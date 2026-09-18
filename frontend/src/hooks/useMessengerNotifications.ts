@@ -113,7 +113,28 @@ export function guardarMarcaDeBarrido(userId: string, iso: string): void {
   }
 }
 
-export type PlanDeBarrido = { desde: string | null; limite: number };
+/** Cuántas tandas seguidas puede pedir un barrido cuando viene de muy atrás.
+ *  Con tope 200 por tanda, cubre 1.000 mensajes sin marcar. Más que eso es una
+ *  ausencia de días, y esos se marcan igual al abrir la conversación. */
+export const MAX_TANDAS = 5;
+
+export type PlanDeBarrido = {
+  desde: string | null;
+  limite: number;
+  /** ⚠️ ASCENDENTE cuando hay marca, y esto NO es un detalle de estilo.
+   *
+   *  Con `descending` + tope, la base devuelve los N MÁS NUEVOS y la marca
+   *  avanza hasta el más nuevo de todos: lo que quedó entre la marca vieja y esa
+   *  tanda se salta PARA SIEMPRE. Era exactamente el agujero que se midió el
+   *  17/09: el ✓ gris pasó del 73% al 39% de los mensajes.
+   *
+   *  Ascendente la tanda arranca en la marca y avanza pegada a ella, así que no
+   *  puede quedar hueco: la marca nueva es el último que SÍ se marcó.
+   *
+   *  La primera vez (sin marca) sí va descendente: no se puede marcar la
+   *  historia entera, y lo más útil es lo más reciente. */
+  ascendente: boolean;
+};
 
 /**
  * Qué pedirle a la base en este barrido.
@@ -126,12 +147,12 @@ export type PlanDeBarrido = { desde: string | null; limite: number };
 export function planDeBarrido(marca: string | null | undefined, ahoraMs: number): PlanDeBarrido {
   const t = marca ? Date.parse(marca) : Number.NaN;
   if (!Number.isFinite(t) || t > ahoraMs + TOLERANCIA_RELOJ_MS) {
-    return { desde: null, limite: LOTE_PRIMERA_VEZ };
+    return { desde: null, limite: LOTE_PRIMERA_VEZ, ascendente: false };
   }
   // Normalizar a ISO con milisegundos RECORTA los microsegundos de Postgres, así
   // que el último mensaje ya marcado puede volver a caer en el lote. Es el lado
   // bueno del error: el upsert con ignoreDuplicates lo ignora.
-  return { desde: new Date(t).toISOString(), limite: LOTE_INCREMENTAL };
+  return { desde: new Date(t).toISOString(), limite: LOTE_INCREMENTAL, ascendente: true };
 }
 
 /** Le pone el `gt(created_at)` a la consulta cuando hay marca. Separado para
@@ -156,30 +177,52 @@ export function marcaDeLote(filas: { created_at: string }[]): string | null {
   return Number.isFinite(t) ? new Date(t - MARGEN_SOLAPE_MS).toISOString() : null;
 }
 
-/** Marca "entregado" lo que llegó desde el último barrido. Devuelve cuántos marcó. */
+/** Una tanda: pide, marca y avanza la marca. Devuelve cuántas filas trajo, para
+ *  que quien llama sepa si vino llena (y entonces falta más). */
+async function tandaDeBarrido(userId: string, plan: PlanDeBarrido): Promise<number> {
+  const { data, error } = await aplicarFiltroDelBarrido(
+    supabase
+      .from("chat_messages")
+      .select("id, created_at")
+      .neq("sender_id", userId)
+      .eq("is_deleted", false),
+    plan,
+  )
+    .order("created_at", { ascending: plan.ascendente })
+    .limit(plan.limite);
+  const filas = (data as { id: string; created_at: string }[] | null) ?? [];
+  if (error || filas.length === 0) return 0;
+  await markMessagesDelivered(userId, filas.map((f) => f.id));
+  // La marca avanza DESPUÉS de marcar de verdad: si el upsert falla, el próximo
+  // barrido vuelve a traer lo mismo.
+  const nueva = marcaDeLote(filas);
+  if (nueva) guardarMarcaDeBarrido(userId, nueva);
+  return filas.length;
+}
+
+/** Marca "entregado" lo que llegó desde el último barrido. Devuelve cuántos marcó.
+ *
+ *  Va por tandas mientras la anterior venga LLENA: una tanda llena significa que
+ *  el tope cortó, o sea que detrás quedan más mensajes sin marcar. Como las
+ *  tandas van pegadas a la marca (ascendente), cada una arranca donde terminó la
+ *  anterior y no puede saltarse nada.
+ *
+ *  Sin este bucle, quien vuelve tras una ausencia larga marcaría solo la primera
+ *  tanda y el resto quedaría sin ✓ gris hasta abrir cada conversación. */
 export async function barridoDeEntregados(userId: string, ahoraMs = Date.now()): Promise<number> {
-  const plan = planDeBarrido(leerMarcaDeBarrido(userId), ahoraMs);
+  let total = 0;
   try {
-    const { data, error } = await aplicarFiltroDelBarrido(
-      supabase
-        .from("chat_messages")
-        .select("id, created_at")
-        .neq("sender_id", userId)
-        .eq("is_deleted", false),
-      plan,
-    )
-      .order("created_at", { ascending: false })
-      .limit(plan.limite);
-    const filas = (data as { id: string; created_at: string }[] | null) ?? [];
-    if (error || filas.length === 0) return 0;
-    await markMessagesDelivered(userId, filas.map((f) => f.id));
-    // La marca avanza DESPUÉS de marcar de verdad: si el upsert falla, el
-    // próximo barrido vuelve a traer lo mismo.
-    const nueva = marcaDeLote(filas);
-    if (nueva) guardarMarcaDeBarrido(userId, nueva);
-    return filas.length;
+    for (let tanda = 0; tanda < MAX_TANDAS; tanda++) {
+      const plan = planDeBarrido(leerMarcaDeBarrido(userId), ahoraMs);
+      const traidas = await tandaDeBarrido(userId, plan);
+      total += traidas;
+      // Vino corta → ya no queda nada detrás. Y la primera vez (sin marca) se
+      // hace UNA sola tanda a propósito: no se marca la historia entera.
+      if (traidas < plan.limite || !plan.ascendente) break;
+    }
+    return total;
   } catch {
-    return 0; // sin red o sin permisos: el próximo barrido reintenta lo mismo
+    return total; // sin red o sin permisos: el próximo barrido reintenta desde la marca
   }
 }
 

@@ -91,13 +91,13 @@ afterEach(() => {
 
 describe("planDeBarrido", () => {
   it("sin marca pide un lote ACOTADO y sin filtro de fecha (primer barrido del navegador)", () => {
-    expect(planDeBarrido(null, AHORA)).toEqual({ desde: null, limite: LOTE_PRIMERA_VEZ });
+    expect(planDeBarrido(null, AHORA)).toEqual({ desde: null, limite: LOTE_PRIMERA_VEZ, ascendente: false });
     expect(LOTE_PRIMERA_VEZ).toBeLessThanOrEqual(200);
   });
 
   it("con marca pide SOLO LO NUEVO: filtra por la fecha del último barrido", () => {
     const marca = "2026-09-17T17:59:00.000Z";
-    expect(planDeBarrido(marca, AHORA)).toEqual({ desde: marca, limite: LOTE_INCREMENTAL });
+    expect(planDeBarrido(marca, AHORA)).toEqual({ desde: marca, limite: LOTE_INCREMENTAL, ascendente: true });
   });
 
   it("una marca ilegible NO deja de marcar: vuelve al lote de la primera vez", () => {
@@ -112,7 +112,7 @@ describe("planDeBarrido", () => {
     // es "marco de más"; "no marco nada para siempre" apaga el ✓✓ gris en ese
     // navegador y nadie se entera.
     const futuro = new Date(AHORA + TOLERANCIA_RELOJ_MS + 60_000).toISOString();
-    expect(planDeBarrido(futuro, AHORA)).toEqual({ desde: null, limite: LOTE_PRIMERA_VEZ });
+    expect(planDeBarrido(futuro, AHORA)).toEqual({ desde: null, limite: LOTE_PRIMERA_VEZ, ascendente: false });
   });
 
   it("un desfase normal de reloj contra el servidor SÍ se respeta", () => {
@@ -125,15 +125,57 @@ describe("aplicarFiltroDelBarrido", () => {
   it("con marca le pone gt(created_at) a la consulta", () => {
     const llamadas: [string, string][] = [];
     const falsa = { gt(c: string, v: string) { llamadas.push([c, v]); return falsa; } };
-    aplicarFiltroDelBarrido(falsa, { desde: "2026-09-17T17:00:00.000Z", limite: 200 });
+    aplicarFiltroDelBarrido(falsa, { desde: "2026-09-17T17:00:00.000Z", limite: 200, ascendente: true });
     expect(llamadas).toEqual([["created_at", "2026-09-17T17:00:00.000Z"]]);
   });
 
   it("sin marca no filtra por fecha (el límite es el que acota)", () => {
     const llamadas: string[] = [];
     const falsa = { gt(c: string) { llamadas.push(c); return falsa; } };
-    aplicarFiltroDelBarrido(falsa, { desde: null, limite: 100 });
+    aplicarFiltroDelBarrido(falsa, { desde: null, limite: 100, ascendente: false });
     expect(llamadas).toEqual([]);
+  });
+});
+
+// ⚠️ EL AGUJERO QUE SE MIDIÓ EN PRODUCCIÓN EL 17/09 (y estas pruebas lo cierran).
+//
+// El barrido incremental pedía `order created_at DESC` + tope. Con más mensajes
+// pendientes que el tope, la base devuelve los N MÁS NUEVOS, y después la marca
+// avanzaba hasta el más nuevo de todos: TODO lo que quedaba entre la marca vieja
+// y esa tanda se saltaba para siempre.
+//
+// Se vio en los números: comparando la misma franja horaria, el ✓ gris pasó del
+// 73% de los mensajes al 39%. La mediana mejoró muchísimo (de horas a 0,44 s),
+// o sea que el camino en vivo andaba bien; lo que se perdió fue la RED que tapa
+// lo que el canal se pierde.
+//
+// La regla: cuando hay marca, la tanda va ASCENDENTE, pegada a la marca, para
+// que la marca nueva sea siempre el último mensaje que SÍ se marcó.
+describe("el barrido no puede saltarse mensajes", () => {
+  it("con marca pide ASCENDENTE (pegado a la marca), no descendente", () => {
+    const plan = planDeBarrido("2026-09-17T17:00:00.000Z", AHORA);
+    expect(plan.ascendente).toBe(true);
+  });
+
+  it("la primera vez (sin marca) sí va descendente: lo más reciente es lo útil", () => {
+    expect(planDeBarrido(null, AHORA).ascendente).toBe(false);
+    expect(planDeBarrido("no es una fecha", AHORA).ascendente).toBe(false);
+  });
+
+  it("la marca de una tanda ascendente es el ÚLTIMO que se marcó, así que no deja hueco", () => {
+    // Tanda ascendente: llegan del más viejo al más nuevo. La marca tiene que
+    // quedar en el más nuevo DE LA TANDA, no más allá.
+    const tanda = [
+      { created_at: "2026-09-17T10:00:00.000Z" },
+      { created_at: "2026-09-17T10:05:00.000Z" },
+      { created_at: "2026-09-17T10:10:00.000Z" },
+    ];
+    const marca = marcaDeLote(tanda);
+    expect(marca).not.toBeNull();
+    // Con el solape hacia atrás, la marca queda justo antes del último marcado:
+    // el siguiente barrido arranca ahí y no se salta nada.
+    expect(Date.parse(marca as string)).toBeLessThan(Date.parse("2026-09-17T10:10:00.000Z"));
+    expect(Date.parse(marca as string)).toBeGreaterThan(Date.parse("2026-09-17T10:05:00.000Z"));
   });
 });
 
