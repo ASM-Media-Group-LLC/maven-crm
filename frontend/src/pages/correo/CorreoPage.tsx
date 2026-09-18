@@ -77,7 +77,8 @@ import {
  useMailBulk, type OperacionMasiva,
   useAdjuntosParaReenviar,
 } from "@/hooks/useMailbox";
-import { agruparEnHilos, type Hilo } from "@/lib/mailHilos";
+import { agruparEnHilos, sinPrefijos, type Hilo } from "@/lib/mailHilos";
+import { resumenSinCita } from "@/lib/mailCita";
 import { useHiloCompleto } from "@/hooks/useHiloCompleto";
 import { opcionesDePosponer } from "@/lib/posponer";
 import {
@@ -1190,8 +1191,11 @@ export default function CorreoPage() {
                   correo quedaba flotando en el medio con dos gutters enormes.
                   Se le da un poco más de ancho recién en pantallas 2xl. */}
               <article className="w-full px-4 py-6 sm:px-6">
+                {/* El asunto de la CONVERSACIÓN, sin los «Re:» que apilan
+                    los clientes: Gmail titula el hilo «Test», no «Re: Test».
+                    Si al sacarlos no queda nada, se deja el original. */}
                 <h2 className="text-xl font-semibold leading-snug tracking-tight sm:text-2xl">
-                  {mensaje.data.subject}
+                  {sinPrefijos(mensaje.data.subject) || mensaje.data.subject}
                 </h2>
 
                 {/* ── Lo ANTERIOR de la conversación ──────────────────────
@@ -1476,8 +1480,11 @@ function FilaPlegada({ m, abrir }: { m: MailSummary; abrir: (m: MailSummary) => 
         <span className="block truncate text-sm font-medium leading-tight">
           {nombreDe(m.from)}
         </span>
+        {/* ⚠️ SIN la cita. Sin esto todos los renglones de una conversación
+            empiezan igual —con la cita del anterior— y la tira deja de decir
+            quién dijo qué. */}
         <span className="block truncate text-xs leading-tight text-muted-foreground">
-          {m.snippet}
+          {resumenSinCita(m.snippet)}
         </span>
       </span>
       <span className="shrink-0 self-start pt-0.5 text-xs text-muted-foreground">

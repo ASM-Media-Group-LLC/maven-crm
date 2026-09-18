@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { partirCitado, partirCitadoTexto } from "@/lib/mailCita";
+import { partirCitado, partirCitadoTexto, resumenSinCita } from "@/lib/mailCita";
 
 // Los dos cuerpos son los de VERDAD, copiados de la base el 18/09/2026 del
 // hilo «Test» que Jhon usó para comparar Maven con Gmail. Importa que sean
@@ -107,5 +107,51 @@ describe("partirCitadoTexto", () => {
 
   it("un texto sin citas queda igual", () => {
     expect(partirCitadoTexto("hola\nqué tal").citado).toBeNull();
+  });
+});
+
+
+describe("resumenSinCita", () => {
+  // Los cuatro resúmenes tal como los mostraba la tira del hilo «Test» en
+  // producción. Los cuatro empezaban con lo propio y seguían con la cita del
+  // anterior, así que la conversación plegada era cuatro veces lo mismo.
+  it("⚠️ corta la cita pegada en el renglón", () => {
+    expect(resumenSinCita("llegó > El 18 de septiembre de 2026, 15:53, Jhon Lopez escribió:"))
+      .toBe("llegó");
+    expect(resumenSinCita("bien El vie, 18 sept 2026 a la(s) 4:02 p.m., Jhon Lopez escribió:"))
+      .toBe("bien");
+    expect(resumenSinCita("Bien gracias y tu > El 18 de septiembre de 2026, 16:02, Jhon Lopez escribió:"))
+      .toBe("Bien gracias y tu");
+  });
+
+  it("corta también el «On … wrote:» del inglés", () => {
+    expect(resumenSinCita("thanks On Fri, Sep 18, 2026 at 4:02 PM John wrote:")).toBe("thanks");
+  });
+
+  it("corta el «Mensaje reenviado» de Outlook", () => {
+    expect(resumenSinCita("mirá esto ---- Mensaje reenviado ----")).toBe("mirá esto");
+  });
+
+  it("un resumen sin cita queda igual", () => {
+    expect(resumenSinCita("esto es una prueba")).toBe("esto es una prueba");
+  });
+
+  it("⚠️ si al sacar la cita no queda NADA, se deja entero", () => {
+    // Un renglón vacío en la tira es peor que uno con la cita: no se sabe si
+    // el correo está vacío o si lo escondimos.
+    const soloCita = "> El 18 de septiembre de 2026, Jhon Lopez escribió: hola";
+    expect(resumenSinCita(soloCita)).toBe(soloCita);
+  });
+
+  it("⚠️ y un resto de solo SIGNOS tampoco cuenta como texto", () => {
+    // Una cadena de guiones no es vacía, así que pasaba como resumen: el
+    // renglón decía «---», que parece un error más que un correo.
+    const conGuiones = "--- El 18 de septiembre de 2026, Jhon Lopez escribió: hola";
+    expect(resumenSinCita(conGuiones)).toBe(conGuiones);
+  });
+
+  it("no explota sin resumen", () => {
+    expect(resumenSinCita(null)).toBe("");
+    expect(resumenSinCita("")).toBe("");
   });
 });

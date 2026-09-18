@@ -149,7 +149,10 @@ export function MailBody({ html, text, remoteImages, truncated }: Props) {
         const h = medida
           ? Math.ceil(medida.getBoundingClientRect().height) + 32   // + el padding del body
           : Math.max(doc.body.scrollHeight, doc.documentElement.scrollHeight);
-        if (h > 0) setAlto(Math.min(Math.max(h, 96), 20000));
+        // ⚠️ El piso estaba en 96 y una respuesta de una palabra quedaba en
+        // una tarjeta blanca medio vacía. 44 es una línea con su padding: lo
+        // justo para que un «Test» se vea como un «Test».
+        if (h > 0) setAlto(Math.min(Math.max(h, 44), 20000));
       } catch {
         // Si el navegador no deja leer el documento, queda el alto por
         // defecto y el iframe scrollea solo. Se ve peor, no se rompe.
