@@ -28,9 +28,17 @@ export interface BorradorGuardado {
   ts: number;
 }
 
-/** Distingue "correo nuevo" de "responder a tal hilo". Sin esto, abrir una
- *  respuesta recuperaría el borrador de un correo nuevo (o al revés). */
-export function firmaContexto(inReplyTo?: string): string {
+/** Distingue "correo nuevo" de "responder a tal hilo" y de "reenviar tal
+ *  correo". Sin esto, abrir una respuesta recuperaría el borrador de un correo
+ *  nuevo (o al revés).
+ *
+ *  ⚠️ EL REENVÍO NECESITA SU PROPIO SLOT. Un reenvío no tiene `inReplyTo` —no
+ *  cuelga del hilo original—, así que caía en "nuevo", el mismo cajón que un
+ *  correo en blanco. Con un borrador nuevo a medio escribir guardado, tocar
+ *  Reenviar pegaba ESE texto encima y se llevaba puesta la cita y el
+ *  encabezado del mensaje reenviado. */
+export function firmaContexto(inReplyTo?: string, reenvioDe?: string): string {
+  if (reenvioDe) return `fwd:${reenvioDe}`;
   return inReplyTo ? `reply:${inReplyTo}` : "nuevo";
 }
 

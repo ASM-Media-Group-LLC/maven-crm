@@ -512,6 +512,43 @@ export function useAttachmentBytes(args: {
   });
 }
 
+/** Los adjuntos de un correo, todos, listos para volver a mandarlos.
+ *
+ *  Reenviar SIN los adjuntos no es reenviar: casi siempre el archivo ES el
+ *  correo (una hoja de vida, un contrato). Por eso esto existe.
+ *
+ *  Van por `fetchQuery` con la MISMA llave que usa el visor: lo que ya se miró
+ *  no se vuelve a bajar. Y `conTurno` adentro de `callMail` los pone en fila,
+ *  así que trece adjuntos no abren trece sesiones IMAP a la vez.
+ *
+ *  ⚠️ El tope se comprueba con la metadata ANTES de bajar nada. Bajar 40 MB a
+ *  memoria para después decir que no entran es castigar al navegador por un
+ *  límite que ya se conocía. */
+export function useAdjuntosParaReenviar() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (
+      { folder, uid, adjuntos }: {
+        folder: string;
+        uid: number;
+        adjuntos: { filename: string; contentType: string; sizeBytes: number }[];
+      },
+    ) => {
+      const bajados = [];
+      for (const [i, meta] of adjuntos.entries()) {
+        const a = await qc.fetchQuery(adjuntoQuery(folder, uid, i));
+        bajados.push({
+          filename: a.filename || meta.filename,
+          contentType: a.contentType || meta.contentType,
+          sizeBytes: meta.sizeBytes,
+          contentBase64: a.contentBase64,
+        });
+      }
+      return bajados;
+    },
+  });
+}
+
 /** Deja listo el adjunto SIGUIENTE mientras se lee el actual. Con 30 hojas de
  *  vida en un correo, es la diferencia entre que «Siguiente» sea instantáneo o
  *  que cada clic espere una ida y vuelta a IMAP. */

@@ -21,6 +21,7 @@ import {
   RefreshCw,
   Reply,
   ReplyAll,
+  Forward,
   Search,
   Send,
   Signature,
@@ -46,7 +47,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/EmptyState";
 import { MailBody } from "@/components/correo/MailBody";
-import { MailComposer, type BorradorInicial } from "@/components/correo/MailComposer";
+import {
+  MailComposer, TOPE_ADJUNTOS, type BorradorInicial,
+} from "@/components/correo/MailComposer";
 import { MailSignatureDialog } from "@/components/correo/MailSignatureDialog";
 import {
   useMailbox,
@@ -64,8 +67,9 @@ import {
   nombreDe,
   type MailSummary,
  useMailBulk, type OperacionMasiva,
+  useAdjuntosParaReenviar,
 } from "@/hooks/useMailbox";
-import { destinatariosRespuesta, direccionesDe, participantesDe, tieneVariosInvolucrados } from "@/lib/mailAddr";
+import { asuntoDeReenvio, destinatariosRespuesta, direccionesDe, participantesDe, tieneVariosInvolucrados } from "@/lib/mailAddr";
 import { toast } from "sonner";
 
 /**
@@ -177,6 +181,7 @@ export default function CorreoPage() {
   // Adjunto abierto en el visor (índice dentro de `attachments`).
   const [adjuntoAbierto, setAdjuntoAbierto] = useState<number | null>(null);
   const [redactar, setRedactar] = useState<BorradorInicial | null>(null);
+  const bajarParaReenviar = useAdjuntosParaReenviar();
   const [firmaAbierta, setFirmaAbierta] = useState(false);
   const firma = useMailSignature();
   // La firma que recibe el compositor: solo si está activada y no vacía.
@@ -348,6 +353,58 @@ export default function CorreoPage() {
         fecha: fechaLarga(m.date),
         texto: (m.text ?? "").slice(0, 4000),
       },
+    });
+  };
+
+  // ── Reenviar ───────────────────────────────────────────────────────────
+  // Lo pidió Carolina: no existía. Reenviar SIN los adjuntos no sería
+  // reenviar —casi siempre el archivo ES el correo—, así que se bajan primero
+  // y recién después se abre el compositor con todo puesto.
+  const reenviar = async () => {
+    const m = mensaje.data;
+    if (!m) return;
+    const uid = sel?.uid != null ? Number(sel.uid) : null;
+    const metas = m.attachments ?? [];
+
+    let adjuntosIniciales: BorradorInicial["adjuntosIniciales"];
+    if (metas.length > 0 && uid != null) {
+      const pesa = metas.reduce((n, a) => n + (a.sizeBytes ?? 0), 0);
+      if (pesa > TOPE_ADJUNTOS) {
+        // Se avisa ANTES de bajar nada: traer 40 MB a memoria para después
+        // decir que no entran es castigar al navegador por un límite que ya
+        // se conocía. El correo se reenvía igual, sin los archivos.
+        toast.warning(
+          `Los adjuntos pesan ${(pesa / 1024 / 1024).toFixed(1)} MB y el tope es 20 MB: se reenvía el texto sin ellos.`,
+        );
+      } else {
+        try {
+          adjuntosIniciales = await bajarParaReenviar.mutateAsync({
+            folder: carpeta, uid, adjuntos: metas,
+          });
+        } catch (e) {
+          // Que falle un adjunto no puede impedir reenviar el mensaje.
+          toast.error(`No se pudieron traer los adjuntos: ${(e as Error).message}`);
+        }
+      }
+    }
+
+    setRedactar({
+      // A quién va lo elige quien reenvía: ese es el punto del reenvío.
+      to: "",
+      subject: asuntoDeReenvio(m.subject),
+      // Su propio cajón de borrador: ver `firmaContexto`.
+      reenvioDe: sel?.messageId || `uid:${carpeta}:${uid ?? "?"}`,
+      // ⚠️ SIN `inReplyTo`: un reenvío no cuelga del hilo original. Ponerlo
+      // metería el correo en una conversación que su destinatario no tuvo.
+      citar: {
+        reenvio: true,
+        de: m.from,
+        para: m.to,
+        asunto: m.subject,
+        fecha: fechaLarga(m.date),
+        texto: (m.text ?? "").slice(0, 4000),
+      },
+      adjuntosIniciales,
     });
   };
 
@@ -834,6 +891,20 @@ export default function CorreoPage() {
                           Responder a todos
                         </Button>
                       )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="rounded-full"
+                        onClick={reenviar}
+                        disabled={bajarParaReenviar.isPending}
+                      >
+                        {bajarParaReenviar.isPending ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Forward className="mr-2 h-4 w-4" />
+                        )}
+                        {bajarParaReenviar.isPending ? "Trayendo adjuntos…" : "Reenviar"}
+                      </Button>
                     </>
                   )}
                 </div>

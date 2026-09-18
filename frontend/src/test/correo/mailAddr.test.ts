@@ -7,7 +7,8 @@ import {
   destinatariosRespuesta,
   direccionesDe,
   nombreDe,
-  tieneVariosInvolucrados, participantesDe} from "@/lib/mailAddr";
+  tieneVariosInvolucrados, participantesDe, asuntoDeReenvio,
+} from "@/lib/mailAddr";
 
 describe("direccionesDe", () => {
   it("saca una sola dirección con nombre", () => {
@@ -175,5 +176,30 @@ describe("participantesDe", () => {
   it("conserva el orden original", () => {
     const r = participantesDe("c@x.com, a@x.com, b@x.com");
     expect(r.map((p) => p.email)).toEqual(["c@x.com", "a@x.com", "b@x.com"]);
+  });
+});
+
+describe("asuntoDeReenvio", () => {
+  it("antepone Fwd:", () => {
+    expect(asuntoDeReenvio("Hojas de vida")).toBe("Fwd: Hojas de vida");
+  });
+
+  it("NO se apila al reenviar dos veces", () => {
+    expect(asuntoDeReenvio("Fwd: Hojas de vida")).toBe("Fwd: Hojas de vida");
+  });
+
+  it("respeta el RV: que escriben Outlook y Zoho en español", () => {
+    // Si no, un correo reenviado desde Outlook quedaría "Fwd: RV: …".
+    expect(asuntoDeReenvio("RV: Contrato")).toBe("RV: Contrato");
+    expect(asuntoDeReenvio("rv: contrato")).toBe("rv: contrato");
+  });
+
+  it("no confunde una respuesta con un reenvío", () => {
+    expect(asuntoDeReenvio("Re: Contrato")).toBe("Fwd: Re: Contrato");
+  });
+
+  it("aguanta espacios al principio y el asunto vacío", () => {
+    expect(asuntoDeReenvio("  Fwd: algo")).toBe("  Fwd: algo");
+    expect(asuntoDeReenvio("")).toBe("Fwd: ");
   });
 });
