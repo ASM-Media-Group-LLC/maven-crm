@@ -23,6 +23,14 @@ export function useSidebarBadges() {
       // al traer correo nuevo; sin esto el badge tardaría hasta un minuto.
       .on("postgres_changes", { event: "*", schema: "public", table: "mail_folders", filter: `user_id=eq.${user.id}` }, () => {
         queryClient.invalidateQueries({ queryKey: ["sidebar-badges"] });
+        // ⚠️ Y la lista de carpetas DEL CORREO, que lee la misma tabla.
+        //
+        // Sin esto, al leer un correo el globito de la columna se quedaba con
+        // el número viejo hasta recargar la página: la consulta tiene
+        // `staleTime` de un minuto y nadie la invalidaba. Se aprovecha ESTA
+        // suscripción en vez de abrir otra sobre la misma tabla — Realtime ya
+        // fue un tercio del tiempo de la base una vez.
+        queryClient.invalidateQueries({ queryKey: ["mail-folders"] });
       })
       .subscribe();
     return () => { supabase.removeChannel(ch); };

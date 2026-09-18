@@ -381,6 +381,25 @@ export function useMarkSeen() {
               }
             : prev,
       );
+
+      // ⚠️ Y EL CONTADOR DE LA CARPETA, al instante.
+      //
+      // `mail_folders.unread` es una columna GUARDADA que solo escribe
+      // `mail-sync` (la RLS de esa tabla es de solo lectura para la persona),
+      // así que el número de verdad se corrige recién en el próximo barrido.
+      // Hasta entonces el globito decía uno de más: leías el correo y el
+      // número no se movía hasta recargar la página.
+      //
+      // Se baja acá de a uno y el barrido reconcilia después. Nunca por debajo
+      // de cero: con dos pestañas abiertas, leer el mismo correo dos veces
+      // pasaría por acá dos veces.
+      qc.setQueryData(
+        ["mail-folders"],
+        (prev: { folder: string; unread: number }[] | undefined) =>
+          prev?.map((c) =>
+            c.folder === folder ? { ...c, unread: Math.max(0, c.unread - 1) } : c,
+          ) ?? prev,
+      );
     },
   });
 }
