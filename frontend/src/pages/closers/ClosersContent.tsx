@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Search, X, UserPlus, LayoutGrid, List, LayoutDashboard, ListChecks, Eye, TrendingUp, Activity } from "lucide-react";
 import DataTableShell from "@/components/ui/data-table-shell";
 import { PageHeader } from "@/components/ui/page-header";
-import { useCloserLeads, PLATFORMS, type DateFieldType, type CloserCreatorRow } from "./hooks/useCloserLeads";
+import { useCloserLeads, ORIGIN_FILTERS, CATEGORY_FILTERS, type CloserCreatorRow } from "./hooks/useCloserLeads";
 import { useClosersKpiPopup } from "./hooks/useClosersKpiPopup";
 import ClosersKPICards from "./components/ClosersKPICards";
 import ClosersKpiDetailDialog from "./components/ClosersKpiDetailDialog";
@@ -28,16 +28,13 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+// Tabs = SÓLO etapas del embudo. El ORIGEN (Ex-creadoras/Agencias/Ventas) y la
+// CATEGORÍA pasaron a ser FILTROS (barra de abajo), no tabs: son otro eje (qué
+// tipo de lead), no un paso del pipeline. "Antiguos/Nuevo" se fundieron en "Pool"
+// (el corte de 30 días era arbitrario; lo útil es "sin asignar").
 const ALL_TABS = [
   { value: "todas", label: "Todas" },
-  // Bases de leads propias (closer_creators.lead_source): vistas por ORIGEN que
-  // cruzan todos los stages, como "Todas" pero de esa base. Van juntas al lado
-  // de "Todas" porque son del mismo tipo (vista global), no un stage del embudo.
-  { value: "ex_creadores", label: "Ex-creadores" },
-  { value: "agencias", label: "Agencias" },
-  { value: "ventas", label: "Ventas" },
-  { value: "antiguos", label: "Antiguos" },
-  { value: "nuevo", label: "Nuevo" },
+  { value: "pool", label: "Pool" },
   { value: "asignadas", label: "Asignaciones" },
   { value: "confirmadas", label: "Confirmadas" },
   { value: "completadas", label: "Completadas" },
@@ -52,11 +49,12 @@ const ClosersContent = () => {
     search, setSearch,
     activeTab, setActiveTab,
     agentFilter, setAgentFilter,
-    platformFilter, setPlatformFilter,
+    originFilter, setOriginFilter,
+    categoryFilter, setCategoryFilter,
     agentList,
     dateFrom, setDateFrom,
     dateTo, setDateTo,
-    dateField, setDateField,
+    dateField,
     updateField, updateStage, assignCreator, claimLead,
     isAdmin, isManager, isSupervisor,
     viewAsCloserId, viewAsCloserName, setViewAsCloser,
@@ -225,7 +223,7 @@ const ClosersContent = () => {
     }
   };
 
-  const hasFilters = !!(search || agentFilter || platformFilter || dateFrom || dateTo);
+  const hasFilters = !!(search || agentFilter || originFilter || categoryFilter || dateFrom || dateTo);
 
   const TABS = useMemo(() =>
     (isAdmin || isManager || isSupervisor) ? ALL_TABS : ALL_TABS.filter(t => t.value !== "todas"),
@@ -401,14 +399,10 @@ const ClosersContent = () => {
               {TABS.map((tab) => {
                 const stageKey =
                   tab.value === "todas" ? "" :
-                  tab.value === "ventas" ? "ventas" :
-                  tab.value === "antiguos" ? "Antiguos" :
-                  tab.value === "nuevo" ? "Nuevo" :
+                  tab.value === "pool" ? "pool" :
                   tab.value === "asignadas" ? "Asignada" :
                   tab.value === "confirmadas" ? "Confirmada" :
                   tab.value === "completadas" ? "Completada" :
-                  tab.value === "ex_creadores" ? "ex_creadores" :
-                  tab.value === "agencias" ? "agencias" :
                   "No interesada";
                 const count = statusCounts[stageKey];
                 // Dot rojo (vencidos) + naranja (decisión) sólo en el
@@ -469,36 +463,41 @@ const ClosersContent = () => {
                 </SelectContent>
               </Select>
 
+              {/* Origen / línea de negocio (reemplaza los viejos tabs
+                  Ex-creadoras / Agencias / Ventas). */}
               <Select
-                value={platformFilter || ""}
-                onValueChange={(v) => setPlatformFilter(v === "all" ? null : v)}
+                value={originFilter || "all"}
+                onValueChange={(v) => setOriginFilter(v === "all" ? null : v)}
               >
-                <SelectTrigger className="w-full sm:w-40 h-10">
-                  <SelectValue placeholder="Plataforma" />
+                <SelectTrigger className="w-full sm:w-48 h-10">
+                  <SelectValue placeholder="Origen" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todas</SelectItem>
-                  {PLATFORMS.map((p) => (
-                    <SelectItem key={p} value={p}>{p}</SelectItem>
+                  <SelectItem value="all">Todos los orígenes</SelectItem>
+                  {ORIGIN_FILTERS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
 
+              {/* Categoría (nuevo). Usa ilike server-side por el casing sucio. */}
               <Select
-                value={dateField}
-                onValueChange={(v) => setDateField(v as DateFieldType)}
+                value={categoryFilter || "all"}
+                onValueChange={(v) => setCategoryFilter(v === "all" ? null : v)}
               >
-                <SelectTrigger className="w-full sm:w-44 h-10">
-                  <SelectValue />
+                <SelectTrigger className="w-full sm:w-40 h-10">
+                  <SelectValue placeholder="Categoría" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="passed_date">Fecha de paso</SelectItem>
-                  <SelectItem value="lg_entry_date">Fecha LeadGen</SelectItem>
+                  <SelectItem value="all">Todas las categorías</SelectItem>
+                  {CATEGORY_FILTERS.map((c) => (
+                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
 
               {hasFilters && (
-                <Button variant="ghost" size="sm" onClick={() => { setSearch(""); setAgentFilter(null); setPlatformFilter(null); setDateFrom(undefined); setDateTo(undefined); }}>
+                <Button variant="ghost" size="sm" onClick={() => { setSearch(""); setAgentFilter(null); setOriginFilter(null); setCategoryFilter(null); setDateFrom(undefined); setDateTo(undefined); }}>
                   <X className="h-4 w-4 mr-1" /> Limpiar
                 </Button>
               )}

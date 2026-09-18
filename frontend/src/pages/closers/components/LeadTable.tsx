@@ -725,13 +725,13 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortAsc, setSortAsc] = useState(true);
 
-  // Ex-creadoras y Agencias caen en el layout genérico (`default`), cuyo menú de
-  // fila solo trae "Mover a…" y "Asignar" — y "Asignar" además exige permiso de
-  // supervisor. Resultado: un closer no tenía forma de tomarse una para sí y
-  // terminaba usando "Asignar" para elegirse a sí mismo de la lista, que era
-  // justo el camino roto (01/08, reporte de Miguel). Estas dos bases son
-  // autoservicio igual que Antiguos, así que llevan el mismo "Tomar".
-  const isBaseTab = activeTab === "ex_creadores" || activeTab === "agencias";
+  // Pool = leads sin asignar + contactos del directorio, autoservicio: llevan
+  // "Tomar". Los contactos del directorio (filas `__isContact`) además se pintan
+  // read-only en Todas/Pool (ver la rama en el case default), porque editar sus
+  // campos inline haría un UPDATE closer_creators sobre un id que no existe ahí
+  // (no-op silencioso). Para trabajarlos: "Tomar" o registrar un seguimiento
+  // (ambos promueven el contacto a lead vía RPC).
+  const isPoolTab = activeTab === "pool";
 
   // Motivo estructurado al cerrar: al mover un lead a "No interesada" pedimos el
   // motivo (enum) + detalle opcional antes de confirmar. El code va a
@@ -1011,6 +1011,9 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
     const isLastAttempt = c.contact_count >= 6;
     const nextDate = getNextContactDate(c.passed_date, c.contact_count, c.last_contact_date);
     const isCloser = isCloserRow(c);
+    // Fila de contacto del DIRECTORIO (no es un lead todavía): en Todas/Pool se
+    // pinta read-only + "Tomar". Su id es de closers_contacts, no de closer_creators.
+    const isContactRow = !!(c as unknown as { __isContact?: boolean }).__isContact;
 
     const igLink = (
       <>
@@ -1355,7 +1358,54 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
         );
 
 
-      default: // todas
+      default: // todas / pool
+        // Fila de CONTACTO del directorio (aún no es lead): read-only salvo
+        // Tomar / registrar seguimiento (que lo promueven a lead). Editar sus
+        // campos inline haría un UPDATE closer_creators sobre un id inexistente
+        // (no-op silencioso), así que la categoría/estado/nota van estáticas.
+        if (isContactRow) {
+          return (
+            <TableRow key={c.id}>
+              <TableCell className="text-muted-foreground text-xs align-top">{idx + 1}</TableCell>
+              <TableCell className="align-top">
+                <div className="flex items-center gap-1.5">{igLink}</div>
+                <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                  {c.category && <Badge variant={CATEGORY_VARIANT[c.category] || "outline"}>{c.category}</Badge>}
+                  <span className="text-[10px] text-muted-foreground/70 whitespace-nowrap">
+                    {c.created_at ? `creado ${format(new Date(c.created_at), "dd/MM")}` : ""}
+                  </span>
+                </div>
+              </TableCell>
+              <TableCell className="align-top">
+                <Badge variant="outline" title="Contacto del directorio — aún no es un lead. Tómalo o registra un seguimiento para trabajarlo.">Contacto</Badge>
+              </TableCell>
+              <TableCell className="align-top"><SeguimientoCell c={c} /></TableCell>
+              <TableCell className="align-top"><LeadContactButtons leadId={c.id} source={c._source} resolvedPhone={c.resolved_whatsapp_phone} onlyfansUrl={c.onlyfans_url} /></TableCell>
+              <TableCell className="align-top">
+                {c.notes ? <span className="line-clamp-2 text-sm text-muted-foreground">{c.notes}</span> : <span className="text-xs text-muted-foreground/50">—</span>}
+              </TableCell>
+              <TableCell className="text-right sticky right-0 bg-background z-20 align-top">
+                <div className="flex items-center justify-end gap-1">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => onClaim?.(c.id)}>
+                        <UserPlus className="h-4 w-4 mr-2" /> Tomar (asignármela)
+                      </DropdownMenuItem>
+                      {(isAdmin || canAssign) && (
+                        <DropdownMenuItem onClick={() => onAssign(c.id, c.assigned_to, c._source)}>
+                          <UserPlus className="h-4 w-4 mr-2" /> Asignar
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </TableCell>
+            </TableRow>
+          );
+        }
         return (
           <TableRow key={c.id}>
             <TableCell className="text-muted-foreground text-xs align-top">{idx + 1}</TableCell>
@@ -1384,10 +1434,9 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                     <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    {/* Autoservicio en las bases (Ex-creadoras / Agencias), igual
-                        que en Antiguos: cualquier closer puede tomársela sin
-                        depender del permiso de asignar. */}
-                    {isBaseTab && (
+                    {/* Pool = leads sin asignar: cualquier closer puede tomárselos
+                        sin depender del permiso de asignar (autoservicio). */}
+                    {isPoolTab && (
                       <>
                         <DropdownMenuItem onClick={() => onClaim?.(c.id)}>
                           <UserPlus className="h-4 w-4 mr-2" /> Tomar (asignármela)

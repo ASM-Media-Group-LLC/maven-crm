@@ -74,23 +74,37 @@ export const STAGE_LABELS: Record<string, string> = {
 };
 
 export const TAB_STAGE_MAP: Record<string, string[]> = {
+  // Todas y Pool cruzan leads + directorio (ver fetchCreatorsForTab); los demás
+  // son un stage del embudo (sólo leads).
   todas: [],
-  ventas: [],
-  antiguos: ["Nuevo"],
-  nuevo: ["Nuevo"],
+  pool: [],
   asignadas: ["Asignada"],
   confirmadas: ["Confirmada"],
   completadas: ["Completada"],
   no_interesadas: ["No interesada"],
-  // Bases propias: cruzan todos los stages, filtran por lead_source.
-  ex_creadores: [],
-  agencias: [],
 };
 
-// Tabs que son una BASE de leads (vista por origen) en vez de un stage.
-export const SOURCE_TABS: Record<string, string> = {
-  ex_creadores: "ex_creadora",
-  agencias: "agencia",
+// Filtro de ORIGEN / línea de negocio (reemplaza los viejos tabs Ex-creadores /
+// Agencias / Ventas). Cada opción se traduce a un filtro sobre los LEADS
+// (closer_creators) y, cuando corresponde, sobre el DIRECTORIO (closers_contacts).
+export const ORIGIN_FILTERS: { value: string; label: string }[] = [
+  { value: "modelos", label: "Modelos (Kash)" },
+  { value: "ex_creadora", label: "Ex-creadoras" },
+  { value: "agencia", label: "Agencias" },
+  { value: "venta_plataforma", label: "Ventas de plataforma" },
+];
+
+// Escala de categoría canónica para el filtro. Los datos tienen casing sucio
+// ("Elite"/"ELITE", "b"/"B") en AMBAS tablas, así que el filtro usa ilike.
+export const CATEGORY_FILTERS = ["ELITE", "A+", "A", "B+", "B", "C"] as const;
+
+// contact_kind del directorio para cada origen (null = ese origen no tiene
+// contactos de directorio, p.ej. una venta siempre es sobre un lead ya existente).
+const ORIGIN_TO_CONTACT_KIND: Record<string, string | null> = {
+  modelos: "modelo",
+  ex_creadora: "ex_creadora",
+  agencia: "agencia",
+  venta_plataforma: null,
 };
 
 // Las agencias son otra LÍNEA DE NEGOCIO (B2B: se les vende producto, no se
@@ -273,6 +287,11 @@ export const useCloserLeads = () => {
   const [page, setPage] = useState(0);
   const [agentFilter, setAgentFilter] = useState<string | null>(null);
   const [platformFilter, setPlatformFilter] = useState<string | null>(null);
+  // Filtros nuevos (reemplazan a los viejos tabs de origen y al filtro de
+  // plataforma): origen/línea de negocio + categoría. Se aplican a los LEADS y,
+  // cuando corresponde, al DIRECTORIO en fetchCreatorsForTab.
+  const [originFilter, setOriginFilter] = useState<string | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
   const [dateField, setDateField] = useState<DateFieldType>("passed_date");
@@ -339,6 +358,8 @@ export const useCloserLeads = () => {
   const handleSetSearch = (v: string) => { setSearch(v); setPage(0); };
   const handleSetAgentFilter = (v: string | null) => { setAgentFilter(v); setPage(0); };
   const handleSetPlatformFilter = (v: string | null) => { setPlatformFilter(v); setPage(0); };
+  const handleSetOriginFilter = (v: string | null) => { setOriginFilter(v); setPage(0); };
+  const handleSetCategoryFilter = (v: string | null) => { setCategoryFilter(v); setPage(0); };
   const handleSetDateFrom = (v: Date | undefined) => { setDateFrom(v); setPage(0); };
   const handleSetDateTo = (v: Date | undefined) => { setDateTo(v); setPage(0); };
 
@@ -357,230 +378,159 @@ export const useCloserLeads = () => {
   const rawNormalizedSearch = debouncedSearch ? normalizeHandle(debouncedSearch) : "";
   const normalizedSearch = rawNormalizedSearch.length >= 3 ? rawNormalizedSearch : "";
 
-  // Extraído como función con `tab` + `pageNum` parametrizados para poder
-  // prefetchear las otras tabs cuando se monta el componente — así al
-  // cambiar de tab los datos ya están en caché y no se ve el skeleton.
-  const fetchCreatorsForTab = async (tab: string, pageNum: number) => {
-      // ── Ex-creadores / Agencias: BASES DEL DIRECTORIO ──
-      // Muestran los CONTACTOS disponibles para trabajar (closers_contacts).
-      // Se excluyen los convertidos: al tomar uno, assign_closer_to_contact pone
-      // status='converted' → sale de la base. `__isContact` marca que el id es de
-      // closers_contacts, así "Tomar" y "registrar seguimiento" llaman al RPC de
-      // asignación (que promueve el contacto a lead) en vez de tocar closer_creators
-      // con un id que no existe ahí.
-      if (SOURCE_TABS[tab]) {
-        // Query del directorio (contactos disponibles), parametrizada por página.
-        const mapContactRow = (c: any) => ({
-          id: c.id,
-          __isContact: true,
-          instagram_handle: c.handle || c.name || "sin_handle",
-          phone: c.phone ?? null,
-          category: c.physical_appearance ?? null,
-          city: c.city ?? null,
-          notes: c.notes ?? null,
-          stage: "Nuevo",
-          assigned_to: null,
-          passed_date: null,
-          last_contact_date: null,
-          contact_count: 0,
-          estimated_monetization: 0,
-          agency_commission: 0,
-          subscription_amount: null,
-          deal_type: tab === "agencias" ? "venta_plataforma" : "reclutamiento",
-          lead_source: SOURCE_TABS[tab],
-          main_platform: null,
-          extras: null,
-          created_at: c.created_at,
-          created_by: c.created_by,
-          source_contact_id: c.id,
-          agent_name: null,
-        });
-        const dirBase = () => {
-          let q = supabase
-            .from("v_closers_contacts")
-            .select("id, name, handle, phone, city, physical_appearance, notes, created_at, created_by, contact_kind, status", { count: "exact" })
-            .eq("contact_kind", SOURCE_TABS[tab])
-            .neq("status", "converted")
-            .order("physical_appearance", { ascending: true })   // Alta → Media → Baja
-            .order("created_at", { ascending: false });
-          if (normalizedSearch) q = q.or(`handle.ilike.%${normalizedSearch}%,name.ilike.%${normalizedSearch}%`);
-          return q;
-        };
+  // ── Helpers de filtro compartidos por todos los tabs ──
+  // Origen (línea de negocio) aplicado a una query de LEADS (closer_creators).
+  const applyOriginToLeads = (q: any) => {
+    switch (originFilter) {
+      // Modelos = reclutamiento Kash (base maven / sin marca). lead_source puede
+      // ser null o 'maven' → OR explícito para no perder los null.
+      case "modelos": return q.or("lead_source.eq.maven,lead_source.is.null").eq("deal_type", "reclutamiento");
+      case "ex_creadora": return q.eq("lead_source", "ex_creadora");
+      case "agencia": return q.eq("lead_source", B2B_SOURCE);
+      case "venta_plataforma": return q.eq("deal_type", "venta_plataforma").neq("lead_source", B2B_SOURCE);
+      default: return q;
+    }
+  };
+  // Categoría (ilike por el casing sucio: "Elite"/"ELITE", "b"/"B"). Vale para
+  // leads (columna category) y directorio (physical_appearance).
+  const applyCategory = (q: any, col: string) => (categoryFilter ? q.ilike(col, categoryFilter) : q);
 
-        // EX-CREADORES: directorio puro. Al tomarse pasan a reclutamiento y
-        // reaparecen en "Asignaciones" (no están excluidas del embudo), así que
-        // no necesitan mostrarse acá una vez trabajadas.
-        if (tab !== "agencias") {
-          const cFrom = pageNum * PAGE_SIZE;
-          const { data, error, count } = await dirBase().range(cFrom, cFrom + PAGE_SIZE - 1);
-          if (error) throw error;
-          return { rows: (data || []).map(mapContactRow), total: count || 0 };
-        }
+  // Query base de LEADS. `opts.stages` filtra por stage; `opts.poolOnly` = pool
+  // sin asignar (stage Nuevo + assigned_to null).
+  const buildLeadsQuery = (opts: { stages?: string[]; poolOnly?: boolean }) => {
+    let q = supabase.from("closer_creators").select("*", { count: "exact" });
+    if (opts.poolOnly) {
+      q = q.eq("stage", "Nuevo").is("assigned_to", null);
+    } else if (opts.stages && opts.stages.length === 1) {
+      q = q.eq("stage", opts.stages[0]);
+    } else if (opts.stages && opts.stages.length > 1) {
+      q = q.in("stage", opts.stages);
+    }
+    q = applyOriginToLeads(q);
+    q = applyCategory(q, "category");
+    if (normalizedSearch) q = q.ilike("instagram_handle", `%${normalizedSearch}%`);
+    // El filtro de agente no aplica al pool (por definición sin asignar).
+    if (agentFilter && !opts.poolOnly) q = q.eq("assigned_to", agentFilter);
+    // El POOL es visible para todos (RLS "Closers can view unassigned pool"); no
+    // se acota por agente, si no un closer raso lo vería vacío (assigned_to null
+    // nunca es == su id). El resto de tabs sí espeja la RLS por agente.
+    if (!opts.poolOnly) q = scopeByAgent(q);
+    // El pool son 'Nuevo' sin passed_date → filtrar por fecha lo vaciaría.
+    if (dateFrom && dateTo && dateField === "passed_date" && !opts.poolOnly) {
+      const fromStr = dateFrom.toISOString().split("T")[0];
+      const toStr = dateTo.toISOString().split("T")[0];
+      q = q.gte("passed_date", fromStr).lte("passed_date", toStr);
+    }
+    return q.order("created_at", { ascending: false });
+  };
 
-        // AGENCIAS: unimos las que YA están en trabajo (leads B2B en el pipeline)
-        // con las intactas del directorio. Sin esto, al registrar el primer
-        // seguimiento la agencia se convierte en lead y —como las agencias están
-        // EXCLUIDAS del embudo de modelos (Asignaciones, etc.)— desaparecería de
-        // toda vista. Las en trabajo van primero (tienen actividad). Conjuntos
-        // disjuntos: al convertirse el contacto sale del directorio.
-        const leadBase = () => {
-          // Solo las que YA están EN TRABAJO (con dueño). Una agencia en el
-          // pipeline pero sin asignar sigue estando "disponible", y su contacto
-          // sin convertir ya la muestra en la porción de directorio de abajo:
-          // sin este filtro aparecería DOS veces para quien ve todo el pipeline
-          // (admin/supervisor), que es lo que pasó al reetiquetar las 72 que el
-          // trigger había metido al embudo de modelos. Los closers rasos no lo
-          // notaban porque scopeByAgent ya les acota a sus propias filas.
-          let q = supabase.from("closer_creators").select("*", { count: "exact" })
-            .eq("lead_source", B2B_SOURCE)
-            .not("assigned_to", "is", null);
-          if (normalizedSearch) q = q.ilike("instagram_handle", `%${normalizedSearch}%`);
-          q = scopeByAgent(q); // el Closer Supervisor no ve las de sus pares
-          return q.order("passed_date", { ascending: false, nullsFirst: false }).order("created_at", { ascending: false });
-        };
-        // ⚠️ Estos dos counts NO pueden ser estimados: L no solo se muestra,
-        // PARTE la página entre los dos conjuntos (el .range de abajo se
-        // calcula contra L). Un L estimado corre todas las filas: la lista
-        // saltearía unas y repetiría otras.
-        const [leadCountRes, dirCountRes] = await Promise.all([
-          leadBase().range(0, 0),   // solo para el count exact
-          dirBase().range(0, 0),
-        ]);
-        if (leadCountRes.error) throw leadCountRes.error;
-        if (dirCountRes.error) throw dirCountRes.error;
-        const L = leadCountRes.count || 0;
-        const D = dirCountRes.count || 0;
+  // Query base del DIRECTORIO de contactos disponibles (no convertidos). Devuelve
+  // null cuando el origen activo no tiene contactos de directorio (ventas).
+  const buildDirQuery = () => {
+    const kind = originFilter ? ORIGIN_TO_CONTACT_KIND[originFilter] : "ALL";
+    if (kind === null) return null; // origen = venta_plataforma → sin directorio
+    let q = supabase
+      .from("v_closers_contacts")
+      .select("id, name, handle, phone, city, physical_appearance, notes, created_at, created_by, contact_kind, status", { count: "exact" })
+      .neq("status", "converted");
+    if (kind !== "ALL") q = q.eq("contact_kind", kind);
+    q = applyCategory(q, "physical_appearance");
+    if (normalizedSearch) q = q.or(`handle.ilike.%${normalizedSearch}%,name.ilike.%${normalizedSearch}%`);
+    // Categoría alta primero (ELITE→…→C), luego más nuevos.
+    return q.order("physical_appearance", { ascending: true }).order("created_at", { ascending: false });
+  };
 
-        const from = pageNum * PAGE_SIZE;
-        const to = from + PAGE_SIZE - 1;
-        let rows: any[] = [];
-        // Porción de leads en trabajo (índices [0, L) del listado combinado).
-        if (from < L) {
-          const { data, error } = await leadBase().range(from, Math.min(to, L - 1));
-          if (error) throw error;
-          rows = data || [];
-        }
-        // Porción de directorio (rellena el resto de la página).
-        if (rows.length < PAGE_SIZE && to >= L) {
-          const dFrom = Math.max(0, from - L);
-          const need = PAGE_SIZE - rows.length;
-          const { data, error } = await dirBase().range(dFrom, dFrom + need - 1);
-          if (error) throw error;
-          rows = rows.concat((data || []).map(mapContactRow));
-        }
-        return { rows, total: L + D };
-      }
+  // Mapea una fila del directorio al shape de lead que consume la tabla. La marca
+  // `__isContact` hace que "Tomar"/registrar seguimiento pasen por el RPC de
+  // asignación (que promueve el contacto a lead) en vez de escribir un
+  // closer_creators con un id que no existe ahí, y que la fila salga read-only.
+  const mapContactRow = (c: any) => ({
+    id: c.id,
+    __isContact: true,
+    instagram_handle: c.handle || c.name || "sin_handle",
+    phone: c.phone ?? null,
+    category: c.physical_appearance ?? null,
+    city: c.city ?? null,
+    notes: c.notes ?? null,
+    stage: "Nuevo",
+    assigned_to: null,
+    passed_date: null,
+    last_contact_date: null,
+    contact_count: 0,
+    estimated_monetization: 0,
+    agency_commission: 0,
+    subscription_amount: null,
+    deal_type: c.contact_kind === "agencia" ? "venta_plataforma" : "reclutamiento",
+    lead_source: c.contact_kind === "agencia" ? "agencia" : c.contact_kind === "ex_creadora" ? "ex_creadora" : "maven",
+    main_platform: null,
+    extras: null,
+    created_at: c.created_at,
+    created_by: c.created_by,
+    source_contact_id: c.id,
+    agent_name: null,
+  });
 
-      // ── Nuevo / Antiguos: pool de leads SIN asignar (stage 'Nuevo') ──
-      // Partido por antigüedad: "Nuevo" = creados en los últimos 30 días;
-      // "Antiguos" = hace más de 30 días sin que nadie los asigne. Ambos
-      // exigen assigned_to NULL (el pool). Los closers ahora pueden leer
-      // este pool (policy RLS "Closers can view unassigned pool"); antes
-      // RLS lo ocultaba y la pestaña salía vacía.
-      if (tab === "nuevo" || tab === "antiguos") {
-        const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-        let query = supabase
-          .from("closer_creators")
-          .select("*", { count: "exact" })
-          .eq("stage", "Nuevo")
-          .is("assigned_to", null)
-          // El pool de modelos no muestra agencias (tienen su propio tab).
-          .neq("lead_source", B2B_SOURCE);
-
-        // Antigüedad: Nuevo = recientes (≤30d), Antiguos = viejos (>30d)
-        query = tab === "nuevo"
-          ? query.gte("created_at", cutoff)
-          : query.lt("created_at", cutoff);
-
-        // Server-side search filter
-        if (normalizedSearch) {
-          query = query.ilike("instagram_handle", `%${normalizedSearch}%`);
-        }
-
-        query = query.order("created_at", { ascending: false });
-
-        if (dateFrom && dateTo) {
-          const fromStr = dateFrom.toISOString().split("T")[0];
-          const toStr = dateTo.toISOString().split("T")[0];
-          query = query.gte("created_at", fromStr).lte("created_at", toStr);
-        }
-
-        const from = pageNum * PAGE_SIZE;
-        query = query.range(from, from + PAGE_SIZE - 1);
-
-        const { data, error, count } = await query;
-        if (error) throw error;
-
-        // 1ª ola: solo la página cruda. El enriquecimiento (perfiles/historial/
-        // teléfonos) se hace aparte y progresivo para que la lista pinte ya.
-        return { rows: (data || []) as any[], total: count || 0 };
-      }
-
-      // ── All other tabs: fetch from closer_creators ──
-      const stageFilter = TAB_STAGE_MAP[tab] || [];
-
-      let query = supabase
-        .from("closer_creators")
-        .select("*", { count: "exact" })
-        .order("created_at", { ascending: false });
-
-      if (stageFilter.length === 1) {
-        query = query.eq("stage", stageFilter[0]);
-      } else if (stageFilter.length > 1) {
-        query = query.in("stage", stageFilter);
-      }
-
-      // Las agencias (B2B) SÍ entran a los tabs por stage, igual que las
-      // ex-creadoras: Miguel y Jhon (04/08) tomaban agencias y "Asignaciones"
-      // no las contaba — para quien trabaja el pipeline eso lee como que el
-      // Tomar no guardó nada. Solo las TOMADAS llegan acá (las no tomadas son
-      // contactos del directorio y viven en el tab Agencias), así que no se
-      // repite la contaminación del import de las 465.
-      // Tab "Ventas": deals de venta de plataforma a creadoras propias
-      // (cross-stage) — ahí las B2B sí quedan afuera para no mezclar líneas.
-      if (tab === "ventas") {
-        query = query.eq("deal_type", "venta_plataforma").neq("lead_source", B2B_SOURCE);
-      }
-
-      // Server-side search filter
-      if (normalizedSearch) {
-        query = query.ilike("instagram_handle", `%${normalizedSearch}%`);
-      }
-
-      // Server-side agent filter
-      if (agentFilter) {
-        query = query.eq("assigned_to", agentFilter);
-      }
-
-      // Server-side platform filter
-      if (platformFilter) {
-        query = query.eq("main_platform", platformFilter);
-      }
-
-      // Role-based filter: closers only see assigned. Si el admin está
-      // viendo "como" un closer (viewAsCloserId), también restringimos.
-      query = scopeByAgent(query);
-
-      // Date filter server-side for passed_date
-      if (dateFrom && dateTo && dateField === "passed_date") {
-        const fromStr = dateFrom.toISOString().split("T")[0];
-        const toStr = dateTo.toISOString().split("T")[0];
-        query = query.gte("passed_date", fromStr).lte("passed_date", toStr);
-      }
-
-      const from = pageNum * PAGE_SIZE;
-      query = query.range(from, from + PAGE_SIZE - 1);
-
-      const { data, error, count } = await query;
+  // Paginado COMBINADO leads + directorio (los leads primero). Recibe FÁBRICAS de
+  // query (no la query ya construida) porque el builder de supabase-js se consume
+  // al await-earlo: cada .range() necesita un builder fresco. Los dos counts son
+  // exact a propósito: L PARTE la página entre los dos conjuntos (el .range del
+  // directorio se calcula contra L), así que un L estimado saltaría/repetiría filas.
+  const pagedUnion = async (makeLeadsQ: () => any, buildDir: () => any, pageNum: number) => {
+    const firstDir = buildDir();
+    const [lc, dc] = await Promise.all([
+      makeLeadsQ().range(0, 0),
+      firstDir ? firstDir.range(0, 0) : Promise.resolve({ count: 0, error: null }),
+    ]);
+    if (lc.error) throw lc.error;
+    if ((dc as any).error) throw (dc as any).error;
+    const L = lc.count || 0;
+    const D = (dc as any).count || 0;
+    const from = pageNum * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+    let rows: any[] = [];
+    if (from < L) {
+      const { data, error } = await makeLeadsQ().range(from, Math.min(to, L - 1));
       if (error) throw error;
+      rows = data || [];
+    }
+    if (rows.length < PAGE_SIZE && to >= L && firstDir) {
+      const dFrom = Math.max(0, from - L);
+      const need = PAGE_SIZE - rows.length;
+      const { data, error } = await buildDir().range(dFrom, dFrom + need - 1);
+      if (error) throw error;
+      rows = rows.concat((data || []).map(mapContactRow));
+    }
+    return { rows, total: L + D };
+  };
 
+  // Extraído como función con `tab` + `pageNum` parametrizados para poder
+  // prefetchear otras tabs cuando se monta el componente — así al cambiar de tab
+  // los datos ya están en caché y no se ve el skeleton.
+  const fetchCreatorsForTab = async (tab: string, pageNum: number) => {
+      // Todas = leads (todos los stages) + directorio disponible. Es el listado
+      // maestro: todo lo que existe, con el filtro de origen/categoría para acotar.
+      if (tab === "todas") {
+        return pagedUnion(() => buildLeadsQuery({}), buildDirQuery, pageNum);
+      }
+      // Pool = leads sin asignar (stage Nuevo) + directorio disponible. Reemplaza
+      // a los viejos tabs Nuevo/Antiguos (el corte por 30 días era arbitrario):
+      // acá está todo lo tomable, ordenado por más nuevo / categoría alta primero.
+      if (tab === "pool") {
+        return pagedUnion(() => buildLeadsQuery({ poolOnly: true }), buildDirQuery, pageNum);
+      }
+      // Tabs por stage (Asignaciones/Confirmadas/Completadas/No interesadas):
+      // sólo leads, respetando origen/categoría/agente/fecha/rol.
+      const stageFilter = TAB_STAGE_MAP[tab] || [];
+      const from = pageNum * PAGE_SIZE;
+      const { data, error, count } = await buildLeadsQuery({ stages: stageFilter }).range(from, from + PAGE_SIZE - 1);
+      if (error) throw error;
       // 1ª ola: solo la página cruda (ver useMemo `creators` + query de
       // enriquecimiento más abajo para el patrón progresivo).
       return { rows: (data || []) as any[], total: count || 0 };
   };
 
   const buildCreatorsListKey = (tab: string, pageNum: number) =>
-    ["closer-creators-list", tab, pageNum, user?.id, role, scopeKey, dateFrom?.toISOString(), dateTo?.toISOString(), dateField, normalizedSearch, agentFilter, platformFilter, viewAsCloserId] as const;
+    ["closer-creators-list", tab, pageNum, user?.id, role, scopeKey, dateFrom?.toISOString(), dateTo?.toISOString(), dateField, normalizedSearch, agentFilter, originFilter, categoryFilter, viewAsCloserId] as const;
 
   const { data: creatorsData, isLoading } = useQuery({
     queryKey: buildCreatorsListKey(activeTab, page),
@@ -590,17 +540,16 @@ export const useCloserLeads = () => {
     placeholderData: keepPreviousData,
   });
 
-  // Prefetch las demás tabs en segundo plano para que al cambiar
-  // de tab los datos ya estén en caché — elimina el flash de loading
-  // en el primer ingreso a cada tab. Se reactiva cuando cambian filtros.
+  // Prefetch ACOTADO: sólo un par de tabs de trabajo (no las 6) para no disparar
+  // una tormenta de pedidos al montar — Todas/Pool ahora también cruzan el
+  // directorio (más queries por tab), y la instancia quedó justa de conexiones
+  // (caída 17/09). Sólo sin filtros activos: con filtro, el page-0 prefetcheado
+  // no matchea lo que se va a ver, así que sería puro desperdicio.
   useEffect(() => {
     if (!user?.id || !role) return;
-    // No prefetchear las otras tabs mientras hay búsqueda activa: cada tab
-    // repetiría el ilike + count exact sobre toda la tabla en cada tecla.
-    // El prefetch solo tiene sentido para navegar entre tabs sin filtro.
-    if (normalizedSearch) return;
-    const otherTabs = Object.keys(TAB_STAGE_MAP).filter((t) => t !== activeTab);
-    for (const t of otherTabs) {
+    if (normalizedSearch || originFilter || categoryFilter || agentFilter || dateFrom || dateTo) return;
+    const PREFETCH_TABS = ["pool", "asignadas"].filter((t) => t !== activeTab);
+    for (const t of PREFETCH_TABS) {
       queryClient.prefetchQuery({
         queryKey: buildCreatorsListKey(t, 0),
         queryFn: () => fetchCreatorsForTab(t, 0),
@@ -608,7 +557,7 @@ export const useCloserLeads = () => {
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, role, activeTab, dateFrom, dateTo, dateField, normalizedSearch, agentFilter, platformFilter, viewAsCloserId]);
+  }, [user?.id, role, activeTab, normalizedSearch, originFilter, categoryFilter, agentFilter, dateFrom, dateTo, viewAsCloserId]);
 
   const rawRows = (creatorsData?.rows ?? []) as any[];
   const totalCount = creatorsData?.total || 0;
@@ -783,41 +732,22 @@ export const useCloserLeads = () => {
         if (src === B2B_SOURCE) continue;
         if (row.deal_type === "venta_plataforma") counts["ventas"] = (counts["ventas"] || 0) + 1;
       }
-      // (B) Pool SIN asignar partido por antigüedad (Nuevo ≤30d / Antiguos
-      // >30d). Va aparte de (A) porque NO se filtra por assigned_to (todos
-      // ven el pool, incluido el closer tras la policy RLS) ni por el rango
-      // de passed_date (los 'Nuevo' no tienen passed_date). head:true =
-      // solo cuenta, no transfiere filas. Sobrescribe Nuevo/Antiguos de (A).
-      const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-      // .neq(lead_source, agencia): el pool de modelos no incluye B2B (mismo
-      // criterio que la query del listado, si no el contador no cuadra con la lista).
-      // ⚠️ count:"exact" a propósito en los cuatro de abajo, aunque sean
-      // "contadores de pestaña": el mismo número se pinta como total de la
-      // paginación del listado de esa pestaña ("Mostrando 1–50 de N"). Si el
-      // chip estimara y el pie paginara exacto, se contradirían en pantalla.
-      // Además el pool de closer_creators ya pasa las 2.000 filas (o sea, por
-      // encima del max-rows: el estimado SÍ entraría) y las estadísticas de
-      // esa tabla están desviadas ~90% (reltuples 5.197 vs 2.729 reales).
-      const [recentRes, oldRes] = await Promise.all([
+      // (B) Conteo del POOL para el badge del tab: leads sin asignar (stage
+      // Nuevo) + contactos del directorio disponibles (no convertidos). head:true
+      // = sólo COUNT, sin transferir filas. count:"exact" a propósito: el mismo
+      // número se pinta como total de la paginación del listado ("Mostrando 1–50
+      // de N"), así que un estimado se contradiría con el pie.
+      // Sin filtros de origen/categoría a propósito: el badge muestra el total
+      // disponible; la lista sí los aplica. (Reemplaza los 4 counts viejos de
+      // Nuevo/Antiguos/Ex/Agencias → 2 pedidos menos por carga, importante con la
+      // instancia justa de conexiones tras la caída del 17/09.)
+      const [poolLeadsRes, poolDirRes] = await Promise.all([
         supabase.from("closer_creators").select("id", { count: "exact", head: true })
-          .eq("stage", "Nuevo").is("assigned_to", null).neq("lead_source", B2B_SOURCE).gte("created_at", cutoff),
-        supabase.from("closer_creators").select("id", { count: "exact", head: true })
-          .eq("stage", "Nuevo").is("assigned_to", null).neq("lead_source", B2B_SOURCE).lt("created_at", cutoff),
-      ]);
-      // (C) Bases del DIRECTORIO: Ex-creadores y Agencias cuentan contactos
-      // disponibles (no convertidos), igual que su listado — si contaran leads,
-      // el número del tab no cuadraría con las filas que se ven.
-      const [exRes, agRes] = await Promise.all([
+          .eq("stage", "Nuevo").is("assigned_to", null),
         supabase.from("v_closers_contacts").select("id", { count: "exact", head: true })
-          .eq("contact_kind", "ex_creadora").neq("status", "converted"),
-        supabase.from("v_closers_contacts").select("id", { count: "exact", head: true })
-          .eq("contact_kind", "agencia").neq("status", "converted"),
+          .neq("status", "converted"),
       ]);
-      counts["ex_creadores"] = exRes.count || 0;
-      counts["agencias"] = agRes.count || 0;
-
-      counts["Nuevo"] = recentRes.count || 0;
-      counts["Antiguos"] = oldRes.count || 0;
+      counts["pool"] = (poolLeadsRes.count || 0) + (poolDirRes.count || 0);
       return counts;
     },
     enabled: !!user?.id && !!role,
@@ -1231,7 +1161,8 @@ export const useCloserLeads = () => {
     search, setSearch: handleSetSearch,
     activeTab, setActiveTab: handleTabChange,
     agentFilter, setAgentFilter: handleSetAgentFilter,
-    platformFilter, setPlatformFilter: handleSetPlatformFilter,
+    originFilter, setOriginFilter: handleSetOriginFilter,
+    categoryFilter, setCategoryFilter: handleSetCategoryFilter,
     agentList,
     dateFrom, setDateFrom: handleSetDateFrom,
     dateTo, setDateTo: handleSetDateTo,
