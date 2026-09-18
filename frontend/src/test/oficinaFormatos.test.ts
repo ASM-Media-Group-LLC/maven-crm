@@ -126,10 +126,14 @@ describe("las acciones del historial no esquivan el control de acceso", () => {
 // `customer` como "available only for ONLYOFFICE Docs Developer". Esta guarda
 // existe para que un día nadie los agregue "porque sí se puede poner".
 describe("personalización de ONLYOFFICE", () => {
+  // ⚠️ Hay DOS bloques `customization`: el del documento propio y el del
+  // adjunto del correo, que se abre en solo lectura. Este describe se ocupa
+  // del PRIMERO, así que se ancla en algo que solo tiene ese —el autoguardado,
+  // que un adjunto no puede tener porque no hay dónde guardarlo.
   const custom = (() => {
-    const a = edge.indexOf("customization: {");
+    const a = edge.indexOf("autosave: true");
     const b = edge.indexOf("};", a);
-    expect(a, "no está el bloque de customization").toBeGreaterThan(-1);
+    expect(a, "no está el customization del documento").toBeGreaterThan(-1);
     expect(b).toBeGreaterThan(a);
     return edge.slice(a, b);
   })();

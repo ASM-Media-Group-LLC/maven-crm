@@ -9,6 +9,10 @@ import TarjetaDeEvento from "@/components/correo/TarjetaDeEvento";
 import { leerInvitacion } from "@/lib/ics";
 import { sePuedeConvertir, useConversionAPdf } from "@/hooks/useConversionAPdf";
 import {
+  seAbreEnOnlyOffice, useAdjuntoEnOnlyOffice,
+} from "@/hooks/useAdjuntoEnOnlyOffice";
+import { useEditorDeOffice } from "@/hooks/useOnlyOffice";
+import {
   useAttachmentBytes,
   usePrefetchAttachment,
   type MailAttachment,
@@ -16,7 +20,7 @@ import {
 import { cn } from "@/lib/utils";
 
 type Tipo =
-  | "pdf" | "imagen" | "texto" | "convertible"
+  | "pdf" | "imagen" | "texto" | "convertible" | "office"
   | "calendario" | "audio" | "video"
   | "ninguno";
 
@@ -60,8 +64,15 @@ export function tipoDeAdjunto(a: MailAttachment): Tipo {
   if (["txt", "csv", "log", "md"].includes(ext) || ct.startsWith("text/plain")) return "texto";
   if (AUDIO.includes(ext) || ct.startsWith("audio/")) return "audio";
   if (VIDEO.includes(ext) || ct.startsWith("video/")) return "video";
-  // Word, Excel y PowerPoint: el navegador no los dibuja, pero LibreOffice los
-  // pasa a PDF del lado del servidor y entonces sí se leen acá.
+  // .docx, .xlsx y .pptx se abren EN ONLYOFFICE, que ya está en Maven.
+  //
+  // ⚠️ Antes se convertían a PDF, y eso era ver una FOTO del documento: las
+  // fórmulas de una hoja no se podían mirar, las pestañas no se podían cambiar
+  // y una tabla ancha salía cortada por el salto de página que LibreOffice le
+  // inventaba.
+  if (seAbreEnOnlyOffice(a.filename)) return "office";
+  // Los formatos VIEJOS (.doc, .xls, .ppt, .odt, .rtf…) siguen por LibreOffice:
+  // ONLYOFFICE los abre peor que el conversor, y son los que menos llegan.
   if (sePuedeConvertir(a.filename)) return "convertible";
   return "ninguno";
 }
@@ -202,6 +213,18 @@ export default function AdjuntoVisor({
     contentBase64: bytes.data?.contentBase64,
     enabled: abierto && tipo === "convertible",
   });
+
+  // Office moderno: se sube el ORIGINAL a R2 y se abre en ONLYOFFICE.
+  const enOffice = useAdjuntoEnOnlyOffice({
+    filename: actual?.filename ?? "",
+    contentBase64: bytes.data?.contentBase64,
+    enabled: abierto && tipo === "office",
+  });
+  // El editor se monta en su propio contenedor. El id lleva el índice para que
+  // al pasar al adjunto siguiente ONLYOFFICE se monte LIMPIO: reusar el mismo
+  // div dejaba el documento anterior dibujado debajo.
+  const contenedorOffice = `visor-adjunto-office-${indice}`;
+  const editorOffice = useEditorDeOffice(contenedorOffice, enOffice.data);
 
   // El PDF convertido llega como URL firmada; se baja para dibujarlo con el
   // mismo visor que el resto, y no con un <iframe> que Chrome deja en blanco.
@@ -352,6 +375,36 @@ export default function AdjuntoVisor({
             <div className="flex h-full items-center justify-center bg-black/90 p-4">
               <video src={url} controls playsInline className="max-h-full max-w-full" />
             </div>
+          ) : tipo === "office" ? (
+            enOffice.isError || editorOffice.error ? (
+              <Mensaje
+                icono={<FileQuestion className="h-8 w-8 text-destructive" />}
+                titulo="No se pudo abrir el documento"
+                detalle={
+                  (enOffice.error as Error)?.message || editorOffice.error ||
+                  "El servidor de Oficina no respondió."
+                }
+                accion={
+                  <Button size="sm" variant="outline" className="rounded-full"
+                    onClick={() => onDescargar(indice)} disabled={descargando}>
+                    <Download className="mr-2 h-4 w-4" />
+                    Descargar {actual.filename}
+                  </Button>
+                }
+              />
+            ) : (
+              <div className="relative h-full w-full">
+                {(enOffice.isLoading || editorOffice.estado === "cargando") && (
+                  <div className="absolute inset-0 z-10 grid place-items-center bg-background">
+                    <div className="flex flex-col items-center gap-3">
+                      <Loader2 className="h-7 w-7 animate-spin text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground">Abriendo el documento…</p>
+                    </div>
+                  </div>
+                )}
+                <div id={contenedorOffice} className="h-full w-full" />
+              </div>
+            )
           ) : tipo === "convertible" ? (
             pdfConvertido.data ? (
               <VisorPdf key={indice} bytes={pdfConvertido.data} nombre={actual.filename} />
