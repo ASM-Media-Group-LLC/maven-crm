@@ -69,6 +69,7 @@ import {
  useMailBulk, type OperacionMasiva,
   useAdjuntosParaReenviar,
 } from "@/hooks/useMailbox";
+import { agruparEnHilos, type Hilo } from "@/lib/mailHilos";
 import { asuntoDeReenvio, destinatariosRespuesta, direccionesDe, participantesDe, tieneVariosInvolucrados } from "@/lib/mailAddr";
 import { toast } from "sonner";
 
@@ -242,6 +243,24 @@ export default function CorreoPage() {
       return next;
     });
 
+  /** Marcar una conversación marca TODOS sus mensajes.
+   *
+   *  ⚠️ Es lo que hace que las acciones masivas sigan siendo honestas: si
+   *  marcar el renglón seleccionara solo el último, tocar "Archivar" dejaría
+   *  media conversación en la bandeja y la persona creería que la archivó
+   *  entera. */
+  const toggleSeleccionHilo = (h: Hilo<MailSummary>) =>
+    setSeleccion((prev) => {
+      const next = new Set(prev);
+      const claves = h.mensajes.map(claveDe);
+      const todosMarcados = claves.every((k) => next.has(k));
+      for (const k of claves) {
+        if (todosMarcados) next.delete(k);
+        else next.add(k);
+      }
+      return next;
+    });
+
   // El hook entrega los mensajes ya ordenados (más nuevo primero) venga de
   // la caché o del camino en vivo. En búsqueda, la lista son los resultados.
   const mensajes = useMemo(() => lista.data?.messages ?? [], [lista.data]);
@@ -284,6 +303,26 @@ export default function CorreoPage() {
     );
   };
   const items = enBusqueda ? (resultados.data?.messages ?? []) : mensajes;
+
+  // ── Conversaciones ─────────────────────────────────────────────────────
+  // La lista muestra un renglón por HILO, no por mensaje. Lo pidió Keila: con
+  // veinte respuestas a un comunicado, veinte renglones sueltos no se leen.
+  //
+  // En BÚSQUEDA no se agrupa: quien busca quiere ver los mensajes que
+  // coinciden, no las conversaciones que los contienen. Esconder el mensaje
+  // encontrado adentro de un hilo sería justo lo contrario de buscar.
+  const hilos = useMemo<Hilo<MailSummary>[]>(
+    () => (enBusqueda
+      ? items.map((m) => ({ asunto: m.subject, mensajes: [m], ultimo: m, cantidad: 1 }))
+      : agruparEnHilos(items)),
+    [items, enBusqueda],
+  );
+
+  /** El hilo al que pertenece el correo abierto, para mostrarlo entero. */
+  const hiloAbierto = useMemo(
+    () => (sel ? hilos.find((h) => h.mensajes.some((m) => claveDe(m) === claveDe(sel))) : undefined),
+    [hilos, sel],
+  );
   const cargandoItems = enBusqueda ? resultados.isFetching : lista.isLoading;
   const errorItems = enBusqueda ? resultados.error : lista.error;
 
@@ -749,16 +788,28 @@ export default function CorreoPage() {
                   />
                 )
               )}
-              {items.map((m) => (
+              {hilos.map((h) => (
                 <FilaMensaje
-                  key={claveDe(m)}
-                  m={m}
-                  activo={sel ? claveDe(m) === claveDe(sel) : false}
-                  seleccionado={seleccion.has(claveDe(m))}
-                  onToggleSeleccion={() => toggleSeleccion(m)}
-                  onClick={() => abrir(m)}
-                  onPrecargar={() => precargar(carpeta, m)}
+                  key={claveDe(h.ultimo)}
+                  m={h.ultimo}
+                  // El hilo entero cuenta como activo: da igual cuál de sus
+                  // mensajes esté abierto, el renglón es el mismo.
+                  activo={!!sel && h.mensajes.some((m) => claveDe(m) === claveDe(sel))}
+                  // Y como seleccionado: marcar la conversación y que la acción
+                  // masiva se lleve solo el último sería una trampa.
+                  seleccionado={h.mensajes.every((m) => seleccion.has(claveDe(m)))}
+                  onToggleSeleccion={() => toggleSeleccionHilo(h)}
+                  onClick={() => abrir(h.ultimo)}
+                  onPrecargar={() => precargar(carpeta, h.ultimo)}
                   mostrarDestinatario={carpeta === "Enviado" || carpeta === "Borrador"}
+                  enHilo={h.cantidad}
+                  // El hilo se llama como empezó, sin los "Re: RE: RV:" que
+                  // van apilando los clientes. Lo calcula `agruparEnHilos`
+                  // porque el más viejo CARGADO no siempre es la raíz.
+                  asuntoDelHilo={h.asunto}
+                  // Sin leer si CUALQUIERA del hilo lo está: si no, una
+                  // conversación con una respuesta nueva se vería leída.
+                  hiloSinLeer={h.mensajes.some((m) => m.unread)}
                 />
               ))}
             </div>
@@ -800,6 +851,40 @@ export default function CorreoPage() {
                 <h2 className="text-xl font-semibold leading-snug tracking-tight sm:text-2xl">
                   {mensaje.data.subject}
                 </h2>
+
+                {/* ── Lo anterior de la conversación ──────────────────────
+                    Los mensajes previos, plegados: quién y cuándo, con su
+                    resumen. Se abren con un clic y recién ahí se baja el
+                    cuerpo — abrir un hilo de veinte no puede costar veinte
+                    descargas. */}
+                {hiloAbierto && hiloAbierto.cantidad > 1 && (
+                  <ol className="mt-4 flex flex-col gap-1 border-l-2 border-border/50 pl-3">
+                    {hiloAbierto.mensajes
+                      // El abierto es `sel`, no `mensaje.data`: el segundo es el cuerpo
+                      // bajado, sin la identidad de fila (uid/origen) con la que
+                      // se comparan los mensajes de la lista.
+                      .filter((m) => !sel || claveDe(m) !== claveDe(sel))
+                      .map((m) => (
+                        <li key={claveDe(m)}>
+                          <button
+                            type="button"
+                            onClick={() => abrir(m)}
+                            className="flex w-full min-w-0 items-baseline gap-2 rounded-control px-2 py-1.5 text-left transition-colors hover:bg-muted/50"
+                          >
+                            <span className="shrink-0 text-xs font-medium">
+                              {nombreDe(m.from)}
+                            </span>
+                            <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+                              {m.snippet}
+                            </span>
+                            <span className="shrink-0 text-[10px] text-muted-foreground">
+                              {fechaCorta(m.date)}
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                  </ol>
+                )}
 
                 <div className="mt-4 flex items-start gap-3">
                   <UserAvatar name={nombreDe(mensaje.data.from)} size="lg" className="shrink-0" />
@@ -1035,6 +1120,9 @@ function FilaMensaje({
   onClick,
   onPrecargar,
   mostrarDestinatario,
+  enHilo,
+  hiloSinLeer,
+  asuntoDelHilo,
 }: {
   m: MailSummary;
   activo: boolean;
@@ -1047,10 +1135,19 @@ function FilaMensaje({
   /** En Enviados y Borradores el remitente eres tú: verte a ti mismo en
    *  cada fila no informa nada. Lo util es A QUIEN fue. */
   mostrarDestinatario?: boolean;
+  /** Cuántos mensajes tiene la conversación. 1 = correo suelto, sin globo. */
+  enHilo?: number;
+  /** Si CUALQUIERA del hilo está sin leer. Una conversación con una respuesta
+   *  nueva tiene que verse sin leer aunque los viejos ya se hayan abierto. */
+  hiloSinLeer?: boolean;
+  /** El asunto con el que EMPEZÓ la conversación. */
+  asuntoDelHilo?: string;
 }) {
   // Con varios destinatarios ("a@x, b@y") se muestra el primero.
   const quien = mostrarDestinatario ? (m.to || m.from).split(",")[0] : m.from;
   const nombre = nombreDe(quien);
+  const enConversacion = (enHilo ?? 1) > 1;
+  const sinLeer = hiloSinLeer ?? m.unread;
   return (
     <div
       className={cn(
@@ -1079,7 +1176,7 @@ function FilaMensaje({
         activo
           ? "bg-primary/12 before:absolute before:inset-y-2 before:left-0 before:w-[3px] before:rounded-r before:bg-gradient-to-b before:from-accent before:to-primary"
           : !seleccionado && "hover:bg-primary/5",
-        m.unread && !activo && !seleccionado && "bg-primary/[0.04]",
+        sinLeer && !activo && !seleccionado && "bg-primary/[0.04]",
       )}
     >
       <UserAvatar name={nombre} size="md" className={cn("shrink-0", activo && "ring-2 ring-primary/20")} />
@@ -1089,32 +1186,39 @@ function FilaMensaje({
           <span
             className={cn(
               "truncate text-sm",
-              m.unread ? "font-bold text-foreground" : "font-medium text-foreground",
+              sinLeer ? "font-bold text-foreground" : "font-medium text-foreground",
             )}
           >
             {mostrarDestinatario && (
               <span className="font-normal text-muted-foreground">Para </span>
             )}
             {nombre}
+            {/* El globo con la cantidad, como en Gmail: es lo que convierte un
+                renglón en "esto es una conversación" de un vistazo. */}
+            {enConversacion && (
+              <span className="ml-1.5 inline-flex items-center rounded-full bg-muted px-1.5 text-[10px] font-semibold tabular-nums text-muted-foreground">
+                {enHilo}
+              </span>
+            )}
           </span>
           <span
             className={cn(
               "shrink-0 text-[10px]",
-              m.unread ? "font-semibold text-primary" : "text-muted-foreground",
+              sinLeer ? "font-semibold text-primary" : "text-muted-foreground",
             )}
           >
             {fechaCorta(m.date)}
           </span>
         </div>
         <div className="flex items-center gap-1.5">
-          {m.unread && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />}
+          {sinLeer && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />}
           <span
             className={cn(
               "truncate text-[13px]",
-              m.unread ? "font-medium text-foreground/90" : "text-muted-foreground",
+              sinLeer ? "font-medium text-foreground/90" : "text-muted-foreground",
             )}
           >
-            {m.subject || "(sin asunto)"}
+            {asuntoDelHilo || m.subject || "(sin asunto)"}
           </span>
         </div>
         {m.snippet ? (

@@ -30,12 +30,16 @@ export interface CorreoEncadenable {
  *  «Re: RV: Fwd: Re: Contrato» y «Contrato» son el mismo hilo. Se cubren los
  *  del español (RE:, RV:) y los del inglés (RE:, FW:, FWD:), que es lo que
  *  mezclan Zoho, Gmail y Outlook en la misma empresa. */
-export function asuntoNormalizado(asunto: string): string {
+export function sinPrefijos(asunto: string): string {
   let s = (asunto ?? "").trim();
   // El `[...]` cubre el «Re[2]:» de algunos clientes viejos.
   const prefijo = /^\s*(re|rv|fw|fwd)\s*(\[\d+\])?\s*:\s*/i;
   for (let i = 0; i < 12 && prefijo.test(s); i++) s = s.replace(prefijo, "");
-  return s.trim().toLowerCase().replace(/\s+/g, " ");
+  return s.trim();
+}
+
+export function asuntoNormalizado(asunto: string): string {
+  return sinPrefijos(asunto).toLowerCase().replace(/\s+/g, " ");
 }
 
 /** Las direcciones que aparecen en un correo, en minúscula. */
@@ -80,6 +84,15 @@ class Union {
 }
 
 export interface Hilo<T> {
+  /** Con qué nombre se muestra la conversación en la lista.
+   *
+   *  ⚠️ Es el asunto del más viejo SIN los prefijos, y no el asunto tal cual
+   *  del primero, porque `mensajes[0]` es el más viejo CARGADO y no
+   *  necesariamente la raíz: la bandeja trae 50 correos y el que arrancó el
+   *  hilo puede haber quedado afuera. Pasó con «Hojas de vida Chatters», donde
+   *  el más viejo de la ventana era un «RE: RV: …» — y el hilo se habría
+   *  llamado así. */
+  asunto: string;
   /** Los mensajes, del más VIEJO al más nuevo. */
   mensajes: T[];
   /** El que representa al hilo en la lista: el más reciente. */
@@ -161,7 +174,12 @@ export function agruparEnHilos<T extends CorreoEncadenable>(correos: T[]): Hilo<
   const hilos: Hilo<T>[] = [];
   for (const mensajes of porRaiz.values()) {
     mensajes.sort((a, b) => (Date.parse(a.date) || 0) - (Date.parse(b.date) || 0));
-    hilos.push({ mensajes, ultimo: mensajes[mensajes.length - 1], cantidad: mensajes.length });
+    hilos.push({
+      asunto: sinPrefijos(mensajes[0].subject) || mensajes[0].subject,
+      mensajes,
+      ultimo: mensajes[mensajes.length - 1],
+      cantidad: mensajes.length,
+    });
   }
   // La bandeja se ordena por lo más nuevo de cada conversación, no por cuándo
   // empezó: un hilo de marzo con una respuesta de hoy va arriba.
