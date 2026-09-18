@@ -120,3 +120,44 @@ describe("las acciones del historial no esquivan el control de acceso", () => {
       .toMatch(/datos\.token = await firmar\(datos, secretoOO\)/);
   });
 });
+
+// ── La personalización del editor no cruza la línea de la licencia ─────────
+// Community obliga a mantener la marca de ONLYOFFICE, y la API marca `logo` y
+// `customer` como "available only for ONLYOFFICE Docs Developer". Esta guarda
+// existe para que un día nadie los agregue "porque sí se puede poner".
+describe("personalización de ONLYOFFICE", () => {
+  const custom = (() => {
+    const a = edge.indexOf("customization: {");
+    const b = edge.indexOf("};", a);
+    expect(a, "no está el bloque de customization").toBeGreaterThan(-1);
+    expect(b).toBeGreaterThan(a);
+    return edge.slice(a, b);
+  })();
+
+  it("⚠️ NO usa los parámetros que exigen Developer Edition", () => {
+    expect(custom).not.toMatch(/\blogo\s*:/);
+    expect(custom).not.toMatch(/\bcustomer\s*:/);
+  });
+
+  it("apaga el chat del editor pero deja los comentarios", () => {
+    // Un segundo lugar para hablar que nadie mira es peor que ninguno; los
+    // comentarios en cambio van anclados al documento y eso el Messenger no
+    // lo hace.
+    expect(custom).toMatch(/chat:\s*false/);
+    expect(custom).toMatch(/comments:\s*true/);
+  });
+
+  it("⚠️ la URL de «volver» NO se acepta del cliente", () => {
+    // Un goback.url libre sería un enlace a donde quisiera quien llame a la
+    // edge. Se arma con el origen del pedido y solo si está en la allowlist.
+    expect(edge).toMatch(/ALLOWED_ORIGINS\.includes\(origen\)/);
+    expect(custom).toMatch(/url:\s*volverA/);
+    expect(custom).not.toMatch(/url:\s*body\./);
+  });
+
+  it("el tema sale del navegador y con los valores que ONLYOFFICE entiende", () => {
+    expect(edge).toMatch(/body\.tema === "dark"/);
+    expect(edge).toMatch(/theme-night/);
+    expect(edge).toMatch(/theme-white/);
+  });
+});
