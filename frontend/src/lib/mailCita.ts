@@ -117,3 +117,50 @@ export function partirCitadoTexto(texto: string | null | undefined): {
   if (!propio.trim()) return { propio: texto, citado: null };
   return { propio, citado: lineas.slice(corte).join("\n") };
 }
+
+
+/** Dónde arranca lo citado DENTRO DE UNA SOLA LÍNEA.
+ *
+ *  El `snippet` que guarda el sincronizador es el cuerpo con los espacios
+ *  aplastados: no tiene saltos de línea, así que el corte por sangría no
+ *  sirve. Estas son las marcas tal como quedan pegadas en un renglón. */
+const MARCAS_EN_LINEA: RegExp[] = [
+  /(^|\s)>\s/,                                        // la sangría de toda la vida
+  // ⚠️ `.` y NO `[^:]`: la línea del encabezado lleva la HORA adentro
+  // («…de 2026, 15:53, Jhon Lopez escribió:»), así que prohibir los dos
+  // puntos hacía que nunca emparejara. Se acota con el perezoso `{0,90}?`.
+  /\bEl \d{1,2} de [a-záéíóú]+ de \d{4}.{0,90}?escribi/i,
+  /\bEl [a-záéíóú]{3,10},? \d{1,2} [a-záéíóú]{3,12}.{0,90}?escribi/i,
+  /\bOn .{0,100}?\bwrote:/i,
+  /-{2,}\s*(Mensaje original|Mensaje reenviado|Original Message|Forwarded message)/i,
+];
+
+/** ¿Queda algo que LEER? Un resto de solo signos («>», «--») no es texto. */
+function diceAlgo(s: string): boolean {
+  return /[\p{L}\p{N}]/u.test(s);
+}
+
+/** El resumen de un correo SIN la cita que arrastra.
+ *
+ *  ⚠️ Es lo que separa «llegó» de «llegó > El 18 de septiembre de 2026, 15:53,
+ *  Jhon Lopez escribió:…». En una conversación apilada, todos los renglones
+ *  plegados empiezan igual —con la cita del anterior— y la tira deja de decir
+ *  quién dijo qué. Gmail muestra solo lo que escribió cada uno.
+ *
+ *  Si al sacar la cita no queda nada, se devuelve el resumen entero: un
+ *  renglón vacío es peor que uno con la cita. */
+export function resumenSinCita(resumen: string | null | undefined): string {
+  const s = (resumen ?? "").trim();
+  if (!s) return "";
+  let corte = -1;
+  for (const re of MARCAS_EN_LINEA) {
+    const m = re.exec(s);
+    if (m && (corte < 0 || m.index < corte)) corte = m.index;
+  }
+  if (corte < 0) return s;
+  const propio = s.slice(0, corte).trim();
+  // ⚠️ `propio || s` no alcanzaba: un resto de «>» es una cadena no vacía y
+  // pasaba como resumen. Un renglón que dice «>» es igual de inútil que uno
+  // vacío, y encima parece un error.
+  return diceAlgo(propio) ? propio : s;
+}
