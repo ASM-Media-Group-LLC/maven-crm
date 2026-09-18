@@ -23,6 +23,7 @@ import { ImapClient } from "../_shared/imap.ts";
 import { decodeBodyToBytes, extraerAdjunto, parseMessage } from "../_shared/mime.ts";
 import { parsearBodyStructure, parteDelAdjunto } from "../_shared/bodystructure.ts";
 import { sanitizeEmailHtml } from "../_shared/html-sanitize.ts";
+import { tamanoDeBase64 } from "../_shared/base64.ts";
 import { buildMessage, esDireccionSmtp, SmtpClient } from "../_shared/smtp.ts";
 import { unseal } from "../_shared/mail-crypto.ts";
 import { ocultarAvisosDelProveedor } from "../_shared/mail-notices.ts";
@@ -1051,6 +1052,17 @@ Deno.serve(async (req) => {
               if (ap.ok && ap.uid != null && ap.uidvalidity != null) {
                 const messageId = rfc822.match(/^Message-ID:\s*(.+)$/im)?.[1]?.trim() ?? null;
                 const nombre = (perfil?.full_name as string) ?? "";
+                // ⚠️ EL CUERPO TAMBIÉN. Sembrar solo el `snippet` deja la fila
+                // con asunto y resumen pero sin `html` ni `text_body`: en la
+                // lista el correo se ve bien y al abrirlo dice "(sin
+                // contenido)", hasta que el barrido completo pasa por Enviados
+                // y lo corrige. Enviados NO está en HOT_FOLDERS, así que esa
+                // ventana es de hasta 30 minutos para CADA correo que se manda.
+                //
+                // Se guarda el html SANEADO, el mismo que guardaría el sync:
+                // sembrar el crudo dejaría pasar imágenes remotas que el resto
+                // del Correo bloquea y cuenta.
+                const limpio = html ? sanitizeEmailHtml(html) : null;
                 await admin.from("mail_messages").upsert({
                   user_id: user.id,
                   folder: carpeta,
@@ -1058,10 +1070,25 @@ Deno.serve(async (req) => {
                   uid: ap.uid,
                   from_addr: nombre ? `"${nombre}" <${fromAddress}>` : fromAddress,
                   to_addr: (to ?? []).join(", "),
+                  cc_addr: (cc ?? []).join(", "),
                   subject: subject ?? "(sin asunto)",
                   date: new Date().toISOString(),
                   snippet: (text ?? html?.replace(/<[^>]+>/g, " ") ?? "")
                     .replace(/\s+/g, " ").trim().slice(0, 200),
+                  html: limpio?.html ?? null,
+                  text_body: text ?? null,
+                  remote_images: limpio?.remoteImages ?? 0,
+                  // La misma forma que escribe el sync ({filename, contentType,
+                  // sizeBytes, contentId}), porque el visor y la descarga
+                  // buscan la parte por NOMBRE y usan el tamaño de desempate.
+                  // Sin esto, tu propio correo recién enviado se ve sin
+                  // adjuntos durante media hora.
+                  attachments: adjuntos.map((a) => ({
+                    filename: a.filename,
+                    contentType: a.contentType,
+                    sizeBytes: tamanoDeBase64(a.contentBase64),
+                    contentId: null,
+                  })),
                   unread: false,
                   message_id: messageId,
                 }, { onConflict: "user_id,folder,uidvalidity,uid" });
