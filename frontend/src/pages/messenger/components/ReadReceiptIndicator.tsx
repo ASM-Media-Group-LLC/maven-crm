@@ -58,17 +58,38 @@ export default function ReadReceiptIndicator({ isMe, deliveredByUsers, readByUse
   const othersCount = Math.max(totalParticipants - 1, 1);
   const readCount = readByUsers.length;
   const deliveredCount = deliveredByUsers.length; // leer implica entregar → incluye a los que leyeron
+  const esGrupo = othersCount > 1;
   const allRead = readCount >= othersCount;
   const allDelivered = deliveredCount >= othersCount;
+
+  // ⚠️ EN GRUPOS NO SE PUEDE EXIGIR QUE LLEGUE A TODOS.
+  //
+  // Exigir los 20 destinatarios es exigir que los 20 estén conectados a la vez,
+  // y eso no pasa nunca. Medido el 17/09: de 49 mensajes de grupo, CERO llegaron
+  // a ✓✓ —ni gris— aunque el promedio fuera de 7,7 entregados y 3,2 leídos, con
+  // picos de 8. O sea que a los 49 les decía "aún no le llegó" mientras ocho
+  // personas ya lo habían leído. Eso es lo que se veía "impreciso".
+  //
+  // Con que le haya llegado a alguien, "aún no le llegó" es FALSO. En chats
+  // directos no cambia nada: ahí `othersCount` es 1, así que "alguno" y "todos"
+  // son lo mismo.
+  const hayEntrega = esGrupo ? deliveredCount > 0 : allDelivered;
 
   const names = (uids: string[]) => uids.map((uid) => profileName(profiles[uid])).join(", ");
   // ✓ simple = enviado (todavía no llegó al navegador de la otra persona). Antes no
   // tenía tooltip y se leía como "entregado": esa confusión fue el reporte de
   // Jackeline con Fabiana (que salía "Disponible" pero tenía la app en segundo plano).
-  const sentOnly = !allDelivered && !allRead;
+  const sentOnly = !hayEntrega && !allRead;
+  // En grupos el tooltip lleva la cuenta: "Leído por 3 de 20" dice la verdad, y
+  // la lista de nombres de veinte personas no cabe ni sirve.
+  const conCuenta = (n: number, verbo: string) => `${verbo} por ${n} de ${othersCount}`;
   const label = sentOnly
     ? "Enviado · aún no le llegó"
-    : allRead ? `Leído por ${names(readByUsers)}` : `Entregado a ${names(deliveredByUsers)}`;
+    : esGrupo
+      ? (readCount > 0
+          ? `${conCuenta(readCount, "Leído")}${deliveredCount > readCount ? ` · entregado a ${deliveredCount}` : ""}`
+          : `Entregado a ${deliveredCount} de ${othersCount}`)
+      : allRead ? `Leído por ${names(readByUsers)}` : `Entregado a ${names(deliveredByUsers)}`;
 
   return (
     <TooltipProvider delayDuration={200}>
