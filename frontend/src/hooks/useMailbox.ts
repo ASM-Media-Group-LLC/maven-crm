@@ -49,6 +49,11 @@ export interface MailSummary {
   /** Primeras líneas del cuerpo — solo lo trae la caché. */
   snippet?: string;
   messageId?: string;
+  /** En qué carpeta vive. Solo lo trae la vista por ETIQUETA, donde conviven
+   *  correos de Recibidos, Archivados y Enviados: sin esto, abrir uno lo
+   *  buscaría en la carpeta seleccionada, que no es la suya. En las vistas por
+   *  carpeta sobra, porque son todos de la misma. */
+  folder?: string;
   /** `In-Reply-To`. Falta en lo sincronizado antes del 18/09/2026. */
   inReplyTo?: string;
   /** `References`, del más viejo al más nuevo. Ídem. */

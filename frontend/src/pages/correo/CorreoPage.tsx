@@ -23,6 +23,7 @@ import {
   ReplyAll,
   Forward,
   Check,
+  Plus,
   Search,
   Send,
   Signature,
@@ -78,7 +79,8 @@ import {
 import { agruparEnHilos, type Hilo } from "@/lib/mailHilos";
 import { opcionesDePosponer } from "@/lib/posponer";
 import {
-  useEtiquetarCorreos, useEtiquetas, useEtiquetasPorCorreo,
+  useCorreosDeEtiqueta, useEtiquetarCorreos, useEtiquetas, useEtiquetasPorCorreo,
+  useNoLeidosPorEtiqueta,
   type EtiquetaDeCorreo,
 } from "@/hooks/useEtiquetasCorreo";
 import { asuntoDeReenvio, destinatariosRespuesta, direccionesDe, participantesDe, tieneVariosInvolucrados } from "@/lib/mailAddr";
@@ -146,6 +148,14 @@ const FONDO_ETIQUETA: Record<string, string> = {
   warning: "bg-warning", destructive: "bg-destructive", muted: "bg-muted-foreground",
 };
 
+/** El color del icono de cada etiqueta en la columna. Mismos tokens que el
+ *  fondo del punto de la lista, pero como TEXTO: un icono relleno del color
+ *  entero le gana visualmente al icono de la carpeta de al lado. */
+const TEXTO_ETIQUETA: Record<string, string> = {
+  primary: "text-primary", accent: "text-accent", success: "text-success",
+  warning: "text-warning", destructive: "text-destructive", muted: "text-muted-foreground",
+};
+
 const CARPETAS_KEY = "maven.correo.carpetas";
 
 /** ¿La columna de carpetas arranca abierta? Se recuerda, como el panel de Maven. */
@@ -203,8 +213,12 @@ export default function CorreoPage() {
   const bajarParaReenviar = useAdjuntosParaReenviar();
   const etiquetas = useEtiquetas();
   const etiquetasPorCorreo = useEtiquetasPorCorreo();
+  const noLeidosPorEtiqueta = useNoLeidosPorEtiqueta();
   const etiquetar = useEtiquetarCorreos();
   const [gestionandoEtiquetas, setGestionandoEtiquetas] = useState(false);
+  // Qué etiqueta se está mirando. Null = una carpeta normal.
+  const [etiquetaVista, setEtiquetaVista] = useState<string | null>(null);
+  const correosDeEtiqueta = useCorreosDeEtiqueta(etiquetaVista);
   const [firmaAbierta, setFirmaAbierta] = useState(false);
   const firma = useMailSignature();
   // La firma que recibe el compositor: solo si está activada y no vacía.
@@ -219,7 +233,11 @@ export default function CorreoPage() {
   const carpetas = useMailFolders(hayBuzon);
   const lista = useMailMessages(carpeta, hayBuzon);
   const resultados = useMailSearch(carpeta, queryActiva, hayBuzon);
-  const mensaje = useMailMessage(carpeta, sel);
+  // ⚠️ La carpeta del correo ABIERTO, que no siempre es la seleccionada: en la
+  // vista por etiqueta conviven correos de Recibidos, Archivados y Enviados.
+  // Pedirlos todos a `carpeta` sería buscarlos donde no están.
+  const carpetaDelAbierto = sel?.folder ?? carpeta;
+  const mensaje = useMailMessage(carpetaDelAbierto, sel);
   const precargar = usePrefetchMailMessage();
   const marcarLeido = useMarkSeen();
   const descargar = useDownloadAttachment();
@@ -343,19 +361,58 @@ export default function CorreoPage() {
     const n = elegidos.length;
     if (sel && elegidos.some((m) => claveDe(m) === claveDe(sel)) && op !== "seen" && op !== "unseen") setSel(null);
     setSeleccion(new Set());
-    masiva.mutate(
-      { folder: carpeta, op, items: elegidos, dest, volverAt },
-      {
-        onSuccess: (r) => {
-          toast.success(NOMBRE_OP[op](n - (r.omitidos ?? 0)), {
-            description: r.omitidos ? `${r.omitidos} sin identificador: vuelve a abrir la carpeta e inténtalo.` : undefined,
-          });
+    // ⚠️ UNA LLAMADA POR CARPETA, y no una sola con la carpeta seleccionada.
+    //
+    // Los UID son POR CARPETA: el uid 5 de Recibidos y el uid 5 de Archivados
+    // son correos DISTINTOS. En la vista por etiqueta conviven correos de
+    // varias, así que mandarlos todos como si fueran de una sola no fallaría —
+    // movería OTROS mensajes, los que tengan esos uid en la carpeta que se
+    // mandó. Es la clase de error que no se nota hasta que falta un correo.
+    const porCarpeta = new Map<string, MailSummary[]>();
+    for (const m of elegidos) {
+      const f = m.folder ?? carpeta;
+      const ya = porCarpeta.get(f);
+      if (ya) ya.push(m); else porCarpeta.set(f, [m]);
+    }
+    for (const [f, delGrupo] of porCarpeta) {
+      masiva.mutate(
+        { folder: f, op, items: delGrupo, dest, volverAt },
+        {
+          // El aviso cuenta LO DE ESTE GRUPO, no el total: con correos de dos
+          // carpetas saldrían dos avisos diciendo el mismo número grande.
+          onSuccess: (r) => {
+            toast.success(NOMBRE_OP[op](delGrupo.length - (r.omitidos ?? 0)), {
+              description: r.omitidos
+                ? `${r.omitidos} sin identificador: vuelve a abrir la carpeta e inténtalo.`
+                : undefined,
+            });
+          },
+          onError: (e) => toast.error((e as Error).message || "No se pudo aplicar la acción"),
         },
-        onError: (e) => toast.error((e as Error).message || "No se pudo aplicar la acción"),
-      },
-    );
+      );
+    }
   };
-  const items = enBusqueda ? (resultados.data?.messages ?? []) : mensajes;
+  // Mirando una etiqueta, la lista son SUS correos —de cualquier carpeta— y no
+  // los de la carpeta seleccionada.
+  const items: MailSummary[] = etiquetaVista
+    ? ((correosDeEtiqueta.data ?? []) as Record<string, unknown>[]).map((m) => ({
+        id: m.id as string,
+        uid: m.uid as number,
+        // ⚠️ La carpeta viaja con CADA correo: en una etiqueta conviven correos
+        // de Recibidos, Archivados y Enviados, y abrir uno o archivarlo necesita
+        // saber en cuál está. Usar `carpeta` acá iría a buscarlo donde no está.
+        folder: m.folder as string,
+        from: (m.from_addr as string) ?? "",
+        to: (m.to_addr as string) ?? "",
+        cc: (m.cc_addr as string) ?? undefined,
+        subject: (m.subject as string) ?? "(sin asunto)",
+        date: (m.date as string) ?? "",
+        snippet: (m.snippet as string) ?? "",
+        messageId: (m.message_id as string) ?? undefined,
+        unread: !!m.unread,
+        origen: "cache" as const,
+      }))
+    : enBusqueda ? (resultados.data?.messages ?? []) : mensajes;
 
   // ── Conversaciones ─────────────────────────────────────────────────────
   // La lista muestra un renglón por HILO, no por mensaje. Lo pidió Keila: con
@@ -376,8 +433,12 @@ export default function CorreoPage() {
     () => (sel ? hilos.find((h) => h.mensajes.some((m) => claveDe(m) === claveDe(sel))) : undefined),
     [hilos, sel],
   );
-  const cargandoItems = enBusqueda ? resultados.isFetching : lista.isLoading;
-  const errorItems = enBusqueda ? resultados.error : lista.error;
+  const cargandoItems = etiquetaVista
+    ? correosDeEtiqueta.isLoading
+    : enBusqueda ? resultados.isFetching : lista.isLoading;
+  const errorItems = etiquetaVista
+    ? correosDeEtiqueta.error
+    : enBusqueda ? resultados.error : lista.error;
 
   // La precarga de los 2 más nuevos ya NO se hace desde acá: viene con la
   // lista (`with_bodies`), en la misma sesión IMAP. Disparar conexiones
@@ -418,7 +479,7 @@ export default function CorreoPage() {
     setSel(m);
     // "Leído" se marca al ABRIR, no al descargar: la precarga baja el
     // cuerpo sin tocar la bandera.
-    if (m.unread) marcarLeido.mutate({ folder: carpeta, m });
+    if (m.unread) marcarLeido.mutate({ folder: m.folder ?? carpeta, m });
   };
 
   // Arma el borrador de respuesta. `aTodos`: además del remitente, arrastra
@@ -643,6 +704,69 @@ export default function CorreoPage() {
                     {unread > 0 && (
                       <span className="ml-auto rounded-full bg-primary px-1.5 text-[10px] font-bold leading-4 text-primary-foreground">
                         {unread > 99 ? "99+" : unread}
+                      </span>
+                    )}
+                  </>
+                )}
+              </button>
+            );
+          })}
+
+          {/* ── Etiquetas ─────────────────────────────────────────────────
+              Debajo de las carpetas, como en Gmail. Una etiqueta NO es una
+              carpeta: cruza todas, así que un correo etiquetado y después
+              archivado sigue apareciendo acá. */}
+          {(etiquetas.data ?? []).length > 0 && carpetasAbiertas && (
+            <p className="flex items-center justify-between px-3 pb-1 pt-4 text-xs font-semibold text-muted-foreground">
+              Etiquetas
+              <button
+                type="button"
+                aria-label="Administrar etiquetas"
+                title="Administrar etiquetas"
+                onClick={() => setGestionandoEtiquetas(true)}
+                className="rounded-full p-0.5 transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </button>
+            </p>
+          )}
+          {(etiquetas.data ?? []).map((e) => {
+            const activa = etiquetaVista === e.id;
+            const sinLeerEtiqueta = noLeidosPorEtiqueta.data?.get(e.id) ?? 0;
+            return (
+              <button
+                key={e.id}
+                onClick={() => { setEtiquetaVista(activa ? null : e.id); setSel(null); }}
+                title={carpetasAbiertas ? undefined : e.nombre}
+                aria-label={e.nombre}
+                aria-current={activa ? "page" : undefined}
+                className={cn(
+                  "relative flex w-full items-center gap-2.5 rounded-2xl py-2 text-left text-sm transition-colors",
+                  carpetasAbiertas ? "px-3" : "justify-center px-0",
+                  activa
+                    ? "bg-primary/12 font-medium text-foreground before:absolute before:inset-y-2 before:left-0 before:w-[3px] before:rounded-r before:bg-gradient-to-b before:from-accent before:to-primary"
+                    : sinLeerEtiqueta > 0
+                      ? "font-semibold text-foreground hover:bg-primary/5"
+                      : "text-muted-foreground hover:bg-primary/5 hover:text-foreground",
+                )}
+              >
+                {/* Icono de ETIQUETA, del color de la etiqueta: ocupa la misma
+                    columna que los iconos de las carpetas, así los dos bloques
+                    se leen como una sola lista y no como dos cosas pegadas. */}
+                <span className="relative shrink-0">
+                  <Tag className={cn("h-4 w-4", TEXTO_ETIQUETA[e.color])} />
+                  {!carpetasAbiertas && sinLeerEtiqueta > 0 && (
+                    <span className="absolute -right-2 -top-1.5 min-w-[15px] rounded-full bg-primary px-1 text-[9px] font-bold leading-[15px] text-primary-foreground">
+                      {sinLeerEtiqueta > 9 ? "9+" : sinLeerEtiqueta}
+                    </span>
+                  )}
+                </span>
+                {carpetasAbiertas && (
+                  <>
+                    <span className="truncate">{e.nombre}</span>
+                    {sinLeerEtiqueta > 0 && (
+                      <span className="ml-auto rounded-full bg-primary px-1.5 text-[10px] font-bold leading-4 text-primary-foreground">
+                        {sinLeerEtiqueta > 99 ? "99+" : sinLeerEtiqueta}
                       </span>
                     )}
                   </>
@@ -1207,7 +1331,7 @@ export default function CorreoPage() {
                             onClick={() =>
                               uid != null &&
                               descargar.mutate(
-                                { folder: carpeta, uid, index: i, filename: a.filename },
+                                { folder: carpetaDelAbierto, uid, index: i, filename: a.filename },
                                 { onError: (e) => toast.error((e as Error).message) },
                               )
                             }
@@ -1257,7 +1381,7 @@ export default function CorreoPage() {
           const a = mensaje.data?.attachments[i];
           if (uid == null || !a) return;
           descargar.mutate(
-            { folder: carpeta, uid, index: i, filename: a.filename },
+            { folder: carpetaDelAbierto, uid, index: i, filename: a.filename },
             { onError: (e) => toast.error((e as Error).message) },
           );
         }}
