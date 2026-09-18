@@ -580,6 +580,17 @@ class CuentaSync {
       uid,
       uidvalidity: uidValidity,
       message_id: parsed.messageId ?? null,
+      // Las dos cabeceras que encadenan la conversación (RFC 5322). Sin ellas
+      // agrupar en hilos solo se puede adivinar por el asunto, y adivinar une
+      // de más. `references` en mailparser viene como string o como array
+      // según el correo: se normaliza acá para que la base vea siempre lo
+      // mismo.
+      in_reply_to: parsed.inReplyTo ?? null,
+      refs: Array.isArray(parsed.references)
+        ? parsed.references
+        : parsed.references
+          ? [parsed.references]
+          : null,
       from_addr: parsed.from?.text ?? "",
       to_addr: parsed.to?.text ?? "",
       cc_addr: parsed.cc?.text ?? "",
