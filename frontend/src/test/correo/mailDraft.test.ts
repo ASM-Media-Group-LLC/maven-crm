@@ -81,3 +81,30 @@ describe("guardar / leer / borrar", () => {
     expect(leerBorrador("yo@maven.me", "nuevo")).toBeNull();
   });
 });
+
+describe("⚠️ el reenvío tiene su PROPIO cajón de borrador", () => {
+  // Lo encontró el banco de pruebas: un reenvío no tiene `inReplyTo` —no
+  // cuelga del hilo original— y caía en "nuevo", el mismo cajón que un correo
+  // en blanco. Con un borrador nuevo a medio escribir, tocar Reenviar pegaba
+  // ESE texto encima y se llevaba puesta la cita del mensaje reenviado.
+  it("no comparte cajón con un correo nuevo", () => {
+    expect(firmaContexto(undefined, "<abc@zoho>")).not.toBe(firmaContexto());
+  });
+
+  it("no comparte cajón con la respuesta al mismo correo", () => {
+    expect(firmaContexto(undefined, "<abc@zoho>")).not.toBe(firmaContexto("<abc@zoho>"));
+  });
+
+  it("dos reenvíos de correos distintos no se pisan", () => {
+    expect(firmaContexto(undefined, "<a@zoho>")).not.toBe(firmaContexto(undefined, "<b@zoho>"));
+  });
+
+  it("el mismo reenvío recupera su propio borrador", () => {
+    expect(firmaContexto(undefined, "<abc@zoho>")).toBe(firmaContexto(undefined, "<abc@zoho>"));
+  });
+
+  it("sin reenvío se comporta como antes", () => {
+    expect(firmaContexto()).toBe("nuevo");
+    expect(firmaContexto("<x@zoho>")).toBe("reply:<x@zoho>");
+  });
+});

@@ -80,8 +80,14 @@ export interface BorradorInicial {
   to?: string;
   cc?: string;
   subject?: string;
-  /** Cuerpo del correo al que se responde, para citarlo abajo. */
-  citar?: { de: string; fecha: string; texto: string };
+  /** Cuerpo del correo al que se responde (o que se reenvía), para citarlo
+   *  abajo. Con `reenvio`, la cita lleva encabezado completo —De, Para,
+   *  Fecha, Asunto— porque quien lo recibe no vio el original y necesita
+   *  saber de dónde salió. */
+  citar?: {
+    de: string; fecha: string; texto: string;
+    reenvio?: boolean; para?: string; asunto?: string;
+  };
   inReplyTo?: string;
   references?: string;
   /** Cuerpo HTML ya armado, para RETOMAR un borrador del servidor (en vez de
@@ -90,6 +96,15 @@ export interface BorradorInicial {
   /** UID del borrador en el servidor que se está retomando: al re-guardar se
    *  reemplaza y al enviar se borra. */
   serverDraftUid?: number;
+  /** `Message-ID` del correo que se reenvía. NO se manda: sirve para que el
+   *  borrador del reenvío tenga su propio cajón y no se mezcle con el de un
+   *  correo nuevo. */
+  reenvioDe?: string;
+  /** Adjuntos con los que el compositor ARRANCA: los del correo que se
+   *  reenvía, ya bajados. Se pueden quitar antes de mandar, como los propios. */
+  adjuntosIniciales?: Array<
+    { filename: string; contentType: string; sizeBytes: number; contentBase64: string }
+  >;
 }
 
 interface Props {
@@ -168,7 +183,7 @@ const ES_CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  *  techo duro de 256 MB de memoria para armar el mensaje. 25 MB no entra por
  *  ninguno de los dos lados sin subir el adjunto a Storage y leerlo de a
  *  pedazos, que es otro trabajo. */
-const TOPE_ADJUNTOS = 20 * 1024 * 1024;
+export const TOPE_ADJUNTOS = 20 * 1024 * 1024;
 
 /** Lee un archivo a base64 SIN el prefijo `data:<tipo>;base64,`. */
 function leerBase64(file: File): Promise<string> {
@@ -558,7 +573,7 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
   // Firma del contexto (nuevo vs. responder a tal hilo) y borrador guardado
   // para ese contexto. Se lee UNA vez al montar: el compositor se monta de
   // cero en cada apertura, así que no hace falta re-leer.
-  const firma = firmaContexto(inicial?.inReplyTo);
+  const firma = firmaContexto(inicial?.inReplyTo, inicial?.reenvioDe);
   // Al RETOMAR un borrador del servidor (`cuerpoHtml`), no se recupera el
   // local: el contenido bueno es el que vino del servidor.
   const recuperado = useMemo(
@@ -587,7 +602,7 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
   // localStorage): recuperar un borrador no los trae de vuelta.
   const [adjuntos, setAdjuntos] = useState<
     Array<{ filename: string; contentType: string; sizeBytes: number; contentBase64: string }>
-  >([]);
+  >(() => inicial?.adjuntosIniciales ?? []);
   const inputArchivo = useRef<HTMLInputElement>(null);
   const enviar = useSendMail();
 
@@ -628,6 +643,21 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
     }
     const c = inicial.citar;
     const texto = escapar(c.texto).replace(/\n/g, "<br>");
+    if (c.reenvio) {
+      // Un reenvío NO es una respuesta: no hay a quién contestarle, hay algo
+      // que mostrar. Por eso el encabezado completo y no "Fulano escribió:".
+      const filas = [
+        `De: ${escapar(c.de)}`,
+        c.fecha && `Fecha: ${escapar(c.fecha)}`,
+        c.asunto && `Asunto: ${escapar(c.asunto)}`,
+        c.para && `Para: ${escapar(c.para)}`,
+      ].filter(Boolean).join("<br>");
+      return (
+        `<p></p><p></p>${f}` +
+        `<blockquote><p>---------- Mensaje reenviado ----------<br>${filas}</p>` +
+        `<p>${texto}</p></blockquote>`
+      );
+    }
     // Respuesta: espacio para escribir, la firma, y después la cita — el orden
     // de Gmail (la firma cierra lo tuyo, antes del hilo citado).
     return (

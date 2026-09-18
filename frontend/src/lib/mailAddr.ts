@@ -124,3 +124,13 @@ export function tieneVariosInvolucrados(o: CamposOriginal): boolean {
   );
   return gente.size > 1;
 }
+
+/** El asunto de un reenvío.
+ *
+ *  No se apila: reenviar tres veces sigue diciendo "Fwd:" una sola vez, igual
+ *  que "Re:" al responder. Se acepta también "RV:" porque es lo que escriben
+ *  Outlook y Zoho en español, y un correo que ya viene reenviado desde ahí no
+ *  tiene por qué quedar como "Fwd: RV: …". */
+export function asuntoDeReenvio(asunto: string): string {
+  return /^\s*(fwd|fw|rv):/i.test(asunto) ? asunto : `Fwd: ${asunto}`;
+}
