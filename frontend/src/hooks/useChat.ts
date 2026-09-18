@@ -816,6 +816,44 @@ export function useChat() {
       .then();
   }, [user]);
 
+  // VOLVER A MARCAR COMO NO LEÍDO (Jhon, 18/09). El no leído lo calcula
+  // get_unread_counts como "mensajes de otros posteriores a last_read_at", así
+  // que se retrocede last_read_at a justo antes del último mensaje ajeno: queda
+  // al menos uno pendiente y el chat vuelve a "No leídos" (y al globo del
+  // menú: useUnreadChatCount escucha los UPDATE de chat_participants). Sin
+  // mensajes ajenos no hay cómo dejarlo en no leído; quien llama avisa.
+  const markConversationUnread = useCallback(
+    async (conversationId: string): Promise<"ok" | "sin-mensajes" | "error"> => {
+      if (!user) return "error";
+      const ultimo = await supabase
+        .from("chat_messages")
+        .select("created_at")
+        .eq("conversation_id", conversationId)
+        .neq("sender_id", user.id)
+        .eq("is_deleted", false)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (ultimo.error) return "error";
+      if (!ultimo.data) return "sin-mensajes";
+      const antes = new Date(new Date(ultimo.data.created_at).getTime() - 1).toISOString();
+      setConversations((prev) =>
+        prev.map((c) => (c.id === conversationId && c.unreadCount === 0 ? { ...c, unreadCount: 1 } : c)),
+      );
+      const { error } = await supabase
+        .from("chat_participants")
+        .update({ last_read_at: antes })
+        .eq("conversation_id", conversationId)
+        .eq("user_id", user.id);
+      if (error) {
+        setConversations((prev) => prev.map((c) => (c.id === conversationId ? { ...c, unreadCount: 0 } : c)));
+        return "error";
+      }
+      return "ok";
+    },
+    [user],
+  );
+
   // Silenciar / reactivar una conversación (contacto o grupo) para el usuario actual.
   // Actualiza chat_participants.is_muted; el hook global useMessengerNotifications lo respeta
   // para NO sonar/avisar en conversaciones silenciadas (los recibos ✓✓ siguen igual).
@@ -863,6 +901,7 @@ export function useChat() {
     deleteConversation,
     loadConversations,
     markConversationRead,
+    markConversationUnread,
     toggleMute,
   };
 }

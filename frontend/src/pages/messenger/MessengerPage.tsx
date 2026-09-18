@@ -35,7 +35,7 @@ function openCallInNewTab(roomName: string, isAdmin: boolean, displayName?: stri
 const rutaInterna = (r: string | null): boolean => !!r && /^\/[A-Za-z0-9\-_/]*(\?[^#]*)?$/.test(r) && !r.startsWith("//");
 
 export default function MessengerPage() {
-  const { conversations, loading, profiles, createDirectChat, createGroupChat, deleteConversation, loadConversations, markConversationRead, toggleMute } = useChatShared();
+  const { conversations, loading, profiles, createDirectChat, createGroupChat, deleteConversation, loadConversations, markConversationRead, markConversationUnread, toggleMute } = useChatShared();
   const { isOnline, onlineUsers, getStatus } = useOnlinePresence();
   const { user } = useAuth();
   const { initiateCall } = useCall();
@@ -274,6 +274,9 @@ export default function MessengerPage() {
           isArchived={isArchived}
           onToggleArchive={toggleArchive}
           onToggleMute={toggleMute}
+          onMarkRead={markConversationRead}
+          // Si es el chat abierto, se cierra antes: abierto se marcaría leído solo.
+          onMarkUnread={(id) => { if (id === activeChatId) selectChat(null); return markConversationUnread(id); }}
         />
       </div>
 

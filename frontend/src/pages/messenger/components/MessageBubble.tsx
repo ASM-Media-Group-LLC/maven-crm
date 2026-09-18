@@ -466,15 +466,17 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
               táctil (hover:none) aparecen al tocar la burbuja y se esconden al
               volver a tocar (siempre visibles atiborraban el chat del celular). */}
           <div className={cn(
-            "absolute top-0 transition-opacity z-10 flex items-center gap-0.5",
+            // Al CENTRO de la burbuja, no arriba (Jhon, 18/09). En táctil siguen
+            // encima de la esquina, así que allí se deshace el translate.
+            "absolute top-1/2 -translate-y-1/2 transition-opacity z-10 flex items-center gap-0.5",
             "[@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100",
             "[@media(hover:none)]:opacity-0 [@media(hover:none)]:pointer-events-none",
             "[@media(hover:none)]:group-data-[acciones=1]/burbuja:opacity-100 [@media(hover:none)]:group-data-[acciones=1]/burbuja:pointer-events-auto",
             // Con mouse, al costado de la burbuja. En táctil, ENCIMA de la esquina:
             // al costado se salían de la pantalla y dejaban un scroll lateral.
             isMe
-              ? "-left-16 [@media(hover:none)]:left-0 [@media(hover:none)]:-top-7"
-              : "-right-16 [@media(hover:none)]:right-0 [@media(hover:none)]:-top-7"
+              ? "-left-16 [@media(hover:none)]:left-0 [@media(hover:none)]:-top-7 [@media(hover:none)]:translate-y-0"
+              : "-right-16 [@media(hover:none)]:right-0 [@media(hover:none)]:-top-7 [@media(hover:none)]:translate-y-0"
           )}
             onClick={(e) => e.stopPropagation()}
           >

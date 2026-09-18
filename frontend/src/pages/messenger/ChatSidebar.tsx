@@ -1,7 +1,9 @@
 import InstalarMaven from "@/components/pwa/InstalarMaven";
 import { esTactil } from "@/lib/plataformaPwa";
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { Search, Users, Pin, PinOff, GripVertical, Home, AtSign, Star, Mail, ChevronDown, ChevronRight, ChevronsUpDown, ChevronsDownUp, X, User, MessageSquare, Archive, MoreVertical, Trash2, Bell, BellOff, Plus, Pencil } from "lucide-react";
+import { Search, Users, Pin, PinOff, GripVertical, Home, AtSign, Star, Mail, MailOpen, ChevronDown, ChevronRight, ChevronsUpDown, ChevronsDownUp, X, User, MessageSquare, Archive, MoreVertical, Trash2, Bell, BellOff, Plus, Pencil } from "lucide-react";
+import { toast } from "sonner";
+import { useLanguage } from "@/hooks/useLanguage";
 import { BotonSilenciarCanal } from "@/components/BotonSilenciarCanal";
 import { useGlobalSearch, type GlobalSearchResult } from "@/hooks/useGlobalSearch";
 import { formatDistanceToNow } from "date-fns";
@@ -53,13 +55,15 @@ interface ChatSidebarProps {
   isArchived: (id: string) => boolean;
   onToggleArchive: (id: string) => void;
   onToggleMute: (id: string, muted: boolean) => void;
+  onMarkRead: (id: string) => void;
+  onMarkUnread: (id: string) => Promise<"ok" | "sin-mensajes" | "error">;
 }
 
 
 export default function ChatSidebar({
   conversations, activeChatId, onSelectChat, onNewChat, onNewGroup,
   onSelectContact, onDeleteChat, loading, profiles,
-  isPinned, onTogglePin, pinnedOrder, onReorderPinned, isArchived, onToggleArchive, onToggleMute,
+  isPinned, onTogglePin, pinnedOrder, onReorderPinned, isArchived, onToggleArchive, onToggleMute, onMarkRead, onMarkUnread,
 }: ChatSidebarProps) {
   const { user } = useAuth();
   const { isAdmin } = useUserRole();
@@ -319,6 +323,8 @@ export default function ChatSidebar({
                     onArchive={() => onToggleArchive(conv.id)}
                     isArchivedChat={isArchived(conv.id)}
                     onToggleMute={onToggleMute}
+                    onMarkRead={() => onMarkRead(conv.id)}
+                    onMarkUnread={() => onMarkUnread(conv.id)}
                     onDragStart={(e) => handleDragStart(e, conv.id)}
                     onDragEnd={handleDragEnd}
                     canReorderDrop={draggedIsPinned && isPinned(conv.id)}
@@ -525,7 +531,7 @@ function CollapsibleSection({ label, defaultOpen = true, children }: { label: st
 }
 
 /* ── Conversation Item — M3 ── */
-function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned, onTogglePin, onArchive, isArchivedChat, onToggleMute, onDragStart, onDragEnd, canReorderDrop, onReorderDrop, isSystemAdmin }: {
+function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned, onTogglePin, onArchive, isArchivedChat, onToggleMute, onMarkRead, onMarkUnread, onDragStart, onDragEnd, canReorderDrop, onReorderDrop, isSystemAdmin }: {
   conversation: ConversationWithDetails;
   isActive: boolean;
   onClick: () => void;
@@ -535,6 +541,8 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
   onArchive: () => void;
   isArchivedChat: boolean;
   onToggleMute: (id: string, muted: boolean) => void;
+  onMarkRead: () => void;
+  onMarkUnread: () => Promise<"ok" | "sin-mensajes" | "error">;
   onDragStart: (e: React.DragEvent) => void;
   onDragEnd: () => void;
   canReorderDrop?: boolean;
@@ -547,6 +555,12 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
   const { isOnline, getStatus, getStatusColorPersonal } = useOnlinePresence();
   const isMuted = conversation.participants.find(p => p.user_id === user?.id)?.is_muted ?? false;
   const handleToggleMute = () => onToggleMute(conversation.id, !isMuted);
+  const { t } = useLanguage();
+  const handleMarkUnread = async () => {
+    const r = await onMarkUnread();
+    if (r === "sin-mensajes") toast.info(t("messenger.sinMensajesQueMarcar"));
+    else if (r === "error") toast.error(t("messenger.noPudeMarcarNoLeido"));
+  };
 
   const otherParticipant = !isGroup
     ? conversation.participants.find(p => p.user_id !== user?.id)
@@ -689,6 +703,18 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
                 {isMuted ? <Bell className="h-3.5 w-3.5 mr-2" /> : <BellOff className="h-3.5 w-3.5 mr-2" />}
                 {isMuted ? "Reactivar notificaciones" : "Silenciar notificaciones"}
               </DropdownMenuItem>
+              {/* Volver a dejar el chat como pendiente (Jhon, 18/09). */}
+              {conversation.unreadCount > 0 ? (
+                <DropdownMenuItem onClick={onMarkRead}>
+                  <MailOpen className="h-3.5 w-3.5 mr-2" />
+                  {t("messenger.marcarLeido")}
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem onClick={handleMarkUnread}>
+                  <Mail className="h-3.5 w-3.5 mr-2" />
+                  {t("messenger.marcarNoLeido")}
+                </DropdownMenuItem>
+              )}
               {(isSystemAdmin || !isGroup || conversation.participants.find(p => p.user_id === user?.id)?.role === "admin") && (
                 <DropdownMenuItem
                   onClick={onDelete}
