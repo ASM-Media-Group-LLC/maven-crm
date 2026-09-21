@@ -849,22 +849,54 @@ Deno.serve(async (req) => {
       // y se llama recién con el usuario ya borrado OK: si el borrado falla, no
       // dejamos una casilla huérfana. deleteMailbox es irreversible (borra el
       // buzón) — que es justo lo que libera el cupo del plan.
+      //
+      // ⚠️ TODA salida de acá escribe su motivo, y el motivo queda en el
+      // evento de auditoría. Antes la rama `!existe` era la única de las
+      // tres que no logueaba nada, y resultó ser la que se tomaba SIEMPRE
+      // (listAccounts traía 10 casillas de 68). Nueve bajas seguidas
+      // dejaron la casilla viva sin una sola línea en el log. Un
+      // best-effort que no cuenta por qué falló no es best-effort, es un
+      // agujero.
+      let motivoZoho: string | null = null;
       const liberarPuestoZoho = async (): Promise<string | null> => {
-        if (!zohoMailbox || !zohoConfigured()) return null;
+        if (!zohoMailbox) {
+          motivoZoho = "el usuario no tenía casilla de correo de Maven";
+          return null;
+        }
+        if (!zohoConfigured()) {
+          motivoZoho = "Zoho no está configurado en este entorno";
+          console.warn(`[delete_user] ${motivoZoho}`);
+          return null;
+        }
         try {
           // Confirmamos que ese email existe como cuenta en Zoho (así un usuario
           // con correo EXTERNO no dispara nada). Después borramos POR EMAIL.
           const cuentas = await listAccounts();
+          if (!cuentas.ok) {
+            motivoZoho = `no se pudo listar la organización: ${cuentas.error ?? "error desconocido"}`;
+            console.error(`[delete_user] ${motivoZoho}`);
+            return null;
+          }
           const existe = (cuentas.data ?? []).some(
             (a) => (a.primaryEmailAddress ?? "").toLowerCase() === zohoMailbox!.toLowerCase(),
           );
-          if (!existe) return null;
+          if (!existe) {
+            motivoZoho =
+              `${zohoMailbox} no figura entre las ${cuentas.data?.length ?? 0} casillas de la organización`;
+            console.warn(`[delete_user] ${motivoZoho}`);
+            return null;
+          }
           const del = await deleteMailbox(zohoMailbox);
-          if (!del.ok) { console.error("[delete_user] no pude borrar la casilla Zoho:", del.error); return null; }
+          if (!del.ok) {
+            motivoZoho = `Zoho rechazó el borrado: ${del.error ?? "error desconocido"}`;
+            console.error(`[delete_user] ${motivoZoho}`);
+            return null;
+          }
           console.log(`[delete_user] casilla Zoho liberada: ${zohoMailbox}`);
           return zohoMailbox;
         } catch (e) {
-          console.error("[delete_user] baja de casilla explotó:", (e as Error).message);
+          motivoZoho = `la baja de casilla explotó: ${(e as Error).message}`;
+          console.error(`[delete_user] ${motivoZoho}`);
           return null;
         }
       };
@@ -918,7 +950,12 @@ Deno.serve(async (req) => {
       await anotarEvento(adminClient, "eliminada",
         { id: user_id, email: auDel?.user?.email ?? null, full_name: (perfilDel as { full_name?: string } | null)?.full_name ?? null },
         { id: callerId, email: callerEmail },
-        { casilla_zoho_liberada: mbRemoved, dias_de_papelera: DIAS_DE_PAPELERA });
+        {
+          casilla_zoho_liberada: mbRemoved,
+          // Un null sin motivo fue lo que dejó el bug escondido nueve bajas.
+          casilla_zoho_motivo: mbRemoved ? null : motivoZoho,
+          dias_de_papelera: DIAS_DE_PAPELERA,
+        });
 
       console.log(`[delete_user] suspendida user_id=${user_id}, recuperable ${DIAS_DE_PAPELERA} días`);
       return new Response(JSON.stringify({
