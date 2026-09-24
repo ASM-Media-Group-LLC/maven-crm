@@ -17,8 +17,18 @@
 //
 // La key se busca por su hash SHA-256; se chequea que no esté revocada ni vencida,
 // que la IP esté permitida (si tiene whitelist) y que tenga el scope del recurso.
+//
+// ⚠️ AISLAMIENTO ENTRE AGENCIAS. Esta función corre con service_role: SALTA LA RLS.
+// La única pared entre agencias es lo que el código filtre. Cada llave pertenece a
+// una agencia (`api_keys.tenant_id`, asignada por la base) y cada recurso declara
+// cómo se aísla en `./aislamiento.ts`. Un recurso que no sabe de qué
+// agencia es cada fila se APAGA solo en cuanto Maven tenga más de una. Antes de
+// agregar un endpoint, leé ese archivo: el test te va a obligar a hacerlo igual.
 import { corsFor } from "../_shared/cors.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+// Local a esta función y no en _shared/: un cambio en _shared/ redespliega TODAS
+// las edge functions, y este módulo solo lo usa public-api.
+import { decidir } from "./aislamiento.ts";
 
 const corsHeaders = (req: Request) =>
   corsFor(req, {
@@ -26,11 +36,22 @@ const corsHeaders = (req: Request) =>
     "Access-Control-Allow-Methods": "GET, OPTIONS",
   });
 
-const json = (req: Request, body: unknown, status = 200) =>
+const json = (req: Request, body: unknown, status = 200, extra: Record<string, string> = {}) =>
   new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders(req), "Content-Type": "application/json" },
+    headers: { ...corsHeaders(req), "Content-Type": "application/json", ...extra },
   });
+
+// Un fallo NUESTRO (la base no respondió) no puede verse como "tu llave es
+// inválida" ni como "no tenés permiso": el cliente dejaría de reintentar, o
+// revocaría una llave que está bien.
+const noDisponible = (req: Request, donde: string, err: unknown) => {
+  console.error(`[public-api] ${donde}:`, (err as { message?: string })?.message ?? err);
+  return json(req, {
+    error: "temporarily_unavailable",
+    message: "El servicio no está disponible en este momento. Reintentá en unos segundos.",
+  }, 503, { "Retry-After": "30" });
+};
 
 async function sha256hex(s: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
@@ -147,10 +168,14 @@ Deno.serve(async (req) => {
   );
 
   const key_hash = await sha256hex(rawKey);
-  const { data: keyRow } = await admin
+  const { data: keyRow, error: keyErr } = await admin
     .from("api_keys")
-    .select("id, scopes, ip_whitelist, revoked_at, expires_at")
+    .select("id, scopes, ip_whitelist, revoked_at, expires_at, tenant_id")
     .eq("key_hash", key_hash).maybeSingle();
+  // Antes el error se descartaba y una base caída respondía "API key inválida".
+  // Además es la red si esta función se desplegara antes que la migración que crea
+  // la columna tenant_id: 503 y no 401 para todas las llaves.
+  if (keyErr) return noDisponible(req, "búsqueda de la llave", keyErr);
 
   if (!keyRow) return json(req, { error: "unauthorized", message: "API key inválida" }, 401);
   if (keyRow.revoked_at) return json(req, { error: "unauthorized", message: "API key revocada" }, 401);
@@ -163,6 +188,22 @@ Deno.serve(async (req) => {
   }
   const scopes: string[] = (keyRow.scopes as string[]) ?? [];
   const need = (s: string) => scopes.includes(s);
+
+  // De qué agencia es esta llave. La columna es NOT NULL, así que esto no debería
+  // pasar nunca; si pasa, se corta acá: una llave sin agencia no puede servir nada
+  // sin arriesgar datos de otra.
+  const tenantId = keyRow.tenant_id as string | null;
+  if (!tenantId) {
+    return json(req, { error: "unauthorized", message: "Esta API key no pertenece a ninguna agencia" }, 401);
+  }
+
+  // Cuántas agencias hay en Maven. Los recursos que no saben de qué agencia es cada
+  // fila solo se sirven cuando la respuesta es exactamente 1. Si la consulta falla,
+  // null: `decidir` cierra con 503, no con 403.
+  const { count: agencias, error: agErr } = await admin
+    .from("tenants").select("id", { count: "exact", head: true });
+  if (agErr) console.error("[public-api] conteo de agencias:", agErr.message);
+  const cantidadDeAgencias = agErr ? null : (agencias ?? null);
 
   // bump de uso (best-effort, atómico, no bloquea la respuesta)
   admin.rpc("increment_api_key_usage", { _id: keyRow.id as string }).then(() => {}, () => {});
@@ -178,6 +219,8 @@ Deno.serve(async (req) => {
   if (!resource) {
     return json(req, {
       object: "api", name: "Maven Public API", version: "v1", your_scopes: scopes,
+      // Toda respuesta de esta llave es de esta agencia y de ninguna otra.
+      agency_id: tenantId,
       resources: [
         { path: "/creators", scope: "creators:read" },
         { path: "/creators/{id}", scope: "creators:read" },
@@ -194,6 +237,15 @@ Deno.serve(async (req) => {
         { path: "/promolog", scope: "promolog:read" },
       ],
     });
+  }
+
+  // ===== Puerta de aislamiento =====
+  // Todo recurso pasa por acá ANTES de tocar la base. Ver ./aislamiento.ts.
+  const recursoClave = resource === "sales" && sub === "chatters" ? "sales/chatters" : resource;
+  const veredicto = decidir(recursoClave, cantidadDeAgencias);
+  if (!veredicto.ok) {
+    if (veredicto.estado === 503) return noDisponible(req, "puerta de aislamiento", veredicto.motivo);
+    return json(req, { error: veredicto.error, message: veredicto.motivo }, veredicto.estado);
   }
 
   // ===== /creators =====
@@ -327,9 +379,21 @@ Deno.serve(async (req) => {
     const { limit, offset } = pageParams(url);
     const roleFilter = url.searchParams.get("role");
 
+    // Defensa extra, NO el aislamiento: tenant_members todavía no es confiable (ver
+    // ./aislamiento.ts) y por eso /employees se apaga con 2+ agencias. profiles no
+    // tiene columna de agencia; las personas se separan por tenant_members.
+    const { data: miembros, error: mErr } = await admin
+      .from("tenant_members").select("user_id").eq("tenant_id", tenantId);
+    if (mErr) return json(req, { error: "server_error", message: mErr.message }, 500);
+    const idsDeLaAgencia = (miembros ?? []).map((m) => (m as { user_id: string }).user_id);
+    if (idsDeLaAgencia.length === 0) {
+      return json(req, { object: "list", resource: "employees", count: 0, limit, offset, data: [] });
+    }
+
     const { data: profs, count, error } = await admin
       .from("profiles")
       .select("id, full_name, avatar_url, is_owner, created_at", { count: "exact" })
+      .in("id", idsDeLaAgencia)
       .order("full_name", { ascending: true }).range(offset, offset + limit - 1);
     if (error) return json(req, { error: "server_error", message: error.message }, 500);
 
@@ -382,6 +446,10 @@ Deno.serve(async (req) => {
       "date, creator_id, blu_creator_name, total_gross, subscription_gross, new_sub_gross, recurring_sub_gross, tips_gross, message_gross, post_gross, referral_gross, stream_gross, chargebacks_gross, contribution_pct, active_fans, new_fans",
       { count: "exact" },
     );
+    // Defensa extra, NO el aislamiento: el tenant_id de esta tabla todavía no es
+    // confiable (ver ./aislamiento.ts) y por eso /sales se apaga con 2+ agencias.
+    // Queda para que la consulta ya esté bien el día que la columna diga la verdad.
+    q = q.eq("tenant_id", tenantId);
     const from = url.searchParams.get("from"), to = url.searchParams.get("to"), creatorId = url.searchParams.get("creator_id");
     if (from) q = q.gte("date", from);
     if (to) q = q.lte("date", to);

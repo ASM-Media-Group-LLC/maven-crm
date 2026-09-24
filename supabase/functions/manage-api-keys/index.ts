@@ -7,7 +7,10 @@ import { corsFor } from "../_shared/cors.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { SCOPE_CATALOG, SCOPE_GROUPS, isValidScope } from "../_shared/api-scopes.ts";
 
-const MAX_ACTIVE_KEYS = 3; // igual que Infloww: hasta 3 keys válidas a la vez.
+// Igual que Infloww: hasta 3 keys válidas a la vez, POR AGENCIA. Antes se contaba
+// para toda la plataforma: con las 3 de la primera agencia, la segunda no habría
+// podido crear ni una.
+const MAX_ACTIVE_KEYS = 3;
 
 const corsHeaders = (req: Request) =>
   corsFor(req, {
@@ -88,6 +91,22 @@ Deno.serve(async (req) => {
       return json(req, { error: "Forbidden: solo administradores pueden gestionar API keys" }, 403);
     }
 
+    // ⚠️ AISLAMIENTO ENTRE AGENCIAS. Esta función usa service_role, que salta la
+    // RLS: lo único que separa las llaves de una agencia de las de otra es que CADA
+    // consulta de abajo filtre por esta agencia. Sin esto, un admin de una agencia
+    // veía —y podía editar o revocar por id— las llaves de todas.
+    const { data: agenciasDelAdmin, error: tErr } = await admin
+      .from("tenant_members").select("tenant_id").eq("user_id", callerId);
+    if (tErr) return json(req, { error: tErr.message }, 500);
+    if (!agenciasDelAdmin?.length) {
+      return json(req, { error: "Forbidden: no pertenecés a ninguna agencia" }, 403);
+    }
+    if (agenciasDelAdmin.length > 1) {
+      // Adivinar la agencia acá es justo cómo se termina administrando la ajena.
+      return json(req, { error: "Pertenecés a varias agencias; todavía no se puede elegir en cuál gestionar llaves" }, 409);
+    }
+    const tenantId = (agenciasDelAdmin[0] as { tenant_id: string }).tenant_id;
+
     const body = await req.json().catch(() => ({}));
     const action = body?.action as string | undefined;
 
@@ -97,7 +116,7 @@ Deno.serve(async (req) => {
     // === LIST ===
     if (action === "list") {
       const { data, error } = await admin
-        .from("api_keys").select(SELECT_COLS).order("created_at", { ascending: false });
+        .from("api_keys").select(SELECT_COLS).eq("tenant_id", tenantId).order("created_at", { ascending: false });
       if (error) return json(req, { error: error.message }, 500);
       const keys = (data ?? []).map((k) => ({ ...k, status: statusOf(k) }));
       return json(req, { keys, scope_catalog: SCOPE_CATALOG, scope_groups: SCOPE_GROUPS, max_active_keys: MAX_ACTIVE_KEYS });
@@ -124,6 +143,7 @@ Deno.serve(async (req) => {
       const nowIso = new Date().toISOString();
       const { count: activeCount } = await admin
         .from("api_keys").select("id", { count: "exact", head: true })
+        .eq("tenant_id", tenantId)
         .is("revoked_at", null)
         .or(`expires_at.is.null,expires_at.gt.${nowIso}`);
       if ((activeCount ?? 0) >= MAX_ACTIVE_KEYS) {
@@ -139,6 +159,9 @@ Deno.serve(async (req) => {
           name, key_prefix: prefix, last_four: full.slice(-4), key_hash, scopes,
           ip_whitelist: ipWhitelist,
           created_by: callerId, created_by_email: user.email ?? null,
+          // Explícita. El trigger de la base igual verifica que sea una agencia de
+          // quien la crea: el cliente no puede elegir una ajena.
+          tenant_id: tenantId,
           expires_at: expiresAt ? expiresAt.toISOString() : null,
         })
         .select("id, name, key_prefix, last_four, scopes, ip_whitelist, created_at, expires_at")
@@ -184,7 +207,7 @@ Deno.serve(async (req) => {
       if (Object.keys(patch).length === 0) return json(req, { error: "Nada para actualizar" }, 400);
 
       const { data, error } = await admin
-        .from("api_keys").update(patch).eq("id", id).is("revoked_at", null)
+        .from("api_keys").update(patch).eq("id", id).eq("tenant_id", tenantId).is("revoked_at", null)
         .select(SELECT_COLS);
       if (error) return json(req, { error: error.message }, 500);
       if (!data?.length) return json(req, { error: "La key no existe o está revocada" }, 404);
@@ -198,7 +221,7 @@ Deno.serve(async (req) => {
       const { data, error } = await admin
         .from("api_keys")
         .update({ revoked_at: new Date().toISOString(), revoked_by: callerId })
-        .eq("id", id).is("revoked_at", null).select("id");
+        .eq("id", id).eq("tenant_id", tenantId).is("revoked_at", null).select("id");
       if (error) return json(req, { error: error.message }, 500);
       if (!data?.length) return json(req, { error: "La key no existe o ya estaba revocada" }, 404);
       return json(req, { success: true, id });
