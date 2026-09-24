@@ -12,15 +12,21 @@
 // sirve un recurso que no esté en este mapa, y el test lee public-api/index.ts y
 // falla si aparece una tabla o función que nadie declaró.
 //
-// LOS TRES MODOS.
+// LOS CUATRO MODOS.
 //  * `columna`     — la tabla tiene un tenant_id CONFIABLE y se filtra por él.
 //  * `miembros`    — son personas: se aíslan por `tenant_members`, y tenant_members
 //                    dice la verdad sobre quién es de qué agencia.
+//  * `como_usuario` — NO corre con service_role: consulta con la sesión de la persona
+//                    como la que actúa la llave (./como-usuario.ts), así que la pared
+//                    es la RLS de la base, la misma que la app. La base garantiza que
+//                    esa persona es de la agencia de la llave. Su código vive en
+//                    ./recursos-como-usuario.ts, que el test obliga a no tocar `admin`.
 //  * `sin_agencia` — no hay forma confiable de saber de qué agencia es cada fila.
 //                    Con UNA agencia todas son de ella y se sirven igual que siempre.
 //                    Con dos o más, el recurso se APAGA en vez de entregar datos ajenos.
 //
-// ⚠️ HOY TODOS LOS RECURSOS SON `sin_agencia`, Y ES A PROPÓSITO. Tener una columna
+// ⚠️ HOY TODOS LOS RECURSOS DE DATOS SON `sin_agencia`, Y ES A PROPÓSITO (el único
+// que no, /me, devuelve a la persona misma y corre `como_usuario`). Tener una columna
 // no alcanza: tiene que decir la verdad. La revisión del 24/09 lo mostró con /sales:
 // creator_daily_earnings SÍ tiene tenant_id, pero con un DEFAULT fijo (el id de la
 // primera agencia) que ningún importador sobrescribe, y sus índices únicos son para
@@ -38,6 +44,7 @@
 export type ModoDeAislamiento =
   | { tipo: "columna"; columna: "tenant_id" }
   | { tipo: "miembros" }
+  | { tipo: "como_usuario" }
   | {
     tipo: "sin_agencia";
     /** Qué hace falta arreglar para poder aislarlo de verdad. */
@@ -45,6 +52,9 @@ export type ModoDeAislamiento =
   };
 
 export const AISLAMIENTO_POR_RECURSO: Record<string, ModoDeAislamiento> = {
+  // Quién es la llave: la persona como la que actúa y su agencia. Sirve para probar
+  // en vivo que la sesión fabricada funciona antes de abrir nada más sobre ella.
+  me: { tipo: "como_usuario" },
   sales: {
     tipo: "sin_agencia",
     pendiente: "creator_daily_earnings.tenant_id tiene DEFAULT fijo y los importadores BLU " +
@@ -89,10 +99,20 @@ export const INFRAESTRUCTURA: ReadonlySet<string> = new Set([
   "tenants",
   "tenant_members",
   "increment_api_key_usage",
+  "api_key_consumir",
 ]);
+
+/** Recursos que se sirven con la sesión del usuario y nunca con service_role. */
+export function esComoUsuario(
+  recurso: string,
+  mapa: Record<string, ModoDeAislamiento> = AISLAMIENTO_POR_RECURSO,
+): boolean {
+  return Object.hasOwn(mapa, recurso) && mapa[recurso].tipo === "como_usuario";
+}
 
 /** Cada tabla/función de datos que toca public-api, y a qué recurso pertenece. */
 export const FUENTES_POR_RECURSO: Record<string, string[]> = {
+  me: ["profiles", "current_tenant_id"],
   sales: ["creator_daily_earnings"],
   employees: ["profiles", "user_roles"],
   creators: ["creators", "creator_of_accounts"],

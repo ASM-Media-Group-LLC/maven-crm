@@ -111,14 +111,32 @@ Deno.serve(async (req) => {
     const action = body?.action as string | undefined;
 
     const SELECT_COLS =
-      "id, name, key_prefix, last_four, scopes, ip_whitelist, created_at, created_by_email, last_used_at, request_count, expires_at, revoked_at";
+      "id, name, key_prefix, last_four, scopes, ip_whitelist, created_at, created_by_email, last_used_at, request_count, expires_at, revoked_at, acts_as_user_id, limite_por_hora";
+
+    // Como quién actúa cada llave, con nombre: es lo primero que tiene que ver quien
+    // la administra, porque todo lo que la llave haga con permisos de usuario lo hace
+    // a nombre de esa persona.
+    const conPersona = async <T extends { acts_as_user_id?: string | null }>(filas: T[]) => {
+      const ids = [...new Set(filas.map((f) => f.acts_as_user_id).filter((x): x is string => !!x))];
+      const nombres = new Map<string, string | null>();
+      if (ids.length) {
+        const { data: perfiles } = await admin.from("profiles").select("id, full_name").in("id", ids);
+        for (const p of perfiles ?? []) {
+          nombres.set((p as { id: string }).id, (p as { full_name: string | null }).full_name ?? null);
+        }
+      }
+      return filas.map((f) => ({
+        ...f,
+        acts_as: f.acts_as_user_id ? { id: f.acts_as_user_id, name: nombres.get(f.acts_as_user_id) ?? null } : null,
+      }));
+    };
 
     // === LIST ===
     if (action === "list") {
       const { data, error } = await admin
         .from("api_keys").select(SELECT_COLS).eq("tenant_id", tenantId).order("created_at", { ascending: false });
       if (error) return json(req, { error: error.message }, 500);
-      const keys = (data ?? []).map((k) => ({ ...k, status: statusOf(k) }));
+      const keys = (await conPersona(data ?? [])).map((k) => ({ ...k, status: statusOf(k) }));
       return json(req, { keys, scope_catalog: SCOPE_CATALOG, scope_groups: SCOPE_GROUPS, max_active_keys: MAX_ACTIVE_KEYS });
     }
 
@@ -159,17 +177,21 @@ Deno.serve(async (req) => {
           name, key_prefix: prefix, last_four: full.slice(-4), key_hash, scopes,
           ip_whitelist: ipWhitelist,
           created_by: callerId, created_by_email: user.email ?? null,
+          // La llave actúa como quien la crea, y no cambia nunca: la base rechaza
+          // cualquier cambio y exige que esa persona sea de esta agencia y esté activa.
+          acts_as_user_id: callerId,
           // Explícita. El trigger de la base igual verifica que sea una agencia de
           // quien la crea: el cliente no puede elegir una ajena.
           tenant_id: tenantId,
           expires_at: expiresAt ? expiresAt.toISOString() : null,
         })
-        .select("id, name, key_prefix, last_four, scopes, ip_whitelist, created_at, expires_at")
+        .select("id, name, key_prefix, last_four, scopes, ip_whitelist, created_at, expires_at, acts_as_user_id, limite_por_hora")
         .single();
       if (error) return json(req, { error: error.message }, 500);
 
       // El secreto completo viaja UNA sola vez. No se vuelve a poder recuperar.
-      return json(req, { ...inserted, key: full, status: "active" }, 201);
+      const [conNombre] = await conPersona([inserted]);
+      return json(req, { ...conNombre, key: full, status: "active" }, 201);
     }
 
     // === UPDATE (editar nombre / scopes / IPs / expiración de una key activa) ===
@@ -211,7 +233,8 @@ Deno.serve(async (req) => {
         .select(SELECT_COLS);
       if (error) return json(req, { error: error.message }, 500);
       if (!data?.length) return json(req, { error: "La key no existe o está revocada" }, 404);
-      return json(req, { ...data[0], status: statusOf(data[0]) });
+      const [conNombre] = await conPersona(data);
+      return json(req, { ...conNombre, status: statusOf(data[0]) });
     }
 
     // === REVOKE ===

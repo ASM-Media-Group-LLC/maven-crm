@@ -34,6 +34,10 @@ type ApiKey = {
   last_used_at: string | null; request_count: number;
   expires_at: string | null; revoked_at: string | null;
   status: "active" | "revoked" | "expired";
+  // Como quién actúa la key: fija desde que se crea (quien la crea). Opcionales
+  // mientras convivan el front nuevo y un manage-api-keys anterior.
+  acts_as?: { id: string; name: string | null } | null;
+  limite_por_hora?: number;
 };
 type ListResp = { keys: ApiKey[]; scope_catalog: ScopeDef[]; scope_groups: string[]; max_active_keys: number };
 
@@ -223,6 +227,7 @@ const AdminApiKeys = () => {
                   <th className="px-4 py-3 font-medium">API key</th>
                   <th className="px-4 py-3 font-medium">Creada</th>
                   <th className="px-4 py-3 font-medium">Creada por</th>
+                  <th className="px-4 py-3 font-medium" title="La key actúa en Maven como esta persona, con lo que esta persona puede ver y hacer. No cambia nunca.">Actúa como</th>
                   <th className="px-4 py-3 font-medium">IP whitelist</th>
                   <th className="px-4 py-3 font-medium">Expira</th>
                   <th className="px-4 py-3 font-medium">Estado</th>
@@ -241,6 +246,7 @@ const AdminApiKeys = () => {
                     <td className="px-4 py-3"><code className="rounded bg-muted px-1.5 py-0.5 text-xs">{k.key_prefix}…{k.last_four ?? ""}</code></td>
                     <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">{fmt(k.created_at, f.intl("es-CO"))}</td>
                     <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">{k.created_by_email ?? "—"}</td>
+                    <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">{k.acts_as ? (k.acts_as.name ?? "—") : "—"}</td>
                     <td className="px-4 py-3 text-muted-foreground">
                       {k.ip_whitelist?.length ? (
                         <span title={k.ip_whitelist.join(", ")}>{k.ip_whitelist.length} IP{k.ip_whitelist.length > 1 ? "s" : ""}</span>
@@ -298,7 +304,10 @@ const AdminApiKeys = () => {
             <>
               <DialogHeader>
                 <DialogTitle>{modalMode === "edit" ? "Editar API key" : "Create API key"}</DialogTitle>
-                <DialogDescription>Nombre, IPs permitidas, expiración y permisos.</DialogDescription>
+                <DialogDescription>
+                  Nombre, IPs permitidas, expiración y permisos.
+                  {modalMode !== "edit" && " La key va a actuar como vos, y eso no se puede cambiar después."}
+                </DialogDescription>
               </DialogHeader>
               <div className="space-y-5">
                 {/* Nombre */}
@@ -407,6 +416,13 @@ const AdminApiKeys = () => {
             <div>
               <div className="mb-1 font-medium">Autenticación</div>
               <p className="text-xs text-muted-foreground">Envía la key en <code className="rounded bg-muted px-1 py-0.5">Authorization: Bearer mvk_live_…</code> (o el header <code className="rounded bg-muted px-1 py-0.5">X-API-Key</code>).</p>
+              <p className="mt-1 text-xs text-muted-foreground">Cada key actúa como una persona de Maven (quien la creó) y eso no cambia nunca. Si esa persona deja Maven, la key deja de funcionar (401). <code className="rounded bg-muted px-1 py-0.5">GET /me</code> dice cuál es.</p>
+            </div>
+            <div>
+              <div className="mb-1 font-medium">Límite</div>
+              <p className="text-xs text-muted-foreground">
+                1.000 pedidos por hora por key; se reinicia a la hora en punto. Cada respuesta trae <code className="rounded bg-muted px-1 py-0.5">X-RateLimit-Limit</code>, <code className="rounded bg-muted px-1 py-0.5">X-RateLimit-Remaining</code> y <code className="rounded bg-muted px-1 py-0.5">X-RateLimit-Reset</code> (epoch en segundos). Pasado el límite: <code className="rounded bg-muted px-1 py-0.5">429</code> con <code className="rounded bg-muted px-1 py-0.5">Retry-After</code> (segundos).
+              </p>
             </div>
             <div>
               <div className="mb-1 font-medium">Ejemplo</div>
@@ -418,7 +434,8 @@ const AdminApiKeys = () => {
             <div>
               <div className="mb-2 font-medium">Endpoints</div>
               <div className="space-y-2 text-xs">
-                {[
+                {([
+                  { m: "GET", p: "/me", s: null, d: "Como quién actúa esta key (acts_as: id, name, avatar_url), su agencia (agency_id) y el cupo que le queda esta hora (rate_limit). No necesita scope." },
                   { m: "GET", p: "/creators", s: "creators:read", d: "Creadoras + redes (IG, TikTok, X, OnlyFans, Telegram…). Filtros: status, limit, offset." },
                   { m: "GET", p: "/creators/{id}", s: "creators:read", d: "Detalle de una creadora." },
                   { m: "GET", p: "/contacts", s: "contacts:read", d: "Directorio comercial. Filtros: kind (modelo|agencia|ex_creadora), status, country, con_telefono, limit, offset. Teléfono y email enmascarados salvo que la key tenga contacts:phone." },
@@ -432,12 +449,12 @@ const AdminApiKeys = () => {
                   { m: "GET", p: "/sales", s: "sales:read", d: "Ganancias diarias por creadora + desglose. Filtros: from, to, creator_id." },
                   { m: "GET", p: "/sales/chatters", s: "sales:chatters", d: "Ventas diarias por chatter. Filtros: from, to." },
                   { m: "GET", p: "/promolog", s: "promolog:read", d: "Promoción diaria por creadora y red (promovió sí/no, historias). Filtros: from, to, creator_id, network." },
-                ].map((e) => (
+                ] as { m: string; p: string; s: string | null; d: string }[]).map((e) => (
                   <div key={e.p} className="rounded-md border border-border/60 p-2.5">
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge variant="outline" className="font-mono text-[10px]">{e.m}</Badge>
                       <code className="font-medium">{e.p}</code>
-                      <Badge variant="secondary" className="font-normal text-[10px]">{e.s}</Badge>
+                      {e.s && <Badge variant="secondary" className="font-normal text-[10px]">{e.s}</Badge>}
                     </div>
                     <p className="mt-1 text-muted-foreground">{e.d}</p>
                   </div>
