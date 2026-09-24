@@ -52,6 +52,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useTenantProfiles } from "@/hooks/useAgencyQa";
 import { useAuth } from "@/hooks/useAuth";
+import { useFormato } from "@/hooks/useFormato";
 import { toast } from "sonner";
 import AddSpammerAccountDialog from "./AddSpammerAccountDialog";
 
@@ -90,11 +91,11 @@ const scoreCfg = (score: number | null) => {
   return SCORE_BUCKETS.find((b) => b.test(score))!;
 };
 
-const fmtCount = (n: number | null | undefined): string => {
+const fmtCount = (n: number | null | undefined, locale: string): string => {
   if (n == null) return "—";
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
-  return n.toLocaleString("es");
+  return n.toLocaleString(locale);
 };
 
 type StatPopupKind = "all" | "pending" | "failed";
@@ -429,6 +430,7 @@ const SpammerCard = ({
   onClick: () => void;
   hideOperators?: boolean;
 }) => {
+  const f = useFormato();
   const r = account.representative;
   const cfg = scoreCfg(r.ai_score);
   const isScanning = r.scan_status === "pending" || r.scan_status === "scanning";
@@ -500,9 +502,9 @@ const SpammerCard = ({
 
       {/* Métricas IG */}
       <div className="grid grid-cols-3 gap-1 px-4 pb-3 text-center">
-        <Metric label="Followers" value={fmtCount(r.followers_count)} />
-        <Metric label="Following" value={fmtCount(r.following_count)} />
-        <Metric label="Posts" value={fmtCount(r.posts_count)} />
+        <Metric label="Followers" value={fmtCount(r.followers_count, f.intl("es-ES"))} />
+        <Metric label="Following" value={fmtCount(r.following_count, f.intl("es-ES"))} />
+        <Metric label="Posts" value={fmtCount(r.posts_count, f.intl("es-ES"))} />
       </div>
 
       {/* Summary IA + estado */}
@@ -1058,6 +1060,7 @@ const SpammerDetailDialog = ({
   onRescan: (id: string) => void;
   rescanning: boolean;
 }) => {
+  const f = useFormato();
   if (!account) return null;
   const r = account.representative;
   const a = r.ai_analysis;
@@ -1086,8 +1089,8 @@ const SpammerDetailDialog = ({
                 )}
               </DialogTitle>
               <DialogDescription className="text-xs">
-                {r.display_name ?? "Sin nombre visible"} · {fmtCount(r.followers_count)} followers ·{" "}
-                {fmtCount(r.following_count)} following · {fmtCount(r.posts_count)} posts
+                {r.display_name ?? "Sin nombre visible"} · {fmtCount(r.followers_count, f.intl("es-ES"))} followers ·{" "}
+                {fmtCount(r.following_count, f.intl("es-ES"))} following · {fmtCount(r.posts_count, f.intl("es-ES"))} posts
               </DialogDescription>
             </div>
             <ScoreBadge score={r.ai_score} cfg={cfg} />
@@ -1175,7 +1178,7 @@ const SpammerDetailDialog = ({
               </span>
               {r.last_scanned_at && (
                 <span className="text-[11px] text-muted-foreground">
-                  Escaneado {new Date(r.last_scanned_at).toLocaleDateString("es-AR", { day: "2-digit", month: "short", year: "numeric" })}
+                  Escaneado {new Date(r.last_scanned_at).toLocaleDateString(f.intl("es-AR"), { day: "2-digit", month: "short", year: "numeric" })}
                 </span>
               )}
             </div>

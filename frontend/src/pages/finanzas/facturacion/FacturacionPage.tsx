@@ -35,6 +35,8 @@ import PaymentNoteA4Preview from "./PaymentNoteA4Preview";
 import ComisionesTab from "../comisiones/ComisionesTab";
 import { exportTableToExcel } from "@/pages/finanzas/reportes/generateReport";
 import { format } from "date-fns";
+import { useFormato } from "@/hooks/useFormato";
+import type { Formato } from "@/lib/formato";
 
 const STATUS_BADGE: Record<string, { variant: "default" | "secondary" | "destructive" | "outline" | "warning"; label: string }> = {
   borrador: { variant: "secondary", label: "Borrador" },
@@ -59,12 +61,13 @@ const getDisplayStatus = (inv: any): string => {
 const FACTURA_TABS = ["Invoices", "Notas de Pago", "Reversos", "Comisiones", "Mail", "Archivo de PagoMundo"] as const;
 type FacturaTab = typeof FACTURA_TABS[number];
 
-function fmt(n: number) {
-  return new Intl.NumberFormat("es-CO", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
+function fmt(n: number, f: Formato) {
+  return new Intl.NumberFormat(f.intl("es-CO"), { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
 }
 
 export default function FacturacionPage() {
   const navigate = useNavigate();
+  const f = useFormato();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { methods: configuredPaymentMethods } = usePaymentMethods();
@@ -472,7 +475,7 @@ export default function FacturacionPage() {
                               <span className="text-sm">{creatorName}</span>
                             </div>
                           </TableCell>
-                          <TableCell className="text-sm font-medium">{fmt(Number(n.amount) || 0)}</TableCell>
+                          <TableCell className="text-sm font-medium">{fmt(Number(n.amount) || 0, f)}</TableCell>
                           <TableCell className="text-sm">{n.payment_type || "—"}</TableCell>
                           <TableCell className="text-sm">{n.payment_method || "—"}</TableCell>
                           <TableCell><Badge variant={badge.variant}>{badge.label}</Badge></TableCell>
@@ -518,7 +521,7 @@ export default function FacturacionPage() {
                       <TableRow key={inv.id} className="hover:bg-muted/30">
                         <TableCell className="text-sm font-mono">#{inv.invoice_number}</TableCell>
                         <TableCell className="text-sm">{(inv as any).creators?.artistic_name || (inv as any).creators?.name || "—"}</TableCell>
-                        <TableCell className="text-sm font-medium">{fmt(Number(inv.amount) || 0)}</TableCell>
+                        <TableCell className="text-sm font-medium">{fmt(Number(inv.amount) || 0, f)}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">{inv.reversal_reason || "—"}</TableCell>
                         <TableCell className="text-sm">{format(new Date(inv.created_at), "dd/MM/yyyy")}</TableCell>
                       </TableRow>
@@ -618,8 +621,8 @@ export default function FacturacionPage() {
             <>
               <StatChip label="Total Invoices" value={String(invoices.length)} icon={<FileText className="h-3.5 w-3.5" />} color="bg-primary" hint="Todos" onClick={() => setKpiPopup("total")} />
               <StatChip label="Pendientes" value={String(totalPendientes)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" hint="Enviadas + vencidas" onClick={() => setKpiPopup("pendientes")} />
-              <StatChip label="Monto Total" value={fmt(totalMonto)} icon={<DollarSign className="h-3.5 w-3.5" />} color="bg-success" hint="Suma" onClick={() => setKpiPopup("monto")} />
-              <StatChip label="Fee Total" value={fmt(totalFee)} icon={<DollarSign className="h-3.5 w-3.5" />} color="bg-destructive" hint="Fees cobrados" onClick={() => setKpiPopup("fee")} />
+              <StatChip label="Monto Total" value={fmt(totalMonto, f)} icon={<DollarSign className="h-3.5 w-3.5" />} color="bg-success" hint="Suma" onClick={() => setKpiPopup("monto")} />
+              <StatChip label="Fee Total" value={fmt(totalFee, f)} icon={<DollarSign className="h-3.5 w-3.5" />} color="bg-destructive" hint="Fees cobrados" onClick={() => setKpiPopup("fee")} />
             </>
           )}
         </div>
@@ -693,8 +696,8 @@ export default function FacturacionPage() {
           switch (kpiPopup) {
             case "total": return `Total Invoices — ${invoices.length}`;
             case "pendientes": return `Invoices Pendientes — ${totalPendientes}`;
-            case "monto": return `Monto Total — ${fmt(totalMonto)}`;
-            case "fee": return `Fees Cobrados — ${fmt(totalFee)}`;
+            case "monto": return `Monto Total — ${fmt(totalMonto, f)}`;
+            case "fee": return `Fees Cobrados — ${fmt(totalFee, f)}`;
             default: return "";
           }
         })()}
@@ -715,7 +718,7 @@ export default function FacturacionPage() {
           return list.map((i): KpiRow => ({
             primary: (i as any).recipient_name || `Invoice ${(i as any).invoice_number ?? i.id.slice(0, 8)}`,
             secondary: `${i.status} · ${i.created_at ? format(new Date(i.created_at), "dd MMM yyyy") : "—"}`,
-            right: kpiPopup === "fee" ? fmt(Number((i as any).fee_amount) || 0) : fmt(Number(i.amount) || 0),
+            right: kpiPopup === "fee" ? fmt(Number((i as any).fee_amount) || 0, f) : fmt(Number(i.amount) || 0, f),
             rightTone: tone(i.status as string),
           }));
         })()}

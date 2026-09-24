@@ -47,6 +47,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useFormato } from "@/hooks/useFormato";
 import {
   useCreateQaChatSession,
   useDeleteQaChatSession,
@@ -67,7 +68,7 @@ import {
 // respuesta. Cuando se conecte el backend, esa nota se reemplaza por la
 // llamada a la edge function que streamea tokens.
 
-const formatRelative = (iso: string): string => {
+const formatRelative = (iso: string, locale: string): string => {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "";
   const now = new Date();
@@ -84,13 +85,13 @@ const formatRelative = (iso: string): string => {
   const diffDays = Math.floor((now.getTime() - date.getTime()) / 86_400_000);
   if (diffDays < 7) {
     const wd = date
-      .toLocaleDateString("es-AR", { weekday: "short" })
+      .toLocaleDateString(locale, { weekday: "short" })
       .replace(".", "");
     return `${wd} ${hh}:${mm}`;
   }
   const day = date.getDate();
   const month = date
-    .toLocaleDateString("es-AR", { month: "short" })
+    .toLocaleDateString(locale, { month: "short" })
     .replace(".", "");
   return `${day} ${month}`;
 };
@@ -241,6 +242,7 @@ const useSpeechRecognition = ({
 };
 
 const AgencyQaChat = () => {
+  const f = useFormato();
   const sessionsQ = useQaChatSessions();
   const closersQ = useQaClosers();
   const createSession = useCreateQaChatSession();
@@ -270,6 +272,7 @@ const AgencyQaChat = () => {
     onError: (msg) => {
       toast.error("Dictado por voz", { description: msg });
     },
+    // Idioma fijo a propósito: es el idioma del dictado por voz, no un formato.
     lang: "es-ES",
   });
 
@@ -431,7 +434,7 @@ const AgencyQaChat = () => {
                           ? (s.closer?.name ?? "(closer)")
                           : "Todos"}
                       </span>
-                      <span>· {formatRelative(s.updated_at)}</span>
+                      <span>· {formatRelative(s.updated_at, f.intl("es-AR"))}</span>
                     </div>
                   </button>
                 ))
@@ -506,7 +509,7 @@ const AgencyQaChat = () => {
                             <div className="whitespace-pre-wrap">{m.content}</div>
                           </div>
                           <span className="text-[10px] text-muted-foreground">
-                            {formatRelative(m.created_at)}
+                            {formatRelative(m.created_at, f.intl("es-AR"))}
                           </span>
                         </div>
                       </div>

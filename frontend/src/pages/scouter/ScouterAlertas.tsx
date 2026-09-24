@@ -27,6 +27,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useSpammerAlerts } from "@/hooks/useSpammerTasks";
+import { useFormato } from "@/hooks/useFormato";
 
 const LOOKBACK_OPTIONS = [
   { value: 1, label: "Hoy" },
@@ -35,9 +36,9 @@ const LOOKBACK_OPTIONS = [
   { value: 30, label: "Último mes" },
 ];
 
-const fmtDate = (iso: string): string => {
+const fmtDate = (iso: string, locale: string): string => {
   try {
-    return new Date(iso + "T00:00:00").toLocaleDateString("es-ES", {
+    return new Date(iso + "T00:00:00").toLocaleDateString(locale, {
       weekday: "short",
       day: "2-digit",
       month: "short",
@@ -48,6 +49,7 @@ const fmtDate = (iso: string): string => {
 };
 
 const ScouterAlertas = () => {
+  const f = useFormato();
   const [lookback, setLookback] = useState(7);
   const alertsQ = useSpammerAlerts(lookback);
   const rows = alertsQ.data ?? [];
@@ -124,7 +126,7 @@ const ScouterAlertas = () => {
                 <TableRow key={`${r.spammer_id}-${r.date}`}>
                   <TableCell className="font-medium">{r.spammer_name}</TableCell>
                   <TableCell className="text-xs text-muted-foreground">
-                    {fmtDate(r.date)}
+                    {fmtDate(r.date, f.intl("es-ES"))}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
                     {r.total_assignments}

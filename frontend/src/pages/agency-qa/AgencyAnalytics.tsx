@@ -28,6 +28,7 @@ import {
   scoreColor,
   type QaWindow,
 } from "@/hooks/useAgencyQa";
+import { useFormato } from "@/hooks/useFormato";
 
 // Analytics subtab — supervisor dashboard for Agency QA. Aggregates
 // every qa_calls row in the chosen window and surfaces:
@@ -62,9 +63,9 @@ const OUTCOME_LABELS: Record<string, string> = {
 
 const formatPct = (n: number) => `${(n * 100).toFixed(1)}%`;
 
-const fmtWeekShort = (iso: string) => {
+const fmtWeekShort = (iso: string, locale: string) => {
   const d = new Date(`${iso}T00:00:00Z`);
-  return d.toLocaleDateString("es-ES", { day: "2-digit", month: "short" });
+  return d.toLocaleDateString(locale, { day: "2-digit", month: "short" });
 };
 
 // ─── KPI card — wrapper sobre KpiCard estándar ──────────────────────
@@ -88,6 +89,7 @@ const Kpi = ({
 
 // ─── Main ──────────────────────────────────────────────────────────────
 const AgencyAnalytics = () => {
+  const f = useFormato();
   const [window, setWindow] = useState<QaWindow>("30d");
   type KpiKey = "totales" | "close_rate" | "score" | "closers";
   const [kpiPopup, setKpiPopup] = useState<KpiKey | null>(null);
@@ -104,7 +106,7 @@ const AgencyAnalytics = () => {
     : [];
 
   const weeklyData = (data?.weekly_volume ?? []).map((w) => ({
-    label: fmtWeekShort(w.week_start),
+    label: fmtWeekShort(w.week_start, f.intl("es-ES")),
     calls: w.count,
     avg: w.avg_score,
   }));

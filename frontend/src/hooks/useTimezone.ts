@@ -19,7 +19,7 @@ export function useTimezone() {
 // ─── Format helpers ─────────────────────────────────────────────────
 
 interface FormatOptions {
-  /** Locale BCP47 — default "es-ES". */
+  /** Locale BCP47 — default "es-ES". Para lo que se dibuja, pasar `f.intl("es-ES")` (useFormato). */
   locale?: string;
   /** Intl.DateTimeFormat options. */
   options?: Intl.DateTimeFormatOptions;

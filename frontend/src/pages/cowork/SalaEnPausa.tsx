@@ -10,6 +10,7 @@ import { useId } from "react";
 import { Coffee, Video } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { fraseDePausa } from "@/lib/frasesDePausa";
+import { formatoActual, type Formato } from "@/lib/formato";
 
 export interface PausaDeSala {
   /** "meet" = la sala entera está en un meet grupal del supervisor: no es una
@@ -31,8 +32,8 @@ const mmss = (seg: number) => {
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), r = s % 60;
   return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${String(r).padStart(2, "0")}` : `${m}:${String(r).padStart(2, "0")}`;
 };
-const horaCorta = (epoch: number | null) =>
-  epoch ? new Date(epoch).toLocaleTimeString("es-CO", { hour: "numeric", minute: "2-digit" }) : null;
+const horaCorta = (f: Formato, epoch: number | null) =>
+  epoch ? new Date(epoch).toLocaleTimeString(f.intl("es-CO"), { hour: "numeric", minute: "2-digit" }) : null;
 
 // El "paisaje" de fondo de las miniaturas en pausa del mock (Jhon, 10/09:
 // "tienen hasta una especie de paisaje detrás"). Dibujado en SVG —noche, luna,
@@ -82,11 +83,14 @@ export function PaisajeDePausa({ excedida }: { excedida: boolean }) {
 }
 
 /** Textos y proporción del tope. Puro, para probarlo. */
-export function describirPausa(p: PausaDeSala): { titulo: string; detalle: string; pct: number; tono: "ok" | "poco" | "excedida" } {
+// `formatoActual()` y no el hook: la miniatura se vuelve a dibujar cada segundo
+// (el reloj corre), así que toma el idioma vigente sin exigir el proveedor de
+// idioma (los tests la dibujan sola).
+export function describirPausa(p: PausaDeSala, f: Formato = formatoActual()): { titulo: string; detalle: string; pct: number; tono: "ok" | "poco" | "excedida" } {
   const esBano = p.kind === "bano";
   const titulo = p.kind === "meet" ? "En meet grupal" : esBano ? "En el baño" : "En break";
   const partes: string[] = [];
-  const desde = horaCorta(p.desde);
+  const desde = horaCorta(f, p.desde);
   if (desde) partes.push(`Desde ${desde}`);
   // El meet no tiene tope ni se "pasa": solo desde cuándo.
   if (p.kind === "meet") return { titulo, detalle: partes.join(" · "), pct: 0, tono: "ok" };

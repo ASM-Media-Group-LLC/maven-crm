@@ -25,6 +25,7 @@ import {
   type QaModelWithStats,
 } from "@/hooks/useAgencyQa";
 import { cn } from "@/lib/utils";
+import { useFormato } from "@/hooks/useFormato";
 import CallDetailPage from "./CallDetailPage";
 
 // Modelos subtab — catálogo de modelos con stats agregados (count de
@@ -38,10 +39,10 @@ import CallDetailPage from "./CallDetailPage";
 //   - Avatar upload editor
 //   - Filtro por categoría / país
 
-const fmtDate = (iso: string | null): string => {
+const fmtDate = (iso: string | null, locale: string): string => {
   if (!iso) return "—";
   const d = new Date(`${iso}T00:00:00`);
-  return d.toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" });
+  return d.toLocaleDateString(locale, { day: "2-digit", month: "short", year: "numeric" });
 };
 
 const Avatar = ({ name, dataUrl, size = 32 }: { name: string; dataUrl: string | null; size?: number }) => {
@@ -68,6 +69,7 @@ const OutcomeMini = ({ outcome }: { outcome: CallOutcome }) => {
 };
 
 const AgencyModels = () => {
+  const f = useFormato();
   const [search, setSearch] = useState("");
   // Detail embebido: cuando hay callId, ocultamos la tabla + stats y
   // mostramos CallDetailPage en su lugar con el botón "← Historial"
@@ -259,7 +261,7 @@ const AgencyModels = () => {
                       )}
                     </TableCell>
                     <TableCell className="text-right text-xs text-muted-foreground tabular-nums">
-                      {fmtDate(m.last_call_date)}
+                      {fmtDate(m.last_call_date, f.intl("es-ES"))}
                     </TableCell>
                   </TableRow>
                 );

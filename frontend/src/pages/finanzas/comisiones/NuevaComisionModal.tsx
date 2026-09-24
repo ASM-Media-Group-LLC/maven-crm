@@ -9,9 +9,10 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { ChevronsUpDown, Check, AlertCircle, CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { Calendar } from "@/components/ui/calendar";
+import { useFormato } from "@/hooks/useFormato";
+import type { Formato } from "@/lib/formato";
 
 interface Props {
   open: boolean;
@@ -20,11 +21,12 @@ interface Props {
   isPending?: boolean;
 }
 
-function fmt(n: number) {
-  return new Intl.NumberFormat("es-CO", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
+function fmt(n: number, f: Formato) {
+  return new Intl.NumberFormat(f.intl("es-CO"), { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
 }
 
 export default function NuevaComisionModal({ open, onClose, onSubmit, isPending }: Props) {
+  const f = useFormato();
   const [creatorId, setCreatorId] = useState("");
   const [creatorOpen, setCreatorOpen] = useState(false);
   const [periodStart, setPeriodStart] = useState<Date>();
@@ -159,11 +161,11 @@ export default function NuevaComisionModal({ open, onClose, onSubmit, isPending 
                 <PopoverTrigger asChild>
                   <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !periodStart && "text-muted-foreground")}>
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {periodStart ? format(periodStart, "d MMM yyyy", { locale: es }) : "Seleccionar"}
+                    {periodStart ? format(periodStart, "d MMM yyyy", { locale: f.fechas }) : "Seleccionar"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar mode="single" selected={periodStart} onSelect={(d) => setPeriodStart(d ?? undefined)} locale={es} />
+                  <Calendar mode="single" selected={periodStart} onSelect={(d) => setPeriodStart(d ?? undefined)} locale={f.fechas} />
                 </PopoverContent>
               </Popover>
             </div>
@@ -173,11 +175,11 @@ export default function NuevaComisionModal({ open, onClose, onSubmit, isPending 
                 <PopoverTrigger asChild>
                   <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !periodEnd && "text-muted-foreground")}>
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {periodEnd ? format(periodEnd, "d MMM yyyy", { locale: es }) : "Seleccionar"}
+                    {periodEnd ? format(periodEnd, "d MMM yyyy", { locale: f.fechas }) : "Seleccionar"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar mode="single" selected={periodEnd} onSelect={(d) => setPeriodEnd(d ?? undefined)} locale={es} />
+                  <Calendar mode="single" selected={periodEnd} onSelect={(d) => setPeriodEnd(d ?? undefined)} locale={f.fechas} />
                 </PopoverContent>
               </Popover>
             </div>
@@ -194,7 +196,7 @@ export default function NuevaComisionModal({ open, onClose, onSubmit, isPending 
             <p className="text-sm font-medium">Cálculo Automático</p>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Ganancia de la Creadora</span>
-              <span>{fmt(base)}</span>
+              <span>{fmt(base, f)}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Comisión</span>
@@ -211,12 +213,12 @@ export default function NuevaComisionModal({ open, onClose, onSubmit, isPending 
             {hasBlue && (
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Blue</span>
-                <span className="font-medium">{fmt(blueAmount)}</span>
+                <span className="font-medium">{fmt(blueAmount, f)}</span>
               </div>
             )}
             <div className="border-t border-border pt-1 flex justify-between text-sm font-semibold">
               <span>Total a pagar</span>
-              <span className="text-primary">{fmt(companyValue)}</span>
+              <span className="text-primary">{fmt(companyValue, f)}</span>
             </div>
           </div>
 

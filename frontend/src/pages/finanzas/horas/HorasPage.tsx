@@ -7,15 +7,18 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import StatChip from "@/components/StatChip";
 import { PageHeader } from "@/components/ui/page-header";
+import { useFormato } from "@/hooks/useFormato";
 
 const TABS = ["Horas Extra", "Banco de Horas"] as const;
 type Tab = typeof TABS[number];
 
-function fmt(n: number) {
-  return new Intl.NumberFormat("es-CO", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
+function fmtUsd(n: number, locale: string) {
+  return new Intl.NumberFormat(locale, { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
 }
 
 export default function HorasPage() {
+  const f = useFormato();
+  const fmt = (n: number) => fmtUsd(n, f.intl("es-CO"));
   const [activeTab, setActiveTab] = useState<Tab>("Horas Extra");
 
   const { data: details = [], isLoading } = useQuery({

@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Eye, MousePointerClick, Users, Calendar, Paperclip, Image } from "lucide-react";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useAnnouncementViews, type AnnouncementRow } from "./useAnnouncementsAdmin";
@@ -31,6 +31,7 @@ interface Props {
 }
 
 const AnnouncementDetailModal = ({ open, onOpenChange, announcement }: Props) => {
+  const f = useFormato();
   const { data: views = [] } = useAnnouncementViews(announcement?.id ?? null);
 
   // Get profiles for view users
@@ -79,12 +80,12 @@ const AnnouncementDetailModal = ({ open, onOpenChange, announcement }: Props) =>
             <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
               <span className="flex items-center gap-1.5">
                 <Calendar className="h-3.5 w-3.5" />
-                Publicación: {format(new Date(announcement.starts_at), "d MMM yyyy HH:mm", { locale: es })}
+                Publicación: {format(new Date(announcement.starts_at), "d MMM yyyy HH:mm", { locale: f.fechas })}
               </span>
               {announcement.expires_at && (
                 <span className="flex items-center gap-1.5">
                   <Calendar className="h-3.5 w-3.5" />
-                  Expira: {format(new Date(announcement.expires_at), "d MMM yyyy HH:mm", { locale: es })}
+                  Expira: {format(new Date(announcement.expires_at), "d MMM yyyy HH:mm", { locale: f.fechas })}
                 </span>
               )}
             </div>
@@ -170,11 +171,11 @@ const AnnouncementDetailModal = ({ open, onOpenChange, announcement }: Props) =>
                       <TableRow key={v.id}>
                         <TableCell className="font-medium">{profileMap[v.user_id] ?? "Usuario"}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">
-                          {format(new Date(v.viewed_at), "d MMM yyyy HH:mm", { locale: es })}
+                          {format(new Date(v.viewed_at), "d MMM yyyy HH:mm", { locale: f.fechas })}
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {v.opened_at
-                            ? format(new Date(v.opened_at), "d MMM yyyy HH:mm", { locale: es })
+                            ? format(new Date(v.opened_at), "d MMM yyyy HH:mm", { locale: f.fechas })
                             : "—"}
                         </TableCell>
                       </TableRow>

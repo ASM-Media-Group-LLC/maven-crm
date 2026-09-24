@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Brain, Mic, Search, AlertTriangle, DollarSign } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useFormato } from "@/hooks/useFormato";
 import {
   ResponsiveContainer,
   LineChart,
@@ -147,6 +148,7 @@ interface ControlGastoTabProps {
 }
 
 const ControlGastoTab = ({ range }: ControlGastoTabProps = {}) => {
+  const f = useFormato();
   const capsQ = useCaps();
   const summaryQ = useUsageSummary(range?.from, range?.to);
   const caps = capsQ.data ?? [];
@@ -263,7 +265,7 @@ const ControlGastoTab = ({ range }: ControlGastoTabProps = {}) => {
                     ${s.monthSpend.toFixed(2)}
                   </p>
                   <p className="text-[10px] text-muted-foreground mt-1 line-clamp-2">
-                    de ${s.cap.toFixed(2)} · {s.callsThisMonth.toLocaleString("es")} calls
+                    de ${s.cap.toFixed(2)} · {s.callsThisMonth.toLocaleString(f.idioma === "en" ? "en-US" : "es")} calls
                   </p>
                 </div>
                 {/* Progress bar — fina, status-coloreada. */}
@@ -367,7 +369,7 @@ const ControlGastoTab = ({ range }: ControlGastoTabProps = {}) => {
                 {recent.map((r, i) => (
                   <tr key={i} className="border-b border-border/40">
                     <td className="py-1.5 pr-3 text-xs text-muted-foreground tabular-nums">
-                      {new Date(r.occurred_at).toLocaleString("es-CO", {
+                      {new Date(r.occurred_at).toLocaleString(f.intl("es-CO"), {
                         month: "short",
                         day: "2-digit",
                         hour: "2-digit",

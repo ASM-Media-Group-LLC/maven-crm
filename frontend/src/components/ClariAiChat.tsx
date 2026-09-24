@@ -258,6 +258,7 @@ const ClariAiChat = ({
     if (!SpeechRecAPI) return;
 
     const rec = new SpeechRecAPI();
+    // Idioma fijo a propósito: es el idioma en que se reconoce lo que se dicta (entrada para Clari), no un formato de pantalla.
     rec.lang = "es-ES";
     rec.continuous = false;
     rec.interimResults = true;

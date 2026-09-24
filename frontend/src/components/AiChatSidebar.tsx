@@ -14,7 +14,6 @@ import {
 import { Plus, Pencil, Trash2, MessageSquare } from "lucide-react";
 import { AiConversation } from "@/hooks/useAiConversations";
 import { format, isToday, isYesterday, isThisWeek } from "date-fns";
-import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 
 interface AiChatSidebarProps {

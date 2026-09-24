@@ -14,15 +14,19 @@ import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/ui/page-header";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useFormato } from "@/hooks/useFormato";
+import type { Formato } from "@/lib/formato";
 
-function fmt(n: number) {
-  return new Intl.NumberFormat("es-CO", { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(n);
+function fmtMonto(n: number, f: Formato) {
+  return new Intl.NumberFormat(f.intl("es-CO"), { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(n);
 }
 
 const A4_W = 595;
 const A4_H = 842;
 
 export default function NuevoInvoicePage() {
+  const f = useFormato();
+  const fmt = (n: number) => fmtMonto(n, f);
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();

@@ -11,15 +11,18 @@ import { DateRangePicker } from "@/components/ui/date-range-picker";
 import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import { PageHeader } from "@/components/ui/page-header";
+import { useFormato } from "@/hooks/useFormato";
 
 const TABS = ["Ingresos vs Costos", "Costos por CC", "Costos por Departamento", "Productividad por Empleado", "Márgenes Operativos"] as const;
 type Tab = typeof TABS[number];
 
-function fmt(n: number) {
-  return new Intl.NumberFormat("es-CO", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
+function fmtUsd(n: number, locale: string) {
+  return new Intl.NumberFormat(locale, { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
 }
 
 export default function ControlFinancieroPage() {
+  const f = useFormato();
+  const fmt = (n: number) => fmtUsd(n, f.intl("es-CO"));
   const [activeTab, setActiveTab] = useState<Tab>("Ingresos vs Costos");
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
   const [dateTo, setDateTo] = useState<Date | undefined>();
@@ -365,7 +368,7 @@ export default function ControlFinancieroPage() {
             const paid = invoices.filter(i => i.status === "pagada");
             return paid.map((i): KpiRow => ({
               primary: (i as any).recipient_name || `Invoice ${(i as any).invoice_number ?? i.id.slice(0, 8)}`,
-              secondary: i.created_at ? new Date(i.created_at).toLocaleDateString("es") : "—",
+              secondary: i.created_at ? new Date(i.created_at).toLocaleDateString(f.idioma === "en" ? "en-US" : "es") : "—",
               right: fmt(Number(i.amount) || 0),
               rightTone: "success",
             }));

@@ -56,3 +56,12 @@ export function useLanguage() {
   if (!context) throw new Error("useLanguage must be used within LanguageProvider");
   return context;
 }
+
+/** Igual que `useLanguage()` pero SIN tirar si falta el proveedor: devuelve
+ *  undefined. Existe para lo que se puede dibujar fuera del árbol de la app, donde
+ *  tirar es una pantalla en negro. El caso real: FacturacionPage monta un
+ *  `createRoot` aparte para dibujar la factura y pasarla a PDF, fuera del
+ *  LanguageProvider. Para texto de pantalla normal, seguí usando `useLanguage()`. */
+export function useLanguageSiHay(): LanguageContextType | undefined {
+  return useContext(LanguageContext);
+}

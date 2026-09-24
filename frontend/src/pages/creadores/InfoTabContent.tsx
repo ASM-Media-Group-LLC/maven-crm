@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
 import { Edit, Save, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,6 +20,7 @@ import { TgChatButton } from "@/components/TgChatButton";
 import { useScouterCompanies } from "@/hooks/useScouterLeads";
 import { ManagerSelect, managerAssignmentPatch, useManagerName } from "./ManagerSelect";
 import { useModelCategories } from "@/hooks/useModelCategories";
+import { useFormato } from "@/hooks/useFormato";
 import { ExternalLink } from "lucide-react";
 
 const statusLabel: Record<string, string> = {
@@ -107,6 +107,7 @@ const EditField = ({ label, children }: { label: string; children: React.ReactNo
 );
 
 const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
+  const f = useFormato();
   const queryClient = useQueryClient();
   const c = creator;
   const biz = c.creator_business;
@@ -274,7 +275,7 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
 
         {/* Fecha de Registro (read-only always) */}
         <InfoField label="Fecha de Registro" value={
-          c.registration_date ? format(new Date(c.registration_date), "dd 'de' MMMM 'de' yyyy", { locale: es }) : null
+          c.registration_date ? format(new Date(c.registration_date), f.idioma === "en" ? "MMMM dd, yyyy" : "dd 'de' MMMM 'de' yyyy", { locale: f.fechas }) : null
         } />
 
         {/* Manager (PERSONA con rol manager — fuente de verdad de quién maneja
@@ -325,7 +326,7 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
           </EditField>
         ) : (
           <InfoField label="Fecha de Nacimiento" value={
-            c.birth_date ? format(new Date(c.birth_date), "dd 'de' MMMM 'de' yyyy", { locale: es }) : null
+            c.birth_date ? format(new Date(c.birth_date), f.idioma === "en" ? "MMMM dd, yyyy" : "dd 'de' MMMM 'de' yyyy", { locale: f.fechas }) : null
           } />
         )}
 

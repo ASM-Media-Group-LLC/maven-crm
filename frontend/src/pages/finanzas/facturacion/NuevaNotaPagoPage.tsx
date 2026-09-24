@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { PageHeader } from "@/components/ui/page-header";
 
+// Idioma fijo a propósito: monto de la nota de pago (vista previa del documento que recibe la creadora).
 function fmt(n: number) {
   return new Intl.NumberFormat("es-CO", { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(n);
 }
@@ -79,6 +80,7 @@ export default function NuevaNotaPagoPage() {
 
   const amt = Number(amount) || 0;
   const selectedCreator = creators.find(c => c.id === creatorId);
+  // Idioma fijo a propósito: fecha dentro de la nota de pago, documento que recibe la creadora.
   const today = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
 
   const handleSubmit = () => {
@@ -243,6 +245,7 @@ export default function NuevaNotaPagoPage() {
                         <div className="space-y-1 text-right">
                           <p className="font-semibold text-gray-800">Payment details</p>
                           <p><span className="font-semibold text-gray-800">Payment date: </span><span className="text-gray-600">{today}</span></p>
+                          {/* Idioma fijo a propósito: fecha dentro de la nota de pago, documento que recibe la creadora. */}
                           {dueDate && (
                             <p><span className="font-semibold text-gray-800">Due date: </span><span className="text-gray-600">{new Date(dueDate + "T12:00:00").toLocaleDateString("es-ES")}</span></p>
                           )}

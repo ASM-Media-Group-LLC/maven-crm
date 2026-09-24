@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import { ExternalLink, MapPin, Building2, Mail, Phone, UserCog, CalendarDays, Globe, MessageCircle, Trash2, Facebook, Link as LinkIcon, Send } from "lucide-react";
 import { WaChatButton, toE164 } from "@/components/WaChatButton";
 import { TgChatButton } from "@/components/TgChatButton";
@@ -112,13 +112,14 @@ const SocialLink = ({ icon, handle, url, rawHandle }: { icon: React.ReactNode; h
 };
 
 const ViewCreadorModal = ({ open, onOpenChange, creator }: Props) => {
+  const f = useFormato();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { isAdmin } = useUserRole();
   const [deleteOpen, setDeleteOpen] = useState(false);
   const c = creator;
   const flag = getFlagEmoji(c.country_code || countryToCode[c.country ?? ""] || null);
-  const regDate = c.registration_date ? format(new Date(c.registration_date), "dd MMM yyyy", { locale: es }) : null;
+  const regDate = c.registration_date ? format(new Date(c.registration_date), "dd MMM yyyy", { locale: f.fechas }) : null;
   const igUrl = c.instagram_handle ? buildSocialUrl("instagram", c.instagram_handle) : null;
 
   const deleteCreator = useMutation({

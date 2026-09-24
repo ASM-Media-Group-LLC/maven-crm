@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useFormato } from "@/hooks/useFormato";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -26,7 +27,6 @@ import { PERFORMANCE_EVALUATION_STATUSES } from "@/lib/hrConstants";
 import HrPerformanceOperativo from "./HrPerformanceOperativo";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
 // xlsx loaded on demand inside handleExport — keeps the export
 // dependency out of the cold-load bundle.
 
@@ -132,6 +132,7 @@ const STATUS_TAB_LIST = [
 
 // ─── Main ───────────────────────────────────────────────────────────────────
 export default function HRPerformance() {
+  const f = useFormato();
   const navigate = useNavigate();
   const { data: evals = [], isLoading } = usePerformanceData();
   const { data: departments = [] } = useDepartments();
@@ -496,7 +497,7 @@ export default function HRPerformance() {
                       </div>
                       <div className="flex items-center justify-between">
                         <ScoreStars score={ev.overall_score} />
-                        <span className="text-xs text-muted-foreground">{format(new Date(ev.evaluation_date), "dd MMM yyyy", { locale: es })}</span>
+                        <span className="text-xs text-muted-foreground">{format(new Date(ev.evaluation_date), "dd MMM yyyy", { locale: f.fechas })}</span>
                       </div>
                       {ev.goals_next_period && (
                         <p className="text-xs text-muted-foreground line-clamp-2">{ev.goals_next_period}</p>
@@ -541,7 +542,7 @@ export default function HRPerformance() {
                   <UserAvatar name={emp ? `${emp.first_name} ${emp.last_name}` : null} src={emp?.profile_photo_url ?? undefined} size="md" />
                   <div>
                     <p className="font-medium">{fullName}</p>
-                    <p className="text-sm text-muted-foreground">{viewItem.period} · {format(new Date(viewItem.evaluation_date), "dd MMM yyyy", { locale: es })}</p>
+                    <p className="text-sm text-muted-foreground">{viewItem.period} · {format(new Date(viewItem.evaluation_date), "dd MMM yyyy", { locale: f.fechas })}</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">

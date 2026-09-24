@@ -3,7 +3,7 @@ import DataTableShell from "@/components/ui/data-table-shell";
 import { MaskedPhone } from "@/components/MaskedPhone";
 import { ArrowLeft, Plus, UserPlus, Clock, Search, List, LayoutGrid, FileText, BarChart3, Target, TrendingUp, Star, ArrowUpRight, ArrowRight, ArrowDownRight, Eye, ClipboardCheck } from "lucide-react";
 import { format, isSameDay, differenceInMinutes, differenceInSeconds, startOfDay, endOfDay, subDays } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Button } from "@/components/ui/button";
@@ -60,6 +60,7 @@ const tabs = [
 const OBJETIVO_POR_HORA = 20;
 
 const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: AgentDetailViewProps) => {
+  const f = useFormato();
   const [activeTab, setActiveTab] = useState("leads");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [searchTerm, setSearchTerm] = useState("");
@@ -362,7 +363,7 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
                             </Badge>
                           </div>
                           <div className="flex items-center justify-end text-xs text-muted-foreground">
-                            <span>{format(new Date(lead.created_at), "d MMM", { locale: es })}</span>
+                            <span>{format(new Date(lead.created_at), "d MMM", { locale: f.fechas })}</span>
                           </div>
                           {lead.country_code && <p className="text-xs text-muted-foreground mt-1">{lead.country_code}</p>}
                         </CardContent>
@@ -378,7 +379,7 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
             const dailyData = Array.from({ length: 7 }, (_, i) => {
               const day = subDays(now, 6 - i);
               return {
-                label: format(day, "EEE dd", { locale: es }),
+                label: format(day, "EEE dd", { locale: f.fechas }),
                 count: agentLeads.filter(l => isSameDay(new Date(l.created_at), day)).length,
               };
             });
@@ -534,7 +535,7 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
                         return (
                           <TableRow key={lead.id}>
                             <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                              {format(new Date(lead.created_at), "dd/MM/yyyy", { locale: es })}
+                              {format(new Date(lead.created_at), "dd/MM/yyyy", { locale: f.fechas })}
                             </TableCell>
                             <TableCell className="font-medium text-sm">@{lead.model_handle}</TableCell>
                             <TableCell>
@@ -650,7 +651,7 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Fecha</p>
-                  <p className="text-sm font-medium">{format(new Date(selectedLead.created_at), "dd/MM/yyyy hh:mm a", { locale: es })}</p>
+                  <p className="text-sm font-medium">{format(new Date(selectedLead.created_at), "dd/MM/yyyy hh:mm a", { locale: f.fechas })}</p>
                 </div>
               </div>
               {selectedLead.notes && (

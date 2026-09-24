@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ExternalLink, MessageCircle, Plus, Save, UserCheck, Trash2 } from "lucide-react";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MaskedPhone } from "@/components/MaskedPhone";
 import InstagramIcon from "@/components/icons/InstagramIcon";
@@ -61,6 +61,7 @@ const InfoCard = ({ label, children }: { label: string; children: React.ReactNod
 );
 
 const ViewLeadModal = ({ open, onOpenChange, lead, onDelete }: Props) => {
+  const f = useFormato();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [showNoteForm, setShowNoteForm] = useState(false);
@@ -180,10 +181,10 @@ const ViewLeadModal = ({ open, onOpenChange, lead, onDelete }: Props) => {
                 <span>@{lead.model_handle}</span>
               </InfoCard>
               <InfoCard label="Fecha de entrada">
-                {format(createdDate, "dd MMM yyyy", { locale: es })}
+                {format(createdDate, "dd MMM yyyy", { locale: f.fechas })}
               </InfoCard>
               <InfoCard label="Hora">
-                {format(createdDate, "hh:mm a", { locale: es })}
+                {format(createdDate, "hh:mm a", { locale: f.fechas })}
               </InfoCard>
               <InfoCard label="Ubicación">
                 <span className="flex items-center gap-1.5">
@@ -273,7 +274,7 @@ const ViewLeadModal = ({ open, onOpenChange, lead, onDelete }: Props) => {
                     <div key={note.id} className="border rounded-lg p-3 space-y-1">
                       <p className="text-sm">{note.note_text}</p>
                       <p className="text-xs text-muted-foreground">
-                        {format(new Date(note.created_at), "dd MMM yyyy, hh:mm a", { locale: es })}
+                        {format(new Date(note.created_at), "dd MMM yyyy, hh:mm a", { locale: f.fechas })}
                       </p>
                     </div>
                   ))}

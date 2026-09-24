@@ -5,6 +5,7 @@ import { ExternalLink, Pencil, Sparkles, Trash2, ArrowRight, History, Phone } fr
 import ContactHistoryView from "./ContactHistoryView";
 import { useUserRole } from "@/hooks/useUserRole";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useFormato } from "@/hooks/useFormato";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -13,7 +14,6 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { format, parseISO } from "date-fns";
-import { es } from "date-fns/locale";
 import { getCountryFlag, getCountryShortDisplay } from "@/lib/country-utils";
 import { WaChatButton } from "@/components/WaChatButton";
 import { TgChatButton } from "@/components/TgChatButton";
@@ -46,6 +46,7 @@ interface Props {
 // Mismo patrón que CreatorDetailDialog (Dashboard 2): foto + título + IG
 // + grid de stats + botones de acción.
 const ContactoDetailDialog = ({ open, onOpenChange, contacto, onEdit, onConvert, onDelete, canDelete, salesChannels = [], showSalesChannels }: Props) => {
+  const f = useFormato();
   const [historyOpen, setHistoryOpen] = useState(false);
   const { isAdmin } = useUserRole();
   const { permissions } = usePermissions();
@@ -244,7 +245,7 @@ const ContactoDetailDialog = ({ open, onOpenChange, contacto, onEdit, onConvert,
                     <Badge variant="secondary" className="font-normal">{ch.label}</Badge>
                     <span className="text-xs text-muted-foreground tabular-nums whitespace-nowrap">
                       {ch.lastAt
-                        ? format(parseISO(ch.lastAt), "dd MMM yy, HH:mm", { locale: es })
+                        ? format(parseISO(ch.lastAt), "dd MMM yy, HH:mm", { locale: f.fechas })
                         : "—"}
                     </span>
                   </div>
@@ -267,7 +268,7 @@ const ContactoDetailDialog = ({ open, onOpenChange, contacto, onEdit, onConvert,
                       contacto {n.idx}{n.channel ? ` · ${n.channel}` : ""}
                     </span>
                     <span className="text-[10px] text-muted-foreground tabular-nums whitespace-nowrap">
-                      {n.contact_date ? format(parseISO(n.contact_date), "dd MMM yy", { locale: es }) : ""}
+                      {n.contact_date ? format(parseISO(n.contact_date), "dd MMM yy", { locale: f.fechas }) : ""}
                     </span>
                   </div>
                   <p className="text-sm text-muted-foreground mt-0.5 whitespace-pre-wrap">{n.notes}</p>

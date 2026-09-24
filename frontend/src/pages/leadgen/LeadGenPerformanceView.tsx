@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import { format, subDays, isSameDay, subMonths } from "date-fns";
-import { es } from "date-fns/locale";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, LineChart, Line, ResponsiveContainer } from "recharts";
 import { BarChart3, Clock, ChevronsUpDown, Check } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,6 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandInput, CommandList, CommandEmpty, CommandItem } from "@/components/ui/command";
 import { useLeadGenAgentLeads } from "./useLeadGen";
 import type { LeadGenEntry } from "./useLeadGen";
+import { useFormato } from "@/hooks/useFormato";
 
 interface Props {
   profiles: Array<{ id: string; full_name: string | null }>;
@@ -18,6 +18,7 @@ interface Props {
 }
 
 const LeadGenPerformanceView = ({ profiles, agentIds, dateFrom, dateTo }: Props) => {
+  const f = useFormato();
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
 
@@ -43,29 +44,29 @@ const LeadGenPerformanceView = ({ profiles, agentIds, dateFrom, dateTo }: Props)
   const weeklyData = useMemo(() => Array.from({ length: 7 }, (_, i) => {
     const day = subDays(now, 6 - i);
     return {
-      label: format(day, "EEE dd", { locale: es }),
+      label: format(day, "EEE dd", { locale: f.fechas }),
       count: agentLeads.filter(l => isSameDay(new Date(l.created_at), day)).length,
     };
-  }), [agentLeads, now]);
+  }), [agentLeads, now, f]);
 
   const last30Data = useMemo(() => Array.from({ length: 30 }, (_, i) => {
     const day = subDays(now, 29 - i);
     return {
-      label: format(day, "d MMM", { locale: es }),
+      label: format(day, "d MMM", { locale: f.fechas }),
       count: agentLeads.filter(l => isSameDay(new Date(l.created_at), day)).length,
     };
-  }), [agentLeads, now]);
+  }), [agentLeads, now, f]);
 
   const yearlyData = useMemo(() => Array.from({ length: 12 }, (_, i) => {
     const month = subMonths(now, 11 - i);
     return {
-      label: format(month, "MMM yy", { locale: es }),
+      label: format(month, "MMM yy", { locale: f.fechas }),
       count: agentLeads.filter(l => {
         const d = new Date(l.created_at);
         return d.getMonth() === month.getMonth() && d.getFullYear() === month.getFullYear();
       }).length,
     };
-  }), [agentLeads, now]);
+  }), [agentLeads, now, f]);
 
   const tooltipStyle = { backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' };
 

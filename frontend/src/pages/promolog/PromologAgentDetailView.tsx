@@ -17,8 +17,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { useFormato } from "@/hooks/useFormato";
 import { format, subDays, startOfDay, isToday } from "date-fns";
-import { es } from "date-fns/locale";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   LineChart, Line, Cell, PieChart, Pie, Legend,
@@ -56,6 +56,7 @@ const NETWORK_COLORS: Record<string, string> = {
 };
 
 const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps) => {
+  const f = useFormato();
   const { user } = useAuth();
   const { role } = useUserRole();
   const isManagement = ["admin", "manager", "supervisor"].includes(role ?? "");
@@ -159,15 +160,15 @@ const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps
         network: (pe.network || "").toLowerCase(),
         platform: pe.platform || "OnlyFans",
         result: promotedToResult(pe.promoted),
-        date: dateObj.toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" }),
-        time: dateObj.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", hour12: true }),
+        date: dateObj.toLocaleDateString(f.intl("es-ES"), { day: "numeric", month: "short", year: "numeric" }),
+        time: dateObj.toLocaleTimeString(f.intl("es-ES"), { hour: "2-digit", minute: "2-digit", hour12: true }),
         agent: (pe.reviewed_by && profilesMap[pe.reviewed_by]) || "—",
         notes: pe.notes || "",
         creator_id: pe.creator_id,
         reviewed_by: pe.reviewed_by || undefined,
       };
     });
-  }, [rawEntries, profilesMap]);
+  }, [rawEntries, profilesMap, f]);
 
   // KPIs
   const totalEntries = entries.length;
@@ -181,7 +182,7 @@ const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps
     for (let i = 6; i >= 0; i--) {
       const d = subDays(new Date(), i);
       const dayStr = format(d, "yyyy-MM-dd");
-      const dayLabel = format(d, "EEE d", { locale: es });
+      const dayLabel = format(d, "EEE d", { locale: f.fechas });
       const dayEntries = rawEntries.filter((e: any) => (e.date?.split("T")[0] ?? "") === dayStr);
       // Sí = promocionó ('true'/'yes'/'partial'); No = todo lo demás (incl. 'pending'/'false'),
       // así si + no === total y las barras apiladas cuadran con el total del día.
@@ -194,7 +195,7 @@ const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps
       });
     }
     return days;
-  }, [rawEntries]);
+  }, [rawEntries, f]);
 
   const promosByHour = useMemo(() => {
     const hours: { hour: string; count: number }[] = [];
@@ -500,7 +501,7 @@ const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps
             result === "Sí" ? "success" : "destructive";
           return list.slice(0, 100).map((e: any): KpiRow => ({
             primary: e.creator_name ?? e.creator_handle ?? "Sin creador",
-            secondary: `${e.network ?? "—"} · ${e.date ? new Date(e.date).toLocaleDateString("es") : "—"}`,
+            secondary: `${e.network ?? "—"} · ${e.date ? new Date(e.date).toLocaleDateString(f.idioma === "en" ? "en-US" : "es") : "—"}`,
             right: e.result ?? "—",
             rightTone: tone(e.result ?? ""),
           }));

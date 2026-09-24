@@ -66,6 +66,7 @@ import {
   type QaSectionType,
 } from "@/hooks/useAgencyQa";
 import OutcomeBadge from "@/components/agency-qa/OutcomeBadge";
+import { useFormato } from "@/hooks/useFormato";
 
 // CallDetailPage — port directo de Kash (kash-call-qa/app/calls/[id]/page.tsx)
 // con la paleta de colores de Maven: el dorado (--gold #c9a96e) se reemplaza
@@ -79,18 +80,18 @@ const PRIMARY_SOFT = "hsl(var(--primary) / 0.12)";
 // que --gold del diseño Kash original.
 const GOLD = "#d4a942";
 
-const fmtDate = (iso: string): string => {
+const fmtDate = (iso: string, locale: string): string => {
   const d = new Date(`${iso}T00:00:00`);
-  return d.toLocaleDateString("es-ES", {
+  return d.toLocaleDateString(locale, {
     day: "2-digit",
     month: "long",
     year: "numeric",
   });
 };
 
-const fmtDateTime = (d: Date | string): string => {
+const fmtDateTime = (d: Date | string, locale: string): string => {
   const date = typeof d === "string" ? new Date(d) : d;
-  return date.toLocaleString("es-ES", {
+  return date.toLocaleString(locale, {
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -1336,6 +1337,7 @@ const CallDetailPage = ({
   callId: string;
   onBack: () => void;
 }) => {
+  const f = useFormato();
   const callQ = useQaCall(callId);
   const audioUrlQ = useQaAudioSignedUrl(callQ.data?.audio_path ?? null);
   const fireWebhook = useFireQaWebhook();
@@ -1545,7 +1547,7 @@ const CallDetailPage = ({
                   </span>
                   <span className="inline-flex items-center gap-1.5">
                     <Calendar className="h-3.5 w-3.5" />
-                    {fmtDate(call.call_date)}
+                    {fmtDate(call.call_date, f.intl("es-ES"))}
                   </span>
                   <span className="inline-flex items-center gap-1.5">
                     <Sparkles className="h-3.5 w-3.5" />
@@ -1603,7 +1605,7 @@ const CallDetailPage = ({
             </span>
           )}
           <span className="text-xs text-muted-foreground">
-            Análisis: {fmtDateTime(call.created_at)}
+            Análisis: {fmtDateTime(call.created_at, f.intl("es-ES"))}
           </span>
         </div>
         <ReanalyzeButton callId={call.id} />
@@ -1767,7 +1769,7 @@ const CallDetailPage = ({
                 <span className="font-medium text-foreground">
                   {lastFb.evaluator_name}
                 </span>
-                <span>{fmtDateTime(lastFb.created_at)}</span>
+                <span>{fmtDateTime(lastFb.created_at, f.intl("es-ES"))}</span>
               </div>
               {typeof lastFb.human_score === "number" && (
                 <div className="mt-1 text-xs text-muted-foreground">

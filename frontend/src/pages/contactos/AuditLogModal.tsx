@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ interface Props {
 }
 
 const AuditLogModal = ({ open, onOpenChange }: Props) => {
+  const f = useFormato();
   const [search, setSearch] = useState("");
   const [agentFilter, setAgentFilter] = useState("all");
   const [riskFilter, setRiskFilter] = useState<"all" | "suspicious" | "normal">("all");
@@ -269,7 +270,7 @@ const AuditLogModal = ({ open, onOpenChange }: Props) => {
                           <TableRow key={c.id} className={isSuspicious ? "bg-warning/5" : ""}>
                             <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                               {c.changed_at
-                                ? format(new Date(c.changed_at), "dd MMM yy, HH:mm", { locale: es })
+                                ? format(new Date(c.changed_at), "dd MMM yy, HH:mm", { locale: f.fechas })
                                 : "—"}
                             </TableCell>
                             <TableCell className="text-xs font-mono text-muted-foreground">

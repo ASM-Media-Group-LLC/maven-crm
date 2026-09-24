@@ -10,7 +10,7 @@ import { PRESET_CONFIG, rangeForPreset, type RangePreset } from "@/lib/range-pre
 import { cn } from "@/lib/utils";
 import SelectorDeTablero from "@/pages/dashboard/SelectorDeTablero";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import { CLOSER_STAGES, STAGE_LABELS, getNextContactDate, isContactOverdue, needsContactDecision } from "@/pages/closers/hooks/useCloserLeads";
 import { diasDelRango, useMisHoras, resumirHoras } from "@/hooks/useMisHoras";
 import { useMiTiempoCowork, resumirTiempoCowork, pieTiempoCowork } from "@/hooks/useMiTiempoCowork";
@@ -72,6 +72,7 @@ function Kpi({ label, valor, pie, icono: Icono, color, tinte, barra }: {
 }
 
 export default function CloserDashboard() {
+  const f = useFormato();
   const [rango, setRango] = useState<{ from: Date; to: Date }>(() => rangeForPreset("this_week", new Date()));
   const [preset, setPreset] = useState<RangePreset | null>("this_week");
   const desde = isoDia(rango.from);
@@ -250,7 +251,7 @@ export default function CloserDashboard() {
                     <p className="truncate text-sm font-medium leading-tight">@{l.instagram_handle}</p>
                     <p className="truncate text-[11px] text-muted-foreground">
                       {l.contactos} de 6 contactos
-                      {l.last_contact_date && ` · último ${format(new Date(`${l.last_contact_date}T12:00:00`), "d MMM", { locale: es })}`}
+                      {l.last_contact_date && ` · último ${format(new Date(`${l.last_contact_date}T12:00:00`), "d MMM", { locale: f.fechas })}`}
                       {l.category && ` · ${l.category}`}
                     </p>
                   </div>
@@ -334,13 +335,13 @@ export default function CloserDashboard() {
                   {diasGrafico.map((d) => (
                     <div key={d.date} className="flex min-w-0 max-w-[64px] flex-1 flex-col items-center gap-1"
                       title={d.horas > 0
-                        ? `${format(new Date(`${d.date}T12:00:00`), "EEEE d MMM", { locale: es })}: ${d.horas.toFixed(1)} h${d.actividad != null ? ` · ${d.actividad}% de actividad` : ""}`
-                        : `${format(new Date(`${d.date}T12:00:00`), "EEEE d MMM", { locale: es })}: sin registro`}>
+                        ? `${format(new Date(`${d.date}T12:00:00`), "EEEE d MMM", { locale: f.fechas })}: ${d.horas.toFixed(1)} h${d.actividad != null ? ` · ${d.actividad}% de actividad` : ""}`
+                        : `${format(new Date(`${d.date}T12:00:00`), "EEEE d MMM", { locale: f.fechas })}: sin registro`}>
                       <span className="text-[9px] tabular-nums text-muted-foreground">{d.horas > 0 ? d.horas.toFixed(1) : ""}</span>
                       <div className={cn("w-full rounded-t transition-[height] duration-700", d.horas > 0 ? "bg-sky-500" : "bg-white/[0.07]")}
                         style={{ height: `${d.horas > 0 ? Math.max(4, (d.horas / hubstaff.maxHoras) * 80) : 3}px` }} />
                       <span className="truncate text-[9px] text-muted-foreground">
-                        {format(new Date(`${d.date}T12:00:00`), "d", { locale: es })}
+                        {format(new Date(`${d.date}T12:00:00`), "d", { locale: f.fechas })}
                       </span>
                     </div>
                   ))}

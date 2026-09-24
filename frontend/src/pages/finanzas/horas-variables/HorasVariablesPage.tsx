@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useFormato } from "@/hooks/useFormato";
 import { usePayrollParams } from "@/hooks/useFinancialConfig";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,8 +28,8 @@ import NuevaComisionModal from "../comisiones/NuevaComisionModal";
 import { exportTableToExcel } from "@/pages/finanzas/reportes/generateReport";
 import { PageHeader } from "@/components/ui/page-header";
 
-function fmt(n: number) {
-  return new Intl.NumberFormat("es-CO", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
+function fmtMonto(n: number, locale: string) {
+  return new Intl.NumberFormat(locale, { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
 }
 
 const TABS = ["Horas Extra", "Banco de Horas", "Comisiones"] as const;
@@ -41,6 +42,8 @@ const COMISION_STATUS: Record<string, { variant: "default" | "secondary" | "dest
 };
 
 export default function HorasVariablesPage() {
+  const f = useFormato();
+  const fmt = (n: number) => fmtMonto(n, f.intl("es-CO"));
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<HVTab>("Horas Extra");

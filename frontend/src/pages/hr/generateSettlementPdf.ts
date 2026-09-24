@@ -13,12 +13,14 @@ interface SettlementData {
   hourBankAmount: number;
 }
 
+// Idioma fijo a propósito: la liquidación es un PDF en español que se descarga y se le entrega al empleado.
 const fmt = (n: number) =>
   new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(n);
 
 const fmtDate = (d: string) => {
   if (!d) return "—";
   const date = new Date(d + "T12:00:00");
+  // Idioma fijo a propósito: fecha dentro del PDF de liquidación, documento en español para el empleado.
   return date.toLocaleDateString("es-CO", { year: "numeric", month: "long", day: "numeric" });
 };
 
@@ -37,6 +39,7 @@ export function generateSettlementPdf(data: SettlementData) {
   doc.setFont("helvetica", "normal");
   doc.text("Liquidación Proyectada", 14, 24);
   doc.setFontSize(8);
+  // Idioma fijo a propósito: encabezado del PDF de liquidación, documento en español para el empleado.
   doc.text(`Generado: ${new Date().toLocaleDateString("es-CO")}`, 160, 16);
 
   // Employee info

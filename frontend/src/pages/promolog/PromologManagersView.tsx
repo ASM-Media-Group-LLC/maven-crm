@@ -17,7 +17,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format, differenceInCalendarDays } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import { ChevronDown, ChevronUp, TrendingDown, TrendingUp } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -65,7 +65,6 @@ interface GrowthRow {
 }
 
 const SILENT_DAYS = 3;
-const money = (n: number) => `$${Math.round(n).toLocaleString("es-CO")}`;
 const pct = (num: number, den: number) => (den > 0 ? Math.round((num / den) * 100) : 0);
 const deltaPct = (cur: number, prev: number) => (prev > 0 ? Math.round(((cur - prev) / prev) * 100) : null);
 
@@ -98,6 +97,8 @@ const Kpi = ({ label, value, sub, tone }: { label: string; value: React.ReactNod
 const COLS = "md:grid-cols-[minmax(200px,1.3fr)_repeat(5,minmax(0,1fr))_32px]";
 
 const PromologManagersView = ({ dateFrom, dateTo, creators }: Props) => {
+  const f = useFormato();
+  const money = (n: number) => `$${Math.round(n).toLocaleString(f.intl("es-CO"))}`;
   // El rango efectivo termina HOY como máximo: "Esta semana"/"Este mes" llegan al
   // domingo/fin de mes y el delta BLU compararía 2 días contra 7 del tramo anterior.
   const hoy = new Date();
@@ -209,7 +210,7 @@ const PromologManagersView = ({ dateFrom, dateTo, creators }: Props) => {
         <div>
           <h3 className="text-lg font-semibold">Managers</h3>
           <p className="text-xs text-muted-foreground">
-            {rangeDays === 1 ? format(fromDate, "d 'de' MMMM yyyy", { locale: es }) : `${format(fromDate, "d MMM", { locale: es })} – ${format(toDate, "d MMM yyyy", { locale: es })} · ${rangeDays} días`}
+            {rangeDays === 1 ? format(fromDate, f.idioma === "en" ? "MMMM d, yyyy" : "d 'de' MMMM yyyy", { locale: f.fechas }) : `${format(fromDate, "d MMM", { locale: f.fechas })} – ${format(toDate, "d MMM yyyy", { locale: f.fechas })} · ${rangeDays} días`}
             {recortado && <span className="text-warning"> · recortado a hoy</span>}
             {" · "}creadoras activas, por la manager asignada en su ficha
           </p>
@@ -253,7 +254,7 @@ const PromologManagersView = ({ dateFrom, dateTo, creators }: Props) => {
                   <Kpi label="Promocionaron" value={`${promoPct}%`} sub={`${r.promotedCount} de ${r.roster}`} tone={promoPct >= 70 ? "good" : promoPct >= 40 ? "warn" : "bad"} />
                   <Kpi label="Calidad promo" value={r.avgScore != null ? r.avgScore : "—"} sub={r.avgScore != null ? "promedio /100" : "sin lecturas"} tone={r.avgScore == null ? undefined : r.avgScore >= 70 ? "good" : r.avgScore >= 40 ? "warn" : "bad"} />
                   <Kpi label="Contacto WhatsApp" value={`${contactPct}%`} sub={`${r.contacted} de ${r.contactable} contactadas`} tone={contactPct >= 80 ? "good" : contactPct >= 50 ? "warn" : "bad"} />
-                  <Kpi label="Fans nuevos" value={r.newFans.toLocaleString("es-CO")} sub={<Delta cur={r.newFans} prev={r.prevNewFans} />} />
+                  <Kpi label="Fans nuevos" value={r.newFans.toLocaleString(f.intl("es-CO"))} sub={<Delta cur={r.newFans} prev={r.prevNewFans} />} />
                   <Kpi label="Subs nuevas" value={money(r.newSub)} sub={<><Delta cur={r.newSub} prev={r.prevNewSub} /> <span className="text-muted-foreground">· rec. {money(r.recSub)}</span></>} />
                   <div className="hidden md:flex justify-end pt-1 text-muted-foreground">{open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</div>
                 </button>
@@ -305,7 +306,7 @@ const PromologManagersView = ({ dateFrom, dateTo, creators }: Props) => {
                                 : d.lastDays == null ? <span className="text-destructive text-xs">nunca</span>
                                 : <span className={cn(d.silent ? "text-warning" : "text-success")}>{d.lastDays === 0 ? "hoy" : `hace ${d.lastDays}d`}</span>}
                             </TableCell>
-                            <TableCell className="text-right text-sm font-medium">{d.newFans.toLocaleString("es-CO")}</TableCell>
+                            <TableCell className="text-right text-sm font-medium">{d.newFans.toLocaleString(f.intl("es-CO"))}</TableCell>
                             <TableCell className="text-right text-sm">{money(d.newSub)}</TableCell>
                             <TableCell className="text-right text-sm text-muted-foreground">{money(d.total)}</TableCell>
                           </TableRow>

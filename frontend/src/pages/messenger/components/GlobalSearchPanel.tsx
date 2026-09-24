@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useGlobalSearch, type GlobalSearchResult } from "@/hooks/useGlobalSearch";
 import { formatDistanceToNow } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import { cn } from "@/lib/utils";
 
 interface GlobalSearchPanelProps {
@@ -30,6 +30,7 @@ function highlightKeyword(text: string, keyword: string) {
 
 export default function GlobalSearchPanel({ open, onClose, onSelectResult }: GlobalSearchPanelProps) {
   const { results, searching, search, clearResults } = useGlobalSearch();
+  const f = useFormato();
   const [query, setQuery] = useState("");
 
   const handleSearch = useCallback((value: string) => {
@@ -120,7 +121,7 @@ export default function GlobalSearchPanel({ open, onClose, onSelectResult }: Glo
                     <User className="h-3 w-3 text-muted-foreground shrink-0" />
                     <span className="text-[11px] font-medium text-foreground">{r.senderName}</span>
                     <span className="text-[10px] text-muted-foreground ml-auto shrink-0">
-                      {formatDistanceToNow(new Date(r.createdAt), { addSuffix: true, locale: es })}
+                      {formatDistanceToNow(new Date(r.createdAt), { addSuffix: true, locale: f.fechas })}
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground leading-relaxed">

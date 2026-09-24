@@ -35,6 +35,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useMyProfile } from "@/hooks/useUserProfile";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useFormato } from "@/hooks/useFormato";
+import type { Formato } from "@/lib/formato";
 import {
   useQaCalls,
   useFireQaWebhook,
@@ -122,10 +124,10 @@ const StatusBadge = ({
   );
 };
 
-const fmtDate = (iso: string) => {
+const fmtDate = (f: Formato, iso: string) => {
   try {
     const d = new Date(`${iso}T00:00:00`);
-    return d.toLocaleDateString("es-ES", {
+    return d.toLocaleDateString(f.intl("es-ES"), {
       day: "2-digit",
       month: "short",
       year: "numeric",
@@ -170,6 +172,7 @@ interface AgencyQaHistoryProps {
 }
 
 const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
+  const f = useFormato();
   const { user } = useAuth();
   const profileQ = useMyProfile();
   const callsQ = useQaCalls();
@@ -362,7 +365,7 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
                       </TableCell>
                       {/* Fecha */}
                       <TableCell className="tabular-nums text-sm">
-                        {fmtDate(call.call_date)}
+                        {fmtDate(f, call.call_date)}
                       </TableCell>
                       {/* Modelo (avatar + nombre) */}
                       <TableCell>

@@ -53,6 +53,8 @@ import {
 import { supabase as sb } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import { useFormato } from "@/hooks/useFormato";
+import type { Formato } from "@/lib/formato";
 import {
   LeadDrawer,
   STATUS_META,
@@ -683,15 +685,15 @@ const Pagination = ({
 };
 
 // ─── Helper: jobs → console lines ────────────────────────────────────
-const fmtTs = (iso: string): string =>
-  new Date(iso).toLocaleTimeString("es-CO", {
+const fmtTs = (f: Formato, iso: string): string =>
+  new Date(iso).toLocaleTimeString(f.intl("es-CO"), {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
   });
 
-function jobToConsoleLines(job: ScouterJob): PlainLine[] {
-  const ts = fmtTs(job.created_at);
+function jobToConsoleLines(job: ScouterJob, f: Formato): PlainLine[] {
+  const ts = fmtTs(f, job.created_at);
   const tsKey = new Date(job.created_at).getTime();
   const lines: PlainLine[] = [];
 
@@ -729,7 +731,7 @@ function jobToConsoleLines(job: ScouterJob): PlainLine[] {
       id: `job-${job.id}-running`,
       kind: "plain",
       tsKey: new Date(startTs).getTime(),
-      ts: fmtTs(startTs),
+      ts: fmtTs(f, startTs),
       level: "ok",
       text: `[${kind}] ejecutando… — ${detail}`,
     });
@@ -739,7 +741,7 @@ function jobToConsoleLines(job: ScouterJob): PlainLine[] {
       id: `job-${job.id}-done`,
       kind: "plain",
       tsKey: new Date(endTs).getTime(),
-      ts: fmtTs(endTs),
+      ts: fmtTs(f, endTs),
       level: "ok",
       text: `[${kind}] ✔ completado — ${detail}`,
     });
@@ -749,7 +751,7 @@ function jobToConsoleLines(job: ScouterJob): PlainLine[] {
       id: `job-${job.id}-failed`,
       kind: "plain",
       tsKey: new Date(endTs).getTime(),
-      ts: fmtTs(endTs),
+      ts: fmtTs(f, endTs),
       level: job.last_error?.includes("Cancelado") ? "warn" : "error",
       text: `[${kind}] ✗ ${job.last_error ?? "error desconocido"}`,
     });
@@ -762,12 +764,13 @@ function jobToConsoleLines(job: ScouterJob): PlainLine[] {
 function leadToConsoleLine(
   lead: ConsoleLeadEvent,
   companySlug: string | null,
+  f: Formato,
 ): LeadFoundLine {
   return {
     id: `lead-${lead.id}`,
     kind: "lead_found",
     tsKey: new Date(lead.created_at).getTime(),
-    ts: fmtTs(lead.created_at),
+    ts: fmtTs(f, lead.created_at),
     handle: lead.instagram_handle,
     name: lead.name,
     country: lead.country,
@@ -781,6 +784,7 @@ function leadToConsoleLine(
 
 // ─── Main component ──────────────────────────────────────────────────
 const ScouterDiscover = () => {
+  const f = useFormato();
   useEffect(() => injectStyles(), []);
   const navigate = useNavigate();
 
@@ -935,15 +939,15 @@ const ScouterDiscover = () => {
   const consoleLines = useMemo(() => {
     const lines: ConsoleLine[] = [];
     const jobs = recentJobs.data ?? [];
-    for (const job of jobs) lines.push(...jobToConsoleLines(job));
+    for (const job of jobs) lines.push(...jobToConsoleLines(job, f));
     const leads = recentLeads.data ?? [];
     for (const lead of leads) {
       const slug = lead.company_id ? companyMap.get(lead.company_id) ?? null : null;
-      lines.push(leadToConsoleLine(lead, slug));
+      lines.push(leadToConsoleLine(lead, slug, f));
     }
     lines.sort((a, b) => a.tsKey - b.tsKey);
     return lines.slice(-MAX_CONSOLE_LINES);
-  }, [recentJobs.data, recentLeads.data, companyMap]);
+  }, [recentJobs.data, recentLeads.data, companyMap, f]);
 
   // ── Handlers
   const handleStart = useCallback(() => {

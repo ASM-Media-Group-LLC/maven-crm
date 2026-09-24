@@ -11,12 +11,15 @@ import { HRPageHeader } from "@/components/hr/HRPageHeader";
 import { cn } from "@/lib/utils";
 import { useHrPayroll, useRoleCosts, useSaveRoleCost, type RoleCost } from "./useHrPayroll";
 import { HR_ROLE_LABEL } from "./useHrPeople";
+import { useFormato } from "@/hooks/useFormato";
+import type { Formato } from "@/lib/formato";
 
-const usd = (n: number | null | undefined) => (n == null ? "—" : `$${Math.round(n).toLocaleString("es-CO")}`);
-const cop = (n: number | null | undefined) => (n == null || n === 0 ? "—" : `$${Math.round(n).toLocaleString("es-CO")}`);
+const usd = (n: number | null | undefined, f: Formato) => (n == null ? "—" : `$${Math.round(n).toLocaleString(f.intl("es-CO"))}`);
+const cop = (n: number | null | undefined, f: Formato) => (n == null || n === 0 ? "—" : `$${Math.round(n).toLocaleString(f.intl("es-CO"))}`);
 
 export default function HRPayroll() {
   const navigate = useNavigate();
+  const f = useFormato();
   const { toast } = useToast();
   const { data: rows = [], isLoading } = useHrPayroll();
   const { data: roleCosts = [] } = useRoleCosts();
@@ -65,9 +68,9 @@ export default function HRPayroll() {
             Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
           ) : (
             <>
-              <Kpi label="Costo mensual" value={usd(totals.cost)} icon={DollarSign} color="bg-blue-500" hint="Suma de costos del equipo" />
-              <Kpi label="Ingreso atribuido" value={usd(totals.rev)} icon={TrendingUp} color="bg-violet-500" hint="Tajada agencia (chatters/BLU)" />
-              <Kpi label="Margen" value={usd(totals.margin)} icon={Wallet} color={totals.margin >= 0 ? "bg-success" : "bg-destructive"} hint="Ingreso − costo (chatters)" tone={totals.margin >= 0 ? "ok" : "bad"} />
+              <Kpi label="Costo mensual" value={usd(totals.cost, f)} icon={DollarSign} color="bg-blue-500" hint="Suma de costos del equipo" />
+              <Kpi label="Ingreso atribuido" value={usd(totals.rev, f)} icon={TrendingUp} color="bg-violet-500" hint="Tajada agencia (chatters/BLU)" />
+              <Kpi label="Margen" value={usd(totals.margin, f)} icon={Wallet} color={totals.margin >= 0 ? "bg-success" : "bg-destructive"} hint="Ingreso − costo (chatters)" tone={totals.margin >= 0 ? "ok" : "bad"} />
               <Kpi label="Personas" value={String(totals.people)} icon={Users} color="bg-slate-500" hint="En el roster" />
             </>
           )}
@@ -134,17 +137,17 @@ export default function HRPayroll() {
                       className="cursor-pointer border-b border-border/60 hover:bg-muted/40">
                       <td className="px-4 py-2.5 font-medium">{r.name}</td>
                       <td className="px-3 py-2.5 text-muted-foreground">{HR_ROLE_LABEL[r.role] ?? r.role}</td>
-                      <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">{cop(r.base_salary_cop)}</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">{cop(r.base_salary_cop, f)}</td>
                       <td className="px-3 py-2.5 text-right tabular-nums">
                         <span className="inline-flex items-center gap-1">
-                          {usd(r.cost_usd)}
+                          {usd(r.cost_usd, f)}
                           {r.cost_modelado && <Badge variant="secondary-soft" className="text-[9px]">modelado</Badge>}
                         </span>
                       </td>
-                      <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">{r.revenue_usd != null ? usd(r.revenue_usd) : "—"}</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">{r.revenue_usd != null ? usd(r.revenue_usd, f) : "—"}</td>
                       <td className={cn("px-3 py-2.5 text-right font-semibold tabular-nums",
                         r.margin_usd == null ? "text-muted-foreground" : r.margin_usd >= 0 ? "text-success" : "text-destructive")}>
-                        {r.margin_usd != null ? usd(r.margin_usd) : "—"}
+                        {r.margin_usd != null ? usd(r.margin_usd, f) : "—"}
                       </td>
                       <td className="px-4 py-2.5"><Pencil className="h-3.5 w-3.5 text-muted-foreground/50" /></td>
                     </tr>

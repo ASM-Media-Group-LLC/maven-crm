@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
 import { Pencil, Trash2, MessageSquare } from "lucide-react";
 import {
   Dialog,
@@ -29,6 +28,7 @@ import {
   type TicketWithCreator,
   useTickets,
 } from "./useTickets";
+import { useFormato } from "@/hooks/useFormato";
 
 interface Props {
   open: boolean;
@@ -46,6 +46,7 @@ const priorityVariant: Record<string, "destructive" | "default" | "secondary" | 
 };
 
 const ViewTicketModal = ({ open, onOpenChange, ticket, onEdit, onDelete }: Props) => {
+  const f = useFormato();
   const { updateTicket, useTicketComments, addComment } = useTickets();
   const commentsQuery = useTicketComments(ticket.id);
   const comments = commentsQuery.data || [];
@@ -79,7 +80,7 @@ const ViewTicketModal = ({ open, onOpenChange, ticket, onEdit, onDelete }: Props
           </DialogTitle>
           {ticket.created_at && (
             <p className="text-xs text-muted-foreground">
-              Creado el {format(new Date(ticket.created_at), "dd MMM yyyy, HH:mm", { locale: es })}
+              Creado el {format(new Date(ticket.created_at), "dd MMM yyyy, HH:mm", { locale: f.fechas })}
             </p>
           )}
         </DialogHeader>
@@ -181,7 +182,7 @@ const ViewTicketModal = ({ open, onOpenChange, ticket, onEdit, onDelete }: Props
                       <span className="text-sm font-medium">{c.author_name}</span>
                       {c.created_at && (
                         <span className="text-[10px] text-muted-foreground">
-                          {format(new Date(c.created_at), "dd MMM yyyy, HH:mm", { locale: es })}
+                          {format(new Date(c.created_at), "dd MMM yyyy, HH:mm", { locale: f.fechas })}
                         </span>
                       )}
                     </div>

@@ -29,7 +29,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isWithinInterval, parseISO, isSameDay, addMonths, subMonths } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import { cn } from "@/lib/utils";
 import { TRAINING_STATUSES, TRAINING_TARGET_ROLES, TRAINING_MODALITIES, TRAINING_CONTENT_TYPES } from "@/lib/hrConstants";
 import { PageHeader } from "@/components/ui/page-header";
@@ -198,6 +198,7 @@ export default function HRTraining() {
 function TrainingDashboard({ onAssign, onConfig, onViewDetail, onViewProgram }: {
   onAssign: () => void; onConfig: () => void; onViewDetail: (a: any) => void; onViewProgram: (p: any) => void;
 }) {
+  const f = useFormato();
   const navigate = useNavigate();
   const { data: assignments = [], isLoading } = useTrainingAssignments();
   const { data: allPrograms = [] } = useAllPrograms();
@@ -459,7 +460,7 @@ function TrainingDashboard({ onAssign, onConfig, onViewDetail, onViewProgram }: 
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <Button variant="outline" size="sm" onClick={() => setCalMonth((m) => subMonths(m, 1))}>← Anterior</Button>
-                <h3 className="text-sm font-semibold capitalize">{format(calMonth, "MMMM yyyy", { locale: es })}</h3>
+                <h3 className="text-sm font-semibold capitalize">{format(calMonth, "MMMM yyyy", { locale: f.fechas })}</h3>
                 <Button variant="outline" size="sm" onClick={() => setCalMonth((m) => addMonths(m, 1))}>Siguiente →</Button>
               </div>
               <div className="border rounded-lg overflow-hidden">
@@ -519,6 +520,7 @@ function AssignmentsTable({ assignments, isLoading, progressMap, moduleCounts, o
   moduleCounts: Record<string, number>;
   onViewDetail: (a: any) => void;
 }) {
+  const f = useFormato();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -572,10 +574,10 @@ function AssignmentsTable({ assignments, isLoading, progressMap, moduleCounts, o
                       </div>
                     </TableCell>
                     <TableCell className="text-sm">{prog?.name || "—"}</TableCell>
-                    <TableCell className="text-sm">{a.start_date ? new Date(a.start_date).toLocaleDateString("es-CO") : "—"}</TableCell>
+                    <TableCell className="text-sm">{a.start_date ? new Date(a.start_date).toLocaleDateString(f.intl("es-CO")) : "—"}</TableCell>
                     <TableCell className="text-sm">
                       <div className="flex items-center gap-1.5">
-                        {a.completion_date ? new Date(a.completion_date).toLocaleDateString("es-CO") : "—"}
+                        {a.completion_date ? new Date(a.completion_date).toLocaleDateString(f.intl("es-CO")) : "—"}
                         {expiring && <Badge variant="outline" className="text-xs bg-warning/10 text-warning border-warning/30">Por vencer</Badge>}
                       </div>
                     </TableCell>
@@ -675,6 +677,7 @@ function AssignmentsGrid({ assignments, isLoading, progressMap, moduleCounts, on
 // ASSIGNMENT DETAIL VIEW (full screen)
 // ══════════════════════════════════════════════
 function AssignmentDetailView({ assignment, onBack }: { assignment: any; onBack: () => void }) {
+  const f = useFormato();
   const emp = assignment.employees;
   const prog = assignment.training_programs;
   const { data: modules = [], isLoading: modulesLoading } = useTrainingModules(prog?.id || null);
@@ -773,11 +776,11 @@ function AssignmentDetailView({ assignment, onBack }: { assignment: any; onBack:
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">Fecha Inicio</p>
-              <p className="text-sm font-medium">{assignment.start_date ? new Date(assignment.start_date).toLocaleDateString("es-CO") : "—"}</p>
+              <p className="text-sm font-medium">{assignment.start_date ? new Date(assignment.start_date).toLocaleDateString(f.intl("es-CO")) : "—"}</p>
             </div>
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">Fecha Límite</p>
-              <p className="text-sm font-medium">{assignment.completion_date ? new Date(assignment.completion_date).toLocaleDateString("es-CO") : "—"}</p>
+              <p className="text-sm font-medium">{assignment.completion_date ? new Date(assignment.completion_date).toLocaleDateString(f.intl("es-CO")) : "—"}</p>
             </div>
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">Departamento</p>
@@ -840,7 +843,7 @@ function AssignmentDetailView({ assignment, onBack }: { assignment: any; onBack:
                           </a>
                         )}
                         {isCompleted && mp?.completed_at && (
-                          <span className="text-xs text-muted-foreground">{new Date(mp.completed_at).toLocaleDateString("es-CO")}</span>
+                          <span className="text-xs text-muted-foreground">{new Date(mp.completed_at).toLocaleDateString(f.intl("es-CO"))}</span>
                         )}
                       </div>
                     </div>

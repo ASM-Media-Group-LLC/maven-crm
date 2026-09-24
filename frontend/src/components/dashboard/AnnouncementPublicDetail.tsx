@@ -5,7 +5,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import { Paperclip, Download } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -19,6 +19,7 @@ interface Props {
 }
 
 export default function AnnouncementPublicDetail({ announcement, open, onOpenChange, onOpened }: Props) {
+  const f = useFormato();
   useEffect(() => {
     if (open && announcement) {
       onOpened(announcement.id);
@@ -40,7 +41,7 @@ export default function AnnouncementPublicDetail({ announcement, open, onOpenCha
             )}
           </div>
           <p className="text-xs text-muted-foreground">
-            {format(new Date(announcement.starts_at), "d 'de' MMMM yyyy, HH:mm", { locale: es })}
+            {format(new Date(announcement.starts_at), f.idioma === "en" ? "MMMM d, yyyy, HH:mm" : "d 'de' MMMM yyyy, HH:mm", { locale: f.fechas })}
           </p>
         </DialogHeader>
 

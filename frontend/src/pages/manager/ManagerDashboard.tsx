@@ -12,7 +12,7 @@ import { PRESET_CONFIG, diasEntre, rangeForPreset, type RangePreset } from "@/li
 import { cn } from "@/lib/utils";
 import SelectorDeTablero from "@/pages/dashboard/SelectorDeTablero";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import { usePromoScoresRango } from "@/pages/promolog/usePromoPeriodScores";
 import { useDashboard2Summary } from "@/pages/sales-performance/useDashboard2Summary";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -143,6 +143,7 @@ export default function ManagerDashboard({ forzado = false }: {
    *  terminaba en el tablero genérico sin entender por qué). */
   forzado?: boolean;
 } = {}) {
+  const f = useFormato();
   const [rango, setRango] = useState<{ from: Date; to: Date }>(() => rangeForPreset("this_week", new Date()));
   const [preset, setPreset] = useState<RangePreset | null>("this_week");
   const desde = isoDia(rango.from);
@@ -268,7 +269,7 @@ export default function ManagerDashboard({ forzado = false }: {
               label="Tu nota (bot)"
               valor={ultima ? ultima.nota.toFixed(1) : "—"}
               pie={ultima
-                ? <>del {format(new Date(`${ultima.fecha}T12:00:00`), "d MMM", { locale: es })}{promedio != null && ` · promedio ${promedio.toFixed(1)}`}</>
+                ? <>del {format(new Date(`${ultima.fecha}T12:00:00`), "d MMM", { locale: f.fechas })}{promedio != null && ` · promedio ${promedio.toFixed(1)}`}</>
                 : "sin nota en el rango"}
               icono={Sparkles} color="bg-violet-500" tinte="from-violet-500/10"
               barra={ultima ? { pct: (ultima.nota / 10) * 100, clase: tonoNota(ultima.nota).barra } : undefined}
@@ -355,7 +356,7 @@ export default function ManagerDashboard({ forzado = false }: {
                 <div className="flex h-28 items-end gap-1">
                   {barras.map((b) => {
                     const t = tonoNota(b.nota);
-                    const dia = format(new Date(`${b.fecha}T12:00:00`), "EEEE d MMM", { locale: es });
+                    const dia = format(new Date(`${b.fecha}T12:00:00`), "EEEE d MMM", { locale: f.fechas });
                     return (
                       <div key={b.fecha} className="flex min-w-0 max-w-[56px] flex-1 flex-col items-center gap-1"
                         title={b.nota != null ? `${dia}: ${b.nota.toFixed(1)}` : `${dia}: sin nota`}>
@@ -363,7 +364,7 @@ export default function ManagerDashboard({ forzado = false }: {
                         <div className={cn("w-full rounded-t transition-[height] duration-700", b.nota != null ? t.barra : "bg-white/[0.07]")}
                           style={{ height: `${b.nota != null ? Math.max(4, (b.nota / 10) * 80) : 3}px` }} />
                         <span className="truncate text-[9px] text-muted-foreground">
-                          {format(new Date(`${b.fecha}T12:00:00`), "d", { locale: es })}
+                          {format(new Date(`${b.fecha}T12:00:00`), "d", { locale: f.fechas })}
                         </span>
                       </div>
                     );
@@ -438,7 +439,7 @@ export default function ManagerDashboard({ forzado = false }: {
           <header className="border-b border-white/5 px-5 py-4">
             <DialogTitle className="text-base leading-tight">Ingresos por modelo</DialogTitle>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              {format(rango.from, "d MMM", { locale: es })} – {format(rango.to, "d MMM yyyy", { locale: es })} ·{" "}
+              {format(rango.from, "d MMM", { locale: f.fechas })} – {format(rango.to, "d MMM yyyy", { locale: f.fechas })} ·{" "}
               {money(aporte.total)} en total, {money(aporte.subs)} en suscripciones
             </p>
           </header>

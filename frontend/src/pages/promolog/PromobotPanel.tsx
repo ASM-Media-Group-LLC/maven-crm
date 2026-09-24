@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useFormato } from "@/hooks/useFormato";
+import type { Formato } from "@/lib/formato";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -85,9 +87,9 @@ const statusMeta: Record<string, { label: string; variant: "success-soft" | "des
   timeout: { label: "Timeout", variant: "destructive-soft", Icon: XCircle },
 };
 
-const fmtTime = (iso: string) => {
+const fmtTime = (iso: string, f: Formato) => {
   try {
-    return new Date(iso).toLocaleString("es-CO", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+    return new Date(iso).toLocaleString(f.intl("es-CO"), { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
   } catch {
     return iso.slice(0, 16).replace("T", " ");
   }
@@ -108,6 +110,7 @@ const NET_OPTIONS: Array<{ key: string; label: string; fn: string }> = [
 const NET_LABEL: Record<string, string> = Object.fromEntries(NET_OPTIONS.map((n) => [n.key, n.label]));
 
 const PromobotPanel = () => {
+  const f = useFormato();
   const { toast } = useToast();
 
   const [creators, setCreators] = useState<EligibleCreator[]>([]);
@@ -614,7 +617,7 @@ const PromobotPanel = () => {
                   <li key={r.id} className="flex items-center gap-3 px-3 py-2">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs tabular-nums">{fmtTime(r.started_at)}</span>
+                        <span className="text-xs tabular-nums">{fmtTime(r.started_at, f)}</span>
                         <span className="text-[11px] text-muted-foreground">{r.dispatched_by ? "Manual" : "Cron"}</span>
                       </div>
                       <p className="mt-0.5 text-[11px] text-muted-foreground">
@@ -660,7 +663,7 @@ const PromobotPanel = () => {
                     const isActive = ACTIVE_STATUSES.has(r.status);
                     return (
                       <tr key={r.id} className="border-b last:border-0">
-                        <td className="px-2 py-1.5 tabular-nums text-xs">{fmtTime(r.started_at)}</td>
+                        <td className="px-2 py-1.5 tabular-nums text-xs">{fmtTime(r.started_at, f)}</td>
                         <td className="px-2 py-1.5">
                           <Badge variant={meta.variant} className="gap-1 text-[10px]">
                             <meta.Icon className={`h-3 w-3 ${isActive && r.status === "running" ? "animate-spin" : ""}`} />
@@ -738,7 +741,7 @@ const PromobotPanel = () => {
             <DialogTitle>Modelos de la corrida</DialogTitle>
             <DialogDescription>
               {runModels
-                ? `${fmtTime(runModels.started_at)} · ${runModelsList.length} modelo(s)`
+                ? `${fmtTime(runModels.started_at, f)} · ${runModelsList.length} modelo(s)`
                 : ""}
             </DialogDescription>
           </DialogHeader>

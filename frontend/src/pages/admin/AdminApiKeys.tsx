@@ -19,6 +19,7 @@ import {
 import { toast } from "sonner";
 import { adminInvoke } from "@/lib/adminInvoke";
 import { PageHeader } from "@/components/ui/page-header";
+import { useFormato } from "@/hooks/useFormato";
 
 // Settings → Administración → API keys (SOLO admins).
 // Gestión de la API pública de Maven, estilo Infloww: tabla + modal agrupado por
@@ -59,9 +60,9 @@ const EXPIRY_OPTIONS = [
   { label: "Nunca", days: 0 },
 ];
 
-function fmt(d: string | null): string {
+function fmt(d: string | null, locale: string): string {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString("es-CO", { day: "2-digit", month: "short", year: "numeric" });
+  return new Date(d).toLocaleDateString(locale, { day: "2-digit", month: "short", year: "numeric" });
 }
 
 function CopyButton({ text, label = "Copiar", size = "sm" as "sm" | "default" }) {
@@ -85,6 +86,7 @@ function CopyButton({ text, label = "Copiar", size = "sm" as "sm" | "default" })
 
 const AdminApiKeys = () => {
   const qc = useQueryClient();
+  const f = useFormato();
   const [modalMode, setModalMode] = useState<null | "create" | "edit">(null);
   const [editing, setEditing] = useState<ApiKey | null>(null);
   const [revokeTarget, setRevokeTarget] = useState<ApiKey | null>(null);
@@ -237,14 +239,14 @@ const AdminApiKeys = () => {
                       </div>
                     </td>
                     <td className="px-4 py-3"><code className="rounded bg-muted px-1.5 py-0.5 text-xs">{k.key_prefix}…{k.last_four ?? ""}</code></td>
-                    <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">{fmt(k.created_at)}</td>
+                    <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">{fmt(k.created_at, f.intl("es-CO"))}</td>
                     <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">{k.created_by_email ?? "—"}</td>
                     <td className="px-4 py-3 text-muted-foreground">
                       {k.ip_whitelist?.length ? (
                         <span title={k.ip_whitelist.join(", ")}>{k.ip_whitelist.length} IP{k.ip_whitelist.length > 1 ? "s" : ""}</span>
                       ) : <span className="text-muted-foreground/70">Sin restricción</span>}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">{k.expires_at ? fmt(k.expires_at) : "Nunca"}</td>
+                    <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">{k.expires_at ? fmt(k.expires_at, f.intl("es-CO")) : "Nunca"}</td>
                     <td className="px-4 py-3">
                       {k.status === "active" && <Badge variant="outline" className="border-success/40 text-success">Activa</Badge>}
                       {k.status === "revoked" && <Badge variant="outline" className="border-destructive/40 text-destructive">Revocada</Badge>}

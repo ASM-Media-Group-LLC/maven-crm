@@ -8,6 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { format } from "date-fns";
 import { useCostCenters, usePayrollParams } from "@/hooks/useFinancialConfig";
+import { useFormato } from "@/hooks/useFormato";
+import type { Formato } from "@/lib/formato";
 
 interface Props {
   open: boolean;
@@ -17,11 +19,12 @@ interface Props {
   isPending?: boolean;
 }
 
-function fmt(n: number) {
-  return new Intl.NumberFormat("es-CO", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
+function fmt(n: number, f: Formato) {
+  return new Intl.NumberFormat(f.intl("es-CO"), { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
 }
 
 export default function CalcularNominaModal({ open, onClose, employees, onSubmit, isPending }: Props) {
+  const f = useFormato();
   const [name, setName] = useState("");
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
   const [dateTo, setDateTo] = useState<Date | undefined>();
@@ -81,7 +84,7 @@ export default function CalcularNominaModal({ open, onClose, employees, onSubmit
           <div className="rounded-lg border border-border p-4 bg-muted/30 space-y-1">
             <p className="text-sm font-medium">Preview del Cálculo</p>
             <p className="text-sm text-muted-foreground">Empleados activos: <strong>{employees.length}</strong></p>
-            <p className="text-sm text-muted-foreground">Total salarios base: <strong>{fmt(totalBase)}</strong></p>
+            <p className="text-sm text-muted-foreground">Total salarios base: <strong>{fmt(totalBase, f)}</strong></p>
             {payrollParams && (
               <div className="text-xs text-muted-foreground space-y-0.5 mt-2 pt-2 border-t border-border">
                 <p>Salud: {payrollParams.deductions.health_pct}% · Pensión: {payrollParams.deductions.pension_pct}%{payrollParams.deductions.tax_pct > 0 ? ` · Impuestos: ${payrollParams.deductions.tax_pct}%` : ""}</p>

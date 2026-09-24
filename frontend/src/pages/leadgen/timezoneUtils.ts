@@ -1,12 +1,13 @@
 import { formatInTimeZone, toZonedTime } from "date-fns-tz";
-import { es } from "date-fns/locale";
+import type { Formato } from "@/lib/formato";
 
 const MIAMI_TZ = "America/New_York";
 
-/** Format a date to Miami timezone with a given format string */
-export function formatToMiamiTime(date: Date | string, formatStr: string): string {
+/** Format a date to Miami timezone with a given format string.
+ *  `f` = useFormato() (o formatoActual()): el mes y el día salen en el idioma de la interfaz. */
+export function formatToMiamiTime(date: Date | string, formatStr: string, f: Formato): string {
   const d = typeof date === "string" ? new Date(date) : date;
-  return formatInTimeZone(d, MIAMI_TZ, formatStr, { locale: es });
+  return formatInTimeZone(d, MIAMI_TZ, formatStr, { locale: f.fechas });
 }
 
 /** Get the current Date in Miami timezone */

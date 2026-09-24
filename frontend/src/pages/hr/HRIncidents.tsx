@@ -31,7 +31,6 @@ import { INCIDENT_TYPES, INCIDENT_SEVERITIES, INCIDENT_STATUSES } from "@/lib/hr
 import { SEVERITY_COLORS } from "@/lib/hrAreaUtils";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface IncidentRecord {

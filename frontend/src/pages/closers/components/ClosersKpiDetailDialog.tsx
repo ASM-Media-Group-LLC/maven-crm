@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from "react";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
 import { Users } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ListRow } from "@/components/ui/list-row";
 import CategorySectionHeader from "@/components/dashboard/CategorySectionHeader";
+import { useFormato } from "@/hooks/useFormato";
+import type { Formato } from "@/lib/formato";
 import type { ClosersKpiPopupResult, ClosersKpiPopupRow } from "../hooks/useClosersKpiPopup";
 
 // Popup detalle de un KPI card de closers/dashboard. Sigue el layout
@@ -25,7 +26,7 @@ interface Props {
   popupKey: string | null; // identificador para inicializar collapsed state una sola vez
 }
 
-const renderRow = (row: ClosersKpiPopupRow) => (
+const renderRow = (row: ClosersKpiPopupRow, f: Formato) => (
   <ListRow key={row.id} className="justify-between">
     <div className="min-w-0 flex-1">
       <p className="font-medium truncate">{row.primary}</p>
@@ -46,7 +47,7 @@ const renderRow = (row: ClosersKpiPopupRow) => (
       )}
       {row.date && (
         <span className="text-[10px] text-muted-foreground tabular-nums">
-          {format(new Date(row.date), "d MMM", { locale: es })}
+          {format(new Date(row.date), "d MMM", { locale: f.fechas })}
         </span>
       )}
     </div>
@@ -62,6 +63,7 @@ const ClosersKpiDetailDialog = ({
   isLoading,
   popupKey,
 }: Props) => {
+  const f = useFormato();
   const groups = result?.groups ?? [];
   const totalCount = result?.totalCount ?? 0;
   const isGrouped = result?.mode === "grouped";
@@ -102,14 +104,14 @@ const ClosersKpiDetailDialog = ({
                 {title}
                 {!isLoading && (
                   <span className="inline-flex items-center rounded-full bg-primary/15 px-2.5 py-0.5 text-sm font-bold text-primary tabular-nums">
-                    {totalCount.toLocaleString("es")}
+                    {totalCount.toLocaleString(f.idioma === "en" ? "en-US" : "es")}
                   </span>
                 )}
               </DialogTitle>
               {!isLoading && totalCount > 0 && (
                 <p className="text-[11px] text-muted-foreground mt-1.5">
                   {subtitle ||
-                    `${totalCount.toLocaleString("es")} ${totalCount === 1 ? "registro" : "registros"}`}
+                    `${totalCount.toLocaleString(f.idioma === "en" ? "en-US" : "es")} ${totalCount === 1 ? "registro" : "registros"}`}
                   {isGrouped && groups.length > 0 &&
                     ` · ${groups.length} ${groups.length === 1 ? "grupo" : "grupos"}`}
                 </p>
@@ -156,7 +158,7 @@ const ClosersKpiDetailDialog = ({
             </div>
           ) : !isGrouped ? (
             <div className="space-y-1.5">
-              {groups[0]?.rows.map(renderRow)}
+              {groups[0]?.rows.map((row) => renderRow(row, f))}
             </div>
           ) : (
             groups.map((g) => {
@@ -176,7 +178,7 @@ const ClosersKpiDetailDialog = ({
                           Sin registros visibles para esta categoría.
                         </p>
                       ) : (
-                        g.rows.map(renderRow)
+                        g.rows.map((row) => renderRow(row, f))
                       )}
                     </div>
                   )}

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Users, CheckCircle, Trophy, XCircle, TrendingUp, Layers, Crown, Repeat } from "lucide-react";
 import { startOfMonth, endOfMonth, format } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import StatChip from "@/components/StatChip";
 import { UserAvatar } from "@/components/UserAvatar";
 import { Card } from "@/components/ui/card";
@@ -67,6 +67,7 @@ const ClosersKPICards = ({
   onPipelineClick,
   onRevenueClick,
 }: Props) => {
+  const f = useFormato();
   // Línea de negocio a mostrar. Son tres embudos distintos (reclutar una modelo
   // ≠ venderle Trafix a una agencia): mezclarlos hacía que la conversión y los
   // conteos no significaran nada. "Todo" suma las tres.
@@ -171,7 +172,7 @@ const ClosersKPICards = ({
         <UserAvatar name={bestCloser?.name ?? "?"} size="lg" ring />
         <div className="min-w-0 flex-1">
           <div className="text-xs font-extrabold text-amber-500">
-            Mejor cerrador <span className="text-muted-foreground/80 font-semibold capitalize">· {format(today, "MMMM yyyy", { locale: es })}</span>
+            Mejor cerrador <span className="text-muted-foreground/80 font-semibold capitalize">· {format(today, "MMMM yyyy", { locale: f.fechas })}</span>
           </div>
           {bestCloserLoading ? (
             <Skeleton className="mt-1 h-7 w-48" />
@@ -180,7 +181,7 @@ const ClosersKPICards = ({
               <div className="truncate font-display text-lg font-bold">{bestCloser.name}</div>
               <div className="flex items-center gap-4 text-xs text-muted-foreground">
                 <span className="tabular-nums">
-                  <strong className="text-foreground">{bestCloser.closes.toLocaleString("es")}</strong> cierres
+                  <strong className="text-foreground">{bestCloser.closes.toLocaleString(f.intl("es-ES"))}</strong> cierres
                 </span>
                 <span className="text-border">·</span>
                 <span className="tabular-nums">

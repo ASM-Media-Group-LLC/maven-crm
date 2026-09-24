@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 import { CompartirGrabacionDialog } from "./CompartirGrabacionDialog";
 import { invokeRecordings } from "@/hooks/useRecordings";
+import { useFormato } from "@/hooks/useFormato";
+import type { Formato } from "@/lib/formato";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
@@ -55,8 +57,8 @@ function diasHasta(iso: string | null): number | null {
   return Math.ceil((new Date(iso).getTime() - Date.now()) / (24 * 3600 * 1000));
 }
 
-const fechaCorta = (iso: string) =>
-  new Date(iso).toLocaleDateString("es-CO", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+const fechaCorta = (iso: string, f: Formato) =>
+  new Date(iso).toLocaleDateString(f.intl("es-CO"), { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
 export default function GrabacionesPage() {
   const {
@@ -65,6 +67,7 @@ export default function GrabacionesPage() {
     refresh,
   } = useRecordings();
   const { isAdmin } = useUserRole();
+  const f = useFormato();
   const [trabajando, setTrabajando] = useState<string | null>(null);
   const [viendo, setViendo] = useState<{ rec: RecordingRow; url: string } | null>(null);
   // Compartir con gente de Maven (pedido de Jhon, 09/09/2026): la lista de
@@ -297,7 +300,7 @@ export default function GrabacionesPage() {
                     )}
                   </div>
                   <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
-                    <span>{fechaCorta(r.started_at)}</span>
+                    <span>{fechaCorta(r.started_at, f)}</span>
                     {dur && <><span>·</span><span>{dur}</span></>}
                     {r.size_bytes != null && <><span>·</span><span>{formatBytes(r.size_bytes)}</span></>}
                     {r.status === "ready" && dias !== null && (
@@ -424,7 +427,7 @@ export default function GrabacionesPage() {
             <AlertDialogTitle>¿Borrar esta grabación?</AlertDialogTitle>
             <AlertDialogDescription>
               <b className="text-foreground">{porBorrar?.title || porBorrar?.room_name}</b>
-              {porBorrar?.started_at ? ` · ${fechaCorta(porBorrar.started_at)}` : ""}. El archivo se elimina ya
+              {porBorrar?.started_at ? ` · ${fechaCorta(porBorrar.started_at, f)}` : ""}. El archivo se elimina ya
               mismo, para ti y para todos con quienes esté compartida, y no se puede recuperar.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -468,7 +471,7 @@ export default function GrabacionesPage() {
               {viendo?.rec.title || (viendo?.rec.source === "cowork" ? "Sesión de Cowork" : "Reunión")}
             </DialogTitle>
             <DialogDescription className="text-xs">
-              {viendo && fechaCorta(viendo.rec.started_at)}
+              {viendo && fechaCorta(viendo.rec.started_at, f)}
               {viendo?.rec.duration_seconds != null && ` · ${formatDur(viendo.rec.duration_seconds)}`}
               {viendo?.rec.size_bytes != null && ` · ${formatBytes(viendo.rec.size_bytes)}`}
             </DialogDescription>

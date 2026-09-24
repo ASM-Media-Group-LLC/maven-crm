@@ -31,7 +31,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths, isSameDay, isSameMonth, isToday, differenceInCalendarDays } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 
 // ─── Constants ─────────────────────────────────────────────────────
 const VACATION_TYPES = [
@@ -71,6 +71,7 @@ function EditVacationForm({ data, onSave, onCancel, isPending }: { data: any; on
   const [startDate, setStartDate] = useState<Date | undefined>(new Date(data.start_date));
   const [endDate, setEndDate] = useState<Date | undefined>(new Date(data.end_date));
   const [reason, setReason] = useState(data.reason ?? "");
+  const f = useFormato();
 
   const handleSave = () => {
     const days = startDate && endDate ? Math.max(1, differenceInCalendarDays(endDate, startDate) + 1) : data.total_days;
@@ -96,7 +97,7 @@ function EditVacationForm({ data, onSave, onCancel, isPending }: { data: any; on
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
-                <Calendar mode="single" selected={startDate} onSelect={setStartDate} locale={es} className="p-3 pointer-events-auto" />
+                <Calendar mode="single" selected={startDate} onSelect={setStartDate} locale={f.fechas} className="p-3 pointer-events-auto" />
               </PopoverContent>
             </Popover>
           </div>
@@ -110,7 +111,7 @@ function EditVacationForm({ data, onSave, onCancel, isPending }: { data: any; on
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
-                <Calendar mode="single" selected={endDate} onSelect={setEndDate} locale={es} disabled={(d) => startDate ? d < startDate : false} className="p-3 pointer-events-auto" />
+                <Calendar mode="single" selected={endDate} onSelect={setEndDate} locale={f.fechas} disabled={(d) => startDate ? d < startDate : false} className="p-3 pointer-events-auto" />
               </PopoverContent>
             </Popover>
           </div>
@@ -134,6 +135,7 @@ export default function HRVacations() {
   const { data: employees = [] } = useEmployees();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const f = useFormato();
 
   // State
   const [activeType, setActiveType] = useState<VacationType>("vacaciones");
@@ -385,7 +387,7 @@ export default function HRVacations() {
               <StatChip label="Días Usados" value={String(approvedThisYear)} icon={<CalendarDays className="h-3.5 w-3.5" />} color="bg-primary" hint={`De ${maxDays} anuales`} />
               <StatChip label="Disponibles" value={String(availableDays)} icon={<CheckCircle2 className="h-3.5 w-3.5" />} color="bg-success" hint="Restantes" />
               <StatChip label="Pendientes" value={String(pending)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" hint="Por aprobar" onClick={() => setKpiPopup("pending")} />
-              <StatChip label="Este Mes" value={String(approvedThisMonth)} icon={<CalendarClock className="h-3.5 w-3.5" />} color="bg-primary" hint={format(new Date(), "MMMM yyyy", { locale: es })} onClick={() => setKpiPopup("thisMonth")} />
+              <StatChip label="Este Mes" value={String(approvedThisMonth)} icon={<CalendarClock className="h-3.5 w-3.5" />} color="bg-primary" hint={format(new Date(), "MMMM yyyy", { locale: f.fechas })} onClick={() => setKpiPopup("thisMonth")} />
               <StatChip label="Rechazadas" value={String(rejected)} icon={<XCircle className="h-3.5 w-3.5" />} color="bg-destructive" hint="Denegadas" onClick={() => setKpiPopup("rejected")} />
             </>
           )}
@@ -488,9 +490,9 @@ export default function HRVacations() {
                             </TableCell>
                             <TableCell className="text-sm">
                               <div className="leading-tight">
-                                <span>{format(new Date(a.start_date), "dd MMM", { locale: es })}</span>
+                                <span>{format(new Date(a.start_date), "dd MMM", { locale: f.fechas })}</span>
                                 <span className="text-muted-foreground"> — </span>
-                                <span>{format(new Date(a.end_date), "dd MMM yyyy", { locale: es })}</span>
+                                <span>{format(new Date(a.end_date), "dd MMM yyyy", { locale: f.fechas })}</span>
                               </div>
                             </TableCell>
                             <TableCell className="text-sm font-medium">{a.total_days}</TableCell>
@@ -532,7 +534,7 @@ export default function HRVacations() {
                           <span className="text-xs text-muted-foreground">{a.total_days} días</span>
                         </div>
                         <p className="text-sm">
-                          {format(new Date(a.start_date), "dd MMM", { locale: es })} — {format(new Date(a.end_date), "dd MMM yyyy", { locale: es })}
+                          {format(new Date(a.start_date), "dd MMM", { locale: f.fechas })} — {format(new Date(a.end_date), "dd MMM yyyy", { locale: f.fechas })}
                         </p>
                         {a.reason && <p className="text-xs text-muted-foreground line-clamp-2">{a.reason}</p>}
                         <div className="flex justify-end">{renderActions(a)}</div>
@@ -610,7 +612,7 @@ export default function HRVacations() {
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
                   <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-semibold capitalize">{format(calendarMonth, "MMMM yyyy", { locale: es })}</h3>
+                    <h3 className="text-sm font-semibold capitalize">{format(calendarMonth, "MMMM yyyy", { locale: f.fechas })}</h3>
                     <Button variant="outline" size="sm" className="text-xs h-7" onClick={() => setCalendarMonth(new Date())}>Hoy</Button>
                   </div>
                   <Button variant="ghost" size="icon" onClick={() => setCalendarMonth(addMonths(calendarMonth, 1))}>
@@ -667,7 +669,7 @@ export default function HRVacations() {
               <CardContent className="p-4">
                 {selectedDay ? (
                   <>
-                    <h4 className="text-sm font-semibold mb-3 capitalize">{format(selectedDay, "EEEE dd MMMM", { locale: es })}</h4>
+                    <h4 className="text-sm font-semibold mb-3 capitalize">{format(selectedDay, "EEEE dd MMMM", { locale: f.fechas })}</h4>
                     {getAbsencesForDay(selectedDay).length === 0 ? (
                       <p className="text-xs text-muted-foreground">Sin ausencias este día</p>
                     ) : (
@@ -728,7 +730,7 @@ export default function HRVacations() {
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar mode="single" selected={form.start_date} onSelect={(d) => setForm((f) => ({ ...f, start_date: d }))} locale={es} className="p-3 pointer-events-auto" />
+                    <Calendar mode="single" selected={form.start_date} onSelect={(d) => setForm((f) => ({ ...f, start_date: d }))} locale={f.fechas} className="p-3 pointer-events-auto" />
                   </PopoverContent>
                 </Popover>
               </div>
@@ -742,7 +744,7 @@ export default function HRVacations() {
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar mode="single" selected={form.end_date} onSelect={(d) => setForm((f) => ({ ...f, end_date: d }))} locale={es} disabled={(d) => form.start_date ? d < form.start_date : false} className="p-3 pointer-events-auto" />
+                    <Calendar mode="single" selected={form.end_date} onSelect={(d) => setForm((f) => ({ ...f, end_date: d }))} locale={f.fechas} disabled={(d) => form.start_date ? d < form.start_date : false} className="p-3 pointer-events-auto" />
                   </PopoverContent>
                 </Popover>
               </div>

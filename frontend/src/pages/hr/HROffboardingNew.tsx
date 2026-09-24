@@ -15,6 +15,7 @@ import { DateInput } from "@/components/ui/date-input";
 import { Progress } from "@/components/ui/progress";
 import { PageHeader } from "@/components/ui/page-header";
 import { usePayrollParams } from "@/hooks/useFinancialConfig";
+import { useFormato } from "@/hooks/useFormato";
 // generateSettlementPdf pulls jspdf — loaded on demand below.
 
 // ─── Steps ──────────────────────────────────────────────────────────────────
@@ -63,6 +64,7 @@ const EXIT_REASONS = [
 
 export default function HROffboardingNew() {
   const navigate = useNavigate();
+  const formatoUi = useFormato();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { params: payrollParams } = usePayrollParams();
@@ -206,7 +208,7 @@ export default function HROffboardingNew() {
   const vacationDaysPending = Math.max(0, vacationDaysAccrued - vacationDaysTaken);
   const vacationAmount = baseSalary > 0 ? (baseSalary / 30) * vacationDaysPending : 0;
 
-  const fmt = (n: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(n);
+  const fmt = (n: number) => new Intl.NumberFormat(formatoUi.intl("es-CO"), { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(n);
 
   const handleDownloadSettlement = async () => {
     if (!selectedEmployee) return;

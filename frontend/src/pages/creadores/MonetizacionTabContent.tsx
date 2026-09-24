@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { EmptyState } from "@/components/EmptyState";
 import { DollarSign, TrendingUp } from "lucide-react";
 import { format, parseISO } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -19,6 +19,7 @@ const money2 = (n: number | null) =>
 const money0 = (n: number) => `$${Math.round(n || 0).toLocaleString("en-US")}`;
 
 const MonetizacionTabContent = ({ creatorId }: Props) => {
+  const f = useFormato();
   // ── Ingreso diario desde BLU (creator_daily_earnings), MES ACTUAL ──
   const now = new Date();
   const year = now.getFullYear();
@@ -51,7 +52,7 @@ const MonetizacionTabContent = ({ creatorId }: Props) => {
 
   const formatMonth = (monthYear: string) => {
     try {
-      return format(parseISO(monthYear), "MMMM yyyy", { locale: es }).replace(/^\w/, (c) => c.toUpperCase());
+      return format(parseISO(monthYear), "MMMM yyyy", { locale: f.fechas }).replace(/^\w/, (c) => c.toUpperCase());
     } catch {
       return monthYear;
     }

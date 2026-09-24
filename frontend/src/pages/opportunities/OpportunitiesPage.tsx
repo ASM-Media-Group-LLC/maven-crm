@@ -28,6 +28,8 @@ import {
 import { TrendingUp, Plus, Loader2, Clock, AlertCircle } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/ui/page-header";
+import { useFormato } from "@/hooks/useFormato";
+import type { Formato } from "@/lib/formato";
 
 // ── catálogo de productos y etapas ───────────────────────────────────────────
 const PRODUCTS: { value: string; label: string }[] = [
@@ -79,10 +81,10 @@ interface BigConfirmada {
   confirmed_date: string | null;
 }
 
-const fmtDate = (iso: string | null) => {
+const fmtDate = (f: Formato, iso: string | null) => {
   if (!iso) return "—";
   const d = new Date(iso);
-  return d.toLocaleDateString("es-CO", { day: "2-digit", month: "short" });
+  return d.toLocaleDateString(f.intl("es-CO"), { day: "2-digit", month: "short" });
 };
 const isOverdue = (iso: string | null) => !!iso && new Date(iso) < new Date();
 // Monto compacto en USD: $24k, $1.2k, $120, o "—" si no hay valor.
@@ -94,6 +96,7 @@ const fmtUsd = (n: number | null | undefined) => {
 const confValue = (c: BigConfirmada) => Number(c.monthly_monetization ?? 0) || Number(c.estimated_monetization ?? 0) || 0;
 
 const OpportunitiesPage = () => {
+  const f = useFormato();
   const qc = useQueryClient();
   const [filter, setFilter] = useState<"open" | "all" | Stage>("open");
   const [formOpen, setFormOpen] = useState(false);
@@ -202,7 +205,7 @@ const OpportunitiesPage = () => {
                   </span>
                   {big && <span className="text-xs" title="Cierre grande">🔥</span>}
                   <span className="ml-auto text-xs text-muted-foreground">{userName(c.assigned_to)}</span>
-                  <span className="text-[11px] text-muted-foreground">{fmtDate(c.confirmed_date)}</span>
+                  <span className="text-[11px] text-muted-foreground">{fmtDate(f, c.confirmed_date)}</span>
                 </div>
               );
             })}
@@ -270,7 +273,7 @@ const OpportunitiesPage = () => {
                     <td className="px-3 py-2 text-xs">
                       <span className={`inline-flex items-center gap-1 ${overdue ? "text-destructive" : "text-muted-foreground"}`}>
                         {overdue ? <AlertCircle className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
-                        {fmtDate(o.next_followup_at)}
+                        {fmtDate(f, o.next_followup_at)}
                       </span>
                     </td>
                   </tr>

@@ -680,6 +680,7 @@ export const ChatPanel = ({ session }: Props) => {
     };
     rec.continuous = true;
     rec.interimResults = true;
+    // Idioma fijo a propósito: es el idioma en que se DICTA el mensaje (reconocimiento de voz), no el de la interfaz.
     rec.lang = "es-ES";
     rec.onresult = (ev) => {
       const results = ev.results as unknown as Array<{ 0: { transcript: string }; isFinal: boolean }>;

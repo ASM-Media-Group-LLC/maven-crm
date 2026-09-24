@@ -1,11 +1,11 @@
 import { useState, useMemo, useEffect } from "react";
 import { Clock, Target, TrendingUp, BarChart3 } from "lucide-react";
 import { format, isSameDay, differenceInMinutes, differenceInSeconds, subDays } from "date-fns";
-import { es } from "date-fns/locale";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { LeadGenEntry } from "./useLeadGen";
+import { useFormato } from "@/hooks/useFormato";
 
 interface AgentHourlyPerformanceProps {
   leads: LeadGenEntry[];
@@ -28,6 +28,7 @@ const qualityBarColors: Record<string, string> = {
 };
 
 const AgentHourlyPerformance = ({ leads }: AgentHourlyPerformanceProps) => {
+  const f = useFormato();
   const [now, setNow] = useState(new Date());
 
   useEffect(() => {
@@ -78,10 +79,10 @@ const AgentHourlyPerformance = ({ leads }: AgentHourlyPerformanceProps) => {
   const dailyData = useMemo(() => Array.from({ length: 7 }, (_, i) => {
     const day = subDays(now, 6 - i);
     return {
-      label: format(day, "EEE dd", { locale: es }),
+      label: format(day, "EEE dd", { locale: f.fechas }),
       count: leads.filter(l => isSameDay(new Date(l.created_at), day)).length,
     };
-  }), [leads, now]);
+  }), [leads, now, f]);
 
   const hourlyData = useMemo(() => {
     const data = Array.from({ length: 24 }, (_, i) => ({

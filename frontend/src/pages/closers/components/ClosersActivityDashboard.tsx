@@ -1,6 +1,5 @@
 import { useState, useMemo } from "react";
 import { startOfMonth, endOfDay, format } from "date-fns";
-import { es } from "date-fns/locale";
 import {
   Activity, Users, AlertTriangle, UserX, ChevronRight, ArrowLeft, MessageCircle,
   Instagram, Send, CalendarDays, ExternalLink, Bot,
@@ -15,6 +14,7 @@ import {
 } from "@/components/ui/table";
 import StatChip from "@/components/StatChip";
 import { cn } from "@/lib/utils";
+import { useFormato } from "@/hooks/useFormato";
 import {
   useCloserActivity, useCloserActivityDetail,
   type CloserActivityRow, type CloserActivityDetailRow,
@@ -93,6 +93,7 @@ interface Props {
 }
 
 const ClosersActivityDashboard = ({ isAdmin, isManager, viewAsCloserId }: Props) => {
+  const f = useFormato();
   // Default = mes en curso (hoy suele estar vacío → parecía roto).
   const [from, setFrom] = useState<Date>(() => startOfMonth(new Date()));
   const [to, setTo] = useState<Date>(() => endOfDay(new Date()));
@@ -125,8 +126,8 @@ const ClosersActivityDashboard = ({ isAdmin, isManager, viewAsCloserId }: Props)
 
   const rangeLabel =
     format(from, "yyyy-MM-dd") === format(to, "yyyy-MM-dd")
-      ? format(from, "EEEE d 'de' MMMM", { locale: es })
-      : `${format(from, "d MMM", { locale: es })} – ${format(to, "d MMM yyyy", { locale: es })}`;
+      ? format(from, f.idioma === "en" ? "EEEE, MMMM d" : "EEEE d 'de' MMMM", { locale: f.fechas })
+      : `${format(from, "d MMM", { locale: f.fechas })} – ${format(to, "d MMM yyyy", { locale: f.fechas })}`;
 
   const dateBar = (
     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -227,7 +228,7 @@ const ClosersActivityDashboard = ({ isAdmin, isManager, viewAsCloserId }: Props)
                       </TableCell>
                       <TableCell><CountChips data={r.by_result} /></TableCell>
                       <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
-                        {r.last_activity ? format(new Date(r.last_activity), "d MMM HH:mm", { locale: es }) : "—"}
+                        {r.last_activity ? format(new Date(r.last_activity), "d MMM HH:mm", { locale: f.fechas }) : "—"}
                       </TableCell>
                       <TableCell><ChevronRight className="h-4 w-4 text-muted-foreground" /></TableCell>
                     </TableRow>
@@ -251,6 +252,7 @@ const EmployeeActivityDetail = ({
   to: Date;
   onBack: () => void;
 }) => {
+  const f = useFormato();
   const { data: contacts = [], isLoading } = useCloserActivityDetail(from, to, emp.employee_id);
 
   const byDay = useMemo(() => {
@@ -315,7 +317,7 @@ const EmployeeActivityDetail = ({
                 <div className="mb-2 flex items-center gap-2">
                   <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
                   <span className="text-xs font-semibold capitalize">
-                    {format(new Date(dayRows[0].contact_date), "EEEE d 'de' MMMM", { locale: es })}
+                    {format(new Date(dayRows[0].contact_date), f.idioma === "en" ? "EEEE, MMMM d" : "EEEE d 'de' MMMM", { locale: f.fechas })}
                   </span>
                   <span className="text-[11px] text-muted-foreground">· {dayRows.length} contacto{dayRows.length === 1 ? "" : "s"}</span>
                 </div>

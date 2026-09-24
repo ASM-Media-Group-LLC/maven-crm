@@ -3,7 +3,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Upload, FileText, Download } from "lucide-react";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,7 @@ function fileTypeLabel(type: string): string {
 }
 
 export default function DocumentosTabContent({ creatorId }: Props) {
+  const formatoUi = useFormato();
   const qc = useQueryClient();
   const { isAgent } = useUserRole();
   const [showUpload, setShowUpload] = useState(false);
@@ -120,7 +121,7 @@ export default function DocumentosTabContent({ creatorId }: Props) {
                     </TableCell>
                     <TableCell>{fileTypeLabel(d.file_type)}</TableCell>
                     <TableCell>
-                      {d.uploaded_at ? format(new Date(d.uploaded_at), "dd MMM yyyy", { locale: es }) : "—"}
+                      {d.uploaded_at ? format(new Date(d.uploaded_at), "dd MMM yyyy", { locale: formatoUi.fechas }) : "—"}
                     </TableCell>
                     <TableCell className="text-right">
                       <Button

@@ -51,6 +51,8 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { useFormato } from "@/hooks/useFormato";
+import type { Formato } from "@/lib/formato";
 import { EmptyState } from "@/components/EmptyState";
 import { MailBody } from "@/components/correo/MailBody";
 import {
@@ -130,17 +132,18 @@ function iconoCarpeta(f: string): LucideIcon {
 }
 
 /** Fecha corta para la lista: hora si es hoy, día y mes si es de este año. */
-function fechaCorta(iso: string): string {
+function fechaCorta(iso: string, formatoUi: Formato): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
   if (isToday(d)) return format(d, "HH:mm");
-  if (isThisYear(d)) return format(d, "d MMM", { locale: es });
-  return format(d, "d MMM yy", { locale: es });
+  if (isThisYear(d)) return format(d, "d MMM", { locale: formatoUi.fechas });
+  return format(d, "d MMM yy", { locale: formatoUi.fechas });
 }
 
 function fechaLarga(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
+  // Idioma fijo a propósito: va en la cita del correo que se le manda a otra persona.
   return format(d, "d 'de' MMMM 'de' yyyy, HH:mm", { locale: es });
 }
 
@@ -192,6 +195,7 @@ function FilaDetalle({ etiqueta, gente }: { etiqueta: string; gente: { nombre: s
 }
 
 export default function CorreoPage() {
+  const formatoUi = useFormato();
   const { data: buzon, isLoading: cargandoBuzon, error: errorBuzon } = useMailbox();
   const [params, setParams] = useSearchParams();
   const hayBuzon = !!buzon?.is_active;
@@ -992,7 +996,7 @@ export default function CorreoPage() {
                               >
                                 <span className="flex-1">{o.rotulo}</span>
                                 <span className="ml-3 text-[10px] tabular-nums text-muted-foreground">
-                                  {format(o.cuando, "d MMM HH:mm", { locale: es })}
+                                  {format(o.cuando, "d MMM HH:mm", { locale: formatoUi.fechas })}
                                 </span>
                               </DropdownMenuItem>
                             )
@@ -1255,7 +1259,7 @@ export default function CorreoPage() {
                     })()}
                   </div>
                   <span className="shrink-0 pt-1 text-xs text-muted-foreground">
-                    {fechaCorta(mensaje.data.date)}
+                    {fechaCorta(mensaje.data.date, formatoUi)}
                   </span>
                 </div>
 
@@ -1467,6 +1471,7 @@ const PLEGADOS_A_LA_VISTA = 4;
  *  ⚠️ Vienen de VARIAS carpetas (tus respuestas están en Enviados), y cada uno
  *  se abre en la suya: `abrir` usa el `folder` que trae el mensaje. */
 function FilaPlegada({ m, abrir }: { m: MailSummary; abrir: (m: MailSummary) => void }) {
+  const formatoUi = useFormato();
   return (
     <button
       type="button"
@@ -1488,7 +1493,7 @@ function FilaPlegada({ m, abrir }: { m: MailSummary; abrir: (m: MailSummary) => 
         </span>
       </span>
       <span className="shrink-0 self-start pt-0.5 text-xs text-muted-foreground">
-        {fechaCorta(m.date)}
+        {fechaCorta(m.date, formatoUi)}
       </span>
     </button>
   );
@@ -1571,6 +1576,7 @@ function FilaMensaje({
   /** Las que tiene puestas la conversación. */
   etiquetas?: EtiquetaDeCorreo[];
 }) {
+  const formatoUi = useFormato();
   // Con varios destinatarios ("a@x, b@y") se muestra el primero.
   const quien = mostrarDestinatario ? (m.to || m.from).split(",")[0] : m.from;
   const nombre = nombreDe(quien);
@@ -1635,7 +1641,7 @@ function FilaMensaje({
               sinLeer ? "font-semibold text-primary" : "text-muted-foreground",
             )}
           >
-            {fechaCorta(m.date)}
+            {fechaCorta(m.date, formatoUi)}
           </span>
         </div>
         <div className="flex items-center gap-1.5">

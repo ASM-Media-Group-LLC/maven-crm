@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { useHubstaffSyncStatus } from "@/pages/agency-qa/chatters-qa/useHubstaffEffort";
 import { useHrRoster } from "./useHrPeople";
 import { useChatterPerf, useCloserPerf, useLlgPerf, useManagerPerf } from "./useHrPerformance";
+import { useFormato } from "@/hooks/useFormato";
 
 // Performance OPERATIVO de RRHH: leaderboard por rol con resultado real (ventas/ROI, cierres,
 // leads, esfuerzo) desde las vistas de Hubstaff/BLU. Distinto del QA por rol: acá es la vista
@@ -20,7 +21,7 @@ const TABS: { key: RoleTab; label: string; icon: any }[] = [
   { key: "managers", label: "Managers", icon: Briefcase },
 ];
 
-const usd = (n: number | null | undefined) => (n == null ? "—" : `$${Math.round(n).toLocaleString("es-CO")}`);
+const usd = (n: number | null | undefined, locale: string) => (n == null ? "—" : `$${Math.round(n).toLocaleString(locale)}`);
 const pct = (n: number | null | undefined) => (n == null ? "—" : `${Math.round(n)}%`);
 
 const relativeTime = (iso: string | null): string => {
@@ -34,6 +35,7 @@ const relativeTime = (iso: string | null): string => {
 
 export default function HrPerformanceOperativo() {
   const navigate = useNavigate();
+  const f = useFormato();
   const [tab, setTab] = useState<RoleTab>("chatters");
   const { data: sync } = useHubstaffSyncStatus();
   const { data: roster = [] } = useHrRoster();
@@ -88,10 +90,10 @@ export default function HrPerformanceOperativo() {
                         <Td className="font-medium pl-4">{r.name}</Td>
                         <Td num>{r.total_hours}h</Td>
                         <Td num>{pct(r.avg_activity_pct)}</Td>
-                        <Td num>{usd(r.sales)}</Td>
-                        <Td num>{usd(r.agency_revenue_usd)}</Td>
-                        <Td num>{usd(r.cost_usd)}</Td>
-                        <Td num cls={(r.margin_usd ?? 0) >= 0 ? "text-success" : "text-destructive"}>{usd(r.margin_usd)}</Td>
+                        <Td num>{usd(r.sales, f.intl("es-CO"))}</Td>
+                        <Td num>{usd(r.agency_revenue_usd, f.intl("es-CO"))}</Td>
+                        <Td num>{usd(r.cost_usd, f.intl("es-CO"))}</Td>
+                        <Td num cls={(r.margin_usd ?? 0) >= 0 ? "text-success" : "text-destructive"}>{usd(r.margin_usd, f.intl("es-CO"))}</Td>
                         <Td num cls={(r.roi_x ?? 0) >= 1 ? "text-success" : "text-destructive"}>{r.roi_x != null ? `${r.roi_x}x` : "—"}</Td>
                         <Td>{r.no_rentable ? <Pill tone="bad">no rentable</Pill> : r.sin_venta_blu ? <Pill tone="muted">sin venta BLU</Pill> : <Pill tone="ok">rentable</Pill>}</Td>
                       </Row>
@@ -112,8 +114,8 @@ export default function HrPerformanceOperativo() {
                         <Td num>{pct(r.avg_activity_pct)}</Td>
                         <Td num>{r.leads}</Td>
                         <Td num>{r.cerradas}</Td>
-                        <Td num>{usd(r.monetizacion_usd)}</Td>
-                        <Td num>{usd(r.usd_por_hora)}</Td>
+                        <Td num>{usd(r.monetizacion_usd, f.intl("es-CO"))}</Td>
+                        <Td num>{usd(r.usd_por_hora, f.intl("es-CO"))}</Td>
                         <Td num>{r.avg_qa_score != null ? `${r.avg_qa_score}` : "—"}</Td>
                         <Td>{r.sin_cierres ? <Pill tone="bad">sin cierres</Pill> : <Pill tone="ok">activo</Pill>}</Td>
                       </Row>

@@ -24,7 +24,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format, startOfWeek, endOfWeek, addDays, isSameDay, isWithinInterval, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, getDay } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import { cn } from "@/lib/utils";
 import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
@@ -56,6 +56,7 @@ function TypeBadge({ type }: { type: string }) {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 const HRSchedules = () => {
+  const f = useFormato();
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -524,7 +525,7 @@ const HRSchedules = () => {
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-4">
                   <Button variant="outline" size="sm" onClick={() => setCalMonth(addDays(startOfMonth(calMonth), -1))}>←</Button>
-                  <h3 className="font-medium capitalize">{format(calMonth, "MMMM yyyy", { locale: es })}</h3>
+                  <h3 className="font-medium capitalize">{format(calMonth, "MMMM yyyy", { locale: f.fechas })}</h3>
                   <Button variant="outline" size="sm" onClick={() => setCalMonth(addDays(endOfMonth(calMonth), 1))}>→</Button>
                 </div>
                 <div className="grid grid-cols-7 gap-1">
@@ -630,7 +631,7 @@ const HRSchedules = () => {
           }
           return list.slice(0, 100).map((s: any): KpiRow => ({
             primary: s.title ?? s.employee_name ?? "Sin título",
-            secondary: s.start_at ? new Date(s.start_at).toLocaleString("es") : undefined,
+            secondary: s.start_at ? new Date(s.start_at).toLocaleString(f.intl("es-ES")) : undefined,
             right: s.shift_type ?? "—",
           }));
         })()}

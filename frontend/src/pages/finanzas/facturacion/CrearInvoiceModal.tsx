@@ -12,6 +12,8 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import { useFormato } from "@/hooks/useFormato";
+import type { Formato } from "@/lib/formato";
 
 interface Props {
   open: boolean;
@@ -20,11 +22,13 @@ interface Props {
   isPending?: boolean;
 }
 
-function fmt(n: number) {
-  return new Intl.NumberFormat("es-CO", { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(n);
+function fmtMonto(n: number, f: Formato) {
+  return new Intl.NumberFormat(f.intl("es-CO"), { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(n);
 }
 
 export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }: Props) {
+  const f = useFormato();
+  const fmt = (n: number) => fmtMonto(n, f);
   const [templateId, setTemplateId] = useState("");
   const [creatorId, setCreatorId] = useState("");
   const [creatorOpen, setCreatorOpen] = useState(false);
@@ -282,7 +286,7 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
               {totals.blue > 0 && <p className="text-muted-foreground">Blue: {fmt(totals.blue)}</p>}
               {totals.paypal > 0 && <p className="text-muted-foreground">PayPal: {fmt(totals.paypal)}</p>}
               <p className="font-semibold text-foreground pt-1 border-t border-border">Total: {fmt(totals.grand)}</p>
-              {totals.dueDate && <p className="text-muted-foreground text-xs">Vencimiento: {new Date(totals.dueDate + "T12:00:00").toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" })}</p>}
+              {totals.dueDate && <p className="text-muted-foreground text-xs">Vencimiento: {new Date(totals.dueDate + "T12:00:00").toLocaleDateString(f.intl("es-ES"), { day: "2-digit", month: "long", year: "numeric" })}</p>}
             </div>
           )}
 

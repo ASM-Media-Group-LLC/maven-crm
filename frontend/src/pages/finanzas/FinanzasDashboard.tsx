@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   DollarSign, FileText, Users, TrendingUp, TrendingDown, AlertTriangle,
@@ -14,10 +14,11 @@ import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDi
 import { PageHeader } from "@/components/ui/page-header";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip, ResponsiveContainer, Legend } from "recharts";
 import { startOfMonth, endOfMonth, subMonths, format, isWithinInterval } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
+import type { Formato } from "@/lib/formato";
 
-function fmt(n: number) {
-  return new Intl.NumberFormat("es-CO", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
+function fmtMonto(n: number, f: Formato) {
+  return new Intl.NumberFormat(f.intl("es-CO"), { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
 }
 
 function pctChange(current: number, previous: number) {
@@ -47,6 +48,8 @@ type KpiKey =
   | "accion-archivos";
 
 export default function FinanzasDashboard() {
+  const f = useFormato();
+  const fmt = useCallback((n: number) => fmtMonto(n, f), [f]);
   const [dateFrom, setDateFrom] = useState<Date | undefined>(startOfMonth(new Date()));
   const [dateTo, setDateTo] = useState<Date | undefined>(endOfMonth(new Date()));
   const [costCenter, setCostCenter] = useState("");
@@ -181,9 +184,9 @@ export default function FinanzasDashboard() {
       const ing = invoices.filter(inv => inv.status === "pagada" && inRange(inv.created_at, ms, me)).reduce((s, inv) => s + (Number(inv.amount) || 0), 0);
       const cos = payroll.filter(p => inRange(p.created_at, ms, me)).reduce((s, p) => s + (Number(p.net_total) || 0), 0) +
         commissions.filter(c => c.status === "pagado" && inRange(c.created_at, ms, me)).reduce((s, c) => s + (Number(c.final_amount) || 0), 0);
-      return { name: format(m, "MMM yy", { locale: es }), Ingresos: ing, Costos: cos };
+      return { name: format(m, "MMM yy", { locale: f.fechas }), Ingresos: ing, Costos: cos };
     });
-  }, [invoices, payroll, commissions, chartMonths]);
+  }, [invoices, payroll, commissions, chartMonths, f]);
 
   const hasFilters = costCenter || area || tipo !== "ambos";
 
@@ -197,10 +200,10 @@ export default function FinanzasDashboard() {
     switch (kpiPopup) {
       case "ingresos":
         title = `Ingresos del Mes — ${fmt(curIngresos)}`;
-        subtitle = `${curInvoicesPaid.length} facturas pagadas en ${format(now, "MMMM yyyy", { locale: es })}`;
+        subtitle = `${curInvoicesPaid.length} facturas pagadas en ${format(now, "MMMM yyyy", { locale: f.fechas })}`;
         rows = curInvoicesPaid.map(i => ({
           primary: i.recipient_name || `Invoice ${i.invoice_number ?? i.id.slice(0, 8)}`,
-          secondary: i.payment_method ? `${i.payment_method} · ${format(new Date(i.created_at), "dd MMM", { locale: es })}` : format(new Date(i.created_at), "dd MMM", { locale: es }),
+          secondary: i.payment_method ? `${i.payment_method} · ${format(new Date(i.created_at), "dd MMM", { locale: f.fechas })}` : format(new Date(i.created_at), "dd MMM", { locale: f.fechas }),
           right: fmt(Number(i.amount) || 0),
           rightTone: "success",
         }));
@@ -257,7 +260,7 @@ export default function FinanzasDashboard() {
         subtitle = "Estatus 'enviada', esperando pago";
         rows = facturasPendientesList.map(i => ({
           primary: i.recipient_name || `Invoice ${i.invoice_number ?? i.id.slice(0, 8)}`,
-          secondary: i.due_date ? `Vence ${format(new Date(i.due_date), "dd MMM yyyy", { locale: es })}` : format(new Date(i.created_at), "dd MMM", { locale: es }),
+          secondary: i.due_date ? `Vence ${format(new Date(i.due_date), "dd MMM yyyy", { locale: f.fechas })}` : format(new Date(i.created_at), "dd MMM", { locale: f.fechas }),
           right: fmt(Number(i.amount) || 0),
           rightTone: "warning",
         }));
@@ -267,7 +270,7 @@ export default function FinanzasDashboard() {
         subtitle = "Requieren atención inmediata";
         rows = facturasVencidasList.map(i => ({
           primary: i.recipient_name || `Invoice ${i.invoice_number ?? i.id.slice(0, 8)}`,
-          secondary: i.due_date ? `Vencida ${format(new Date(i.due_date), "dd MMM yyyy", { locale: es })}` : format(new Date(i.created_at), "dd MMM", { locale: es }),
+          secondary: i.due_date ? `Vencida ${format(new Date(i.due_date), "dd MMM yyyy", { locale: f.fechas })}` : format(new Date(i.created_at), "dd MMM", { locale: f.fechas }),
           right: fmt(Number(i.amount) || 0),
           rightTone: "destructive",
         }));
@@ -276,8 +279,8 @@ export default function FinanzasDashboard() {
         title = `Variación vs Mes Anterior — ${variacion >= 0 ? "+" : ""}${variacion.toFixed(1)}%`;
         subtitle = `Mes actual ${fmt(curIngresos)} vs Mes anterior ${fmt(prevIngresos)}`;
         rows = [
-          { primary: format(now, "MMMM yyyy", { locale: es }), right: fmt(curIngresos), rightTone: "success" },
-          { primary: format(subMonths(now, 1), "MMMM yyyy", { locale: es }), right: fmt(prevIngresos) },
+          { primary: format(now, "MMMM yyyy", { locale: f.fechas }), right: fmt(curIngresos), rightTone: "success" },
+          { primary: format(subMonths(now, 1), "MMMM yyyy", { locale: f.fechas }), right: fmt(prevIngresos) },
           { primary: "Diferencia", right: fmt(curIngresos - prevIngresos), rightTone: curIngresos - prevIngresos >= 0 ? "success" : "destructive" },
         ];
         break;
@@ -351,7 +354,7 @@ export default function FinanzasDashboard() {
         subtitle = "Status 'borrador'";
         rows = invoicesPorEnviarList.map(i => ({
           primary: i.recipient_name || `Invoice ${i.invoice_number ?? i.id.slice(0, 8)}`,
-          secondary: format(new Date(i.created_at), "dd MMM yyyy", { locale: es }),
+          secondary: format(new Date(i.created_at), "dd MMM yyyy", { locale: f.fechas }),
           right: fmt(Number(i.amount) || 0),
           rightTone: "warning",
         }));
@@ -364,7 +367,7 @@ export default function FinanzasDashboard() {
     }
 
     return { title, subtitle, rows };
-  }, [kpiPopup, curInvoicesPaid, curIngresos, curPayroll, curCommissionsPaid, curNomina, curCostos, curMargen, curMargenPct, nominaProyectadaList, nominaProyectada, curCommissions, curComisiones, facturasPendientesList, facturasPendientes, facturasVencidasList, facturasVencidas, variacion, prevIngresos, hrData, alerts, nominaSinCerrarList, nominaSinCerrar, comisionesPorAprobarList, comisionesPorAprobar, invoicesPorEnviarList, invoicesPorEnviar, now]);
+  }, [kpiPopup, curInvoicesPaid, curIngresos, curPayroll, curCommissionsPaid, curNomina, curCostos, curMargen, curMargenPct, nominaProyectadaList, nominaProyectada, curCommissions, curComisiones, facturasPendientesList, facturasPendientes, facturasVencidasList, facturasVencidas, variacion, prevIngresos, hrData, alerts, nominaSinCerrarList, nominaSinCerrar, comisionesPorAprobarList, comisionesPorAprobar, invoicesPorEnviarList, invoicesPorEnviar, now, f, fmt]);
 
   return (
     <div className="flex flex-col h-full overflow-hidden">

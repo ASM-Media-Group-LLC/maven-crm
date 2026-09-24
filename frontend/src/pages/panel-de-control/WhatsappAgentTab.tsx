@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
 import {
   AlertCircle,
   Bot,
@@ -31,6 +30,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { useFormato } from "@/hooks/useFormato";
 import { EmptyState } from "@/components/EmptyState";
 import {
   useAskWhatsappAgent,
@@ -148,6 +148,7 @@ function GroupsList({
   selectedId: string | null;
   onSelect: (id: string) => void;
 }) {
+  const f = useFormato();
   return (
     <div className="space-y-2">
       {groups.map((g) => (
@@ -167,7 +168,7 @@ function GroupsList({
               <div className="text-xs text-muted-foreground truncate">
                 {g.provider}
                 {g.last_message_at && (
-                  <> · {format(new Date(g.last_message_at), "d MMM HH:mm", { locale: es })}</>
+                  <> · {format(new Date(g.last_message_at), "d MMM HH:mm", { locale: f.fechas })}</>
                 )}
               </div>
             </div>
@@ -349,6 +350,7 @@ function Stat({
 }
 
 function CommitmentsList({ groupId }: { groupId: string }) {
+  const f = useFormato();
   const [status, setStatus] = useState<WhatsappCommitment["status"] | "all">("pending");
   const { data: rows, isLoading } = useWhatsappCommitments(groupId, status);
   const resolveMut = useResolveCommitment();
@@ -393,7 +395,7 @@ function CommitmentsList({ groupId }: { groupId: string }) {
                   <>
                     {" · "}
                     <Calendar className="inline h-3 w-3 mr-0.5" />
-                    {format(new Date(c.due_at), "d MMM HH:mm", { locale: es })}
+                    {format(new Date(c.due_at), "d MMM HH:mm", { locale: f.fechas })}
                   </>
                 )}
                 {c.followup_count > 0 && (
@@ -476,6 +478,7 @@ function MessagesList({ groupId }: { groupId: string }) {
 }
 
 function MessageRow({ msg }: { msg: WhatsappMessage }) {
+  const f = useFormato();
   return (
     <div className={cn(
       "p-2 rounded-md text-sm",
@@ -489,7 +492,7 @@ function MessageRow({ msg }: { msg: WhatsappMessage }) {
           {msg.is_from_bot ? "🤖 Maven Asistente" : (msg.sender_display_name ?? "anon")}
         </span>
         <span className="text-[10px] text-muted-foreground shrink-0">
-          {format(new Date(msg.sent_at), "d MMM HH:mm", { locale: es })}
+          {format(new Date(msg.sent_at), "d MMM HH:mm", { locale: f.fechas })}
         </span>
       </div>
       <div className="text-sm whitespace-pre-wrap break-words">{msg.body ?? <em className="text-muted-foreground">[{msg.msg_type}]</em>}</div>
@@ -569,6 +572,7 @@ function MemberRow({
   onLink: (userId: string | null) => void;
   isUpdating: boolean;
 }) {
+  const f = useFormato();
   const [open, setOpen] = useState(false);
   const linkedName = member.linked_user?.full_name ?? (member.user_id ? "(usuario sin nombre)" : null);
 
@@ -583,7 +587,7 @@ function MemberRow({
         </div>
         <div className="text-xs text-muted-foreground truncate mt-0.5">
           {member.last_seen_at
-            ? <>Activo {format(new Date(member.last_seen_at), "d MMM HH:mm", { locale: es })}</>
+            ? <>Activo {format(new Date(member.last_seen_at), "d MMM HH:mm", { locale: f.fechas })}</>
             : "Sin actividad reciente"}
         </div>
       </div>
@@ -662,6 +666,7 @@ function MemberRow({
 }
 
 function CostsCard({ groupId }: { groupId: string }) {
+  const f = useFormato();
   const { data: rows } = useWhatsappGroupCosts(groupId, 3);
 
   // Mes actual = primera row porque la query viene ordenada desc
@@ -672,7 +677,7 @@ function CostsCard({ groupId }: { groupId: string }) {
     n == null ? "—" : n < 1 ? `$${n.toFixed(3)}` : `$${n.toFixed(2)}`;
 
   const monthLabel = current
-    ? format(new Date(`${current.month}T12:00:00Z`), "MMMM yyyy", { locale: es })
+    ? format(new Date(`${current.month}T12:00:00Z`), "MMMM yyyy", { locale: f.fechas })
     : "—";
 
   // Delta vs mes anterior
@@ -748,6 +753,7 @@ function CostMetric({ label, value }: { label: string; value: number | null | un
 }
 
 function DailyReportsList({ groupId }: { groupId: string }) {
+  const f = useFormato();
   const { data: reports, isLoading } = useWhatsappDailyReports(groupId, 14);
   const [selected, setSelected] = useState<WhatsappDailyReport | null>(null);
 
@@ -778,7 +784,7 @@ function DailyReportsList({ groupId }: { groupId: string }) {
             <Card key={date} className="p-3">
               <div className="flex items-baseline justify-between mb-2">
                 <p className="text-sm font-medium">
-                  {format(new Date(`${date}T12:00:00Z`), "EEEE d 'de' MMMM", { locale: es })}
+                  {format(new Date(`${date}T12:00:00Z`), f.idioma === "en" ? "EEEE, MMMM d" : "EEEE d 'de' MMMM", { locale: f.fechas })}
                 </p>
                 <span className="text-[11px] text-muted-foreground">{dayReports.length} reporte{dayReports.length === 1 ? "" : "s"}</span>
               </div>
@@ -799,7 +805,7 @@ function DailyReportsList({ groupId }: { groupId: string }) {
               Reporte de {selected?.profile?.full_name ?? "—"}
             </DialogTitle>
             <DialogDescription>
-              {selected && format(new Date(`${selected.report_date}T12:00:00Z`), "EEEE d 'de' MMMM yyyy", { locale: es })}
+              {selected && format(new Date(`${selected.report_date}T12:00:00Z`), f.idioma === "en" ? "EEEE, MMMM d, yyyy" : "EEEE d 'de' MMMM yyyy", { locale: f.fechas })}
               {" · "}
               <Badge variant="outline" className="text-[10px]">{selected?.role_kind === "llg" ? "LLG" : "Closer Sup."}</Badge>
             </DialogDescription>
@@ -852,7 +858,7 @@ function DailyReportsList({ groupId }: { groupId: string }) {
                 </div>
               )}
               <p className="text-[10px] text-muted-foreground">
-                Capturado {format(new Date(selected.created_at), "d MMM HH:mm", { locale: es })}
+                Capturado {format(new Date(selected.created_at), "d MMM HH:mm", { locale: f.fechas })}
               </p>
             </div>
           )}
@@ -905,6 +911,7 @@ function Metric({ label, value, accent }: { label: string; value: number | null;
 }
 
 function EventsList({ groupId }: { groupId: string }) {
+  const f = useFormato();
   const { data: events } = useWhatsappBotEvents(groupId);
   if (!events || events.length === 0) {
     return (
@@ -918,7 +925,7 @@ function EventsList({ groupId }: { groupId: string }) {
       {events.map((e) => (
         <div key={e.id} className="text-xs flex items-baseline gap-2 py-1 border-b last:border-b-0">
           <span className="text-muted-foreground shrink-0 w-32">
-            {format(new Date(e.created_at), "d MMM HH:mm:ss", { locale: es })}
+            {format(new Date(e.created_at), "d MMM HH:mm:ss", { locale: f.fechas })}
           </span>
           <Badge variant="outline" className="text-[10px] shrink-0">{e.kind}</Badge>
           <span className="text-muted-foreground truncate">

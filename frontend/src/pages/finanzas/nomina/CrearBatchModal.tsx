@@ -7,6 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { listRowBase, listRowInteractive } from "@/components/ui/list-row";
 import { cn } from "@/lib/utils";
+import { useFormato } from "@/hooks/useFormato";
 
 interface Props {
   open: boolean;
@@ -16,11 +17,13 @@ interface Props {
   isPending?: boolean;
 }
 
-function fmt(n: number) {
-  return new Intl.NumberFormat("es-CO", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
+function fmtUsd(n: number, locale: string) {
+  return new Intl.NumberFormat(locale, { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
 }
 
 export default function CrearBatchModal({ open, onClose, periods, onSubmit, isPending }: Props) {
+  const f = useFormato();
+  const fmt = (n: number) => fmtUsd(n, f.intl("es-CO"));
   const [selected, setSelected] = useState<string[]>([]);
   const [reason, setReason] = useState("");
 

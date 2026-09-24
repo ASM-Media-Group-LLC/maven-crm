@@ -21,11 +21,15 @@ import { normalizeRoomCode, isCompleteRoomCode, ROOM_CODE_LENGTH } from "@/lib/c
 import { Plus, Users2, ArrowRight, KeyRound, Loader2, VenetianMask, LogOut, History } from "lucide-react";
 import CoworkIncognitoView from "./CoworkIncognitoView";
 import { toast } from "sonner";
+import { useFormato } from "@/hooks/useFormato";
+import type { Formato } from "@/lib/formato";
 
 export default function CoworkPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const sessionId = searchParams.get("session");
   const navigate = useNavigate();
+  // `f` ya es la variable de las filas de finalizadas; por eso este se llama `formato`.
+  const formato = useFormato();
   const [showCreate, setShowCreate] = useState(false);
   const [autoJoining, setAutoJoining] = useState(false);
   const [autoJoinFailed, setAutoJoinFailed] = useState(false);
@@ -478,7 +482,7 @@ export default function CoworkPage() {
                   </div>
                   <div className="text-xs text-muted-foreground truncate">
                     La finalizó <span className="text-foreground/80 font-medium">{f.endedByName ?? "alguien (sin registro: anterior al 3/9)"}</span>
-                    {" · "}{fechaCorta(f.endedAt)} · {f.members} {f.members === 1 ? "miembro" : "miembros"}
+                    {" · "}{fechaCorta(f.endedAt, formato)} · {f.members} {f.members === 1 ? "miembro" : "miembros"}
                   </div>
                 </div>
               </div>
@@ -597,14 +601,15 @@ export default function CoworkPage() {
 // Shown briefly while we redirect participants out of an ended Cowork session
 // back to the main Maven dashboard.
 /** dd/mm HH:MM en hora local, para las listas y la pantalla de finalizada. */
-function fechaCorta(iso: string | null | undefined): string {
+function fechaCorta(iso: string | null | undefined, formato: Formato): string {
   if (!iso) return "";
   const d = new Date(iso);
-  return d.toLocaleString("es-CO", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleString(formato.intl("es-CO"), { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
 
 function CoworkSessionEndedRedirect({ session }: { session: CoworkSessionRow | null }) {
   const navigate = useNavigate();
+  const formato = useFormato();
   const [quien, setQuien] = useState<{ nombre: string; foto: string | null; seed: string | null } | null>(null);
 
   // Quién la finalizó, con nombre. Antes esta pantalla decía "la finalizó el
@@ -648,7 +653,7 @@ function CoworkSessionEndedRedirect({ session }: { session: CoworkSessionRow | n
         <h2 className="text-lg font-semibold text-foreground">Esta sesión ha finalizado</h2>
         <p className="text-sm text-muted-foreground">
           {session?.ended_by
-            ? <>La finalizó <span className="text-foreground font-medium">{quien?.nombre ?? "…"}</span>{session?.ended_at ? ` el ${fechaCorta(session.ended_at)}` : ""}.</>
+            ? <>La finalizó <span className="text-foreground font-medium">{quien?.nombre ?? "…"}</span>{session?.ended_at ? ` el ${fechaCorta(session.ended_at, formato)}` : ""}.</>
             : "La finalizó un supervisor."}
           {" "}Los enlaces y códigos de esta sesión ya no sirven: pide el de la sesión nueva.
         </p>

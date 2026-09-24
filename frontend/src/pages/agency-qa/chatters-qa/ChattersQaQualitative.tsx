@@ -10,7 +10,8 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
+import type { Formato } from "@/lib/formato";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { useBluModels, bluModelLabel } from "../../sales-performance/useBluMp";
 import { COMPANIES, companyLabel, periodLabel, type CompanyCode } from "./useChatterScorecards";
@@ -25,9 +26,10 @@ const toneBadge: Record<string, string> = {
 // Mes actual YYYY-MM (en el navegador del usuario).
 const currentMonth = () => new Date().toISOString().slice(0, 7);
 // Día exacto en que se hizo el reporte (created_at).
-const fmtDay = (iso?: string | null) => (iso ? format(new Date(iso), "d MMM yyyy", { locale: es }) : "—");
+const fmtDay = (f: Formato, iso?: string | null) => (iso ? format(new Date(iso), "d MMM yyyy", { locale: f.fechas }) : "—");
 
 export default function ChattersQaQualitative() {
+  const f = useFormato();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const { data: reports = [], isLoading } = useQaReports(null); // todos; filtramos en UI
   const create = useCreateQaReport();
@@ -165,7 +167,7 @@ export default function ChattersQaQualitative() {
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <span className="font-medium">{r.chatter_name}</span>
-                <span className="text-xs text-muted-foreground">{companyLabel(r.company)} · {periodLabel(r.period)} · hecho el {fmtDay(r.created_at)}</span>
+                <span className="text-xs text-muted-foreground">{companyLabel(r.company)} · {periodLabel(r.period)} · hecho el {fmtDay(f, r.created_at)}</span>
               </div>
               <p className="truncate text-xs text-muted-foreground">
                 {(r.evaluated_models ?? []).map((m) => m.model_name).join(", ") || "sin modelos"}

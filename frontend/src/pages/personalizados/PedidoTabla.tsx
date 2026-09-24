@@ -7,7 +7,8 @@ import {
 import { ArrowDown, ArrowUp, ChevronsUpDown, Filter } from "lucide-react";
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
+import type { Formato } from "@/lib/formato";
 import { DIAS_VENCIDO, agenciaDe, alertaDe, estadoDe, tipoDe, usd, type Pedido } from "./types";
 import { CLASE, TEXTOS, etiquetaValor, valoresDe, type ColumnaOrden, type Direccion, type Orden } from "./orden";
 
@@ -25,7 +26,7 @@ interface Props {
   onFiltrar: (col: ColumnaOrden, valor: string) => void;
 }
 
-const f = (d: string | null) => (d ? format(new Date(`${d}T12:00:00`), "d MMM yy", { locale: es }) : "—");
+const f = (d: string | null, fo: Formato) => (d ? format(new Date(`${d}T12:00:00`), "d MMM yy", { locale: fo.fechas }) : "—");
 
 const COLUMNAS: Array<{ col: ColumnaOrden; label: string; alinear?: "der" }> = [
   { col: "creator_name", label: "Creadora" },
@@ -100,6 +101,7 @@ function Encabezado({ col, label, alinear, pedidos, orden, onOrdenar, filtroDe, 
 // La vista "sheet": todo lo que la gente estaba acostumbrada a ver en columnas,
 // pero filtrable, ordenable por columna y con clic para abrir la ficha.
 export default function PedidoTabla({ pedidos, onAbrir, orden, onOrdenar, filtroDe, onFiltrar, onVerChatter, puedeVerCreadora }: Props) {
+  const formatoUI = useFormato();
   return (
     <div className="rounded-2xl border border-border/60 overflow-x-auto">
       <Table>
@@ -137,7 +139,7 @@ export default function PedidoTabla({ pedidos, onAbrir, orden, onOrdenar, filtro
                 </TableCell>
                 <TableCell className="whitespace-nowrap text-muted-foreground">
                   <span className="inline-flex items-center gap-1.5">
-                    {f(p.requested_on)}
+                    {f(p.requested_on, formatoUI)}
                     {a && (
                       <span
                         title={a.nivel === "vencido"
@@ -168,7 +170,7 @@ export default function PedidoTabla({ pedidos, onAbrir, orden, onOrdenar, filtro
                 <TableCell className="text-right font-medium">{usd(p.price_usd)}</TableCell>
                 <TableCell className="text-right text-muted-foreground">{usd(p.paid_usd)}</TableCell>
                 <TableCell>{p.sale_channel === "buster" ? "⚡ Buster" : p.sale_channel === "normal" ? "Normal" : "—"}</TableCell>
-                <TableCell className="whitespace-nowrap text-muted-foreground">{f(p.due_on)}</TableCell>
+                <TableCell className="whitespace-nowrap text-muted-foreground">{f(p.due_on, formatoUI)}</TableCell>
                 <TableCell><Badge variant="outline" className={`rounded-full ${ag.tono}`}>{ag.label}</Badge></TableCell>
               </TableRow>
             );

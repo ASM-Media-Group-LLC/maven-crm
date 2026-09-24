@@ -1,6 +1,6 @@
 import { ExternalLink, Eye } from "lucide-react";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
 import XIcon from "@/components/icons/XIcon";
@@ -40,6 +40,7 @@ interface Props {
 }
 
 const LeadGenGrid = ({ leads, onView }: Props) => {
+  const f = useFormato();
   const buildProfileUrl = (entry: LeadGenEntry) => {
     if (entry.source_link) return entry.source_link;
     const p = entry.platform.toLowerCase();
@@ -98,7 +99,7 @@ const LeadGenGrid = ({ leads, onView }: Props) => {
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Fecha:</span>
                     <span className="font-medium">
-                      {format(createdAt, "d MMM yyyy", { locale: es })} · {format(createdAt, "hh:mm a")}
+                      {format(createdAt, "d MMM yyyy", { locale: f.fechas })} · {format(createdAt, "hh:mm a")}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">

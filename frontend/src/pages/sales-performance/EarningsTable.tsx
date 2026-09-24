@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ALL_COLUMNS, type EarningsRow, type SortField, type SortDirection, type ColumnDef } from "./types";
 import LinkCreatorModal from "./LinkCreatorModal";
+import { useFormato } from "@/hooks/useFormato";
 
 interface EarningsTableProps {
   rows: EarningsRow[];
@@ -34,9 +35,9 @@ interface EarningsTableProps {
   visibleColumns: Set<SortField>;
 }
 
-const formatDate = (d: string) => {
+const formatDate = (d: string, locale: string) => {
   try {
-    return new Date(d).toLocaleDateString("es-CL", {
+    return new Date(d).toLocaleDateString(locale, {
       year: "numeric",
       month: "short",
       day: "numeric",
@@ -51,7 +52,7 @@ const SortIcon = ({ field, current, direction }: { field: SortField; current: So
   return direction === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />;
 };
 
-const formatCell = (row: EarningsRow, col: ColumnDef): string => {
+const formatCell = (row: EarningsRow, col: ColumnDef, locale: string): string => {
   const val = row[col.key];
   if (val == null) return "—";
   switch (col.format) {
@@ -68,7 +69,7 @@ const formatCell = (row: EarningsRow, col: ColumnDef): string => {
     case "trend":
       return String(val);
     case "date":
-      return formatDate(val as string);
+      return formatDate(val as string, locale);
     case "time":
       return String(val);
     case "document":
@@ -88,6 +89,7 @@ const TrendCell = ({ value }: { value: string | null | undefined }) => {
 };
 
 const EarningsTable = ({ rows, sortField, sortDirection, onSort, visibleColumns }: EarningsTableProps) => {
+  const f = useFormato();
   const queryClient = useQueryClient();
   const columns = ALL_COLUMNS.filter((c) => visibleColumns.has(c.key));
   const [linkModal, setLinkModal] = useState<{ open: boolean; pendingCreator: string; rowId: string }>({
@@ -151,7 +153,7 @@ const EarningsTable = ({ rows, sortField, sortDirection, onSort, visibleColumns 
                     >
                       {col.key === "pending_creator" && isUnlinked ? (
                         <div className="flex items-center gap-1.5">
-                          <span>{formatCell(row, col)}</span>
+                          <span>{formatCell(row, col, f.intl("es-CL"))}</span>
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Button
@@ -174,7 +176,7 @@ const EarningsTable = ({ rows, sortField, sortDirection, onSort, visibleColumns 
                         </div>
                       ) : col.key === "pending_creator" && isManuallyLinked ? (
                         <div className="flex items-center gap-1.5">
-                          <span>{formatCell(row, col)}</span>
+                          <span>{formatCell(row, col, f.intl("es-CL"))}</span>
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Button
@@ -198,10 +200,10 @@ const EarningsTable = ({ rows, sortField, sortDirection, onSort, visibleColumns 
                           (row[col.key] as number) < 0 ? "text-destructive font-medium" :
                           "text-muted-foreground"
                         }>
-                          {formatCell(row, col)}
+                          {formatCell(row, col, f.intl("es-CL"))}
                         </span>
                       ) : (
-                        formatCell(row, col)
+                        formatCell(row, col, f.intl("es-CL"))
                       )}
                     </TableCell>
                   ))}

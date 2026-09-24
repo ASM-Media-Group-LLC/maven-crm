@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Pencil, Trash2, KeyRound, UserCog, X, ExternalLink, AtSign } from "lucide-react";
 import type { AdminUser } from "./useAdminUsers";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -29,6 +29,7 @@ interface UsersTableProps {
 }
 
 const UsersTable = ({ users, onEditRole, onEdit, onResetPassword, onMigrarCorreo, onDelete, onRemoveRole }: UsersTableProps) => {
+  const f = useFormato();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user: authUser } = useAuth();
@@ -122,7 +123,7 @@ const UsersTable = ({ users, onEditRole, onEdit, onResetPassword, onMigrarCorreo
                 </TableCell>
               )}
               <TableCell className="text-muted-foreground">
-                {user.created_at ? format(new Date(user.created_at), "dd MMM yyyy", { locale: es }) : "—"}
+                {user.created_at ? format(new Date(user.created_at), "dd MMM yyyy", { locale: f.fechas }) : "—"}
               </TableCell>
               <TableCell className="sticky right-0 bg-card text-right shadow-[inset_6px_0_6px_-6px_rgba(0,0,0,0.35)]">
                 <TooltipProvider>
