@@ -253,6 +253,8 @@ const AdminUsuarios = () => {
                   onPurgar={(id) => papelera.purgar.mutate(id)}
                   recuperando={papelera.recuperar.isPending}
                   purgando={papelera.purgar.isPending}
+                  error={papelera.error}
+                  onReintentar={() => { void papelera.refetch(); }}
                 />
               ) : activeTab === "usuarios" ? (
                 <>

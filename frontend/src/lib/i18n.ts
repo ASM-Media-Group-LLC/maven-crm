@@ -1307,6 +1307,7 @@ const translations = {
   "common.confirm": { es: "Confirmar", en: "Confirm" },
   "common.understood": { es: "Entendido", en: "Got it" },
   "common.retry": { es: "Reintentar", en: "Retry" },
+  "papelera.noCargo": { es: "No pude cargar las cuentas eliminadas", en: "Couldn't load the deleted accounts" },
   "common.continue": { es: "Continuar", en: "Continue" },
   "common.download": { es: "Descargar", en: "Download" },
   // Campos de formulario y columnas de tabla

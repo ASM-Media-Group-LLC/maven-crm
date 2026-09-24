@@ -155,8 +155,12 @@ Deno.serve(async (req) => {
       });
     }
 
-    // For actions other than create_user and list_users, user_id is required
-    if (action !== "create_user" && !user_id) {
+    // Acciones sin persona concreta: crear una, o listar. El resto va sobre un
+    // user_id. ⚠️ list_deleted_users faltaba aquí: la papelera respondía 400
+    // "user_id is required" y el front lo leía como "No hay cuentas
+    // eliminadas" (Jhon, 24/09), con ocho cuentas recuperables en la base.
+    const SIN_USER_ID = new Set(["create_user", "list_users", "list_deleted_users"]);
+    if (!SIN_USER_ID.has(action) && !user_id) {
       return new Response(JSON.stringify({ error: "user_id is required" }), {
         status: 400,
         headers: { ...corsHeaders(req), "Content-Type": "application/json" },

@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { UserAvatar } from "@/components/UserAvatar";
+import { useLanguage } from "@/hooks/useLanguage";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, RotateCcw, Trash2, Trash } from "lucide-react";
+import { Loader2, RotateCcw, Trash2, Trash, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import {
@@ -22,6 +23,9 @@ interface Props {
   onPurgar: (userId: string) => void;
   recuperando: boolean;
   purgando: boolean;
+  /** Mensaje si la lista no se pudo cargar: se muestra, no se disfraza de vacío. */
+  error?: string | null;
+  onReintentar?: () => void;
 }
 
 // Los últimos días en rojo: es el aviso de que se va a purgar sola.
@@ -33,14 +37,31 @@ export function tonoDelPlazo(dias: number): "secondary" | "outline" | "destructi
 
 export default function PapeleraTabla({
   cuentas, diasDePapelera, isLoading, puedePurgar,
-  onRecuperar, onPurgar, recuperando, purgando,
+  onRecuperar, onPurgar, recuperando, purgando, error, onReintentar,
 }: Props) {
   const [aPurgar, setAPurgar] = useState<CuentaEnPapelera | null>(null);
+  const { t } = useLanguage();
 
   if (isLoading) {
     return (
       <div className="flex justify-center py-12">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // Un fallo de la llamada NO es "no hay cuentas". Se dice, con reintento.
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+        <AlertTriangle className="h-12 w-12 mb-3 opacity-40" />
+        <p>{t("papelera.noCargo")}</p>
+        <p className="text-xs mt-1 max-w-md text-center">{error}</p>
+        {onReintentar && (
+          <Button variant="outline" size="sm" className="mt-4" onClick={onReintentar}>
+            {t("common.retry")}
+          </Button>
+        )}
       </div>
     );
   }
