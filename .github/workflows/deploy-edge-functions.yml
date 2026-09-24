@@ -70,6 +70,25 @@ jobs:
           # autenticado (5000 req/h en vez de 60) y deja de ser una lotería.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          # Pinneada por la misma razón que la CLI de arriba: reproducible, y sin
+          # depender de resolver "latest" contra una API externa en cada deploy.
+          deno-version: 2.9.5
+
+      # ⚠️ GUARD DE SEGURIDAD — aislamiento entre agencias del API pública.
+      # public-api corre con service_role (salta la RLS): la única pared entre
+      # agencias es lo que el código filtre. Este test falla si alguien agrega una
+      # tabla o un endpoint sin declarar cómo aísla, si promueve un recurso a
+      # "aislado" sin arreglar el dato, o si se pierde un filtro. Si falla, NO se
+      # despliega nada, a propósito: prod se queda con el código anterior, que es
+      # mucho mejor que desplegar una fuga de datos entre clientes.
+      # Corre SIEMPRE, no solo cuando cambia public-api: un cambio en _shared/
+      # también la redespliega.
+      - name: Guard — aislamiento entre agencias
+        run: deno test --allow-read --no-check supabase/functions/public-api/aislamiento.test.ts
+
       - name: Determinar qué deployar
         id: changes
         run: |
