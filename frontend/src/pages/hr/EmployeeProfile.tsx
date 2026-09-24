@@ -15,7 +15,7 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import { ABSENCE_TYPES, INCIDENT_SEVERITIES, TRAINING_STATUSES, PERFORMANCE_EVALUATION_STATUSES, HISTORY_CHANGE_TYPES, HISTORY_FIELD_LABELS } from "@/lib/hrConstants";
 import { SEVERITY_COLORS } from "@/lib/hrAreaUtils";
 import { cn } from "@/lib/utils";
@@ -39,6 +39,7 @@ const MODALITY_ICONS: Record<string, React.ComponentType<{ className?: string }>
 export default function EmployeeProfile() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const f = useFormato();
   const { data: employee, isLoading } = useEmployee(id);
   const { data: absences = [] } = useEmployeeAbsences(id);
   const { data: incidents = [] } = useEmployeeIncidents(id);
@@ -205,7 +206,7 @@ export default function EmployeeProfile() {
                   <InfoRow label="Banco" value={employee.bank_name} />
                   <InfoRow label="No. Cuenta" value={employee.bank_account_number} />
                   <InfoRow label="Tipo" value={employee.bank_account_type} />
-                  <InfoRow label="Salario Base" value={employee.base_salary ? `$${employee.base_salary.toLocaleString("es-CO")}` : undefined} />
+                  <InfoRow label="Salario Base" value={employee.base_salary ? `$${employee.base_salary.toLocaleString(f.intl("es-CO"))}` : undefined} />
                   <InfoRow label="Frecuencia" value={employee.salary_frequency} />
                 </CardContent>
               </Card>
@@ -317,7 +318,7 @@ export default function EmployeeProfile() {
                       <div key={pd.id} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm transition-colors">
                         <div>
                           <p className="font-medium">{pd.payroll_periods?.period_name ?? "—"}</p>
-                          <p className="text-xs text-muted-foreground">Bruto: ${Number(pd.gross_salary || 0).toLocaleString("es-CO")} · Neto: ${Number(pd.net_total || 0).toLocaleString("es-CO")}</p>
+                          <p className="text-xs text-muted-foreground">Bruto: ${Number(pd.gross_salary || 0).toLocaleString(f.intl("es-CO"))} · Neto: ${Number(pd.net_total || 0).toLocaleString(f.intl("es-CO"))}</p>
                         </div>
                         <Badge variant="outline" className="text-xs">{pd.payroll_periods?.status ?? "—"}</Badge>
                       </div>
@@ -342,7 +343,7 @@ export default function EmployeeProfile() {
                       <div key={c.id} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm transition-colors">
                         <div>
                           <p className="font-medium">{c.period}</p>
-                          <p className="text-xs text-muted-foreground">{c.commission_type} · Est: ${Number(c.estimated_amount || 0).toLocaleString("es-CO")}</p>
+                          <p className="text-xs text-muted-foreground">{c.commission_type} · Est: ${Number(c.estimated_amount || 0).toLocaleString(f.intl("es-CO"))}</p>
                         </div>
                         <Badge variant={c.status === "pagado" ? "default" : "secondary"} className="text-xs">{c.status}</Badge>
                       </div>
@@ -367,7 +368,7 @@ export default function EmployeeProfile() {
                       <div key={d.id} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm transition-colors">
                         <div>
                           <p className="font-medium">{d.deduction_type}</p>
-                          <p className="text-xs text-muted-foreground">{d.month_year} · ${Number(d.amount || 0).toLocaleString("es-CO")}</p>
+                          <p className="text-xs text-muted-foreground">{d.month_year} · ${Number(d.amount || 0).toLocaleString(f.intl("es-CO"))}</p>
                         </div>
                         <Badge variant={d.status === "applied" ? "default" : "secondary"} className="text-xs">{d.status}</Badge>
                       </div>
@@ -445,7 +446,7 @@ export default function EmployeeProfile() {
                       <div className="space-y-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <Badge variant="secondary" className="text-xs">{typeLabel}</Badge>
-                          <span className="text-xs text-muted-foreground">{format(new Date(h.effective_date), "dd MMM yyyy", { locale: es })}</span>
+                          <span className="text-xs text-muted-foreground">{format(new Date(h.effective_date), "dd MMM yyyy", { locale: f.fechas })}</span>
                         </div>
                         <p className="text-sm">
                           <span className="text-muted-foreground">{fieldLabel}:</span>{" "}

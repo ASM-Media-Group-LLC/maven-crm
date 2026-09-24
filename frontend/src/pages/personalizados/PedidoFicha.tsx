@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import {
   CAMINO, DIAS_VENCIDO, SIGUIENTES, SOLO_SUPERVISOR, acentoDe, agenciaDe, alertaDe,
   estadoDe, flagDe, tipoDe, usd,
@@ -31,8 +31,6 @@ interface Props {
   onClose: () => void;
   onEditar: (p: Pedido) => void;
 }
-
-const fecha = (d: string | null | undefined) => (d ? format(new Date(d.length === 10 ? `${d}T12:00:00` : d), "d MMM yyyy", { locale: es }) : "—");
 
 // Defaults ESTABLES para cuando la query está deshabilitada (ficha cerrada):
 // un `= []` inline sería un array nuevo por render y, como `adjuntos` es
@@ -85,6 +83,8 @@ function Recorrido({ estado }: { estado: Estado }) {
 // ESTADO en el degradé del header, la foto de la creadora y el recorrido, para
 // que cada pedido se lea distinto y no como una lista de campos grises.
 export default function PedidoFicha({ pedido, onClose, onEditar }: Props) {
+  const formatoUi = useFormato();
+  const fecha = (d: string | null | undefined) => (d ? format(new Date(d.length === 10 ? `${d}T12:00:00` : d), "d MMM yyyy", { locale: formatoUi.fechas }) : "—");
   const { puedeAprobar, puedeGestionar } = usePermisosPersonalizados();
   const { nombreDe } = useCatalogos();
   const { cambiarEstado, editar, borrar, subirAdjunto, borrarAdjunto } = useMutacionesPedidos();
@@ -393,7 +393,7 @@ export default function PedidoFicha({ pedido, onClose, onEditar }: Props) {
                     {" "}{ev.from_status ? `pasó de ${estadoDe(ev.from_status).label} a ` : "creó el pedido como "}
                     <span className={`font-medium ${acentoDe(ev.to_status).texto}`}>{estadoDe(ev.to_status).label}</span>
                     {ev.note && <span className="text-muted-foreground"> — {ev.note}</span>}
-                    <span className="text-muted-foreground"> · {formatDistanceToNow(new Date(ev.created_at), { addSuffix: true, locale: es })}</span>
+                    <span className="text-muted-foreground"> · {formatDistanceToNow(new Date(ev.created_at), { addSuffix: true, locale: formatoUi.fechas })}</span>
                   </li>
                 ))}
               </ol>

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { differenceInCalendarDays, format } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import { Activity, ArrowRight, CalendarOff, ChevronRight, Clock, DollarSign, Gauge, Megaphone, Moon, Sparkles, Sun, Sunset, Target, TrendingUp, Timer } from "lucide-react";
 import { Bar, CartesianGrid, Cell, ComposedChart, LabelList, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +30,7 @@ import SelectorDeTablero from "@/pages/dashboard/SelectorDeTablero";
 const SIN_DIAS: never[] = []; // default estable: un `[]` inline cambia por render
 
 export default function ChatterDashboard({ hoy = new Date() }: { hoy?: Date }) {
+  const formatoUi = useFormato();
   const { data: perfil } = useMyProfile();
   const identidad = useMiIdentidad();
   const yo = identidad.data ?? null;
@@ -62,7 +63,7 @@ export default function ChatterDashboard({ hoy = new Date() }: { hoy?: Date }) {
   const nombres = useNombres([descansoSemana?.covered_by_identity_id ?? ""]);
 
   const nombre = perfil?.full_name?.split(" ")[0] ?? "";
-  const fechaLarga = format(hoy, "EEEE d 'de' MMMM", { locale: es });
+  const fechaLarga = format(hoy, formatoUi.idioma === "en" ? "EEEE, MMMM d" : "EEEE d 'de' MMMM", { locale: formatoUi.fechas });
 
   // La serie cubre TODOS los días del rango (los sin nota van en blanco): con
   // "Este mes" el día 3 se ve el mes entero con lo que va, no dos barras
@@ -119,7 +120,7 @@ export default function ChatterDashboard({ hoy = new Date() }: { hoy?: Date }) {
               color={resumen.actividad == null ? undefined : resumen.actividad >= 60 ? "bg-success" : resumen.actividad >= 40 ? "bg-warning" : "bg-destructive"} hint="actividad Hubstaff" />
             <StatChip label="Masivos" icon={<Megaphone className="h-3.5 w-3.5" />} value={resumen.masivos} hint={resumen.masivosConversion == null ? undefined : `${resumen.masivosConversion.toFixed(1)}% conversión`} />
             <StatChip label="Mejor día" icon={<TrendingUp className="h-3.5 w-3.5" />} color="bg-success"
-              value={resumen.mejorDia ? money(resumen.mejorDia.ventas) : "—"} hint={resumen.mejorDia ? format(fechaDe(resumen.mejorDia.dia), "EEE d", { locale: es }) : undefined} />
+              value={resumen.mejorDia ? money(resumen.mejorDia.ventas) : "—"} hint={resumen.mejorDia ? format(fechaDe(resumen.mejorDia.dia), "EEE d", { locale: formatoUi.fechas }) : undefined} />
           </div>
         )}
 
@@ -254,7 +255,7 @@ export default function ChatterDashboard({ hoy = new Date() }: { hoy?: Date }) {
                         <div className="min-w-0 flex-1">
                           <p className="text-xs font-bold text-amber-500">Tu #1</p>
                           <p className="truncate font-display text-base font-bold leading-tight">{top.model_name ?? `Modelo ${top.blu_model_id}`}</p>
-                          <p className="text-xs text-muted-foreground">{top.fans.toLocaleString("es")} fans · {top.dias} {top.dias === 1 ? "día" : "días"}</p>
+                          <p className="text-xs text-muted-foreground">{top.fans.toLocaleString(formatoUi.intl("es-ES"))} fans · {top.dias} {top.dias === 1 ? "día" : "días"}</p>
                         </div>
                         <div className="text-right">
                           <p className="font-display text-xl font-extrabold tabular-nums leading-none">{money(top.sales)}</p>
@@ -333,7 +334,8 @@ function TurnoHero({ shift, hoy, libre, grupo }: { shift: "am" | "pm" | "mad"; h
 // Un día: ventas, esperado, horas y las tres notas que componen la final.
 function DetalleDia({ dia, fila, identityId, libre }: { dia: string; fila: ReturnType<typeof useResumenChatter>["dias"][number] | null; identityId: string | null; libre: boolean }) {
   const modelos = useModelosDelDia(identityId, dia);
-  const fecha = format(fechaDe(dia), "EEEE d 'de' MMMM", { locale: es });
+  const formatoUi = useFormato();
+  const fecha = format(fechaDe(dia), formatoUi.idioma === "en" ? "EEEE, MMMM d" : "EEEE d 'de' MMMM", { locale: formatoUi.fechas });
   const faltan = fila?.detalle?.faltantes ?? [];
   return (
     <div className="grid gap-4 sm:grid-cols-[180px_1fr_1fr]">

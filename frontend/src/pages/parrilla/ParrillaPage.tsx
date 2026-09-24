@@ -10,7 +10,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarClock, CalendarRange, Copy, Loader2, Palette, Plus, Printer, Save, Send, Sparkles, Trash2 } from "lucide-react";
 import { usePermissions } from "@/hooks/usePermissions";
 import { type DateRange } from "react-day-picker";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
@@ -245,6 +245,7 @@ function DayColumn({ day, theme, isToday, onChange }: {
 }
 
 export default function ParrillaPage() {
+  const f = useFormato();
   const { data: grids = [], isLoading: gridsLoading } = useGridList();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const grid = useMemo(() => grids.find((g) => g.id === selectedId) ?? grids[0] ?? null, [grids, selectedId]);
@@ -590,7 +591,7 @@ export default function ParrillaPage() {
                   onSelect={cambiarInicio}
                   defaultMonth={grid ? new Date(grid.week_start + "T00:00:00") : undefined}
                   weekStartsOn={1}
-                  locale={es}
+                  locale={f.fechas}
                 />
               </PopoverContent>
             </Popover>
@@ -610,7 +611,7 @@ export default function ParrillaPage() {
                 onSelect={setRange}
                 defaultMonth={range?.from}
                 weekStartsOn={1}
-                locale={es}
+                locale={f.fechas}
               />
               <div className="mt-1 flex items-center justify-between gap-3">
                 <span className="text-[11px] text-muted-foreground">
@@ -654,7 +655,7 @@ export default function ParrillaPage() {
           <>
             {soloLectura && (
               <div className="print-hide mb-3 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-900">
-                <b>Parrilla enviada al grupo</b>{grid.sent_at ? ` el ${new Date(grid.sent_at).toLocaleString("es-CO", { timeZone: "America/Bogota", dateStyle: "short", timeStyle: "short" })}` : ""} — lo enviado es el contrato: queda en solo lectura. Para corregirla, usa <b>Volver a borrador</b> y vuelve a enviarla.
+                <b>Parrilla enviada al grupo</b>{grid.sent_at ? ` el ${new Date(grid.sent_at).toLocaleString(f.intl("es-CO"), { timeZone: "America/Bogota", dateStyle: "short", timeStyle: "short" })}` : ""} — lo enviado es el contrato: queda en solo lectura. Para corregirla, usa <b>Volver a borrador</b> y vuelve a enviarla.
                 {grid.pdf_url && <> · <a href={grid.pdf_url} target="_blank" rel="noreferrer" className="font-semibold underline">Ver PDF</a></>}
               </div>
             )}

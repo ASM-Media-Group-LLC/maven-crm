@@ -27,6 +27,8 @@ import {
   type CallOutcome,
 } from "@/hooks/useAgencyQa";
 import OutcomeBadge from "@/components/agency-qa/OutcomeBadge";
+import { useFormato } from "@/hooks/useFormato";
+import type { Formato } from "@/lib/formato";
 
 // Calls subtab — Kash-style table with model avatar, closer, evaluator,
 // outcome badge, score pill, and resend email button.
@@ -39,9 +41,9 @@ const OUTCOME_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "en_espera", label: "En espera" },
 ];
 
-const fmtDate = (iso: string) => {
+const fmtDate = (iso: string, f: Formato) => {
   const d = new Date(`${iso}T00:00:00`);
-  return d.toLocaleDateString("es-ES", {
+  return d.toLocaleDateString(f.intl("es-ES"), {
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -100,6 +102,7 @@ interface AgencyCallsProps {
 }
 
 const AgencyCalls = ({ onOpenDetail }: AgencyCallsProps) => {
+  const f = useFormato();
   const [search, setSearch] = useState("");
   const [outcomeFilter, setOutcomeFilter] = useState<string>("all");
   const [closerFilter, setCloserFilter] = useState<string>("all");
@@ -290,7 +293,7 @@ const AgencyCalls = ({ onOpenDetail }: AgencyCallsProps) => {
                     onClick={() => onOpenDetail?.(row.id)}
                   >
                     <TableCell className="tabular-nums text-sm">
-                      {fmtDate(row.call_date)}
+                      {fmtDate(row.call_date, f)}
                     </TableCell>
                     <TableCell>
                       {row.model ? (

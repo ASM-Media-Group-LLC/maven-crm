@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo } from "react";
 import { ArrowUpDown, ExternalLink, Eye, ChevronDown, Phone, UserPlus, CheckCircle2, ClipboardCheck, MessageSquare, MoreHorizontal, Trash2 } from "lucide-react";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -292,11 +292,12 @@ QACell.displayName = "QACell";
 // Memoized row
 const LeadRow = React.memo(({ lead, onView, onDelete, profiles, qaMap, canReview }: { lead: LeadGenEntry; onView?: (lead: LeadGenEntry) => void; onDelete?: (lead: LeadGenEntry) => void; profiles?: { id: string; full_name: string | null }[]; qaMap: Record<string, any>; canReview: boolean }) => {
   const isOrphan = lead.agent_name === "—" && profiles && profiles.length > 0;
+  const f = useFormato();
 
   return (
     <TableRow className="cursor-pointer" onClick={() => onView?.(lead)}>
       <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-        {format(new Date(lead.created_at), "dd/MM/yyyy hh:mm a", { locale: es })}
+        {format(new Date(lead.created_at), "dd/MM/yyyy hh:mm a", { locale: f.fechas })}
       </TableCell>
       <TableCell>
         <a

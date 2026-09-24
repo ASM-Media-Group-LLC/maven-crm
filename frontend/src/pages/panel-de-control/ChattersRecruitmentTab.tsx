@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import {
   Users,
   UserCheck,
@@ -51,16 +51,19 @@ interface KpiCardProps {
   onClick: () => void;
 }
 
-const KpiCard = ({ label, value, icon, gradient, hint, loading, onClick }: KpiCardProps) => (
-  <StatChip
-    label={label}
-    value={loading ? <Skeleton className="h-6 w-16" /> : value.toLocaleString("es")}
-    hint={hint}
-    color={gradient}
-    icon={icon}
-    onClick={loading ? undefined : onClick}
-  />
-);
+const KpiCard = ({ label, value, icon, gradient, hint, loading, onClick }: KpiCardProps) => {
+  const f = useFormato();
+  return (
+    <StatChip
+      label={label}
+      value={loading ? <Skeleton className="h-6 w-16" /> : value.toLocaleString(f.intl("es-ES"))}
+      hint={hint}
+      color={gradient}
+      icon={icon}
+      onClick={loading ? undefined : onClick}
+    />
+  );
+};
 
 // ─── Funnel step indicator (igual al tab modelos) ──────────────────────
 const FunnelStep = ({
@@ -71,14 +74,17 @@ const FunnelStep = ({
   label: string;
   value: number;
   color: string;
-}) => (
-  <div className="flex flex-col">
-    <span className="text-xs text-muted-foreground">{label}</span>
-    <span className={cn("text-lg font-bold tabular-nums", color)}>
-      {value.toLocaleString("es")}
-    </span>
-  </div>
-);
+}) => {
+  const f = useFormato();
+  return (
+    <div className="flex flex-col">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className={cn("text-lg font-bold tabular-nums", color)}>
+        {value.toLocaleString(f.intl("es-ES"))}
+      </span>
+    </div>
+  );
+};
 
 // ─── Detail dialog ─────────────────────────────────────────────────────
 const DetailDialog = ({
@@ -94,6 +100,7 @@ const DetailDialog = ({
   metricLabel: string;
   range: ChattersRange;
 }) => {
+  const f = useFormato();
   const { data, isLoading } = useChattersRecruitmentDetails(
     metric ?? "total",
     range,
@@ -140,7 +147,7 @@ const DetailDialog = ({
                   )}
                   {row.date && (
                     <span className="text-[10px] text-muted-foreground tabular-nums">
-                      {format(new Date(row.date), "d MMM", { locale: es })}
+                      {format(new Date(row.date), "d MMM", { locale: f.fechas })}
                     </span>
                   )}
                 </div>
@@ -165,6 +172,7 @@ interface Props {
 }
 
 const ChattersRecruitmentTab = ({ range }: Props) => {
+  const f = useFormato();
   const { data, isLoading } = useChattersRecruitment(range);
   const [openMetric, setOpenMetric] = useState<ChattersMetricKey | null>(null);
 
@@ -268,10 +276,10 @@ const ChattersRecruitmentTab = ({ range }: Props) => {
             </p>
             <div className="flex items-end gap-3 mt-2">
               <p className="text-4xl font-bold tabular-nums leading-none">
-                {k.total.toLocaleString("es")}
+                {k.total.toLocaleString(f.intl("es-ES"))}
               </p>
               <p className="text-xs text-muted-foreground pb-1">
-                {k.claimed.toLocaleString("es")} reclamadas ({claimRate}%)
+                {k.claimed.toLocaleString(f.intl("es-ES"))} reclamadas ({claimRate}%)
               </p>
             </div>
           </div>
@@ -288,7 +296,7 @@ const ChattersRecruitmentTab = ({ range }: Props) => {
                 <span className="text-xl text-muted-foreground">%</span>
               </p>
               <p className="text-xs text-muted-foreground pb-1">
-                {k.apto.toLocaleString("es")} aptos de {k.evaluated.toLocaleString("es")} evaluados
+                {k.apto.toLocaleString(f.intl("es-ES"))} aptos de {k.evaluated.toLocaleString(f.intl("es-ES"))} evaluados
               </p>
             </div>
           </div>

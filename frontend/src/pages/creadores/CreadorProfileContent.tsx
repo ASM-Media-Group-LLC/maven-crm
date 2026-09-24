@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useParams, useNavigate, useLocation, Link } from "react-router-dom";
 import { format } from "date-fns";
 import { computeAge, getDaysUntilBirthday } from "@/lib/edad";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import { ArrowLeft, Phone, Cake, Download, LogOut, ChevronRight, CheckCircle2 } from "lucide-react";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import { WaChatButton, toE164 } from "@/components/WaChatButton";
@@ -104,6 +104,7 @@ function OffboardingSummaryCard({ creatorId }: { creatorId: string }) {
 
 
 const CreadorProfileContent = () => {
+  const f = useFormato();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
@@ -243,7 +244,7 @@ const CreadorProfileContent = () => {
                 title={`Detectada automáticamente al completar onboarding (status ≠ borrador)`}
               >
                 <CheckCircle2 className="h-3 w-3" />
-                Ingresada al CRM · {format(new Date((c as any).entered_crm_at), "d MMM yyyy", { locale: es })}
+                Ingresada al CRM · {format(new Date((c as any).entered_crm_at), "d MMM yyyy", { locale: f.fechas })}
               </Badge>
             )}
             {c.status && (

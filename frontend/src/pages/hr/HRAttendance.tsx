@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ClipboardCheck, Search, Users, UserCheck, Clock, UserX, ListIcon, LayoutGrid, Pencil, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useFormato } from "@/hooks/useFormato";
 import { useEmployees } from "@/hooks/useEmployees";
 import { EmployeeSearchCombobox } from "@/components/hr/EmployeeSearchCombobox";
 import { Button } from "@/components/ui/button";
@@ -22,7 +23,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format, differenceInMinutes } from "date-fns";
-import { es } from "date-fns/locale";
 import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import StatChip from "@/components/StatChip";
@@ -138,6 +138,7 @@ interface RegisterModalProps {
 }
 
 function RegisterAttendanceModal({ open, onOpenChange }: RegisterModalProps) {
+  const formatoUI = useFormato();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -244,7 +245,7 @@ function RegisterAttendanceModal({ open, onOpenChange }: RegisterModalProps) {
                   selected={date}
                   onSelect={(d) => { if (d) { setDate(d); setDateOpen(false); } }}
                   initialFocus
-                  locale={es}
+                  locale={formatoUI.fechas}
                   className="p-3 pointer-events-auto"
                 />
               </PopoverContent>
@@ -316,6 +317,7 @@ function RegisterAttendanceModal({ open, onOpenChange }: RegisterModalProps) {
 
 // ─── Edit Modal ──────────────────────────────────────────────────────────────
 function EditAttendanceModal({ record, onClose }: { record: AttendanceRecord | null; onClose: () => void }) {
+  const formatoUI = useFormato();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -374,7 +376,7 @@ function EditAttendanceModal({ record, onClose }: { record: AttendanceRecord | n
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
-                <Calendar mode="single" selected={date} onSelect={(d) => { if (d) { setDate(d); setDateOpen(false); } }} initialFocus locale={es} className="p-3 pointer-events-auto" />
+                <Calendar mode="single" selected={date} onSelect={(d) => { if (d) { setDate(d); setDateOpen(false); } }} initialFocus locale={formatoUI.fechas} className="p-3 pointer-events-auto" />
               </PopoverContent>
             </Popover>
           </div>
@@ -444,6 +446,7 @@ function EditAttendanceModal({ record, onClose }: { record: AttendanceRecord | n
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function HRAttendance() {
+  const formatoUI = useFormato();
   const { data: records = [], isLoading } = useAttendance();
   const { data: departments = [] } = useDepartments();
   const queryClient = useQueryClient();
@@ -592,7 +595,7 @@ export default function HRAttendance() {
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
-              <Calendar mode="single" selected={dateFrom} onSelect={(d) => { setDateFrom(d); setDateFromOpen(false); }} locale={es} className="p-3 pointer-events-auto" />
+              <Calendar mode="single" selected={dateFrom} onSelect={(d) => { setDateFrom(d); setDateFromOpen(false); }} locale={formatoUI.fechas} className="p-3 pointer-events-auto" />
               {dateFrom && (
                 <div className="border-t p-2">
                   <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => setDateFrom(undefined)}>Limpiar</Button>
@@ -610,7 +613,7 @@ export default function HRAttendance() {
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
-              <Calendar mode="single" selected={dateTo} onSelect={(d) => { setDateTo(d); setDateToOpen(false); }} locale={es} className="p-3 pointer-events-auto" />
+              <Calendar mode="single" selected={dateTo} onSelect={(d) => { setDateTo(d); setDateToOpen(false); }} locale={formatoUI.fechas} className="p-3 pointer-events-auto" />
               {dateTo && (
                 <div className="border-t p-2">
                   <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => setDateTo(undefined)}>Limpiar</Button>

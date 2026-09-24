@@ -7,7 +7,7 @@ import {
   ArrowUpDown, ArrowUp, ArrowDown, LayoutDashboard, Activity,
 } from "lucide-react";
 import { format, isSameDay, subDays, startOfWeek, addDays, isToday, isFuture, startOfDay, startOfMonth, subMonths } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,6 +57,7 @@ const DAY_LABELS = ["LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB", "DOM"];
 
 const LeadGenContent = () => {
   const navigate = useNavigate();
+  const f = useFormato();
   const { user } = useAuth();
   const { dataScope, isLoading: permsLoading } = usePermissions();
   const { isAdmin } = useUserRole();
@@ -276,9 +277,9 @@ const LeadGenContent = () => {
     // Si from y to caen en el mismo mes/año, mostramos "Mayo 2026".
     // Si no, formato corto "4 may → 18 may".
     const sameMonth = dateFrom.getMonth() === dateTo.getMonth() && dateFrom.getFullYear() === dateTo.getFullYear();
-    if (sameMonth) return format(dateFrom, "MMMM yyyy", { locale: es });
-    return `${format(dateFrom, "d MMM", { locale: es })} → ${format(dateTo, "d MMM", { locale: es })}`;
-  }, [dateFrom, dateTo]);
+    if (sameMonth) return format(dateFrom, "MMMM yyyy", { locale: f.fechas });
+    return `${format(dateFrom, "d MMM", { locale: f.fechas })} → ${format(dateTo, "d MMM", { locale: f.fechas })}`;
+  }, [dateFrom, dateTo, f]);
 
   const agentStats = useMemo(() => {
     if (!agentStatsRaw) return [];
@@ -360,7 +361,7 @@ const LeadGenContent = () => {
               {viewMode === "agent" ? "Tus leads" : "Gestión de leads"} · {totalLeads.toLocaleString()} leads
               {dateFrom && dateTo && (
                 <span className="ml-1">
-                  ({format(dateFrom, "d MMM", { locale: es })} — {format(dateTo, "d MMM", { locale: es })})
+                  ({format(dateFrom, "d MMM", { locale: f.fechas })} — {format(dateTo, "d MMM", { locale: f.fechas })})
                 </span>
               )}
             </span>
@@ -610,8 +611,8 @@ const LeadGenContent = () => {
                 title="Rendimiento de Agentes"
                 subtitle={
                   dateFrom && dateTo
-                    ? `${format(dateFrom, "d 'de' MMMM", { locale: es })} — ${format(dateTo, "d 'de' MMMM, yyyy", { locale: es })} · ${agentStats.length} agentes activos`
-                    : `${format(new Date(), "d 'de' MMMM, yyyy", { locale: es })} · ${agentStats.length} agentes activos`
+                    ? `${format(dateFrom, f.idioma === "en" ? "MMMM d" : "d 'de' MMMM", { locale: f.fechas })} — ${format(dateTo, f.idioma === "en" ? "MMMM d, yyyy" : "d 'de' MMMM, yyyy", { locale: f.fechas })} · ${agentStats.length} agentes activos`
+                    : `${format(new Date(), f.idioma === "en" ? "MMMM d, yyyy" : "d 'de' MMMM, yyyy", { locale: f.fechas })} · ${agentStats.length} agentes activos`
                 }
                 count={agentStats.length}
                 countLabel="Agentes Activos"
@@ -807,6 +808,7 @@ function AgentsWeeklyCalendar({
   onWeekChange: (n: number) => void;
   onSelectAgent: (a: { id: string; name: string }) => void;
 }) {
+  const f = useFormato();
   const weekDays = getWeekDays(weekOffset);
 
   const leadsInDay = (agentId: string, day: Date) =>
@@ -823,7 +825,7 @@ function AgentsWeeklyCalendar({
             <ChevronLeft className="h-4 w-4 mr-1" /> Anterior
           </Button>
           <span className="text-sm font-medium text-muted-foreground">
-            {format(weekDays[0], "d 'de' MMMM", { locale: es })} – {format(weekDays[6], "d 'de' MMMM, yyyy", { locale: es })}
+            {format(weekDays[0], f.idioma === "en" ? "MMMM d" : "d 'de' MMMM", { locale: f.fechas })} – {format(weekDays[6], f.idioma === "en" ? "MMMM d, yyyy" : "d 'de' MMMM, yyyy", { locale: f.fechas })}
           </span>
           <Button variant="outline" size="sm" onClick={() => onWeekChange(weekOffset + 1)} disabled={weekOffset >= 0}>
             Siguiente <ChevronRight className="h-4 w-4 ml-1" />

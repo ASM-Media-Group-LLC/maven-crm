@@ -17,6 +17,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+import { useFormato } from "@/hooks/useFormato";
 
 interface Template {
   id: string;
@@ -33,6 +34,7 @@ interface Template {
 }
 
 export default function TemplatesPage() {
+  const f = useFormato();
   const [deleteTemplate, setDeleteTemplate] = useState<Template | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editTemplate, setEditTemplate] = useState<Template | null>(null);
@@ -133,7 +135,7 @@ export default function TemplatesPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                        {new Date(t.created_at).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" })}
+                        {new Date(t.created_at).toLocaleDateString(f.intl("es-ES"), { day: "2-digit", month: "short", year: "numeric" })}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">{t.creator_name}</TableCell>
                       <TableCell className="sticky right-0 bg-card group-hover:bg-muted">

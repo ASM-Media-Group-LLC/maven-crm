@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import {
   useAnnouncementsAdmin,
   useUpdateAnnouncement,
@@ -56,6 +56,7 @@ const STATUS_TABS = [
 ];
 
 const HRAnnouncements = () => {
+  const f = useFormato();
   const { data: announcements = [], isLoading } = useAnnouncementsAdmin();
   const [searchParams, setSearchParams] = useSearchParams();
   const duplicateAnn = useDuplicateAnnouncement();
@@ -213,7 +214,7 @@ const HRAnnouncements = () => {
                         </span>
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
-                        {format(new Date(a.starts_at), "d MMM yyyy", { locale: es })}
+                        {format(new Date(a.starts_at), "d MMM yyyy", { locale: f.fechas })}
                       </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end">

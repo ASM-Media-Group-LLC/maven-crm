@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { format, isToday, isThisYear } from "date-fns";
-import { es } from "date-fns/locale";
 import {
   FileText, FileSpreadsheet, Presentation, Plus, Search, Users, Lock,
   Trash2, RotateCcw, Loader2, X,
@@ -25,12 +24,14 @@ import {
 import { useCrearDocumentoOffice, type FormatoDeOficina } from "@/hooks/useOnlyOffice";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { TranslationKey } from "@/lib/i18n";
+import { useFormato } from "@/hooks/useFormato";
+import type { Formato } from "@/lib/formato";
 
-function cuando(iso: string): string {
+function cuando(iso: string, f: Formato): string {
   const d = new Date(iso);
   if (isToday(d)) return format(d, "HH:mm");
-  if (isThisYear(d)) return format(d, "d 'de' MMM", { locale: es });
-  return format(d, "d MMM yyyy", { locale: es });
+  if (isThisYear(d)) return format(d, f.idioma === "en" ? "MMM d" : "d 'de' MMM", { locale: f.fechas });
+  return format(d, "d MMM yyyy", { locale: f.fechas });
 }
 
 /** Cada formato es su propia sección del menú, como en Google: la lista de
@@ -69,6 +70,7 @@ const VISTAS: { id: FiltrosDocumentos["vista"]; label: string }[] = [
 export default function OficinaPage({ formato = "docx" }: { formato?: FormatoDeOficina }) {
   const navigate = useNavigate();
   const { t } = useLanguage();
+  const f = useFormato();
   const cfg = FORMATOS[formato];
   const { user } = useAuth();
   const [q, setQ] = useState("");
@@ -233,7 +235,7 @@ export default function OficinaPage({ formato = "docx" }: { formato?: FormatoDeO
                             <><Lock className="h-3 w-3" /> Privado</>
                           )}
                           <span aria-hidden="true">·</span>
-                          <span>{cuando(d.updated_at)}</span>
+                          <span>{cuando(d.updated_at, f)}</span>
                         </span>
                       </span>
                     </button>

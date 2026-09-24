@@ -23,7 +23,8 @@ import StatChip from "@/components/StatChip";
 import { PageHeader } from "@/components/ui/page-header";
 import { generateReport, exportTableToExcel } from "./generateReport";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
+import type { Formato } from "@/lib/formato";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RTooltip, Legend } from "recharts";
 
 const REPORT_TABS = ["Estado de Cuenta CC", "Ventas por Creador", "Por Método de Pago", "Comparativos Mensuales", "Reportes Generales"] as const;
@@ -39,11 +40,13 @@ const REPORT_TYPES: Record<string, string> = {
   metodo_pago: "Por Método de Pago",
 };
 
-function fmt(n: number) {
-  return new Intl.NumberFormat("es-CO", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
+function fmtMonto(n: number, f: Formato) {
+  return new Intl.NumberFormat(f.intl("es-CO"), { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
 }
 
 function DepartmentCostSection() {
+  const f = useFormato();
+  const fmt = (n: number) => fmtMonto(n, f);
   const { data: employees = [] } = useQuery({
     queryKey: ["reportes-dept-employees"],
     queryFn: async () => {
@@ -103,6 +106,8 @@ function DepartmentCostSection() {
 }
 
 export default function ReportesPage() {
+  const f = useFormato();
+  const fmt = (n: number) => fmtMonto(n, f);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [reportTab, setReportTab] = useState<ReportTab>("Estado de Cuenta CC");
@@ -234,7 +239,7 @@ export default function ReportesPage() {
     const mPay = payroll.filter(p => { const d = new Date(p.created_at); return d >= mStart && d <= mEnd; });
     const ing = mInv.reduce((s, i) => s + (Number(i.amount) || 0), 0);
     const egr = mPay.reduce((s, p) => s + (Number(p.net_total) || 0), 0);
-    return { mes: format(month, "MMM yyyy", { locale: es }), ingresos: ing, egresos: egr, margen: ing - egr };
+    return { mes: format(month, "MMM yyyy", { locale: f.fechas }), ingresos: ing, egresos: egr, margen: ing - egr };
   });
 
   // Add % change

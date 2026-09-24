@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useFormato } from "@/hooks/useFormato";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -26,12 +27,11 @@ import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDi
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip as RTooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 import { exportTableToExcel } from "@/pages/finanzas/reportes/generateReport";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
-import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/ui/page-header";
 
-function fmt(n: number) {
-  return new Intl.NumberFormat("es-CO", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
+function fmtMonto(n: number, locale: string) {
+  return new Intl.NumberFormat(locale, { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
 }
 
 const TABS = ["Dashboard", "Cobros"] as const;
@@ -45,6 +45,8 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function CollectionsPage() {
+  const f = useFormato();
+  const fmt = (n: number) => fmtMonto(n, f.intl("es-CO"));
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<Tab>("Dashboard");
@@ -172,7 +174,8 @@ export default function CollectionsPage() {
     const creatorName = inv.creators?.artistic_name || inv.creators?.name || "—";
     const w = window.open("", "_blank", "width=600,height=400");
     if (!w) return;
-    w.document.write(`<html><head><title>Cobro #${inv.invoice_number}</title><style>body{font-family:sans-serif;padding:2rem}table{width:100%;border-collapse:collapse;margin-top:1rem}td,th{border:1px solid #ccc;padding:8px;text-align:left}</style></head><body><h2>Cobro #${inv.invoice_number}</h2><table><tr><th>Creadora</th><td>${creatorName}</td></tr><tr><th>Monto</th><td>${fmt(Number(inv.amount) || 0)}</td></tr><tr><th>Estado</th><td>${inv.status}</td></tr><tr><th>Fecha</th><td>${format(new Date(inv.created_at), "dd/MM/yyyy")}</td></tr><tr><th>Notas</th><td>${inv.notes || "—"}</td></tr></table></body></html>`);
+    // Idioma fijo a propósito: el cobro impreso es un documento para la creadora, no texto de pantalla.
+    w.document.write(`<html><head><title>Cobro #${inv.invoice_number}</title><style>body{font-family:sans-serif;padding:2rem}table{width:100%;border-collapse:collapse;margin-top:1rem}td,th{border:1px solid #ccc;padding:8px;text-align:left}</style></head><body><h2>Cobro #${inv.invoice_number}</h2><table><tr><th>Creadora</th><td>${creatorName}</td></tr><tr><th>Monto</th><td>${fmtMonto(Number(inv.amount) || 0, "es-CO")}</td></tr><tr><th>Estado</th><td>${inv.status}</td></tr><tr><th>Fecha</th><td>${format(new Date(inv.created_at), "dd/MM/yyyy")}</td></tr><tr><th>Notas</th><td>${inv.notes || "—"}</td></tr></table></body></html>`);
     w.document.close();
     w.print();
   };
@@ -236,7 +239,7 @@ export default function CollectionsPage() {
     const mEnd = endOfMonth(month);
     const mInvoices = invoices.filter(inv => { const d = new Date(inv.created_at); return d >= mStart && d <= mEnd; });
     return {
-      month: format(month, "MMM", { locale: es }),
+      month: format(month, "MMM", { locale: f.fechas }),
       Pagadas: mInvoices.filter(i => i.status === "pagada").reduce((s, i) => s + (Number(i.amount) || 0), 0),
       Pendientes: mInvoices.filter(i => i.status === "enviada").reduce((s, i) => s + (Number(i.amount) || 0), 0),
       Vencidas: mInvoices.filter(i => i.status === "vencida").reduce((s, i) => s + (Number(i.amount) || 0), 0),
@@ -716,7 +719,7 @@ export default function CollectionsPage() {
             status === "enviada" ? "warning" : "default";
           return list.map((i) => ({
             primary: (i as any).creators?.artistic_name || (i as any).creators?.name || (i as any).recipient_name || `Invoice ${(i as any).invoice_number ?? i.id.slice(0, 8)}`,
-            secondary: `${i.status} · ${i.created_at ? format(new Date(i.created_at), "dd MMM yyyy", { locale: es }) : "—"}`,
+            secondary: `${i.status} · ${i.created_at ? format(new Date(i.created_at), "dd MMM yyyy", { locale: f.fechas }) : "—"}`,
             right: fmt(Number(i.amount) || 0),
             rightTone: tone(i.status as string),
           }));

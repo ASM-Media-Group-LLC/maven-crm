@@ -47,6 +47,7 @@ const fetchEarnings = async (): Promise<EarningsRow[]> => {
   return (earnings ?? []).map((e) => ({
     ...e,
     artistic_name: e.creator_id ? creatorsMap[e.creator_id] ?? null : null,
+    // Idioma fijo a propósito: es un dato de la fila (HH:mm en 24 h, igual en cualquier idioma) armado en el queryFn y cacheado.
     report_time: e.date ? new Date(e.date).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit", hour12: false }) : null,
     effective_date: format(new Date(e.date), "yyyy-MM-dd"),
   }));

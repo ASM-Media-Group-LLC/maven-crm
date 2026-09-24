@@ -21,6 +21,7 @@ import {
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useFormato } from "@/hooks/useFormato";
 import {
   useChatterSessions,
   useChatterProfiles,
@@ -40,9 +41,9 @@ import type { ChatterSession, ChatterProfile } from "./types";
 //     siempre via canAccess; otros roles dependen del toggle en
 //     Settings → Usuarios → Roles.
 
-const fmtDate = (iso: string): string => {
+const fmtDate = (iso: string, locale: string): string => {
   try {
-    return new Date(iso).toLocaleString("es-ES", {
+    return new Date(iso).toLocaleString(locale, {
       day: "2-digit",
       month: "short",
       year: "numeric",
@@ -55,6 +56,7 @@ const fmtDate = (iso: string): string => {
 };
 
 const HistoryContent = () => {
+  const f = useFormato();
   // scope='global' → admin/role con data_scope='all' ve sesiones de TODOS
   // los examiners. Roles con data_scope='self' siguen viendo sólo las
   // propias (el RLS aplica el filtro por examiner_user_id).
@@ -369,7 +371,7 @@ const HistoryContent = () => {
                                 {profile?.name ?? "(sin perfil)"}
                               </span>
                               <span>·</span>
-                              <span>{fmtDate(s.created_at)}</span>
+                              <span>{fmtDate(s.created_at, f.intl("es-ES"))}</span>
                             </div>
                           </div>
                         </Link>

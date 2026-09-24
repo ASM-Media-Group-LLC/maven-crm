@@ -82,6 +82,7 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { useCurrentTenantId } from "@/hooks/useAgencyQa";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/EmptyState";
+import { useFormato } from "@/hooks/useFormato";
 
 // ─── Asistente conversacional via edge fn `scouter-company-fill` ─────
 // Reemplaza el one-shot Groq llama-3.1-8b que daba siempre la misma
@@ -585,6 +586,7 @@ const CompanyFormModal = ({
   initial?: CompanyFormState;
   companyId?: string; // if editing
 }) => {
+  const formato = useFormato();
   const [form, setForm] = useState<CompanyFormState>(initial ?? emptyForm);
   const [aiLoading, setAiLoading] = useState(false);
   const [newTag, setNewTag] = useState("");
@@ -945,7 +947,7 @@ const CompanyFormModal = ({
                   Configuración generada por IA
                 </span>
                 <span className="text-[10px] text-muted-foreground ml-auto">
-                  {new Date(cfg.ai_generated_at).toLocaleString("es-CO")}
+                  {new Date(cfg.ai_generated_at).toLocaleString(formato.intl("es-CO"))}
                 </span>
               </div>
             </div>
@@ -1902,6 +1904,9 @@ const ScouterSettings = () => {
 // poblar el pool histórico la primera vez (la nueva data ya se embedea
 // automática post-scoring desde el worker).
 const LookalikeBackfillSection = () => {
+  const f = useFormato();
+  // "es" a secas (no "es-ES"): es el que ya usaba; en español no cambia nada.
+  const numeros = f.idioma === "en" ? "en-US" : "es";
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState<{
     done: number;
@@ -1984,7 +1989,7 @@ const LookalikeBackfillSection = () => {
         </Button>
         {progress && (
           <p className="text-xs text-muted-foreground mt-2 tabular-nums">
-            {progress.done.toLocaleString("es")} / {progress.total.toLocaleString("es")} embedded
+            {progress.done.toLocaleString(numeros)} / {progress.total.toLocaleString(numeros)} embedded
             {progress.failures > 0 && ` · ${progress.failures} fallidos`}
           </p>
         )}

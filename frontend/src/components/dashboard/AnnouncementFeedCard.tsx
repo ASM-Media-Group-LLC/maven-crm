@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import { Megaphone, AlertTriangle, Info, RefreshCw } from "lucide-react";
 import type { Announcement } from "@/hooks/useAnnouncements";
 
@@ -25,6 +25,7 @@ interface Props {
 }
 
 export default function AnnouncementFeedCard({ announcement, onOpen, onVisible }: Props) {
+  const f = useFormato();
   const ref = useRef<HTMLDivElement>(null);
 
   // IntersectionObserver - register view after 1 second visible
@@ -81,7 +82,7 @@ export default function AnnouncementFeedCard({ announcement, onOpen, onVisible }
           <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{announcement.message}</p>
         )}
         <p className="text-[10px] text-muted-foreground mt-1">
-          {format(new Date(announcement.starts_at), "d MMM yyyy", { locale: es })}
+          {format(new Date(announcement.starts_at), "d MMM yyyy", { locale: f.fechas })}
         </p>
       </div>
       {announcement.image_url && (

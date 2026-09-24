@@ -3,9 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Clock, CalendarIcon, Upload, X, FileText, Image } from "lucide-react";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useFormato } from "@/hooks/useFormato";
 import { EmployeeSearchCombobox } from "@/components/hr/EmployeeSearchCombobox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +32,7 @@ const PERMISSION_TYPES = [
 ];
 
 export default function HRPermisoNew() {
+  const f = useFormato();
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -166,7 +167,7 @@ export default function HRPermisoNew() {
                     className={cn("w-full justify-start font-normal", !date && "text-muted-foreground")}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {date ? format(date, "dd 'de' MMMM yyyy", { locale: es }) : "Seleccionar fecha"}
+                    {date ? format(date, f.idioma === "en" ? "MMMM dd, yyyy" : "dd 'de' MMMM yyyy", { locale: f.fechas }) : "Seleccionar fecha"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -174,7 +175,7 @@ export default function HRPermisoNew() {
                     mode="single"
                     selected={date}
                     onSelect={(d) => { setDate(d); setCalendarOpen(false); }}
-                    locale={es}
+                    locale={f.fechas}
                     initialFocus
                   />
                 </PopoverContent>

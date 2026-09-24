@@ -1,9 +1,9 @@
 import { formatDistanceToNow } from "date-fns";
-import { es } from "date-fns/locale";
 import { Archive, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import type { Notification } from "@/hooks/useNotifications";
+import { useFormato } from "@/hooks/useFormato";
 import { getModuleIcon, getTypeIcon, getPriorityDotClass } from "@/lib/notificationHelpers";
 
 interface Props {
@@ -15,6 +15,7 @@ interface Props {
 }
 
 export default function NotificationItem({ notification: n, onClickNotification, onArchive, onDelete, showArchive }: Props) {
+  const f = useFormato();
   const ModuleIcon = n.module_origin ? getModuleIcon(n.module_origin) : getTypeIcon(n.type);
   const isUnread = n.status === "new" || (!n.status && !n.is_read);
   const dotClass = getPriorityDotClass(n.priority);
@@ -40,7 +41,7 @@ export default function NotificationItem({ notification: n, onClickNotification,
         )}
         <div className="flex items-center gap-2 mt-1">
           <p className="text-[11px] text-muted-foreground">
-            {formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: es })}
+            {formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: f.fechas })}
           </p>
           {n.module_origin && (
             <span className="text-[10px] px-1.5 py-0 rounded bg-muted text-muted-foreground capitalize">

@@ -7,6 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { useFormato } from "@/hooks/useFormato";
 import {
   PRESETS, REGLAS_ESTANDAR, OPCIONES_SEG, OPCIONES_BANO_MIN, OPCIONES_BREAK_MIN, OPCIONES_RELOJ_SEG,
   detectarPreset, paraGuardar, textoSegundos, mismasReglas,
@@ -99,10 +100,10 @@ function resumenPausas(p: ReglaPausas): string {
 }
 
 /** "por Yoselin Castillo · 8 de sept", o null si no hay nada que decir. */
-export function firmaDeLasReglas(autoria?: { quien: string | null; cuando: string | null }): string | null {
+export function firmaDeLasReglas(autoria?: { quien: string | null; cuando: string | null }, locale: string = "es-CO"): string | null {
   if (!autoria?.quien && !autoria?.cuando) return null;
   const cuando = autoria.cuando
-    ? new Date(autoria.cuando).toLocaleDateString("es-CO", { day: "numeric", month: "short" })
+    ? new Date(autoria.cuando).toLocaleDateString(locale, { day: "numeric", month: "short" })
     : null;
   if (autoria.quien && cuando) return `por ${autoria.quien} · ${cuando}`;
   if (autoria.quien) return `por ${autoria.quien}`;
@@ -110,6 +111,7 @@ export function firmaDeLasReglas(autoria?: { quien: string | null; cuando: strin
 }
 
 export default function CoworkReglasDialog({ open, onOpenChange, reglas, nombreSesion, autoria, onGuardar }: Props) {
+  const f = useFormato();
   const [borrador, setBorrador] = useState<ReglasCowork>(reglas);
   const [guardando, setGuardando] = useState(false);
   const [abiertas, setAbiertas] = useState<Record<string, boolean>>({});
@@ -196,9 +198,9 @@ export default function CoworkReglasDialog({ open, onOpenChange, reglas, nombreS
           {/* Quién las dejó así. Antes no quedaba registro: Jhon vio cuatro
               sesiones con las alertas apagadas y no había forma de saber quién
               lo había hecho (09/09/2026). */}
-          {firmaDeLasReglas(autoria) && (
+          {firmaDeLasReglas(autoria, f.intl("es-CO")) && (
             <p className="text-xs text-muted-foreground">
-              Personalizadas {firmaDeLasReglas(autoria)}
+              Personalizadas {firmaDeLasReglas(autoria, f.intl("es-CO"))}
             </p>
           )}
         </DialogHeader>

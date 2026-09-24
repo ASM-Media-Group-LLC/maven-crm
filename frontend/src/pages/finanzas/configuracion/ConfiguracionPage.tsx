@@ -25,12 +25,14 @@ import {
   type CommissionDefaults,
   type PayrollParams,
 } from "@/hooks/useFinancialConfig";
+import { useFormato } from "@/hooks/useFormato";
+import type { Formato } from "@/lib/formato";
 
 const TABS = ["Templates QuickBooks", "Métodos de Pago", "Centros de Costo", "Config. Comisiones", "Parámetros de Nómina"] as const;
 type Tab = typeof TABS[number];
 
-function fmt(n: number) {
-  return new Intl.NumberFormat("es-CO", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
+function fmt(n: number, f: Formato) {
+  return new Intl.NumberFormat(f.intl("es-CO"), { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
 }
 
 // ─── QuickBooks Tab ───────────────────────────────────────────
@@ -367,6 +369,7 @@ type SectionKey = typeof SECTIONS[number]["key"];
 
 // ─── Main Page ────────────────────────────────────────────────
 export default function ConfiguracionPage() {
+  const f = useFormato();
   const [activeSection, setActiveSection] = useState<SectionKey | null>(null);
   type KpiKey = "qb" | "methods" | "centers" | "commissions" | "payroll";
   const [kpiPopup, setKpiPopup] = useState<KpiKey | null>(null);
@@ -409,7 +412,7 @@ export default function ConfiguracionPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
           <StatChip label="Mapeos QB" value={String(mappings.length)} icon={<FileText className="h-3.5 w-3.5" />} color="bg-primary" hint="cuentas configuradas" onClick={() => setKpiPopup("qb")} />
           <StatChip label="Métodos de Pago" value={String(activeMethods)} icon={<CreditCard className="h-3.5 w-3.5" />} color="bg-success" hint="métodos activos" onClick={() => setKpiPopup("methods")} />
-          <StatChip label="Centros de Costo" value={String(centers.length)} icon={<Building2 className="h-3.5 w-3.5" />} color="bg-accent" hint={fmt(totalBudget) + " presupuesto"} onClick={() => setKpiPopup("centers")} />
+          <StatChip label="Centros de Costo" value={String(centers.length)} icon={<Building2 className="h-3.5 w-3.5" />} color="bg-accent" hint={fmt(totalBudget, f) + " presupuesto"} onClick={() => setKpiPopup("centers")} />
           <StatChip label="Comisiones" value={`${defaults?.creator_pct ?? 0}%`} icon={<Percent className="h-3.5 w-3.5" />} color="bg-warning" hint={`${exceptionsCount} excepciones`} onClick={() => setKpiPopup("commissions")} />
           <StatChip label="Parámetros Nómina" value={`$${params?.hour_bank?.hour_value ?? 0}/h`} icon={<Calculator className="h-3.5 w-3.5" />} color="bg-destructive" hint={`HE: ${params?.overtime_multipliers?.daytime ?? 0}x / ${params?.overtime_multipliers?.nighttime ?? 0}x / ${params?.overtime_multipliers?.holiday ?? 0}x`} onClick={() => setKpiPopup("payroll")} />
         </div>
@@ -473,7 +476,7 @@ export default function ConfiguracionPage() {
           switch (kpiPopup) {
             case "qb": return "Mapeo de categorías a cuentas contables";
             case "methods": return "Métodos de pago configurados";
-            case "centers": return `Presupuesto total: ${fmt(totalBudget)}`;
+            case "centers": return `Presupuesto total: ${fmt(totalBudget, f)}`;
             case "commissions": return `${exceptionsCount} excepciones · default ${defaults?.creator_pct ?? 0}%`;
             case "payroll": return "Banco de horas y multiplicadores HE";
             default: return undefined;
@@ -498,7 +501,7 @@ export default function ConfiguracionPage() {
             return centers.map((c): KpiRow => ({
               primary: c.name,
               secondary: (c as any).code ?? undefined,
-              right: fmt(c.monthly_budget),
+              right: fmt(c.monthly_budget, f),
             }));
           }
           if (kpiPopup === "commissions") {
@@ -513,7 +516,7 @@ export default function ConfiguracionPage() {
           }
           if (kpiPopup === "payroll") {
             return [
-              { primary: "Hora banco", right: fmt(params?.hour_bank?.hour_value ?? 0) },
+              { primary: "Hora banco", right: fmt(params?.hour_bank?.hour_value ?? 0, f) },
               { primary: "Vigencia banco", right: `${params?.hour_bank?.validity_months ?? 0} meses` },
               { primary: "HE diurnas", right: `${params?.overtime_multipliers?.daytime ?? 0}x` },
               { primary: "HE nocturnas", right: `${params?.overtime_multipliers?.nighttime ?? 0}x` },

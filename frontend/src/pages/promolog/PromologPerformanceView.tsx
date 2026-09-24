@@ -1,6 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
 import { format, subDays, isSameDay, subMonths } from "date-fns";
-import { es } from "date-fns/locale";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, LineChart, Line, ResponsiveContainer } from "recharts";
 import { CHART_AXIS, CHART_GRID } from "@/lib/chartTheme";
 import { BarChart3, Clock, ChevronsUpDown, Check, CheckCircle } from "lucide-react";
@@ -9,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandItem } from "@/components/ui/command";
 import { useAuth } from "@/hooks/useAuth";
+import { useFormato } from "@/hooks/useFormato";
 import { useUserRole } from "@/hooks/useUserRole";
 import { usePromologActiveAgents, usePromologAgentEntries } from "./usePromologAgentStats";
 
@@ -17,6 +17,7 @@ interface Props {
 }
 
 const PromologPerformanceView = ({ profiles }: Props) => {
+  const f = useFormato();
   const { user } = useAuth();
   const { role, isAgent, isEmployee } = useUserRole();
   const isCloser = role === "closer";
@@ -70,29 +71,29 @@ const PromologPerformanceView = ({ profiles }: Props) => {
   const weeklyData = useMemo(() => Array.from({ length: 7 }, (_, i) => {
     const day = subDays(now, 6 - i);
     return {
-      label: format(day, "EEE dd", { locale: es }),
+      label: format(day, "EEE dd", { locale: f.fechas }),
       count: agentEntries.filter(l => isSameDay(new Date(l.created_at), day)).length,
     };
-  }), [agentEntries, now]);
+  }), [agentEntries, now, f]);
 
   const last30Data = useMemo(() => Array.from({ length: 30 }, (_, i) => {
     const day = subDays(now, 29 - i);
     return {
-      label: format(day, "d MMM", { locale: es }),
+      label: format(day, "d MMM", { locale: f.fechas }),
       count: agentEntries.filter(l => isSameDay(new Date(l.created_at), day)).length,
     };
-  }), [agentEntries, now]);
+  }), [agentEntries, now, f]);
 
   const yearlyData = useMemo(() => Array.from({ length: 12 }, (_, i) => {
     const month = subMonths(now, 11 - i);
     return {
-      label: format(month, "MMM yy", { locale: es }),
+      label: format(month, "MMM yy", { locale: f.fechas }),
       count: agentEntries.filter(l => {
         const d = new Date(l.created_at);
         return d.getMonth() === month.getMonth() && d.getFullYear() === month.getFullYear();
       }).length,
     };
-  }), [agentEntries, now]);
+  }), [agentEntries, now, f]);
 
   // Result distribution — BINARIO Sí/No. Sí = promocionó ('true'/'yes'/'partial');
   // No = todo lo demás (incl. 'false'/'pending'/null), para que si + no === total.
@@ -115,7 +116,7 @@ const PromologPerformanceView = ({ profiles }: Props) => {
           <div>
             <h3 className="text-base font-semibold">Rendimiento por Agente</h3>
             <p className="text-sm text-muted-foreground">
-              {format(now, "dd 'de' MMMM, yyyy", { locale: es })} · {agents.length} agentes activos
+              {format(now, f.idioma === "en" ? "MMMM dd, yyyy" : "dd 'de' MMMM, yyyy", { locale: f.fechas })} · {agents.length} agentes activos
             </p>
           </div>
           {!isOperational && (

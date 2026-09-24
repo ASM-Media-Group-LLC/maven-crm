@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { CheckCircle2, Clock, Loader2, Settings2, ShieldAlert, Trash2 } from "lucide-react";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -24,6 +23,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { OnboardingCreator } from "./useOnboarding";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useFormato } from "@/hooks/useFormato";
 
 interface Props {
   data: OnboardingCreator[];
@@ -37,6 +37,7 @@ const statusConfig = {
 };
 
 const OnboardingTable = ({ data, onManage }: Props) => {
+  const f = useFormato();
   const { t } = useLanguage();
   const { isAdmin } = useUserRole();
   const queryClient = useQueryClient();
@@ -112,7 +113,7 @@ const OnboardingTable = ({ data, onManage }: Props) => {
                   </TableCell>
                   <TableCell className="text-sm">{item.company}</TableCell>
                   <TableCell className="text-sm">
-                    {item.startDate ? format(new Date(item.startDate), "dd MMM yyyy", { locale: es }) : "—"}
+                    {item.startDate ? format(new Date(item.startDate), "dd MMM yyyy", { locale: f.fechas }) : "—"}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2 min-w-[120px]">

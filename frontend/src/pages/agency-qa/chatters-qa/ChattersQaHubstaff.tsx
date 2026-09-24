@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Clock, TrendingUp, AlertTriangle, Activity, DollarSign, Wallet, Scale, Info } from "lucide-react";
 import { format, startOfMonth, endOfMonth } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
+import type { Formato } from "@/lib/formato";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { useHubstaffEffort, useHubstaffSyncStatus, useChatterEffortRange, useChatterSalesRange } from "./useHubstaffEffort";
 import { periodLabel } from "./useChatterScorecards";
@@ -28,9 +29,10 @@ const money = (n: number | null | undefined) =>
   (n != null && n < 0 ? "-$" : "$") + Math.abs(Math.round(n ?? 0)).toLocaleString("en-US");
 
 const ymd = (d: Date) => format(d, "yyyy-MM-dd");
-const dayLabel = (d: Date) => format(d, "d MMM", { locale: es });
+const dayLabel = (d: Date, f: Formato) => format(d, "d MMM", { locale: f.fechas });
 
 export default function ChattersQaHubstaff() {
+  const f = useFormato();
   const { data: rows = [], isLoading } = useHubstaffEffort();
   const { data: sync } = useHubstaffSyncStatus();
 
@@ -102,7 +104,7 @@ export default function ChattersQaHubstaff() {
           </h3>
           <p className="text-sm text-muted-foreground">
             {stats?.chatters} chatters · {stats?.rangeAvgAct}% actividad · {stats?.rangeHours}h —{" "}
-            <strong>{dayLabel(from)}–{dayLabel(to)}</strong> (esfuerzo y venta por el rango elegido).
+            <strong>{dayLabel(from, f)}–{dayLabel(to, f)}</strong> (esfuerzo y venta por el rango elegido).
           </p>
         </div>
         <div className="flex flex-col items-end gap-1">
@@ -187,7 +189,7 @@ export default function ChattersQaHubstaff() {
       </Card>
 
       <p className="px-1 text-[11px] leading-relaxed text-muted-foreground">
-        <strong>Días/Horas/Actividad y Venta/Ingreso/Margen/ROI</strong> = del rango seleccionado ({dayLabel(from)}–{dayLabel(to)}){rangeLoading ? " (cargando…)" : ""} — venta diaria de BLU.
+        <strong>Días/Horas/Actividad y Venta/Ingreso/Margen/ROI</strong> = del rango seleccionado ({dayLabel(from, f)}–{dayLabel(to, f)}){rangeLoading ? " (cargando…)" : ""} — venta diaria de BLU.
         {stats?.hasCost ? (
           <>
             {" "}Ingreso agencia = venta × 80% (neto OF) × {stats.rate}% (comisión efectiva ponderada).

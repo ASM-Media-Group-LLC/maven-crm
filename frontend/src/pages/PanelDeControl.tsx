@@ -3,7 +3,8 @@ import {
   startOfMonth, endOfMonth, startOfDay, endOfDay, startOfWeek, endOfWeek,
   subDays, format,
 } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
+import type { Formato } from "@/lib/formato";
 import {
   Users,
   Phone,
@@ -92,16 +93,19 @@ const KpiCard = ({
   hint,
   loading,
   onClick,
-}: KpiCardProps) => (
-  <StatChip
-    label={label}
-    value={loading ? <Skeleton className="h-6 w-16" /> : value.toLocaleString("es")}
-    hint={hint}
-    color={gradient}
-    icon={icon}
-    onClick={loading ? undefined : onClick}
-  />
-);
+}: KpiCardProps) => {
+  const f = useFormato();
+  return (
+    <StatChip
+      label={label}
+      value={loading ? <Skeleton className="h-6 w-16" /> : value.toLocaleString(f.intl("es-ES"))}
+      hint={hint}
+      color={gradient}
+      icon={icon}
+      onClick={loading ? undefined : onClick}
+    />
+  );
+};
 
 // ─── Detail dialog ─────────────────────────────────────────────────────
 // CATEGORY_TONES, BADGE_TONES, DEFAULT_TONE y categoryTone() viven en
@@ -122,6 +126,7 @@ const DetailDialog = ({
   range: DashboardRange;
 }) => {
   const navigate = useNavigate();
+  const f = useFormato();
   // Metrics como totalLeads / totalGenerated / contacted usan el flow
   // de breakdown (RPC trae counts por categoría, rows se fetchean
   // lazy al expandir). El resto sigue con useMetricDetails que trae
@@ -258,17 +263,17 @@ const DetailDialog = ({
                 {metricLabel || "Detalle"}
                 {!isLoading && (
                   <span className="inline-flex items-center rounded-full bg-primary/15 px-2.5 py-0.5 text-sm font-bold text-primary tabular-nums">
-                    {totalCount.toLocaleString("es")}
+                    {totalCount.toLocaleString(f.intl("es-ES"))}
                   </span>
                 )}
               </DialogTitle>
               {!isLoading && groups.list.length > 0 && (
                 <p className="text-[11px] text-muted-foreground mt-1.5">
                   {supportsBreakdown
-                    ? `${totalCount.toLocaleString("es")} ${totalCount === 1 ? "registro" : "registros"}`
+                    ? `${totalCount.toLocaleString(f.intl("es-ES"))} ${totalCount === 1 ? "registro" : "registros"}`
                     : totalCount > data.length
-                      ? `Mostrando los ${data.length} más recientes de ${totalCount.toLocaleString("es")} totales`
-                      : `${data.length.toLocaleString("es")} ${data.length === 1 ? "registro" : "registros"}`}
+                      ? `Mostrando los ${data.length} más recientes de ${totalCount.toLocaleString(f.intl("es-ES"))} totales`
+                      : `${data.length.toLocaleString(f.intl("es-ES"))} ${data.length === 1 ? "registro" : "registros"}`}
                   {groups.hasCategory && ` · ${groups.list.length} ${groups.list.length === 1 ? "categoría" : "categorías"}`}
                 </p>
               )}
@@ -329,7 +334,7 @@ const DetailDialog = ({
             </div>
           ) : !groups.hasCategory ? (
             <div className="space-y-1.5">
-              {data.map((row) => renderRow(row, navigate, onOpenChange, setDetailLead))}
+              {data.map((row) => renderRow(row, navigate, onOpenChange, setDetailLead, f))}
             </div>
           ) : (
             groups.list.map((g) => (
@@ -354,7 +359,7 @@ const DetailDialog = ({
         {!supportsBreakdown && data.length > 0 && totalCount > data.length && (
           <p className="text-[10px] text-muted-foreground text-center py-2.5 border-t border-border/40 bg-muted/20">
             Mostrando los {data.length} más recientes de{" "}
-            <strong className="text-foreground">{totalCount.toLocaleString("es")}</strong> totales —
+            <strong className="text-foreground">{totalCount.toLocaleString(f.intl("es-ES"))}</strong> totales —
             exportar desde Reports para ver el listado completo.
           </p>
         )}
@@ -403,6 +408,7 @@ const CategorySection = ({
   onOpenChange: (o: boolean) => void;
   setDetailLead: (v: { source: "leadgen" | "scouter" | "creator"; id: string; title: string } | null) => void;
 }) => {
+  const f = useFormato();
   // Lazy fetch: solo cuando supportsBreakdown && expandida. React-query
   // cachea por (metric, range, cat) — expandir/colapsar no re-fetchea.
   const { data: lazyRows, isLoading: isLazyLoading } = useMetricCategoryRows(
@@ -433,10 +439,10 @@ const CategorySection = ({
             </p>
           ) : (
             <>
-              {rows.map((row) => renderRow(row, navigate, onOpenChange, setDetailLead))}
+              {rows.map((row) => renderRow(row, navigate, onOpenChange, setDetailLead, f))}
               {supportsBreakdown && count > rows.length && (
                 <p className="text-[10px] text-muted-foreground text-center py-1.5 italic">
-                  Mostrando los {rows.length} más recientes de {count.toLocaleString("es")} en esta categoría.
+                  Mostrando los {rows.length} más recientes de {count.toLocaleString(f.intl("es-ES"))} en esta categoría.
                 </p>
               )}
             </>
@@ -455,6 +461,7 @@ const renderRow = (
   navigate: (path: string) => void,
   onOpenChange: (o: boolean) => void,
   setDetailLead: (v: { source: "leadgen" | "scouter" | "creator"; id: string; title: string } | null) => void,
+  f: Formato,
 ) => {
   const handleRowClick = () => {
     if (row.linkUrl) {
@@ -509,7 +516,7 @@ const renderRow = (
         )}
         {row.date && (
           <span className="text-[10px] text-muted-foreground tabular-nums">
-            {format(new Date(row.date), "d MMM", { locale: es })}
+            {format(new Date(row.date), "d MMM", { locale: f.fechas })}
           </span>
         )}
         {isClickable && (
@@ -791,6 +798,7 @@ const LeadDetailDialog = ({
 // "Hoy" es el default al entrar a la página (antes era el mes entero,
 // pero la mayoría del uso es check del día en curso).
 const PanelDeControl = () => {
+  const f = useFormato();
   const today = startOfDay(new Date());
   // Default: Hoy (antes era el mes entero — la mayoría del uso es
   // check del día en curso, no análisis histórico mensual).
@@ -870,13 +878,13 @@ const PanelDeControl = () => {
           <span className="inline-flex items-center gap-1 rounded-full bg-success/15 ring-1 ring-success/30 px-2 py-0.5 text-[10px] font-bold text-success tabular-nums">
             Nuevas
             <span className="text-success font-extrabold">
-              {k.leadsNuevas.toLocaleString("es")}
+              {k.leadsNuevas.toLocaleString(f.intl("es-ES"))}
             </span>
           </span>
           <span className="inline-flex items-center gap-1 rounded-full bg-warning/15 ring-1 ring-warning/30 px-2 py-0.5 text-[10px] font-bold text-warning tabular-nums">
             Existentes
             <span className="text-warning font-extrabold">
-              {k.leadsExistentes.toLocaleString("es")}
+              {k.leadsExistentes.toLocaleString(f.intl("es-ES"))}
             </span>
           </span>
         </div>
@@ -1052,19 +1060,19 @@ const PanelDeControl = () => {
             </p>
             <div className="flex items-end gap-3 mt-2">
               <p className="text-4xl font-bold tabular-nums leading-none">
-                {k.totalGenerated.toLocaleString("es")}
+                {k.totalGenerated.toLocaleString(f.intl("es-ES"))}
               </p>
               <div className="flex flex-wrap items-center gap-1.5 pb-1">
                 <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/15 ring-1 ring-blue-400/30 px-2 py-0.5 text-[10px] font-bold text-blue-300 tabular-nums">
                   LLG
                   <span className="text-blue-100 font-extrabold">
-                    {k.contacted.toLocaleString("es")}
+                    {k.contacted.toLocaleString(f.intl("es-ES"))}
                   </span>
                 </span>
                 <span className="inline-flex items-center gap-1 rounded-full bg-pink-500/15 ring-1 ring-pink-400/30 px-2 py-0.5 text-[10px] font-bold text-pink-300 tabular-nums">
                   Bot
                   <span className="text-pink-100 font-extrabold">
-                    {k.scouterGenerated.toLocaleString("es")}
+                    {k.scouterGenerated.toLocaleString(f.intl("es-ES"))}
                   </span>
                 </span>
               </div>
@@ -1087,8 +1095,8 @@ const PanelDeControl = () => {
                 <span className="text-xl text-muted-foreground">%</span>
               </p>
               <p className="text-xs text-muted-foreground pb-1">
-                {k.numbersObtained.toLocaleString("es")} de{" "}
-                {k.totalGenerated.toLocaleString("es")} leads
+                {k.numbersObtained.toLocaleString(f.intl("es-ES"))} de{" "}
+                {k.totalGenerated.toLocaleString(f.intl("es-ES"))} leads
               </p>
             </div>
           </div>
@@ -1126,7 +1134,7 @@ const PanelDeControl = () => {
                 <span className="text-lg text-muted-foreground">%</span>
               </p>
               <p className="text-[10px] text-muted-foreground mt-1">
-                Números / Contactadas ({k.numbersObtained.toLocaleString("es")}/{k.totalLeads.toLocaleString("es")})
+                Números / Contactadas ({k.numbersObtained.toLocaleString(f.intl("es-ES"))}/{k.totalLeads.toLocaleString(f.intl("es-ES"))})
               </p>
             </div>
           </div>
@@ -1196,11 +1204,11 @@ const PanelDeControl = () => {
                 <div className="flex items-baseline gap-4 mt-1 tabular-nums">
                   <span className="flex items-center text-success text-2xl font-bold">
                     <ArrowUp className="h-5 w-5 mr-0.5" />
-                    {k.crmAltas.toLocaleString("es")}
+                    {k.crmAltas.toLocaleString(f.intl("es-ES"))}
                   </span>
                   <span className="flex items-center text-destructive text-2xl font-bold">
                     <ArrowDown className="h-5 w-5 mr-0.5" />
-                    {k.crmBajas.toLocaleString("es")}
+                    {k.crmBajas.toLocaleString(f.intl("es-ES"))}
                   </span>
                 </div>
               )}
@@ -1223,7 +1231,7 @@ const PanelDeControl = () => {
                       Balance
                       <span className="font-extrabold">
                         {sign}
-                        {balance.toLocaleString("es")}
+                        {balance.toLocaleString(f.intl("es-ES"))}
                       </span>
                     </span>
                   </div>
@@ -1260,9 +1268,9 @@ const PanelDeControl = () => {
                       range.from.getFullYear() === range.to.getFullYear() &&
                       range.from.getMonth() === range.to.getMonth();
                     if (sameMonth) {
-                      return cap(format(range.from, "MMMM yyyy", { locale: es }));
+                      return cap(format(range.from, "MMMM yyyy", { locale: f.fechas }));
                     }
-                    return `${cap(format(range.from, "MMM yyyy", { locale: es }))} - ${cap(format(range.to, "MMM yyyy", { locale: es }))}`;
+                    return `${cap(format(range.from, "MMM yyyy", { locale: f.fechas }))} - ${cap(format(range.to, "MMM yyyy", { locale: f.fechas }))}`;
                   })()}
                 </span>
               </p>
@@ -1274,7 +1282,7 @@ const PanelDeControl = () => {
                     {bestCloser.name}
                   </p>
                   <p className="text-[11px] text-muted-foreground mt-1 tabular-nums">
-                    {bestCloser.closes.toLocaleString("es")} cierres · calif promedio {Math.round(bestCloser.avgScore)}/100
+                    {bestCloser.closes.toLocaleString(f.intl("es-ES"))} cierres · calif promedio {Math.round(bestCloser.avgScore)}/100
                   </p>
                 </>
               ) : (
@@ -1367,16 +1375,19 @@ const FunnelStep = ({
   label: string;
   value: number;
   color: string;
-}) => (
-  <div className="rounded-xl border border-white/10 bg-white/5/40 px-3 py-1.5">
-    <p className="text-xs text-muted-foreground">
-      {label}
-    </p>
-    <p className={cn("font-bold tabular-nums text-base", color)}>
-      {value.toLocaleString("es")}
-    </p>
-  </div>
-);
+}) => {
+  const f = useFormato();
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/5/40 px-3 py-1.5">
+      <p className="text-xs text-muted-foreground">
+        {label}
+      </p>
+      <p className={cn("font-bold tabular-nums text-base", color)}>
+        {value.toLocaleString(f.intl("es-ES"))}
+      </p>
+    </div>
+  );
+};
 
 export default PanelDeControl;
 // rebuild cache buster 1778199315

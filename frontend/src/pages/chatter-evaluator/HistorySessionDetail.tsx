@@ -23,10 +23,11 @@ import {
   useChatterProfiles,
   useChatterConfig,
 } from "@/hooks/useChatterEvaluator";
+import { useFormato } from "@/hooks/useFormato";
 
-const fmtDate = (iso: string): string => {
+const fmtDate = (iso: string, locale: string): string => {
   try {
-    return new Date(iso).toLocaleString("es-ES", {
+    return new Date(iso).toLocaleString(locale, {
       day: "2-digit",
       month: "short",
       year: "numeric",
@@ -49,6 +50,7 @@ const statusColors = (s: "pass" | "partial" | "fail") =>
       : "bg-destructive/10 text-destructive";
 
 const HistorySessionDetail = () => {
+  const f = useFormato();
   const { sessionId } = useParams<{ sessionId: string }>();
   const sessionQ = useChatterSession(sessionId);
   const messagesQ = useChatterMessages(sessionId);
@@ -104,7 +106,7 @@ const HistorySessionDetail = () => {
           </Button>
           {session?.created_at && (
             <span className="text-xs text-muted-foreground">
-              Sesión del {fmtDate(session.created_at)}
+              Sesión del {fmtDate(session.created_at, f.intl("es-ES"))}
             </span>
           )}
         </div>
@@ -286,7 +288,7 @@ const HistorySessionDetail = () => {
                           <div className="whitespace-pre-wrap">{m.content}</div>
                         )}
                         <div className="mt-1 text-right text-[9px] opacity-60">
-                          {new Date(m.created_at).toLocaleTimeString("es-ES", {
+                          {new Date(m.created_at).toLocaleTimeString(f.intl("es-ES"), {
                             hour: "2-digit",
                             minute: "2-digit",
                           })}

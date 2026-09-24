@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { format, subDays, isToday } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import {
   ArrowLeft, Search, List, LayoutGrid, Eye, ChevronsUpDown, Check,
   Database, BarChart3,
@@ -43,6 +43,7 @@ const calidadColors: Record<string, string> = {
 
 const LeadGenBaseDatosContent = () => {
   const navigate = useNavigate();
+  const f = useFormato();
   const [activeTab, setActiveTab] = useState<"leads" | "analisis">("leads");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [searchTerm, setSearchTerm] = useState("");
@@ -125,7 +126,7 @@ const LeadGenBaseDatosContent = () => {
     for (let i = 6; i >= 0; i--) {
       const d = subDays(new Date(), i);
       const key = format(d, "yyyy-MM-dd");
-      days.push({ label: format(d, "EEE d", { locale: es }), date: key, leads: 0 });
+      days.push({ label: format(d, "EEE d", { locale: f.fechas }), date: key, leads: 0 });
     }
     filtered.forEach((l) => {
       const key = format(new Date(l.created_at), "yyyy-MM-dd");
@@ -133,14 +134,14 @@ const LeadGenBaseDatosContent = () => {
       if (found) found.leads++;
     });
     return days;
-  }, [filtered]);
+  }, [filtered, f]);
 
   const monthlyData = useMemo(() => {
     const days: { label: string; date: string; leads: number }[] = [];
     for (let i = 29; i >= 0; i--) {
       const d = subDays(new Date(), i);
       const key = format(d, "yyyy-MM-dd");
-      days.push({ label: format(d, "d MMM", { locale: es }), date: key, leads: 0 });
+      days.push({ label: format(d, "d MMM", { locale: f.fechas }), date: key, leads: 0 });
     }
     filtered.forEach((l) => {
       const key = format(new Date(l.created_at), "yyyy-MM-dd");
@@ -148,7 +149,7 @@ const LeadGenBaseDatosContent = () => {
       if (found) found.leads++;
     });
     return days;
-  }, [filtered]);
+  }, [filtered, f]);
 
   const tabs = [
     { id: "leads" as const, label: "Leads", icon: Database },
@@ -302,7 +303,7 @@ const LeadGenBaseDatosContent = () => {
                         <p className="text-xs text-muted-foreground">{lead.company || "—"}</p>
                         <div className="flex items-center justify-end">
                           <span className="text-xs text-muted-foreground">
-                            {format(new Date(lead.created_at), "d MMM", { locale: es })}
+                            {format(new Date(lead.created_at), "d MMM", { locale: f.fechas })}
                           </span>
                         </div>
                       </CardContent>
@@ -341,7 +342,7 @@ const LeadGenBaseDatosContent = () => {
                               </TableCell>
                               <TableCell className="text-sm">{lead.country_code || "—"}</TableCell>
                               <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                                {format(new Date(lead.created_at), "dd MMM yyyy", { locale: es })}
+                                {format(new Date(lead.created_at), "dd MMM yyyy", { locale: f.fechas })}
                               </TableCell>
                               <TableCell className="text-center sticky right-0 bg-card">
                                 <Button variant="ghost" size="sm" className="h-8 w-8 p-0"><Eye className="h-4 w-4" /></Button>

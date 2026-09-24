@@ -4,7 +4,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { format, parseISO } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import {
   ArrowLeft, Loader2, UserPlus, MessageCircle, StickyNote, Sparkles, ArrowRightLeft,
   Megaphone, Calendar, Building2, Phone, TrendingDown, Circle,
@@ -47,6 +47,7 @@ interface Props {
 }
 
 export default function ContactHistoryView({ contactId, contactName, open, onClose }: Props) {
+  const f = useFormato();
   const { data: events = [], isLoading, error } = useQuery({
     queryKey: ["contact-history", contactId],
     enabled: open && !!contactId,
@@ -99,7 +100,7 @@ export default function ContactHistoryView({ contactId, contactName, open, onClo
                           <p className="text-sm font-medium text-foreground">{e.title}</p>
                           {e.event_at && (
                             <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-                              {format(parseISO(e.event_at), "dd MMM yy, HH:mm", { locale: es })}
+                              {format(parseISO(e.event_at), "dd MMM yy, HH:mm", { locale: f.fechas })}
                             </span>
                           )}
                         </div>

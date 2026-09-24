@@ -8,7 +8,7 @@ import { Check, Loader2, Minus, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import { TIPOS_FEEDBACK, feedbackDe, useFeedbackDeChatter, useMutacionesFeedback, type TipoFeedback } from "@/pages/chatters/feedbackTL";
 
 // Popup del supervisor sobre un chatter: registra el feedback del día y lista
@@ -29,6 +29,7 @@ export default function FeedbackDialog({
   hasta: string;
   onClose: () => void;
 }) {
+  const fmt = useFormato();
   const { feedback, cargando } = useFeedbackDeChatter(identityId, desde, hasta);
   const { registrarVarios, borrar } = useMutacionesFeedback();
   const [comentario, setComentario] = useState("");
@@ -40,7 +41,7 @@ export default function FeedbackDialog({
     setSeleccion((s) => (s.includes(tipo) ? s.filter((t) => t !== tipo) : [...s, tipo]));
 
   const puntosElegidos = seleccion.reduce((s, t) => s + (feedbackDe(t)?.puntos ?? 0), 0);
-  const fechaCorta = format(new Date(`${dia}T12:00:00`), "d MMM", { locale: es });
+  const fechaCorta = format(new Date(`${dia}T12:00:00`), "d MMM", { locale: fmt.fechas });
 
   const confirmar = async () => {
     if (!identityId || seleccion.length === 0) return;
@@ -69,7 +70,7 @@ export default function FeedbackDialog({
           <div className="min-w-0 flex-1">
             <DialogTitle className="truncate text-base leading-tight">{nombre}</DialogTitle>
             <p className="text-xs text-muted-foreground">
-              Feedback del {format(new Date(`${dia}T12:00:00`), "EEEE d 'de' MMMM", { locale: es })}
+              Feedback del {format(new Date(`${dia}T12:00:00`), fmt.idioma === "en" ? "EEEE, MMMM d" : "EEEE d 'de' MMMM", { locale: fmt.fechas })}
             </p>
           </div>
           {feedback.length > 0 && (
@@ -190,7 +191,7 @@ export default function FeedbackDialog({
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm leading-tight">{cat?.label ?? f.tipo}</p>
                         <p className="truncate text-[11px] text-muted-foreground">
-                          {format(new Date(`${f.dia}T12:00:00`), "d MMM", { locale: es })}
+                          {format(new Date(`${f.dia}T12:00:00`), "d MMM", { locale: fmt.fechas })}
                           {f.comentario ? ` · ${f.comentario}` : ""}
                         </p>
                       </div>

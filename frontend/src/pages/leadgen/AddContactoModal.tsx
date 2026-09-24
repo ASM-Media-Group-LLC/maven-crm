@@ -21,6 +21,7 @@ import { checkCreatorExists, checkExistingContact } from "@/lib/lead-validation"
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useScouterCompanies } from "@/hooks/useScouterLeads";
+import { useFormato } from "@/hooks/useFormato";
 
 const contactoSchema = z.object({
   nombre: z.string().trim().min(1, "Nombre requerido").max(100, "Máximo 100 caracteres"),
@@ -107,6 +108,7 @@ function extractIgHandle(input: string): string | null {
 
 
 const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
+  const f = useFormato();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [existingContactData, setExistingContactData] = useState<{
     id: string; name: string; phone?: string; email?: string; agentName?: string; createdAt?: string;
@@ -719,7 +721,7 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
                 <p><span className="text-muted-foreground">Registrado por:</span> {existingContactData.agentName}</p>
               )}
               {existingContactData.createdAt && (
-                <p><span className="text-muted-foreground">Fecha:</span> {new Date(existingContactData.createdAt).toLocaleDateString("es-CO")}</p>
+                <p><span className="text-muted-foreground">Fecha:</span> {new Date(existingContactData.createdAt).toLocaleDateString(f.intl("es-CO"))}</p>
               )}
               {existingContactData.phone && (
                 <p><span className="text-muted-foreground">Teléfono actual:</span> <MaskedPhone phone={existingContactData.phone} /></p>

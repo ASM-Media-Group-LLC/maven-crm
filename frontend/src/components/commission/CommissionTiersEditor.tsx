@@ -5,6 +5,8 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { cn } from "@/lib/utils";
+import { useFormato } from "@/hooks/useFormato";
+import type { Formato } from "@/lib/formato";
 
 export interface CommissionTier {
   min_revenue: number;
@@ -21,8 +23,8 @@ interface CommissionTiersEditorProps {
   onTiersChange: (tiers: CommissionTier[]) => void;
 }
 
-function fmt(n: number) {
-  return new Intl.NumberFormat("es-CO", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
+function fmt(n: number, f: Formato) {
+  return new Intl.NumberFormat(f.intl("es-CO"), { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
 }
 
 function validateTiers(tiers: CommissionTier[]): string | null {
@@ -49,6 +51,7 @@ export default function CommissionTiersEditor({
   onFixedPercentageChange,
   onTiersChange,
 }: CommissionTiersEditorProps) {
+  const f = useFormato();
   const [error, setError] = useState<string | null>(null);
 
   const addTier = () => {
@@ -191,7 +194,7 @@ export default function CommissionTiersEditor({
               <p className="text-xs font-medium text-muted-foreground">Resumen de tramos</p>
               {tiers.map((t, i) => (
                 <p key={i} className="text-xs">
-                  {fmt(t.min_revenue)} – {t.max_revenue !== null ? fmt(t.max_revenue) : "∞"}: <span className="font-semibold">{t.percentage}%</span>
+                  {fmt(t.min_revenue, f)} – {t.max_revenue !== null ? fmt(t.max_revenue, f) : "∞"}: <span className="font-semibold">{t.percentage}%</span>
                 </p>
               ))}
             </div>

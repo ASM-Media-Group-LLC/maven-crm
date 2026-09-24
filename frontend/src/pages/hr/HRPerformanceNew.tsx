@@ -71,6 +71,7 @@ export default function HRPerformanceNew() {
     try {
       const s = new Date(periodStart + "T12:00:00");
       const e = new Date(periodEnd + "T12:00:00");
+      // Idioma fijo a propósito: este texto se guarda en la base como `period` de la evaluación.
       return `${format(s, "MMM yyyy", { locale: es })} - ${format(e, "MMM yyyy", { locale: es })}`;
     } catch {
       return "";

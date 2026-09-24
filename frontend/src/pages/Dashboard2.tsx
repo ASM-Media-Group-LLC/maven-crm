@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, startOfDay, startOfMonth, endOfMonth, startOfWeek, endOfWeek, subDays, subMonths, endOfDay, differenceInCalendarDays } from "date-fns";
 import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 // Una sola definición de "Esta semana" para todo Maven (lunes → domingo de la
 // semana EN CURSO). Antes esta pantalla, Panel de Control y DateRangePresets
@@ -114,6 +115,7 @@ const SPARKLINE_MESES = 4;
 // ─── Component ───────────────────────────────────────────────────
 const Dashboard2 = () => {
   const navigate = useNavigate();
+  const formatoUi = useFormato();
   const { isAdmin } = useUserRole();
   // La data de ingresos ya NO se baja cruda (13k+ filas, 14 requests, sin caché): se
   // agrega SERVER-SIDE por el RPC get_dashboard2_creator_summary. Las llamadas (período
@@ -295,10 +297,14 @@ const Dashboard2 = () => {
     const sameMonth = f.getFullYear() === t.getFullYear() && f.getMonth() === t.getMonth();
     const isFullMonth = sameMonth && f.getDate() === 1 && t.getDate() === endOfMonth(f).getDate();
     const label = isFullMonth
+      ? cap(format(f, "MMMM yyyy", { locale: formatoUi.fechas }))
+      : `${format(f, "d MMM", { locale: formatoUi.fechas })} – ${format(t, "d MMM yyyy", { locale: formatoUi.fechas })}`;
+    // Idioma fijo a propósito: es el título del PDF que se exporta, que está todo en español.
+    const labelPdf = isFullMonth
       ? cap(format(f, "MMMM yyyy", { locale: es }))
       : `${format(f, "d MMM", { locale: es })} – ${format(t, "d MMM yyyy", { locale: es })}`;
-    return { startStr, endStr, label, value: `${startStr}_${endStr}` };
-  }, [range]);
+    return { startStr, endStr, label, labelPdf, value: `${startStr}_${endStr}` };
+  }, [range, formatoUi]);
 
   // Resumen por creadora del período seleccionado (agregado server-side, 1 request,
   // cacheado). Reemplaza el `allRows` crudo. isLoading/isError/refetch del dashboard
@@ -719,7 +725,7 @@ const Dashboard2 = () => {
     ]);
     const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
     doc.setFontSize(16);
-    doc.text(`Ventas OnlyFans - ${selectedPeriod.label}`, 14, 15);
+    doc.text(`Ventas OnlyFans - ${selectedPeriod.labelPdf ?? selectedPeriod.label}`, 14, 15);
     doc.setFontSize(9);
     doc.text(`Periodo: ${selectedPeriod.startStr} a ${selectedPeriod.endStr} | Generado: ${format(new Date(), "dd/MM/yyyy HH:mm")}`, 14, 21);
     doc.setFontSize(10);
@@ -731,6 +737,7 @@ const Dashboard2 = () => {
       fmt(c.total), fmt(c.net), fmtShort(c.subs), fmtShort(c.newSubs), fmtShort(c.recurringSubs),
       fmtShort(c.tips), fmtShort(c.messages), String(c.activeFans), String(c.newFans),
       fmtShort(c.avgPerDay), fmtShort(c.avgPerFan), String(c.daysWithData),
+      // Idioma fijo a propósito: va en el PDF que se exporta, todo en español.
       format(new Date(c.lastDate + "T12:00:00"), "dd MMM", { locale: es }),
     ]);
     autoTable(doc, { startY: 33, head: tHead, body: tBody, styles: { fontSize: 7, cellPadding: 1.5 }, headStyles: { fillColor: [30, 64, 175], textColor: 255, fontSize: 7 }, alternateRowStyles: { fillColor: [245, 245, 250] }, margin: { left: 8, right: 8 } });
@@ -797,7 +804,7 @@ const Dashboard2 = () => {
         <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{fmtShort(c.avgPerFan)}</TableCell>
         <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{c.daysWithData}</TableCell>
         <TableCell className={`text-sm tabular-nums whitespace-nowrap ${stopped ? "font-medium" : "text-muted-foreground"}`} style={stopped ? { color: "hsl(25, 95%, 53%)" } : undefined}>
-          {format(new Date(c.lastDate + "T12:00:00"), "dd MMM", { locale: es })}
+          {format(new Date(c.lastDate + "T12:00:00"), "dd MMM", { locale: formatoUi.fechas })}
           {stopped && " ⚠"}
         </TableCell>
       </TableRow>
@@ -1247,7 +1254,7 @@ const Dashboard2 = () => {
                     <div className="flex items-center gap-2">
                       <Target className="h-5 w-5 text-primary" />
                       <h2 className="text-xl font-semibold text-foreground">
-                        Proyección {format(new Date(), "MMMM yyyy", { locale: es }).replace(/^\w/, (c) => c.toUpperCase())}
+                        Proyección {format(new Date(), "MMMM yyyy", { locale: formatoUi.fechas }).replace(/^\w/, (c) => c.toUpperCase())}
                       </h2>
                     </div>
                     <div className="text-right">
@@ -1715,7 +1722,7 @@ const Dashboard2 = () => {
                               </p>
                             )}
                             <p className="text-xs text-muted-foreground mt-1">
-                              Proyección {format(new Date(), "MMMM yyyy", { locale: es })}
+                              Proyección {format(new Date(), "MMMM yyyy", { locale: formatoUi.fechas })}
                             </p>
                           </div>
                         </div>
@@ -2638,7 +2645,7 @@ const Dashboard2 = () => {
                                           : <Badge variant="outline" className="text-success border-success/30">Activo</Badge>}
                                       </TableCell>
                                       <TableCell className={`text-sm tabular-nums whitespace-nowrap ${expSoon ? "text-warning font-medium" : "text-muted-foreground"}`}>
-                                        {exp ? format(exp, "dd MMM yy", { locale: es }) : "—"}{expSoon && " ⚠"}
+                                        {exp ? format(exp, "dd MMM yy", { locale: formatoUi.fechas }) : "—"}{expSoon && " ⚠"}
                                       </TableCell>
                                     </TableRow>
                                   );

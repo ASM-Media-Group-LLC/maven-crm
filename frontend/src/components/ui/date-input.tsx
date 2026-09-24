@@ -1,6 +1,5 @@
 import * as React from "react";
 import { format, parse, isValid, setMonth, setYear, addMonths, subMonths } from "date-fns";
-import { es } from "date-fns/locale";
 import { CalendarIcon, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { DayPicker } from "react-day-picker";
 
@@ -9,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useFormato } from "@/hooks/useFormato";
 
 const MONTH_NAMES_SHORT = [
   "Ene", "Feb", "Mar", "Abr", "May", "Jun",
@@ -44,6 +44,7 @@ export function DateInput({
   fromYear = 1940,
   toYear = new Date().getFullYear() + 5,
 }: DateInputProps) {
+  const f = useFormato();
   const [open, setOpen] = React.useState(false);
   const [draft, setDraft] = React.useState<Date | undefined>(undefined);
   const [textValue, setTextValue] = React.useState("");
@@ -133,10 +134,10 @@ export function DateInput({
   }, [value]);
 
   const triggerLabel = selectedDate
-    ? format(selectedDate, "d MMM yyyy", { locale: es })
+    ? format(selectedDate, "d MMM yyyy", { locale: f.fechas })
     : placeholder;
 
-  const currentMonthLabel = format(displayMonth, "MMMM", { locale: es });
+  const currentMonthLabel = format(displayMonth, "MMMM", { locale: f.fechas });
   const currentYear = displayMonth.getFullYear();
 
   const years = React.useMemo(() => {
@@ -253,7 +254,7 @@ export function DateInput({
             onSelect={handleCalendarSelect}
             month={displayMonth}
             onMonthChange={setDisplayMonth}
-            locale={es}
+            locale={f.fechas}
             showOutsideDays
             className="pointer-events-auto"
             classNames={{

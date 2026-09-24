@@ -17,7 +17,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Download, ImageIcon, Loader2, Paperclip } from "lucide-react";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 
 interface EvidenceFile {
   id: string;
@@ -36,6 +36,7 @@ interface Props {
 }
 
 const EvidenceViewer = ({ entityType, entityId, uploaderNameHint }: Props) => {
+  const formato = useFormato();
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   const tableName =
@@ -105,7 +106,7 @@ const EvidenceViewer = ({ entityType, entityId, uploaderNameHint }: Props) => {
                 </div>
               )}
               <div className="absolute bottom-0 left-0 right-0 truncate bg-black/60 px-1 py-0.5 text-[10px] text-white">
-                {format(new Date(f.uploaded_at), "d MMM HH:mm", { locale: es })}
+                {format(new Date(f.uploaded_at), "d MMM HH:mm", { locale: formato.fechas })}
               </div>
             </button>
           ))}
@@ -130,7 +131,7 @@ const EvidenceViewer = ({ entityType, entityId, uploaderNameHint }: Props) => {
                   {" · "}
                   Subido{" "}
                   {format(new Date(files[openIndex].uploaded_at), "d MMM yyyy HH:mm", {
-                    locale: es,
+                    locale: formato.fechas,
                   })}
                   {uploaderNameHint && ` · por ${uploaderNameHint}`}
                 </span>

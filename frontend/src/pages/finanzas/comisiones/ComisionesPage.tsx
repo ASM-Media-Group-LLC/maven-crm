@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useFormato } from "@/hooks/useFormato";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -33,11 +34,13 @@ const STATUS_BADGE: Record<string, { variant: "default" | "secondary" | "destruc
 
 const TABS = ["En Tiempo Real", "Proyección", "Historial Batch"] as const;
 
-function fmt(n: number) {
-  return new Intl.NumberFormat("es-CO", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
+function fmtMonto(n: number, locale: string) {
+  return new Intl.NumberFormat(locale, { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
 }
 
 export default function ComisionesPage() {
+  const f = useFormato();
+  const fmt = (n: number) => fmtMonto(n, f.intl("es-CO"));
   const { toast } = useToast();
   const queryClient = useQueryClient();
 

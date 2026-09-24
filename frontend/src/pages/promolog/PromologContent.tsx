@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAssignableManagers } from "@/hooks/useAssignableManagers";
 import { format, isSameDay, addDays, startOfWeek, isToday, isFuture, startOfDay } from "date-fns";
 import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import { computeDayScore, displayPlatform } from "./promoScore";
 import { promotedToResult, isUnverified } from "./promoResult";
 import {
@@ -151,6 +152,7 @@ const selectedLocalDayKeys = (from?: Date, to?: Date): Set<string> | null => {
 };
 
 const PromologContent = () => {
+  const f = useFormato();
   const { user } = useAuth();
   // Timezone preferido del user — afecta cómo se agrupan/renderizan TODAS las
   // fechas de Promolog (el "día" es el día EN TU ZONA, no en UTC). Se lee acá arriba
@@ -734,6 +736,7 @@ const PromologContent = () => {
   // pasarlo aquí — por ahora el caso simple alcanza.)
   const promotedTodayIds = useMemo(() => {
     const today = new Date();
+    // Idioma fijo a propósito: se compara con e.date, no se dibuja.
     const todayStr = today.toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" });
     const ids = new Set<string>();
     for (const e of dedupedEntries) {
@@ -894,8 +897,8 @@ const PromologContent = () => {
   const creatorsPromotedCount = useMemo(() => creatorsScan.filter(c => c.promoted).length, [creatorsScan]);
   const creatorsNotPromotedCount = creatorsScannedCount - creatorsPromotedCount;
 
-  const formattedDate = dateFrom ? dateFrom.toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" }) : "Seleccionar fecha";
-  const shortDate = dateFrom ? dateFrom.toLocaleDateString("es-ES", { day: "numeric", month: "short" }) : "";
+  const formattedDate = dateFrom ? dateFrom.toLocaleDateString(f.intl("es-ES"), { day: "numeric", month: "long", year: "numeric" }) : "Seleccionar fecha";
+  const shortDate = dateFrom ? dateFrom.toLocaleDateString(f.intl("es-ES"), { day: "numeric", month: "short" }) : "";
 
   const clearFilters = () => {
     setSearchEntry(""); setSelectedStatus(""); setSelectedNetwork(""); setSelectedCardPlatform(""); setSelectedCreatorFilter(""); setSelectedManagerFilter("");
@@ -1717,7 +1720,7 @@ const PromologContent = () => {
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Mes</p>
-                  <p className="text-sm font-medium capitalize">{new Date(viewCampaign.month_year + "T00:00:00").toLocaleDateString("es-ES", { month: "long", year: "numeric" })}</p>
+                  <p className="text-sm font-medium capitalize">{new Date(viewCampaign.month_year + "T00:00:00").toLocaleDateString(f.intl("es-ES"), { month: "long", year: "numeric" })}</p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Obj. Mensual</p>
@@ -1733,7 +1736,7 @@ const PromologContent = () => {
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Creación</p>
-                  <p className="text-sm">{new Date(viewCampaign.created_at).toLocaleDateString("es-ES")}</p>
+                  <p className="text-sm">{new Date(viewCampaign.created_at).toLocaleDateString(f.intl("es-ES"))}</p>
                 </div>
               </div>
             </div>

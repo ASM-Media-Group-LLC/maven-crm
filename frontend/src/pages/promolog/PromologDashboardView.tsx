@@ -20,7 +20,6 @@ import {
   Sparkles,
 } from "lucide-react";
 import { format, eachDayOfInterval, isSameDay, differenceInCalendarDays } from "date-fns";
-import { es } from "date-fns/locale";
 import StatChip from "@/components/StatChip";
 import { Card, CardContent } from "@/components/ui/card";
 import { UserAvatar } from "@/components/UserAvatar";
@@ -28,6 +27,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { ListRowButton } from "@/components/ui/list-row";
 import { CATEGORY_ORDER } from "@/hooks/useOperationsDashboard";
+import { useFormato } from "@/hooks/useFormato";
 import PromoScoreLeaderboard from "./PromoScoreLeaderboard";
 import { categoryTone } from "@/components/dashboard/categoryTones";
 import { type PromologEntry } from "./PromologEntryCard";
@@ -93,6 +93,7 @@ const PromologDashboardView = ({
   prevMetrics,
   activeCreators,
 }: Props) => {
+  const f = useFormato();
   const navigate = useNavigate();
 
   // ── Agregados por creador (alimenta KPI, podios, insights, acción) ──
@@ -568,7 +569,7 @@ const PromologDashboardView = ({
                   <div
                     key={i}
                     className="flex-1 flex flex-col items-center gap-1 group"
-                    title={`${format(d.day, "d 'de' MMMM", { locale: es })}\nSí: ${d.si} · No: ${d.no}`}
+                    title={`${format(d.day, f.idioma === "en" ? "MMMM d" : "d 'de' MMMM", { locale: f.fechas })}\nSí: ${d.si} · No: ${d.no}`}
                   >
                     <div className="w-full flex-1 flex flex-col justify-end gap-px">
                       {d.no > 0 && (
@@ -585,7 +586,7 @@ const PromologDashboardView = ({
                       )}
                     </div>
                     <span className={`text-[9px] tabular-nums ${isToday ? "text-primary font-bold" : "text-muted-foreground"}`}>
-                      {format(d.day, "d", { locale: es })}
+                      {format(d.day, "d", { locale: f.fechas })}
                     </span>
                   </div>
                 );

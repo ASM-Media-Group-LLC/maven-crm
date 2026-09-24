@@ -5,7 +5,7 @@ import {
   CalendarDays, ChevronLeft, ChevronRight, Info, Loader2,
 } from "lucide-react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, subMonths, addMonths, isToday, isSameMonth } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -372,6 +372,7 @@ function MonitoringGrid({ agents, onSelectAgent }: { agents: HubstaffAgent[]; on
 const WEEKDAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
 function MonitoringCalendar({ month, onMonthChange }: { month: Date; onMonthChange: (d: Date) => void }) {
+  const f = useFormato();
   const monthStart = startOfMonth(month);
   const monthEnd = endOfMonth(month);
   const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
@@ -384,7 +385,7 @@ function MonitoringCalendar({ month, onMonthChange }: { month: Date; onMonthChan
         <Button variant="ghost" size="sm" onClick={() => onMonthChange(subMonths(month, 1))}>
           <ChevronLeft className="h-4 w-4" />
         </Button>
-        <h3 className="text-sm font-semibold capitalize">{format(month, "MMMM yyyy", { locale: es })}</h3>
+        <h3 className="text-sm font-semibold capitalize">{format(month, "MMMM yyyy", { locale: f.fechas })}</h3>
         <Button variant="ghost" size="sm" onClick={() => onMonthChange(addMonths(month, 1))}>
           <ChevronRight className="h-4 w-4" />
         </Button>

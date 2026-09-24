@@ -5,6 +5,7 @@ import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useCreatorVideo, TIPOS_VIDEO, TOPE_VIDEOS } from "@/hooks/useCreatorVideo";
+import { useFormato } from "@/hooks/useFormato";
 
 /**
  * Videos de onboarding de la creadora (hasta 3): se graban una vez y los mira
@@ -28,6 +29,7 @@ export default function VideoOnboarding({
    *  El manager sí ve el hueco, porque él es quien lo llena. */
   ocultarSiVacio?: boolean;
 }) {
+  const f = useFormato();
   const { videos, cargando, subir, urlParaVer, quitar, subiendo, progreso } = useCreatorVideo(creatorId);
   // Qué video está abierto y con qué URL firmada. Uno a la vez: dos <video>
   // reproduciendo en paralelo es ruido y ancho de banda tirado.
@@ -74,7 +76,7 @@ export default function VideoOnboarding({
   };
 
   const fechaDe = (iso: string) =>
-    new Date(iso).toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" });
+    new Date(iso).toLocaleDateString(f.intl("es-CO"), { day: "numeric", month: "short", year: "numeric" });
 
   if (!cargando && videos.length === 0 && ocultarSiVacio && !subiendo) return null;
 

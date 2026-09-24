@@ -8,12 +8,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { useFormato } from "@/hooks/useFormato";
+import type { Formato } from "@/lib/formato";
 import { useHrPersonCard, HR_ROLE_LABEL } from "./useHrPeople";
 import { periodLabel } from "@/pages/agency-qa/chatters-qa/useChatterScorecards";
 import { PageHeader } from "@/components/ui/page-header";
 
-const usd = (n: number | null | undefined) =>
-  n == null ? "—" : `$${Math.round(n).toLocaleString("es-CO")}`;
+const usd = (n: number | null | undefined, f: Formato) =>
+  n == null ? "—" : `$${Math.round(n).toLocaleString(f.intl("es-CO"))}`;
 const pct = (n: number | null | undefined) => (n == null ? "—" : `${Math.round(n)}%`);
 const hhmm = (min: number | null | undefined) => {
   if (min == null) return "—";
@@ -48,6 +50,7 @@ function Section({ icon: Icon, title, period, children }: { icon: any; title: st
 }
 
 export default function HRPersonCard() {
+  const f = useFormato();
   const { id } = useParams();
   const navigate = useNavigate();
   const { data: card, isLoading, error } = useHrPersonCard(id ?? null);
@@ -134,10 +137,10 @@ export default function HRPersonCard() {
         {chatter && (
           <Section icon={DollarSign} title="Costo, ingreso y ROI" period={chatter.period}>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-              <Stat label="Ventas (BLU)" value={usd(chatter.sales)} hint={chatter.sin_venta_blu ? "sin venta BLU" : undefined} />
-              <Stat label="Ingreso agencia" value={usd(chatter.agency_revenue_usd)} />
-              <Stat label="Costo" value={usd(chatter.cost_usd)} />
-              <Stat label="Margen" value={usd(chatter.margin_usd)} tone={(chatter.margin_usd ?? 0) >= 0 ? "ok" : "bad"} />
+              <Stat label="Ventas (BLU)" value={usd(chatter.sales, f)} hint={chatter.sin_venta_blu ? "sin venta BLU" : undefined} />
+              <Stat label="Ingreso agencia" value={usd(chatter.agency_revenue_usd, f)} />
+              <Stat label="Costo" value={usd(chatter.cost_usd, f)} />
+              <Stat label="Margen" value={usd(chatter.margin_usd, f)} tone={(chatter.margin_usd ?? 0) >= 0 ? "ok" : "bad"} />
               <Stat label="ROI" value={chatter.roi_x != null ? `${chatter.roi_x}x` : "—"} tone={(chatter.roi_x ?? 0) >= 1 ? "ok" : "bad"} />
               <Stat label="Estado" value={chatter.no_rentable ? "No rentable" : "Rentable"} tone={chatter.no_rentable ? "bad" : "ok"} />
             </div>
@@ -148,7 +151,7 @@ export default function HRPersonCard() {
         {scorecard && (
           <Section icon={MessageSquare} title="Scorecard (Mensajes Pro)">
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-              <Stat label="Ventas totales" value={usd(scorecard.total_sales)} />
+              <Stat label="Ventas totales" value={usd(scorecard.total_sales, f)} />
               <Stat label="Conversión" value={pct(scorecard.fan_conversion_rate)} />
               <Stat label="Unlock rate" value={pct(scorecard.unlock_rate)} />
               <Stat label="Resp. prom." value={scorecard.avg_response_seconds != null ? `${Math.round(scorecard.avg_response_seconds)}s` : "—"} />
@@ -166,7 +169,7 @@ export default function HRPersonCard() {
               <Stat label="Actividad" value={pct(closer.avg_activity_pct)} />
               <Stat label="Leads" value={String(closer.leads)} />
               <Stat label="Cerradas" value={String(closer.cerradas)} tone={closer.sin_cierres ? "bad" : "ok"} />
-              <Stat label="Monetización" value={usd(closer.monetizacion_usd)} />
+              <Stat label="Monetización" value={usd(closer.monetizacion_usd, f)} />
               <Stat label="QA prom." value={closer.avg_qa_score != null ? `${closer.avg_qa_score}` : "—"} hint={`${closer.qa_calls} QAs`} />
             </div>
           </Section>

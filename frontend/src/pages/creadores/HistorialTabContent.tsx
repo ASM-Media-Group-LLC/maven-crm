@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { EmptyState } from "@/components/EmptyState";
 import { History } from "lucide-react";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,7 @@ interface Props {
 }
 
 const HistorialTabContent = ({ creatorId }: Props) => {
+  const f = useFormato();
   const { data: entries, isLoading } = useQuery({
     queryKey: ["creator_history", creatorId],
     queryFn: async () => {
@@ -28,7 +29,7 @@ const HistorialTabContent = ({ creatorId }: Props) => {
 
   const formatDate = (dateStr: string) => {
     try {
-      return format(new Date(dateStr), "d MMM yyyy, HH:mm", { locale: es });
+      return format(new Date(dateStr), "d MMM yyyy, HH:mm", { locale: f.fechas });
     } catch {
       return dateStr;
     }

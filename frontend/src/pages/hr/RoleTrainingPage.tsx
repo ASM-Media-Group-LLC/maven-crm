@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useFormato } from "@/hooks/useFormato";
 import { EmployeeSearchCombobox } from "@/components/hr/EmployeeSearchCombobox";
 import { HRMetricCard } from "@/components/hr/HRMetricCard";
 import { Button } from "@/components/ui/button";
@@ -27,7 +28,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { UserAvatar } from "@/components/UserAvatar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isWithinInterval, parseISO, isSameDay, addMonths, subMonths } from "date-fns";
-import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { TRAINING_STATUSES, TRAINING_MODALITIES, TRAINING_TARGET_ROLES, TRAINING_CONTENT_TYPES } from "@/lib/hrConstants";
 import { PageHeader } from "@/components/ui/page-header";
@@ -406,11 +406,12 @@ function RoleListView({ targetRole, roleLabel, onConfig, onAssign, onViewDetail 
 
 // ── Calendar View ──
 function CalendarView({ calMonth, setCalMonth, calDays, dayLabels, getAssignmentsForDay, onViewDetail }: any) {
+  const f = useFormato();
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <Button variant="outline" size="sm" onClick={() => setCalMonth((m: Date) => subMonths(m, 1))}>← Anterior</Button>
-        <h3 className="text-sm font-semibold capitalize">{format(calMonth, "MMMM yyyy", { locale: es })}</h3>
+        <h3 className="text-sm font-semibold capitalize">{format(calMonth, "MMMM yyyy", { locale: f.fechas })}</h3>
         <Button variant="outline" size="sm" onClick={() => setCalMonth((m: Date) => addMonths(m, 1))}>Siguiente →</Button>
       </div>
       <div className="border rounded-lg overflow-hidden">
@@ -459,6 +460,7 @@ function CalendarView({ calMonth, setCalMonth, calDays, dayLabels, getAssignment
 function AssignmentsTable({ assignments, isLoading, progressMap, moduleCounts, onViewDetail }: {
   assignments: any[]; isLoading: boolean; progressMap: Record<string, { completed: number; total: number }>; moduleCounts: Record<string, number>; onViewDetail: (a: any) => void;
 }) {
+  const f = useFormato();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -512,10 +514,10 @@ function AssignmentsTable({ assignments, isLoading, progressMap, moduleCounts, o
                       </div>
                     </TableCell>
                     <TableCell className="text-sm">{prog?.name || "—"}</TableCell>
-                    <TableCell className="text-sm">{a.start_date ? new Date(a.start_date).toLocaleDateString("es-CO") : "—"}</TableCell>
+                    <TableCell className="text-sm">{a.start_date ? new Date(a.start_date).toLocaleDateString(f.intl("es-CO")) : "—"}</TableCell>
                     <TableCell className="text-sm">
                       <div className="flex items-center gap-1.5">
-                        {a.completion_date ? new Date(a.completion_date).toLocaleDateString("es-CO") : "—"}
+                        {a.completion_date ? new Date(a.completion_date).toLocaleDateString(f.intl("es-CO")) : "—"}
                         {expiring && <Badge variant="outline" className="text-xs bg-warning/10 text-warning border-warning/30">Por vencer</Badge>}
                       </div>
                     </TableCell>
@@ -602,6 +604,7 @@ function AssignmentsGrid({ assignments, isLoading, progressMap, moduleCounts, on
 // ASSIGNMENT DETAIL VIEW
 // ══════════════════════════════════════════════
 function AssignmentDetailView({ assignment, onBack }: { assignment: any; onBack: () => void }) {
+  const f = useFormato();
   const emp = assignment.employees;
   const prog = assignment.training_programs;
   const { data: modules = [], isLoading: modulesLoading } = useTrainingModules(prog?.id || null);
@@ -679,8 +682,8 @@ function AssignmentDetailView({ assignment, onBack }: { assignment: any; onBack:
       <div className="flex-1 overflow-auto">
         <div className="px-6 py-5 space-y-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="space-y-1"><p className="text-xs text-muted-foreground">Fecha Inicio</p><p className="text-sm font-medium">{assignment.start_date ? new Date(assignment.start_date).toLocaleDateString("es-CO") : "—"}</p></div>
-            <div className="space-y-1"><p className="text-xs text-muted-foreground">Fecha Límite</p><p className="text-sm font-medium">{assignment.completion_date ? new Date(assignment.completion_date).toLocaleDateString("es-CO") : "—"}</p></div>
+            <div className="space-y-1"><p className="text-xs text-muted-foreground">Fecha Inicio</p><p className="text-sm font-medium">{assignment.start_date ? new Date(assignment.start_date).toLocaleDateString(f.intl("es-CO")) : "—"}</p></div>
+            <div className="space-y-1"><p className="text-xs text-muted-foreground">Fecha Límite</p><p className="text-sm font-medium">{assignment.completion_date ? new Date(assignment.completion_date).toLocaleDateString(f.intl("es-CO")) : "—"}</p></div>
             <div className="space-y-1"><p className="text-xs text-muted-foreground">Departamento</p><p className="text-sm font-medium">{emp?.departments?.name || "—"}</p></div>
             <div className="space-y-1"><p className="text-xs text-muted-foreground">Rol del Programa</p><p className="text-sm font-medium">{TRAINING_TARGET_ROLES.find((r) => r.value === prog?.target_role)?.label || "General"}</p></div>
           </div>
@@ -724,7 +727,7 @@ function AssignmentDetailView({ assignment, onBack }: { assignment: any; onBack:
                         {m.duration_minutes && <span className="text-xs text-muted-foreground">{m.duration_minutes} min</span>}
                         {m.is_required && <Badge variant="outline" className="text-xs">Req.</Badge>}
                         {m.content_url && <a href={m.content_url} target="_blank" rel="noreferrer"><Button variant="ghost" size="icon" className="h-7 w-7"><Eye className="h-3.5 w-3.5" /></Button></a>}
-                        {isCompleted && mp?.completed_at && <span className="text-xs text-muted-foreground">{new Date(mp.completed_at).toLocaleDateString("es-CO")}</span>}
+                        {isCompleted && mp?.completed_at && <span className="text-xs text-muted-foreground">{new Date(mp.completed_at).toLocaleDateString(f.intl("es-CO"))}</span>}
                       </div>
                     </div>
                   );

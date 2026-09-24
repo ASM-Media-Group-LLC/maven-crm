@@ -24,6 +24,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useScouterCompanies } from "@/hooks/useScouterLeads";
 import FileUploadModal, { type UploadCategory, type UploadedFile } from "@/components/FileUploadModal";
 import { PageHeader } from "@/components/ui/page-header";
+import { useFormato } from "@/hooks/useFormato";
 
 const CATEGORIES = [
   { value: "A+", label: "A+ (Premium)" },
@@ -90,6 +91,7 @@ const defaultForm: FormData = {
 
 const NuevoContactoForm = () => {
   const navigate = useNavigate();
+  const f = useFormato();
   const { toast } = useToast();
   const { user } = useAuth();
   const [form, setForm] = useState<FormData>(defaultForm);
@@ -571,7 +573,7 @@ const NuevoContactoForm = () => {
                   <p><span className="text-muted-foreground">Registrado por:</span> {existingContactData.agentName}</p>
                 )}
                 {existingContactData.createdAt && (
-                  <p><span className="text-muted-foreground">Fecha:</span> {new Date(existingContactData.createdAt).toLocaleDateString("es-CO")}</p>
+                  <p><span className="text-muted-foreground">Fecha:</span> {new Date(existingContactData.createdAt).toLocaleDateString(f.intl("es-CO"))}</p>
                 )}
                 {existingContactData.phone && (
                   <p><span className="text-muted-foreground">Teléfono actual:</span> <MaskedPhone phone={existingContactData.phone} /></p>

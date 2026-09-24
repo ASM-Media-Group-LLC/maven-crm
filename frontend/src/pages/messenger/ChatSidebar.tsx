@@ -7,7 +7,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { BotonSilenciarCanal } from "@/components/BotonSilenciarCanal";
 import { useGlobalSearch, type GlobalSearchResult } from "@/hooks/useGlobalSearch";
 import { formatDistanceToNow } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -67,6 +67,7 @@ export default function ChatSidebar({
 }: ChatSidebarProps) {
   const { user } = useAuth();
   const { isAdmin } = useUserRole();
+  const f = useFormato();
   const { isOnline, getStatus, getStatusColorPersonal } = useOnlinePresence();
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState("all");
@@ -434,7 +435,7 @@ export default function ChatSidebar({
                           <User className="h-3 w-3 text-muted-foreground shrink-0" />
                           <span className="text-[11px] font-medium text-foreground">{r.senderName}</span>
                           <span className="text-[10px] text-muted-foreground ml-auto shrink-0">
-                            {formatDistanceToNow(new Date(r.createdAt), { addSuffix: true, locale: es })}
+                            {formatDistanceToNow(new Date(r.createdAt), { addSuffix: true, locale: f.fechas })}
                           </span>
                         </div>
                         <p className="text-[11px] text-muted-foreground leading-relaxed truncate">

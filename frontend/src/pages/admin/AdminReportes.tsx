@@ -26,6 +26,7 @@ import {
   type ReportPeriod,
 } from "@/hooks/useReportSchedules";
 import ReportScheduleModal from "./ReportScheduleModal";
+import { useFormato } from "@/hooks/useFormato";
 
 // Settings → Administración → Reportes
 // CRUD de reports programados. Los reports se mandan via cron diario y
@@ -35,6 +36,7 @@ import ReportScheduleModal from "./ReportScheduleModal";
 // Cargada lazy: el query a send-report (preview_only=true) sólo corre
 // cuando el user hace click en "Vista previa".
 const ReportPreviewToggle = ({ scheduleId }: { scheduleId: string }) => {
+  const f = useFormato();
   const [open, setOpen] = useState(false);
   const { data: preview, isLoading, isError, error } = useReportPreview(scheduleId, open);
 
@@ -64,7 +66,7 @@ const ReportPreviewToggle = ({ scheduleId }: { scheduleId: string }) => {
               <div className="rounded bg-muted/30 px-3 py-2 text-[11px] text-foreground">
                 <div><span className="font-semibold text-muted-foreground">Asunto:</span> {preview.subject}</div>
                 <div className="text-muted-foreground">
-                  {preview.row_count} {preview.row_count === 1 ? "fila" : "filas"} · rango usado: {new Date(preview.from).toLocaleString("es-CO")} → {new Date(preview.to).toLocaleString("es-CO")}
+                  {preview.row_count} {preview.row_count === 1 ? "fila" : "filas"} · rango usado: {new Date(preview.from).toLocaleString(f.intl("es-CO"))} → {new Date(preview.to).toLocaleString(f.intl("es-CO"))}
                 </div>
               </div>
               {/* Wrapper full-width con scroll horizontal SOLO si el email
@@ -103,6 +105,7 @@ const PERIOD_TONES: Record<ReportPeriod, string> = {
 };
 
 const AdminReportes = () => {
+  const f = useFormato();
   const { data: schedules = [], isLoading } = useReportSchedules();
   const deleteSchedule = useDeleteReportSchedule();
   const updateSchedule = useUpdateReportSchedule();
@@ -248,7 +251,7 @@ const AdminReportes = () => {
                     </div>
                     {s.last_dispatched_at && (
                       <p className="text-[10px] text-muted-foreground">
-                        Último envío: {new Date(s.last_dispatched_at).toLocaleString("es-CO")}
+                        Último envío: {new Date(s.last_dispatched_at).toLocaleString(f.intl("es-CO"))}
                       </p>
                     )}
                   </div>

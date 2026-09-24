@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/ui/page-header";
 import { cn } from "@/lib/utils";
+import { useFormato } from "@/hooks/useFormato";
+import type { Formato } from "@/lib/formato";
 import { horas, porcentaje, type ResumenPersona } from "@/lib/coworkVsHubstaff";
 import { useCoworkVsHubstaff, fechaBogota } from "./coworkVsHubstaff/useCoworkVsHubstaff";
 
@@ -21,8 +23,8 @@ const RANGOS = [
   { label: "30 días", dias: 30 },
 ];
 
-const fechaCorta = (iso: string) =>
-  new Date(`${iso}T12:00:00-05:00`).toLocaleDateString("es-CO", { weekday: "short", day: "numeric", month: "short" });
+const fechaCorta = (iso: string, f: Formato) =>
+  new Date(`${iso}T12:00:00-05:00`).toLocaleDateString(f.intl("es-CO"), { weekday: "short", day: "numeric", month: "short" });
 
 /** Colores de la cobertura: cuánto del Hubstaff lo explica Cowork. */
 function tonoCobertura(c: number | null): string {
@@ -116,6 +118,7 @@ export default function CoworkVsHubstaff() {
 }
 
 function FilaPersona({ p, abierta, onToggle }: { p: ResumenPersona; abierta: boolean; onToggle: () => void }) {
+  const f = useFormato();
   const detenido = p.cowork_en_sala_seg - p.cowork_activo_seg;
   return (
     <div className="border-b border-border/40 last:border-b-0">
@@ -182,7 +185,7 @@ function FilaPersona({ p, abierta, onToggle }: { p: ResumenPersona; abierta: boo
                   ].filter(Boolean).join(" · ");
                   return (
                     <tr key={d.dia} className="border-t border-border/30">
-                      <td className="py-1.5 capitalize">{fechaCorta(d.dia)}</td>
+                      <td className="py-1.5 capitalize">{fechaCorta(d.dia, f)}</td>
                       <td className="py-1.5 text-right tabular-nums">{d.hubstaff_seg > 0 ? horas(d.hubstaff_seg) : <span className="text-muted-foreground">—</span>}</td>
                       <td className="py-1.5 text-right tabular-nums text-muted-foreground">{d.hubstaff_actividad != null ? `${d.hubstaff_actividad}%` : "—"}</td>
                       <td className="py-1.5 text-right tabular-nums font-medium text-violet-600 dark:text-violet-400">{d.cowork_en_sala_seg > 0 ? horas(d.cowork_activo_seg) : <span className="font-normal text-muted-foreground">—</span>}</td>

@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useFormato } from "@/hooks/useFormato";
 import { EmployeeSearchCombobox } from "@/components/hr/EmployeeSearchCombobox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,7 +27,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format, startOfMonth, endOfMonth } from "date-fns";
-import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/ui/page-header";
 import StatChip from "@/components/StatChip";
@@ -112,6 +112,7 @@ function useDepartments() {
 
 // ─── Create Modal ─────────────────────────────────────────────────────────────
 function CreatePermisoModal({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+  const f = useFormato();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -204,7 +205,7 @@ function CreatePermisoModal({ open, onOpenChange }: { open: boolean; onOpenChang
                   className={cn("w-full justify-start font-normal", !date && "text-muted-foreground")}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
-                  {date ? format(date, "dd 'de' MMMM yyyy", { locale: es }) : "Seleccionar fecha"}
+                  {date ? format(date, f.idioma === "en" ? "MMMM dd, yyyy" : "dd 'de' MMMM yyyy", { locale: f.fechas }) : "Seleccionar fecha"}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
@@ -212,7 +213,7 @@ function CreatePermisoModal({ open, onOpenChange }: { open: boolean; onOpenChang
                   mode="single"
                   selected={date}
                   onSelect={(d) => { setDate(d); setCalendarOpen(false); }}
-                  locale={es}
+                  locale={f.fechas}
                   initialFocus
                 />
               </PopoverContent>
@@ -260,6 +261,7 @@ function CreatePermisoModal({ open, onOpenChange }: { open: boolean; onOpenChang
 
 // ─── View Modal ───────────────────────────────────────────────────────────────
 function ViewPermisoModal({ permiso, onClose }: { permiso: PermisoRecord | null; onClose: () => void }) {
+  const f = useFormato();
   if (!permiso) return null;
   const emp = permiso.employees;
   const empName = emp ? `${emp.first_name} ${emp.last_name}` : "—";
@@ -297,7 +299,7 @@ function ViewPermisoModal({ permiso, onClose }: { permiso: PermisoRecord | null;
             </div>
             <div>
               <p className="text-muted-foreground text-xs mb-1">Fecha</p>
-              <p className="font-medium">{format(new Date(permiso.start_date), "dd MMM yyyy", { locale: es })}</p>
+              <p className="font-medium">{format(new Date(permiso.start_date), "dd MMM yyyy", { locale: f.fechas })}</p>
             </div>
             {permiso.notes && (
               <div>
@@ -320,6 +322,7 @@ function ViewPermisoModal({ permiso, onClose }: { permiso: PermisoRecord | null;
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function HRPermisos() {
+  const f = useFormato();
   const { data: permisos = [], isLoading } = usePermisos();
   const { data: departments = [] } = useDepartments();
   const queryClient = useQueryClient();
@@ -587,7 +590,7 @@ export default function HRPermisos() {
 
                         {/* Fecha */}
                         <TableCell className="text-sm whitespace-nowrap">
-                          {format(new Date(p.start_date), "dd MMM yyyy", { locale: es })}
+                          {format(new Date(p.start_date), "dd MMM yyyy", { locale: f.fechas })}
                         </TableCell>
 
                         {/* Horario */}
@@ -672,7 +675,7 @@ export default function HRPermisos() {
                     {/* Fecha + Horario */}
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <CalendarDays className="h-3.5 w-3.5 shrink-0" />
-                      <span>{format(new Date(p.start_date), "dd MMM yyyy", { locale: es })}</span>
+                      <span>{format(new Date(p.start_date), "dd MMM yyyy", { locale: f.fechas })}</span>
                       {p.notes && <span className="ml-1 font-medium text-foreground">{p.notes}</span>}
                     </div>
 
@@ -794,6 +797,7 @@ function EditPermisoModal({
   onSave: (vals: { id: string; absence_type: string; start_date: string; end_date: string; notes: string | null; reason: string | null }) => void;
   isPending: boolean;
 }) {
+  const f = useFormato();
   const emp = permiso.employees;
   const empName = emp ? `${emp.first_name} ${emp.last_name}` : "—";
 
@@ -861,7 +865,7 @@ function EditPermisoModal({
               <PopoverTrigger asChild>
                 <Button variant="outline" className={cn("w-full justify-start font-normal", !date && "text-muted-foreground")}>
                   <CalendarIcon className="mr-2 h-4 w-4" />
-                  {date ? format(date, "dd 'de' MMMM yyyy", { locale: es }) : "Seleccionar fecha"}
+                  {date ? format(date, f.idioma === "en" ? "MMMM dd, yyyy" : "dd 'de' MMMM yyyy", { locale: f.fechas }) : "Seleccionar fecha"}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
@@ -869,7 +873,7 @@ function EditPermisoModal({
                   mode="single"
                   selected={date}
                   onSelect={(d) => { setDate(d); setCalendarOpen(false); }}
-                  locale={es}
+                  locale={f.fechas}
                   initialFocus
                   className="pointer-events-auto"
                 />

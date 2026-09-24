@@ -20,6 +20,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserRole } from "@/hooks/useUserRole";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useFormato } from "@/hooks/useFormato";
 import CategorySectionHeader from "@/components/dashboard/CategorySectionHeader";
 import { ListRowButton } from "@/components/ui/list-row";
 import { PageHeader } from "@/components/ui/page-header";
@@ -101,6 +102,7 @@ const loadViewState = (): { filters?: ContactoFilters; page?: number } => {
 };
 
 const ContactosContent = () => {
+  const f = useFormato();
   const restored = loadViewState();
   const [filters, setFilters] = useState<ContactoFilters>(restored.filters ?? emptyFilters);
   const [selectedContacto, setSelectedContacto] = useState<Contacto | null>(null);
@@ -415,7 +417,7 @@ const ContactosContent = () => {
         id: c.id,
         rawCreatedAt: c.created_at || "",
         creacion: c.created_at
-          ? new Date(c.created_at).toLocaleDateString("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })
+          ? new Date(c.created_at).toLocaleDateString(f.intl("es-ES"), { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })
           : "—",
         ticket: c.ticket_number || "",
         nombre: c.name,
@@ -441,7 +443,7 @@ const ContactosContent = () => {
         onlyfans_url: (c as any).onlyfans_url || "",
       };
     }),
-  [dbContactos, interactionCounts, profilesMap, creatorsCityMap]);
+  [dbContactos, interactionCounts, profilesMap, creatorsCityMap, f]);
 
   // Client-side filters for resolved fields
   // Ciudad y Agente ahora se filtran SERVER-SIDE (en el query) → `filtered` = la página ya filtrada.
@@ -473,8 +475,8 @@ const ContactosContent = () => {
           title="Directorio de Contactos"
           subtitle={
             <>
-              {funnelStats.pipelineVivo.toLocaleString("es")} en pipeline vivo
-              <span className="text-muted-foreground/60"> · {totalCount.toLocaleString("es")} en el directorio</span>
+              {funnelStats.pipelineVivo.toLocaleString(f.idioma === "en" ? "en-US" : "es")} en pipeline vivo
+              <span className="text-muted-foreground/60"> · {totalCount.toLocaleString(f.idioma === "en" ? "en-US" : "es")} en el directorio</span>
             </>
           }
           actions={

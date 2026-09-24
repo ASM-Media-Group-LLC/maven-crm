@@ -1,7 +1,6 @@
 import { useState, useRef } from "react";
 import { ExternalLink, MessageCircle, Pencil, Plus, Sparkles, Trash2, Upload, X, Phone, FileText } from "lucide-react";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import { WhatsAppLink } from "@/components/MaskedPhone";
 import {
@@ -16,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useFormato } from "@/hooks/useFormato";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -44,6 +44,7 @@ interface Props {
 }
 
 const ViewContactoModal = ({ open, onOpenChange, contacto, onEdit, onDelete }: Props) => {
+  const f = useFormato();
   const { toast } = useToast();
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -388,7 +389,7 @@ const ViewContactoModal = ({ open, onOpenChange, contacto, onEdit, onDelete }: P
                         </div>
                         {inter.created_at && (
                           <span className="text-[10px] text-muted-foreground">
-                            {format(new Date(inter.created_at), "dd MMM yyyy, HH:mm", { locale: es })}
+                            {format(new Date(inter.created_at), "dd MMM yyyy, HH:mm", { locale: f.fechas })}
                           </span>
                         )}
                       </div>

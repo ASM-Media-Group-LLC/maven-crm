@@ -1,5 +1,5 @@
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import { Badge } from "@/components/ui/badge";
 import { Shield, ShieldOff, ArrowRightLeft, UserPlus, UserMinus } from "lucide-react";
 import type { AuditLogEntry } from "./useAuditoriaData";
@@ -19,6 +19,7 @@ const actionConfig: Record<string, { label: string; icon: typeof Shield; color: 
 };
 
 const AuditoriaActivityLog = ({ entries, profiles }: Props) => {
+  const f = useFormato();
   if (entries.length === 0) {
     return (
       <div className="rounded-lg border bg-card p-8 text-center text-muted-foreground">
@@ -57,7 +58,7 @@ const AuditoriaActivityLog = ({ entries, profiles }: Props) => {
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium">{description}</p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {format(new Date(entry.created_at), "d MMM yyyy, HH:mm", { locale: es })}
+                {format(new Date(entry.created_at), "d MMM yyyy, HH:mm", { locale: f.fechas })}
               </p>
             </div>
             <Badge variant="outline" className={`shrink-0 text-[10px] ${config.color}`}>

@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import { Badge } from "@/components/ui/badge";
 import { UserPlus, MessageCircle, CheckCircle, Trophy, XCircle } from "lucide-react";
 
@@ -37,6 +37,7 @@ const colorMap = {
 };
 
 const ActivityTimeline = ({ creatorId, passedDate, confirmedDate, completedDate, stage }: Props) => {
+  const f = useFormato();
   const { data: contacts = [] } = useQuery({
     queryKey: ["closer-contact-history", creatorId],
     queryFn: async () => {
@@ -104,7 +105,7 @@ const ActivityTimeline = ({ creatorId, passedDate, confirmedDate, completedDate,
               <p className="text-sm font-medium">{event.label}</p>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground">
-                  {format(new Date(event.date), "dd MMM yyyy, HH:mm", { locale: es })}
+                  {format(new Date(event.date), "dd MMM yyyy, HH:mm", { locale: f.fechas })}
                 </span>
                 {event.detail && <Badge variant="outline" className="text-xs h-5">{event.detail}</Badge>}
               </div>

@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import { Badge } from "@/components/ui/badge";
 import { AlertTriangle, ArrowRight, Clock, Shield } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -14,6 +14,7 @@ interface Props {
 }
 
 const CategoryAuditLog = ({ open }: Props) => {
+  const f = useFormato();
   const { data: changes = [], isLoading } = useQuery({
     queryKey: ["category-audit-log"],
     enabled: open,
@@ -131,7 +132,7 @@ const CategoryAuditLog = ({ open }: Props) => {
                   <TableRow key={c.id} className={isSuspicious ? "bg-warning/5" : ""}>
                     <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                       {c.changed_at
-                        ? format(new Date(c.changed_at), "dd MMM yy, HH:mm", { locale: es })
+                        ? format(new Date(c.changed_at), "dd MMM yy, HH:mm", { locale: f.fechas })
                         : "—"}
                     </TableCell>
                     <TableCell>

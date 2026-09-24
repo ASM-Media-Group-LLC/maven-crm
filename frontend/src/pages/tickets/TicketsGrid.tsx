@@ -1,6 +1,6 @@
 import { format } from "date-fns";
 import { EmptyState } from "@/components/EmptyState";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import { Eye, Pencil, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -43,6 +43,7 @@ const priorityColor: Record<string, string> = {
 };
 
 const TicketsGrid = ({ tickets, onView, onEdit, onDelete }: Props) => {
+  const f = useFormato();
   if (tickets.length === 0) {
     return (
       <EmptyState seed="tickets" title="No hay tickets" description="Crea un nuevo ticket para comenzar" />
@@ -120,7 +121,7 @@ const TicketsGrid = ({ tickets, onView, onEdit, onDelete }: Props) => {
 
             {ticket.created_at && (
               <span className="text-[10px] text-muted-foreground">
-                {format(new Date(ticket.created_at), "dd MMM yyyy", { locale: es })}
+                {format(new Date(ticket.created_at), "dd MMM yyyy", { locale: f.fechas })}
               </span>
             )}
           </Card>

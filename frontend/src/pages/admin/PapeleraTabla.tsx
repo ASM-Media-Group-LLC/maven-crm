@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, RotateCcw, Trash2, Trash, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -41,6 +41,7 @@ export default function PapeleraTabla({
 }: Props) {
   const [aPurgar, setAPurgar] = useState<CuentaEnPapelera | null>(null);
   const { t } = useLanguage();
+  const f = useFormato();
 
   if (isLoading) {
     return (
@@ -115,7 +116,7 @@ export default function PapeleraTabla({
                 </div>
               </TableCell>
               <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                {format(new Date(c.deleted_at), "d MMM yyyy, HH:mm", { locale: es })}
+                {format(new Date(c.deleted_at), "d MMM yyyy, HH:mm", { locale: f.fechas })}
               </TableCell>
               <TableCell className="text-sm text-muted-foreground">
                 {c.deleted_by_name || "—"}

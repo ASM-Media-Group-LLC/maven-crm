@@ -29,6 +29,7 @@ import { useNomina } from "./useNomina";
 // from the export buttons below so the nómina page stays light.
 import { exportTableToExcel } from "@/pages/finanzas/reportes/generateReport";
 import { PageHeader } from "@/components/ui/page-header";
+import { useFormato } from "@/hooks/useFormato";
 
 const STATUS_BADGE: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
   borrador: { variant: "secondary", label: "Borrador" },
@@ -37,11 +38,13 @@ const STATUS_BADGE: Record<string, { variant: "default" | "secondary" | "destruc
   pagado: { variant: "default", label: "Pagado" },
 };
 
-function fmt(n: number) {
-  return new Intl.NumberFormat("es-CO", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
+function fmtUsd(n: number, locale: string) {
+  return new Intl.NumberFormat(locale, { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
 }
 
 function PeriodDetailContent({ item }: { item: any }) {
+  const f = useFormato();
+  const fmt = (n: number) => fmtUsd(n, f.intl("es-CO"));
   const { data: deductions = [], isLoading } = useQuery({
     queryKey: ["nomina-deductions", item.period_name],
     queryFn: async () => {
@@ -85,7 +88,7 @@ function PeriodDetailContent({ item }: { item: any }) {
                   <span className="text-xs text-muted-foreground ml-2">{d.deduction_type}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium">${Number(d.amount).toLocaleString("es-CO")}</span>
+                  <span className="text-xs font-medium">${Number(d.amount).toLocaleString(f.intl("es-CO"))}</span>
                   <Badge variant={d.status === "applied" ? "default" : "secondary"} className="text-[10px]">{d.status}</Badge>
                 </div>
               </div>
@@ -102,6 +105,8 @@ type NominaTab = typeof NOMINA_TABS[number];
 
 export default function NominaPage() {
   const { toast } = useToast();
+  const formatoUi = useFormato();
+  const fmt = (n: number) => fmtUsd(n, formatoUi.intl("es-CO"));
   const queryClient = useQueryClient();
   const [nominaTab, setNominaTab] = useState<NominaTab>("Cálculo");
   const { periods, employees, details, loadingPeriods, loadingDetails, createPeriod, batchClose, deletePeriod } = useNomina();

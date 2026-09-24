@@ -17,9 +17,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { exportTableToExcel } from "@/pages/finanzas/reportes/generateReport";
 import { format } from "date-fns";
 import NuevaComisionModal from "./NuevaComisionModal";
+import { useFormato } from "@/hooks/useFormato";
 
-function fmt(n: number) {
-  return new Intl.NumberFormat("es-CO", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
+function fmtUsd(n: number, locale: string) {
+  return new Intl.NumberFormat(locale, { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
 }
 
 const STATUS_BADGE: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
@@ -35,6 +36,8 @@ interface Props {
 }
 
 export default function ComisionesTab({ renderFilterBar, currentFilters }: Props) {
+  const f = useFormato();
+  const fmt = (n: number) => fmtUsd(n, f.intl("es-CO"));
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [showCreate, setShowCreate] = useState(false);

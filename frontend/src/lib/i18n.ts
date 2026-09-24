@@ -1441,6 +1441,12 @@ export function fijarIdioma(lang: Language): void {
   idiomaActual = lang;
 }
 
+/** El idioma de la interfaz, para código que no es un componente. Mismas reglas
+ *  que `traducir()`: se lee en el momento de la llamada y no vuelve a correr. */
+export function idioma(): Language {
+  return idiomaActual;
+}
+
 export function traducir(
   key: TranslationKey,
   params?: Record<string, string | number>,

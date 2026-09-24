@@ -28,6 +28,7 @@ import {
   useCreateLeadManual,
   type ScouterLead,
 } from "@/hooks/useScouterLeads";
+import { useFormato } from "@/hooks/useFormato";
 import {
   LeadDrawer,
   STATUS_META,
@@ -50,6 +51,7 @@ import {
 //   - Per-column sort (only created_at DESC for now)
 
 const ScouterLeads = () => {
+  const f = useFormato();
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<ScouterLead | null>(null);
@@ -216,7 +218,7 @@ const ScouterLeads = () => {
                       )}
                     </TableCell>
                     <TableCell className="text-right text-xs text-muted-foreground tabular-nums">
-                      {new Date(lead.created_at).toLocaleDateString("es-CO", {
+                      {new Date(lead.created_at).toLocaleDateString(f.intl("es-CO"), {
                         day: "2-digit",
                         month: "short",
                       })}

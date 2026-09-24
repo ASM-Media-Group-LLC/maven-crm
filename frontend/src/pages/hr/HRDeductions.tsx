@@ -29,6 +29,8 @@ import { DEDUCTION_DISPLAY_TYPES, DEDUCTION_STATUSES, INFRACTION_CATEGORIES } fr
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { PageHeader } from "@/components/ui/page-header";
+import { useFormato } from "@/hooks/useFormato";
+import type { Formato } from "@/lib/formato";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface DeductionRecord {
@@ -93,8 +95,8 @@ function parseDescription(description: string | null): string {
   return description.replace(/^\[.+?\]\s*/, "");
 }
 
-function formatAmount(amount: number): string {
-  return new Intl.NumberFormat("es-CO", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(amount);
+function formatAmount(f: Formato, amount: number): string {
+  return new Intl.NumberFormat(f.intl("es-CO"), { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(amount);
 }
 
 const STATUS_BADGE: Record<string, { variant: "default" | "secondary" | "destructive"; label: string }> = {
@@ -105,6 +107,7 @@ const STATUS_BADGE: Record<string, { variant: "default" | "secondary" | "destruc
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function HRDeductions() {
+  const f = useFormato();
   const navigate = useNavigate();
   const { data: deductions = [], isLoading } = useDeductions();
   const { data: departments = [] } = useDepartments();
@@ -195,7 +198,7 @@ export default function HRDeductions() {
               <StatChip label="Total Deducciones" value={String(deductions.length)} icon={<DollarSign className="h-3.5 w-3.5" />} color="bg-primary" hint="Todos los registros" onClick={() => setKpiPopup("total")} />
               <StatChip label="Pendientes" value={String(totalPending)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" hint={deductions.length > 0 ? `${((totalPending / deductions.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("pending")} />
               <StatChip label="Aplicadas" value={String(totalApplied)} icon={<CheckCircle className="h-3.5 w-3.5" />} color="bg-success" hint={deductions.length > 0 ? `${((totalApplied / deductions.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("applied")} />
-              <StatChip label="Monto Total" value={formatAmount(totalAmount)} icon={<Wallet className="h-3.5 w-3.5" />} color="bg-destructive" hint="Suma de todas las deducciones" onClick={() => setKpiPopup("amount")} />
+              <StatChip label="Monto Total" value={formatAmount(f, totalAmount)} icon={<Wallet className="h-3.5 w-3.5" />} color="bg-destructive" hint="Suma de todas las deducciones" onClick={() => setKpiPopup("amount")} />
             </>
           )}
         </div>
@@ -314,7 +317,7 @@ export default function HRDeductions() {
                             </div>
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">{catLabel}</TableCell>
-                          <TableCell className="text-sm font-medium">{formatAmount(ded.amount)}</TableCell>
+                          <TableCell className="text-sm font-medium">{formatAmount(f, ded.amount)}</TableCell>
                           <TableCell className="text-sm whitespace-nowrap">{format(new Date(ded.created_at), "dd/MM/yyyy")}</TableCell>
                           <TableCell>
                             <Badge variant={badge.variant}>{badge.label}</Badge>
@@ -373,7 +376,7 @@ export default function HRDeductions() {
                               {emp?.employee_code && <p className="text-xs text-muted-foreground">{emp.employee_code}</p>}
                             </div>
                           </div>
-                          <span className="text-sm font-semibold shrink-0">{formatAmount(ded.amount)}</span>
+                          <span className="text-sm font-semibold shrink-0">{formatAmount(f, ded.amount)}</span>
                         </div>
                         <div className="space-y-1">
                           <div className="flex items-center gap-1.5 text-sm">
@@ -424,7 +427,7 @@ export default function HRDeductions() {
                   <div><Label className="text-muted-foreground">Empleado</Label><p className="font-medium">{viewItem.employees ? `${viewItem.employees.first_name} ${viewItem.employees.last_name}` : "—"}</p></div>
                   <div><Label className="text-muted-foreground">Tipo</Label><p className="font-medium">{typeLabel}</p></div>
                   {catLabel && <div><Label className="text-muted-foreground">Categoría</Label><p className="font-medium">{catLabel}</p></div>}
-                  <div><Label className="text-muted-foreground">Monto</Label><p className="font-medium">{formatAmount(viewItem.amount)}</p></div>
+                  <div><Label className="text-muted-foreground">Monto</Label><p className="font-medium">{formatAmount(f, viewItem.amount)}</p></div>
                   <div><Label className="text-muted-foreground">Fecha</Label><p className="font-medium">{format(new Date(viewItem.created_at), "dd/MM/yyyy")}</p></div>
                   <div><Label className="text-muted-foreground">Estado</Label><Badge variant={badge.variant}>{badge.label}</Badge></div>
                 </div>
@@ -440,7 +443,7 @@ export default function HRDeductions() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar deducción?</AlertDialogTitle>
-            <AlertDialogDescription>Esta acción no se puede deshacer. Se eliminará permanentemente esta deducción de {formatAmount(deleteItem?.amount ?? 0)}.</AlertDialogDescription>
+            <AlertDialogDescription>Esta acción no se puede deshacer. Se eliminará permanentemente esta deducción de {formatAmount(f, deleteItem?.amount ?? 0)}.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel />
@@ -459,7 +462,7 @@ export default function HRDeductions() {
             case "total": return `Total Deducciones — ${deductions.length}`;
             case "pending": return `Pendientes — ${totalPending}`;
             case "applied": return `Aplicadas — ${totalApplied}`;
-            case "amount": return `Monto Total — ${formatAmount(totalAmount)}`;
+            case "amount": return `Monto Total — ${formatAmount(f, totalAmount)}`;
             default: return "";
           }
         })()}
@@ -473,7 +476,7 @@ export default function HRDeductions() {
           return list.slice(0, 100).map((d: any): KpiRow => ({
             primary: d.employee_name ?? d.reason ?? "Sin concepto",
             secondary: d.month_year ?? d.deduction_type ?? undefined,
-            right: formatAmount(d.amount || 0),
+            right: formatAmount(f, d.amount || 0),
             rightTone: tone(d.status ?? ""),
           }));
         })()}

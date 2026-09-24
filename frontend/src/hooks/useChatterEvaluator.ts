@@ -2,6 +2,8 @@ import { useEffect } from "react";
 import { getPublicBaseUrl } from "@/lib/getPublicUrl";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useFormato } from "@/hooks/useFormato";
+import type { Formato } from "@/lib/formato";
 import { supabase } from "@/integrations/supabase/client";
 import { buildEmailHtml, buildEmailSubject } from "@/pages/chatter-evaluator/emailTemplate";
 import type {
@@ -578,8 +580,8 @@ const monthKeyOf = (d: Date): string =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 // Label legible para el chart: "ene 26", "feb 26"... el año va en YY
 // para no comer ancho cuando hay 12 buckets pegados.
-const monthLabelOf = (d: Date): string => {
-  const month = d.toLocaleString("es-ES", { month: "short" }).replace(".", "");
+const monthLabelOf = (d: Date, f: Formato): string => {
+  const month = d.toLocaleString(f.intl("es-ES"), { month: "short" }).replace(".", "");
   return `${month} ${String(d.getFullYear()).slice(-2)}`;
 };
 
@@ -604,14 +606,17 @@ const startOfMonth = (now: Date): Date => {
 export const useChatterEvaluationStats = (customRange?: {
   from?: Date;
   to?: Date;
-}) =>
-  useQuery({
+}) => {
+  const f = useFormato();
+  return useQuery({
     // Incluímos el rango custom en la queryKey para que React Query refetchee
     // (y recalcule el bucket `custom`) cuando el user cambia las fechas.
+    // El idioma también: las etiquetas de mes ("ene 26") se arman acá adentro.
     queryKey: [
       "chatter-evaluation-stats",
       customRange?.from?.toISOString() ?? null,
       customRange?.to?.toISOString() ?? null,
+      f.idioma,
     ],
     queryFn: async (): Promise<ChatterEvaluationStats> => {
       // Join inverso: cada evaluación trae su sesión y, vía la sesión,
@@ -683,7 +688,7 @@ export const useChatterEvaluationStats = (customRange?: {
       for (let i = 11; i >= 0; i--) {
         const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
         const key = monthKeyOf(d);
-        monthlyMap.set(key, { label: monthLabelOf(d), apto: 0, noApto: 0 });
+        monthlyMap.set(key, { label: monthLabelOf(d, f), apto: 0, noApto: 0 });
         monthlyOrder.push(key);
       }
       const monthlyCutoff = new Date(
@@ -757,6 +762,7 @@ export const useChatterEvaluationStats = (customRange?: {
       };
     },
   });
+};
 
 /**
  * Lista de sesiones para el workspace + header.

@@ -15,7 +15,7 @@ import { CATEGORY_ORDER } from "@/hooks/useOperationsDashboard";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import CreadoresHeader from "./CreadoresHeader";
 
 const emptyFilters = { search: "", agency: "", status: "", category: "", country: "", city: "", manager: "" };
@@ -32,6 +32,7 @@ const statusConfig = [
 ];
 
 const CreadorasDashboardContent = () => {
+  const f = useFormato();
   const navigate = useNavigate();
   const { allCreators, isLoading } = useCreadores(emptyFilters);
   type StatusKey = "active" | "onboarding" | "paused" | "leaving" | "terminated";
@@ -354,7 +355,7 @@ const CreadorasDashboardContent = () => {
                         <div>
                           <p className="text-xs text-muted-foreground">Registro</p>
                           <p className="text-xs font-medium whitespace-nowrap">
-                            {c.created_at ? format(new Date(c.created_at), "dd MMM", { locale: es }) : "—"}
+                            {c.created_at ? format(new Date(c.created_at), "dd MMM", { locale: f.fechas }) : "—"}
                           </p>
                         </div>
                       </div>
@@ -435,7 +436,7 @@ const CreadorasDashboardContent = () => {
               { label: "Agencia", value: c.creator_business?.company?.name ?? c.creator_business?.assigned_agency ?? "—" },
               { label: "País", value: c.country ?? "—" },
               { label: "Categoría", value: c.category ?? "—" },
-              { label: "Registro", value: c.created_at ? format(new Date(c.created_at), "dd MMM yyyy", { locale: es }) : "—" },
+              { label: "Registro", value: c.created_at ? format(new Date(c.created_at), "dd MMM yyyy", { locale: f.fechas }) : "—" },
               { label: "Manager", value: c.creator_business?.manager_type ?? "—" },
             ];
             return (

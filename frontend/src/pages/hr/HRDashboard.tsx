@@ -20,7 +20,7 @@ import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format, subDays, differenceInDays } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import { cn } from "@/lib/utils";
 import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
@@ -93,6 +93,7 @@ const absenceTypeLabel: Record<string, string> = {
 // ─── Financial Summary from Finanzas ─────────────────────────────────────────
 function FinancialSummaryCards() {
   const navigate = useNavigate();
+  const f = useFormato();
   const { data: employees = [] } = useEmployees();
 
   const { data: payrollTotal } = useQuery({
@@ -134,8 +135,8 @@ function FinancialSummaryCards() {
     : 0;
 
   const cards = [
-    { label: "Costo Nómina (mes)", value: `$${(payrollTotal ?? 0).toLocaleString("es-CO")}`, icon: DollarSignIcon, color: "bg-primary", path: "/finanzas/nomina" },
-    { label: "Salario Promedio", value: `$${Math.round(avgSalary).toLocaleString("es-CO")}`, icon: Wallet, color: "bg-primary", path: "/finanzas/control" },
+    { label: "Costo Nómina (mes)", value: `$${(payrollTotal ?? 0).toLocaleString(f.intl("es-CO"))}`, icon: DollarSignIcon, color: "bg-primary", path: "/finanzas/nomina" },
+    { label: "Salario Promedio", value: `$${Math.round(avgSalary).toLocaleString(f.intl("es-CO"))}`, icon: Wallet, color: "bg-primary", path: "/finanzas/control" },
     { label: "Deducciones Pend.", value: String(pendingDeductions ?? 0), icon: AlertTriangle, color: "bg-warning", path: "/hr/deducciones" },
     { label: "Horas Extra Acum.", value: `${(overtimeHours ?? 0).toFixed(1)}h`, icon: Clock, color: "bg-success", path: "/finanzas/horas-variables" },
   ];
@@ -151,6 +152,7 @@ function FinancialSummaryCards() {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 export default function HRDashboard() {
+  const f = useFormato();
   const { data: employees = [], isLoading } = useEmployees();
   const { data: pendingAbsences = [], isLoading: absencesLoading } = usePendingAbsences();
   const { data: prod } = useHrProductivity(7);
@@ -297,7 +299,7 @@ export default function HRDashboard() {
           <CardContent>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {[
-                { label: "Horas trackeadas", value: prod ? `${prod.totalHours.toLocaleString("es-CO")}h` : "—", icon: Clock, color: "bg-primary/10 border-primary/20", textColor: "text-primary" },
+                { label: "Horas trackeadas", value: prod ? `${prod.totalHours.toLocaleString(f.intl("es-CO"))}h` : "—", icon: Clock, color: "bg-primary/10 border-primary/20", textColor: "text-primary" },
                 { label: "Actividad prom.", value: prod ? `${prod.avgActivity}%` : "—", icon: Activity, color: "bg-accent/10 border-accent/20", textColor: "text-accent" },
                 { label: "Personas activas", value: prod ? String(prod.people) : "—", icon: Users, color: "bg-primary/10 border-primary/20", textColor: "text-primary" },
                 { label: "Puntualidad prom.", value: avgPunct != null ? `${avgPunct}%` : "—", icon: Percent, color: "bg-success/10 border-success/20", textColor: "text-success" },
@@ -409,8 +411,8 @@ export default function HRDashboard() {
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {absenceTypeLabel[absence.absence_type] ?? absence.absence_type} ·{" "}
-                        {format(new Date(absence.start_date), "dd MMM", { locale: es })} →{" "}
-                        {format(new Date(absence.end_date), "dd MMM yyyy", { locale: es })}
+                        {format(new Date(absence.start_date), "dd MMM", { locale: f.fechas })} →{" "}
+                        {format(new Date(absence.end_date), "dd MMM yyyy", { locale: f.fechas })}
                       </p>
                     </div>
                     <Badge variant="outline" className="text-xs shrink-0 border-warning/40 text-warning">Pendiente</Badge>
@@ -564,7 +566,7 @@ export default function HRDashboard() {
           if (kpiPopup === "ausencias") {
             return pendingAbsences.slice(0, 100).map((a: any): KpiRow => ({
               primary: a.employee_name ?? a.full_name ?? `Empleado ${a.employee_id?.slice?.(0, 8) ?? "—"}`,
-              secondary: a.absence_type ? `${a.absence_type} · ${a.start_date ? new Date(a.start_date).toLocaleDateString("es") : "—"}` : a.start_date ? new Date(a.start_date).toLocaleDateString("es") : undefined,
+              secondary: a.absence_type ? `${a.absence_type} · ${a.start_date ? new Date(a.start_date).toLocaleDateString(f.intl("es-ES")) : "—"}` : a.start_date ? new Date(a.start_date).toLocaleDateString(f.intl("es-ES")) : undefined,
               right: a.status ?? "Pendiente",
               rightTone: "warning",
             }));
@@ -578,7 +580,7 @@ export default function HRDashboard() {
               .map((e: any): KpiRow => ({
                 primary: `${e.first_name ?? ""} ${e.last_name ?? ""}`.trim() || "Sin nombre",
                 secondary: e.position ?? undefined,
-                right: e.hire_date ? new Date(e.hire_date).toLocaleDateString("es") : "—",
+                right: e.hire_date ? new Date(e.hire_date).toLocaleDateString(f.intl("es-ES")) : "—",
               }));
           }
           return [];

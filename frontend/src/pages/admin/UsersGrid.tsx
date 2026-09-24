@@ -7,9 +7,9 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { MoreVertical } from "lucide-react";
 import type { AdminUser } from "./useAdminUsers";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { useFormato } from "@/hooks/useFormato";
 import { useAuth } from "@/hooks/useAuth";
 
 const roleConfig: Record<string, { icon: React.ReactNode; variant: "default" | "secondary" | "destructive" | "outline" }> = {
@@ -30,6 +30,7 @@ interface UsersGridProps {
 }
 
 const UsersGrid = ({ users, onEditRole, onEdit, onResetPassword, onMigrarCorreo, onDelete, onRemoveRole }: UsersGridProps) => {
+  const f = useFormato();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user: authUser } = useAuth();
@@ -100,7 +101,7 @@ const UsersGrid = ({ users, onEditRole, onEdit, onResetPassword, onMigrarCorreo,
                     <p className="text-xs text-muted-foreground">Sin email</p>
                   )}
                   <p className="text-xs text-muted-foreground mt-1">
-                    {user.created_at ? format(new Date(user.created_at), "dd MMM yyyy", { locale: es }) : "—"}
+                    {user.created_at ? format(new Date(user.created_at), "dd MMM yyyy", { locale: f.fechas }) : "—"}
                   </p>
                 </div>
                 {user.role ? (

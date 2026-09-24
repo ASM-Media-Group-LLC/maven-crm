@@ -1,6 +1,5 @@
 import * as React from "react";
 import { format, startOfToday, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subMonths, parse, isValid, endOfDay } from "date-fns";
-import { es } from "date-fns/locale";
 import { CalendarIcon } from "lucide-react";
 import { DayPicker, type DateRange } from "react-day-picker";
 
@@ -11,6 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { buttonVariants } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useFormato } from "@/hooks/useFormato";
 
 interface DateRangePickerProps {
   from: Date | undefined;
@@ -83,6 +83,7 @@ function DateRangePicker({
   className,
 }: DateRangePickerProps) {
   const isMobile = useIsMobile();
+  const f = useFormato();
   const [open, setOpen] = React.useState(false);
   const [range, setRange] = React.useState<DateRange | undefined>(
     from || to ? { from, to } : undefined
@@ -153,9 +154,9 @@ function DateRangePicker({
   };
 
   const triggerLabel = from && to
-    ? `${format(from, "d MMM", { locale: es })} – ${format(to, "d MMM yyyy", { locale: es })}`
+    ? `${format(from, "d MMM", { locale: f.fechas })} – ${format(to, "d MMM yyyy", { locale: f.fechas })}`
     : from
-      ? `${format(from, "d MMM yyyy", { locale: es })}`
+      ? `${format(from, "d MMM yyyy", { locale: f.fechas })}`
       : placeholder;
 
   // Trigger estándar Maven: el botón es VISIBLE — tinte primary + icon
@@ -219,7 +220,7 @@ function DateRangePicker({
               selected={range}
               onSelect={handleSelect}
               numberOfMonths={isMobile ? 1 : 2}
-              locale={es}
+              locale={f.fechas}
               showOutsideDays
               className="pointer-events-auto"
               classNames={{

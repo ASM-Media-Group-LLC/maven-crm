@@ -6,6 +6,8 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useFormato } from "@/hooks/useFormato";
+import type { Formato } from "@/lib/formato";
 import { EmployeeSearchCombobox } from "@/components/hr/EmployeeSearchCombobox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,7 +29,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { ABSENCE_TYPES, ABSENCE_STATUSES } from "@/lib/hrConstants";
 import { format, startOfMonth, endOfMonth } from "date-fns";
-import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
@@ -74,14 +75,14 @@ function getStatusVariant(status: string): "default" | "secondary" | "destructiv
   return "secondary";
 }
 
-function formatDateRange(start: string, end: string) {
+function formatDateRange(start: string, end: string, f: Formato) {
   const s = new Date(start);
   const e = new Date(end);
   const sameMonth = s.getMonth() === e.getMonth() && s.getFullYear() === e.getFullYear();
   if (sameMonth) {
-    return `${format(s, "d")} - ${format(e, "d MMM", { locale: es })}`;
+    return `${format(s, "d")} - ${format(e, "d MMM", { locale: f.fechas })}`;
   }
-  return `${format(s, "d MMM", { locale: es })} - ${format(e, "d MMM", { locale: es })}`;
+  return `${format(s, "d MMM", { locale: f.fechas })} - ${format(e, "d MMM", { locale: f.fechas })}`;
 }
 
 // ─── Hooks ─────────────────────────────────────────────────────────────────────
@@ -126,6 +127,7 @@ interface RegisterModalProps {
 }
 
 function RegisterAbsenceModal({ open, onOpenChange }: RegisterModalProps) {
+  const f = useFormato();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -212,7 +214,7 @@ function RegisterAbsenceModal({ open, onOpenChange }: RegisterModalProps) {
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar mode="single" selected={startDate} onSelect={(d) => { setStartDate(d); setStartOpen(false); }} locale={es} initialFocus />
+                  <Calendar mode="single" selected={startDate} onSelect={(d) => { setStartDate(d); setStartOpen(false); }} locale={f.fechas} initialFocus />
                 </PopoverContent>
               </Popover>
             </div>
@@ -226,7 +228,7 @@ function RegisterAbsenceModal({ open, onOpenChange }: RegisterModalProps) {
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar mode="single" selected={endDate} onSelect={(d) => { setEndDate(d); setEndOpen(false); }} locale={es} disabled={(d) => startDate ? d < startDate : false} initialFocus />
+                  <Calendar mode="single" selected={endDate} onSelect={(d) => { setEndDate(d); setEndOpen(false); }} locale={f.fechas} disabled={(d) => startDate ? d < startDate : false} initialFocus />
                 </PopoverContent>
               </Popover>
             </div>
@@ -251,6 +253,7 @@ function RegisterAbsenceModal({ open, onOpenChange }: RegisterModalProps) {
 
 // ─── Edit Modal ─────────────────────────────────────────────────────────────────
 function EditAbsenceModal({ absence, onClose }: { absence: AbsenceRecord | null; onClose: () => void }) {
+  const f = useFormato();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -315,7 +318,7 @@ function EditAbsenceModal({ absence, onClose }: { absence: AbsenceRecord | null;
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar mode="single" selected={startDate} onSelect={(d) => { setStartDate(d); setStartOpen(false); }} locale={es} initialFocus />
+                  <Calendar mode="single" selected={startDate} onSelect={(d) => { setStartDate(d); setStartOpen(false); }} locale={f.fechas} initialFocus />
                 </PopoverContent>
               </Popover>
             </div>
@@ -329,7 +332,7 @@ function EditAbsenceModal({ absence, onClose }: { absence: AbsenceRecord | null;
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar mode="single" selected={endDate} onSelect={(d) => { setEndDate(d); setEndOpen(false); }} locale={es} disabled={(d) => startDate ? d < startDate : false} initialFocus />
+                  <Calendar mode="single" selected={endDate} onSelect={(d) => { setEndDate(d); setEndOpen(false); }} locale={f.fechas} disabled={(d) => startDate ? d < startDate : false} initialFocus />
                 </PopoverContent>
               </Popover>
             </div>
@@ -352,6 +355,7 @@ function EditAbsenceModal({ absence, onClose }: { absence: AbsenceRecord | null;
 
 // ─── View Modal ─────────────────────────────────────────────────────────────────
 function ViewAbsenceModal({ absence, onClose }: { absence: AbsenceRecord | null; onClose: () => void }) {
+  const f = useFormato();
   if (!absence) return null;
   const emp = absence.employees;
   const empName = emp ? `${emp.first_name} ${emp.last_name}` : "—";
@@ -383,7 +387,7 @@ function ViewAbsenceModal({ absence, onClose }: { absence: AbsenceRecord | null;
             </div>
             <div>
               <p className="text-muted-foreground text-xs mb-0.5">Fechas</p>
-              <p className="font-medium">{formatDateRange(absence.start_date, absence.end_date)}</p>
+              <p className="font-medium">{formatDateRange(absence.start_date, absence.end_date, f)}</p>
             </div>
             <div>
               <p className="text-muted-foreground text-xs mb-0.5">Días</p>
@@ -404,6 +408,7 @@ function ViewAbsenceModal({ absence, onClose }: { absence: AbsenceRecord | null;
 
 // ─── Main Component ─────────────────────────────────────────────────────────────
 export default function HRAbsences() {
+  const f = useFormato();
   const { data: absences = [], isLoading } = useAbsences();
   const { data: departments = [] } = useDepartments();
   const queryClient = useQueryClient();
@@ -588,7 +593,7 @@ export default function HRAbsences() {
                             </div>
                           </TableCell>
                           <TableCell><Badge variant="outline" className="text-xs">{getAbsenceTypeLabel(a.absence_type)}</Badge></TableCell>
-                          <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{formatDateRange(a.start_date, a.end_date)}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{formatDateRange(a.start_date, a.end_date, f)}</TableCell>
                           <TableCell>
                             <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-muted text-xs font-semibold">{a.total_days ?? "—"}</span>
                           </TableCell>
@@ -654,7 +659,7 @@ export default function HRAbsences() {
                       </Badge>
                     </div>
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">{formatDateRange(a.start_date, a.end_date)}</span>
+                      <span className="text-muted-foreground">{formatDateRange(a.start_date, a.end_date, f)}</span>
                       <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-muted text-xs font-semibold">{a.total_days ?? "—"}</span>
                     </div>
                     {a.notes && <p className="text-xs text-muted-foreground line-clamp-2">{a.notes}</p>}
@@ -723,7 +728,7 @@ export default function HRAbsences() {
             status === "approved" ? "success" : status === "rejected" ? "destructive" : "warning";
           return list.slice(0, 100).map((a: any): KpiRow => ({
             primary: a.employee_name ?? `Empleado ${a.employee_id?.slice?.(0, 8) ?? "—"}`,
-            secondary: `${a.absence_type ?? ""} · ${a.start_date ? new Date(a.start_date).toLocaleDateString("es") : "—"}`,
+            secondary: `${a.absence_type ?? ""} · ${a.start_date ? new Date(a.start_date).toLocaleDateString(f.idioma === "en" ? "en-US" : "es") : "—"}`,
             right: a.status ?? "—",
             rightTone: tone(a.status ?? ""),
           }));

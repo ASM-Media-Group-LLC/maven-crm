@@ -2,7 +2,7 @@ import { useState } from "react";
 import { EmptyState } from "@/components/EmptyState";
 import { usePermissions } from "@/hooks/usePermissions";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import { ArrowUpDown, Eye, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -74,6 +74,7 @@ const getSortValue = (ticket: TicketWithCreator, key: SortKey): string => {
 };
 
 const TicketsList = ({ tickets, onView, onEdit, onDelete }: Props) => {
+  const f = useFormato();
   const { canAccess } = usePermissions();
   const canEditTicket = canAccess("Tickets", "Editar Ticket");
   const canDeleteTicket = canAccess("Tickets", "Eliminar Ticket");
@@ -171,7 +172,7 @@ const TicketsList = ({ tickets, onView, onEdit, onDelete }: Props) => {
                   {ticket.assigned_to ? `@${ticket.assigned_to}` : "Sin asignar"}
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                  {ticket.created_at ? format(new Date(ticket.created_at), "dd MMM yyyy", { locale: es }) : "—"}
+                  {ticket.created_at ? format(new Date(ticket.created_at), "dd MMM yyyy", { locale: f.fechas }) : "—"}
                 </TableCell>
                 <TableCell className="sticky right-0 bg-card" onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center justify-end">

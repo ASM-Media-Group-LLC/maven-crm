@@ -11,6 +11,7 @@ interface PaymentNoteData {
 }
 
 function fmt(n: number) {
+  // Idioma fijo a propósito: es la vista previa de la nota de pago (documento para la creadora), no texto de pantalla.
   return new Intl.NumberFormat("es-CO", { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(n);
 }
 
@@ -21,6 +22,7 @@ const A4_H = 842;
 export default function PaymentNoteA4Preview({ note }: { note: PaymentNoteData }) {
   const amt = Number(note.amount) || 0;
   const creatorName = note._creator?.artistic_name || note._creator?.name || "—";
+  // Idioma fijo a propósito: fecha impresa en la nota de pago, igual que en el documento que recibe la creadora.
   const noteDate = note.created_at
     ? new Date(note.created_at).toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" })
     : "—";
@@ -65,6 +67,7 @@ export default function PaymentNoteA4Preview({ note }: { note: PaymentNoteData }
               <p>
                 <span className="font-semibold text-gray-800">Due date: </span>
                 <span className="text-gray-600">
+                  {/* Idioma fijo a propósito: fecha impresa en la nota de pago, no texto de pantalla. */}
                   {new Date(note.due_date + "T12:00:00").toLocaleDateString("es-ES")}
                 </span>
               </p>
