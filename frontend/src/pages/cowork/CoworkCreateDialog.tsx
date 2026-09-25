@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Plus, X } from "lucide-react";
 import { toast } from "sonner";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface Props {
   open: boolean;
@@ -13,8 +14,11 @@ interface Props {
 }
 
 export default function CoworkCreateDialog({ open, onOpenChange, onCreate }: Props) {
+  const { t } = useLanguage();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  // Los nombres por defecto de las salas NO se traducen: se guardan en la base
+  // (cowork_rooms.name) y los lee toda la sesión, cada uno en su idioma.
   const [roomNames, setRoomNames] = useState(["Sala 1", "Sala 2"]);
   const [loading, setLoading] = useState(false);
 
@@ -35,21 +39,21 @@ export default function CoworkCreateDialog({ open, onOpenChange, onCreate }: Pro
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[85dvh] flex-col overflow-hidden w-[calc(100%-2rem)] max-w-md rounded-2xl">
         <DialogHeader>
-          <DialogTitle className="text-foreground">Crear sesión Cowork</DialogTitle>
+          <DialogTitle className="text-foreground">{t("cowork.create.title")}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 overflow-y-auto min-h-0">
           <div>
-            <Label className="text-muted-foreground text-xs font-medium">Nombre de la sesión</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej: Cowork semanal" className="mt-1.5 rounded-xl" />
+            <Label className="text-muted-foreground text-xs font-medium">{t("cowork.create.sessionName")}</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("cowork.create.sessionNamePlaceholder")} className="mt-1.5 rounded-xl" />
           </div>
           <div>
-            <Label className="text-muted-foreground text-xs font-medium">Descripción (opcional)</Label>
-            <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descripción..." className="mt-1.5 rounded-xl" />
+            <Label className="text-muted-foreground text-xs font-medium">{t("cowork.create.descriptionOptional")}</Label>
+            <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t("cowork.create.descriptionPlaceholder")} className="mt-1.5 rounded-xl" />
           </div>
           <div>
             <Label className="text-muted-foreground text-xs font-medium">
-              Salas <span className="text-muted-foreground/70 font-normal normal-case">({roomNames.length}/10)</span>
+              {t("cowork.create.rooms")} <span className="text-muted-foreground/70 font-normal normal-case">({roomNames.length}/10)</span>
             </Label>
             <div className="space-y-2 mt-1.5">
               {roomNames.map((rn, i) => (
@@ -63,14 +67,14 @@ export default function CoworkCreateDialog({ open, onOpenChange, onCreate }: Pro
                 </div>
               ))}
               <Button variant="outline" size="sm" onClick={addRoom} className="gap-1 rounded-full" disabled={roomNames.length >= MAX_ROOMS}>
-                <Plus className="h-3 w-3" /> Agregar sala
+                <Plus className="h-3 w-3" /> {t("cowork.create.addRoom")}
               </Button>
             </div>
           </div>
         </div>
 
         <DialogFooter className="gap-2 sm:gap-0">
-          <Button variant="outline" onClick={() => onOpenChange(false)} className="rounded-full">Cancelar</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="rounded-full">{t("common.cancel")}</Button>
           <Button
             className="rounded-full"
             disabled={!name.trim() || roomNames.some(r => !r.trim()) || loading}
@@ -78,7 +82,7 @@ export default function CoworkCreateDialog({ open, onOpenChange, onCreate }: Pro
               setLoading(true);
               try {
                 await onCreate(name, roomNames, description || undefined);
-                toast.success("Sesión creada");
+                toast.success(t("cowork.create.created"));
               } catch (e: any) {
                 toast.error(e.message);
               } finally {
@@ -86,7 +90,7 @@ export default function CoworkCreateDialog({ open, onOpenChange, onCreate }: Pro
               }
             }}
           >
-            {loading ? "Creando..." : "Crear"}
+            {loading ? t("cowork.create.creating") : t("common.create")}
           </Button>
         </DialogFooter>
       </DialogContent>

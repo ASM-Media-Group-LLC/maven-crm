@@ -34,7 +34,7 @@ import { useOnlinePresence } from "@/hooks/useOnlinePresence";
 import { useCoworkMediaPresence, type MediaState } from "@/hooks/useCoworkMediaPresence";
 import { cn } from "@/lib/utils";
 import { leerLimitesPausa } from "@/lib/coworkTablas";
-import { relojDesdePresencia, segundosMostrados, formatoReloj, motivoDetenidoDeOtro } from "@/lib/coworkReloj";
+import { relojDesdePresencia, segundosMostrados, formatoReloj } from "@/lib/coworkReloj";
 import { personasEnSala, relojDeRespaldo, latidoFresco } from "@/lib/coworkOcupacion";
 import { useRelojDeSala } from "@/hooks/useRelojDeSala";
 import SalaEnPausa, { type PausaDeSala } from "./SalaEnPausa";
@@ -46,7 +46,7 @@ import CoworkPausasDialog from "./CoworkPausasDialog";
 import MeetGrupalDialog from "./MeetGrupalDialog";
 import type { CoworkMeet } from "@/hooks/useCoworkSession";
 import PausaSupervisorBoton from "./PausaSupervisorBoton";
-import { leerPausaSupervisor, suscribirPausaSupervisor, esEstadoSupervisor, etiquetaDePausaSupervisor } from "@/lib/pausaSupervisor";
+import { leerPausaSupervisor, suscribirPausaSupervisor, esEstadoSupervisor } from "@/lib/pausaSupervisor";
 import type { useCoworkSession, CoworkRoom } from "@/hooks/useCoworkSession";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -56,6 +56,34 @@ import { MUELLE_EXTRA_ID } from "@/hooks/useMuelleFlotante";
 import { UserAvatar } from "@/components/UserAvatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { useLanguage } from "@/hooks/useLanguage";
+import { traducir, type TranslationKey } from "@/lib/i18n";
+import { ETIQUETA_SUPERVISOR, NOMBRE_PAUSA, claveMotivoDetenido, mensajeDeSolicitud } from "./textosCowork";
+
+// Lo que vio el detector de encuadre, como CÓDIGO: se compara y se elige el
+// icono con esto, y el texto sale del diccionario en el idioma de quien mira.
+type ProblemaCara = "sin_rostro" | "fuera_de_cuadro" | "sin_luz" | "camara_apagada";
+const ETIQUETA_PROBLEMA: Record<ProblemaCara, TranslationKey> = {
+  sin_rostro: "cowork.host.face.noFace",
+  fuera_de_cuadro: "cowork.host.face.outOfFrame",
+  sin_luz: "cowork.host.face.noLight",
+  camara_apagada: "cowork.host.face.cameraOff",
+};
+// Lo que DICE la voz del tablero. Queda en español a propósito: el motor de voz
+// está fijo en español (lib/voz pide es-419) y leer inglés con esa voz no se
+// entiende. Lo escrito (etiquetas y avisos) sí sale en el idioma de la interfaz.
+const VOZ_PROBLEMA: Record<ProblemaCara, string> = {
+  sin_rostro: "no está frente a la cámara",
+  fuera_de_cuadro: "está fuera de cuadro",
+  sin_luz: "no tiene luz suficiente",
+  camara_apagada: "tiene la cámara apagada y no marcó pausa",
+};
+// Por qué se murió la voz: lib/colaDeVoz lo manda armado en español. Los dos
+// motivos que conoce se dicen en el idioma de quien mira; uno nuevo sale tal cual.
+const MOTIVO_VOZ: Record<string, TranslationKey> = {
+  "el navegador aceptó la frase pero nunca la reprodujo": "cowork.host.voiceReason.neverPlayed",
+  "este navegador no tiene síntesis de voz": "cowork.host.voiceReason.noSynthesis",
+};
 
 // Un control de la tarjeta de sala (escuchar, hablar, cámara, pantalla). El
 // estado se lee por el color, no por la palabra: apagado es neutro, encendido
@@ -108,6 +136,10 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // Los métodos del meet grupal sueltos: los callbacks dependen de ellos, no de `cowork` entero.
   const { crearMeetGrupal, terminarMeetGrupal, joinMeetGrupal } = cowork;
   const navigate = useNavigate();
+  // `t` para lo que se dibuja. Los avisos que salen de efectos, de callbacks
+  // memoizados y de la config de la llamada usan traducir(): meter `t` en esas
+  // dependencias reconectaría el Hub o la sala al cambiar el idioma.
+  const { t } = useLanguage();
   const { isOnline } = useOnlinePresence();
   const { mediaStates, supervisores, supervisoresDesde, trackEstadoSupervisor } = useCoworkMediaPresence(cowork.session?.id, userId);
   // La pausa del supervisor (break / almuerzo / ausente) se elige con la tacita
@@ -215,9 +247,9 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     if (ventanaDelSistemaAbierta) { cerrarVentanaDelSistema(); return; }
     if (ventanaDelSistemaSoportada) {
       const ok = await abrirVentanaDelSistema({ width: hubSize?.w ?? 480, height: hubSize?.h ?? 420 });
-      if (!ok) { toast.error("No pude abrir la ventana flotante"); toggleHubPinned(); }
+      if (!ok) { toast.error(t("cowork.host.popOutError")); toggleHubPinned(); }
     } else {
-      toast.info("Tu navegador no soporta ventana flotante multi-monitor (usa Chrome/Edge). Fijo al frente dentro de Maven.");
+      toast.info(t("cowork.host.popOutUnsupported"));
       toggleHubPinned();
     }
   };
@@ -382,8 +414,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     // Si cada lado lo calculara aparte, discutirían sobre distintos minutos.
     const cuenta = cuentaPausa(segundos, limite, kind === "bano" ? (st.banoConsumidoSeg ?? 0) : 0);
     return {
-      segundos, kind,
-      etiqueta: kind === "break" ? "Break" : "Baño",
+      segundos, kind: kind as "bano" | "break",
       excedida: cuenta.excedida,
       cuenta,
     };
@@ -555,15 +586,15 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       renaciendo = true;
       if (vivoDesde && Date.now() - vivoDesde > SOBREVIVIO_MS) recapturasMic.current = 0;
       if (recapturasMic.current >= MAX_RECAPTURAS_MIC) {
-        toast.error("Tu micrófono se sigue cayendo", {
-          description: "Nadie te está oyendo. Revisa el dispositivo y vuelve a activar el micro.",
+        toast.error(traducir("cowork.host.micKeepsDropping"), {
+          description: traducir("cowork.host.micKeepsDroppingDesc"),
           duration: 12_000, id: "micro-supervisor",
         });
         return;
       }
       recapturasMic.current += 1;
-      toast.warning("Tu micrófono se cayó — lo estoy retomando", {
-        description: "Mientras tanto las salas no te oyen.",
+      toast.warning(traducir("cowork.host.micDropped"), {
+        description: traducir("cowork.host.micDroppedDesc"),
         duration: 6_000, id: "micro-supervisor",
       });
       setGeneracionMic((n) => n + 1);
@@ -610,7 +641,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
         // quedó huérfano cuando el botón global pasó a ser una acción sobre
         // las salas — o sea que si a alguien le fallaba el micrófono, en vez
         // del aviso se llevaba una pantalla negra.
-        if (!cancelled) { toast.error("No pude acceder al micrófono"); setRoomMic({}); }
+        if (!cancelled) { toast.error(traducir("cowork.host.micAccessError")); setRoomMic({}); }
       }
     })();
     return () => {
@@ -640,12 +671,12 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
         if (cancelled || !track) { track?.stop(); return; }
         track.addEventListener("ended", () => {
           if (cancelled) return;
-          toast.error("Tu cámara se cayó", { description: "Las salas dejaron de ver tu cámara.", id: "cam-broadcast" });
+          toast.error(traducir("cowork.host.camDropped"), { description: traducir("cowork.host.camDroppedDesc"), id: "cam-broadcast" });
           setRoomCam({});
         });
         setCamBaseTrack(track);
       } catch {
-        if (!cancelled) { toast.error("No pude acceder a la cámara"); setRoomCam({}); }
+        if (!cancelled) { toast.error(traducir("cowork.host.camAccessError")); setRoomCam({}); }
       }
     })();
     return () => {
@@ -704,7 +735,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     setActiveRoomId(roomId);
     setActiveRoomName(room.name);
     // Cambiar de sala = moverse: la anterior se cuelga (no se puede estar en dos salas).
-    if (switching) toast.info(`Te moviste a ${room.name}`);
+    if (switching) toast.info(traducir("cowork.host.movedTo", { room: room.name }));
   }, [cowork.rooms, activeRoomId, activeMeetId, terminarMeetGrupal]);
 
   // ── Meet grupal ──────────────────────────────────────────────────────────
@@ -715,16 +746,20 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     setActiveMeetId(meet.id);
     setActiveRoomLk(meet.livekit_room_name);
     setActiveRoomId(`meet:${meet.id}`);
+    // En español a propósito: es también el título de la GRABACIÓN (se guarda).
+    // Lo que se ve en pantalla sale de `nombreSalaActiva`, traducido.
     setActiveRoomName("Meet grupal");
   }, []);
   const crearMeet = useCallback(async (roomIds: string[]) => {
     try {
       const r = await crearMeetGrupal(roomIds);
-      toast.success(`Meet grupal con ${r.participantes} ${r.participantes === 1 ? "persona" : "personas"}`);
+      toast.success(r.participantes === 1
+        ? traducir("cowork.host.meetCreatedOne")
+        : traducir("cowork.host.meetCreatedMany", { n: r.participantes }));
       setMeetDialogOpen(false);
       entrarAlMeet(r.meet);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "No se pudo crear el meet");
+      toast.error(e instanceof Error ? e.message : traducir("cowork.host.meetCreateError"));
     }
   }, [crearMeetGrupal, entrarAlMeet]);
 
@@ -828,7 +863,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     if (activeMeetId) {
       void terminarMeetGrupal(activeMeetId, "supervisor_salio").catch(() => { /* ya cerrado */ });
       setActiveMeetId(null);
-      toast.info("Meet grupal terminado: todos vuelven a su sala");
+      toast.info(traducir("cowork.host.meetEnded"));
     }
     setActiveRoomLk(null);
     setActiveRoomId(null);
@@ -882,7 +917,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       }
       navigate(`/cowork?session=${id}`);
     } catch (e) {
-      toast.error((e as Error).message || "No se pudo entrar a esa sesión");
+      toast.error((e as Error).message || traducir("cowork.host.switchSessionError"));
     }
   }, [cowork, navigate]);
   // Sincronización de los refs declarados arriba de conectarHub.
@@ -916,7 +951,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     if (!oneOnOneSeenInListRef.current) return;
     if (!req || req.status === "resolved") {
       leaveOneOnOne();
-      toast.info("Llamada privada finalizada");
+      toast.info(traducir("cowork.host.privateCallEnded"));
     }
   }, [cowork.hostRequests, oneOnOneRequestId, leaveOneOnOne]);
 
@@ -941,9 +976,9 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       await cowork.renameSession(nombre);
       cowork.refetch();
       setRenameOpen(false);
-      toast.success("Nombre actualizado");
+      toast.success(t("cowork.host.renamed"));
     } catch (e: any) {
-      toast.error(e.message || "No se pudo cambiar el nombre");
+      toast.error(e.message || t("cowork.host.renameError"));
     } finally {
       setRenaming(false);
     }
@@ -975,8 +1010,9 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
    *  reglas por sesión eso puede ser cero o cinco. */
   const vecesAvisada = (regla: ReglaAviso, seg: number): number =>
     seg < regla.primerAvisoSeg ? 0 : 1 + Math.floor((seg - regla.primerAvisoSeg) / Math.max(1, regla.repetirSeg));
+  // traducir(): se arma dentro de los efectos de los avisos.
   const textoAvisada = (n: number): string =>
-    n === 0 ? "todavía no recibió su aviso" : n === 1 ? "ya se le avisó una vez" : `ya se le avisó ${n} veces`;
+    n === 0 ? traducir("cowork.host.warned.none") : n === 1 ? traducir("cowork.host.warned.once") : traducir("cowork.host.warned.many", { n });
   // ¿Lleva rato sin compartir pantalla?
   //
   // En Cowork la pantalla es la mitad del trabajo: sin ella el supervisor ve
@@ -990,7 +1026,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     reglas.pantalla.activa && reglas.pantalla.supervisorSeg !== null ? reglas.pantalla.supervisorSeg * 1000 : null,
   );
 
-  const faceIssue = (ms: MediaState | undefined): string | null => {
+  const faceIssue = (ms: MediaState | undefined): ProblemaCara | null => {
     if (!ms || !ms.faceState || !ms.faceSince) return null;
     if (ms.onBreak) return null;                   // ya sabemos que no está
     if (ms.faceState === "ok") return null;
@@ -1001,14 +1037,14 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     // La etiqueta aparece al minuto, pero nunca DESPUÉS de que suene: un umbral
     // de supervisor más corto (Estricto, o uno personalizado) la adelanta.
     if (now - ms.faceSince < Math.min(FACE_ALERT_MS, (regla.supervisorSeg ?? Infinity) * 1000)) return null;
-    return ms.faceState === "no_face" ? "Sin rostro"
-      : ms.faceState === "too_small" ? "Fuera de cuadro"
-      : ms.faceState === "too_dark" ? "Sin luz"
+    return ms.faceState === "no_face" ? "sin_rostro"
+      : ms.faceState === "too_small" ? "fuera_de_cuadro"
+      : ms.faceState === "too_dark" ? "sin_luz"
       // Cámara apagada SIN pausa marcada. Antes se ignoraba, y era el hueco más
       // grande: apagar la cámara es la forma más fácil de desaparecer, y era
       // justo la que no avisaba. Con pausa marcada sigue sin avisar (la corta
       // el `ms.onBreak` de arriba), que es lo correcto.
-      : ms.faceState === "cam_off" ? "Cámara apagada"
+      : ms.faceState === "cam_off" ? "camara_apagada"
       : null;
   };
 
@@ -1027,8 +1063,8 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // Ahora se dice en pantalla, con la instrucción que de verdad sirve: recargar
   // NO destraba el motor, hay que cerrar el navegador entero.
   useEffect(() => alFallarLaVoz((motivo) => {
-    toast.error("Los avisos por voz no se están escuchando", {
-      description: `${motivo}. Cierra el navegador POR COMPLETO y vuelve a abrirlo — recargar la página no alcanza. Los avisos escritos siguen funcionando.`,
+    toast.error(traducir("cowork.host.voiceDead"), {
+      description: traducir("cowork.host.voiceDeadDesc", { reason: MOTIVO_VOZ[motivo] ? traducir(MOTIVO_VOZ[motivo]) : motivo }),
       duration: 20_000,
       id: "voz-muerta",
     });
@@ -1064,10 +1100,11 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       // gente en el mismo ciclo, y disparar `cancel()+speak()` decenas de veces
       // de golpe es lo que traba el motor de voz de Chromium. La cola agrupa
       // por persona y habla de a una.
-      encolarVoz(quien, `lleva ${Math.floor(pasadoSeg / 60)} minutos pasado de su ${p.etiqueta.toLowerCase()}`,
+      // La voz, en español (ver VOZ_PROBLEMA); el cartel, en el idioma de la interfaz.
+      encolarVoz(quien, `lleva ${Math.floor(pasadoSeg / 60)} minutos pasado de su ${p.kind === "break" ? "break" : "baño"}`,
         { volumen: 0.85 });
-      toast.warning(`${quien}: pasado de ${p.etiqueta.toLowerCase()}`, {
-        description: `Lleva ${p.cuenta.texto.replace("−", "")} de más y ya se le avisó por voz.`,
+      toast.warning(traducir(p.kind === "break" ? "cowork.host.alert.overBreak" : "cowork.host.alert.overBathroom", { name: quien }), {
+        description: traducir("cowork.host.alert.overDesc", { time: p.cuenta.texto.replace("−", "") }),
         duration: 10_000,
       });
     }
@@ -1102,18 +1139,13 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
         // El nombre lo pone la cola: así dos problemas de la misma persona se
         // dicen en UNA frase ("...tiene la cámara apagada, y lleva 8 minutos
         // sin compartir pantalla") en vez de dos que se cortan entre sí.
-        encolarVoz(
-          quien,
-          problema === "Sin luz" ? "no tiene luz suficiente"
-          : problema === "Fuera de cuadro" ? "está fuera de cuadro"
-          : problema === "Cámara apagada" ? "tiene la cámara apagada y no marcó pausa"
-          : "no está frente a la cámara",
-          { volumen: 0.85 },
-        );
+        encolarVoz(quien, VOZ_PROBLEMA[problema], { volumen: 0.85 });
         const seg = Math.floor((now - (st.faceSince as number)) / 1000);
         const regla = reglaDeEstado(reglas, st.faceState);
-        toast.warning(`${quien}: ${problema.toLowerCase()}`, {
-          description: `Lleva ${formatBreak(seg)} así y ${textoAvisada(regla ? vecesAvisada(regla, seg) : 0)}.`,
+        toast.warning(`${quien}: ${traducir(ETIQUETA_PROBLEMA[problema]).toLowerCase()}`, {
+          description: traducir("cowork.host.alert.faceDesc", {
+            time: formatBreak(seg), warned: textoAvisada(regla ? vecesAvisada(regla, seg) : 0),
+          }),
           duration: 8000,
         });
       } else if (!problema) {
@@ -1142,8 +1174,10 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
         // equipo hay dos Álvaro Mejía.
         encolarVoz(quien, `lleva ${minutos} minutos sin compartir pantalla`, { volumen: 0.85 });
         const seg = Math.floor((now - (st.screenShareSince as number)) / 1000);
-        toast.warning(`${quien}: sin compartir pantalla`, {
-          description: `Lleva ${minutos} minutos así y ${textoAvisada(vecesAvisada(reglas.pantalla, seg))}.`,
+        toast.warning(traducir("cowork.host.alert.noScreen", { name: quien }), {
+          description: traducir("cowork.host.alert.noScreenDesc", {
+            n: minutos, warned: textoAvisada(vecesAvisada(reglas.pantalla, seg)),
+          }),
           duration: 8000,
         });
       } else if (st.screenShareOn) {
@@ -1178,10 +1212,10 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     try {
       await cowork.addRoom(name);
       await cowork.refetch(true);
-      toast.success("Sala añadida");
+      toast.success(t("cowork.host.roomAdded"));
       setAddOpen(false);
       setAddName("");
-    } catch (e: any) { toast.error(e?.message || "No se pudo añadir la sala"); }
+    } catch (e: any) { toast.error(e?.message || t("cowork.host.roomAddError")); }
     finally { setRoomBusy(false); }
   };
 
@@ -1200,9 +1234,9 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
         previewMode: editVideo ? "video" : "avatars",
       });
       await cowork.refetch(true);
-      toast.success("Sala actualizada");
+      toast.success(t("cowork.host.roomUpdated"));
       setEditRoom(null);
-    } catch (e: any) { toast.error(e?.message || "No se pudo actualizar la sala"); }
+    } catch (e: any) { toast.error(e?.message || t("cowork.host.roomUpdateError")); }
     finally { setRoomBusy(false); }
   };
 
@@ -1212,9 +1246,9 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     try {
       await cowork.closeRoom(closeTarget.id);
       await cowork.refetch(true);
-      toast.success("Sala cerrada");
+      toast.success(t("cowork.host.roomClosed"));
       setCloseTarget(null);
-    } catch (e: any) { toast.error(e?.message || "No se pudo cerrar la sala"); }
+    } catch (e: any) { toast.error(e?.message || t("cowork.host.roomCloseError")); }
     finally { setRoomBusy(false); }
   };
 
@@ -1260,7 +1294,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       const enMeet = meetDe(a.user_id);
       if (enMeet) {
         if (sinPausaGlobal) {
-          out.push({ key: `${a.user_id}-meet`, icono: Video, texto: `${quien}En meet grupal · ${minutosTexto(Math.floor((now - enMeet.desde) / 1000))}`, tono: "muted" });
+          out.push({ key: `${a.user_id}-meet`, icono: Video, texto: `${quien}${t("cowork.host.chip.inMeet", { time: minutosTexto(Math.floor((now - enMeet.desde) / 1000)) })}`, tono: "muted" });
         }
         continue;
       }
@@ -1268,8 +1302,8 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       if (problema && ms?.faceSince) {
         out.push({
           key: `${a.user_id}-cara`,
-          icono: problema === "Cámara apagada" ? VideoOff : EyeOff,
-          texto: `${quien}${problema} · ${minutosTexto(Math.floor((now - ms.faceSince) / 1000))}`,
+          icono: problema === "camara_apagada" ? VideoOff : EyeOff,
+          texto: `${quien}${t(ETIQUETA_PROBLEMA[problema])} · ${minutosTexto(Math.floor((now - ms.faceSince) / 1000))}`,
           tono: "warning",
         });
       }
@@ -1277,7 +1311,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
         out.push({
           key: `${a.user_id}-pantalla`,
           icono: MonitorOff,
-          texto: `${quien}Sin pantalla · ${minutosTexto(Math.floor((now - ms.screenShareSince) / 1000))}`,
+          texto: `${quien}${t("cowork.host.chip.noScreen")} · ${minutosTexto(Math.floor((now - ms.screenShareSince) / 1000))}`,
           tono: "warning",
         });
       }
@@ -1286,7 +1320,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
         out.push({
           key: `${a.user_id}-pausa`,
           icono: Coffee,
-          texto: `${quien}${pausa.etiqueta} ${pausa.cuenta.texto}`,
+          texto: `${quien}${t(NOMBRE_PAUSA[pausa.kind])} ${pausa.cuenta.texto}`,
           tono: pausa.cuenta.estado === "excedida" ? "destructive" : pausa.cuenta.estado === "poco" ? "warning" : "muted",
         });
       }
@@ -1313,7 +1347,10 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       online: isOnline(a.user_id) || latidoFresco(relojRespaldo[a.user_id], now),
       reloj: reloj ? formatoReloj(segundosMostrados(reloj, now)) : null,
       corre,
-      motivo: reloj && !corre ? motivoDetenidoDeOtro(reloj.estado) : null,
+      motivo: (() => {
+        const clave = reloj && !corre ? claveMotivoDetenido(reloj.estado, true) : null;
+        return clave ? t(clave) : null;
+      })(),
     };
   });
 
@@ -1327,8 +1364,8 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
         tono="neutro"
         activo={hearFor(room.id)}
         icono={hearFor(room.id) ? Volume2 : VolumeX}
-        etiqueta={grande ? (hearFor(room.id) ? "Escuchando" : "Silenciada") : undefined}
-        title={hearFor(room.id) ? "Escuchando esta sala. Toca para silenciar su audio." : "Sala silenciada (no la escuchas). Toca para escuchar."}
+        etiqueta={grande ? (hearFor(room.id) ? t("cowork.host.room.listening") : t("cowork.host.room.muted")) : undefined}
+        title={hearFor(room.id) ? t("cowork.host.room.listeningHint") : t("cowork.host.room.mutedHint")}
         onClick={() => setRoomHear((m) => ({ ...m, [room.id]: !hearFor(room.id) }))}
       />
       <BotonSala
@@ -1336,26 +1373,26 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
         tono={broadcastFor(room.id) && micCaido ? "caido" : "verde"}
         activo={broadcastFor(room.id)}
         icono={broadcastFor(room.id) && !micCaido ? Mic : MicOff}
-        etiqueta={broadcastFor(room.id) ? (micCaido ? "Micro caído" : "Hablando") : "Hablar"}
+        etiqueta={broadcastFor(room.id) ? (micCaido ? t("cowork.host.micDown") : t("cowork.host.room.talking")) : t("cowork.host.talk")}
         title={broadcastFor(room.id)
-          ? (micCaido ? "Tu micrófono no está llegando a esta sala." : "Tu voz va a esta sala. Toca para dejar de hablarle.")
-          : "Toca para hablarle solo a esta sala."}
+          ? (micCaido ? t("cowork.host.room.micDownHint") : t("cowork.host.room.talkingHint"))
+          : t("cowork.host.room.talkHint")}
         onClick={() => setRoomMic((m) => ({ ...m, [room.id]: !(m[room.id] ?? false) }))}
       />
       <BotonSala
         grande={grande}
         activo={camFor(room.id)}
         icono={camFor(room.id) ? Video : VideoOff}
-        etiqueta={grande ? "Cámara" : undefined}
-        title={camFor(room.id) ? "Tu cámara se ve en esta sala. Toca para apagarla acá." : "Comparte tu cámara solo con esta sala."}
+        etiqueta={grande ? t("cowork.host.camera") : undefined}
+        title={camFor(room.id) ? t("cowork.host.room.cameraOnHint") : t("cowork.host.room.cameraHint")}
         onClick={() => setRoomCam((m) => ({ ...m, [room.id]: !(m[room.id] ?? false) }))}
       />
       <BotonSala
         grande={grande}
         activo={screenFor(room.id)}
         icono={screenFor(room.id) ? ScreenShare : ScreenShareOff}
-        etiqueta={grande ? "Pantalla" : undefined}
-        title={screenFor(room.id) ? "Tu pantalla se ve en esta sala. Toca para dejar de compartirla acá." : "Comparte tu pantalla solo con esta sala."}
+        etiqueta={grande ? t("cowork.host.screen") : undefined}
+        title={screenFor(room.id) ? t("cowork.host.room.screenOnHint") : t("cowork.host.room.screenHint")}
         onClick={() => setRoomScreen((m) => ({ ...m, [room.id]: !(m[room.id] ?? false) }))}
       />
     </>
@@ -1364,16 +1401,22 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const copiarEnlaceDeSala = (room: CoworkRoom) => {
     const url = `${window.location.origin}/cowork?session=${cowork.session?.id || ""}&room=${room.id}`;
     navigator.clipboard.writeText(url);
-    toast.success(`Enlace de ${room.name} copiado`);
+    toast.success(t("cowork.host.linkCopied", { room: room.name }));
   };
   const copiarCodigoDeSala = (room: CoworkRoom) => {
     if (!room.join_code) return;
     navigator.clipboard.writeText(room.join_code);
-    toast.success(`Código de ${room.name}: ${room.join_code}`);
+    toast.success(t("cowork.host.codeCopied", { room: room.name, code: room.join_code }));
   };
 
   const conectadas = cowork.assignments.filter((a) => a.is_active).length;
-  const fraseDeSalas = `${conectadas} ${conectadas === 1 ? "persona conectada" : "personas conectadas"} en ${cowork.rooms.length} ${cowork.rooms.length === 1 ? "sala" : "salas"}.`;
+  const fraseDeSalas = t("cowork.host.roomsSummary", {
+    people: conectadas === 1 ? t("cowork.host.peopleConnectedOne") : t("cowork.host.peopleConnectedMany", { n: conectadas }),
+    rooms: cowork.rooms.length === 1 ? t("cowork.host.roomsOne") : t("cowork.host.roomsMany", { n: cowork.rooms.length }),
+  });
+  // Lo que se VE como nombre de la sala activa. En el meet grupal, "Meet grupal"
+  // en el idioma de quien mira (el estado guarda el español para la grabación).
+  const nombreSalaActiva = activeMeetId ? t("cowork.meet.title") : activeRoomName;
 
   // Quién está en cada sala, calculado antes de dibujar. "Participantes" son
   // los asignados que ESTÁN según LiveKit; si el monitor no sabe (no conectó,
@@ -1414,7 +1457,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
           <Button
             variant="ghost" size="icon"
             className="h-8 w-8 text-muted-foreground hover:text-foreground"
-            title="Mostrar el panel de solicitudes y pantallas"
+            title={t("cowork.host.showPanel")}
             onClick={() => { setSidebarCollapsed(false); localStorage.setItem("maven.cowork.sidebar.collapsed", "0"); }}
           >
             <PanelRightOpen className="h-4 w-4" />
@@ -1425,7 +1468,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
           {openHostRequests.length > 0 && (
             <button
               onClick={() => { setSidebarCollapsed(false); localStorage.setItem("maven.cowork.sidebar.collapsed", "0"); }}
-              title={`${openHostRequests.length} ${openHostRequests.length === 1 ? "persona pide" : "personas piden"} supervisor`}
+              title={openHostRequests.length === 1 ? t("cowork.host.requestsOne") : t("cowork.host.requestsMany", { n: openHostRequests.length })}
               className="mt-2 relative h-8 w-8 rounded-lg flex items-center justify-center bg-warning/15 text-warning hover:bg-warning/25 transition-colors animate-pulse"
             >
               <Hand className="h-4 w-4" />
@@ -1442,7 +1485,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
             return (
               <button
                 onClick={() => { setSidebarCollapsed(false); localStorage.setItem("maven.cowork.sidebar.collapsed", "0"); }}
-                title={excedidas ? `${excedidas} pasado(s) del límite` : `${enPausa} en pausa`}
+                title={excedidas ? t("cowork.host.overLimit", { n: excedidas }) : t("cowork.host.pausedCount", { n: enPausa })}
                 className={`mt-2 relative h-8 w-8 rounded-lg flex items-center justify-center transition-colors ${
                   excedidas ? "bg-destructive/20 text-destructive animate-pulse" : "bg-success/15 text-success hover:bg-success/25"
                 }`}
@@ -1477,7 +1520,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               <button
                 type="button"
                 className="group flex min-w-0 items-center text-left"
-                title="Cambiar el nombre de la sesión"
+                title={t("cowork.host.renameHint")}
                 onClick={() => {
                   setSessionName(cowork.session?.name || "");
                   setRenameOpen(true);
@@ -1496,8 +1539,8 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
-                  title="Copiar enlace de host (vale 30 minutos)"
-                  aria-label="Copiar enlace de host"
+                  title={t("cowork.host.copyHostLinkHint")}
+                  aria-label={t("cowork.host.copyHostLink")}
                   disabled={copiandoEnlace}
                   // El código se pide AL COPIAR, no al abrir el tablero: el servidor
                   // lo emite con vencimiento, y uno pedido hace tres horas ya no
@@ -1508,11 +1551,11 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                       const res = await cowork.getHostCode() as { hostCode: string; expiresAt?: string };
                       const url = `${window.location.origin}/cowork?session=${cowork.session?.id || ""}&role=host&code=${res.hostCode}`;
                       await navigator.clipboard.writeText(url);
-                      toast.success("Enlace de host copiado", {
-                        description: "Vale 30 minutos y convierte en host a quien lo abra: compártelo solo con quien deba supervisar.",
+                      toast.success(t("cowork.host.hostLinkCopied"), {
+                        description: t("cowork.host.hostLinkCopiedDesc"),
                       });
                     } catch (e) {
-                      toast.error("No se pudo copiar el enlace", { description: (e as Error).message });
+                      toast.error(t("cowork.host.copyLinkError"), { description: (e as Error).message });
                     } finally {
                       setCopiandoEnlace(false);
                     }
@@ -1525,8 +1568,8 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
-                title="Pausas: baño y break por persona"
-                aria-label="Pausas"
+                title={t("cowork.host.pausesHint")}
+                aria-label={t("cowork.host.pauses")}
                 onClick={() => setPausasOpen(true)}
               >
                 <Coffee className="h-4 w-4" />
@@ -1535,8 +1578,8 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 variant="ghost"
                 size="icon"
                 className="relative h-8 w-8 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
-                title="Reglas de esta sesión"
-                aria-label="Reglas de esta sesión"
+                title={t("cowork.rules.eyebrow")}
+                aria-label={t("cowork.rules.eyebrow")}
                 onClick={() => setReglasOpen(true)}
               >
                 <Settings2 className="h-4 w-4" />
@@ -1551,8 +1594,8 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 variant="ghost"
                 size="icon"
                 className="hidden h-8 w-8 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground md:inline-flex"
-                title="Ocultar este panel"
-                aria-label="Ocultar este panel"
+                title={t("cowork.host.hidePanel")}
+                aria-label={t("cowork.host.hidePanel")}
                 onClick={() => { setSidebarCollapsed(true); localStorage.setItem("maven.cowork.sidebar.collapsed", "1"); }}
               >
                 <PanelRightClose className="h-4 w-4" />
@@ -1573,16 +1616,16 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               <div className="min-w-0 flex-1">
                 <p className="truncate text-xs font-semibold text-foreground">Supervisor Hub</p>
                 <p className="truncate text-[11px] text-muted-foreground">
-                  {hubConnected ? (hubMinimized ? "Conectado · minimizado" : "Conectado") : "Sin conectar"}
+                  {hubConnected ? (hubMinimized ? t("cowork.host.hub.connectedMinimized") : t("cowork.host.hub.connected")) : t("cowork.host.hub.notConnected")}
                 </p>
               </div>
               {hubConnected ? (
                 <Button variant="outline" size="sm" className="h-7 shrink-0 rounded-full px-2.5 text-[11px]" onClick={() => setHubMinimized(!hubMinimized)}>
-                  {hubMinimized ? "Mostrar" : "Minimizar"}
+                  {hubMinimized ? t("cowork.host.hub.show") : t("cowork.host.minimize")}
                 </Button>
               ) : cowork.session?.host_hub_livekit_room ? (
                 <Button variant="outline" size="sm" className="h-7 shrink-0 rounded-full px-2.5 text-[11px]" onClick={conectarHub}>
-                  Reconectar
+                  {t("cowork.host.hub.reconnect")}
                 </Button>
               ) : null}
             </div>
@@ -1594,11 +1637,11 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
           <section className="mx-3 mt-3 space-y-2 rounded-2xl border border-border/60 bg-background/50 p-3">
             <div className="flex items-center gap-2">
               <span className="grid h-6 w-6 place-items-center rounded-full bg-warning/15 text-warning"><Hand className="h-3.5 w-3.5" /></span>
-              <h3 className="text-xs font-semibold text-foreground">Solicitudes</h3>
+              <h3 className="text-xs font-semibold text-foreground">{t("cowork.host.requests")}</h3>
               <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold tabular-nums text-muted-foreground">{openHostRequests.length}</span>
             </div>
             {openHostRequests.length === 0 ? (
-              <p className="text-xs text-muted-foreground px-1">Sin solicitudes pendientes</p>
+              <p className="text-xs text-muted-foreground px-1">{t("cowork.host.noRequests")}</p>
             ) : (
               openHostRequests.map((req) => {
                 const roomName = cowork.rooms.find(r => r.id === req.room_id)?.name || "?";
@@ -1613,7 +1656,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                       </div>
                       <Badge variant="outline" className={`text-[9px] rounded-full ${is1on1 ? "border-primary/30 text-primary" : "border-warning/30 text-warning"}`}>{roomName}</Badge>
                     </div>
-                    {req.message && <p className="text-[10px] text-muted-foreground">{req.message}</p>}
+                    {req.message && <p className="text-[10px] text-muted-foreground">{mensajeDeSolicitud(req.message, t)}</p>}
                     <div className="flex gap-1">
                       {req.status === "open" && (
                         <Button size="sm" variant="ghost" className={`h-5 text-[10px] rounded-full ${is1on1 ? "text-primary" : "text-warning"}`} onClick={async () => {
@@ -1621,14 +1664,14 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                             await cowork.ackHostRequest(req.id);
                             setOneOnOneRequestId(req.id);
                             setOneOnOneRoom(req.oneone_livekit_room!);
-                            setOneOnOneName(`Llamada privada con ${cowork.profiles[req.user_id] || "User"}`);
+                            setOneOnOneName(cowork.profiles[req.user_id] || "User");
                             setHubMinimized(true);
                           } else {
                             if (req.room_id) enterRoom(req.room_id);
                             await cowork.resolveHostRequest(req.id);
                           }
                         }}>
-                          {is1on1 ? "Atender" : "Ir a la sala"}
+                          {is1on1 ? t("cowork.host.answer") : t("cowork.host.goToRoom")}
                         </Button>
                       )}
                       {/* Marcar como atendida SIN entrar a la sala: muchas veces el
@@ -1654,26 +1697,26 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                         variant="ghost"
                         className="h-5 text-[10px] text-muted-foreground hover:text-foreground rounded-full"
                         title={is1on1
-                          ? "Cerrar la llamada privada y devolver a la persona a su sala"
-                          : "Sacarla de la lista sin entrar a la sala"}
+                          ? t("cowork.host.closePrivateHint")
+                          : t("cowork.host.doneHint")}
                         onClick={async () => {
                           try {
                             await cowork.resolveHostRequest(req.id);
                           } catch {
-                            toast.error("No se pudo marcar como atendida");
+                            toast.error(t("cowork.host.doneError"));
                           }
                         }}
                       >
-                        <Check className="h-3 w-3 mr-0.5" /> {is1on1 ? "Cerrar" : "Listo"}
+                        <Check className="h-3 w-3 mr-0.5" /> {is1on1 ? t("common.close") : t("cowork.host.done")}
                       </Button>
                       {req.status === "acknowledged" && is1on1 && (
                         <Button size="sm" variant="ghost" className="h-5 text-[10px] text-primary rounded-full" onClick={() => {
                           setOneOnOneRequestId(req.id);
                           setOneOnOneRoom(req.oneone_livekit_room!);
-                          setOneOnOneName(`Llamada privada con ${cowork.profiles[req.user_id] || "User"}`);
+                          setOneOnOneName(cowork.profiles[req.user_id] || "User");
                           setHubMinimized(true);
                         }}>
-                          Unirse a llamada privada
+                          {t("cowork.host.joinPrivate")}
                         </Button>
                       )}
                     </div>
@@ -1709,7 +1752,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               <section className="mx-3 mt-3 space-y-2 rounded-2xl border border-border/60 bg-background/50 p-3">
                 <div className="flex items-center gap-2">
                   <span className="grid h-6 w-6 place-items-center rounded-full bg-warning/15 text-warning"><Coffee className="h-3.5 w-3.5" /></span>
-                  <h3 className="text-xs font-semibold text-foreground">En pausa</h3>
+                  <h3 className="text-xs font-semibold text-foreground">{t("common.paused")}</h3>
                   <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold tabular-nums text-muted-foreground">{enPausa.length}</span>
                 </div>
                 {enPausa.map((p) => (
@@ -1743,14 +1786,14 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               .map(([uid, e]) => ({
                 uid,
                 nombre: nombreYApellido(cowork.profiles[uid]) || "Supervisor",
-                etiqueta: etiquetaDePausaSupervisor(e) ?? "",
+                etiqueta: esEstadoSupervisor(e) ? t(ETIQUETA_SUPERVISOR[e]) : "",
                 desde: supervisoresDesde[uid] ?? null,
               }));
             if (!sups.length) return null;
             return (
               <div className="p-3 border-t border-border/50 space-y-2">
                 <h3 className="text-xs font-medium text-warning flex items-center gap-1">
-                  <Coffee className="h-3 w-3" /> Supervisores en pausa ({sups.length})
+                  <Coffee className="h-3 w-3" /> {t("cowork.host.supervisorsPaused", { n: sups.length })}
                 </h3>
                 {sups.map((s) => (
                   <div key={s.uid} className="bg-warning/10 rounded-xl p-2.5 flex items-center justify-between gap-2">
@@ -1782,8 +1825,8 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                   key: `${room.id}-${uid}`,
                   uid,
                   room,
-                  nombre: nombreYApellido(cowork.profiles[uid]) || "Alguien",
-                  etiquetaPausa: pausa ? pausa.etiqueta : null,
+                  nombre: nombreYApellido(cowork.profiles[uid]) || t("cowork.common.someone"),
+                  kindPausa: pausa ? pausa.kind : null,
                   enMeet: !!meetDe(uid),
                   comparte: (roomSharerIds[room.id] ?? []).includes(uid),
                 };
@@ -1792,37 +1835,37 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 <>
                   <div className="flex items-center gap-2">
                     <span className="grid h-6 w-6 place-items-center rounded-full bg-primary/15 text-primary"><Users2 className="h-3.5 w-3.5" /></span>
-                    <h3 className="text-xs font-semibold text-foreground">En las salas</h3>
+                    <h3 className="text-xs font-semibold text-foreground">{t("cowork.host.inRooms")}</h3>
                     <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold tabular-nums text-muted-foreground">{filas.length}</span>
                   </div>
-                  {filas.length === 0 && <p className="px-1 text-xs text-muted-foreground">Nadie conectado en las salas</p>}
+                  {filas.length === 0 && <p className="px-1 text-xs text-muted-foreground">{t("cowork.host.nobodyInRooms")}</p>}
                   {filas.map((f) => (
-                    <div key={f.key} className={cn("flex items-center gap-2 rounded-xl px-2 py-1.5", f.etiquetaPausa ? "bg-warning/10" : "bg-primary/5")}>
+                    <div key={f.key} className={cn("flex items-center gap-2 rounded-xl px-2 py-1.5", f.kindPausa ? "bg-warning/10" : "bg-primary/5")}>
                       <UserAvatar name={cowork.profiles[f.uid]} src={cowork.avatares[f.uid]?.src} seed={cowork.avatares[f.uid]?.seed} size="sm" />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
                           <span
-                            className={cn("h-2 w-2 shrink-0 rounded-full", f.etiquetaPausa ? "bg-warning" : f.enMeet ? "bg-primary" : "bg-success")}
-                            title={f.etiquetaPausa ? `En ${f.etiquetaPausa.toLowerCase()}` : f.enMeet ? "En meet grupal" : "Trabajando"}
+                            className={cn("h-2 w-2 shrink-0 rounded-full", f.kindPausa ? "bg-warning" : f.enMeet ? "bg-primary" : "bg-success")}
+                            title={f.kindPausa ? t(f.kindPausa === "break" ? "cowork.host.status.onBreak" : "cowork.host.status.inBathroom") : f.enMeet ? t("cowork.pauseTile.inMeet") : t("cowork.host.status.working")}
                           />
                           <span className="truncate text-xs text-foreground/90">{f.nombre}</span>
                         </div>
                         <span className="block truncate text-[10px] text-primary/80">
-                          {f.room.name}{f.etiquetaPausa ? ` · ${f.etiquetaPausa}` : f.enMeet ? " · Meet grupal" : ""}
+                          {f.room.name}{f.kindPausa ? ` · ${t(NOMBRE_PAUSA[f.kindPausa])}` : f.enMeet ? ` · ${t("cowork.meet.title")}` : ""}
                         </span>
                       </div>
-                      <span className="shrink-0" title={f.comparte ? "Compartiendo pantalla" : "Sin pantalla compartida"}>
+                      <span className="shrink-0" title={f.comparte ? t("cowork.host.sharingScreen") : t("cowork.host.notSharingScreen")}>
                         {f.comparte ? <Monitor className="h-3.5 w-3.5 text-primary" /> : <MonitorOff className="h-3.5 w-3.5 text-muted-foreground/40" />}
                       </span>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 rounded-lg text-muted-foreground hover:text-foreground" title="Más">
+                          <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 rounded-lg text-muted-foreground hover:text-foreground" title={t("cowork.host.more")}>
                             <MoreVertical className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-52">
                           <DropdownMenuItem onClick={() => escribirA(f.uid)}>
-                            <MessageCircle className="mr-2 h-4 w-4" /> Escribirle por Messenger
+                            <MessageCircle className="mr-2 h-4 w-4" /> {t("cowork.host.messageOnMessenger")}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -1844,7 +1887,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               key={oneOnOneRoom}
               roomName={oneOnOneRoom}
               displayName={displayName}
-              callDisplayName={oneOnOneName || "Llamada privada"}
+              callDisplayName={oneOnOneName ? t("cowork.host.privateCallWith", { name: oneOnOneName }) : t("cowork.host.privateCall")}
               isAdmin={false}
               onLeave={() => { leaveOneOnOne(); }}
               hideShareLink
@@ -1853,7 +1896,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               initialMicOn={false}
               initialCamOn={false}
               getToken={getOneOnOneToken}
-              leaveLabel="Regresar a dashboard"
+              leaveLabel={t("cowork.host.returnToDashboard")}
               leaveIcon={ArrowLeft}
             />
           </div>
@@ -1861,7 +1904,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
           <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 pt-14 pb-28 md:p-6 md:pb-32">
             <div className="mb-4 flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
               <div className="min-w-0">
-                <h2 className="font-display text-lg font-semibold leading-tight text-foreground">Salas</h2>
+                <h2 className="font-display text-lg font-semibold leading-tight text-foreground">{t("cowork.create.rooms")}</h2>
                 <p className="text-sm text-muted-foreground">{fraseDeSalas}</p>
               </div>
               {/* Los cuatro botones globales fijan TODAS las salas de un golpe. Una
@@ -1873,12 +1916,12 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                   variant="outline"
                   className={`gap-1.5 rounded-full h-8 ${todasEscuchando ? "" : "text-destructive border-destructive/40"}`}
                   title={todasEscuchando
-                    ? "Estás escuchando todas las salas. Toca para silenciarlas (solo para ti)."
-                    : "Toca para escuchar todas. Las que ya tenías activadas se quedan como están."}
+                    ? t("cowork.host.all.listeningHint")
+                    : t("cowork.host.all.listenHint")}
                   onClick={() => fijarEscuchaDeTodas(!todasEscuchando)}
                 >
                   {todasEscuchando ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
-                  <span className="hidden sm:inline">Escuchar</span>
+                  <span className="hidden sm:inline">{t("cowork.host.listen")}</span>
                 </Button>
                 <Button
                   size="sm"
@@ -1894,15 +1937,15 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                   }`}
                   title={micCaido
                     ? (micCaido === "muerto"
-                        ? "Tu micrófono se cayó: NADIE te está oyendo. Revisa el dispositivo."
-                        : "Otro programa se quedó con tu micrófono: NADIE te está oyendo.")
+                        ? t("cowork.host.all.micDeadHint")
+                        : t("cowork.host.all.micTakenHint"))
                     : hablandoATodas
-                      ? "Tu voz va a TODAS las salas. Toca para dejar de hablarles."
-                      : "Habla a todas a la vez. Las que ya tenías activadas se quedan como están."}
+                      ? t("cowork.host.all.talkingHint")
+                      : t("cowork.host.all.talkHint")}
                   onClick={() => fijarMicDeTodas(!hablandoATodas)}
                 >
                   {hablandoATodas && !micCaido ? <Mic className="h-3.5 w-3.5" /> : <MicOff className="h-3.5 w-3.5" />}
-                  <span className="hidden sm:inline">{micCaido ? "Micro caído" : "Hablar"}</span>
+                  <span className="hidden sm:inline">{micCaido ? t("cowork.host.micDown") : t("cowork.host.talk")}</span>
                 </Button>
                 {/* Cámara y pantalla a todas: mismo modelo que escuchar/hablar —
                     el global fija todas y después se apagan salas individuales. */}
@@ -1911,30 +1954,30 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                   variant={camaraATodas ? "default" : "outline"}
                   className={`gap-1.5 rounded-full h-8 ${camaraATodas ? "bg-success hover:bg-success/90 text-white border-transparent" : ""}`}
                   title={camaraATodas
-                    ? "Tu cámara se ve en TODAS las salas. Toca para apagarla en todas."
-                    : "Comparte tu cámara con todas las salas a la vez. Después puedes apagarla en salas puntuales."}
+                    ? t("cowork.host.all.cameraOnHint")
+                    : t("cowork.host.all.cameraHint")}
                   onClick={() => fijarCamDeTodas(!camaraATodas)}
                 >
                   {camaraATodas ? <Video className="h-3.5 w-3.5" /> : <VideoOff className="h-3.5 w-3.5" />}
-                  <span className="hidden sm:inline">Cámara</span>
+                  <span className="hidden sm:inline">{t("cowork.host.camera")}</span>
                 </Button>
                 <Button
                   size="sm"
                   variant={pantallaATodas ? "default" : "outline"}
                   className={`gap-1.5 rounded-full h-8 ${pantallaATodas ? "bg-success hover:bg-success/90 text-white border-transparent" : ""}`}
                   title={pantallaATodas
-                    ? "Tu pantalla se ve en TODAS las salas. Toca para dejar de compartirla en todas."
-                    : "Comparte tu pantalla con todas las salas a la vez (eliges qué pantalla una sola vez)."}
+                    ? t("cowork.host.all.screenOnHint")
+                    : t("cowork.host.all.screenHint")}
                   onClick={() => fijarScreenDeTodas(!pantallaATodas)}
                 >
                   {pantallaATodas ? <ScreenShare className="h-3.5 w-3.5" /> : <ScreenShareOff className="h-3.5 w-3.5" />}
-                  <span className="hidden sm:inline">Pantalla</span>
+                  <span className="hidden sm:inline">{t("cowork.host.screen")}</span>
                 </Button>
                 <Button
                   size="sm"
                   variant="outline"
                   className="gap-1.5 rounded-full h-8 shrink-0"
-                  title="Meet grupal: llevar la gente de una o varias salas a una sala temporal"
+                  title={t("cowork.host.meetHint")}
                   onClick={() => setMeetDialogOpen(true)}
                 >
                   <Video className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Meet</span>
@@ -1943,10 +1986,10 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                   size="sm"
                   variant="outline"
                   className="gap-1 rounded-full h-8 shrink-0"
-                  title="Añadir sala"
+                  title={t("cowork.host.addRoom")}
                   onClick={() => { setAddName(""); setAddOpen(true); }}
                 >
-                  <Plus className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Añadir sala</span>
+                  <Plus className="h-3.5 w-3.5" /> <span className="hidden sm:inline">{t("cowork.host.addRoom")}</span>
                 </Button>
               </div>
             </div>
@@ -1964,22 +2007,22 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                   <div key={`meet-${meet.id}`} data-meet={meet.id} className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-primary/40 bg-card">
                     <div className="flex h-10 items-center gap-2 px-3">
                       <Video className="h-3.5 w-3.5 shrink-0 text-primary" />
-                      <span className="min-w-0 truncate font-display text-sm font-semibold text-foreground">Meet grupal</span>
-                      <span className="ml-auto inline-flex items-center gap-1 text-[11px] tabular-nums text-muted-foreground" title={`${gente.length} en el meet`}>
+                      <span className="min-w-0 truncate font-display text-sm font-semibold text-foreground">{t("cowork.meet.title")}</span>
+                      <span className="ml-auto inline-flex items-center gap-1 text-[11px] tabular-nums text-muted-foreground" title={t("cowork.host.inMeetCount", { n: gente.length })}>
                         <Users2 className="h-3 w-3" />{gente.length}
                       </span>
                     </div>
                     <div className="mx-2 mb-2 flex aspect-[4/3] flex-col items-center justify-center gap-1 overflow-hidden rounded-xl bg-primary/10 px-3 text-center md:mx-0 md:mb-0 md:aspect-video md:rounded-none">
                       <div className="font-display text-2xl font-bold tabular-nums text-primary">{formatoReloj(Math.max(0, Math.floor((now - Date.parse(meet.started_at)) / 1000)))}</div>
-                      <div className="text-[11px] text-muted-foreground">Lo invocó {nombreYApellido(cowork.profiles[meet.created_by]) || "un supervisor"}</div>
-                      <div className="line-clamp-2 text-[11px] text-foreground/80">{gente.map((p) => nombreYApellido(cowork.profiles[p.user_id])).join(", ") || "Todos volvieron a su sala"}</div>
+                      <div className="text-[11px] text-muted-foreground">{t("cowork.pauses.calledBy", { name: nombreYApellido(cowork.profiles[meet.created_by]) || t("cowork.host.aSupervisor") })}</div>
+                      <div className="line-clamp-2 text-[11px] text-foreground/80">{gente.map((p) => nombreYApellido(cowork.profiles[p.user_id])).join(", ") || t("cowork.host.everyoneBack")}</div>
                     </div>
                     <div className="hidden md:flex items-center gap-1 px-2 py-2">
-                      <Button variant="ghost" size="sm" className="h-8 rounded-lg text-xs text-destructive hover:text-destructive" onClick={() => { void terminarMeetGrupal(meet.id, "terminado").catch((e: unknown) => toast.error(e instanceof Error ? e.message : "No se pudo terminar")); if (dentro) leaveActiveRoom(); }}>
-                        Terminar
+                      <Button variant="ghost" size="sm" className="h-8 rounded-lg text-xs text-destructive hover:text-destructive" onClick={() => { void terminarMeetGrupal(meet.id, "terminado").catch((e: unknown) => toast.error(e instanceof Error ? e.message : t("cowork.host.endMeetError"))); if (dentro) leaveActiveRoom(); }}>
+                        {t("cowork.host.endMeetShort")}
                       </Button>
                       <Button variant="secondary" size="sm" className="ml-auto h-8 gap-1.5 rounded-lg text-xs" disabled={dentro} onClick={() => entrarAlMeet(meet)}>
-                        <DoorOpen className="h-3.5 w-3.5" /> {dentro ? "Estás dentro" : "Entrar"}
+                        <DoorOpen className="h-3.5 w-3.5" /> {dentro ? t("cowork.host.youreIn") : t("cowork.common.enter")}
                       </Button>
                     </div>
                   </div>
@@ -2036,7 +2079,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                       {room.join_code && (
                         <button
                           type="button"
-                          title="Copiar código de esta sala"
+                          title={t("cowork.host.copyRoomCode")}
                           className="hidden md:inline-flex items-center gap-1 font-mono text-[11px] tracking-[0.18em] text-muted-foreground transition-colors hover:text-primary"
                           onClick={() => copiarCodigoDeSala(room)}
                         >
@@ -2044,7 +2087,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                           <Copy className="h-2.5 w-2.5 opacity-60" />
                         </button>
                       )}
-                      <span className="ml-auto inline-flex items-center gap-1 text-[11px] tabular-nums text-muted-foreground" title={`${participants.length} en la sala`}>
+                      <span className="ml-auto inline-flex items-center gap-1 text-[11px] tabular-nums text-muted-foreground" title={t("cowork.host.inRoomCount", { n: participants.length })}>
                         <Users2 className="h-3 w-3" />{participants.length}
                       </span>
                       <DropdownMenu>
@@ -2053,26 +2096,26 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                             variant="ghost"
                             size="icon"
                             className="hidden md:inline-flex h-7 w-7 rounded-lg text-muted-foreground hover:text-foreground"
-                            title="Más opciones de la sala"
+                            title={t("cowork.host.roomMenu")}
                           >
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-56">
                           <DropdownMenuItem onClick={() => copiarEnlaceDeSala(room)}>
-                            <Link2 className="mr-2 h-4 w-4" /> Copiar enlace de participante
+                            <Link2 className="mr-2 h-4 w-4" /> {t("cowork.host.copyParticipantLink")}
                           </DropdownMenuItem>
                           {room.join_code && (
                             <DropdownMenuItem onClick={() => copiarCodigoDeSala(room)}>
-                              <KeyRound className="mr-2 h-4 w-4" /> Copiar código <span className="ml-auto font-mono text-xs text-muted-foreground">{room.join_code}</span>
+                              <KeyRound className="mr-2 h-4 w-4" /> {t("cowork.host.copyCode")} <span className="ml-auto font-mono text-xs text-muted-foreground">{room.join_code}</span>
                             </DropdownMenuItem>
                           )}
                           <DropdownMenuSeparator />
                           <DropdownMenuItem onClick={() => openEdit(room)}>
-                            <Pencil className="mr-2 h-4 w-4" /> Editar sala
+                            <Pencil className="mr-2 h-4 w-4" /> {t("cowork.host.editRoom")}
                           </DropdownMenuItem>
                           <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setCloseTarget(room)}>
-                            <X className="mr-2 h-4 w-4" /> Cerrar sala
+                            <X className="mr-2 h-4 w-4" /> {t("cowork.host.closeRoom")}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -2090,7 +2133,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                         <>
                           <div className="flex h-full flex-col items-center justify-center gap-1.5 text-muted-foreground/60">
                             <Users2 className="h-5 w-5" />
-                            <span className="text-xs">Sin participantes</span>
+                            <span className="text-xs">{t("cowork.host.noParticipants")}</span>
                           </div>
                           {/* El monitor sigue MONTADO aunque no vea a nadie. Antes se
                               desmontaba acá, y como es él quien avisa quién está, ya no
@@ -2158,7 +2201,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                                   se corte con puntos y el reloj no se sale de la miniatura. */}
                               <span className="min-w-0 truncate">{p.nombre}</span>
                               {p.reloj && (
-                                <span className={cn("shrink-0 font-mono tabular-nums", p.corre ? "text-success" : "text-white/60")} title={p.motivo ? `Reloj detenido: ${p.motivo}` : "Reloj de hoy corriendo"}>
+                                <span className={cn("shrink-0 font-mono tabular-nums", p.corre ? "text-success" : "text-white/60")} title={p.motivo ? t("cowork.host.clockStopped", { reason: p.motivo }) : t("cowork.host.clockRunning")}>
                                   {p.reloj}
                                 </span>
                               )}
@@ -2179,7 +2222,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                             <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", p.online ? "bg-success" : "bg-muted-foreground/40")} />
                             <span className="min-w-0 flex-1 truncate text-foreground/90">{p.nombre}</span>
                             {p.reloj && (
-                              <span className={cn("shrink-0 font-mono tabular-nums", p.corre ? "text-success" : "text-muted-foreground")} title={p.motivo ? `Reloj detenido: ${p.motivo}` : "Reloj de hoy corriendo"}>
+                              <span className={cn("shrink-0 font-mono tabular-nums", p.corre ? "text-success" : "text-muted-foreground")} title={p.motivo ? t("cowork.host.clockStopped", { reason: p.motivo }) : t("cowork.host.clockRunning")}>
                                 {p.reloj}
                               </span>
                             )}
@@ -2202,7 +2245,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                         className="ml-auto h-8 gap-1.5 rounded-lg text-xs"
                         onClick={() => enterRoom(room.id)}
                       >
-                        <DoorOpen className="h-3.5 w-3.5" /> Entrar
+                        <DoorOpen className="h-3.5 w-3.5" /> {t("cowork.common.enter")}
                       </Button>
                     </div>
                   </div>
@@ -2224,7 +2267,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
           <div className="flex items-center justify-between px-3 py-1.5 bg-muted border-b border-border shrink-0">
             <div className="flex items-center gap-1.5 text-xs text-primary font-medium">
               <DoorOpen className="h-3 w-3" />
-              {activeRoomName || "Sala"}
+              {nombreSalaActiva || t("cowork.common.room")}
             </div>
             <div className="flex items-center gap-1">
               <Button
@@ -2232,16 +2275,16 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 size="sm"
                 className="h-6 gap-1 rounded-full px-2.5 text-[11px]"
                 onClick={leaveActiveRoom}
-                title="Salir de la sala y volver al dashboard"
+                title={t("cowork.host.leaveRoomHint")}
               >
-                <ArrowLeft className="h-3 w-3" /> Volver al dashboard
+                <ArrowLeft className="h-3 w-3" /> {t("cowork.common.backToDashboard")}
               </Button>
               <Button
                 variant="ghost"
                 size="icon"
                 className="h-5 w-5 text-destructive hover:text-destructive/80"
                 onClick={leaveActiveRoom}
-                title="Colgar llamada"
+                title={t("cowork.host.hangUpCall")}
               >
                 <PhoneOff className="h-3 w-3" />
               </Button>
@@ -2252,7 +2295,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               key={activeRoomLk}
               roomName={activeRoomLk}
               displayName={displayName}
-              callDisplayName={activeRoomName || undefined}
+              callDisplayName={nombreSalaActiva || undefined}
               isAdmin={true}
               // Una sala de Cowork no se termina desde adentro de la llamada.
               hideEndForAll
@@ -2265,7 +2308,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               initialMicOn={!!activeMeetId}
               initialCamOn={!!activeMeetId}
               getToken={getActiveRoomToken}
-              leaveLabel={activeMeetId ? "Terminar meet" : "Colgar"}
+              leaveLabel={activeMeetId ? t("cowork.host.endMeet") : t("cowork.host.hangUp")}
               // Flechas + lista para moverse entre las SALAS de esta sesión sin
               // volver al dashboard (Jhon, 10/09: cambiar de sesión se hace solo
               // desde el Supervisor Hub). Moverse = "Entrar" a la otra: la actual
@@ -2299,8 +2342,8 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
             const boton = (
               <button
                 type="button"
-                title="Volver a mostrar el Supervisor Hub"
-                aria-label="Volver a mostrar el Supervisor Hub"
+                title={t("cowork.host.showHub")}
+                aria-label={t("cowork.host.showHub")}
                 onClick={() => setHubMinimized(false)}
                 className={cn(
                   "glass-panel group flex h-10 items-center gap-2 rounded-full pl-1.5 pr-3.5 text-foreground",
@@ -2360,7 +2403,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               <div
                 className={cn("flex flex-1 items-center gap-1.5 text-xs text-foreground font-medium select-none", !hubMaximized && !isMobile && "cursor-move touch-none")}
                 onPointerDown={(e) => { if (!hubMaximized && !isMobile) startWindowDrag(e, hubPanelRef, setHubPos, "cowork.hub.pos"); }}
-                title={hubMaximized || isMobile ? undefined : "Arrastra para mover la ventana"}
+                title={hubMaximized || isMobile ? undefined : t("cowork.host.dragToMove")}
               >
                 <Headphones className="h-3 w-3 text-warning" />
                 Supervisor Hub
@@ -2372,8 +2415,8 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                   className={`h-5 w-5 ${hubSilenciado ? "text-amber-500 hover:text-amber-400" : "text-muted-foreground hover:text-foreground"}`}
                   onClick={toggleHubSilencio}
                   title={hubSilenciado
-                    ? "Hub silenciado solo para ti (ellos siguen hablando). Toca para volver a escucharlo."
-                    : "Silenciar el Hub solo para ti: no los escuchas, pero ellos no se enteran y tu micro no cambia."}
+                    ? t("cowork.host.hub.mutedHint")
+                    : t("cowork.host.hub.muteHint")}
                 >
                   {hubSilenciado ? <VolumeX className="h-3 w-3" /> : <Volume2 className="h-3 w-3" />}
                 </Button>
@@ -2384,9 +2427,9 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                   onClick={popOutHub}
                   title={ventanaDelSistemaSoportada
                     ? (ventanaDelSistemaAbierta
-                        ? "Traer el Hub de vuelta a Maven"
-                        : "Ventana flotante: siempre al frente y movible a otro monitor")
-                    : (hubPinned ? "Fijado al frente (click para soltar)" : "Fijar al frente")}
+                        ? t("cowork.host.hub.bringBack")
+                        : t("cowork.host.hub.popOut"))
+                    : (hubPinned ? t("cowork.host.hub.pinned") : t("cowork.host.hub.pin"))}
                 >
                   {ventanaDelSistemaSoportada ? <PictureInPicture2 className="h-3 w-3" /> : (hubPinned ? <Pin className="h-3 w-3" /> : <PinOff className="h-3 w-3" />)}
                 </Button>
@@ -2395,7 +2438,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                   size="icon"
                   className="h-5 w-5 text-muted-foreground hover:text-foreground"
                   onClick={() => setHubMinimized(true)}
-                  title="Minimizar"
+                  title={t("cowork.host.minimize")}
                 >
                   <span className="text-xs leading-none">−</span>
                 </Button>
@@ -2404,7 +2447,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                   size="icon"
                   className="h-5 w-5 text-muted-foreground hover:text-foreground"
                   onClick={() => setHubMaximized(!hubMaximized)}
-                  title={hubMaximized ? "Restaurar" : "Maximizar"}
+                  title={hubMaximized ? t("cowork.host.restore") : t("cowork.host.maximize")}
                 >
                   {hubMaximized ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
                 </Button>
@@ -2413,7 +2456,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                   size="icon"
                   className="h-5 w-5 text-destructive hover:text-destructive/80"
                   onClick={colgarHub}
-                  title="Colgar llamada"
+                  title={t("cowork.host.hangUpCall")}
                 >
                   <PhoneOff className="h-3 w-3" />
                 </Button>
@@ -2426,7 +2469,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
             {!hubMaximized && (
               <div
                 onPointerDown={startHubResize}
-                title="Arrastra para cambiar el tamaño"
+                title={t("cowork.host.dragToResize")}
                 className="absolute bottom-0 right-0 h-4 w-4 cursor-nwse-resize touch-none z-10"
                 style={{ background: "linear-gradient(135deg, transparent 50%, hsl(var(--muted-foreground)/0.5) 50%)" }}
               />
@@ -2455,10 +2498,10 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 <SheetHeader className="text-left">
                   <SheetTitle className="flex items-center gap-2 font-display">
                     {room.name}
-                    <span className="text-xs font-normal text-muted-foreground">{participants.length} {participants.length === 1 ? "persona" : "personas"}</span>
+                    <span className="text-xs font-normal text-muted-foreground">{participants.length === 1 ? t("cowork.host.personOne") : t("cowork.host.personMany", { n: participants.length })}</span>
                   </SheetTitle>
                   <SheetDescription>
-                    {room.join_code ? <>Código de la sala <span className="font-mono tracking-[0.18em] text-foreground">{room.join_code}</span></> : "Sala sin código."}
+                    {room.join_code ? <>{t("cowork.host.roomCode")} <span className="font-mono tracking-[0.18em] text-foreground">{room.join_code}</span></> : t("cowork.host.roomNoCode")}
                   </SheetDescription>
                 </SheetHeader>
                 {personas.length > 0 && (
@@ -2468,7 +2511,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                         <UserAvatar name={p.nombre} src={cowork.avatares[p.uid]?.src} seed={cowork.avatares[p.uid]?.seed} size="sm" status={p.online ? "online" : "away"} />
                         <span className="min-w-0 flex-1">
                           <span className="block truncate">{p.nombre}</span>
-                          {p.motivo && <span className="block truncate text-xs text-muted-foreground">Reloj detenido: {p.motivo}</span>}
+                          {p.motivo && <span className="block truncate text-xs text-muted-foreground">{t("cowork.host.clockStopped", { reason: p.motivo })}</span>}
                         </span>
                         {p.reloj && (
                           <span className={cn("shrink-0 font-mono text-xs tabular-nums", p.corre ? "text-success" : "text-muted-foreground")}>
@@ -2494,17 +2537,17 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                   </div>
                 )}
                 <Button className="mt-3 h-11 w-full gap-2 rounded-xl" onClick={() => { setSalaEnHoja(null); enterRoom(room.id); }}>
-                  <DoorOpen className="h-4 w-4" /> Entrar a la sala
+                  <DoorOpen className="h-4 w-4" /> {t("cowork.host.enterRoom")}
                 </Button>
                 <div className="mt-2 grid grid-cols-3 gap-2">
                   <Button variant="outline" className="h-10 gap-1.5 rounded-xl text-xs" onClick={() => copiarEnlaceDeSala(room)}>
-                    <Link2 className="h-3.5 w-3.5" /> Enlace
+                    <Link2 className="h-3.5 w-3.5" /> {t("cowork.host.link")}
                   </Button>
                   <Button variant="outline" className="h-10 gap-1.5 rounded-xl text-xs" onClick={() => { setSalaEnHoja(null); openEdit(room); }}>
-                    <Pencil className="h-3.5 w-3.5" /> Editar
+                    <Pencil className="h-3.5 w-3.5" /> {t("common.edit")}
                   </Button>
                   <Button variant="outline" className="h-10 gap-1.5 rounded-xl text-xs text-destructive hover:text-destructive" onClick={() => { setSalaEnHoja(null); setCloseTarget(room); }}>
-                    <X className="h-3.5 w-3.5" /> Cerrar
+                    <X className="h-3.5 w-3.5" /> {t("common.close")}
                   </Button>
                 </div>
               </>
@@ -2549,25 +2592,23 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       {/* Añadir sala */}
       <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
         <DialogContent className="sm:max-w-sm">
-          <DialogHeader><DialogTitle>Nombre de la sesión</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t("cowork.create.sessionName")}</DialogTitle></DialogHeader>
           <div className="space-y-2 py-1">
-            <Label htmlFor="cowork-session-name">Cómo se llama esta sesión</Label>
+            <Label htmlFor="cowork-session-name">{t("cowork.host.renameLabel")}</Label>
             <Input
               id="cowork-session-name"
               value={sessionName}
               onChange={(e) => setSessionName(e.target.value.slice(0, 80))}
               onKeyDown={(e) => { if (e.key === "Enter" && sessionName.trim()) void doRenameSession(); }}
-              placeholder="Ej: Chatters mañana"
+              placeholder={t("cowork.host.renamePlaceholder")}
               autoFocus
             />
-            <p className="text-[11px] text-muted-foreground">
-              Lo ven todos los participantes de la sesión.
-            </p>
+            <p className="text-[11px] text-muted-foreground">{t("cowork.host.renameHelp")}</p>
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setRenameOpen(false)}>Cancelar</Button>
+            <Button variant="ghost" onClick={() => setRenameOpen(false)}>{t("common.cancel")}</Button>
             <Button onClick={() => void doRenameSession()} disabled={!sessionName.trim() || renaming}>
-              {renaming ? "Guardando..." : "Guardar"}
+              {renaming ? t("cowork.host.saving") : t("common.save")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2575,22 +2616,22 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="sm:max-w-sm">
-          <DialogHeader><DialogTitle>Añadir sala</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t("cowork.host.addRoom")}</DialogTitle></DialogHeader>
           <div className="space-y-2 py-1">
-            <Label htmlFor="cowork-add-room">Nombre de la sala</Label>
+            <Label htmlFor="cowork-add-room">{t("cowork.host.roomName")}</Label>
             <Input
               id="cowork-add-room"
               value={addName}
               onChange={(e) => setAddName(e.target.value)}
-              placeholder="Ej. Sala 3"
+              placeholder={t("cowork.host.roomNamePlaceholder")}
               autoFocus
               onKeyDown={(e) => { if (e.key === "Enter") handleAddRoom(); }}
             />
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setAddOpen(false)}>Cancelar</Button>
+            <Button variant="ghost" onClick={() => setAddOpen(false)}>{t("common.cancel")}</Button>
             <Button onClick={handleAddRoom} disabled={roomBusy || !addName.trim()} className="gap-1">
-              {roomBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Añadir
+              {roomBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} {t("common.add")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2599,24 +2640,24 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       {/* Editar sala (nombre + modo de preview) */}
       <Dialog open={!!editRoom} onOpenChange={(o) => { if (!o) setEditRoom(null); }}>
         <DialogContent className="sm:max-w-sm">
-          <DialogHeader><DialogTitle>Editar sala</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t("cowork.host.editRoom")}</DialogTitle></DialogHeader>
           <div className="space-y-4 py-1">
             <div className="space-y-2">
-              <Label htmlFor="cowork-edit-room">Nombre</Label>
+              <Label htmlFor="cowork-edit-room">{t("common.name")}</Label>
               <Input id="cowork-edit-room" value={editName} onChange={(e) => setEditName(e.target.value)} autoFocus />
             </div>
             <div className="flex items-center justify-between rounded-xl border border-border p-3 gap-3">
               <div>
-                <div className="text-sm font-medium text-foreground">Mostrar video en vivo</div>
-                <div className="text-xs text-muted-foreground">Si lo apagas, la miniatura muestra solo los participantes (sin video).</div>
+                <div className="text-sm font-medium text-foreground">{t("cowork.host.showLiveVideo")}</div>
+                <div className="text-xs text-muted-foreground">{t("cowork.host.showLiveVideoHint")}</div>
               </div>
               <Switch checked={editVideo} onCheckedChange={setEditVideo} />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setEditRoom(null)}>Cancelar</Button>
+            <Button variant="ghost" onClick={() => setEditRoom(null)}>{t("common.cancel")}</Button>
             <Button onClick={handleSaveEdit} disabled={roomBusy}>
-              {roomBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Guardar"}
+              {roomBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : t("common.save")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2626,10 +2667,8 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       <AlertDialog open={!!closeTarget} onOpenChange={(o) => { if (!o) setCloseTarget(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Cerrar la sala «{closeTarget?.name}»?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Se eliminará la sala y los participantes que estén dentro quedarán sin asignación. Esta acción no se puede deshacer.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{t("cowork.host.closeRoomTitle", { name: closeTarget?.name ?? "" })}</AlertDialogTitle>
+            <AlertDialogDescription>{t("cowork.host.closeRoomDesc")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={roomBusy} />
@@ -2637,7 +2676,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               onClick={(e) => { e.preventDefault(); handleCloseRoom(); }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {roomBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Cerrar sala"}
+              {roomBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : t("cowork.host.closeRoom")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

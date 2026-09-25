@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Users2, Loader2 } from "lucide-react";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface Props {
   sessionId: string;
@@ -9,6 +10,7 @@ interface Props {
 }
 
 export default function CoworkLobby({ sessionId, session, onJoin }: Props) {
+  const { t } = useLanguage();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -18,7 +20,7 @@ export default function CoworkLobby({ sessionId, session, onJoin }: Props) {
     try {
       await onJoin("participant");
     } catch (e: any) {
-      setError(e.message || "Error al unirse");
+      setError(e.message || t("cowork.lobby.joinError"));
     } finally {
       setLoading(false);
     }
@@ -34,7 +36,7 @@ export default function CoworkLobby({ sessionId, session, onJoin }: Props) {
             <Users2 className="h-7 w-7 md:h-8 md:w-8 text-primary" />
           </div>
           <h2 className="text-lg md:text-xl font-semibold text-foreground text-center">
-            {session?.name || "Sesión Cowork"}
+            {session?.name || t("cowork.lobby.defaultName")}
           </h2>
           {session?.description && (
             <p className="text-sm text-muted-foreground text-center">{session.description}</p>
@@ -54,7 +56,7 @@ export default function CoworkLobby({ sessionId, session, onJoin }: Props) {
             ) : (
               <Users2 className="h-4 w-4" />
             )}
-            Unirse como participante
+            {t("cowork.lobby.joinAsParticipant")}
           </Button>
 
           {error && (

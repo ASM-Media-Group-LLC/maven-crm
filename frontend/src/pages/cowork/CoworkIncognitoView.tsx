@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { VenetianMask, Volume2, VolumeX, Loader2, ArrowLeft } from "lucide-react";
 import CoworkRoomMonitor from "./CoworkRoomMonitor";
 import type { useCoworkSession, AdminSessionRow } from "@/hooks/useCoworkSession";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // MODO INCÓGNITO (solo admin): mirar y escuchar las salas de una sesión SIN
 // existir para nadie — sin membresía (no aparece en el tablero del host), como
@@ -19,6 +20,7 @@ interface Props {
 }
 
 export default function CoworkIncognitoView({ sessionId, cowork, onExit }: Props) {
+  const { t } = useLanguage();
   const [sesion, setSesion] = useState<AdminSessionRow | null>(null);
   const [cargando, setCargando] = useState(true);
   // Audio POR SALA, apagado por defecto: entrar y que exploten nueve salas de
@@ -71,9 +73,9 @@ export default function CoworkIncognitoView({ sessionId, cowork, onExit }: Props
   if (!sesion) {
     return (
       <div className="flex-1 min-h-0 flex flex-col items-center justify-center gap-3 p-6">
-        <p className="text-sm text-muted-foreground">No se pudo cargar la sesión (¿sigue activa? ¿eres admin?).</p>
+        <p className="text-sm text-muted-foreground">{t("cowork.incognito.loadError")}</p>
         <Button variant="secondary" className="rounded-full" onClick={onExit}>
-          <ArrowLeft className="h-4 w-4 mr-1" /> Volver
+          <ArrowLeft className="h-4 w-4 mr-1" /> {t("common.back")}
         </Button>
       </div>
     );
@@ -86,15 +88,15 @@ export default function CoworkIncognitoView({ sessionId, cowork, onExit }: Props
         <VenetianMask className="h-5 w-5 text-violet-500 shrink-0" />
         <div className="flex-1 min-w-0">
           <span className="font-semibold text-foreground">{sesion.name}</span>
-          <span className="text-xs text-muted-foreground"> · Modo incógnito — nadie te ve ni te escucha (solo otro admin sabe que estás acá)</span>
+          <span className="text-xs text-muted-foreground"> · {t("cowork.incognito.banner")}</span>
           {sesion.incognito.length > 0 && (
             <span className="block text-xs text-violet-500 truncate">
-              🕶 También de incógnito: {sesion.incognito.join(", ")}
+              🕶 {t("cowork.incognito.alsoHere", { names: sesion.incognito.join(", ") })}
             </span>
           )}
         </div>
         <Button variant="secondary" size="sm" className="rounded-full gap-1" onClick={onExit}>
-          <ArrowLeft className="h-4 w-4" /> Salir
+          <ArrowLeft className="h-4 w-4" /> {t("cowork.incognito.exit")}
         </Button>
       </div>
 
@@ -117,14 +119,14 @@ export default function CoworkIncognitoView({ sessionId, cowork, onExit }: Props
                     <span className={`font-medium text-sm truncate flex-1 ${room.id === "hub" ? "text-amber-500" : "text-foreground"}`}>{room.name}</span>
                     {room.online != null && (
                       <span className={`text-[11px] ${room.online > 0 ? "text-success font-medium" : "text-muted-foreground"}`}>
-                        {room.online} en línea
+                        {t("cowork.common.online", { n: room.online })}
                       </span>
                     )}
                     <Button
                       variant={oyendo ? "default" : "ghost"}
                       size="icon"
                       className="h-7 w-7 rounded-full"
-                      title={oyendo ? "Dejar de escuchar esta sala" : "Escuchar esta sala"}
+                      title={oyendo ? t("cowork.incognito.stopListening") : t("cowork.incognito.listen")}
                       onClick={() => setEscuchando((m) => ({ ...m, [room.id]: !m[room.id] }))}
                     >
                       {oyendo ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
