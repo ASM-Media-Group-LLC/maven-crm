@@ -15,6 +15,10 @@
 //   GET /public-api/cowork/breaks       cowork:read     (cada pausa: baño o break, con tope y exceso)
 //   GET /public-api/cowork/meets        cowork:read     (cada meet grupal: quién lo invocó, quién estuvo y cuánto)
 //   GET /public-api/me                  (sin scope)     (como quién actúa la llave, y su cupo)
+//   GET /public-api/messenger/conversations              messenger:read (la bandeja de la persona)
+//   GET /public-api/messenger/conversations/:id          messenger:read (una conversación y sus miembros)
+//   GET /public-api/messenger/conversations/:id/messages messenger:read (historia, con cursor)
+//   GET /public-api/messenger/feed                       messenger:read (lo nuevo en todas, con cursor)
 //
 // LÍMITE: 1.000 pedidos por hora por llave (api_keys.limite_por_hora), en ventana
 // fija que se reinicia a la hora en punto, y 60 por minuto (limite_por_minuto) para
@@ -269,6 +273,10 @@ Deno.serve(async (req) => {
       agency_id: tenantId,
       resources: [
         { path: "/me", scope: null },
+        { path: "/messenger/conversations", scope: "messenger:read" },
+        { path: "/messenger/conversations/{id}", scope: "messenger:read" },
+        { path: "/messenger/conversations/{id}/messages", scope: "messenger:read" },
+        { path: "/messenger/feed", scope: "messenger:read" },
         { path: "/creators", scope: "creators:read" },
         { path: "/creators/{id}", scope: "creators:read" },
         { path: "/contacts", scope: "contacts:read" },
@@ -319,6 +327,7 @@ Deno.serve(async (req) => {
           conWhitelist: ((keyRow.ip_whitelist as string[] | null) ?? []).length > 0,
           venceEl: (keyRow.expires_at as string | null) ?? null,
         },
+        baseDeArchivos: Deno.env.get("SUPABASE_URL") ?? "",
         cupo: { limite: consumo.limite, restantes: consumo.restantes, reinicio: consumo.reinicio },
       });
     } catch (e) {

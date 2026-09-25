@@ -9,6 +9,7 @@ import {
   type Handler,
   crearServidorComoUsuario,
   RECURSOS_COMO_USUARIO,
+  SCOPE_REQUERIDO,
   servirComoUsuario,
   servirMe,
 } from "./recursos-como-usuario.ts";
@@ -24,6 +25,7 @@ const CTX: Contexto = {
   ruta: [],
   consulta: {},
   llave: { conWhitelist: false, venceEl: null },
+  baseDeArchivos: "https://proyecto.supabase.co",
   cupo: { limite: 1000, restantes: 999, reinicio: "2026-09-24T23:00:00+00:00" },
 };
 
@@ -68,10 +70,16 @@ Deno.test("/me: la sesión es de la agencia de la llave → responde quién es",
 Deno.test("si la base ve OTRA agencia o a nadie, 503 para TODO handler y sin leer datos", async () => {
   // Otra agencia: la persona se mudó, o está en dos y la base elige la otra. Nadie
   // (null): auth.uid() no reconoció el `sub`. En los dos casos ningún handler corre.
+  // Con TODOS los scopes y una llave en regla: lo único que falla es la agencia.
+  const conTodo: Contexto = {
+    ...CTX,
+    scopes: Object.values(SCOPE_REQUERIDO).filter((s): s is string => !!s),
+    llave: { conWhitelist: true, venceEl: "2026-12-01T00:00:00Z" },
+  };
   for (const recurso of Object.keys(RECURSOS_COMO_USUARIO)) {
     for (const agencia of [OTRA_AGENCIA, null]) {
       const { cliente, lecturas } = clienteFalso(ok(agencia), PERFIL);
-      const r = await servirComoUsuario(recurso, cliente, CTX);
+      const r = await servirComoUsuario(recurso, cliente, conTodo);
       assert(!r.ok && r.estado === 503, `${recurso} con agencia=${agencia} respondió`);
       assertEquals(lecturas.perfil, 0, `${recurso} leyó datos con una sesión ajena`);
     }

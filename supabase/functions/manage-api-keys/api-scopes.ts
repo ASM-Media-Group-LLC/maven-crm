@@ -2,11 +2,24 @@
 // modal estilo Infloww. Extensible: agregar una entrada acá habilita el scope
 // tanto en el gestor (manage-api-keys) como en la validación (public-api).
 //
+// Vive en manage-api-keys/ y no en _shared/ (desde el 25/09): es su único
+// importador, y un cambio en _shared/ redespliega TODAS las edge functions.
+//
 // OJO: Maven es el CRM de la AGENCIA, no la fuente de datos de OnlyFans. Los
 // scopes exponen datos de Maven (creadoras, empleados, ventas), no data de fans.
 export type ScopeDef = { key: string; group: string; label: string; description: string };
 
-export const SCOPE_GROUPS = ["Creadoras", "Contactos", "Empleados", "Ventas", "Promolog"] as const;
+export const SCOPE_GROUPS = ["Creadoras", "Contactos", "Empleados", "Ventas", "Promolog", "Messenger"] as const;
+
+/** Scopes que leen conversaciones privadas: exigen IPs fijas y vencimiento de
+ *  90 días como máximo, y solo van en llaves NUEVAS (decisión de Jhon, 25/09). La
+ *  base lo vuelve a exigir (api_keys_reglas_messenger). */
+export const SCOPES_MESSENGER = ["messenger:read"] as const;
+export const MESSENGER_MAX_DIAS = 90;
+
+export function esScopeMessenger(s: string): boolean {
+  return (SCOPES_MESSENGER as readonly string[]).includes(s);
+}
 
 export const SCOPE_CATALOG: ScopeDef[] = [
   {
@@ -64,6 +77,13 @@ export const SCOPE_CATALOG: ScopeDef[] = [
     label: "Ventas por chatter (diario)",
     description:
       "Ventas diarias por chatter: total vendido, mensajes vendidos y fans chateados.",
+  },
+  {
+    key: "messenger:read",
+    group: "Messenger",
+    label: "⚠️ Leer el Messenger de quien crea la key",
+    description:
+      "Lee TODAS las conversaciones del Messenger de la persona que crea la key — directas y grupos, también las futuras — exactamente como las ve ella en /messenger, con los mensajes que le mandan otras personas. No marca nada como leído. Exige IPs fijas y vencimiento de 90 días como máximo, y solo se puede poner al crear una key nueva.",
   },
   {
     key: "promolog:read",
