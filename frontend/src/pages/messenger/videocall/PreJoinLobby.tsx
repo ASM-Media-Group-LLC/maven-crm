@@ -15,7 +15,13 @@ import {
   type BackgroundEffect, type ImagenDeFondo,
 } from "@/lib/fondoDeLlamada";
 import QuienesEstan from "./QuienesEstan";
+import { nombreDelFondo } from "./nombreDelFondo";
 import type { PersonaEnSala } from "@/hooks/useQuienesEstanEnLaSala";
+import { useLanguage } from "@/hooks/useLanguage";
+// traducir() en la enumeración de dispositivos: arma una etiqueta de respaldo
+// que se guarda en el estado una vez, y el hook ahí obligaría a reiniciar las
+// pistas de cámara y micro cada vez que cambia el idioma.
+import { traducir, type TranslationKey } from "@/lib/i18n";
 
 
 interface PreJoinLobbyProps {
@@ -55,6 +61,7 @@ async function withTimeout<T>(task: Promise<T>, timeoutMs: number, label: string
 }
 
 export default function PreJoinLobby({ roomName, displayName, callDisplayName, onJoin, quienesEstan }: PreJoinLobbyProps) {
+  const { t } = useLanguage();
   const videoRef = useRef<HTMLVideoElement>(null);
   const videoTrackRef = useRef<LocalVideoTrack | null>(null);
   const attachedVideoElRef = useRef<HTMLVideoElement | null>(null);
@@ -93,15 +100,15 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
   const [selectedAudioOutput, setSelectedAudioOutput] = useState<string>("");
 
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
-  const [permissionError, setPermissionError] = useState<string | null>(null);
+  const [permissionError, setPermissionError] = useState<TranslationKey | null>(null);
 
   // ── Enumerate devices ───────────────────────────────────────
   const enumerateDevices = useCallback(async () => {
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
-      const ai = devices.filter((d) => d.kind === "audioinput" && d.deviceId).map((d) => ({ deviceId: d.deviceId, label: d.label || `Micrófono ${d.deviceId.slice(0, 5)}` }));
-      const vi = devices.filter((d) => d.kind === "videoinput" && d.deviceId).map((d) => ({ deviceId: d.deviceId, label: d.label || `Cámara ${d.deviceId.slice(0, 5)}` }));
-      const ao = devices.filter((d) => d.kind === "audiooutput" && d.deviceId).map((d) => ({ deviceId: d.deviceId, label: d.label || `Altavoz ${d.deviceId.slice(0, 5)}` }));
+      const ai = devices.filter((d) => d.kind === "audioinput" && d.deviceId).map((d) => ({ deviceId: d.deviceId, label: d.label || traducir("messenger.call.microfonoN", { id: d.deviceId.slice(0, 5) }) }));
+      const vi = devices.filter((d) => d.kind === "videoinput" && d.deviceId).map((d) => ({ deviceId: d.deviceId, label: d.label || traducir("messenger.call.camaraN", { id: d.deviceId.slice(0, 5) }) }));
+      const ao = devices.filter((d) => d.kind === "audiooutput" && d.deviceId).map((d) => ({ deviceId: d.deviceId, label: d.label || traducir("messenger.call.altavozN", { id: d.deviceId.slice(0, 5) }) }));
       setAudioInputs(ai);
       setVideoInputs(vi);
       setAudioOutputs(ao);
@@ -208,7 +215,7 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
           if ("falta" in imagen && imagen.falta) {
             guardarFondo("none");
             setBgEffectEstado("none");
-            toast.error("Tu fondo ya no está disponible", { description: "Elegí otro cuando quieras.", id: "fondo-perdido" });
+            toast.error(traducir("messenger.lobby.fondoNoDisponible"), { description: traducir("messenger.lobby.eligeOtro"), id: "fondo-perdido" });
           }
           return false;
         }
@@ -314,9 +321,9 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
       await enumerateDevices();
     } catch (err: any) {
       if (err.name === "NotAllowedError") {
-        setPermissionError("Permiso de cámara denegado. Habilítalo en la configuración del navegador.");
+        setPermissionError("messenger.lobby.permisoCamaraDenegado");
       } else {
-        setPermissionError("No se pudo acceder a la cámara.");
+        setPermissionError("messenger.lobby.noSePudoCamara");
       }
     } finally {
       if (mountedRef.current) {
@@ -336,7 +343,7 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
       setPermissionError(null);
       await enumerateDevices();
     } catch (err: any) {
-      if (err.name === "NotAllowedError") { setPermissionError("Permiso de micrófono denegado. Habilítalo en la configuración del navegador."); }
+      if (err.name === "NotAllowedError") { setPermissionError("messenger.lobby.permisoMicrofonoDenegado"); }
     }
   }, [micOn, selectedAudioInput, stopAudioTrack, enumerateDevices]);
 
@@ -405,11 +412,14 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
     label.length > max ? label.slice(0, max) + "…" : label;
 
   const selectedBackgroundLabel =
-    bgEffect === "none" ? "Sin fondo virtual"
-    : bgEffect === "blur" ? "Difuminar fondo"
-    : bgEffect === "blur-strong" ? "Difuminar más el fondo"
-    : isCustomBackground(bgEffect) ? "Tu fondo"
-    : BACKGROUND_TEMPLATES.find((tpl) => tpl.id === bgEffect)?.label || "Fondo virtual";
+    bgEffect === "none" ? t("messenger.bg.sinFondo")
+    : bgEffect === "blur" ? t("messenger.call.difuminarFondo")
+    : bgEffect === "blur-strong" ? t("messenger.bg.difuminarMas")
+    : isCustomBackground(bgEffect) ? t("messenger.bg.tuFondo")
+    : (() => {
+        const tpl = BACKGROUND_TEMPLATES.find((x) => x.id === bgEffect);
+        return tpl ? nombreDelFondo(tpl, t) : t("messenger.bg.fondoVirtual");
+      })();
 
   const selectedBackgroundTemplate = BACKGROUND_TEMPLATES.find((tpl) => tpl.id === bgEffect) || null;
   const showBackgroundWarmupOverlay = camOn && isPreparingBackgroundFirstFrame && bgEffect !== "none";
@@ -423,7 +433,7 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
           <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-card">
             {/* Background template preview fallback */}
             {selectedBackgroundTemplate && (backgroundPreviewUnsupported || showBackgroundWarmupOverlay) && (
-              <img src={selectedBackgroundTemplate.src} alt={`Vista previa del fondo ${selectedBackgroundTemplate.label}`} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
+              <img src={selectedBackgroundTemplate.src} alt={t("messenger.lobby.vistaPreviaFondo", { fondo: nombreDelFondo(selectedBackgroundTemplate, t) })} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
             )}
 
             {showBackgroundWarmupOverlay && !selectedBackgroundTemplate && (
@@ -456,7 +466,7 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
               <div className="absolute inset-0 z-20 flex items-center justify-center bg-[hsl(220_3%_14%/0.45)] backdrop-blur-[2px]">
                 <div className="inline-flex items-center gap-2 rounded-full bg-[hsl(220_3%_14%/0.8)] px-3 py-1.5 text-xs text-foreground border border-border">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  Aplicando fondo…
+                  {t("messenger.lobby.aplicandoFondo")}
                 </div>
               </div>
             )}
@@ -476,7 +486,7 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
                     ? "bg-muted hover:bg-muted text-white"
                     : "bg-destructive hover:bg-destructive/90 text-white"
                 )}
-                title={micOn ? "Desactivar micrófono" : "Activar micrófono"}
+                title={micOn ? t("messenger.lobby.desactivarMicrofono") : t("messenger.lobby.activarMicrofono")}
               >
                 {micOn ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
               </button>
@@ -488,7 +498,7 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
                     ? "bg-muted hover:bg-muted text-white"
                     : "bg-destructive hover:bg-destructive/90 text-white"
                 )}
-                title={camOn ? "Desactivar cámara" : "Activar cámara"}
+                title={camOn ? t("messenger.lobby.desactivarCamara") : t("messenger.lobby.activarCamara")}
               >
                 {camOn ? <VideoIcon className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
               </button>
@@ -496,7 +506,7 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
 
             {permissionError && (
               <div className="absolute inset-0 flex items-center justify-center bg-[hsl(220_3%_14%/0.95)] z-20 px-6">
-                <p className="text-sm text-destructive text-center">{permissionError}</p>
+                <p className="text-sm text-destructive text-center">{t(permissionError)}</p>
               </div>
             )}
           </div>
@@ -505,7 +515,7 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
           <div className="flex flex-wrap items-center justify-center gap-2">
             <DeviceDropdown
               icon={<Mic className="h-3.5 w-3.5 shrink-0" />}
-              label={truncateLabel(audioInputs.find((d) => d.deviceId === selectedAudioInput)?.label || "Micrófono")}
+              label={truncateLabel(audioInputs.find((d) => d.deviceId === selectedAudioInput)?.label || t("messenger.call.microfono"))}
               devices={audioInputs}
               selectedId={selectedAudioInput}
               onSelect={(id) => setSelectedAudioInput(id)}
@@ -514,7 +524,7 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
             />
             <DeviceDropdown
               icon={<Volume2 className="h-3.5 w-3.5 shrink-0" />}
-              label={truncateLabel(audioOutputs.find((d) => d.deviceId === selectedAudioOutput)?.label || "Altavoces")}
+              label={truncateLabel(audioOutputs.find((d) => d.deviceId === selectedAudioOutput)?.label || t("messenger.lobby.altavoces"))}
               devices={audioOutputs}
               selectedId={selectedAudioOutput}
               onSelect={(id) => setSelectedAudioOutput(id)}
@@ -523,7 +533,7 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
             />
             <DeviceDropdown
               icon={<Monitor className="h-3.5 w-3.5 shrink-0" />}
-              label={truncateLabel(videoInputs.find((d) => d.deviceId === selectedVideoInput)?.label || "Cámara")}
+              label={truncateLabel(videoInputs.find((d) => d.deviceId === selectedVideoInput)?.label || t("messenger.input.camara"))}
               devices={videoInputs}
               selectedId={selectedVideoInput}
               onSelect={(id) => setSelectedVideoInput(id)}
@@ -535,12 +545,12 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
 
           {bgEffect !== "none" && (
             <p className="text-xs text-muted-foreground text-center">
-              Fondo: <span className="text-foreground">{selectedBackgroundLabel}</span>
+              {t("messenger.lobby.fondo")} <span className="text-foreground">{selectedBackgroundLabel}</span>
             </p>
           )}
           {backgroundPreviewUnsupported && bgEffect !== "none" && (
             <p className="text-[11px] text-muted-foreground text-center max-w-md">
-              Tu navegador no soporta vista previa en tiempo real del fondo, pero se aplicará al entrar en la llamada.
+              {t("messenger.lobby.sinVistaPrevia")}
             </p>
           )}
         </div>
@@ -548,7 +558,7 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
         {/* ── Right: Join panel ── */}
         <div className="flex flex-col items-center gap-5 text-center min-w-[260px] max-w-[320px]">
           <h1 className="text-xl md:text-2xl font-normal text-white">
-            ¿Listo para unirte?
+            {t("messenger.lobby.listo")}
           </h1>
           {callDisplayName && (
             <p className="text-sm text-muted-foreground">{callDisplayName}</p>
@@ -569,14 +579,14 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
             )}
           >
             {joining ? (
-              <><Loader2 className="h-4 w-4 animate-spin" />Conectando...</>
+              <><Loader2 className="h-4 w-4 animate-spin" />{t("messenger.lobby.conectando")}</>
             ) : (
-              "Unirse ahora"
+              t("messenger.lobby.unirseAhora")
             )}
           </button>
 
           <p className="text-xs text-muted-foreground">
-            Tu micrófono y cámara se pueden cambiar durante la llamada
+            {t("messenger.lobby.sePuedenCambiar")}
           </p>
         </div>
       </div>

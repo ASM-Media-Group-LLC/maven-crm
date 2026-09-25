@@ -2,6 +2,7 @@ import { useState, useEffect, type ReactNode } from "react";
 import { Link2, LayoutGrid, Shield, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface CallTopBarProps {
   roomName: string;
@@ -23,6 +24,7 @@ interface CallTopBarProps {
 export default function CallTopBar({
   roomName, participantCount, isEncrypted, onOpenAdjustView, shareLink, hideShareLink, compact, tactil, extra,
 }: CallTopBarProps) {
+  const { t } = useLanguage();
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
@@ -38,7 +40,7 @@ export default function CallTopBar({
 
   const copyLink = () => {
     navigator.clipboard.writeText(shareLink);
-    toast.success("Enlace copiado");
+    toast.success(t("messenger.topbar.enlaceCopiado"));
   };
 
   return (
@@ -70,25 +72,26 @@ export default function CallTopBar({
 
       <div className="flex items-center gap-1">
         <span className={cn("text-muted-foreground mr-1", compact ? "text-[10px]" : "text-xs mr-2")}>
-          {participantCount} participante{participantCount !== 1 ? "s" : ""}
+          {participantCount === 1 ? t("messenger.topbar.unParticipante") : t("messenger.metrics.nParticipantes", { n: participantCount })}
         </span>
         {!hideShareLink && !compact && (
           <button
             onClick={copyLink}
+            title={t("messenger.topbar.copiarEnlace")}
             className="flex items-center gap-1.5 h-8 px-3 rounded-full text-xs text-foreground hover:bg-card transition-colors"
           >
             <Link2 className="h-3.5 w-3.5" />
-            <span className="hidden md:inline">Copiar enlace</span>
+            <span className="hidden md:inline">{t("messenger.topbar.copiarEnlace")}</span>
           </button>
         )}
         {!compact && (
           <button
             onClick={onOpenAdjustView}
-            title="Ajustar vista"
+            title={t("messenger.call.ajustarVista")}
             className="flex items-center gap-1.5 h-8 px-3 rounded-full text-xs text-foreground hover:bg-card transition-colors"
           >
             <LayoutGrid className="h-3.5 w-3.5" />
-            <span className="hidden md:inline">Ajustar vista</span>
+            <span className="hidden md:inline">{t("messenger.call.ajustarVista")}</span>
           </button>
         )}
       </div>

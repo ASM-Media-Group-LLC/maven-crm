@@ -1,5 +1,6 @@
 import { Phone, PhoneOff, Video } from "lucide-react";
 import type { Call } from "@/hooks/useVideoCall";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface Props {
   call: Call;
@@ -8,6 +9,7 @@ interface Props {
 }
 
 export default function IncomingCallModal({ call, onAccept, onDecline }: Props) {
+  const { t } = useLanguage();
   const isAudio = call.call_type === "audio";
   const isGroup = call.is_group === true;
   const isOngoing = call.call_status === "accepted";
@@ -27,9 +29,17 @@ export default function IncomingCallModal({ call, onAccept, onDecline }: Props) 
 
         <div className="text-center space-y-1">
           <p className="text-xs text-muted-foreground">
-            {isOngoing ? "En curso" : "Entrante"} · {isGroup ? "grupo " : ""}{isAudio ? "audio" : "video"}
+            {t(
+              isOngoing
+                ? (isGroup
+                    ? (isAudio ? "messenger.incoming.enCursoGrupoAudio" : "messenger.incoming.enCursoGrupoVideo")
+                    : (isAudio ? "messenger.incoming.enCursoAudio" : "messenger.incoming.enCursoVideo"))
+                : (isGroup
+                    ? (isAudio ? "messenger.incoming.entranteGrupoAudio" : "messenger.incoming.entranteGrupoVideo")
+                    : (isAudio ? "messenger.incoming.entranteAudio" : "messenger.incoming.entranteVideo")),
+            )}
           </p>
-          <p className="text-xl font-semibold text-foreground">{call.caller_name ?? "Desconocido"}</p>
+          <p className="text-xl font-semibold text-foreground">{call.caller_name ?? t("messenger.incoming.desconocido")}</p>
         </div>
 
         <div className="flex gap-6">
@@ -41,7 +51,7 @@ export default function IncomingCallModal({ call, onAccept, onDecline }: Props) 
             <div className="h-14 w-14 rounded-full bg-destructive flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
               <PhoneOff className="h-6 w-6 text-destructive-foreground" />
             </div>
-            <span className="text-xs text-muted-foreground">Rechazar</span>
+            <span className="text-xs text-muted-foreground">{t("messenger.incoming.rechazar")}</span>
           </button>
 
           {/* Accept */}
@@ -52,7 +62,7 @@ export default function IncomingCallModal({ call, onAccept, onDecline }: Props) 
             <div className="h-14 w-14 rounded-full bg-success flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
               <Phone className="h-6 w-6 text-success-foreground" />
             </div>
-            <span className="text-xs text-muted-foreground">{isOngoing ? "Unirse" : "Aceptar"}</span>
+            <span className="text-xs text-muted-foreground">{isOngoing ? t("messenger.incoming.unirse") : t("messenger.incoming.aceptar")}</span>
           </button>
         </div>
       </div>

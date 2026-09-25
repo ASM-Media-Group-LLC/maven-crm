@@ -1,4 +1,7 @@
 import { supabase, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
+// traducir() y no el hook: esto no es un componente, y estos textos se arman una
+// vez (el estado de la subida, el error que termina en un toast).
+import { traducir } from "@/lib/i18n";
 
 export const MAX_FILES = 20;
 // 1 GB por archivo (pedido de Jhon 03/09/2026; antes 350 MB). Tiene que ir
@@ -81,10 +84,10 @@ export async function uploadFileWithTUS(
       } catch {}
       if (createRes.status === 413 || detail.toLowerCase().includes("maximum allowed size") || detail.toLowerCase().includes("payload too large")) {
         return {
-          error: "El archivo excede el límite de Storage del proyecto. Ve a Supabase Dashboard > Storage > Settings y aumenta el 'Global file size limit'.",
+          error: traducir("messenger.upload.excedeLimite"),
         };
       }
-      return { error: `Error al iniciar subida: ${detail}` };
+      return { error: traducir("messenger.upload.errorAlIniciar", { detalle: detail }) };
     }
 
     const location = createRes.headers.get("Location");
@@ -106,7 +109,7 @@ export async function uploadFileWithTUS(
 
       for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         if (attempt > 1) {
-          callbacks.onStatusText(`Reintentando chunk ${chunkIndex}/${totalChunks} (intento ${attempt})...`);
+          callbacks.onStatusText(traducir("messenger.upload.reintentando", { n: chunkIndex, total: totalChunks, intento: attempt }));
           await new Promise(r => setTimeout(r, 1000 * attempt));
         }
 
@@ -139,7 +142,7 @@ export async function uploadFileWithTUS(
 
           xhr.onerror = () => {
             callbacks.abortRef.current = null;
-            resolve({ error: "Error de red — verifica tu conexión", nextOffset: currentOffset });
+            resolve({ error: traducir("messenger.upload.errorDeRed"), nextOffset: currentOffset });
           };
 
           xhr.onabort = () => {
@@ -150,7 +153,7 @@ export async function uploadFileWithTUS(
           xhr.timeout = 120000;
           xhr.ontimeout = () => {
             callbacks.abortRef.current = null;
-            resolve({ error: "Timeout — conexión lenta", nextOffset: currentOffset });
+            resolve({ error: traducir("messenger.upload.timeout"), nextOffset: currentOffset });
           };
 
           xhr.open("PATCH", uploadUrl);
@@ -175,13 +178,13 @@ export async function uploadFileWithTUS(
       }
 
       if (!succeeded) {
-        return { error: `Error en chunk ${chunkIndex}/${totalChunks}: ${lastError}` };
+        return { error: traducir("messenger.upload.errorEnChunk", { n: chunkIndex, total: totalChunks, error: lastError ?? "" }) };
       }
     }
 
     callbacks.onProgress(100);
     return { error: null };
   } catch (err: any) {
-    return { error: err.message || "Error inesperado en la subida" };
+    return { error: err.message || traducir("messenger.upload.errorInesperado") };
   }
 }

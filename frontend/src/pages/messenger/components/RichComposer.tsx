@@ -16,6 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils";
 import { RichNode } from "../types";
 import { richTieneFormato } from "./RichText";
+import { useLanguage } from "@/hooks/useLanguage";
 
 export interface RichComposerHandle {
   focus: () => void;
@@ -46,6 +47,7 @@ const COLORES = ["#ef4444", "#f97316", "#eab308", "#22c55e", "#3b82f6", "#a855f7
 const RichComposer = forwardRef<RichComposerHandle, Props>(({
   initialContent, placeholder, showToolbar, disabled, onUpdate, onEnter, onPasteFiles,
 }, ref) => {
+  const { t } = useLanguage();
   const [linkOpen, setLinkOpen] = useState(false);
   const [colorOpen, setColorOpen] = useState(false);
   // Posición del cursor ANTES de abrir el panel del enlace: ahí el foco se va sí
@@ -74,7 +76,7 @@ const RichComposer = forwardRef<RichComposerHandle, Props>(({
       TextStyle,
       Color,
       Link.configure({ openOnClick: false, autolink: true }),
-      Placeholder.configure({ placeholder: placeholder || "Escribe un mensaje..." }),
+      Placeholder.configure({ placeholder: placeholder || t("messenger.input.placeholder") }),
     ],
     content: initialContent || "",
     editorProps: {
@@ -230,16 +232,16 @@ const RichComposer = forwardRef<RichComposerHandle, Props>(({
     <div>
       {showToolbar && editor && (
         <div className="flex flex-wrap items-center gap-0.5 px-1 pb-1.5 mb-1.5 border-b border-border/60">
-          <Button type="button" onMouseDown={sinRobarFoco} variant="ghost" size="icon" className={btn(editor.isActive("bold"))} title="Negrita"
+          <Button type="button" onMouseDown={sinRobarFoco} variant="ghost" size="icon" className={btn(editor.isActive("bold"))} title={t("messenger.rich.negrita")}
             onClick={() => editor.chain().focus().toggleBold().run()}><Bold className="h-3.5 w-3.5" /></Button>
-          <Button type="button" onMouseDown={sinRobarFoco} variant="ghost" size="icon" className={btn(editor.isActive("italic"))} title="Cursiva"
+          <Button type="button" onMouseDown={sinRobarFoco} variant="ghost" size="icon" className={btn(editor.isActive("italic"))} title={t("messenger.rich.cursiva")}
             onClick={() => editor.chain().focus().toggleItalic().run()}><Italic className="h-3.5 w-3.5" /></Button>
-          <Button type="button" onMouseDown={sinRobarFoco} variant="ghost" size="icon" className={btn(editor.isActive("underline"))} title="Subrayado"
+          <Button type="button" onMouseDown={sinRobarFoco} variant="ghost" size="icon" className={btn(editor.isActive("underline"))} title={t("messenger.rich.subrayado")}
             onClick={() => editor.chain().focus().toggleUnderline().run()}><UnderlineIcon className="h-3.5 w-3.5" /></Button>
 
           <Popover open={colorOpen} onOpenChange={setColorOpen}>
             <PopoverTrigger asChild>
-              <Button type="button" onMouseDown={sinRobarFoco} variant="ghost" size="icon" className={btn(editor.isActive("textStyle"))} title="Color de texto">
+              <Button type="button" onMouseDown={sinRobarFoco} variant="ghost" size="icon" className={btn(editor.isActive("textStyle"))} title={t("messenger.rich.colorDeTexto")}>
                 <Baseline className="h-3.5 w-3.5" />
               </Button>
             </PopoverTrigger>
@@ -260,25 +262,25 @@ const RichComposer = forwardRef<RichComposerHandle, Props>(({
               </div>
               <button type="button" className="mt-2 w-full text-[11px] text-muted-foreground hover:text-foreground"
                 onMouseDown={sinRobarFoco}
-                onClick={() => { editor.chain().focus().unsetColor().run(); setColorOpen(false); }}>Quitar color</button>
+                onClick={() => { editor.chain().focus().unsetColor().run(); setColorOpen(false); }}>{t("messenger.rich.quitarColor")}</button>
             </PopoverContent>
           </Popover>
 
-          <Button type="button" onMouseDown={sinRobarFoco} variant="ghost" size="icon" className={btn(editor.isActive("strike"))} title="Tachado"
+          <Button type="button" onMouseDown={sinRobarFoco} variant="ghost" size="icon" className={btn(editor.isActive("strike"))} title={t("messenger.rich.tachado")}
             onClick={() => editor.chain().focus().toggleStrike().run()}><Strikethrough className="h-3.5 w-3.5" /></Button>
 
           <span className="mx-1 h-4 w-px bg-border" />
 
-          <Button type="button" onMouseDown={sinRobarFoco} variant="ghost" size="icon" className={btn(editor.isActive("bulletList"))} title="Lista con viñetas"
+          <Button type="button" onMouseDown={sinRobarFoco} variant="ghost" size="icon" className={btn(editor.isActive("bulletList"))} title={t("messenger.rich.listaVinetas")}
             onClick={() => editor.chain().focus().toggleBulletList().run()}><List className="h-3.5 w-3.5" /></Button>
-          <Button type="button" onMouseDown={sinRobarFoco} variant="ghost" size="icon" className={btn(editor.isActive("orderedList"))} title="Lista numerada"
+          <Button type="button" onMouseDown={sinRobarFoco} variant="ghost" size="icon" className={btn(editor.isActive("orderedList"))} title={t("messenger.rich.listaNumerada")}
             onClick={() => editor.chain().focus().toggleOrderedList().run()}><ListOrdered className="h-3.5 w-3.5" /></Button>
-          <Button type="button" onMouseDown={sinRobarFoco} variant="ghost" size="icon" className={btn(editor.isActive("blockquote"))} title="Cita"
+          <Button type="button" onMouseDown={sinRobarFoco} variant="ghost" size="icon" className={btn(editor.isActive("blockquote"))} title={t("messenger.rich.cita")}
             onClick={() => editor.chain().focus().toggleBlockquote().run()}><Quote className="h-3.5 w-3.5" /></Button>
 
           <Popover open={linkOpen} onOpenChange={(o) => { setLinkOpen(o); if (o) setLinkValue(editor.getAttributes("link").href || ""); }}>
             <PopoverTrigger asChild>
-              <Button type="button" onMouseDown={(e) => { sinRobarFoco(e); guardarSeleccion(); }} variant="ghost" size="icon" className={btn(editor.isActive("link"))} title="Enlace">
+              <Button type="button" onMouseDown={(e) => { sinRobarFoco(e); guardarSeleccion(); }} variant="ghost" size="icon" className={btn(editor.isActive("link"))} title={t("messenger.rich.enlace")}>
                 <Link2 className="h-3.5 w-3.5" />
               </Button>
             </PopoverTrigger>
@@ -288,19 +290,19 @@ const RichComposer = forwardRef<RichComposerHandle, Props>(({
                 onChange={(e) => setLinkValue(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); aplicarLink(); } }} />
               <div className="flex justify-end gap-1.5 mt-2">
-                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setLinkValue(""); aplicarLink(); }}>Quitar</Button>
-                <Button size="sm" className="h-7 text-xs" onClick={aplicarLink}>Aplicar</Button>
+                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setLinkValue(""); aplicarLink(); }}>{t("messenger.thread.quitar")}</Button>
+                <Button size="sm" className="h-7 text-xs" onClick={aplicarLink}>{t("messenger.rich.aplicar")}</Button>
               </div>
             </PopoverContent>
           </Popover>
 
           <span className="mx-1 h-4 w-px bg-border" />
 
-          <Button type="button" onMouseDown={sinRobarFoco} variant="ghost" size="icon" className={btn(editor.isActive("code"))} title="Código"
+          <Button type="button" onMouseDown={sinRobarFoco} variant="ghost" size="icon" className={btn(editor.isActive("code"))} title={t("common.code")}
             onClick={() => editor.chain().focus().toggleCode().run()}><Code className="h-3.5 w-3.5" /></Button>
-          <Button type="button" onMouseDown={sinRobarFoco} variant="ghost" size="icon" className={btn(editor.isActive("codeBlock"))} title="Bloque de código"
+          <Button type="button" onMouseDown={sinRobarFoco} variant="ghost" size="icon" className={btn(editor.isActive("codeBlock"))} title={t("messenger.rich.bloqueDeCodigo")}
             onClick={() => editor.chain().focus().toggleCodeBlock().run()}><SquareCode className="h-3.5 w-3.5" /></Button>
-          <Button type="button" onMouseDown={sinRobarFoco} variant="ghost" size="icon" className={btn(false)} title="Limpiar formato"
+          <Button type="button" onMouseDown={sinRobarFoco} variant="ghost" size="icon" className={btn(false)} title={t("messenger.rich.limpiarFormato")}
             onClick={() => editor.chain().focus().clearNodes().unsetAllMarks().run()}><RemoveFormatting className="h-3.5 w-3.5" /></Button>
         </div>
       )}

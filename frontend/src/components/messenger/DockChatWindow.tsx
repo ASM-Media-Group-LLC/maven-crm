@@ -16,6 +16,7 @@ import MessageInput from "@/pages/messenger/components/MessageInput";
 import type { ChatMessage, ConversationWithDetails } from "@/pages/messenger/types";
 import { puedeVerLaListaDeMiembros } from "@/pages/messenger/utils";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/hooks/useLanguage";
 
 export const VENTANA_ANCHO = 336;
 export const VENTANA_ALTO = 460;
@@ -41,6 +42,7 @@ export default function DockChatWindow({
 }) {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { t } = useLanguage();
   const { profiles, markConversationRead } = useChatShared();
   const { isOnline, getStatus, getStatusText, getStatusColorPersonal } = useOnlinePresence();
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
@@ -76,10 +78,12 @@ export default function DockChatWindow({
   // aparecer el aviso no salte el alto de la cabecera cada vez que alguien
   // teclea. En 460px de ventana ese brinco se nota.
   const nombresEscribiendo = typingUsers
-    .map((id) => profiles[id]?.full_name?.split(" ")[0] || "Alguien")
+    .map((id) => profiles[id]?.full_name?.split(" ")[0] || t("messenger.header.alguien"))
     .join(", ");
   const escribiendo = nombresEscribiendo
-    ? `${nombresEscribiendo} ${typingUsers.length > 1 ? "están escribiendo..." : "está escribiendo..."}`
+    ? (typingUsers.length > 1
+        ? t("messenger.header.estanEscribiendo", { nombres: nombresEscribiendo })
+        : t("messenger.header.estaEscribiendo", { nombres: nombresEscribiendo }))
     : null;
   const otro = useMemo(
     () => (isGroup ? undefined : conversation.participants.find((p) => p.user_id !== user?.id)),
@@ -90,9 +94,9 @@ export default function DockChatWindow({
   // estado de la otra persona (su texto propio si lo puso, si no la etiqueta).
   const idOtro = otro?.user_id;
   const subtituloPresencia = isGroup
-    ? `${conversation.participants.length} miembros`
+    ? t("messenger.header.miembros", { n: conversation.participants.length })
     : idOtro
-      ? (getStatusText(idOtro) || getStatusLabel(getStatus(idOtro), isOnline(idOtro)))
+      ? (getStatusText(idOtro) || getStatusLabel(getStatus(idOtro), isOnline(idOtro), t))
       : "";
 
   return (
@@ -100,7 +104,7 @@ export default function DockChatWindow({
       className="glass-panel pointer-events-auto flex flex-col overflow-hidden rounded-t-2xl"
       style={llenar ? { width: "100%", height: "100%" } : { width: VENTANA_ANCHO, height: VENTANA_ALTO }}
       role="dialog"
-      aria-label={`Chat con ${conversation.displayName}`}
+      aria-label={t("messenger.dock.chatCon", { name: conversation.displayName })}
     >
       <div className="flex shrink-0 items-center gap-2 border-b border-border/40 bg-gradient-to-b from-primary/10 to-transparent px-2.5 py-2">
         <div className="relative shrink-0">
@@ -149,15 +153,15 @@ export default function DockChatWindow({
         </div>
         <Button
           variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground"
-          title="Abrir en Messenger"
+          title={t("messenger.dock.abrirEnMessenger")} aria-label={t("messenger.dock.abrirEnMessenger")}
           onClick={() => { onClose(); navigate(`/messenger?c=${conversation.id}`); }}
         >
           <Maximize2 className="h-3.5 w-3.5" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" title="Minimizar" onClick={onMinimize}>
+        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" title={t("messenger.dock.minimizar")} aria-label={t("messenger.dock.minimizar")} onClick={onMinimize}>
           <Minus className="h-4 w-4" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" title="Cerrar" onClick={onClose}>
+        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" title={t("common.close")} aria-label={t("common.close")} onClick={onClose}>
           <X className="h-4 w-4" />
         </Button>
       </div>

@@ -22,6 +22,7 @@ import RichText from "./RichText";
 import { formatTime as formatMsgTime } from "../utils";
 import { useNavigate } from "react-router-dom";
 import NotaDeVoz from "./NotaDeVoz";
+import { useLanguage } from "@/hooks/useLanguage";
 
 const MAX_GRID_IMAGES = 9;
 
@@ -63,7 +64,8 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
   threadCount = 0, unreadThreadCount = 0, onOpenThread,
   adjacentImages, isGridLeader, isPartOfGrid,
 }, ref) => {
-  const senderName = profileName(profiles[message.sender_id]);
+  const { t, language } = useLanguage();
+  const senderName = profileName(profiles[message.sender_id], t("messenger.usuario"));
   const [lightboxOpen, setLightboxOpen] = useState(false);
   // Táctil: las acciones (reaccionar, ⋮) salen al tocar la burbuja. Siempre
   // visibles ocupaban 64 px al lado de CADA mensaje y el chat se veía atiborrado.
@@ -124,20 +126,20 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
              eliminado, mismo criterio que Chatter Evaluator. */
           <div className="max-w-[70%] rounded-3xl px-3 py-2 bg-destructive/10 border border-destructive/25">
             {deletedArchive.type === "image" && deletedArchive.file_url ? (
-              <img src={deletedArchive.file_url} alt={deletedArchive.file_name || "imagen"} decoding="async" className="rounded-lg max-w-full max-h-48 object-cover" />
+              <img src={deletedArchive.file_url} alt={deletedArchive.file_name || t("messenger.bubble.imagen")} decoding="async" className="rounded-lg max-w-full max-h-48 object-cover" />
             ) : deletedArchive.file_url ? (
               <a href={deletedArchive.file_url} target="_blank" rel="noopener noreferrer" className="text-xs underline break-all">
-                {deletedArchive.file_name || "Archivo"}
+                {deletedArchive.file_name || t("common.file")}
               </a>
             ) : null}
             {deletedArchive.content && (
               <p className="text-sm whitespace-pre-wrap break-words mt-1">{deletedArchive.content}</p>
             )}
-            <div className="mt-0.5 text-[10px] italic text-destructive/90">Eliminado por el autor · solo admins</div>
+            <div className="mt-0.5 text-[10px] italic text-destructive/90">{t("messenger.bubble.eliminadoSoloAdmins")}</div>
           </div>
         ) : (
           <div className="max-w-[70%] rounded-3xl px-3 py-1.5 bg-primary/5">
-            <p className="text-xs text-muted-foreground italic">Eliminado por el autor</p>
+            <p className="text-xs text-muted-foreground italic">{t("messenger.bubble.eliminadoPorAutor")}</p>
           </div>
         )}
       </div>
@@ -175,7 +177,7 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
   const highlightText = (text: string) => {
     if (!highlight) {
       if (chatType === "group") {
-        return renderTextWithMentions(text, participantNames, abrirDmDeMencion);
+        return renderTextWithMentions(text, participantNames, abrirDmDeMencion, (nombre) => t("messenger.mention.abrirChatCon", { name: nombre }));
       }
       return linkifyText(text);
     }
@@ -370,7 +372,7 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
             <File className="h-4 w-4" />
           </div>
           <div className="min-w-0">
-            <span className="text-[13px] truncate block">{message.file_name || "Archivo"}</span>
+            <span className="text-[13px] truncate block">{message.file_name || t("common.file")}</span>
             {ext && <span className="text-[10px] text-muted-foreground uppercase">{ext}</span>}
           </div>
         </a>
@@ -402,17 +404,17 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
               onClick={cancelEdit}
               className={cn("text-[11px] px-2 py-0.5 rounded-lg transition-colors", isMe ? "text-white/70 hover:text-white hover:bg-primary-foreground/10" : "text-muted-foreground hover:bg-muted")}
             >
-              Cancelar
+              {t("common.cancel")}
             </button>
             <button
               type="button"
               onClick={saveEdit}
               className={cn("text-[11px] font-medium px-2 py-0.5 rounded-lg flex items-center gap-1 transition-colors", isMe ? "bg-primary-foreground/20 text-white hover:bg-primary-foreground/30" : "bg-primary text-primary-foreground hover:opacity-90")}
             >
-              <Check className="h-3 w-3" /> Guardar
+              <Check className="h-3 w-3" /> {t("common.save")}
             </button>
           </div>
-          <p className={cn("text-[10px] mt-0.5", isMe ? "text-white/40" : "text-muted-foreground")}>Enter para guardar · Esc para cancelar</p>
+          <p className={cn("text-[10px] mt-0.5", isMe ? "text-white/40" : "text-muted-foreground")}>{t("messenger.bubble.enterParaGuardar")}</p>
         </div>
       );
     }
@@ -442,7 +444,7 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
               <button
                 type="button"
                 onClick={() => onOpenProfile?.(message.sender_id)}
-                title="Ver ficha"
+                title={t("messenger.header.verFicha")}
                 className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-primary"
               >
                 <UserAvatar
@@ -489,32 +491,32 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
               </DropdownMenuTrigger>
               <DropdownMenuContent align={isMe ? "end" : "start"} className="min-w-[140px] rounded-2xl">
                 <DropdownMenuItem onClick={onReply}>
-                  <Reply className="h-3.5 w-3.5 mr-2" /> Responder
+                  <Reply className="h-3.5 w-3.5 mr-2" /> {t("common.reply")}
                 </DropdownMenuItem>
                 {onOpenThread && (
                   <DropdownMenuItem onClick={onOpenThread}>
-                    <MessageSquareText className="h-3.5 w-3.5 mr-2" /> Abrir hilo
+                    <MessageSquareText className="h-3.5 w-3.5 mr-2" /> {t("messenger.bubble.abrirHilo")}
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuItem onClick={onCopy}>
-                  <Copy className="h-3.5 w-3.5 mr-2" /> Copiar
+                  <Copy className="h-3.5 w-3.5 mr-2" /> {t("common.copy")}
                 </DropdownMenuItem>
                 {/* Todo mensaje con archivo (imagen, video, audio, documento) se
                     puede descargar desde acá, además del botón del zoom. */}
                 {message.file_url && (
                   <DropdownMenuItem onClick={() => void descargarArchivo(message.file_url!, message.file_name)}>
-                    <Download className="h-3.5 w-3.5 mr-2" /> Descargar
+                    <Download className="h-3.5 w-3.5 mr-2" /> {t("common.download")}
                   </DropdownMenuItem>
                 )}
                 {isMe && (
                   <>
                     {message.type === "text" && (
                       <DropdownMenuItem onClick={startEdit}>
-                        <Edit2 className="h-3.5 w-3.5 mr-2" /> Editar
+                        <Edit2 className="h-3.5 w-3.5 mr-2" /> {t("common.edit")}
                       </DropdownMenuItem>
                     )}
                     <DropdownMenuItem className="text-destructive" onClick={onDelete}>
-                      <Trash2 className="h-3.5 w-3.5 mr-2" /> Eliminar
+                      <Trash2 className="h-3.5 w-3.5 mr-2" /> {t("common.delete")}
                     </DropdownMenuItem>
                   </>
                 )}
@@ -533,7 +535,7 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
                 "text-[11px] mb-1.5 px-2.5 py-1.5 rounded-xl",
                 isMe ? "bg-primary-foreground/10" : "bg-background/60"
               )}>
-                <p className="font-semibold opacity-80">{profileName(profiles[replyMessage.sender_id])}</p>
+                <p className="font-semibold opacity-80">{profileName(profiles[replyMessage.sender_id], t("messenger.usuario"))}</p>
                 <p className="truncate opacity-70">{replyMessage.content}</p>
               </div>
             )}
@@ -546,24 +548,24 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
 
             <div className="flex items-center gap-1 mt-1 justify-end">
               {message.is_edited && (
-                <span className={cn("text-[10px]", isMe ? "text-primary-foreground/50" : "text-muted-foreground")}>editado</span>
+                <span className={cn("text-[10px]", isMe ? "text-primary-foreground/50" : "text-muted-foreground")}>{t("messenger.bubble.editado")}</span>
               )}
               <span className={cn("text-[10px]", isMe ? "text-primary-foreground/60" : "text-muted-foreground")}>
-                {formatMsgTime(message.created_at)}
+                {formatMsgTime(message.created_at, language)}
               </span>
               {isMe && message._localStatus === "sending" ? (
                 // Aún en vuelo: reloj (como el "reloj" de WhatsApp antes de la palomita).
-                <Clock className="h-3 w-3 text-primary-foreground/50" aria-label="Enviando" />
+                <Clock className="h-3 w-3 text-primary-foreground/50" aria-label={t("messenger.bubble.enviando")} />
               ) : isMe && message._localStatus === "failed" ? (
                 // No se pudo enviar → botón para reintentar (antes el mensaje desaparecía sin avisar).
                 <button
                   type="button"
                   onClick={onRetry}
                   className="flex items-center gap-0.5 text-[10px] font-medium text-destructive hover:text-white transition-colors"
-                  title="No se envió · toca para reintentar"
+                  title={t("messenger.bubble.noSeEnvio")}
                 >
                   <RotateCw className="h-3 w-3" />
-                  Reintentar
+                  {t("common.retry")}
                 </button>
               ) : (
                 <ReadReceiptIndicator
@@ -587,7 +589,7 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
               )}
             >
               <MessageSquareText className="h-3 w-3" />
-              <span>{threadCount} {threadCount === 1 ? "respuesta" : "respuestas"}</span>
+              <span>{threadCount === 1 ? t("messenger.bubble.unaRespuesta") : t("messenger.bubble.respuestas", { n: threadCount })}</span>
               {unreadThreadCount > 0 && (
                 <span className="bg-primary text-primary-foreground text-[10px] font-bold rounded-full min-w-[16px] h-4 px-1 flex items-center justify-center">
                   {unreadThreadCount}

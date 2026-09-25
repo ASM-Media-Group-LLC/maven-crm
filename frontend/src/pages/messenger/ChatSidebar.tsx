@@ -68,6 +68,7 @@ export default function ChatSidebar({
   const { user } = useAuth();
   const { isAdmin } = useUserRole();
   const f = useFormato();
+  const { t } = useLanguage();
   const { isOnline, getStatus, getStatusColorPersonal } = useOnlinePresence();
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState("all");
@@ -214,16 +215,16 @@ export default function ChatSidebar({
             <BotonSilenciarCanal channel="messenger" className="h-9 w-9 sm:h-8 sm:w-8 hover:bg-primary/8" />
             <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-8 sm:w-8 rounded-full hover:bg-primary/8" title="Nuevo">
+              <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-8 sm:w-8 rounded-full hover:bg-primary/8" title={t("messenger.sidebar.nuevo")}>
                 <Plus className="h-5 w-5" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="rounded-2xl min-w-[180px]">
               <DropdownMenuItem onClick={onNewChat}>
-                <Pencil className="h-3.5 w-3.5 mr-2" /> Nuevo mensaje
+                <Pencil className="h-3.5 w-3.5 mr-2" /> {t("messenger.sidebar.nuevoMensaje")}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onNewGroup}>
-                <Users className="h-3.5 w-3.5 mr-2" /> Nuevo grupo
+                <Users className="h-3.5 w-3.5 mr-2" /> {t("messenger.sidebar.nuevoGrupo")}
               </DropdownMenuItem>
             </DropdownMenuContent>
             </DropdownMenu>
@@ -234,7 +235,7 @@ export default function ChatSidebar({
         <div className="relative">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar en todos los chats…"
+            placeholder={t("messenger.sidebar.buscarEnChats")}
             className="pl-10 pr-8 h-11 sm:h-9 bg-primary/5 border-0 focus-visible:ring-1 focus-visible:ring-primary/30 rounded-full text-sm"
             value={search}
             onChange={e => setSearch(e.target.value)}
@@ -260,14 +261,14 @@ export default function ChatSidebar({
               de mensajes no existe sin instalarla. Se puede posponer 7 días. */}
           <InstalarMaven variante="banner" className="mx-3 mb-2" />
           {/* Quick access section */}
-          <CollapsibleSection label="Acceso Rápido" defaultOpen>
+          <CollapsibleSection label={t("messenger.sidebar.accesoRapido")} defaultOpen>
             <div className="flex flex-wrap gap-1.5 px-3 pb-1">
               {[
-                { key: "all", icon: Home, label: "Todos", badge: 0, canBadge: false },
-                { key: "unread", icon: Mail, label: "No leídos", badge: unreadTotal, canBadge: true },
-                { key: "mentions", icon: AtSign, label: "Menciones", badge: mentionedIds.size, canBadge: true },
-                { key: "pinned", icon: Star, label: "Fijados", badge: 0, canBadge: false },
-                { key: "archived", icon: Archive, label: "Archivados", badge: archivedCount, canBadge: true },
+                { key: "all", icon: Home, label: t("common.all"), badge: 0, canBadge: false },
+                { key: "unread", icon: Mail, label: t("messenger.sidebar.noLeidos"), badge: unreadTotal, canBadge: true },
+                { key: "mentions", icon: AtSign, label: t("messenger.sidebar.menciones"), badge: mentionedIds.size, canBadge: true },
+                { key: "pinned", icon: Star, label: t("messenger.sidebar.fijados"), badge: 0, canBadge: false },
+                { key: "archived", icon: Archive, label: t("messenger.sidebar.archivados"), badge: archivedCount, canBadge: true },
               ].map(item => {
                 const isActive = tab === item.key;
                 const Icon = item.icon;
@@ -309,7 +310,7 @@ export default function ChatSidebar({
             const renderConvs = (items: ConversationWithDetails[], emptyText: string) =>
               items.length === 0 ? (
                 <div className="text-center py-4">
-                  <p className="text-xs text-muted-foreground">{search ? "Sin resultados" : emptyText}</p>
+                  <p className="text-xs text-muted-foreground">{search ? t("common.noResultsShort") : emptyText}</p>
                 </div>
               ) : (
                 items.map(conv => (
@@ -353,16 +354,16 @@ export default function ChatSidebar({
             if (tab === "archived") {
               return (
                 <div className="mt-1 px-2">
-                  {sectionHeader("Archivados", sorted.length, dmExpanded, () => setDmExpanded(!dmExpanded))}
-                  {dmExpanded && renderConvs(sorted, "No tienes chats archivados")}
+                  {sectionHeader(t("messenger.sidebar.archivados"), sorted.length, dmExpanded, () => setDmExpanded(!dmExpanded))}
+                  {dmExpanded && renderConvs(sorted, t("messenger.sidebar.sinArchivados"))}
                 </div>
               );
             }
             return (
               <>
                 <div className="mt-1 px-2">
-                  {sectionHeader("Mensajes directos", sortedDirect.length, dmExpanded, () => setDmExpanded(!dmExpanded))}
-                  {dmExpanded && renderConvs(dmRecorte.visibles, "Inicia una conversación")}
+                  {sectionHeader(t("messenger.sidebar.mensajesDirectos"), sortedDirect.length, dmExpanded, () => setDmExpanded(!dmExpanded))}
+                  {dmExpanded && renderConvs(dmRecorte.visibles, t("messenger.sidebar.iniciaConversacion"))}
                   {/* Renglón "Mostrar todo / Mostrar menos", alineado como un chat
                       más (el ícono ocupa la columna del avatar). */}
                   {dmExpanded && !search.trim() && sortedDirect.length > DM_VISIBLES && (
@@ -376,10 +377,10 @@ export default function ChatSidebar({
                         {dmMostrarTodos ? <ChevronsDownUp className="h-4 w-4" /> : <ChevronsUpDown className="h-4 w-4" />}
                       </span>
                       <span className="flex-1 min-w-0 truncate">
-                        {dmMostrarTodos ? "Mostrar menos" : `Mostrar todo · ${dmRecorte.ocultos.length} más`}
+                        {dmMostrarTodos ? t("messenger.sidebar.mostrarMenos") : t("messenger.sidebar.mostrarTodo", { n: dmRecorte.ocultos.length })}
                       </span>
                       {!dmMostrarTodos && dmOcultosNoLeidos > 0 && (
-                        <Badge className="h-5 min-w-5 px-1.5 text-[10px] bg-primary text-primary-foreground rounded-full shrink-0 font-bold" title={`${dmOcultosNoLeidos} chats ocultos con mensajes sin leer`}>
+                        <Badge className="h-5 min-w-5 px-1.5 text-[10px] bg-primary text-primary-foreground rounded-full shrink-0 font-bold" title={t("messenger.sidebar.ocultosSinLeer", { n: dmOcultosNoLeidos })}>
                           {dmOcultosNoLeidos}
                         </Badge>
                       )}
@@ -387,8 +388,8 @@ export default function ChatSidebar({
                   )}
                 </div>
                 <div className="mt-1 px-2">
-                  {sectionHeader("Grupos", sortedGroups.length, groupsExpanded, () => setGroupsExpanded(!groupsExpanded))}
-                  {groupsExpanded && renderConvs(sortedGroups, "Sin grupos todavía")}
+                  {sectionHeader(t("messenger.sidebar.grupos"), sortedGroups.length, groupsExpanded, () => setGroupsExpanded(!groupsExpanded))}
+                  {groupsExpanded && renderConvs(sortedGroups, t("messenger.sidebar.sinGrupos"))}
                 </div>
               </>
             );
@@ -399,16 +400,16 @@ export default function ChatSidebar({
             <div className="mt-1 px-2">
               <div className="flex items-center gap-1.5 px-2 py-1.5 text-xs font-semibold text-muted-foreground">
                 <Search className="h-3.5 w-3.5" />
-                <span>Resultados en mensajes</span>
+                <span>{t("messenger.sidebar.resultadosEnMensajes")}</span>
               </div>
               {globalSearching && globalResults.length === 0 && (
                 <div className="flex items-center justify-center gap-2 py-4">
                   <div className="h-3.5 w-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                  <p className="text-[11px] text-muted-foreground">Buscando…</p>
+                  <p className="text-[11px] text-muted-foreground">{t("messenger.sidebar.buscando")}</p>
                 </div>
               )}
               {!globalSearching && globalResults.length === 0 && (
-                <p className="text-[11px] text-muted-foreground px-3 py-2">No se encontraron mensajes</p>
+                <p className="text-[11px] text-muted-foreground px-3 py-2">{t("messenger.sidebar.noSeEncontraronMensajes")}</p>
               )}
               {(() => {
                 const grouped = globalResults.reduce<Record<string, { title: string; results: GlobalSearchResult[] }>>((acc, r) => {
@@ -456,9 +457,9 @@ export default function ChatSidebar({
               className="w-full flex items-center gap-1.5 px-2 py-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
             >
               {contactsExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-              <span>Contactos</span>
+              <span>{t("messenger.sidebar.contactos")}</span>
               <span className="ml-auto text-[10px] font-normal normal-case text-muted-foreground/70">
-                {onlineCount} en línea
+                {t("messenger.sidebar.enLinea", { n: onlineCount })}
               </span>
             </button>
 
@@ -491,7 +492,7 @@ export default function ChatSidebar({
                         "text-sm truncate",
                         online ? "text-foreground" : "text-muted-foreground"
                       )}>
-                        {p.full_name || "Sin nombre"}
+                        {p.full_name || t("messenger.sidebar.sinNombre")}
                       </span>
                     </button>
                   );
@@ -556,7 +557,7 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
   const { isOnline, getStatus, getStatusColorPersonal } = useOnlinePresence();
   const isMuted = conversation.participants.find(p => p.user_id === user?.id)?.is_muted ?? false;
   const handleToggleMute = () => onToggleMute(conversation.id, !isMuted);
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const handleMarkUnread = async () => {
     const r = await onMarkUnread();
     if (r === "sin-mensajes") toast.info(t("messenger.sinMensajesQueMarcar"));
@@ -579,10 +580,10 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
   // renglón nuevo ni salto de alto ni el agujero de min-w-0 de #1602.
   const escribiendo = !!useTypingInbox().quienEscribe(conversation.id);
   const lastMsgPreview = escribiendo
-    ? "escribiendo…"
+    ? t("messenger.sidebar.escribiendo")
     : draft
-      ? `✏️ Borrador: ${draft}`
-      : getMessagePreview(conversation, user?.id);
+      ? t("messenger.sidebar.borrador", { draft })
+      : getMessagePreview(conversation, user?.id, t);
 
   // En el teléfono la fila NO es arrastrable: iOS trata el primer toque sobre un
   // elemento `draggable` como intento de arrastre y hacía falta tocar dos veces
@@ -658,7 +659,7 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
                 hasUnread ? "text-primary font-semibold" : "text-muted-foreground"
               )}>
                 {isMuted && <BellOff className="h-3 w-3 text-muted-foreground" />}
-                {formatTime(conversation.lastMessage?.created_at)}
+                {formatTime(conversation.lastMessage?.created_at, t, language)}
               </span>
             </div>
             <div className="flex items-center justify-between">
@@ -694,15 +695,15 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
             <DropdownMenuContent align="end" className="rounded-2xl">
               <DropdownMenuItem onClick={onTogglePin}>
                 {isPinned ? <PinOff className="h-3.5 w-3.5 mr-2" /> : <Pin className="h-3.5 w-3.5 mr-2" />}
-                {isPinned ? "Desanclar" : "Anclar"}
+                {isPinned ? t("messenger.sidebar.desanclar") : t("messenger.sidebar.anclar")}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onArchive}>
                 <Archive className="h-3.5 w-3.5 mr-2" />
-                {isArchivedChat ? "Desarchivar" : "Archivar"}
+                {isArchivedChat ? t("messenger.sidebar.desarchivar") : t("messenger.sidebar.archivar")}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={handleToggleMute}>
                 {isMuted ? <Bell className="h-3.5 w-3.5 mr-2" /> : <BellOff className="h-3.5 w-3.5 mr-2" />}
-                {isMuted ? "Reactivar notificaciones" : "Silenciar notificaciones"}
+                {isMuted ? t("messenger.sidebar.reactivarNotificaciones") : t("messenger.sidebar.silenciarNotificaciones")}
               </DropdownMenuItem>
               {/* Volver a dejar el chat como pendiente (Jhon, 18/09). */}
               {conversation.unreadCount > 0 ? (
@@ -722,7 +723,7 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
                   className="text-destructive focus:text-destructive focus:bg-destructive/10"
                 >
                   <Trash2 className="h-3.5 w-3.5 mr-2" />
-                  Eliminar {isGroup ? "grupo" : "chat"}
+                  {isGroup ? t("messenger.sidebar.eliminarGrupo") : t("messenger.sidebar.eliminarChat")}
                 </DropdownMenuItem>
               )}
             </DropdownMenuContent>
@@ -732,15 +733,15 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
       <ContextMenuContent className="rounded-2xl">
         <ContextMenuItem onClick={onTogglePin}>
           {isPinned ? <PinOff className="h-3.5 w-3.5 mr-2" /> : <Pin className="h-3.5 w-3.5 mr-2" />}
-          {isPinned ? "Desanclar" : "Anclar"}
+          {isPinned ? t("messenger.sidebar.desanclar") : t("messenger.sidebar.anclar")}
         </ContextMenuItem>
         <ContextMenuItem onClick={onArchive}>
           <Archive className="h-3.5 w-3.5 mr-2" />
-          {isArchivedChat ? "Desarchivar" : "Archivar"}
+          {isArchivedChat ? t("messenger.sidebar.desarchivar") : t("messenger.sidebar.archivar")}
         </ContextMenuItem>
         <ContextMenuItem onClick={handleToggleMute}>
           {isMuted ? <Bell className="h-3.5 w-3.5 mr-2" /> : <BellOff className="h-3.5 w-3.5 mr-2" />}
-          {isMuted ? "Reactivar notificaciones" : "Silenciar notificaciones"}
+          {isMuted ? t("messenger.sidebar.reactivarNotificaciones") : t("messenger.sidebar.silenciarNotificaciones")}
         </ContextMenuItem>
         {(isSystemAdmin || !isGroup || conversation.participants.find(p => p.user_id === user?.id)?.role === "admin") && (
           <ContextMenuItem
@@ -748,7 +749,7 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
             className="text-destructive focus:text-destructive focus:bg-destructive/10"
           >
             <span className="h-3.5 w-3.5 mr-2">🗑</span>
-            Eliminar {isGroup ? "grupo" : "chat"}
+            {isGroup ? t("messenger.sidebar.eliminarGrupo") : t("messenger.sidebar.eliminarChat")}
           </ContextMenuItem>
         )}
       </ContextMenuContent>

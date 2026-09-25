@@ -22,6 +22,9 @@ const joinByCode = vi.fn();
 const resolveByLivekitRoom = vi.fn();
 const endRoom = vi.fn();
 
+vi.mock("@/hooks/useLanguage", (original) =>
+  import("@/test/messenger/espanolEnTests").then((m) => m.idiomaEnEspanol(original)));
+
 vi.mock("@/hooks/useMeetRooms", () => ({
   useMeetRooms: () => ({
     myRooms: [room],

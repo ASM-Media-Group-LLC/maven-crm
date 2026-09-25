@@ -14,6 +14,7 @@ import DockChatWindow, { VENTANA_ANCHO } from "./DockChatWindow";
 import ChatsPanel from "./ChatsPanel";
 import type { ConversationWithDetails } from "@/pages/messenger/types";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/hooks/useLanguage";
 
 /** Tope duro de ventanas abiertas; abajo se recorta además por ancho real. */
 const MAX_ABIERTAS = 3;
@@ -36,6 +37,7 @@ export function MessengerDockProvider({ children }: { children: ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
+  const { t } = useLanguage();
   const { canAccess } = usePermissions();
   const { isAdmin } = useUserRole();
   const { conversations } = useChatShared();
@@ -198,9 +200,9 @@ export function MessengerDockProvider({ children }: { children: ReactNode }) {
             type="button"
             onClick={() => setPanelAbierto((v) => !v)}
             className="glass-panel relative flex h-14 w-14 items-center justify-center rounded-full text-foreground transition-transform hover:scale-105 active:scale-95"
-            title="Mensajes — arrastrame para moverme"
+            title={t("messenger.dock.mensajesArrastrame")}
             aria-expanded={panelAbierto}
-            aria-label="Mensajes"
+            aria-label={t("messenger.dock.mensajes")}
           >
             <MessageCircle className="h-6 w-6" />
             {sinLeer > 0 && (
@@ -238,6 +240,7 @@ function Burbuja({
   onClose: () => void;
 }) {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const isGroup = conversation.type === "group";
   const otro = isGroup ? undefined : conversation.participants.find((p) => p.user_id !== user?.id);
   const sinLeer = conversation.unreadCount;
@@ -249,7 +252,7 @@ function Burbuja({
         onClick={onOpen}
         className="block rounded-full shadow-[0_10px_28px_-8px_hsl(228_40%_6%_/_.45)] ring-1 ring-border/50 transition-transform hover:scale-105 active:scale-95"
         title={conversation.displayName}
-        aria-label={`Abrir chat con ${conversation.displayName}`}
+        aria-label={t("messenger.mention.abrirChatCon", { name: conversation.displayName })}
       >
         {isGroup ? (
           <Avatar className="h-12 w-12">
@@ -281,8 +284,8 @@ function Burbuja({
         type="button"
         onClick={onClose}
         className="absolute -left-1 -top-1 hidden h-4 w-4 items-center justify-center rounded-full bg-muted text-muted-foreground ring-1 ring-border group-hover:flex"
-        title="Quitar"
-        aria-label={`Quitar el chat con ${conversation.displayName}`}
+        title={t("messenger.thread.quitar")}
+        aria-label={t("messenger.dock.quitarChatCon", { name: conversation.displayName })}
       >
         <X className="h-2.5 w-2.5" />
       </button>

@@ -3,6 +3,9 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import CallTopBar from "@/pages/messenger/videocall/CallTopBar";
 
 // Mock sonner
+vi.mock("@/hooks/useLanguage", (original) =>
+  import("@/test/messenger/espanolEnTests").then((m) => m.idiomaEnEspanol(original)));
+
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), info: vi.fn(), error: vi.fn() } }));
 
 // Mock clipboard

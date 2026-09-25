@@ -1,7 +1,10 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import QuienesEstan, { fraseDeQuienesEstan } from "@/pages/messenger/videocall/QuienesEstan";
 import type { PersonaEnSala } from "@/hooks/useQuienesEstanEnLaSala";
+
+vi.mock("@/hooks/useLanguage", (original) =>
+  import("@/test/messenger/espanolEnTests").then((m) => m.idiomaEnEspanol(original)));
 
 const persona = (id: string, nombre: string, extra: Partial<PersonaEnSala> = {}): PersonaEnSala => ({
   id, nombre, foto: null, seed: null, invitado: false, ...extra,

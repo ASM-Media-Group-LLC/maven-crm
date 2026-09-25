@@ -4,6 +4,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { LKParticipant } from "@/hooks/useLiveKit";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface CallParticipantsSidebarProps {
   participants: LKParticipant[];
@@ -24,6 +25,7 @@ export default function CallParticipantsSidebar({
   participants, isAdmin, onMuteParticipant, onRemoveParticipant, onClose,
   onMuteAll, onEndForAll, onSetCanPublish, onSetCohost,
 }: CallParticipantsSidebarProps) {
+  const { t } = useLanguage();
   const handRaisedFirst = [...participants].sort((a, b) => {
     if (a.isLocal) return -1;
     if (b.isLocal) return 1;
@@ -36,9 +38,9 @@ export default function CallParticipantsSidebar({
     <div className="w-80 max-sm:absolute max-sm:inset-y-0 max-sm:right-0 max-sm:w-full max-sm:z-30 flex flex-col bg-background border-l border-secondary rounded-l-xl">
       <div className="flex items-center justify-between px-4 py-3 border-b border-secondary">
         <h3 className="text-sm font-medium text-foreground">
-          Participantes ({participants.length})
+          {t("messenger.participants.titulo", { n: participants.length })}
         </h3>
-        <button onClick={onClose} className="h-7 w-7 rounded-full flex items-center justify-center text-muted-foreground hover:bg-secondary transition-colors">
+        <button onClick={onClose} aria-label={t("common.close")} className="h-7 w-7 rounded-full flex items-center justify-center text-muted-foreground hover:bg-secondary transition-colors">
           <X className="h-4 w-4" />
         </button>
       </div>
@@ -63,10 +65,10 @@ export default function CallParticipantsSidebar({
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
                   <span className="text-sm text-foreground truncate">
-                    {p.isLocal ? "Tú" : p.name}
+                    {p.isLocal ? t("messenger.preview.tu") : p.name}
                   </span>
                   {p.isLocal && (
-                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">Tú</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{t("messenger.preview.tu")}</span>
                   )}
                 </div>
               </div>
@@ -85,7 +87,7 @@ export default function CallParticipantsSidebar({
                 {!p.isLocal && (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <button className="h-7 w-7 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors">
+                      <button aria-label={t("messenger.tile.masOpcionesPara", { name: p.name })} className="h-7 w-7 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors">
                         <MoreVertical className="h-3.5 w-3.5" />
                       </button>
                     </DropdownMenuTrigger>
@@ -96,27 +98,27 @@ export default function CallParticipantsSidebar({
                           DES-silenciar a otro: eso solo lo hace su dueño. */}
                       {!p.isMuted && (
                         <DropdownMenuItem onClick={() => onMuteParticipant(p.identity)} className="text-foreground focus:bg-muted">
-                          <MicOff className="h-3.5 w-3.5 mr-2" /> Silenciar
+                          <MicOff className="h-3.5 w-3.5 mr-2" /> {t("messenger.participants.silenciar")}
                         </DropdownMenuItem>
                       )}
                       {isAdmin && onSetCanPublish && (
                         <>
                           <DropdownMenuItem onClick={() => onSetCanPublish(p.identity, false)} className="text-foreground focus:bg-muted">
-                            <Eye className="h-3.5 w-3.5 mr-2" /> Dejar solo como oyente
+                            <Eye className="h-3.5 w-3.5 mr-2" /> {t("messenger.participants.soloOyente")}
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => onSetCanPublish(p.identity, true)} className="text-foreground focus:bg-muted">
-                            <MicVocal className="h-3.5 w-3.5 mr-2" /> Devolverle la palabra
+                            <MicVocal className="h-3.5 w-3.5 mr-2" /> {t("messenger.participants.devolverPalabra")}
                           </DropdownMenuItem>
                         </>
                       )}
                       {isAdmin && onSetCohost && (
                         <DropdownMenuItem onClick={() => onSetCohost(p.identity, true)} className="text-foreground focus:bg-muted">
-                          <Crown className="h-3.5 w-3.5 mr-2" /> Hacer co-anfitrión
+                          <Crown className="h-3.5 w-3.5 mr-2" /> {t("messenger.participants.hacerCoanfitrion")}
                         </DropdownMenuItem>
                       )}
                       {isAdmin && (
                         <DropdownMenuItem onClick={() => onRemoveParticipant(p.identity)} className="text-destructive focus:bg-muted">
-                          <UserX className="h-3.5 w-3.5 mr-2" /> Eliminar
+                          <UserX className="h-3.5 w-3.5 mr-2" /> {t("common.delete")}
                         </DropdownMenuItem>
                       )}
                     </DropdownMenuContent>
@@ -131,14 +133,14 @@ export default function CallParticipantsSidebar({
       {isAdmin && (onMuteAll || onEndForAll) && (
         <div className="border-t border-secondary p-3 flex flex-col gap-2">
           <span className="text-xs text-muted-foreground">
-            Controles de anfitrión
+            {t("messenger.participants.controlesAnfitrion")}
           </span>
           {onMuteAll && (
             <button
               onClick={onMuteAll}
               className="flex items-center gap-2 text-xs text-foreground hover:bg-secondary rounded-lg px-2 py-1.5 transition-colors"
             >
-              <MicOff className="h-3.5 w-3.5" /> Silenciar a todos
+              <MicOff className="h-3.5 w-3.5" /> {t("messenger.participants.silenciarATodos")}
             </button>
           )}
           {onEndForAll && (
@@ -146,7 +148,7 @@ export default function CallParticipantsSidebar({
               onClick={onEndForAll}
               className="flex items-center gap-2 text-xs text-destructive hover:bg-secondary rounded-lg px-2 py-1.5 transition-colors"
             >
-              <PhoneOff className="h-3.5 w-3.5" /> Terminar para todos
+              <PhoneOff className="h-3.5 w-3.5" /> {t("messenger.participants.terminarParaTodos")}
             </button>
           )}
         </div>

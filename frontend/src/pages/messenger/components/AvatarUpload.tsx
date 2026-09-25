@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { dicebearUri } from "@/lib/avatar";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface AvatarUploadProps {
   /** Current avatar URL */
@@ -46,6 +47,7 @@ export default function AvatarUpload({
   currentUrl, seed, displayName, onAvatarChanged, size = "md", editable = true, isGroup = false,
 }: AvatarUploadProps) {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -54,12 +56,12 @@ export default function AvatarUpload({
     if (!file || !user) return;
 
     if (!file.type.startsWith("image/")) {
-      toast.error("Solo se permiten imágenes");
+      toast.error(t("messenger.avatar.soloImagenes"));
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      toast.error("Máximo 5MB para la imagen de perfil");
+      toast.error(t("messenger.avatar.maximo5mb"));
       return;
     }
 
@@ -73,15 +75,15 @@ export default function AvatarUpload({
         .upload(path, file, { upsert: true });
 
       if (uploadError) {
-        toast.error("Error al subir imagen");
+        toast.error(t("messenger.avatar.errorAlSubir"));
         return;
       }
 
       const { data: urlData } = supabase.storage.from("chat-files").getPublicUrl(path);
       onAvatarChanged(urlData.publicUrl);
-      toast.success("Imagen actualizada");
+      toast.success(t("messenger.avatar.actualizada"));
     } catch {
-      toast.error("Error inesperado");
+      toast.error(t("messenger.avatar.errorInesperado"));
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";
@@ -122,6 +124,7 @@ export default function AvatarUpload({
           <button
             onClick={() => fileRef.current?.click()}
             disabled={uploading}
+            aria-label={t("messenger.avatar.cambiarFoto")}
             className={cn(
               "absolute inset-0 rounded-full bg-black/40 flex items-center justify-center",
               "opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer",

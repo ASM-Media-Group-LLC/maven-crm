@@ -2,6 +2,9 @@ import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from "vite
 import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
 import CallControls from "@/pages/messenger/videocall/CallControls";
 
+vi.mock("@/hooks/useLanguage", (original) =>
+  import("@/test/messenger/espanolEnTests").then((m) => m.idiomaEnEspanol(original)));
+
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), info: vi.fn(), error: vi.fn() } }));
 
 // En un teléfono, la llamada se dibuja en MODO COMPACTO — el que se inventó

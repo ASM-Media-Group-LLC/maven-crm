@@ -7,6 +7,7 @@ import { EMOJI_CATALOG } from "@/pages/chatter-evaluator/workspace/EmojiBar";
 import { GifPanel } from "@/pages/inbox/GifPicker";
 import { StickerPanel } from "@/pages/inbox/StickerPicker";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // Un solo botón para emojis, GIF y stickers, como WhatsApp. Es la versión del
 // TELÉFONO: en escritorio siguen la barra de emojis arriba del cajón y los dos
@@ -31,6 +32,7 @@ export default function Expresiones({
   /** Clases del icono (tamaño/trazo). Dentro del cajón del teléfono va más grande. */
   iconClassName?: string;
 }) {
+  const { t } = useLanguage();
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState("emojis");
 
@@ -42,8 +44,8 @@ export default function Expresiones({
           size="icon"
           className={cn("h-9 w-9 shrink-0 rounded-full text-muted-foreground hover:bg-primary/8 hover:text-foreground", className)}
           disabled={disabled}
-          title="Emojis, GIF y stickers"
-          aria-label="Emojis, GIF y stickers"
+          title={t("messenger.expr.titulo")}
+          aria-label={t("messenger.expr.titulo")}
           data-testid="expresiones"
         >
           <Smile className={cn("h-5 w-5", iconClassName)} strokeWidth={2.1} />
@@ -66,7 +68,7 @@ export default function Expresiones({
             <div className="h-full overflow-y-auto pr-1">
               {favoritos.length > 0 && (
                 <section className="mb-2">
-                  <p className="mb-1 px-1 text-xs text-muted-foreground">Frecuentes</p>
+                  <p className="mb-1 px-1 text-xs text-muted-foreground">{t("messenger.expr.frecuentes")}</p>
                   <div className="grid grid-cols-8 gap-0.5">
                     {favoritos.map((e) => (
                       <button key={`fav-${e}`} type="button" onClick={() => onEmoji(e)} className="rounded-md py-1 text-2xl leading-none hover:bg-muted" aria-label={e}>

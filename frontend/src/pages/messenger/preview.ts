@@ -6,19 +6,28 @@
 // campana de mensajes del topbar. Duplicar esto era garantía de que un día una
 // dijera "📷 Foto" y la otra mostrara una URL.
 import { ConversationWithDetails } from "./types";
+import type { Language, TranslationKey } from "@/lib/i18n";
 
-export function formatTime(dateStr?: string) {
+// El `t` del componente que dibuja (useLanguage). Se pasa desde afuera y no se
+// usa `traducir()` porque esto se DIBUJA: tiene que seguir al botón ES/EN.
+export type Traductor = (key: TranslationKey, params?: Record<string, string | number>) => string;
+
+// En español se queda el locale "es" de siempre (hora 14:30, "14 jul"): cambiarlo
+// por "es-CO" cambiaría lo que ya se ve. Solo en inglés pasa a en-US.
+const localeDe = (lang: Language) => (lang === "en" ? "en-US" : "es");
+
+export function formatTime(dateStr: string | undefined, t: Traductor, lang: Language) {
   if (!dateStr) return "";
   const date = new Date(dateStr);
   const now = new Date();
   const diff = now.getTime() - date.getTime();
   if (diff < 86400000 && date.getDate() === now.getDate()) {
-    return date.toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" });
+    return date.toLocaleTimeString(localeDe(lang), { hour: "2-digit", minute: "2-digit" });
   }
-  if (diff < 172800000) return "Ayer";
+  if (diff < 172800000) return t("messenger.preview.ayer");
   // "14 jul", no "14/07": el formato numérico es ambiguo (¿día/mes o
   // mes/día?) y el resto de la app ya usa el mes abreviado.
-  return date.toLocaleDateString("es", { day: "numeric", month: "short" });
+  return date.toLocaleDateString(localeDe(lang), { day: "numeric", month: "short" });
 }
 
 export function truncate(text: string, max: number) {
@@ -29,22 +38,24 @@ export function truncate(text: string, max: number) {
 export function getMessagePreview(
   conversation: ConversationWithDetails,
   userId: string | undefined,
+  t: Traductor,
 ) {
   const lastMsg = conversation.lastMessage;
-  if (!lastMsg) return "Sin mensajes";
-  if (lastMsg.is_deleted) return "🚫 Mensaje eliminado";
+  if (!lastMsg) return t("messenger.preview.sinMensajes");
+  if (lastMsg.is_deleted) return t("messenger.preview.eliminado");
+  // El texto de un mensaje de sistema es DATO (se guardó así en chat_messages).
   if (lastMsg.type === "system") return `ℹ️ ${lastMsg.content || ""}`;
   let body = "";
   if (lastMsg.type === "file") {
     const fn = lastMsg.file_name || "";
-    if (/^voice-note/i.test(fn)) body = "🎤 Nota de voz";
-    else if (/\.(webm|mp3|ogg|m4a|wav)(\?|$)/i.test(fn)) body = "🎵 Audio";
-    else body = `📎 ${fn || "Archivo"}`;
-  } else if (lastMsg.type === "image") body = "📷 Foto";
+    if (/^voice-note/i.test(fn)) body = t("messenger.preview.notaDeVoz");
+    else if (/\.(webm|mp3|ogg|m4a|wav)(\?|$)/i.test(fn)) body = t("messenger.preview.audio");
+    else body = `📎 ${fn || t("common.file")}`;
+  } else if (lastMsg.type === "image") body = t("messenger.preview.foto");
   else body = lastMsg.content || "";
   if (conversation.type === "group" && lastMsg.sender_id) {
     const senderName = lastMsg.sender_id === userId
-      ? "Tú"
+      ? t("messenger.preview.tu")
       : (conversation.participants.find((p) => p.user_id === lastMsg.sender_id)?.profile?.full_name?.split(" ")[0] || "");
     if (senderName) return `${senderName}: ${body}`;
   }
