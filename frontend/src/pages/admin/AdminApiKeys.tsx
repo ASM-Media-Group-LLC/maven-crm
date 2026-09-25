@@ -158,6 +158,9 @@ const AdminApiKeys = () => {
     mutationFn: async () =>
       adminInvoke<{ key: string }>("manage-api-keys", {
         action: "create", name: name.trim(), scopes, ip_whitelist: parseIps(),
+        // Los días los convierte en fecha el servidor (el reloj de la PC puede estar
+        // adelantado); expires_at queda por si responde un manage-api-keys anterior.
+        expires_in_days: expiryDays,
         expires_at: expiryDays === 0 ? null : new Date(Date.now() + expiryDays * 86400_000).toISOString(),
         // Solo si la persona lo confirmó en la pantalla: sin esto el servidor no la crea.
         ...(conMessenger && confirmaMessenger && data?.you?.id ? { acknowledge_messenger_reads_as: data.you.id } : {}),
@@ -170,7 +173,9 @@ const AdminApiKeys = () => {
     mutationFn: async () => {
       const patch: Record<string, unknown> = { action: "update", id: editing!.id, name: name.trim(), scopes, ip_whitelist: parseIps() };
       const exp = expiresAtFromChoice();
-      if (exp !== undefined) patch.expires_at = exp;
+      // Con Messenger, al editar el vencimiento solo se mantiene (la pantalla no ofrece
+      // otra cosa): no se manda aunque quede elegido de antes de volver a tildarlo.
+      if (exp !== undefined && !conMessenger) patch.expires_at = exp;
       return adminInvoke("manage-api-keys", patch);
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["api-keys"] }); toast.success("API key actualizada"); closeModal(); },
@@ -190,6 +195,7 @@ const AdminApiKeys = () => {
       // Messenger exige IPs fijas y vencimiento corto: se ponen solos.
       setIpMode("restrict");
       if (modalMode === "create" && !DIAS_MESSENGER.includes(expiryDays)) setExpiryDays(30);
+      if (modalMode === "edit") setExpiryDays(-1);
     }
     if (k === SCOPE_MESSENGER && !activa) setConfirmaMessenger(false);
   };

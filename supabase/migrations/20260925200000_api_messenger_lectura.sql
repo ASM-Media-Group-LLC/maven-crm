@@ -12,8 +12,8 @@
 -- 2. api_keys_reglas_messenger: las reglas que decidió Jhon el 25/09 para las
 --    llaves que leen el Messenger, en la base, para que valgan aunque alguien
 --    saltee manage-api-keys:
---      * al crear: IPs EXACTAS (sin rangos: 0.0.0.0/0 deja entrar a todos) y
---        vencimiento en el futuro y a 90 días como máximo;
+--      * al crear: actúa como QUIEN LA CREA; IPs EXACTAS (sin rangos: 0.0.0.0/0
+--        deja entrar a todos) y vencimiento en el futuro y a 90 días como máximo;
 --      * al editar: no se le puede SUMAR el permiso a una llave que no lo tenía (las
 --        3 de hoy actúan como el CEO), y a una que lo tiene no se le pueden sacar
 --        las IPs ni extender el vencimiento.
@@ -66,6 +66,12 @@ begin
   end if;
   if tg_op = 'UPDATE' and not _tenia then
     raise exception 'api_keys: el permiso de Messenger solo se puede poner al crear una llave nueva';
+  end if;
+  -- Lee las conversaciones de QUIEN LA CREA, nunca las de otra persona. coalesce:
+  -- este trigger corre antes que api_keys_validar_actua_como (orden alfabético), que
+  -- es el que completa acts_as_user_id con created_by cuando viene vacío.
+  if tg_op = 'INSERT' and coalesce(new.acts_as_user_id, new.created_by) is distinct from new.created_by then
+    raise exception 'api_keys: una llave con Messenger lee las conversaciones de quien la crea, no las de otra persona';
   end if;
   if coalesce(cardinality(new.ip_whitelist), 0) = 0 then
     raise exception 'api_keys: una llave con Messenger necesita IPs fijas';

@@ -17,7 +17,6 @@ import {
   codificarCursor,
   compararMensajes,
   decodificarCursor,
-  filtroAntes,
   filtroDespues,
   type FilaDeMensaje,
   mensajeParaApi,
@@ -177,16 +176,56 @@ Deno.test("messages: acotado por conversación, página+1 y cursor con microsegu
   assertEquals(op(q, "limit")[0], [3]);
 });
 
-Deno.test("messages: con before, el filtro desempata por id (no saltea el mismo instante)", async () => {
-  const cursor = { t: "2026-09-25T10:00:00.123456+00:00", i: "a0000000-0000-4000-8000-000000000002" };
-  const { cliente, llamadas } = clienteFalso((ll) => ll.tabla === "chat_conversations" ? ok({ id: CONV }) : ok([]));
-  const r = await servirMessenger(cliente, con(["conversations", CONV, "messages"], { before: codificarCursor(cursor) }));
+Deno.test("messages: con cursor, DOS consultas (empates del instante + rango), sin or(), y en ese orden", async () => {
+  // Con un solo or() el planificador leía todo un lado de la conversación (3.300+
+  // bloques medidos). Cada consulta con un solo rango corta en limit+1.
+  const cursor = { t: "2026-09-25T10:00:00.123456+00:00", i: "a0000000-0000-4000-8000-000000000005" };
+  const empate = fila({ id: "a0000000-0000-4000-8000-000000000004", created_at: cursor.t });
+  const viejo1 = fila({ id: "a0000000-0000-4000-8000-000000000009", created_at: "2026-09-25T09:00:00+00:00" });
+  const viejo2 = fila({ id: "a0000000-0000-4000-8000-000000000001", created_at: "2026-09-25T08:00:00+00:00" });
+  const { cliente, llamadas } = clienteFalso((ll) => {
+    if (ll.tabla === "chat_conversations") return ok({ id: CONV });
+    if (ll.tabla === "chat_messages") return ok(op(ll, "eq").some((a) => a[0] === "created_at") ? [empate] : [viejo1, viejo2]);
+    return ok([]);
+  });
+  const r = await servirMessenger(cliente, con(["conversations", CONV, "messages"], { before: codificarCursor(cursor), limit: "2" }));
   assert(r.ok);
-  const q = llamadas.find((l) => l.tabla === "chat_messages")!;
-  assertEquals(op(q, "lte")[0], ["created_at", cursor.t]);
-  assertEquals(op(q, "or")[0], [filtroAntes(cursor)]);
-  assertEquals(filtroAntes(cursor), `created_at.lt."${cursor.t}",and(created_at.eq."${cursor.t}",id.lt.${cursor.i})`);
-  assertEquals((r.cuerpo as any).next_cursor, null, "sin más páginas, next_cursor tiene que ser null");
+  const c = r.cuerpo as any;
+  assertEquals(c.data.map((m: any) => m.id), [empate.id, viejo1.id], "no van primero los empates del instante");
+  assertEquals(c.has_more, true);
+  assertEquals(decodificarCursor(c.next_cursor), { t: viejo1.created_at, i: viejo1.id });
+  const qs = llamadas.filter((l) => l.tabla === "chat_messages");
+  assertEquals(qs.length, 2);
+  for (const q of qs) {
+    assertEquals(op(q, "eq")[0], ["conversation_id", CONV]);
+    assertEquals(op(q, "or").length, 0, "volvió el or()");
+    assertEquals(op(q, "limit")[0], [3]);
+  }
+  const [qe, qr] = [qs.find((q) => op(q, "eq").some((a) => a[0] === "created_at"))!, qs.find((q) => !op(q, "eq").some((a) => a[0] === "created_at"))!];
+  assertEquals(op(qe, "lt")[0], ["id", cursor.i]);
+  assertEquals(op(qr, "lt")[0], ["created_at", cursor.t]);
+  assertEquals(op(qr, "order")[0], ["created_at", { ascending: false }]);
+});
+
+Deno.test("messages: con after, lo mismo hacia adelante (gt) y siempre hay cursor para seguir", async () => {
+  const cursor = { t: "2026-09-25T10:00:00.123456+00:00", i: "a0000000-0000-4000-8000-000000000005" };
+  const { cliente, llamadas } = clienteFalso((ll) => ll.tabla === "chat_conversations" ? ok({ id: CONV }) : ok([]));
+  const r = await servirMessenger(cliente, con(["conversations", CONV, "messages"], { after: codificarCursor(cursor) }));
+  assert(r.ok);
+  const qs = llamadas.filter((l) => l.tabla === "chat_messages");
+  assertEquals(qs.length, 2);
+  assert(qs.some((q) => op(q, "gt").some((a) => a[0] === "id" && a[1] === cursor.i)));
+  assert(qs.some((q) => op(q, "gt").some((a) => a[0] === "created_at" && a[1] === cursor.t)));
+  assertEquals((r.cuerpo as any).order, "asc");
+  assertEquals(decodificarCursor((r.cuerpo as any).next_cursor), cursor, "sin mensajes nuevos, el mismo cursor");
+});
+
+Deno.test("messages: sin cursor, una sola consulta, y sin más páginas no hay next_cursor", async () => {
+  const { cliente, llamadas } = clienteFalso((ll) => ll.tabla === "chat_conversations" ? ok({ id: CONV }) : ok([]));
+  const r = await servirMessenger(cliente, con(["conversations", CONV, "messages"]));
+  assert(r.ok);
+  assertEquals(llamadas.filter((l) => l.tabla === "chat_messages").length, 1);
+  assertEquals((r.cuerpo as any).next_cursor, null);
 });
 
 // ─── /feed ───────────────────────────────────────────────────────────────────
@@ -199,6 +238,8 @@ Deno.test("feed: parámetros malos dan 400 sin tocar la base", async () => {
     { since: "ayer" },
     { exclude_own: "si" },
     { after: "roto" },
+    { after: codificarCursor({ t: "2026-09-25T10:00:00-05", i: CONV }) },
+    { after: codificarCursor({ t: "2026-02-31T00:00:00Z", i: CONV }) },
     { limit: "500" },
   ]) {
     const { cliente, llamadas } = clienteFalso(() => { throw new Error("tocó la base"); });
@@ -308,6 +349,7 @@ Deno.test("detalle: grupo que esconde miembros → un miembro NO ve la lista (ni
   assert(r.ok);
   const d = (r.cuerpo as any).data;
   assertEquals([d.participants, d.member_count, d.participants_hidden], [null, null, true]);
+  assertEquals(d.created_by, null, "con la lista escondida, el creador tampoco sale");
   assertEquals(llamadas.filter((l) => l.tabla === "chat_participants").length, 1, "consultó la lista de miembros");
 });
 
@@ -326,6 +368,7 @@ Deno.test("detalle: el admin DEL GRUPO sí la ve, y de los demás no sale cuánd
   assert(r.ok);
   const d = (r.cuerpo as any).data;
   assertEquals(d.member_count, 2);
+  assertEquals(d.created_by, OTRA, "el admin del grupo sí ve quién lo creó");
   assertEquals(d.participants[1], { user: { id: OTRA, name: "Otra", avatar_url: null }, role: "member", joined_at: "2026-01-03T00:00:00+00:00" });
   assert(!JSON.stringify(d.participants).includes("last_read_at"));
   assert(!JSON.stringify(d.participants).includes("is_muted"));
@@ -393,6 +436,13 @@ Deno.test("cursor: ida y vuelta exacta, y uno alterado no pasa", () => {
   assertEquals(decodificarCursor(codificarCursor(c)), c);
   for (const malo of ["", "@@@", codificarCursor({ t: "ayer", i: c.i }), codificarCursor({ t: c.t, i: "x" }), btoa("[]")]) {
     assertEquals(decodificarCursor(malo), null, `aceptó ${malo}`);
+  }
+  // Fechas que pasan una regex floja pero no existen, o que JS no sabe leer.
+  for (const t of ["2026-09-25T10:00:00-05", "2026-02-31T00:00:00Z", "2026-09-25T25:00:00Z", "2026-13-01T00:00:00Z", "2026-09-25T10:00:00+0000"]) {
+    assertEquals(decodificarCursor(codificarCursor({ t, i: c.i })), null, `aceptó la fecha ${t}`);
+  }
+  for (const t of ["2026-09-25T10:00:00Z", "2026-09-25T10:00:00.5+00:00", "2024-02-29T00:00:00+00:00"]) {
+    assert(decodificarCursor(codificarCursor({ t, i: c.i })) !== null, `rechazó la fecha buena ${t}`);
   }
   assertEquals(filtroDespues(c), `created_at.gt."${c.t}",and(created_at.eq."${c.t}",id.gt.${c.i})`);
 });

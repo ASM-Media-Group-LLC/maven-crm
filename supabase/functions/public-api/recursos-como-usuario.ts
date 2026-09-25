@@ -26,7 +26,6 @@ import {
   decodificarCursor,
   enTandas,
   type FilaDeMensaje,
-  filtroAntes,
   filtroDespues,
   limiteDePagina,
   mensajeParaApi,
@@ -314,7 +313,9 @@ async function conversacion(yo: SupabaseClient, ctx: Contexto, id: string): Prom
       data: {
         id: c.id, type: c.type,
         name: c.name ?? null, description: c.description ?? null, avatar_url: c.avatar_url ?? null,
-        created_by: c.created_by, created_at: c.created_at, updated_at: c.updated_at,
+        // El creador es un miembro más: si la lista está escondida, también él (la
+        // app no lo muestra en ningún lado).
+        created_by: veMiembros ? c.created_by : null, created_at: c.created_at, updated_at: c.updated_at,
         settings: {
           msg_permission: c.msg_permission, members_visibility: c.members_visibility,
           info_permission: c.info_permission, add_permission: c.add_permission,
@@ -357,16 +358,39 @@ async function mensajes(yo: SupabaseClient, ctx: Contexto, id: string): Promise<
   if (!conv.data) return noEncontrada();
 
   const ascendente = !!after;
-  let q = yo.from("chat_messages").select(incluir.rico ? COLS_MENSAJE_RICO : COLS_MENSAJE).eq("conversation_id", id);
-  if (hilo) q = q.eq("reply_to_id", hilo).eq("is_thread_reply", true);
-  // El gte/lte redundante con el or() es lo que deja que el índice use el cursor.
-  if (cursor && ascendente) q = q.gte("created_at", cursor.t).or(filtroDespues(cursor));
-  if (cursor && !ascendente) q = q.lte("created_at", cursor.t).or(filtroAntes(cursor));
-  q = q.order("created_at", { ascending: ascendente }).order("id", { ascending: ascendente }).limit(limit + 1);
-  const { data, error } = await q;
-  if (error) return falla(`mensajes: ${error.message}`);
+  const consulta = () => {
+    let q = yo.from("chat_messages").select(incluir.rico ? COLS_MENSAJE_RICO : COLS_MENSAJE).eq("conversation_id", id);
+    if (hilo) q = q.eq("reply_to_id", hilo).eq("is_thread_reply", true);
+    return q;
+  };
+  let filas: FilaDeMensaje[];
+  if (!cursor) {
+    const { data, error } = await consulta()
+      .order("created_at", { ascending: false }).order("id", { ascending: false }).limit(limit + 1);
+    if (error) return falla(`mensajes: ${error.message}`);
+    filas = (data ?? []) as unknown as FilaDeMensaje[];
+  } else {
+    // ⚠️ DOS consultas y no un or(): con "(created_at < t) o (= t y id < i)" el
+    // planificador subestima las filas y lee y chequea con la RLS TODO un lado de la
+    // conversación antes de ordenar (3.300+ bloques medidos el 25/09), en vez de cortar
+    // en limit+1. Así cada una tiene un solo rango y el índice corta donde debe:
+    //  * los empates del mismo instante (casi siempre 0-2: los álbumes se guardan
+    //    juntos), desempatados por id;
+    //  * el rango estricto, del otro lado del instante.
+    // Van primero los empates (están más cerca del cursor) y después el rango.
+    const empates = ascendente
+      ? consulta().eq("created_at", cursor.t).gt("id", cursor.i).order("id", { ascending: true }).limit(limit + 1)
+      : consulta().eq("created_at", cursor.t).lt("id", cursor.i).order("id", { ascending: false }).limit(limit + 1);
+    const rango = ascendente
+      ? consulta().gt("created_at", cursor.t).order("created_at", { ascending: true }).order("id", { ascending: true }).limit(limit + 1)
+      : consulta().lt("created_at", cursor.t).order("created_at", { ascending: false }).order("id", { ascending: false }).limit(limit + 1);
+    const [e, r] = await Promise.all([empates, rango]);
+    if (e.error) return falla(`mensajes (empates): ${e.error.message}`);
+    if (r.error) return falla(`mensajes: ${r.error.message}`);
+    filas = [...((e.data ?? []) as unknown as FilaDeMensaje[]), ...((r.data ?? []) as unknown as FilaDeMensaje[])]
+      .slice(0, limit + 1);
+  }
 
-  const filas = (data ?? []) as unknown as FilaDeMensaje[];
   const hayMas = filas.length > limit;
   const pagina = filas.slice(0, limit);
   const gente = await personas(yo, pagina.map((m) => m.sender_id));
@@ -420,6 +444,7 @@ async function feed(yo: SupabaseClient, ctx: Contexto): Promise<Resultado> {
 
   const asentado = ahora - ASENTAMIENTO_MS;
   const desdeMs = Date.parse(desde.t);
+  if (!Number.isFinite(desdeMs)) return malPedido("El cursor no es válido");
   const hastaMs = Math.min(desdeMs + VENTANA_FEED_MS, asentado);
   const hasta = new Date(hastaMs).toISOString();
   const alDia = hastaMs >= asentado;

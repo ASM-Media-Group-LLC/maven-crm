@@ -186,7 +186,18 @@ Deno.serve(async (req) => {
     if (action === "create") {
       const name = String(body?.name ?? "").trim();
       const scopes: string[] = Array.isArray(body?.scopes) ? body.scopes : [];
-      const expiresAt = body?.expires_at ? new Date(body.expires_at) : null;
+      // El vencimiento lo calcula el SERVIDOR a partir de los días elegidos: si lo
+      // calculaba el navegador, uno con el reloj adelantado pedía "90 días" y el
+      // servidor lo leía como 90 días y un poco, y lo rechazaba. Un minuto de margen
+      // cubre la diferencia entre el reloj de la función y el de la base. Si no vienen
+      // días (un frontend viejo), se usa expires_at como antes.
+      const dias = body?.expires_in_days;
+      if (dias !== undefined && (!Number.isInteger(dias) || dias < 0 || dias > 3650)) {
+        return json(req, { error: "expires_in_days tiene que ser un número de días entre 0 y 3650" }, 400);
+      }
+      const expiresAt: Date | null = dias !== undefined
+        ? (dias === 0 ? null : new Date(Date.now() + dias * 86_400_000 - 60_000))
+        : (body?.expires_at ? new Date(body.expires_at) : null);
       const ipWhitelist = cleanIpList(body?.ip_whitelist);
 
       if (!name) return json(req, { error: "El nombre de la key es requerido" }, 400);

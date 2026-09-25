@@ -15,8 +15,10 @@ export const ROL_ADMIN_DE_GRUPO = "admin";
 
 export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** Tope de página: con la RLS por fila, cada mensaje cuesta ~5-6 bloques de lectura;
- *  100 mantiene cualquier pedido por debajo de ~1.100 (medido en prod el 25/09). */
+/** Tope de página: con la RLS por fila, cada mensaje leído cuesta ~5-6 bloques; una
+ *  página de 100 queda en ~600 bloques (medido en prod el 25/09, peor persona y
+ *  conversación más larga). Eso vale mientras cada consulta corte en limit+1: ver
+ *  cómo pagina mensajes() con cursor. */
 export const PAGINA_MAX = 100;
 
 export function limiteDePagina(valor: string | undefined, porDefecto: number): number | null {
@@ -40,7 +42,22 @@ export function offsetDePagina(valor: string | undefined): number | null {
 
 export type Cursor = { t: string; i: string };
 
-const MARCA_DE_TIEMPO = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}(:?\d{2})?)$/;
+// Solo las dos formas que emite el servidor: la de la base ("+00:00") y la de JS
+// ("Z"). Una zona como "-05" o una fecha imposible ("31 de febrero") no pasan: si
+// pasaran, reventarían más adelante como un 503 "reintentá", y un cliente que
+// obedece Retry-After reintentaría el mismo cursor malo para siempre.
+const MARCA_DE_TIEMPO = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})(\.\d{1,6})?(Z|[+-]\d{2}:\d{2})$/;
+
+/** ¿Es una marca de tiempo que existe? (formato + calendario + que JS la lea). */
+export function marcaDeTiempoValida(t: string): boolean {
+  const m = t.match(MARCA_DE_TIEMPO);
+  if (!m) return false;
+  const [anio, mes, dia, hora, min, seg] = m.slice(1, 7).map(Number);
+  if (mes < 1 || mes > 12 || dia < 1 || hora > 23 || min > 59 || seg > 59) return false;
+  const diasDelMes = new Date(Date.UTC(anio, mes, 0)).getUTCDate();
+  if (dia > diasDelMes) return false;
+  return Number.isFinite(Date.parse(t));
+}
 
 function aBase64Url(s: string): string {
   const bytes = new TextEncoder().encode(s);
@@ -77,7 +94,7 @@ export function decodificarCursor(s: string): Cursor | null {
   if (!o || typeof o !== "object") return null;
   const { t, i } = o as Record<string, unknown>;
   if (typeof t !== "string" || typeof i !== "string") return null;
-  if (!MARCA_DE_TIEMPO.test(t) || !UUID.test(i)) return null;
+  if (!marcaDeTiempoValida(t) || !UUID.test(i)) return null;
   return { t, i };
 }
 
@@ -101,10 +118,6 @@ export function filtroDespues(c: Cursor): string {
   return `created_at.gt."${c.t}",and(created_at.eq."${c.t}",id.gt.${c.i})`;
 }
 
-/** Filtro PostgREST "antes del cursor" (orden descendente por created_at, id). */
-export function filtroAntes(c: Cursor): string {
-  return `created_at.lt."${c.t}",and(created_at.eq."${c.t}",id.lt.${c.i})`;
-}
 
 // ─── Mensajes ──────────────────────────────────────────────────────────────────
 
