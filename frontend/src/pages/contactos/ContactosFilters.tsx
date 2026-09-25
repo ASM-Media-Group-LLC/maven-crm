@@ -13,6 +13,8 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/hooks/useLanguage";
+import { ETIQUETA_PRIORIDAD } from "./etiquetas";
 
 export interface ContactoFilters {
   search: string;
@@ -62,6 +64,7 @@ interface Props {
 }
 
 const ContactosFilters = ({ filters, onChange, view, onViewChange, hasActiveFilters, onClear, creators = [], cities = [], salesChannelOptions = [], canSearchPhone = false }: Props) => {
+  const { t } = useLanguage();
   const [agentOpen, setAgentOpen] = useState(false);
   const [channelOpen, setChannelOpen] = useState(false);
 
@@ -73,14 +76,14 @@ const ContactosFilters = ({ filters, onChange, view, onViewChange, hasActiveFilt
     onChange({ salesChannels: Array.from(set) });
   };
   const channelButtonLabel = (() => {
-    if (selectedChannels.length === 0) return "Canal de venta";
+    if (selectedChannels.length === 0) return t("contactos.salesChannel");
     if (selectedChannels.length === 1) {
       const only = selectedChannels[0];
-      if (only === SALES_CHANNEL_NONE) return "Sin contactar";
-      if (only === SALES_CHANNEL_MULTI) return "2+ canales";
-      return salesChannelOptions.find((o) => o.id === only)?.label ?? "1 canal";
+      if (only === SALES_CHANNEL_NONE) return t("contactos.notContacted");
+      if (only === SALES_CHANNEL_MULTI) return t("contactos.twoPlusChannels");
+      return salesChannelOptions.find((o) => o.id === only)?.label ?? t("contactos.oneChannel");
     }
-    return `${selectedChannels.length} canales`;
+    return t("contactos.nChannels", { count: selectedChannels.length });
   })();
 
   return (
@@ -88,7 +91,7 @@ const ContactosFilters = ({ filters, onChange, view, onViewChange, hasActiveFilt
       <div className="relative w-full sm:w-64 sm:shrink-0">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
-          placeholder={canSearchPhone ? "Buscar por ticket, nombre, handle, teléfono..." : "Buscar por ticket, nombre, handle..."}
+          placeholder={canSearchPhone ? t("contactos.searchPlaceholderPhone") : t("contactos.searchPlaceholder")}
           className="pl-9"
           value={filters.search}
           onChange={(e) => onChange({ search: e.target.value })}
@@ -96,7 +99,7 @@ const ContactosFilters = ({ filters, onChange, view, onViewChange, hasActiveFilt
       </div>
 
       <FilterSelect
-        placeholder="País"
+        placeholder={t("common.country")}
         value={filters.pais}
         options={["AR", "BR", "CL", "CO", "CR", "EC", "ES", "GB", "GT", "HN", "IT", "MX", "PA", "PE", "PY", "SV", "TH", "US", "UY", "VE"]}
         labels={Object.fromEntries(
@@ -107,20 +110,23 @@ const ContactosFilters = ({ filters, onChange, view, onViewChange, hasActiveFilt
       />
       {/* Tipo: separa las agencias (B2B) de los contactos de modelos. */}
       <FilterSelect
-        placeholder="Tipo"
+        placeholder={t("common.type")}
         value={filters.contactKind ?? ""}
         options={["modelo", "agencia"]}
-        labels={{ modelo: "Modelos", agencia: "Agencias" }}
+        labels={{ modelo: t("contactos.kindModels"), agencia: t("contactos.kindAgencies") }}
         onChange={(v) => onChange({ contactKind: v })}
       />
+      {/* Alta/Media/Baja es la prioridad de una agencia: el valor se filtra tal
+          cual está en la base; solo cambia lo que se lee. */}
       <FilterSelect
-        placeholder="Categoría"
+        placeholder={t("common.category")}
         value={filters.categoria}
         options={["A+", "A", "B+", "B", "C", "Alta", "Media", "Baja"]}
+        labels={Object.fromEntries(Object.entries(ETIQUETA_PRIORIDAD).map(([v, k]) => [v, t(k)]))}
         onChange={(v) => onChange({ categoria: v })}
       />
       <FilterSelect
-        placeholder="Ciudad"
+        placeholder={t("common.city")}
         value={filters.ciudad}
         options={cities}
         onChange={(v) => onChange({ ciudad: v })}
@@ -136,14 +142,14 @@ const ContactosFilters = ({ filters, onChange, view, onViewChange, hasActiveFilt
             className="w-full sm:w-[180px] justify-between font-normal"
           >
             <span className="truncate">
-              {filters.creadoPor || "Agente"}
+              {filters.creadoPor || t("contactos.agent")}
             </span>
             <ChevronsUpDown className="ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-[220px] p-0" align="start">
           <Command>
-            <CommandInput placeholder="Buscar agente..." />
+            <CommandInput placeholder={t("contactos.searchAgent")} />
             <CommandList>
               <CommandEmpty />
               <CommandGroup>
@@ -154,7 +160,7 @@ const ContactosFilters = ({ filters, onChange, view, onViewChange, hasActiveFilt
                   }}
                 >
                   <Check className={cn("mr-2 h-4 w-4", !filters.creadoPor ? "opacity-100" : "opacity-0")} />
-                  Todos
+                  {t("common.all")}
                 </CommandItem>
                 {creators.map((c) => (
                   <CommandItem
@@ -190,7 +196,7 @@ const ContactosFilters = ({ filters, onChange, view, onViewChange, hasActiveFilt
           </PopoverTrigger>
           <PopoverContent className="w-[240px] p-0" align="start">
             <Command>
-              <CommandInput placeholder="Buscar canal..." />
+              <CommandInput placeholder={t("contactos.searchChannel")} />
               <CommandList>
                 <CommandEmpty />
                 <CommandGroup>
@@ -201,14 +207,14 @@ const ContactosFilters = ({ filters, onChange, view, onViewChange, hasActiveFilt
                     </CommandItem>
                   ))}
                 </CommandGroup>
-                <CommandGroup heading="Especial">
+                <CommandGroup heading={t("contactos.special")}>
                   <CommandItem onSelect={() => toggleChannel(SALES_CHANNEL_MULTI)}>
                     <Check className={cn("mr-2 h-4 w-4", selectedChannels.includes(SALES_CHANNEL_MULTI) ? "opacity-100" : "opacity-0")} />
-                    Contactado por 2+ canales
+                    {t("contactos.contactedTwoPlus")}
                   </CommandItem>
                   <CommandItem onSelect={() => toggleChannel(SALES_CHANNEL_NONE)}>
                     <Check className={cn("mr-2 h-4 w-4", selectedChannels.includes(SALES_CHANNEL_NONE) ? "opacity-100" : "opacity-0")} />
-                    Sin contactar por WhatsApp
+                    {t("contactos.notContactedWhatsapp")}
                   </CommandItem>
                 </CommandGroup>
               </CommandList>
@@ -220,7 +226,7 @@ const ContactosFilters = ({ filters, onChange, view, onViewChange, hasActiveFilt
       {hasActiveFilters && onClear && (
         <Button variant="ghost" size="sm" onClick={onClear}>
           <X className="mr-1.5 h-4 w-4" />
-          Limpiar filtros
+          {t("contactos.clearFilters")}
         </Button>
       )}
 
@@ -259,13 +265,14 @@ function FilterSelect({
   labels?: Record<string, string>;
   onChange: (v: string) => void;
 }) {
+  const { t } = useLanguage();
   return (
     <Select value={value || undefined} onValueChange={(v) => onChange(v === "__all__" ? "" : v)}>
       <SelectTrigger className="w-full sm:w-[180px]">
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value="__all__">Todos</SelectItem>
+        <SelectItem value="__all__">{t("common.all")}</SelectItem>
         {options.map((o) => (
           <SelectItem key={o} value={o}>
             {labels?.[o] || o}

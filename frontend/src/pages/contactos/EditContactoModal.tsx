@@ -18,24 +18,20 @@ import { CountryCodeSelect } from "@/components/ui/country-code-select";
 import { cn } from "@/lib/utils";
 import { UserAvatar } from "@/components/UserAvatar";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/hooks/useLanguage";
+import { CATEGORIAS, PLATAFORMA_OTRA } from "./etiquetas";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import FileUploadModal, { type UploadCategory, type UploadedFile } from "@/components/FileUploadModal";
 import type { Contacto } from "./ContactosContent";
 
-const CATEGORIES = [
-  { value: "A+", label: "A+ (Premium)" },
-  { value: "A", label: "A (Alta)" },
-  { value: "B+", label: "B+ (Media Alta)" },
-  { value: "B", label: "B (Media)" },
-  { value: "C", label: "C (Básica)" },
-];
-
 const DEFAULT_COMPANIES = [
   "Kash", "Alvaro Letshoot", "Blue App", "PicLink", "Pagomundo", "Exchange", "Unlok", "Trafix",
 ];
-const PLATFORMS = ["Instagram", "TikTok", "Twitter/X", "OnlyFans", "Otra"];
+// Valores que se guardan tal cual en closers_contacts.platform; "Otra" solo cambia
+// de etiqueta al dibujarse.
+const PLATFORMS = ["Instagram", "TikTok", "Twitter/X", "OnlyFans", PLATAFORMA_OTRA];
 
 interface Props {
   open: boolean;
@@ -45,6 +41,7 @@ interface Props {
 
 const EditContactoModal = ({ open, onOpenChange, contacto }: Props) => {
   const { toast } = useToast();
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
   // Teléfono y email son admin-only (la vista enmascarada los devuelve NULL a no-admin).
   // Para no-admin: ocultamos los campos y NO los mandamos en el update (si no, el NULL
@@ -100,7 +97,7 @@ const EditContactoModal = ({ open, onOpenChange, contacto }: Props) => {
         twitter: "Twitter/X",
         onlyfans: "OnlyFans",
       };
-      setPlataforma(platformMap[detected] || "Otra");
+      setPlataforma(platformMap[detected] || PLATAFORMA_OTRA);
     }
   }, []);
 
@@ -124,7 +121,7 @@ const EditContactoModal = ({ open, onOpenChange, contacto }: Props) => {
   const handleSave = async () => {
     const extractedHandle = normalizeHandle(accountLink);
     if (!nombre.trim() || !extractedHandle) {
-      toast({ title: "Nombre y link de la cuenta son obligatorios", variant: "destructive" });
+      toast({ title: t("contactos.nameAndLinkRequired"), variant: "destructive" });
       return;
     }
     if (!contacto) return;
@@ -161,10 +158,10 @@ const EditContactoModal = ({ open, onOpenChange, contacto }: Props) => {
       if (error) throw error;
 
       queryClient.invalidateQueries({ queryKey: ["closers_contacts"] });
-      toast({ title: "Contacto actualizado exitosamente" });
+      toast({ title: t("contactos.updatedToast") });
       onOpenChange(false);
     } catch (err: any) {
-      toast({ title: "Error al actualizar", description: err.message, variant: "destructive" });
+      toast({ title: t("common.errorUpdating"), description: err.message, variant: "destructive" });
     } finally {
       setIsSaving(false);
     }
@@ -178,87 +175,87 @@ const EditContactoModal = ({ open, onOpenChange, contacto }: Props) => {
         <DialogContent className="max-w-[95vw] sm:max-w-[600px] max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Pencil className="h-5 w-5" /> Editar Contacto
+              <Pencil className="h-5 w-5" /> {t("contactos.editContact")}
             </DialogTitle>
-            <DialogDescription>Modifica los datos del contacto</DialogDescription>
+            <DialogDescription>{t("contactos.editContactDesc")}</DialogDescription>
           </DialogHeader>
 
           <ScrollArea className="flex-1 max-h-[60vh] pr-4">
             <div className="space-y-4 pb-2">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label className="text-sm font-medium">Nombre del Contacto *</Label>
+                  <Label className="text-sm font-medium">{t("contactos.contactName")}</Label>
                   <Input value={nombre} onChange={(e) => setNombre(e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-sm font-medium">Categoría Física *</Label>
+                  <Label className="text-sm font-medium">{t("contactos.physicalCategory")}</Label>
                   <Select value={categoria} onValueChange={setCategoria}>
-                    <SelectTrigger><SelectValue placeholder="Seleccionar categoría" /></SelectTrigger>
-                    <SelectContent>{CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
+                    <SelectTrigger><SelectValue placeholder={t("contactos.selectCategory")} /></SelectTrigger>
+                    <SelectContent>{CATEGORIAS.map((c) => <SelectItem key={c.value} value={c.value}>{t(c.label)}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-sm font-medium">Compañía / Cuenta de Origen</Label>
+                <Label className="text-sm font-medium">{t("contactos.companySource")}</Label>
                 <CompanySelector value={compania} onChange={setCompania} companies={companies} onAddCompany={(name) => setCompanies((prev) => [...prev, name])} />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label className="text-sm font-medium">Email</Label>
-                  <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@ejemplo.com" />
+                  <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t("contactos.emailPlaceholder")} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-sm font-medium">Teléfono</Label>
+                  <Label className="text-sm font-medium">{t("common.phone")}</Label>
                   <div className="flex gap-2">
                     <CountryCodeSelect value={countryCode} onChange={setCountryCode} />
-                    <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Número de teléfono" className="flex-1" />
+                    <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder={t("contactos.phoneNumber")} className="flex-1" />
                   </div>
                 </div>
               </div>
               {!isAdmin && (
                 <p className="text-[11px] text-muted-foreground -mt-2">
-                  📞 Ves el teléfono/email enmascarados (••••). Para cambiarlos, escribe uno nuevo; si los dejas así, no se modifican.
+                  {t("contactos.maskedHint")}
                 </p>
               )}
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label className="text-sm font-medium">Link de la Cuenta *</Label>
-                  <Input value={accountLink} onChange={(e) => handleAccountLinkChange(e.target.value)} placeholder="https://instagram.com/usuario" />
+                  <Label className="text-sm font-medium">{t("contactos.accountLink")}</Label>
+                  <Input value={accountLink} onChange={(e) => handleAccountLinkChange(e.target.value)} placeholder={t("contactos.accountLinkPlaceholder")} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-sm font-medium">Plataforma</Label>
+                  <Label className="text-sm font-medium">{t("contactos.platform")}</Label>
                   <Select value={plataforma} onValueChange={setPlataforma}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>{PLATFORMS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
+                    <SelectContent>{PLATFORMS.map((p) => <SelectItem key={p} value={p}>{p === PLATAFORMA_OTRA ? t("contactos.platformOther") : p}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label className="text-sm font-medium">Ciudad</Label>
-                  <Input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Ej: Bogotá" />
+                  <Label className="text-sm font-medium">{t("common.city")}</Label>
+                  <Input value={city} onChange={(e) => setCity(e.target.value)} placeholder={t("contactos.cityPlaceholderShort")} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-sm font-medium">Número de Ticket</Label>
-                  <Input value={ticket} onChange={(e) => setTicket(e.target.value)} placeholder="Ej: CT586864" />
+                  <Label className="text-sm font-medium">{t("contactos.ticketNumber")}</Label>
+                  <Input value={ticket} onChange={(e) => setTicket(e.target.value)} placeholder={t("contactos.ticketPlaceholder")} />
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-sm font-medium">Notas</Label>
-                <Textarea value={notas} onChange={(e) => setNotas(e.target.value)} placeholder="Notas adicionales sobre el contacto..." rows={3} />
+                <Label className="text-sm font-medium">{t("contactos.notes")}</Label>
+                <Textarea value={notas} onChange={(e) => setNotas(e.target.value)} placeholder={t("contactos.notesPlaceholder")} rows={3} />
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-sm font-medium">Foto de Perfil</Label>
+                <Label className="text-sm font-medium">{t("contactos.profilePhoto")}</Label>
                 <div className="flex items-center gap-3">
                   <UserAvatar name={nombre} src={profilePhoto?.url} size="lg" />
                   <Button variant="outline" size="sm" type="button" onClick={() => setUploadModal({ open: true, category: "piclink" })}>
-                    <Upload className="mr-1.5 h-3.5 w-3.5" /> Subir
+                    <Upload className="mr-1.5 h-3.5 w-3.5" /> {t("contactos.upload")}
                   </Button>
                   {profilePhoto && (
                     <Button variant="ghost" size="sm" type="button" onClick={() => setProfilePhoto(null)}>
@@ -270,9 +267,9 @@ const EditContactoModal = ({ open, onOpenChange, contacto }: Props) => {
 
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <Label className="text-sm font-medium">Fotos y Videos Extras</Label>
+                  <Label className="text-sm font-medium">{t("contactos.extraMedia")}</Label>
                   <Button variant="outline" size="sm" type="button" onClick={() => setUploadModal({ open: true, category: "extras" })}>
-                    <Upload className="mr-1.5 h-3.5 w-3.5" /> Subir
+                    <Upload className="mr-1.5 h-3.5 w-3.5" /> {t("contactos.upload")}
                   </Button>
                 </div>
                 {extraFiles.length > 0 && (
@@ -296,9 +293,9 @@ const EditContactoModal = ({ open, onOpenChange, contacto }: Props) => {
           </ScrollArea>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>{t("common.cancel")}</Button>
             <Button onClick={handleSave} disabled={isSaving}>
-              <Save className="mr-1.5 h-4 w-4" /> {isSaving ? "Guardando..." : "Guardar Cambios"}
+              <Save className="mr-1.5 h-4 w-4" /> {isSaving ? t("contactos.saving") : t("contactos.saveChanges")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -317,6 +314,7 @@ interface CompanySelectorProps {
 }
 
 function CompanySelector({ value, onChange, companies, onAddCompany }: CompanySelectorProps) {
+  const { t } = useLanguage();
   const [open, setOpen] = useState(false);
   const [addingNew, setAddingNew] = useState(false);
   const [newName, setNewName] = useState("");
@@ -335,23 +333,23 @@ function CompanySelector({ value, onChange, companies, onAddCompany }: CompanySe
     <Popover open={open} onOpenChange={(o) => { setOpen(o); if (!o) setAddingNew(false); }}>
       <PopoverTrigger asChild>
         <Button variant="outline" role="combobox" aria-expanded={open} className="w-full justify-between font-normal">
-          {value || <span className="text-muted-foreground">Seleccionar compañía</span>}
+          {value || <span className="text-muted-foreground">{t("contactos.selectCompany")}</span>}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-full p-0" align="start">
         {addingNew ? (
           <div className="p-3 space-y-2">
-            <p className="text-xs text-muted-foreground font-medium">Nueva compañía</p>
-            <Input autoFocus value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Nombre de la compañía" onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); if (e.key === "Escape") { setAddingNew(false); setNewName(""); } }} />
+            <p className="text-xs text-muted-foreground font-medium">{t("contactos.newCompany")}</p>
+            <Input autoFocus value={newName} onChange={(e) => setNewName(e.target.value)} placeholder={t("contactos.companyName")} onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); if (e.key === "Escape") { setAddingNew(false); setNewName(""); } }} />
             <div className="flex gap-2">
-              <Button size="sm" className="flex-1" onClick={handleAdd} disabled={!newName.trim()}>Agregar</Button>
-              <Button size="sm" variant="outline" onClick={() => { setAddingNew(false); setNewName(""); }}>Cancelar</Button>
+              <Button size="sm" className="flex-1" onClick={handleAdd} disabled={!newName.trim()}>{t("common.add")}</Button>
+              <Button size="sm" variant="outline" onClick={() => { setAddingNew(false); setNewName(""); }}>{t("common.cancel")}</Button>
             </div>
           </div>
         ) : (
           <Command>
-            <CommandInput placeholder="Buscar compañía..." />
+            <CommandInput placeholder={t("contactos.searchCompany")} />
             <CommandList>
               <CommandEmpty />
               <CommandGroup>
@@ -364,7 +362,7 @@ function CompanySelector({ value, onChange, companies, onAddCompany }: CompanySe
               </CommandGroup>
               <CommandGroup>
                 <CommandItem onSelect={() => setAddingNew(true)} className="text-muted-foreground">
-                  <Plus className="mr-2 h-4 w-4" /> Agregar nueva compañía…
+                  <Plus className="mr-2 h-4 w-4" /> {t("contactos.addNewCompany")}
                 </CommandItem>
               </CommandGroup>
             </CommandList>

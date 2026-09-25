@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
 import { Badge } from "@/components/ui/badge";
 import { AlertTriangle, ArrowRight, Clock, Shield } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -15,6 +16,7 @@ interface Props {
 
 const CategoryAuditLog = ({ open }: Props) => {
   const f = useFormato();
+  const { t } = useLanguage();
   const { data: changes = [], isLoading } = useQuery({
     queryKey: ["category-audit-log"],
     enabled: open,
@@ -51,7 +53,9 @@ const CategoryAuditLog = ({ open }: Props) => {
         .rpc("get_agent_names", { _user_ids: agentIds });
       if (error) throw error;
       const map: Record<string, string> = {};
-      (data ?? []).forEach((p: any) => { map[p.id] = p.full_name || "Desconocido"; });
+      // Sin nombre queda vacío: el "Desconocido" se pone al dibujar, en el idioma de
+      // la interfaz (este mapa queda en la caché de react-query).
+      (data ?? []).forEach((p: any) => { map[p.id] = p.full_name || ""; });
       return map;
     },
   });
@@ -65,7 +69,7 @@ const CategoryAuditLog = ({ open }: Props) => {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <p className="text-sm text-muted-foreground">Cargando log de auditoría…</p>
+        <p className="text-sm text-muted-foreground">{t("contactos.loadingAuditLog")}</p>
       </div>
     );
   }
@@ -74,8 +78,8 @@ const CategoryAuditLog = ({ open }: Props) => {
     return (
       <div className="flex flex-col items-center justify-center py-12 gap-3">
         <Shield className="h-10 w-10 text-muted-foreground" />
-        <p className="text-sm text-muted-foreground">No se han registrado cambios de categoría aún.</p>
-        <p className="text-xs text-muted-foreground">Cuando un agente cambie la categoría de un contacto, aparecerá aquí.</p>
+        <p className="text-sm text-muted-foreground">{t("contactos.noCategoryChanges")}</p>
+        <p className="text-xs text-muted-foreground">{t("contactos.noCategoryChangesHint")}</p>
       </div>
     );
   }
@@ -92,15 +96,15 @@ const CategoryAuditLog = ({ open }: Props) => {
         {/* Summary cards */}
         <div className="grid grid-cols-3 gap-3">
           <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-            <p className="text-xs text-muted-foreground">Total cambios</p>
+            <p className="text-xs text-muted-foreground">{t("contactos.totalChanges")}</p>
             <p className="text-2xl font-bold">{changes.length}</p>
           </div>
           <div className="rounded-lg border border-warning/30 bg-warning/5 p-3">
-            <p className="text-xs text-warning">⚠ Sospechosos (&gt;24h)</p>
+            <p className="text-xs text-warning">{t("contactos.suspiciousOver24h")}</p>
             <p className="text-2xl font-bold text-warning">{suspicious.length}</p>
           </div>
           <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-            <p className="text-xs text-muted-foreground">Agentes involucrados</p>
+            <p className="text-xs text-muted-foreground">{t("contactos.agentsInvolved")}</p>
             <p className="text-2xl font-bold">{agentIds.length}</p>
           </div>
         </div>
@@ -110,17 +114,17 @@ const CategoryAuditLog = ({ open }: Props) => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="sticky top-0 bg-card z-10">Fecha</TableHead>
-                <TableHead className="sticky top-0 bg-card z-10">Contacto</TableHead>
-                <TableHead className="sticky top-0 bg-card z-10">Cambio</TableHead>
-                <TableHead className="sticky top-0 bg-card z-10">Agente</TableHead>
-                <TableHead className="sticky top-0 bg-card z-10">Horas después</TableHead>
-                <TableHead className="sticky top-0 bg-card z-10">Riesgo</TableHead>
+                <TableHead className="sticky top-0 bg-card z-10">{t("common.date")}</TableHead>
+                <TableHead className="sticky top-0 bg-card z-10">{t("contactos.contact")}</TableHead>
+                <TableHead className="sticky top-0 bg-card z-10">{t("contactos.change")}</TableHead>
+                <TableHead className="sticky top-0 bg-card z-10">{t("contactos.agent")}</TableHead>
+                <TableHead className="sticky top-0 bg-card z-10">{t("contactos.hoursAfter")}</TableHead>
+                <TableHead className="sticky top-0 bg-card z-10">{t("contactos.risk")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {changes.map((c) => {
-                const agentName = profiles[c.changed_by] || "Desconocido";
+                const agentName = profiles[c.changed_by] || t("contactos.unknown");
                 const isSuspicious = (c.hours_since_creation ?? 0) > 24;
                 const hoursLabel = c.hours_since_creation != null
                   ? c.hours_since_creation < 1
@@ -176,10 +180,10 @@ const CategoryAuditLog = ({ open }: Props) => {
                       {isSuspicious ? (
                         <Badge variant="destructive" className="text-[10px] gap-1">
                           <AlertTriangle className="h-3 w-3" />
-                          Sospechoso
+                          {t("contactos.suspicious")}
                         </Badge>
                       ) : (
-                        <Badge variant="secondary" className="text-[10px]">Normal</Badge>
+                        <Badge variant="secondary" className="text-[10px]">{t("contactos.normal")}</Badge>
                       )}
                     </TableCell>
                   </TableRow>
@@ -190,7 +194,7 @@ const CategoryAuditLog = ({ open }: Props) => {
         </div>
 
         <p className="text-[10px] text-muted-foreground">
-          Se registra automáticamente cada cambio de categoría. Los cambios realizados más de 24 horas después de la creación del contacto se marcan como sospechosos.
+          {t("contactos.auditFooter")}
         </p>
       </div>
     </TooltipProvider>
