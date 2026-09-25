@@ -9,6 +9,7 @@ import { displayPhone } from "@/lib/country-utils";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import type { LeadGenEntry } from "./useLeadGen";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface Props {
   open: boolean;
@@ -18,18 +19,19 @@ interface Props {
 }
 
 const ConvertLeadModal = ({ open, onOpenChange, lead, onConverted }: Props) => {
+  const { t } = useLanguage();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const handleCancel = () => {
-    toast({ title: "Conversión cancelada" });
+    toast({ title: t("leadgen.convert.canceled") });
     onOpenChange(false);
   };
 
   const convert = useMutation({
     mutationFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("No autenticado");
+      if (!user) throw new Error(t("leadgen.notSignedIn"));
 
       // Insert into closers_contacts — the trigger sync_closers_contact_to_creators
       // will automatically create the closer_creators row if phone is present
@@ -72,11 +74,11 @@ const ConvertLeadModal = ({ open, onOpenChange, lead, onConverted }: Props) => {
       queryClient.invalidateQueries({ queryKey: ["closer-creators-list"] });
       queryClient.invalidateQueries({ queryKey: ["closer-creators-counts"] });
       queryClient.invalidateQueries({ queryKey: ["closers-contacts"] });
-      toast({ title: "Lead convertido", description: "El contacto fue creado y agregado al pipeline de Closers." });
+      toast({ title: t("leadgen.convert.done"), description: t("leadgen.convert.doneDesc") });
       onConverted();
     },
     onError: () => {
-      toast({ title: "Error al convertir", variant: "destructive" });
+      toast({ title: t("leadgen.convert.error"), variant: "destructive" });
     },
   });
 
@@ -87,11 +89,11 @@ const ConvertLeadModal = ({ open, onOpenChange, lead, onConverted }: Props) => {
   const { isAdmin } = useUserRole();
   const items = [
     { label: "Handle", value: lead.model_handle ? `@${lead.model_handle}` : "—" },
-    { label: "Plataforma", value: lead.platform },
-    { label: "Categoría", value: lead.quality || "—" },
-    { label: "Cuenta origen", value: lead.company || "—" },
-    { label: "Teléfono", value: displayPhone(lead.phone_raw, isAdmin) || "—" },
-    { label: "Enlace", value: lead.source_link ? "✓ Incluido" : "—" },
+    { label: t("leadgen.convert.platform"), value: lead.platform },
+    { label: t("common.category"), value: lead.quality || "—" },
+    { label: t("leadgen.convert.sourceAccount"), value: lead.company || "—" },
+    { label: t("common.phone"), value: displayPhone(lead.phone_raw, isAdmin) || "—" },
+    { label: t("leadgen.convert.link"), value: lead.source_link ? t("leadgen.convert.included") : "—" },
   ];
 
   return (
@@ -100,15 +102,15 @@ const ConvertLeadModal = ({ open, onOpenChange, lead, onConverted }: Props) => {
         <DialogHeader>
           <div className="flex items-center gap-2">
             <ArrowRight className="h-5 w-5 text-primary" />
-            <DialogTitle>Convertir Lead a Pipeline Closers</DialogTitle>
+            <DialogTitle>{t("leadgen.convert.title")}</DialogTitle>
           </div>
           <DialogDescription>
-            Este lead será transferido al pipeline de Closers como una creator nueva en etapa "Asignada".
+            {t("leadgen.convert.description")}
           </DialogDescription>
         </DialogHeader>
 
         <div className="border rounded-lg p-4 space-y-3">
-          <p className="text-sm font-semibold">Datos que se transferirán</p>
+          <p className="text-sm font-semibold">{t("leadgen.convert.dataToTransfer")}</p>
           <ul className="space-y-1.5">
             {items.map((item) => (
               <li key={item.label} className="flex items-start gap-2 text-sm">
@@ -126,28 +128,28 @@ const ConvertLeadModal = ({ open, onOpenChange, lead, onConverted }: Props) => {
           <div className="flex items-start gap-2.5 rounded-lg bg-warning/10 p-3">
             <AlertTriangle className="h-4 w-4 text-warning shrink-0 mt-0.5" />
             <p className="text-xs text-warning">
-              <span className="font-semibold">Falta el handle de Instagram.</span> Ningún
-              contacto puede entrar al pipeline sin handle. Edita el lead para agregarlo y vuelve a intentar.
+              <span className="font-semibold">{t("leadgen.convert.missingHandleTitle")}</span>{" "}
+              {t("leadgen.convert.missingHandleBody")}
             </p>
           </div>
         ) : (
           <div className="flex items-start gap-2.5 rounded-lg bg-primary/10 p-3">
             <Lightbulb className="h-4 w-4 text-primary shrink-0 mt-0.5" />
             <p className="text-xs text-muted-foreground">
-              El lead quedará marcado como "contactado" y la creator aparecerá en el módulo de Closers con referencia al lead original.
+              {t("leadgen.convert.hint")}
             </p>
           </div>
         )}
 
         <DialogFooter className="gap-2 sm:gap-0">
           <Button variant="outline" onClick={handleCancel} disabled={convert.isPending}>
-            Cancelar
+            {t("common.cancel")}
           </Button>
           <Button
             onClick={() => convert.mutate()}
             disabled={convert.isPending || missingHandle}
           >
-            {convert.isPending ? "Convirtiendo..." : "Confirmar Conversión"}
+            {convert.isPending ? t("leadgen.convert.converting") : t("leadgen.convert.confirm")}
           </Button>
         </DialogFooter>
       </DialogContent>

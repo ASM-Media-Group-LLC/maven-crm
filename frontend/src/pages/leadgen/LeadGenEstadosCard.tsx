@@ -2,6 +2,8 @@ import { Phone } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { LeadGenEntry } from "./useLeadGen";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 
 interface ActiveFilter {
   type: "categoria" | "status" | null;
@@ -16,10 +18,20 @@ interface Props {
 
 const knownStatuses = new Set(["no_response", "contactado", "respondio", "interesado", "no_interesado"]);
 
-const estadoConfig = [
+// `key` es el filtro que entiende LeadGenContent (no se traduce); en pantalla
+// va t(labelKey).
+const estadoConfig: Array<{
+  key: string;
+  labelKey: TranslationKey;
+  dotClass: string;
+  activeClass: string;
+  hoverClass: string;
+  isPhone?: boolean;
+  count: (leads: LeadGenEntry[]) => number;
+}> = [
   {
     key: "respondieron",
-    label: "Respondieron",
+    labelKey: "leadgen.status.replied",
     dotClass: "bg-primary",
     activeClass: "bg-primary/10 border-l-primary",
     hoverClass: "hover:bg-primary/8 hover:border-l-primary/60",
@@ -28,7 +40,7 @@ const estadoConfig = [
   },
   {
     key: "interesadas",
-    label: "Interesadas",
+    labelKey: "leadgen.status.interested",
     dotClass: "bg-success",
     activeClass: "bg-success/10 border-l-success",
     hoverClass: "hover:bg-success/8 hover:border-l-success/60",
@@ -36,7 +48,7 @@ const estadoConfig = [
   },
   {
     key: "no_interesadas",
-    label: "No interesadas",
+    labelKey: "leadgen.status.notInterested",
     dotClass: "bg-destructive",
     activeClass: "bg-destructive/10 border-l-destructive",
     hoverClass: "hover:bg-destructive/8 hover:border-l-destructive/60",
@@ -44,7 +56,7 @@ const estadoConfig = [
   },
   {
     key: "otros",
-    label: "Otros",
+    labelKey: "leadgen.status.other",
     dotClass: "bg-muted-foreground/50",
     activeClass: "bg-muted border-l-muted-foreground",
     hoverClass: "hover:bg-muted hover:border-l-muted-foreground/40",
@@ -52,7 +64,7 @@ const estadoConfig = [
   },
   {
     key: "con_telefono",
-    label: "Con Teléfono",
+    labelKey: "leadgen.status.withPhone",
     dotClass: "bg-warning",
     activeClass: "bg-warning/10 border-l-warning",
     hoverClass: "hover:bg-warning/8 hover:border-l-warning/60",
@@ -63,6 +75,7 @@ const estadoConfig = [
 ];
 
 const LeadGenEstadosCard = ({ leads = [], activeFilter, onFilterChange }: Props) => {
+  const { t } = useLanguage();
   const handleClick = (key: string) => {
     if (!onFilterChange) return;
     if (activeFilter?.type === "status" && activeFilter.value === key) {
@@ -79,7 +92,7 @@ const LeadGenEstadosCard = ({ leads = [], activeFilter, onFilterChange }: Props)
     <Card className="transition-all duration-200 hover:shadow-md hover:border-primary/30">
       <CardHeader className="pb-0.5 px-3 pt-2">
         <CardTitle className="text-xs font-semibold text-muted-foreground">
-          Estados
+          {t("leadgen.status.title")}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-0 px-3 pb-2 pt-0">
@@ -103,7 +116,7 @@ const LeadGenEstadosCard = ({ leads = [], activeFilter, onFilterChange }: Props)
                 <span className={cn("h-2.5 w-2.5 rounded-full shrink-0 transition-transform", estado.dotClass, active && "scale-125")} />
               )}
               <span className={cn("text-sm font-medium flex-1", active ? "text-foreground" : "text-muted-foreground")}>
-                {estado.label}
+                {t(estado.labelKey)}
               </span>
               <span className={cn("text-base font-bold tabular-nums", active ? "text-foreground" : "text-foreground/70")}>
                 {count}

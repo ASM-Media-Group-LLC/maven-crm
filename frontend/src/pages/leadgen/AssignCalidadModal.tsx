@@ -13,6 +13,8 @@ import {
 import { useUpdateLeadQuality } from "./useLeadGen";
 import { useToast } from "@/hooks/use-toast";
 import type { LeadGenEntry } from "./useLeadGen";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 
 const calidadColors: Record<string, string> = {
   "a+": "bg-primary text-primary-foreground",
@@ -22,18 +24,19 @@ const calidadColors: Record<string, string> = {
   c: "bg-destructive text-destructive-foreground",
 };
 
-const calidadOptions = [
-  { value: "a+", label: "A+ — Top calidad" },
-  { value: "a", label: "A — Alta calidad" },
-  { value: "b+", label: "B+ — Buena calidad" },
-  { value: "b", label: "B — Calidad estándar" },
-  { value: "c", label: "C — Baja calidad" },
+// `value` es el dato; en pantalla va t(labelKey).
+const calidadOptions: Array<{ value: string; labelKey: TranslationKey }> = [
+  { value: "a+", labelKey: "leadgen.assign.optTop" },
+  { value: "a", labelKey: "leadgen.assign.optHigh" },
+  { value: "b+", labelKey: "leadgen.assign.optGood" },
+  { value: "b", labelKey: "leadgen.assign.optStandard" },
+  { value: "c", labelKey: "leadgen.assign.optLow" },
 ];
 
-const puntuacionOptions = [
-  { value: "alto", label: "Alto — Excelente trabajo" },
-  { value: "medio", label: "Medio — Trabajo aceptable" },
-  { value: "bajo", label: "Bajo — Necesita mejorar" },
+const puntuacionOptions: Array<{ value: string; labelKey: TranslationKey }> = [
+  { value: "alto", labelKey: "leadgen.assign.scoreHigh" },
+  { value: "medio", labelKey: "leadgen.assign.scoreMid" },
+  { value: "bajo", labelKey: "leadgen.assign.scoreLow" },
 ];
 
 const getTicketId = (entry: LeadGenEntry) =>
@@ -46,6 +49,7 @@ interface Props {
 }
 
 const AssignCalidadModal = ({ open, onOpenChange, lead }: Props) => {
+  const { t } = useLanguage();
   const [calidad, setCalidad] = useState("");
   const [puntuacion, setPuntuacion] = useState("");
   const [comentario, setComentario] = useState("");
@@ -71,11 +75,11 @@ const AssignCalidadModal = ({ open, onOpenChange, lead }: Props) => {
       { id: lead.id, quality: calidad },
       {
         onSuccess: () => {
-          toast({ title: "Calidad actualizada", description: `Se asignó ${calidad.toUpperCase()} correctamente.` });
+          toast({ title: t("leadgen.assign.updated"), description: t("leadgen.assign.updatedDesc", { quality: calidad.toUpperCase() }) });
           onOpenChange(false);
         },
         onError: () => {
-          toast({ title: "Error", description: "No se pudo actualizar la calidad.", variant: "destructive" });
+          toast({ title: t("common.error"), description: t("leadgen.assign.updateError"), variant: "destructive" });
         },
       }
     );
@@ -85,21 +89,21 @@ const AssignCalidadModal = ({ open, onOpenChange, lead }: Props) => {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[440px]">
         <DialogHeader className="pr-8">
-          <DialogTitle>Asignar Calidad — {getTicketId(lead)}</DialogTitle>
-          <DialogDescription>Asigna o cambia la calidad de este lead.</DialogDescription>
+          <DialogTitle>{t("leadgen.assign.title", { ticket: getTicketId(lead) })}</DialogTitle>
+          <DialogDescription>{t("leadgen.assign.description")}</DialogDescription>
         </DialogHeader>
 
         <Card className="p-4">
           <div className="flex items-center justify-center gap-4">
             <div className="flex flex-col items-center gap-1.5">
-              <span className="text-xs font-semibold text-muted-foreground">Calidad Actual</span>
+              <span className="text-xs font-semibold text-muted-foreground">{t("leadgen.assign.current")}</span>
               <div className={`flex h-12 w-12 items-center justify-center rounded-full text-sm font-bold ${calidadColors[currentCat] ?? "bg-muted text-muted-foreground"}`}>
                 {lead.quality.toUpperCase()}
               </div>
             </div>
             <ArrowRight className="h-5 w-5 text-muted-foreground mt-4" />
             <div className="flex flex-col items-center gap-1.5">
-              <span className="text-xs font-semibold text-muted-foreground">Nueva Calidad</span>
+              <span className="text-xs font-semibold text-muted-foreground">{t("leadgen.assign.new")}</span>
               <div className={`flex h-12 w-12 items-center justify-center rounded-full text-sm font-bold ${calidadColors[calidad] ?? "bg-muted text-muted-foreground"}`}>
                 {calidad ? calidad.toUpperCase() : "—"}
               </div>
@@ -109,43 +113,43 @@ const AssignCalidadModal = ({ open, onOpenChange, lead }: Props) => {
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label>Calidad del Modelo</Label>
+            <Label>{t("leadgen.assign.modelQuality")}</Label>
             <Select value={calidad} onValueChange={setCalidad}>
-              <SelectTrigger><SelectValue placeholder="Seleccionar calidad" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder={t("leadgen.assign.selectQuality")} /></SelectTrigger>
               <SelectContent>
                 {calidadOptions.map((o) => (
-                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                  <SelectItem key={o.value} value={o.value}>{t(o.labelKey)}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
           <div className="space-y-2">
-            <Label>Puntuación del Trabajo</Label>
+            <Label>{t("leadgen.assign.workScore")}</Label>
             <Select value={puntuacion} onValueChange={setPuntuacion}>
-              <SelectTrigger><SelectValue placeholder="Seleccionar puntuación" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder={t("leadgen.assign.selectScore")} /></SelectTrigger>
               <SelectContent>
                 {puntuacionOptions.map((o) => (
-                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                  <SelectItem key={o.value} value={o.value}>{t(o.labelKey)}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
           <div className="space-y-2">
-            <Label>Comentario</Label>
+            <Label>{t("leadgen.assign.comment")}</Label>
             <Textarea
-              placeholder="Razón de la calificación..."
+              placeholder={t("leadgen.assign.commentPlaceholder")}
               value={comentario}
               onChange={(e) => setComentario(e.target.value)}
             />
             <p className="text-xs text-muted-foreground">
-              Opcional. Si escribes una nota, debe tener al menos 3 caracteres.
+              {t("leadgen.assign.commentHint")}
             </p>
           </div>
 
           <Button className="w-full" disabled={!isValid || isPending} onClick={handleSave}>
-            {isPending ? "Guardando..." : "Guardar Calificación"}
+            {isPending ? t("leadgen.saving") : t("leadgen.assign.save")}
           </Button>
         </div>
       </DialogContent>

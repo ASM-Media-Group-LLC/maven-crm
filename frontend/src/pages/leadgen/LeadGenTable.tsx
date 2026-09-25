@@ -2,6 +2,8 @@ import React, { useState, useCallback, useMemo } from "react";
 import { ArrowUpDown, ExternalLink, Eye, ChevronDown, Phone, UserPlus, CheckCircle2, ClipboardCheck, MessageSquare, MoreHorizontal, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -60,10 +62,11 @@ const cleanPhoneForWhatsApp = (phone: string) =>
 
 type SortKey = "hora" | "handle" | "agente" | "agencia" | "categoria" | "pais" | "contacto" | "qa" | "of";
 
-const QA_RATING_OPTIONS = [
-  { value: "bien", label: "Bien", variant: "success-soft" as const },
-  { value: "regular", label: "Regular", variant: "warning-soft" as const },
-  { value: "mal", label: "Mal", variant: "destructive-soft" as const },
+// `value` es el rating que se guarda en leadgen_qa; en pantalla va t(labelKey).
+const QA_RATING_OPTIONS: Array<{ value: string; labelKey: TranslationKey; variant: "success-soft" | "warning-soft" | "destructive-soft" }> = [
+  { value: "bien", labelKey: "leadgen.qa.good", variant: "success-soft" },
+  { value: "regular", labelKey: "leadgen.qa.fair", variant: "warning-soft" },
+  { value: "mal", labelKey: "leadgen.qa.poor", variant: "destructive-soft" },
 ];
 
 interface Props {
@@ -116,6 +119,7 @@ QualityCell.displayName = "QualityCell";
 
 // Inline editable company/source cell
 const InlineSourceCell = React.memo(({ lead }: { lead: LeadGenEntry }) => {
+  const { t } = useLanguage();
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(lead.company || "");
   const { data: scouterCompanies = [] } = useScouterCompanies();
@@ -153,7 +157,7 @@ const InlineSourceCell = React.memo(({ lead }: { lead: LeadGenEntry }) => {
       <span
         className="cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5 block max-w-[140px] truncate text-sm text-muted-foreground"
         onClick={(e) => { e.stopPropagation(); setText(lead.company || ""); setEditing(true); }}
-        title={lead.company || "Click para editar"}
+        title={lead.company || t("leadgen.table.clickToEdit")}
       >
         {lead.company || "—"}
       </span>
@@ -186,6 +190,7 @@ const buildProfileUrl = (entry: LeadGenEntry) => {
 
 // Inline agent reassignment for orphan leads
 const AgentReassignCell = React.memo(({ lead, profiles }: { lead: LeadGenEntry; profiles: { id: string; full_name: string | null }[] }) => {
+  const { t } = useLanguage();
   const updateField = useUpdateLeadField();
 
   return (
@@ -199,12 +204,12 @@ const AgentReassignCell = React.memo(({ lead, profiles }: { lead: LeadGenEntry; 
         onClick={(e) => e.stopPropagation()}
       >
         <UserPlus className="h-3 w-3 mr-1" />
-        <SelectValue placeholder="Vincular agente" />
+        <SelectValue placeholder={t("leadgen.table.linkAgent")} />
       </SelectTrigger>
       <SelectContent onClick={(e) => e.stopPropagation()}>
         {profiles.map((p) => (
           <SelectItem key={p.id} value={p.id} className="text-xs">
-            {p.full_name || "Sin nombre"}
+            {p.full_name || t("leadgen.noName")}
           </SelectItem>
         ))}
       </SelectContent>
@@ -215,6 +220,7 @@ AgentReassignCell.displayName = "AgentReassignCell";
 
 // QA Review Cell
 const QACell = React.memo(({ lead, qaMap, canReview }: { lead: LeadGenEntry; qaMap: Record<string, any>; canReview: boolean }) => {
+  const { t } = useLanguage();
   const [open, setOpen] = useState(false);
   const [rating, setRating] = useState("");
   const [comment, setComment] = useState("");
@@ -227,7 +233,7 @@ const QACell = React.memo(({ lead, qaMap, canReview }: { lead: LeadGenEntry; qaM
     const opt = QA_RATING_OPTIONS.find(o => o.value === existing.rating);
     return (
       <Badge variant={opt?.variant ?? "secondary-soft"}>
-        {opt?.label ?? existing.rating}
+        {opt ? t(opt.labelKey) : existing.rating}
       </Badge>
     );
   }
@@ -256,11 +262,11 @@ const QACell = React.memo(({ lead, qaMap, canReview }: { lead: LeadGenEntry; qaM
           onClick={(e) => e.stopPropagation()}
         >
           <ClipboardCheck className="h-3.5 w-3.5" />
-          <span>Revisar</span>
+          <span>{t("leadgen.qa.review")}</span>
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-64 p-3" align="start" onClick={(e) => e.stopPropagation()}>
-        <p className="text-xs font-medium mb-2">Calificar lead</p>
+        <p className="text-xs font-medium mb-2">{t("leadgen.qa.rateLead")}</p>
         <div className="flex gap-1 mb-2">
           {QA_RATING_OPTIONS.map((opt) => (
             <Button
@@ -270,18 +276,18 @@ const QACell = React.memo(({ lead, qaMap, canReview }: { lead: LeadGenEntry; qaM
               className="flex-1 h-7 text-xs"
               onClick={() => setRating(opt.value)}
             >
-              {opt.label}
+              {t(opt.labelKey)}
             </Button>
           ))}
         </div>
         <Textarea
-          placeholder="Comentario (opcional)"
+          placeholder={t("leadgen.qa.commentOptional")}
           value={comment}
           onChange={(e) => setComment(e.target.value)}
           className="text-xs h-16 mb-2"
         />
         <Button size="sm" className="w-full h-7 text-xs" disabled={!rating || createQA.isPending} onClick={handleSave}>
-          {createQA.isPending ? "Guardando..." : "Guardar"}
+          {createQA.isPending ? t("leadgen.saving") : t("common.save")}
         </Button>
       </PopoverContent>
     </Popover>
@@ -293,11 +299,12 @@ QACell.displayName = "QACell";
 const LeadRow = React.memo(({ lead, onView, onDelete, profiles, qaMap, canReview }: { lead: LeadGenEntry; onView?: (lead: LeadGenEntry) => void; onDelete?: (lead: LeadGenEntry) => void; profiles?: { id: string; full_name: string | null }[]; qaMap: Record<string, any>; canReview: boolean }) => {
   const isOrphan = lead.agent_name === "—" && profiles && profiles.length > 0;
   const f = useFormato();
+  const { t } = useLanguage();
 
   return (
     <TableRow className="cursor-pointer" onClick={() => onView?.(lead)}>
       <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-        {format(new Date(lead.created_at), "dd/MM/yyyy hh:mm a", { locale: f.fechas })}
+        {format(new Date(lead.created_at), f.idioma === "en" ? "MM/dd/yyyy hh:mm a" : "dd/MM/yyyy hh:mm a", { locale: f.fechas })}
       </TableCell>
       <TableCell>
         <a
@@ -340,7 +347,7 @@ const LeadRow = React.memo(({ lead, onView, onDelete, profiles, qaMap, canReview
       <TableCell><QualityCell lead={lead} /></TableCell>
       <TableCell>
         <Badge variant={(lead as any).record_type === "reactivado" ? "warning-soft" : "success-soft"} className="font-normal">
-          {(lead as any).record_type === "reactivado" ? "Reactivado" : "Nuevo"}
+          {(lead as any).record_type === "reactivado" ? t("leadgen.recordType.reactivated") : t("leadgen.recordType.new")}
         </Badge>
       </TableCell>
       <TableCell className="text-center text-lg">{countryToFlag(lead.country_code)}</TableCell>
@@ -360,10 +367,10 @@ const LeadRow = React.memo(({ lead, onView, onDelete, profiles, qaMap, canReview
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => onView?.(lead)}>
-                <Eye className="mr-2 h-4 w-4" /> Ver detalle
+                <Eye className="mr-2 h-4 w-4" /> {t("common.viewDetail")}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onDelete(lead)} className="text-destructive focus:text-destructive">
-                <Trash2 className="mr-2 h-4 w-4" /> Eliminar
+                <Trash2 className="mr-2 h-4 w-4" /> {t("common.delete")}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -379,6 +386,7 @@ const LeadRow = React.memo(({ lead, onView, onDelete, profiles, qaMap, canReview
 LeadRow.displayName = "LeadRow";
 
 const LeadGenTable = ({ leads, onView, onEdit, onDelete, profiles }: Props) => {
+  const { t } = useLanguage();
   const [sortKey, setSortKey] = useState<SortKey>("hora");
   const [sortAsc, setSortAsc] = useState(false);
   const { isAdmin, isSupervisor } = useUserRole();
@@ -433,17 +441,17 @@ const LeadGenTable = ({ leads, onView, onEdit, onDelete, profiles }: Props) => {
     <Table containerClassName="overflow-visible max-md:overflow-x-auto" className="md:min-w-[1050px]">
       <TableHeader>
         <TableRow>
-          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Creación" col="hora" /></TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label={t("leadgen.col.created")} col="hora" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Handle" col="handle" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="OF URL" col="of" /></TableHead>
-          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Agente" col="agente" /></TableHead>
-          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Agencia" col="agencia" /></TableHead>
-          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Categoría" col="categoria" /></TableHead>
-          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Tipo</TableHead>
-          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="País" col="pais" /></TableHead>
-          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Contacto" col="contacto" /></TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label={t("leadgen.col.agent")} col="agente" /></TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label={t("leadgen.col.agency")} col="agencia" /></TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label={t("common.category")} col="categoria" /></TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">{t("common.type")}</TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label={t("common.country")} col="pais" /></TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label={t("leadgen.col.contact")} col="contacto" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="QA" col="qa" /></TableHead>
-          <TableHead className="sticky top-0 right-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))] w-[80px]">Acciones</TableHead>
+          <TableHead className="sticky top-0 right-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))] w-[80px]">{t("common.actions")}</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -453,7 +461,7 @@ const LeadGenTable = ({ leads, onView, onEdit, onDelete, profiles }: Props) => {
         {sorted.length === 0 && (
           <TableRow>
             <TableCell colSpan={11} className="h-24 text-center text-muted-foreground">
-              No se encontraron leads.
+              {t("leadgen.table.empty")}
             </TableCell>
           </TableRow>
         )}
