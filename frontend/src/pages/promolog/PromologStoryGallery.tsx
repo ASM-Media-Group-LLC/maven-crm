@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import type { PromologEntry } from "./PromologEntryCard";
 import { summarizeStories } from "./storyEvidence";
 import { resultBadgeVariant } from "./promoResult";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // Galería de evidencia: muestra las historias del día de una creadora, cada una con
 // su thumbnail, veredicto (promovió/no), confianza y razonamiento de la IA. El
@@ -33,11 +34,12 @@ const VerdictToggle = ({
   saving?: boolean;
   dark?: boolean;
 }) => {
+  const { t } = useLanguage();
   if (!onSetVerdict) {
     return (
       <Badge variant={resultBadgeVariant(story.result)} className="gap-0.5 text-[10px]">
         <ResultIcon result={story.result} />
-        {story.result === "Sí" ? "Sí" : "No"}
+        {story.result === "Sí" ? t("promolog.yes") : t("promolog.no")}
       </Badge>
     );
   }
@@ -53,7 +55,7 @@ const VerdictToggle = ({
         onClick={(e) => { e.stopPropagation(); onSetVerdict(story, "Sí"); }}
         className={`flex flex-1 items-center justify-center gap-1 px-2 py-1 transition-colors disabled:opacity-60 ${story.result === "Sí" ? "bg-success text-white" : `${idle} hover:text-success`}`}
       >
-        {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />} Sí
+        {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />} {t("promolog.yes")}
       </button>
       <button
         type="button"
@@ -61,7 +63,7 @@ const VerdictToggle = ({
         onClick={(e) => { e.stopPropagation(); onSetVerdict(story, "No"); }}
         className={`flex flex-1 items-center justify-center gap-1 px-2 py-1 transition-colors disabled:opacity-60 ${story.result !== "Sí" ? "bg-destructive text-white" : `${idle} hover:text-destructive`}`}
       >
-        <XMark className="h-3 w-3" /> No
+        <XMark className="h-3 w-3" /> {t("promolog.no")}
       </button>
     </div>
   );
@@ -69,13 +71,14 @@ const VerdictToggle = ({
 
 // Thumbnail con fallback cuando la URL del CDN expiró.
 const StoryThumb = ({ url }: { url: string | null | undefined }) => {
+  const { t } = useLanguage();
   const [failed, setFailed] = useState(false);
   if (!url || failed) {
     return (
       <div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-muted/40 p-2 text-center">
         <ImageOff className="h-5 w-5 text-muted-foreground" />
         <span className="text-[10px] leading-tight text-muted-foreground">
-          {url ? "Imagen expirada" : "Sin imagen"}
+          {url ? t("promolog.imageExpired") : t("promolog.noImage")}
         </span>
       </div>
     );
@@ -87,13 +90,14 @@ const StoryThumb = ({ url }: { url: string | null | undefined }) => {
 
 // Imagen grande del lightbox, con su propio fallback de "imagen expirada".
 const LightboxImage = ({ url }: { url: string | null | undefined }) => {
+  const { t } = useLanguage();
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [url]);
   if (!url || failed) {
     return (
       <div className="flex aspect-[9/16] max-h-[72vh] w-full max-w-[420px] flex-col items-center justify-center gap-2 rounded-lg bg-white/5 text-center">
         <ImageOff className="h-10 w-10 text-white/40" />
-        <span className="text-sm text-white/60">{url ? "Imagen expirada" : "Sin imagen"}</span>
+        <span className="text-sm text-white/60">{url ? t("promolog.imageExpired") : t("promolog.noImage")}</span>
       </div>
     );
   }
@@ -115,7 +119,8 @@ const LightboxImage = ({ url }: { url: string | null | undefined }) => {
 const isTgEvidence = (s: PromologEntry) =>
   (s.network || "").toLowerCase() === "telegram" || /^https?:\/\/t\.me\//i.test(s.evidence_url || "");
 
-const tgChannelName = (s: PromologEntry) => s.name?.trim() || "Canal de Telegram";
+// `fallback` = "Canal de Telegram" traducido (lo pasa el componente que dibuja).
+const tgChannelName = (s: PromologEntry, fallback: string) => s.name?.trim() || fallback;
 
 // URLs del texto → links azules clickeables (como en Telegram).
 const renderTgText = (text: string) =>
@@ -132,6 +137,7 @@ const TgBubble = ({
   s: PromologEntry; channel: string; big?: boolean;
   onSetVerdict?: (s: PromologEntry, v: "Sí" | "No") => void; savingId?: string | null;
 }) => {
+  const { t } = useLanguage();
   const promo = s.result === "Sí";
   return (
     <div className="flex">
@@ -144,7 +150,7 @@ const TgBubble = ({
         <p className={`font-semibold text-[#3a8fd6] ${big ? "text-[12px]" : "text-[8.5px] leading-tight"}`}>{channel}</p>
         {s.notes
           ? <p className={`whitespace-pre-wrap break-words text-slate-900 ${big ? "text-[13.5px] leading-snug" : "text-[9px] leading-tight"}`}>{big ? renderTgText(s.notes) : s.notes}</p>
-          : <p className={`inline-flex items-center gap-1 italic text-slate-400 ${big ? "text-[12px]" : "text-[8px]"}`}><Lock className={big ? "h-3 w-3" : "h-2 w-2"} /> foto/video</p>}
+          : <p className={`inline-flex items-center gap-1 italic text-slate-400 ${big ? "text-[12px]" : "text-[8px]"}`}><Lock className={big ? "h-3 w-3" : "h-2 w-2"} /> {t("promolog.photoVideo")}</p>}
         <div className="flex items-center justify-end">
           <span className={`text-slate-400 ${big ? "text-[10px]" : "text-[7px]"}`}>{s.time}</span>
         </div>
@@ -168,6 +174,7 @@ const TgPhone = ({
   channel: string; bubbles: PromologEntry[]; big?: boolean; fill?: boolean;
   onSetVerdict?: (s: PromologEntry, v: "Sí" | "No") => void; savingId?: string | null;
 }) => {
+  const { t } = useLanguage();
   const initial = (channel.trim()[0] || "T").toUpperCase();
   return (
     <div className={`flex w-full flex-col bg-[#c5d3dd] ${fill ? "h-full" : ""}`}>
@@ -182,7 +189,7 @@ const TgPhone = ({
         <span className={`flex shrink-0 items-center justify-center rounded-full bg-white/25 font-bold ${big ? "h-8 w-8 text-xs" : "h-4 w-4 text-[7px]"}`}>{initial}</span>
         <div className="min-w-0 flex-1 leading-tight">
           <p className={`truncate font-semibold ${big ? "text-sm" : "text-[8px]"}`}>{channel}</p>
-          <p className={`text-white/70 ${big ? "text-[11px]" : "text-[6px]"}`}>canal</p>
+          <p className={`text-white/70 ${big ? "text-[11px]" : "text-[6px]"}`}>{t("promolog.channel")}</p>
         </div>
         <span className={big ? "text-base" : "text-[8px]"}>⋮</span>
       </div>
@@ -197,7 +204,7 @@ const TgPhone = ({
       </div>
       {/* Barra de difusión */}
       <div className={`flex shrink-0 items-center gap-2 bg-[#17212b] text-[#6d7f8f] ${big ? "px-4 py-2.5 text-[12px]" : "px-1.5 py-1 text-[6.5px]"}`}>
-        <span className="flex-1">Difusión</span>
+        <span className="flex-1">{t("promolog.broadcast")}</span>
         <Lock className={big ? "h-3.5 w-3.5" : "h-2 w-2"} />
       </div>
     </div>
@@ -206,16 +213,20 @@ const TgPhone = ({
 
 // Tile de UN post en la grilla (estilo IG): el screenshot de teléfono full-bleed,
 // con un solo post.
-const TelegramTile = ({ story }: { story: PromologEntry }) => (
-  <TgPhone channel={tgChannelName(story)} bubbles={[story]} fill />
-);
+const TelegramTile = ({ story }: { story: PromologEntry }) => {
+  const { t } = useLanguage();
+  return <TgPhone channel={tgChannelName(story, t("promolog.telegramChannel"))} bubbles={[story]} fill />;
+};
 
 // Lightbox de UN post (caso mixto).
-const TelegramLightbox = ({ story }: { story: PromologEntry }) => (
-  <div className="w-full max-w-[300px] overflow-hidden rounded-2xl shadow-2xl ring-1 ring-white/10">
-    <TgPhone channel={tgChannelName(story)} bubbles={[story]} big />
-  </div>
-);
+const TelegramLightbox = ({ story }: { story: PromologEntry }) => {
+  const { t } = useLanguage();
+  return (
+    <div className="w-full max-w-[300px] overflow-hidden rounded-2xl shadow-2xl ring-1 ring-white/10">
+      <TgPhone channel={tgChannelName(story, t("promolog.telegramChannel"))} bubbles={[story]} big />
+    </div>
+  );
+};
 
 // ── Facebook ────────────────────────────────────────────────────────────────────
 // La media de FB suele estar protegida o el permalink expira como vista. En vez de
@@ -226,7 +237,8 @@ const TelegramLightbox = ({ story }: { story: PromologEntry }) => (
 // profile_photo_url = foto · evidence_url = foto del bucket O permalink · result.
 const isFb = (s: PromologEntry) => (s.network || "").toLowerCase() === "facebook";
 const isFbUrl = (u?: string | null) => /^https?:\/\/([\w-]+\.)*facebook\.com/i.test(u || "");
-const fbName = (s: PromologEntry) => s.name?.trim() || s.source_handle?.replace(/^@/, "").trim() || "Página de Facebook";
+// `fallback` = "Página de Facebook" traducido (lo pasa el componente que dibuja).
+const fbName = (s: PromologEntry, fallback: string) => s.name?.trim() || s.source_handle?.replace(/^@/, "").trim() || fallback;
 // La FOTO del post: evidence_url solo si NO es un permalink (entonces es la del bucket).
 const fbImage = (s: PromologEntry) => (s.evidence_url && !isFbUrl(s.evidence_url) ? s.evidence_url : null);
 // El permalink para "Abrir en Facebook": evidence_url si es facebook.com, sino story_media_url.
@@ -235,6 +247,7 @@ const fbLink = (s: PromologEntry) =>
 
 // Avatar del header: foto de la creadora con fallback a la inicial sobre azul FB.
 const FbAvatar = ({ s, big }: { s: PromologEntry; big?: boolean }) => {
+  const { t } = useLanguage();
   const [failed, setFailed] = useState(false);
   const size = big ? "h-9 w-9 text-sm" : "h-5 w-5 text-[8px]";
   if (s.profile_photo_url && !failed) {
@@ -242,7 +255,7 @@ const FbAvatar = ({ s, big }: { s: PromologEntry; big?: boolean }) => {
   }
   return (
     <span className={`${size} flex shrink-0 items-center justify-center rounded-full bg-[#1877F2] font-bold text-white`}>
-      {(fbName(s)[0] || "F").toUpperCase()}
+      {(fbName(s, t("promolog.facebookPage"))[0] || "F").toUpperCase()}
     </span>
   );
 };
@@ -250,7 +263,8 @@ const FbAvatar = ({ s, big }: { s: PromologEntry; big?: boolean }) => {
 // Recreación del post de Facebook. `fill` = llena un tile 9:16 (grilla); `big` =
 // versión legible del lightbox.
 const FbPost = ({ s, big, fill }: { s: PromologEntry; big?: boolean; fill?: boolean }) => {
-  const name = fbName(s);
+  const { t } = useLanguage();
+  const name = fbName(s, t("promolog.facebookPage"));
   const img = fbImage(s);
   const promo = s.result === "Sí";
   return (
@@ -282,16 +296,16 @@ const FbPost = ({ s, big, fill }: { s: PromologEntry; big?: boolean; fill?: bool
         ) : !s.notes ? (
           <div className={`flex flex-col items-center justify-center gap-1 bg-[#1877F2]/5 text-center ${fill ? "flex-1" : "py-6"}`}>
             <Facebook className={big ? "h-10 w-10" : "h-6 w-6"} style={{ color: "#1877F2" }} />
-            <span className={`text-slate-500 ${big ? "text-xs" : "text-[8px]"}`}>Contenido de Facebook</span>
+            <span className={`text-slate-500 ${big ? "text-xs" : "text-[8px]"}`}>{t("promolog.facebookContent")}</span>
           </div>
         ) : null}
       </div>
 
       {/* Barra de reacciones (decorativa, para dar el look de FB) */}
       <div className={`flex shrink-0 items-center justify-around border-t border-slate-100 text-slate-500 ${big ? "px-3 py-2 text-[12px]" : "px-1 py-1 text-[6px]"}`}>
-        <span className="flex items-center gap-1"><ThumbsUp className={big ? "h-3.5 w-3.5" : "h-2 w-2"} /> Me gusta</span>
-        <span className="flex items-center gap-1"><MessageCircle className={big ? "h-3.5 w-3.5" : "h-2 w-2"} /> Comentar</span>
-        <span className="flex items-center gap-1"><Share2 className={big ? "h-3.5 w-3.5" : "h-2 w-2"} /> Compartir</span>
+        <span className="flex items-center gap-1"><ThumbsUp className={big ? "h-3.5 w-3.5" : "h-2 w-2"} /> {t("promolog.fbLike")}</span>
+        <span className="flex items-center gap-1"><MessageCircle className={big ? "h-3.5 w-3.5" : "h-2 w-2"} /> {t("promolog.fbComment")}</span>
+        <span className="flex items-center gap-1"><Share2 className={big ? "h-3.5 w-3.5" : "h-2 w-2"} /> {t("promolog.fbShare")}</span>
       </div>
     </div>
   );
@@ -302,6 +316,7 @@ const FbTile = ({ story }: { story: PromologEntry }) => <FbPost s={story} fill /
 
 // Versión grande del lightbox: la tarjeta + link "Abrir en Facebook" si hay permalink.
 const FacebookLightbox = ({ story }: { story: PromologEntry }) => {
+  const { t } = useLanguage();
   const link = fbLink(story);
   return (
     <div className="max-h-[82vh] w-full max-w-[380px] overflow-y-auto rounded-xl bg-white shadow-2xl ring-1 ring-white/10">
@@ -314,7 +329,7 @@ const FacebookLightbox = ({ story }: { story: PromologEntry }) => {
           onClick={(e) => e.stopPropagation()}
           className="flex items-center justify-center gap-1 border-t border-slate-100 py-2.5 text-xs font-medium text-[#1877F2] transition-colors hover:bg-[#1877F2]/5"
         >
-          Abrir en Facebook <ExternalLink className="h-3 w-3" />
+          {t("promolog.openInFacebook")} <ExternalLink className="h-3 w-3" />
         </a>
       )}
     </div>
@@ -333,6 +348,7 @@ const isXText = (s: PromologEntry) =>
   (s.network || "").toLowerCase() === "x" && !!s.evidence_url && isXUrl(s.evidence_url);
 
 const XPost = ({ s, big, fill }: { s: PromologEntry; big?: boolean; fill?: boolean }) => {
+  const { t } = useLanguage();
   const handle = (s.source_handle || "").replace(/^@+/, "");
   const promo = s.result === "Sí";
   return (
@@ -355,7 +371,7 @@ const XPost = ({ s, big, fill }: { s: PromologEntry; big?: boolean; fill?: boole
         </p>
       </div>
       <div className={`shrink-0 border-t border-white/10 text-white/40 ${big ? "px-3 py-2 text-[11px]" : "px-1.5 py-1 text-[6.5px]"}`}>
-        {s.time || "X"} · tweet de solo texto
+        {s.time || "X"} · {t("promolog.textOnlyTweet")}
       </div>
     </div>
   );
@@ -363,7 +379,9 @@ const XPost = ({ s, big, fill }: { s: PromologEntry; big?: boolean; fill?: boole
 
 const XTile = ({ story }: { story: PromologEntry }) => <XPost s={story} fill />;
 
-const XLightbox = ({ story }: { story: PromologEntry }) => (
+const XLightbox = ({ story }: { story: PromologEntry }) => {
+  const { t } = useLanguage();
+  return (
   <div className="max-h-[82vh] w-full max-w-[380px] overflow-y-auto rounded-xl bg-black shadow-2xl ring-1 ring-white/10">
     <XPost s={story} big />
     <a
@@ -373,10 +391,11 @@ const XLightbox = ({ story }: { story: PromologEntry }) => (
       onClick={(e) => e.stopPropagation()}
       className="flex items-center justify-center gap-1 border-t border-white/10 py-2.5 text-xs font-medium text-white/80 transition-colors hover:bg-white/5"
     >
-      Ver tweet en X <ExternalLink className="h-3 w-3" />
+      {t("promolog.viewTweetOnX")} <ExternalLink className="h-3 w-3" />
     </a>
   </div>
-);
+  );
+};
 
 interface Props {
   stories: PromologEntry[];
@@ -386,6 +405,7 @@ interface Props {
 }
 
 const PromologStoryGallery = ({ stories, selectedId, onSetVerdict, savingId }: Props) => {
+  const { t } = useLanguage();
   const summary = summarizeStories(stories);
   // Lightbox referenciado por ID (no por índice): así, si al cambiar un veredicto la
   // historia se filtra fuera de la galería, no se desincroniza — se reubica por id o
@@ -427,21 +447,21 @@ const PromologStoryGallery = ({ stories, selectedId, onSetVerdict, savingId }: P
   // abrir el lightbox para marcar cada mensaje). Un tile = un post = un veredicto.
   const allTgOrFb = stories.length > 0 && stories.every((s) => isTgEvidence(s) || isFb(s));
   const evidenceNoun = allTgOrFb
-    ? (summary.total === 1 ? "publicación" : "publicaciones")
-    : (summary.total === 1 ? "historia" : "historias");
+    ? t(summary.total === 1 ? "promolog.postOne" : "promolog.postMany")
+    : t(summary.total === 1 ? "promolog.storyOne" : "promolog.storyMany");
 
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <p className="text-xs font-semibold text-muted-foreground">
-          Evidencia · {summary.total} {evidenceNoun}
+          {t("promolog.evidenceCount", { count: summary.total, noun: evidenceNoun })}
         </p>
         <div className="flex items-center gap-1.5">
           {summary.promoted > 0 && (
-            <Badge variant="success-soft" className="text-[10px]">{summary.promoted} promovió</Badge>
+            <Badge variant="success-soft" className="text-[10px]">{t("promolog.promotedCount", { count: summary.promoted })}</Badge>
           )}
           {summary.notPromoted > 0 && (
-            <Badge variant="destructive-soft" className="text-[10px]">{summary.notPromoted} no</Badge>
+            <Badge variant="destructive-soft" className="text-[10px]">{t("promolog.notPromotedCount", { count: summary.notPromoted })}</Badge>
           )}
         </div>
       </div>
@@ -506,7 +526,7 @@ const PromologStoryGallery = ({ stories, selectedId, onSetVerdict, savingId }: P
             type="button"
             onClick={() => setLightboxId(null)}
             className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white transition-colors hover:bg-white/20"
-            aria-label="Cerrar"
+            aria-label={t("common.close")}
           >
             <CloseIcon className="h-5 w-5" />
           </button>
@@ -517,7 +537,7 @@ const PromologStoryGallery = ({ stories, selectedId, onSetVerdict, savingId }: P
                 type="button"
                 onClick={(e) => { e.stopPropagation(); go(-1); }}
                 className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-2 text-white transition-colors hover:bg-white/20 sm:left-4"
-                aria-label="Anterior"
+                aria-label={t("common.previous")}
               >
                 <ChevronLeft className="h-6 w-6" />
               </button>
@@ -525,7 +545,7 @@ const PromologStoryGallery = ({ stories, selectedId, onSetVerdict, savingId }: P
                 type="button"
                 onClick={(e) => { e.stopPropagation(); go(1); }}
                 className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-2 text-white transition-colors hover:bg-white/20 sm:right-4"
-                aria-label="Siguiente"
+                aria-label={t("common.next")}
               >
                 <ChevronRight className="h-6 w-6" />
               </button>
@@ -539,7 +559,7 @@ const PromologStoryGallery = ({ stories, selectedId, onSetVerdict, savingId }: P
                 <span className="text-xs tabular-nums text-white/70">
                   #{activeSlide} · {activeIdx + 1}/{stories.length}
                 </span>
-                {activeConf != null && <span className="text-xs tabular-nums text-white/70">IA: {activeConf}%</span>}
+                {activeConf != null && <span className="text-xs tabular-nums text-white/70">{t("promolog.aiPct", { pct: activeConf })}</span>}
               </div>
               {/* Veredicto editable (marca si promocionó o no en esta historia) */}
               <div className="mx-auto max-w-[220px]">
@@ -556,7 +576,7 @@ const PromologStoryGallery = ({ stories, selectedId, onSetVerdict, savingId }: P
                   onClick={(e) => e.stopPropagation()}
                   className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
                 >
-                  Abrir original <ExternalLink className="h-3 w-3" />
+                  {t("promolog.openOriginal")} <ExternalLink className="h-3 w-3" />
                 </a>
               )}
             </div>

@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertTriangle, CheckCircle2, Scale } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // CONCILIACIÓN MAVEN ↔ BLU — el objetivo es que el número de creadoras coincida
 // exacto entre las dos ("el número debe coincidir exacto de creadoras en maven y
@@ -59,6 +60,8 @@ function Cifra({ label, valor, pie, tono }: { label: string; valor: string; pie?
 }
 
 export default function BluConciliacion() {
+  // Antes de los `return` tempranos de abajo (isLoading / sin datos).
+  const { t } = useLanguage();
   const { data, isLoading } = useQuery({
     queryKey: ["blu-conciliacion"],
     staleTime: 5 * 60_000,
@@ -81,47 +84,45 @@ export default function BluConciliacion() {
       <CardHeader className="pb-3">
         <CardTitle className="flex flex-wrap items-center gap-2 text-lg">
           <Scale className="h-5 w-5" />
-          Conciliación Maven ↔ BLU
+          {t("promolog.bluReconciliation")}
           {data.cuadra ? (
             <Badge className="gap-1 border-success/30 bg-success/15 text-success" variant="outline">
-              <CheckCircle2 className="h-3 w-3" /> cuadra
+              <CheckCircle2 className="h-3 w-3" /> {t("promolog.bluMatches")}
             </Badge>
           ) : (
             <Badge className="gap-1 border-warning/30 bg-warning/15 text-warning" variant="outline">
-              <AlertTriangle className="h-3 w-3" /> no cuadra
+              <AlertTriangle className="h-3 w-3" /> {t("promolog.bluNoMatch")}
             </Badge>
           )}
         </CardTitle>
         <CardDescription>
-          Últimos 30 días (desde el {data.desde}). Todo en <strong>personas</strong>: una creadora con dos
-          cuentas de OF cuenta una sola vez. El número que facturó en BLU tiene que ser el mismo que el de
-          creadoras activas en Maven.
+          {t("promolog.bluDescBefore", { date: data.desde })}<strong>{t("promolog.bluDescPeople")}</strong>{t("promolog.bluDescAfter")}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">
           <Cifra
-            label="Facturaron en BLU"
+            label={t("promolog.bluBilled")}
             valor={String(data.blu_personas)}
-            pie={`${data.blu_vinculadas} con perfil en Maven + ${data.blu_sin_vincular} sueltas · ${data.blu_cuentas} cuentas`}
+            pie={t("promolog.bluBilledFoot", { linked: data.blu_vinculadas, loose: data.blu_sin_vincular, accounts: data.blu_cuentas })}
           />
           <Cifra
-            label="Activas en Maven"
+            label={t("promolog.mavenActive")}
             valor={String(data.maven_activas)}
             pie={`${data.maven_plus} Plus · ${data.maven_massive} Massive`}
           />
           <Cifra
-            label="Diferencia"
+            label={t("promolog.difference")}
             valor={diferencia === 0 ? "0" : `${diferencia > 0 ? "+" : ""}${diferencia}`}
             pie={diferencia === 0
-              ? "los dos números coinciden"
-              : `${data.blu_sin_vincular} sueltas + ${data.estado_viejo} con estado viejo − ${data.activas_sin_facturar} que no facturó`}
+              ? t("promolog.numbersMatch")
+              : t("promolog.diffFoot", { loose: data.blu_sin_vincular, stale: data.estado_viejo, notBilled: data.activas_sin_facturar })}
             tono={diferencia === 0 ? "ok" : "alerta"}
           />
           <Cifra
-            label="Plata sin dueña"
+            label={t("promolog.unownedMoney")}
             valor={money0(plataSuelta)}
-            pie={`${data.blu_sin_vincular} creadora${data.blu_sin_vincular === 1 ? "" : "s"} sin vincular${cuentasSueltas > data.blu_sin_vincular ? ` (${cuentasSueltas} cuentas)` : ""}`}
+            pie={t(data.blu_sin_vincular === 1 ? "promolog.unlinkedCreatorsOne" : "promolog.unlinkedCreatorsMany", { count: data.blu_sin_vincular }) + (cuentasSueltas > data.blu_sin_vincular ? t("promolog.accountsParen", { count: cuentasSueltas }) : "")}
             tono={plataSuelta > 0 ? "alerta" : "ok"}
           />
         </div>
@@ -129,16 +130,15 @@ export default function BluConciliacion() {
         {data.sin_vincular.length > 0 && (
           <div className="rounded-xl border border-warning/25 bg-warning/5 p-3">
             <p className="text-xs font-semibold text-warning">
-              Ganan en BLU y no están vinculadas a ninguna creadora ({data.blu_sin_vincular})
+              {t("promolog.bluEarnUnlinked", { count: data.blu_sin_vincular })}
             </p>
             <p className="mt-0.5 text-[11px] text-muted-foreground">
               {data.blu_sueltas_con_agencia > 0 && (
                 <>
-                  <strong>{data.blu_sueltas_con_agencia}</strong> vinieron con la key de Plus o Massive, así que son
-                  nuestras: falta crearlas en Maven.{" "}
+                  <strong>{data.blu_sueltas_con_agencia}</strong>{t("promolog.bluAgencyKeyAfter")}{" "}
                 </>
               )}
-              Se vinculan en la tabla de abajo. Las que tienen dos cuentas van en una sola fila: son una creadora.
+              {t("promolog.bluLinkBelow")}
             </p>
             <ul className="mt-2 divide-y divide-white/5">
               {data.sin_vincular.map((r) => (
@@ -149,12 +149,12 @@ export default function BluConciliacion() {
                       {r.agencia}
                     </Badge>
                   ) : (
-                    <Badge variant="outline" className="text-[10px] text-muted-foreground">sin agencia</Badge>
+                    <Badge variant="outline" className="text-[10px] text-muted-foreground">{t("promolog.noAgency")}</Badge>
                   )}
                   {r.n_cuentas > 1 && (
-                    <Badge variant="outline" className="text-[10px]">{r.n_cuentas} cuentas</Badge>
+                    <Badge variant="outline" className="text-[10px]">{t("promolog.accountsCount", { count: r.n_cuentas })}</Badge>
                   )}
-                  <span className="text-[11px] text-muted-foreground">{r.dias} días · último {r.ultimo_dia}</span>
+                  <span className="text-[11px] text-muted-foreground">{t("promolog.daysLast", { days: r.dias, last: r.ultimo_dia })}</span>
                   <span className="ml-auto font-semibold tabular-nums">{money0(r.bruto)}</span>
                 </li>
               ))}
@@ -165,17 +165,17 @@ export default function BluConciliacion() {
         {data.facturan_sin_estar_activas.length > 0 && (
           <div className="rounded-xl border border-warning/25 bg-warning/5 p-3">
             <p className="text-xs font-semibold text-warning">
-              Facturan en BLU pero en Maven no están activas ({data.facturan_sin_estar_activas.length})
+              {t("promolog.bluBillingNotActive", { count: data.facturan_sin_estar_activas.length })}
             </p>
             <p className="mt-0.5 text-[11px] text-muted-foreground">
-              Su estado en Maven quedó viejo: no cuentan como roster, así que no aparecen en los tableros de nadie.
+              {t("promolog.bluStaleStatus")}
             </p>
             <ul className="mt-2 divide-y divide-white/5">
               {data.facturan_sin_estar_activas.map((r) => (
                 <li key={r.creadora} className="flex flex-wrap items-center gap-2 py-1.5 text-sm">
                   <span className="font-medium">{r.creadora}</span>
                   <Badge variant="outline" className="text-[10px]">{r.status}</Badge>
-                  <span className="text-[11px] text-muted-foreground">{r.kash} · {r.cuentas} · último {r.ultimo_dia}</span>
+                  <span className="text-[11px] text-muted-foreground">{r.kash} · {r.cuentas} · {t("promolog.lastOn", { date: r.ultimo_dia })}</span>
                   <span className="ml-auto font-semibold tabular-nums">{money0(r.bruto)}</span>
                 </li>
               ))}
@@ -186,10 +186,10 @@ export default function BluConciliacion() {
         {data.activas_sin_blu.length > 0 && (
           <div className="rounded-xl border border-border p-3">
             <p className="text-xs font-semibold">
-              Activas en Maven sin un peso en BLU ({data.activas_sin_blu.length})
+              {t("promolog.activeNoBlu", { count: data.activas_sin_blu.length })}
             </p>
             <p className="mt-0.5 text-[11px] text-muted-foreground">
-              O todavía no arrancaron, o les falta la cuenta de BLU.
+              {t("promolog.activeNoBluDesc")}
             </p>
             <div className="mt-2 flex flex-wrap gap-1.5">
               {data.activas_sin_blu.map((r) => (

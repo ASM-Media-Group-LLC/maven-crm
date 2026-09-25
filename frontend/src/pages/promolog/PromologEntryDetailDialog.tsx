@@ -21,6 +21,9 @@ import { displayPlatform } from "./promoScore";
 import { resultBadgeVariant } from "./promoResult";
 import type { PromologEntry } from "./PromologEntryCard";
 import { useCreatorDailyEarnings } from "@/hooks/useCreatorDailyEarnings";
+import { useLanguage } from "@/hooks/useLanguage";
+import { useFormato } from "@/hooks/useFormato";
+import { format } from "date-fns";
 
 const SOCIAL_PLATFORMS = ["instagram", "tiktok", "twitter", "x", "youtube", "linkedin", "facebook", "reddit"];
 
@@ -74,6 +77,9 @@ const PromologEntryDetailDialog = ({
   savingId,
   onEdit,
 }: Props) => {
+  // Los hooks van ANTES del `if (!entry) return null` de más abajo.
+  const { t } = useLanguage();
+  const f = useFormato();
   // Redes de la modelo (para los chips clickeables). El entry solo trae la red
   // escaneada (IG); las demás salen del perfil de la creadora por creator_id.
   const { data: creatorSocials } = useQuery({
@@ -107,9 +113,15 @@ const PromologEntryDetailDialog = ({
   const showStoryGallery = dayStories.length > 0;
   const money0 = (n: number) => "$" + Math.round(n || 0).toLocaleString("en-US");
   const MESES_ABBR = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
-  const fmtDay = (ymd: string) => { const p = ymd.split("-"); return `${Number(p[2])} ${MESES_ABBR[Number(p[1]) - 1]}`; };
+  // En español se conserva el formato de siempre ("12 sep"); en inglés, date-fns ("Sep 12").
+  const fmtDay = (ymd: string) => {
+    const p = ymd.split("-");
+    return f.idioma === "en"
+      ? format(new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2])), "MMM d", { locale: f.fechas })
+      : `${Number(p[2])} ${MESES_ABBR[Number(p[1]) - 1]}`;
+  };
   const earningChannels: Array<[string, string]> = [
-    ["Subs", "subscription_gross"], ["Mensajes", "message_gross"], ["Tips", "tips_gross"],
+    ["Subs", "subscription_gross"], [t("promolog.messages"), "message_gross"], ["Tips", "tips_gross"],
     ["Posts", "post_gross"], ["Ref", "referral_gross"], ["Stream", "stream_gross"],
   ];
 
@@ -129,7 +141,7 @@ const PromologEntryDetailDialog = ({
         { label: "X", icon: <XIcon className="h-3.5 w-3.5" />, url: buildSocialUrl("twitter", creatorSocials.twitter_handle) },
         { label: "TikTok", icon: <TikTokIcon className="h-3.5 w-3.5" />, url: buildSocialUrl("tiktok", creatorSocials.tiktok_handle) },
         { label: "YouTube", icon: <span className="text-[10px] font-bold leading-none">YT</span>, url: buildSocialUrl("youtube", creatorSocials.youtube_handle) },
-        { label: "Otra", icon: <ExternalLink className="h-3.5 w-3.5" />, url: creatorSocials.other_url || "" },
+        { label: t("promolog.other"), icon: <ExternalLink className="h-3.5 w-3.5" />, url: creatorSocials.other_url || "" },
       ].filter((c) => c.url)
     : [];
 
@@ -137,8 +149,8 @@ const PromologEntryDetailDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader className="pr-8">
-          <DialogTitle>Detalle de Entrada</DialogTitle>
-          <DialogDescription className="sr-only">Detalle completo de la entrada de Promolog</DialogDescription>
+          <DialogTitle>{t("promolog.entryDetail")}</DialogTitle>
+          <DialogDescription className="sr-only">{t("promolog.entryDetailDesc")}</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           {/* Header: ticket + nombre + handle */}
@@ -150,7 +162,7 @@ const PromologEntryDetailDialog = ({
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-sm font-semibold text-primary hover:underline inline-flex items-center gap-1"
-                title="Abrir Instagram de la modelo"
+                title={t("promolog.openModelInstagram")}
               >
                 {entry.name}
                 <ExternalLink className="h-3 w-3" />
@@ -172,14 +184,14 @@ const PromologEntryDetailDialog = ({
           {/* Grid de metadata principal */}
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div>
-              <span className="text-muted-foreground">Red social:</span>{" "}
+              <span className="text-muted-foreground">{t("promolog.networkLabel")}</span>{" "}
               {networkUrl ? (
                 <a
                   href={networkUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="font-medium capitalize text-primary hover:underline inline-flex items-center gap-1"
-                  title="Abrir el perfil de esa red"
+                  title={t("promolog.openNetworkProfile")}
                 >
                   {entry.network || "—"}
                   <ExternalLink className="h-3 w-3" />
@@ -189,34 +201,34 @@ const PromologEntryDetailDialog = ({
               )}
             </div>
             <div>
-              <span className="text-muted-foreground">Plataforma destino:</span>{" "}
+              <span className="text-muted-foreground">{t("promolog.targetPlatformLabel")}</span>{" "}
               <span className="font-medium">{displayPlatform(entry) ?? "—"}</span>
             </div>
             <div>
-              <span className="text-muted-foreground">Resultado:</span>{" "}
+              <span className="text-muted-foreground">{t("promolog.resultLabel")}</span>{" "}
               <span className="ml-1 inline-flex items-center gap-1">
                 <Badge variant={resultBadgeVariant(dayResult)} className="text-xs">
-                  {dayResult === "Sí" ? "Sí" : "No"}
+                  {dayResult === "Sí" ? t("promolog.yes") : t("promolog.no")}
                 </Badge>
                 {entry.needs_review ? (
-                  <span title={entry.error_reason || "Revisar manual"} className="text-warning" aria-label="Revisar manual">
+                  <span title={entry.error_reason || t("promolog.reviewManually")} className="text-warning" aria-label={t("promolog.reviewManually")}>
                     <AlertTriangle className="h-3.5 w-3.5" />
                   </span>
                 ) : entry.is_pending ? (
-                  <span title="Lectura no confirmada — puede tener historias sin leer" className="text-[10px] text-muted-foreground">no verif.</span>
+                  <span title={t("promolog.unconfirmedRead")} className="text-[10px] text-muted-foreground">{t("promolog.notVerifiedShort")}</span>
                 ) : null}
               </span>
             </div>
             <div>
-              <span className="text-muted-foreground">Agente:</span>{" "}
+              <span className="text-muted-foreground">{t("promolog.agentLabel")}</span>{" "}
               <span className="font-medium">{entry.agent}</span>
             </div>
             <div>
-              <span className="text-muted-foreground">Fecha:</span>{" "}
+              <span className="text-muted-foreground">{t("promolog.dateLabel")}</span>{" "}
               <span className="font-medium">{entry.date}</span>
             </div>
             <div>
-              <span className="text-muted-foreground">Hora:</span>{" "}
+              <span className="text-muted-foreground">{t("promolog.timeLabel")}</span>{" "}
               <span className="font-medium">{entry.time}</span>
             </div>
           </div>
@@ -232,7 +244,7 @@ const PromologEntryDetailDialog = ({
             return (
               <div className="rounded-md border border-warning/30 bg-warning/5 p-3 space-y-2">
                 <p className="text-xs text-warning font-semibold">
-                  Ingresos (BLU) · alrededor de la promo
+                  {t("promolog.incomeAroundPromo")}
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {earnings.map((e) => {
@@ -269,7 +281,7 @@ const PromologEntryDetailDialog = ({
               Reddit, X, TikTok, YouTube, Otra), traídos del perfil de la creadora. */}
           {socialChips.length > 0 && (
             <div className="space-y-1.5">
-              <p className="text-xs text-muted-foreground font-semibold">Redes de la modelo</p>
+              <p className="text-xs text-muted-foreground font-semibold">{t("promolog.modelNetworks")}</p>
               <div className="flex flex-wrap gap-1.5">
                 {socialChips.map((c) => (
                   <a
@@ -292,17 +304,17 @@ const PromologEntryDetailDialog = ({
             <div className="rounded-md border border-success/30 bg-success/5 p-3 space-y-1">
               <p className="text-xs text-success font-semibold flex items-center gap-1.5">
                 <Check className="h-3 w-3" />
-                Link de compra detectado
+                {t("promolog.buyLinkDetected")}
               </p>
               <p className="text-sm">
-                Tipo:{" "}
+                {t("promolog.typeLabel")}{" "}
                 <Badge variant="success-soft" className="text-[10px] capitalize">
-                  {entry.buy_link_type || "no especificado"}
+                  {entry.buy_link_type || t("promolog.notSpecified")}
                 </Badge>
               </p>
               {entry.story_link_url && (
                 <p className="text-xs text-muted-foreground break-all">
-                  Destino:{" "}
+                  {t("promolog.destinationLabel")}{" "}
                   <span className="font-mono text-foreground/80">{entry.story_link_url}</span>
                 </p>
               )}
@@ -312,7 +324,7 @@ const PromologEntryDetailDialog = ({
           {/* Acción tomada — qué hizo la creadora para promocionar. */}
           {entry.action_taken && (
             <div className="space-y-1">
-              <p className="text-xs text-muted-foreground font-semibold">Qué hizo para promocionar</p>
+              <p className="text-xs text-muted-foreground font-semibold">{t("promolog.whatWasDoneToPromote")}</p>
               <p className="text-sm bg-muted/40 rounded-md p-3">{entry.action_taken}</p>
             </div>
           )}
@@ -320,7 +332,7 @@ const PromologEntryDetailDialog = ({
           {/* Notas — viene del chatter manual o del bot ([AUTO] reasoning). */}
           {entry.notes && (
             <div className="space-y-1">
-              <p className="text-xs text-muted-foreground font-semibold">Notas</p>
+              <p className="text-xs text-muted-foreground font-semibold">{t("promolog.notes")}</p>
               <p className="text-sm bg-muted/40 rounded-md p-3 whitespace-pre-wrap">{entry.notes}</p>
             </div>
           )}
@@ -330,10 +342,10 @@ const PromologEntryDetailDialog = ({
           {!(dayNetworks && dayNetworks.length > 0) && !showStoryGallery && entry.ai_reasoning && (
             <div className="rounded-md border border-primary/30 bg-primary/5 p-3 space-y-1">
               <div className="flex items-center justify-between">
-                <p className="text-xs text-primary font-semibold">Análisis AI</p>
+                <p className="text-xs text-primary font-semibold">{t("promolog.aiAnalysis")}</p>
                 {entry.ai_confidence != null && (
                   <Badge variant="secondary-soft" className="text-[10px] tabular-nums">
-                    Confianza: {(entry.ai_confidence * 100).toFixed(0)}%
+                    {t("promolog.confidencePct", { pct: (entry.ai_confidence * 100).toFixed(0) })}
                   </Badge>
                 )}
               </div>
@@ -362,13 +374,13 @@ const PromologEntryDetailDialog = ({
                       <span className="text-xs text-muted-foreground">· {accts.map((a) => `@${a}`).join(", ")}</span>
                     )}
                     <Badge variant={dn.promoted ? "success-soft" : "destructive-soft"} className="text-[10px]">
-                      {dn.promoted ? "Promocionó" : "Revisada · sin promo"}
+                      {dn.promoted ? t("promolog.promoted") : t("promolog.reviewedNoPromo")}
                     </Badge>
                   </div>
                   {dn.stories.length > 0 ? (
                     <PromologStoryGallery stories={dn.stories} selectedId={entry.id} onSetVerdict={onSetVerdict} savingId={savingId} />
                   ) : (
-                    <p className="px-1 text-xs italic text-muted-foreground">Revisada ese día · sin actividad.</p>
+                    <p className="px-1 text-xs italic text-muted-foreground">{t("promolog.reviewedNoActivity")}</p>
                   )}
                 </div>
                 );
@@ -379,7 +391,7 @@ const PromologEntryDetailDialog = ({
           ) : entry.evidence_url ? (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <p className="text-xs text-muted-foreground font-semibold">Evidencia</p>
+                <p className="text-xs text-muted-foreground font-semibold">{t("promolog.evidence")}</p>
                 <a
                   href={entry.evidence_url}
                   target="_blank"
@@ -387,7 +399,7 @@ const PromologEntryDetailDialog = ({
                   className="text-[10px] text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
                 >
                   <ExternalLink className="h-3 w-3" />
-                  Abrir en nueva pestaña
+                  {t("promolog.openInNewTab")}
                 </a>
               </div>
               <a
@@ -398,7 +410,7 @@ const PromologEntryDetailDialog = ({
               >
                 <img
                   src={entry.evidence_url}
-                  alt="Pantallazo de la promo"
+                  alt={t("promolog.promoScreenshot")}
                   className="w-full max-h-[400px] object-contain"
                   onError={(e) => {
                     const img = e.currentTarget;
@@ -407,7 +419,7 @@ const PromologEntryDetailDialog = ({
                     if (parent && !parent.querySelector(".fallback")) {
                       const fb = document.createElement("div");
                       fb.className = "fallback p-6 text-center text-xs text-muted-foreground";
-                      fb.textContent = "La imagen ya no está disponible (URL expirada). Haz click en 'Abrir en nueva pestaña' para verla en su origen.";
+                      fb.textContent = t("promolog.imageExpiredFallback");
                       parent.appendChild(fb);
                     }
                   }}
@@ -417,8 +429,8 @@ const PromologEntryDetailDialog = ({
           ) : null}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cerrar</Button>
-          {onEdit && <Button onClick={() => onEdit(entry)}>Editar</Button>}
+          <Button variant="outline" onClick={() => onOpenChange(false)}>{t("common.close")}</Button>
+          {onEdit && <Button onClick={() => onEdit(entry)}>{t("common.edit")}</Button>}
         </DialogFooter>
       </DialogContent>
     </Dialog>

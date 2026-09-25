@@ -11,6 +11,8 @@ import { useTimezone, formatDateInTz, formatTimeInTz, dayKeyInTz } from "@/hooks
 import { useAssignableManagers } from "@/hooks/useAssignableManagers";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/hooks/useLanguage";
+import { useFormato } from "@/hooks/useFormato";
 import { cn } from "@/lib/utils";
 import PromologEntryDetailDialog from "./PromologEntryDetailDialog";
 import type { PromologEntry } from "./PromologEntryCard";
@@ -46,6 +48,7 @@ interface Props {
 }
 
 const DAY_LABELS_ES = ["LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB", "DOM"];
+const DAY_LABELS_EN = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 const MONTHS_ES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
@@ -74,6 +77,11 @@ const LegendChip = ({ status, label }: { status: DayStatus; label: string }) => 
 );
 
 const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
+  const { t } = useLanguage();
+  const f = useFormato();
+  // Meses y días: en español se conservan tal cual; en inglés salen de date-fns.
+  const monthLabel = (i: number) => (f.idioma === "en" ? format(new Date(2000, i, 1), "LLLL", { locale: f.fechas }) : MONTHS_ES[i]);
+  const dayLabels = f.idioma === "en" ? DAY_LABELS_EN : DAY_LABELS_ES;
   const { timezone: userTz } = useTimezone();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -376,7 +384,7 @@ const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
     setSavingId(null);
     if (error) {
       queryClient.setQueryData(calKey, prev); // rollback
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({ title: t("common.error"), description: error.message, variant: "destructive" });
       return;
     }
     // Reconciliar en background (la UI ya refleja el cambio).
@@ -390,7 +398,7 @@ const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
       <div className="flex flex-wrap items-center gap-3">
         <Select value={creatorId || undefined} onValueChange={setCreatorId}>
           <SelectTrigger className="w-[260px] h-10">
-            <SelectValue placeholder="Selecciona una creadora…" />
+            <SelectValue placeholder={t("promolog.selectCreatorEllipsis")} />
           </SelectTrigger>
           <SelectContent>
             {creatorOptions.map((c) => (
@@ -409,7 +417,7 @@ const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
             <SelectValue placeholder="Managers" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="__all__">Todas las managers</SelectItem>
+            <SelectItem value="__all__">{t("promolog.allManagers")}</SelectItem>
             {assignableManagers.map((m) => (
               <SelectItem key={m.id} value={m.id}>{m.full_name ?? m.id}</SelectItem>
             ))}
@@ -417,14 +425,14 @@ const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
         </Select>
 
         <div className="ml-auto flex items-center gap-1.5">
-          <Button variant="outline" size="icon" className="h-9 w-9" onClick={goPrev} aria-label="Mes anterior">
+          <Button variant="outline" size="icon" className="h-9 w-9" onClick={goPrev} aria-label={t("promolog.prevMonth")}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <Select value={String(month)} onValueChange={(v) => setCursor(new Date(year, Number(v), 1))}>
             <SelectTrigger className="w-[140px] h-9"><SelectValue /></SelectTrigger>
             <SelectContent>
-              {MONTHS_ES.map((m, i) => (
-                <SelectItem key={i} value={String(i)}>{m}</SelectItem>
+              {MONTHS_ES.map((_, i) => (
+                <SelectItem key={i} value={String(i)}>{monthLabel(i)}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -436,7 +444,7 @@ const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
               ))}
             </SelectContent>
           </Select>
-          <Button variant="outline" size="icon" className="h-9 w-9" onClick={goNext} aria-label="Mes siguiente">
+          <Button variant="outline" size="icon" className="h-9 w-9" onClick={goNext} aria-label={t("promolog.nextMonth")}>
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
@@ -445,7 +453,7 @@ const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
       {!creatorId ? (
         <Card className="flex flex-col items-center justify-center gap-2 py-20 text-center">
           <CircleDashed className="h-10 w-10 text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">Selecciona una creadora para ver su calendario de promos.</p>
+          <p className="text-sm text-muted-foreground">{t("promolog.selectCreatorForCalendar")}</p>
         </Card>
       ) : (
         <>
@@ -460,26 +468,26 @@ const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
               <div>
                 <p className="text-sm font-semibold leading-tight">{selectedCreator?.artistic_name || selectedCreator?.name}</p>
                 <p className="text-xs text-muted-foreground">
-                  {MONTHS_ES[month]} {year} ·{" "}
+                  {monthLabel(month)} {year} ·{" "}
                   <span className="font-semibold text-foreground">
-                    {monthAvgScore != null ? `${Math.round(monthAvgScore * 100)}% calidad` : "— calidad"}
+                    {monthAvgScore != null ? t("promolog.pctQuality", { pct: Math.round(monthAvgScore * 100) }) : t("promolog.noQuality")}
                   </span>{" "}
-                  · {monthSummary.promo} promocionó · {monthSummary.no} no · {monthSummary.none} sin análisis
+                  · {t("promolog.monthSummary", { promo: monthSummary.promo, no: monthSummary.no, none: monthSummary.none })}
                 </p>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-4">
-              <LegendChip status="promo" label="Promocionó" />
-              <LegendChip status="no" label="No promocionó" />
-              <LegendChip status="none" label="Sin análisis" />
-              <span className="text-xs text-muted-foreground">· 🔥 {isPastMonth ? "top 5 días del mes" : "mejor día (cada 5)"} · 👑 mejor del mes</span>
+              <LegendChip status="promo" label={t("promolog.promoted")} />
+              <LegendChip status="no" label={t("promolog.notPromoted")} />
+              <LegendChip status="none" label={t("promolog.notAnalyzed")} />
+              <span className="text-xs text-muted-foreground">· 🔥 {isPastMonth ? t("promolog.legendFirePast") : t("promolog.legendFireCurrent")} · 👑 {t("promolog.legendCrown")}</span>
             </div>
           </div>
 
           {/* Grid del calendario */}
           <Card className="overflow-hidden p-0">
             <div className="grid grid-cols-7 border-b border-border bg-muted/30">
-              {DAY_LABELS_ES.map((d) => (
+              {dayLabels.map((d) => (
                 <div key={d} className="px-3 py-2 text-center text-xs font-medium text-muted-foreground">{d}</div>
               ))}
             </div>
@@ -516,7 +524,7 @@ const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
                       {inMonth && earningMarkers.get(key) && (
                         <span
                           className="text-sm leading-none"
-                          title={earningMarkers.get(key) === "crown" ? "Mejor día de ingresos del mes" : (isPastMonth ? "Top 5 días de ingresos del mes" : "Mejor día de ingresos de estos 5 días")}
+                          title={earningMarkers.get(key) === "crown" ? t("promolog.bestIncomeDayMonth") : (isPastMonth ? t("promolog.top5IncomeDays") : t("promolog.bestIncomeDay5"))}
                         >
                           {earningMarkers.get(key) === "crown" ? "👑" : "🔥"}
                         </span>
@@ -555,7 +563,7 @@ const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
             </div>
           </Card>
 
-          {isLoading && <p className="text-center text-xs text-muted-foreground">Cargando…</p>}
+          {isLoading && <p className="text-center text-xs text-muted-foreground">{t("common.loading")}</p>}
         </>
       )}
 

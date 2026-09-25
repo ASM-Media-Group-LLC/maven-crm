@@ -18,6 +18,7 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
 import { format, subDays, startOfDay, isToday } from "date-fns";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -57,6 +58,7 @@ const NETWORK_COLORS: Record<string, string> = {
 
 const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps) => {
   const f = useFormato();
+  const { t } = useLanguage();
   const { user } = useAuth();
   const { role } = useUserRole();
   const isManagement = ["admin", "manager", "supervisor"].includes(role ?? "");
@@ -155,7 +157,7 @@ const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps
       return {
         id: pe.id,
         ticketNumber: pe.ticket_number || "",
-        name: creator?.artistic_name || creator?.name || "Sin nombre",
+        name: creator?.artistic_name || creator?.name || t("promolog.noName"),
         handle: creator?.instagram_handle || undefined,
         network: (pe.network || "").toLowerCase(),
         platform: pe.platform || "OnlyFans",
@@ -168,7 +170,7 @@ const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps
         reviewed_by: pe.reviewed_by || undefined,
       };
     });
-  }, [rawEntries, profilesMap, f]);
+  }, [rawEntries, profilesMap, f, t]);
 
   // KPIs
   const totalEntries = entries.length;
@@ -220,9 +222,9 @@ const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps
   }, [rawEntries]);
 
   const resultDistribution = useMemo(() => [
-    { name: "Sí", value: siCount, color: COLORS.si },
-    { name: "No", value: noCount, color: COLORS.no },
-  ], [siCount, noCount]);
+    { name: t("promolog.yes"), value: siCount, color: COLORS.si },
+    { name: t("promolog.no"), value: noCount, color: COLORS.no },
+  ], [siCount, noCount, t]);
 
   const avgPerDay = useMemo(() => {
     const daySet = new Set(rawEntries.map((e: any) => e.date?.split("T")[0]));
@@ -251,7 +253,7 @@ const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps
   const handleNotesChange = async (entryId: string, notes: string | null) => {
     const { error } = await supabase.from("promolog_entries").update({ notes }).eq("id", entryId);
     if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({ title: t("common.error"), description: error.message, variant: "destructive" });
       return;
     }
     queryClient.invalidateQueries({ queryKey: ["promolog-agent-detail", agent.id] });
@@ -273,7 +275,7 @@ const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps
                   <Badge variant="outline" className="text-xs shrink-0">{totalEntries} promos</Badge>
                 </span>
               }
-              subtitle="Detalle del agente — Promolog"
+              subtitle={t("promolog.agentDetailSubtitle")}
             />
           </div>
         </div>
@@ -283,7 +285,7 @@ const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps
               <Table2 className="h-4 w-4 mr-1.5" />Promos
             </TabsTrigger>
             <TabsTrigger value="rendimiento">
-              <BarChart3 className="h-4 w-4 mr-1.5" />Rendimiento
+              <BarChart3 className="h-4 w-4 mr-1.5" />{t("promolog.performance")}
             </TabsTrigger>
           </TabsList>
         </Tabs>
@@ -295,9 +297,9 @@ const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps
           <div className={`shrink-0 px-6 pt-4 transition-all duration-300 overflow-hidden ${statsCollapsed ? "max-h-0 opacity-0 py-0" : "max-h-[240px] opacity-100 pb-2"}`}>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               <StatChip label="Total" value={String(totalEntries)} icon={<Table2 className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("total")} />
-              <StatChip label="Sí" value={String(siCount)} icon={<Check className="h-3.5 w-3.5" />} color="bg-success" onClick={() => setKpiPopup("si")} />
-              <StatChip label="No" value={String(noCount)} icon={<X className="h-3.5 w-3.5" />} color="bg-destructive" onClick={() => setKpiPopup("no")} />
-              <StatChip label="Éxito" value={`${successRate}%`} icon={<TrendingUp className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("exito")} />
+              <StatChip label={t("promolog.yes")} value={String(siCount)} icon={<Check className="h-3.5 w-3.5" />} color="bg-success" onClick={() => setKpiPopup("si")} />
+              <StatChip label={t("promolog.no")} value={String(noCount)} icon={<X className="h-3.5 w-3.5" />} color="bg-destructive" onClick={() => setKpiPopup("no")} />
+              <StatChip label={t("promolog.success")} value={`${successRate}%`} icon={<TrendingUp className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("exito")} />
             </div>
           </div>
 
@@ -306,35 +308,35 @@ const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps
             <div className="flex items-center gap-3 flex-wrap">
               <div className="relative flex-1 max-w-xs">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Buscar modelo..." className="pl-9 h-9" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                <Input placeholder={t("promolog.searchModel")} className="pl-9 h-9" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
               </div>
               <Select value={filterNetwork || undefined} onValueChange={(v) => setFilterNetwork(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="Red Social" /></SelectTrigger>
+                <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder={t("promolog.networkPlaceholder")} /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__all__">Todas</SelectItem>
+                  <SelectItem value="__all__">{t("common.allF")}</SelectItem>
                   {networkOptions.map(n => <SelectItem key={n.value} value={n.value}>{n.label}</SelectItem>)}
                 </SelectContent>
               </Select>
               <Select value={filterPlatform || undefined} onValueChange={(v) => setFilterPlatform(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="Plataforma" /></SelectTrigger>
+                <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder={t("promolog.platform")} /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__all__">Todas</SelectItem>
+                  <SelectItem value="__all__">{t("common.allF")}</SelectItem>
                   <SelectItem value="onlyfans">OnlyFans</SelectItem>
                   <SelectItem value="unlok">Unlok</SelectItem>
-                  <SelectItem value="otra">Otra</SelectItem>
+                  <SelectItem value="otra">{t("promolog.other")}</SelectItem>
                 </SelectContent>
               </Select>
               <DateRangePicker
                 from={dateFrom}
                 to={dateTo}
                 onApply={(from, to) => { setDateFrom(from); setDateTo(to); setStatsCollapsed(false); }}
-                placeholder="Fechas"
+                placeholder={t("promolog.dates")}
                 className="h-9"
               />
               {(searchTerm || filterNetwork || filterPlatform || dateFrom || dateTo) && (
                 <Button variant="ghost" size="sm" className="h-9" onClick={() => { setSearchTerm(""); setFilterNetwork(""); setFilterPlatform(""); setDateFrom(undefined); setDateTo(undefined); }}>
                   <X className="mr-1.5 h-4 w-4" />
-                  Limpiar
+                  {t("promolog.clear")}
                 </Button>
               )}
             </div>
@@ -370,17 +372,17 @@ const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps
         <div className="flex-1 min-h-0 overflow-auto p-6 space-y-6">
           {/* Summary KPIs — clickeables */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <StatChip label="Total Promos" value={String(totalEntries)} icon={<Table2 className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("total")} />
-            <StatChip label="Promedio/Día" value={String(avgPerDay)} icon={<TrendingUp className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("avg")} />
-            <StatChip label="Tasa de Éxito" value={`${successRate}%`} icon={<Check className="h-3.5 w-3.5" />} color="bg-success" onClick={() => setKpiPopup("exito")} />
-            <StatChip label="Hoy" value={String(rawEntries.filter((e: any) => isToday(new Date(e.date))).length)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" onClick={() => setKpiPopup("hoy")} />
+            <StatChip label={t("promolog.totalPromos")} value={String(totalEntries)} icon={<Table2 className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("total")} />
+            <StatChip label={t("promolog.avgPerDayShort")} value={String(avgPerDay)} icon={<TrendingUp className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("avg")} />
+            <StatChip label={t("promolog.successRateTitle")} value={`${successRate}%`} icon={<Check className="h-3.5 w-3.5" />} color="bg-success" onClick={() => setKpiPopup("exito")} />
+            <StatChip label={t("common.today")} value={String(rawEntries.filter((e: any) => isToday(new Date(e.date))).length)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" onClick={() => setKpiPopup("hoy")} />
           </div>
 
           {/* Charts row 1: Promos por Día + Promos por Hora */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Promos por Día (últimos 7 días)</CardTitle>
+                <CardTitle className="text-sm font-medium">{t("promolog.chartLast7")}</CardTitle>
               </CardHeader>
               <CardContent className="pt-0">
                 <ResponsiveContainer width="100%" height={220}>
@@ -389,8 +391,8 @@ const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps
                     <XAxis dataKey="date" tick={{ fontSize: 11 }} className="text-muted-foreground" />
                     <YAxis allowDecimals={false} tick={{ fontSize: 11 }} className="text-muted-foreground" />
                     <Tooltip contentStyle={{ fontSize: 12 }} />
-                    <Bar dataKey="si" stackId="a" fill={COLORS.si} name="Sí" radius={[0, 0, 0, 0]} />
-                    <Bar dataKey="no" stackId="a" fill={COLORS.no} name="No" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="si" stackId="a" fill={COLORS.si} name={t("promolog.yes")} radius={[0, 0, 0, 0]} />
+                    <Bar dataKey="no" stackId="a" fill={COLORS.no} name={t("promolog.no")} radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -398,7 +400,7 @@ const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps
 
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Promos por Hora (Hoy)</CardTitle>
+                <CardTitle className="text-sm font-medium">{t("promolog.chartByHourToday")}</CardTitle>
               </CardHeader>
               <CardContent className="pt-0">
                 <ResponsiveContainer width="100%" height={220}>
@@ -418,7 +420,7 @@ const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Distribución por Red Social</CardTitle>
+                <CardTitle className="text-sm font-medium">{t("promolog.distributionByNetwork")}</CardTitle>
               </CardHeader>
               <CardContent className="pt-0">
                 <ResponsiveContainer width="100%" height={200}>
@@ -439,7 +441,7 @@ const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps
 
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Distribución por Resultado</CardTitle>
+                <CardTitle className="text-sm font-medium">{t("promolog.distributionByResult")}</CardTitle>
               </CardHeader>
               <CardContent className="pt-0">
                 <ResponsiveContainer width="100%" height={200}>
@@ -472,16 +474,16 @@ const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps
         onOpenChange={(o) => !o && setKpiPopup(null)}
         title={(() => {
           switch (kpiPopup) {
-            case "total": return `Total Promos — ${totalEntries}`;
-            case "si": return `Promos con Sí — ${siCount}`;
-            case "no": return `Promos con No — ${noCount}`;
-            case "exito": return `Tasa de Éxito — ${successRate}%`;
-            case "avg": return `Promedio por día — ${avgPerDay}`;
-            case "hoy": return `Promos de Hoy`;
+            case "total": return t("promolog.kpiTotalPromos", { count: totalEntries });
+            case "si": return t("promolog.kpiPromosYes", { count: siCount });
+            case "no": return t("promolog.kpiPromosNo", { count: noCount });
+            case "exito": return t("promolog.kpiSuccessRate", { pct: successRate });
+            case "avg": return t("promolog.kpiAvgPerDay", { value: avgPerDay });
+            case "hoy": return t("promolog.kpiPromosToday");
             default: return "";
           }
         })()}
-        subtitle={kpiPopup === "exito" ? `${siCount} de ${totalEntries} con resultado Sí` : undefined}
+        subtitle={kpiPopup === "exito" ? t("promolog.kpiSuccessSubtitle", { yes: siCount, total: totalEntries }) : undefined}
         rows={(() => {
           if (!kpiPopup) return [];
           let list: any[] = rawEntries;
@@ -490,17 +492,17 @@ const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps
           else if (kpiPopup === "hoy") list = rawEntries.filter((e: any) => isToday(new Date(e.date)));
           else if (kpiPopup === "exito" || kpiPopup === "avg") {
             return [
-              { primary: "Total entradas", right: String(totalEntries) },
-              { primary: "Resultados Sí", right: String(siCount), rightTone: "success" as const },
-              { primary: "Resultados No", right: String(noCount), rightTone: "destructive" as const },
-              { primary: "Promedio por día", right: String(avgPerDay) },
-              { primary: "Tasa de éxito", right: `${successRate}%`, rightTone: Number(successRate) >= 50 ? "success" as const : "warning" as const },
+              { primary: t("promolog.totalEntries"), right: String(totalEntries) },
+              { primary: t("promolog.yesResults"), right: String(siCount), rightTone: "success" as const },
+              { primary: t("promolog.noResults"), right: String(noCount), rightTone: "destructive" as const },
+              { primary: t("promolog.avgPerDay"), right: String(avgPerDay) },
+              { primary: t("promolog.successRate"), right: `${successRate}%`, rightTone: Number(successRate) >= 50 ? "success" as const : "warning" as const },
             ];
           }
           const tone = (result: string): KpiRow["rightTone"] =>
             result === "Sí" ? "success" : "destructive";
           return list.slice(0, 100).map((e: any): KpiRow => ({
-            primary: e.creator_name ?? e.creator_handle ?? "Sin creador",
+            primary: e.creator_name ?? e.creator_handle ?? t("promolog.noCreator"),
             secondary: `${e.network ?? "—"} · ${e.date ? new Date(e.date).toLocaleDateString(f.idioma === "en" ? "en-US" : "es") : "—"}`,
             right: e.result ?? "—",
             rightTone: tone(e.result ?? ""),

@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Check, ChevronsUpDown, Link2, EyeOff, Loader2, PartyPopper } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/hooks/useLanguage";
 import BluConciliacion from "./BluConciliacion";
 
 // Pantalla admin (subtab "Vincular BLU"): los ingresos que el micro blu-bridge importó
@@ -28,6 +29,7 @@ const money0 = (n: number) => "$" + Math.round(n || 0).toLocaleString("en-US");
 const labelOf = (c: CreatorOpt) => c.artistic_name || c.name;
 
 const BluUnmatchedManager = () => {
+  const { t } = useLanguage();
   const qc = useQueryClient();
   const { toast } = useToast();
   const [picked, setPicked] = useState<Record<string, string>>({}); // blu_name → creator_id elegido
@@ -65,13 +67,13 @@ const BluUnmatchedManager = () => {
 
   const handleMap = async (bluName: string) => {
     const cid = picked[bluName];
-    if (!cid) { toast({ title: "Elige una creadora primero", variant: "destructive" }); return; }
+    if (!cid) { toast({ title: t("promolog.pickCreatorFirst"), variant: "destructive" }); return; }
     setBusy(bluName);
     const { data, error } = await (supabase.rpc as any)("blu_map_creator", { p_blu_name: bluName, p_creator_id: cid });
     setBusy(null);
-    if (error) { toast({ title: "Error al vincular", description: error.message, variant: "destructive" }); return; }
+    if (error) { toast({ title: t("promolog.errorLinking"), description: error.message, variant: "destructive" }); return; }
     const c = creatorById(cid);
-    toast({ title: "Vinculada ✅", description: `${bluName} → ${c ? labelOf(c) : "creadora"} (${data ?? 0} días de ingreso reasignados).` });
+    toast({ title: t("promolog.linked"), description: t("promolog.linkedDesc", { blu: bluName, creator: c ? labelOf(c) : t("promolog.creatorLower"), days: data ?? 0 }) });
     setPicked((p) => { const n = { ...p }; delete n[bluName]; return n; });
     refresh();
   };
@@ -80,8 +82,8 @@ const BluUnmatchedManager = () => {
     setBusy(bluName);
     const { error } = await (supabase.rpc as any)("blu_ignore_creator", { p_blu_name: bluName });
     setBusy(null);
-    if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
-    toast({ title: "Ignorada", description: `${bluName} no volverá a aparecer acá.` });
+    if (error) { toast({ title: t("common.error"), description: error.message, variant: "destructive" }); return; }
+    toast({ title: t("promolog.ignored"), description: t("promolog.ignoredDesc", { blu: bluName }) });
     refresh();
   };
 
@@ -95,12 +97,10 @@ const BluUnmatchedManager = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
             <Link2 className="h-5 w-5" />
-            Ingresos de BLU sin vincular
+            {t("promolog.bluUnlinkedIncome")}
           </CardTitle>
           <CardDescription>
-            Nombres de BLU que están ganando pero no matchean ningún perfil de Maven (no aparecen en el
-            calendario). Vinculalos a una creadora — se le reasignan los ingresos históricos al instante —
-            o ignoralos si no son del roster.
+            {t("promolog.bluUnlinkedDesc")}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -109,19 +109,19 @@ const BluUnmatchedManager = () => {
           ) : orphans.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-12 text-center text-muted-foreground">
               <PartyPopper className="h-8 w-8" />
-              <p className="text-sm">Todo vinculado — no hay ingresos de BLU huérfanos. 🎉</p>
+              <p className="text-sm">{t("promolog.allLinked")}</p>
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Nombre en BLU</TableHead>
-                  <TableHead>Agencia</TableHead>
-                  <TableHead className="text-right">Ingreso total</TableHead>
-                  <TableHead className="text-right">Días</TableHead>
-                  <TableHead>Rango</TableHead>
-                  <TableHead>Vincular a creadora</TableHead>
-                  <TableHead className="text-right">Acción</TableHead>
+                  <TableHead>{t("promolog.nameInBlu")}</TableHead>
+                  <TableHead>{t("promolog.agency")}</TableHead>
+                  <TableHead className="text-right">{t("promolog.totalIncome")}</TableHead>
+                  <TableHead className="text-right">{t("common.days")}</TableHead>
+                  <TableHead>{t("promolog.range")}</TableHead>
+                  <TableHead>{t("promolog.linkToCreator")}</TableHead>
+                  <TableHead className="text-right">{t("promolog.action")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -138,7 +138,7 @@ const BluUnmatchedManager = () => {
                             {o.agency}
                           </span>
                         ) : (
-                          <span className="text-[10px] text-muted-foreground">sin agencia</span>
+                          <span className="text-[10px] text-muted-foreground">{t("promolog.noAgency")}</span>
                         )}
                       </TableCell>
                       <TableCell className="text-right tabular-nums font-semibold">{money0(o.total_gross)}</TableCell>
@@ -148,13 +148,13 @@ const BluUnmatchedManager = () => {
                         <Popover open={openFor === o.blu_name} onOpenChange={(v) => setOpenFor(v ? o.blu_name : null)}>
                           <PopoverTrigger asChild>
                             <Button variant="outline" size="sm" className="w-[220px] justify-between">
-                              <span className="truncate">{sel ? labelOf(sel) : "Elegir creadora…"}</span>
+                              <span className="truncate">{sel ? labelOf(sel) : t("promolog.chooseCreator")}</span>
                               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                             </Button>
                           </PopoverTrigger>
                           <PopoverContent className="w-[260px] p-0" align="start">
                             <Command>
-                              <CommandInput placeholder="Buscar creadora…" />
+                              <CommandInput placeholder={t("promolog.searchCreatorEllipsis")} />
                               <CommandList>
                                 <CommandEmpty />
                                 {creators.map((c) => (
@@ -181,9 +181,9 @@ const BluUnmatchedManager = () => {
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
                           <Button size="sm" onClick={() => handleMap(o.blu_name)} disabled={busy === o.blu_name || !picked[o.blu_name]}>
-                            {busy === o.blu_name ? <Loader2 className="h-4 w-4 animate-spin" /> : (<><Link2 className="mr-1.5 h-4 w-4" />Vincular</>)}
+                            {busy === o.blu_name ? <Loader2 className="h-4 w-4 animate-spin" /> : (<><Link2 className="mr-1.5 h-4 w-4" />{t("promolog.link")}</>)}
                           </Button>
-                          <Button size="sm" variant="ghost" onClick={() => handleIgnore(o.blu_name)} disabled={busy === o.blu_name} title="No es del roster — no volver a mostrar">
+                          <Button size="sm" variant="ghost" onClick={() => handleIgnore(o.blu_name)} disabled={busy === o.blu_name} title={t("promolog.notRosterHide")}>
                             <EyeOff className="h-4 w-4" />
                           </Button>
                         </div>
