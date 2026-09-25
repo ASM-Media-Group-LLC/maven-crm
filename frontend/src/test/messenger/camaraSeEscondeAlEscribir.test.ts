@@ -12,7 +12,7 @@ const fuentes = (import.meta as unknown as {
 describe("fila compacta del compositor", () => {
   it("la cámara solo se dibuja cuando no hay nada que enviar", () => {
     const c = Object.values(fuentes)[0] ?? "";
-    expect(c).toMatch(/\{!\(text\.trim\(\) \|\| pendingFiles\.length > 0\) && \(\s*<Button[\s\S]{0,400}aria-label="Cámara"/);
+    expect(c).toMatch(/\{!\(text\.trim\(\) \|\| pendingFiles\.length > 0\) && \(\s*<Button[\s\S]{0,400}aria-label=\{t\("messenger\.input\.camara"\)\}/);
   });
   it("y el micrófono se vuelve enviar con la misma condición", () => {
     const c = Object.values(fuentes)[0] ?? "";

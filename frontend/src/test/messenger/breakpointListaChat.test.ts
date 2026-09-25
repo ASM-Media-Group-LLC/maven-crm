@@ -24,7 +24,7 @@ describe("breakpoint lista→chat", () => {
   });
   it("el botón Volver del chat se esconde desde md", () => {
     const src = leer("components/ChatHeader.tsx");
-    const boton = src.slice(src.indexOf('aria-label="Volver a la lista de chats"'), src.indexOf("onClick={onBack}"));
+    const boton = src.slice(src.indexOf('aria-label={t("messenger.header.volverALista")}'), src.indexOf("onClick={onBack}"));
     expect(boton).toContain("md:hidden");
     expect(boton).not.toContain("sm:hidden");
   });

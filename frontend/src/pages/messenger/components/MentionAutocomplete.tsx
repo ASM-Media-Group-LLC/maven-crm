@@ -3,6 +3,7 @@ import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { UserAvatar } from "@/components/UserAvatar";
 import { UserProfile } from "../types";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface MentionAutocompleteProps {
   text: string;
@@ -127,6 +128,9 @@ export function renderTextWithMentions(
   // Con handler, la mención es un HIPERVÍNCULO: clic → abrir el DM con esa
   // persona (lo resuelve el que llama, que es quien conoce nombre→userId).
   onMentionClick?: (name: string) => void,
+  // El title del vínculo, en el idioma de quien mira: lo arma el componente
+  // que dibuja (esta función no es un componente y no puede usar el hook).
+  tituloMencion?: (name: string) => string,
 ) {
   // Sin participantes no hay menciones que buscar, pero los links igual van.
   if (!text) return text;
@@ -151,7 +155,7 @@ export function renderTextWithMentions(
         <button
           key={match.index}
           type="button"
-          title={`Abrir chat con ${nombre}`}
+          title={tituloMencion?.(nombre)}
           onClick={(e) => { e.stopPropagation(); onMentionClick(nombre); }}
           className="font-bold underline decoration-dotted underline-offset-2 hover:opacity-80"
         >
@@ -177,6 +181,7 @@ export default function MentionAutocomplete({
   text, cursorPosition, participants, currentUserId, onSelect, aCiegas = false,
 }: MentionAutocompleteProps) {
   const mentionQuery = useMentionDetection(text, cursorPosition);
+  const { t } = useLanguage();
   const [selectedIndex, setSelectedIndex] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -231,7 +236,7 @@ export default function MentionAutocomplete({
   if (mentionQuery && aCiegas && mentionQuery.query.length < LETRAS_MINIMAS_A_CIEGAS) {
     return (
       <div className="absolute bottom-full left-0 mb-1 w-64 bg-popover border border-border rounded-xl shadow-lg z-50 px-3 py-2 text-xs text-muted-foreground">
-        Escribe {LETRAS_MINIMAS_A_CIEGAS} letras del nombre para buscar
+        {t("messenger.mention.escribeLetras", { n: LETRAS_MINIMAS_A_CIEGAS })}
       </div>
     );
   }

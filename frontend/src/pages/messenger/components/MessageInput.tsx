@@ -22,6 +22,7 @@ import { MAX_FILES, MAX_FILE_SIZE_MB, MAX_FILE_SIZE_BYTES, formatFileSize, uploa
 import { claveSeguraParaArchivo } from "@/lib/claveDeArchivo";
 import { contenidoDeAdjunto } from "@/lib/mensajeConAdjunto";
 import { getDraft, setDraft } from "../drafts";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface PendingFile {
   file: File;
@@ -71,6 +72,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
   participants, chatType, aCiegas, compacto = false,
 }, ref) => {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [cursorPosition, setCursorPosition] = useState(0);
   // El texto arranca desde el borrador guardado: si te fuiste a otro chat (o
   // recargaste) sin terminar el mensaje, al volver sigue acá.
@@ -101,6 +103,9 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
 
   // GIF (Giphy mp4, URL externa estable) → se manda como archivo (Messenger no renderiza video
   // inline; el sticker sí porque es webp/imagen).
+  //
+  // "🎬 GIF", "sticker" y "🎤 Nota de voz (m:ss)" son el CONTENIDO del mensaje que
+  // se guarda en chat_messages y ven los demás: es dato, no se traduce.
   const sendGifUrl = (mp4Url: string) => {
     onSendMessage("🎬 GIF", "file" as ChatMessage["type"], mp4Url, "gif.mp4", replyTo?.id);
     onCancelReply();
@@ -111,7 +116,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
     if (!user) return;
     try {
       const resp = await fetch(signedUrl);
-      if (!resp.ok) throw new Error("no se pudo leer el sticker");
+      if (!resp.ok) throw new Error(t("messenger.input.noSePudoLeerSticker"));
       const blob = await resp.blob();
       const ext = blob.type.includes("gif") ? "gif" : "webp";
       const fileName = `sticker-${Date.now()}.${ext}`;
@@ -122,20 +127,20 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
       onSendMessage("sticker", "image" as ChatMessage["type"], urlData.publicUrl, fileName, replyTo?.id);
       onCancelReply();
     } catch (e) {
-      toast.error("No se pudo enviar el sticker", { description: (e as Error).message });
+      toast.error(t("messenger.input.noSePudoSticker"), { description: (e as Error).message });
     }
   };
 
   const addFilesInternal = useCallback((files: File[]) => {
     const totalFiles = pendingFiles.length + files.length;
     if (totalFiles > MAX_FILES) {
-      toast.error(`Máximo ${MAX_FILES} archivos adjuntos por envío`);
+      toast.error(t("messenger.input.maximoArchivos", { n: MAX_FILES }));
       return;
     }
     const oversized = files.filter(f => f.size > MAX_FILE_SIZE_BYTES);
     if (oversized.length > 0) {
       const names = oversized.map(f => f.name).join(", ");
-      toast.error(`Archivos demasiado grandes (máx ${MAX_FILE_SIZE_MB}MB): ${names}`);
+      toast.error(t("messenger.input.archivosGrandes", { mb: MAX_FILE_SIZE_MB, nombres: names }));
       return;
     }
     const newPending: PendingFile[] = files.map(file => {
@@ -147,7 +152,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
       };
     });
     setPendingFiles(prev => [...prev, ...newPending]);
-  }, [pendingFiles.length]);
+  }, [pendingFiles.length, t]);
 
   // Expose addFiles to parent via ref
   useImperativeHandle(ref, () => ({
@@ -191,7 +196,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
       let captionPending = !!caption;
       for (let i = 0; i < files.length; i++) {
         const pf = files[i];
-        setUploadProgress(`Subiendo ${i + 1}/${files.length}: ${pf.file.name} (${formatFileSize(pf.file.size)})`);
+        setUploadProgress(t("messenger.input.subiendo", { n: i + 1, total: files.length, name: pf.file.name, tamano: formatFileSize(pf.file.size) }));
         setUploadPercent(0);
         // La clave se SANEA; el nombre que ve la gente sigue siendo el original
         // (se manda aparte, más abajo). Meter el nombre crudo acá era el bug:
@@ -210,14 +215,14 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
         }
 
         if (uploadError === "cancelled") {
-          toast("Subida cancelada");
+          toast(t("messenger.input.subidaCancelada"));
           setUploading(false);
           setUploadProgress("");
           setUploadPercent(0);
           return;
         }
         if (uploadError) {
-          toast.error(`Error al subir ${pf.file.name}: ${uploadError}`);
+          toast.error(t("messenger.input.errorAlSubir", { name: pf.file.name, error: uploadError }));
           continue;
         }
         const { data: urlData } = supabase.storage.from("chat-files").getPublicUrl(path);
@@ -272,7 +277,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
     clearTimeout(typingTimeout.current);
     onSendTyping(false);
     composerRef.current?.focus();
-  }, [text, replyTo, onSendMessage, onCancelReply, onSendTyping, pendingFiles, user, uploadFileWithProgress, uploading]);
+  }, [text, replyTo, onSendMessage, onCancelReply, onSendTyping, pendingFiles, user, uploadFileWithProgress, uploading, t]);
 
   // El editor rico avisa el texto PLANO y dónde está el cursor dentro de ese texto;
   // con eso siguen andando el borrador, el indicador de "escribiendo" y las @menciones.
@@ -333,7 +338,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
       contentType: blob.type,
     });
     if (error) {
-      toast.error("Error al subir nota de voz");
+      toast.error(t("messenger.input.errorNotaDeVoz"));
       setUploading(false);
       return;
     }
@@ -343,7 +348,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
     onSendMessage(`🎤 Nota de voz (${mins}:${secs.toString().padStart(2, "0")})`, "file" as ChatMessage["type"], urlData.publicUrl, fileName);
     setIsRecording(false);
     setUploading(false);
-  }, [user, onSendMessage]);
+  }, [user, onSendMessage, t]);
 
   return (
     // Borde inferior en el iPhone instalado: el área segura son 34 pt, pero el
@@ -358,11 +363,11 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
           <div className="h-8 w-1 rounded-full bg-primary shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-[11px] font-semibold text-primary">
-              {replyTo.sender_id === user?.id ? "Tú" : profiles[replyTo.sender_id]?.full_name || "Usuario"}
+              {replyTo.sender_id === user?.id ? t("messenger.preview.tu") : profiles[replyTo.sender_id]?.full_name || t("messenger.usuario")}
             </p>
             <p className="text-[11px] text-muted-foreground truncate">{replyTo.content}</p>
           </div>
-          <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={onCancelReply}>
+          <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={onCancelReply} aria-label={t("composer.cancelReply")}>
             <X className="h-3 w-3" />
           </Button>
         </div>
@@ -373,13 +378,13 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
         <div className="bg-primary/[0.03]">
           <div className="flex items-center justify-between px-4 pt-2 pb-1">
             <span className="text-[11px] text-muted-foreground font-medium">
-              {pendingFiles.length}/{MAX_FILES} archivos adjuntos
+              {t("messenger.input.adjuntos", { n: pendingFiles.length, max: MAX_FILES })}
             </span>
             <Button variant="ghost" size="sm" className="h-5 text-[10px] text-destructive hover:text-destructive" onClick={() => {
               pendingFiles.forEach(pf => { if (pf.preview) URL.revokeObjectURL(pf.preview); });
               setPendingFiles([]);
             }}>
-              Quitar todos
+              {t("messenger.input.quitarTodos")}
             </Button>
           </div>
           <div className="flex gap-2 px-4 pb-2 overflow-x-auto">
@@ -403,7 +408,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
                 )}
                 <button
                   onClick={() => removePendingFile(i)}
-                  aria-label={`Quitar ${pf.file.name}`}
+                  aria-label={t("messenger.input.quitarArchivo", { name: pf.file.name })}
                   className="absolute -top-1.5 -right-1.5 h-5 w-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/file:opacity-100 transition-opacity"
                 >
                   <X className="h-3 w-3" />
@@ -428,7 +433,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
               className="h-5 px-2 text-[10px] text-destructive hover:text-destructive"
               onClick={cancelUpload}
             >
-              Cancelar
+              {t("common.cancel")}
             </Button>
           </div>
           {uploadPercent > 0 && (
@@ -478,8 +483,8 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
               className={cn("h-10 shrink-0 rounded-full text-foreground/90 hover:bg-primary/8", compacto ? "w-9" : "w-10")}
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
-              title="Adjuntar archivo"
-              aria-label="Adjuntar archivo"
+              title={t("messenger.input.adjuntarArchivo")}
+              aria-label={t("messenger.input.adjuntarArchivo")}
             >
               {uploading ? <Loader2 className="h-7 w-7 animate-spin" /> : <Plus className="h-7 w-7" strokeWidth={2.25} />}
             </Button>
@@ -504,7 +509,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
                 <RichComposer
                   ref={composerRef}
                   initialContent={getDraft(user?.id, conversationId)}
-                  placeholder={chatType === "group" ? "Escribe un mensaje... (usa @ para mencionar)" : "Escribe un mensaje..."}
+                  placeholder={chatType === "group" ? t("messenger.input.placeholderGrupo") : t("messenger.input.placeholder")}
                   showToolbar={showToolbar}
                   disabled={uploading}
                   onUpdate={handleComposerUpdate}
@@ -532,8 +537,8 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
                     showToolbar ? "bg-primary/15 text-primary" : "text-foreground/90",
                   )}
                   onClick={() => setShowToolbar((v) => !v)}
-                  title="Opciones de formato"
-                  aria-label="Opciones de formato"
+                  title={t("messenger.input.opcionesFormato")}
+                  aria-label={t("messenger.input.opcionesFormato")}
                 >
                   <Baseline className="h-[22px] w-[22px]" strokeWidth={2.1} />
                 </Button>
@@ -548,8 +553,8 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
                 className="h-10 w-9 shrink-0 rounded-full text-foreground/90 hover:bg-primary/8"
                 onClick={() => cameraInputRef.current?.click()}
                 disabled={uploading}
-                title="Cámara"
-                aria-label="Cámara"
+                title={t("messenger.input.camara")}
+                aria-label={t("messenger.input.camara")}
               >
                 <Camera className="h-[26px] w-[26px]" strokeWidth={2.1} />
               </Button>
@@ -560,8 +565,8 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
                 onClick={handleSend}
                 className="h-10 w-10 shrink-0 rounded-full bg-gradient-to-br from-accent to-primary text-white shadow-sm hover:opacity-90 transition-all"
                 disabled={uploading}
-                title="Enviar"
-                aria-label="Enviar"
+                title={t("common.send")}
+                aria-label={t("common.send")}
               >
                 {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
               </Button>
@@ -570,8 +575,8 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
                 variant="ghost" size="icon"
                 className="h-10 w-9 shrink-0 rounded-full text-foreground/90 hover:bg-primary/8"
                 onClick={() => setIsRecording(true)}
-                title="Grabar nota de voz"
-                aria-label="Grabar nota de voz"
+                title={t("messenger.input.grabarNotaDeVoz")}
+                aria-label={t("messenger.input.grabarNotaDeVoz")}
               >
                 <Mic className="h-[26px] w-[26px]" strokeWidth={2.1} />
               </Button>
@@ -596,7 +601,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
                 <RichComposer
                   ref={composerRef}
                   initialContent={getDraft(user?.id, conversationId)}
-                  placeholder={chatType === "group" ? "Escribe un mensaje... (usa @ para mencionar)" : "Escribe un mensaje..."}
+                  placeholder={chatType === "group" ? t("messenger.input.placeholderGrupo") : t("messenger.input.placeholder")}
                   showToolbar={showToolbar}
                   disabled={uploading}
                   onUpdate={handleComposerUpdate}
@@ -609,7 +614,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
                 onClick={handleSend}
                 className="absolute bottom-[7px] right-2 h-7 w-7 shrink-0 rounded-full bg-gradient-to-br from-accent to-primary text-white shadow-sm hover:opacity-90 transition-all"
                 disabled={uploading || (!text.trim() && pendingFiles.length === 0)}
-                title="Enviar"
+                title={t("common.send")}
               >
                 {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
               </Button>
@@ -622,7 +627,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
                   showToolbar ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground",
                 )}
                 onClick={() => setShowToolbar((v) => !v)}
-                title="Opciones de formato"
+                title={t("messenger.input.opcionesFormato")}
               >
                 <Baseline className="h-5 w-5" />
               </Button>
@@ -631,7 +636,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
                 className="h-9 w-9 shrink-0 rounded-full text-muted-foreground hover:bg-primary/8 hover:text-foreground"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploading}
-                title="Adjuntar archivo"
+                title={t("messenger.input.adjuntarArchivo")}
               >
                 {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Paperclip className="h-5 w-5" />}
               </Button>
@@ -649,7 +654,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
                 variant="ghost" size="icon"
                 className="h-9 w-9 shrink-0 rounded-full text-muted-foreground hover:bg-primary/8 hover:text-foreground"
                 onClick={() => setIsRecording(true)}
-                title="Grabar nota de voz"
+                title={t("messenger.input.grabarNotaDeVoz")}
               >
                 <Mic className="h-5 w-5" />
               </Button>

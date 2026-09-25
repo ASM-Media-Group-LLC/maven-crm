@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { X, Download, ZoomIn, ZoomOut, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { descargarArchivo } from "../downloadFile";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface MediaLightboxProps {
   src: string;
@@ -13,6 +14,7 @@ interface MediaLightboxProps {
 }
 
 export default function ImageLightbox({ src, alt, isOpen, onClose, type = "image" }: MediaLightboxProps) {
+  const { t } = useLanguage();
   const [scale, setScale] = useState(1);
   const [rotation, setRotation] = useState(0);
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -130,8 +132,8 @@ export default function ImageLightbox({ src, alt, isOpen, onClose, type = "image
   // fetch→blob: `<a download>` directo sobre la URL del bucket es cross-origin
   // y el navegador lo ignoraba (guardaba "la página", no el archivo).
   const handleDownload = useCallback(() => {
-    void descargarArchivo(src, alt || (type === "video" ? "video.mp4" : "imagen"));
-  }, [src, alt, type]);
+    void descargarArchivo(src, alt || (type === "video" ? "video.mp4" : t("messenger.bubble.imagen")));
+  }, [src, alt, type, t]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (scale <= 1) return;
@@ -178,30 +180,30 @@ export default function ImageLightbox({ src, alt, isOpen, onClose, type = "image
       {/* Toolbar */}
       <div className="absolute top-4 right-4 flex items-center gap-1 z-10" onClick={e => e.stopPropagation()}>
         <span className="text-white/50 text-xs mr-2">{Math.round(scale * 100)}%</span>
-        <Button variant="ghost" size="icon" className="h-9 w-9 text-white/80 hover:text-white hover:bg-white/10" onClick={() => setScale(s => Math.min(s + 0.25, 5))}>
+        <Button variant="ghost" size="icon" className="h-9 w-9 text-white/80 hover:text-white hover:bg-white/10" onClick={() => setScale(s => Math.min(s + 0.25, 5))} title={t("lightbox.zoomIn")} aria-label={t("lightbox.zoomIn")}>
           <ZoomIn className="h-5 w-5" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-9 w-9 text-white/80 hover:text-white hover:bg-white/10" onClick={() => setScale(s => Math.max(s - 0.25, 0.25))}>
+        <Button variant="ghost" size="icon" className="h-9 w-9 text-white/80 hover:text-white hover:bg-white/10" onClick={() => setScale(s => Math.max(s - 0.25, 0.25))} title={t("lightbox.zoomOut")} aria-label={t("lightbox.zoomOut")}>
           <ZoomOut className="h-5 w-5" />
         </Button>
         {type === "image" && (
-          <Button variant="ghost" size="icon" className="h-9 w-9 text-white/80 hover:text-white hover:bg-white/10" onClick={() => setRotation(r => r + 90)}>
+          <Button variant="ghost" size="icon" className="h-9 w-9 text-white/80 hover:text-white hover:bg-white/10" onClick={() => setRotation(r => r + 90)} title={t("messenger.lightbox.rotar")} aria-label={t("messenger.lightbox.rotar")}>
             <RotateCw className="h-5 w-5" />
           </Button>
         )}
         {/* Descargar aplica a TODO: imagen y video (antes el video no tenía botón). */}
-        <Button variant="ghost" size="icon" className="h-9 w-9 text-white/80 hover:text-white hover:bg-white/10" onClick={handleDownload} title="Descargar">
+        <Button variant="ghost" size="icon" className="h-9 w-9 text-white/80 hover:text-white hover:bg-white/10" onClick={handleDownload} title={t("common.download")} aria-label={t("common.download")}>
           <Download className="h-5 w-5" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-9 w-9 text-white/80 hover:text-white hover:bg-white/10" onClick={onClose}>
+        <Button variant="ghost" size="icon" className="h-9 w-9 text-white/80 hover:text-white hover:bg-white/10" onClick={onClose} title={t("lightbox.close")} aria-label={t("lightbox.close")}>
           <X className="h-5 w-5" />
         </Button>
       </div>
 
       {/* Hint */}
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/40 text-xs select-none pointer-events-none text-center px-4">
-        <span className="[@media(hover:hover)]:inline hidden">Doble clic para zoom · Scroll para ajustar · Arrastra para mover</span>
-        <span className="[@media(hover:hover)]:hidden inline">Pellizca para zoom · Doble toque para acercar · Arrastra para mover</span>
+        <span className="[@media(hover:hover)]:inline hidden">{t("messenger.lightbox.ayudaMouse")}</span>
+        <span className="[@media(hover:hover)]:hidden inline">{t("messenger.lightbox.ayudaTactil")}</span>
       </div>
 
       {/* Media */}

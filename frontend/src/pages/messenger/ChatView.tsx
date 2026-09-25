@@ -3,6 +3,7 @@ import { ConversationWithDetails, ChatMessage, UserProfile } from "./types";
 import { ReactionGroup } from "@/hooks/useReactions";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { useLanguage } from "@/hooks/useLanguage";
 import ChatHeader from "./components/ChatHeader";
 import MessageList from "./components/MessageList";
 import MessageInput, { MessageInputHandle } from "./components/MessageInput";
@@ -60,6 +61,7 @@ export default function ChatView({
   isPinned, onTogglePin, onArchive, onDelete, canDelete, returnTo,
 }: ChatViewProps) {
   const { user } = useAuth();
+  const { t } = useLanguage();
   // Grupo "anuncios": solo admins escriben. Un no-admin ve un aviso en vez del composer.
   const amAdmin = conversation.participants.find(p => p.user_id === user?.id)?.role === "admin";
   const announcementLocked = conversation.type === "group" && conversation.msg_permission === "admins" && !amAdmin;
@@ -245,8 +247,8 @@ export default function ChatView({
         <div className="absolute inset-0 z-50 bg-primary/10 backdrop-blur-sm border-2 border-dashed border-primary rounded-xl flex items-center justify-center pointer-events-none">
           <div className="flex flex-col items-center gap-3 text-primary">
             <Upload className="h-12 w-12" />
-            <p className="text-lg font-semibold">Suelta archivos aquí</p>
-            <p className="text-sm text-muted-foreground">Máx. 20 archivos, 350MB cada uno</p>
+            <p className="text-lg font-semibold">{t("messenger.chat.sueltaArchivos")}</p>
+            <p className="text-sm text-muted-foreground">{t("messenger.chat.maxArchivos")}</p>
           </div>
         </div>
       )}
@@ -288,7 +290,7 @@ export default function ChatView({
         onReply={setReplyTo}
         onOpenProfile={setProfileUserId}
         deletedArchive={deletedArchive}
-        onCopy={(content) => { navigator.clipboard.writeText(content); toast.success("Copiado"); }}
+        onCopy={(content) => { navigator.clipboard.writeText(content); toast.success(t("messenger.chat.copiado")); }}
         onEdit={onEditMessage}
         onDelete={onDeleteMessage}
         onRetry={onRetryMessage}
@@ -309,7 +311,7 @@ export default function ChatView({
       {announcementLocked ? (
         <div className="shrink-0 px-4 py-3.5 border-t border-border bg-muted/20">
           <p className="text-xs text-muted-foreground flex items-center justify-center gap-1.5">
-            <Megaphone className="h-3.5 w-3.5 shrink-0" /> Solo los administradores pueden enviar mensajes
+            <Megaphone className="h-3.5 w-3.5 shrink-0" /> {t("messenger.chat.soloAdminsEscriben")}
           </p>
         </div>
       ) : (

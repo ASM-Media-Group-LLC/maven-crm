@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { ConversationWithDetails } from "../types";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface NotificationSettingsProps {
   conversation: ConversationWithDetails;
@@ -16,6 +17,7 @@ interface NotificationSettingsProps {
 
 export default function NotificationSettings({ conversation, onClose }: NotificationSettingsProps) {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const myParticipation = conversation.participants.find(p => p.user_id === user?.id);
   const [mode, setMode] = useState(myParticipation?.notifications_mode || "all");
   const [isMuted, setIsMuted] = useState(myParticipation?.is_muted || false);
@@ -30,16 +32,16 @@ export default function NotificationSettings({ conversation, onClose }: Notifica
       .eq("conversation_id", conversation.id)
       .eq("user_id", user.id);
     setSaving(false);
-    if (error) { toast.error("Error al guardar"); return; }
-    toast.success("Preferencias guardadas");
+    if (error) { toast.error(t("common.errorSaving")); return; }
+    toast.success(t("messenger.notif.preferenciasGuardadas"));
     onClose();
   };
 
   return (
     <div className="p-4 space-y-4 rounded-3xl">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold">Notificaciones</h3>
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose}>
+        <h3 className="text-sm font-semibold">{t("messenger.header.notificaciones")}</h3>
+        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose} aria-label={t("common.close")}>
           <X className="h-4 w-4" />
         </Button>
       </div>
@@ -47,7 +49,7 @@ export default function NotificationSettings({ conversation, onClose }: Notifica
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           {isMuted ? <BellOff className="h-4 w-4 text-muted-foreground" /> : <Bell className="h-4 w-4 text-primary" />}
-          <Label className="text-sm">Silenciar conversación</Label>
+          <Label className="text-sm">{t("messenger.notif.silenciarConversacion")}</Label>
         </div>
         <Switch checked={isMuted} onCheckedChange={setIsMuted} />
       </div>
@@ -57,26 +59,26 @@ export default function NotificationSettings({ conversation, onClose }: Notifica
           <div className="flex items-center gap-2">
             <RadioGroupItem value="all" id="notif-all" />
             <Label htmlFor="notif-all" className="text-sm flex items-center gap-2">
-              <BellRing className="h-3.5 w-3.5" /> Todos los mensajes
+              <BellRing className="h-3.5 w-3.5" /> {t("messenger.notif.todosLosMensajes")}
             </Label>
           </div>
           <div className="flex items-center gap-2">
             <RadioGroupItem value="mentions" id="notif-mentions" />
             <Label htmlFor="notif-mentions" className="text-sm flex items-center gap-2">
-              <Bell className="h-3.5 w-3.5" /> Solo @menciones
+              <Bell className="h-3.5 w-3.5" /> {t("messenger.notif.soloMenciones")}
             </Label>
           </div>
           <div className="flex items-center gap-2">
             <RadioGroupItem value="none" id="notif-none" />
             <Label htmlFor="notif-none" className="text-sm flex items-center gap-2">
-              <BellOff className="h-3.5 w-3.5" /> Ninguna
+              <BellOff className="h-3.5 w-3.5" /> {t("messenger.notif.ninguna")}
             </Label>
           </div>
         </RadioGroup>
       )}
 
       <Button onClick={handleSave} disabled={saving} size="sm" className="w-full rounded-full">
-        {saving ? "Guardando..." : "Guardar"}
+        {saving ? t("messenger.notif.guardando") : t("common.save")}
       </Button>
     </div>
   );
