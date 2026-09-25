@@ -21,6 +21,14 @@ describe("horarios · fechas", () => {
     expect(etiquetaDia("2026-08-31", 5)).toBe("Sábado 5");
   });
 
+  it("con la interfaz en inglés las etiquetas salen en inglés (el weekday no cambia)", () => {
+    expect(etiquetaSemana("2026-08-31", "en")).toBe("Aug 31 – Sep 6");
+    expect(etiquetaSemana("2026-09-07", "en")).toBe("Sep 7 – 13");
+    expect(etiquetaDia("2026-08-31", 5, "en")).toBe("Saturday 5");
+    // Sin idioma sigue en español: es lo que ya devolvía.
+    expect(etiquetaDia("2026-08-31", 5, "es")).toBe("Sábado 5");
+  });
+
   it("sumarDias cruza fin de mes y de año", () => {
     expect(sumarDias("2026-09-28", 7)).toBe("2026-10-05");
     expect(sumarDias("2026-12-28", 7)).toBe("2027-01-04");

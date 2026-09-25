@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { traducir, type TranslationKey } from "@/lib/i18n";
 
 // FEEDBACK DEL TL — lo que el supervisor registra de un chatter en el día y que
 // suma o resta a su nota.
@@ -16,18 +17,20 @@ export type TipoFeedback =
   | "buen_performance";
 
 /** Catálogo con los puntos por defecto. Los puntos se GUARDAN en la fila, así
- *  que cambiar un valor acá no reescribe el historial. */
+ *  que cambiar un valor acá no reescribe el historial.
+ *  `tipo` es el dato que se guarda; `label`/`ayuda` son claves de i18n de lo que
+ *  se muestra (t(label)), así el mismo registro se lee en el idioma de cada uno. */
 export const TIPOS_FEEDBACK: Array<{
   tipo: TipoFeedback;
-  label: string;
+  label: TranslationKey;
   puntos: number;
-  ayuda: string;
+  ayuda: TranslationKey;
 }> = [
-  { tipo: "falta_no_justificada", label: "Falta no justificada", puntos: -2, ayuda: "No apareció y no avisó." },
-  { tipo: "bajo_rendimiento", label: "Bajo rendimiento", puntos: -1, ayuda: "Estuvo, pero por debajo de lo que puede." },
-  { tipo: "mala_actitud", label: "Mala actitud", puntos: -1, ayuda: "Trato o disposición fuera de lugar." },
-  { tipo: "buena_actitud", label: "Buena actitud", puntos: 0.5, ayuda: "Ayudó, cubrió, buena disposición." },
-  { tipo: "buen_performance", label: "Buen performance", puntos: 1, ayuda: "Se pasó de lo esperado." },
+  { tipo: "falta_no_justificada", label: "chatters.fb.tipo.faltaNoJustificada", puntos: -2, ayuda: "chatters.fb.ayuda.faltaNoJustificada" },
+  { tipo: "bajo_rendimiento", label: "chatters.fb.tipo.bajoRendimiento", puntos: -1, ayuda: "chatters.fb.ayuda.bajoRendimiento" },
+  { tipo: "mala_actitud", label: "chatters.fb.tipo.malaActitud", puntos: -1, ayuda: "chatters.fb.ayuda.malaActitud" },
+  { tipo: "buena_actitud", label: "chatters.fb.tipo.buenaActitud", puntos: 0.5, ayuda: "chatters.fb.ayuda.buenaActitud" },
+  { tipo: "buen_performance", label: "chatters.fb.tipo.buenPerformance", puntos: 1, ayuda: "chatters.fb.ayuda.buenPerformance" },
 ];
 
 export const feedbackDe = (tipo: string) => TIPOS_FEEDBACK.find((t) => t.tipo === tipo);
@@ -80,7 +83,7 @@ export function useMutacionesFeedback() {
   const registrar = useMutation({
     mutationFn: async (v: { identityId: string; dia: string; tipo: TipoFeedback; comentario?: string }) => {
       const cat = feedbackDe(v.tipo);
-      if (!cat) throw new Error("Tipo de feedback desconocido");
+      if (!cat) throw new Error(traducir("chatters.fb.unknownType", { tipo: v.tipo }));
       const { data: sesion } = await supabase.auth.getUser();
       const { error } = await db.from("chatter_tl_feedback").insert({
         identity_id: v.identityId,
@@ -99,11 +102,11 @@ export function useMutacionesFeedback() {
   // que eligió entra junto (un solo insert) y no queda a medias si se corta.
   const registrarVarios = useMutation({
     mutationFn: async (v: { identityId: string; dia: string; tipos: TipoFeedback[]; comentario?: string }) => {
-      if (v.tipos.length === 0) throw new Error("No elegiste ninguna opción");
+      if (v.tipos.length === 0) throw new Error(traducir("chatters.fb.noneChosen"));
       const { data: sesion } = await supabase.auth.getUser();
       const filas = v.tipos.map((tipo) => {
         const cat = feedbackDe(tipo);
-        if (!cat) throw new Error(`Tipo de feedback desconocido: ${tipo}`);
+        if (!cat) throw new Error(traducir("chatters.fb.unknownType", { tipo }));
         return {
           identity_id: v.identityId,
           dia: v.dia,

@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import type { TranslationKey } from "@/lib/i18n";
 
 // Datos del dashboard de rendimiento de chatters.
 //
@@ -184,8 +185,10 @@ export function tonoDeNota(nota: number | null | undefined): string {
 export const money = (n: number | null | undefined) =>
   n == null ? "—" : `$${Math.round(n).toLocaleString("en-US")}`;
 
-export const NOMBRE_FALTANTE: Record<string, string> = {
-  ventas: "sin ventas reportadas",
-  horas: "sin horas de Hubstaff",
-  cowork: "sin registro en Cowork",
+/** Lo que le faltó a un día para tener nota. La LLAVE viene de la base
+ *  (`detalle.faltantes`); el valor es la clave de i18n de lo que se muestra. */
+export const NOMBRE_FALTANTE: Record<string, TranslationKey> = {
+  ventas: "chatters.missing.ventas",
+  horas: "chatters.missing.horas",
+  cowork: "chatters.missing.cowork",
 };

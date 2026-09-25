@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Plus, X, Clock, CircleDot, CircleDashed, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useLanguage } from "@/hooks/useLanguage";
 import { supabase } from "@/integrations/supabase/client";
 import {
   useChatterSessions,
@@ -30,10 +31,10 @@ interface Props {
   onSelect: (id: string | null) => void;
 }
 
-const formatRelative = (iso: string): string => {
+const formatRelative = (iso: string, ahora: string): string => {
   const ms = Date.now() - new Date(iso).getTime();
   const min = Math.floor(ms / 60000);
-  if (min < 1) return "ahora";
+  if (min < 1) return ahora;
   if (min < 60) return `${min}m`;
   const h = Math.floor(min / 60);
   if (h < 24) return `${h}h`;
@@ -64,7 +65,9 @@ const SessionRow = ({
   isTyping: boolean;
   onSelect: () => void;
   onEnd: () => void;
-}) => (
+}) => {
+  const { t } = useLanguage();
+  return (
   <button
     type="button"
     onClick={onSelect}
@@ -79,7 +82,7 @@ const SessionRow = ({
     {unread > 0 && (
       <span
         className="pointer-events-none absolute -right-1 -top-1 z-10 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[11px] font-bold text-destructive-foreground shadow ring-2 ring-background"
-        aria-label={`${unread} mensajes sin leer`}
+        aria-label={t("chatters.sess.unreadN", { n: unread })}
       >
         {unread > 99 ? "99+" : unread}
       </span>
@@ -113,7 +116,7 @@ const SessionRow = ({
             <span className="h-1 w-1 animate-pulse rounded-full bg-current" style={{ animationDelay: "150ms" }} />
             <span className="h-1 w-1 animate-pulse rounded-full bg-current" style={{ animationDelay: "300ms" }} />
           </span>
-          <span>escribiendo…</span>
+          <span>{t("chatters.sess.typing")}</span>
         </div>
       ) : (
         <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
@@ -123,7 +126,7 @@ const SessionRow = ({
           <span className="min-w-0 flex-1 truncate">{profile?.name ?? "?"}</span>
           <span className="flex shrink-0 items-center gap-0.5 whitespace-nowrap">
             <Clock className="h-2.5 w-2.5" />
-            {formatRelative(session.created_at)}
+            {formatRelative(session.created_at, t("chatters.sess.now"))}
           </span>
           <span className="shrink-0 whitespace-nowrap font-mono font-bold text-success">
             ${totalSpent}
@@ -146,13 +149,14 @@ const SessionRow = ({
         }
       }}
       className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/20 hover:text-destructive group-hover:opacity-100"
-      aria-label="Cerrar sesión"
-      title="Cerrar sesión"
+      aria-label={t("chatters.sess.close")}
+      title={t("chatters.sess.close")}
     >
       <X className="h-3 w-3" />
     </span>
   </button>
-);
+  );
+};
 
 // Constante compartida con la vista del chat: cuántos ms después del
 // último timestamp de typing_chatter_at consideramos que el chatter
@@ -172,6 +176,7 @@ const TYPING_TIMEOUT_MS = 3500;
 // auto-dismissea al enviar la evaluación).
 
 export const SessionsPanel = ({ selectedId, onSelect }: Props) => {
+  const { t } = useLanguage();
   const sessionsQ = useChatterSessions("all");
   const profilesQ = useChatterProfiles();
   const qc = useQueryClient();
@@ -188,8 +193,8 @@ export const SessionsPanel = ({ selectedId, onSelect }: Props) => {
   // recibir un nuevo evento realtime.
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    const t = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(t);
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
   }, []);
 
   // Re-sincroniza el set de dismissed cuando cambia desde OTRA vista (WorkspaceContent
@@ -371,9 +376,9 @@ export const SessionsPanel = ({ selectedId, onSelect }: Props) => {
       await endMut.mutateAsync(sessionId);
       dismissFromWorkspace(sessionId);
       setEndConfirm(null);
-      toast.success("Sesión terminada y cerrada del workspace");
+      toast.success(t("chatters.sess.endedAndClosed"));
     } catch (e) {
-      toast.error("No se pudo terminar", { description: (e as Error).message });
+      toast.error(t("chatters.sess.couldNotEnd"), { description: (e as Error).message });
     }
   };
 
@@ -383,20 +388,20 @@ export const SessionsPanel = ({ selectedId, onSelect }: Props) => {
           botón "+ Nueva sesión" lado a lado sin desbordar. */}
       <div className="flex shrink-0 items-center justify-between border-b p-3">
         <span className="text-xs font-semibold text-muted-foreground">
-          Sesiones
+          {t("chatters.ws.sessions")}
         </span>
         <Button size="sm" onClick={() => setNewOpen(true)} className="h-7 gap-1 text-xs">
-          <Plus className="h-3 w-3" /> Nueva sesión
+          <Plus className="h-3 w-3" /> {t("chatters.sess.new")}
         </Button>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-2 space-y-1">
         {sessionsQ.isLoading && (
-          <p className="p-2 text-xs text-muted-foreground">Cargando…</p>
+          <p className="p-2 text-xs text-muted-foreground">{t("common.loading")}</p>
         )}
         {!sessionsQ.isLoading && open.length === 0 && (
           <p className="p-4 text-center text-xs italic text-muted-foreground">
-            Sin sesiones abiertas.
+            {t("chatters.sess.noneOpen")}
           </p>
         )}
         {open.map((s) => {
@@ -450,19 +455,19 @@ export const SessionsPanel = ({ selectedId, onSelect }: Props) => {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Cerrar sesión activa</AlertDialogTitle>
+            <AlertDialogTitle>{t("chatters.sess.closeActiveTitle")}</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div>
-                <p>Esta sesión todavía está abierta. Si la cierras del workspace ahora:</p>
+                <p>{t("chatters.sess.stillOpen")}</p>
                 <ul className="mt-2 list-disc space-y-1 pl-5">
                   <li>
-                    Se <strong>termina la sesión para el chatter</strong> — no podrá enviar más mensajes y el link se invalida.
+                    {t("chatters.sess.endsPre")} <strong>{t("chatters.sess.endsStrong")}</strong> {t("chatters.sess.endsPost")}
                   </li>
                   <li>
-                    <strong>NO vas a poder enviar la evaluación</strong> después porque la sesión sale de tu workspace.
+                    <strong>{t("chatters.sess.noEvalStrong")}</strong> {t("chatters.sess.noEvalPost")}
                   </li>
                 </ul>
-                <p className="mt-2">¿Estás seguro?</p>
+                <p className="mt-2">{t("chatters.sess.areYouSure")}</p>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -477,7 +482,7 @@ export const SessionsPanel = ({ selectedId, onSelect }: Props) => {
               disabled={endMut.isPending}
             >
               {endMut.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Terminar y cerrar
+              {t("chatters.sess.endAndClose")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
