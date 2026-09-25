@@ -82,12 +82,6 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders(req) });
 
   try {
-    // El cuerpo se lee PRIMERO para saber en qué idioma contestar, también los
-    // errores de sesión. Sin `lang`, español como siempre.
-    const body = await req.json().catch(() => ({}));
-    const idioma: Idioma = idiomaDe(body);
-    const m = (clave: ClaveDeMensaje, vars?: Record<string, string | number>) => msg(idioma, clave, vars);
-
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return json(req, { error: "Unauthorized", reason: "missing_auth_header" }, 401);
@@ -104,6 +98,14 @@ Deno.serve(async (req) => {
       return json(req, { error: "Unauthorized", reason: "invalid_token" }, 401);
     }
     const callerId = user.id;
+
+    // El cuerpo se lee recién con la sesión validada (a un anónimo no se le lee
+    // nada) y trae el idioma de la página: todo mensaje traducido viene de acá para
+    // abajo. Los dos 401 de arriba dicen "Unauthorized" a propósito: adminInvoke
+    // lo mira para saber que la sesión se cayó. Sin `lang`, español como siempre.
+    const body = await req.json().catch(() => ({}));
+    const idioma: Idioma = idiomaDe(body);
+    const m = (clave: ClaveDeMensaje, vars?: Record<string, string | number>) => msg(idioma, clave, vars);
 
     const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -349,7 +351,7 @@ Deno.serve(async (req) => {
       return json(req, { success: true, id });
     }
 
-    return json(req, { error: m("accionDesconocida", { accion: action ?? "(vacía)" }) }, 400);
+    return json(req, { error: m("accionDesconocida", { accion: action ?? (idioma === "en" ? "(empty)" : "(vacía)") }) }, 400);
   } catch (e) {
     return json(req, { error: String((e as Error)?.message ?? e) }, 500);
   }

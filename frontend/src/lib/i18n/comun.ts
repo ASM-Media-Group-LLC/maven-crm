@@ -167,4 +167,13 @@ export const comun = {
   "audio.decoding": { es: "Decodificando audio…", en: "Decoding audio…" },
   "audio.downsampling": { es: "Bajando sample rate…", en: "Lowering sample rate…" },
   "audio.encoding": { es: "Codificando mp3…", en: "Encoding mp3…" },
+  // Los errores que arma adminInvoke (lib/adminInvoke.ts) y muestran las pantallas.
+  "common.sessionExpiredRelogin": {
+    es: "Tu sesión expiró. Por favor, vuelve a iniciar sesión.",
+    en: "Your session expired. Please sign in again.",
+  },
+  "common.noPermissionAction": {
+    es: "No tienes permisos para realizar esta acción.",
+    en: "You don't have permission to do this.",
+  },
 } as const satisfies Record<string, { es: string; en: string }>;

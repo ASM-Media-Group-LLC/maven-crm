@@ -1,14 +1,17 @@
 import { supabase } from "@/integrations/supabase/client";
+import { traducir } from "@/lib/i18n";
 
 export class SessionExpiredError extends Error {
   constructor() {
-    super("Tu sesión expiró. Por favor, vuelve a iniciar sesión.");
+    // traducir() y no un texto fijo: este mensaje se muestra tal cual en las
+    // pantallas (toasts, tarjetas de error), también con la interfaz en inglés.
+    super(traducir("common.sessionExpiredRelogin"));
     this.name = "SessionExpiredError";
   }
 }
 
 export class ForbiddenError extends Error {
-  constructor(msg = "No tienes permisos para realizar esta acción.") {
+  constructor(msg = traducir("common.noPermissionAction")) {
     super(msg);
     this.name = "ForbiddenError";
   }

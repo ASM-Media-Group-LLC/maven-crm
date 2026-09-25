@@ -35,14 +35,22 @@ const LISTA = {
 };
 
 const llamadas: Record<string, unknown>[] = [];
-vi.mock("@/lib/adminInvoke", () => ({
-  adminInvoke: (_fn: string, body: Record<string, unknown>) => {
-    llamadas.push(body);
-    return Promise.resolve(LISTA);
-  },
-}));
+// Qué contesta el servidor en cada prueba: la lista, o un error que arma adminInvoke.
+let respuesta: () => Promise<unknown> = () => Promise.resolve(LISTA);
+vi.mock("@/lib/adminInvoke", async () => {
+  const real = await vi.importActual<typeof import("@/lib/adminInvoke")>("@/lib/adminInvoke");
+  return {
+    ...real,
+    adminInvoke: (_fn: string, body: Record<string, unknown>) => {
+      llamadas.push(body);
+      return respuesta();
+    },
+  };
+});
 
 import AdminApiKeys from "@/pages/admin/AdminApiKeys";
+import { SessionExpiredError } from "@/lib/adminInvoke";
+import { apiKeys } from "@/lib/i18n/apiKeys";
 
 /** Todo el texto visible (sin lo que es código: headers, campos, rutas) y los
  *  atributos que se leen en pantalla. */
@@ -80,6 +88,7 @@ describe("Ajustes → API keys en inglés", () => {
   beforeEach(() => {
     localStorage.setItem("app-language", "en");
     llamadas.length = 0;
+    respuesta = () => Promise.resolve(LISTA);
   });
 
   it("la tabla y el aviso no tienen nada en español", async () => {
@@ -124,5 +133,47 @@ describe("Ajustes → API keys en inglés", () => {
     const deServidor = SCOPE_CATALOG.find((s) => s.key === "creators:read")!;
     expect(within(dialogo).getByText(deServidor.label)).toBeTruthy();
     expect(llamadas[0]).toMatchObject({ lang: "es" });
+  });
+});
+
+describe("Ajustes → API keys: los casos que encontró la revisión", () => {
+  beforeEach(() => {
+    localStorage.setItem("app-language", "en");
+    llamadas.length = 0;
+  });
+
+  it("con la sesión vencida, el error también sale en inglés", async () => {
+    respuesta = () => Promise.reject(new SessionExpiredError());
+    montar();
+    expect(await screen.findByText("Your session expired. Please sign in again.")).toBeTruthy();
+    expect(enEspanol(document.body)).toEqual([]);
+  });
+
+  it("sin nombre de la persona, el aviso de Messenger dice «your», no «you's»", async () => {
+    respuesta = () => Promise.resolve({ ...LISTA, you: { id: YO, name: null } });
+    montar();
+    await screen.findByText("Integration one");
+    fireEvent.click(screen.getByRole("button", { name: /Create API key/ }));
+    const dialogo = await screen.findByRole("dialog");
+    fireEvent.click(within(dialogo).getByText("messenger:read").closest("label")!.querySelector("input")!);
+    expect(await within(dialogo).findByText("This key will read ALL of your Messenger conversations")).toBeTruthy();
+    expect(dialogo.textContent).not.toMatch(/you's/);
+  });
+
+  it("el español de cada scope en el diccionario es EXACTAMENTE el del servidor", () => {
+    // Si el servidor no manda el catálogo, la página usa el diccionario: tiene que
+    // decir lo mismo (el aviso de contacts:phone incluido), no una versión corta.
+    const clave: Record<string, string> = {
+      "creators:read": "creators", "contacts:read": "contacts", "contacts:phone": "phone", "employees:read": "employees",
+      "hubstaff:read": "hubstaff", "cowork:read": "cowork", "sales:read": "sales", "sales:chatters": "salesChatters",
+      "promolog:read": "promolog", "messenger:read": "messenger",
+    };
+    for (const s of SCOPE_CATALOG) {
+      const base = clave[s.key];
+      expect(base, `el scope ${s.key} no tiene traducción en lib/i18n/apiKeys.ts`).toBeTruthy();
+      const dic = apiKeys as unknown as Record<string, { es: string }>;
+      expect(dic[`apiKeys.scope.${base}.label`].es).toBe(s.label);
+      expect(dic[`apiKeys.scope.${base}.desc`].es).toBe(s.description);
+    }
   });
 });

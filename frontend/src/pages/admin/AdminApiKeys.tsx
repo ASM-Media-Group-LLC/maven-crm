@@ -99,11 +99,11 @@ function ConFormato({ texto }: { texto: string }) {
     <>
       {texto.split(/(`[^`]+`)/g).map((trozo, i) =>
         trozo.startsWith("`") && trozo.endsWith("`") && trozo.length > 1 ? (
-          <code key={i} className="rounded bg-muted px-1 py-0.5">{trozo.slice(1, -1)}</code>
+          <code key={i} className="rounded bg-muted px-1 py-0.5 [overflow-wrap:anywhere]">{trozo.slice(1, -1)}</code>
         ) : (
           trozo.split(/(\*\*[^*]+\*\*)/g).map((parte, j) =>
             parte.startsWith("**") && parte.endsWith("**") && parte.length > 4
-              ? <span key={`${i}-${j}`} className="font-medium text-foreground">{parte.slice(2, -2)}</span>
+              ? <strong key={`${i}-${j}`} className="font-semibold text-foreground">{parte.slice(2, -2)}</strong>
               : <span key={`${i}-${j}`}>{parte}</span>,
           )
         ),
@@ -185,7 +185,8 @@ const AdminApiKeys = () => {
   const conMessenger = scopes.includes(SCOPE_MESSENGER);
   // En edición, Messenger solo se puede conservar o sacar, nunca sumar.
   const teniaMessenger = !!editing?.scopes.includes(SCOPE_MESSENGER);
-  const yoNombre = data?.you?.name ?? t("apiKeys.form.you");
+  // Sin nombre (perfil sin full_name) no se arma "ALL of you's": hay una frase propia.
+  const yoNombre = data?.you?.name?.trim() || null;
   // En español manda el texto del servidor (es la fuente); en inglés, o si el
   // servidor no mandó texto, el del diccionario.
   const etiquetaScope = (s: ScopeDef) =>
@@ -394,7 +395,7 @@ const AdminApiKeys = () => {
 
       {/* Modal crear / editar / mostrar key */}
       <Dialog open={modalMode !== null} onOpenChange={(o) => { if (!o) closeModal(); }}>
-        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+        <DialogContent className="max-h-[85vh] grid-cols-[minmax(0,1fr)] overflow-y-auto sm:max-w-lg">
           {freshKey ? (
             <>
               <DialogHeader>
@@ -500,7 +501,7 @@ const AdminApiKeys = () => {
                                   <span className="text-sm font-medium">{etiquetaScope(s)}</span>
                                   <span className="shrink-0 text-xs text-muted-foreground">{t("apiKeys.form.readOnly")}</span>
                                 </span>
-                                <span className="block text-xs text-muted-foreground">{descripcionScope(s)}</span>
+                                <span className="block text-xs text-muted-foreground"><ConFormato texto={descripcionScope(s)} /></span>
                                 <code className="text-[10px] text-muted-foreground">{s.key}</code>
                               </span>
                             </label>
@@ -515,7 +516,7 @@ const AdminApiKeys = () => {
               {conMessenger && modalMode === "create" && (
                 <div className="mt-4 space-y-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">
                   <p className="font-medium text-foreground">
-                    {t("apiKeys.form.messengerTitle", { name: yoNombre })}
+                    {yoNombre ? t("apiKeys.form.messengerTitle", { name: yoNombre }) : t("apiKeys.form.messengerTitleYou")}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {t("apiKeys.form.messengerBody")}
@@ -542,7 +543,11 @@ const AdminApiKeys = () => {
 
       {/* API reference */}
       <Dialog open={docsOpen} onOpenChange={setDocsOpen}>
-        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+        {/* grid-cols-[minmax(0,1fr)]: sin esto la columna del diálogo toma el ancho
+            del contenido que no se puede partir (el `curl` del ejemplo) y todo se sale
+            por la derecha: medido en prod el 25/09, 659 px de lugar y la columna en
+            728. Así el ejemplo se desplaza en SU caja y el resto se acomoda. */}
+        <DialogContent className="max-h-[85vh] grid-cols-[minmax(0,1fr)] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2"><BookOpen className="h-5 w-5" /> {t("apiKeys.apiReference")}</DialogTitle>
             <DialogDescription>{t("apiKeys.docs.description")}</DialogDescription>
@@ -551,7 +556,7 @@ const AdminApiKeys = () => {
             <div>
               <div className="mb-1 font-medium">{t("apiKeys.docs.baseUrl")}</div>
               <div className="flex items-center gap-2">
-                <code className="flex-1 overflow-x-auto rounded-md border border-border/60 bg-background px-3 py-2 text-xs">{API_BASE}</code>
+                <code className="min-w-0 flex-1 overflow-x-auto rounded-md border border-border/60 bg-background px-3 py-2 text-xs">{API_BASE}</code>
                 <CopyButton text={API_BASE} />
               </div>
             </div>

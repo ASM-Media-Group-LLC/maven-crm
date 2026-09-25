@@ -107,11 +107,14 @@ export const apiKeys = {
     es: "Directas y grupos, también las futuras, con los mensajes que te mandan otras personas: exactamente lo que ves en /messenger. Quien tenga la key las lee desde las IPs que pongas, hasta que venza o la revoques. No marca nada como leído.",
     en: "Direct chats and groups, including future ones, with the messages other people send you: exactly what you see in /messenger. Whoever has the key can read them from the IPs you set, until it expires or you revoke it. It doesn't mark anything as read.",
   },
+  "apiKeys.form.messengerTitleYou": {
+    es: "Esta key va a leer TODAS tus conversaciones del Messenger",
+    en: "This key will read ALL of your Messenger conversations",
+  },
   "apiKeys.form.messengerConfirm": {
     es: "Entiendo que la key lee mis conversaciones y las de quienes me escriben.",
     en: "I understand the key reads my conversations and those of people who write to me.",
   },
-  "apiKeys.form.you": { es: "vos", en: "you" },
   "apiKeys.form.create": { es: "Crear key", en: "Create key" },
   "apiKeys.toast.created": { es: "API key creada", en: "API key created" },
   "apiKeys.toast.createFailed": { es: "No pude crear la key", en: "Couldn't create the key" },
@@ -136,52 +139,52 @@ export const apiKeys = {
   "apiKeys.group.Messenger": { es: "Messenger", en: "Messenger" },
   "apiKeys.scope.creators.label": { es: "Perfil + redes sociales", en: "Profile + social networks" },
   "apiKeys.scope.creators.desc": {
-    es: "Roster de creadoras: nombre artístico, categoría, estado, ubicación, seguidores de Instagram y todas sus redes.",
+    es: "Roster de creadoras: nombre artístico, categoría, estado, ubicación, seguidores de Instagram y todas sus redes (IG, TikTok, Twitter/X, YouTube, Facebook, Reddit, Telegram, LinkedIn, OnlyFans).",
     en: "Creator roster: stage name, category, status, location, Instagram followers and all their networks (IG, TikTok, Twitter/X, YouTube, Facebook, Reddit, Telegram, LinkedIn, OnlyFans).",
   },
   "apiKeys.scope.contacts.label": { es: "Contactos y agencias", en: "Contacts and agencies" },
   "apiKeys.scope.contacts.desc": {
-    es: "Directorio comercial: modelos, agencias y ex-creadoras. Teléfono y email enmascarados salvo con contacts:phone.",
+    es: "Directorio comercial: modelos, AGENCIAS y ex-creadoras. Nombre, handle, plataforma, país, ciudad, empresa, estado y de qué base salió. Filtro `kind` = modelo | agencia | ex_creadora. El teléfono y el email van ENMASCARADOS salvo que la key tenga además contacts:phone.",
     en: "Business directory: models, AGENCIES and former creators. Name, handle, platform, country, city, company, status and source. Filter `kind` = modelo | agencia | ex_creadora. Phone and email are MASKED unless the key also has contacts:phone.",
   },
   "apiKeys.scope.phone.label": { es: "⚠️ Teléfono y email sin enmascarar", en: "⚠️ Unmasked phone and email" },
   "apiKeys.scope.phone.desc": {
-    es: "Devuelve el teléfono y el email REALES de cada contacto.",
-    en: "Returns each contact's REAL phone and email instead of masked ones. It's the complete business database: once handed over it can't be undone. Inside Maven this data is admin-only (admin-only column + 'View Phones' permission), and an API key BYPASSES those layers — this scope is the only thing stopping it. Give it only to keys that truly need it, with a short expiration and an IP whitelist.",
+    es: "Devuelve el teléfono y el email REALES de cada contacto, en vez de enmascarados. Es la base de datos comercial completa: una vez entregada no se puede deshacer. Dentro de Maven este dato está restringido a admins (columna solo-admin + permiso 'Ver Teléfonos'), y una API key SALTEA esas capas — este scope es lo único que la frena. Dalo solo a keys que de verdad lo necesiten, con vencimiento corto y whitelist de IP.",
+    en: "Returns each contact's REAL phone and email instead of masked ones. It's the complete business database: once handed over it can't be undone. Inside Maven this data is admin-only (admin-only column + the `Ver Teléfonos` (view phones) permission), and an API key BYPASSES those layers — this scope is the only thing stopping it. Give it only to keys that truly need it, with a short expiration and an IP whitelist.",
   },
   "apiKeys.scope.employees.label": { es: "Roster del equipo", en: "Team roster" },
   "apiKeys.scope.employees.desc": {
-    es: "Empleados de la agencia: nombre, rol y fecha de alta.",
+    es: "Empleados de la agencia: nombre, rol (chatter, closer, manager, coordinador…) y fecha de alta.",
     en: "Agency employees: name, role (chatter, closer, manager, coordinator…) and start date.",
   },
   "apiKeys.scope.hubstaff.label": { es: "Horas de Hubstaff (diario)", en: "Hubstaff hours (daily)" },
   "apiKeys.scope.hubstaff.desc": {
-    es: "Horas trabajadas por día según Hubstaff.",
+    es: "Horas trabajadas por día según Hubstaff: tiempo trackeado (horas), actividad general y proyecto, por empleado. Filtros por fecha y empleado.",
     en: "Hours worked per day according to Hubstaff: tracked time (hours), overall activity and project, per employee. Filters by date and employee.",
   },
   "apiKeys.scope.cowork.label": { es: "Tiempo en Cowork (diario y al detalle)", en: "Cowork time (daily and detailed)" },
   "apiKeys.scope.cowork.desc": {
-    es: "Tiempo trabajado en Cowork por empleado y día.",
+    es: "Tiempo trabajado en Cowork por empleado y día: segundos con el reloj corriendo (cámara + pantalla, presente), y detenido por pausa, sin cámara, sin pantalla o fuera de cámara. Con /cowork/time/segments, cada tramo con hora de inicio, fin y motivo. Es el dato que va a reemplazar a Hubstaff.",
     en: "Time worked in Cowork per employee and day: seconds with the clock running (camera + screen, present), and stopped for a break, no camera, no screen or off camera. With /cowork/time/segments, each segment with start time, end time and reason. It's the data that will replace Hubstaff.",
   },
   "apiKeys.scope.sales.label": { es: "Ganancias por creadora (diario)", en: "Earnings per creator (daily)" },
   "apiKeys.scope.sales.desc": {
-    es: "Ganancias brutas diarias por creadora con desglose.",
+    es: "Ganancias brutas diarias por creadora con desglose (suscripciones, tips, mensajes, posts, referidos, streams) y fans activos/nuevos.",
     en: "Daily gross earnings per creator with breakdown (subscriptions, tips, messages, posts, referrals, streams) and active/new fans.",
   },
   "apiKeys.scope.salesChatters.label": { es: "Ventas por chatter (diario)", en: "Sales per chatter (daily)" },
   "apiKeys.scope.salesChatters.desc": {
-    es: "Ventas diarias por chatter.",
+    es: "Ventas diarias por chatter: total vendido, mensajes vendidos y fans chateados.",
     en: "Daily sales per chatter: total sold, messages sold and fans chatted.",
   },
   "apiKeys.scope.promolog.label": { es: "Promoción diaria", en: "Daily promotion" },
   "apiKeys.scope.promolog.desc": {
-    es: "Estado diario de promoción por creadora y red.",
+    es: "Estado diario de promoción por creadora y red: si promocionó ese día, cuántas historias se escanearon y cuántas contaron como promo. Filtros por fecha, creadora y red.",
     en: "Daily promotion status per creator and network: whether they promoted that day, how many stories were scanned and how many counted as promotion. Filters by date, creator and network.",
   },
   "apiKeys.scope.messenger.label": { es: "⚠️ Leer el Messenger de quien crea la key", en: "⚠️ Read the Messenger of whoever creates the key" },
   "apiKeys.scope.messenger.desc": {
-    es: "Lee TODAS las conversaciones del Messenger de la persona que crea la key.",
+    es: "Lee TODAS las conversaciones del Messenger de la persona que crea la key — directas y grupos, también las futuras — exactamente como las ve ella en /messenger, con los mensajes que le mandan otras personas. No marca nada como leído. Exige IPs fijas y vencimiento de 90 días como máximo, y solo se puede poner al crear una key nueva.",
     en: "Reads ALL the Messenger conversations of the person who creates the key — direct chats and groups, including future ones — exactly as they see them in /messenger, including the messages other people send them. It doesn't mark anything as read. Requires fixed IPs and an expiration of 90 days at most, and can only be added when creating a new key.",
   },
 
@@ -218,16 +221,16 @@ export const apiKeys = {
     en: "Who this key acts as (acts_as: id, name, avatar_url), its agency (agency_id) and how much of this hour's quota is left (rate_limit). No scope needed.",
   },
   "apiKeys.ep.conversations": {
-    es: "La bandeja de la persona de la key, como en /messenger: cada conversación con type (direct | group), counterpart (en las directas), last_message (text_preview de 200 caracteres), unread_count (tope 100; null si no se pudo contar), me (su rol, last_read_at, silenciada), is_pinned, is_archived. Ordenada por última actividad. Filtros: limit (máx 100), offset. No es para sondear: para lo nuevo, /messenger/feed.",
-    en: "The inbox of the key's person, as in /messenger: each conversation with type (direct | group), counterpart (in direct chats), last_message (200-character text_preview), unread_count (capped at 100; null if it couldn't be counted), me (their role, last_read_at, muted), is_pinned, is_archived. Sorted by latest activity. Filters: limit (max 100), offset. Not meant for polling: for what's new, use /messenger/feed.",
+    es: "La bandeja de la persona de la key, como en /messenger: cada conversación con type (direct | group), counterpart (en las directas), last_message (text_preview de 200 caracteres), unread_count (tope 100; null si no se pudo contar), me (role, last_read_at, is_muted), is_pinned, is_archived. Ordenada por última actividad. Filtros: limit (máx 100), offset. No es para sondear: para lo nuevo, /messenger/feed.",
+    en: "The inbox of the key's person, as in /messenger: each conversation with type (direct | group), counterpart (in direct chats), last_message (200-character text_preview), unread_count (capped at 100; null if it couldn't be counted), me (role, last_read_at, is_muted), is_pinned, is_archived. Sorted by latest activity. Filters: limit (max 100), offset. Not meant for polling: for what's new, use /messenger/feed.",
   },
   "apiKeys.ep.conversation": {
     es: "Una conversación: datos, settings del grupo, me y participants (user, role, joined_at). Si el grupo esconde la lista de miembros y la persona no es admin del grupo, participants = null y participants_hidden = true. Si no la ve, 404.",
     en: "One conversation: details, group settings, me and participants (user, role, joined_at). If the group hides its member list and the person isn't a group admin, participants = null and participants_hidden = true. If they can't see it, 404.",
   },
   "apiKeys.ep.messages": {
-    es: "La historia, de lo más nuevo a lo más viejo, con cursor: pasá next_cursor en before para la página anterior, o usá after para pedir lo nuevo en orden. Cada mensaje: sender, kind (text | image | gif | video | voice_note | audio | file | system), text, attachment (url, name, hosted_by, storage_path), reply_to_id, is_thread_reply, is_edited, is_deleted. Un borrado viene sin texto ni adjunto. Filtros: limit (máx 100), before | after, thread_root_id, include=rich (agrega el texto con formato).",
-    en: "The history, newest to oldest, with a cursor: pass next_cursor as before for the previous page, or use after to get what's new in order. Each message: sender, kind (text | image | gif | video | voice_note | audio | file | system), text, attachment (url, name, hosted_by, storage_path), reply_to_id, is_thread_reply, is_edited, is_deleted. A deleted message comes without text or attachment. Filters: limit (max 100), before | after, thread_root_id, include=rich (adds the formatted text).",
+    es: "La historia, de lo más nuevo a lo más viejo, con cursor: pasá next_cursor en el parámetro before para la página anterior, o usá el parámetro after para pedir lo nuevo en orden. Cada mensaje: sender, kind (text | image | gif | video | voice_note | audio | file | system), text, attachment (url, name, hosted_by, storage_path), reply_to_id, is_thread_reply, is_edited, is_deleted. Un borrado viene sin texto ni adjunto. Filtros: limit (máx 100), before | after, thread_root_id, include=rich (agrega el texto con formato).",
+    en: "The history, newest to oldest, with a cursor: pass next_cursor in the before parameter for the previous page, or use the after parameter to get what's new in order. Each message: sender, kind (text | image | gif | video | voice_note | audio | file | system), text, attachment (url, name, hosted_by, storage_path), reply_to_id, is_thread_reply, is_edited, is_deleted. A deleted message comes without text or attachment. Filters: limit (max 100), before | after, thread_root_id, include=rich (adds the formatted text).",
   },
   "apiKeys.ep.feed": {
     es: "Lo nuevo en TODAS las conversaciones, en orden: así recibe mensajes una integración sin webhooks. Primer pedido con since (ISO, 72 h como máximo) o sin nada (últimos 15 min); después, siempre after=next_cursor. Si caught_up = true, esperá 30 s o más antes del próximo. Mira como mucho una hora por pedido. exclude_own=true saca lo que mandó la propia persona. Solo mensajes nuevos: ediciones y borrados se ven releyendo la conversación.",
