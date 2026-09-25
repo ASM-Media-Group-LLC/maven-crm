@@ -329,6 +329,10 @@ const LeadGenContent = () => {
     };
     return rows.sort(cmp);
   }, [agentStatsRaw, profilesMap, agentSortKey, agentSortDir, t]);
+  const agentesActivos = t(
+    agentStats.length === 1 ? "leadgen.agents.activeCount.one" : "leadgen.agents.activeCount.other",
+    { count: agentStats.length },
+  );
 
   const handleDateApply = useCallback((from: Date | undefined, to: Date | undefined) => {
     setDateFrom(from);
@@ -366,7 +370,7 @@ const LeadGenContent = () => {
           title="LeadGen"
           subtitle={
             <span className="whitespace-nowrap">
-              {viewMode === "agent" ? t("leadgen.header.yourLeads") : t("leadgen.header.leadManagement")} · {t("leadgen.header.leadsCount", { count: totalLeads.toLocaleString() })}
+              {viewMode === "agent" ? t("leadgen.header.yourLeads") : t("leadgen.header.leadManagement")} · {t(totalLeads === 1 ? "leadgen.header.leadsCount.one" : "leadgen.header.leadsCount.other", { count: totalLeads.toLocaleString(f.intl()) })}
               {dateFrom && dateTo && (
                 <span className="ml-1">
                   ({format(dateFrom, f.idioma === "en" ? "MMM d" : "d MMM", { locale: f.fechas })} — {format(dateTo, f.idioma === "en" ? "MMM d" : "d MMM", { locale: f.fechas })})
@@ -619,8 +623,8 @@ const LeadGenContent = () => {
                 title={t("leadgen.agents.bannerTitle")}
                 subtitle={
                   dateFrom && dateTo
-                    ? `${format(dateFrom, f.idioma === "en" ? "MMMM d" : "d 'de' MMMM", { locale: f.fechas })} — ${format(dateTo, f.idioma === "en" ? "MMMM d, yyyy" : "d 'de' MMMM, yyyy", { locale: f.fechas })} · ${t("leadgen.agents.activeCount", { count: agentStats.length })}`
-                    : `${format(new Date(), f.idioma === "en" ? "MMMM d, yyyy" : "d 'de' MMMM, yyyy", { locale: f.fechas })} · ${t("leadgen.agents.activeCount", { count: agentStats.length })}`
+                    ? `${format(dateFrom, f.idioma === "en" ? "MMMM d" : "d 'de' MMMM", { locale: f.fechas })} — ${format(dateTo, f.idioma === "en" ? "MMMM d, yyyy" : "d 'de' MMMM, yyyy", { locale: f.fechas })} · ${agentesActivos}`
+                    : `${format(new Date(), f.idioma === "en" ? "MMMM d, yyyy" : "d 'de' MMMM, yyyy", { locale: f.fechas })} · ${agentesActivos}`
                 }
                 count={agentStats.length}
                 countLabel={t("leadgen.agents.activeLabel")}

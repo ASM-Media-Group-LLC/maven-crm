@@ -18,6 +18,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { Upload, X, Image as ImageIcon, ClipboardPaste } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface Props {
   files: File[];
@@ -26,7 +27,8 @@ interface Props {
   minFiles?: number;
   /** Tope superior. Default 8. */
   maxFiles?: number;
-  /** Label opcional sobre el bloque (e.g. "Evidencia del primer contacto"). */
+  /** Label opcional sobre el bloque (e.g. "Evidencia del primer contacto").
+   *  Sin label dice "Evidencia" en el idioma de la interfaz; "" lo esconde. */
   label?: string;
   /** Descripción opcional debajo del label. */
   description?: string;
@@ -41,11 +43,13 @@ const EvidenceUploader = ({
   onFilesChange,
   minFiles = 0,
   maxFiles = 8,
-  label = "Evidencia",
+  label: labelProp,
   description,
   enablePaste = true,
   accept = "image/*",
 }: Props) => {
+  const { t } = useLanguage();
+  const label = labelProp ?? t("leadgen.uploader.defaultLabel");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [previewUrls, setPreviewUrls] = useState<Map<File, string>>(new Map());
@@ -123,7 +127,8 @@ const EvidenceUploader = ({
           const f = item.getAsFile();
           if (!f) return null;
           // Renombrar pasted images con timestamp para que tengan algo más
-          // legible que "image.png".
+          // legible que "image.png". El nombre termina en la ruta del bucket
+          // (es dato): "pegado-" no cambia con el idioma.
           const ext = f.type.split("/")[1] ?? "png";
           const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
           return new File([f], `pegado-${ts}.${ext}`, { type: f.type });
@@ -179,7 +184,7 @@ const EvidenceUploader = ({
             )}
           >
             {files.length}/{maxFiles}
-            {minFiles > 0 && minNotMet && ` · faltan ${remaining}`}
+            {minFiles > 0 && minNotMet && t("leadgen.uploader.missing", { count: remaining })}
           </span>
         </div>
       )}
@@ -221,15 +226,15 @@ const EvidenceUploader = ({
         >
           <div className="flex items-center gap-2 text-sm">
             <Upload className="h-4 w-4" />
-            <span>{isFull ? "Llegaste al máximo" : "Subir o pegar imágenes"}</span>
+            <span>{isFull ? t("leadgen.uploader.full") : t("leadgen.uploader.uploadOrPaste")}</span>
           </div>
           <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
             <span className="flex items-center gap-1">
               <ImageIcon className="h-3 w-3" />
-              Click para elegir
+              {t("leadgen.uploader.clickToChoose")}
             </span>
             <span>·</span>
-            <span>arrastrar y soltar</span>
+            <span>{t("leadgen.uploader.dragAndDrop")}</span>
             <span>·</span>
             <span className="flex items-center gap-1">
               <ClipboardPaste className="h-3 w-3" />
@@ -264,7 +269,8 @@ const EvidenceUploader = ({
                   type="button"
                   onClick={() => removeFile(i)}
                   className="absolute top-1 right-1 rounded-full bg-background/90 p-1 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-destructive hover:text-destructive-foreground"
-                  title="Quitar"
+                  title={t("leadgen.uploader.remove")}
+                  aria-label={t("leadgen.uploader.remove")}
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -279,7 +285,7 @@ const EvidenceUploader = ({
 
       {minNotMet && (
         <p className="text-xs text-destructive">
-          Necesitas al menos {minFiles} {minFiles === 1 ? "imagen" : "imágenes"} para guardar.
+          {t(minFiles === 1 ? "leadgen.uploader.needAtLeast.one" : "leadgen.uploader.needAtLeast.other", { count: minFiles })}
         </p>
       )}
     </div>

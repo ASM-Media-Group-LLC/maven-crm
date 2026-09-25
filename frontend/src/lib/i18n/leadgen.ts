@@ -76,7 +76,8 @@ export const leadgen = {
   // Pantalla principal (LeadGenContent)
   "leadgen.header.yourLeads": { es: "Tus leads", en: "Your leads" },
   "leadgen.header.leadManagement": { es: "Gestión de leads", en: "Lead management" },
-  "leadgen.header.leadsCount": { es: "{count} leads", en: "{count} leads" },
+  "leadgen.header.leadsCount.one": { es: "{count} lead", en: "{count} lead" },
+  "leadgen.header.leadsCount.other": { es: "{count} leads", en: "{count} leads" },
   "leadgen.header.selectDates": { es: "Selecciona fechas", en: "Select dates" },
   "leadgen.header.myIgAccountsHint": {
     es: "Estado de tus cuentas IG de outreach — qué tan creíble se ven y qué les falta para que las creadoras respondan",
@@ -101,7 +102,8 @@ export const leadgen = {
     en: "No leads match these filters",
   },
   "leadgen.agents.bannerTitle": { es: "Rendimiento de Agentes", en: "Agent performance" },
-  "leadgen.agents.activeCount": { es: "{count} agentes activos", en: "{count} active agents" },
+  "leadgen.agents.activeCount.one": { es: "{count} agente activo", en: "{count} active agent" },
+  "leadgen.agents.activeCount.other": { es: "{count} agentes activos", en: "{count} active agents" },
   "leadgen.agents.activeLabel": { es: "Agentes Activos", en: "Active agents" },
   "leadgen.agents.newRec": { es: "({new} nv · {rec} rec)", en: "({new} new · {rec} rec.)" },
   "leadgen.agents.empty": { es: "No hay agentes con leads en este rango", en: "No agents with leads in this range" },
@@ -226,6 +228,290 @@ export const leadgen = {
     es: "Cuentas de Instagram que usas para hacer outreach a creadoras. La IA analiza qué tan creíble se ve cada una para que las modelos respondan. Mientras peor la cuenta, menos respuestas vas a sacar.",
     en: "Instagram accounts you use for outreach to creators. The AI analyzes how credible each one looks so models reply. The worse the account, the fewer replies you'll get.",
   },
+  // La pestaña de cuentas (pages/panel-de-control/SpammerAccountsTab), que se ve
+  // acá adentro y en Panel de Control, y su alta (AddSpammerAccountDialog).
+  // ⚠️ El análisis de la IA (resumen, fortalezas, red flags…) es DATO: se guarda
+  // en la base tal como lo escribió el modelo y se muestra tal cual.
+  // Lo que va entre **dobles asteriscos** se dibuja en negrita.
+  "leadgen.igAccounts.titleMine": { es: "Mis cuentas IG", en: "My IG accounts" },
+  "leadgen.igAccounts.titleAll": { es: "Salud de Cuentas IG", en: "IG account health" },
+  "leadgen.igAccounts.hintMine": {
+    es: "Tus cuentas de IG que usas para outreach. Cada cuenta se escanea con IA que evalúa qué tan creíble se ve para que las creadoras respondan. Click en una card para ver el análisis del scan.",
+    en: "The IG accounts you use for outreach. Each account is scanned by an AI that rates how credible it looks so creators reply. Click a card to see the scan analysis.",
+  },
+  "leadgen.igAccounts.hintAll": {
+    es: "Cuentas de IG que el equipo usa para outreach (LGs/scouters). Cada cuenta se escanea con IA (Sonnet 4.6) que evalúa qué tan creíble se ve para que las creadoras objetivo respondan. Click en una card para ver el detalle del análisis.",
+    en: "IG accounts the team uses for outreach (LGs/scouters). Each account is scanned by an AI (Sonnet 4.6) that rates how credible it looks so target creators reply. Click a card to see the full analysis.",
+  },
+  "leadgen.igAccounts.hintShort": {
+    es: "· IA escanea cada cuenta nueva — click en una card para ver el análisis completo",
+    en: "· AI scans every new account — click a card to see the full analysis",
+  },
+  "leadgen.igAccounts.searchMine": { es: "Buscar handle o nombre…", en: "Search handle or name…" },
+  "leadgen.igAccounts.searchAll": { es: "Buscar handle, nombre, scouter…", en: "Search handle, name, scouter…" },
+  "leadgen.igAccounts.uniqueAccounts": { es: "Cuentas únicas", en: "Unique accounts" },
+  "leadgen.igAccounts.avgScore": { es: "Score promedio", en: "Average score" },
+  "leadgen.igAccounts.waitingScan": { es: "Esperando scan", en: "Waiting for scan" },
+  "leadgen.igAccounts.failed": { es: "Fallidas", en: "Failed" },
+  "leadgen.igAccounts.allAccounts": { es: "Todas las cuentas", en: "All accounts" },
+  "leadgen.igAccounts.loading": { es: "Cargando cuentas…", en: "Loading accounts…" },
+  "leadgen.igAccounts.emptyMine": { es: "Todavía no tienes cuentas registradas", en: "You don't have any accounts yet" },
+  "leadgen.igAccounts.emptyAll": { es: "Todavía no hay cuentas registradas", en: "No accounts registered yet" },
+  "leadgen.igAccounts.noSearchResults": { es: "Sin resultados para esa búsqueda", en: "No results for that search" },
+  "leadgen.igAccounts.emptyMineDesc": {
+    es: "Agrega tu primera cuenta de Instagram para que la IA evalúe qué tan creíble se ve.",
+    en: "Add your first Instagram account so the AI can rate how credible it looks.",
+  },
+  "leadgen.igAccounts.emptyAllDesc": {
+    es: "Cuando un scouter agregue su primera cuenta en Scouter Assist > Cuentas, aparecerá aquí con su análisis IA.",
+    en: "When a scouter adds their first account in Scouter Assist > Accounts, it will show up here with its AI analysis.",
+  },
+  "leadgen.igAccounts.noSearchResultsDesc": {
+    es: "Prueba con otro handle, nombre o scouter.",
+    en: "Try another handle, name or scouter.",
+  },
+  "leadgen.igAccounts.addFirst": { es: "Agregar mi primera cuenta", en: "Add my first account" },
+  "leadgen.igAccounts.addAccount": { es: "Agregar cuenta", en: "Add account" },
+  "leadgen.igAccounts.addAccountHint": {
+    es: "Suma una cuenta IG. La IA la escanea automático.",
+    en: "Add an IG account. The AI scans it automatically.",
+  },
+  "leadgen.igAccounts.rescanStarted": { es: "Re-escaneo en marcha", en: "Rescan started" },
+  "leadgen.igAccounts.rescanStartedDesc": {
+    es: "Vuelve en unos segundos a ver el resultado.",
+    en: "Check back in a few seconds for the result.",
+  },
+  "leadgen.igAccounts.rescanError": { es: "No se pudo re-escanear", en: "Couldn't rescan" },
+  // Nivel del score (el número lo da la IA; la etiqueta es solo de pantalla)
+  "leadgen.igAccounts.score.high": { es: "Alto", en: "High" },
+  "leadgen.igAccounts.score.good": { es: "Bueno", en: "Good" },
+  "leadgen.igAccounts.score.medium": { es: "Medio", en: "Medium" },
+  "leadgen.igAccounts.score.low": { es: "Bajo", en: "Low" },
+  "leadgen.igAccounts.score.veryLow": { es: "Muy bajo", en: "Very low" },
+  "leadgen.igAccounts.score.none": { es: "Sin scan", en: "Not scanned" },
+  // Tarjeta
+  "leadgen.igAccounts.deleteThis": { es: "Eliminar esta cuenta", en: "Delete this account" },
+  "leadgen.igAccounts.restricted": { es: "Restringida", en: "Restricted" },
+  "leadgen.igAccounts.restrictedHint": {
+    es: "IG marcó la cuenta como restringida — oculta a viewers no-loggeados.",
+    en: "IG flagged the account as restricted — it's hidden from logged-out viewers.",
+  },
+  "leadgen.igAccounts.restrictedTargetHint": {
+    es: "IG marcó la cuenta como restringida — las creators target no pueden verla sin login.",
+    en: "IG flagged the account as restricted — target creators can't see it without logging in.",
+  },
+  "leadgen.igAccounts.notRead": { es: "Sin leer", en: "Not read" },
+  "leadgen.igAccounts.notReadHint": {
+    es: "No pudimos leer el perfil automáticamente. Reintenta el scan o sube un screenshot — no significa que esté restringida.",
+    en: "We couldn't read the profile automatically. Retry the scan or upload a screenshot — it doesn't mean it's restricted.",
+  },
+  "leadgen.igAccounts.scanning": { es: "Escaneando con IA…", en: "Scanning with AI…" },
+  "leadgen.igAccounts.scanFailed": { es: "Scan fallido", en: "Scan failed" },
+  "leadgen.igAccounts.couldNotRead": {
+    es: "No se pudo leer — reintenta el scan o sube un screenshot.",
+    en: "Couldn't read it — retry the scan or upload a screenshot.",
+  },
+  "leadgen.igAccounts.noAnalysisYet": { es: "Sin análisis todavía.", en: "No analysis yet." },
+  "leadgen.igAccounts.noScouter": { es: "Sin scouter asignado", en: "No scouter assigned" },
+  "leadgen.igAccounts.noScouterDot": { es: "Sin scouter asignado.", en: "No scouter assigned." },
+  // Siempre 2 o más: con uno solo se muestra su nombre.
+  "leadgen.igAccounts.scoutersUseIt": { es: "{count} scouters la usan", en: "{count} scouters use it" },
+  "leadgen.igAccounts.deleteTitle": { es: "¿Eliminar @{handle}?", en: "Delete @{handle}?" },
+  "leadgen.igAccounts.deleteDesc": {
+    es: "Esta cuenta dejará de aparecer en \"Mis Cuentas IG\" y no se usará más para outreach. Si la quemaron en IG y quieres agregar una nueva, primero eliminala acá.",
+    en: "This account will no longer show up in \"My IG accounts\" and won't be used for outreach anymore. If it got burned on IG and you want to add a new one, delete it here first.",
+  },
+  "leadgen.igAccounts.deleteDescShared": {
+    es: "Si más de un scouter la tenía registrada, se elimina solo TU registro — los demás siguen viéndola.",
+    en: "If more than one scouter had it registered, only YOUR record is deleted — the others still see it.",
+  },
+  "leadgen.igAccounts.confirmDelete": { es: "Sí, eliminar", en: "Yes, delete" },
+  // Guía para recuperar una cuenta restringida
+  "leadgen.igAccounts.guide.title": { es: "Cómo recuperar esta cuenta", en: "How to recover this account" },
+  "leadgen.igAccounts.guide.decisionTitle": {
+    es: "Decisión 0 — ¿Recuperar o abandonar?",
+    en: "Decision 0 — Recover or abandon?",
+  },
+  "leadgen.igAccounts.guide.decisionBody": {
+    es: "Si es cuenta nueva (<3 meses) o con nombre genérico, **abandonar y crear fresh** suele ser más rápido que pelear la restricción (puede tomar semanas). Si tiene historial decente, vale la pena recuperar.",
+    en: "If it's a new account (<3 months) or has a generic name, **abandoning it and starting fresh** is usually faster than fighting the restriction (it can take weeks). If it has a decent history, it's worth recovering.",
+  },
+  "leadgen.igAccounts.guide.ifRecover": { es: "Si decides recuperar:", en: "If you decide to recover it:" },
+  "leadgen.igAccounts.guide.step1": {
+    es: "**Verificar email Y teléfono real** (no virtual): Settings → Account → Personal information.",
+    en: "**Verify a real email AND phone** (not virtual): Settings → Account → Personal information.",
+  },
+  "leadgen.igAccounts.guide.step2": {
+    es: "**Activar 2FA**: Settings → Security → Two-factor authentication.",
+    en: "**Turn on 2FA**: Settings → Security → Two-factor authentication.",
+  },
+  "leadgen.igAccounts.guide.step3": {
+    es: "**Revisar reports/violations**: Settings → Help → Account status. Eliminar posts marcados.",
+    en: "**Check reports/violations**: Settings → Help → Account status. Delete flagged posts.",
+  },
+  "leadgen.igAccounts.guide.step4": {
+    es: "**Cambiar a perfil business**: Settings → Account type → Switch to Business. Category: \"Talent Agency\".",
+    en: "**Switch to a business profile**: Settings → Account type → Switch to Business. Category: \"Talent Agency\".",
+  },
+  "leadgen.igAccounts.guide.step5": {
+    es: "**Apelar formalmente**: Settings → Help → Report a Problem. Explica que eres una agencia legítima.",
+    en: "**Appeal formally**: Settings → Help → Report a Problem. Explain that you're a legitimate agency.",
+  },
+  "leadgen.igAccounts.guide.step6": {
+    es: "**PARAR todo outreach** por 7-14 días. Navega normal, like a posts, sigue cuentas, postea 2-3 cosas propias. Si sigues spammeando DMs, IG nunca levanta el flag.",
+    en: "**STOP all outreach** for 7-14 days. Browse normally, like posts, follow accounts, post 2-3 things of your own. If you keep spamming DMs, IG never lifts the flag.",
+  },
+  "leadgen.igAccounts.guide.step7": {
+    es: "**Volver gradual**: 5 DMs/día semana 3, 10 DMs/día semana 4, máximo 20/día después. Cada DM personalizado.",
+    en: "**Ramp back up gradually**: 5 DMs/day in week 3, 10 DMs/day in week 4, 20/day max after that. Every DM personalized.",
+  },
+  "leadgen.igAccounts.guide.ifAbandon": {
+    es: "Si decides abandonar y crear nueva:",
+    en: "If you decide to abandon it and create a new one:",
+  },
+  "leadgen.igAccounts.guide.fresh1": {
+    es: "SIM física fresca, email dedicado, dispositivo limpio.",
+    en: "A fresh physical SIM, a dedicated email, a clean device.",
+  },
+  "leadgen.igAccounts.guide.fresh2": {
+    es: "Día 1: profile completo (foto logo, bio profesional, link al sitio, business).",
+    en: "Day 1: complete profile (logo photo, professional bio, website link, business).",
+  },
+  "leadgen.igAccounts.guide.fresh3": {
+    es: "Días 1-14: warm-up — browsear, likes, posts propios. **CERO DMs**.",
+    en: "Days 1-14: warm-up — browse, like, post your own content. **ZERO DMs**.",
+  },
+  "leadgen.igAccounts.guide.fresh4": { es: "Día 14+: ramp-up gradual de outreach.", en: "Day 14+: gradual outreach ramp-up." },
+  "leadgen.igAccounts.guide.rules": {
+    es: "**Reglas permanentes:** nunca copy-paste el mismo DM · espaciar 2-3 min entre DMs · 1 IP/device por cuenta · profile completo ANTES de cualquier outreach · mínimo 5 posts del roster en feed.",
+    en: "**Permanent rules:** never copy-paste the same DM · space DMs 2-3 min apart · 1 IP/device per account · complete profile BEFORE any outreach · at least 5 roster posts in the feed.",
+  },
+  // Capturas del perfil (cuando IG no deja leerlo)
+  "leadgen.igAccounts.notAnImage": { es: "\"{name}\" no es una imagen.", en: "\"{name}\" isn't an image." },
+  "leadgen.igAccounts.tooLarge": { es: "\"{name}\" pesa más de 10 MB.", en: "\"{name}\" is larger than 10 MB." },
+  "leadgen.igAccounts.screenshotsLoaded.one": {
+    es: "{count} screenshot cargado — el análisis usa la data real",
+    en: "{count} screenshot uploaded — the analysis uses the real data",
+  },
+  "leadgen.igAccounts.screenshotsLoaded.other": {
+    es: "{count} screenshots cargados — el análisis usa la data real",
+    en: "{count} screenshots uploaded — the analysis uses the real data",
+  },
+  "leadgen.igAccounts.pasteScreenshots": {
+    es: "Pega uno o varios screenshots del perfil",
+    en: "Paste one or more screenshots of the profile",
+  },
+  "leadgen.igAccounts.improveWithScreenshots": {
+    es: "Mejorar análisis con screenshots",
+    en: "Improve the analysis with screenshots",
+  },
+  "leadgen.igAccounts.screenshotsRestrictedHint": {
+    es: "Como IG oculta la cuenta a viewers no-loggeados, el bot no puede leer bio/foto/link. Saca screenshots del perfil desde tu browser (logueado) y subilos acá — puedes agregar varios (bio, posts, link, etc) y Claude vision los lee y enriquece el análisis.",
+    en: "Since IG hides the account from logged-out viewers, the bot can't read the bio/photo/link. Take screenshots of the profile from your browser (logged in) and upload them here — you can add several (bio, posts, link, etc.) and Claude vision reads them and enriches the analysis.",
+  },
+  "leadgen.igAccounts.screenshotsUnreadHint": {
+    es: "No pudimos leer la cuenta automáticamente (muy nueva o IG bloqueó la lectura). Saca screenshots del perfil desde tu browser (logueado) y subilos acá — puedes agregar varios (bio, posts, link, etc) y Claude vision los lee y arma el análisis con la data real.",
+    en: "We couldn't read the account automatically (too new, or IG blocked the read). Take screenshots of the profile from your browser (logged in) and upload them here — you can add several (bio, posts, link, etc.) and Claude vision reads them and builds the analysis from the real data.",
+  },
+  "leadgen.igAccounts.uploading": { es: "Subiendo…", en: "Uploading…" },
+  "leadgen.igAccounts.addMoreScreenshots": { es: "Agregar más screenshots", en: "Add more screenshots" },
+  "leadgen.igAccounts.uploadScreenshots": { es: "Subir screenshots", en: "Upload screenshots" },
+  "leadgen.igAccounts.profileScreenshot": { es: "Screenshot del perfil", en: "Profile screenshot" },
+  "leadgen.igAccounts.removeScreenshot": { es: "Quitar screenshot", en: "Remove screenshot" },
+  // Detalle de una cuenta
+  "leadgen.igAccounts.verified": { es: "Verificada", en: "Verified" },
+  "leadgen.igAccounts.noDisplayName": { es: "Sin nombre visible", en: "No display name" },
+  "leadgen.igAccounts.wouldReply": { es: "Sí respondería", en: "Would reply" },
+  "leadgen.igAccounts.mightReply": { es: "Tal vez respondería", en: "Might reply" },
+  "leadgen.igAccounts.wouldNotReply": { es: "No respondería", en: "Wouldn't reply" },
+  "leadgen.igAccounts.restrictedBannerTitle": {
+    es: "IG marcó la cuenta como restringida",
+    en: "IG flagged the account as restricted",
+  },
+  "leadgen.igAccounts.restrictedBannerBody": {
+    es: "IG la oculta a viewers no-loggeados. Cuando esta cuenta le mande DM a una creadora, lo más probable es que el perfil le aparezca con muro de login o aviso de cuenta restringida — no van a poder validar quién manda el mensaje. Típicamente pasa por contenido NSFW, patrones de spam previos, reportes de usuarios, o cuenta sin verificar mail/teléfono.",
+    en: "IG hides it from logged-out viewers. When this account DMs a creator, she'll most likely see the profile behind a login wall or a restricted-account notice — she won't be able to check who's sending the message. It usually happens because of NSFW content, earlier spam patterns, user reports, or an account without a verified email/phone.",
+  },
+  "leadgen.igAccounts.enrichOptional": {
+    es: "¿Quieres enriquecer el análisis con screenshots? (opcional)",
+    en: "Want to enrich the analysis with screenshots? (optional)",
+  },
+  "leadgen.igAccounts.unreadBannerTitle": {
+    es: "No pudimos leer el perfil automáticamente",
+    en: "We couldn't read the profile automatically",
+  },
+  "leadgen.igAccounts.unreadBannerBody": {
+    es: "Suele pasar con cuentas muy nuevas (todavía sin indexar) o cuando IG bloquea la lectura desde el servidor. **No** significa que la cuenta esté restringida. Reintenta el scan con el botón de abajo, o sube un screenshot del perfil (logueado) para analizarla igual.",
+    en: "It usually happens with very new accounts (not indexed yet) or when IG blocks reads from the server. It does **not** mean the account is restricted. Retry the scan with the button below, or upload a screenshot of the profile (logged in) to analyze it anyway.",
+  },
+  "leadgen.igAccounts.scannedOn": { es: "Escaneado {date}", en: "Scanned {date}" },
+  "leadgen.igAccounts.whyNot": { es: "Por qué NO respondería", en: "Why they WOULDN'T reply" },
+  "leadgen.igAccounts.urgentImprovements": { es: "Mejoras urgentes", en: "Urgent improvements" },
+  "leadgen.igAccounts.strengths": { es: "Fortalezas", en: "Strengths" },
+  "leadgen.igAccounts.recommendations": { es: "Recomendaciones a mediano plazo", en: "Medium-term recommendations" },
+  "leadgen.igAccounts.scanFailedWith": { es: "Scan fallido: {error}", en: "Scan failed: {error}" },
+  "leadgen.igAccounts.unknownError": { es: "error desconocido", en: "unknown error" },
+  "leadgen.igAccounts.scanInProgress": {
+    es: "Escaneo en curso… vuelve en unos segundos.",
+    en: "Scan in progress… check back in a few seconds.",
+  },
+  "leadgen.igAccounts.noAiAnalysis": {
+    es: "Sin análisis IA disponible para esta cuenta.",
+    en: "No AI analysis available for this account.",
+  },
+  "leadgen.igAccounts.scoutersUsing": { es: "Scouters que la usan ({count})", en: "Scouters using it ({count})" },
+  "leadgen.igAccounts.rescanNow": { es: "Re-escanear ahora", en: "Rescan now" },
+  // Lista que abre cada recuadro de arriba
+  "leadgen.igAccounts.list.count.one": { es: "{count} cuenta", en: "{count} account" },
+  "leadgen.igAccounts.list.count.other": { es: "{count} cuentas", en: "{count} accounts" },
+  "leadgen.igAccounts.list.pending.one": {
+    es: "{count} cuenta esperando o ejecutando scan IA",
+    en: "{count} account waiting for or running an AI scan",
+  },
+  "leadgen.igAccounts.list.pending.other": {
+    es: "{count} cuentas esperando o ejecutando scan IA",
+    en: "{count} accounts waiting for or running an AI scan",
+  },
+  "leadgen.igAccounts.list.failed.one": {
+    es: "{count} cuenta — el scan falló (cuenta privada, baneada, o IG bloqueó la API)",
+    en: "{count} account — the scan failed (private or banned account, or IG blocked the API)",
+  },
+  "leadgen.igAccounts.list.failed.other": {
+    es: "{count} cuentas — el scan falló (cuenta privada, baneada, o IG bloqueó la API)",
+    en: "{count} accounts — the scan failed (private or banned account, or IG blocked the API)",
+  },
+  "leadgen.igAccounts.list.all.one": {
+    es: "{count} cuenta registrada en este tenant",
+    en: "{count} account registered in this tenant",
+  },
+  "leadgen.igAccounts.list.all.other": {
+    es: "{count} cuentas registradas en este tenant",
+    en: "{count} accounts registered in this tenant",
+  },
+  "leadgen.igAccounts.list.rescanAll": { es: "Re-escanear todas", en: "Rescan all" },
+  "leadgen.igAccounts.list.emptyPending": { es: "No hay cuentas en cola de scan.", en: "No accounts in the scan queue." },
+  "leadgen.igAccounts.list.emptyFailed": { es: "No hay cuentas con scan fallido.", en: "No accounts with a failed scan." },
+  "leadgen.igAccounts.list.emptyAll": { es: "No hay cuentas registradas todavía.", en: "No accounts registered yet." },
+  "leadgen.igAccounts.list.rescanThis": { es: "Re-escanear esta cuenta", en: "Rescan this account" },
+  "leadgen.igAccounts.list.scan": { es: "Escanear", en: "Scan" },
+  // Alta de una cuenta (AddSpammerAccountDialog)
+  "leadgen.igAccounts.add.handleInvalid": {
+    es: "Solo letras, números, puntos y guiones bajos (máx 30).",
+    en: "Only letters, numbers, periods and underscores (30 max).",
+  },
+  "leadgen.igAccounts.add.added": { es: "Cuenta agregada — escaneando con IA…", en: "Account added — scanning with AI…" },
+  "leadgen.igAccounts.add.title": { es: "Agregar cuenta IG", en: "Add IG account" },
+  "leadgen.igAccounts.add.description": {
+    es: "Suma una cuenta de Instagram que uses para hacer outreach. La IA la escanea y te dice qué tan creíble se ve para las creadoras.",
+    en: "Add an Instagram account you use for outreach. The AI scans it and tells you how credible it looks to creators.",
+  },
+  "leadgen.igAccounts.add.handle": { es: "Handle de Instagram", en: "Instagram handle" },
+  "leadgen.igAccounts.add.handlePlaceholder": { es: "handle o link de IG", en: "handle or IG link" },
+  "leadgen.igAccounts.add.detected": { es: "Detectado: @{handle}", en: "Detected: @{handle}" },
+  "leadgen.igAccounts.add.displayName": { es: "Nombre descriptivo", en: "Descriptive name" },
+  "leadgen.igAccounts.add.displayNamePlaceholder": { es: "Ej. Cuenta principal · Kash", en: "E.g. Main account · Kash" },
+  "leadgen.igAccounts.add.niche": { es: "Nicho de la cuenta", en: "Account niche" },
+  "leadgen.igAccounts.add.nichePlaceholder": { es: "Elige un nicho…", en: "Pick a niche…" },
 
   // Formularios: validación (AddLeadModal / AddContactoModal)
   "leadgen.form.maxChars": { es: "Máximo {max} caracteres", en: "Maximum {max} characters" },
@@ -287,6 +573,81 @@ export const leadgen = {
   },
   "leadgen.addLead.cantAdd": { es: "No se puede agregar", en: "Can't be added" },
   "leadgen.addLead.save": { es: "Guardar Lead", en: "Save lead" },
+
+  // ¿Se puede agregar este lead? (banner del alta y el aviso al guardar). Lo
+  // arma pages/leadgen/disponibilidadLead.ts con un motivo + sus datos; el
+  // status de la creadora y el nombre son DATOS y van tal cual.
+  "leadgen.availability.today": { es: "hoy", en: "today" },
+  "leadgen.availability.yesterday": { es: "ayer", en: "yesterday" },
+  "leadgen.availability.daysAgo": { es: "hace {count} días", en: "{count} days ago" },
+  "leadgen.availability.monthAgo": { es: "hace 1 mes", en: "1 month ago" },
+  "leadgen.availability.monthsAgo": { es: "hace {count} meses", en: "{count} months ago" },
+  "leadgen.availability.thisModel": { es: "Esta modelo", en: "This model" },
+  "leadgen.availability.canAddAgain": {
+    es: "Puedes volver a agregarla como lead.",
+    en: "You can add her as a lead again.",
+  },
+  "leadgen.availability.activeCreatorTitle": { es: "Es modelo activa de la agencia", en: "She's an active model at the agency" },
+  "leadgen.availability.activeCreatorMsg": {
+    es: "{name} ya es creadora con status \"{status}\". No se puede agregar como lead.",
+    en: "{name} is already a creator with status \"{status}\". She can't be added as a lead.",
+  },
+  "leadgen.availability.formerCreatorTitle": { es: "Fue creadora de la agencia", en: "She was a creator at the agency" },
+  "leadgen.availability.formerCreatorWaitTitle": { es: "Fue creadora — espera", en: "Former creator — wait" },
+  // La primera frase del mensaje, según el status: "terminated" o "leaving".
+  "leadgen.availability.terminatedSince": { es: "{name} está terminada {ago}.", en: "{name} was terminated {ago}." },
+  "leadgen.availability.leavingSince": { es: "{name} está en retiro {ago}.", en: "{name} started leaving the agency {ago}." },
+  "leadgen.availability.terminated": { es: "{name} está terminada.", en: "{name} was terminated." },
+  "leadgen.availability.leaving": { es: "{name} está en retiro.", en: "{name} is leaving the agency." },
+  "leadgen.availability.wait30.one": {
+    es: "Hay que esperar 30 días desde el cambio de estado — falta {count} día.",
+    en: "You have to wait 30 days from the status change — {count} day to go.",
+  },
+  "leadgen.availability.wait30.other": {
+    es: "Hay que esperar 30 días desde el cambio de estado — faltan {count} días.",
+    en: "You have to wait 30 days from the status change — {count} days to go.",
+  },
+  "leadgen.availability.otherCreatorTitle": { es: "Ya existe en creadoras", en: "Already in Creators" },
+  "leadgen.availability.otherCreatorMsg": {
+    es: "{name} ya tiene un registro en creadoras con status \"{status}\".",
+    en: "{name} already has a record in Creators with status \"{status}\".",
+  },
+  "leadgen.availability.closingTitle": { es: "Está en proceso de cierre", en: "She's in the closing process" },
+  "leadgen.availability.closingMsg": {
+    es: "Esta modelo está en stage \"{stage}\" en Closers{closer}. No se puede agregar como lead.",
+    en: "This model is in the \"{stage}\" stage in Closers{closer}. She can't be added as a lead.",
+  },
+  "leadgen.availability.failedCloseTitle": { es: "Cierre previo fallido", en: "Earlier close attempt failed" },
+  "leadgen.availability.failedCloseWaitTitle": { es: "Cierre fallido — espera", en: "Failed close — wait" },
+  "leadgen.availability.markedNotInterested": {
+    es: "Esta modelo fue marcada \"No interesada\" {ago}.",
+    en: "This model was marked \"Not interested\" {ago}.",
+  },
+  "leadgen.availability.wait60.one": {
+    es: "Hay que esperar 60 días desde entonces — falta {count} día.",
+    en: "You have to wait 60 days from then — {count} day to go.",
+  },
+  "leadgen.availability.wait60.other": {
+    es: "Hay que esperar 60 días desde entonces — faltan {count} días.",
+    en: "You have to wait 60 days from then — {count} days to go.",
+  },
+  // " por Laura" / " by Laura": quién lo cargó, pegado a "agregado".
+  "leadgen.availability.byAgent": { es: " por {name}", en: " by {name}" },
+  "leadgen.availability.duplicateWaitTitle": { es: "Lead duplicado — espera", en: "Duplicate lead — wait" },
+  "leadgen.availability.duplicateWaitMsg": {
+    es: "Este lead fue agregado{by} hace {hours}h. Podrás resubirlo en ~{left}h (regla 24h).",
+    en: "This lead was added{by} {hours}h ago. You can add it again in ~{left}h (24h rule).",
+  },
+  "leadgen.availability.existingTitle": { es: "Lead ya existente en LeadGen", en: "Lead already in LeadGen" },
+  "leadgen.availability.existingMsg": {
+    es: "Este lead ya fue agregado{by}{when}. Se va a crear como entrada repetida (reactivado).",
+    en: "This lead was already added{by}{when}. It will be created as a repeat entry (reactivated).",
+  },
+  "leadgen.availability.scouterTitle": { es: "Encontrada por Scouter Assist", en: "Found by Scouter Assist" },
+  "leadgen.availability.scouterMsg": {
+    es: "Esta modelo fue descubierta por Scouter Assist{when}{status}. Puedes agregarla como lead.",
+    en: "This model was found by Scouter Assist{when}{status}. You can add her as a lead.",
+  },
 
   // Nuevo contacto (AddContactoModal)
   "leadgen.addContact.nameRequired": { es: "Nombre requerido", en: "Name required" },
@@ -354,7 +715,8 @@ export const leadgen = {
     es: "Adjunta al menos {min} screenshots del chat con la modelo (conversación, número compartido, etc.). Puedes pegar con Cmd/Ctrl+V.",
     en: "Attach at least {min} screenshots of the chat with the model (conversation, shared number, etc.). You can paste with Cmd/Ctrl+V.",
   },
-  "leadgen.addContact.missingScreenshots": { es: "Faltan {count} screenshots", en: "{count} screenshots missing" },
+  "leadgen.addContact.missingScreenshots.one": { es: "Falta {count} screenshot", en: "{count} screenshot missing" },
+  "leadgen.addContact.missingScreenshots.other": { es: "Faltan {count} screenshots", en: "{count} screenshots missing" },
   "leadgen.addContact.existingTitle": { es: "Contacto existente", en: "Existing contact" },
   "leadgen.addContact.existingDesc": {
     es: "Esta modelo ya está registrada como contacto. Puedes actualizar sus datos o crear un nuevo registro.",
@@ -370,6 +732,51 @@ export const leadgen = {
     es: "Este handle ya tiene un teléfono registrado. No se permite duplicar.",
     en: "This handle already has a phone registered. Duplicates aren't allowed.",
   },
+
+  // Buscador de leads del alta de contacto (components/leadgen/LeadAutocomplete)
+  "leadgen.autocomplete.placeholder": {
+    es: "Nombre completo (o busca un lead existente)",
+    en: "Full name (or search for an existing lead)",
+  },
+  "leadgen.autocomplete.unlink": { es: "Quitar asociación al lead", en: "Unlink from the lead" },
+  "leadgen.autocomplete.searching": { es: "Buscando…", en: "Searching…" },
+  "leadgen.autocomplete.noMatches": {
+    es: "Sin leads que matcheen. Si el lead no existe, agregalo primero en LeadGen.",
+    en: "No matching leads. If the lead doesn't exist, add it in LeadGen first.",
+  },
+  "leadgen.autocomplete.hasPhone": { es: "📞 ya tiene tel", en: "📞 has a phone" },
+
+  // Subida de capturas (components/leadgen/EvidenceUploader)
+  "leadgen.uploader.defaultLabel": { es: "Evidencia", en: "Evidence" },
+  "leadgen.uploader.missing": { es: " · faltan {count}", en: " · {count} missing" },
+  "leadgen.uploader.full": { es: "Llegaste al máximo", en: "You've reached the limit" },
+  "leadgen.uploader.uploadOrPaste": { es: "Subir o pegar imágenes", en: "Upload or paste images" },
+  "leadgen.uploader.clickToChoose": { es: "Click para elegir", en: "Click to choose" },
+  "leadgen.uploader.dragAndDrop": { es: "arrastrar y soltar", en: "drag and drop" },
+  "leadgen.uploader.remove": { es: "Quitar", en: "Remove" },
+  "leadgen.uploader.needAtLeast.one": {
+    es: "Necesitas al menos {count} imagen para guardar.",
+    en: "You need at least {count} image to save.",
+  },
+  "leadgen.uploader.needAtLeast.other": {
+    es: "Necesitas al menos {count} imágenes para guardar.",
+    en: "You need at least {count} images to save.",
+  },
+
+  // Ver las capturas subidas (components/leadgen/EvidenceViewer: detalle del
+  // lead y ficha de Closers)
+  "leadgen.viewer.title": { es: "Evidencia", en: "Evidence" },
+  "leadgen.viewer.loading": { es: "Cargando evidencia…", en: "Loading evidence…" },
+  "leadgen.viewer.emptyLead": { es: "Sin archivos adjuntos para este lead.", en: "No files attached to this lead." },
+  "leadgen.viewer.emptyContact": {
+    es: "Sin archivos adjuntos para este contacto.",
+    en: "No files attached to this contact.",
+  },
+  "leadgen.viewer.thumbAlt": { es: "evidencia {n}", en: "evidence {n}" },
+  "leadgen.viewer.imageAlt": { es: "evidencia", en: "evidence" },
+  "leadgen.viewer.imageOf": { es: "Imagen {index} de {total}", en: "Image {index} of {total}" },
+  "leadgen.viewer.uploaded": { es: "Subido {date}", en: "Uploaded {date}" },
+  "leadgen.viewer.by": { es: " · por {name}", en: " · by {name}" },
 
   // Base de datos (LeadGenBaseDatosContent)
   "leadgen.db.analysis": { es: "Análisis", en: "Analysis" },

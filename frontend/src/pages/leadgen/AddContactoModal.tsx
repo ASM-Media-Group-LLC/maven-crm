@@ -700,7 +700,12 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
                 {isSubmitting
                   ? t("leadgen.saving")
                   : evidenceFiles.length < MIN_EVIDENCE
-                    ? t("leadgen.addContact.missingScreenshots", { count: MIN_EVIDENCE - evidenceFiles.length })
+                    ? t(
+                        MIN_EVIDENCE - evidenceFiles.length === 1
+                          ? "leadgen.addContact.missingScreenshots.one"
+                          : "leadgen.addContact.missingScreenshots.other",
+                        { count: MIN_EVIDENCE - evidenceFiles.length },
+                      )
                     : t("common.save")}
               </Button>
             </DialogFooter>

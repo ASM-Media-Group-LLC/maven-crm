@@ -23,7 +23,8 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { normalizeHandle, detectPlatformFromUrl } from "@/lib/handle-utils";
 import { enqueueAvatarFetch } from "@/lib/avatarFetch";
-import { checkLeadAvailability, checkDuplicateOnlyFans, type LeadAvailabilityStatus } from "@/lib/lead-validation";
+import { checkDuplicateOnlyFans } from "@/lib/lead-validation";
+import { checkLeadAvailability, textoDisponibilidad, type DisponibilidadLead } from "./disponibilidadLead";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, Info } from "lucide-react";
 
@@ -94,7 +95,7 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
     return () => clearTimeout(timer);
   }, [watchedSourceLink]);
   const debouncedHandle = debouncedSourceLink ? normalizeHandle(debouncedSourceLink) : "";
-  const availability = useQuery<LeadAvailabilityStatus>({
+  const availability = useQuery<DisponibilidadLead>({
     queryKey: ["lead-availability", debouncedHandle],
     queryFn: () => checkLeadAvailability(debouncedHandle),
     enabled: debouncedHandle.length >= 2,
@@ -102,6 +103,10 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
   });
   const availabilityResult = availability.data;
   const isBlockedByAvailability = availabilityResult?.kind === "blocked";
+  // La frase se arma al dibujar, con el idioma de quien mira (el chequeo solo
+  // devuelve el motivo y sus datos).
+  const availabilityText =
+    availabilityResult && availabilityResult.kind !== "new" ? textoDisponibilidad(t, availabilityResult) : null;
 
   // Auto-detect platform when URL changes
   const handleUrlChange = (value: string, onChange: (v: string) => void) => {
@@ -136,9 +141,10 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
       // después del debounce.
       const finalCheck = await checkLeadAvailability(normalizedHandle);
       if (finalCheck.kind === "blocked") {
+        const { title, message } = textoDisponibilidad(t, finalCheck);
         toast({
-          title: `❌ ${finalCheck.title}`,
-          description: finalCheck.message,
+          title: `❌ ${title}`,
+          description: message,
           variant: "destructive",
         });
         setIsSubmitting(false);
@@ -263,7 +269,7 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
               {/* Banner de disponibilidad — corre en vivo cuando el LLG
                   cambia la URL. Rojo si bloquea, amarillo si permite con
                   historial, oculto si es nuevo. */}
-              {availabilityResult && availabilityResult.kind !== "new" && (
+              {availabilityResult && availabilityText && (
                 <div
                   className={cn(
                     "rounded-lg border p-3 flex items-start gap-2.5",
@@ -278,8 +284,8 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
                     <Info className="h-4 w-4 shrink-0 mt-0.5" />
                   )}
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-bold leading-tight">{availabilityResult.title}</p>
-                    <p className="text-xs mt-1 leading-snug">{availabilityResult.message}</p>
+                    <p className="text-sm font-bold leading-tight">{availabilityText.title}</p>
+                    <p className="text-xs mt-1 leading-snug">{availabilityText.message}</p>
                   </div>
                 </div>
               )}
