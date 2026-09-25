@@ -256,11 +256,17 @@ const AdminApiKeys = () => {
                     <td className="px-4 py-3">
                       {k.status === "active" && k.acts_as?.active === false && (
                         <Badge variant="outline" className="border-destructive/40 text-destructive"
-                          title="La persona como la que actúa esta key fue dada de baja: el API la rechaza con 401. Revocala y creá otra.">
+                          title="La persona como la que actúa esta key fue dada de baja o ya no está en la agencia: el API la rechaza con 401. Revocala y creá otra.">
                           Persona dada de baja
                         </Badge>
                       )}
-                      {k.status === "active" && k.acts_as?.active !== false && <Badge variant="outline" className="border-success/40 text-success">Activa</Badge>}
+                      {k.status === "active" && k.acts_as?.active === true && <Badge variant="outline" className="border-success/40 text-success">Activa</Badge>}
+                      {k.status === "active" && (k.acts_as?.active ?? null) === null && (
+                        <Badge variant="outline" className="text-muted-foreground"
+                          title="No se pudo verificar si la persona como la que actúa esta key sigue activa. Recargá la página.">
+                          Activa · sin verificar
+                        </Badge>
+                      )}
                       {k.status === "revoked" && <Badge variant="outline" className="border-destructive/40 text-destructive">Revocada</Badge>}
                       {k.status === "expired" && <Badge variant="outline" className="text-muted-foreground">Vencida</Badge>}
                     </td>

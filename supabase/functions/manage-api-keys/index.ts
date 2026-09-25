@@ -113,25 +113,35 @@ Deno.serve(async (req) => {
     const SELECT_COLS =
       "id, name, key_prefix, last_four, scopes, ip_whitelist, created_at, created_by_email, last_used_at, request_count, expires_at, revoked_at, acts_as_user_id, limite_por_hora";
 
-    // Como quién actúa cada llave, con nombre y si sigue activa: es lo primero que
+    // Como quién actúa cada llave, con nombre y si sigue vigente: es lo primero que
     // tiene que ver quien la administra. Si a esa persona la dieron de baja, el API
     // rechaza la llave con 401 aunque acá diga "Activa"; sin esto no hay cómo saberlo.
-    // `active` es null si no se pudo leer (no se adivina).
-    const conPersona = async <T extends { acts_as_user_id?: string | null }>(filas: T[]) => {
+    // `active` sale de api_key_vigente, la MISMA regla que usa el API (sin baja, sin
+    // bloqueo, en la agencia): si la página y el API no coinciden, alguien revoca la
+    // llave equivocada. Solo para las llaves activas (a lo sumo MAX_ACTIVE_KEYS).
+    // null = no se pudo saber, y la página lo muestra así, sin adivinar.
+    const conPersona = async <T extends {
+      id: string; acts_as_user_id?: string | null; revoked_at: string | null; expires_at: string | null;
+    }>(filas: T[]) => {
       const ids = [...new Set(filas.map((f) => f.acts_as_user_id).filter((x): x is string => !!x))];
-      const personas = new Map<string, { name: string | null; active: boolean }>();
+      const nombres = new Map<string, string | null>();
       if (ids.length) {
         const { data: perfiles, error: pErr } = await admin
-          .from("profiles").select("id, full_name, deleted_at").in("id", ids);
+          .from("profiles").select("id, full_name").in("id", ids);
         if (pErr) console.error("[manage-api-keys] personas de las llaves:", pErr.message);
-        for (const p of (perfiles ?? []) as { id: string; full_name: string | null; deleted_at: string | null }[]) {
-          personas.set(p.id, { name: p.full_name ?? null, active: !p.deleted_at });
+        for (const p of (perfiles ?? []) as { id: string; full_name: string | null }[]) {
+          nombres.set(p.id, p.full_name ?? null);
         }
       }
-      return filas.map((f) => {
+      const vigentes = await Promise.all(filas.map(async (f) => {
+        if (statusOf(f) !== "active") return null;
+        const { data, error: vErr } = await admin.rpc("api_key_vigente", { _id: f.id });
+        if (vErr) console.error("[manage-api-keys] vigencia de la llave:", vErr.message);
+        return vErr || typeof data !== "boolean" ? null : data;
+      }));
+      return filas.map((f, i) => {
         const id = f.acts_as_user_id;
-        const p = id ? personas.get(id) : undefined;
-        return { ...f, acts_as: id ? { id, name: p?.name ?? null, active: p ? p.active : null } : null };
+        return { ...f, acts_as: id ? { id, name: nombres.get(id) ?? null, active: vigentes[i] } : null };
       });
     };
 
@@ -189,7 +199,7 @@ Deno.serve(async (req) => {
           tenant_id: tenantId,
           expires_at: expiresAt ? expiresAt.toISOString() : null,
         })
-        .select("id, name, key_prefix, last_four, scopes, ip_whitelist, created_at, expires_at, acts_as_user_id, limite_por_hora")
+        .select("id, name, key_prefix, last_four, scopes, ip_whitelist, created_at, expires_at, revoked_at, acts_as_user_id, limite_por_hora")
         .single();
       if (error) return json(req, { error: error.message }, 500);
 

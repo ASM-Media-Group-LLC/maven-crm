@@ -1,0 +1,33 @@
+name: Guard Edge Functions
+
+# La MISMA guarda que corre deploy-edge-functions.yml antes de desplegar, pero en
+# cada PR. Sin esto la guarda recién corría después del merge: un PR que la rompía
+# se mergeaba igual y dejaba TODAS las edge functions sin poder desplegarse —
+# incluidos los arreglos urgentes— hasta que alguien arreglara el test.
+# Solo lee el código: no despliega nada ni necesita secretos.
+
+on:
+  pull_request:
+    paths:
+      - "supabase/functions/**"
+      - ".github/workflows/deploy-edge-functions.yml"
+      - ".github/workflows/guard-edge-functions.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: 2.9.5
+
+      - name: Guard — aislamiento entre agencias
+        run: deno test --allow-read --no-check supabase/functions/public-api/

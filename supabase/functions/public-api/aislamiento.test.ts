@@ -27,12 +27,15 @@ import {
 } from "./aislamiento.ts";
 import { RECURSOS_COMO_USUARIO } from "./recursos-como-usuario.ts";
 
-/** El código sin comentarios de bloque ni líneas que son solo comentario. */
+/** El código sin comentarios: de bloque, líneas que son solo comentario, y el
+ *  comentario al final de una línea de código (`x, // nota`). Este último solo si
+ *  va después de un espacio, para no cortar las URLs ("https://…"). */
 function sinComentarios(src: string): string {
   return src
     .replace(/\/\*[\s\S]*?\*\//g, "")
     .split("\n")
     .filter((l) => !/^\s*\/\//.test(l))
+    .map((l) => l.replace(/\s\/\/\s.*$/, ""))
     .join("\n");
 }
 
@@ -233,10 +236,20 @@ Deno.test("como_usuario: los handlers nunca ven service_role", () => {
   // nombre de cualquiera.
   //
   // Mirar identificadores no alcanza: `import { adminClient } from "../_shared/…"`
-  // trae un cliente service_role sin que aparezca la palabra. Por eso: el archivo
-  // solo puede importar TIPOS, y cada handler tiene que estar definido en él.
-  for (const prohibido of [/admin/i, /service_?role/i, /serviceClient/i, /createClient/, /Deno\.env/, /\bimport\s*\(/, /\bfetch\s*\(/]) {
+  // trae un cliente service_role sin que aparezca la palabra. Por eso, las TRES
+  // puertas por las que puede entrar un cliente con service_role:
+  //  1. importarlo o fabricarlo: el archivo solo importa TIPOS, y no puede crear
+  //     clientes, leer secretos ni hablar HTTP por su cuenta;
+  //  2. recibirlo por parámetro: Contexto no puede llevar funciones ni clientes;
+  //  3. que el router se lo pase: la rama como_usuario del router no nombra `admin`.
+  // (No se prohíbe la palabra "admin" a secas: el Messenger tiene is_chat_admin.)
+  for (const prohibido of [/\badmin\b/, /adminClient|serviceClient/i, /service_?role/i, /createClient/, /Deno\.env/, /\bimport\s*\(/, /\bfetch\s*\(/]) {
     assert(!prohibido.test(RECURSOS_USUARIO), `recursos-como-usuario.ts usa ${prohibido}`);
+  }
+  const contexto = RECURSOS_USUARIO.match(/export\s+type\s+Contexto\s*=\s*\{([\s\S]*?)\n\};/);
+  assert(contexto, "no se encontró el tipo Contexto");
+  for (const prohibido of [/=>/, /SupabaseClient/, /\bFunction\b/, /\bany\b/, /\bunknown\b/]) {
+    assert(!prohibido.test(contexto[1]), `Contexto puede llevar un cliente o una función (${prohibido})`);
   }
   // Por sentencia y no por línea: un import partido en varias líneas también cuenta.
   const importsDeValores = RECURSOS_USUARIO.match(/^\s*import\s+(?!type\b)[^;]*/gm) ?? [];
@@ -258,7 +271,11 @@ Deno.test("como_usuario: los handlers nunca ven service_role", () => {
   // El router entra por servirComoUsuario (que verifica la sesión) con el cliente de
   // la persona, y solo ese. Nada de despachar handlers sueltos.
   assert(/await\s+servirComoUsuario\(\s*recursoClave\s*,\s*yo\s*,/.test(PUBLIC_API), "el router no entra por servirComoUsuario con `yo`");
-  assert(!/servirComoUsuario\([^)]*\badmin\b/.test(PUBLIC_API), "el router le pasa `admin` a lo como_usuario");
+  const inicioRama = PUBLIC_API.indexOf("if (esComoUsuario(recursoClave))");
+  const finRama = PUBLIC_API.indexOf('resource === "creators"', inicioRama);
+  assert(inicioRama > 0 && finRama > inicioRama, "no se encontró la rama como_usuario del router");
+  const rama = PUBLIC_API.slice(inicioRama, finRama);
+  assert(!/\badmin\b/.test(rama), "la rama como_usuario del router usa `admin`");
   assert(!/RECURSOS_COMO_USUARIO/.test(PUBLIC_API), "el router despacha handlers sin pasar por servirComoUsuario");
   // Si falta el secreto se responde 503; no se cae a service_role.
   const tramo = PUBLIC_API.slice(PUBLIC_API.indexOf("esComoUsuario(recursoClave)"));
