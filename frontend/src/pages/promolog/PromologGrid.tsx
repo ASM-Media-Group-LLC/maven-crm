@@ -1,4 +1,5 @@
 import PromologEntryCard, { type PromologEntry } from "./PromologEntryCard";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface Props {
   entries: PromologEntry[];
@@ -8,11 +9,12 @@ interface Props {
 }
 
 const PromologGrid = ({ entries }: Props) => {
+  const { t } = useLanguage();
   if (entries.length === 0) {
     return (
       <div className="rounded-lg border border-border py-16 text-center text-muted-foreground">
-        <p className="text-lg font-medium">No hay entradas</p>
-        <p className="text-sm">Registra una nueva entrada para comenzar</p>
+        <p className="text-lg font-medium">{t("promolog.noEntries")}</p>
+        <p className="text-sm">{t("promolog.noEntriesHint")}</p>
       </div>
     );
   }

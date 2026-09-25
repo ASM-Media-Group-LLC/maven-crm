@@ -3,6 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useFormato } from "@/hooks/useFormato";
 import type { Formato } from "@/lib/formato";
+import { useLanguage } from "@/hooks/useLanguage";
+import { traducir, type TranslationKey } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -78,13 +80,15 @@ const STALE_HOURS = 26;
 // refrescamos la tabla cada 15s para ver cuando termina.
 const ACTIVE_STATUSES = new Set(["pending", "running"]);
 
-const statusMeta: Record<string, { label: string; variant: "success-soft" | "destructive-soft" | "warning-soft" | "secondary-soft"; Icon: typeof CheckCircle2 }> = {
-  pending: { label: "Pendiente", variant: "secondary-soft", Icon: Clock },
-  running: { label: "Corriendo", variant: "secondary-soft", Icon: Loader2 },
-  succeeded: { label: "OK", variant: "success-soft", Icon: CheckCircle2 },
-  partial: { label: "Parcial", variant: "warning-soft", Icon: AlertTriangle },
-  failed: { label: "Falló", variant: "destructive-soft", Icon: XCircle },
-  timeout: { label: "Timeout", variant: "destructive-soft", Icon: XCircle },
+// La clave (pending, running…) es el `status` de promolog_dispatch_runs; solo el
+// rótulo se traduce, al dibujar.
+const statusMeta: Record<string, { labelKey: TranslationKey; variant: "success-soft" | "destructive-soft" | "warning-soft" | "secondary-soft"; Icon: typeof CheckCircle2 }> = {
+  pending: { labelKey: "common.pending", variant: "secondary-soft", Icon: Clock },
+  running: { labelKey: "promolog.runRunning", variant: "secondary-soft", Icon: Loader2 },
+  succeeded: { labelKey: "promolog.runOk", variant: "success-soft", Icon: CheckCircle2 },
+  partial: { labelKey: "promolog.runPartial", variant: "warning-soft", Icon: AlertTriangle },
+  failed: { labelKey: "promolog.runFailed", variant: "destructive-soft", Icon: XCircle },
+  timeout: { labelKey: "promolog.runTimeout", variant: "destructive-soft", Icon: XCircle },
 };
 
 const fmtTime = (iso: string, f: Formato) => {
@@ -101,8 +105,9 @@ const creatorLabel = (c: EligibleCreator) =>
 // Redes que se pueden escanear a mano + la edge function de cada una. IG NO tiene
 // fn: se escanea desde la extensión de Chrome (promolog-ingest-stories) y este panel
 // solo informa. Las demás corren su scanner server-side con only_creator_ids.
+// El rótulo de IG ("Instagram (extensión)") se traduce al dibujar: ver netLabel().
 const NET_OPTIONS: Array<{ key: string; label: string; fn: string }> = [
-  { key: "instagram", label: "Instagram (extensión)", fn: "" },
+  { key: "instagram", label: "Instagram", fn: "" },
   { key: "x", label: "X", fn: "x-scan" },
   { key: "telegram", label: "Telegram", fn: "telegram-scan" },
   { key: "facebook", label: "Facebook", fn: "fb-scan" },
@@ -111,7 +116,9 @@ const NET_LABEL: Record<string, string> = Object.fromEntries(NET_OPTIONS.map((n)
 
 const PromobotPanel = () => {
   const f = useFormato();
+  const { t } = useLanguage();
   const { toast } = useToast();
+  const netLabel = (k: string) => (k === "instagram" ? t("promolog.instagramExtension") : NET_LABEL[k] ?? k);
 
   const [creators, setCreators] = useState<EligibleCreator[]>([]);
   const [runs, setRuns] = useState<DispatchRun[]>([]);
@@ -148,7 +155,7 @@ const PromobotPanel = () => {
       .from("v_promolog_eligible_creators")
       .select("id, name, artistic_name, instagram_handle");
     if (error) {
-      toast({ title: "Error cargando modelos", description: error.message, variant: "destructive" });
+      toast({ title: traducir("promolog.errorLoadingModels"), description: error.message, variant: "destructive" });
     } else {
       setCreators((data ?? []) as EligibleCreator[]);
     }
@@ -165,7 +172,7 @@ const PromobotPanel = () => {
     q = q.limit(runsLimit);
     const { data, error } = await q;
     if (error) {
-      toast({ title: "Error cargando corridas", description: error.message, variant: "destructive" });
+      toast({ title: traducir("promolog.errorLoadingRuns"), description: error.message, variant: "destructive" });
     } else {
       setRuns((data ?? []) as DispatchRun[]);
     }
@@ -348,14 +355,14 @@ const PromobotPanel = () => {
 
     if (igSelected && serverNets.length === 0) {
       toast({
-        title: "Instagram se escanea desde la extensión",
-        description: 'El scan de IG corre en la extensión de Chrome (su botón "Escanear"), no desde este panel. No se disparó ninguna corrida de Apify.',
+        title: t("promolog.igScannedFromExtension"),
+        description: t("promolog.igScannedFromExtensionDesc"),
       });
     } else {
-      const serverLabels = serverNets.map((n) => NET_LABEL[n] ?? n).join(", ");
+      const serverLabels = serverNets.map((n) => netLabel(n)).join(", ");
       toast({
-        title: "Análisis lanzado",
-        description: `Redes: ${serverLabels}. Insertan al terminar (pueden tardar unos minutos).${igSelected ? " IG se escanea aparte desde la extensión de Chrome." : ""}`,
+        title: t("promolog.analysisLaunched"),
+        description: t("promolog.analysisLaunchedDesc", { networks: serverLabels }) + (igSelected ? ` ${t("promolog.igSeparately")}` : ""),
       });
     }
   };
@@ -380,7 +387,7 @@ const PromobotPanel = () => {
         <div>
           <h2 className="text-base font-semibold leading-tight">Promobot</h2>
           <p className="text-xs text-muted-foreground">
-            Control manual del análisis de stories. El cron corre 1×/día automáticamente.
+            {t("promolog.promobotDesc")}
           </p>
         </div>
       </div>
@@ -391,9 +398,9 @@ const PromobotPanel = () => {
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
             <div className="flex items-center gap-2">
               <Zap className="h-4 w-4 text-amber-500" />
-              <span className="text-sm font-medium">Lanzar análisis ahora</span>
+              <span className="text-sm font-medium">{t("promolog.launchNow")}</span>
               <Badge variant="secondary-soft" className="text-[10px] gap-1">
-                <Users className="h-3 w-3" /> {loadingCreators ? "…" : totalEligible} elegibles
+                <Users className="h-3 w-3" /> {t("promolog.eligibleCount", { count: loadingCreators ? "…" : totalEligible })}
               </Badge>
             </div>
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center">
@@ -405,7 +412,7 @@ const PromobotPanel = () => {
                 onClick={() => setConfirmScope("selected")}
               >
                 {launching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-                Analizar seleccionadas ({selectedCount})
+                {t("promolog.analyzeSelected", { count: selectedCount })}
               </Button>
               <Button
                 size="sm"
@@ -414,14 +421,14 @@ const PromobotPanel = () => {
                 onClick={() => setConfirmScope("all")}
               >
                 {launching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-                Analizar todas
+                {t("promolog.analyzeAll")}
               </Button>
             </div>
           </div>
 
           {/* Redes a escanear (multi-red) */}
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-[11px] text-muted-foreground">Redes a escanear:</span>
+            <span className="text-[11px] text-muted-foreground">{t("promolog.networksToScan")}</span>
             {NET_OPTIONS.map((n) => {
               const on = selectedNetworks.has(n.key);
               return (
@@ -431,11 +438,11 @@ const PromobotPanel = () => {
                   onClick={() => toggleNet(n.key)}
                   className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium ring-1 transition-colors ${on ? "bg-primary/15 text-primary ring-primary/40" : "text-muted-foreground ring-border/60 hover:text-foreground"}`}
                 >
-                  {n.label}
+                  {netLabel(n.key)}
                 </button>
               );
             })}
-            {netCount === 0 && <span className="text-[11px] text-destructive">· elige al menos una red</span>}
+            {netCount === 0 && <span className="text-[11px] text-destructive">{t("promolog.pickAtLeastOneNetworkInline")}</span>}
           </div>
 
           {/* Buscador + lista de modelos (plegado en celular) */}
@@ -445,7 +452,7 @@ const PromobotPanel = () => {
               onClick={() => setPickerOpen((o) => !o)}
               className="flex w-full items-center justify-between rounded-md border px-3 py-2 text-sm"
             >
-              <span>Elegir creadoras{selectedCount > 0 ? ` · ${selectedCount} seleccionada${selectedCount === 1 ? "" : "s"}` : ""}</span>
+              <span>{t("promolog.pickCreators")}{selectedCount > 0 ? ` · ${t(selectedCount === 1 ? "promolog.nSelectedOne" : "promolog.nSelected", { count: selectedCount })}` : ""}</span>
               <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${pickerOpen ? "rotate-180" : ""}`} />
             </button>
           )}
@@ -456,7 +463,7 @@ const PromobotPanel = () => {
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar modelo por nombre o @handle…"
+              placeholder={t("promolog.searchModelByNameHandle")}
               className="pl-8 h-9"
             />
           </div>
@@ -464,10 +471,10 @@ const PromobotPanel = () => {
           <ScrollArea className="h-56 rounded-md border">
             {loadingCreators ? (
               <div className="flex h-full items-center justify-center py-8 text-sm text-muted-foreground">
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Cargando modelos…
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> {t("promolog.loadingModels")}
               </div>
             ) : filteredCreators.length === 0 ? (
-              <div className="py-8 text-center text-sm text-muted-foreground">Sin resultados</div>
+              <div className="py-8 text-center text-sm text-muted-foreground">{t("common.noResultsShort")}</div>
             ) : (
               <div className="divide-y">
                 {filteredCreators.map((c) => (
@@ -491,7 +498,7 @@ const PromobotPanel = () => {
           </>
           )}
           <p className="text-[11px] text-muted-foreground">
-            Lanzar dispara un scrape real en Apify + análisis con Gemini (tiene costo). Usa <code>force</code> — saltea el límite de 1 corrida/día.
+            {t("promolog.launchCostNoteBefore")}<code>force</code>{t("promolog.launchCostNoteAfter")}
           </p>
         </CardContent>
       </Card>
@@ -503,7 +510,7 @@ const PromobotPanel = () => {
           : Infinity;
         const stale = staleH > STALE_HOURS;
         const usd = (n: number) => `$${n.toFixed(2)}`;
-        const ago = (h: number) => (h === Infinity ? "nunca" : h < 1 ? `${Math.round(h * 60)} min` : `${Math.round(h)} h`);
+        const ago = (h: number) => (h === Infinity ? t("promolog.never") : h < 1 ? `${Math.round(h * 60)} min` : `${Math.round(h)} h`);
         const gap = totalEligible > 0 ? totalEligible - health.scannedToday : 0;
         return (
           // order-first: en celular lo primero que importa es CÓMO está el bot, no el lanzador.
@@ -511,54 +518,53 @@ const PromobotPanel = () => {
             <CardContent className="space-y-3 p-4">
               <div className="flex flex-wrap items-center gap-2">
                 <Activity className="h-4 w-4 text-primary" />
-                <span className="text-sm font-medium">Salud del pipeline</span>
-                <Badge variant="secondary-soft" className="text-[10px]">solo IG</Badge>
+                <span className="text-sm font-medium">{t("promolog.pipelineHealth")}</span>
+                <Badge variant="secondary-soft" className="text-[10px]">{t("promolog.igOnly")}</Badge>
                 <span className="ml-auto text-[10px] text-muted-foreground">
-                  última OK: {health.lastSuccessAt ? `hace ${ago(staleH)}` : "—"}
+                  {t("promolog.lastOk", { value: health.lastSuccessAt ? t("promolog.agoValue", { value: ago(staleH) }) : "—" })}
                 </span>
               </div>
               {stale && (
                 <div className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
                   <AlertTriangle className="h-4 w-4 shrink-0" />
                   <span>
-                    El bot no completa una corrida desde hace <b>{ago(staleH)}</b> (debería correr 1×/día).
-                    Revisa el cron o lanza una corrida manual.
+                    {t("promolog.staleBefore")}<b>{ago(staleH)}</b>{t("promolog.staleAfter")}
                   </span>
                 </div>
               )}
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 <HealthStat
                   icon={<DollarSign className="h-3.5 w-3.5" />}
-                  label="Costo hoy"
+                  label={t("promolog.costToday")}
                   value={usd(health.costToday)}
                   sub={`7d ${usd(health.cost7d)} · 30d ${usd(health.cost30d)}`}
                 />
                 <HealthStat
                   icon={<CheckCircle2 className="h-3.5 w-3.5" />}
-                  label="Corridas 30d"
+                  label={t("promolog.runs30d")}
                   value={`${health.runsOk30} OK`}
-                  sub={health.runsBad30 > 0 ? `${health.runsBad30} con error` : "sin errores"}
+                  sub={health.runsBad30 > 0 ? t("promolog.withErrorsCount", { count: health.runsBad30 }) : t("promolog.noErrors")}
                   tone={health.runsBad30 > 0 ? "bad" : "ok"}
                 />
                 <HealthStat
                   icon={<Trash2 className="h-3.5 w-3.5" />}
-                  label="Desperdicio 30d"
+                  label={t("promolog.waste30d")}
                   value={`${health.zeroEntryRuns30}`}
-                  sub={`corridas 0-entries · ${usd(health.wastedCost30)}`}
+                  sub={t("promolog.zeroEntryRuns", { cost: usd(health.wastedCost30) })}
                   tone={health.zeroEntryRuns30 > 0 ? "warn" : "ok"}
                 />
                 <HealthStat
                   icon={<ScanLine className="h-3.5 w-3.5" />}
-                  label="Escaneadas hoy"
+                  label={t("promolog.scannedToday")}
                   value={`${health.scannedToday}/${totalEligible || "—"}`}
-                  sub={gap > 0 ? `${gap} sin escanear` : "cobertura completa"}
+                  sub={gap > 0 ? t("promolog.notScanned", { count: gap }) : t("promolog.fullCoverage")}
                   tone={gap > 0 ? "warn" : "ok"}
                 />
               </div>
               {fallen.length > 0 && (
                 <div className="flex flex-col gap-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs sm:flex-row sm:items-center sm:justify-between">
                   <span className="text-warning">
-                    {fallen.length} creadora(s) quedaron sin escanear hoy por corridas con error.
+                    {t("promolog.fallenCreators", { count: fallen.length })}
                   </span>
                   <Button
                     size="sm"
@@ -568,7 +574,7 @@ const PromobotPanel = () => {
                     onClick={() => setConfirmScope("fallen")}
                   >
                     {launching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-                    Reescanear ({fallen.length})
+                    {t("promolog.rescan", { count: fallen.length })}
                   </Button>
                 </div>
               )}
@@ -581,9 +587,9 @@ const PromobotPanel = () => {
       <Card>
         <CardContent className="space-y-3 p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="text-sm font-medium">Corridas recientes</span>
+            <span className="text-sm font-medium">{t("promolog.recentRuns")}</span>
             <div className="flex items-center gap-1">
-              {([["all", "Todas"], ["error", "Con error"], ["ok", "OK"]] as const).map(([k, label]) => (
+              {([["all", t("common.allF")], ["error", t("promolog.withErrors")], ["ok", "OK"]] as const).map(([k, label]) => (
                 <button
                   key={k}
                   type="button"
@@ -594,17 +600,17 @@ const PromobotPanel = () => {
                 </button>
               ))}
               <Button size="sm" variant="ghost" onClick={() => { fetchRuns(); fetchHealth(); }} className="h-7 gap-1 text-xs">
-                <RefreshCw className={`h-3.5 w-3.5 ${hasActiveRun ? "animate-spin" : ""}`} /> Refrescar
+                <RefreshCw className={`h-3.5 w-3.5 ${hasActiveRun ? "animate-spin" : ""}`} /> {t("promolog.refresh")}
               </Button>
             </div>
           </div>
 
           {loadingRuns ? (
             <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Cargando…
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> {t("common.loading")}
             </div>
           ) : runs.length === 0 ? (
-            <div className="py-8 text-center text-sm text-muted-foreground">Todavía no hay corridas</div>
+            <div className="py-8 text-center text-sm text-muted-foreground">{t("promolog.noRunsYet")}</div>
           ) : isMobile ? (
             <>
             {/* Celular: una fila por corrida en vez de la tabla de 6 columnas. */}
@@ -622,14 +628,14 @@ const PromobotPanel = () => {
                       </div>
                       <p className="mt-0.5 text-[11px] text-muted-foreground">
                         {conDetalle ? (
-                          <button type="button" onClick={() => setRunModels(r)} className="font-medium text-primary underline-offset-2 hover:underline">{r.creators_count} modelos</button>
-                        ) : `${r.creators_count} modelos`}
+                          <button type="button" onClick={() => setRunModels(r)} className="font-medium text-primary underline-offset-2 hover:underline">{t("promolog.modelsCount", { count: r.creators_count })}</button>
+                        ) : t("promolog.modelsCount", { count: r.creators_count })}
                         {" · "}{r.entries_created} entries{r.cost_usd != null ? ` · $${r.cost_usd.toFixed(3)}` : ""}
                       </p>
                     </div>
                     <Badge variant={meta.variant} className="shrink-0 gap-1 text-[10px]">
                       <meta.Icon className={`h-3 w-3 ${isActive && r.status === "running" ? "animate-spin" : ""}`} />
-                      {meta.label}
+                      {t(meta.labelKey)}
                     </Badge>
                   </li>
                 );
@@ -638,7 +644,7 @@ const PromobotPanel = () => {
             {runs.length >= runsLimit && (
               <div className="flex justify-center pt-1">
                 <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setRunsLimit((n) => n + 15)}>
-                  Ver más
+                  {t("promolog.showMore")}
                 </Button>
               </div>
             )}
@@ -649,12 +655,12 @@ const PromobotPanel = () => {
               <table className="tabla-movil w-full text-sm">
                 <thead>
                   <tr className="border-b text-left text-xs text-muted-foreground">
-                    <th className="px-2 py-1.5 font-medium">Inicio</th>
-                    <th className="px-2 py-1.5 font-medium">Estado</th>
-                    <th className="px-2 py-1.5 font-medium">Origen</th>
-                    <th className="px-2 py-1.5 text-right font-medium">Modelos</th>
+                    <th className="px-2 py-1.5 font-medium">{t("promolog.started")}</th>
+                    <th className="px-2 py-1.5 font-medium">{t("common.status")}</th>
+                    <th className="px-2 py-1.5 font-medium">{t("promolog.source")}</th>
+                    <th className="px-2 py-1.5 text-right font-medium">{t("promolog.models")}</th>
                     <th className="px-2 py-1.5 text-right font-medium">Entries</th>
-                    <th className="px-2 py-1.5 text-right font-medium">Costo</th>
+                    <th className="px-2 py-1.5 text-right font-medium">{t("promolog.cost")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -667,7 +673,7 @@ const PromobotPanel = () => {
                         <td className="px-2 py-1.5">
                           <Badge variant={meta.variant} className="gap-1 text-[10px]">
                             <meta.Icon className={`h-3 w-3 ${isActive && r.status === "running" ? "animate-spin" : ""}`} />
-                            {meta.label}
+                            {t(meta.labelKey)}
                           </Badge>
                         </td>
                         <td className="px-2 py-1.5 text-xs text-muted-foreground">
@@ -679,7 +685,7 @@ const PromobotPanel = () => {
                               type="button"
                               onClick={() => setRunModels(r)}
                               className="font-medium text-primary underline-offset-2 hover:underline"
-                              title="Ver qué modelos entraron en esta corrida"
+                              title={t("promolog.seeRunModels")}
                             >
                               {r.creators_count}
                             </button>
@@ -700,7 +706,7 @@ const PromobotPanel = () => {
             {runs.length >= runsLimit && (
               <div className="flex justify-center pt-1">
                 <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setRunsLimit((n) => n + 15)}>
-                  Ver más
+                  {t("promolog.showMore")}
                 </Button>
               </div>
             )}
@@ -713,22 +719,22 @@ const PromobotPanel = () => {
       <Dialog open={confirmScope !== null} onOpenChange={(o) => !o && setConfirmScope(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Confirmar análisis</DialogTitle>
+            <DialogTitle>{t("promolog.confirmAnalysis")}</DialogTitle>
             <DialogDescription>
               {confirmScope === "all"
-                ? `Vas a lanzar el análisis de las ${totalEligible} modelos elegibles.`
+                ? t("promolog.confirmAll", { count: totalEligible })
                 : confirmScope === "fallen"
-                ? `Vas a reescanear ${fallen.length} creadora(s) que quedaron sin escanear hoy por corridas con error.`
-                : `Vas a lanzar el análisis de ${selectedCount} modelo(s) seleccionada(s).`}
-              {confirmScope !== "fallen" && ` Redes: ${[...selectedNetworks].map((n) => NET_LABEL[n] ?? n).join(", ")}.`}
-              {" "}Esto dispara un scrape en Apify + análisis con Gemini (tiene costo) y saltea el límite de 1 corrida/día.
+                ? t("promolog.confirmFallen", { count: fallen.length })
+                : t("promolog.confirmSelected", { count: selectedCount })}
+              {confirmScope !== "fallen" && ` ${t("promolog.confirmNetworks", { networks: [...selectedNetworks].map((n) => netLabel(n)).join(", ") })}`}
+              {" "}{t("promolog.confirmCostNote")}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmScope(null)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => setConfirmScope(null)}>{t("common.cancel")}</Button>
             <Button onClick={() => confirmScope && launch(confirmScope)} disabled={launching}>
               {launching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-              Lanzar
+              {t("promolog.launch")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -738,16 +744,16 @@ const PromobotPanel = () => {
       <Dialog open={runModels !== null} onOpenChange={(o) => !o && setRunModels(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Modelos de la corrida</DialogTitle>
+            <DialogTitle>{t("promolog.runModels")}</DialogTitle>
             <DialogDescription>
               {runModels
-                ? `${fmtTime(runModels.started_at, f)} · ${runModelsList.length} modelo(s)`
+                ? t("promolog.runModelsCount", { time: fmtTime(runModels.started_at, f), count: runModelsList.length })
                 : ""}
             </DialogDescription>
           </DialogHeader>
           {runModelsList.length === 0 ? (
             <p className="py-4 text-sm text-muted-foreground">
-              Sin detalle de modelos para esta corrida.
+              {t("promolog.noRunModels")}
             </p>
           ) : (
             <ScrollArea className="max-h-80 rounded-md border">
@@ -771,7 +777,7 @@ const PromobotPanel = () => {
             </ScrollArea>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRunModels(null)}>Cerrar</Button>
+            <Button variant="outline" onClick={() => setRunModels(null)}>{t("common.close")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

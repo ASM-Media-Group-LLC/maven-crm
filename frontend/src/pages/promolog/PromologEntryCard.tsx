@@ -20,6 +20,7 @@ import XIcon from "@/components/icons/XIcon";
 import TelegramIcon from "@/components/icons/TelegramIcon";
 import { displayPlatform, type NetworkScore } from "./promoScore";
 import { resultBadgeVariant } from "./promoResult";
+import { useLanguage } from "@/hooks/useLanguage";
 
 export interface PromologEntry {
   id: string;
@@ -141,13 +142,8 @@ const platformOptions = [
   { value: "otra", label: "Otra" },
 ] as const;
 
-const contactTypeOptions = [
-  { value: "hablaron", label: "Hablaron" },
-  { value: "textearon", label: "Textearon" },
-  { value: "mensaje_voz", label: "Mensaje de Voz" },
-] as const;
-
 const PromologEntryCard = ({ entry }: PromologEntryCardProps) => {
+  const { t } = useLanguage();
   const { toast } = useToast();
   const [editOpen, setEditOpen] = useState(false);
   const [editResult, setEditResult] = useState<"si" | "no">(
@@ -191,14 +187,14 @@ const PromologEntryCard = ({ entry }: PromologEntryCardProps) => {
                 marcas AL LADO, nunca reemplazan el resultado. */}
             <div className="flex items-center gap-1">
               <Badge variant={resultBadgeVariant(entry.result)} className="text-xs">
-                {entry.result === "Sí" ? "Sí" : "No"}
+                {entry.result === "Sí" ? t("promolog.yes") : t("promolog.no")}
               </Badge>
               {entry.needs_review ? (
-                <span title={entry.error_reason ?? "Revisar manual"} className="text-warning" aria-label="Revisar manual">
+                <span title={entry.error_reason ?? t("promolog.reviewManually")} className="text-warning" aria-label={t("promolog.reviewManually")}>
                   <AlertTriangle className="h-3.5 w-3.5" />
                 </span>
               ) : entry.is_pending ? (
-                <span title="Lectura no confirmada — puede tener historias sin leer" className="text-[10px] text-muted-foreground">no verif.</span>
+                <span title={t("promolog.unconfirmedRead")} className="text-[10px] text-muted-foreground">{t("promolog.notVerifiedShort")}</span>
               ) : null}
             </div>
           </div>
@@ -253,7 +249,7 @@ const PromologEntryCard = ({ entry }: PromologEntryCardProps) => {
             onClick={handleOpenEdit}
           >
             <Pencil className="h-3.5 w-3.5" />
-            Editar
+            {t("common.edit")}
           </Button>
         </CardContent>
       </Card>
@@ -262,9 +258,9 @@ const PromologEntryCard = ({ entry }: PromologEntryCardProps) => {
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
           <DialogHeader className="pr-8">
-            <DialogTitle>Editar Promoción</DialogTitle>
+            <DialogTitle>{t("promolog.editPromo")}</DialogTitle>
             <DialogDescription className="sr-only">
-              Editar los detalles de promoción para este creador
+              {t("promolog.editPromoDescCard")}
             </DialogDescription>
           </DialogHeader>
 
@@ -288,7 +284,7 @@ const PromologEntryCard = ({ entry }: PromologEntryCardProps) => {
           </Card>
 
           <div className="space-y-2">
-            <span className="text-sm font-medium">¿Promocionó Hoy?</span>
+            <span className="text-sm font-medium">{t("promolog.promotedTodayQ")}</span>
             <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
@@ -300,7 +296,7 @@ const PromologEntryCard = ({ entry }: PromologEntryCardProps) => {
                 }`}
               >
                 <Check className="h-4 w-4" />
-                Sí Promocionó
+                {t("promolog.yesPromoted")}
               </button>
               <button
                 type="button"
@@ -312,7 +308,7 @@ const PromologEntryCard = ({ entry }: PromologEntryCardProps) => {
                 }`}
               >
                 <XMark className="h-4 w-4" />
-                No Promocionó
+                {t("promolog.noNotPromoted")}
               </button>
             </div>
           </div>
@@ -321,7 +317,7 @@ const PromologEntryCard = ({ entry }: PromologEntryCardProps) => {
             <>
               <div className="space-y-2">
                 <span className="text-sm font-medium">
-                  Red Social <span className="text-destructive">*</span>
+                  {t("promolog.networkPlaceholder")} <span className="text-destructive">*</span>
                 </span>
                 <div className="grid grid-cols-4 gap-2">
                   {networkOptions.map((opt) => {
@@ -348,7 +344,7 @@ const PromologEntryCard = ({ entry }: PromologEntryCardProps) => {
 
               <div className="space-y-2">
                 <span className="text-sm font-medium">
-                  Plataforma <span className="text-destructive">*</span>
+                  {t("promolog.platform")} <span className="text-destructive">*</span>
                 </span>
                 <div className="grid grid-cols-3 gap-2">
                   {platformOptions.map((opt) => {
@@ -364,7 +360,7 @@ const PromologEntryCard = ({ entry }: PromologEntryCardProps) => {
                             : "border border-input bg-background text-muted-foreground hover:bg-accent"
                         }`}
                       >
-                        {opt.label}
+                        {opt.value === "otra" ? t("promolog.other") : opt.label}
                       </button>
                     );
                   })}
@@ -376,17 +372,17 @@ const PromologEntryCard = ({ entry }: PromologEntryCardProps) => {
                   plataforma + estrategia ya alcanza. */}
 
               <div className="space-y-2">
-                <span className="text-sm font-medium">Notas</span>
+                <span className="text-sm font-medium">{t("promolog.notes")}</span>
                 <Textarea
                   value={editNotes}
                   onChange={(e) => setEditNotes(e.target.value)}
-                  placeholder="Agregar notas..."
+                  placeholder={t("promolog.addNotes")}
                   className="min-h-[80px]"
                 />
               </div>
 
               <div className="space-y-2">
-                <span className="text-sm font-medium">Evidencia (Pantallazo)</span>
+                <span className="text-sm font-medium">{t("promolog.evidenceScreenshot")}</span>
                 <div
                   className="border-2 border-dashed border-input rounded-md p-4 text-center cursor-pointer hover:bg-accent/50 transition-colors"
                   onClick={() => fileInputRef.current?.click()}
@@ -405,7 +401,7 @@ const PromologEntryCard = ({ entry }: PromologEntryCardProps) => {
                   <div className="space-y-2">
                     <img
                       src={editEvidencePreview}
-                      alt="Evidencia"
+                      alt={t("promolog.evidence")}
                       className="w-full rounded-md border border-input max-h-48 object-contain"
                     />
                     <button
@@ -414,7 +410,7 @@ const PromologEntryCard = ({ entry }: PromologEntryCardProps) => {
                       onClick={() => window.open(editEvidencePreview, "_blank")}
                     >
                       <ExternalLink className="h-3 w-3" />
-                      Abrir en nueva pestaña
+                      {t("promolog.openInNewTab")}
                     </button>
                   </div>
                 )}
@@ -425,18 +421,18 @@ const PromologEntryCard = ({ entry }: PromologEntryCardProps) => {
           <DialogFooter>
             <Button variant="outline" onClick={() => {
               setEditOpen(false);
-              toast({ title: "Edición cancelada" });
+              toast({ title: t("promolog.editCancelled") });
             }}>
-              Cancelar
+              {t("common.cancel")}
             </Button>
             <Button
               className="bg-primary hover:bg-primary/90 text-primary-foreground"
               onClick={() => {
                 setEditOpen(false);
-                toast({ title: "Promoción actualizada", description: `Los cambios para ${entry.name} han sido guardados.` });
+                toast({ title: t("promolog.promoUpdated"), description: t("promolog.changesSavedFor", { name: entry.name }) });
               }}
             >
-              Guardar Cambios
+              {t("promolog.saveChanges")}
             </Button>
           </DialogFooter>
         </DialogContent>
