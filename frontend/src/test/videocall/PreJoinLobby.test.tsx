@@ -2,6 +2,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 
 // Mock livekit-client
+vi.mock("@/hooks/useLanguage", (original) =>
+  import("@/test/messenger/espanolEnTests").then((m) => m.idiomaEnEspanol(original)));
+
 vi.mock("livekit-client", () => ({
   createLocalTracks: vi.fn().mockRejectedValue(new Error("mocked")),
   LocalAudioTrack: vi.fn(),

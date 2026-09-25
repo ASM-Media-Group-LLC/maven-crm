@@ -11,6 +11,7 @@ import {
 import { LKParticipant } from "@/hooks/useLiveKit";
 import { cn } from "@/lib/utils";
 import { useVideoZoom } from "./useVideoZoom";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface ParticipantTileProps {
   participant: LKParticipant;
@@ -68,19 +69,20 @@ function areParticipantPropsEqual(prev: ParticipantTileProps, next: ParticipantT
 }
 
 function ConnectionIndicator({ quality }: { quality: string }) {
+  const { t } = useLanguage();
   const bars = quality === "excellent" ? 3 : quality === "good" ? 2 : quality === "poor" ? 1 : 0;
   const color = bars >= 2 ? "bg-success" : bars === 1 ? "bg-warning" : "bg-destructive";
 
   if (quality === "lost") {
     return (
-      <div className="flex items-center gap-0.5" title="Conexión perdida">
+      <div className="flex items-center gap-0.5" title={t("messenger.tile.conexionPerdida")}>
         <WifiOff className="h-3 w-3 text-destructive" />
       </div>
     );
   }
 
   return (
-    <div className="flex items-end gap-px h-3" title={`Calidad: ${quality}`}>
+    <div className="flex items-end gap-px h-3" title={t("messenger.tile.calidad", { calidad: quality })}>
       {[1, 2, 3].map((level) => (
         <div
           key={level}
@@ -96,6 +98,7 @@ const ParticipantTile = memo(function ParticipantTile({
   participant, room, large, className, preferredAudioOutputDeviceId,
   onMuteParticipant, onRemoveParticipant, onPinParticipant, pinnedSid, isAdmin, compact,
 }: ParticipantTileProps) {
+  const { t } = useLanguage();
   const isPinned = pinnedSid === participant.sid;
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -340,8 +343,8 @@ const ParticipantTile = memo(function ParticipantTile({
             type="button"
             onClick={zoom.zoomOut}
             disabled={zoom.scale <= 1}
-            title="Alejar"
-            aria-label="Alejar"
+            title={t("messenger.tile.alejar")}
+            aria-label={t("messenger.tile.alejar")}
             className="flex h-6 w-6 items-center justify-center rounded-full text-white/90 hover:bg-white/15 disabled:opacity-30"
           >
             <ZoomOut className="h-3.5 w-3.5" />
@@ -352,8 +355,8 @@ const ParticipantTile = memo(function ParticipantTile({
           <button
             type="button"
             onClick={zoom.zoomIn}
-            title="Acercar"
-            aria-label="Acercar"
+            title={t("messenger.tile.acercar")}
+            aria-label={t("messenger.tile.acercar")}
             className="flex h-6 w-6 items-center justify-center rounded-full text-white/90 hover:bg-white/15"
           >
             <ZoomIn className="h-3.5 w-3.5" />
@@ -362,8 +365,8 @@ const ParticipantTile = memo(function ParticipantTile({
             <button
               type="button"
               onClick={zoom.reset}
-              title="Ver completa"
-              aria-label="Ver completa"
+              title={t("messenger.tile.verCompleta")}
+              aria-label={t("messenger.tile.verCompleta")}
               className="flex h-6 w-6 items-center justify-center rounded-full text-white/90 hover:bg-white/15"
             >
               <Minimize2 className="h-3.5 w-3.5" />
@@ -441,7 +444,7 @@ const ParticipantTile = memo(function ParticipantTile({
                   ? "bg-primary/30 text-primary hover:bg-primary/40"
                   : "bg-[hsl(220_3%_18%/0.85)] text-foreground hover:bg-[hsl(220_3%_25%/0.95)]"
               )}
-              title={isPinned ? "Desanclar" : "Anclar en pantalla"}
+              title={isPinned ? t("messenger.sidebar.desanclar") : t("messenger.tile.anclarEnPantalla")}
             >
               {isPinned ? <PinOff className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} /> : <Pin className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} />}
             </button>
@@ -451,7 +454,7 @@ const ParticipantTile = memo(function ParticipantTile({
             <DropdownMenuTrigger asChild>
               <button
                 className="h-10 w-10 rounded-full bg-[hsl(220_3%_18%/0.85)] backdrop-blur-sm flex items-center justify-center text-foreground hover:bg-[hsl(220_3%_25%/0.95)] transition-colors"
-                title={`Más opciones para ${participant.name}`}
+                title={t("messenger.tile.masOpcionesPara", { name: participant.name })}
               >
                 <MoreVertical className="h-4 w-4" />
               </button>
@@ -460,7 +463,7 @@ const ParticipantTile = memo(function ParticipantTile({
               {onPinParticipant && (
                 <DropdownMenuItem onClick={() => onPinParticipant(participant.sid)} className="text-foreground focus:bg-muted">
                   {isPinned ? <PinOff className="h-3.5 w-3.5 mr-2" /> : <Pin className="h-3.5 w-3.5 mr-2" />}
-                  {isPinned ? "Desanclar" : "Anclar en pantalla"}
+                  {isPinned ? t("messenger.sidebar.desanclar") : t("messenger.tile.anclarEnPantalla")}
                 </DropdownMenuItem>
               )}
               {/* Silenciar a otro: cualquiera en la llamada, como en Google.
@@ -470,12 +473,12 @@ const ParticipantTile = memo(function ParticipantTile({
                   otro mudo para toda la sala sin que ninguno entendiera por que. */}
               {!participant.isLocal && onMuteParticipant && !participant.isMuted && (
                 <DropdownMenuItem onClick={() => setConfirmarSilencio(true)} className="text-foreground focus:bg-muted">
-                  <MicOff className="h-3.5 w-3.5 mr-2" /> Silenciar para todos
+                  <MicOff className="h-3.5 w-3.5 mr-2" /> {t("messenger.tile.silenciarParaTodos")}
                 </DropdownMenuItem>
               )}
               {isAdmin && !participant.isLocal && onRemoveParticipant && (
                 <DropdownMenuItem onClick={() => onRemoveParticipant(participant.identity)} className="text-destructive focus:bg-muted">
-                  <UserX className="h-3.5 w-3.5 mr-2" /> Eliminar
+                  <UserX className="h-3.5 w-3.5 mr-2" /> {t("common.delete")}
                 </DropdownMenuItem>
               )}
             </DropdownMenuContent>
@@ -490,17 +493,15 @@ const ParticipantTile = memo(function ParticipantTile({
       <AlertDialog open={confirmarSilencio} onOpenChange={setConfirmarSilencio}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Silenciar a {participant.name}?</AlertDialogTitle>
+            <AlertDialogTitle>{t("messenger.tile.silenciarA", { name: participant.name })}</AlertDialogTitle>
             <AlertDialogDescription>
-              Deja de escucharse para toda la sala, no solo para ti. Se le avisa que lo
-              silenciaron y puede volver a activar su micrófono cuando quiera — tú no puedes
-              hacerlo por él.
+              {t("messenger.tile.silenciarDesc")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel />
             <AlertDialogAction onClick={() => onMuteParticipant?.(participant.identity)}>
-              Silenciar para todos
+              {t("messenger.tile.silenciarParaTodos")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -526,7 +527,7 @@ const ParticipantTile = memo(function ParticipantTile({
       {isPinned && (
         <div className="absolute top-3 right-3 z-10">
           <div className="flex items-center gap-1 bg-primary/85 backdrop-blur-sm text-white text-[10px] font-medium rounded-full px-2 py-1">
-            <Pin className="h-3 w-3" /> Anclado
+            <Pin className="h-3 w-3" /> {t("messenger.tile.anclado")}
           </div>
         </div>
       )}
@@ -535,7 +536,7 @@ const ParticipantTile = memo(function ParticipantTile({
       {participant.isScreenSharing && (
         <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10">
           <div className="flex items-center gap-1.5 bg-[hsl(220_3%_14%/0.8)] backdrop-blur-sm text-foreground text-[10px] font-medium rounded-full px-2.5 py-1">
-            <Monitor className="h-3 w-3" /> Compartiendo pantalla
+            <Monitor className="h-3 w-3" /> {t("messenger.tile.compartiendoPantalla")}
           </div>
         </div>
       )}
@@ -544,7 +545,7 @@ const ParticipantTile = memo(function ParticipantTile({
       <div className={cn("absolute bottom-0 left-0 right-0 flex items-center justify-between z-10 bg-gradient-to-t from-black/50 to-transparent", compact ? "px-1.5 py-1" : "px-2.5 py-1.5")}>
         <div className="flex min-w-0 items-center gap-1.5">
           <span className={cn("truncate font-medium text-white", compact ? "text-[10px]" : "text-xs")}>
-            {participant.isLocal ? "Tú" : participant.name}
+            {participant.isLocal ? t("messenger.preview.tu") : participant.name}
           </span>
           {participant.isMuted && (
             <div className="h-5 w-5 rounded-full bg-destructive flex items-center justify-center">

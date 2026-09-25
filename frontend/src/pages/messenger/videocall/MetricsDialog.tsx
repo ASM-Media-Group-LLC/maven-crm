@@ -4,6 +4,7 @@ import { BarChart3, Monitor as MonitorIcon, Wifi } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Room, Track } from "livekit-client";
 import type { LKParticipant } from "@/hooks/useLiveKit";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface MetricsDialogProps {
   open: boolean;
@@ -19,6 +20,7 @@ interface ParticipantStats {
 }
 
 export default function MetricsDialog({ open, onClose, room, participants }: MetricsDialogProps) {
+  const { t } = useLanguage();
   const [stats, setStats] = useState<ParticipantStats[]>([]);
 
   const collectStats = useCallback(async () => {
@@ -79,26 +81,26 @@ export default function MetricsDialog({ open, onClose, room, participants }: Met
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="bg-background border-secondary text-foreground max-w-sm p-0 gap-0">
         <DialogHeader className="px-5 pt-5 pb-3">
-          <DialogTitle className="text-base font-medium text-white">Métricas</DialogTitle>
+          <DialogTitle className="text-base font-medium text-white">{t("messenger.call.metricas")}</DialogTitle>
         </DialogHeader>
         <div className="p-5 space-y-3 max-h-[60vh] overflow-y-auto">
           {!room ? (
-            <p className="text-xs text-muted-foreground">No conectado a la sala</p>
+            <p className="text-xs text-muted-foreground">{t("messenger.metrics.noConectado")}</p>
           ) : (
             <>
               <div className="flex items-center gap-2 text-foreground">
                 <BarChart3 className="h-4 w-4" />
-                <span className="text-xs font-medium">Métricas en tiempo real</span>
-                <span className="ml-auto text-[10px] text-muted-foreground">{participants?.length || stats.length} participantes</span>
+                <span className="text-xs font-medium">{t("messenger.metrics.enTiempoReal")}</span>
+                <span className="ml-auto text-[10px] text-muted-foreground">{t("messenger.metrics.nParticipantes", { n: participants?.length || stats.length })}</span>
               </div>
               {stats.map((s) => (
                 <div key={s.identity} className="rounded-lg bg-card p-3 space-y-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-foreground">{s.isLocal ? "Tú" : s.name}</span>
+                    <span className="text-xs font-medium text-foreground">{s.isLocal ? t("messenger.preview.tu") : s.name}</span>
                     {s.isLocal && <span className="text-[8px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">Local</span>}
                   </div>
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
-                    <MetricRow icon={<MonitorIcon className="h-3 w-3" />} label="Resolución" value={s.videoResolution} />
+                    <MetricRow icon={<MonitorIcon className="h-3 w-3" />} label={t("messenger.metrics.resolucion")} value={s.videoResolution} />
                     <MetricRow icon={<Wifi className="h-3 w-3" />} label="FPS" value={s.fps} />
                     <MetricRow label="Video codec" value={s.videoCodec} />
                     <MetricRow label="Audio codec" value={s.audioCodec} />

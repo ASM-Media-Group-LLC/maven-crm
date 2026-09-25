@@ -3,6 +3,9 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import CallParticipantsSidebar from "@/pages/messenger/videocall/CallParticipantsSidebar";
 import { LKParticipant } from "@/hooks/useLiveKit";
 
+vi.mock("@/hooks/useLanguage", (original) =>
+  import("@/test/messenger/espanolEnTests").then((m) => m.idiomaEnEspanol(original)));
+
 describe("CallParticipantsSidebar", () => {
   const mockParticipants: LKParticipant[] = [
     { sid: "s1", identity: "user-1", name: "Yo", isSpeaking: false, isMuted: false, isCameraOff: false, isScreenSharing: false, isLocal: true, handRaised: false, reactions: [], connectionQuality: "excellent", hasVideoTrack: false },

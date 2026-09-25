@@ -2,6 +2,8 @@ import { X, LayoutGrid, Grid3X3, PanelRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 
 export type LayoutMode = "auto" | "tiled" | "sidebar";
 
@@ -18,10 +20,10 @@ interface AdjustViewDialogProps {
   onSettingsChange: (settings: ViewSettings) => void;
 }
 
-const LAYOUT_OPTIONS: { value: LayoutMode; label: string; description: string; icon: React.ElementType }[] = [
-  { value: "auto", label: "Auto (dinámico)", description: "Se ajusta según participantes", icon: LayoutGrid },
-  { value: "tiled", label: "Mosaico", description: "Todos en cuadrícula uniforme", icon: Grid3X3 },
-  { value: "sidebar", label: "Barra lateral", description: "Principal + miniaturas", icon: PanelRight },
+const LAYOUT_OPTIONS: { value: LayoutMode; label: TranslationKey; description: TranslationKey; icon: React.ElementType }[] = [
+  { value: "auto", label: "messenger.view.auto", description: "messenger.view.autoDesc", icon: LayoutGrid },
+  { value: "tiled", label: "messenger.view.mosaico", description: "messenger.view.mosaicoDesc", icon: Grid3X3 },
+  { value: "sidebar", label: "messenger.view.barraLateral", description: "messenger.view.barraLateralDesc", icon: PanelRight },
 ];
 
 const TILE_STEPS = [1, 4, 6, 9, 16, 25, 49];
@@ -32,6 +34,7 @@ function getTileLabel(val: number) {
 }
 
 export default function AdjustViewDialog({ open, onClose, settings, onSettingsChange }: AdjustViewDialogProps) {
+  const { t } = useLanguage();
   if (!open) return null;
 
   const handleLayoutChange = (layout: LayoutMode) => {
@@ -49,11 +52,12 @@ export default function AdjustViewDialog({ open, onClose, settings, onSettingsCh
         {/* Header */}
         <div className="flex items-start justify-between px-6 pt-5 pb-1">
           <div>
-            <h2 className="text-base font-medium">Ajustar vista</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">La selección se guarda para futuras llamadas</p>
+            <h2 className="text-base font-medium">{t("messenger.call.ajustarVista")}</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">{t("messenger.view.seGuarda")}</p>
           </div>
           <button
             onClick={onClose}
+            aria-label={t("common.close")}
             className="h-8 w-8 rounded-full flex items-center justify-center hover:bg-secondary transition-colors text-muted-foreground"
           >
             <X className="h-4 w-4" />
@@ -83,8 +87,8 @@ export default function AdjustViewDialog({ open, onClose, settings, onSettingsCh
                   {isActive && <div className="h-2.5 w-2.5 rounded-full bg-primary" />}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className={cn("text-sm", isActive ? "text-primary" : "text-foreground")}>{opt.label}</p>
-                  <p className="text-xs text-muted-foreground">{opt.description}</p>
+                  <p className={cn("text-sm", isActive ? "text-primary" : "text-foreground")}>{t(opt.label)}</p>
+                  <p className="text-xs text-muted-foreground">{t(opt.description)}</p>
                 </div>
                 <div className={cn(
                   "h-9 w-12 rounded-lg flex items-center justify-center shrink-0 transition-colors",
@@ -102,8 +106,8 @@ export default function AdjustViewDialog({ open, onClose, settings, onSettingsCh
         {/* Max tiles */}
         <div className="px-6 py-4 space-y-3">
           <div>
-            <p className="text-sm">Mosaicos</p>
-            <p className="text-xs text-muted-foreground">Máximo de mosaicos a mostrar</p>
+            <p className="text-sm">{t("messenger.view.mosaicos")}</p>
+            <p className="text-xs text-muted-foreground">{t("messenger.view.maximoMosaicos")}</p>
           </div>
           <div className="flex items-center gap-3">
             <Grid3X3 className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -118,7 +122,7 @@ export default function AdjustViewDialog({ open, onClose, settings, onSettingsCh
             <LayoutGrid className="h-4 w-4 text-muted-foreground shrink-0" />
           </div>
           <p className="text-center text-xs font-medium text-primary">
-            {getTileLabel(settings.maxTiles)} mosaicos
+            {t("messenger.view.nMosaicos", { n: getTileLabel(settings.maxTiles) })}
           </p>
         </div>
 
@@ -126,7 +130,7 @@ export default function AdjustViewDialog({ open, onClose, settings, onSettingsCh
 
         {/* Hide no video */}
         <div className="px-6 py-4 flex items-center justify-between">
-          <p className="text-sm text-foreground">Ocultar mosaicos sin video</p>
+          <p className="text-sm text-foreground">{t("messenger.view.ocultarSinVideo")}</p>
           <Switch
             checked={settings.hideNoVideo}
             onCheckedChange={(checked) => onSettingsChange({ ...settings, hideNoVideo: checked })}

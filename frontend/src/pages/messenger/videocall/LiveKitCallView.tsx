@@ -24,6 +24,7 @@ import { useFaceNudge, useScreenShareNudge } from "@/hooks/useFaceNudge";
 import { latirEnLlamada, salirDeLlamada, LATIDO_LLAMADA_MS } from "@/lib/llamadaEnMaven";
 import { useRegistrarLlamados } from "@/hooks/useRegistrarLlamados";
 import { esBlur, alternarBlur, leerFondoGuardado, guardarFondo, type BackgroundEffect } from "@/lib/fondoDeLlamada";
+import { useLanguage } from "@/hooks/useLanguage";
 
 const DEFAULT_VIEW_SETTINGS: ViewSettings = { layout: "auto", maxTiles: 49, hideNoVideo: false };
 
@@ -126,6 +127,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   // Lista de salas del navegador (solo Cowork supervisor+): estado del popup.
   const [salasAbiertas, setSalasAbiertas] = useState(false);
   const lk = useLiveKit();
+  const { t } = useLanguage();
 
   // Silencio local del audio entrante (p.ej. el Hub de Cowork mientras el
   // coordinador está metido en una sala). setVolume(0) por participante remoto:
@@ -339,7 +341,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   useEffect(() => {
     if (!pantallaInicialRef.current || lk.connectionState !== ConnectionState.Connected || lk.isScreenSharing) return;
     pantallaInicialRef.current = false;
-    Promise.resolve(lk.toggleScreenShare()).catch(() => toast.info("Toca «Compartir pantalla» para volver a compartirla"));
+    Promise.resolve(lk.toggleScreenShare()).catch(() => toast.info(t("messenger.callView.tocaCompartir")));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lk.connectionState]);
 
@@ -357,12 +359,12 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     // le avisa a quien se va.
     const mia = leerMiGrabacion(roomName);
     if (mia) {
-      const ok = window.confirm("Estás grabando esta reunión. Si sales, la grabación se detiene y queda guardada en Grabaciones. ¿Salir?");
+      const ok = window.confirm(t("messenger.callView.confirmarSalirGrabando"));
       if (!ok) return;
       void detenerAlSalir(roomName, mia.id);
     }
-    lk.disconnect(); onLeave(); if (!suppressLeaveToast) toast.info("Llamada finalizada");
-  }, [lk, onLeave, suppressLeaveToast, roomName]);
+    lk.disconnect(); onLeave(); if (!suppressLeaveToast) toast.info(t("messenger.callView.llamadaFinalizada"));
+  }, [lk, onLeave, suppressLeaveToast, roomName, t]);
 
   // Una acción de moderación puede volver con 403 del servidor (no eres
   // anfitrión, o intentás moderar al anfitrión): mostramos el motivo. Con el
@@ -373,9 +375,9 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
       await fn();
       toast.success(okMessage);
     } catch (e: any) {
-      toast.error(e?.message || "No se pudo aplicar la acción");
+      toast.error(e?.message || t("messenger.callView.noSePudoAplicar"));
     }
-  }, []);
+  }, [t]);
 
   const handleModeration = useCallback(
     (fn: (identity: string) => Promise<void>, okMessage: string) => (identity: string) => {
@@ -588,7 +590,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     return (
       <div className="flex flex-col h-full bg-background text-foreground items-center justify-center gap-4">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
-        <p className="text-sm text-muted-foreground">Conectando a la sala...</p>
+        <p className="text-sm text-muted-foreground">{t("messenger.callView.conectando")}</p>
       </div>
     );
   }
@@ -596,9 +598,9 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   if (lk.error) {
     return (
       <div className="flex flex-col h-full bg-background text-foreground items-center justify-center gap-4">
-        <p className="text-destructive font-medium">Error de conexión</p>
+        <p className="text-destructive font-medium">{t("messenger.callView.errorConexion")}</p>
         <p className="text-sm text-muted-foreground max-w-md text-center">{lk.error}</p>
-        <button onClick={handleLeave} className="mt-4 px-4 py-2 rounded-full bg-primary text-white text-sm hover:bg-primary/90">Volver</button>
+        <button onClick={handleLeave} className="mt-4 px-4 py-2 rounded-full bg-primary text-white text-sm hover:bg-primary/90">{t("common.back")}</button>
       </div>
     );
   }
@@ -623,11 +625,11 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
       <button
         type="button"
         onClick={() => setSalasAbiertas((v) => !v)}
-        title="Cambiar de sala: te saca de la actual y entras muteado a la elegida"
+        title={t("messenger.callView.cambiarDeSala")}
         className={`flex items-center gap-1.5 rounded-full bg-muted/60 px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:bg-muted ${effectiveCompact ? "max-w-[190px]" : "max-w-[240px]"}`}
       >
         <DoorOpen className="h-3.5 w-3.5 shrink-0" />
-        <span className="truncate">{salasNavegables[salaActualIdx]?.name ?? "Salas"}</span>
+        <span className="truncate">{salasNavegables[salaActualIdx]?.name ?? t("messenger.callView.salas")}</span>
         <ChevronRight className={`h-3 w-3 shrink-0 transition-transform ${salasAbiertas ? "-rotate-90" : "rotate-90"}`} />
       </button>
       {salasAbiertas && (
@@ -654,7 +656,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
 
       {lk.isReconnecting && (
         <div className="shrink-0 flex items-center justify-center gap-2 py-1.5 bg-warning/15 text-warning text-xs font-medium">
-          <WifiOff className="h-3.5 w-3.5 animate-pulse" /> Reconectando...
+          <WifiOff className="h-3.5 w-3.5 animate-pulse" /> {t("messenger.callView.reconectando")}
         </div>
       )}
 
@@ -664,16 +666,16 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
           pasó y se le deja elegir dónde quedarse. */}
       {pantallaPendiente && (
         <div className="shrink-0 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 py-2 px-3 bg-primary/15 text-foreground text-xs font-medium text-center">
-          <span>Volviste de la pausa. Tu cámara y tu micrófono ya están encendidos; la pantalla hay que retomarla.</span>
+          <span>{t("messenger.callView.volvisteDeLaPausa")}</span>
           <button
             type="button"
             onClick={() => { void lk.toggleScreenShare(); setPantallaPendiente(false); }}
             className="rounded-full bg-primary px-3 py-1 text-primary-foreground font-semibold hover:bg-primary/90"
           >
-            Volver a compartir pantalla
+            {t("messenger.callView.volverACompartir")}
           </button>
           <button type="button" onClick={() => setPantallaPendiente(false)} className="underline underline-offset-2 opacity-80 hover:opacity-100">
-            Ahora no
+            {t("messenger.callView.ahoraNo")}
           </button>
         </div>
       )}
@@ -765,7 +767,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
 
           {lk.participants.length <= 1 && (
             <div className="pointer-events-none absolute inset-x-0 bottom-8 flex justify-center px-4">
-              <div className="rounded-full bg-[hsl(220_3%_20%/0.9)] border border-border px-3 py-1.5 text-xs text-muted-foreground backdrop-blur-sm">Esperando a que otros participantes se unan...</div>
+              <div className="rounded-full bg-[hsl(220_3%_20%/0.9)] border border-border px-3 py-1.5 text-xs text-muted-foreground backdrop-blur-sm">{t("messenger.callView.esperando")}</div>
             </div>
           )}
 
@@ -786,28 +788,28 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
           <CallParticipantsSidebar
             participants={lk.participants}
             isAdmin={isAdmin}
-            onMuteParticipant={handleModeration(lk.muteParticipant, "Silenciado")}
-            onRemoveParticipant={handleModeration(lk.removeParticipant, "Sacado de la llamada")}
+            onMuteParticipant={handleModeration(lk.muteParticipant, t("messenger.callView.silenciado"))}
+            onRemoveParticipant={handleModeration(lk.removeParticipant, t("messenger.callView.sacado"))}
             onSetCanPublish={(identity, canPublish) =>
               runModeration(
                 () => lk.setParticipantCanPublish(identity, canPublish),
-                canPublish ? "Puede volver a hablar" : "Queda solo como oyente",
+                canPublish ? t("messenger.callView.puedeHablar") : t("messenger.callView.soloOyente"),
               )}
             onSetCohost={(identity, isCohost) =>
               runModeration(
                 () => lk.setCohost(identity, isCohost),
-                isCohost ? "Ahora es co-anfitrión" : "Ya no es co-anfitrión",
+                isCohost ? t("messenger.callView.ahoraCoanfitrion") : t("messenger.callView.yaNoCoanfitrion"),
               )}
             onMuteAll={() => runModeration(
               async () => {
                 const muted = await lk.muteAllParticipants();
                 return muted;
               },
-              "Todos silenciados",
+              t("messenger.callView.todosSilenciados"),
             )}
             onEndForAll={hideEndForAll ? undefined : async () => {
-              if (!window.confirm("¿Terminar la llamada para todos los participantes?")) return;
-              await runModeration(lk.endRoomForAll, "Llamada terminada para todos");
+              if (!window.confirm(t("messenger.callView.confirmarTerminarTodos"))) return;
+              await runModeration(lk.endRoomForAll, t("messenger.callView.terminadaParaTodos"));
             }}
             onClose={() => setParticipantsOpen(false)}
           />
@@ -830,8 +832,8 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
           <>
             <button
               type="button"
-              title={`Ir a ${anterior.name}`}
-              aria-label={`Ir a ${anterior.name}`}
+              title={t("messenger.callView.irA", { name: anterior.name })}
+              aria-label={t("messenger.callView.irA", { name: anterior.name })}
               onClick={() => roomSwitcher.onSwitch(anterior.id)}
               className="absolute left-1.5 top-1/2 -translate-y-1/2 z-30 h-9 w-9 rounded-full flex items-center justify-center bg-black/45 text-white/85 backdrop-blur-sm hover:bg-black/65 hover:text-white transition-colors"
             >
@@ -839,8 +841,8 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
             </button>
             <button
               type="button"
-              title={`Ir a ${siguiente.name}`}
-              aria-label={`Ir a ${siguiente.name}`}
+              title={t("messenger.callView.irA", { name: siguiente.name })}
+              aria-label={t("messenger.callView.irA", { name: siguiente.name })}
               onClick={() => roomSwitcher.onSwitch(siguiente.id)}
               className="absolute right-1.5 top-1/2 -translate-y-1/2 z-30 h-9 w-9 rounded-full flex items-center justify-center bg-black/45 text-white/85 backdrop-blur-sm hover:bg-black/65 hover:text-white transition-colors"
             >

@@ -4,6 +4,8 @@ import { Video as VideoIcon, ChevronDown, Check, Ban, Cloud, CloudFog, Plus, X }
 import { cn } from "@/lib/utils";
 import { useFondosPropios } from "@/hooks/useFondosPropios";
 import { BACKGROUND_TEMPLATES, isCustomBackground, type BackgroundEffect } from "@/lib/fondoDeLlamada";
+import { useLanguage } from "@/hooks/useLanguage";
+import { nombreDelFondo } from "./nombreDelFondo";
 
 interface DeviceInfo {
   deviceId: string;
@@ -24,6 +26,7 @@ export default function VideoSettingsDialog({
   onVideoInputChange, currentVideoInputId,
   backgroundEffect, onBackgroundChange,
 }: VideoSettingsDialogProps) {
+  const { t } = useLanguage();
   const [videoInputs, setVideoInputs] = useState<DeviceInfo[]>([]);
   const [selectedVideoInput, setSelectedVideoInput] = useState(currentVideoInputId || "");
   // Los MISMOS fondos propios que ve el lobby: salen de IndexedDB, no de un
@@ -35,9 +38,9 @@ export default function VideoSettingsDialog({
   const enumerateDevices = useCallback(async () => {
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
-      setVideoInputs(devices.filter((d) => d.kind === "videoinput" && d.deviceId).map((d) => ({ deviceId: d.deviceId, label: d.label || `Cámara ${d.deviceId.slice(0, 5)}` })));
+      setVideoInputs(devices.filter((d) => d.kind === "videoinput" && d.deviceId).map((d) => ({ deviceId: d.deviceId, label: d.label || t("messenger.call.camaraN", { id: d.deviceId.slice(0, 5) }) })));
     } catch {}
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (open) {
@@ -65,33 +68,33 @@ export default function VideoSettingsDialog({
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="z-[200] bg-background border-secondary text-foreground max-w-sm p-0 gap-0">
         <DialogHeader className="px-5 pt-5 pb-3">
-          <DialogTitle className="text-base font-medium text-white">Vídeo</DialogTitle>
+          <DialogTitle className="text-base font-medium text-white">{t("messenger.videoSettings.video")}</DialogTitle>
         </DialogHeader>
         <div className="p-5 space-y-5 max-h-[60vh] overflow-y-auto">
           {/* Camera selector */}
-          <DeviceSection icon={<VideoIcon className="h-4 w-4" />} label="Cámara" devices={videoInputs} selectedId={selectedVideoInput} onSelect={(id) => { setSelectedVideoInput(id); onVideoInputChange?.(id); }} />
+          <DeviceSection icon={<VideoIcon className="h-4 w-4" />} label={t("messenger.input.camara")} devices={videoInputs} selectedId={selectedVideoInput} onSelect={(id) => { setSelectedVideoInput(id); onVideoInputChange?.(id); }} />
 
           {/* Background effects */}
           <div className="space-y-2">
-            <p className="text-xs font-medium text-foreground">Fondos y efectos</p>
+            <p className="text-xs font-medium text-foreground">{t("messenger.call.fondosYEfectos")}</p>
             <div className="space-y-3">
               <div className="grid grid-cols-4 gap-1.5">
-                <EffectOption label="Sin efecto" active={isSelected("none")} onClick={() => onBackgroundChange("none")}>
+                <EffectOption label={t("messenger.bg.sinEfecto")} active={isSelected("none")} onClick={() => onBackgroundChange("none")}>
                   <div className="w-full h-full bg-secondary rounded flex items-center justify-center">
                     <Ban className="h-4 w-4 text-muted-foreground" />
                   </div>
                 </EffectOption>
-                <EffectOption label="Difuminar" active={isSelected("blur")} onClick={() => onBackgroundChange("blur")}>
+                <EffectOption label={t("messenger.bg.difuminar")} active={isSelected("blur")} onClick={() => onBackgroundChange("blur")}>
                   <div className="w-full h-full rounded bg-muted flex items-center justify-center">
                     <Cloud className="h-4 w-4 text-muted-foreground" />
                   </div>
                 </EffectOption>
-                <EffectOption label="Difuminar más" active={isSelected("blur-strong")} onClick={() => onBackgroundChange("blur-strong")}>
+                <EffectOption label={t("messenger.bg.difuminarMasCorto")} active={isSelected("blur-strong")} onClick={() => onBackgroundChange("blur-strong")}>
                   <div className="w-full h-full rounded bg-muted flex items-center justify-center">
                     <CloudFog className="h-4 w-4 text-muted-foreground" />
                   </div>
                 </EffectOption>
-                <EffectOption label="Subir imagen" active={false} onClick={() => fileRef.current?.click()}>
+                <EffectOption label={t("messenger.bg.subirImagen")} active={false} onClick={() => fileRef.current?.click()}>
                   <div className="w-full h-full bg-secondary rounded flex items-center justify-center">
                     <Plus className="h-4 w-4 text-muted-foreground" />
                   </div>
@@ -103,7 +106,7 @@ export default function VideoSettingsDialog({
               {/* Custom backgrounds */}
               {fondos.length > 0 && (
                 <>
-                  <p className="text-xs text-muted-foreground mb-1">Tus fondos</p>
+                  <p className="text-xs text-muted-foreground mb-1">{t("messenger.bg.tusFondos")}</p>
                   <div className="grid grid-cols-4 gap-1.5">
                     {fondos.map((bg) => (
                       <div
@@ -117,11 +120,11 @@ export default function VideoSettingsDialog({
                       >
                         <button
                           type="button"
-                          title="Fondo personalizado"
+                          title={t("messenger.bg.personalizado")}
                           onClick={() => onBackgroundChange(`custom:${bg.id}`)}
                           className="absolute inset-0 w-full h-full"
                         >
-                          <img src={bg.url} alt="Fondo personalizado" className="w-full h-full object-cover" />
+                          <img src={bg.url} alt={t("messenger.bg.personalizado")} className="w-full h-full object-cover" />
                           {isSelected(`custom:${bg.id}`) && (
                             <span className="absolute inset-0 flex items-center justify-center bg-black/40">
                               <Check className="h-4 w-4 text-white" />
@@ -130,7 +133,8 @@ export default function VideoSettingsDialog({
                         </button>
                         <button
                           type="button"
-                          title="Borrar este fondo"
+                          title={t("messenger.bg.borrarEste")}
+                          aria-label={t("messenger.bg.borrarEste")}
                           onClick={() => void handleDeleteCustom(bg.id)}
                           // Visible SIEMPRE: con `group-hover` en un teléfono no se veía nunca, y
                     // desde que el borrado es permanente eso significaba borrar a ciegas
@@ -150,7 +154,7 @@ export default function VideoSettingsDialog({
                 {BACKGROUND_TEMPLATES.map((tpl) => (
                   <button
                     key={tpl.id}
-                    title={tpl.label}
+                    title={nombreDelFondo(tpl, t)}
                     onClick={() => onBackgroundChange(tpl.id)}
                     className={cn(
                       "relative h-14 rounded-lg overflow-hidden border-2 transition-all hover:scale-105 group",
@@ -159,7 +163,7 @@ export default function VideoSettingsDialog({
                         : "border-transparent hover:border-border"
                     )}
                   >
-                    <img src={tpl.src} alt={tpl.label} className="w-full h-full object-cover" loading="lazy" />
+                    <img src={tpl.src} alt={nombreDelFondo(tpl, t)} className="w-full h-full object-cover" loading="lazy" />
                     {isSelected(tpl.id) && (
                       <div className="absolute inset-0 flex items-center justify-center bg-black/40">
                         <Check className="h-4 w-4 text-white" />
@@ -196,6 +200,7 @@ function EffectOption({ label, active, onClick, children }: {
 function DeviceSection({ icon, label, devices, selectedId, onSelect }: {
   icon: React.ReactNode; label: string; devices: DeviceInfo[]; selectedId: string; onSelect: (id: string) => void;
 }) {
+  const { t } = useLanguage();
   const [open, setOpen] = useState(false);
   const selected = devices.find((d) => d.deviceId === selectedId);
 
@@ -210,7 +215,7 @@ function DeviceSection({ icon, label, devices, selectedId, onSelect }: {
           onClick={() => setOpen(!open)}
           className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg bg-card border border-border text-sm text-foreground hover:bg-secondary transition-colors"
         >
-          <span className="truncate text-left flex-1">{selected?.label || "Seleccionar dispositivo"}</span>
+          <span className="truncate text-left flex-1">{selected?.label || t("messenger.videoSettings.seleccionarDispositivo")}</span>
           <ChevronDown className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} />
         </button>
         {open && devices.length > 0 && (
