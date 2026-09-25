@@ -65,6 +65,15 @@ export const AISLAMIENTO_POR_RECURSO: Record<string, ModoDeAislamiento> = {
   // Quién es la llave: la persona como la que actúa y su agencia. Sirve para probar
   // en vivo que la sesión fabricada funciona antes de abrir nada más sobre ella.
   me: { tipo: "como_usuario" },
+  // Las conversaciones de la persona de la llave, leídas con SU sesión: la RLS del
+  // Messenger es por participación, como en la app. Pero nada en la base impide
+  // todavía una conversación con gente de OTRA agencia, así que con dos o más se
+  // apaga.
+  messenger: {
+    tipo: "como_usuario",
+    pendienteConVariasAgencias: "la base todavía no impide sumar a una conversación a alguien de otra " +
+      "agencia (la política INSERT de chat_participants no mira la agencia del agregado)",
+  },
   sales: {
     tipo: "sin_agencia",
     pendiente: "creator_daily_earnings.tenant_id tiene DEFAULT fijo y los importadores BLU " +
@@ -124,6 +133,16 @@ export function esComoUsuario(
 /** Cada tabla/función de datos que toca public-api, y a qué recurso pertenece. */
 export const FUENTES_POR_RECURSO: Record<string, string[]> = {
   me: ["profiles", "current_tenant_id"],
+  messenger: [
+    "chat_participants",
+    "chat_conversations",
+    "chat_messages",
+    "chat_pinned",
+    "chat_archived",
+    "profiles",
+    "get_last_messages",
+    "messenger_unread_counts",
+  ],
   sales: ["creator_daily_earnings"],
   employees: ["profiles", "user_roles"],
   creators: ["creators", "creator_of_accounts"],

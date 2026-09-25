@@ -26,7 +26,7 @@ import {
   type ModoDeAislamiento,
 } from "./aislamiento.ts";
 import { RECURSOS_COMO_USUARIO, SCOPE_REQUERIDO } from "./recursos-como-usuario.ts";
-import { isValidScope } from "../_shared/api-scopes.ts";
+import { isValidScope } from "../manage-api-keys/api-scopes.ts";
 
 /** El código sin comentarios: de bloque, líneas que son solo comentario, y el
  *  comentario al final de una línea de código (`x, // nota`). Este último solo si
@@ -43,6 +43,7 @@ function sinComentarios(src: string): string {
 const leer = (ruta: string) => sinComentarios(Deno.readTextFileSync(new URL(ruta, import.meta.url)));
 const PUBLIC_API = leer("./index.ts");
 const RECURSOS_USUARIO = leer("./recursos-como-usuario.ts");
+const FORMATO_MESSENGER = leer("./messenger-formato.ts");
 const COMO_USUARIO = leer("./como-usuario.ts");
 const PETICION = leer("./peticion.ts");
 const MANAGE_KEYS = sinComentarios(
@@ -126,7 +127,13 @@ Deno.test("hoy ningún recurso de DATOS dice estar aislado (y con 2 agencias se 
   //    se verifica al crearla (api_keys_validar_actua_como), en cada pedido
   //    (api_key_consumir → 401) y antes de servir (servirComoUsuario compara
   //    current_tenant_id() de la sesión → 503). No cambia (api_keys_actua_como_inmutable).
-  const PROMOVIDOS_CON_VERIFICACION: string[] = ["me"];
+  //  * messenger — 25/09/2026. La bandeja, las conversaciones, los mensajes y el feed
+  //    de la persona de la llave, leídos con SU sesión: la RLS del Messenger es 100%
+  //    por participación (is_chat_participant), sin excepción para admins de Maven en
+  //    chat_conversations / chat_participants / chat_messages. Como la base todavía
+  //    no impide conversaciones con gente de otra agencia, declara
+  //    pendienteConVariasAgencias: con dos o más agencias se apaga (test de abajo).
+  const PROMOVIDOS_CON_VERIFICACION: string[] = ["me", "messenger"];
 
   const promovidos = Object.entries(AISLAMIENTO_POR_RECURSO)
     .filter(([, m]) => m.tipo !== "sin_agencia")
@@ -292,7 +299,10 @@ Deno.test("como_usuario: los handlers nunca ven service_role", () => {
     assert(!prohibido.test(contexto[1]), `Contexto puede llevar un cliente o una función (${prohibido})`);
   }
   // Por sentencia y no por línea: un import partido en varias líneas también cuenta.
-  const importsDeValores = RECURSOS_USUARIO.match(/^\s*import\s+(?!type\b)[^;]*/gm) ?? [];
+  // La única excepción: las piezas PURAS del Messenger, que el test de abajo obliga a
+  // no importar nada ni tocar la base.
+  const importsDeValores = (RECURSOS_USUARIO.match(/^\s*import\s+(?!type\b)[^;]*/gm) ?? [])
+    .filter((i) => !/from\s+"\.\/messenger-formato\.ts"\s*$/.test(i.trim()));
   assertEquals(importsDeValores, [], "recursos-como-usuario.ts importa valores, no solo tipos");
   const reexports = RECURSOS_USUARIO.match(/^\s*export\s*(\*|\{)[^;]*\bfrom\b/gm) ?? [];
   assertEquals(reexports, [], "recursos-como-usuario.ts reexporta de otro archivo");
@@ -363,4 +373,79 @@ Deno.test("límite: pasado el cupo, 429 con Retry-After; persona inactiva, 401",
     assert(PETICION.includes(`"${h}"`), `falta la cabecera ${h}`);
   }
   assert(/cabecerasDelPedido\.set\(\s*req\s*,\s*cabeceras\s*\)/.test(PUBLIC_API), "las cabeceras del cupo no se ponen en la respuesta");
+});
+
+// ─── 7. El Messenger por API: solo lectura, siempre acotado ──────────────────
+
+Deno.test("messenger: con DOS agencias se apaga (hasta que la base impida mezclarlas)", () => {
+  assert(decidir("messenger", 1).ok, "con una agencia no se sirve");
+  const v = decidir("messenger", 2);
+  assert(!v.ok && v.estado === 403, "con 2 agencias se sirvió el Messenger");
+  assert(decidir("me", 2).ok, "/me dejó de servirse con 2 agencias");
+});
+
+Deno.test("messenger-formato.ts es PURO: no importa nada ni toca la base", () => {
+  for (const prohibido of [
+    /^\s*import\b/m, /\bimport\s*\(/, /SupabaseClient/, /createClient/, /Deno\.env/, /\bfetch\s*\(/,
+    /service_?role/i, /\.from\(\s*["'`]/, /\.rpc\(/, /\byo\b/,
+  ]) {
+    assert(!prohibido.test(FORMATO_MESSENGER), `messenger-formato.ts usa ${prohibido}`);
+  }
+  // "admin" aparece UNA vez, y es el rol de admin DEL GRUPO.
+  const admins = FORMATO_MESSENGER.match(/\badmin\b/g) ?? [];
+  assertEquals(admins.length, 1, "messenger-formato.ts nombra 'admin' más de una vez");
+  assert(/export const ROL_ADMIN_DE_GRUPO = "admin";/.test(FORMATO_MESSENGER), "el único 'admin' no es ROL_ADMIN_DE_GRUPO");
+});
+
+Deno.test("lo como_usuario no escribe: fase de solo lectura", () => {
+  // Leer NO marca como leído ni entregado. Escribir es otra fase, con su revisión.
+  for (const prohibido of [/\.insert\(/, /\.update\(/, /\.upsert\(/, /\.delete\(/]) {
+    assert(!prohibido.test(RECURSOS_USUARIO), `recursos-como-usuario.ts escribe (${prohibido})`);
+  }
+  const rpcs = [...RECURSOS_USUARIO.matchAll(/\.rpc\(\s*"([a-z_]+)"/g)].map((m) => m[1]).sort();
+  const PERMITIDAS = ["current_tenant_id", "get_last_messages", "messenger_unread_counts"];
+  assertEquals([...new Set(rpcs)].filter((r) => !PERMITIDAS.includes(r)), [], "una función de base no autorizada");
+  assert(!/\.(from|rpc)\(\s*[^"\s]/.test(RECURSOS_USUARIO), "from()/rpc() con un nombre que no es literal");
+});
+
+Deno.test("lo como_usuario no toca las tablas caras ni las de admins", () => {
+  // chat_message_deletions la puede leer cualquier admin de Maven (no solo los que
+  // estaban en la conversación); los acuses cuestan 29k bloques por página.
+  for (const t of ["chat_message_deletions", "chat_messages_rich_respaldo", "chat_read_receipts", "get_unread_counts"]) {
+    assert(!RECURSOS_USUARIO.includes(`"${t}"`), `recursos-como-usuario.ts usa ${t}`);
+  }
+});
+
+Deno.test("toda consulta a chat_messages va acotada por conversación, sin count ni embeds", () => {
+  // Sin conversation_id, la RLS recorre los mensajes de TODA la plataforma: 82k+
+  // bloques y hasta 1,3 s por pedido (medido el 25/09).
+  const sentencias: string[] = [];
+  let i = RECURSOS_USUARIO.indexOf('from("chat_messages")');
+  while (i !== -1) {
+    const fin = RECURSOS_USUARIO.indexOf(";", i);
+    sentencias.push(RECURSOS_USUARIO.slice(i, fin === -1 ? undefined : fin));
+    i = RECURSOS_USUARIO.indexOf('from("chat_messages")', i + 1);
+  }
+  assert(sentencias.length >= 2, `se esperaban al menos 2 consultas a chat_messages, hay ${sentencias.length}`);
+  for (const st of sentencias) {
+    assert(/\.(eq|in)\(\s*"conversation_id"/.test(st), `consulta a chat_messages sin conversation_id: ${st.slice(0, 120)}`);
+  }
+  // `count: "exact"` (y sus primos) le pide a la base contar TODO lo que la RLS deja
+  // ver; `count:` a secas es un campo de la respuesta y está bien.
+  assert(!/count\s*:\s*["'`](exact|planned|estimated)/.test(RECURSOS_USUARIO), "recursos-como-usuario.ts pide un count (recorre todo)");
+  assert(!/\bhead\s*:\s*true/.test(RECURSOS_USUARIO), "recursos-como-usuario.ts pide solo el conteo (head: true)");
+  // Las columnas se piden de constantes COLS_* o literales, y ninguna trae embeds.
+  for (const m of RECURSOS_USUARIO.matchAll(/\.select\(\s*([^)]*)\)/g)) {
+    const arg = m[1].trim();
+    assert(/^"[^"(]*"$/.test(arg) || /^COLS_[A-Z_]+$/.test(arg) || /^\w+\.\w+\s*\?\s*COLS_[A-Z_]+\s*:\s*COLS_[A-Z_]+$/.test(arg),
+      `select con algo que no es una lista fija de columnas: ${arg}`);
+  }
+  for (const m of RECURSOS_USUARIO.matchAll(/const (COLS_[A-Z_]+)\s*=\s*([^;]+);/g)) {
+    assert(!m[2].includes("("), `${m[1]} trae un embed`);
+  }
+});
+
+Deno.test("paginas del Messenger topan en 100", () => {
+  assert(/export const PAGINA_MAX = 100;/.test(FORMATO_MESSENGER), "cambió el tope de página");
+  assert(/n > PAGINA_MAX/.test(FORMATO_MESSENGER), "limiteDePagina no aplica el tope");
 });

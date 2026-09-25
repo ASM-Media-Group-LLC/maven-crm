@@ -5,7 +5,13 @@
 // el frontend: user_roles.role='admin').
 import { corsFor } from "../_shared/cors.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { SCOPE_CATALOG, SCOPE_GROUPS, isValidScope } from "../_shared/api-scopes.ts";
+import {
+  esScopeMessenger,
+  isValidScope,
+  MESSENGER_MAX_DIAS,
+  SCOPE_CATALOG,
+  SCOPE_GROUPS,
+} from "./api-scopes.ts";
 
 // Igual que Infloww: hasta 3 keys válidas a la vez, POR AGENCIA. Antes se contaba
 // para toda la plataforma: con las 3 de la primera agencia, la segunda no habría
@@ -53,6 +59,21 @@ function looksLikeIpOrCidr(v: string): boolean {
   if (s.includes(":") && /^[0-9a-fA-F:]+(\/\d{1,3})?$/.test(s)) return true; // v6 (laxo)
   return false;
 }
+// Las keys con Messenger leen conversaciones privadas: IPs EXACTAS (un rango como
+// 0.0.0.0/0 deja entrar a todo el mundo) y vencimiento de 90 días como máximo.
+// Decisión de Jhon del 25/09. La base lo vuelve a exigir (api_keys_reglas_messenger).
+function problemaDeReglasMessenger(ips: string[], vence: Date | null): string | null {
+  if (ips.length === 0) return "Las keys con Messenger necesitan IPs fijas (whitelist)";
+  if (ips.some((ip) => ip.includes("/"))) return "Con Messenger van IPs exactas, sin rangos (/)";
+  if (!vence) return "Las keys con Messenger necesitan fecha de vencimiento";
+  const ahora = Date.now();
+  if (vence.getTime() <= ahora) return "La fecha de vencimiento ya pasó";
+  if (vence.getTime() > ahora + MESSENGER_MAX_DIAS * 86_400_000) {
+    return `Las keys con Messenger vencen como máximo en ${MESSENGER_MAX_DIAS} días`;
+  }
+  return null;
+}
+
 function cleanIpList(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [];
   return raw.map((x) => String(x).trim()).filter(Boolean);
@@ -147,18 +168,36 @@ Deno.serve(async (req) => {
 
     // === LIST ===
     if (action === "list") {
-      const { data, error } = await admin
-        .from("api_keys").select(SELECT_COLS).eq("tenant_id", tenantId).order("created_at", { ascending: false });
+      const [{ data, error }, { data: yoPerfil }] = await Promise.all([
+        admin.from("api_keys").select(SELECT_COLS).eq("tenant_id", tenantId).order("created_at", { ascending: false }),
+        admin.from("profiles").select("full_name").eq("id", callerId).maybeSingle(),
+      ]);
       if (error) return json(req, { error: error.message }, 500);
       const keys = (await conPersona(data ?? [])).map((k) => ({ ...k, status: statusOf(k) }));
-      return json(req, { keys, scope_catalog: SCOPE_CATALOG, scope_groups: SCOPE_GROUPS, max_active_keys: MAX_ACTIVE_KEYS });
+      return json(req, {
+        keys, scope_catalog: SCOPE_CATALOG, scope_groups: SCOPE_GROUPS, max_active_keys: MAX_ACTIVE_KEYS,
+        // Quién está mirando: una key nueva actúa como esta persona. La página lo
+        // usa para decir de quién son las conversaciones que leería con Messenger.
+        you: { id: callerId, name: (yoPerfil as { full_name?: string | null } | null)?.full_name ?? null },
+      });
     }
 
     // === CREATE ===
     if (action === "create") {
       const name = String(body?.name ?? "").trim();
       const scopes: string[] = Array.isArray(body?.scopes) ? body.scopes : [];
-      const expiresAt = body?.expires_at ? new Date(body.expires_at) : null;
+      // El vencimiento lo calcula el SERVIDOR a partir de los días elegidos: si lo
+      // calculaba el navegador, uno con el reloj adelantado pedía "90 días" y el
+      // servidor lo leía como 90 días y un poco, y lo rechazaba. Un minuto de margen
+      // cubre la diferencia entre el reloj de la función y el de la base. Si no vienen
+      // días (un frontend viejo), se usa expires_at como antes.
+      const dias = body?.expires_in_days;
+      if (dias !== undefined && (!Number.isInteger(dias) || dias < 0 || dias > 3650)) {
+        return json(req, { error: "expires_in_days tiene que ser un número de días entre 0 y 3650" }, 400);
+      }
+      const expiresAt: Date | null = dias !== undefined
+        ? (dias === 0 ? null : new Date(Date.now() + dias * 86_400_000 - 60_000))
+        : (body?.expires_at ? new Date(body.expires_at) : null);
       const ipWhitelist = cleanIpList(body?.ip_whitelist);
 
       if (!name) return json(req, { error: "El nombre de la key es requerido" }, 400);
@@ -170,6 +209,16 @@ Deno.serve(async (req) => {
       }
       const badIps = ipWhitelist.filter((ip) => !looksLikeIpOrCidr(ip));
       if (badIps.length) return json(req, { error: `IP(s) inválida(s): ${badIps.join(", ")}` }, 400);
+
+      if (scopes.some(esScopeMessenger)) {
+        const problema = problemaDeReglasMessenger(ipWhitelist, expiresAt);
+        if (problema) return json(req, { error: problema }, 400);
+        // Que quien la crea diga que sí sabiendo que la key lee SUS conversaciones.
+        // Un frontend viejo en caché no manda esto: no puede crearla sin darse cuenta.
+        if (body?.acknowledge_messenger_reads_as !== callerId) {
+          return json(req, { error: "Confirmá que la key va a leer TUS conversaciones del Messenger" }, 400);
+        }
+      }
 
       // Límite de keys activas (no revocadas ni vencidas).
       const nowIso = new Date().toISOString();
@@ -241,6 +290,38 @@ Deno.serve(async (req) => {
         }
       }
       if (Object.keys(patch).length === 0) return json(req, { error: "Nada para actualizar" }, 400);
+
+      // Reglas del Messenger contra lo que la key tiene HOY, no contra lo que dice
+      // el pedido.
+      const { data: actual, error: aErr } = await admin
+        .from("api_keys").select("scopes, ip_whitelist, expires_at, acts_as_user_id")
+        .eq("id", id).eq("tenant_id", tenantId).is("revoked_at", null).maybeSingle();
+      if (aErr) return json(req, { error: aErr.message }, 500);
+      if (!actual) return json(req, { error: "La key no existe o está revocada" }, 404);
+      const hoy = actual as { scopes: string[]; ip_whitelist: string[]; expires_at: string | null; acts_as_user_id: string };
+      const teniaMessenger = (hoy.scopes ?? []).some(esScopeMessenger);
+      const scopesNuevos = (patch.scopes as string[] | undefined) ?? hoy.scopes ?? [];
+      const tendraMessenger = scopesNuevos.some(esScopeMessenger);
+      if (tendraMessenger && !teniaMessenger) {
+        // Las 3 keys de hoy actúan como el CEO y las usan integraciones: sumarles
+        // Messenger les daría sus chats sin que nadie lo note.
+        return json(req, { error: "El permiso de Messenger solo se puede poner al crear una key nueva" }, 400);
+      }
+      if (tendraMessenger) {
+        // Solo la persona como la que actúa puede editarla (cualquier admin la revoca).
+        if (hoy.acts_as_user_id !== callerId) {
+          return json(req, { error: "Solo la persona dueña de esta key de Messenger puede editarla; cualquier admin puede revocarla" }, 403);
+        }
+        const ips = (patch.ip_whitelist as string[] | undefined) ?? hoy.ip_whitelist ?? [];
+        const venceNuevo = patch.expires_at === undefined
+          ? (hoy.expires_at ? new Date(hoy.expires_at) : null)
+          : (patch.expires_at === null ? null : new Date(patch.expires_at as string));
+        const problema = problemaDeReglasMessenger(ips, venceNuevo);
+        if (problema) return json(req, { error: problema }, 400);
+        if (hoy.expires_at && venceNuevo && venceNuevo.getTime() > new Date(hoy.expires_at).getTime()) {
+          return json(req, { error: "A una key con Messenger no se le puede extender el vencimiento: creá otra" }, 400);
+        }
+      }
 
       const { data, error } = await admin
         .from("api_keys").update(patch).eq("id", id).eq("tenant_id", tenantId).is("revoked_at", null)

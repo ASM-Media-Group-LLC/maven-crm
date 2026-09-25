@@ -39,7 +39,16 @@ type ApiKey = {
   acts_as?: { id: string; name: string | null; active: boolean | null } | null;
   limite_por_hora?: number;
 };
-type ListResp = { keys: ApiKey[]; scope_catalog: ScopeDef[]; scope_groups: string[]; max_active_keys: number };
+type ListResp = {
+  keys: ApiKey[]; scope_catalog: ScopeDef[]; scope_groups: string[]; max_active_keys: number;
+  /** Quién está mirando: una key nueva actúa como esta persona. */
+  you?: { id: string; name: string | null };
+};
+
+// Leen conversaciones privadas: IPs exactas, vencimiento de 90 días como máximo y
+// solo en keys nuevas (decisión del 25/09; manage-api-keys y la base lo exigen).
+const SCOPE_MESSENGER = "messenger:read";
+const DIAS_MESSENGER = [30, 90];
 
 const FALLBACK_CATALOG: ScopeDef[] = [
   { key: "creators:read", group: "Creadoras", label: "Perfil + redes sociales", description: "Roster de creadoras y sus redes." },
@@ -103,6 +112,7 @@ const AdminApiKeys = () => {
   const [ipMode, setIpMode] = useState<"none" | "restrict">("none");
   const [ipText, setIpText] = useState("");
   const [expiryDays, setExpiryDays] = useState<number>(30); // -1 = mantener (solo edición)
+  const [confirmaMessenger, setConfirmaMessenger] = useState(false);
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["api-keys"],
@@ -119,8 +129,15 @@ const AdminApiKeys = () => {
   const parseIps = () =>
     ipMode === "none" ? [] : ipText.split(/[\n,]/).map((s) => s.trim()).filter(Boolean);
 
+  const conMessenger = scopes.includes(SCOPE_MESSENGER);
+  // En edición, Messenger solo se puede conservar o sacar, nunca sumar.
+  const teniaMessenger = !!editing?.scopes.includes(SCOPE_MESSENGER);
+  const yoNombre = data?.you?.name ?? "vos";
+  const ipsConRango = parseIps().some((ip) => ip.includes("/"));
+
   const resetForm = () => {
     setName(""); setScopes(["creators:read"]); setIpMode("none"); setIpText(""); setExpiryDays(30); setFreshKey(null);
+    setConfirmaMessenger(false);
   };
   const openCreate = () => { resetForm(); setEditing(null); setModalMode("create"); };
   const openEdit = (k: ApiKey) => {
@@ -141,7 +158,12 @@ const AdminApiKeys = () => {
     mutationFn: async () =>
       adminInvoke<{ key: string }>("manage-api-keys", {
         action: "create", name: name.trim(), scopes, ip_whitelist: parseIps(),
+        // Los días los convierte en fecha el servidor (el reloj de la PC puede estar
+        // adelantado); expires_at queda por si responde un manage-api-keys anterior.
+        expires_in_days: expiryDays,
         expires_at: expiryDays === 0 ? null : new Date(Date.now() + expiryDays * 86400_000).toISOString(),
+        // Solo si la persona lo confirmó en la pantalla: sin esto el servidor no la crea.
+        ...(conMessenger && confirmaMessenger && data?.you?.id ? { acknowledge_messenger_reads_as: data.you.id } : {}),
       }),
     onSuccess: (res) => { setFreshKey(res.key); qc.invalidateQueries({ queryKey: ["api-keys"] }); toast.success("API key creada"); },
     onError: (e) => toast.error((e as Error)?.message ?? "No pude crear la key"),
@@ -151,7 +173,9 @@ const AdminApiKeys = () => {
     mutationFn: async () => {
       const patch: Record<string, unknown> = { action: "update", id: editing!.id, name: name.trim(), scopes, ip_whitelist: parseIps() };
       const exp = expiresAtFromChoice();
-      if (exp !== undefined) patch.expires_at = exp;
+      // Con Messenger, al editar el vencimiento solo se mantiene (la pantalla no ofrece
+      // otra cosa): no se manda aunque quede elegido de antes de volver a tildarlo.
+      if (exp !== undefined && !conMessenger) patch.expires_at = exp;
       return adminInvoke("manage-api-keys", patch);
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["api-keys"] }); toast.success("API key actualizada"); closeModal(); },
@@ -164,12 +188,25 @@ const AdminApiKeys = () => {
     onError: (e) => toast.error((e as Error)?.message ?? "No pude revocar la key"),
   });
 
-  const toggleScope = (k: string) =>
+  const toggleScope = (k: string) => {
+    const activa = !scopes.includes(k);
     setScopes((prev) => prev.includes(k) ? prev.filter((s) => s !== k) : [...prev, k]);
+    if (k === SCOPE_MESSENGER && activa) {
+      // Messenger exige IPs fijas y vencimiento corto: se ponen solos.
+      setIpMode("restrict");
+      if (modalMode === "create" && !DIAS_MESSENGER.includes(expiryDays)) setExpiryDays(30);
+      if (modalMode === "edit") setExpiryDays(-1);
+    }
+    if (k === SCOPE_MESSENGER && !activa) setConfirmaMessenger(false);
+  };
 
   const submitting = createMut.isPending || updateMut.isPending;
+  const reglasMessengerOk = !conMessenger || (
+    ipMode === "restrict" && parseIps().length > 0 && !ipsConRango &&
+    (modalMode === "edit" ? true : confirmaMessenger && DIAS_MESSENGER.includes(expiryDays))
+  );
   const canSubmit = name.trim() && scopes.length > 0 && !submitting &&
-    (ipMode === "none" || parseIps().length > 0);
+    (ipMode === "none" || parseIps().length > 0) && reglasMessengerOk;
 
   return (
     <div className="space-y-5 p-6 lg:p-8">
@@ -274,9 +311,11 @@ const AdminApiKeys = () => {
                       <div className="flex items-center justify-end gap-1">
                         {k.status === "active" && (
                           <>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(k)} title="Editar">
-                              <Pencil className="h-3.5 w-3.5" />
-                            </Button>
+                            {!(k.scopes.includes(SCOPE_MESSENGER) && data?.you?.id && k.acts_as?.id !== data.you.id) && (
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(k)} title="Editar">
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive"
                               onClick={() => setRevokeTarget(k)} title="Revocar">
                               <Trash2 className="h-3.5 w-3.5" />
@@ -332,10 +371,12 @@ const AdminApiKeys = () => {
                 {/* IP whitelist */}
                 <div className="space-y-2">
                   <Label>IP whitelist</Label>
-                  <label className="flex cursor-pointer items-start gap-2.5 text-sm">
-                    <input type="radio" className="mt-1 accent-primary" checked={ipMode === "none"} onChange={() => setIpMode("none")} />
-                    <span><span className="font-medium">Sin restricción</span><span className="block text-xs text-muted-foreground">Acceso desde cualquier IP.</span></span>
-                  </label>
+                  {!conMessenger && (
+                    <label className="flex cursor-pointer items-start gap-2.5 text-sm">
+                      <input type="radio" className="mt-1 accent-primary" checked={ipMode === "none"} onChange={() => setIpMode("none")} />
+                      <span><span className="font-medium">Sin restricción</span><span className="block text-xs text-muted-foreground">Acceso desde cualquier IP.</span></span>
+                    </label>
+                  )}
                   <label className="flex cursor-pointer items-start gap-2.5 text-sm">
                     <input type="radio" className="mt-1 accent-primary" checked={ipMode === "restrict"} onChange={() => setIpMode("restrict")} />
                     <span><span className="font-medium">Restringir a IPs de confianza</span><span className="block text-xs text-muted-foreground">Solo estas IPs/CIDR pueden usar la key.</span></span>
@@ -343,8 +384,13 @@ const AdminApiKeys = () => {
                   {ipMode === "restrict" && (
                     <textarea
                       className="min-h-[64px] w-full rounded-md border border-border/60 bg-background p-2 text-sm"
-                      placeholder={"Una por línea, ej:\n45.225.224.129\n190.0.0.0/24"}
+                      placeholder={conMessenger ? "Una por línea, IPs exactas, ej:\n45.225.224.129" : "Una por línea, ej:\n45.225.224.129\n190.0.0.0/24"}
                       value={ipText} onChange={(e) => setIpText(e.target.value)} />
+                  )}
+                  {conMessenger && (
+                    <p className={`text-xs ${ipsConRango ? "text-destructive" : "text-muted-foreground"}`}>
+                      Con Messenger van IPs exactas del servidor de la integración, sin rangos (/). Desde una laptop o una casa la IP cambia y la key deja de funcionar.
+                    </p>
                   )}
                 </div>
 
@@ -358,7 +404,11 @@ const AdminApiKeys = () => {
                         Mantener actual
                       </button>
                     )}
-                    {EXPIRY_OPTIONS.map((o) => (
+                    {EXPIRY_OPTIONS
+                      // Con Messenger: 90 días como máximo al crear, y al editar solo se
+                      // mantiene (renovarla es crear otra).
+                      .filter((o) => !conMessenger || (modalMode === "create" && DIAS_MESSENGER.includes(o.days)))
+                      .map((o) => (
                       <button key={o.days} type="button" onClick={() => setExpiryDays(o.days)}
                         className={`rounded-md border px-3 py-1.5 text-xs transition-colors ${expiryDays === o.days ? "border-primary bg-primary/10 text-foreground" : "border-border/60 text-muted-foreground hover:bg-muted/30"}`}>
                         {o.label}
@@ -377,9 +427,13 @@ const AdminApiKeys = () => {
                       <div key={group} className="rounded-lg border border-border/60 bg-muted/10 p-3">
                         <div className="mb-2 text-sm font-semibold">{group}</div>
                         <div className="space-y-1.5">
-                          {items.map((s) => (
-                            <label key={s.key} className="flex cursor-pointer items-start gap-2.5 rounded-md p-1.5 hover:bg-muted/30">
-                              <input type="checkbox" className="mt-0.5 h-4 w-4 accent-primary"
+                          {items.map((s) => {
+                            const bloqueado = s.key === SCOPE_MESSENGER && modalMode === "edit" && !teniaMessenger;
+                            return (
+                            <label key={s.key}
+                              className={`flex items-start gap-2.5 rounded-md p-1.5 ${bloqueado ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:bg-muted/30"}`}
+                              title={bloqueado ? "El Messenger solo se puede poner al crear una key nueva" : undefined}>
+                              <input type="checkbox" className="mt-0.5 h-4 w-4 accent-primary" disabled={bloqueado}
                                 checked={scopes.includes(s.key)} onChange={() => toggleScope(s.key)} />
                               <span className="min-w-0 flex-1">
                                 <span className="flex items-center justify-between gap-2">
@@ -390,13 +444,29 @@ const AdminApiKeys = () => {
                                 <code className="text-[10px] text-muted-foreground">{s.key}</code>
                               </span>
                             </label>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     );
                   })}
                 </div>
               </div>
+              {conMessenger && modalMode === "create" && (
+                <div className="mt-4 space-y-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">
+                  <p className="font-medium text-foreground">
+                    Esta key va a leer TODAS las conversaciones del Messenger de {yoNombre}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Directas y grupos, también las futuras, con los mensajes que te mandan otras personas: exactamente lo que ves en /messenger. Quien tenga la key las lee desde las IPs que pongas, hasta que venza o la revoques. No marca nada como leído.
+                  </p>
+                  <label className="flex cursor-pointer items-start gap-2 text-xs">
+                    <input type="checkbox" className="mt-0.5 h-4 w-4 accent-destructive"
+                      checked={confirmaMessenger} onChange={(e) => setConfirmaMessenger(e.target.checked)} />
+                    <span>Entiendo que la key lee mis conversaciones y las de quienes me escriben.</span>
+                  </label>
+                </div>
+              )}
               <DialogFooter>
                 <Button variant="ghost" onClick={closeModal}>Cancelar</Button>
                 <Button className="gap-1.5" disabled={!canSubmit}
@@ -448,6 +518,10 @@ const AdminApiKeys = () => {
               <div className="space-y-2 text-xs">
                 {([
                   { m: "GET", p: "/me", s: null, d: "Como quién actúa esta key (acts_as: id, name, avatar_url), su agencia (agency_id) y el cupo que le queda esta hora (rate_limit). No necesita scope." },
+                  { m: "GET", p: "/messenger/conversations", s: "messenger:read", d: "La bandeja de la persona de la key, como en /messenger: cada conversación con type (direct | group), counterpart (en las directas), last_message (text_preview de 200 caracteres), unread_count (tope 100; null si no se pudo contar), me (su rol, last_read_at, silenciada), is_pinned, is_archived. Ordenada por última actividad. Filtros: limit (máx 100), offset. No es para sondear: para lo nuevo, /messenger/feed." },
+                  { m: "GET", p: "/messenger/conversations/{id}", s: "messenger:read", d: "Una conversación: datos, settings del grupo, me y participants (user, role, joined_at). Si el grupo esconde la lista de miembros y la persona no es admin del grupo, participants = null y participants_hidden = true. Si no la ve, 404." },
+                  { m: "GET", p: "/messenger/conversations/{id}/messages", s: "messenger:read", d: "La historia, de lo más nuevo a lo más viejo, con cursor: pasá next_cursor en before para la página anterior, o usá after para pedir lo nuevo en orden. Cada mensaje: sender, kind (text | image | gif | video | voice_note | audio | file | system), text, attachment (url, name, hosted_by, storage_path), reply_to_id, is_thread_reply, is_edited, is_deleted. Un borrado viene sin texto ni adjunto. Filtros: limit (máx 100), before | after, thread_root_id, include=rich (agrega el texto con formato)." },
+                  { m: "GET", p: "/messenger/feed", s: "messenger:read", d: "Lo nuevo en TODAS las conversaciones, en orden: así recibe mensajes una integración sin webhooks. Primer pedido con since (ISO, 72 h como máximo) o sin nada (últimos 15 min); después, siempre after=next_cursor. Si caught_up = true, esperá 30 s o más antes del próximo. Mira como mucho una hora por pedido. exclude_own=true saca lo que mandó la propia persona. Solo mensajes nuevos: ediciones y borrados se ven releyendo la conversación." },
                   { m: "GET", p: "/creators", s: "creators:read", d: "Creadoras + redes (IG, TikTok, X, OnlyFans, Telegram…). Filtros: status, limit, offset." },
                   { m: "GET", p: "/creators/{id}", s: "creators:read", d: "Detalle de una creadora." },
                   { m: "GET", p: "/contacts", s: "contacts:read", d: "Directorio comercial. Filtros: kind (modelo|agencia|ex_creadora), status, country, con_telefono, limit, offset. Teléfono y email enmascarados salvo que la key tenga contacts:phone." },
@@ -474,7 +548,7 @@ const AdminApiKeys = () => {
               </div>
             </div>
             <p className="text-xs text-muted-foreground">
-              Paginación: <code className="rounded bg-muted px-1 py-0.5">limit</code> (máx 500) + <code className="rounded bg-muted px-1 py-0.5">offset</code>. Cada respuesta trae <code className="rounded bg-muted px-1 py-0.5">count</code> total.
+              Paginación: <code className="rounded bg-muted px-1 py-0.5">limit</code> (máx 500) + <code className="rounded bg-muted px-1 py-0.5">offset</code>. Cada respuesta trae <code className="rounded bg-muted px-1 py-0.5">count</code> total. En el Messenger los mensajes van con cursor (<code className="rounded bg-muted px-1 py-0.5">next_cursor</code>, máx 100 por página) y sin count. Las keys con Messenger exigen IPs fijas y vencimiento; los adjuntos son links públicos permanentes: cualquiera que tenga el link lo abre, aunque la key se revoque.
             </p>
           </div>
           <DialogFooter><Button variant="outline" onClick={() => setDocsOpen(false)}>Cerrar</Button></DialogFooter>
