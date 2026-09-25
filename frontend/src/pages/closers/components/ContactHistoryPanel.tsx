@@ -7,7 +7,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus } from "lucide-react";
 import { useContactHistory } from "../useContactHistory";
-import { CHANNELS, RESULTS } from "../hooks/useCloserLeads";
+import { CHANNELS, RESULTS, resultLabel } from "../hooks/useCloserLeads";
+import { useLanguage } from "@/hooks/useLanguage";
 import { format } from "date-fns";
 
 interface Props {
@@ -15,6 +16,7 @@ interface Props {
 }
 
 const ContactHistoryPanel = ({ creatorId }: Props) => {
+  const { t } = useLanguage();
   const { history, count, maxReached, addContact } = useContactHistory(creatorId);
   const [showForm, setShowForm] = useState(false);
   const [channel, setChannel] = useState("");
@@ -32,8 +34,8 @@ const ContactHistoryPanel = ({ creatorId }: Props) => {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h4 className="text-sm font-medium">Historial de Contacto</h4>
-        <Badge variant="outline">{count}/6 contactos</Badge>
+        <h4 className="text-sm font-medium">{t("closers.contact.history")}</h4>
+        <Badge variant="outline">{t("closers.contact.countSlash6", { n: count })}</Badge>
       </div>
 
       {history.map((h) => (
@@ -41,7 +43,7 @@ const ContactHistoryPanel = ({ creatorId }: Props) => {
           <div className="flex items-center gap-2 text-xs">
             <span className="text-muted-foreground">{format(new Date(h.contact_date), "dd/MM/yyyy HH:mm")}</span>
             <Badge variant="secondary">{h.channel}</Badge>
-            {h.result && <Badge variant="outline">{h.result}</Badge>}
+            {h.result && <Badge variant="outline">{resultLabel(t, h.result)}</Badge>}
           </div>
           {h.notes && <p className="text-sm text-muted-foreground">{h.notes}</p>}
         </div>
@@ -49,44 +51,44 @@ const ContactHistoryPanel = ({ creatorId }: Props) => {
 
       {!maxReached && !showForm && (
         <Button variant="outline" size="sm" onClick={() => setShowForm(true)} className="w-full">
-          <Plus className="h-4 w-4 mr-1" /> Agregar contacto
+          <Plus className="h-4 w-4 mr-1" /> {t("closers.contact.add")}
         </Button>
       )}
 
       {maxReached && (
-        <p className="text-xs text-muted-foreground text-center">Máximo de contactos alcanzado</p>
+        <p className="text-xs text-muted-foreground text-center">{t("closers.contact.maxReached")}</p>
       )}
 
       {showForm && (
         <div className="border border-border rounded-xl p-3 space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label className="text-xs">Canal *</Label>
+              <Label className="text-xs">{t("closers.channelRequired")}</Label>
               <Select value={channel} onValueChange={setChannel}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={t("common.select")} /></SelectTrigger>
                 <SelectContent>
                   {CHANNELS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <Label className="text-xs">Resultado</Label>
+              <Label className="text-xs">{t("closers.result")}</Label>
               <Select value={result} onValueChange={setResult}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={t("common.select")} /></SelectTrigger>
                 <SelectContent>
-                  {RESULTS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                  {RESULTS.map((r) => <SelectItem key={r} value={r}>{resultLabel(t, r)}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
           </div>
           <div>
-            <Label className="text-xs">Notas</Label>
+            <Label className="text-xs">{t("closers.notes")}</Label>
             <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
           </div>
           <div className="flex gap-2 justify-end">
-            <Button variant="ghost" size="sm" onClick={() => setShowForm(false)}>Cancelar</Button>
+            <Button variant="ghost" size="sm" onClick={() => setShowForm(false)}>{t("common.cancel")}</Button>
             <Button size="sm" onClick={handleAdd} disabled={!channel || addContact.isPending}>
-              {addContact.isPending ? "Guardando..." : "Guardar"}
+              {addContact.isPending ? t("closers.saving") : t("common.save")}
             </Button>
           </div>
         </div>

@@ -8,7 +8,9 @@ import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import BestCloserMonthlyDialog from "@/components/dashboard/BestCloserMonthlyDialog";
 import { useBestCloser } from "@/hooks/useOperationsDashboard";
-import { BUSINESS_LINES, type BusinessLine } from "../hooks/useCloserLeads";
+import { BUSINESS_LINES, REVENUE_KPI_LABEL_KEYS, platformLabel, type BusinessLine } from "../hooks/useCloserLeads";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 
 interface Props {
   statusCounts: Record<string, number>;
@@ -68,6 +70,7 @@ const ClosersKPICards = ({
   onRevenueClick,
 }: Props) => {
   const f = useFormato();
+  const { t } = useLanguage();
   // Línea de negocio a mostrar. Son tres embudos distintos (reclutar una modelo
   // ≠ venderle Trafix a una agencia): mezclarlos hacía que la conversión y los
   // conteos no significaran nada. "Todo" suma las tres.
@@ -115,6 +118,8 @@ const ClosersKPICards = ({
   // Cada línea factura distinto: Kash cobra comisión % sobre el OF de la modelo;
   // Plataformas y Agencias cobran suscripción. Mostrar sólo lo que aplica evita
   // cards en $0 que parecen un error.
+  // `label` es la LLAVE que recibe onRevenueClick (la compara useClosersKpiPopup):
+  // queda en español. En pantalla va t(REVENUE_KPI_LABEL_KEYS[label]).
   const revenueCards =
     line === "kash"
       ? [{ label: "Rev. OnlyFans", amount: ofMonetizationTotal, icon: TrendingUp, color: "bg-emerald-500" }]
@@ -137,13 +142,16 @@ const ClosersKPICards = ({
               { label: "Rev. Total", amount: revTotal, icon: Crown, color: "bg-blue-600" },
             ];
 
-  const pipelineCards = [
-    { key: "total" as const, label: "Total", count: total, icon: Users, color: "bg-slate-500" },
-    { key: "asignadas" as const, label: "Asignadas", count: asignadas, icon: Users, color: "bg-blue-500" },
-    { key: "confirmadas" as const, label: "Confirmadas", count: confirmadas, icon: CheckCircle, color: "bg-emerald-500" },
-    { key: "completadas" as const, label: "Completadas", count: completadas, icon: Trophy, color: "bg-emerald-600" },
-    { key: "cerradas" as const, label: "Cerradas", count: cerradas, icon: CheckCircle, color: "bg-violet-500" },
-    { key: "no_interesadas" as const, label: "No interesadas", count: noInteresadas, icon: XCircle, color: "bg-rose-500" },
+  const pipelineCards: Array<{
+    key: "total" | "asignadas" | "confirmadas" | "completadas" | "cerradas" | "no_interesadas";
+    labelKey: TranslationKey; count: number; icon: typeof Users; color: string;
+  }> = [
+    { key: "total", labelKey: "closers.kpi.total", count: total, icon: Users, color: "bg-slate-500" },
+    { key: "asignadas", labelKey: "closers.kpi.assigned", count: asignadas, icon: Users, color: "bg-blue-500" },
+    { key: "confirmadas", labelKey: "closers.tab.confirmed", count: confirmadas, icon: CheckCircle, color: "bg-emerald-500" },
+    { key: "completadas", labelKey: "closers.tab.completed", count: completadas, icon: Trophy, color: "bg-emerald-600" },
+    { key: "cerradas", labelKey: "closers.kpi.closed", count: cerradas, icon: CheckCircle, color: "bg-violet-500" },
+    { key: "no_interesadas", labelKey: "closers.kpi.notInterested", count: noInteresadas, icon: XCircle, color: "bg-rose-500" },
   ];
 
   // Hero del revenue — armado según la línea seleccionada (ver revenueCards).
@@ -172,7 +180,7 @@ const ClosersKPICards = ({
         <UserAvatar name={bestCloser?.name ?? "?"} size="lg" ring />
         <div className="min-w-0 flex-1">
           <div className="text-xs font-extrabold text-amber-500">
-            Mejor cerrador <span className="text-muted-foreground/80 font-semibold capitalize">· {format(today, "MMMM yyyy", { locale: f.fechas })}</span>
+            {t("closers.kpi.bestCloser")} <span className="text-muted-foreground/80 font-semibold capitalize">· {format(today, "MMMM yyyy", { locale: f.fechas })}</span>
           </div>
           {bestCloserLoading ? (
             <Skeleton className="mt-1 h-7 w-48" />
@@ -181,17 +189,17 @@ const ClosersKPICards = ({
               <div className="truncate font-display text-lg font-bold">{bestCloser.name}</div>
               <div className="flex items-center gap-4 text-xs text-muted-foreground">
                 <span className="tabular-nums">
-                  <strong className="text-foreground">{bestCloser.closes.toLocaleString(f.intl("es-ES"))}</strong> cierres
+                  <strong className="text-foreground">{bestCloser.closes.toLocaleString(f.intl("es-ES"))}</strong> {t("closers.kpi.closes")}
                 </span>
                 <span className="text-border">·</span>
                 <span className="tabular-nums">
-                  Calif. QA promedio <strong className="text-foreground">{Math.round(bestCloser.avgScore)}/100</strong>
+                  {t("closers.kpi.avgQa")} <strong className="text-foreground">{Math.round(bestCloser.avgScore)}/100</strong>
                 </span>
               </div>
             </>
           ) : (
             <p className="text-sm text-muted-foreground mt-1">
-              Sin calls en el rango seleccionado.
+              {t("closers.kpi.noCalls")}
             </p>
           )}
         </div>
@@ -222,16 +230,16 @@ const ClosersKPICards = ({
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  {l.label}
+                  {t(l.labelKey)}
                 </button>
               ))}
             </div>
             {trabajadas > 0 && (
               <span
                 className="whitespace-nowrap rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-muted-foreground"
-                title="Cerradas (confirmadas + completadas) sobre los leads que se trabajaron — no cuenta el pool sin tocar."
+                title={t("closers.kpi.conversionHint")}
               >
-                Conversión <strong className="text-foreground">{conversion.toFixed(1)}%</strong>
+                {t("closers.kpi.conversion")} <strong className="text-foreground">{conversion.toFixed(1)}%</strong>
               </span>
             )}
           </div>
@@ -239,8 +247,8 @@ const ClosersKPICards = ({
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
           {pipelineCards.map((card) => (
             <StatChip
-              key={card.label}
-              label={card.label}
+              key={card.key}
+              label={t(card.labelKey)}
               value={card.count}
               icon={<card.icon className="h-3.5 w-3.5" />}
               color={card.color}
@@ -259,7 +267,7 @@ const ClosersKPICards = ({
           {heroRevenue.map((card) => (
             <StatChip
               key={card.label}
-              label={card.label}
+              label={REVENUE_KPI_LABEL_KEYS[card.label] ? t(REVENUE_KPI_LABEL_KEYS[card.label]) : card.label}
               value={fmtMoney(card.amount)}
               icon={<card.icon className="h-3.5 w-3.5" />}
               color={card.color}
@@ -274,7 +282,7 @@ const ClosersKPICards = ({
           es 0 (todas en cero), se muestra una barra placeholder gris. */}
       <div className="space-y-3">
         <h3 className="text-xs font-semibold text-muted-foreground">
-          Por plataforma
+          {t("closers.kpi.byPlatform")}
         </h3>
         <Card className="p-4 space-y-3">
           <div className="flex h-3 w-full overflow-hidden rounded-full bg-muted">
@@ -292,7 +300,7 @@ const ClosersKPICards = ({
                       type="button"
                       onClick={onRevenueClick ? () => onRevenueClick(p.key) : undefined}
                       disabled={!onRevenueClick}
-                      title={`${p.key}: ${fmtMoney(p.amount)} · ${pct.toFixed(1)}%`}
+                      title={`${platformLabel(t, p.key)}: ${fmtMoney(p.amount)} · ${pct.toFixed(1)}%`}
                       className={`h-full ${color} transition-opacity hover:opacity-80 disabled:hover:opacity-100`}
                       style={{ width: `${pct}%` }}
                     />
@@ -315,7 +323,7 @@ const ClosersKPICards = ({
                   <span className={`h-2 w-2 shrink-0 rounded-full ${dot}`} />
                   <div className="min-w-0 flex-1">
                     <p className="text-xs text-muted-foreground truncate">
-                      {p.key}
+                      {platformLabel(t, p.key)}
                     </p>
                     <p className="text-sm font-bold tabular-nums leading-tight">
                       {fmtMoney(p.amount)}

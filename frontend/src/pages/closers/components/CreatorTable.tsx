@@ -9,6 +9,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { CloserCreator, STAGES } from "../useCloserCreators";
 import { differenceInDays } from "date-fns";
+import { useLanguage } from "@/hooks/useLanguage";
+import { stageLabel, type Traductor } from "../hooks/useCloserLeads";
 
 interface Column {
   key: string;
@@ -55,9 +57,9 @@ const needsReminder = (lastContact: string | null) => {
   return differenceInDays(new Date(), new Date(lastContact)) >= 3;
 };
 
-const defaultRender = (creator: CloserCreator, key: string): React.ReactNode => {
+const defaultRender = (t: Traductor, creator: CloserCreator, key: string): React.ReactNode => {
   const val = (creator as unknown as Record<string, unknown>)[key];
-  if (key === "stage") return <Badge variant={stageVariant(String(val))}>{String(val)}</Badge>;
+  if (key === "stage") return <Badge variant={stageVariant(String(val))}>{stageLabel(t, String(val))}</Badge>;
   if (key === "estimated_monetization" || key === "monthly_monetization")
     return `$${Number(val || 0).toLocaleString()}`;
   if (key === "agency_commission") return `${Number(val || 0)}%`;
@@ -68,6 +70,7 @@ const defaultRender = (creator: CloserCreator, key: string): React.ReactNode => 
 };
 
 const CreatorTable = ({ creators, columns, onView, onEdit, onDelete, onStageChange, showActions = true }: Props) => {
+  const { t } = useLanguage();
   return (
     <div className="overflow-x-auto rounded-lg border border-border">
       <Table>
@@ -76,14 +79,14 @@ const CreatorTable = ({ creators, columns, onView, onEdit, onDelete, onStageChan
             {columns.map((col) => (
               <TableHead key={col.key}>{col.label}</TableHead>
             ))}
-            {showActions && <TableHead className="text-right">Acciones</TableHead>}
+            {showActions && <TableHead className="text-right">{t("common.actions")}</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
           {creators.length === 0 ? (
             <TableRow>
               <TableCell colSpan={columns.length + (showActions ? 1 : 0)} className="text-center text-muted-foreground py-8">
-                Sin registros
+                {t("closers.noRecords")}
               </TableCell>
             </TableRow>
           ) : (
@@ -95,7 +98,7 @@ const CreatorTable = ({ creators, columns, onView, onEdit, onDelete, onStageChan
                       {col.key === "instagram_handle" && needsReminder(c.last_contact_date) && !["Completada", "No interesada"].includes(c.stage) && (
                         <AlertCircle className="h-3.5 w-3.5 text-destructive shrink-0" />
                       )}
-                      {col.render ? col.render(c) : defaultRender(c, col.key)}
+                      {col.render ? col.render(c) : defaultRender(t, c, col.key)}
                     </div>
                   </TableCell>
                 ))}
@@ -115,25 +118,25 @@ const CreatorTable = ({ creators, columns, onView, onEdit, onDelete, onStageChan
                             {NEXT_STAGE[c.stage] && (
                               <DropdownMenuItem onClick={() => onStageChange(c.id, NEXT_STAGE[c.stage]!)}>
                                 <ArrowRight className="h-4 w-4 mr-2" />
-                                Avanzar a {NEXT_STAGE[c.stage]}
+                                {t("closers.table.advanceTo", { stage: stageLabel(t, NEXT_STAGE[c.stage]) })}
                               </DropdownMenuItem>
                             )}
                             {c.stage !== "No interesada" && (
                               <DropdownMenuItem onClick={() => onStageChange(c.id, "No interesada")}>
                                 <XCircle className="h-4 w-4 mr-2" />
-                                Marcar No interesada
+                                {t("closers.markNotInterested")}
                               </DropdownMenuItem>
                             )}
                             <DropdownMenuSeparator />
                             <DropdownMenuSub>
                               <DropdownMenuSubTrigger>
                                 <Phone className="h-4 w-4 mr-2" />
-                                Cambiar etapa
+                                {t("closers.table.changeStage")}
                               </DropdownMenuSubTrigger>
                               <DropdownMenuSubContent>
                                 {STAGES.filter((s) => s !== c.stage).map((s) => (
                                   <DropdownMenuItem key={s} onClick={() => onStageChange(c.id, s)}>
-                                    {s}
+                                    {stageLabel(t, s)}
                                   </DropdownMenuItem>
                                 ))}
                               </DropdownMenuSubContent>

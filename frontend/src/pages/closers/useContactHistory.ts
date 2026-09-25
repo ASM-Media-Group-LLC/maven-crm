@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { traducir } from "@/lib/i18n";
 
 export interface ContactRecord {
   id: string;
@@ -36,7 +37,7 @@ export const useContactHistory = (creatorId: string | null) => {
 
   const addContact = useMutation({
     mutationFn: async (record: { creator_id: string; channel: string; result?: string; notes?: string; contact_date?: string; promoteContactId?: string }) => {
-      if (!user) throw new Error("No autenticado");
+      if (!user) throw new Error(traducir("closers.err.notSignedIn"));
       const { promoteContactId, ...rest } = record;
       let targetId = record.creator_id;
       // Filas de los tabs Agencias/Ex-creadores: son CONTACTOS del directorio, no
@@ -51,7 +52,7 @@ export const useContactHistory = (creatorId: string | null) => {
           p_closer_id: user.id,
         });
         if (promoErr) throw promoErr;
-        if (!newLeadId) throw new Error("No se pudo tomar la agencia para registrar el seguimiento.");
+        if (!newLeadId) throw new Error(traducir("closers.err.takeAgency"));
         targetId = newLeadId as string;
       }
       const { error } = await supabase.from("closer_contact_history").insert({
@@ -62,7 +63,7 @@ export const useContactHistory = (creatorId: string | null) => {
       });
       if (error) {
         if (error.message.includes("Maximum of 6")) {
-          throw new Error("Máximo 6 contactos por creator");
+          throw new Error(traducir("closers.err.maxContacts"));
         }
         throw error;
       }
@@ -82,10 +83,10 @@ export const useContactHistory = (creatorId: string | null) => {
       // Si el seguimiento promovió un contacto del directorio a lead, hay que
       // refrescar también la vista de contactos para que salga de la base.
       queryClient.invalidateQueries({ queryKey: ["closers-contacts"] });
-      toast({ title: "Contacto registrado" });
+      toast({ title: traducir("closers.toast.contactLogged") });
     },
     onError: (e: Error) => {
-      toast({ title: "Error", description: e.message, variant: "destructive" });
+      toast({ title: traducir("common.error"), description: e.message, variant: "destructive" });
     },
   });
 
