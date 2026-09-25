@@ -98,8 +98,13 @@ describe("el diccionario y el catálogo del menú", () => {
     // Dejar el MISMO texto en los dos idiomas está bien cuando la palabra es
     // igual en ambos ("Dashboard", "Messenger", "Cowork"): eso no es español,
     // es un nombre propio. Lo que se marca es el español de verdad.
+    //
+    // Lo que va entre `acentos graves` es código (un header, un campo: `Accept-
+    // Language: en`) y lo que va entre {llaves} es una variable: ninguno de los dos
+    // es prosa, y "en" o "de" ahí adentro no son español. Se sacan antes de mirar.
+    const soloProsa = (s: string) => s.replace(/`[^`]*`/g, " ").replace(/\{\w+\}/g, " ");
     const enEspanol = Object.entries(translations)
-      .filter(([, par]) => esEspanol(par.en))
+      .filter(([, par]) => esEspanol(soloProsa(par.en)))
       .map(([clave, par]) => `${clave} → es: «${par.es}» / en: «${par.en}»`);
 
     expect(

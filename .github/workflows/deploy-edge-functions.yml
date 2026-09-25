@@ -89,7 +89,7 @@ jobs:
       # Desde el 24/09 también cubre lo que ACTÚA COMO usuario (la sesión fabricada,
       # /me, que esos handlers nunca vean service_role) y el límite por hora.
       - name: Guard — aislamiento entre agencias
-        run: deno test --allow-read --no-check supabase/functions/public-api/
+        run: deno test --allow-read --no-check supabase/functions/public-api/ supabase/functions/manage-api-keys/
 
       - name: Determinar qué deployar
         id: changes
