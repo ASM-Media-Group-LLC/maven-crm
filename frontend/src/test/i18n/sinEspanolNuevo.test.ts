@@ -31,7 +31,8 @@ const fuentes = (import.meta as unknown as {
 // Fuera del alcance de la migración, por decisión, no por olvido:
 //
 //  - `test/` y `harness/`: no los ve ningún usuario.
-//  - `lib/i18n.ts`: ES el diccionario. Su español es el dato, no un descuido.
+//  - `lib/i18n.ts` y `lib/i18n/`: ES el diccionario (partido por módulo). Su
+//    español es el dato, no un descuido.
 //  - `lib/navCatalog.ts`: cada entrada guarda su `title` en español a propósito
 //    —el ⌘K lo usa como sinónimo de búsqueda— y muestra `i18nKey` traducida.
 //  - `pages/portada/`: la landing pública. Si Maven se presenta en inglés al
@@ -41,7 +42,7 @@ const fuentes = (import.meta as unknown as {
 //  - `components/ui/`: primitivas de shadcn; su texto se pasa desde afuera.
 const FUERA_DE_ALCANCE = new RegExp(
   "^/frontend/src/(" +
-    "test/|harness/|lib/i18n\\.ts|lib/navCatalog\\.ts|" +
+    "test/|harness/|lib/i18n\\.ts|lib/i18n/|lib/navCatalog\\.ts|" +
     "pages/portada/|pages/design-system/|pages/docs/|pages/roadmap/|components/ui/" +
   ")",
 );
@@ -65,8 +66,8 @@ describe("el botón EN tiene que seguir sirviendo", () => {
     expect(
       nuevos,
       "Estos archivos muestran texto en español que el botón EN no puede traducir.\n" +
-      "Pasalo por t(\"clave\"): const { t } = useLanguage(), y agregá la clave en\n" +
-      "frontend/src/lib/i18n.ts con sus dos idiomas.\n\n" +
+      "Pasalo por t(\"clave\"): const { t } = useLanguage(), y agregá la clave con\n" +
+      "sus dos idiomas en el archivo de su módulo, en frontend/src/lib/i18n/.\n\n" +
       nuevos.join("\n") + "\n",
     ).toEqual([]);
   });
@@ -103,7 +104,7 @@ describe("el diccionario y el catálogo del menú", () => {
 
     expect(
       enEspanol,
-      "Estas claves siguen en español en la columna `en` de lib/i18n.ts:\n\n" +
+      "Estas claves siguen en español en la columna `en` de lib/i18n/:\n\n" +
       enEspanol.join("\n") + "\n",
     ).toEqual([]);
   });

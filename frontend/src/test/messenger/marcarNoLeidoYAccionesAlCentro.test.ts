@@ -13,7 +13,7 @@ const hook = uno((import.meta as unknown as Glob).glob("/frontend/src/hooks/useC
 const sidebar = uno((import.meta as unknown as Glob).glob("/frontend/src/pages/messenger/ChatSidebar.tsx", { query: "?raw", import: "default", eager: true }));
 const page = uno((import.meta as unknown as Glob).glob("/frontend/src/pages/messenger/MessengerPage.tsx", { query: "?raw", import: "default", eager: true }));
 const bubble = uno((import.meta as unknown as Glob).glob("/frontend/src/pages/messenger/components/MessageBubble.tsx", { query: "?raw", import: "default", eager: true }));
-const i18n = uno((import.meta as unknown as Glob).glob("/frontend/src/lib/i18n.ts", { query: "?raw", import: "default", eager: true }));
+const i18n = uno((import.meta as unknown as Glob).glob("/frontend/src/lib/i18n/messenger.ts", { query: "?raw", import: "default", eager: true }));
 
 describe("marcar como no leído", () => {
   it("las fuentes se cargaron", () => {
