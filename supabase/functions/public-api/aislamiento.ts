@@ -47,7 +47,14 @@
 export type ModoDeAislamiento =
   | { tipo: "columna"; columna: "tenant_id" }
   | { tipo: "miembros" }
-  | { tipo: "como_usuario" }
+  | {
+    tipo: "como_usuario";
+    /** Si está, el recurso se APAGA (403) con dos o más agencias hasta arreglar
+     *  esto. Para lo que la base todavía no separa por agencia aunque la sesión sea
+     *  la de la persona: p. ej. el Messenger, donde nada impide una conversación
+     *  con gente de otra agencia. */
+    pendienteConVariasAgencias?: string;
+  }
   | {
     tipo: "sin_agencia";
     /** Qué hace falta arreglar para poder aislarlo de verdad. */
@@ -158,7 +165,10 @@ export function decidir(
     return { ok: false, estado: 404, error: "not_found", motivo: `Recurso desconocido: ${recurso}` };
   }
   const modo = mapa[recurso];
-  if (modo.tipo !== "sin_agencia") return { ok: true };
+  if (modo.tipo === "columna" || modo.tipo === "miembros") return { ok: true };
+  // `=== undefined` y no por verdad: un pendiente vacío ("") igual cuenta como pendiente.
+  if (modo.tipo === "como_usuario" && modo.pendienteConVariasAgencias === undefined) return { ok: true };
+  const pendiente = modo.tipo === "sin_agencia" ? modo.pendiente : modo.pendienteConVariasAgencias;
   if (agencias === 1) return { ok: true };
   if (agencias !== null && agencias >= 2) {
     return {
@@ -167,7 +177,7 @@ export function decidir(
       error: "resource_unavailable",
       motivo: "Este recurso todavía no separa datos por agencia, así que se desactiva " +
         "mientras Maven tenga más de una, para no exponer datos de otras. " +
-        `Pendiente: ${modo.pendiente}.`,
+        `Pendiente: ${pendiente}.`,
     };
   }
   // null (no se pudo contar), 0 o negativo: no lo sabemos, así que no se sirve.

@@ -433,7 +433,7 @@ const AdminApiKeys = () => {
             <div>
               <div className="mb-1 font-medium">Límite</div>
               <p className="text-xs text-muted-foreground">
-                1.000 pedidos por hora por key; se reinicia a la hora en punto. Las respuestas a una key válida traen <code className="rounded bg-muted px-1 py-0.5">X-RateLimit-Limit</code>, <code className="rounded bg-muted px-1 py-0.5">X-RateLimit-Remaining</code> y <code className="rounded bg-muted px-1 py-0.5">X-RateLimit-Reset</code> (epoch en segundos). Pasado el límite: <code className="rounded bg-muted px-1 py-0.5">429</code> con <code className="rounded bg-muted px-1 py-0.5">Retry-After</code> (segundos).
+                1.000 pedidos por hora y 60 por minuto por key; la hora se reinicia en punto. Las respuestas a una key válida traen <code className="rounded bg-muted px-1 py-0.5">X-RateLimit-Limit</code>, <code className="rounded bg-muted px-1 py-0.5">X-RateLimit-Remaining</code> y <code className="rounded bg-muted px-1 py-0.5">X-RateLimit-Reset</code> (epoch en segundos), que son los de la hora. Pasado cualquiera de los dos límites: <code className="rounded bg-muted px-1 py-0.5">429</code> con <code className="rounded bg-muted px-1 py-0.5">Retry-After</code> (segundos).
               </p>
             </div>
             <div>
