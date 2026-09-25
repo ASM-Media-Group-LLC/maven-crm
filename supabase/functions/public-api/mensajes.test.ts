@@ -3,8 +3,10 @@
 // Lo que tiene que ser cierto, y por qué importa:
 //  * sin Accept-Language, o si no pide inglés, sale en español BYTE A BYTE igual que
 //    antes: las integraciones vivas (kashgrupo1) no pueden ver ni una coma distinta;
-//  * la negociación sigue la RFC 9110: q=0 es "no", gana el q más alto, empate el
-//    primero; basura, "*" u otros idiomas → español;
+//  * la negociación sigue la RFC 9110 / RFC 4647: q=0 es "no", gana el q más alto,
+//    el `*` vale para el idioma que nadie nombró, empate el explícito y después el
+//    primero; basura u otros idiomas → español; rechazar el español → inglés;
+//  * msg() nunca tira, ni con una clave que no existe (arma el cuerpo de un error);
 //  * ningún texto en inglés tiene rastros de español;
 //  * el idioma llega de verdad a cada handler (Contexto.idioma), no solo al router.
 //
@@ -46,8 +48,37 @@ Deno.test("Accept-Language: se elige según la RFC 9110", () => {
     // Espacios y mayúsculas en el parámetro.
     ["  en-GB ; Q = 0.8 , es ; q=0.7", "en"],
     ["es-419,es;q=0.9,en;q=0.8", "es"],
+    // El comodín: vale, con su q, para el idioma que ningún rango nombra.
     ["*", "es"],
-    ["*;q=1, en;q=0.1", "en"],
+    ["*;q=1, en;q=0.1", "es"],
+    ["*;q=0.5, en;q=0.4", "es"],
+    ["*;q=0.4, en;q=0.5", "en"],
+    ["en;q=0, *", "es"],
+    ["es;q=0, *", "en"],
+    ["es;q=0.1, *;q=0.5", "en"],
+    ["fr, *;q=0.5", "es"],
+    // Con empate, el nombrado le gana al que entra por el comodín.
+    ["*, en", "en"],
+    ["en, *", "en"],
+    ["es, *", "es"],
+    ["*;q=0.3, *;q=0.9, en;q=0.5", "es"],
+    // Nada aceptable: inglés solo si rechaza el español y no el inglés.
+    ["fr, es;q=0", "en"],
+    ["es;q=0", "en"],
+    ["es-CO;q=0, es;q=0", "en"],
+    // Rechazar una variante no es rechazar el español (ni el inglés).
+    ["es-CO;q=0", "es"],
+    ["es;q=0, en-US;q=0", "en"],
+    ["en;q=0, es;q=0", "es"],
+    ["es;q=0, en;q=0", "es"],
+    ["*;q=0", "es"],
+    ["fr, *;q=0", "es"],
+    ["es;q=0, *;q=0", "es"],
+    ["en, *;q=0", "en"],
+    ["es, *;q=0", "es"],
+    // Varios rangos del mismo idioma: cuenta el mayor.
+    ["en;q=0, en-US;q=0.5, es;q=0.4", "en"],
+    ["es;q=0.2, es-CO;q=0.9, en;q=0.8", "es"],
     ["fr, de;q=0.5", "es"],
     ["english", "es"],
     ["en_US", "es"],
@@ -126,11 +157,39 @@ Deno.test("msg: reemplaza TODAS las variables, en un solo pase", () => {
     }
   }
   // El valor no se vuelve a interpretar, y un número sale como número.
-  assertEquals(msg("en", "limite_por_minuto", { n: 60, s: "{n}" }), "This API key has reached its limit of 60 requests per minute. Retry in {n} s.");
+  assertEquals(
+    msg("en", "limite_por_minuto", { n: 60, s: "{n}" }),
+    "This API key has reached its limit of 60 requests per minute. Please try again in {n} s.",
+  );
   assertEquals(msg("es", "ip_no_permitida", { ip: "{ip}" }), "IP {ip} no está en la whitelist de esta API key");
   // Un idioma que no existe (p. ej. un Contexto armado a mano sin idioma) sale en español.
   // deno-lint-ignore no-explicit-any
   assertEquals(msg(undefined as any, "llave_invalida"), "API key inválida");
+  // La IP que no se conoce, en inglés, se lee como frase.
+  assertEquals(
+    msg("en", "ip_no_permitida", { ip: msg("en", "ip_desconocida") }),
+    "IP (unknown) is not in this API key's IP allowlist",
+  );
+});
+
+Deno.test("msg: NUNCA tira, ni con una clave mal escrita (arma el cuerpo de un error)", () => {
+  // Si tirara, en index.ts la excepción escaparía de Deno.serve: un 500 sin CORS ni
+  // JSON. El tipo y la guarda de aislamiento.test.ts ya lo frenan antes; esto es la red.
+  // deno-lint-ignore no-explicit-any
+  const suelto = msg as any;
+  for (const idioma of ["es", "en", undefined]) {
+    assertEquals(suelto(idioma, "creadora_no_encontradx"), "creadora_no_encontradx");
+    // Heredadas de Object.prototype: no son textos.
+    for (const heredada of ["constructor", "toString", "__proto__", "hasOwnProperty"]) {
+      assertEquals(suelto(idioma, heredada), heredada);
+    }
+  }
+  // Una variable que falta (o un tercer argumento que no es un objeto) deja su marca:
+  // ni tira ni pone "undefined".
+  assertEquals(suelto("es", "falta_scope"), "Falta el scope {scope}");
+  assertEquals(suelto("en", "falta_scope", null), "Missing scope {scope}");
+  assertEquals(suelto("en", "falta_scope", "creators:read"), "Missing scope {scope}");
+  assertEquals(suelto("en", "falta_scope", 7), "Missing scope {scope}");
 });
 
 // ─── Por defecto, EXACTAMENTE lo de antes ────────────────────────────────────
@@ -309,7 +368,7 @@ Deno.test("/me y el scope: el 404 y el 403 salen en el idioma del Contexto", asy
   assertEquals(es.mensaje, "Sub-recurso de me desconocido: x");
   const en = await servirMe(explota, { ...CTX, ruta: ["x"], idioma: "en" });
   assert(!en.ok && en.estado === 404 && en.error === "not_found");
-  assertEquals(en.mensaje, "Unknown me sub-resource: x");
+  assertEquals(en.mensaje, "Unknown /me sub-resource: x");
 
   const sinScopeEs = await servirComoUsuario("messenger", explota, { ...CTX, scopes: [] });
   assert(!sinScopeEs.ok && sinScopeEs.estado === 403);
@@ -319,7 +378,7 @@ Deno.test("/me y el scope: el 404 y el 403 salen en el idioma del Contexto", asy
   assertEquals(sinScopeEn.mensaje, "Missing scope messenger:read");
 });
 
-// ─── Tipos (lo verifica `deno check`, no corre) ──────────────────────────────
+// ─── Tipos (no corre: lo verifica `deno check`, en la guarda de CI) ─────────
 
 function _soloTipos() {
   // @ts-expect-error una clave que no existe no compila

@@ -16,7 +16,7 @@
 //
 // Corre en CI antes de desplegar (ver .github/workflows/deploy-edge-functions.yml).
 
-import { assert, assertEquals } from "jsr:@std/assert";
+import { assert, assertEquals, assertThrows } from "jsr:@std/assert";
 import {
   AISLAMIENTO_POR_RECURSO,
   decidir,
@@ -26,6 +26,7 @@ import {
   type ModoDeAislamiento,
 } from "./aislamiento.ts";
 import { RECURSOS_COMO_USUARIO, SCOPE_REQUERIDO } from "./recursos-como-usuario.ts";
+import { MENSAJES } from "./mensajes.ts";
 import { isValidScope } from "../manage-api-keys/api-scopes.ts";
 
 /** El código sin comentarios: de bloque, líneas que son solo comentario, y el
@@ -209,6 +210,37 @@ Deno.test("public-api: la puerta recibe el conteo REAL de agencias, no un númer
   );
   assertEquals((PUBLIC_API.match(/\bdecidir\(/g) ?? []).length, 1, "la puerta se llama más de una vez");
   assert(!/cantidadDeAgencias\s*=\s*1\b/.test(PUBLIC_API), "el conteo de agencias está fijado en 1");
+  // Que se LLAME AISLAMIENTO_POR_RECURSO no alcanza: `import { AISLAMIENTO_POR_RECURSO as
+  // REAL }` + `const AISLAMIENTO_POR_RECURSO = { ...REAL, contacts: … }` pasaba la regex
+  // de arriba y servía /contacts con dos agencias. Por eso: index.ts importa el mapa y
+  // la puerta TAL CUAL de aislamiento.ts y no los vuelve a nombrar en ningún otro lado
+  // (ni para declarar uno propio, ni para escribirle, ni para envolverlos): cada uno
+  // aparece exactamente dos veces, en el import y en la llamada.
+  for (const nombre of ["AISLAMIENTO_POR_RECURSO", "decidir"]) {
+    const importado = PUBLIC_API.match(/^\s*import\s*\{([^}]*)\}\s*from\s*"\.\/aislamiento\.ts"\s*;?\s*$/m);
+    assert(importado, "index.ts no importa de ./aislamiento.ts");
+    const nombres = importado[1].split(",").map((n) => n.trim()).filter(Boolean);
+    assert(nombres.includes(nombre), `index.ts no importa ${nombre} de ./aislamiento.ts tal cual (sin alias)`);
+    assert(!new RegExp(`\\bas\\s+${nombre}\\b`).test(PUBLIC_API), `index.ts le pone el nombre ${nombre} a otra cosa`);
+    const usos = (PUBLIC_API.match(new RegExp(`(?<![\\w$])${nombre}(?![\\w$])`, "g")) ?? []).length;
+    assertEquals(usos, 2, `index.ts nombra ${nombre} fuera del import y de la puerta (lo declara, lo envuelve o le escribe)`);
+  }
+});
+
+Deno.test("el mapa de aislamiento está congelado: nadie le cambia el modo a un recurso", () => {
+  // Lo que la guarda de arriba no ve: otro módulo que escriba en el mapa importado.
+  assert(Object.isFrozen(AISLAMIENTO_POR_RECURSO), "el mapa no está congelado");
+  for (const [recurso, modo] of Object.entries(AISLAMIENTO_POR_RECURSO)) {
+    assert(Object.isFrozen(modo), `el modo de ${recurso} no está congelado`);
+  }
+  // deno-lint-ignore no-explicit-any
+  const mapa = AISLAMIENTO_POR_RECURSO as any;
+  assertThrows(() => { mapa.contacts = { tipo: "columna", columna: "tenant_id" }; }, TypeError);
+  assertThrows(() => { mapa.contacts.tipo = "columna"; }, TypeError);
+  assertThrows(() => { mapa.nuevo = { tipo: "miembros" }; }, TypeError);
+  assertThrows(() => { delete mapa.contacts; }, TypeError);
+  const v = decidir("contacts", 2);
+  assert(!v.ok && v.estado === 403, "después de intentar escribirle, /contacts se sirvió con 2 agencias");
 });
 
 Deno.test("public-api: los filtros de defensa extra por agencia siguen en su lugar", () => {
@@ -471,38 +503,72 @@ function finDeString(src: string, i: number): number {
   return src.length;
 }
 
-/** La expresión que arranca en `desde`, hasta la coma o el cierre de su nivel. */
-function expresionDesde(src: string, desde: number): string {
+/** Dónde termina la expresión que arranca en `desde`: el índice de la coma o del
+ *  cierre de su nivel (o el final del código). */
+function finDeExpresion(src: string, desde: number): number {
   let nivel = 0;
   for (let i = desde; i < src.length; i++) {
     const c = src[i];
     if (c === '"' || c === "'" || c === "`") { i = finDeString(src, i); continue; }
     if ("([{".includes(c)) nivel++;
     else if (")]}".includes(c)) {
-      if (nivel === 0) return src.slice(desde, i).trim();
+      if (nivel === 0) return i;
       nivel--;
-    } else if (c === "," && nivel === 0) return src.slice(desde, i).trim();
+    } else if (c === "," && nivel === 0) return i;
   }
-  return src.slice(desde).trim();
+  return src.length;
+}
+
+/** La expresión que arranca en `desde`, hasta la coma o el cierre de su nivel. */
+function expresionDesde(src: string, desde: number): string {
+  return src.slice(desde, finDeExpresion(src, desde)).trim();
+}
+
+/** Los elementos separados por comas que arrancan en `desde`, hasta el cierre de su
+ *  nivel: los argumentos de una llamada o las propiedades de un objeto. Una coma
+ *  final (`f(a, b,)`) no cuenta como un elemento más. */
+function elementosDesde(src: string, desde: number): { elementos: string[]; cierre: number } {
+  const elementos: string[] = [];
+  let i = desde;
+  for (;;) {
+    const fin = finDeExpresion(src, i);
+    elementos.push(src.slice(i, fin).trim());
+    if (src[fin] !== ",") {
+      if (elementos.length > 1 && elementos[elementos.length - 1] === "") elementos.pop();
+      return { elementos, cierre: fin };
+    }
+    i = fin + 1;
+  }
+}
+
+/** Cada llamada a `nombre(...)` de un código (no `x.nombre(` ni `otronombre(`): sus
+ *  argumentos, ya separados. */
+function llamadasDe(nombre: string, src: string): string[][] {
+  const out: string[][] = [];
+  for (const m of src.matchAll(new RegExp(`(?<![\\w$.])${nombre}\\s*\\(`, "g"))) {
+    out.push(elementosDesde(src, m.index! + m[0].length).elementos);
+  }
+  return out;
 }
 
 /** Cada llamada a msg(...) de un código: sus argumentos, ya separados. */
-function llamadasAMsg(src: string): string[][] {
-  const out: string[][] = [];
-  for (const m of src.matchAll(/(?<![\w$.])msg\s*\(/g)) {
-    const args: string[] = [];
-    let i = m.index! + m[0].length;
-    for (;;) {
-      const arg = expresionDesde(src, i);
-      args.push(arg);
-      i = src.indexOf(arg, i) + arg.length;
-      while (/\s/.test(src[i])) i++;
-      if (src[i] !== ",") break;
-      i++;
-    }
-    out.push(args);
+const llamadasAMsg = (src: string) => llamadasDe("msg", src);
+
+/** Las claves de un objeto literal `{ a: 1, b }`, o null si `expr` no es exactamente
+ *  un objeto literal de claves simples (sin `...`, `[clave]:` ni métodos). */
+function clavesDeObjeto(expr: string): string[] | null {
+  const t = expr.trim();
+  if (!t.startsWith("{")) return null;
+  const { elementos, cierre } = elementosDesde(t, 1);
+  if (t[cierre] !== "}" || cierre !== t.length - 1) return null;
+  const claves: string[] = [];
+  for (const e of elementos) {
+    if (e === "") continue;
+    const m = e.match(/^([A-Za-z_$][\w$]*)\s*(?::|$)/) ?? e.match(/^"([A-Za-z_$][\w$]*)"\s*:/);
+    if (!m) return null;
+    claves.push(m[1]);
   }
-  return out;
+  return claves;
 }
 
 /** La expresión sin sus llamadas a msg(...). */
@@ -554,6 +620,14 @@ Deno.test("idioma: index.ts no devuelve ni un texto suelto, todo `message` sale 
     conMsg++;
   }
   assert(conMsg >= 20, `se esperaban al menos 20 message con msg(), hay ${conMsg}`);
+  // Lo de arriba solo mira `message:` seguido de un valor. La forma abreviada
+  // (`const message = "Creadora no encontrada"; json(req, { error: "not_found", message })`),
+  // la clave entre comillas (`"message": "…"`) o una variable o parámetro llamado
+  // message se lo saltearían: en index.ts, `message` solo puede ser `message:` o `.message`.
+  assert(!/[{,]\s*message\s*[,}]/.test(PUBLIC_API), "un `message` abreviado ({ message }) que no pasa por msg()");
+  const sueltos = [...PUBLIC_API.matchAll(/(?<![\w$.])message(?![\w$])(?!\s*\??\s*:)/g)]
+    .map((m) => PUBLIC_API.slice(Math.max(0, m.index! - 30), m.index! + 30).replace(/\s+/g, " "));
+  assertEquals(sueltos, [], "index.ts usa `message` como variable, parámetro o clave entre comillas");
 });
 
 Deno.test("idioma: cada msg() usa el idioma del pedido, nunca uno fijo", () => {
@@ -588,6 +662,102 @@ Deno.test("idioma: cada msg() usa el idioma del pedido, nunca uno fijo", () => {
   assertEquals(llamadasA.length, 3, "decidir tiene que armar sus 3 motivos con msg()");
   for (const [primero] of llamadasA) assertEquals(primero, "idioma", "decidir arma un motivo con un idioma fijo");
   assert(!/motivo\s*:\s*["'`]/.test(AISLAMIENTO_TS), "decidir arma un motivo con texto suelto");
+});
+
+Deno.test("idioma: cada msg() nombra una clave que EXISTE y le pasa exactamente sus variables", () => {
+  // El tipo de msg() ya lo exige, pero CI corre `deno test --no-check`: con
+  // `msg(idioma, "creadora_no_encontradx")` o `msg(idioma, "falta_scope")` sin su
+  // variable pasaban todos los tests. Acá se mira en el código, llamada por llamada,
+  // en los tres archivos que responden.
+  type ConVars = { vars?: readonly string[] };
+  const entrada = (k: string) => Object.hasOwn(MENSAJES, k) ? (MENSAJES as Record<string, ConVars>)[k] : null;
+  /** La clave de un literal "…" o '…'; null si no es un literal. */
+  const literal = (arg: string) => arg.match(/^"([a-z_]+)"$/)?.[1] ?? arg.match(/^'([a-z_]+)'$/)?.[1] ?? null;
+  const usadas = new Set<string>();
+  const revisar = (archivo: string, args: string[], clave: string) => {
+    const e = entrada(clave);
+    assert(e, `${archivo}: msg() con una clave que no existe en MENSAJES: "${clave}"`);
+    usadas.add(clave);
+    const vars = [...(e.vars ?? [])].sort();
+    if (vars.length === 0) {
+      assertEquals(args.length, 2, `${archivo}: "${clave}" no lleva variables y msg() recibe de más: ${args.join(", ")}`);
+      return;
+    }
+    assertEquals(args.length, 3, `${archivo}: msg(…, "${clave}") sin sus variables (${vars.join(", ")})`);
+    const claves = clavesDeObjeto(args[2]);
+    assert(claves, `${archivo}: las variables de "${clave}" no son un objeto literal: ${args[2]}`);
+    assertEquals([...claves].sort(), vars, `${archivo}: msg(…, "${clave}") con variables que no son las suyas`);
+  };
+
+  const archivos: [string, string][] = [
+    ["index.ts", PUBLIC_API],
+    ["recursos-como-usuario.ts", RECURSOS_USUARIO],
+    ["aislamiento.ts", AISLAMIENTO_TS],
+  ];
+  let llamadas = 0;
+  for (const [archivo, src] of archivos) {
+    for (const args of llamadasAMsg(src)) {
+      llamadas++;
+      const clave = literal(args[1] ?? "");
+      if (clave !== null) {
+        revisar(archivo, args, clave);
+        continue;
+      }
+      // La única clave que no es un literal: la de malPedido, que el tipo ClaveSinVars
+      // ata a las claves SIN variables. Cada llamada a malPedido se revisa abajo.
+      assert(
+        archivo === "recursos-como-usuario.ts" && args.join(", ") === "idioma, clave",
+        `${archivo}: msg() con una clave que no es un texto literal: msg(${args.join(", ")})`,
+      );
+    }
+  }
+  assert(llamadas >= 30, `se esperaban al menos 30 llamadas a msg(), hay ${llamadas}: se rompió la búsqueda`);
+
+  // malPedido: la única que recibe la clave de afuera. Definida una sola vez, con
+  // msg(idioma, clave); y cada llamada, con una clave literal que exista y sin variables.
+  assertEquals(llamadasAMsg(RECURSOS_USUARIO).filter((a) => a[1] === "clave").length, 1, "más de un msg() con la clave de afuera");
+  assert(
+    /const malPedido = \(idioma: Idioma, clave: ClaveSinVars\): Resultado => \(\{[^;]*mensaje: msg\(idioma, clave\)/.test(RECURSOS_USUARIO),
+    "malPedido cambió de forma: el msg(idioma, clave) de afuera solo se permite ahí",
+  );
+  const malPedidos = llamadasDe("malPedido", RECURSOS_USUARIO);
+  assert(malPedidos.length >= 10, `se esperaban al menos 10 malPedido(), hay ${malPedidos.length}: se rompió la búsqueda`);
+  for (const args of malPedidos) {
+    assertEquals(args.length, 2, `malPedido(${args.join(", ")}): tiene que ser malPedido(ctx.idioma, "clave")`);
+    const clave = literal(args[1]);
+    assert(clave, `malPedido con una clave que no es un texto literal: ${args[1]}`);
+    revisar("recursos-como-usuario.ts (malPedido)", ["idioma", args[1]], clave);
+  }
+
+  // Y ningún texto del diccionario quedó sin usar: su versión en español es la que
+  // mensajes.test.ts compara byte a byte con la de antes, y tiene que ser la que sale.
+  const sinUsar = Object.keys(MENSAJES).filter((k) => !usadas.has(k));
+  assertEquals(sinUsar, [], "textos de mensajes.ts que ningún archivo usa");
+});
+
+Deno.test("idioma: lo que va SOLO al log queda en español (no pasa por msg() ni por el idioma)", () => {
+  // Una búsqueda o una alerta sobre el log no puede depender del Accept-Language de
+  // quien llamó: el 503 de la puerta llegó a loguear `veredicto.motivo`, que en un
+  // pedido en inglés salía en inglés.
+  const enElIdiomaDelCliente = /(?<![\w$.])msg\s*\(|\bidioma\b|\bidiomaDelPedido\b|\.motivo\b|\.mensaje\b/;
+  const noDisponibles = llamadasDe("noDisponible", PUBLIC_API);
+  assert(noDisponibles.length >= 6, `se esperaban al menos 6 noDisponible(), hay ${noDisponibles.length}: se rompió la búsqueda`);
+  for (const [, donde, detalle] of noDisponibles) {
+    for (const arg of [donde ?? "", detalle ?? ""]) {
+      assert(!enElIdiomaDelCliente.test(arg), `noDisponible loguea algo en el idioma del cliente: ${arg}`);
+    }
+  }
+  for (const args of llamadasDe("console\\.(?:error|warn|log|info)", PUBLIC_API)) {
+    assert(!enElIdiomaDelCliente.test(args.join(", ")), `index.ts loguea algo en el idioma del cliente: ${args.join(", ")}`);
+  }
+  // recursos-como-usuario.ts: `detalle` (lo que se loguea en un 503) y falla().
+  const detalles = [...RECURSOS_USUARIO.matchAll(/\bdetalle\s*:/g)]
+    .map((m) => expresionDesde(RECURSOS_USUARIO, m.index! + m[0].length));
+  const fallas = llamadasDe("falla", RECURSOS_USUARIO).map((a) => a.join(", "));
+  assert(detalles.length >= 3 && fallas.length >= 10, "no se encontraron los detalle/falla(): se rompió la búsqueda");
+  for (const valor of [...detalles, ...fallas]) {
+    assert(!enElIdiomaDelCliente.test(valor), `recursos-como-usuario.ts loguea algo en el idioma del cliente: ${valor}`);
+  }
 });
 
 Deno.test("idioma: recursos-como-usuario.ts no arma ningún `mensaje` con texto suelto", () => {

@@ -310,7 +310,12 @@ Deno.serve(async (req) => {
   const recursoClave = resource === "sales" && sub === "chatters" ? "sales/chatters" : resource;
   const veredicto = decidir(recursoClave, cantidadDeAgencias, AISLAMIENTO_POR_RECURSO, idioma);
   if (!veredicto.ok) {
-    if (veredicto.estado === 503) return noDisponible(req, "puerta de aislamiento", veredicto.motivo);
+    // Al log va un texto FIJO en español (el mismo comienzo que antes) y no
+    // `veredicto.motivo`, que viene en el idioma del cliente: una búsqueda o una alerta
+    // sobre el log no puede depender del Accept-Language de quien llamó.
+    if (veredicto.estado === 503) {
+      return noDisponible(req, "puerta de aislamiento", `No se pudo verificar el aislamiento entre agencias (conteo: ${cantidadDeAgencias})`);
+    }
     return json(req, { error: veredicto.error, message: veredicto.motivo }, veredicto.estado);
   }
 

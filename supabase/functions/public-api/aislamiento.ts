@@ -63,7 +63,19 @@ export type ModoDeAislamiento =
     pendiente: string;
   };
 
-export const AISLAMIENTO_POR_RECURSO: Record<string, ModoDeAislamiento> = {
+/** El mapa recurso → modo, de solo lectura. */
+export type MapaDeAislamiento = Readonly<Record<string, Readonly<ModoDeAislamiento>>>;
+
+/** Congela el mapa y cada entrada: la puerta decide con ESTE mapa, y nadie (ni un
+ *  import que lo modifique, ni `mapa.x = …` desde otro archivo) puede cambiarle el
+ *  modo a un recurso en tiempo de ejecución. En un módulo (modo estricto) escribirle
+ *  tira TypeError en vez de abrir el recurso en silencio. */
+function congelar(mapa: Record<string, ModoDeAislamiento>): MapaDeAislamiento {
+  for (const modo of Object.values(mapa)) Object.freeze(modo);
+  return Object.freeze(mapa);
+}
+
+export const AISLAMIENTO_POR_RECURSO: MapaDeAislamiento = congelar({
   // Quién es la llave: la persona como la que actúa y su agencia. Sirve para probar
   // en vivo que la sesión fabricada funciona antes de abrir nada más sobre ella.
   me: { tipo: "como_usuario" },
@@ -112,7 +124,7 @@ export const AISLAMIENTO_POR_RECURSO: Record<string, ModoDeAislamiento> = {
     pendiente: "el dato es por persona: las RPC de cowork pueden filtrar por tenant_members " +
       "cuando tenant_members sea confiable",
   },
-};
+});
 
 /** Tablas y funciones que public-api usa para AUTENTICAR, no para servir datos. */
 export const INFRAESTRUCTURA: ReadonlySet<string> = new Set([
@@ -127,7 +139,7 @@ export const INFRAESTRUCTURA: ReadonlySet<string> = new Set([
 /** Recursos que se sirven con la sesión del usuario y nunca con service_role. */
 export function esComoUsuario(
   recurso: string,
-  mapa: Record<string, ModoDeAislamiento> = AISLAMIENTO_POR_RECURSO,
+  mapa: MapaDeAislamiento = AISLAMIENTO_POR_RECURSO,
 ): boolean {
   return Object.hasOwn(mapa, recurso) && mapa[recurso].tipo === "como_usuario";
 }
@@ -179,7 +191,7 @@ export type Veredicto =
 export function decidir(
   recurso: string,
   agencias: number | null,
-  mapa: Record<string, ModoDeAislamiento> = AISLAMIENTO_POR_RECURSO,
+  mapa: MapaDeAislamiento = AISLAMIENTO_POR_RECURSO,
   idioma: Idioma = "es",
 ): Veredicto {
   // Object.hasOwn y no `mapa[recurso]`: con un objeto literal, "constructor" o

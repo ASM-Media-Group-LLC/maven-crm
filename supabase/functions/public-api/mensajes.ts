@@ -6,9 +6,10 @@
 // el estado HTTP, las cabeceras, los nombres de campo y los datos. Un cliente que
 // decide por `error` sigue funcionando igual; solo cambia el texto para personas.
 //
-// CÓMO SE ELIGE. Por la cabecera Accept-Language del pedido (RFC 9110 §12.5.4). Sin
-// cabecera, o si no pide inglés, sale en ESPAÑOL, byte a byte igual que antes: las
-// integraciones vivas (kashgrupo1) no ven ningún cambio.
+// CÓMO SE ELIGE. Por la cabecera Accept-Language del pedido (RFC 9110 §12.5.4, con el
+// comodín `*` como dice la RFC 4647). Sin cabecera, o si no prefiere el inglés, sale en
+// ESPAÑOL, byte a byte igual que antes: las integraciones vivas (kashgrupo1) no ven
+// ningún cambio.
 //
 // ⚠️ PURO: no importa nada, no toca la base ni la red. recursos-como-usuario.ts lo
 // importa, y ese archivo solo puede importar valores de piezas puras (el test lo
@@ -35,15 +36,30 @@ function idiomaDeRango(rango: string): Idioma | null {
 
 /** El idioma de las respuestas a este pedido, según su Accept-Language.
  *
- *  Gana, de los rangos ACEPTABLES (q > 0) que son "en"/"en-*" o "es"/"es-*", el de
- *  mayor q; con empate, el primero de la lista. `q=0` quiere decir "esto NO". Un
- *  elemento mal formado se ignora. Si ninguno sirve (sin cabecera, "*", otros
- *  idiomas, basura), español: es lo que el API respondió siempre. */
+ *  Cada idioma que servimos toma su q de los rangos que lo nombran ("en"/"en-*",
+ *  "es"/"es-*"; si hay varios, el mayor). El comodín `*` vale para el idioma que
+ *  ningún rango nombra (RFC 9110 §12.5.4, RFC 4647 §2.1): un rango explícito siempre
+ *  le gana al `*` para su idioma. `q=0` quiere decir "esto NO".
+ *
+ *  Gana el de mayor q entre los aceptables (q > 0). Con empate, el nombrado
+ *  explícitamente le gana al que solo entró por `*`; entre dos explícitos, el que
+ *  vino primero; si los dos entraron por `*`, español.
+ *
+ *  Si ninguno es aceptable: inglés solo si el pedido RECHAZA el español y no rechaza
+ *  el inglés; si no, español, que es lo que el API respondió siempre (sin cabecera,
+ *  otros idiomas, basura). Rechazar es `es;q=0`, o `*;q=0` sin nombrarlo: un rango
+ *  que cubre lo que servimos ("es" a secas). `es-CO;q=0` rechaza una variante, no el
+ *  español (RFC 4647 §3.3.1: "es-CO" no cubre "es"). Un elemento mal formado se
+ *  ignora. */
 export function idiomaDelPedido(req: Request): Idioma {
   const cabecera = req.headers.get("accept-language");
   if (!cabecera) return "es";
-  let elegido: Idioma | null = null;
-  let mejor = 0;
+  // Por idioma: el mayor q de sus rangos explícitos y en qué posición vino.
+  const explicito: Partial<Record<Idioma, { q: number; pos: number }>> = {};
+  // Por idioma: si algún rango EXACTO ("es", no "es-CO") lo rechaza con q=0.
+  const rechazoExacto: Partial<Record<Idioma, true>> = {};
+  let comodin: { q: number; pos: number } | null = null;
+  let pos = 0;
   for (const elemento of cabecera.split(",")) {
     const [rangoCrudo, ...parametros] = elemento.split(";");
     const rango = rangoCrudo.trim();
@@ -58,15 +74,41 @@ export function idiomaDelPedido(req: Request): Idioma {
       if (!PESO.test(valor)) { valido = false; break; }
       q = Number(valor);
     }
-    if (!valido || q <= 0) continue;
-    const idioma = idiomaDeRango(rango);
-    // Estrictamente mayor: con empate se queda el que vino antes.
-    if (idioma !== null && q > mejor) {
-      elegido = idioma;
-      mejor = q;
+    if (!valido) continue;
+    const aca = { q, pos: pos++ };
+    if (rango === "*") {
+      // Estrictamente mayor: con empate se queda el que vino antes.
+      if (comodin === null || q > comodin.q) comodin = aca;
+      continue;
     }
+    const idioma = idiomaDeRango(rango);
+    if (idioma === null) continue;
+    if (q <= 0 && rango.toLowerCase() === idioma) rechazoExacto[idioma] = true;
+    const previo = explicito[idioma];
+    if (previo === undefined || q > previo.q) explicito[idioma] = aca;
   }
-  return elegido ?? "es";
+
+  // El peso de cada idioma: el explícito si lo hay; si no, el del comodín; si no, nada.
+  const peso = (idioma: Idioma) => {
+    const e = explicito[idioma];
+    if (e !== undefined) return { ...e, porComodin: false };
+    if (comodin !== null) return { ...comodin, porComodin: true };
+    return null;
+  };
+  const es = peso("es");
+  const en = peso("en");
+  const aceptable = (p: typeof es): p is NonNullable<typeof es> => p !== null && p.q > 0;
+  const rechazado = (idioma: Idioma, p: typeof es) =>
+    p !== null && p.q <= 0 && (p.porComodin || rechazoExacto[idioma] === true);
+
+  if (aceptable(en) && aceptable(es)) {
+    if (en.q !== es.q) return en.q > es.q ? "en" : "es";
+    if (en.porComodin !== es.porComodin) return en.porComodin ? "es" : "en";
+    return en.pos < es.pos ? "en" : "es";
+  }
+  if (aceptable(en)) return "en";
+  if (aceptable(es)) return "es";
+  return rechazado("es", es) && !rechazado("en", en) ? "en" : "es";
 }
 
 /** El valor de Vary con Accept-Language sumado (sin pisar el Vary: Origin del CORS):
@@ -105,7 +147,8 @@ export const MENSAJES = {
     en: "IP {ip} is not in this API key's IP allowlist",
     vars: ["ip"],
   },
-  ip_desconocida: { es: "desconocida", en: "unknown" },
+  // En inglés entre paréntesis: "IP (unknown) is not in…" se lee; "IP unknown is not…", no.
+  ip_desconocida: { es: "desconocida", en: "(unknown)" },
   llave_sin_agencia: {
     es: "Esta API key no pertenece a ninguna agencia",
     en: "This API key does not belong to any agency",
@@ -116,11 +159,11 @@ export const MENSAJES = {
   },
   no_disponible: {
     es: "El servicio no está disponible en este momento. Reintentá en unos segundos.",
-    en: "The service is temporarily unavailable. Retry in a few seconds.",
+    en: "The service is temporarily unavailable. Please try again in a few seconds.",
   },
   limite_por_minuto: {
     es: "Esta API key llegó a su límite de {n} pedidos por minuto. Reintentá en {s} s.",
-    en: "This API key has reached its limit of {n} requests per minute. Retry in {s} s.",
+    en: "This API key has reached its limit of {n} requests per minute. Please try again in {s} s.",
     vars: ["n", "s"],
   },
   limite_por_hora: {
@@ -137,7 +180,7 @@ export const MENSAJES = {
   kind_invalido: { es: "kind invalido. Usa: {opciones}", en: "Invalid kind. Use: {opciones}", vars: ["opciones"] },
   sales_sub_recurso_desconocido: {
     es: "Sub-recurso de sales desconocido: {sub}",
-    en: "Unknown sales sub-resource: {sub}",
+    en: "Unknown /sales sub-resource: {sub}",
     vars: ["sub"],
   },
   cowork_rutas: {
@@ -158,13 +201,13 @@ export const MENSAJES = {
   },
   aislamiento_no_verificado: {
     es: "No se pudo verificar el aislamiento entre agencias. Reintentá en unos segundos.",
-    en: "Could not verify isolation between agencies. Retry in a few seconds.",
+    en: "Could not verify isolation between agencies. Please try again in a few seconds.",
   },
 
   // --- Lo que actúa como la persona de la llave (recursos-como-usuario.ts) ---
   me_sub_recurso_desconocido: {
     es: "Sub-recurso de me desconocido: {sub}",
-    en: "Unknown me sub-resource: {sub}",
+    en: "Unknown /me sub-resource: {sub}",
     vars: ["sub"],
   },
   messenger_llave_sin_reglas: {
@@ -208,19 +251,28 @@ type VarsDe<K extends Clave> = (typeof MENSAJES)[K] extends { readonly vars: rea
 export type ClaveSinVars = { [K in Clave]: [VarsDe<K>] extends [never] ? K : never }[Clave];
 
 /** El texto de `clave` en `idioma`, con sus variables puestas. Una clave que no
- *  existe, una variable que falta o una que sobra no compilan. Cualquier idioma que
- *  no sea "en" sale en español. Un solo pase: el valor de una variable nunca se
- *  vuelve a interpretar (una IP con "{s}" adentro queda tal cual). */
+ *  existe, una variable que falta o una que sobra no compilan (`deno check`, que corre
+ *  la guarda de CI) y además los rechaza la guarda que lee cada llamada
+ *  (aislamiento.test.ts). Cualquier idioma que no sea "en" sale en español. Un solo
+ *  pase: el valor de una variable nunca se vuelve a interpretar (una IP con "{s}"
+ *  adentro queda tal cual).
+ *
+ *  NUNCA tira: esto arma el cuerpo de un error, y una excepción acá escaparía de
+ *  Deno.serve como un 500 sin CORS ni JSON (justo lo que noDisponible existe para
+ *  evitar). Si igual llegara una clave que no existe (o heredada, como "constructor"),
+ *  devuelve la clave misma; una variable que falta deja su {marca} tal cual. */
 export function msg<K extends Clave>(
   idioma: Idioma,
   clave: K,
   ...vars: [VarsDe<K>] extends [never] ? [] : [Record<VarsDe<K>, string | number>]
 ): string {
+  if (!Object.hasOwn(MENSAJES, clave)) return String(clave);
   const entrada: Entrada = MENSAJES[clave];
   const texto = idioma === "en" ? entrada.en : entrada.es;
   const declaradas = entrada.vars ?? [];
   if (declaradas.length === 0) return texto;
-  const valores = (vars[0] ?? {}) as Record<string, string | number>;
+  const crudos: unknown = vars[0];
+  const valores = (typeof crudos === "object" && crudos !== null ? crudos : {}) as Record<string, string | number>;
   return texto.replace(/\{([A-Za-z_]+)\}/g, (marca, nombre: string) =>
     declaradas.includes(nombre) && Object.hasOwn(valores, nombre) ? String(valores[nombre]) : marca
   );
