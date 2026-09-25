@@ -44,6 +44,8 @@
 // FALLAR CERRADO ES EL PUNTO: un 403 el primer día de la agencia nueva se ve y se
 // arregla; una fuga no se ve hasta que ya pasó.
 
+import { type Idioma, msg } from "./mensajes.ts";
+
 export type ModoDeAislamiento =
   | { tipo: "columna"; columna: "tenant_id" }
   | { tipo: "miembros" }
@@ -61,7 +63,19 @@ export type ModoDeAislamiento =
     pendiente: string;
   };
 
-export const AISLAMIENTO_POR_RECURSO: Record<string, ModoDeAislamiento> = {
+/** El mapa recurso → modo, de solo lectura. */
+export type MapaDeAislamiento = Readonly<Record<string, Readonly<ModoDeAislamiento>>>;
+
+/** Congela el mapa y cada entrada: la puerta decide con ESTE mapa, y nadie (ni un
+ *  import que lo modifique, ni `mapa.x = …` desde otro archivo) puede cambiarle el
+ *  modo a un recurso en tiempo de ejecución. En un módulo (modo estricto) escribirle
+ *  tira TypeError en vez de abrir el recurso en silencio. */
+function congelar(mapa: Record<string, ModoDeAislamiento>): MapaDeAislamiento {
+  for (const modo of Object.values(mapa)) Object.freeze(modo);
+  return Object.freeze(mapa);
+}
+
+export const AISLAMIENTO_POR_RECURSO: MapaDeAislamiento = congelar({
   // Quién es la llave: la persona como la que actúa y su agencia. Sirve para probar
   // en vivo que la sesión fabricada funciona antes de abrir nada más sobre ella.
   me: { tipo: "como_usuario" },
@@ -110,7 +124,7 @@ export const AISLAMIENTO_POR_RECURSO: Record<string, ModoDeAislamiento> = {
     pendiente: "el dato es por persona: las RPC de cowork pueden filtrar por tenant_members " +
       "cuando tenant_members sea confiable",
   },
-};
+});
 
 /** Tablas y funciones que public-api usa para AUTENTICAR, no para servir datos. */
 export const INFRAESTRUCTURA: ReadonlySet<string> = new Set([
@@ -125,7 +139,7 @@ export const INFRAESTRUCTURA: ReadonlySet<string> = new Set([
 /** Recursos que se sirven con la sesión del usuario y nunca con service_role. */
 export function esComoUsuario(
   recurso: string,
-  mapa: Record<string, ModoDeAislamiento> = AISLAMIENTO_POR_RECURSO,
+  mapa: MapaDeAislamiento = AISLAMIENTO_POR_RECURSO,
 ): boolean {
   return Object.hasOwn(mapa, recurso) && mapa[recurso].tipo === "como_usuario";
 }
@@ -167,6 +181,7 @@ export type Veredicto =
  *
  *  @param agencias  filas en `tenants`, o `null` si no se pudo contar.
  *  @param mapa      inyectable para testear los modos que hoy nadie usa.
+ *  @param idioma    el de `motivo` (ver ./mensajes.ts). Español si no se dice.
  *
  *  Tres salidas distintas, porque le dicen cosas distintas al cliente:
  *   - 404: el recurso no existe (o no declaró cómo aísla, que para el caso es igual).
@@ -176,12 +191,13 @@ export type Veredicto =
 export function decidir(
   recurso: string,
   agencias: number | null,
-  mapa: Record<string, ModoDeAislamiento> = AISLAMIENTO_POR_RECURSO,
+  mapa: MapaDeAislamiento = AISLAMIENTO_POR_RECURSO,
+  idioma: Idioma = "es",
 ): Veredicto {
   // Object.hasOwn y no `mapa[recurso]`: con un objeto literal, "constructor" o
   // "toString" existen por herencia y la puerta los dejaba pasar.
   if (!Object.hasOwn(mapa, recurso)) {
-    return { ok: false, estado: 404, error: "not_found", motivo: `Recurso desconocido: ${recurso}` };
+    return { ok: false, estado: 404, error: "not_found", motivo: msg(idioma, "recurso_desconocido", { recurso }) };
   }
   const modo = mapa[recurso];
   if (modo.tipo === "columna" || modo.tipo === "miembros") return { ok: true };
@@ -194,9 +210,9 @@ export function decidir(
       ok: false,
       estado: 403,
       error: "resource_unavailable",
-      motivo: "Este recurso todavía no separa datos por agencia, así que se desactiva " +
-        "mientras Maven tenga más de una, para no exponer datos de otras. " +
-        `Pendiente: ${pendiente}.`,
+      // String(): acá `pendiente` nunca es undefined (se retornó arriba), pero el tipo
+      // no lo sabe; así sale igual que el template de antes.
+      motivo: msg(idioma, "recurso_sin_aislamiento", { pendiente: String(pendiente) }),
     };
   }
   // null (no se pudo contar), 0 o negativo: no lo sabemos, así que no se sirve.
@@ -204,6 +220,6 @@ export function decidir(
     ok: false,
     estado: 503,
     error: "temporarily_unavailable",
-    motivo: "No se pudo verificar el aislamiento entre agencias. Reintentá en unos segundos.",
+    motivo: msg(idioma, "aislamiento_no_verificado"),
   };
 }
