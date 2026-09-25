@@ -21,8 +21,10 @@ import EditTicketModal from "./EditTicketModal";
 import DeleteTicketDialog from "./DeleteTicketDialog";
 import { usePermissions } from "@/hooks/usePermissions";
 import { PageHeader } from "@/components/ui/page-header";
+import { useLanguage } from "@/hooks/useLanguage";
 
 const TicketsContent = () => {
+  const { t } = useLanguage();
   const { canAccess } = usePermissions();
   // Gates: el fallback de canAccess concede a quien tenga el módulo Tickets, así que
   // hoy nadie pierde acceso; solo permite restringir por rol desde el modal de permisos.
@@ -57,24 +59,24 @@ const TicketsContent = () => {
   const tickets = ticketsQuery.data || [];
 
   const filtered = useMemo(() => {
-    return tickets.filter((t) => {
+    return tickets.filter((tk) => {
       if (search) {
         const q = search.toLowerCase();
-        const num = t.id.slice(0, 6).toLowerCase();
+        const num = tk.id.slice(0, 6).toLowerCase();
         if (
-          !t.title.toLowerCase().includes(q) &&
-          !(t.description || "").toLowerCase().includes(q) &&
+          !tk.title.toLowerCase().includes(q) &&
+          !(tk.description || "").toLowerCase().includes(q) &&
           !num.includes(q)
         )
           return false;
       }
-      if (priority && t.priority !== priority) return false;
-      if (ticketType && t.ticket_type !== ticketType) return false;
-      if (status && t.status !== status) return false;
-      if (company && t.company !== company) return false;
-      if (assignedTo && t.assigned_to !== assignedTo) return false;
-      if (dateFrom && t.created_at && t.created_at < dateFrom) return false;
-      if (dateTo && t.created_at && t.created_at > dateTo + "T23:59:59") return false;
+      if (priority && tk.priority !== priority) return false;
+      if (ticketType && tk.ticket_type !== ticketType) return false;
+      if (status && tk.status !== status) return false;
+      if (company && tk.company !== company) return false;
+      if (assignedTo && tk.assigned_to !== assignedTo) return false;
+      if (dateFrom && tk.created_at && tk.created_at < dateFrom) return false;
+      if (dateTo && tk.created_at && tk.created_at > dateTo + "T23:59:59") return false;
       return true;
     });
   }, [tickets, search, priority, ticketType, status, company, assignedTo, dateFrom, dateTo]);
@@ -99,18 +101,18 @@ const TicketsContent = () => {
       <header className="bg-background/30 backdrop-blur-xl px-6 pt-6 pb-4 border-b border-white/10 shrink-0">
         <PageHeader
           title="Customer Service"
-          subtitle="Gestión de soporte y escalaciones"
+          subtitle={t("tickets.subtitle")}
           actions={
             canManageForms ? (
               <Button onClick={() => setBuilderOpen(true)}>
                 <Plus className="h-4 w-4 mr-1" />
-                Nueva plantilla
+                {t("tickets.newTemplate")}
               </Button>
             ) : (
               canCreate && (
                 <Button onClick={() => setPickerOpen(true)}>
                   <Plus className="h-4 w-4 mr-1" />
-                  Nuevo Ticket
+                  {t("tickets.newTicket")}
                 </Button>
               )
             )
@@ -121,17 +123,17 @@ const TicketsContent = () => {
       <div className="flex-1 overflow-auto p-6 space-y-4">
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="mb-4">
-          {canCreate && <TabsTrigger value="new">Nuevo Ticket</TabsTrigger>}
-          {canSeeList && <TabsTrigger value="list">Lista de Tickets</TabsTrigger>}
-          {canManageForms && <TabsTrigger value="forms">Plantillas</TabsTrigger>}
+          {canCreate && <TabsTrigger value="new">{t("tickets.newTicket")}</TabsTrigger>}
+          {canSeeList && <TabsTrigger value="list">{t("tickets.tab.list")}</TabsTrigger>}
+          {canManageForms && <TabsTrigger value="forms">{t("tickets.tab.templates")}</TabsTrigger>}
         </TabsList>
 
         {canCreate && (
         <TabsContent value="new" className="space-y-4">
           <div>
-            <h2 className="text-sm font-medium">¿Qué tipo de ticket quieres levantar?</h2>
+            <h2 className="text-sm font-medium">{t("tickets.whatKind")}</h2>
             <p className="text-xs text-muted-foreground">
-              Elige una plantilla y completa el formulario. El código se asigna solo.
+              {t("tickets.pickTemplateHint")}
             </p>
           </div>
 
@@ -158,7 +160,7 @@ const TicketsContent = () => {
           <p className="text-xs text-muted-foreground">{filtered.length} tickets</p>
 
           {ticketsQuery.isLoading ? (
-            <p className="text-sm text-muted-foreground py-8 text-center">Cargando tickets...</p>
+            <p className="text-sm text-muted-foreground py-8 text-center">{t("tickets.loadingTickets")}</p>
           ) : view === "list" ? (
             <TicketsList tickets={filtered} onView={handleView} onEdit={handleEdit} onDelete={handleDelete} />
           ) : (
@@ -181,9 +183,9 @@ const TicketsContent = () => {
       <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>Nuevo ticket</DialogTitle>
+            <DialogTitle>{t("tickets.newTicket")}</DialogTitle>
             <DialogDescription>
-              Elegi una plantilla y completa el formulario. El codigo se asigna solo.
+              {t("tickets.pickTemplateHint")}
             </DialogDescription>
           </DialogHeader>
           <NewTicketLauncher canCreate={canCreate} canManageForms={canManageForms} />

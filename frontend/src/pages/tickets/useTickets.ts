@@ -1,31 +1,46 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { traducir, type TranslationKey } from "@/lib/i18n";
 
+// Catálogos cerrados: la LLAVE es el valor que se guarda en `tickets` (y contra
+// el que se filtra); lo que se traduce es solo la etiqueta. Por eso cada mapa
+// va de valor a clave de i18n, y la pantalla la pasa por t() con `etiquetaDe`.
 export const PRIORITIES = ["low", "medium", "high", "urgent"] as const;
-export const PRIORITY_LABELS: Record<string, string> = {
-  low: "Baja",
-  medium: "Media",
-  high: "Alta",
-  urgent: "Urgente",
+export const PRIORITY_LABEL_KEYS: Record<string, TranslationKey> = {
+  low: "tickets.priority.low",
+  medium: "tickets.priority.medium",
+  high: "tickets.priority.high",
+  urgent: "tickets.priority.urgent",
 };
 
 export const STATUSES = ["open", "in_progress", "resolved", "closed"] as const;
-export const STATUS_LABELS: Record<string, string> = {
-  open: "Abierto",
-  in_progress: "En Progreso",
-  resolved: "Resuelto",
-  closed: "Cerrado",
+export const STATUS_LABEL_KEYS: Record<string, TranslationKey> = {
+  open: "tickets.status.open",
+  in_progress: "common.inProgress",
+  resolved: "tickets.status.resolved",
+  closed: "tickets.status.closed",
 };
 
 export const TICKET_TYPES = ["complaint", "technical", "billing", "content", "general"] as const;
-export const TYPE_LABELS: Record<string, string> = {
-  complaint: "Queja",
-  technical: "Técnico",
-  billing: "Facturación",
-  content: "Contenido",
-  general: "General",
+export const TYPE_LABEL_KEYS: Record<string, TranslationKey> = {
+  complaint: "tickets.type.complaint",
+  technical: "tickets.type.technical",
+  billing: "tickets.type.billing",
+  content: "tickets.type.content",
+  general: "tickets.type.general",
 };
+
+/** La etiqueta traducida de un valor del catálogo; si el valor no está en el
+ *  catálogo (un dato viejo), se muestra tal cual en vez de una clave de i18n. */
+export function etiquetaDe(
+  claves: Record<string, TranslationKey>,
+  valor: string,
+  t: (key: TranslationKey) => string,
+): string {
+  const clave = claves[valor];
+  return clave ? t(clave) : valor;
+}
 
 export const COMPANIES = [
   { value: "ora_miami", label: "Ora Miami" },
@@ -132,11 +147,11 @@ export function useTickets() {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast({ title: "Ticket creado exitosamente" });
+      toast({ title: traducir("tickets.toast.created") });
       queryClient.invalidateQueries({ queryKey: ["tickets-module"] });
     },
     onError: (error: Error) => {
-      toast({ title: "Error al crear ticket", description: error.message, variant: "destructive" });
+      toast({ title: traducir("tickets.toast.createError"), description: error.message, variant: "destructive" });
     },
   });
 
@@ -146,11 +161,11 @@ export function useTickets() {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast({ title: "Ticket actualizado exitosamente" });
+      toast({ title: traducir("tickets.toast.updated") });
       queryClient.invalidateQueries({ queryKey: ["tickets-module"] });
     },
     onError: (error: Error) => {
-      toast({ title: "Error al actualizar ticket", description: error.message, variant: "destructive" });
+      toast({ title: traducir("tickets.toast.updateError"), description: error.message, variant: "destructive" });
     },
   });
 
@@ -160,11 +175,11 @@ export function useTickets() {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast({ title: "Ticket eliminado exitosamente" });
+      toast({ title: traducir("tickets.toast.deleted") });
       queryClient.invalidateQueries({ queryKey: ["tickets-module"] });
     },
     onError: (error: Error) => {
-      toast({ title: "Error al eliminar ticket", description: error.message, variant: "destructive" });
+      toast({ title: traducir("tickets.toast.deleteError"), description: error.message, variant: "destructive" });
     },
   });
 
@@ -202,11 +217,11 @@ export function useTickets() {
       if (error) throw error;
     },
     onSuccess: (_data, variables) => {
-      toast({ title: "Comentario agregado" });
+      toast({ title: traducir("tickets.toast.commentAdded") });
       queryClient.invalidateQueries({ queryKey: ["ticket-comments", variables.ticket_id] });
     },
     onError: (error: Error) => {
-      toast({ title: "Error al agregar comentario", description: error.message, variant: "destructive" });
+      toast({ title: traducir("tickets.toast.commentError"), description: error.message, variant: "destructive" });
     },
   });
 

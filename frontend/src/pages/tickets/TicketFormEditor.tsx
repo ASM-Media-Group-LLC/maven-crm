@@ -53,9 +53,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 import { FORM_COLORS, FORM_ICONS, EDITOR_CANVAS } from "./ticketFormPresentation";
 import {
   useTicketForms,
+  FIELD_TYPES,
   TYPES_WITH_OPTIONS,
   MAPPABLE_COLUMNS,
   slugifyFieldKey,
@@ -91,23 +94,10 @@ const TYPE_ICONS: Record<FieldType, LucideIcon> = {
   drive_links: Paperclip,
 };
 
-const TYPE_LABELS: Record<FieldType, string> = {
-  creator: "Creadora",
-  text: "Respuesta corta",
-  textarea: "Parrafo",
-  number: "Numero",
-  currency: "Monto ($)",
-  percent: "Porcentaje (%)",
-  date: "Fecha",
-  select: "Opcion multiple",
-  multiselect: "Casillas",
-  checkbox: "Si / No",
-  email: "Correo",
-  url: "Enlace",
-  instagram: "Instagram",
-  user: "Empleado de Maven",
-  drive_links: "Archivos de Drive",
-};
+/** Clave de i18n del nombre de cada tipo, sacada del catálogo de useTicketForms. */
+const TYPE_LABEL_KEYS = Object.fromEntries(
+  FIELD_TYPES.map((ft) => [ft.value, ft.labelKey]),
+) as Record<FieldType, TranslationKey>;
 
 const TYPE_ORDER: FieldType[] = [
   "creator",
@@ -168,6 +158,7 @@ interface Props {
 
 const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
   const { toast } = useToast();
+  const { t } = useLanguage();
   const { fieldsByForm, saveForm, saveFields } = useTicketForms({ includeUnpublished: true });
 
   const uidSeq = useRef(0);
@@ -248,6 +239,8 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
         ...prev,
         {
           uid: nextUid(),
+          // La etiqueta y la ayuda se guardan en ticket_form_fields y las leen
+          // todos los que llenan la plantilla (y el correo del aviso): no se traducen.
           label: "Link de Instagram",
           field_key: "link_instagram",
           field_type: "instagram",
@@ -264,7 +257,7 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
     const e = emailDraft.trim().toLowerCase();
     if (!e) return;
     if (!EMAIL_RE.test(e)) {
-      toast({ title: "Correo invalido", description: e, variant: "destructive" });
+      toast({ title: t("common.invalidEmail"), description: e, variant: "destructive" });
       return;
     }
     if (!emails.includes(e)) setEmails([...emails, e]);
@@ -281,6 +274,7 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
           merged.field_key = slugifyFieldKey(p.label);
         }
         // Al pasar a un tipo con opciones, arrancar con una para que sea usable.
+        // "Opcion 1" queda guardada como opción si nadie la cambia: no se traduce.
         if (p.field_type && TYPES_WITH_OPTIONS.includes(p.field_type) && !merged.options.length) {
           merged.options = [{ value: "", label: "Opcion 1" }];
         }
@@ -313,6 +307,7 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
       const copy: DraftField = {
         ...prev[i],
         uid: nextUid(),
+        // Se guarda como etiqueta de la pregunta: no se traduce.
         label: `${prev[i].label} (copia)`,
         field_key: "",
         options: prev[i].options.map((o) => ({ ...o })),
@@ -336,32 +331,37 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
     });
   };
 
-  /** Errores que la base rechazaria, detectados antes de mandar. */
+  /**
+   * Errores que la base rechazaria, detectados antes de mandar. `enAjustes`
+   * marca los que se corrigen en la pestaña Ajustes: antes se decidía buscando
+   * la palabra "prefijo" en el texto, y eso deja de andar al traducirlo.
+   */
   const problems = useMemo(() => {
-    const out: string[] = [];
-    if (!name.trim()) out.push("La plantilla necesita un nombre.");
+    const out: { texto: string; enAjustes?: boolean }[] = [];
+    const add = (texto: string) => out.push({ texto });
+    if (!name.trim()) add(t("tickets.editor.problem.noName"));
     if (!/^[A-Z][A-Z0-9]{0,7}$/.test(prefix.trim().toUpperCase()))
-      out.push("El prefijo debe ser de 1 a 8 caracteres, empezando por letra (ej. TK).");
+      out.push({ texto: t("tickets.editor.problem.badPrefix"), enAjustes: true });
 
     if (fields.filter((f) => f.field_type === "creator").length > 1)
-      out.push("Solo puede haber una pregunta de tipo Creadora por plantilla.");
+      add(t("tickets.editor.problem.twoCreators"));
 
     const keys = new Set<string>();
     const maps = new Set<string>();
     fields.forEach((f, i) => {
       const n = i + 1;
-      if (!f.label.trim()) out.push(`La pregunta ${n} no tiene texto.`);
+      const label = f.label || String(n);
+      if (!f.label.trim()) add(t("tickets.editor.problem.noText", { n }));
       const k = f.field_key || slugifyFieldKey(f.label);
-      if (!/^[a-z][a-z0-9_]{0,48}$/.test(k))
-        out.push(`"${f.label || n}" no produce una clave valida. Usa al menos una letra.`);
-      else if (keys.has(k)) out.push(`Hay dos preguntas con la clave "${k}". Cambia una etiqueta.`);
+      if (!/^[a-z][a-z0-9_]{0,48}$/.test(k)) add(t("tickets.editor.problem.badKey", { label }));
+      else if (keys.has(k)) add(t("tickets.editor.problem.duplicateKey", { key: k }));
       keys.add(k);
 
       if (TYPES_WITH_OPTIONS.includes(f.field_type) && serializeOptions(f.options).length === 0)
-        out.push(`"${f.label || n}" necesita al menos una opcion.`);
+        add(t("tickets.editor.problem.needsOption", { label }));
 
       if (f.maps_to) {
-        if (maps.has(f.maps_to)) out.push(`Dos preguntas apuntan a "${f.maps_to}". Solo una puede.`);
+        if (maps.has(f.maps_to)) add(t("tickets.editor.problem.duplicateMapping", { column: f.maps_to }));
         maps.add(f.maps_to);
 
         // Este es el error que corrompe datos en silencio: guardar la etiqueta
@@ -370,20 +370,18 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
         if (col && "closedCatalog" in col && col.closedCatalog) {
           const opts = f.options.filter((o) => o.label.trim());
           if (!opts.length || opts.some((o) => !o.value.trim()))
-            out.push(
-              `"${f.label || n}" alimenta ${col.label}, que solo acepta valores del catalogo. Completa el "valor guardado" de cada opcion.`,
-            );
+            add(t("tickets.editor.problem.closedCatalog", { label, column: t(col.labelKey) }));
         }
       }
     });
     return out;
-  }, [name, prefix, fields]);
+  }, [name, prefix, fields, t]);
 
   const handleSave = async (alsoPublish?: boolean, skipRecipientCheck?: boolean) => {
     if (problems.length) {
       setShowProblems(true);
-      setTab(problems[0].includes("prefijo") ? "settings" : "questions");
-      toast({ title: "Revisa el formulario", description: problems[0], variant: "destructive" });
+      setTab(problems[0].enAjustes ? "settings" : "questions");
+      toast({ title: t("tickets.editor.checkForm"), description: problems[0].texto, variant: "destructive" });
       return;
     }
     // Publicar sin destinatarios deja los tickets sin avisarle a nadie: es el
@@ -439,7 +437,7 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
         onEscapeKeyDown={(e) => e.preventDefault()}
       >
         <DialogTitle className="sr-only">
-          {form ? `Editar plantilla ${form.name}` : "Nueva plantilla de ticket"}
+          {form ? t("tickets.editor.srTitleEdit", { name: form.name }) : t("tickets.editor.srTitleNew")}
         </DialogTitle>
 
         {/* ── Barra superior ─────────────────────────────────────────────── */}
@@ -452,7 +450,7 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
           <Input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Plantilla sin titulo"
+            placeholder={t("tickets.editor.untitledTemplate")}
             className="h-8 max-w-xs border-0 bg-transparent px-0 text-base font-medium shadow-none focus-visible:ring-0"
           />
           {prefix && (
@@ -469,7 +467,7 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
               className="h-7"
             >
               <ListOrdered className="mr-1.5 h-3.5 w-3.5" />
-              Preguntas
+              {t("tickets.editor.questions")}
             </Button>
             <Button
               variant={tab === "settings" ? "secondary" : "ghost"}
@@ -478,21 +476,21 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
               className="h-7"
             >
               <Settings2 className="mr-1.5 h-3.5 w-3.5" />
-              Ajustes
+              {t("tickets.editor.settings")}
             </Button>
           </div>
 
           <Separator orientation="vertical" className="h-6" />
 
           <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)} disabled={saving}>
-            Cancelar
+            {t("common.cancel")}
           </Button>
           <Button variant="outline" size="sm" onClick={() => handleSave()} disabled={saving}>
-            {saving ? "Guardando..." : "Guardar"}
+            {saving ? t("tickets.saving") : t("common.save")}
           </Button>
           {!published && (
             <Button size="sm" onClick={() => handleSave(true)} disabled={saving}>
-              Publicar
+              {t("tickets.editor.publish")}
             </Button>
           )}
         </div>
@@ -510,13 +508,13 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
                     <Input
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      placeholder="Plantilla sin titulo"
+                      placeholder={t("tickets.editor.untitledTemplate")}
                       className="h-auto border-0 border-b border-transparent bg-transparent px-0 pb-1 !text-[28px] font-normal leading-tight shadow-none focus-visible:border-b-foreground/40 focus-visible:ring-0"
                     />
                     <Textarea
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
-                      placeholder="Descripcion del formulario"
+                      placeholder={t("tickets.editor.formDescription")}
                       rows={1}
                       className="min-h-0 resize-none border-0 border-b border-transparent bg-transparent px-0 text-sm shadow-none focus-visible:border-b-primary focus-visible:ring-0"
                     />
@@ -555,7 +553,7 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
                                   <div
                                     {...dragProvided.dragHandleProps}
                                     className="flex cursor-grab justify-center py-1 text-muted-foreground/50 hover:text-muted-foreground"
-                                    aria-label="Arrastrar para reordenar"
+                                    aria-label={t("tickets.editor.dragToReorder")}
                                   >
                                     <GripHorizontal className="h-4 w-4" />
                                   </div>
@@ -567,7 +565,7 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
                                           <Input
                                             value={f.label}
                                             onChange={(e) => patch(f.uid, { label: e.target.value })}
-                                            placeholder="Pregunta sin titulo"
+                                            placeholder={t("tickets.editor.untitledQuestion")}
                                             className="flex-1 border-0 border-b bg-muted/50 focus-visible:border-b-primary focus-visible:ring-0"
                                           />
                                           <Select
@@ -580,13 +578,13 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
                                               <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent>
-                                              {TYPE_ORDER.map((t) => {
-                                                const I = TYPE_ICONS[t];
+                                              {TYPE_ORDER.map((tipo) => {
+                                                const I = TYPE_ICONS[tipo];
                                                 return (
-                                                  <SelectItem key={t} value={t}>
+                                                  <SelectItem key={tipo} value={tipo}>
                                                     <span className="flex items-center gap-2">
                                                       <I className="h-4 w-4" />
-                                                      {TYPE_LABELS[t]}
+                                                      {t(TYPE_LABEL_KEYS[tipo])}
                                                     </span>
                                                   </SelectItem>
                                                 );
@@ -612,7 +610,7 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
                                                     next[oi] = { ...o, label: e.target.value };
                                                     patch(f.uid, { options: next });
                                                   }}
-                                                  placeholder={`Opcion ${oi + 1}`}
+                                                  placeholder={t("tickets.editor.optionN", { n: oi + 1 })}
                                                   className="flex-1 border-0 border-b bg-transparent px-0 shadow-none focus-visible:border-b-primary focus-visible:ring-0"
                                                 />
                                                 {closed && (
@@ -623,7 +621,7 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
                                                       next[oi] = { ...o, value: e.target.value };
                                                       patch(f.uid, { options: next });
                                                     }}
-                                                    placeholder="valor guardado"
+                                                    placeholder={t("tickets.editor.storedValue")}
                                                     className="w-40 font-mono text-xs"
                                                   />
                                                 )}
@@ -631,7 +629,7 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
                                                   variant="ghost"
                                                   size="icon"
                                                   className="h-7 w-7 shrink-0"
-                                                  aria-label="Quitar opcion"
+                                                  aria-label={t("tickets.editor.removeOption")}
                                                   onClick={() =>
                                                     patch(f.uid, {
                                                       options: f.options.filter((_, x) => x !== oi),
@@ -656,14 +654,14 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
                                               }
                                             >
                                               <Plus className="mr-1 h-3.5 w-3.5" />
-                                              Anadir opcion
+                                              {t("tickets.editor.addOption")}
                                             </Button>
                                             {closed && (
                                               <p className="text-xs text-muted-foreground">
-                                                Esta pregunta alimenta {mapped?.label}, que solo
-                                                acepta valores de su catalogo. El texto de la
-                                                izquierda es lo que se ve; el de la derecha es lo que
-                                                se guarda (ej. <code>urgent</code>).
+                                                {t("tickets.editor.closedCatalogHint", {
+                                                  column: mapped ? t(mapped.labelKey) : "",
+                                                })}{" "}
+                                                <code>urgent</code>).
                                               </p>
                                             )}
                                           </div>
@@ -672,7 +670,7 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
                                         <Input
                                           value={f.help_text}
                                           onChange={(e) => patch(f.uid, { help_text: e.target.value })}
-                                          placeholder="Texto de ayuda (opcional)"
+                                          placeholder={t("tickets.editor.helpText")}
                                           className="mt-4 border-0 border-b bg-transparent px-0 text-xs shadow-none focus-visible:border-b-primary focus-visible:ring-0"
                                         />
 
@@ -690,11 +688,11 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
                                             </SelectTrigger>
                                             <SelectContent>
                                               <SelectItem value="__none__">
-                                                Solo queda en el ticket
+                                                {t("tickets.editor.onlyInTicket")}
                                               </SelectItem>
                                               {MAPPABLE_COLUMNS.map((c) => (
                                                 <SelectItem key={c.value} value={c.value}>
-                                                  Alimenta: {c.label}
+                                                  {t("tickets.editor.feeds", { column: t(c.labelKey) })}
                                                 </SelectItem>
                                               ))}
                                             </SelectContent>
@@ -704,7 +702,7 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
                                             variant="ghost"
                                             size="icon"
                                             className="h-8 w-8"
-                                            aria-label="Duplicar pregunta"
+                                            aria-label={t("tickets.editor.duplicateQuestion")}
                                             onClick={() => duplicateField(f.uid)}
                                           >
                                             <Copy className="h-4 w-4" />
@@ -713,7 +711,7 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
                                             variant="ghost"
                                             size="icon"
                                             className="h-8 w-8"
-                                            aria-label="Borrar pregunta"
+                                            aria-label={t("tickets.editor.deleteQuestion")}
                                             onClick={() =>
                                               setFields(fields.filter((x) => x.uid !== f.uid))
                                             }
@@ -722,7 +720,7 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
                                           </Button>
                                           <Separator orientation="vertical" className="h-6" />
                                           <label className="flex cursor-pointer items-center gap-2 text-sm">
-                                            Obligatorio
+                                            {t("tickets.editor.required")}
                                             <Switch
                                               checked={f.is_required}
                                               onCheckedChange={(v) => patch(f.uid, { is_required: v })}
@@ -739,14 +737,14 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
                                             f.label ? "" : "text-muted-foreground"
                                           }`}
                                         >
-                                          {f.label || "Pregunta sin titulo"}
+                                          {f.label || t("tickets.editor.untitledQuestion")}
                                         </span>
                                         {f.is_required && (
                                           <span className="text-destructive">*</span>
                                         )}
                                         {f.maps_to && (
                                           <Badge variant="outline" className="ml-auto shrink-0 text-[10px]">
-                                            {mapped?.label}
+                                            {mapped ? t(mapped.labelKey) : f.maps_to}
                                           </Badge>
                                         )}
                                       </div>
@@ -769,19 +767,20 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
                   onClick={addField}
                 >
                   <Plus className="mr-1.5 h-4 w-4" />
-                  Anadir pregunta
+                  {t("tickets.editor.addQuestion")}
                 </Button>
 
                 {showProblems && problems.length > 0 && (
                   <div className="rounded-lg border border-destructive/50 bg-destructive/5 p-3">
                     <p className="text-xs font-medium text-destructive">
-                      Falta corregir {problems.length}{" "}
-                      {problems.length === 1 ? "cosa" : "cosas"}:
+                      {problems.length === 1
+                        ? t("tickets.editor.problems.one")
+                        : t("tickets.editor.problems.other", { count: problems.length })}
                     </p>
                     <ul className="mt-1 list-inside list-disc space-y-0.5">
                       {problems.map((p, i) => (
                         <li key={i} className="text-xs text-destructive">
-                          {p}
+                          {p.texto}
                         </li>
                       ))}
                     </ul>
@@ -794,7 +793,7 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
                 <div className="space-y-4 rounded-lg border bg-card p-5">
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-1.5">
-                      <Label>Prefijo del codigo *</Label>
+                      <Label>{t("tickets.editor.codePrefix")}</Label>
                       <Input
                         value={prefix}
                         onChange={(e) => setPrefix(e.target.value.toUpperCase())}
@@ -805,13 +804,13 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
                       />
                       <p className="text-xs text-muted-foreground">
                         {form
-                          ? "No se puede cambiar: los tickets ya emitidos lo usan."
-                          : `Los tickets saldran como ${(prefix || "TK").toUpperCase()}-0001, -0002...`}
+                          ? t("tickets.editor.prefixLocked")
+                          : t("tickets.editor.prefixPreview", { prefix: (prefix || "TK").toUpperCase() })}
                       </p>
                     </div>
 
                     <div className="space-y-1.5">
-                      <Label>Icono</Label>
+                      <Label>{t("tickets.editor.icon")}</Label>
                       <Select value={icon} onValueChange={setIcon}>
                         <SelectTrigger>
                           <SelectValue />
@@ -858,10 +857,10 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
                     <div>
                       <Label className="flex items-center gap-1.5">
                         <Mail className="h-4 w-4" />
-                        Destinatarios del correo
+                        {t("tickets.editor.recipients")}
                       </Label>
                       <p className="text-xs text-muted-foreground">
-                        A quien le llega el aviso al crearse un ticket de esta plantilla.
+                        {t("tickets.editor.recipientsHint")}
                       </p>
                     </div>
                     <Switch checked={notifyEnabled} onCheckedChange={setNotifyEnabled} />
@@ -879,17 +878,17 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
                               addEmail();
                             }
                           }}
-                          placeholder="persona@unlok.me"
+                          placeholder={t("tickets.editor.emailPlaceholder")}
                           type="email"
                         />
                         <Button type="button" variant="outline" onClick={addEmail}>
-                          Agregar
+                          {t("common.add")}
                         </Button>
                       </div>
 
                       {emails.length === 0 ? (
                         <p className="text-xs text-muted-foreground">
-                          Sin destinatarios: el ticket se crea igual, pero no se avisa por correo.
+                          {t("tickets.editor.noRecipients")}
                         </p>
                       ) : (
                         <div className="flex flex-wrap gap-1.5">
@@ -900,7 +899,7 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
                                 type="button"
                                 onClick={() => setEmails(emails.filter((x) => x !== e))}
                                 className="rounded-full p-0.5 hover:bg-background/60"
-                                aria-label={`Quitar ${e}`}
+                                aria-label={t("tickets.editor.removeEmail", { email: e })}
                               >
                                 <X className="h-3 w-3" />
                               </button>
@@ -922,8 +921,8 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
                   variant="ghost"
                   size="icon"
                   onClick={addField}
-                  aria-label="Anadir pregunta"
-                  title="Anadir pregunta"
+                  aria-label={t("tickets.editor.addQuestion")}
+                  title={t("tickets.editor.addQuestion")}
                 >
                   <Plus className="h-4 w-4" />
                 </Button>
@@ -931,8 +930,8 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
                   variant="ghost"
                   size="icon"
                   onClick={() => setTab("settings")}
-                  aria-label="Ajustes de la plantilla"
-                  title="Ajustes de la plantilla"
+                  aria-label={t("tickets.editor.templateSettings")}
+                  title={t("tickets.editor.templateSettings")}
                 >
                   <Settings2 className="h-4 w-4" />
                 </Button>
@@ -945,11 +944,9 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
         <AlertDialog open={askRecipients} onOpenChange={setAskRecipients}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Nadie va a recibir el aviso</AlertDialogTitle>
+              <AlertDialogTitle>{t("tickets.editor.noOneNotified")}</AlertDialogTitle>
               <AlertDialogDescription>
-                Esta plantilla no tiene destinatarios de correo. Los tickets se van a crear
-                igual, pero no se le va a avisar a nadie — y ese es el tipo de falla que no se
-                nota hasta que alguien pregunta por un ticket que nadie vio.
+                {t("tickets.editor.noOneNotifiedDesc")}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -959,7 +956,7 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
                   setTab("settings");
                 }}
               >
-                Agregar destinatarios
+                {t("tickets.editor.addRecipients")}
               </AlertDialogCancel>
               <AlertDialogAction
                 onClick={() => {
@@ -968,7 +965,7 @@ const TicketFormEditor = ({ form, open, onOpenChange }: Props) => {
                   void handleSave(true, true);
                 }}
               >
-                Publicar sin correo
+                {t("tickets.editor.publishWithoutEmail")}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

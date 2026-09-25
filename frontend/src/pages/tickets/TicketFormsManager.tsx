@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { useLanguage } from "@/hooks/useLanguage";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,6 +24,7 @@ import { useTicketForms, type TicketForm } from "./useTicketForms";
  * Apps Script": aca se publica, se archiva y se entra al constructor.
  */
 const TicketFormsManager = () => {
+  const { t } = useLanguage();
   const { formsQuery, fieldsByForm, deleteForm, togglePublished } = useTicketForms({
     includeUnpublished: true,
   });
@@ -41,21 +43,19 @@ const TicketFormsManager = () => {
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-sm font-medium">Plantillas de ticket</h2>
+        <h2 className="text-sm font-medium">{t("tickets.forms.title")}</h2>
         <p className="text-xs text-muted-foreground">
-          Arma los formularios que el equipo va a usar. El boton "Nueva plantilla" de arriba crea
-          una; el interruptor de cada fila la publica.
+          {t("tickets.forms.intro")}
         </p>
       </div>
 
       {formsQuery.isLoading ? (
-        <p className="py-8 text-center text-sm text-muted-foreground">Cargando plantillas...</p>
+        <p className="py-8 text-center text-sm text-muted-foreground">{t("tickets.forms.loading")}</p>
       ) : forms.length === 0 ? (
         <div className="rounded-lg border border-dashed p-8 text-center">
-          <p className="text-sm font-medium">Todavia no hay plantillas</p>
+          <p className="text-sm font-medium">{t("tickets.forms.empty")}</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Usa "Nueva plantilla" arriba para crear la primera: sus campos, su prefijo y a
-            quien le llega el correo.
+            {t("tickets.forms.emptyHint")}
           </p>
         </div>
       ) : (
@@ -78,20 +78,22 @@ const TicketFormsManager = () => {
                       {f.code_prefix}-{String(f.next_number).padStart(4, "0")}
                     </Badge>
                     {f.is_published ? (
-                      <Badge className="text-[10px]">Publicada</Badge>
+                      <Badge className="text-[10px]">{t("tickets.published")}</Badge>
                     ) : (
                       // Sin esta aclaracion nadie ata "Borrador" con "no me
                       // aparece en Nuevo Ticket".
                       <Badge variant="secondary" className="text-[10px]">
-                        Borrador - no aparece en Nuevo Ticket
+                        {t("tickets.forms.draft")}
                       </Badge>
                     )}
                   </div>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    {count} {count === 1 ? "campo" : "campos"} ·{" "}
+                    {t(count === 1 ? "tickets.fieldCount.one" : "tickets.fieldCount.other", { count })} ·{" "}
                     {f.notify_enabled
-                      ? `${recipients} destinatario${recipients === 1 ? "" : "s"}`
-                      : "sin correo"}
+                      ? t(recipients === 1 ? "tickets.recipientCount.one" : "tickets.recipientCount.other", {
+                          count: recipients,
+                        })
+                      : t("tickets.forms.noEmail")}
                   </p>
                 </div>
 
@@ -100,14 +102,14 @@ const TicketFormsManager = () => {
                     <Switch
                       checked={f.is_published}
                       onCheckedChange={(v) => togglePublished.mutate({ id: f.id, is_published: v })}
-                      aria-label="Publicar plantilla"
+                      aria-label={t("tickets.forms.publish")}
                     />
-                    <span className="hidden text-xs text-muted-foreground sm:inline">Publicada</span>
+                    <span className="hidden text-xs text-muted-foreground sm:inline">{t("tickets.published")}</span>
                   </div>
-                  <Button variant="ghost" size="icon" onClick={() => openEditor(f)} aria-label="Editar">
+                  <Button variant="ghost" size="icon" onClick={() => openEditor(f)} aria-label={t("common.edit")}>
                     <Pencil className="h-4 w-4" />
                   </Button>
-                  <Button variant="ghost" size="icon" onClick={() => setToArchive(f)} aria-label="Archivar">
+                  <Button variant="ghost" size="icon" onClick={() => setToArchive(f)} aria-label={t("tickets.forms.archive")}>
                     <Archive className="h-4 w-4" />
                   </Button>
                 </div>
@@ -122,11 +124,10 @@ const TicketFormsManager = () => {
       <AlertDialog open={!!toArchive} onOpenChange={(o) => !o && setToArchive(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Archivar "{toArchive?.name}"?</AlertDialogTitle>
+            <AlertDialogTitle>{t("tickets.forms.archiveTitle", { name: toArchive?.name ?? "" })}</AlertDialogTitle>
             <AlertDialogDescription>
-              Deja de aparecer en Nuevo Ticket. Los tickets ya creados con esta plantilla se
-              conservan intactos, y su prefijo <code>{toArchive?.code_prefix}</code> queda reservado
-              para que los codigos historicos nunca se repitan.
+              {t("tickets.forms.archiveBefore")} <code>{toArchive?.code_prefix}</code>{" "}
+              {t("tickets.forms.archiveAfter")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -137,7 +138,7 @@ const TicketFormsManager = () => {
                 setToArchive(null);
               }}
             >
-              Archivar
+              {t("tickets.forms.archive")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

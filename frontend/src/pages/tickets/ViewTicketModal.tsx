@@ -20,15 +20,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  PRIORITY_LABELS,
-  STATUS_LABELS,
-  TYPE_LABELS,
+  PRIORITY_LABEL_KEYS,
+  STATUS_LABEL_KEYS,
+  TYPE_LABEL_KEYS,
   COMPANIES,
   TEAM_MEMBERS,
+  etiquetaDe,
   type TicketWithCreator,
   useTickets,
 } from "./useTickets";
 import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface Props {
   open: boolean;
@@ -47,6 +49,7 @@ const priorityVariant: Record<string, "destructive" | "default" | "secondary" | 
 
 const ViewTicketModal = ({ open, onOpenChange, ticket, onEdit, onDelete }: Props) => {
   const f = useFormato();
+  const { t } = useLanguage();
   const { updateTicket, useTicketComments, addComment } = useTickets();
   const commentsQuery = useTicketComments(ticket.id);
   const comments = commentsQuery.data || [];
@@ -65,6 +68,7 @@ const ViewTicketModal = ({ open, onOpenChange, ticket, onEdit, onDelete }: Props
   const handleAddComment = () => {
     if (!commentText.trim()) return;
     addComment.mutate(
+      // author_name se guarda en ticket_comments y lo leen los demás: no se traduce.
       { ticket_id: ticket.id, author_name: "Usuario", content: commentText.trim() },
       { onSuccess: () => setCommentText("") }
     );
@@ -80,7 +84,9 @@ const ViewTicketModal = ({ open, onOpenChange, ticket, onEdit, onDelete }: Props
           </DialogTitle>
           {ticket.created_at && (
             <p className="text-xs text-muted-foreground">
-              Creado el {format(new Date(ticket.created_at), "dd MMM yyyy, HH:mm", { locale: f.fechas })}
+              {t("tickets.view.createdOn", {
+                date: format(new Date(ticket.created_at), "dd MMM yyyy, HH:mm", { locale: f.fechas }),
+              })}
             </p>
           )}
         </DialogHeader>
@@ -89,7 +95,7 @@ const ViewTicketModal = ({ open, onOpenChange, ticket, onEdit, onDelete }: Props
           {/* Description */}
           {ticket.description && (
             <div>
-              <h4 className="text-sm font-medium mb-1">Descripción</h4>
+              <h4 className="text-sm font-medium mb-1">{t("common.description")}</h4>
               <p className="text-sm text-muted-foreground whitespace-pre-wrap">{ticket.description}</p>
             </div>
           )}
@@ -97,11 +103,11 @@ const ViewTicketModal = ({ open, onOpenChange, ticket, onEdit, onDelete }: Props
           {/* Details grid */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <h4 className="text-xs font-medium text-muted-foreground mb-1">Creado por</h4>
+              <h4 className="text-xs font-medium text-muted-foreground mb-1">{t("tickets.view.createdBy")}</h4>
               <p className="text-sm">@{creatorHandle}</p>
             </div>
             <div>
-              <h4 className="text-xs font-medium text-muted-foreground mb-1">Compañía</h4>
+              <h4 className="text-xs font-medium text-muted-foreground mb-1">{t("common.company")}</h4>
               {companyLabel ? (
                 <Badge variant="outline">{companyLabel}</Badge>
               ) : (
@@ -109,45 +115,45 @@ const ViewTicketModal = ({ open, onOpenChange, ticket, onEdit, onDelete }: Props
               )}
             </div>
             <div>
-              <h4 className="text-xs font-medium text-muted-foreground mb-1">Tipo</h4>
-              <Badge variant="outline">{TYPE_LABELS[ticket.ticket_type] || ticket.ticket_type}</Badge>
+              <h4 className="text-xs font-medium text-muted-foreground mb-1">{t("common.type")}</h4>
+              <Badge variant="outline">{etiquetaDe(TYPE_LABEL_KEYS, ticket.ticket_type, t)}</Badge>
             </div>
             <div>
-              <h4 className="text-xs font-medium text-muted-foreground mb-1">Prioridad</h4>
+              <h4 className="text-xs font-medium text-muted-foreground mb-1">{t("tickets.priority")}</h4>
               <Select value={ticket.priority} onValueChange={(v) => handleInlineUpdate("priority", v)}>
                 <SelectTrigger className="w-[140px] h-8">
                   <Badge variant={priorityVariant[ticket.priority] || "secondary"}>
-                    {PRIORITY_LABELS[ticket.priority] || ticket.priority}
+                    {etiquetaDe(PRIORITY_LABEL_KEYS, ticket.priority, t)}
                   </Badge>
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(PRIORITY_LABELS).map(([k, v]) => (
-                    <SelectItem key={k} value={k}>{v}</SelectItem>
+                  {Object.entries(PRIORITY_LABEL_KEYS).map(([k, clave]) => (
+                    <SelectItem key={k} value={k}>{t(clave)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <h4 className="text-xs font-medium text-muted-foreground mb-1">Estado</h4>
+              <h4 className="text-xs font-medium text-muted-foreground mb-1">{t("common.status")}</h4>
               <Select value={ticket.status} onValueChange={(v) => handleInlineUpdate("status", v)}>
                 <SelectTrigger className="w-[140px] h-8">
-                  <SelectValue>{STATUS_LABELS[ticket.status] || ticket.status}</SelectValue>
+                  <SelectValue>{etiquetaDe(STATUS_LABEL_KEYS, ticket.status, t)}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(STATUS_LABELS).map(([k, v]) => (
-                    <SelectItem key={k} value={k}>{v}</SelectItem>
+                  {Object.entries(STATUS_LABEL_KEYS).map(([k, clave]) => (
+                    <SelectItem key={k} value={k}>{t(clave)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <h4 className="text-xs font-medium text-muted-foreground mb-1">Asignado a</h4>
+              <h4 className="text-xs font-medium text-muted-foreground mb-1">{t("tickets.assignedTo")}</h4>
               <Select value={ticket.assigned_to || undefined} onValueChange={(v) => handleInlineUpdate("assigned_to", v === "__none__" ? "" : v)}>
                 <SelectTrigger className="w-[180px] h-8">
-                  <SelectValue placeholder="Sin asignar">{assignedLabel || "Sin asignar"}</SelectValue>
+                  <SelectValue placeholder={t("common.unassigned")}>{assignedLabel || t("common.unassigned")}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__none__">Sin asignar</SelectItem>
+                  <SelectItem value="__none__">{t("common.unassigned")}</SelectItem>
                   {TEAM_MEMBERS.map((m) => (
                     <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
                   ))}
@@ -158,7 +164,7 @@ const ViewTicketModal = ({ open, onOpenChange, ticket, onEdit, onDelete }: Props
 
           {ticket.creator_notes && (
             <div>
-              <h4 className="text-sm font-medium mb-1">Notas sobre el creator</h4>
+              <h4 className="text-sm font-medium mb-1">{t("tickets.creatorNotes")}</h4>
               <p className="text-sm text-muted-foreground">{ticket.creator_notes}</p>
             </div>
           )}
@@ -169,11 +175,11 @@ const ViewTicketModal = ({ open, onOpenChange, ticket, onEdit, onDelete }: Props
           <div>
             <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
               <MessageSquare className="h-4 w-4" />
-              Comentarios ({comments.length})
+              {t("tickets.view.comments", { count: comments.length })}
             </h4>
 
             {comments.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No hay comentarios aún</p>
+              <p className="text-sm text-muted-foreground">{t("tickets.view.noComments")}</p>
             ) : (
               <div className="space-y-3">
                 {comments.map((c) => (
@@ -194,14 +200,14 @@ const ViewTicketModal = ({ open, onOpenChange, ticket, onEdit, onDelete }: Props
 
             <div className="mt-3 flex gap-2">
               <Textarea
-                placeholder="Escribe un comentario..."
+                placeholder={t("tickets.view.commentPlaceholder")}
                 value={commentText}
                 onChange={(e) => setCommentText(e.target.value)}
                 rows={2}
                 className="flex-1"
               />
               <Button onClick={handleAddComment} disabled={addComment.isPending || !commentText.trim()} className="self-end">
-                Agregar
+                {t("common.add")}
               </Button>
             </div>
           </div>
@@ -210,11 +216,11 @@ const ViewTicketModal = ({ open, onOpenChange, ticket, onEdit, onDelete }: Props
         <DialogFooter>
           <Button variant="outline" onClick={onEdit}>
             <Pencil className="h-4 w-4 mr-1" />
-            Editar
+            {t("common.edit")}
           </Button>
           <Button variant="destructive" onClick={onDelete}>
             <Trash2 className="h-4 w-4 mr-1" />
-            Eliminar
+            {t("common.delete")}
           </Button>
         </DialogFooter>
       </DialogContent>

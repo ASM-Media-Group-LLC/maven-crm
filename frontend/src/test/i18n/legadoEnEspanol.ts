@@ -435,17 +435,8 @@ export const LEGADO_EN_ESPANOL: string[] = [
   "pages/telefonos/TelefonosPage.tsx",
   "pages/telegram/TelegramChannelsPage.tsx",
   "pages/telegram/TelegramInboxPage.tsx",
-  "pages/tickets/DeleteTicketDialog.tsx",
-  "pages/tickets/DynamicTicketForm.tsx",
-  "pages/tickets/EditTicketModal.tsx",
-  "pages/tickets/NewTicketLauncher.tsx",
+  // Traducido; queda «Link de Instagram», la pregunta que se guarda en ticket_form_fields y la leen todos: no se traduce.
   "pages/tickets/TicketFormEditor.tsx",
-  "pages/tickets/TicketFormsManager.tsx",
-  "pages/tickets/TicketsContent.tsx",
-  "pages/tickets/TicketsFilters.tsx",
-  "pages/tickets/TicketsGrid.tsx",
-  "pages/tickets/TicketsList.tsx",
-  "pages/tickets/ViewTicketModal.tsx",
-  "pages/tickets/useTicketForms.ts",
+  // Traducido; queda un nombre propio con ñ en TEAM_MEMBERS («Castaño»), que no es texto de pantalla.
   "pages/tickets/useTickets.ts",
 ];

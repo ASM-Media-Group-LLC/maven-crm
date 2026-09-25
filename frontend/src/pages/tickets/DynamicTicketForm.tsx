@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/hooks/useLanguage";
 import { useTickets } from "./useTickets";
 import { useMavenUsers } from "./useMavenUsers";
 import {
@@ -69,6 +70,7 @@ function isBlank(v: AnswerValue): boolean {
  */
 const DynamicTicketForm = ({ form, open, onOpenChange }: Props) => {
   const { toast } = useToast();
+  const { t } = useLanguage();
   const { fieldsByForm, fieldsQuery } = useTicketForms({ includeUnpublished: true });
   const { creatorsQuery } = useTickets();
   const { options: mavenUsers } = useMavenUsers();
@@ -160,7 +162,7 @@ const DynamicTicketForm = ({ form, open, onOpenChange }: Props) => {
 
     if (missing.length) {
       toast({
-        title: "Faltan campos obligatorios",
+        title: t("tickets.form.missingRequired"),
         description: missing.map((f) => f.label).join(", "),
         variant: "destructive",
       });
@@ -211,7 +213,7 @@ const DynamicTicketForm = ({ form, open, onOpenChange }: Props) => {
             value={(v as string) || ""}
             onValueChange={(nv) => setAnswer(f.field_key, nv)}
             options={f.options.map((o) => ({ value: optionValue(o), label: optionLabel(o) }))}
-            placeholder="Seleccionar…"
+            placeholder={t("common.selectEllipsis")}
             triggerClassName={ring}
           />
         );
@@ -258,7 +260,7 @@ const DynamicTicketForm = ({ form, open, onOpenChange }: Props) => {
               checked={!!v}
               onCheckedChange={(c) => setAnswer(f.field_key, !!c)}
             />
-            <span className="text-muted-foreground">Sí</span>
+            <span className="text-muted-foreground">{t("tickets.form.yes")}</span>
           </label>
         );
 
@@ -269,12 +271,11 @@ const DynamicTicketForm = ({ form, open, onOpenChange }: Props) => {
               value={(v as string) || ""}
               onValueChange={(nv) => setAnswer(f.field_key, nv)}
               options={creatorOptions}
-              placeholder="Buscar creadora..."
+              placeholder={t("tickets.form.searchCreator")}
               triggerClassName={ring}
             />
             <p className="mt-1 text-xs text-muted-foreground">
-              {creatorOptions.length} creadoras de la base de Maven — busca por nombre o handle.
-              Queda vinculada al perfil, no es texto libre.
+              {t("tickets.form.creatorHint", { count: creatorOptions.length })}
             </p>
           </>
         );
@@ -285,7 +286,7 @@ const DynamicTicketForm = ({ form, open, onOpenChange }: Props) => {
             value={(v as string) || ""}
             onValueChange={(nv) => setAnswer(f.field_key, nv)}
             options={mavenUsers}
-            placeholder="Buscar empleado de Maven…"
+            placeholder={t("tickets.form.searchMavenUser")}
             triggerClassName={ring}
           />
         );
@@ -326,7 +327,7 @@ const DynamicTicketForm = ({ form, open, onOpenChange }: Props) => {
               size="sm"
               onClick={() => setAnswer(f.field_key, [...links, ""])}
             >
-              <Plus className="mr-1 h-3 w-3" /> Agregar otra prueba
+              <Plus className="mr-1 h-3 w-3" /> {t("tickets.form.addEvidence")}
             </Button>
           </div>
         );
@@ -371,7 +372,7 @@ const DynamicTicketForm = ({ form, open, onOpenChange }: Props) => {
           <Input
             value={(v as string) || ""}
             onChange={(e) => setAnswer(f.field_key, e.target.value)}
-            placeholder="https://www.instagram.com/usuario/"
+            placeholder={t("tickets.form.instagramPlaceholder")}
             className={ring}
           />
         );
@@ -408,7 +409,7 @@ const DynamicTicketForm = ({ form, open, onOpenChange }: Props) => {
           <div className="space-y-4">
             {fields.length === 0 && (
               <p className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-                Esta plantilla todavía no tiene campos. Agregalos desde Plantillas.
+                {t("tickets.form.noFields")}
               </p>
             )}
 
@@ -427,10 +428,10 @@ const DynamicTicketForm = ({ form, open, onOpenChange }: Props) => {
 
         <DialogFooter>
           <Button variant="outline" onClick={close}>
-            Cancelar
+            {t("common.cancel")}
           </Button>
           <Button onClick={handleSubmit} disabled={createTicket.isPending}>
-            {createTicket.isPending ? "Creando…" : "Crear ticket"}
+            {createTicket.isPending ? t("tickets.form.creating") : t("tickets.form.create")}
           </Button>
         </DialogFooter>
       </DialogContent>
