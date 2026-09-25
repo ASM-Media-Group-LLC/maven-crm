@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
 import { TIPOS_FEEDBACK, feedbackDe, useFeedbackDeChatter, useMutacionesFeedback, type TipoFeedback } from "@/pages/chatters/feedbackTL";
 
 // Popup del supervisor sobre un chatter: registra el feedback del día y lista
@@ -30,6 +31,7 @@ export default function FeedbackDialog({
   onClose: () => void;
 }) {
   const fmt = useFormato();
+  const { t } = useLanguage();
   const { feedback, cargando } = useFeedbackDeChatter(identityId, desde, hasta);
   const { registrarVarios, borrar } = useMutacionesFeedback();
   const [comentario, setComentario] = useState("");
@@ -38,25 +40,26 @@ export default function FeedbackDialog({
   const [seleccion, setSeleccion] = useState<TipoFeedback[]>([]);
 
   const alternar = (tipo: TipoFeedback) =>
-    setSeleccion((s) => (s.includes(tipo) ? s.filter((t) => t !== tipo) : [...s, tipo]));
+    setSeleccion((s) => (s.includes(tipo) ? s.filter((x) => x !== tipo) : [...s, tipo]));
 
-  const puntosElegidos = seleccion.reduce((s, t) => s + (feedbackDe(t)?.puntos ?? 0), 0);
+  const puntosElegidos = seleccion.reduce((s, x) => s + (feedbackDe(x)?.puntos ?? 0), 0);
   const fechaCorta = format(new Date(`${dia}T12:00:00`), "d MMM", { locale: fmt.fechas });
 
   const confirmar = async () => {
     if (!identityId || seleccion.length === 0) return;
     try {
       await registrarVarios.mutateAsync({ identityId, dia, tipos: seleccion, comentario });
+      const elegido = feedbackDe(seleccion[0]);
       toast.success(
         seleccion.length === 1
-          ? `${feedbackDe(seleccion[0])?.label} registrado`
-          : `${seleccion.length} feedbacks registrados`,
-        { description: `${puntosElegidos > 0 ? "+" : ""}${puntosElegidos} a la nota de ${nombre} del ${fechaCorta}` },
+          ? t("chatters.fb.loggedOne", { tipo: elegido ? t(elegido.label) : seleccion[0] })
+          : t("chatters.fb.loggedMany", { n: seleccion.length }),
+        { description: t("chatters.fb.loggedDesc", { puntos: `${puntosElegidos > 0 ? "+" : ""}${puntosElegidos}`, name: nombre, date: fechaCorta }) },
       );
       setSeleccion([]);
       setComentario("");
     } catch (e) {
-      toast.error("No se pudo registrar", { description: (e as Error).message });
+      toast.error(t("chatters.fb.couldNotLog"), { description: (e as Error).message });
     }
   };
 
@@ -70,13 +73,13 @@ export default function FeedbackDialog({
           <div className="min-w-0 flex-1">
             <DialogTitle className="truncate text-base leading-tight">{nombre}</DialogTitle>
             <p className="text-xs text-muted-foreground">
-              Feedback del {format(new Date(`${dia}T12:00:00`), fmt.idioma === "en" ? "EEEE, MMMM d" : "EEEE d 'de' MMMM", { locale: fmt.fechas })}
+              {t("chatters.fb.feedbackFor", { date: format(new Date(`${dia}T12:00:00`), fmt.idioma === "en" ? "EEEE, MMMM d" : "EEEE d 'de' MMMM", { locale: fmt.fechas }) })}
             </p>
           </div>
           {feedback.length > 0 && (
             <span className={cn("shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold tabular-nums",
               neto < 0 ? "bg-destructive/15 text-destructive" : neto > 0 ? "bg-success/15 text-success" : "bg-white/5 text-muted-foreground")}>
-              {neto > 0 ? "+" : ""}{neto} en el rango
+              {t("chatters.fb.netInRange", { n: `${neto > 0 ? "+" : ""}${neto}` })}
             </span>
           )}
         </header>
@@ -84,21 +87,21 @@ export default function FeedbackDialog({
         <div className="space-y-4 px-5 py-4">
           <div>
             <p className="mb-2 text-xs font-semibold text-muted-foreground">
-              Registrar
+              {t("chatters.fb.log")}
             </p>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {TIPOS_FEEDBACK.map((t) => {
-                const negativo = t.puntos < 0;
-                const marcado = seleccion.includes(t.tipo);
+              {TIPOS_FEEDBACK.map((op) => {
+                const negativo = op.puntos < 0;
+                const marcado = seleccion.includes(op.tipo);
                 return (
                   <button
-                    key={t.tipo}
+                    key={op.tipo}
                     type="button"
                     role="checkbox"
                     aria-checked={marcado}
                     disabled={registrarVarios.isPending}
-                    onClick={() => alternar(t.tipo)}
-                    title={t.ayuda}
+                    onClick={() => alternar(op.tipo)}
+                    title={t(op.ayuda)}
                     className={cn(
                       "flex items-center gap-2 rounded-xl border px-3 py-2.5 text-left text-sm transition-all disabled:opacity-50",
                       negativo
@@ -119,12 +122,12 @@ export default function FeedbackDialog({
                         : negativo ? <Minus className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate font-medium leading-tight">{t.label}</span>
-                      <span className="block truncate text-[11px] text-muted-foreground">{t.ayuda}</span>
+                      <span className="block truncate font-medium leading-tight">{t(op.label)}</span>
+                      <span className="block truncate text-[11px] text-muted-foreground">{t(op.ayuda)}</span>
                     </span>
                     <span className={cn("shrink-0 text-xs font-bold tabular-nums",
                       negativo ? "text-destructive" : "text-success")}>
-                      {t.puntos > 0 ? "+" : ""}{t.puntos}
+                      {op.puntos > 0 ? "+" : ""}{op.puntos}
                     </span>
                   </button>
                 );
@@ -134,7 +137,7 @@ export default function FeedbackDialog({
               rows={2}
               value={comentario}
               onChange={(e) => setComentario(e.target.value)}
-              placeholder="Comentario (opcional) — se guarda con el feedback que elijas"
+              placeholder={t("chatters.fb.commentPlaceholder")}
               className="mt-2 resize-none rounded-xl border-white/5 bg-background/40 text-sm"
             />
 
@@ -148,35 +151,35 @@ export default function FeedbackDialog({
                 className="gap-2"
               >
                 {registrarVarios.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                Confirmar
+                {t("common.confirm")}
                 {seleccion.length > 1 && ` (${seleccion.length})`}
               </Button>
               {seleccion.length > 0 && (
                 <>
                   <span className={cn("text-xs font-semibold tabular-nums",
                     puntosElegidos < 0 ? "text-destructive" : puntosElegidos > 0 ? "text-success" : "text-muted-foreground")}>
-                    {puntosElegidos > 0 ? "+" : ""}{puntosElegidos} a la nota del {fechaCorta}
+                    {t("chatters.fb.toScoreOf", { puntos: `${puntosElegidos > 0 ? "+" : ""}${puntosElegidos}`, date: fechaCorta })}
                   </span>
                   <button type="button" onClick={() => setSeleccion([])}
                     className="text-xs text-muted-foreground underline-offset-2 hover:underline">
-                    limpiar
+                    {t("chatters.fb.clear")}
                   </button>
                 </>
               )}
             </div>
             <p className="mt-2 text-[11px] text-muted-foreground">
-              Elige una o varias opciones y confirma. No reemplaza la nota: se suma o se resta a la que ya calculó Maven para ese día.
+              {t("chatters.fb.help")}
             </p>
           </div>
 
           <div>
             <p className="mb-2 text-xs font-semibold text-muted-foreground">
-              Historial del rango
+              {t("chatters.fb.historyInRange")}
             </p>
             {cargando ? (
               <div className="space-y-2">{Array.from({ length: 2 }, (_, i) => <Skeleton key={i} className="h-10 rounded-lg" />)}</div>
             ) : feedback.length === 0 ? (
-              <p className="text-xs text-muted-foreground">Sin feedback cargado en este rango.</p>
+              <p className="text-xs text-muted-foreground">{t("chatters.fb.noneInRange")}</p>
             ) : (
               <ul className="divide-y divide-white/5 overflow-hidden rounded-xl border border-white/5">
                 {feedback.map((f) => {
@@ -189,7 +192,7 @@ export default function FeedbackDialog({
                         {Number(f.puntos) > 0 ? "+" : ""}{Number(f.puntos)}
                       </span>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm leading-tight">{cat?.label ?? f.tipo}</p>
+                        <p className="truncate text-sm leading-tight">{cat ? t(cat.label) : f.tipo}</p>
                         <p className="truncate text-[11px] text-muted-foreground">
                           {format(new Date(`${f.dia}T12:00:00`), "d MMM", { locale: fmt.fechas })}
                           {f.comentario ? ` · ${f.comentario}` : ""}
@@ -198,10 +201,10 @@ export default function FeedbackDialog({
                       <Button
                         variant="ghost" size="icon"
                         className="h-7 w-7 shrink-0 rounded-full text-muted-foreground hover:text-destructive"
-                        title="Quitar"
+                        title={t("chatters.fb.remove")}
                         disabled={borrar.isPending}
                         onClick={async () => {
-                          try { await borrar.mutateAsync(f.id); } catch (e) { toast.error("No se pudo quitar", { description: (e as Error).message }); }
+                          try { await borrar.mutateAsync(f.id); } catch (e) { toast.error(t("chatters.fb.couldNotRemove"), { description: (e as Error).message }); }
                         }}
                       >
                         <Trash2 className="h-3.5 w-3.5" />

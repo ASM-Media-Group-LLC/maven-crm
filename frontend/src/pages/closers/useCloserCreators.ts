@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useToast } from "@/hooks/use-toast";
+import { traducir } from "@/lib/i18n";
 
 export interface CloserCreator {
   id: string;
@@ -79,7 +80,7 @@ export const useCloserCreators = () => {
 
   const createCreator = useMutation({
     mutationFn: async (creator: NewCreatorData) => {
-      if (!user) throw new Error("No autenticado");
+      if (!user) throw new Error(traducir("closers.err.notSignedIn"));
       const { error } = await supabase.from("closer_creators").insert({
         ...creator,
         created_by: user.id,
@@ -90,10 +91,10 @@ export const useCloserCreators = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["closer-creators"] });
-      toast({ title: "Creator agregada", description: "La creator se registró exitosamente." });
+      toast({ title: traducir("closers.toast.creatorAdded"), description: traducir("closers.toast.creatorAddedDesc") });
     },
     onError: (e: Error) => {
-      toast({ title: "Error", description: e.message, variant: "destructive" });
+      toast({ title: traducir("common.error"), description: e.message, variant: "destructive" });
     },
   });
 
@@ -129,11 +130,11 @@ export const useCloserCreators = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["closer-creators"] });
-      toast({ title: "Creator actualizada" });
+      toast({ title: traducir("closers.toast.creatorUpdated") });
     },
     onError: (e: Error, _vars, context) => {
       rollbackCreatorsCache(context);
-      toast({ title: "Error", description: e.message || "No se pudo actualizar.", variant: "destructive" });
+      toast({ title: traducir("common.error"), description: e.message || traducir("common.couldNotUpdate"), variant: "destructive" });
     },
   });
 
@@ -162,7 +163,7 @@ export const useCloserCreators = () => {
     },
     onError: (e: Error, _vars, context) => {
       rollbackCreatorsCache(context);
-      toast({ title: "Error", description: e.message || "No se pudo cambiar la etapa.", variant: "destructive" });
+      toast({ title: traducir("common.error"), description: e.message || traducir("closers.err.stageChange"), variant: "destructive" });
     },
   });
 
@@ -173,7 +174,7 @@ export const useCloserCreators = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["closer-creators"] });
-      toast({ title: "Creator eliminada" });
+      toast({ title: traducir("closers.toast.creatorDeleted") });
     },
   });
 
@@ -189,11 +190,11 @@ export const useCloserCreators = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["closer-creators"] });
-      toast({ title: "Creator asignada" });
+      toast({ title: traducir("closers.toast.assigned") });
     },
     onError: (e: Error, _vars, context) => {
       rollbackCreatorsCache(context);
-      toast({ title: "Error", description: e.message || "No se pudo asignar.", variant: "destructive" });
+      toast({ title: traducir("common.error"), description: e.message || traducir("closers.err.couldNotAssign"), variant: "destructive" });
     },
   });
 

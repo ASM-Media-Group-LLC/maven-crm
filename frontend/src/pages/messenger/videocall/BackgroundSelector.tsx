@@ -8,6 +8,8 @@ import {
   isCustomBackground, getCustomBackgroundUrl, isTemplateBackground,
   type BackgroundEffect,
 } from "@/lib/fondoDeLlamada";
+import { useLanguage } from "@/hooks/useLanguage";
+import { nombreDelFondo } from "./nombreDelFondo";
 
 // El tipo, las plantillas y los predicados VIVEN en `@/lib/fondoDeLlamada` desde
 // el 09/09/2026 (para que el hook los use sin importar este archivo, que trae
@@ -22,6 +24,7 @@ interface BackgroundSelectorProps {
 }
 
 export default function BackgroundSelector({ selected, onSelect }: BackgroundSelectorProps) {
+  const { t } = useLanguage();
   const [open, setOpen] = useState(false);
   const { fondos, subir, borrar } = useFondosPropios(open);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -50,7 +53,7 @@ export default function BackgroundSelector({ selected, onSelect }: BackgroundSel
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
-          title="Fondo virtual"
+          title={t("messenger.bg.fondoVirtual")}
           className={cn(
             "h-11 w-11 rounded-full flex items-center justify-center transition-colors",
             selected !== "none"
@@ -65,28 +68,28 @@ export default function BackgroundSelector({ selected, onSelect }: BackgroundSel
         // contenido pasa los 470px y en una pantalla baja (el teléfono acostado) la
         // última fila quedaba fuera, sin forma de llegar.
         className="z-[200] w-80 p-3 bg-background border-secondary max-h-[70vh] overflow-y-auto">
-        <p className="text-xs font-medium text-foreground mb-3">Fondos y efectos</p>
+        <p className="text-xs font-medium text-foreground mb-3">{t("messenger.call.fondosYEfectos")}</p>
 
         {/* Cuatro opciones: sin efecto, los DOS niveles de difuminado y subir
             imagen. En grilla, no en flex: con cuatro en una fila `flex-1` las
             etiquetas quedaban en 68 px y se partían en tres líneas. */}
         <div className="grid grid-cols-4 gap-1.5 mb-3">
-          <EffectOption label="Sin efecto" active={isSelected("none")} onClick={() => onSelect("none")}>
+          <EffectOption label={t("messenger.bg.sinEfecto")} active={isSelected("none")} onClick={() => onSelect("none")}>
             <div className="w-full h-full bg-secondary rounded flex items-center justify-center">
               <Ban className="h-4 w-4 text-muted-foreground" />
             </div>
           </EffectOption>
-          <EffectOption label="Difuminar" active={isSelected("blur")} onClick={() => onSelect("blur")}>
+          <EffectOption label={t("messenger.bg.difuminar")} active={isSelected("blur")} onClick={() => onSelect("blur")}>
             <div className="w-full h-full rounded bg-muted flex items-center justify-center">
               <Cloud className="h-4 w-4 text-muted-foreground" />
             </div>
           </EffectOption>
-          <EffectOption label="Difuminar más" active={isSelected("blur-strong")} onClick={() => onSelect("blur-strong")}>
+          <EffectOption label={t("messenger.bg.difuminarMasCorto")} active={isSelected("blur-strong")} onClick={() => onSelect("blur-strong")}>
             <div className="w-full h-full rounded bg-muted flex items-center justify-center">
               <CloudFog className="h-4 w-4 text-muted-foreground" />
             </div>
           </EffectOption>
-          <EffectOption label="Subir imagen" active={false} onClick={() => fileRef.current?.click()}>
+          <EffectOption label={t("messenger.bg.subirImagen")} active={false} onClick={() => fileRef.current?.click()}>
             <div className="w-full h-full bg-secondary rounded flex items-center justify-center">
               <Plus className="h-4 w-4 text-muted-foreground" />
             </div>
@@ -99,7 +102,7 @@ export default function BackgroundSelector({ selected, onSelect }: BackgroundSel
             mañana y son los MISMOS que se ven en el diálogo de la llamada. */}
         {fondos.length > 0 && (
           <>
-            <p className="text-xs text-muted-foreground mb-2">Tus fondos</p>
+            <p className="text-xs text-muted-foreground mb-2">{t("messenger.bg.tusFondos")}</p>
             <div className="grid grid-cols-4 gap-1.5 mb-3">
               {fondos.map((bg) => (
                 <div
@@ -113,22 +116,23 @@ export default function BackgroundSelector({ selected, onSelect }: BackgroundSel
                 >
                   <button
                     type="button"
-                    title="Fondo personalizado"
+                    title={t("messenger.bg.personalizado")}
                     onClick={() => onSelect(`custom:${bg.id}`)}
                     className="absolute inset-0 w-full h-full"
                   >
-                    <img src={bg.url} alt="Fondo personalizado" className="w-full h-full object-cover" />
+                    <img src={bg.url} alt={t("messenger.bg.personalizado")} className="w-full h-full object-cover" />
                     {isSelected(`custom:${bg.id}`) && (
                       <span className="absolute inset-0 flex items-center justify-center bg-black/40">
                         <Check className="h-4 w-4 text-white" />
                       </span>
                     )}
                   </button>
-                  {/* Va FUERA del otro botón: un <button> dentro de un <button>
+                  {/* Va FUERA del otro botón: un botón dentro de otro botón
                       es HTML inválido y el navegador lo desanida solo. */}
                   <button
                     type="button"
-                    title="Borrar este fondo"
+                    title={t("messenger.bg.borrarEste")}
+                    aria-label={t("messenger.bg.borrarEste")}
                     onClick={() => void handleDeleteCustom(bg.id)}
                     // Visible SIEMPRE: con `group-hover` en un teléfono no se veía nunca, y
                     // desde que el borrado es permanente eso significaba borrar a ciegas
@@ -144,26 +148,26 @@ export default function BackgroundSelector({ selected, onSelect }: BackgroundSel
         )}
 
         {/* Templates */}
-        <p className="text-xs text-muted-foreground mb-2">Fondos virtuales</p>
+        <p className="text-xs text-muted-foreground mb-2">{t("messenger.bg.fondosVirtuales")}</p>
         <div className="grid grid-cols-4 gap-1.5 mb-3">
           {BACKGROUND_TEMPLATES.map((tpl) => (
             <button
               key={tpl.id}
-              title={tpl.label}
+              title={nombreDelFondo(tpl, t)}
               onClick={() => onSelect(tpl.id)}
               className={cn(
                 "relative h-14 rounded-lg overflow-hidden border-2 transition-all hover:scale-105 group",
                 isSelected(tpl.id) ? "border-primary ring-1 ring-primary/30" : "border-transparent hover:border-border"
               )}
             >
-              <img src={tpl.src} alt={tpl.label} className="w-full h-full object-cover" loading="lazy" />
+              <img src={tpl.src} alt={nombreDelFondo(tpl, t)} className="w-full h-full object-cover" loading="lazy" />
               {isSelected(tpl.id) && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/40">
                   <Check className="h-4 w-4 text-white" />
                 </div>
               )}
               <span className="absolute bottom-0 inset-x-0 text-[8px] text-center text-white bg-black/50 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                {tpl.label}
+                {nombreDelFondo(tpl, t)}
               </span>
             </button>
           ))}
@@ -173,7 +177,7 @@ export default function BackgroundSelector({ selected, onSelect }: BackgroundSel
           onClick={handleRandom}
           className="w-full text-xs text-center py-1.5 rounded-md bg-secondary text-foreground hover:bg-muted transition-colors"
         >
-          🎲 Fondo aleatorio
+          {t("messenger.bg.aleatorio")}
         </button>
       </PopoverContent>
     </Popover>

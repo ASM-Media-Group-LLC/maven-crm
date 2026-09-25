@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { differenceInCalendarDays, format } from "date-fns";
 import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
 import { Activity, ArrowRight, CalendarOff, ChevronRight, Clock, DollarSign, Gauge, Megaphone, Moon, Sparkles, Sun, Sunset, Target, TrendingUp, Timer } from "lucide-react";
 import { Bar, CartesianGrid, Cell, ComposedChart, LabelList, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Badge } from "@/components/ui/badge";
@@ -31,6 +32,7 @@ const SIN_DIAS: never[] = []; // default estable: un `[]` inline cambia por rend
 
 export default function ChatterDashboard({ hoy = new Date() }: { hoy?: Date }) {
   const formatoUi = useFormato();
+  const { t, language } = useLanguage();
   const { data: perfil } = useMyProfile();
   const identidad = useMiIdentidad();
   const yo = identidad.data ?? null;
@@ -89,12 +91,12 @@ export default function ChatterDashboard({ hoy = new Date() }: { hoy?: Date }) {
       <header className="shrink-0 border-b border-white/10 bg-background/30 px-6 py-4 backdrop-blur-xl">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <SelectorDeTablero actual="chatter" titulo={nombre ? `Hola, ${nombre}` : "Tu día"} clase="text-2xl font-bold tracking-tight" />
+            <SelectorDeTablero actual="chatter" titulo={nombre ? t("chatters.dash.hello", { name: nombre }) : t("chatters.dash.yourDay")} clase="text-2xl font-bold tracking-tight" />
             <p className="text-sm capitalize text-muted-foreground">{fechaLarga}</p>
           </div>
           <div className="flex items-center gap-2">
             {miFila && (hoyLibre
-              ? <Badge variant="outline" className="gap-1 border-orange-500/30 bg-orange-500/10 text-orange-700 dark:text-orange-300"><CalendarOff className="h-3.5 w-3.5" /> Hoy descansás</Badge>
+              ? <Badge variant="outline" className="gap-1 border-orange-500/30 bg-orange-500/10 text-orange-700 dark:text-orange-300"><CalendarOff className="h-3.5 w-3.5" /> {t("chatters.dash.dayOffToday")}</Badge>
               : <TurnoBadge shift={miFila.shift} conHoras />)}
             <DateRangePresets range={range} activePreset={preset} onChange={(r, p) => { setRange(r); setPreset(p); setDiaSel(null); }} />
           </div>
@@ -105,21 +107,21 @@ export default function ChatterDashboard({ hoy = new Date() }: { hoy?: Date }) {
         {/* KPIs: mismos stat-chips que el dashboard general */}
         {cargando ? <Skeleton className="h-16 w-full rounded-xl" /> : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-8">
-            <StatChip label="Nota Maven" icon={<Gauge className="h-3.5 w-3.5" />} value={resumen.notaPromedio == null ? "—" : resumen.notaPromedio.toFixed(1)}
+            <StatChip label={t("chatters.dash.mavenScore")} icon={<Gauge className="h-3.5 w-3.5" />} value={resumen.notaPromedio == null ? "—" : resumen.notaPromedio.toFixed(1)}
               color={resumen.notaPromedio == null ? undefined : resumen.notaPromedio >= 8 ? "bg-success" : resumen.notaPromedio >= 6 ? "bg-warning" : "bg-destructive"}
-              hint={resumen.notaPromedio == null ? "sin datos" : `${resumen.diasConNota} de ${diasDelPeriodo} días`} />
-            <StatChip label="Ventas BLU" icon={<DollarSign className="h-3.5 w-3.5" />} color="bg-primary" value={money(resumen.ventas)} hint={`${resumen.diasConVentas} días con venta`} />
-            <StatChip label="Vs. esperado" icon={<Target className="h-3.5 w-3.5" />} color={cumplimiento == null ? undefined : cumplimiento >= 100 ? "bg-success" : cumplimiento >= 70 ? "bg-warning" : "bg-destructive"}
-              value={cumplimiento == null ? "—" : `${Math.round(cumplimiento)}%`} hint={resumen.esperado > 0 ? `meta ${money(resumen.esperado)}` : "sin meta"} />
-            <StatChip label="Horas" icon={<Clock className="h-3.5 w-3.5" />} value={resumen.horas ? resumen.horas.toFixed(0) : "—"} hint="Hubstaff" />
+              hint={resumen.notaPromedio == null ? t("chatters.dash.noDataLower") : t("chatters.dash.daysOfPeriod", { n: resumen.diasConNota, total: diasDelPeriodo })} />
+            <StatChip label={t("chatters.dash.bluSales")} icon={<DollarSign className="h-3.5 w-3.5" />} color="bg-primary" value={money(resumen.ventas)} hint={t("chatters.dash.daysWithSales", { n: resumen.diasConVentas })} />
+            <StatChip label={t("chatters.dash.vsExpected")} icon={<Target className="h-3.5 w-3.5" />} color={cumplimiento == null ? undefined : cumplimiento >= 100 ? "bg-success" : cumplimiento >= 70 ? "bg-warning" : "bg-destructive"}
+              value={cumplimiento == null ? "—" : `${Math.round(cumplimiento)}%`} hint={resumen.esperado > 0 ? t("chatters.dash.goalN", { x: money(resumen.esperado) }) : t("chatters.dash.noGoal")} />
+            <StatChip label={t("common.hours")} icon={<Clock className="h-3.5 w-3.5" />} value={resumen.horas ? resumen.horas.toFixed(0) : "—"} hint="Hubstaff" />
             {/* El reloj de Cowork (cámara + pantalla, presente): el dato que va a
                 reemplazar a Hubstaff. Conviven mientras dure la transición. */}
             <StatChip label="Cowork" icon={<Timer className="h-3.5 w-3.5" />} color="bg-violet-500"
               value={cowork.horas > 0 ? cowork.horas.toFixed(0) : "—"} hint={pieTiempoCowork(cowork, coworkCargando)} />
-            <StatChip label="Productividad" icon={<Activity className="h-3.5 w-3.5" />} value={resumen.actividad == null ? "—" : `${Math.round(resumen.actividad)}%`}
-              color={resumen.actividad == null ? undefined : resumen.actividad >= 60 ? "bg-success" : resumen.actividad >= 40 ? "bg-warning" : "bg-destructive"} hint="actividad Hubstaff" />
-            <StatChip label="Masivos" icon={<Megaphone className="h-3.5 w-3.5" />} value={resumen.masivos} hint={resumen.masivosConversion == null ? undefined : `${resumen.masivosConversion.toFixed(1)}% conversión`} />
-            <StatChip label="Mejor día" icon={<TrendingUp className="h-3.5 w-3.5" />} color="bg-success"
+            <StatChip label={t("chatters.dash.productivity")} icon={<Activity className="h-3.5 w-3.5" />} value={resumen.actividad == null ? "—" : `${Math.round(resumen.actividad)}%`}
+              color={resumen.actividad == null ? undefined : resumen.actividad >= 60 ? "bg-success" : resumen.actividad >= 40 ? "bg-warning" : "bg-destructive"} hint={t("chatters.dash.hubstaffActivity")} />
+            <StatChip label={t("chatters.massMessages")} icon={<Megaphone className="h-3.5 w-3.5" />} value={resumen.masivos} hint={resumen.masivosConversion == null ? undefined : t("chatters.dash.conversionPct", { pct: resumen.masivosConversion.toFixed(1) })} />
+            <StatChip label={t("chatters.dash.bestDay")} icon={<TrendingUp className="h-3.5 w-3.5" />} color="bg-success"
               value={resumen.mejorDia ? money(resumen.mejorDia.ventas) : "—"} hint={resumen.mejorDia ? format(fechaDe(resumen.mejorDia.dia), "EEE d", { locale: formatoUi.fechas }) : undefined} />
           </div>
         )}
@@ -129,12 +131,12 @@ export default function ChatterDashboard({ hoy = new Date() }: { hoy?: Date }) {
           <Card className="relative overflow-hidden border-primary/25 transition-all duration-300 hover:border-primary/40">
             <CardContent className="space-y-4 p-5">
               {!miFila ? (
-                <p className="text-sm text-muted-foreground">{identidad.isLoading ? "…" : "Todavía no estás en un grupo de horarios. Cuando un supervisor te asigne, acá vas a ver tu turno, tus creadoras y tu descanso."}</p>
+                <p className="text-sm text-muted-foreground">{identidad.isLoading ? "…" : t("chatters.dash.notInGroup")}</p>
               ) : (
                 <>
                   <TurnoHero shift={miFila.shift} hoy={hoy} libre={hoyLibre} grupo={miGrupo ? `${miGrupo.name} · ${miGrupo.agency === "plus" ? "Plus" : "Massive"}` : ""} />
                   <div>
-                    <p className="mb-2 text-xs text-muted-foreground">Tus creadoras · {misCreadoras.length}</p>
+                    <p className="mb-2 text-xs text-muted-foreground">{t("chatters.dash.yourCreators", { n: misCreadoras.length })}</p>
                     <ul className="space-y-1">
                       {misCreadoras.map((c) => {
                         const url = urlCreadora(c);
@@ -143,7 +145,7 @@ export default function ChatterDashboard({ hoy = new Date() }: { hoy?: Date }) {
                             <Inicial nombre={c.creator_handle} />
                             <span className="min-w-0 flex-1 truncate font-mono text-[12px]">@{c.creator_handle}</span>
                             {c.mad && <span className="rounded bg-muted px-1.5 py-0.5 text-[9px] font-semibold uppercase text-muted-foreground">mad</span>}
-                            {url ? <ChevronRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" /> : <span className="text-[9px] text-muted-foreground">sin ficha</span>}
+                            {url ? <ChevronRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" /> : <span className="text-[9px] text-muted-foreground">{t("chatters.dash.noProfile")}</span>}
                           </>
                         );
                         return (
@@ -153,18 +155,18 @@ export default function ChatterDashboard({ hoy = new Date() }: { hoy?: Date }) {
                           </li>
                         );
                       })}
-                      {misCreadoras.length === 0 && <li className="text-sm text-muted-foreground">Sin creadoras cargadas.</li>}
+                      {misCreadoras.length === 0 && <li className="text-sm text-muted-foreground">{t("chatters.dash.noCreators")}</li>}
                     </ul>
                   </div>
                   <div className="flex items-center gap-3 rounded-xl border border-orange-500/25 bg-orange-500/5 px-3 py-2.5">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-orange-500/15 text-orange-600 dark:text-orange-400"><CalendarOff className="h-4 w-4" /></div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs text-muted-foreground">Tu descanso</p>
-                      <p className="text-sm font-semibold">{descansoSemana ? etiquetaDia(semanaHoy, descansoSemana.weekday) : "Sin cargar"}</p>
+                      <p className="text-xs text-muted-foreground">{t("chatters.dash.yourDayOff")}</p>
+                      <p className="text-sm font-semibold">{descansoSemana ? etiquetaDia(semanaHoy, descansoSemana.weekday, language) : t("chatters.dash.notSet")}</p>
                     </div>
-                    {descansoSemana && <p className="text-right text-xs text-muted-foreground">{descansoSemana.covered_by_identity_id ? <>Te cubre<br /><span className="font-medium text-foreground">{nombres[descansoSemana.covered_by_identity_id] ?? "…"}</span></> : "Sin cobertura"}</p>}
+                    {descansoSemana && <p className="text-right text-xs text-muted-foreground">{descansoSemana.covered_by_identity_id ? <>{t("chatters.dash.coveredBy")}<br /><span className="font-medium text-foreground">{nombres[descansoSemana.covered_by_identity_id] ?? "…"}</span></> : t("chatters.dash.noCover")}</p>}
                   </div>
-                  <Button asChild variant="ghost" size="sm" className="w-full justify-between"><Link to="/chatters/horarios">Ver mi semana completa <ChevronRight className="h-4 w-4" /></Link></Button>
+                  <Button asChild variant="ghost" size="sm" className="w-full justify-between"><Link to="/chatters/horarios">{t("chatters.dash.seeFullWeek")} <ChevronRight className="h-4 w-4" /></Link></Button>
                 </>
               )}
             </CardContent>
@@ -174,19 +176,19 @@ export default function ChatterDashboard({ hoy = new Date() }: { hoy?: Date }) {
             <CardHeader className="pb-2">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <CardTitle className={cardTitle}>Ventas por día</CardTitle>
-                  <CardDescription>Verde: superaste lo esperado por tus modelos · azul: por debajo · línea punteada: la meta</CardDescription>
+                  <CardTitle className={cardTitle}>{t("chatters.dash.salesByDay")}</CardTitle>
+                  <CardDescription>{t("chatters.dash.salesByDayDesc")}</CardDescription>
                 </div>
                 {diasConDato.length > 0 && (
                   <div className="flex gap-4 text-right">
-                    <div><p className="text-xs text-muted-foreground">Promedio</p><p className="font-display text-lg font-bold tabular-nums leading-tight">{money(resumen.ventas / Math.max(1, diasConDato.length))}<span className="text-xs font-normal text-muted-foreground">/día</span></p></div>
-                    <div><p className="text-xs text-muted-foreground">Sobre la meta</p><p className="font-display text-lg font-bold tabular-nums leading-tight text-success">{diasConDato.filter((d) => (d.esperado ?? 0) > 0 && (d.ventas ?? 0) >= (d.esperado ?? 0)).length}<span className="text-xs font-normal text-muted-foreground"> de {diasConDato.length}</span></p></div>
+                    <div><p className="text-xs text-muted-foreground">{t("common.average")}</p><p className="font-display text-lg font-bold tabular-nums leading-tight">{money(resumen.ventas / Math.max(1, diasConDato.length))}<span className="text-xs font-normal text-muted-foreground">{t("chatters.dash.perDay")}</span></p></div>
+                    <div><p className="text-xs text-muted-foreground">{t("chatters.dash.aboveGoal")}</p><p className="font-display text-lg font-bold tabular-nums leading-tight text-success">{diasConDato.filter((d) => (d.esperado ?? 0) > 0 && (d.ventas ?? 0) >= (d.esperado ?? 0)).length}<span className="text-xs font-normal text-muted-foreground">{" "}{t("chatters.dash.ofN", { n: diasConDato.length })}</span></p></div>
                   </div>
                 )}
               </div>
             </CardHeader>
             <CardContent className="flex flex-1 flex-col">
-              {diasConDato.length === 0 ? <p className="flex flex-1 items-center justify-center py-10 text-center text-sm text-muted-foreground">Sin días calculados en este rango.</p> : (
+              {diasConDato.length === 0 ? <p className="flex flex-1 items-center justify-center py-10 text-center text-sm text-muted-foreground">{t("chatters.dash.noDaysInRange")}</p> : (
                 <div className="min-h-[220px] flex-1">
                   <ResponsiveContainer width="100%" height="100%">
                     <ComposedChart data={serie} margin={{ top: 12, right: 8, left: -16, bottom: 0 }}>
@@ -198,11 +200,11 @@ export default function ChatterDashboard({ hoy = new Date() }: { hoy?: Date }) {
                       <XAxis dataKey="etiqueta" {...CHART_AXIS} interval={serie.length > 16 ? 1 : 0} />
                       <YAxis {...CHART_AXIS} tickFormatter={(v) => `$${v}`} />
                       <Tooltip content={<MavenTooltip formatter={(v: number) => money(v)} labelFormatter={(l: string, p: Array<{ payload?: { dia: string } }>) => p?.[0]?.payload?.dia ?? l} />} cursor={{ fill: "hsl(var(--muted) / 0.4)" }} />
-                      <Bar dataKey="ventas" name="Ventas" radius={[6, 6, 0, 0]} maxBarSize={26}>
+                      <Bar dataKey="ventas" name={t("chatters.sales")} radius={[6, 6, 0, 0]} maxBarSize={26}>
                         {serie.map((d) => <Cell key={d.dia} fill={(d.esperado ?? 0) > 0 && (d.ventas ?? 0) >= (d.esperado ?? 0) ? "url(#gMeta)" : "url(#gVentas)"} />)}
                         <LabelList dataKey="ventas" position="top" formatter={(v: number | null) => (v != null && diasConDato.length <= 16 && v > 0 ? `$${Math.round(v)}` : "")} style={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
                       </Bar>
-                      <Line type="monotone" dataKey="esperado" name="Esperado" stroke={CHART_COLOR.ambar} strokeWidth={2} dot={false} strokeDasharray="5 4" connectNulls />
+                      <Line type="monotone" dataKey="esperado" name={t("chatters.expected")} stroke={CHART_COLOR.ambar} strokeWidth={2} dot={false} strokeDasharray="5 4" connectNulls />
                     </ComposedChart>
                   </ResponsiveContainer>
                 </div>
@@ -217,8 +219,8 @@ export default function ChatterDashboard({ hoy = new Date() }: { hoy?: Date }) {
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <CardTitle className={cardTitle}>Tu semana</CardTitle>
-                  <CardDescription>Cada día con su nota, sus ventas y cuánto de la meta cubriste. Toca uno para el detalle.</CardDescription>
+                  <CardTitle className={cardTitle}>{t("chatters.dash.yourWeek")}</CardTitle>
+                  <CardDescription>{t("chatters.dash.yourWeekDesc")}</CardDescription>
                 </div>
                 <Sparkles className="h-4 w-4 text-primary" />
               </div>
@@ -235,12 +237,12 @@ export default function ChatterDashboard({ hoy = new Date() }: { hoy?: Date }) {
 
           <Card className="transition-all duration-300 hover:border-primary/30">
             <CardHeader className="pb-3">
-              <CardTitle className={cardTitle}>Tus mejores creadoras</CardTitle>
-              <CardDescription>Con quién vendés más en el rango, según BLU</CardDescription>
+              <CardTitle className={cardTitle}>{t("chatters.dash.topCreators")}</CardTitle>
+              <CardDescription>{t("chatters.dash.topCreatorsDesc")}</CardDescription>
             </CardHeader>
             <CardContent>
               {modelos.isLoading ? <Skeleton className="h-24 w-full" /> : !modelos.data?.length ? (
-                <p className="py-6 text-center text-sm text-muted-foreground">Sin ventas cruzadas con creadoras en este rango.</p>
+                <p className="py-6 text-center text-sm text-muted-foreground">{t("chatters.dash.noCreatorSales")}</p>
               ) : (() => {
                 const lista = modelos.data;
                 const total = lista.reduce((s, m) => s + m.sales, 0) || 1;
@@ -253,13 +255,13 @@ export default function ChatterDashboard({ hoy = new Date() }: { hoy?: Date }) {
                       <div className="flex items-center gap-3">
                         <Inicial nombre={top.model_name ?? "?"} size="lg" />
                         <div className="min-w-0 flex-1">
-                          <p className="text-xs font-bold text-amber-500">Tu #1</p>
-                          <p className="truncate font-display text-base font-bold leading-tight">{top.model_name ?? `Modelo ${top.blu_model_id}`}</p>
-                          <p className="text-xs text-muted-foreground">{top.fans.toLocaleString(formatoUi.intl("es-ES"))} fans · {top.dias} {top.dias === 1 ? "día" : "días"}</p>
+                          <p className="text-xs font-bold text-amber-500">{t("chatters.dash.yourNumberOne")}</p>
+                          <p className="truncate font-display text-base font-bold leading-tight">{top.model_name ?? t("chatters.modelN", { id: top.blu_model_id })}</p>
+                          <p className="text-xs text-muted-foreground">{t("chatters.dash.fansDays", { fans: top.fans.toLocaleString(formatoUi.intl("es-ES")), days: top.dias, unidad: t(top.dias === 1 ? "chatters.dayOne" : "chatters.dayMany") })}</p>
                         </div>
                         <div className="text-right">
                           <p className="font-display text-xl font-extrabold tabular-nums leading-none">{money(top.sales)}</p>
-                          <p className="mt-1 text-[11px] tabular-nums text-muted-foreground">{Math.round((100 * top.sales) / total)}% de tus ventas</p>
+                          <p className="mt-1 text-[11px] tabular-nums text-muted-foreground">{t("chatters.dash.pctOfYourSales", { pct: Math.round((100 * top.sales) / total) })}</p>
                         </div>
                       </div>
                     </div>
@@ -270,7 +272,7 @@ export default function ChatterDashboard({ hoy = new Date() }: { hoy?: Date }) {
                           <Inicial nombre={m.model_name ?? "?"} />
                           <div className="min-w-0 flex-1">
                             <div className="flex items-baseline justify-between gap-2">
-                              <span className="truncate text-sm font-medium">{m.model_name ?? `Modelo ${m.blu_model_id}`}</span>
+                              <span className="truncate text-sm font-medium">{m.model_name ?? t("chatters.modelN", { id: m.blu_model_id })}</span>
                               <span className="shrink-0 text-sm font-semibold tabular-nums">{money(m.sales)}</span>
                             </div>
                             <div className="mt-1 flex items-center gap-2">
@@ -307,10 +309,11 @@ function Inicial({ nombre, size = "sm" }: { nombre: string; size?: "sm" | "lg" }
 // Cabecera del turno: qué turno es, cuánto va, y si hoy es descanso.
 const HORAS_TURNO: Record<string, [number, number]> = { am: [8, 16], pm: [16, 24], mad: [0, 8] };
 function TurnoHero({ shift, hoy, libre, grupo }: { shift: "am" | "pm" | "mad"; hoy: Date; libre: boolean; grupo: string }) {
+  const { t } = useLanguage();
   const [ini, fin] = HORAS_TURNO[shift];
   const ahora = hoy.getHours() + hoy.getMinutes() / 60;
   const avance = Math.max(0, Math.min(1, (ahora - ini) / (fin - ini)));
-  const estado = libre ? "Hoy descansás" : ahora < ini ? `Empieza a las ${String(ini).padStart(2, "0")}:00` : ahora >= fin ? "Turno terminado" : `Llevás ${Math.floor(ahora - ini)} h de ${fin - ini}`;
+  const estado = libre ? t("chatters.dash.dayOffToday") : ahora < ini ? t("chatters.dash.startsAt", { time: `${String(ini).padStart(2, "0")}:00` }) : ahora >= fin ? t("chatters.dash.shiftOver") : t("chatters.dash.hoursIn", { n: Math.floor(ahora - ini), total: fin - ini });
   const Icono = shift === "am" ? Sun : shift === "pm" ? Sunset : Moon;
   return (
     <div className="flex items-center gap-3">
@@ -319,7 +322,7 @@ function TurnoHero({ shift, hoy, libre, grupo }: { shift: "am" | "pm" | "mad"; h
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-2">
-          <p className="font-display text-lg font-bold leading-tight">{libre ? "Descanso" : `Turno ${TURNOS[shift].label}`}</p>
+          <p className="font-display text-lg font-bold leading-tight">{libre ? t("chatters.dash.dayOff") : t("chatters.dash.shiftN", { label: TURNOS[shift].label })}</p>
           {!libre && <span className="text-xs text-muted-foreground tabular-nums">{TURNOS[shift].horas}</span>}
         </div>
         <p className="text-xs text-muted-foreground">{grupo}{grupo ? " · " : ""}{estado}</p>
@@ -335,43 +338,44 @@ function TurnoHero({ shift, hoy, libre, grupo }: { shift: "am" | "pm" | "mad"; h
 function DetalleDia({ dia, fila, identityId, libre }: { dia: string; fila: ReturnType<typeof useResumenChatter>["dias"][number] | null; identityId: string | null; libre: boolean }) {
   const modelos = useModelosDelDia(identityId, dia);
   const formatoUi = useFormato();
+  const { t } = useLanguage();
   const fecha = format(fechaDe(dia), formatoUi.idioma === "en" ? "EEEE, MMMM d" : "EEEE d 'de' MMMM", { locale: formatoUi.fechas });
   const faltan = fila?.detalle?.faltantes ?? [];
   return (
     <div className="grid gap-4 sm:grid-cols-[180px_1fr_1fr]">
       <div>
-        <p className="text-xs font-medium text-muted-foreground">Día</p>
+        <p className="text-xs font-medium text-muted-foreground">{t("chatters.rend.colDay")}</p>
         <p className="text-sm font-semibold capitalize leading-tight">{fecha}</p>
-        {libre && <Badge variant="outline" className="mt-1 gap-1 border-orange-500/30 bg-orange-500/10 text-orange-700 dark:text-orange-300"><CalendarOff className="h-3 w-3" /> Descanso</Badge>}
+        {libre && <Badge variant="outline" className="mt-1 gap-1 border-orange-500/30 bg-orange-500/10 text-orange-700 dark:text-orange-300"><CalendarOff className="h-3 w-3" /> {t("chatters.dash.dayOff")}</Badge>}
       </div>
       {!fila ? (
-        <p className="text-sm text-muted-foreground">{libre ? "Era tu día de descanso: no se esperaba venta." : "De este día todavía no hay nota calculada."}</p>
+        <p className="text-sm text-muted-foreground">{libre ? t("chatters.dash.wasDayOff") : t("chatters.dash.noScoreForDay")}</p>
       ) : (
         <>
           <div className="flex items-end justify-between">
-            <div><p className="text-xs text-muted-foreground">Nota</p>
+            <div><p className="text-xs text-muted-foreground">{t("chatters.score")}</p>
               <p className={cn("mt-1 inline-block rounded-lg border px-2 py-0.5 text-lg font-bold tabular-nums", tonoDeNota(fila.nota))}>{fila.nota == null ? "—" : fila.nota.toFixed(1)}</p></div>
-            <div className="text-right"><p className="text-xs text-muted-foreground">Ventas</p>
+            <div className="text-right"><p className="text-xs text-muted-foreground">{t("chatters.sales")}</p>
               <p className="text-lg font-bold tabular-nums">{money(fila.ventas)}</p>
-              <p className="text-[11px] text-muted-foreground">esperado {money(fila.ventas_esperadas)}</p></div>
+              <p className="text-[11px] text-muted-foreground">{t("chatters.dash.expectedN", { x: money(fila.ventas_esperadas) })}</p></div>
           </div>
           <ul className="space-y-1 text-sm">
-            <Componente etiqueta="Ventas" nota={fila.nota_ventas} peso="50%" />
-            <Componente etiqueta={`Tiempo${fila.horas != null ? ` · ${fila.horas.toFixed(1)} h` : ""}${fila.detalle?.actividad_pct != null ? ` · ${Math.round(fila.detalle.actividad_pct)}% act.` : ""}`} nota={fila.nota_tiempo} peso="30%" />
+            <Componente etiqueta={t("chatters.sales")} nota={fila.nota_ventas} peso="50%" />
+            <Componente etiqueta={`${t("chatters.dash.time")}${fila.horas != null ? ` · ${fila.horas.toFixed(1)} h` : ""}${fila.detalle?.actividad_pct != null ? ` · ${t("chatters.dash.actPct", { pct: Math.round(fila.detalle.actividad_pct) })}` : ""}`} nota={fila.nota_tiempo} peso="30%" />
             <Componente etiqueta="Cowork" nota={fila.nota_meet} peso="20%" />
           </ul>
-          {faltan.length > 0 && <p className="text-xs text-warning">Calculada sin: {faltan.map((f) => NOMBRE_FALTANTE[f] ?? f).join(", ")}.</p>}
+          {faltan.length > 0 && <p className="text-xs text-warning">{t("chatters.calculatedWithout", { lista: faltan.map((f) => (NOMBRE_FALTANTE[f] ? t(NOMBRE_FALTANTE[f]) : f)).join(", ") })}.</p>}
           <div>
-            <p className="mb-1.5 text-xs font-medium text-muted-foreground">Modelos atendidas</p>
-            {modelos.isLoading ? <Skeleton className="h-6 w-full" /> : !modelos.data?.length ? <p className="text-xs text-muted-foreground">Sin cruce con modelos ese día.</p> : (
+            <p className="mb-1.5 text-xs font-medium text-muted-foreground">{t("chatters.dash.modelsHandled")}</p>
+            {modelos.isLoading ? <Skeleton className="h-6 w-full" /> : !modelos.data?.length ? <p className="text-xs text-muted-foreground">{t("chatters.dash.noModelsThatDay")}</p> : (
               <ul className="space-y-0.5 text-xs">
-                {modelos.data.map((m) => <li key={m.blu_model_id} className="flex justify-between gap-2"><span className="truncate">{m.model_name ?? `Modelo ${m.blu_model_id}`}</span><span className="tabular-nums font-medium">{money(m.sales)}</span></li>)}
+                {modelos.data.map((m) => <li key={m.blu_model_id} className="flex justify-between gap-2"><span className="truncate">{m.model_name ?? t("chatters.modelN", { id: m.blu_model_id })}</span><span className="tabular-nums font-medium">{money(m.sales)}</span></li>)}
               </ul>
             )}
           </div>
         </>
       )}
-      <Link to="/chatter-evaluator/rendimiento" className="inline-flex items-center gap-1 text-xs text-primary hover:underline">Cómo se calcula la nota <ArrowRight className="h-3 w-3" /></Link>
+      <Link to="/chatter-evaluator/rendimiento" className="inline-flex items-center gap-1 text-xs text-primary hover:underline">{t("chatters.dash.howScoreWorks")} <ArrowRight className="h-3 w-3" /></Link>
     </div>
   );
 }

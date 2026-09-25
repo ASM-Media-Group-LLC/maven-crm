@@ -112,6 +112,9 @@ const defaultLkState = {
 
 let lkState = { ...defaultLkState };
 
+vi.mock("@/hooks/useLanguage", (original) =>
+  import("@/test/messenger/espanolEnTests").then((m) => m.idiomaEnEspanol(original)));
+
 vi.mock("@/hooks/useLiveKit", () => ({
   useLiveKit: () => lkState,
 }));

@@ -6,7 +6,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Search, X, UserPlus, LayoutGrid, List, LayoutDashboard, ListChecks, Eye, TrendingUp, Activity } from "lucide-react";
 import DataTableShell from "@/components/ui/data-table-shell";
 import { PageHeader } from "@/components/ui/page-header";
-import { useCloserLeads, ORIGIN_FILTERS, CATEGORY_FILTERS, type CloserCreatorRow } from "./hooks/useCloserLeads";
+import { useCloserLeads, ORIGIN_FILTERS, CATEGORY_FILTERS, REVENUE_KPI_LABEL_KEYS, platformLabel, type CloserCreatorRow } from "./hooks/useCloserLeads";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 import { useClosersKpiPopup } from "./hooks/useClosersKpiPopup";
 import ClosersKPICards from "./components/ClosersKPICards";
 import ClosersKpiDetailDialog from "./components/ClosersKpiDetailDialog";
@@ -32,14 +34,26 @@ import {
 // CATEGORÍA pasaron a ser FILTROS (barra de abajo), no tabs: son otro eje (qué
 // tipo de lead), no un paso del pipeline. "Antiguos/Nuevo" se fundieron en "Pool"
 // (el corte de 30 días era arbitrario; lo útil es "sin asignar").
-const ALL_TABS = [
-  { value: "todas", label: "Todas" },
-  { value: "pool", label: "Pool" },
-  { value: "asignadas", label: "Asignaciones" },
-  { value: "confirmadas", label: "Confirmadas" },
-  { value: "completadas", label: "Completadas" },
-  { value: "no_interesadas", label: "No Interesadas" },
+// `value` es la llave del tab (viaja a TAB_STAGE_MAP y a la URL de las queries):
+// no se traduce. Lo que se muestra es `labelKey`.
+const ALL_TABS: { value: string; labelKey: TranslationKey }[] = [
+  { value: "todas", labelKey: "common.allF" },
+  { value: "pool", labelKey: "closers.tab.pool" },
+  { value: "asignadas", labelKey: "closers.tab.assigned" },
+  { value: "confirmadas", labelKey: "closers.tab.confirmed" },
+  { value: "completadas", labelKey: "closers.tab.completed" },
+  { value: "no_interesadas", labelKey: "closers.tab.notInterested" },
 ];
+
+// Título del popup de cada KPI del pipeline.
+const PIPELINE_POPUP_TITLE_KEYS: Record<string, TranslationKey> = {
+  total: "closers.popup.pipelineTotal",
+  asignadas: "closers.kpi.assigned",
+  confirmadas: "closers.tab.confirmed",
+  completadas: "closers.tab.completed",
+  cerradas: "closers.popup.closedBoth",
+  no_interesadas: "closers.tab.notInterested",
+};
 
 const ClosersContent = () => {
   const {
@@ -61,6 +75,7 @@ const ClosersContent = () => {
   } = useCloserLeads();
 
   const { toast } = useToast();
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
   // Permiso granular: cualquier role con "Closers > Asignar Closer" puede
   // ver el botón. Antes el botón estaba hardcoded a (isAdmin || isManager)
@@ -86,7 +101,7 @@ const ClosersContent = () => {
       const { data, error } = await supabase.from("closer_creators").select("*").eq("id", idDesdeNotificacion).maybeSingle();
       if (cancelado) return;
       if (error || !data) {
-        toast({ title: "Ese lead ya no existe", description: "La notificación apuntaba a un registro que fue borrado o convertido." });
+        toast({ title: t("closers.notif.leadGone"), description: t("closers.notif.leadGoneDesc") });
         searchParams.delete("id");
         setSearchParams(searchParams, { replace: true });
         return;
@@ -138,10 +153,10 @@ const ClosersContent = () => {
     // El botón ya se oculta para estos casos; esto es defensa en profundidad.
     if (c.deal_type !== "reclutamiento") {
       toast({
-        title: "No aplica",
+        title: t("closers.convert.notApplicable"),
         description: c.lead_source === "agencia"
-          ? "Una agencia no se convierte a creadora."
-          : "Esto es una venta de plataforma a una creadora que ya existe — no hay que convertirla.",
+          ? t("closers.convert.agencyNo")
+          : t("closers.convert.platformSaleNo"),
       });
       return;
     }
@@ -166,13 +181,13 @@ const ClosersContent = () => {
     setConverting(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("No se pudo obtener el usuario autenticado");
+      if (!user) throw new Error(t("closers.convert.noUser"));
 
       // Rama 1: YA existe viva y operativa (active/onboarding/borrador/…) → no duplicar.
       if (convertMatch && convertMatch.source === "creators" && !REACTIVATABLE.includes(convertMatch.status)) {
         toast({
-          title: "Ya existe como creadora",
-          description: `${c.instagram_handle} ya está en Creadoras (status: ${convertMatch.status}). No se creó un duplicado.`,
+          title: t("closers.convert.alreadyExists"),
+          description: t("closers.convert.alreadyExistsDesc", { handle: c.instagram_handle, status: convertMatch.status }),
         });
         setConvertTarget(null);
         return;
@@ -188,9 +203,9 @@ const ClosersContent = () => {
         });
         if (error) throw error;
         if (!data || (Array.isArray(data) && data.length === 0)) {
-          throw new Error("No se pudo reactivar (el status actual no es reactivable)");
+          throw new Error(t("closers.convert.cantReactivate"));
         }
-        toast({ title: "Creadora reactivada (reingreso)", description: `${c.instagram_handle} vuelve a la agencia — su perfil existente pasó a onboarding, marcada como reingresada.` });
+        toast({ title: t("closers.convert.reactivated"), description: t("closers.convert.reactivatedDesc", { handle: c.instagram_handle }) });
       } else {
         // Rama 3: nueva, o reingreso de un registro BORRADO → insert con marca.
         const isRejoin = convertMatch?.source === "history";
@@ -207,17 +222,17 @@ const ClosersContent = () => {
         } as any);
         if (error) throw error;
         toast({
-          title: isRejoin ? "Creadora creada (reingreso)" : "Creadora creada",
+          title: isRejoin ? t("closers.convert.createdRejoin") : t("closers.convert.created"),
           description: isRejoin
-            ? `${c.instagram_handle} vuelve a la agencia — quedó marcada como reingresada (onboarding).`
-            : `${c.instagram_handle} fue convertida a creadora (onboarding).`,
+            ? t("closers.convert.createdRejoinDesc", { handle: c.instagram_handle })
+            : t("closers.convert.createdDesc", { handle: c.instagram_handle }),
         });
       }
       queryClient.invalidateQueries({ queryKey: ["closer-leads"] });
       queryClient.invalidateQueries({ queryKey: ["creators"] });
       setConvertTarget(null);
     } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      toast({ title: t("common.error"), description: err.message, variant: "destructive" });
     } finally {
       setConverting(false);
     }
@@ -226,7 +241,7 @@ const ClosersContent = () => {
   const hasFilters = !!(search || agentFilter || originFilter || categoryFilter || dateFrom || dateTo);
 
   const TABS = useMemo(() =>
-    (isAdmin || isManager || isSupervisor) ? ALL_TABS : ALL_TABS.filter(t => t.value !== "todas"),
+    (isAdmin || isManager || isSupervisor) ? ALL_TABS : ALL_TABS.filter((tab) => tab.value !== "todas"),
     [isAdmin, isManager, isSupervisor]
   );
 
@@ -241,7 +256,7 @@ const ClosersContent = () => {
       <header className="bg-background/30 backdrop-blur-xl px-6 pt-6 pb-4 border-b border-white/10 shrink-0">
         <PageHeader
           title="Closers"
-          subtitle="Pipeline de cierre de modelos"
+          subtitle={t("closers.subtitle")}
           actions={
             <>
               {/* En "Actividad" no mostramos este date-picker ni "Asignar":
@@ -255,7 +270,7 @@ const ClosersContent = () => {
                     setDateFrom(from);
                     setDateTo(to);
                   }}
-                  placeholder="Seleccionar fechas"
+                  placeholder={t("closers.selectDates")}
                 />
               )}
               {(isAdmin || isManager || isSupervisor) && (
@@ -266,7 +281,7 @@ const ClosersContent = () => {
               )}
               {viewTab !== "actividad" && (isAdmin || isManager || canAssignCloser) && (
                 <Button size="sm" onClick={() => { setAssignTarget({ id: "", assignee: null, source: "closer" }); setAssignDialogOpen(true); }}>
-                  <UserPlus className="h-4 w-4 mr-1" /> Asignar
+                  <UserPlus className="h-4 w-4 mr-1" /> {t("closers.assign")}
                 </Button>
               )}
             </>
@@ -286,10 +301,10 @@ const ClosersContent = () => {
               </div>
               <div className="min-w-0">
                 <p className="text-xs text-primary/80 font-bold leading-tight">
-                  Vista filtrada
+                  {t("closers.viewAs.filtered")}
                 </p>
                 <p className="text-sm font-semibold truncate">
-                  Viendo el panel como <span className="text-primary">{viewAsCloserName || "este closer"}</span>
+                  {t("closers.viewAs.viewing")} <span className="text-primary">{viewAsCloserName || t("closers.viewAs.thisCloser")}</span>
                 </p>
               </div>
             </div>
@@ -299,7 +314,7 @@ const ClosersContent = () => {
               className="shrink-0 text-primary hover:bg-primary/15"
               onClick={() => setViewAsCloser(null, null)}
             >
-              <X className="h-4 w-4 mr-1" /> Cancelar vista
+              <X className="h-4 w-4 mr-1" /> {t("closers.viewAs.cancel")}
             </Button>
           </div>
         </div>
@@ -307,7 +322,7 @@ const ClosersContent = () => {
 
       {isLoading ? (
         <div className="p-6">
-          <p className="text-sm text-muted-foreground">Cargando...</p>
+          <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
         </div>
       ) : (
         <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setStatsCollapsed(false); }} className="flex-1 flex flex-col overflow-hidden min-h-0">
@@ -327,7 +342,7 @@ const ClosersContent = () => {
                   onClick={() => setViewTab("actividad")}
                 >
                   <Activity className="mr-1.5 h-4 w-4" />
-                  Actividad
+                  {t("closers.sub.activity")}
                 </SubtabNavItem>
               )}
               <SubtabNavItem
@@ -335,7 +350,7 @@ const ClosersContent = () => {
                 onClick={() => setViewTab("operaciones")}
               >
                 <ListChecks className="mr-1.5 h-4 w-4" />
-                Operaciones
+                {t("closers.sub.operations")}
               </SubtabNavItem>
               {canAccess("Closers", "Oportunidades") && (
                 <SubtabNavItem
@@ -343,7 +358,7 @@ const ClosersContent = () => {
                   onClick={() => setViewTab("oportunidades")}
                 >
                   <TrendingUp className="mr-1.5 h-4 w-4" />
-                  Oportunidades
+                  {t("closers.sub.opportunities")}
                 </SubtabNavItem>
               )}
             </SubtabNav>
@@ -412,15 +427,15 @@ const ClosersContent = () => {
                 const hasOverdue = isAsignadas && (alertCounts?.overdue ?? 0) > 0;
                 const hasDecision = isAsignadas && (alertCounts?.decision ?? 0) > 0;
                 const overdueLabel = hasOverdue
-                  ? `${alertCounts.overdue} contacto${alertCounts.overdue === 1 ? "" : "s"} vencido${alertCounts.overdue === 1 ? "" : "s"}`
+                  ? t(alertCounts.overdue === 1 ? "closers.tab.overdueOne" : "closers.tab.overdueMany", { n: alertCounts.overdue })
                   : "";
                 const decisionLabel = hasDecision
-                  ? `${alertCounts.decision} con decisión pendiente`
+                  ? t("closers.tab.decisionPending", { n: alertCounts.decision })
                   : "";
                 const dotTitle = [overdueLabel, decisionLabel].filter(Boolean).join(" · ");
                 return (
                   <TabsTrigger key={tab.value} value={tab.value} className="relative">
-                    {tab.label}
+                    {t(tab.labelKey)}
                     {count ? ` (${count})` : ""}
                     {(hasOverdue || hasDecision) && (
                       <span
@@ -441,7 +456,7 @@ const ClosersContent = () => {
               <div className="relative w-full sm:w-64">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Buscar por handle..."
+                  placeholder={t("closers.searchHandle")}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="pl-9"
@@ -453,10 +468,10 @@ const ClosersContent = () => {
                 onValueChange={(v) => setAgentFilter(v === "all" ? null : v)}
               >
                 <SelectTrigger className="w-full sm:w-44 h-10">
-                  <SelectValue placeholder="Agente" />
+                  <SelectValue placeholder={t("closers.agent")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="all">{t("common.all")}</SelectItem>
                   {agentList.map((a) => (
                     <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
                   ))}
@@ -473,12 +488,12 @@ const ClosersContent = () => {
                 onValueChange={(v) => setOriginFilter(v === "all" ? null : v)}
               >
                 <SelectTrigger className="w-full sm:w-48 h-10">
-                  <SelectValue placeholder="Origen" />
+                  <SelectValue placeholder={t("closers.origin")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todos los orígenes</SelectItem>
+                  <SelectItem value="all">{t("closers.allOrigins")}</SelectItem>
                   {ORIGIN_FILTERS.map((o) => (
-                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                    <SelectItem key={o.value} value={o.value}>{t(o.labelKey)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -491,10 +506,10 @@ const ClosersContent = () => {
                 onValueChange={(v) => setCategoryFilter(v === "all" ? null : v)}
               >
                 <SelectTrigger className="w-full sm:w-40 h-10">
-                  <SelectValue placeholder="Categoría" />
+                  <SelectValue placeholder={t("common.category")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todas las categorías</SelectItem>
+                  <SelectItem value="all">{t("closers.allCategories")}</SelectItem>
                   {CATEGORY_FILTERS.map((c) => (
                     <SelectItem key={c} value={c}>{c}</SelectItem>
                   ))}
@@ -503,7 +518,7 @@ const ClosersContent = () => {
 
               {hasFilters && (
                 <Button variant="ghost" size="sm" onClick={() => { setSearch(""); setAgentFilter(null); setOriginFilter(null); setCategoryFilter(null); setDateFrom(undefined); setDateTo(undefined); }}>
-                  <X className="h-4 w-4 mr-1" /> Limpiar
+                  <X className="h-4 w-4 mr-1" /> {t("closers.clear")}
                 </Button>
               )}
 
@@ -586,12 +601,18 @@ const ClosersContent = () => {
         title={(() => {
           if (!kpiPopup) return "";
           if (kpiPopup.kind === "pipeline") {
-            const labels: Record<string, string> = { total: "Pipeline Total", asignadas: "Asignadas", confirmadas: "Confirmadas", completadas: "Completadas", cerradas: "Cerradas (Confirmadas + Completadas)", no_interesadas: "No Interesadas" };
-            return labels[kpiPopup.key] ?? "";
+            const key = PIPELINE_POPUP_TITLE_KEYS[kpiPopup.key];
+            return key ? t(key) : "";
           }
-          return `Revenue ${kpiPopup.platform}`;
+          // kpiPopup.platform es la LLAVE que entiende useClosersKpiPopup
+          // ("Rev. OnlyFans"… o el nombre de una plataforma): se traduce solo
+          // para mostrarla.
+          const revKey = REVENUE_KPI_LABEL_KEYS[kpiPopup.platform];
+          return revKey
+            ? t("closers.popup.revenueKpiTitle", { name: t(revKey) })
+            : t("closers.popup.revenuePlatformTitle", { name: platformLabel(t, kpiPopup.platform) });
         })()}
-        subtitle={kpiPopup?.kind === "revenue" ? "Detalle por creadora" : undefined}
+        subtitle={kpiPopup?.kind === "revenue" ? t("closers.popup.byCreator") : undefined}
         result={kpiPopupResult}
         isLoading={kpiPopupLoading}
         popupKey={kpiPopup ? (kpiPopup.kind === "pipeline" ? `pipeline:${kpiPopup.key}` : `revenue:${kpiPopup.platform}`) : null}
@@ -600,29 +621,29 @@ const ClosersContent = () => {
       <AlertDialog open={!!convertTarget} onOpenChange={(o) => { if (!o) setConvertTarget(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Convertir a creadora?</AlertDialogTitle>
+            <AlertDialogTitle>{t("closers.convert.title")}</AlertDialogTitle>
             <AlertDialogDescription>
               {convertCheckLoading ? (
-                <>Verificando historial de <strong>{convertTarget?.instagram_handle || "este lead"}</strong>…</>
+                <>{t("closers.convert.checkingA")}<strong>{convertTarget?.instagram_handle || t("closers.thisLead")}</strong>{t("closers.convert.checkingB")}</>
               ) : convertMatch && convertMatch.source === "creators" && !REACTIVATABLE.includes(convertMatch.status) ? (
-                <>⚠️ <strong>{convertTarget?.instagram_handle}</strong> ya existe en Creadoras como "{convertMatch.name ?? "?"}" (status: {convertMatch.status}). No se va a crear un duplicado.</>
+                <>⚠️ <strong>{convertTarget?.instagram_handle}</strong>{t("closers.convert.existsB", { name: convertMatch.name ?? "?", status: convertMatch.status })}</>
               ) : convertMatch && convertMatch.source === "creators" ? (
-                <>🔄 <strong>{convertTarget?.instagram_handle}</strong> ya fue creadora de la agencia (status: {convertMatch.status}). Se va a <strong>reactivar su perfil existente</strong> como reingreso (pasa a onboarding, sin duplicados). El lead seguirá en el pipeline.</>
+                <>🔄 <strong>{convertTarget?.instagram_handle}</strong>{t("closers.convert.reactivateB", { status: convertMatch.status })}<strong>{t("closers.convert.reactivateBold")}</strong>{t("closers.convert.reactivateC")}</>
               ) : convertMatch ? (
-                <>🔄 <strong>{convertTarget?.instagram_handle}</strong> fue creadora antes (registro dado de baja). Se creará de nuevo <strong>marcada como reingreso</strong> (onboarding). El lead seguirá en el pipeline.</>
+                <>🔄 <strong>{convertTarget?.instagram_handle}</strong>{t("closers.convert.historyB")}<strong>{t("closers.convert.historyBold")}</strong>{t("closers.convert.historyC")}</>
               ) : (
-                <>Vas a crear una creadora a partir de <strong>{convertTarget?.instagram_handle || "este lead"}</strong>. Se creará un perfil en el módulo de Creadoras (onboarding). El lead seguirá en el pipeline de closers.</>
+                <>{t("closers.convert.newA")}<strong>{convertTarget?.instagram_handle || t("closers.thisLead")}</strong>{t("closers.convert.newB")}</>
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={converting} />
             <AlertDialogAction onClick={(e) => { e.preventDefault(); doConvertToCreator(); }} disabled={converting || convertCheckLoading}>
-              {converting ? "Procesando…"
-                : convertMatch && convertMatch.source === "creators" && !REACTIVATABLE.includes(convertMatch.status) ? "Entendido"
-                : convertMatch && convertMatch.source === "creators" ? "Reactivar (reingreso)"
-                : convertMatch ? "Convertir (reingreso)"
-                : "Convertir a Creadora"}
+              {converting ? t("closers.processing")
+                : convertMatch && convertMatch.source === "creators" && !REACTIVATABLE.includes(convertMatch.status) ? t("common.understood")
+                : convertMatch && convertMatch.source === "creators" ? t("closers.convert.reactivateBtn")
+                : convertMatch ? t("closers.convert.convertRejoinBtn")
+                : t("closers.convertToCreator")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

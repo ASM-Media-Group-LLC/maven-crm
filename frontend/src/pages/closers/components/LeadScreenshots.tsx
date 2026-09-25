@@ -25,6 +25,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { ImagePlus, Loader2, Trash2, X } from "lucide-react";
 import { SCREENSHOT_BUCKET as BUCKET, uploadLeadScreenshots } from "../leadScreenshots";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface LeadFile {
   id: string;
@@ -44,6 +45,7 @@ const TABLA = "closer_lead_files" as never;
 
 const LeadScreenshots = ({ leadId }: { leadId: string }) => {
   const { toast } = useToast();
+  const { t } = useLanguage();
   const qc = useQueryClient();
   const [dragOver, setDragOver] = useState(false);
   const [abierta, setAbierta] = useState<number | null>(null);
@@ -91,10 +93,10 @@ const LeadScreenshots = ({ leadId }: { leadId: string }) => {
     mutationFn: (files: File[]) => uploadLeadScreenshots(leadId, files),
     onSuccess: (_d, files) => {
       qc.invalidateQueries({ queryKey: ["lead-screenshots", leadId] });
-      toast({ description: `${files.length} captura${files.length > 1 ? "s" : ""} adjunta${files.length > 1 ? "s" : ""}` });
+      toast({ description: t(files.length > 1 ? "closers.shots.attachedMany" : "closers.shots.attachedOne", { n: files.length }) });
     },
     onError: (e: Error) =>
-      toast({ variant: "destructive", title: "No se pudo adjuntar", description: e.message }),
+      toast({ variant: "destructive", title: t("closers.shots.couldNotAttach"), description: e.message }),
   });
 
   const borrar = useMutation({
@@ -108,7 +110,7 @@ const LeadScreenshots = ({ leadId }: { leadId: string }) => {
       qc.invalidateQueries({ queryKey: ["lead-screenshots", leadId] });
     },
     onError: (e: Error) =>
-      toast({ variant: "destructive", title: "No se pudo borrar", description: e.message }),
+      toast({ variant: "destructive", title: t("closers.shots.couldNotDelete"), description: e.message }),
   });
 
   const agregar = useCallback(
@@ -171,7 +173,7 @@ const LeadScreenshots = ({ leadId }: { leadId: string }) => {
             dragOver ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/50 hover:text-foreground",
             subir.isPending && "opacity-60",
           )}
-          title="Adjuntar captura — click, arrastrar o Ctrl+V"
+          title={t("closers.shots.attachHint")}
         >
           {subir.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
         </button>
@@ -188,8 +190,8 @@ const LeadScreenshots = ({ leadId }: { leadId: string }) => {
 
       <p className="text-[10px] leading-tight text-muted-foreground">
         {rows.length === 0
-          ? "Adjuntá capturas: click, arrastrá o pegá con ⌘/Ctrl+V"
-          : `${rows.length} captura${rows.length > 1 ? "s" : ""} · solo tú y quien tenga este lead pueden verlas`}
+          ? t("closers.shots.emptyHint")
+          : t(rows.length > 1 ? "closers.shots.countMany" : "closers.shots.countOne", { n: rows.length })}
       </p>
 
       <Dialog open={activa !== null} onOpenChange={(o) => !o && setAbierta(null)}>
@@ -216,10 +218,10 @@ const LeadScreenshots = ({ leadId }: { leadId: string }) => {
                     disabled={borrar.isPending}
                     onClick={() => borrar.mutate(activa)}
                   >
-                    <Trash2 className="h-3 w-3" /> Borrar
+                    <Trash2 className="h-3 w-3" /> {t("closers.shots.delete")}
                   </Button>
                   <Button variant="outline" size="sm" className="h-7 gap-1 px-2 text-xs" onClick={() => setAbierta(null)}>
-                    <X className="h-3 w-3" /> Cerrar
+                    <X className="h-3 w-3" /> {t("common.close")}
                   </Button>
                 </div>
               </div>

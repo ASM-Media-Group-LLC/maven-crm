@@ -15,6 +15,9 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import ReadReceiptIndicator from "@/pages/messenger/components/ReadReceiptIndicator";
 
+vi.mock("@/hooks/useLanguage", (original) =>
+  import("@/test/messenger/espanolEnTests").then((m) => m.idiomaEnEspanol(original)));
+
 vi.mock("lucide-react", () => ({
   Check: (p: Record<string, unknown>) => <span data-testid="check-simple" {...p} />,
   CheckCheck: (p: Record<string, unknown>) => <span data-testid="check-doble" {...p} />,

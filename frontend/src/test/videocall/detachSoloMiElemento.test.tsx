@@ -16,6 +16,9 @@ import { render } from "@testing-library/react";
 import ParticipantTile from "@/pages/messenger/videocall/ParticipantTile";
 import type { LKParticipant } from "@/hooks/useLiveKit";
 
+vi.mock("@/hooks/useLanguage", (original) =>
+  import("@/test/messenger/espanolEnTests").then((m) => m.idiomaEnEspanol(original)));
+
 vi.mock("livekit-client", () => ({
   Track: { Source: { Camera: "camera", ScreenShare: "screen_share", Microphone: "microphone" } },
   Room: vi.fn(),

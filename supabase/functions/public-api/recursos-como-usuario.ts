@@ -14,10 +14,13 @@
 // este orden: (1) que la llave tenga el scope del recurso, sin tocar la base; (2)
 // que la base vea la sesión como alguien de la agencia de la llave. Un handler nuevo
 // no puede olvidarse de ninguna de las dos porque no le tocan a él.
+//
+// IDIOMA. Todo `mensaje` (lo que ve el cliente) sale de ./mensajes.ts en el idioma de
+// `ctx.idioma`. `detalle` va solo al log y queda en español.
 
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
-// El ÚNICO import de valores permitido: piezas puras, sin base ni red (el test lo
-// verifica en los dos archivos).
+// Los ÚNICOS imports de valores permitidos: piezas puras, sin base ni red (el test
+// lo verifica en los tres archivos).
 import {
   compararMensajes,
   compararPorActividad,
@@ -36,6 +39,7 @@ import {
   visibleEnBandeja,
   vistaPrevia,
 } from "./messenger-formato.ts";
+import { type ClaveSinVars, type Idioma, msg } from "./mensajes.ts";
 
 export type Contexto = {
   /** De qué agencia es la llave (api_keys.tenant_id). */
@@ -54,6 +58,8 @@ export type Contexto = {
   baseDeArchivos: string;
   /** Lo que queda del cupo de esta hora, para devolverlo en el cuerpo. */
   cupo: { limite: number; restantes: number; reinicio: string };
+  /** En qué idioma van los `mensaje` (Accept-Language del pedido; ver ./mensajes.ts). */
+  idioma: Idioma;
 };
 
 export type Resultado =
@@ -70,7 +76,7 @@ export type Handler = (yo: SupabaseClient, ctx: Contexto) => Promise<Resultado>;
  *  agencia de la llave. */
 export const servirMe: Handler = async (yo, ctx) => {
   const sub = ctx.ruta[0] ?? null;
-  if (sub) return { ok: false, estado: 404, error: "not_found", mensaje: `Sub-recurso de me desconocido: ${sub}` };
+  if (sub) return { ok: false, estado: 404, error: "not_found", mensaje: msg(ctx.idioma, "me_sub_recurso_desconocido", { sub }) };
 
   const perfil = await yo.from("profiles").select("id, full_name, avatar_url").eq("id", ctx.actuaComo).maybeSingle();
   if (perfil.error) return { ok: false, estado: 503, detalle: `perfil: ${perfil.error.message}` };
@@ -131,9 +137,11 @@ const FEED_POR_DEFECTO_MS = 15 * 60 * 1000;
 const UUID_MAXIMO = "ffffffff-ffff-ffff-ffff-ffffffffffff";
 const UUID_MINIMO = "00000000-0000-0000-0000-000000000000";
 
-const malPedido = (mensaje: string): Resultado => ({ ok: false, estado: 400, error: "bad_request", mensaje });
-const noEncontrada = (): Resultado => ({
-  ok: false, estado: 404, error: "not_found", mensaje: "Conversación no encontrada",
+const malPedido = (idioma: Idioma, clave: ClaveSinVars): Resultado => ({
+  ok: false, estado: 400, error: "bad_request", mensaje: msg(idioma, clave),
+});
+const noEncontrada = (idioma: Idioma): Resultado => ({
+  ok: false, estado: 404, error: "not_found", mensaje: msg(idioma, "conversacion_no_encontrada"),
 });
 const falla = (detalle: string): Resultado => ({ ok: false, estado: 503, detalle });
 
@@ -174,9 +182,9 @@ async function misParticipaciones(yo: SupabaseClient, ctx: Contexto) {
 /** GET /messenger/conversations — la bandeja. */
 async function bandeja(yo: SupabaseClient, ctx: Contexto): Promise<Resultado> {
   const limit = limiteDePagina(ctx.consulta.limit, 50);
-  if (limit === null) return malPedido("limit tiene que ser un número entre 1 y 100");
+  if (limit === null) return malPedido(ctx.idioma, "limit_invalido");
   const offset = offsetDePagina(ctx.consulta.offset);
-  if (offset === null) return malPedido("offset tiene que ser un número de 0 en adelante");
+  if (offset === null) return malPedido(ctx.idioma, "offset_invalido");
 
   const mias = await misParticipaciones(yo, ctx);
   if ("error" in mias) return falla(mias.error ?? "participaciones");
@@ -270,7 +278,7 @@ async function bandeja(yo: SupabaseClient, ctx: Contexto): Promise<Resultado> {
 
 /** GET /messenger/conversations/{id} — una conversación y sus miembros. */
 async function conversacion(yo: SupabaseClient, ctx: Contexto, id: string): Promise<Resultado> {
-  if (!UUID.test(id)) return malPedido("El id de la conversación no es válido");
+  if (!UUID.test(id)) return malPedido(ctx.idioma, "id_de_conversacion_invalido");
   const [conv, mia] = await Promise.all([
     yo.from("chat_conversations").select(COLS_CONVERSACION).eq("id", id).maybeSingle(),
     yo.from("chat_participants").select(COLS_MI_PARTICIPACION).eq("conversation_id", id).eq("user_id", ctx.actuaComo).maybeSingle(),
@@ -278,7 +286,7 @@ async function conversacion(yo: SupabaseClient, ctx: Contexto, id: string): Prom
   if (conv.error) return falla(`conversación: ${conv.error.message}`);
   if (mia.error) return falla(`participación: ${mia.error.message}`);
   // Si no la ve (no es parte, o no existe) es 404 y no 403: no se confirma que exista.
-  if (!conv.data || !mia.data) return noEncontrada();
+  if (!conv.data || !mia.data) return noEncontrada(ctx.idioma);
   const c = conv.data as unknown as Record<string, unknown>;
   const yoAca = mia.data as MiParticipacion;
 
@@ -339,23 +347,23 @@ function leerIncluir(v: string | undefined): { rico: boolean } | null {
 
 /** GET /messenger/conversations/{id}/messages — historia, con cursor. */
 async function mensajes(yo: SupabaseClient, ctx: Contexto, id: string): Promise<Resultado> {
-  if (!UUID.test(id)) return malPedido("El id de la conversación no es válido");
+  if (!UUID.test(id)) return malPedido(ctx.idioma, "id_de_conversacion_invalido");
   const limit = limiteDePagina(ctx.consulta.limit, 50);
-  if (limit === null) return malPedido("limit tiene que ser un número entre 1 y 100");
+  if (limit === null) return malPedido(ctx.idioma, "limit_invalido");
   const incluir = leerIncluir(ctx.consulta.include);
-  if (incluir === null) return malPedido("include solo acepta: rich");
+  if (incluir === null) return malPedido(ctx.idioma, "include_invalido");
   const { before, after, thread_root_id: hilo } = ctx.consulta;
-  if (before && after) return malPedido("Usá before O after, no los dos");
+  if (before && after) return malPedido(ctx.idioma, "before_y_after");
   let cursor: Cursor | null = null;
   if (before || after) {
     cursor = decodificarCursor((before ?? after)!);
-    if (!cursor) return malPedido("El cursor no es válido");
+    if (!cursor) return malPedido(ctx.idioma, "cursor_invalido");
   }
-  if (hilo !== undefined && !UUID.test(hilo)) return malPedido("thread_root_id no es válido");
+  if (hilo !== undefined && !UUID.test(hilo)) return malPedido(ctx.idioma, "thread_root_id_invalido");
 
   const conv = await yo.from("chat_conversations").select("id").eq("id", id).maybeSingle();
   if (conv.error) return falla(`conversación: ${conv.error.message}`);
-  if (!conv.data) return noEncontrada();
+  if (!conv.data) return noEncontrada(ctx.idioma);
 
   const ascendente = !!after;
   const consulta = () => {
@@ -416,26 +424,26 @@ async function mensajes(yo: SupabaseClient, ctx: Contexto, id: string): Promise<
  *  integración "recibe" sin webhooks: pide, guarda next_cursor, vuelve a pedir. */
 async function feed(yo: SupabaseClient, ctx: Contexto): Promise<Resultado> {
   const limit = limiteDePagina(ctx.consulta.limit, 100);
-  if (limit === null) return malPedido("limit tiene que ser un número entre 1 y 100");
+  if (limit === null) return malPedido(ctx.idioma, "limit_invalido");
   const incluir = leerIncluir(ctx.consulta.include);
-  if (incluir === null) return malPedido("include solo acepta: rich");
+  if (incluir === null) return malPedido(ctx.idioma, "include_invalido");
   const { after, since, exclude_own: sinPropios } = ctx.consulta;
-  if (after && since) return malPedido("Usá after O since, no los dos");
+  if (after && since) return malPedido(ctx.idioma, "after_y_since");
   if (sinPropios !== undefined && sinPropios !== "true" && sinPropios !== "false") {
-    return malPedido("exclude_own tiene que ser true o false");
+    return malPedido(ctx.idioma, "exclude_own_invalido");
   }
 
   const ahora = Date.now();
   let desde: Cursor;
   if (after) {
     const c = decodificarCursor(after);
-    if (!c) return malPedido("El cursor no es válido");
+    if (!c) return malPedido(ctx.idioma, "cursor_invalido");
     desde = c;
   } else if (since) {
     const ms = Date.parse(since);
-    if (Number.isNaN(ms) || !/^\d{4}-\d{2}-\d{2}T/.test(since)) return malPedido("since tiene que ser una fecha ISO 8601");
+    if (Number.isNaN(ms) || !/^\d{4}-\d{2}-\d{2}T/.test(since)) return malPedido(ctx.idioma, "since_invalido");
     if (ahora - ms > FEED_SINCE_MAX_MS) {
-      return malPedido("since no puede tener más de 72 horas: para lo anterior, leé cada conversación con /messages");
+      return malPedido(ctx.idioma, "since_muy_viejo");
     }
     desde = { t: new Date(ms).toISOString(), i: UUID_MINIMO };
   } else {
@@ -444,7 +452,7 @@ async function feed(yo: SupabaseClient, ctx: Contexto): Promise<Resultado> {
 
   const asentado = ahora - ASENTAMIENTO_MS;
   const desdeMs = Date.parse(desde.t);
-  if (!Number.isFinite(desdeMs)) return malPedido("El cursor no es válido");
+  if (!Number.isFinite(desdeMs)) return malPedido(ctx.idioma, "cursor_invalido");
   const hastaMs = Math.min(desdeMs + VENTANA_FEED_MS, asentado);
   const hasta = new Date(hastaMs).toISOString();
   const alDia = hastaMs >= asentado;
@@ -502,7 +510,7 @@ export const servirMessenger: Handler = (yo, ctx) => {
   if (!ctx.llave.conWhitelist || !ctx.llave.venceEl) {
     return Promise.resolve({
       ok: false, estado: 403, error: "forbidden",
-      mensaje: "Las llaves con Messenger necesitan IPs fijas y fecha de vencimiento",
+      mensaje: msg(ctx.idioma, "messenger_llave_sin_reglas"),
     });
   }
   const [a, b, c, ...resto] = ctx.ruta;
@@ -512,8 +520,7 @@ export const servirMessenger: Handler = (yo, ctx) => {
   if (a === "feed" && b === undefined) return feed(yo, ctx);
   return Promise.resolve({
     ok: false, estado: 404, error: "not_found",
-    mensaje: "Usá /messenger/conversations, /messenger/conversations/{id}, " +
-      "/messenger/conversations/{id}/messages o /messenger/feed",
+    mensaje: msg(ctx.idioma, "messenger_rutas"),
   });
 };
 
@@ -552,7 +559,7 @@ export function crearServidorComoUsuario(
     // (1) El scope, ANTES de tocar la base: sin él no se gasta ni una consulta.
     const scope = scopeRequerido[recurso];
     if (scope !== null && !ctx.scopes.includes(scope)) {
-      return { ok: false, estado: 403, error: "forbidden", mensaje: `Falta el scope ${scope}` };
+      return { ok: false, estado: 403, error: "forbidden", mensaje: msg(ctx.idioma, "falta_scope", { scope }) };
     }
     // (2) Que la base vea la sesión como alguien de la agencia de la llave.
     const agencia = await yo.rpc("current_tenant_id");

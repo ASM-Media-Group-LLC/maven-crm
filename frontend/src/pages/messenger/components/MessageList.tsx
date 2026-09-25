@@ -6,6 +6,9 @@ import MessageBubble from "./MessageBubble";
 import { cn } from "@/lib/utils";
 import { Loader2, ChevronDown } from "lucide-react";
 import { agruparEnAlbumes } from "@/lib/albumDeImagenes";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { Language } from "@/lib/i18n";
+import type { Traductor } from "../preview";
 
 interface MessageListProps {
   messages: ChatMessage[];
@@ -39,14 +42,15 @@ interface MessageListProps {
   onLoadMore?: () => void;
 }
 
-function formatDateSeparator(dateStr: string): string {
+function formatDateSeparator(dateStr: string, t: Traductor, lang: Language): string {
   const date = new Date(dateStr);
   const now = new Date();
   const yesterday = new Date(now);
   yesterday.setDate(now.getDate() - 1);
-  if (date.toDateString() === now.toDateString()) return "Hoy";
-  if (date.toDateString() === yesterday.toDateString()) return "Ayer";
-  return date.toLocaleDateString("es", { day: "numeric", month: "long", year: "numeric" });
+  if (date.toDateString() === now.toDateString()) return t("common.today");
+  if (date.toDateString() === yesterday.toDateString()) return t("messenger.preview.ayer");
+  // En español, el "es" de siempre; solo en inglés pasa a en-US.
+  return date.toLocaleDateString(lang === "en" ? "en-US" : "es", { day: "numeric", month: "long", year: "numeric" });
 }
 
 function groupMessages(messages: ChatMessage[]) {
@@ -75,6 +79,7 @@ export default function MessageList({
   highlightedMsgId, onOpenThread, getThreadCount, getUnreadThreadCount,
   hasMore, loadingMore, onLoadMore, className,
 }: MessageListProps) {
+  const { t, language } = useLanguage();
   const scrollRef = useRef<HTMLDivElement>(null);
   const msgRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const prevMessagesLengthRef = useRef(0);
@@ -209,7 +214,7 @@ export default function MessageList({
           <div className="h-14 w-14 rounded-3xl bg-primary/8 flex items-center justify-center mx-auto">
             <span className="text-2xl">💬</span>
           </div>
-          <p className="text-sm text-muted-foreground">Envía el primer mensaje</p>
+          <p className="text-sm text-muted-foreground">{t("messenger.list.primerMensaje")}</p>
         </div>
       </div>
     );
@@ -231,7 +236,7 @@ export default function MessageList({
               onClick={onLoadMore}
               className="text-xs text-primary hover:bg-primary/8 rounded-full px-4 py-1.5 transition-colors"
             >
-              Cargar mensajes anteriores
+              {t("messenger.list.cargarAnteriores")}
             </button>
           </div>
         )}
@@ -240,7 +245,7 @@ export default function MessageList({
           <div key={gi}>
             <div className="flex justify-center my-4">
               <span className="text-[11px] text-muted-foreground bg-primary/8 px-4 py-1 rounded-full font-medium select-none">
-                {formatDateSeparator(group.date)}
+                {formatDateSeparator(group.date, t, language)}
               </span>
             </div>
 
@@ -312,11 +317,11 @@ export default function MessageList({
       {showJump && (
         <button
           onClick={scrollToBottom}
-          aria-label="Ir al último mensaje"
+          aria-label={t("messenger.list.irAlUltimo")}
           className="absolute bottom-4 right-4 z-10 flex items-center gap-1.5 rounded-full bg-card shadow-lg border border-border/60 pl-3 pr-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted transition-colors animate-fade-in"
         >
           {newCount > 0 && (
-            <span className="text-primary">{newCount} {newCount === 1 ? "nuevo" : "nuevos"}</span>
+            <span className="text-primary">{newCount === 1 ? t("messenger.list.unNuevo") : t("messenger.list.nuevos", { n: newCount })}</span>
           )}
           <ChevronDown className="h-4 w-4 text-primary" />
         </button>

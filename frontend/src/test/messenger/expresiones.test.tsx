@@ -6,7 +6,8 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import Expresiones from "@/pages/messenger/components/Expresiones";
 
-vi.mock("@/hooks/useLanguage", () => ({ useLanguage: () => ({ t: (k: string) => k }) }));
+vi.mock("@/hooks/useLanguage", (original) =>
+  import("@/test/messenger/espanolEnTests").then((m) => m.idiomaEnEspanol(original)));
 
 describe("Expresiones", () => {
   it("abre, muestra frecuentes y catálogo, e inserta al tocar", () => {

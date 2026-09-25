@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import { UserProfile } from "../types";
 import { profileName } from "../utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface ReadReceiptIndicatorProps {
   isMe: boolean;
@@ -49,6 +50,7 @@ interface ReadReceiptIndicatorProps {
 // pie de cada burbuja propia. La palabra sigue estando donde no molesta — en el
 // tooltip, que además dice QUIÉN lo leyó.
 export default function ReadReceiptIndicator({ isMe, deliveredByUsers, readByUsers, profiles, totalParticipants, variant = "onPrimary" }: ReadReceiptIndicatorProps) {
+  const { t } = useLanguage();
   if (!isMe) return null;
 
   const palette = variant === "onSurface"
@@ -75,21 +77,24 @@ export default function ReadReceiptIndicator({ isMe, deliveredByUsers, readByUse
   // son lo mismo.
   const hayEntrega = esGrupo ? deliveredCount > 0 : allDelivered;
 
-  const names = (uids: string[]) => uids.map((uid) => profileName(profiles[uid])).join(", ");
+  const names = (uids: string[]) => uids.map((uid) => profileName(profiles[uid], t("messenger.usuario"))).join(", ");
   // ✓ simple = enviado (todavía no llegó al navegador de la otra persona). Antes no
   // tenía tooltip y se leía como "entregado": esa confusión fue el reporte de
   // Jackeline con Fabiana (que salía "Disponible" pero tenía la app en segundo plano).
   const sentOnly = !hayEntrega && !allRead;
   // En grupos el tooltip lleva la cuenta: "Leído por 3 de 20" dice la verdad, y
   // la lista de nombres de veinte personas no cabe ni sirve.
-  const conCuenta = (n: number, verbo: string) => `${verbo} por ${n} de ${othersCount}`;
   const label = sentOnly
-    ? "Enviado · aún no le llegó"
+    ? t("messenger.receipt.enviado")
     : esGrupo
       ? (readCount > 0
-          ? `${conCuenta(readCount, "Leído")}${deliveredCount > readCount ? ` · entregado a ${deliveredCount}` : ""}`
-          : `Entregado a ${deliveredCount} de ${othersCount}`)
-      : allRead ? `Leído por ${names(readByUsers)}` : `Entregado a ${names(deliveredByUsers)}`;
+          ? (deliveredCount > readCount
+              ? t("messenger.receipt.leidoPorDeEntregado", { n: readCount, total: othersCount, entregados: deliveredCount })
+              : t("messenger.receipt.leidoPorDe", { n: readCount, total: othersCount }))
+          : t("messenger.receipt.entregadoADe", { n: deliveredCount, total: othersCount }))
+      : allRead
+        ? t("messenger.receipt.leidoPor", { nombres: names(readByUsers) })
+        : t("messenger.receipt.entregadoA", { nombres: names(deliveredByUsers) });
 
   return (
     <TooltipProvider delayDuration={200}>

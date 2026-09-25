@@ -15,6 +15,7 @@ import {
 import { Plus, Trash2 } from "lucide-react";
 import { celebrateClose } from "@/lib/celebrateClose";
 import { SALE_PLATFORMS } from "../hooks/useCloserLeads";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface Props {
   creatorId: string;
@@ -38,6 +39,7 @@ const normalizaProducto = (s: string | null | undefined) =>
 const PlatformSalesPanel = ({ creatorId }: Props) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   // Confirmación antes de borrar: es un registro monetario, nada de borrado en un clic.
@@ -101,7 +103,7 @@ const PlatformSalesPanel = ({ creatorId }: Props) => {
 
   const addSale = useMutation({
     mutationFn: async () => {
-      if (!user || !platform) throw new Error("Datos incompletos");
+      if (!user || !platform) throw new Error(t("closers.err.missingData"));
       const { error } = await supabase.from("closer_platform_sales").insert({
         creator_id: creatorId,
         platform,
@@ -120,7 +122,7 @@ const PlatformSalesPanel = ({ creatorId }: Props) => {
       queryClient.invalidateQueries({ queryKey: ["closer-platform-revenue"] });
       celebrateClose(`venta-${creatorId}`);
       toast({
-        title: "🎉 Venta cerrada",
+        title: t("closers.sales.closed"),
         description: `${platform}${product ? ` – ${product}` : ""}${monto > 0 ? ` · $${monto.toLocaleString()}` : ""}`,
       });
       setShowForm(false);
@@ -129,7 +131,7 @@ const PlatformSalesPanel = ({ creatorId }: Props) => {
       setPrice("");
     },
     onError: (e: Error) => {
-      toast({ title: "Error", description: e.message, variant: "destructive" });
+      toast({ title: t("common.error"), description: e.message, variant: "destructive" });
     },
   });
 
@@ -142,10 +144,10 @@ const PlatformSalesPanel = ({ creatorId }: Props) => {
       queryClient.invalidateQueries({ queryKey: ["closer-platform-sales", creatorId] });
       queryClient.invalidateQueries({ queryKey: ["closer-platform-revenue"] });
       setSaleToDelete(null);
-      toast({ title: "Venta eliminada" });
+      toast({ title: t("closers.sales.deleted") });
     },
     onError: (e: Error) => {
-      toast({ title: "Error al eliminar", description: e.message, variant: "destructive" });
+      toast({ title: t("common.errorDeleting"), description: e.message, variant: "destructive" });
     },
   });
 
@@ -154,7 +156,7 @@ const PlatformSalesPanel = ({ creatorId }: Props) => {
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <p className="text-xs font-medium text-muted-foreground">Ventas por plataforma</p>
+        <p className="text-xs font-medium text-muted-foreground">{t("closers.salesByPlatform")}</p>
         <span className="text-xs font-semibold text-foreground">${total.toLocaleString()}</span>
       </div>
 
@@ -164,7 +166,7 @@ const PlatformSalesPanel = ({ creatorId }: Props) => {
             <span className="font-medium">{s.platform}</span>
             {s.product && <span className="text-muted-foreground">– {s.product}</span>}
             {s.viaBot && (
-              <span className="text-[10px] rounded bg-muted px-1 py-0.5 text-muted-foreground" title="Registrada por el bot desde WhatsApp (oportunidad ganada)">
+              <span className="text-[10px] rounded bg-muted px-1 py-0.5 text-muted-foreground" title={t("closers.sales.botHint")}>
                 bot
               </span>
             )}
@@ -182,13 +184,13 @@ const PlatformSalesPanel = ({ creatorId }: Props) => {
 
       {!showForm ? (
         <Button variant="outline" size="sm" onClick={() => setShowForm(true)} className="w-full">
-          <Plus className="h-3 w-3 mr-1" /> Agregar venta
+          <Plus className="h-3 w-3 mr-1" /> {t("closers.sales.add")}
         </Button>
       ) : (
         <div className="border border-border rounded-md p-2 space-y-2">
           <div className="grid grid-cols-3 gap-2">
             <div>
-              <Label className="text-xs">Plataforma</Label>
+              <Label className="text-xs">{t("closers.platform")}</Label>
               <Select value={platform} onValueChange={setPlatform}>
                 <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="..." /></SelectTrigger>
                 <SelectContent>
@@ -197,17 +199,17 @@ const PlatformSalesPanel = ({ creatorId }: Props) => {
               </Select>
             </div>
             <div>
-              <Label className="text-xs">Producto</Label>
-              <Input value={product} onChange={(e) => setProduct(e.target.value)} className="h-7 text-xs" placeholder="Suscripción..." />
+              <Label className="text-xs">{t("closers.product")}</Label>
+              <Input value={product} onChange={(e) => setProduct(e.target.value)} className="h-7 text-xs" placeholder={t("closers.sales.productPlaceholder")} />
             </div>
             <div>
-              <Label className="text-xs">Precio</Label>
+              <Label className="text-xs">{t("closers.price")}</Label>
               <Input type="number" value={price} onChange={(e) => setPrice(e.target.value)} className="h-7 text-xs" placeholder="0" />
             </div>
           </div>
           <div className="flex justify-end gap-1">
-            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setShowForm(false)}>Cancelar</Button>
-            <Button size="sm" className="h-7 text-xs" onClick={() => addSale.mutate()} disabled={!platform || addSale.isPending}>Guardar</Button>
+            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setShowForm(false)}>{t("common.cancel")}</Button>
+            <Button size="sm" className="h-7 text-xs" onClick={() => addSale.mutate()} disabled={!platform || addSale.isPending}>{t("common.save")}</Button>
           </div>
         </div>
       )}
@@ -215,12 +217,12 @@ const PlatformSalesPanel = ({ creatorId }: Props) => {
       <AlertDialog open={!!saleToDelete} onOpenChange={(o) => { if (!o) setSaleToDelete(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar esta venta?</AlertDialogTitle>
+            <AlertDialogTitle>{t("closers.sales.deleteTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Estás a punto de eliminar la venta de{" "}
+              {t("closers.sales.deleteA")}{" "}
               <strong>{saleToDelete?.platform}</strong>
               {saleToDelete?.product ? <> – {saleToDelete.product}</> : null}{" "}
-              por <strong>${Number(saleToDelete?.price ?? 0).toLocaleString()}</strong>. Esta acción no se puede deshacer.
+              {t("closers.sales.deleteB")} <strong>${Number(saleToDelete?.price ?? 0).toLocaleString()}</strong>. {t("common.cannotBeUndone")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -230,7 +232,7 @@ const PlatformSalesPanel = ({ creatorId }: Props) => {
               onClick={() => { if (saleToDelete) deleteSale.mutate(saleToDelete.id); }}
               disabled={deleteSale.isPending}
             >
-              {deleteSale.isPending ? "Eliminando..." : "Eliminar"}
+              {deleteSale.isPending ? t("closers.deleting") : t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

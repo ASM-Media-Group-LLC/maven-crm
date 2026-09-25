@@ -2,6 +2,9 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import BackgroundSelector, { BACKGROUND_TEMPLATES, BackgroundEffect, isCustomBackground, getCustomBackgroundUrl, isTemplateBackground } from "@/pages/messenger/videocall/BackgroundSelector";
 
+vi.mock("@/hooks/useLanguage", (original) =>
+  import("@/test/messenger/espanolEnTests").then((m) => m.idiomaEnEspanol(original)));
+
 describe("BackgroundSelector", () => {
   const defaultProps = {
     selected: "none" as BackgroundEffect,

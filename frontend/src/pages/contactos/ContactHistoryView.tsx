@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { format, parseISO } from "date-fns";
 import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
 import {
   ArrowLeft, Loader2, UserPlus, MessageCircle, StickyNote, Sparkles, ArrowRightLeft,
   Megaphone, Calendar, Building2, Phone, TrendingDown, Circle,
@@ -15,6 +16,10 @@ import {
 // baja de la agencia, canales de venta, eventos, monetización…). Se alimenta del RPC
 // get_contact_history (agregación server-side). Es un overlay full-screen sobre el popup:
 // "Volver" cierra y el popup sigue abierto debajo.
+//
+// El título y el detalle de cada evento los arma el RPC en el servidor, en
+// español: son dato, no se traducen acá. Lo que sí es de esta pantalla (encabezado,
+// vacío, error) pasa por t().
 
 interface HistoryEvent {
   event_at: string | null;
@@ -48,6 +53,7 @@ interface Props {
 
 export default function ContactHistoryView({ contactId, contactName, open, onClose }: Props) {
   const f = useFormato();
+  const { t } = useLanguage();
   const { data: events = [], isLoading, error } = useQuery({
     queryKey: ["contact-history", contactId],
     enabled: open && !!contactId,
@@ -67,11 +73,11 @@ export default function ContactHistoryView({ contactId, contactName, open, onClo
         {/* Header */}
         <div className="flex items-center gap-3 border-b border-border px-5 py-3">
           <Button variant="ghost" size="sm" className="gap-1.5 -ml-2" onClick={onClose}>
-            <ArrowLeft className="h-4 w-4" /> Volver
+            <ArrowLeft className="h-4 w-4" /> {t("common.back")}
           </Button>
           <div className="min-w-0">
-            <h2 className="truncate text-base font-semibold leading-tight">Historial de {contactName}</h2>
-            <p className="text-xs text-muted-foreground">Todo lo que pasó con este contacto en Maven</p>
+            <h2 className="truncate text-base font-semibold leading-tight">{t("contactos.historyOf", { name: contactName })}</h2>
+            <p className="text-xs text-muted-foreground">{t("contactos.historySubtitle")}</p>
           </div>
         </div>
 
@@ -80,9 +86,9 @@ export default function ContactHistoryView({ contactId, contactName, open, onClo
             {isLoading ? (
               <div className="flex items-center justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
             ) : error ? (
-              <p className="py-16 text-center text-sm text-destructive">No se pudo cargar el historial.</p>
+              <p className="py-16 text-center text-sm text-destructive">{t("contactos.historyLoadError")}</p>
             ) : events.length === 0 ? (
-              <p className="py-16 text-center text-sm text-muted-foreground">Sin historial registrado todavía.</p>
+              <p className="py-16 text-center text-sm text-muted-foreground">{t("contactos.historyEmpty")}</p>
             ) : (
               <ol className="relative space-y-0">
                 {/* línea vertical */}

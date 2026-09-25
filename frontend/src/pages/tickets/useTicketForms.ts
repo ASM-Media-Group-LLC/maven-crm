@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 import { useToast } from "@/hooks/use-toast";
+import { traducir, type TranslationKey } from "@/lib/i18n";
 
 /**
  * Plantillas de ticket: el equivalente en Maven al Google Form de la hoja de
@@ -9,25 +10,27 @@ import { useToast } from "@/hooks/use-toast";
  * tarjeta en el tab de Tickets.
  */
 
+// `value` es lo que se guarda en ticket_form_fields.field_type; `labelKey` es
+// la clave de i18n de su nombre en el constructor (TicketFormEditor).
 export const FIELD_TYPES = [
   // "creator" es un tipo como cualquier otro: la pregunta se convierte en el
   // buscador de creadoras de Maven y alimenta tickets.creator_id.
-  { value: "creator", label: "Creadora (vinculada a Maven)" },
-  { value: "text", label: "Texto corto" },
-  { value: "textarea", label: "Texto largo" },
-  { value: "number", label: "Número" },
-  { value: "currency", label: "Monto ($)" },
-  { value: "percent", label: "Porcentaje (%)" },
-  { value: "date", label: "Fecha" },
-  { value: "select", label: "Lista (una opción)" },
-  { value: "multiselect", label: "Lista (varias opciones)" },
-  { value: "checkbox", label: "Sí / No" },
-  { value: "email", label: "Correo" },
-  { value: "url", label: "Enlace" },
-  { value: "instagram", label: "Instagram" },
-  { value: "user", label: "Empleado de Maven" },
-  { value: "drive_links", label: "Enlaces de Drive (pruebas)" },
-] as const;
+  { value: "creator", labelKey: "tickets.fieldType.creator" },
+  { value: "text", labelKey: "tickets.fieldType.text" },
+  { value: "textarea", labelKey: "tickets.fieldType.textarea" },
+  { value: "number", labelKey: "common.number" },
+  { value: "currency", labelKey: "tickets.fieldType.currency" },
+  { value: "percent", labelKey: "tickets.fieldType.percent" },
+  { value: "date", labelKey: "common.date" },
+  { value: "select", labelKey: "tickets.fieldType.select" },
+  { value: "multiselect", labelKey: "tickets.fieldType.multiselect" },
+  { value: "checkbox", labelKey: "tickets.fieldType.checkbox" },
+  { value: "email", labelKey: "common.email" },
+  { value: "url", labelKey: "tickets.fieldType.url" },
+  { value: "instagram", labelKey: "tickets.fieldType.instagram" },
+  { value: "user", labelKey: "tickets.fieldType.user" },
+  { value: "drive_links", labelKey: "tickets.fieldType.driveLinks" },
+] as const satisfies readonly { value: string; labelKey: TranslationKey }[];
 
 export type FieldType = (typeof FIELD_TYPES)[number]["value"];
 
@@ -39,13 +42,13 @@ export const TYPES_WITH_OPTIONS: FieldType[] = ["select", "multiselect"];
  * `answers`. Es lo que mantiene vivos los filtros, el kanban y los estados.
  */
 export const MAPPABLE_COLUMNS = [
-  { value: "title", label: "Título del ticket" },
-  { value: "description", label: "Descripción" },
-  { value: "priority", label: "Prioridad", closedCatalog: true },
-  { value: "assigned_to", label: "Asignado a" },
-  { value: "company", label: "Compañía", closedCatalog: true },
-  { value: "creator_notes", label: "Notas de la creadora" },
-] as const;
+  { value: "title", labelKey: "tickets.column.title" },
+  { value: "description", labelKey: "common.description" },
+  { value: "priority", labelKey: "tickets.priority", closedCatalog: true },
+  { value: "assigned_to", labelKey: "tickets.assignedTo" },
+  { value: "company", labelKey: "common.company", closedCatalog: true },
+  { value: "creator_notes", labelKey: "tickets.column.creatorNotes" },
+] as const satisfies readonly { value: string; labelKey: TranslationKey; closedCatalog?: boolean }[];
 
 /**
  * DEPRECADO. La creadora ahora es una pregunta de tipo `creator`. Se conserva el
@@ -180,16 +183,16 @@ export function useTicketForms(options?: { includeUnpublished?: boolean }) {
       return (data as any).id as string;
     },
     onSuccess: () => {
-      toast({ title: "Plantilla guardada" });
+      toast({ title: traducir("tickets.toast.templateSaved") });
       invalidate();
     },
     onError: (error: Error) => {
       // El índice único del prefijo es la causa más frecuente y el mensaje de
       // Postgres no le dice nada al usuario.
       const msg = /ticket_forms_code_prefix_key/.test(error.message)
-        ? "Ese prefijo ya está en uso por otra plantilla. Elige otro."
+        ? traducir("tickets.toast.prefixTaken")
         : error.message;
-      toast({ title: "Error al guardar la plantilla", description: msg, variant: "destructive" });
+      toast({ title: traducir("tickets.toast.templateSaveError"), description: msg, variant: "destructive" });
     },
   });
 
@@ -204,11 +207,11 @@ export function useTicketForms(options?: { includeUnpublished?: boolean }) {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast({ title: "Plantilla archivada" });
+      toast({ title: traducir("tickets.toast.templateArchived") });
       invalidate();
     },
     onError: (error: Error) => {
-      toast({ title: "Error al archivar", description: error.message, variant: "destructive" });
+      toast({ title: traducir("tickets.toast.archiveError"), description: error.message, variant: "destructive" });
     },
   });
 
@@ -221,11 +224,13 @@ export function useTicketForms(options?: { includeUnpublished?: boolean }) {
       if (error) throw error;
     },
     onSuccess: (_d, v) => {
-      toast({ title: v.is_published ? "Plantilla publicada" : "Plantilla despublicada" });
+      toast({
+        title: traducir(v.is_published ? "tickets.toast.templatePublished" : "tickets.toast.templateUnpublished"),
+      });
       invalidate();
     },
     onError: (error: Error) => {
-      toast({ title: "Error al publicar", description: error.message, variant: "destructive" });
+      toast({ title: traducir("tickets.toast.publishError"), description: error.message, variant: "destructive" });
     },
   });
 
@@ -263,20 +268,20 @@ export function useTicketForms(options?: { includeUnpublished?: boolean }) {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast({ title: "Campos guardados" });
+      toast({ title: traducir("tickets.toast.fieldsSaved") });
       invalidate();
     },
     onError: (error: Error) => {
       const msg = /ticket_form_fields_options_needed/.test(error.message)
-        ? "Las listas necesitan al menos una opción."
+        ? traducir("tickets.toast.optionsNeeded")
         : /ticket_form_fields_form_key_key/.test(error.message)
-        ? "Hay dos campos con la misma clave. Cambia una de las etiquetas."
+        ? traducir("tickets.toast.duplicateKey")
         : /ticket_form_fields_form_maps_to_key/.test(error.message)
-        ? "Dos campos apuntan a la misma columna del ticket. Solo uno puede."
+        ? traducir("tickets.toast.duplicateMapping")
         : /ticket_form_fields_key_format/.test(error.message)
-        ? "Una etiqueta no produce una clave válida. Usa al menos una letra."
+        ? traducir("tickets.toast.invalidKey")
         : error.message;
-      toast({ title: "Error al guardar los campos", description: msg, variant: "destructive" });
+      toast({ title: traducir("tickets.toast.fieldsSaveError"), description: msg, variant: "destructive" });
     },
   });
 
@@ -323,12 +328,12 @@ export function useCreateTicketFromForm() {
       return ticket;
     },
     onSuccess: (ticket) => {
-      toast({ title: `Ticket ${ticket?.ticket_code || ""} creado` });
+      toast({ title: traducir("tickets.toast.createdWithCode", { code: ticket?.ticket_code || "" }) });
       queryClient.invalidateQueries({ queryKey: ["tickets-module"] });
       queryClient.invalidateQueries({ queryKey: ["ticket-forms"] });
     },
     onError: (error: Error) => {
-      toast({ title: "Error al crear el ticket", description: error.message, variant: "destructive" });
+      toast({ title: traducir("tickets.toast.createFromFormError"), description: error.message, variant: "destructive" });
     },
   });
 }

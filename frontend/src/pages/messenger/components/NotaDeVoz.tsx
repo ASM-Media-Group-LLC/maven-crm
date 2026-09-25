@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, Pause, Play } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/hooks/useLanguage";
 
 /**
  * Nota de voz, estilo WhatsApp: onda, arrastre y velocidad SIN cambiar el tono.
@@ -150,6 +151,7 @@ export default function NotaDeVoz({
   contenido?: string | null;
   esMio?: boolean;
 }) {
+  const { t } = useLanguage();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [sonando, setSonando] = useState(false);
   const [cargando, setCargando] = useState(false);
@@ -245,7 +247,7 @@ export default function NotaDeVoz({
         <button
           type="button"
           onClick={() => void alternar()}
-          aria-label={sonando ? "Pausar" : "Reproducir"}
+          aria-label={sonando ? t("rec.pause") : t("messenger.voice.reproducir")}
           className={cn(
             "h-9 w-9 rounded-full flex items-center justify-center shrink-0 transition-transform active:scale-95",
             esMio ? "bg-primary-foreground/20 hover:bg-primary-foreground/30" : "bg-primary text-primary-foreground hover:opacity-90",
@@ -260,7 +262,7 @@ export default function NotaDeVoz({
           onClick={buscar}
           role="presentation"
           className="flex-1 flex h-7 min-w-0 items-center gap-px cursor-pointer"
-          title="Clic para moverte por el audio"
+          title={t("messenger.voice.clicParaMoverte")}
         >
           {alturas.map((h, i) => (
             <span
@@ -279,7 +281,7 @@ export default function NotaDeVoz({
         <button
           type="button"
           onClick={cambiarVelocidad}
-          aria-label={`Velocidad ${velocidad}x`}
+          aria-label={t("messenger.voice.velocidad", { v: velocidad })}
           className={cn(
             "shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums transition-opacity",
             velocidad === 1 && !sonando ? "opacity-40" : "opacity-100",

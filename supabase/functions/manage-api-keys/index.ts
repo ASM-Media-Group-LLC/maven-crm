@@ -12,6 +12,7 @@ import {
   SCOPE_CATALOG,
   SCOPE_GROUPS,
 } from "./api-scopes.ts";
+import { type ClaveDeMensaje, type Idioma, idiomaDe, msg } from "./mensajes.ts";
 
 // Igual que Infloww: hasta 3 keys válidas a la vez, POR AGENCIA. Antes se contaba
 // para toda la plataforma: con las 3 de la primera agencia, la segunda no habría
@@ -62,15 +63,13 @@ function looksLikeIpOrCidr(v: string): boolean {
 // Las keys con Messenger leen conversaciones privadas: IPs EXACTAS (un rango como
 // 0.0.0.0/0 deja entrar a todo el mundo) y vencimiento de 90 días como máximo.
 // Decisión de Jhon del 25/09. La base lo vuelve a exigir (api_keys_reglas_messenger).
-function problemaDeReglasMessenger(ips: string[], vence: Date | null): string | null {
-  if (ips.length === 0) return "Las keys con Messenger necesitan IPs fijas (whitelist)";
-  if (ips.some((ip) => ip.includes("/"))) return "Con Messenger van IPs exactas, sin rangos (/)";
-  if (!vence) return "Las keys con Messenger necesitan fecha de vencimiento";
+function problemaDeReglasMessenger(ips: string[], vence: Date | null): ClaveDeMensaje | null {
+  if (ips.length === 0) return "messengerSinIps";
+  if (ips.some((ip) => ip.includes("/"))) return "messengerSinRangos";
+  if (!vence) return "messengerSinVencimiento";
   const ahora = Date.now();
-  if (vence.getTime() <= ahora) return "La fecha de vencimiento ya pasó";
-  if (vence.getTime() > ahora + MESSENGER_MAX_DIAS * 86_400_000) {
-    return `Las keys con Messenger vencen como máximo en ${MESSENGER_MAX_DIAS} días`;
-  }
+  if (vence.getTime() <= ahora) return "vencimientoPasado";
+  if (vence.getTime() > ahora + MESSENGER_MAX_DIAS * 86_400_000) return "messengerMaxDias";
   return null;
 }
 
@@ -100,6 +99,14 @@ Deno.serve(async (req) => {
     }
     const callerId = user.id;
 
+    // El cuerpo se lee recién con la sesión validada (a un anónimo no se le lee
+    // nada) y trae el idioma de la página: todo mensaje traducido viene de acá para
+    // abajo. Los dos 401 de arriba dicen "Unauthorized" a propósito: adminInvoke
+    // lo mira para saber que la sesión se cayó. Sin `lang`, español como siempre.
+    const body = await req.json().catch(() => ({}));
+    const idioma: Idioma = idiomaDe(body);
+    const m = (clave: ClaveDeMensaje, vars?: Record<string, string | number>) => msg(idioma, clave, vars);
+
     const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
@@ -109,7 +116,7 @@ Deno.serve(async (req) => {
     const { data: roleRow } = await admin
       .from("user_roles").select("role").eq("user_id", callerId).maybeSingle();
     if (roleRow?.role !== "admin") {
-      return json(req, { error: "Forbidden: solo administradores pueden gestionar API keys" }, 403);
+      return json(req, { error: m("soloAdmins") }, 403);
     }
 
     // ⚠️ AISLAMIENTO ENTRE AGENCIAS. Esta función usa service_role, que salta la
@@ -120,15 +127,14 @@ Deno.serve(async (req) => {
       .from("tenant_members").select("tenant_id").eq("user_id", callerId);
     if (tErr) return json(req, { error: tErr.message }, 500);
     if (!agenciasDelAdmin?.length) {
-      return json(req, { error: "Forbidden: no pertenecés a ninguna agencia" }, 403);
+      return json(req, { error: m("sinAgencia") }, 403);
     }
     if (agenciasDelAdmin.length > 1) {
       // Adivinar la agencia acá es justo cómo se termina administrando la ajena.
-      return json(req, { error: "Pertenecés a varias agencias; todavía no se puede elegir en cuál gestionar llaves" }, 409);
+      return json(req, { error: m("variasAgencias") }, 409);
     }
     const tenantId = (agenciasDelAdmin[0] as { tenant_id: string }).tenant_id;
 
-    const body = await req.json().catch(() => ({}));
     const action = body?.action as string | undefined;
 
     const SELECT_COLS =
@@ -193,30 +199,30 @@ Deno.serve(async (req) => {
       // días (un frontend viejo), se usa expires_at como antes.
       const dias = body?.expires_in_days;
       if (dias !== undefined && (!Number.isInteger(dias) || dias < 0 || dias > 3650)) {
-        return json(req, { error: "expires_in_days tiene que ser un número de días entre 0 y 3650" }, 400);
+        return json(req, { error: m("diasInvalidos") }, 400);
       }
       const expiresAt: Date | null = dias !== undefined
         ? (dias === 0 ? null : new Date(Date.now() + dias * 86_400_000 - 60_000))
         : (body?.expires_at ? new Date(body.expires_at) : null);
       const ipWhitelist = cleanIpList(body?.ip_whitelist);
 
-      if (!name) return json(req, { error: "El nombre de la key es requerido" }, 400);
-      if (scopes.length === 0) return json(req, { error: "Elige al menos un permiso (scope)" }, 400);
+      if (!name) return json(req, { error: m("nombreRequerido") }, 400);
+      if (scopes.length === 0) return json(req, { error: m("alMenosUnScope") }, 400);
       const bad = scopes.filter((s) => !isValidScope(s));
-      if (bad.length) return json(req, { error: `Scope(s) inválido(s): ${bad.join(", ")}` }, 400);
+      if (bad.length) return json(req, { error: m("scopesInvalidos", { lista: bad.join(", ") }) }, 400);
       if (expiresAt && Number.isNaN(expiresAt.getTime())) {
-        return json(req, { error: "Fecha de expiración inválida" }, 400);
+        return json(req, { error: m("fechaInvalida") }, 400);
       }
       const badIps = ipWhitelist.filter((ip) => !looksLikeIpOrCidr(ip));
-      if (badIps.length) return json(req, { error: `IP(s) inválida(s): ${badIps.join(", ")}` }, 400);
+      if (badIps.length) return json(req, { error: m("ipsInvalidas", { lista: badIps.join(", ") }) }, 400);
 
       if (scopes.some(esScopeMessenger)) {
         const problema = problemaDeReglasMessenger(ipWhitelist, expiresAt);
-        if (problema) return json(req, { error: problema }, 400);
+        if (problema) return json(req, { error: m(problema, { dias: MESSENGER_MAX_DIAS }) }, 400);
         // Que quien la crea diga que sí sabiendo que la key lee SUS conversaciones.
         // Un frontend viejo en caché no manda esto: no puede crearla sin darse cuenta.
         if (body?.acknowledge_messenger_reads_as !== callerId) {
-          return json(req, { error: "Confirmá que la key va a leer TUS conversaciones del Messenger" }, 400);
+          return json(req, { error: m("confirmarMessenger") }, 400);
         }
       }
 
@@ -228,7 +234,7 @@ Deno.serve(async (req) => {
         .is("revoked_at", null)
         .or(`expires_at.is.null,expires_at.gt.${nowIso}`);
       if ((activeCount ?? 0) >= MAX_ACTIVE_KEYS) {
-        return json(req, { error: `Llegaste al máximo de ${MAX_ACTIVE_KEYS} API keys activas. Revoca una antes de crear otra.` }, 400);
+        return json(req, { error: m("maximoDeKeys", { max: MAX_ACTIVE_KEYS }) }, 400);
       }
 
       const { full, prefix } = generateKey();
@@ -260,36 +266,36 @@ Deno.serve(async (req) => {
     // === UPDATE (editar nombre / scopes / IPs / expiración de una key activa) ===
     if (action === "update") {
       const id = String(body?.id ?? "").trim();
-      if (!id) return json(req, { error: "id de la key es requerido" }, 400);
+      if (!id) return json(req, { error: m("idRequerido") }, 400);
 
       const patch: Record<string, unknown> = {};
       if (body?.name !== undefined) {
         const name = String(body.name).trim();
-        if (!name) return json(req, { error: "El nombre no puede quedar vacío" }, 400);
+        if (!name) return json(req, { error: m("nombreVacio") }, 400);
         patch.name = name;
       }
       if (body?.scopes !== undefined) {
         const scopes: string[] = Array.isArray(body.scopes) ? body.scopes : [];
-        if (scopes.length === 0) return json(req, { error: "Elige al menos un permiso (scope)" }, 400);
+        if (scopes.length === 0) return json(req, { error: m("alMenosUnScope") }, 400);
         const bad = scopes.filter((s) => !isValidScope(s));
-        if (bad.length) return json(req, { error: `Scope(s) inválido(s): ${bad.join(", ")}` }, 400);
+        if (bad.length) return json(req, { error: m("scopesInvalidos", { lista: bad.join(", ") }) }, 400);
         patch.scopes = scopes;
       }
       if (body?.ip_whitelist !== undefined) {
         const ips = cleanIpList(body.ip_whitelist);
         const badIps = ips.filter((ip) => !looksLikeIpOrCidr(ip));
-        if (badIps.length) return json(req, { error: `IP(s) inválida(s): ${badIps.join(", ")}` }, 400);
+        if (badIps.length) return json(req, { error: m("ipsInvalidas", { lista: badIps.join(", ") }) }, 400);
         patch.ip_whitelist = ips;
       }
       if (body?.expires_at !== undefined) {
         if (body.expires_at === null) patch.expires_at = null;
         else {
           const d = new Date(body.expires_at);
-          if (Number.isNaN(d.getTime())) return json(req, { error: "Fecha de expiración inválida" }, 400);
+          if (Number.isNaN(d.getTime())) return json(req, { error: m("fechaInvalida") }, 400);
           patch.expires_at = d.toISOString();
         }
       }
-      if (Object.keys(patch).length === 0) return json(req, { error: "Nada para actualizar" }, 400);
+      if (Object.keys(patch).length === 0) return json(req, { error: m("nadaQueActualizar") }, 400);
 
       // Reglas del Messenger contra lo que la key tiene HOY, no contra lo que dice
       // el pedido.
@@ -297,7 +303,7 @@ Deno.serve(async (req) => {
         .from("api_keys").select("scopes, ip_whitelist, expires_at, acts_as_user_id")
         .eq("id", id).eq("tenant_id", tenantId).is("revoked_at", null).maybeSingle();
       if (aErr) return json(req, { error: aErr.message }, 500);
-      if (!actual) return json(req, { error: "La key no existe o está revocada" }, 404);
+      if (!actual) return json(req, { error: m("noExisteORevocada") }, 404);
       const hoy = actual as { scopes: string[]; ip_whitelist: string[]; expires_at: string | null; acts_as_user_id: string };
       const teniaMessenger = (hoy.scopes ?? []).some(esScopeMessenger);
       const scopesNuevos = (patch.scopes as string[] | undefined) ?? hoy.scopes ?? [];
@@ -305,21 +311,21 @@ Deno.serve(async (req) => {
       if (tendraMessenger && !teniaMessenger) {
         // Las 3 keys de hoy actúan como el CEO y las usan integraciones: sumarles
         // Messenger les daría sus chats sin que nadie lo note.
-        return json(req, { error: "El permiso de Messenger solo se puede poner al crear una key nueva" }, 400);
+        return json(req, { error: m("messengerSoloNuevas") }, 400);
       }
       if (tendraMessenger) {
         // Solo la persona como la que actúa puede editarla (cualquier admin la revoca).
         if (hoy.acts_as_user_id !== callerId) {
-          return json(req, { error: "Solo la persona dueña de esta key de Messenger puede editarla; cualquier admin puede revocarla" }, 403);
+          return json(req, { error: m("messengerSoloDueno") }, 403);
         }
         const ips = (patch.ip_whitelist as string[] | undefined) ?? hoy.ip_whitelist ?? [];
         const venceNuevo = patch.expires_at === undefined
           ? (hoy.expires_at ? new Date(hoy.expires_at) : null)
           : (patch.expires_at === null ? null : new Date(patch.expires_at as string));
         const problema = problemaDeReglasMessenger(ips, venceNuevo);
-        if (problema) return json(req, { error: problema }, 400);
+        if (problema) return json(req, { error: m(problema, { dias: MESSENGER_MAX_DIAS }) }, 400);
         if (hoy.expires_at && venceNuevo && venceNuevo.getTime() > new Date(hoy.expires_at).getTime()) {
-          return json(req, { error: "A una key con Messenger no se le puede extender el vencimiento: creá otra" }, 400);
+          return json(req, { error: m("messengerNoExtender") }, 400);
         }
       }
 
@@ -327,7 +333,7 @@ Deno.serve(async (req) => {
         .from("api_keys").update(patch).eq("id", id).eq("tenant_id", tenantId).is("revoked_at", null)
         .select(SELECT_COLS);
       if (error) return json(req, { error: error.message }, 500);
-      if (!data?.length) return json(req, { error: "La key no existe o está revocada" }, 404);
+      if (!data?.length) return json(req, { error: m("noExisteORevocada") }, 404);
       const [conNombre] = await conPersona(data);
       return json(req, { ...conNombre, status: statusOf(data[0]) });
     }
@@ -335,17 +341,17 @@ Deno.serve(async (req) => {
     // === REVOKE ===
     if (action === "revoke") {
       const id = String(body?.id ?? "").trim();
-      if (!id) return json(req, { error: "id de la key es requerido" }, 400);
+      if (!id) return json(req, { error: m("idRequerido") }, 400);
       const { data, error } = await admin
         .from("api_keys")
         .update({ revoked_at: new Date().toISOString(), revoked_by: callerId })
         .eq("id", id).eq("tenant_id", tenantId).is("revoked_at", null).select("id");
       if (error) return json(req, { error: error.message }, 500);
-      if (!data?.length) return json(req, { error: "La key no existe o ya estaba revocada" }, 404);
+      if (!data?.length) return json(req, { error: m("noExisteOYaRevocada") }, 404);
       return json(req, { success: true, id });
     }
 
-    return json(req, { error: `Acción desconocida: ${action ?? "(vacía)"}` }, 400);
+    return json(req, { error: m("accionDesconocida", { accion: action ?? (idioma === "en" ? "(empty)" : "(vacía)") }) }, 400);
   } catch (e) {
     return json(req, { error: String((e as Error)?.message ?? e) }, 500);
   }

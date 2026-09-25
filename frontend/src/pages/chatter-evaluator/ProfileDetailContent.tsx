@@ -10,46 +10,50 @@ import {
 } from "@/hooks/useChatterEvaluator";
 import { VaultGallery } from "./VaultGallery";
 import type { ChatterProfile } from "./types";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 
 interface BilingualField {
-  label: string;
+  label: TranslationKey;
   es: string | null;
   en: string | null;
 }
 
 const buildBilingualFields = (p: ChatterProfile): BilingualField[] => [
-  { label: "Nacionalidad",   es: p.nationality, en: p.nationality_en },
-  { label: "Ubicación",      es: p.location,    en: p.location_en },
-  { label: "Edad",           es: p.age,         en: p.age_en },
-  { label: "Saludo",         es: p.greeting,    en: p.greeting_en },
-  { label: "Trato a usuarios", es: p.users_term, en: p.users_term_en },
-  { label: "Cuerpo",         es: p.body,        en: p.body_en },
-  { label: "Desnudez",       es: p.nudity,      en: p.nudity_en },
-  { label: "Anal",           es: p.anal,        en: p.anal_en },
-  { label: "Colaboraciones", es: p.collabs,     en: p.collabs_en },
-  { label: "Videollamadas",  es: p.videocall,   en: p.videocall_en },
-  { label: "Customs",        es: p.custom,      en: p.custom_en },
-  { label: "Reglas extra",   es: p.extra,       en: p.extra_en },
+  { label: "chatters.field.nationality", es: p.nationality, en: p.nationality_en },
+  { label: "chatters.field.location",    es: p.location,    en: p.location_en },
+  { label: "chatters.field.age",         es: p.age,         en: p.age_en },
+  { label: "chatters.field.greeting",    es: p.greeting,    en: p.greeting_en },
+  { label: "chatters.field.usersTerm",   es: p.users_term,  en: p.users_term_en },
+  { label: "chatters.field.body",        es: p.body,        en: p.body_en },
+  { label: "chatters.field.nudity",      es: p.nudity,      en: p.nudity_en },
+  { label: "chatters.field.anal",        es: p.anal,        en: p.anal_en },
+  { label: "chatters.field.collabs",     es: p.collabs,     en: p.collabs_en },
+  { label: "chatters.field.videocall",   es: p.videocall,   en: p.videocall_en },
+  { label: "chatters.field.customs",     es: p.custom,      en: p.custom_en },
+  { label: "chatters.field.extraRules",  es: p.extra,       en: p.extra_en },
 ];
 
 const FieldRow = ({ field }: { field: BilingualField }) => {
+  const { t } = useLanguage();
   if (!field.es && !field.en) return null;
   return (
     <div className="grid grid-cols-1 gap-2 border-b py-3 last:border-0 md:grid-cols-[160px_1fr_1fr]">
-      <div className="text-sm font-medium text-muted-foreground">{field.label}</div>
+      <div className="text-sm font-medium text-muted-foreground">{t(field.label)}</div>
       <div className="text-sm whitespace-pre-wrap">
         <Badge variant="outline" className="mr-1 text-[10px]">ES</Badge>
-        {field.es || <span className="text-muted-foreground italic">(vacío)</span>}
+        {field.es || <span className="text-muted-foreground italic">{t("chatters.field.empty")}</span>}
       </div>
       <div className="text-sm whitespace-pre-wrap">
         <Badge variant="outline" className="mr-1 text-[10px]">EN</Badge>
-        {field.en || <span className="text-muted-foreground italic">(vacío)</span>}
+        {field.en || <span className="text-muted-foreground italic">{t("chatters.field.empty")}</span>}
       </div>
     </div>
   );
 };
 
 const ChatterProfileDetailContent = () => {
+  const { t } = useLanguage();
   const { profileKey } = useParams<{ profileKey: string }>();
   const profilesQ = useChatterProfiles();
   const profile = useMemo(
@@ -59,16 +63,16 @@ const ChatterProfileDetailContent = () => {
   const vaultQ = useChatterVaultByProfile(profile?.id);
 
   if (profilesQ.isLoading) {
-    return <main className="flex-1 p-6"><p className="text-sm text-muted-foreground">Cargando…</p></main>;
+    return <main className="flex-1 p-6"><p className="text-sm text-muted-foreground">{t("common.loading")}</p></main>;
   }
 
   if (!profile) {
     return (
       <main className="flex-1 p-6">
         <Card className="p-6">
-          <p className="text-sm">Perfil no encontrado: <code>{profileKey}</code></p>
+          <p className="text-sm">{t("chatters.profile.notFound")} <code>{profileKey}</code></p>
           <Button asChild variant="ghost" className="mt-4">
-            <Link to="/chatter-evaluator"><ArrowLeft className="mr-2 h-4 w-4" /> Volver</Link>
+            <Link to="/chatter-evaluator"><ArrowLeft className="mr-2 h-4 w-4" /> {t("common.back")}</Link>
           </Button>
         </Card>
       </main>
@@ -84,11 +88,11 @@ const ChatterProfileDetailContent = () => {
       <div className="space-y-6">
         <div className="flex items-center justify-between gap-3">
           <Button asChild variant="ghost" size="sm">
-            <Link to="/chatter-evaluator"><ArrowLeft className="mr-2 h-4 w-4" /> Perfiles</Link>
+            <Link to="/chatter-evaluator"><ArrowLeft className="mr-2 h-4 w-4" /> {t("chatters.profile.profiles")}</Link>
           </Button>
           <Button asChild size="sm" className="gap-2">
             <Link to={`/chatter-evaluator/${profile.key}/edit`}>
-              <Pencil className="h-4 w-4" /> Editar perfil
+              <Pencil className="h-4 w-4" /> {t("chatters.profile.edit")}
             </Link>
           </Button>
         </div>
@@ -121,15 +125,14 @@ const ChatterProfileDetailContent = () => {
               <Badge variant="outline" className="font-mono text-xs">key: {profile.key}</Badge>
             </div>
             <p className="text-xs text-muted-foreground">
-              Creado: {new Date(profile.created_at).toLocaleDateString()} · Actualizado:{" "}
-              {new Date(profile.updated_at).toLocaleDateString()}
+              {t("chatters.profile.createdUpdated", { creado: new Date(profile.created_at).toLocaleDateString(), actualizado: new Date(profile.updated_at).toLocaleDateString() })}
             </p>
           </div>
         </div>
 
         <Card>
           <CardContent className="p-6">
-            <h2 className="mb-4 text-lg font-semibold">Personaje y reglas</h2>
+            <h2 className="mb-4 text-lg font-semibold">{t("chatters.profile.characterAndRules")}</h2>
             <div className="space-y-0">
               {fields.map((f) => <FieldRow key={f.label} field={f} />)}
             </div>
@@ -139,7 +142,7 @@ const ChatterProfileDetailContent = () => {
         {prices.length > 0 && (
           <Card>
             <CardContent className="p-6">
-              <h2 className="mb-4 text-lg font-semibold">Catálogo de precios ({prices.length})</h2>
+              <h2 className="mb-4 text-lg font-semibold">{t("chatters.profile.priceListN", { n: prices.length })}</h2>
               <div className="grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-3">
                 {prices.map(([service, price]) => (
                   <div
@@ -162,7 +165,7 @@ const ChatterProfileDetailContent = () => {
             </h2>
           </div>
           {vaultQ.isLoading ? (
-            <p className="text-sm text-muted-foreground">Cargando vault…</p>
+            <p className="text-sm text-muted-foreground">{t("chatters.profile.loadingVault")}</p>
           ) : (
             <VaultGallery
               items={items}

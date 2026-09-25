@@ -16,6 +16,8 @@ import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { Loader2, Plus, X, UserPlus, Camera } from "lucide-react";
 import { toast } from "sonner";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 import {
   useCreateChatterProfile,
   useUploadChatterAvatar,
@@ -23,20 +25,22 @@ import {
 
 // Same bilingual fields as the existing ProfileEditContent so admins
 // see exactly the same shape they would see when editing later.
-const BILINGUAL_FIELDS: { key: string; keyEn: string; label: string; type: "input" | "textarea" }[] = [
-  { key: "name",        keyEn: "name_en",        label: "Nombre",            type: "input" },
-  { key: "nationality", keyEn: "nationality_en", label: "Nacionalidad",      type: "input" },
-  { key: "location",    keyEn: "location_en",    label: "Ubicación",         type: "input" },
-  { key: "age",         keyEn: "age_en",         label: "Edad",              type: "input" },
-  { key: "users_term",  keyEn: "users_term_en",  label: "Trato a usuarios",  type: "textarea" },
-  { key: "greeting",    keyEn: "greeting_en",    label: "Saludo",            type: "textarea" },
-  { key: "body",        keyEn: "body_en",        label: "Cuerpo",            type: "input" },
-  { key: "nudity",      keyEn: "nudity_en",      label: "Desnudez",          type: "input" },
-  { key: "anal",        keyEn: "anal_en",        label: "Anal",              type: "input" },
-  { key: "collabs",     keyEn: "collabs_en",     label: "Colaboraciones",    type: "textarea" },
-  { key: "videocall",   keyEn: "videocall_en",   label: "Videollamadas",     type: "textarea" },
-  { key: "custom",      keyEn: "custom_en",      label: "Customs",           type: "textarea" },
-  { key: "extra",       keyEn: "extra_en",       label: "Reglas extra",      type: "textarea" },
+// `label` es la clave de i18n del NOMBRE del campo (lo que se muestra); `key`
+// y `keyEn` son las columnas de chatter_profiles.
+const BILINGUAL_FIELDS: { key: string; keyEn: string; label: TranslationKey; type: "input" | "textarea" }[] = [
+  { key: "name",        keyEn: "name_en",        label: "chatters.field.name",        type: "input" },
+  { key: "nationality", keyEn: "nationality_en", label: "chatters.field.nationality", type: "input" },
+  { key: "location",    keyEn: "location_en",    label: "chatters.field.location",    type: "input" },
+  { key: "age",         keyEn: "age_en",         label: "chatters.field.age",         type: "input" },
+  { key: "users_term",  keyEn: "users_term_en",  label: "chatters.field.usersTerm",   type: "textarea" },
+  { key: "greeting",    keyEn: "greeting_en",    label: "chatters.field.greeting",    type: "textarea" },
+  { key: "body",        keyEn: "body_en",        label: "chatters.field.body",        type: "input" },
+  { key: "nudity",      keyEn: "nudity_en",      label: "chatters.field.nudity",      type: "input" },
+  { key: "anal",        keyEn: "anal_en",        label: "chatters.field.anal",        type: "input" },
+  { key: "collabs",     keyEn: "collabs_en",     label: "chatters.field.collabs",     type: "textarea" },
+  { key: "videocall",   keyEn: "videocall_en",   label: "chatters.field.videocall",   type: "textarea" },
+  { key: "custom",      keyEn: "custom_en",      label: "chatters.field.customs",     type: "textarea" },
+  { key: "extra",       keyEn: "extra_en",       label: "chatters.field.extraRules",  type: "textarea" },
 ];
 
 const DEFAULT_PRICE_KEYS = ["X", "XX", "XXX", "ANAL"];
@@ -47,6 +51,7 @@ interface NewProfileDialogProps {
 }
 
 export const NewProfileDialog = ({ open, onOpenChange }: NewProfileDialogProps) => {
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const create = useCreateChatterProfile();
   const uploadAvatar = useUploadChatterAvatar();
@@ -84,8 +89,8 @@ export const NewProfileDialog = ({ open, onOpenChange }: NewProfileDialogProps) 
   const handleAvatarFile = async (file: File) => {
     const cleanKey = key.trim().toLowerCase().replace(/\s+/g, "");
     if (!cleanKey) {
-      toast.error("Pon la clave interna primero", {
-        description: "Necesito una clave para guardar la imagen en el folder correcto.",
+      toast.error(t("chatters.newProfile.keyFirst"), {
+        description: t("chatters.newProfile.keyFirstDesc"),
       });
       if (fileInputRef.current) fileInputRef.current.value = "";
       return;
@@ -97,7 +102,7 @@ export const NewProfileDialog = ({ open, onOpenChange }: NewProfileDialogProps) 
       });
       setAvatarUrl(url);
     } catch (e) {
-      toast.error("No se pudo subir el avatar", {
+      toast.error(t("chatters.profileEdit.avatarUploadFailed"), {
         description: (e as Error).message,
       });
     } finally {
@@ -110,7 +115,7 @@ export const NewProfileDialog = ({ open, onOpenChange }: NewProfileDialogProps) 
     if (!k) return;
     const slug = k.toLowerCase().replace(/[^a-z0-9_]+/g, "_");
     if (extraFields.find((f) => f.key === slug)) {
-      toast.error("Ese campo ya existe");
+      toast.error(t("chatters.newProfile.fieldExists"));
       return;
     }
     setExtraFields((curr) => [...curr, { key: slug, label: k, valueEs: "", valueEn: "" }]);
@@ -125,7 +130,7 @@ export const NewProfileDialog = ({ open, onOpenChange }: NewProfileDialogProps) 
     const k = newPriceKey.trim().toUpperCase();
     if (!k) return;
     if (prices.find((p) => p.key === k)) {
-      toast.error("Ese precio ya existe");
+      toast.error(t("chatters.newProfile.priceExists"));
       return;
     }
     setPrices((curr) => [...curr, { key: k, value: "" }]);
@@ -139,7 +144,7 @@ export const NewProfileDialog = ({ open, onOpenChange }: NewProfileDialogProps) 
   const handleSubmit = async () => {
     const cleanKey = key.trim().toLowerCase().replace(/\s+/g, "");
     if (!cleanKey) {
-      toast.error("La clave interna es obligatoria");
+      toast.error(t("chatters.newProfile.keyRequired"));
       return;
     }
 
@@ -180,11 +185,11 @@ export const NewProfileDialog = ({ open, onOpenChange }: NewProfileDialogProps) 
 
     try {
       const created = await create.mutateAsync(patch as Parameters<typeof create.mutateAsync>[0]);
-      toast.success("Modelo creado");
+      toast.success(t("chatters.newProfile.created"));
       onOpenChange(false);
       navigate(`/chatter-evaluator/${created.key}/edit`);
     } catch (e) {
-      toast.error("No se pudo crear", { description: (e as Error).message });
+      toast.error(t("common.couldNotCreate"), { description: (e as Error).message });
     }
   };
 
@@ -193,11 +198,10 @@ export const NewProfileDialog = ({ open, onOpenChange }: NewProfileDialogProps) 
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <UserPlus className="h-5 w-5 text-primary" /> Nuevo modelo
+            <UserPlus className="h-5 w-5 text-primary" /> {t("chatters.newProfile.title")}
           </DialogTitle>
           <DialogDescription>
-            Crea un nuevo perfil para evaluar chatters. Después de crearlo
-            podrás agregar el vault de contenido.
+            {t("chatters.newProfile.desc")}
           </DialogDescription>
         </DialogHeader>
 
@@ -226,17 +230,17 @@ export const NewProfileDialog = ({ open, onOpenChange }: NewProfileDialogProps) 
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploadAvatar.isPending}
                   className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/70 text-white opacity-0 transition-opacity hover:opacity-100 focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-100"
-                  aria-label="Subir avatar"
+                  aria-label={t("chatters.newProfile.uploadAvatar")}
                 >
                   {uploadAvatar.isPending ? (
                     <>
                       <Loader2 className="h-6 w-6 animate-spin" />
-                      <span className="text-xs">Subiendo…</span>
+                      <span className="text-xs">{t("chatters.profileEdit.uploading")}</span>
                     </>
                   ) : (
                     <>
                       <Camera className="h-7 w-7" />
-                      <span className="text-xs">{avatarUrl ? "Cambiar foto" : "Subir foto"}</span>
+                      <span className="text-xs">{avatarUrl ? t("chatters.profileEdit.changePhoto") : t("chatters.newProfile.uploadPhoto")}</span>
                     </>
                   )}
                 </button>
@@ -252,31 +256,31 @@ export const NewProfileDialog = ({ open, onOpenChange }: NewProfileDialogProps) 
                 />
               </div>
               <p className="mt-2 text-[10px] text-muted-foreground">
-                Pasa el cursor sobre la imagen para subir desde tu dispositivo.
+                {t("chatters.newProfile.hoverToUpload")}
               </p>
             </div>
 
             <div className="space-y-3">
               <div>
                 <Label htmlFor="profile_key" className="text-xs">
-                  Clave interna <span className="text-destructive">*</span>
+                  {t("chatters.newProfile.internalKey")} <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   id="profile_key"
                   value={key}
                   onChange={(e) => setKey(e.target.value)}
-                  placeholder="ej: katrina"
+                  placeholder={t("chatters.newProfile.keyPh")}
                   className="mt-1 font-mono"
                 />
                 <p className="mt-1 text-[10px] text-muted-foreground">
-                  Sin espacios; se usa como identificador en URLs y en la base de datos.
+                  {t("chatters.newProfile.keyHelp")}
                 </p>
               </div>
 
               {/* Framing sliders — only useful once an image is loaded */}
               <div className={avatarUrl ? "" : "opacity-50 pointer-events-none"}>
                 <div>
-                  <Label className="text-xs">Posición X: {avatarX}%</Label>
+                  <Label className="text-xs">{t("chatters.profileEdit.positionX", { n: avatarX })}</Label>
                   <Slider
                     value={[avatarX]}
                     onValueChange={([v]) => setAvatarX(v)}
@@ -287,7 +291,7 @@ export const NewProfileDialog = ({ open, onOpenChange }: NewProfileDialogProps) 
                   />
                 </div>
                 <div className="mt-2">
-                  <Label className="text-xs">Posición Y: {avatarY}%</Label>
+                  <Label className="text-xs">{t("chatters.profileEdit.positionY", { n: avatarY })}</Label>
                   <Slider
                     value={[avatarY]}
                     onValueChange={([v]) => setAvatarY(v)}
@@ -314,12 +318,12 @@ export const NewProfileDialog = ({ open, onOpenChange }: NewProfileDialogProps) 
 
           {/* Bilingual fields — same ES/EN columns as ProfileEditContent */}
           <div className="space-y-4">
-            <div className="text-sm font-semibold">Personaje y reglas</div>
+            <div className="text-sm font-semibold">{t("chatters.profile.characterAndRules")}</div>
             {BILINGUAL_FIELDS.map((f) => {
               const Cmp = f.type === "textarea" ? Textarea : Input;
               return (
                 <div key={f.key} className="space-y-1">
-                  <Label className="text-xs font-medium">{f.label}</Label>
+                  <Label className="text-xs font-medium">{t(f.label)}</Label>
                   <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                     <div>
                       <div className="mb-1 flex items-center gap-2">
@@ -350,7 +354,7 @@ export const NewProfileDialog = ({ open, onOpenChange }: NewProfileDialogProps) 
           {/* Extra fields */}
           <div className="rounded-md border bg-muted/30 p-3">
             <div className="mb-2 text-xs font-semibold text-muted-foreground">
-              Información relevante (opcional)
+              {t("chatters.newProfile.relevantInfo")}
             </div>
             {extraFields.length > 0 && (
               <div className="mb-3 space-y-3">
@@ -364,7 +368,7 @@ export const NewProfileDialog = ({ open, onOpenChange }: NewProfileDialogProps) 
                         variant="ghost"
                         onClick={() => removeExtra(f.key)}
                         className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                        aria-label={`Quitar ${f.label}`}
+                        aria-label={t("chatters.newProfile.removeN", { name: f.label })}
                       >
                         <X className="h-3 w-3" />
                       </Button>
@@ -395,18 +399,18 @@ export const NewProfileDialog = ({ open, onOpenChange }: NewProfileDialogProps) 
               <Input
                 value={extraFieldKey}
                 onChange={(e) => setExtraFieldKey(e.target.value)}
-                placeholder="Nombre del campo"
+                placeholder={t("chatters.newProfile.fieldNamePh")}
                 onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addExtraField())}
               />
               <Button type="button" variant="outline" onClick={addExtraField} className="gap-1">
-                <Plus className="h-4 w-4" /> Agregar
+                <Plus className="h-4 w-4" /> {t("common.add")}
               </Button>
             </div>
           </div>
 
           {/* Prices */}
           <div className="rounded-md border border-warning/40 bg-warning/5 p-3">
-            <div className="mb-2 text-xs font-semibold text-warning">Precios</div>
+            <div className="mb-2 text-xs font-semibold text-warning">{t("chatters.newProfile.prices")}</div>
             <div className="space-y-2">
               {prices.map((p) => (
                 <div key={p.key} className="flex items-center gap-2">
@@ -416,7 +420,7 @@ export const NewProfileDialog = ({ open, onOpenChange }: NewProfileDialogProps) 
                   <Input
                     value={p.value}
                     onChange={(e) => updatePrice(p.key, e.target.value)}
-                    placeholder="Ej: $50"
+                    placeholder={t("chatters.newProfile.pricePh")}
                     className="flex-1"
                   />
                   {!DEFAULT_PRICE_KEYS.includes(p.key) && (
@@ -426,7 +430,7 @@ export const NewProfileDialog = ({ open, onOpenChange }: NewProfileDialogProps) 
                       variant="ghost"
                       onClick={() => removePrice(p.key)}
                       className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                      aria-label={`Quitar ${p.key}`}
+                      aria-label={t("chatters.newProfile.removeN", { name: p.key })}
                     >
                       <X className="h-3 w-3" />
                     </Button>
@@ -438,12 +442,12 @@ export const NewProfileDialog = ({ open, onOpenChange }: NewProfileDialogProps) 
               <Input
                 value={newPriceKey}
                 onChange={(e) => setNewPriceKey(e.target.value)}
-                placeholder="Ej: CUSTOM"
+                placeholder={t("chatters.newProfile.priceKeyPh")}
                 className="max-w-[150px] font-mono"
                 onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addPriceRow())}
               />
               <Button type="button" variant="outline" onClick={addPriceRow} className="gap-1">
-                <Plus className="h-4 w-4" /> Agregar precio
+                <Plus className="h-4 w-4" /> {t("chatters.newProfile.addPrice")}
               </Button>
             </div>
           </div>
@@ -451,7 +455,7 @@ export const NewProfileDialog = ({ open, onOpenChange }: NewProfileDialogProps) 
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={create.isPending}>
-            Cancelar
+            {t("common.cancel")}
           </Button>
           <Button
             onClick={handleSubmit}
@@ -459,7 +463,7 @@ export const NewProfileDialog = ({ open, onOpenChange }: NewProfileDialogProps) 
             className="gap-2 bg-emerald-600 hover:bg-emerald-700"
           >
             {create.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
-            Crear modelo
+            {t("chatters.newProfile.create")}
           </Button>
         </DialogFooter>
       </DialogContent>

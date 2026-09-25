@@ -3,6 +3,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { CloserCreator } from "../useCloserCreators";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface Props {
   creator: CloserCreator | null;
@@ -12,15 +13,16 @@ interface Props {
 }
 
 const DeleteCreatorDialog = ({ creator, open, onOpenChange, onConfirm }: Props) => {
+  const { t } = useLanguage();
   if (!creator) return null;
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>¿Eliminar creator?</AlertDialogTitle>
+          <AlertDialogTitle>{t("closers.creator.deleteTitle")}</AlertDialogTitle>
           <AlertDialogDescription>
-            Se eliminará permanentemente a <span className="font-semibold">{creator.instagram_handle}</span> y su historial de contacto.
+            {t("closers.creator.deleteA")}<span className="font-semibold">{creator.instagram_handle}</span>{t("closers.creator.deleteB")}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -29,7 +31,7 @@ const DeleteCreatorDialog = ({ creator, open, onOpenChange, onConfirm }: Props) 
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             onClick={() => onConfirm(creator.id)}
           >
-            Eliminar
+            {t("common.delete")}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

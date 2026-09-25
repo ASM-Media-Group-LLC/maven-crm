@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { UserAvatar } from "@/components/UserAvatar";
 import { Loader2, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
+import { useLanguage } from "@/hooks/useLanguage";
 import {
   useChatterProfiles,
   useChatterEvaluators,
@@ -83,6 +84,7 @@ const SuccessView = ({
   examinerName: string;
   onClose: () => void;
 }) => {
+  const { t } = useLanguage();
   const [copied, setCopied] = useState(false);
   const navigate = useNavigate();
   const publicUrl = `${getPublicBaseUrl()}/chatter/${session.id}`;
@@ -92,9 +94,9 @@ const SuccessView = ({
       await navigator.clipboard.writeText(publicUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-      toast.success("Link copiado");
+      toast.success(t("chatters.newSess.linkCopied"));
     } catch (e) {
-      toast.error("No se pudo copiar", { description: (e as Error).message });
+      toast.error(t("common.couldNotCopy"), { description: (e as Error).message });
     }
   };
 
@@ -102,15 +104,13 @@ const SuccessView = ({
     <div className="space-y-4">
       <div>
         <p className="text-sm">
-          Sesión creada para <strong>{session.chatter_name}</strong>.
+          {t("chatters.newSess.createdFor")} <strong>{session.chatter_name}</strong>.
         </p>
         <p className="mt-0.5 text-sm">
-          Examinador: <strong>{examinerName}</strong>
+          {t("chatters.newSess.examiner")} <strong>{examinerName}</strong>
         </p>
         <p className="mt-1 text-xs text-muted-foreground">
-          Comparte este link con el aspirante (no necesita cuenta de Maven). La
-          sesión expira en {session.duration_minutes} min después del primer
-          mensaje del chatter.
+          {t("chatters.newSess.shareLink", { min: session.duration_minutes })}
         </p>
       </div>
       <Card className="p-3">
@@ -118,14 +118,14 @@ const SuccessView = ({
           <code className="flex-1 truncate rounded bg-muted px-2 py-1 text-xs">
             {publicUrl}
           </code>
-          <Button onClick={handleCopy} size="icon" variant="outline" aria-label="Copiar">
+          <Button onClick={handleCopy} size="icon" variant="outline" aria-label={t("common.copy")}>
             {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
           </Button>
         </div>
       </Card>
       <DialogFooter className="gap-2">
         <Button variant="outline" onClick={onClose}>
-          Cerrar
+          {t("common.close")}
         </Button>
         <Button
           onClick={() => {
@@ -133,7 +133,7 @@ const SuccessView = ({
             navigate("/chatter-evaluator/workspace");
           }}
         >
-          Ir al workspace
+          {t("chatters.newSess.goToWorkspace")}
         </Button>
       </DialogFooter>
     </div>
@@ -141,6 +141,7 @@ const SuccessView = ({
 };
 
 export const NewSessionDialog = ({ open, onOpenChange }: Props) => {
+  const { t } = useLanguage();
   const { user } = useAuth();
   const profilesQ = useChatterProfiles();
   const evaluatorsQ = useChatterEvaluators();
@@ -175,11 +176,11 @@ export const NewSessionDialog = ({ open, onOpenChange }: Props) => {
 
   const handleCreate = async () => {
     if (!profileId || !chatterName.trim()) {
-      toast.error("Falta perfil o nombre del chatter");
+      toast.error(t("chatters.newSess.missingProfileOrName"));
       return;
     }
     if (!examinerUserId) {
-      toast.error("Falta el examinador");
+      toast.error(t("chatters.newSess.missingExaminer"));
       return;
     }
     try {
@@ -193,11 +194,11 @@ export const NewSessionDialog = ({ open, onOpenChange }: Props) => {
       const assignedToSelf = examinerUserId === user?.id;
       toast.success(
         assignedToSelf
-          ? "Sesión creada"
-          : "Sesión creada y asignada al examinador",
+          ? t("chatters.newSess.created")
+          : t("chatters.newSess.createdAndAssigned"),
       );
     } catch (e) {
-      toast.error("No se pudo crear la sesión", {
+      toast.error(t("chatters.newSess.couldNotCreate"), {
         description: (e as Error).message,
       });
     }
@@ -218,7 +219,7 @@ export const NewSessionDialog = ({ open, onOpenChange }: Props) => {
     return [
       {
         user_id: user.id,
-        full_name: user.user_metadata?.full_name || user.email || "Yo",
+        full_name: user.user_metadata?.full_name || user.email || t("chatters.newSess.me"),
         avatar_url: (user.user_metadata?.avatar_url as string | undefined) ?? null,
       },
       ...rest,
@@ -229,10 +230,10 @@ export const NewSessionDialog = ({ open, onOpenChange }: Props) => {
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{created ? "Sesión lista" : "Nueva sesión de evaluación"}</DialogTitle>
+          <DialogTitle>{created ? t("chatters.newSess.ready") : t("chatters.newSess.title")}</DialogTitle>
           {!created && (
             <DialogDescription>
-              Selecciona el perfil que el aspirante debe encarnar y dale un nombre.
+              {t("chatters.newSess.desc")}
             </DialogDescription>
           )}
         </DialogHeader>
@@ -242,16 +243,16 @@ export const NewSessionDialog = ({ open, onOpenChange }: Props) => {
             session={created}
             examinerName={
               orderedEvaluators.find((e) => e.user_id === created.examiner_user_id)?.full_name
-                ?? (created.examiner_user_id === user?.id ? "Yo" : "Sin nombre")
+                ?? (created.examiner_user_id === user?.id ? t("chatters.newSess.me") : t("chatters.newSess.noName"))
             }
             onClose={() => handleClose(false)}
           />
         ) : (
           <div className="space-y-4">
             <div>
-              <Label className="mb-2 block">Perfil</Label>
+              <Label className="mb-2 block">{t("chatters.newSess.profile")}</Label>
               {profilesQ.isLoading ? (
-                <p className="text-sm text-muted-foreground">Cargando perfiles…</p>
+                <p className="text-sm text-muted-foreground">{t("chatters.newSess.loadingProfiles")}</p>
               ) : (
                 <ProfilePicker
                   profiles={profilesQ.data ?? []}
@@ -262,10 +263,10 @@ export const NewSessionDialog = ({ open, onOpenChange }: Props) => {
             </div>
 
             <div>
-              <Label htmlFor="examiner">Asignar a (examinador)</Label>
+              <Label htmlFor="examiner">{t("chatters.newSess.assignTo")}</Label>
               <Select value={examinerUserId} onValueChange={setExaminerUserId}>
                 <SelectTrigger id="examiner">
-                  <SelectValue placeholder={evaluatorsQ.isLoading ? "Cargando…" : "Elige examinador"} />
+                  <SelectValue placeholder={evaluatorsQ.isLoading ? t("common.loading") : t("chatters.newSess.pickExaminer")} />
                 </SelectTrigger>
                 <SelectContent>
                   {orderedEvaluators.map((ev) => {
@@ -275,7 +276,7 @@ export const NewSessionDialog = ({ open, onOpenChange }: Props) => {
                         <div className="flex items-center gap-2">
                           <UserAvatar name={ev.full_name} src={ev.avatar_url} size="xs" />
                           <span>
-                            {isSelf ? "Yo · " : ""}
+                            {isSelf ? `${t("chatters.newSess.me")} · ` : ""}
                             {ev.full_name}
                           </span>
                         </div>
@@ -285,23 +286,23 @@ export const NewSessionDialog = ({ open, onOpenChange }: Props) => {
                 </SelectContent>
               </Select>
               <p className="mt-1 text-[11px] text-muted-foreground">
-                La sesión aparece en el workspace del examinador asignado. Si te eliges a ti mismo, queda en tu workspace como siempre.
+                {t("chatters.newSess.assignHelp")}
               </p>
             </div>
 
             <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_180px]">
               <div>
-                <Label htmlFor="chatter-name">Nombre del chatter</Label>
+                <Label htmlFor="chatter-name">{t("chatters.newSess.chatterName")}</Label>
                 <Input
                   id="chatter-name"
                   value={chatterName}
                   onChange={(e) => setChatterName(e.target.value)}
-                  placeholder="Ej. Maria Lopez"
+                  placeholder={t("chatters.newSess.chatterNamePlaceholder")}
                   autoFocus
                 />
               </div>
               <div>
-                <Label htmlFor="duration">Duración (min)</Label>
+                <Label htmlFor="duration">{t("chatters.newSess.duration")}</Label>
                 <Input
                   id="duration"
                   type="number"
@@ -315,7 +316,7 @@ export const NewSessionDialog = ({ open, onOpenChange }: Props) => {
 
             <DialogFooter className="gap-2">
               <Button variant="outline" onClick={() => handleClose(false)}>
-                Cancelar
+                {t("common.cancel")}
               </Button>
               <Button
                 onClick={handleCreate}
@@ -323,7 +324,7 @@ export const NewSessionDialog = ({ open, onOpenChange }: Props) => {
                 className="gap-2"
               >
                 {createMut.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                Crear sesión
+                {t("chatters.newSess.create")}
               </Button>
             </DialogFooter>
           </div>

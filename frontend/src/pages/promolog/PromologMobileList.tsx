@@ -14,6 +14,7 @@ import XIcon from "@/components/icons/XIcon";
 import TelegramIcon from "@/components/icons/TelegramIcon";
 import { resultBadgeVariant } from "./promoResult";
 import type { PromologEntry } from "./PromologEntryCard";
+import { useLanguage } from "@/hooks/useLanguage";
 
 const PAGE = 30;
 
@@ -32,11 +33,12 @@ interface Props {
 }
 
 export default function PromologMobileList({ entries, onView }: Props) {
+  const { t } = useLanguage();
   const [shown, setShown] = useState(PAGE);
   const visible = entries.slice(0, shown);
 
   if (entries.length === 0) {
-    return <p className="py-12 text-center text-sm text-muted-foreground">Sin promos con estos filtros</p>;
+    return <p className="py-12 text-center text-sm text-muted-foreground">{t("promolog.noPromosWithFilters")}</p>;
   }
 
   return (
@@ -68,11 +70,11 @@ export default function PromologMobileList({ entries, onView }: Props) {
                 </div>
                 <div className="flex shrink-0 items-center gap-1.5">
                   {e.needs_review ? (
-                    <AlertTriangle className="h-3.5 w-3.5 text-warning" aria-label="Revisar" />
+                    <AlertTriangle className="h-3.5 w-3.5 text-warning" aria-label={t("promolog.review")} />
                   ) : e.is_pending ? (
-                    <span className="text-[10px] text-muted-foreground">no verif.</span>
+                    <span className="text-[10px] text-muted-foreground">{t("promolog.notVerifiedShort")}</span>
                   ) : null}
-                  <Badge variant={resultBadgeVariant(e.result)} className="text-xs">{e.result === "Sí" ? "Sí" : "No"}</Badge>
+                  <Badge variant={resultBadgeVariant(e.result)} className="text-xs">{e.result === "Sí" ? t("promolog.yes") : t("promolog.no")}</Badge>
                   <ChevronRight className="h-4 w-4 text-muted-foreground/60" />
                 </div>
               </button>
@@ -83,7 +85,7 @@ export default function PromologMobileList({ entries, onView }: Props) {
       {shown < entries.length && (
         <div className="border-t p-2">
           <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => setShown((n) => n + PAGE)}>
-            Ver más ({entries.length - shown} restantes)
+            {t("promolog.showMoreRemaining", { count: entries.length - shown })}
           </Button>
         </div>
       )}

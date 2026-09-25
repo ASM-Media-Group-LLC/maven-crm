@@ -7,6 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { ChatMessage, UserProfile } from "../types";
 import { formatTime, formatDate } from "../utils";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface SearchResultsPanelProps {
   messages: ChatMessage[];
@@ -33,6 +34,7 @@ function highlightText(text: string, query: string) {
 export default function SearchResultsPanel({
   messages, profiles, onResultClick, onClose, onQueryChange,
 }: SearchResultsPanelProps) {
+  const { t, language } = useLanguage();
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -60,7 +62,7 @@ export default function SearchResultsPanel({
     const groups: { label: string; items: ChatMessage[] }[] = [];
     let currentLabel = "";
     for (const msg of results) {
-      const label = formatDate(msg.created_at);
+      const label = formatDate(msg.created_at, t, language);
       if (label !== currentLabel) {
         currentLabel = label;
         groups.push({ label, items: [msg] });
@@ -69,7 +71,7 @@ export default function SearchResultsPanel({
       }
     }
     return groups;
-  }, [results]);
+  }, [results, t, language]);
 
   return (
     <div className="absolute inset-0 sm:inset-y-0 sm:left-auto sm:right-0 z-30 w-full sm:w-[380px] bg-card sm:rounded-l-3xl sm:shadow-xl flex flex-col h-full">
@@ -78,12 +80,12 @@ export default function SearchResultsPanel({
         <Search className="h-4 w-4 text-muted-foreground shrink-0" />
         <Input
           ref={inputRef}
-          placeholder="Buscar en la conversación..."
+          placeholder={t("messenger.search.buscarEnConversacion")}
           className="h-9 bg-primary/5 border-0 rounded-full text-sm"
           value={query}
           onChange={e => setQuery(e.target.value)}
         />
-        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={onClose}>
+        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={onClose} aria-label={t("common.close")}>
           <X className="h-4 w-4" />
         </Button>
       </div>
@@ -92,8 +94,10 @@ export default function SearchResultsPanel({
       {query.trim() && (
         <div className="px-3 py-1.5 text-xs text-muted-foreground shrink-0">
           {results.length === 0
-            ? `Sin resultados para "${query}"`
-            : `${results.length} resultado${results.length !== 1 ? "s" : ""}`}
+            ? t("messenger.search.sinResultadosPara", { query })
+            : results.length === 1
+              ? t("messenger.search.unResultado")
+              : t("messenger.search.resultados", { n: results.length })}
         </div>
       )}
 
@@ -103,7 +107,7 @@ export default function SearchResultsPanel({
           <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
             <Search className="h-10 w-10 text-muted-foreground/40 mb-3" />
             <p className="text-sm text-muted-foreground">
-              Escribe para buscar mensajes
+              {t("messenger.search.escribeParaBuscar")}
             </p>
           </div>
         )}
@@ -115,7 +119,7 @@ export default function SearchResultsPanel({
             </div>
             {group.items.map((msg) => {
               const profile = profiles[msg.sender_id];
-              const name = profile?.full_name || "Usuario";
+              const name = profile?.full_name || t("messenger.usuario");
               const snippet = msg.content || "";
               const fileNameMatch = msg.file_name && msg.file_name.toLowerCase().includes(query.toLowerCase());
 
@@ -142,7 +146,7 @@ export default function SearchResultsPanel({
                         {name}
                       </span>
                       <span className="text-[10px] text-muted-foreground shrink-0">
-                        {formatTime(msg.created_at)}
+                        {formatTime(msg.created_at, language)}
                       </span>
                     </div>
                     <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2 leading-relaxed">

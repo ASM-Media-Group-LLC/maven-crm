@@ -9,6 +9,9 @@ import type { KarmaProfile } from "@/pages/messenger/useKarmaProfile";
 
 const navegado: string[] = [];
 let ruta = "/personalizados";
+vi.mock("@/hooks/useLanguage", (original) =>
+  import("@/test/messenger/espanolEnTests").then((m) => m.idiomaEnEspanol(original)));
+
 vi.mock("react-router-dom", () => ({
   useNavigate: () => (to: string) => navegado.push(to),
   useLocation: () => ({ pathname: ruta, search: "" }),

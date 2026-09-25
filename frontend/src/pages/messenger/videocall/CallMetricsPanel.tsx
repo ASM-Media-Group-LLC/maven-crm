@@ -4,6 +4,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Room, Track } from "livekit-client";
 import { LKParticipant } from "@/hooks/useLiveKit";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface CallMetricsPanelProps {
   room: Room | null;
@@ -34,6 +35,7 @@ function formatBitrate(bps: number): string {
 }
 
 export default function CallMetricsPanel({ room, participants, onClose }: CallMetricsPanelProps) {
+  const { t } = useLanguage();
   const [stats, setStats] = useState<ParticipantStats[]>([]);
 
   const collectStats = useCallback(async () => {
@@ -108,16 +110,16 @@ export default function CallMetricsPanel({ room, participants, onClose }: CallMe
       <div className="flex items-center justify-between px-4 py-3 border-b border-secondary">
         <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
           <BarChart3 className="h-4 w-4" />
-          Métricas en tiempo real
+          {t("messenger.metrics.enTiempoReal")}
         </h3>
-        <button onClick={onClose} className="h-7 w-7 rounded-full flex items-center justify-center text-muted-foreground hover:bg-secondary transition-colors">
+        <button onClick={onClose} aria-label={t("common.close")} className="h-7 w-7 rounded-full flex items-center justify-center text-muted-foreground hover:bg-secondary transition-colors">
           <X className="h-4 w-4" />
         </button>
       </div>
 
       <div className="px-4 py-3 border-b border-card">
         <div className="flex items-center justify-between">
-          <span className="text-xs text-muted-foreground">Participantes</span>
+          <span className="text-xs text-muted-foreground">{t("messenger.call.participantes")}</span>
           <span className="text-xs text-foreground">{participants.length}</span>
         </div>
       </div>
@@ -128,14 +130,14 @@ export default function CallMetricsPanel({ room, participants, onClose }: CallMe
             <div key={s.identity} className="rounded-lg bg-card p-3 space-y-2">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-medium text-foreground">
-                  {s.isLocal ? "Tú" : s.name}
+                  {s.isLocal ? t("messenger.preview.tu") : s.name}
                 </span>
                 {s.isLocal && (
                   <span className="text-[8px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">Local</span>
                 )}
               </div>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
-                <StatRow icon={<MonitorIcon className="h-3 w-3" />} label="Resolución" value={s.videoResolution} />
+                <StatRow icon={<MonitorIcon className="h-3 w-3" />} label={t("messenger.metrics.resolucion")} value={s.videoResolution} />
                 <StatRow icon={<Wifi className="h-3 w-3" />} label="FPS" value={s.fps} />
                 <StatRow label="Video codec" value={s.videoCodec} />
                 <StatRow label="Audio codec" value={s.audioCodec} />

@@ -18,6 +18,7 @@ import AvatarUpload from "./AvatarUpload";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { getInitials, puedeVerLaListaDeMiembros } from "../utils";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface ChatHeaderProps {
   conversation: ConversationWithDetails;
@@ -49,6 +50,7 @@ export default function ChatHeader({
   isPinned, onTogglePin, onArchive, onDelete, canDelete,
 }: ChatHeaderProps) {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const { isOnline, getStatus, getStatusText, getStatusColorPersonal } = useOnlinePresence();
 
   const isGroup = conversation.type === "group";
@@ -78,7 +80,9 @@ export default function ChatHeader({
     if (!v || v === (conversation.name || conversation.displayName)) return;
     const { data, error } = await supabase
       .from("chat_conversations").update({ name: v }).eq("id", conversation.id).select("id");
-    if (error || !data || data.length === 0) { toast.error("No se pudo cambiar el nombre"); return; }
+    if (error || !data || data.length === 0) { toast.error(t("messenger.header.noSePudoRenombrar")); return; }
+    // Mensaje de sistema: se GUARDA y lo leen todos, cada uno en su idioma. Es
+    // dato, no se traduce.
     await supabase.from("chat_messages").insert({
       conversation_id: conversation.id, sender_id: user!.id, type: "system",
       content: `${profiles[user?.id ?? ""]?.full_name || "Alguien"} cambió el nombre del grupo a "${v}"`,
@@ -100,7 +104,7 @@ export default function ChatHeader({
   const statusText = otherUserId ? getStatusText(otherUserId) : "";
 
   const typingNames = typingUsers
-    .map(id => profiles[id]?.full_name?.split(" ")[0] || "Alguien")
+    .map(id => profiles[id]?.full_name?.split(" ")[0] || t("messenger.header.alguien"))
     .join(", ");
 
   const onlineCount = isGroup
@@ -108,14 +112,20 @@ export default function ChatHeader({
     : 0;
 
   const subtitle = typingNames
-    ? `${typingNames} ${typingUsers.length > 1 ? "están escribiendo..." : "está escribiendo..."}`
+    ? (typingUsers.length > 1
+        ? t("messenger.header.estanEscribiendo", { nombres: typingNames })
+        : t("messenger.header.estaEscribiendo", { nombres: typingNames }))
     : isGroup
-      ? (canSeeMembers ? `${conversation.participants.length} miembros${onlineCount > 0 ? ` · ${onlineCount} en línea` : ""}` : "Grupo")
+      ? (canSeeMembers
+          ? (onlineCount > 0
+              ? t("messenger.header.miembrosEnLinea", { n: conversation.participants.length, online: onlineCount })
+              : t("messenger.header.miembros", { n: conversation.participants.length }))
+          : t("messenger.header.grupo"))
       : statusText
         ? statusText
         : online
-          ? getStatusLabel(status, online)
-          : "Desconectado";
+          ? getStatusLabel(status, online, t)
+          : t("messenger.status.desconectado");
 
   const avatarUrl = isGroup
     ? conversation.avatar_url
@@ -127,7 +137,7 @@ export default function ChatHeader({
       .update({ avatar_url: url })
       .eq("id", conversation.id);
     if (error) {
-      toast.error("Error al actualizar avatar del grupo");
+      toast.error(t("messenger.header.errorAvatarGrupo"));
     } else {
       onAvatarChanged?.();
     }
@@ -140,7 +150,7 @@ export default function ChatHeader({
       .update({ avatar_url: url })
       .eq("id", user.id);
     if (error) {
-      toast.error("Error al actualizar tu avatar");
+      toast.error(t("messenger.header.errorTuAvatar"));
     } else {
       onAvatarChanged?.();
     }
@@ -149,7 +159,7 @@ export default function ChatHeader({
   return (
     <div className="shrink-0 bg-primary/[0.03]">
       <div className="flex items-center gap-3 px-3 sm:px-4 py-2.5">
-        <Button variant="ghost" size="icon" aria-label="Volver a la lista de chats" className="md:hidden shrink-0 h-9 w-9 rounded-full hover:bg-primary/8" onClick={onBack}>
+        <Button variant="ghost" size="icon" aria-label={t("messenger.header.volverALista")} className="md:hidden shrink-0 h-9 w-9 rounded-full hover:bg-primary/8" onClick={onBack}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
 
@@ -158,8 +168,8 @@ export default function ChatHeader({
           <Button
             variant="ghost"
             size="icon"
-            aria-label={`Volver a ${returnTo.name}`}
-            title={`Volver a ${returnTo.name}`}
+            aria-label={t("messenger.header.volverA", { name: returnTo.name })}
+            title={t("messenger.header.volverA", { name: returnTo.name })}
             className="shrink-0 h-9 w-9 rounded-full text-primary hover:bg-primary/8"
             onClick={returnTo.onBack}
           >
@@ -182,7 +192,7 @@ export default function ChatHeader({
             <button
               type="button"
               onClick={() => onOpenProfile?.(otherUserId)}
-              title="Ver ficha"
+              title={t("messenger.header.verFicha")}
               className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
               <AvatarUpload
@@ -235,7 +245,7 @@ export default function ChatHeader({
                 maxLength={60}
                 className="flex-1 min-w-0 bg-transparent border-b border-primary/50 text-sm font-semibold text-foreground outline-none py-0.5"
               />
-              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={saveRename} className="shrink-0 text-primary hover:opacity-80" aria-label="Guardar nombre">
+              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={saveRename} className="shrink-0 text-primary hover:opacity-80" aria-label={t("messenger.header.guardarNombre")}>
                 <Check className="h-4 w-4" />
               </button>
             </div>
@@ -244,12 +254,12 @@ export default function ChatHeader({
               <p
                 className={cn("font-semibold text-sm text-foreground truncate leading-tight", nameOpensPanel && "cursor-pointer hover:underline")}
                 onClick={nameOpensPanel ? onOpenGroupMembers : undefined}
-                title={nameOpensPanel ? "Ver configuración del grupo" : undefined}
+                title={nameOpensPanel ? t("messenger.header.verConfigGrupo") : undefined}
               >
                 {conversation.displayName}
               </p>
               {isGroup && canEditInfo && (
-                <button type="button" onClick={startRename} className="shrink-0 text-muted-foreground hover:text-primary transition-colors" title="Editar nombre" aria-label="Editar nombre del grupo">
+                <button type="button" onClick={startRename} className="shrink-0 text-muted-foreground hover:text-primary transition-colors" title={t("messenger.header.editarNombre")} aria-label={t("messenger.header.editarNombreGrupo")}>
                   <Pencil className="h-3.5 w-3.5" />
                 </button>
               )}
@@ -266,19 +276,19 @@ export default function ChatHeader({
         </div>
 
         <div className="flex items-center gap-0.5 shrink-0">
-          <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-8 sm:w-8 rounded-full hover:bg-primary/8" onClick={() => onStartVideoCall(conversation)} title="Videollamada">
+          <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-8 sm:w-8 rounded-full hover:bg-primary/8" onClick={() => onStartVideoCall(conversation)} title={t("messenger.header.videollamada")}>
             <Video className="h-4 w-4" />
           </Button>
           <Button
             variant="ghost" size="icon" className="h-9 w-9 sm:h-8 sm:w-8 rounded-full hover:bg-primary/8"
             onClick={onSearchToggle}
-            title="Buscar"
+            title={t("common.search")}
           >
             <Search className="h-4 w-4" />
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label="Más opciones del chat" className="h-9 w-9 sm:h-8 sm:w-8 rounded-full hover:bg-primary/8">
+              <Button variant="ghost" size="icon" aria-label={t("messenger.header.masOpciones")} className="h-9 w-9 sm:h-8 sm:w-8 rounded-full hover:bg-primary/8">
                 <MoreVertical className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -286,30 +296,30 @@ export default function ChatHeader({
               {onTogglePin && (
                 <DropdownMenuItem onClick={onTogglePin}>
                   {isPinned ? <PinOff className="h-3.5 w-3.5 mr-2" /> : <Pin className="h-3.5 w-3.5 mr-2" />}
-                  {isPinned ? "Desanclar" : "Anclar"}
+                  {isPinned ? t("messenger.sidebar.desanclar") : t("messenger.sidebar.anclar")}
                 </DropdownMenuItem>
               )}
               {onArchive && (
                 <DropdownMenuItem onClick={onArchive}>
-                  <Archive className="h-3.5 w-3.5 mr-2" /> Archivar
+                  <Archive className="h-3.5 w-3.5 mr-2" /> {t("messenger.sidebar.archivar")}
                 </DropdownMenuItem>
               )}
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={onOpenSharedFiles}>
-                <FileText className="h-3.5 w-3.5 mr-2" /> Archivos compartidos
+                <FileText className="h-3.5 w-3.5 mr-2" /> {t("messenger.header.archivosCompartidos")}
               </DropdownMenuItem>
               {isGroup && isAdmin && onOpenGroupMembers && (
                 <DropdownMenuItem onClick={onOpenGroupMembers}>
-                  <Settings className="h-3.5 w-3.5 mr-2" /> Configuración del grupo
+                  <Settings className="h-3.5 w-3.5 mr-2" /> {t("messenger.header.configGrupo")}
                 </DropdownMenuItem>
               )}
               {isGroup && canSeeMembers && onOpenGroupMembers && (
                 <DropdownMenuItem onClick={onOpenGroupMembers}>
-                  <Users className="h-3.5 w-3.5 mr-2" /> Miembros del grupo
+                  <Users className="h-3.5 w-3.5 mr-2" /> {t("messenger.header.miembrosDelGrupo")}
                 </DropdownMenuItem>
               )}
               <DropdownMenuItem onClick={onOpenNotificationSettings}>
-                <Bell className="h-3.5 w-3.5 mr-2" /> Notificaciones
+                <Bell className="h-3.5 w-3.5 mr-2" /> {t("messenger.header.notificaciones")}
               </DropdownMenuItem>
               {canDelete && onDelete && (
                 <>
@@ -318,7 +328,7 @@ export default function ChatHeader({
                     onClick={onDelete}
                     className="text-destructive focus:text-destructive focus:bg-destructive/10"
                   >
-                    <Trash2 className="h-3.5 w-3.5 mr-2" /> Eliminar {isGroup ? "grupo" : "chat"}
+                    <Trash2 className="h-3.5 w-3.5 mr-2" /> {isGroup ? t("messenger.sidebar.eliminarGrupo") : t("messenger.sidebar.eliminarChat")}
                   </DropdownMenuItem>
                 </>
               )}

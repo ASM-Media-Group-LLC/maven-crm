@@ -9,6 +9,8 @@ import ActivityTimeline from "./ActivityTimeline";
 import EvidenceViewer from "@/components/leadgen/EvidenceViewer";
 import { WaChatButton, toE164 } from "@/components/WaChatButton";
 import { TgChatButton } from "@/components/TgChatButton";
+import { useLanguage } from "@/hooks/useLanguage";
+import { stageLabel, platformLabel } from "../hooks/useCloserLeads";
 
 interface Creator {
   id: string;
@@ -44,14 +46,17 @@ const Field = ({ label, value }: { label: string; value: React.ReactNode }) => (
 );
 
 const ViewCreatorModal = ({ creator, open, onOpenChange }: Props) => {
-  if (!creator) return null;
-
-  const leadgenEntryId = (creator as any).leadgen_entry_id as string | null;
+  const { t } = useLanguage();
+  // Los hooks van ANTES del `return null` de abajo: el modal se monta siempre
+  // (ClosersContent lo deja puesto con creator=null) y si las useQuery quedaban
+  // después del early return, al abrir una ficha React veía más hooks que en el
+  // render anterior y tiraba la pantalla.
+  const leadgenEntryId = ((creator as any)?.leadgen_entry_id ?? null) as string | null;
   // source_contact_id apunta al closers_contacts que generó este
   // closer_creator. Es donde vive la evidencia que el LG adjuntó cuando
   // pasó el número. Si la fila no tiene este campo (datos viejos),
   // el viewer simplemente muestra estado vacío.
-  const sourceContactId = (creator as any).source_contact_id as string | null;
+  const sourceContactId = ((creator as any)?.source_contact_id ?? null) as string | null;
 
   const { data: leadOrigin } = useQuery({
     queryKey: ["leadgen-origin", leadgenEntryId],
@@ -82,6 +87,8 @@ const ViewCreatorModal = ({ creator, open, onOpenChange }: Props) => {
     enabled: !!leadOrigin?.lg_user_id && open,
   });
 
+  if (!creator) return null;
+
   const revenue = (Number(creator.estimated_monetization || 0) * Number(creator.agency_commission || 0) / 100) + Number(creator.extras || 0);
 
   return (
@@ -90,15 +97,15 @@ const ViewCreatorModal = ({ creator, open, onOpenChange }: Props) => {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {creator.instagram_handle}
-            <Badge variant="secondary">{creator.stage}</Badge>
+            <Badge variant="secondary">{stageLabel(t, creator.stage)}</Badge>
           </DialogTitle>
         </DialogHeader>
 
         <div className="grid grid-cols-2 gap-4">
           <Field label="Instagram" value={creator.instagram_handle} />
-          <Field label="Categoría" value={creator.category} />
-          <Field label="Fecha de paso" value={creator.passed_date} />
-          <Field label="Cuenta origen" value={creator.source_account} />
+          <Field label={t("common.category")} value={creator.category} />
+          <Field label={t("closers.passedDate")} value={creator.passed_date} />
+          <Field label={t("closers.sourceAccount")} value={creator.source_account} />
           <Field label="WhatsApp" value={
             <div className="flex items-center gap-1">
               <WaChatButton phone={toE164({ phone: creator.phone })} closerCreatorId={creator.id} />
@@ -106,18 +113,18 @@ const ViewCreatorModal = ({ creator, open, onOpenChange }: Props) => {
             </div>
           } />
           <Field label="OnlyFans" value={creator.onlyfans_url} />
-          <Field label="Plataforma principal" value={creator.main_platform} />
-          <Field label="Monetización estimada" value={`$${Number(creator.estimated_monetization || 0).toLocaleString()}`} />
-          <Field label="Comisión agencia" value={`${Number(creator.agency_commission || 0)}%`} />
+          <Field label={t("closers.mainPlatform")} value={creator.main_platform ? platformLabel(t, creator.main_platform) : null} />
+          <Field label={t("closers.estimatedMonetization")} value={`$${Number(creator.estimated_monetization || 0).toLocaleString()}`} />
+          <Field label={t("closers.agencyCommission")} value={`${Number(creator.agency_commission || 0)}%`} />
           <Field label="Extras" value={`$${Number(creator.extras || 0).toLocaleString()}`} />
           <Field label="Revenue" value={`$${revenue.toLocaleString()}`} />
-          <Field label="Monetización mensual" value={creator.monthly_monetization ? `$${Number(creator.monthly_monetization).toLocaleString()}` : null} />
-          {creator.rejection_reason && <Field label="Motivo rechazo" value={creator.rejection_reason} />}
+          <Field label={t("closers.monthlyMonetization")} value={creator.monthly_monetization ? `$${Number(creator.monthly_monetization).toLocaleString()}` : null} />
+          {creator.rejection_reason && <Field label={t("closers.rejectionReason")} value={creator.rejection_reason} />}
         </div>
 
         {creator.notes && (
           <div>
-            <p className="text-xs text-muted-foreground">Notas</p>
+            <p className="text-xs text-muted-foreground">{t("closers.notes")}</p>
             <p className="text-sm">{creator.notes}</p>
           </div>
         )}
@@ -128,17 +135,17 @@ const ViewCreatorModal = ({ creator, open, onOpenChange }: Props) => {
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <FileText className="h-4 w-4 text-primary" />
-                <p className="text-sm font-semibold">Origen del Lead</p>
+                <p className="text-sm font-semibold">{t("closers.view.leadOrigin")}</p>
               </div>
               <div className="grid grid-cols-2 gap-4 rounded-lg border p-3">
-                <Field label="Fecha de contacto" value={leadOrigin.entry_date} />
-                <Field label="Agente" value={agentProfile?.full_name || "—"} />
-                <Field label="Plataforma" value={leadOrigin.platform} />
-                <Field label="Calidad" value={leadOrigin.quality} />
-                <Field label="Agencia" value={leadOrigin.company} />
+                <Field label={t("closers.view.contactDate")} value={leadOrigin.entry_date} />
+                <Field label={t("closers.agent")} value={agentProfile?.full_name || "—"} />
+                <Field label={t("closers.platform")} value={leadOrigin.platform} />
+                <Field label={t("closers.view.quality")} value={leadOrigin.quality} />
+                <Field label={t("closers.agency")} value={leadOrigin.company} />
                 {leadOrigin.source_link && (
                   <Field
-                    label="URL original"
+                    label={t("closers.view.originalUrl")}
                     value={
                       <a href={leadOrigin.source_link} target="_blank" rel="noopener noreferrer" className="text-primary underline text-xs truncate block">
                         {leadOrigin.source_link}
@@ -164,7 +171,7 @@ const ViewCreatorModal = ({ creator, open, onOpenChange }: Props) => {
 
         <Separator />
         <div>
-          <p className="text-sm font-semibold mb-3">Timeline de actividad</p>
+          <p className="text-sm font-semibold mb-3">{t("closers.view.timeline")}</p>
           <ActivityTimeline
             creatorId={creator.id}
             passedDate={creator.passed_date}

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useLanguage } from "@/hooks/useLanguage";
 import { ArrowUpDown, ExternalLink, MoreHorizontal, Eye, Pencil, Sparkles, Phone, Trash2, ShoppingCart } from "lucide-react";
 import { getCountryFlag, getCountryShortDisplay, maskPhone } from "@/lib/country-utils";
 import { WaChatButton } from "@/components/WaChatButton";
@@ -56,6 +57,7 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert, onSellPlatform, 
   // "Contactos" (sembrado en DB) → roles que tenían acceso al tab
   // siguen pudiendo editar/eliminar a menos que admin revoque.
   const { canAccess } = usePermissions();
+  const { t } = useLanguage();
   const canEditContacto = canAccess("Contactos", "Editar Contacto");
   const canDeleteContacto = canAccess("Contactos", "Eliminar Contacto");
   const [sortKey, setSortKey] = useState<SortKey>("creacion");
@@ -101,17 +103,17 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert, onSellPlatform, 
       <Table containerClassName="overflow-visible max-md:overflow-x-auto" className="md:min-w-[1100px]">
         <TableHeader>
           <TableRow>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Creación" col="creacion" /></TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Registro" col="registro" /></TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] max-w-[180px]"><SortHeader label="Nombre" col="nombre" /></TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label={t("contactos.created")} col="creacion" /></TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label={t("contactos.record")} col="registro" /></TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] max-w-[180px]"><SortHeader label={t("common.name")} col="nombre" /></TableHead>
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Instagram" col="instagram" /></TableHead>
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">OF URL</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Agente" col="creadoPor" /></TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Categoría" col="categoria" /></TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Tipo</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="País" col="pais" /></TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Ciudad" col="ciudad" /></TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Contacto</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label={t("contactos.agent")} col="creadoPor" /></TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label={t("common.category")} col="categoria" /></TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">{t("common.type")}</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label={t("common.country")} col="pais" /></TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label={t("common.city")} col="ciudad" /></TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">{t("contactos.contact")}</TableHead>
             <TableHead className="sticky top-0 right-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"></TableHead>
           </TableRow>
         </TableHeader>
@@ -166,7 +168,7 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert, onSellPlatform, 
                       </TooltipContent>
                     </Tooltip>
                   ) : (
-                    "No asignado"
+                    t("contactos.notAssigned")
                   )}
                 </TableCell>
                 <TableCell>
@@ -176,13 +178,13 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert, onSellPlatform, 
                 </TableCell>
                 <TableCell>
                   <Badge variant={(c as any).record_type === "reactivado" ? "warning-soft" : "success-soft"} className="font-normal">
-                    {(c as any).record_type === "reactivado" ? "Reactivado" : "Nuevo"}
+                    {(c as any).record_type === "reactivado" ? t("contactos.reactivated") : t("common.new")}
                   </Badge>
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                  {c.pais ? getCountryShortDisplay(c.pais) : "No aplicable"}
+                  {c.pais ? getCountryShortDisplay(c.pais) : t("contactos.notApplicable")}
                 </TableCell>
-                <TableCell className="text-sm text-muted-foreground">{c.city || "No aplicable"}</TableCell>
+                <TableCell className="text-sm text-muted-foreground">{c.city || t("contactos.notApplicable")}</TableCell>
                 <TableCell className="text-sm text-muted-foreground">
                   <div className="flex items-center gap-1">
                     {/* Sin número cargado el botón sólo puede fallar → no se ofrece.
@@ -201,24 +203,24 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert, onSellPlatform, 
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem onClick={() => onView?.(c)}>
-                        <Eye className="mr-2 h-4 w-4" /> Ver detalle
+                        <Eye className="mr-2 h-4 w-4" /> {t("common.viewDetail")}
                       </DropdownMenuItem>
                       {canEditContacto && (
                         <DropdownMenuItem onClick={() => onEdit?.(c)}>
-                          <Pencil className="mr-2 h-4 w-4" /> Editar
+                          <Pencil className="mr-2 h-4 w-4" /> {t("common.edit")}
                         </DropdownMenuItem>
                       )}
                       <DropdownMenuItem onClick={() => onConvert?.(c)}>
-                        <Sparkles className="mr-2 h-4 w-4" /> Convertir a Creador
+                        <Sparkles className="mr-2 h-4 w-4" /> {t("contactos.convertToCreator")}
                       </DropdownMenuItem>
                       {onSellPlatform && (
                         <DropdownMenuItem onClick={() => onSellPlatform(c)}>
-                          <ShoppingCart className="mr-2 h-4 w-4" /> Vender plataforma
+                          <ShoppingCart className="mr-2 h-4 w-4" /> {t("contactos.sellPlatform")}
                         </DropdownMenuItem>
                       )}
                       {onDelete && canDeleteContacto && (
                         <DropdownMenuItem onClick={() => onDelete(c)} className="text-destructive focus:text-destructive">
-                          <Trash2 className="mr-2 h-4 w-4" /> Eliminar
+                          <Trash2 className="mr-2 h-4 w-4" /> {t("common.delete")}
                         </DropdownMenuItem>
                       )}
                     </DropdownMenuContent>
@@ -230,7 +232,7 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert, onSellPlatform, 
           {sorted.length === 0 && (
             <TableRow>
               <TableCell colSpan={11} className="h-24 text-center text-muted-foreground">
-                No se encontraron contactos.
+                {t("contactos.noContactsFound")}
               </TableCell>
             </TableRow>
           )}

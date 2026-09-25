@@ -3,6 +3,7 @@ import { ReactionGroup } from "@/hooks/useReactions";
 import { UserProfile } from "../types";
 import { profileName } from "../utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface ReactionsDisplayProps {
   reactions: ReactionGroup[];
@@ -15,6 +16,7 @@ interface ReactionsDisplayProps {
 // (absolute, -bottom-3), con borde + fondo sólido + sombra para que resalte sobre
 // la burbuja. El padre (la burbuja) es relative y reserva mb-3 cuando hay reacciones.
 export default function ReactionsDisplay({ reactions, profiles, isMe, onToggle }: ReactionsDisplayProps) {
+  const { t } = useLanguage();
   if (reactions.length === 0) return null;
 
   return (
@@ -37,7 +39,7 @@ export default function ReactionsDisplay({ reactions, profiles, isMe, onToggle }
               </button>
             </TooltipTrigger>
             <TooltipContent side="top" className="text-xs max-w-[200px]">
-              {r.users.map(uid => profileName(profiles[uid])).join(", ")}
+              {r.users.map(uid => profileName(profiles[uid], t("messenger.usuario"))).join(", ")}
             </TooltipContent>
           </Tooltip>
         ))}

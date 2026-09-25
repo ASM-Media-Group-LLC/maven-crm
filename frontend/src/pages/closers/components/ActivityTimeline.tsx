@@ -2,6 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
+import { stageLabel, resultLabel } from "../hooks/useCloserLeads";
 import { Badge } from "@/components/ui/badge";
 import { UserPlus, MessageCircle, CheckCircle, Trophy, XCircle } from "lucide-react";
 
@@ -38,6 +40,7 @@ const colorMap = {
 
 const ActivityTimeline = ({ creatorId, passedDate, confirmedDate, completedDate, stage }: Props) => {
   const f = useFormato();
+  const { t } = useLanguage();
   const { data: contacts = [] } = useQuery({
     queryKey: ["closer-contact-history", creatorId],
     queryFn: async () => {
@@ -55,34 +58,34 @@ const ActivityTimeline = ({ creatorId, passedDate, confirmedDate, completedDate,
   const events: TimelineEvent[] = [];
 
   if (passedDate) {
-    events.push({ date: passedDate, label: "Modelo asignada", type: "assigned" });
+    events.push({ date: passedDate, label: t("closers.timeline.modelAssigned"), type: "assigned" });
   }
 
   for (const c of contacts) {
     events.push({
       date: c.contact_date,
-      label: `Contacto vía ${c.channel}`,
+      label: t("closers.contact.via", { channel: c.channel }),
       type: "contact",
-      detail: c.result || undefined,
+      detail: c.result ? resultLabel(t, c.result) : undefined,
     });
   }
 
   if (confirmedDate) {
-    events.push({ date: confirmedDate, label: "Confirmada", type: "confirmed" });
+    events.push({ date: confirmedDate, label: stageLabel(t, "Confirmada"), type: "confirmed" });
   }
 
   if (completedDate) {
-    events.push({ date: completedDate, label: "Completada", type: "completed" });
+    events.push({ date: completedDate, label: stageLabel(t, "Completada"), type: "completed" });
   }
 
   if (stage === "No interesada" && !completedDate && !confirmedDate) {
-    events.push({ date: contacts[contacts.length - 1]?.contact_date || passedDate || "", label: "No interesada", type: "rejected" });
+    events.push({ date: contacts[contacts.length - 1]?.contact_date || passedDate || "", label: stageLabel(t, "No interesada"), type: "rejected" });
   }
 
   events.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   if (events.length === 0) {
-    return <p className="text-xs text-muted-foreground text-center py-2">Sin actividad registrada</p>;
+    return <p className="text-xs text-muted-foreground text-center py-2">{t("closers.timeline.none")}</p>;
   }
 
   return (

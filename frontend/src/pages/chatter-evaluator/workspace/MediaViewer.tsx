@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { X } from "lucide-react";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // Mirrors the original Roleplaychatters openMediaViewer (index.html line 1670):
 // fullscreen overlay, click-outside to close, ✕ button, supports image/video.
@@ -15,6 +16,7 @@ interface MediaViewerProps {
 const VIDEO_EXT_RE = /\.(mp4|mov|webm|m4v|avi|mkv|hevc)(\?|#|$)/i;
 
 export const MediaViewer = ({ url, kind, onClose }: MediaViewerProps) => {
+  const { t } = useLanguage();
   const resolvedKind: "image" | "video" =
     kind ?? (url && VIDEO_EXT_RE.test(url) ? "video" : "image");
   // Close on Escape, like a sane lightbox would.
@@ -40,7 +42,7 @@ export const MediaViewer = ({ url, kind, onClose }: MediaViewerProps) => {
         type="button"
         onClick={onClose}
         className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-white hover:bg-white/25"
-        aria-label="Cerrar"
+        aria-label={t("common.close")}
       >
         <X className="h-5 w-5" />
       </button>

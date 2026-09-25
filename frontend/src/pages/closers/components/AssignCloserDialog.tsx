@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface Props {
   creatorId: string | null;
@@ -34,6 +35,7 @@ const AssignCloserDialog = ({ creatorId, currentAssignee, open, onOpenChange, on
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
   const [creatorComboOpen, setCreatorComboOpen] = useState(false);
   const { toast } = useToast();
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
 
   const needsCreatorSelection = !creatorId;
@@ -89,14 +91,16 @@ const AssignCloserDialog = ({ creatorId, currentAssignee, open, onOpenChange, on
 
       const creators: Candidate[] = (creatorsRes.data ?? []).map((c) => ({
         id: c.id,
-        label: c.instagram_handle ?? "(sin handle)",
+        // Sin handle → "" y la etiqueta "(sin handle)" la pone candidateLabel()
+        // al dibujar, en el idioma de la pantalla (este resultado queda en cache).
+        label: c.instagram_handle ?? "",
         kind: "creator" as const,
         searchKey: c.instagram_handle ?? "",
       }));
       const contacts: Candidate[] = (contactsRes.data ?? []).map((c) => ({
         id: c.id,
         // handle si está, sino name. Si no hay ninguno, sin handle.
-        label: c.handle || c.name || "(sin nombre)",
+        label: c.handle || c.name || "",
         kind: "contact" as const,
         searchKey: `${c.handle ?? ""} ${c.name ?? ""}`.trim(),
       }));
@@ -108,6 +112,8 @@ const AssignCloserDialog = ({ creatorId, currentAssignee, open, onOpenChange, on
   });
 
   const selectedCloser = closers.find((c) => c.id === selected);
+  const candidateLabel = (c: Candidate) =>
+    c.label || (c.kind === "creator" ? t("closers.noHandleParen") : t("closers.noNameParen"));
 
   // Si vinimos con un creatorId set (modo "asignar este creator"), no
   // hace falta convertir nada — el ID ya es de closer_creators.
@@ -136,7 +142,7 @@ const AssignCloserDialog = ({ creatorId, currentAssignee, open, onOpenChange, on
     },
     onError: (e: Error) => {
       toast({
-        title: "Error al asignar",
+        title: t("common.errorAssigning"),
         description: e.message,
         variant: "destructive",
       });
@@ -162,8 +168,11 @@ const AssignCloserDialog = ({ creatorId, currentAssignee, open, onOpenChange, on
           closerId: selected,
         });
         toast({
-          title: "Contacto asignado",
-          description: `${selectedCandidate.label} quedó asignada a ${selectedCloser?.full_name ?? "el closer"} (stage Asignada).`,
+          title: t("closers.toast.contactAssigned"),
+          description: t("closers.toast.contactAssignedDesc", {
+            label: candidateLabel(selectedCandidate),
+            closer: selectedCloser?.full_name ?? t("closers.toast.theCloser"),
+          }),
         });
         queryClient.invalidateQueries({ queryKey: ["closers_contacts"] });
         queryClient.invalidateQueries({ queryKey: ["assignable-candidates"] });
@@ -193,7 +202,7 @@ const AssignCloserDialog = ({ creatorId, currentAssignee, open, onOpenChange, on
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Asignar Closer</DialogTitle>
+          <DialogTitle>{t("closers.assignDlg.title")}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           {needsCreatorSelection && (
@@ -204,33 +213,33 @@ const AssignCloserDialog = ({ creatorId, currentAssignee, open, onOpenChange, on
                   <Button variant="outline" role="combobox" aria-expanded={creatorComboOpen} className="w-full justify-between font-normal">
                     {selectedCandidate ? (
                       <span className="flex items-center gap-2 truncate">
-                        {selectedCandidate.label}
+                        {candidateLabel(selectedCandidate)}
                         {selectedCandidate.kind === "contact" && (
-                          <Badge variant="secondary" className="text-[10px]">Contacto</Badge>
+                          <Badge variant="secondary" className="text-[10px]">{t("closers.contact")}</Badge>
                         )}
                       </span>
                     ) : (
-                      "Seleccionar creator o contacto..."
+                      t("closers.assignDlg.selectCandidate")
                     )}
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                   <Command>
-                    <CommandInput placeholder="Buscar por handle o nombre..." />
+                    <CommandInput placeholder={t("closers.assignDlg.searchCandidate")} />
                     <CommandList>
                       <CommandEmpty />
                       {pendingContacts.length > 0 && (
-                        <CommandGroup heading="Contactos pendientes (se convierten al asignar)">
+                        <CommandGroup heading={t("closers.assignDlg.pendingContacts")}>
                           {pendingContacts.map((c) => (
                             <CommandItem
                               key={`contact-${c.id}`}
-                              value={c.searchKey || c.label}
+                              value={c.searchKey || candidateLabel(c)}
                               onSelect={() => { setSelectedCandidate(c); setCreatorComboOpen(false); }}
                             >
                               <Check className={cn("mr-2 h-4 w-4", selectedCandidate?.id === c.id && selectedCandidate?.kind === "contact" ? "opacity-100" : "opacity-0")} />
-                              <span className="flex-1 truncate">{c.label}</span>
-                              <Badge variant="secondary" className="ml-2 text-[10px]">Contacto</Badge>
+                              <span className="flex-1 truncate">{candidateLabel(c)}</span>
+                              <Badge variant="secondary" className="ml-2 text-[10px]">{t("closers.contact")}</Badge>
                             </CommandItem>
                           ))}
                         </CommandGroup>
@@ -239,15 +248,15 @@ const AssignCloserDialog = ({ creatorId, currentAssignee, open, onOpenChange, on
                         <CommandSeparator />
                       )}
                       {existingCreators.length > 0 && (
-                        <CommandGroup heading="Creators en el pipeline">
+                        <CommandGroup heading={t("closers.assignDlg.creatorsInPipeline")}>
                           {existingCreators.map((c) => (
                             <CommandItem
                               key={`creator-${c.id}`}
-                              value={c.searchKey || c.label}
+                              value={c.searchKey || candidateLabel(c)}
                               onSelect={() => { setSelectedCandidate(c); setCreatorComboOpen(false); }}
                             >
                               <Check className={cn("mr-2 h-4 w-4", selectedCandidate?.id === c.id && selectedCandidate?.kind === "creator" ? "opacity-100" : "opacity-0")} />
-                              <span className="flex-1 truncate">{c.label}</span>
+                              <span className="flex-1 truncate">{candidateLabel(c)}</span>
                             </CommandItem>
                           ))}
                         </CommandGroup>
@@ -258,26 +267,26 @@ const AssignCloserDialog = ({ creatorId, currentAssignee, open, onOpenChange, on
               </Popover>
               {targetIsContact && (
                 <p className="text-[11px] text-muted-foreground">
-                  ⚡ Al asignar, el contacto se convierte automáticamente a creator del pipeline (queda con stage "Asignada" + closer asignado).
+                  {t("closers.assignDlg.autoConvertHint")}
                 </p>
               )}
             </div>
           )}
 
           <div className="space-y-2">
-            <Label>Closer responsable</Label>
+            <Label>{t("closers.assignDlg.responsible")}</Label>
             <Popover open={comboOpen} onOpenChange={setComboOpen} modal={true}>
               <PopoverTrigger asChild>
                 <Button variant="outline" role="combobox" aria-expanded={comboOpen} className="w-full justify-between font-normal">
-                  {selectedCloser ? selectedCloser.full_name || selectedCloser.id : "Seleccionar closer..."}
+                  {selectedCloser ? selectedCloser.full_name || selectedCloser.id : t("closers.assignDlg.selectCloser")}
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                 <Command>
-                  <CommandInput placeholder="Buscar closer..." />
+                  <CommandInput placeholder={t("closers.assignDlg.searchCloser")} />
                   <CommandList>
-                    <CommandEmpty>No se encontró ningún closer.</CommandEmpty>
+                    <CommandEmpty>{t("closers.assignDlg.noCloser")}</CommandEmpty>
                     <CommandGroup>
                       {closers.map((c) => (
                         <CommandItem
@@ -298,10 +307,10 @@ const AssignCloserDialog = ({ creatorId, currentAssignee, open, onOpenChange, on
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={convertContactAndAssign.isPending}>
-            Cancelar
+            {t("common.cancel")}
           </Button>
           <Button onClick={handleAssign} disabled={!canConfirm}>
-            {convertContactAndAssign.isPending ? "Asignando..." : "Asignar"}
+            {convertContactAndAssign.isPending ? t("closers.assignDlg.assigning") : t("closers.assign")}
           </Button>
         </DialogFooter>
       </DialogContent>

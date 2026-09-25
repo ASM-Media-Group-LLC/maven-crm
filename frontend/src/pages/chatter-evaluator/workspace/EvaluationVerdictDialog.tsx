@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Check, X, Loader2, Send, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+import { useLanguage } from "@/hooks/useLanguage";
 import {
   useChatterCriteria,
   useSubmitEvaluation,
@@ -43,6 +44,7 @@ export const EvaluationVerdictDialog = ({
   onOpenChange,
   onSubmitted,
 }: Props) => {
+  const { t } = useLanguage();
   const criteriaQ = useChatterCriteria();
   const submit = useSubmitEvaluation();
 
@@ -75,11 +77,11 @@ export const EvaluationVerdictDialog = ({
 
   const handleSubmit = async () => {
     if (!examinerName.trim()) {
-      toast.error("Pon tu nombre");
+      toast.error(t("chatters.verdict.enterName"));
       return;
     }
     if (!verdict) {
-      toast.error("Selecciona APTO o NO APTO");
+      toast.error(t("chatters.verdict.pickVerdict"));
       return;
     }
 
@@ -89,21 +91,21 @@ export const EvaluationVerdictDialog = ({
         if (!s) return null;
         return {
           criterion_id: c.id,
-          label: c.label,
+          label: c.label, // se guarda y va al reporte: el label de la base, no el de la pantalla
           status: s,
         };
       })
       .filter(Boolean) as CriterionResult[];
 
     if (criteriaResults.length === 0) {
-      toast.error("No hay criterios calificados");
+      toast.error(t("chatters.verdict.noneScored"));
       return;
     }
     if (criteriaResults.length < criteria.length) {
       toast.error(
-        `Faltan ${criteria.length - criteriaResults.length} criterio(s) por calificar`,
+        t("chatters.verdict.missingN", { n: criteria.length - criteriaResults.length }),
         {
-          description: "Antes de enviar la evaluación, califica todos.",
+          description: t("chatters.verdict.scoreAllFirst"),
         },
       );
       return;
@@ -124,21 +126,21 @@ export const EvaluationVerdictDialog = ({
       // Webhook fires in the background (Apps Script can take 10-30s).
       // The submit hook itself emits a toast with the webhook outcome
       // when it eventually finishes.
-      toast.success("Evaluación guardada", {
-        description: "El reporte se está enviando a Apps Script en segundo plano.",
+      toast.success(t("chatters.verdict.saved"), {
+        description: t("chatters.verdict.sendingReport"),
       });
 
       onOpenChange(false);
       onSubmitted?.();
     } catch (e) {
-      toast.error("No se pudo guardar", {
+      toast.error(t("common.couldNotSave"), {
         description: (e as Error).message,
       });
     }
   };
 
   const badgeText =
-    scorePct >= 80 ? "APROBADO" : scorePct >= 50 ? "A CRITERIO" : "NO APTO";
+    scorePct >= 80 ? t("chatters.crit.badgeApproved") : scorePct >= 50 ? t("chatters.crit.badgeBorderline") : t("chatters.crit.badgeNotFit");
   const badgeColor =
     scorePct >= 80
       ? "text-success"
@@ -150,9 +152,9 @@ export const EvaluationVerdictDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Enviar evaluación de {session.chatter_name}</DialogTitle>
+          <DialogTitle>{t("chatters.verdict.title", { name: session.chatter_name })}</DialogTitle>
           <DialogDescription>
-            Esto cierra la sesión y manda el reporte al webhook configurado en Admin (Drive doc + Sheet row + emails).
+            {t("chatters.verdict.desc")}
           </DialogDescription>
         </DialogHeader>
 
@@ -162,7 +164,7 @@ export const EvaluationVerdictDialog = ({
             <div>
               <div className="text-2xl font-bold tabular-nums">{scorePct}%</div>
               <div className="text-[10px] text-muted-foreground">
-                {filledCount} de {criteria.length} criterios calificados
+                {t("chatters.verdict.scoredNofTotal", { n: filledCount, total: criteria.length })}
               </div>
             </div>
             <div className={`text-sm font-semibold ${badgeColor}`}>{badgeText}</div>
@@ -172,18 +174,18 @@ export const EvaluationVerdictDialog = ({
             <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-2 text-xs text-destructive">
               <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               <span>
-                Faltan {missing} criterio(s) por calificar. Termina de calificarlos antes de enviar la evaluación.
+                {t("chatters.verdict.missingBanner", { n: missing })}
               </span>
             </div>
           )}
 
           <div>
-            <Label htmlFor="examiner_name">Tu nombre (examinador)</Label>
+            <Label htmlFor="examiner_name">{t("chatters.verdict.yourName")}</Label>
             <Input
               id="examiner_name"
               value={examinerName}
               onChange={(e) => setExaminerName(e.target.value)}
-              placeholder="Nombre completo"
+              placeholder={t("common.fullName")}
               autoFocus
             />
           </div>
@@ -201,7 +203,7 @@ export const EvaluationVerdictDialog = ({
                 }`}
               >
                 <Check className="h-5 w-5" />
-                APTO
+                {t("chatters.verdict.fit")}
               </button>
               <button
                 type="button"
@@ -213,26 +215,26 @@ export const EvaluationVerdictDialog = ({
                 }`}
               >
                 <X className="h-5 w-5" />
-                NO APTO
+                {t("chatters.verdict.notFit")}
               </button>
             </div>
           </div>
 
           <div>
-            <Label htmlFor="feedback">Feedback (opcional)</Label>
+            <Label htmlFor="feedback">{t("chatters.verdict.feedbackOptional")}</Label>
             <Textarea
               id="feedback"
               value={feedback}
               onChange={(e) => setFeedback(e.target.value)}
               rows={4}
-              placeholder="Observaciones, sugerencias, recomendaciones…"
+              placeholder={t("chatters.verdict.feedbackPlaceholder")}
             />
           </div>
         </div>
 
         <DialogFooter className="gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submit.isPending}>
-            Cancelar
+            {t("common.cancel")}
           </Button>
           <Button
             onClick={handleSubmit}
@@ -243,10 +245,10 @@ export const EvaluationVerdictDialog = ({
               !allFilled
             }
             className="gap-2"
-            title={!allFilled ? "Completa todos los criterios antes de enviar" : undefined}
+            title={!allFilled ? t("chatters.verdict.completeAll") : undefined}
           >
             {submit.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            Enviar evaluación
+            {t("chatters.crit.submit")}
           </Button>
         </DialogFooter>
       </DialogContent>

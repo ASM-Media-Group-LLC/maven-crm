@@ -3,6 +3,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { usePermissions } from "@/hooks/usePermissions";
 import { format } from "date-fns";
 import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
 import { ArrowUpDown, Eye, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,10 +23,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  PRIORITY_LABELS,
-  STATUS_LABELS,
-  TYPE_LABELS,
+  PRIORITY_LABEL_KEYS,
+  STATUS_LABEL_KEYS,
+  TYPE_LABEL_KEYS,
   COMPANIES,
+  etiquetaDe,
   type TicketWithCreator,
 } from "./useTickets";
 
@@ -75,6 +77,7 @@ const getSortValue = (ticket: TicketWithCreator, key: SortKey): string => {
 
 const TicketsList = ({ tickets, onView, onEdit, onDelete }: Props) => {
   const f = useFormato();
+  const { t } = useLanguage();
   const { canAccess } = usePermissions();
   const canEditTicket = canAccess("Tickets", "Editar Ticket");
   const canDeleteTicket = canAccess("Tickets", "Eliminar Ticket");
@@ -107,7 +110,7 @@ const TicketsList = ({ tickets, onView, onEdit, onDelete }: Props) => {
   if (tickets.length === 0) {
     return (
       <div className="rounded-lg border border-border">
-        <EmptyState seed="tickets" title="No hay tickets" description="Crea un nuevo ticket para comenzar" />
+        <EmptyState seed="tickets" title={t("tickets.empty.title")} description={t("tickets.empty.description")} />
       </div>
     );
   }
@@ -117,15 +120,15 @@ const TicketsList = ({ tickets, onView, onEdit, onDelete }: Props) => {
       <Table>
         <TableHeader className="sticky top-0 z-10 bg-card">
           <TableRow>
-            <TableHead><SortHeader label="Ticket" sortKeyName="ticket" /></TableHead>
-            <TableHead><SortHeader label="Creador" sortKeyName="creator" /></TableHead>
-            <TableHead><SortHeader label="Prioridad" sortKeyName="priority" /></TableHead>
-            <TableHead><SortHeader label="Tipo" sortKeyName="type" /></TableHead>
-            <TableHead><SortHeader label="Estado" sortKeyName="status" /></TableHead>
-            <TableHead><SortHeader label="Compañía" sortKeyName="company" /></TableHead>
-            <TableHead><SortHeader label="Asignado" sortKeyName="assigned" /></TableHead>
-            <TableHead><TableHead><SortHeader label="Creación" sortKeyName="date" /></TableHead></TableHead>
-            <TableHead className="sticky right-0 bg-card z-20 text-right">Acciones</TableHead>
+            <TableHead><SortHeader label={t("tickets.col.ticket")} sortKeyName="ticket" /></TableHead>
+            <TableHead><SortHeader label={t("tickets.creator")} sortKeyName="creator" /></TableHead>
+            <TableHead><SortHeader label={t("tickets.priority")} sortKeyName="priority" /></TableHead>
+            <TableHead><SortHeader label={t("common.type")} sortKeyName="type" /></TableHead>
+            <TableHead><SortHeader label={t("common.status")} sortKeyName="status" /></TableHead>
+            <TableHead><SortHeader label={t("common.company")} sortKeyName="company" /></TableHead>
+            <TableHead><SortHeader label={t("tickets.assignee")} sortKeyName="assigned" /></TableHead>
+            <TableHead><TableHead><SortHeader label={t("tickets.col.created")} sortKeyName="date" /></TableHead></TableHead>
+            <TableHead className="sticky right-0 bg-card z-20 text-right">{t("common.actions")}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -152,24 +155,24 @@ const TicketsList = ({ tickets, onView, onEdit, onDelete }: Props) => {
                 <TableCell className="text-sm text-muted-foreground">@{creatorHandle}</TableCell>
                 <TableCell>
                   <Badge variant={priorityVariant[ticket.priority] || "secondary"} className="text-[10px]">
-                    {PRIORITY_LABELS[ticket.priority] || ticket.priority}
+                    {etiquetaDe(PRIORITY_LABEL_KEYS, ticket.priority, t)}
                   </Badge>
                 </TableCell>
                 <TableCell>
                   <Badge variant="outline" className="text-[10px]">
-                    {TYPE_LABELS[ticket.ticket_type] || ticket.ticket_type}
+                    {etiquetaDe(TYPE_LABEL_KEYS, ticket.ticket_type, t)}
                   </Badge>
                 </TableCell>
                 <TableCell>
                   <Badge variant={statusVariant[ticket.status] || "outline"} className="text-[10px]">
-                    {STATUS_LABELS[ticket.status] || ticket.status}
+                    {etiquetaDe(STATUS_LABEL_KEYS, ticket.status, t)}
                   </Badge>
                 </TableCell>
                 <TableCell>
                   <Badge variant="outline" className="text-[10px]">{companyLabel}</Badge>
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">
-                  {ticket.assigned_to ? `@${ticket.assigned_to}` : "Sin asignar"}
+                  {ticket.assigned_to ? `@${ticket.assigned_to}` : t("common.unassigned")}
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                   {ticket.created_at ? format(new Date(ticket.created_at), "dd MMM yyyy", { locale: f.fechas }) : "—"}
@@ -185,12 +188,12 @@ const TicketsList = ({ tickets, onView, onEdit, onDelete }: Props) => {
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => onView(ticket)}>
                           <Eye className="mr-2 h-4 w-4" />
-                          Ver detalle
+                          {t("common.viewDetail")}
                         </DropdownMenuItem>
                         {canEditTicket && (
                           <DropdownMenuItem onClick={() => onEdit(ticket)}>
                             <Pencil className="mr-2 h-4 w-4" />
-                            Editar
+                            {t("common.edit")}
                           </DropdownMenuItem>
                         )}
                         {canDeleteTicket && (
@@ -198,7 +201,7 @@ const TicketsList = ({ tickets, onView, onEdit, onDelete }: Props) => {
                             <DropdownMenuSeparator />
                             <DropdownMenuItem className="text-destructive" onClick={() => onDelete(ticket)}>
                               <Trash2 className="mr-2 h-4 w-4" />
-                              Eliminar
+                              {t("common.delete")}
                             </DropdownMenuItem>
                           </>
                         )}

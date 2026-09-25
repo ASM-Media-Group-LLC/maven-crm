@@ -16,6 +16,7 @@ import {
 import { Trash2 } from "lucide-react";
 import { SALE_PLATFORMS } from "../hooks/useCloserLeads";
 import { celebrateClose } from "@/lib/celebrateClose";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface PlatformSale {
   id: string;
@@ -35,6 +36,7 @@ interface Props {
 const PlatformSalesModal = ({ creatorId, instagramHandle, open, onOpenChange }: Props) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
   const [selectedPlatforms, setSelectedPlatforms] = useState<Record<string, string>>({});
   // Confirmación antes de borrar: es un registro monetario, nada de borrado en un clic.
@@ -60,14 +62,14 @@ const PlatformSalesModal = ({ creatorId, instagramHandle, open, onOpenChange }: 
 
   const addSales = useMutation({
     mutationFn: async () => {
-      if (!user) throw new Error("No autenticado");
+      if (!user) throw new Error(t("closers.err.notSignedIn"));
       const entries = Object.entries(selectedPlatforms).map(([platform, price]) => ({
         creator_id: creatorId,
         platform,
         price: Number(price) || 0,
         created_by: user.id,
       }));
-      if (entries.length === 0) throw new Error("Sin plataformas seleccionadas");
+      if (entries.length === 0) throw new Error(t("closers.err.noPlatformsSelected"));
       const { error } = await supabase.from("closer_platform_sales").insert(entries);
       if (error) throw error;
     },
@@ -85,15 +87,15 @@ const PlatformSalesModal = ({ creatorId, instagramHandle, open, onOpenChange }: 
       setSelectedPlatforms({});
       celebrateClose(`venta-${creatorId}`);
       toast({
-        title: `🎉 Venta cerrada — @${instagramHandle}`,
+        title: t("closers.sales.closedFor", { handle: instagramHandle }),
         description: savedTotal > 0
-          ? `${saved.length} plataforma${saved.length === 1 ? "" : "s"} · $${savedTotal.toLocaleString()}`
-          : `${saved.length} plataforma${saved.length === 1 ? "" : "s"} registrada${saved.length === 1 ? "" : "s"}`,
+          ? t(saved.length === 1 ? "closers.sales.platformsAmountOne" : "closers.sales.platformsAmountMany", { n: saved.length, amount: savedTotal.toLocaleString() })
+          : t(saved.length === 1 ? "closers.sales.platformsLoggedOne" : "closers.sales.platformsLoggedMany", { n: saved.length }),
       });
       onOpenChange(false);
     },
     onError: (e: Error) => {
-      toast({ title: "Error", description: e.message, variant: "destructive" });
+      toast({ title: t("common.error"), description: e.message, variant: "destructive" });
     },
   });
 
@@ -107,10 +109,10 @@ const PlatformSalesModal = ({ creatorId, instagramHandle, open, onOpenChange }: 
       queryClient.invalidateQueries({ queryKey: ["closer-platform-revenue"] });
       queryClient.invalidateQueries({ queryKey: ["closer-platform-sales-all"] });
       setSaleToDelete(null);
-      toast({ title: "Venta eliminada" });
+      toast({ title: t("closers.sales.deleted") });
     },
     onError: (e: Error) => {
-      toast({ title: "Error al eliminar", description: e.message, variant: "destructive" });
+      toast({ title: t("common.errorDeleting"), description: e.message, variant: "destructive" });
     },
   });
 
@@ -130,14 +132,14 @@ const PlatformSalesModal = ({ creatorId, instagramHandle, open, onOpenChange }: 
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="text-base">
-            Ventas por plataforma — @{instagramHandle}
+            {t("closers.sales.titleFor", { handle: instagramHandle })}
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 max-h-[60vh] overflow-y-auto">
           {sales.length > 0 && (
             <div className="space-y-2">
-              <p className="text-xs font-medium text-muted-foreground">Registradas</p>
+              <p className="text-xs font-medium text-muted-foreground">{t("closers.sales.logged")}</p>
               {sales.map((s) => (
                 <ListRow key={s.id} className="justify-between">
                   <div className="flex items-center gap-2">
@@ -157,7 +159,7 @@ const PlatformSalesModal = ({ creatorId, instagramHandle, open, onOpenChange }: 
 
           {availablePlatforms.length > 0 && (
             <div className="space-y-2">
-              <p className="text-xs font-medium text-muted-foreground">Agregar plataformas</p>
+              <p className="text-xs font-medium text-muted-foreground">{t("closers.sales.addPlatforms")}</p>
               {availablePlatforms.map((p) => {
                 const isSelected = p in selectedPlatforms;
                 return (
@@ -185,7 +187,7 @@ const PlatformSalesModal = ({ creatorId, instagramHandle, open, onOpenChange }: 
               {selectedCount > 0 && (
                 <div className="flex justify-end pt-1">
                   <Button size="sm" className="h-7 text-xs" onClick={() => addSales.mutate()} disabled={addSales.isPending}>
-                    Guardar ({selectedCount})
+                    {t("closers.sales.saveN", { n: selectedCount })}
                   </Button>
                 </div>
               )}
@@ -193,7 +195,7 @@ const PlatformSalesModal = ({ creatorId, instagramHandle, open, onOpenChange }: 
           )}
 
           {sales.length === 0 && availablePlatforms.length === 0 && (
-            <p className="text-sm text-muted-foreground text-center py-4">Todas las plataformas ya registradas</p>
+            <p className="text-sm text-muted-foreground text-center py-4">{t("closers.sales.allLogged")}</p>
           )}
         </div>
 
@@ -207,12 +209,12 @@ const PlatformSalesModal = ({ creatorId, instagramHandle, open, onOpenChange }: 
         <AlertDialog open={!!saleToDelete} onOpenChange={(o) => { if (!o) setSaleToDelete(null); }}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>¿Eliminar esta venta?</AlertDialogTitle>
+              <AlertDialogTitle>{t("closers.sales.deleteTitle")}</AlertDialogTitle>
               <AlertDialogDescription>
-                Estás a punto de eliminar la venta de{" "}
+                {t("closers.sales.deleteA")}{" "}
                 <strong>{saleToDelete?.platform}</strong>
                 {saleToDelete?.product ? <> – {saleToDelete.product}</> : null}{" "}
-                por <strong>${Number(saleToDelete?.price ?? 0).toLocaleString()}</strong>. Esta acción no se puede deshacer.
+                {t("closers.sales.deleteB")} <strong>${Number(saleToDelete?.price ?? 0).toLocaleString()}</strong>. {t("common.cannotBeUndone")}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -222,7 +224,7 @@ const PlatformSalesModal = ({ creatorId, instagramHandle, open, onOpenChange }: 
                 onClick={() => { if (saleToDelete) deleteSale.mutate(saleToDelete.id); }}
                 disabled={deleteSale.isPending}
               >
-                {deleteSale.isPending ? "Eliminando..." : "Eliminar"}
+                {deleteSale.isPending ? t("closers.deleting") : t("common.delete")}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
