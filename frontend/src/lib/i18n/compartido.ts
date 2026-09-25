@@ -169,7 +169,8 @@ export const compartido = {
   "shared.evaluator.emailNotSent": { es: "Email no enviado", en: "Email not sent" },
   "shared.evaluator.emailNotSentDesc": {
     es: "Falló send-notification-email — la evaluación quedó guardada.",
-    en: "`send-notification-email` failed — the evaluation was saved.",
+    // Sin comillas invertidas: es la descripción de un aviso y se verían tal cual.
+    en: "Couldn't send the email — the evaluation was saved.",
   },
   "shared.evaluator.reportSent": { es: "Reporte enviado", en: "Report sent" },
   "shared.evaluator.reportSentDesc": {
@@ -188,6 +189,8 @@ export const compartido = {
 
   // ─── Primitivas de components/ui/ (lo que muestran si la pantalla no pasa nada)
   "shared.ui.searchEllipsis": { es: "Buscar…", en: "Search…" },
+  // El de SearchableSelect: con "…" (un solo carácter), como antes; common.selectEllipsis lleva tres puntos.
+  "shared.ui.selectEllipsis": { es: "Seleccionar…", en: "Select…" },
   "shared.ui.apply": { es: "Aplicar", en: "Apply" },
   "shared.ui.moreActions": { es: "Más acciones", en: "More actions" },
   "shared.ui.searchCountry": { es: "Buscar país...", en: "Search country..." },

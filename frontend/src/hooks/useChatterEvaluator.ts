@@ -896,6 +896,8 @@ export const useCreateChatterSession = () => {
 // del lado server, así que esto es solo para UX.
 export interface ChatterEvaluatorOption {
   user_id: string;
+  /** "" si la persona no tiene nombre: el repuesto ("Sin nombre" / "No name")
+   *  lo pone la pantalla que lo dibuja, en su idioma (NewSessionDialog). */
   full_name: string;
   avatar_url: string | null;
 }
@@ -920,7 +922,7 @@ export const useChatterEvaluators = () =>
         avatar_url: string | null;
       }>).map((row) => ({
         user_id: row.user_id,
-        full_name: row.full_name || "Sin nombre",
+        full_name: row.full_name || "",
         avatar_url: row.avatar_url ?? null,
       }));
     },

@@ -81,7 +81,7 @@ describe("primitivas de components/ui/ en inglés", () => {
   it("SearchableSelect sin textos propios: disparador, buscador y vacío en inglés", () => {
     montar(<SearchableSelect value="" onValueChange={() => {}} options={OPCIONES} />);
     const disparador = screen.getByRole("combobox");
-    expect(disparador).toHaveTextContent("Select...");
+    expect(disparador).toHaveTextContent("Select…");
     fireEvent.click(disparador);
     const buscador = screen.getByPlaceholderText("Search…");
     fireEvent.change(buscador, { target: { value: "zzz" } });
@@ -187,7 +187,7 @@ describe("las mismas primitivas en español no cambian", () => {
 
   it("SearchableSelect y PageHeader también", () => {
     montar(<SearchableSelect value="" onValueChange={() => {}} options={OPCIONES} />);
-    expect(screen.getByRole("combobox")).toHaveTextContent("Seleccionar...");
+    expect(screen.getByRole("combobox")).toHaveTextContent("Seleccionar…");
     cleanup();
     esTelefono = true;
     montar(<PageHeader title="X" actions={<><Button>Uno</Button><Button>Dos</Button><Button>Tres</Button></>} />);

@@ -63,7 +63,7 @@ export function SearchableSelect({
   // Los textos por defecto salen del diccionario: con la app en inglés una
   // pantalla que no pasa placeholder mostraba "Seleccionar…" igual.
   const t = useTSiHay();
-  const placeholder = placeholderProp ?? t("common.selectEllipsis");
+  const placeholder = placeholderProp ?? t("shared.ui.selectEllipsis");
   const searchPlaceholder = searchPlaceholderProp ?? t("shared.ui.searchEllipsis");
   const emptyMessage = emptyMessageProp ?? t("common.noResults");
   const [open, setOpen] = useState(false);
