@@ -1,6 +1,8 @@
 import { ChevronLeft, ChevronRight, CheckCircle2, Clock, SkipForward } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import type { DailyAssignment } from "@/hooks/useSpammerTasks";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 
 // ─── Props ────────────────────────────────────────────────────────────────
 
@@ -18,18 +20,24 @@ function addDays(dateStr: string, delta: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-function formatDisplayDate(dateStr: string): string {
+function formatDisplayDate(
+  dateStr: string,
+  t: (key: TranslationKey) => string,
+  enIngles: boolean,
+): string {
   const today = new Date().toISOString().slice(0, 10);
   const yesterday = addDays(today, -1);
-  if (dateStr === today) return "Hoy";
-  if (dateStr === yesterday) return "Ayer";
+  if (dateStr === today) return t("common.today");
+  if (dateStr === yesterday) return t("scouter.progress.yesterday");
   const d = new Date(dateStr + "T00:00:00");
-  return d.toLocaleDateString("es", { weekday: "short", day: "numeric", month: "short" });
+  // "es" a secas es el que ya usaba: en español no cambia nada.
+  return d.toLocaleDateString(enIngles ? "en-US" : "es", { weekday: "short", day: "numeric", month: "short" });
 }
 
 // ─── Component ────────────────────────────────────────────────────────────
 
 export const DailyProgress = ({ assignments, selectedDate, onDateChange }: DailyProgressProps) => {
+  const { t, language } = useLanguage();
   const total = assignments.length;
   const done = assignments.filter((a) => a.status === "done").length;
   const skipped = assignments.filter((a) => a.status === "skipped").length;
@@ -52,13 +60,13 @@ export const DailyProgress = ({ assignments, selectedDate, onDateChange }: Daily
           type="button"
           onClick={() => onDateChange(addDays(selectedDate, -1))}
           className="flex h-8 w-8 items-center justify-center rounded-md border border-border transition-colors hover:bg-muted"
-          aria-label="Día anterior"
+          aria-label={t("scouter.progress.previousDay")}
         >
           <ChevronLeft className="h-4 w-4" />
         </button>
 
         <span className="text-sm font-semibold text-foreground">
-          {formatDisplayDate(selectedDate)}
+          {formatDisplayDate(selectedDate, t, language === "en")}
         </span>
 
         <button
@@ -66,7 +74,7 @@ export const DailyProgress = ({ assignments, selectedDate, onDateChange }: Daily
           onClick={() => onDateChange(addDays(selectedDate, 1))}
           disabled={isToday}
           className="flex h-8 w-8 items-center justify-center rounded-md border border-border transition-colors hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
-          aria-label="Día siguiente"
+          aria-label={t("scouter.progress.nextDay")}
         >
           <ChevronRight className="h-4 w-4" />
         </button>
@@ -76,7 +84,7 @@ export const DailyProgress = ({ assignments, selectedDate, onDateChange }: Daily
       <div className="space-y-1.5">
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span className="font-medium text-foreground">
-            {settled}/{target} completadas
+            {t("scouter.progress.settled", { settled, target })}
           </span>
           <span>{pct}%</span>
         </div>
@@ -97,19 +105,19 @@ export const DailyProgress = ({ assignments, selectedDate, onDateChange }: Daily
       <div className="flex flex-wrap gap-2">
         <StatPill
           icon={<CheckCircle2 className="h-3.5 w-3.5 text-success" />}
-          label="Listas"
+          label={t("scouter.progress.done")}
           value={done}
           color="emerald"
         />
         <StatPill
           icon={<Clock className="h-3.5 w-3.5 text-warning" />}
-          label="Pendientes"
+          label={t("common.pendingPl")}
           value={pending}
           color="amber"
         />
         <StatPill
           icon={<SkipForward className="h-3.5 w-3.5 text-muted-foreground" />}
-          label="Saltadas"
+          label={t("scouter.tasks.skipped")}
           value={skipped}
           color="zinc"
         />

@@ -23,17 +23,21 @@ import {
   useInsertSpammerAccount,
   type AccountNiche,
 } from "@/hooks/useSpammerAccounts";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 
 // ─── Constants ─────────────────────────────────────────────────────────────
 
 const MAX_ACCOUNTS = 4;
 
-const NICHES: { value: AccountNiche; label: string }[] = [
+// `value` es lo que se guarda en account_niche. Las que se dicen igual en
+// inglés quedan como texto (`label`).
+const NICHES: { value: AccountNiche; label?: string; labelKey?: TranslationKey }[] = [
   { value: "lifestyle", label: "Lifestyle" },
   { value: "fitness", label: "Fitness" },
-  { value: "adult", label: "Adulto" },
+  { value: "adult", labelKey: "scouter.niche.adult" },
   { value: "business", label: "Business" },
-  { value: "mixed", label: "Mixto" },
+  { value: "mixed", labelKey: "scouter.niche.mixed" },
 ];
 
 const IG_HANDLE_REGEX = /^[a-zA-Z0-9_.]{1,30}$/;
@@ -43,7 +47,9 @@ const IG_HANDLE_REGEX = /^[a-zA-Z0-9_.]{1,30}$/;
 interface HandleEntry {
   raw: string;          // what the user typed (may include @)
   handle: string;       // cleaned handle without @
-  error: string | null;
+  // La CLAVE del error, no el texto: se traduce al dibujar, así un cambio de
+  // idioma no deja el mensaje viejo guardado en el estado.
+  error: TranslationKey | null;
 }
 
 interface AccountConfig {
@@ -89,15 +95,18 @@ const StepDot = ({
   );
 };
 
-const StepBar = ({ current }: { current: number }) => (
-  <div className="flex items-start justify-center gap-4 mb-8">
-    <StepDot step={1} current={current} label="Cuentas" />
-    <div className="mt-4 h-px w-12 bg-border" />
-    <StepDot step={2} current={current} label="Vista previa" />
-    <div className="mt-4 h-px w-12 bg-border" />
-    <StepDot step={3} current={current} label="Configurar" />
-  </div>
-);
+const StepBar = ({ current }: { current: number }) => {
+  const { t } = useLanguage();
+  return (
+    <div className="flex items-start justify-center gap-4 mb-8">
+      <StepDot step={1} current={current} label={t("scouter.onboarding.stepAccounts")} />
+      <div className="mt-4 h-px w-12 bg-border" />
+      <StepDot step={2} current={current} label={t("scouter.onboarding.stepPreview")} />
+      <div className="mt-4 h-px w-12 bg-border" />
+      <StepDot step={3} current={current} label={t("scouter.onboarding.stepSetup")} />
+    </div>
+  );
+};
 
 // ─── Step 1: Account handle inputs ─────────────────────────────────────────
 
@@ -105,11 +114,11 @@ function cleanHandle(raw: string): string {
   return raw.trim().replace(/^@+/, "");
 }
 
-function validateHandle(raw: string): string | null {
+function validateHandle(raw: string): TranslationKey | null {
   const handle = cleanHandle(raw);
   if (!handle) return null; // empty is ok (slot unused)
   if (!IG_HANDLE_REGEX.test(handle)) {
-    return "Solo letras, números, puntos y guiones bajos (máx 30).";
+    return "scouter.handleInvalid";
   }
   return null;
 }
@@ -123,6 +132,7 @@ const Step1 = ({
   onChange: (i: number, raw: string) => void;
   onNext: () => void;
 }) => {
+  const { t } = useLanguage();
   const filledCount = entries.filter((e) => e.handle.length > 0).length;
   const hasErrors = entries.some((e) => e.error !== null);
   const canProceed = filledCount >= 1 && !hasErrors;
@@ -130,10 +140,9 @@ const Step1 = ({
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-semibold mb-1">Registra tus cuentas de Instagram</h2>
+        <h2 className="text-xl font-semibold mb-1">{t("scouter.onboarding.registerTitle")}</h2>
         <p className="text-sm text-muted-foreground">
-          Ingresa hasta {MAX_ACCOUNTS} handles de Instagram que uses para hacer outreach.
-          Puedes agregar más tarde desde Configuración.
+          {t("scouter.onboarding.registerHint", { max: MAX_ACCOUNTS })}
         </p>
       </div>
 
@@ -148,7 +157,10 @@ const Step1 = ({
               <Input
                 value={entry.raw}
                 onChange={(e) => onChange(i, e.target.value)}
-                placeholder={`Cuenta ${i + 1}${i === 0 ? " (requerida)" : " (opcional)"}`}
+                placeholder={t(
+                  i === 0 ? "scouter.onboarding.accountRequired" : "scouter.onboarding.accountOptional",
+                  { n: i + 1 },
+                )}
                 className={`rounded-l-none ${entry.error ? "border-destructive focus-visible:ring-destructive" : ""}`}
                 autoCapitalize="none"
                 autoCorrect="off"
@@ -156,7 +168,7 @@ const Step1 = ({
               />
             </div>
             {entry.error && (
-              <p className="mt-1 text-xs text-destructive">{entry.error}</p>
+              <p className="mt-1 text-xs text-destructive">{t(entry.error)}</p>
             )}
           </div>
         ))}
@@ -166,14 +178,13 @@ const Step1 = ({
       <div className="flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2.5">
         <Info className="h-4 w-4 text-primary mt-0.5 shrink-0" />
         <p className="text-xs text-primary">
-          Las cuentas serán sincronizadas automáticamente en segundo plano. Solo necesitas confirmar
-          el handle — no hace falta ingresar ninguna contraseña.
+          {t("scouter.onboarding.syncNotice")}
         </p>
       </div>
 
       <div className="flex justify-end">
         <Button onClick={onNext} disabled={!canProceed} className="gap-1.5">
-          Verificar cuentas
+          {t("scouter.onboarding.verify")}
           <ArrowRight className="h-4 w-4" />
         </Button>
       </div>
@@ -183,29 +194,32 @@ const Step1 = ({
 
 // ─── Step 2: Profile preview (v1 placeholder — no live scrape) ─────────────
 
-const ProfilePlaceholder = ({ handle }: { handle: string }) => (
-  <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 p-3">
-    {/* Avatar placeholder */}
-    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-muted border border-border">
-      <User className="h-5 w-5 text-muted-foreground" />
-    </div>
-    <div className="flex-1 min-w-0">
-      <div className="flex items-center gap-2 mb-1">
-        <span className="font-medium text-sm">@{handle}</span>
-        <Badge
-          variant="outline"
-          className="text-[10px] border-warning/40 text-warning"
-        >
-          Pendiente de sync
-        </Badge>
+const ProfilePlaceholder = ({ handle }: { handle: string }) => {
+  const { t } = useLanguage();
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 p-3">
+      {/* Avatar placeholder */}
+      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-muted border border-border">
+        <User className="h-5 w-5 text-muted-foreground" />
       </div>
-      <p className="text-xs text-muted-foreground">
-        El perfil completo (seguidores, bio) se sincronizará automáticamente.
-      </p>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="font-medium text-sm">@{handle}</span>
+          <Badge
+            variant="outline"
+            className="text-[10px] border-warning/40 text-warning"
+          >
+            {t("scouter.onboarding.pendingSync")}
+          </Badge>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          {t("scouter.onboarding.profileWillSync")}
+        </p>
+      </div>
+      <CheckCircle2 className="h-5 w-5 text-success shrink-0" />
     </div>
-    <CheckCircle2 className="h-5 w-5 text-success shrink-0" />
-  </div>
-);
+  );
+};
 
 const Step2 = ({
   handles,
@@ -215,43 +229,46 @@ const Step2 = ({
   handles: string[];
   onBack: () => void;
   onNext: () => void;
-}) => (
-  <div className="space-y-6">
-    <div>
-      <h2 className="text-xl font-semibold mb-1">Vista previa de cuentas</h2>
-      <p className="text-sm text-muted-foreground">
-        Confirmamos {handles.length} cuenta{handles.length !== 1 ? "s" : ""} encontrada
-        {handles.length !== 1 ? "s" : ""}. La información detallada se sincronizará
-        automáticamente cuando completes el registro.
-      </p>
-    </div>
+}) => {
+  const { t } = useLanguage();
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-xl font-semibold mb-1">{t("scouter.onboarding.previewTitle")}</h2>
+        <p className="text-sm text-muted-foreground">
+          {t(
+            handles.length === 1 ? "scouter.onboarding.previewHintOne" : "scouter.onboarding.previewHintOther",
+            { count: handles.length },
+          )}
+        </p>
+      </div>
 
-    <div className="space-y-2">
-      {handles.map((h) => (
-        <ProfilePlaceholder key={h} handle={h} />
-      ))}
-    </div>
+      <div className="space-y-2">
+        {handles.map((h) => (
+          <ProfilePlaceholder key={h} handle={h} />
+        ))}
+      </div>
 
-    <div className="flex items-start gap-2 rounded-lg border border-success/20 bg-success/5 px-3 py-2.5">
-      <CheckCircle2 className="h-4 w-4 text-success mt-0.5 shrink-0" />
-      <p className="text-xs text-success">
-        Todo listo. En el siguiente paso podrás asignar un nombre y nicho a cada cuenta
-        para que la IA pueda asignarte tareas relevantes.
-      </p>
-    </div>
+      <div className="flex items-start gap-2 rounded-lg border border-success/20 bg-success/5 px-3 py-2.5">
+        <CheckCircle2 className="h-4 w-4 text-success mt-0.5 shrink-0" />
+        <p className="text-xs text-success">
+          {t("scouter.onboarding.allSet")}
+        </p>
+      </div>
 
-    <div className="flex justify-between">
-      <Button variant="ghost" onClick={onBack} className="gap-1.5">
-        <ArrowLeft className="h-4 w-4" />
-        Atrás
-      </Button>
-      <Button onClick={onNext} className="gap-1.5">
-        Configurar cuentas
-        <ArrowRight className="h-4 w-4" />
-      </Button>
+      <div className="flex justify-between">
+        <Button variant="ghost" onClick={onBack} className="gap-1.5">
+          <ArrowLeft className="h-4 w-4" />
+          {t("scouter.onboarding.back")}
+        </Button>
+        <Button onClick={onNext} className="gap-1.5">
+          {t("scouter.onboarding.setupAccounts")}
+          <ArrowRight className="h-4 w-4" />
+        </Button>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 // ─── Step 3: Label & Niche ─────────────────────────────────────────────────
 
@@ -268,6 +285,7 @@ const Step3 = ({
   onSubmit: () => void;
   isSaving: boolean;
 }) => {
+  const { t } = useLanguage();
   const allValid = configs.every(
     (c) => c.display_name.trim().length > 0 && c.account_niche !== "",
   );
@@ -275,10 +293,9 @@ const Step3 = ({
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-semibold mb-1">Etiqueta y nicho</h2>
+        <h2 className="text-xl font-semibold mb-1">{t("scouter.onboarding.labelTitle")}</h2>
         <p className="text-sm text-muted-foreground">
-          Ponele un nombre descriptivo a cada cuenta y elige su nicho. Esto le permite
-          a la IA asignar leads afines a cada perfil.
+          {t("scouter.onboarding.labelHint")}
         </p>
       </div>
 
@@ -295,12 +312,12 @@ const Step3 = ({
               {/* Display name */}
               <div>
                 <label className="text-xs font-medium text-muted-foreground mb-1 block">
-                  Nombre descriptivo *
+                  {t("scouter.onboarding.displayName")}
                 </label>
                 <Input
                   value={cfg.display_name}
                   onChange={(e) => onChange(i, { display_name: e.target.value })}
-                  placeholder='Ej: "Mi cuenta fitness", "Cuenta principal"'
+                  placeholder={t("scouter.onboarding.displayNamePlaceholder")}
                   className="text-sm"
                 />
               </div>
@@ -308,7 +325,7 @@ const Step3 = ({
               {/* Niche dropdown */}
               <div>
                 <label className="text-xs font-medium text-muted-foreground mb-1 block">
-                  Nicho de la cuenta *
+                  {t("scouter.onboarding.niche")}
                 </label>
                 <Select
                   value={cfg.account_niche}
@@ -317,12 +334,12 @@ const Step3 = ({
                   }
                 >
                   <SelectTrigger className="text-sm">
-                    <SelectValue placeholder="Selecciona un nicho…" />
+                    <SelectValue placeholder={t("scouter.onboarding.nichePlaceholder")} />
                   </SelectTrigger>
                   <SelectContent>
                     {NICHES.map((n) => (
                       <SelectItem key={n.value} value={n.value}>
-                        {n.label}
+                        {n.labelKey ? t(n.labelKey) : n.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -336,17 +353,17 @@ const Step3 = ({
       <div className="flex justify-between">
         <Button variant="ghost" onClick={onBack} disabled={isSaving} className="gap-1.5">
           <ArrowLeft className="h-4 w-4" />
-          Atrás
+          {t("scouter.onboarding.back")}
         </Button>
         <Button onClick={onSubmit} disabled={!allValid || isSaving} className="gap-1.5">
           {isSaving ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
-              Guardando…
+              {t("scouter.onboarding.saving")}
             </>
           ) : (
             <>
-              Guardar cuentas
+              {t("scouter.onboarding.saveAccounts")}
               <CheckCircle2 className="h-4 w-4" />
             </>
           )}
@@ -359,6 +376,7 @@ const Step3 = ({
 // ─── Main Wizard ────────────────────────────────────────────────────────────
 
 const SpammerOnboarding = () => {
+  const { t } = useLanguage();
   const [step, setStep] = useState<1 | 2 | 3>(1);
 
   // Step 1 state
@@ -440,10 +458,10 @@ const SpammerOnboarding = () => {
         {/* Header branding */}
         <div className="flex items-center justify-center gap-2 mb-2">
           <Instagram className="h-6 w-6 text-instagram-orange" />
-          <span className="text-lg font-bold tracking-tight">Mis Cuentas</span>
+          <span className="text-lg font-bold tracking-tight">{t("scouter.onboarding.myAccounts")}</span>
         </div>
         <p className="text-center text-xs text-muted-foreground mb-8">
-          Configuración inicial · {step} de 3
+          {t("scouter.onboarding.stepOf", { step })}
         </p>
 
         <StepBar current={step} />

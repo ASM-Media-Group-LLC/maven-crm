@@ -30,9 +30,12 @@ import {
   useDiscardLead,
   type LeadPatch,
   type ScouterLead,
+  type AiQualityFilter,
 } from "@/hooks/useScouterLeads";
 import ConvertScouterLeadModal from "./ConvertScouterLeadModal";
 import { COUNTRIES_ALPHA, COUNTRY_FLAGS } from "@/lib/countries";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 
 // ─── Status palette (shared by Home grid + Leads table) ────────────────
 // Nota: a partir de la simplificación del popup (2026-05), los closer
@@ -40,25 +43,36 @@ import { COUNTRIES_ALPHA, COUNTRY_FLAGS } from "@/lib/countries";
 // responde. Los statuses internos (discovery, candidate, contacting,
 // active) los siguen usando los workflows automáticos del worker y de
 // IA — no los exponemos como botones del popup.
-export const STATUS_META: Record<string, { label: string; dot: string }> = {
-  discovery:  { label: "Discovery",   dot: "#6366f1" },
-  candidate:  { label: "Candidate",   dot: "#0ea5e9" },
-  contacting: { label: "Contactando", dot: "#fbbf24" },
-  confirmed:  { label: "Se interesó", dot: "#22c55e" },
-  active:     { label: "Active",      dot: "#10b981" },
-  rejected:   { label: "No responde", dot: "#f87171" },
-  discarded:  { label: "Descarte",    dot: "#a1a1aa" },
+//
+// La llave (y `value`) es el status que se guarda en scouter_leads: NO se
+// traduce. Lo que se muestra es `t(labelKey)`.
+export const STATUS_META: Record<string, { labelKey: TranslationKey; dot: string }> = {
+  discovery:  { labelKey: "scouter.status.discovery",  dot: "#6366f1" },
+  candidate:  { labelKey: "scouter.status.candidate",  dot: "#0ea5e9" },
+  contacting: { labelKey: "scouter.status.contacting", dot: "#fbbf24" },
+  confirmed:  { labelKey: "scouter.status.confirmed",  dot: "#22c55e" },
+  active:     { labelKey: "scouter.status.active",     dot: "#10b981" },
+  rejected:   { labelKey: "scouter.status.rejected",   dot: "#f87171" },
+  discarded:  { labelKey: "scouter.status.discarded",  dot: "#a1a1aa" },
 };
 
-export const STATUS_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: "discovery",  label: "Discovery" },
-  { value: "candidate",  label: "Candidate" },
-  { value: "contacting", label: "Contactando" },
-  { value: "confirmed",  label: "Se interesó" },
-  { value: "active",     label: "Active" },
-  { value: "rejected",   label: "No responde" },
-  { value: "discarded",  label: "Descarte" },
-  { value: "all",        label: "Todos" },
+export const STATUS_OPTIONS: Array<{ value: string; labelKey: TranslationKey }> = [
+  { value: "discovery",  labelKey: "scouter.status.discovery" },
+  { value: "candidate",  labelKey: "scouter.status.candidate" },
+  { value: "contacting", labelKey: "scouter.status.contacting" },
+  { value: "confirmed",  labelKey: "scouter.status.confirmed" },
+  { value: "active",     labelKey: "scouter.status.active" },
+  { value: "rejected",   labelKey: "scouter.status.rejected" },
+  { value: "discarded",  labelKey: "scouter.status.discarded" },
+  { value: "all",        labelKey: "common.all" },
+];
+
+// Filtro de calidad IA de Home y Búsquedas. El `value` viaja al hook como dato.
+export const AI_QUALITY_OPTIONS: Array<{ value: AiQualityFilter; labelKey: TranslationKey }> = [
+  { value: "approved", labelKey: "scouter.quality.approved" },
+  { value: "high_fit", labelKey: "scouter.quality.highFit" },
+  { value: "scored",   labelKey: "scouter.quality.scored" },
+  { value: "all",      labelKey: "scouter.quality.all" },
 ];
 
 // ─── Visual helpers ─────────────────────────────────────────────────────
@@ -109,10 +123,10 @@ export const VerifiedBadge = ({ size = 14 }: { size?: number }) => (
 // Reducido a los 3 outcomes que un closer/spammer realmente marca tras
 // un intento de contacto. "Active" y "contacting" se asignan
 // automáticamente y no se exponen como botón.
-const QUICK_ACTIONS: Array<{ status: string; label: string; color: string }> = [
-  { status: "discarded",  label: "Descartar",    color: "#71717a" },
-  { status: "confirmed",  label: "Se interesó",  color: "#22c55e" },
-  { status: "rejected",   label: "No responde",  color: "#f87171" },
+const QUICK_ACTIONS: Array<{ status: string; labelKey: TranslationKey; color: string }> = [
+  { status: "discarded",  labelKey: "scouter.action.discard",   color: "#71717a" },
+  { status: "confirmed",  labelKey: "scouter.status.confirmed", color: "#22c55e" },
+  { status: "rejected",   labelKey: "scouter.status.rejected",  color: "#f87171" },
 ];
 
 // ─── Lead modal (centered dialog, replaces old Sheet drawer) ────────────
@@ -125,6 +139,8 @@ export const LeadDrawer = ({
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }) => {
+  // Arriba de todo: el componente sale antes (`if (!lead) return null`).
+  const { t } = useLanguage();
   const update = useUpdateLead();
   const discardLead = useDiscardLead();
   const toggleFavoriteMut = useToggleLeadFavorite();
@@ -211,7 +227,7 @@ export const LeadDrawer = ({
         }
       }
       await update.mutateAsync({ id: lead.id, patch });
-      toast.success("Lead actualizado");
+      toast.success(t("scouter.lead.updated"));
       setEditing(false);
       setDraft({});
     } catch {
@@ -260,7 +276,7 @@ export const LeadDrawer = ({
                 rel="noopener noreferrer"
                 className="h-14 w-14 shrink-0 overflow-hidden rounded-full transition-all hover:ring-2 hover:ring-primary hover:opacity-90"
                 style={{ background: initialsBg(lead.instagram_handle) }}
-                title="Abrir perfil de Instagram"
+                title={t("scouter.lead.openInstagram")}
               >
                 {lead.photo_data_url ? (
                   <img
@@ -300,14 +316,14 @@ export const LeadDrawer = ({
                   target="_blank"
                   rel="noopener noreferrer"
                   className="block hover:underline"
-                  title="Abrir perfil de Instagram"
+                  title={t("scouter.lead.openInstagram")}
                 >
                   <div className="flex items-center gap-1.5">
                     <span className="truncate text-sm font-semibold">@{lead.instagram_handle}</span>
                     {lead.verified && <VerifiedBadge size={16} />}
                   </div>
                   <div className="text-xs text-muted-foreground truncate">
-                    {lead.name || "Sin nombre"}
+                    {lead.name || t("scouter.noName")}
                   </div>
                 </a>
               ) : (
@@ -317,7 +333,7 @@ export const LeadDrawer = ({
                     {lead.verified && <VerifiedBadge size={16} />}
                   </div>
                   <div className="text-xs text-muted-foreground truncate">
-                    {lead.name || "Sin nombre"}
+                    {lead.name || t("scouter.noName")}
                   </div>
                 </>
               )}
@@ -343,7 +359,7 @@ export const LeadDrawer = ({
                   toggleFavoriteMut.mutate({ leadId: lead.id, isFavorite })
                 }
                 className="flex h-9 w-9 items-center justify-center rounded-md border transition-colors hover:bg-muted"
-                aria-label={isFavorite ? "Quitar de favoritos" : "Marcar como favorito"}
+                aria-label={isFavorite ? t("scouter.fav.remove") : t("scouter.fav.add")}
               >
                 <Star
                   className="h-4 w-4"
@@ -380,7 +396,7 @@ export const LeadDrawer = ({
                 className="inline-block h-2 w-2 rounded-full"
                 style={{ background: statusCfg.dot }}
               />
-              {statusCfg.label}
+              {t(statusCfg.labelKey)}
             </span>
             {lead.category && (
               <span className="rounded-full border border-amber-400/60 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-400">
@@ -403,13 +419,13 @@ export const LeadDrawer = ({
               <Textarea
                 value={(get("bio") as string) ?? ""}
                 rows={4}
-                placeholder="Bio del perfil…"
+                placeholder={t("scouter.lead.bioPlaceholder")}
                 onChange={(e) => setField("bio", e.target.value || null)}
                 className="text-sm"
               />
             ) : (
               <div className="rounded-md border bg-muted/30 p-3 text-sm whitespace-pre-line min-h-[40px]">
-                {lead.bio || <span className="text-muted-foreground italic">Sin bio</span>}
+                {lead.bio || <span className="text-muted-foreground italic">{t("scouter.lead.noBio")}</span>}
               </div>
             )}
           </div>
@@ -418,7 +434,7 @@ export const LeadDrawer = ({
           {aiReasons.length > 0 && (
             <div className="px-4 pt-3">
               <div className="text-xs font-bold text-muted-foreground mb-1">
-                Analisis IA
+                {t("scouter.lead.aiAnalysis")}
               </div>
               <ul className="space-y-1 rounded-md border bg-muted/20 p-3 text-sm">
                 {aiReasons.map((reason, i) => (
@@ -446,7 +462,7 @@ export const LeadDrawer = ({
                     onClick={() => { setEditing(false); setDraft({}); }}
                     disabled={update.isPending}
                   >
-                    <X className="mr-1 h-3 w-3" /> Cancelar
+                    <X className="mr-1 h-3 w-3" /> {t("common.cancel")}
                   </Button>
                   <Button size="sm" className="h-7 text-xs gap-1" onClick={handleSave} disabled={update.isPending}>
                     {update.isPending ? (
@@ -454,12 +470,12 @@ export const LeadDrawer = ({
                     ) : (
                       <Save className="h-3 w-3" />
                     )}
-                    Guardar
+                    {t("common.save")}
                   </Button>
                 </div>
               ) : (
                 <Button size="sm" variant="ghost" className="h-7 text-xs gap-1" onClick={() => setEditing(true)}>
-                  <Pencil className="h-3 w-3" /> Editar
+                  <Pencil className="h-3 w-3" /> {t("common.edit")}
                 </Button>
               )}
             </div>
@@ -478,17 +494,17 @@ export const LeadDrawer = ({
                       <SelectContent>
                         {STATUS_OPTIONS.filter((o) => o.value !== "all").map((o) => (
                           <SelectItem key={o.value} value={o.value}>
-                            {o.label}
+                            {t(o.labelKey)}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   ) : (
-                    <span>{STATUS_META[lead.status]?.label ?? lead.status}</span>
+                    <span>{STATUS_META[lead.status] ? t(STATUS_META[lead.status].labelKey) : lead.status}</span>
                   )}
                 </Field>
 
-                <Field label="Categoría">
+                <Field label={t("common.category")}>
                   {editing ? (
                     <Input
                       value={(get("category") as string) ?? ""}
@@ -509,7 +525,7 @@ export const LeadDrawer = ({
                     target_companies = newSet. Si el set queda vacío,
                     seteamos company_id=null para sacar el lead de
                     la compañía del scraper. */}
-                <Field label="Compañías que califica" stacked>
+                <Field label={t("scouter.lead.qualifyingCompanies")} stacked>
                   {(() => {
                     // Slug de la company_id del discovery (si existe en
                     // companies). Es el "owner" original del lead.
@@ -533,7 +549,7 @@ export const LeadDrawer = ({
                         <div className="flex flex-wrap gap-1.5">
                           {companies.length === 0 ? (
                             <span className="text-xs text-muted-foreground">
-                              No hay compañías cargadas.
+                              {t("scouter.lead.noCompanies")}
                             </span>
                           ) : (
                             companies.map((c) => {
@@ -549,7 +565,7 @@ export const LeadDrawer = ({
                                       : [...current, c.slug];
                                     setField("target_companies", next);
                                   }}
-                                  title={isDiscovery ? "Asignada por el scouter al descubrir" : undefined}
+                                  title={isDiscovery ? t("scouter.lead.assignedByScouter") : undefined}
                                   className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
                                     isOn
                                       ? "border-primary bg-primary/15 text-primary"
@@ -588,11 +604,11 @@ export const LeadDrawer = ({
                   })()}
                 </Field>
 
-                <Field label="Closer asignado">
+                <Field label={t("scouter.lead.assignedCloser")}>
                   {editing ? (
                     <Input
                       value={(get("assigned_closer") as string) ?? ""}
-                      placeholder="Nombre del closer"
+                      placeholder={t("scouter.lead.closerName")}
                       onChange={(e) => setField("assigned_closer", e.target.value || null)}
                       className="h-8"
                     />
@@ -601,18 +617,19 @@ export const LeadDrawer = ({
                   )}
                 </Field>
 
-                <Field label="País">
+                <Field label={t("common.country")}>
                   {editing ? (
                     <SearchableSelect
                       value={(get("country") as string) ?? "__none__"}
                       onValueChange={(v) =>
                         setField("country", v === "__none__" ? null : v)
                       }
-                      placeholder="Seleccionar país"
-                      searchPlaceholder="Buscar país…"
+                      placeholder={t("scouter.lead.selectCountry")}
+                      searchPlaceholder={t("scouter.filter.searchCountry")}
+                      emptyMessage={t("common.noResults")}
                       triggerClassName="w-full h-8 text-xs"
                       options={[
-                        { value: "__none__", label: "— Sin país —" },
+                        { value: "__none__", label: t("scouter.lead.noCountry") },
                         ...COUNTRIES_ALPHA.map((c) => ({
                           value: c,
                           label: `${COUNTRY_FLAGS[c] ?? "🌍"} ${c}`,
@@ -629,7 +646,7 @@ export const LeadDrawer = ({
                   )}
                 </Field>
 
-                <Field label="Ciudad">
+                <Field label={t("common.city")}>
                   {editing ? (
                     <Input
                       value={(get("city") as string) ?? ""}
@@ -641,7 +658,7 @@ export const LeadDrawer = ({
                   )}
                 </Field>
 
-                <Field label="Teléfono">
+                <Field label={t("common.phone")}>
                   {editing ? (
                     <Input
                       value={(get("phone") as string) ?? ""}
@@ -654,7 +671,7 @@ export const LeadDrawer = ({
                   )}
                 </Field>
 
-                <Field label="Seguidores">
+                <Field label={t("scouter.lead.followers")}>
                   <span>{formatFollowers(lead.followers)}</span>
                 </Field>
 
@@ -662,7 +679,7 @@ export const LeadDrawer = ({
                   <span>{lead.link_in_bio_platform ?? "—"}</span>
                 </Field>
 
-                <Field label="Fuente">
+                <Field label={t("scouter.lead.source")}>
                   <span>{lead.discovery_source ?? "—"}</span>
                 </Field>
 
@@ -679,7 +696,7 @@ export const LeadDrawer = ({
                   )}
                 </Field>
 
-                <Field label="Plataforma">
+                <Field label={t("scouter.lead.platform")}>
                   {editing ? (
                     <Input
                       value={(get("platform") as string) ?? ""}
@@ -691,7 +708,7 @@ export const LeadDrawer = ({
                   )}
                 </Field>
 
-                <Field label="Notas" stacked>
+                <Field label={t("scouter.lead.notes")} stacked>
                   {editing ? (
                     <Textarea
                       value={(get("notes") as string) ?? ""}
@@ -731,7 +748,7 @@ export const LeadDrawer = ({
                   backgroundColor: qa.color + "15",
                 }}
               >
-                {qa.label}
+                {t(qa.labelKey)}
               </button>
             ))}
           </div>
@@ -741,7 +758,7 @@ export const LeadDrawer = ({
           {lead.converted_at ? (
             <div className="flex h-9 w-full items-center justify-center gap-1.5 rounded-md bg-success/10 text-success text-sm font-medium">
               <CheckCircle2 className="h-3.5 w-3.5" />
-              En Pipeline Closers
+              {t("scouter.lead.inClosersPipeline")}
             </div>
           ) : (
             <Button
@@ -751,7 +768,7 @@ export const LeadDrawer = ({
               onClick={() => setConvertOpen(true)}
             >
               <ArrowRight className="h-3.5 w-3.5" />
-              Pasar a Pipeline Closers
+              {t("scouter.lead.moveToClosers")}
             </Button>
           )}
 
@@ -767,7 +784,7 @@ export const LeadDrawer = ({
               className="flex h-9 w-full items-center justify-center gap-1.5 rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90"
             >
               <ExternalLink className="h-3.5 w-3.5" />
-              Contactar
+              {t("scouter.lead.contact")}
             </a>
           )}
           {/* Guardar — el favorito se movió arriba al lado del score,
@@ -784,7 +801,7 @@ export const LeadDrawer = ({
             ) : (
               <Save className="h-3.5 w-3.5" />
             )}
-            Guardar
+            {t("common.save")}
           </Button>
         </div>
       </DialogContent>
@@ -796,13 +813,9 @@ export const LeadDrawer = ({
       <AlertDialog open={confirmDiscard} onOpenChange={setConfirmDiscard}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Descartar este lead?</AlertDialogTitle>
+            <AlertDialogTitle>{t("scouter.lead.discardTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              @{lead.instagram_handle} se va a borrar de la lista activa y
-              su handle queda en la blocklist para que el scouter NO lo
-              vuelva a agregar en futuras búsquedas. Es prácticamente
-              irreversible (tendrías que borrar manualmente la entrada de
-              la blocklist para que reaparezca).
+              {t("scouter.lead.discardBody", { handle: lead.instagram_handle })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -816,14 +829,14 @@ export const LeadDrawer = ({
                     handle: lead.instagram_handle,
                     tenantId: lead.tenant_id,
                   });
-                  toast.success("Lead descartado");
+                  toast.success(t("scouter.lead.discarded"));
                   onOpenChange(false);
                 } catch {
                   /* el hook ya hizo el toast */
                 }
               }}
             >
-              Sí, descartar
+              {t("scouter.lead.discardConfirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

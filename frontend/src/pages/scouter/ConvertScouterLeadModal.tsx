@@ -10,6 +10,8 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { enqueueAvatarFetch } from "@/lib/avatarFetch";
 import type { ScouterLead } from "@/hooks/useScouterLeads";
+import { useLanguage } from "@/hooks/useLanguage";
+import { textoConPieza } from "./textoConPieza";
 
 interface Props {
   open: boolean;
@@ -30,11 +32,12 @@ interface Props {
 // con converted_at + converted_to_contact_id).
 
 const ConvertScouterLeadModal = ({ open, onOpenChange, lead, onConverted }: Props) => {
+  const { t } = useLanguage();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const handleCancel = () => {
-    toast({ title: "Conversión cancelada" });
+    toast({ title: t("scouter.convert.canceled") });
     onOpenChange(false);
   };
 
@@ -56,15 +59,15 @@ const ConvertScouterLeadModal = ({ open, onOpenChange, lead, onConverted }: Prop
       queryClient.invalidateQueries({ queryKey: ["closer-creators-counts"] });
       queryClient.invalidateQueries({ queryKey: ["closers-contacts"] });
       toast({
-        title: "Pasado al pipeline de Closers",
-        description: "El supervisor del equipo lo va a asignar a un closer.",
+        title: t("scouter.convert.done"),
+        description: t("scouter.convert.doneHint"),
       });
       onConverted?.();
       onOpenChange(false);
     },
     onError: (e) => {
       toast({
-        title: "Error al pasar a Closers",
+        title: t("scouter.convert.error"),
         description: (e as Error).message,
         variant: "destructive",
       });
@@ -74,11 +77,11 @@ const ConvertScouterLeadModal = ({ open, onOpenChange, lead, onConverted }: Prop
   const { isAdmin } = useUserRole();
   const items = [
     { label: "Handle", value: `@${lead.instagram_handle}` },
-    { label: "Nombre", value: lead.name || "—" },
-    { label: "Plataforma", value: lead.platform || "instagram" },
-    { label: "País / Ciudad", value: [lead.country, lead.city].filter(Boolean).join(" · ") || "—" },
-    { label: "Teléfono", value: displayPhone(lead.phone, isAdmin) || "—" },
-    { label: "OnlyFans", value: lead.onlyfans_url ? "✓ Incluido" : "—" },
+    { label: t("common.name"), value: lead.name || "—" },
+    { label: t("scouter.lead.platform"), value: lead.platform || "instagram" },
+    { label: t("scouter.countryCity"), value: [lead.country, lead.city].filter(Boolean).join(" · ") || "—" },
+    { label: t("common.phone"), value: displayPhone(lead.phone, isAdmin) || "—" },
+    { label: "OnlyFans", value: lead.onlyfans_url ? t("scouter.convert.included") : "—" },
   ];
 
   return (
@@ -87,15 +90,15 @@ const ConvertScouterLeadModal = ({ open, onOpenChange, lead, onConverted }: Prop
         <DialogHeader>
           <div className="flex items-center gap-2">
             <ArrowRight className="h-5 w-5 text-primary" />
-            <DialogTitle>Pasar a Pipeline Closers</DialogTitle>
+            <DialogTitle>{t("scouter.lead.moveToClosers")}</DialogTitle>
           </div>
           <DialogDescription>
-            El scouter descubre — los closers contactan. Este lead se pasa al pool del equipo Closers (separado de los leads del equipo LG por la columna <code>source='scouter'</code>). El supervisor lo asigna a un closer específico desde /closers.
+            {textoConPieza(t("scouter.convert.description"), "{code}", <code>source='scouter'</code>)}
           </DialogDescription>
         </DialogHeader>
 
         <div className="border rounded-lg p-4 space-y-3">
-          <p className="text-sm font-semibold">Datos que se transferirán</p>
+          <p className="text-sm font-semibold">{t("scouter.convert.dataTransferred")}</p>
           <ul className="space-y-1.5">
             {items.map((item) => (
               <li key={item.label} className="flex items-start gap-2 text-sm">
@@ -112,16 +115,16 @@ const ConvertScouterLeadModal = ({ open, onOpenChange, lead, onConverted }: Prop
         <div className="flex items-start gap-2.5 rounded-lg bg-primary/10 p-3">
           <Lightbulb className="h-4 w-4 text-primary shrink-0 mt-0.5" />
           <p className="text-xs text-muted-foreground">
-            El lead queda marcado como "convertido" en Scouter. Aparece en /closers como contacto sin asignar — el supervisor lo asignará a un closer concreto desde ahí.
+            {t("scouter.convert.hint")}
           </p>
         </div>
 
         <DialogFooter className="gap-2 sm:gap-0">
           <Button variant="outline" onClick={handleCancel} disabled={convert.isPending}>
-            Cancelar
+            {t("common.cancel")}
           </Button>
           <Button onClick={() => convert.mutate()} disabled={convert.isPending}>
-            {convert.isPending ? "Pasando…" : "Confirmar"}
+            {convert.isPending ? t("scouter.convert.moving") : t("common.confirm")}
           </Button>
         </DialogFooter>
       </DialogContent>

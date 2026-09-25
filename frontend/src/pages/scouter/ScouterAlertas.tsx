@@ -28,12 +28,14 @@ import {
 } from "@/components/ui/table";
 import { useSpammerAlerts } from "@/hooks/useSpammerTasks";
 import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 
-const LOOKBACK_OPTIONS = [
-  { value: 1, label: "Hoy" },
-  { value: 3, label: "Últimos 3 días" },
-  { value: 7, label: "Última semana" },
-  { value: 30, label: "Último mes" },
+const LOOKBACK_OPTIONS: Array<{ value: number; labelKey: TranslationKey }> = [
+  { value: 1, labelKey: "common.today" },
+  { value: 3, labelKey: "scouter.alerts.last3" },
+  { value: 7, labelKey: "scouter.alerts.lastWeek" },
+  { value: 30, labelKey: "scouter.alerts.lastMonth" },
 ];
 
 const fmtDate = (iso: string, locale: string): string => {
@@ -49,6 +51,7 @@ const fmtDate = (iso: string, locale: string): string => {
 };
 
 const ScouterAlertas = () => {
+  const { t } = useLanguage();
   const f = useFormato();
   const [lookback, setLookback] = useState(7);
   const alertsQ = useSpammerAlerts(lookback);
@@ -68,14 +71,14 @@ const ScouterAlertas = () => {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <AlertTriangle className="h-4 w-4 text-warning" />
-          <h2 className="text-base font-semibold">Tareas pendientes</h2>
+          <h2 className="text-base font-semibold">{t("scouter.alerts.title")}</h2>
           {alertsQ.isLoading ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
           ) : (
             <span className="text-xs text-muted-foreground">
-              {spammersWithBacklog} spammer{spammersWithBacklog === 1 ? "" : "s"} ·
+              {t(spammersWithBacklog === 1 ? "scouter.alerts.spammersOne" : "scouter.alerts.spammersOther", { count: spammersWithBacklog })} ·
               {" "}
-              {totalPendingTasks} task{totalPendingTasks === 1 ? "" : "s"} pendientes
+              {t(totalPendingTasks === 1 ? "scouter.alerts.tasksOne" : "scouter.alerts.tasksOther", { count: totalPendingTasks })}
             </span>
           )}
         </div>
@@ -84,12 +87,12 @@ const ScouterAlertas = () => {
           onValueChange={(v) => setLookback(parseInt(v, 10))}
         >
           <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Período" />
+            <SelectValue placeholder={t("common.period")} />
           </SelectTrigger>
           <SelectContent>
             {LOOKBACK_OPTIONS.map((o) => (
               <SelectItem key={o.value} value={String(o.value)}>
-                {o.label}
+                {t(o.labelKey)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -104,9 +107,9 @@ const ScouterAlertas = () => {
         ) : alertRows.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-2 p-10 text-center">
             <ClipboardList className="h-7 w-7 text-muted-foreground/50" />
-            <p className="text-sm font-medium">Sin tareas pendientes 🎉</p>
+            <p className="text-sm font-medium">{t("scouter.alerts.empty")}</p>
             <p className="text-xs text-muted-foreground">
-              Todos los spammers cerraron sus assignments en el período.
+              {t("scouter.alerts.emptyHint")}
             </p>
           </div>
         ) : (
@@ -114,11 +117,11 @@ const ScouterAlertas = () => {
             <TableHeader>
               <TableRow>
                 <TableHead>Spammer</TableHead>
-                <TableHead>Día</TableHead>
-                <TableHead className="text-right">Asignaciones</TableHead>
-                <TableHead className="text-right">Completadas</TableHead>
-                <TableHead className="text-right">Pendientes</TableHead>
-                <TableHead className="text-right">Tasks pending</TableHead>
+                <TableHead>{t("common.day")}</TableHead>
+                <TableHead className="text-right">{t("scouter.alerts.col.assignments")}</TableHead>
+                <TableHead className="text-right">{t("scouter.tasks.completed")}</TableHead>
+                <TableHead className="text-right">{t("common.pendingPl")}</TableHead>
+                <TableHead className="text-right">{t("scouter.alerts.col.pendingTasks")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

@@ -29,6 +29,7 @@ import {
   type ScouterLead,
 } from "@/hooks/useScouterLeads";
 import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
 import {
   LeadDrawer,
   STATUS_META,
@@ -51,6 +52,7 @@ import {
 //   - Per-column sort (only created_at DESC for now)
 
 const ScouterLeads = () => {
+  const { t } = useLanguage();
   const f = useFormato();
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
@@ -68,7 +70,7 @@ const ScouterLeads = () => {
         <div className="relative min-w-[220px] flex-1">
           <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar por handle, nombre, país…"
+            placeholder={t("scouter.filter.searchLeads")}
             className="pl-8"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -81,17 +83,17 @@ const ScouterLeads = () => {
           <SelectContent>
             {STATUS_OPTIONS.map((o) => (
               <SelectItem key={o.value} value={o.value}>
-                {o.label}
+                {t(o.labelKey)}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
         <Button size="sm" className="gap-1.5" onClick={() => setAddOpen(true)}>
           <Plus className="h-4 w-4" />
-          Agregar lead
+          {t("scouter.leads.add")}
         </Button>
         <span className="text-xs text-muted-foreground">
-          {leads.isLoading ? "Cargando…" : `${rows.length} de ≤200`}
+          {leads.isLoading ? t("common.loading") : t("scouter.leads.countOfMax", { count: rows.length })}
         </span>
       </div>
 
@@ -106,9 +108,9 @@ const ScouterLeads = () => {
           </div>
         ) : rows.length === 0 ? (
           <div className="p-10 text-center">
-            <p className="text-sm font-medium">Sin leads para mostrar</p>
+            <p className="text-sm font-medium">{t("scouter.noLeads")}</p>
             <p className="text-xs text-muted-foreground">
-              Cambia los filtros o espera a que el bot descubra cuentas nuevas.
+              {t("scouter.leads.emptyHint")}
             </p>
           </div>
         ) : (
@@ -119,11 +121,11 @@ const ScouterLeads = () => {
                 <TableHead>Handle</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Cat.</TableHead>
-                <TableHead>País / Ciudad</TableHead>
+                <TableHead>{t("scouter.countryCity")}</TableHead>
                 <TableHead className="text-right">AI</TableHead>
                 <TableHead className="text-right">Followers</TableHead>
                 <TableHead>Closer</TableHead>
-                <TableHead className="text-right">Descubierto</TableHead>
+                <TableHead className="text-right">{t("scouter.leads.col.discovered")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -183,7 +185,7 @@ const ScouterLeads = () => {
                           className="h-1.5 w-1.5 rounded-full"
                           style={{ background: statusCfg.dot }}
                         />
-                        {statusCfg.label}
+                        {t(statusCfg.labelKey)}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -249,6 +251,7 @@ const ManualLeadDialog = ({
   open: boolean;
   onOpenChange: (o: boolean) => void;
 }) => {
+  const { t } = useLanguage();
   const companies = useScouterCompanies();
   const create = useCreateLeadManual();
 
@@ -303,10 +306,9 @@ const ManualLeadDialog = ({
     >
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Agregar lead manualmente</DialogTitle>
+          <DialogTitle>{t("scouter.leads.manualTitle")}</DialogTitle>
           <DialogDescription>
-            Inserta un @handle directo a la tabla de leads. Si tienes más
-            datos, completalos — sino, el worker los enriquecerá después.
+            {t("scouter.leads.manualDescription")}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-3">
@@ -322,10 +324,10 @@ const ManualLeadDialog = ({
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="ml-company">Compañía *</Label>
+            <Label htmlFor="ml-company">{t("scouter.leads.companyRequired")}</Label>
             <Select value={companyId} onValueChange={setCompanyId}>
               <SelectTrigger id="ml-company">
-                <SelectValue placeholder="Seleccionar compañía…" />
+                <SelectValue placeholder={t("scouter.leads.selectCompany")} />
               </SelectTrigger>
               <SelectContent>
                 {(companies.data ?? []).map((c) => (
@@ -338,16 +340,16 @@ const ManualLeadDialog = ({
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1.5">
-              <Label htmlFor="ml-name">Nombre</Label>
+              <Label htmlFor="ml-name">{t("common.name")}</Label>
               <Input
                 id="ml-name"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                placeholder="Opcional"
+                placeholder={t("scouter.leads.optional")}
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="ml-country">País</Label>
+              <Label htmlFor="ml-country">{t("common.country")}</Label>
               <Input
                 id="ml-country"
                 value={country}
@@ -364,7 +366,7 @@ const ManualLeadDialog = ({
               inputMode="numeric"
               value={followers}
               onChange={(e) => setFollowers(e.target.value)}
-              placeholder="Opcional"
+              placeholder={t("scouter.leads.optional")}
             />
           </div>
           <div className="space-y-1.5">
@@ -374,17 +376,17 @@ const ManualLeadDialog = ({
               value={bio}
               onChange={(e) => setBio(e.target.value)}
               rows={2}
-              placeholder="Opcional"
+              placeholder={t("scouter.leads.optional")}
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="ml-notes">Notas internas</Label>
+            <Label htmlFor="ml-notes">{t("scouter.leads.internalNotes")}</Label>
             <Textarea
               id="ml-notes"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
-              placeholder="Por qué la quieres trackear, etc."
+              placeholder={t("scouter.leads.internalNotesPlaceholder")}
             />
           </div>
           <DialogFooter className="gap-2 sm:gap-0">
@@ -394,14 +396,14 @@ const ManualLeadDialog = ({
               onClick={() => onOpenChange(false)}
               disabled={create.isPending}
             >
-              Cancelar
+              {t("common.cancel")}
             </Button>
             <Button
               type="submit"
               disabled={create.isPending || !handle.trim() || !companyId}
             >
               {create.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Agregar
+              {t("common.add")}
             </Button>
           </DialogFooter>
         </form>
