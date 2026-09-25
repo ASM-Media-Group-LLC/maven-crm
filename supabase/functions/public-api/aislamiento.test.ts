@@ -46,6 +46,8 @@ const RECURSOS_USUARIO = leer("./recursos-como-usuario.ts");
 const FORMATO_MESSENGER = leer("./messenger-formato.ts");
 const COMO_USUARIO = leer("./como-usuario.ts");
 const PETICION = leer("./peticion.ts");
+const MENSAJES_TS = leer("./mensajes.ts");
+const AISLAMIENTO_TS = leer("./aislamiento.ts");
 const MANAGE_KEYS = sinComentarios(
   Deno.readTextFileSync(new URL("../manage-api-keys/index.ts", import.meta.url)),
 );
@@ -200,7 +202,12 @@ Deno.test("public-api: la puerta recibe el conteo REAL de agencias, no un númer
     /from\("tenants"\)\.select\([^)]*count:\s*"exact"/.test(PUBLIC_API),
     "public-api no cuenta las agencias",
   );
-  assert(/decidir\(\s*recursoClave\s*,\s*cantidadDeAgencias\s*\)/.test(PUBLIC_API), "la puerta no usa el conteo");
+  // Con el mapa REAL (nada de uno inyectado) y el idioma del pedido.
+  assert(
+    /decidir\(\s*recursoClave\s*,\s*cantidadDeAgencias\s*,\s*AISLAMIENTO_POR_RECURSO\s*,\s*idioma\s*\)/.test(PUBLIC_API),
+    "la puerta no usa el conteo (o no usa el mapa real, o no recibe el idioma)",
+  );
+  assertEquals((PUBLIC_API.match(/\bdecidir\(/g) ?? []).length, 1, "la puerta se llama más de una vez");
   assert(!/cantidadDeAgencias\s*=\s*1\b/.test(PUBLIC_API), "el conteo de agencias está fijado en 1");
 });
 
@@ -299,10 +306,10 @@ Deno.test("como_usuario: los handlers nunca ven service_role", () => {
     assert(!prohibido.test(contexto[1]), `Contexto puede llevar un cliente o una función (${prohibido})`);
   }
   // Por sentencia y no por línea: un import partido en varias líneas también cuenta.
-  // La única excepción: las piezas PURAS del Messenger, que el test de abajo obliga a
-  // no importar nada ni tocar la base.
+  // Las únicas excepciones: las piezas PURAS del Messenger y los textos, que los tests
+  // de abajo obligan a no importar nada ni tocar la base.
   const importsDeValores = (RECURSOS_USUARIO.match(/^\s*import\s+(?!type\b)[^;]*/gm) ?? [])
-    .filter((i) => !/from\s+"\.\/messenger-formato\.ts"\s*$/.test(i.trim()));
+    .filter((i) => !/from\s+"\.\/(messenger-formato|mensajes)\.ts"\s*$/.test(i.trim()));
   assertEquals(importsDeValores, [], "recursos-como-usuario.ts importa valores, no solo tipos");
   const reexports = RECURSOS_USUARIO.match(/^\s*export\s*(\*|\{)[^;]*\bfrom\b/gm) ?? [];
   assertEquals(reexports, [], "recursos-como-usuario.ts reexporta de otro archivo");
@@ -448,4 +455,173 @@ Deno.test("toda consulta a chat_messages va acotada por conversación, sin count
 Deno.test("paginas del Messenger topan en 100", () => {
   assert(/export const PAGINA_MAX = 100;/.test(FORMATO_MESSENGER), "cambió el tope de página");
   assert(/n > PAGINA_MAX/.test(FORMATO_MESSENGER), "limiteDePagina no aplica el tope");
+});
+
+// ─── 8. Idioma: todo texto para el cliente sale de mensajes.ts ───────────────
+// El comportamiento (negociación, textos, byte a byte el español de antes) se prueba
+// en mensajes.test.ts. Acá, que el código no se saltee el diccionario.
+
+/** Hasta dónde llega un string que empieza en `i` (índice de la comilla de cierre). */
+function finDeString(src: string, i: number): number {
+  const comilla = src[i];
+  for (let j = i + 1; j < src.length; j++) {
+    if (src[j] === "\\") { j++; continue; }
+    if (src[j] === comilla) return j;
+  }
+  return src.length;
+}
+
+/** La expresión que arranca en `desde`, hasta la coma o el cierre de su nivel. */
+function expresionDesde(src: string, desde: number): string {
+  let nivel = 0;
+  for (let i = desde; i < src.length; i++) {
+    const c = src[i];
+    if (c === '"' || c === "'" || c === "`") { i = finDeString(src, i); continue; }
+    if ("([{".includes(c)) nivel++;
+    else if (")]}".includes(c)) {
+      if (nivel === 0) return src.slice(desde, i).trim();
+      nivel--;
+    } else if (c === "," && nivel === 0) return src.slice(desde, i).trim();
+  }
+  return src.slice(desde).trim();
+}
+
+/** Cada llamada a msg(...) de un código: sus argumentos, ya separados. */
+function llamadasAMsg(src: string): string[][] {
+  const out: string[][] = [];
+  for (const m of src.matchAll(/(?<![\w$.])msg\s*\(/g)) {
+    const args: string[] = [];
+    let i = m.index! + m[0].length;
+    for (;;) {
+      const arg = expresionDesde(src, i);
+      args.push(arg);
+      i = src.indexOf(arg, i) + arg.length;
+      while (/\s/.test(src[i])) i++;
+      if (src[i] !== ",") break;
+      i++;
+    }
+    out.push(args);
+  }
+  return out;
+}
+
+/** La expresión sin sus llamadas a msg(...). */
+function sinLlamadasAMsg(expr: string): string {
+  let out = "";
+  let desde = 0;
+  const re = /(?<![\w$.])msg\s*\(/g;
+  for (let m = re.exec(expr); m; m = re.exec(expr)) {
+    out += expr.slice(desde, m.index);
+    let nivel = 1;
+    let i = m.index + m[0].length;
+    for (; i < expr.length && nivel > 0; i++) {
+      const c = expr[i];
+      if (c === '"' || c === "'" || c === "`") { i = finDeString(expr, i); continue; }
+      if ("([{".includes(c)) nivel++;
+      else if (")]}".includes(c)) nivel--;
+    }
+    desde = i;
+    re.lastIndex = i;
+  }
+  return out + expr.slice(desde);
+}
+
+Deno.test("idioma: index.ts no devuelve ni un texto suelto, todo `message` sale de msg()", () => {
+  // Lo que se pasa tal cual: textos que ya vienen en el idioma del pedido (el
+  // veredicto de la puerta, el mensaje del handler) y el error de la BASE en los 500
+  // (no es nuestro, y así fue siempre).
+  const PASAN_TAL_CUAL = new Set(["veredicto.motivo", "r.mensaje", "error.message", "mErr.message"]);
+  // `message` que no es un error: un campo de DATOS de /sales.
+  const DATOS = new Set(["x.message_gross ?? 0"]);
+  const deError = new Set<number>();
+  for (const m of PUBLIC_API.matchAll(/\berror:\s*(?:"[a-z_]+"|[\w.]+)\s*,\s*message\s*:/g)) {
+    deError.add(m.index! + m[0].length);
+  }
+  assert(deError.size >= 25, `se esperaban al menos 25 errores con message, hay ${deError.size}: se rompió la búsqueda`);
+  let conMsg = 0;
+  for (const m of PUBLIC_API.matchAll(/\bmessage\s*:/g)) {
+    const fin = m.index! + m[0].length;
+    const valor = expresionDesde(PUBLIC_API, fin);
+    if (!deError.has(fin)) {
+      assert(DATOS.has(valor), `un message que no es de error ni de datos conocidos: ${valor}`);
+      continue;
+    }
+    if (PASAN_TAL_CUAL.has(valor)) continue;
+    assert(/(?<![\w$.])msg\s*\(/.test(valor), `un message que no sale de msg(): ${valor}`);
+    // Fuera de las llamadas a msg() solo puede quedar un `cond ? … : …`.
+    const resto = sinLlamadasAMsg(valor).replace(/\s+/g, "");
+    assert(resto === "" || /^[A-Za-z_$][\w$]*\?:$/.test(resto), `un message con texto fuera de msg(): ${valor}`);
+    conMsg++;
+  }
+  assert(conMsg >= 20, `se esperaban al menos 20 message con msg(), hay ${conMsg}`);
+});
+
+Deno.test("idioma: cada msg() usa el idioma del pedido, nunca uno fijo", () => {
+  // index.ts: el del pedido, calculado una vez.
+  assertEquals((PUBLIC_API.match(/const idioma = idiomaDelPedido\(req\);/g) ?? []).length, 1, "index.ts no calcula el idioma del pedido una sola vez");
+  assert(!/\blet\s+idioma\b|\bidioma\s*=[^=>]/.test(PUBLIC_API.replace("const idioma = idiomaDelPedido(req);", "")), "index.ts reasigna el idioma");
+  for (const [primero] of llamadasAMsg(PUBLIC_API)) {
+    assert(primero === "idioma" || primero === "idiomaDelPedido(req)", `index.ts llama a msg() con idioma ${primero}`);
+  }
+  // Y lo pasa a la puerta (guarda de arriba) y a los handlers como_usuario.
+  const entrada = PUBLIC_API.slice(PUBLIC_API.indexOf("await servirComoUsuario("));
+  const contexto = expresionDesde(entrada, entrada.indexOf("{"));
+  assert(/(^|[{,\s])idioma\s*(,|}|$)/.test(contexto), "el Contexto de servirComoUsuario no lleva el idioma");
+  // recursos-como-usuario.ts: el del Contexto (o el parámetro `idioma` de malPedido/noEncontrada).
+  const llamadasR = llamadasAMsg(RECURSOS_USUARIO);
+  assert(llamadasR.length >= 6, "no se encontraron las llamadas a msg() de recursos-como-usuario.ts");
+  for (const [primero] of llamadasR) {
+    assert(primero === "ctx.idioma" || primero === "idioma", `recursos-como-usuario.ts llama a msg() con idioma ${primero}`);
+  }
+  for (const f of ["malPedido", "noEncontrada"]) {
+    const usos = [...RECURSOS_USUARIO.matchAll(new RegExp(`(?<!const )\\b${f}\\(`, "g"))];
+    assert(usos.length >= 1, `no se encontró ${f}`);
+    for (const u of usos) {
+      const primero = expresionDesde(RECURSOS_USUARIO, u.index! + u[0].length);
+      assert(primero === "ctx.idioma", `${f}() recibe ${primero} y no ctx.idioma`);
+    }
+  }
+  assert(/\bidioma\s*:\s*Idioma\s*;/.test(RECURSOS_USUARIO.match(/export\s+type\s+Contexto\s*=\s*\{([\s\S]*?)\n\};/)?.[1] ?? ""),
+    "Contexto no declara idioma: Idioma (obligatorio)");
+  // aislamiento.ts: el parámetro de decidir.
+  const llamadasA = llamadasAMsg(AISLAMIENTO_TS);
+  assertEquals(llamadasA.length, 3, "decidir tiene que armar sus 3 motivos con msg()");
+  for (const [primero] of llamadasA) assertEquals(primero, "idioma", "decidir arma un motivo con un idioma fijo");
+  assert(!/motivo\s*:\s*["'`]/.test(AISLAMIENTO_TS), "decidir arma un motivo con texto suelto");
+});
+
+Deno.test("idioma: recursos-como-usuario.ts no arma ningún `mensaje` con texto suelto", () => {
+  const usos = [...RECURSOS_USUARIO.matchAll(/\bmensaje\s*:/g)];
+  let tipos = 0;
+  for (const u of usos) {
+    const valor = expresionDesde(RECURSOS_USUARIO, u.index! + u[0].length);
+    // La declaración del tipo Resultado.
+    if (valor === "string }" || valor === "string") { tipos++; continue; }
+    assert(/^msg\s*\(/.test(valor) && sinLlamadasAMsg(valor).trim() === "", `un mensaje que no sale de msg(): ${valor}`);
+  }
+  assertEquals(tipos, 1, "se esperaba una sola declaración de tipo de `mensaje` (en Resultado)");
+  assert(usos.length >= 6, "no se encontraron los mensajes de recursos-como-usuario.ts");
+  assert(!/[{,]\s*mensaje\s*[,}]/.test(RECURSOS_USUARIO), "un `mensaje` abreviado ({ mensaje }) que no pasa por msg()");
+});
+
+Deno.test("idioma: las respuestas JSON llevan Vary: Accept-Language sin pisar el Vary: Origin", () => {
+  const helper = PUBLIC_API.slice(PUBLIC_API.indexOf("const json = "), PUBLIC_API.indexOf("const noDisponible"));
+  assert(helper.length > 50, "no se encontró el helper json");
+  const extra = helper.indexOf("...extra");
+  const vary = helper.search(/"Vary"\s*:\s*varyConIdioma\(\s*cors\[\s*"Vary"\s*\]\s*\)/);
+  assert(extra > 0 && vary > extra, "Vary no se arma con varyConIdioma(cors.Vary) DESPUÉS de ...extra");
+  assert(!/new Response\(\s*JSON\.stringify/.test(PUBLIC_API.replace(helper, "")), "hay respuestas JSON armadas fuera del helper json");
+});
+
+Deno.test("mensajes.ts es PURO: no importa nada ni toca la base", () => {
+  // recursos-como-usuario.ts importa valores de acá: si esto importara algo, por acá
+  // entraría un cliente con service_role.
+  for (const prohibido of [
+    /^\s*import\b/m, /\bimport\s*\(/, /^\s*export\s*(\*|\{)[^;]*\bfrom\b/m, /\brequire\s*\(/,
+    /SupabaseClient/, /createClient/, /\bDeno\./, /\bfetch\s*\(/, /service_?role/i,
+    /\.from\(/, /\.rpc\(/, /\badmin\b/, /\byo\b/, /\bglobalThis\b/, /\beval\s*\(/, /\bFunction\s*\(/,
+  ]) {
+    assert(!prohibido.test(MENSAJES_TS), `mensajes.ts usa ${prohibido}`);
+  }
+  assert(/export function msg</.test(MENSAJES_TS) && /export function idiomaDelPedido\(/.test(MENSAJES_TS), "mensajes.ts cambió de forma");
 });

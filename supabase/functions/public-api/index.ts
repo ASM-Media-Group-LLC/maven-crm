@@ -40,14 +40,19 @@
 // cómo se aísla en `./aislamiento.ts`. Un recurso que no sabe de qué
 // agencia es cada fila se APAGA solo en cuanto Maven tenga más de una. Antes de
 // agregar un endpoint, leé ese archivo: el test te va a obligar a hacerlo igual.
+//
+// IDIOMA. Todo `message` que ve el cliente sale de ./mensajes.ts: en inglés si el
+// pedido lo pide con Accept-Language, en español (el de siempre) si no. El código de
+// máquina (`error`), el estado, las cabeceras y los datos no cambian nunca.
 import { corsFor } from "../_shared/cors.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 // Local a esta función y no en _shared/: un cambio en _shared/ redespliega TODAS
 // las edge functions, y este módulo solo lo usa public-api.
-import { decidir, esComoUsuario } from "./aislamiento.ts";
+import { AISLAMIENTO_POR_RECURSO, decidir, esComoUsuario } from "./aislamiento.ts";
 import { clienteComoUsuario, comoUsuarioConfigurado } from "./como-usuario.ts";
 import { servirComoUsuario } from "./recursos-como-usuario.ts";
 import { cabecerasDeCupo, clientIp, ipAllowed } from "./peticion.ts";
+import { idiomaDelPedido, msg, varyConIdioma } from "./mensajes.ts";
 
 const corsHeaders = (req: Request) =>
   corsFor(req, {
@@ -61,16 +66,20 @@ const corsHeaders = (req: Request) =>
 // llave), una vez que se conocen. Por pedido y sin estado compartido entre pedidos.
 const cabecerasDelPedido = new WeakMap<Request, Record<string, string>>();
 
-const json = (req: Request, body: unknown, status = 200, extra: Record<string, string> = {}) =>
-  new Response(JSON.stringify(body), {
+const json = (req: Request, body: unknown, status = 200, extra: Record<string, string> = {}) => {
+  const cors = corsHeaders(req);
+  return new Response(JSON.stringify(body), {
     status,
     headers: {
-      ...corsHeaders(req),
+      ...cors,
       "Content-Type": "application/json",
       ...(cabecerasDelPedido.get(req) ?? {}),
       ...extra,
+      // El texto depende de Accept-Language: se SUMA al Vary: Origin del CORS, no lo pisa.
+      "Vary": varyConIdioma(cors["Vary"]),
     },
   });
+};
 
 // Un fallo NUESTRO (la base no respondió) no puede verse como "tu llave es
 // inválida" ni como "no tenés permiso": el cliente dejaría de reintentar, o
@@ -79,7 +88,7 @@ const noDisponible = (req: Request, donde: string, err: unknown) => {
   console.error(`[public-api] ${donde}:`, (err as { message?: string })?.message ?? err);
   return json(req, {
     error: "temporarily_unavailable",
-    message: "El servicio no está disponible en este momento. Reintentá en unos segundos.",
+    message: msg(idiomaDelPedido(req), "no_disponible"),
   }, 503, { "Retry-After": "30" });
 };
 
@@ -89,7 +98,7 @@ const noDisponible = (req: Request, donde: string, err: unknown) => {
 const personaNoVigente = (req: Request) =>
   json(req, {
     error: "unauthorized",
-    message: "La persona como la que actúa esta API key ya no está activa en esta agencia de Maven",
+    message: msg(idiomaDelPedido(req), "persona_no_vigente"),
   }, 401);
 
 async function sha256hex(s: string): Promise<string> {
@@ -161,13 +170,14 @@ function pageParams(url: URL, defLimit = 100, maxLimit = 500) {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders(req) });
   if (req.method !== "GET") return json(req, { error: "method_not_allowed" }, 405);
+  const idioma = idiomaDelPedido(req);
 
   // --- Auth por API key ---
   const authHeader = req.headers.get("Authorization") ?? "";
   const bearer = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
   const rawKey = (req.headers.get("X-API-Key") || bearer || "").trim();
   if (!rawKey || !rawKey.startsWith("mvk_")) {
-    return json(req, { error: "unauthorized", message: "Falta la API key (Authorization: Bearer mvk_live_...)" }, 401);
+    return json(req, { error: "unauthorized", message: msg(idioma, "falta_llave") }, 401);
   }
 
   const admin = createClient(
@@ -184,14 +194,17 @@ Deno.serve(async (req) => {
   // la columna tenant_id: 503 y no 401 para todas las llaves.
   if (keyErr) return noDisponible(req, "búsqueda de la llave", keyErr);
 
-  if (!keyRow) return json(req, { error: "unauthorized", message: "API key inválida" }, 401);
-  if (keyRow.revoked_at) return json(req, { error: "unauthorized", message: "API key revocada" }, 401);
+  if (!keyRow) return json(req, { error: "unauthorized", message: msg(idioma, "llave_invalida") }, 401);
+  if (keyRow.revoked_at) return json(req, { error: "unauthorized", message: msg(idioma, "llave_revocada") }, 401);
   if (keyRow.expires_at && new Date(keyRow.expires_at as string).getTime() <= Date.now()) {
-    return json(req, { error: "unauthorized", message: "API key vencida" }, 401);
+    return json(req, { error: "unauthorized", message: msg(idioma, "llave_vencida") }, 401);
   }
   const ip = clientIp(req);
   if (!ipAllowed(ip, (keyRow.ip_whitelist as string[]) ?? [])) {
-    return json(req, { error: "forbidden", message: `IP ${ip ?? "desconocida"} no está en la whitelist de esta API key` }, 403);
+    return json(req, {
+      error: "forbidden",
+      message: msg(idioma, "ip_no_permitida", { ip: ip ?? msg(idioma, "ip_desconocida") }),
+    }, 403);
   }
   const scopes: string[] = (keyRow.scopes as string[]) ?? [];
   const need = (s: string) => scopes.includes(s);
@@ -201,7 +214,7 @@ Deno.serve(async (req) => {
   // sin arriesgar datos de otra.
   const tenantId = keyRow.tenant_id as string | null;
   if (!tenantId) {
-    return json(req, { error: "unauthorized", message: "Esta API key no pertenece a ninguna agencia" }, 401);
+    return json(req, { error: "unauthorized", message: msg(idioma, "llave_sin_agencia") }, 401);
   }
 
   // --- Límite por hora + como quién actúa la llave: una ida a la base por pedido ---
@@ -234,10 +247,8 @@ Deno.serve(async (req) => {
       return json(req, {
         error: "rate_limited",
         message: porMinuto
-          ? `Esta API key llegó a su límite de ${consumo.limite_minuto ?? 60} pedidos por minuto. ` +
-            `Reintentá en ${espera} s.`
-          : `Esta API key llegó a su límite de ${consumo.limite} pedidos por hora. ` +
-            `Se reinicia a las ${consumo.reinicio}.`,
+          ? msg(idioma, "limite_por_minuto", { n: consumo.limite_minuto ?? 60, s: espera })
+          : msg(idioma, "limite_por_hora", { n: consumo.limite, hora: consumo.reinicio }),
       }, 429, { "Retry-After": String(espera) });
     }
     if (!consumo.usuario_activo) return personaNoVigente(req);
@@ -297,7 +308,7 @@ Deno.serve(async (req) => {
   // ===== Puerta de aislamiento =====
   // Todo recurso pasa por acá ANTES de tocar la base. Ver ./aislamiento.ts.
   const recursoClave = resource === "sales" && sub === "chatters" ? "sales/chatters" : resource;
-  const veredicto = decidir(recursoClave, cantidadDeAgencias);
+  const veredicto = decidir(recursoClave, cantidadDeAgencias, AISLAMIENTO_POR_RECURSO, idioma);
   if (!veredicto.ok) {
     if (veredicto.estado === 503) return noDisponible(req, "puerta de aislamiento", veredicto.motivo);
     return json(req, { error: veredicto.error, message: veredicto.motivo }, veredicto.estado);
@@ -329,6 +340,7 @@ Deno.serve(async (req) => {
         },
         baseDeArchivos: Deno.env.get("SUPABASE_URL") ?? "",
         cupo: { limite: consumo.limite, restantes: consumo.restantes, reinicio: consumo.reinicio },
+        idioma,
       });
     } catch (e) {
       // Una caída de red hacia la base no puede salir como un 500 sin CORS.
@@ -341,12 +353,12 @@ Deno.serve(async (req) => {
 
   // ===== /creators =====
   if (resource === "creators") {
-    if (!need("creators:read")) return json(req, { error: "forbidden", message: "Falta el scope creators:read" }, 403);
+    if (!need("creators:read")) return json(req, { error: "forbidden", message: msg(idioma, "falta_scope", { scope: "creators:read" }) }, 403);
 
     if (sub) {
       const { data: c, error } = await admin.from("creators").select(CREATOR_COLUMNS).eq("id", sub).maybeSingle();
       if (error) return json(req, { error: "server_error", message: error.message }, 500);
-      if (!c) return json(req, { error: "not_found", message: "Creadora no encontrada" }, 404);
+      if (!c) return json(req, { error: "not_found", message: msg(idioma, "creadora_no_encontrada") }, 404);
       const { data: ofa } = await admin.from("creator_of_accounts").select("account_handle, onlyfans_url").eq("creator_id", sub);
       return json(req, { object: "creator", data: shapeCreator(c as unknown as Row, ofa ?? []) });
     }
@@ -388,7 +400,7 @@ Deno.serve(async (req) => {
   // saltea las tres capas. El scope separado es lo unico que la frena, y permite
   // revocar el telefono sin cortar el resto del acceso.
   if (resource === "contacts") {
-    if (!need("contacts:read")) return json(req, { error: "forbidden", message: "Falta el scope contacts:read" }, 403);
+    if (!need("contacts:read")) return json(req, { error: "forbidden", message: msg(idioma, "falta_scope", { scope: "contacts:read" }) }, 403);
     const conPii = need("contacts:phone");
 
     const COLS = "id, name, handle, platform, email, phone, country_code, city, company, " +
@@ -431,7 +443,7 @@ Deno.serve(async (req) => {
     if (sub) {
       const { data: c, error } = await admin.from("closers_contacts").select(COLS).eq("id", sub).maybeSingle();
       if (error) return json(req, { error: "server_error", message: error.message }, 500);
-      if (!c) return json(req, { error: "not_found", message: "Contacto no encontrado" }, 404);
+      if (!c) return json(req, { error: "not_found", message: msg(idioma, "contacto_no_encontrado") }, 404);
       return json(req, { object: "contact", pii: conPii, data: shape(c as unknown as Row) });
     }
 
@@ -445,7 +457,7 @@ Deno.serve(async (req) => {
     if (kind) {
       const validos = ["modelo", "agencia", "ex_creadora"];
       if (!validos.includes(kind)) {
-        return json(req, { error: "bad_request", message: `kind invalido. Usa: ${validos.join(" | ")}` }, 400);
+        return json(req, { error: "bad_request", message: msg(idioma, "kind_invalido", { opciones: validos.join(" | ") }) }, 400);
       }
       q = q.eq("contact_kind", kind);
     }
@@ -466,7 +478,7 @@ Deno.serve(async (req) => {
 
   // ===== /employees =====
   if (resource === "employees") {
-    if (!need("employees:read")) return json(req, { error: "forbidden", message: "Falta el scope employees:read" }, 403);
+    if (!need("employees:read")) return json(req, { error: "forbidden", message: msg(idioma, "falta_scope", { scope: "employees:read" }) }, 403);
     const { limit, offset } = pageParams(url);
     const roleFilter = url.searchParams.get("role");
 
@@ -509,7 +521,7 @@ Deno.serve(async (req) => {
   if (resource === "sales") {
     // /sales/chatters -> ventas por chatter
     if (sub === "chatters") {
-      if (!need("sales:chatters")) return json(req, { error: "forbidden", message: "Falta el scope sales:chatters" }, 403);
+      if (!need("sales:chatters")) return json(req, { error: "forbidden", message: msg(idioma, "falta_scope", { scope: "sales:chatters" }) }, 403);
       const { limit, offset } = pageParams(url);
       let q = admin.from("chatter_daily_sales")
         .select("blu_employee_id, date, name, total_sales, sold_messages, fans_chatted", { count: "exact" });
@@ -528,10 +540,10 @@ Deno.serve(async (req) => {
       });
       return json(req, { object: "list", resource: "sales/chatters", count: count ?? data.length, limit, offset, data });
     }
-    if (sub) return json(req, { error: "not_found", message: `Sub-recurso de sales desconocido: ${sub}` }, 404);
+    if (sub) return json(req, { error: "not_found", message: msg(idioma, "sales_sub_recurso_desconocido", { sub }) }, 404);
 
     // /sales -> ganancias diarias por creadora
-    if (!need("sales:read")) return json(req, { error: "forbidden", message: "Falta el scope sales:read" }, 403);
+    if (!need("sales:read")) return json(req, { error: "forbidden", message: msg(idioma, "falta_scope", { scope: "sales:read" }) }, 403);
     const { limit, offset } = pageParams(url);
     let q = admin.from("creator_daily_earnings").select(
       "date, creator_id, blu_creator_name, total_gross, subscription_gross, new_sub_gross, recurring_sub_gross, tips_gross, message_gross, post_gross, referral_gross, stream_gross, chargebacks_gross, contribution_pct, active_fans, new_fans",
@@ -567,7 +579,7 @@ Deno.serve(async (req) => {
 
   // ===== /hubstaff =====
   if (resource === "hubstaff") {
-    if (!need("hubstaff:read")) return json(req, { error: "forbidden", message: "Falta el scope hubstaff:read" }, 403);
+    if (!need("hubstaff:read")) return json(req, { error: "forbidden", message: msg(idioma, "falta_scope", { scope: "hubstaff:read" }) }, 403);
     const { limit, offset } = pageParams(url);
     const { data, error } = await admin.rpc("api_hubstaff_daily", {
       _from: url.searchParams.get("from"),
@@ -585,8 +597,8 @@ Deno.serve(async (req) => {
   // con los segundos repartidos por estado. `time/segments` = cada tramo, al
   // detalle: inicio, fin, estado y motivo, sesión y sala.
   if (resource === "cowork") {
-    if (!need("cowork:read")) return json(req, { error: "forbidden", message: "Falta el scope cowork:read" }, 403);
-    if (sub !== "time" && sub !== "breaks" && sub !== "meets") return json(req, { error: "not_found", message: "Usa /cowork/time, /cowork/time/segments, /cowork/breaks o /cowork/meets" }, 404);
+    if (!need("cowork:read")) return json(req, { error: "forbidden", message: msg(idioma, "falta_scope", { scope: "cowork:read" }) }, 403);
+    if (sub !== "time" && sub !== "breaks" && sub !== "meets") return json(req, { error: "not_found", message: msg(idioma, "cowork_rutas") }, 404);
     const { limit, offset } = pageParams(url);
     const detalle = rest[2] === "segments";
     const params = {
@@ -664,7 +676,7 @@ Deno.serve(async (req) => {
 
   // ===== /promolog =====
   if (resource === "promolog") {
-    if (!need("promolog:read")) return json(req, { error: "forbidden", message: "Falta el scope promolog:read" }, 403);
+    if (!need("promolog:read")) return json(req, { error: "forbidden", message: msg(idioma, "falta_scope", { scope: "promolog:read" }) }, 403);
     const { limit, offset } = pageParams(url);
     const { data, error } = await admin.rpc("api_promolog_daily", {
       _from: url.searchParams.get("from"),
@@ -678,5 +690,5 @@ Deno.serve(async (req) => {
     return json(req, { object: "list", resource: "promolog", count: (data ?? []).length, limit, offset, data: data ?? [] });
   }
 
-  return json(req, { error: "not_found", message: `Recurso desconocido: ${resource}` }, 404);
+  return json(req, { error: "not_found", message: msg(idioma, "recurso_desconocido", { recurso: resource }) }, 404);
 });

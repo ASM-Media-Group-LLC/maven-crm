@@ -38,6 +38,7 @@ const CTX: Contexto = {
   llave: { conWhitelist: true, venceEl: "2026-12-01T00:00:00Z" },
   baseDeArchivos: BASE,
   cupo: { limite: 1000, restantes: 999, reinicio: "2026-09-25T19:00:00+00:00" },
+  idioma: "es",
 };
 const con = (ruta: string[], consulta: Record<string, string> = {}): Contexto => ({ ...CTX, ruta, consulta });
 

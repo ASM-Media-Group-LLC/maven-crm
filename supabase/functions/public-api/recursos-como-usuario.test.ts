@@ -27,6 +27,7 @@ const CTX: Contexto = {
   llave: { conWhitelist: false, venceEl: null },
   baseDeArchivos: "https://proyecto.supabase.co",
   cupo: { limite: 1000, restantes: 999, reinicio: "2026-09-24T23:00:00+00:00" },
+  idioma: "es",
 };
 
 type Resp = { data: unknown; error: { message: string } | null };
