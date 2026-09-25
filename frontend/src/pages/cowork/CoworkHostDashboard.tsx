@@ -2631,7 +2631,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
           <DialogFooter>
             <Button variant="ghost" onClick={() => setAddOpen(false)}>{t("common.cancel")}</Button>
             <Button onClick={handleAddRoom} disabled={roomBusy || !addName.trim()} className="gap-1">
-              {roomBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} {t("common.add")}
+              {roomBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} {t("cowork.host.addShort")}
             </Button>
           </DialogFooter>
         </DialogContent>

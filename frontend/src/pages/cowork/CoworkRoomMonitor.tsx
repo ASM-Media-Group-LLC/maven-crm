@@ -192,7 +192,7 @@ function useClonPublicado(opts: {
           if (!cancelado) {
             if (intentoPublicar === MAX_INTENTOS_PUBLICAR) {
               // traducir() y no el hook: esto corre dentro de un efecto, cuando falla.
-              toast.error(traducir(claveFallo, { room: roomName ? `«${roomName}»` : traducir("cowork.monitor.aRoom") }), {
+              toast.error(traducir(claveFallo, { room: roomName ? traducir("cowork.monitor.quotedRoom", { room: roomName }) : traducir("cowork.monitor.aRoom") }), {
                 description: traducir("cowork.monitor.publishRetrying"),
                 duration: 15_000,
                 id: toastId,

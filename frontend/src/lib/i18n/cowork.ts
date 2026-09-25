@@ -69,15 +69,15 @@ export const cowork = {
   "cowork.page.enterError": { es: "No se pudo entrar a la sesión", en: "Couldn't enter the session" },
   "cowork.page.ended": { es: "Sesión finalizada", en: "Session ended" },
   "cowork.page.endError": { es: "No se pudo finalizar la sesión", en: "Couldn't end the session" },
-  "cowork.page.left": { es: "Saliste de «{name}»", en: "You left «{name}»" },
+  "cowork.page.left": { es: "Saliste de «{name}»", en: "You left “{name}”" },
   "cowork.page.leaveError": { es: "No se pudo salir de la sesión", en: "Couldn't leave the session" },
-  "cowork.page.leaveTitle": { es: "¿Salir de «{name}»?", en: "Leave «{name}»?" },
+  "cowork.page.leaveTitle": { es: "¿Salir de «{name}»?", en: "Leave “{name}”?" },
   "cowork.page.leaveDesc": {
     es: "La sesión sigue para los demás; solo te vas tú. Para volver a entrar como host vas a necesitar un enlace nuevo de quien la creó.",
     en: "The session continues for everyone else; only you leave. To come back as host you'll need a new link from whoever created it.",
   },
   "cowork.page.leaving": { es: "Saliendo…", en: "Leaving…" },
-  "cowork.page.endTitle": { es: "¿Finalizar «{name}»?", en: "End «{name}»?" },
+  "cowork.page.endTitle": { es: "¿Finalizar «{name}»?", en: "End “{name}”?" },
   "cowork.page.endDescPeople": {
     es: "Se cierra para las {n} personas que están adentro: salen de sus salas y se corta lo que estén haciendo.",
     en: "It closes for the {n} people inside: they leave their rooms and whatever they're doing gets cut off.",
@@ -244,6 +244,8 @@ export const cowork = {
   "cowork.pauses.groupMeets": { es: "Meets grupales ({n})", en: "Group meets ({n})" },
   "cowork.pauses.ongoing": { es: "En curso", en: "Ongoing" },
   "cowork.pauses.calledBy": { es: "Lo invocó {name}", en: "Called by {name}" },
+  // A mitad de renglón («· lo invocó …»): en minúscula, como siempre se vio en Pausas y meets.
+  "cowork.pauses.calledByInline": { es: "lo invocó {name}", en: "called by {name}" },
 
   // ── Reglas de la sesión ────────────────────────────────────────────────────
   "cowork.rules.eyebrow": { es: "Reglas de esta sesión", en: "This session's rules" },
@@ -328,6 +330,8 @@ export const cowork = {
   "cowork.monitor.otherWindow": { es: "Abierto en otra ventana", en: "Open in another window" },
   "cowork.monitor.useHere": { es: "Usar aquí", en: "Use here" },
   "cowork.monitor.aRoom": { es: "una sala", en: "a room" },
+  // Las comillas del nombre de la sala van en el diccionario: «» en español, “” en inglés.
+  "cowork.monitor.quotedRoom": { es: "«{room}»", en: "“{room}”" },
   "cowork.monitor.publishFailed.mic": { es: "No se está publicando tu micrófono en {room}", en: "Your microphone isn't reaching {room}" },
   "cowork.monitor.publishFailed.camera": { es: "No se está publicando tu cámara en {room}", en: "Your camera isn't reaching {room}" },
   "cowork.monitor.publishFailed.screen": { es: "No se está publicando tu pantalla en {room}", en: "Your screen isn't reaching {room}" },
@@ -586,6 +590,8 @@ export const cowork = {
     en: "Group meet: take the people from one or more rooms to a temporary room",
   },
   "cowork.host.addRoom": { es: "Añadir sala", en: "Add room" },
+  // El botón del diálogo «Añadir sala» dice «Añadir», no el «Agregar» de common.add.
+  "cowork.host.addShort": { es: "Añadir", en: "Add" },
   "cowork.host.inMeetCount": { es: "{n} en el meet", en: "{n} in the meet" },
   "cowork.host.aSupervisor": { es: "un supervisor", en: "a supervisor" },
   "cowork.host.everyoneBack": { es: "Todos volvieron a su sala", en: "Everyone went back to their room" },
@@ -643,7 +649,7 @@ export const cowork = {
     es: "Si lo apagas, la miniatura muestra solo los participantes (sin video).",
     en: "If you turn it off, the thumbnail shows only the participants (no video).",
   },
-  "cowork.host.closeRoomTitle": { es: "¿Cerrar la sala «{name}»?", en: "Close the room «{name}»?" },
+  "cowork.host.closeRoomTitle": { es: "¿Cerrar la sala «{name}»?", en: "Close the room “{name}”?" },
   "cowork.host.closeRoomDesc": {
     es: "Se eliminará la sala y los participantes que estén dentro quedarán sin asignación. Esta acción no se puede deshacer.",
     en: "The room will be deleted and anyone inside will be left without a room. This can't be undone.",

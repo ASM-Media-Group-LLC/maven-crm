@@ -263,7 +263,8 @@ describe("Cowork · tablero del supervisor en inglés", () => {
     expect(within(dialogo).getByText("2 days over on bathroom · 2 breaks over (+15 min)")).toBeTruthy();
     expect(within(dialogo).getByText("1 pause left open (closed the tab)")).toBeTruthy();
     expect(within(dialogo).getAllByText("On track").length).toBe(2);
-    expect(within(dialogo).getByText("Called by Jhon Lopez", { exact: false })).toBeTruthy();
+    // A mitad de renglón va en minúscula (la tarjeta del meet en el tablero, con mayúscula).
+    expect(within(dialogo).getByText("· called by Jhon Lopez")).toBeTruthy();
     expect(enEspanol(dialogo)).toEqual([]);
   });
 
@@ -276,6 +277,18 @@ describe("Cowork · tablero del supervisor en inglés", () => {
     expect(screen.getByText("Necesito ayuda")).toBeTruthy();
     expect(screen.getByText(/^Mateo Ruiz · Sin rostro · /)).toBeTruthy();
     expect(screen.getByText("Supervisores en pausa (1)")).toBeTruthy();
+
+    // Pausas y meets: «· lo invocó …» en minúscula, como siempre.
+    fireEvent.click(screen.getByRole("button", { name: "Pausas" }));
+    let dialogo = await screen.findByRole("dialog");
+    expect(within(dialogo).getByText("· lo invocó Jhon Lopez")).toBeTruthy();
+    fireEvent.keyDown(dialogo, { key: "Escape" });
+
+    // Añadir sala: el título y el botón dicen «Añadir» (no el «Agregar» de common.add).
+    fireEvent.click(screen.getAllByTitle("Añadir sala")[0]);
+    dialogo = await screen.findByRole("dialog");
+    expect(within(dialogo).getByText("Añadir sala")).toBeTruthy();
+    expect(within(dialogo).getByRole("button", { name: "Añadir" })).toBeTruthy();
   });
 
   it("el meet grupal y los diálogos de sala están en inglés", async () => {
@@ -291,6 +304,7 @@ describe("Cowork · tablero del supervisor en inglés", () => {
     fireEvent.click(screen.getAllByTitle("Add room")[0]);
     dialogo = await screen.findByRole("dialog");
     expect(within(dialogo).getByPlaceholderText("e.g. Room 3")).toBeTruthy();
+    expect(within(dialogo).getByRole("button", { name: "Add" })).toBeTruthy();
     expect(enEspanol(dialogo)).toEqual([]);
   });
 });

@@ -110,7 +110,7 @@ describe("Cowork · la entrada en inglés", () => {
     await screen.findByText("Morning shift");
     fireEvent.click(screen.getAllByRole("button", { name: "End" })[0]);
     let dialogo = await screen.findByRole("alertdialog");
-    expect(within(dialogo).getByText("End «Morning shift»?")).toBeTruthy();
+    expect(within(dialogo).getByText("End “Morning shift”?")).toBeTruthy();
     expect(within(dialogo).getByText(/It closes for the 3 people inside/)).toBeTruthy();
     expect(enEspanol(dialogo)).toEqual([]);
     await act(async () => { fireEvent.click(within(dialogo).getByRole("button", { name: "End session" })); });

@@ -35,8 +35,12 @@ const PALABRAS_COWORK = new RegExp(
 );
 const sinAcentos = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
-/** ¿Suena a español? El detector del freno, más las palabras de Cowork. */
-export const pareceEspanol = (s: string): boolean => esEspanol(s) || PALABRAS_COWORK.test(sinAcentos(s));
+// Las comillas «» son del español: en inglés un nombre va entre “” (o "").
+const COMILLAS_ESPANOLAS = /[«»]/;
+
+/** ¿Suena a español? El detector del freno, más las palabras y las comillas de Cowork. */
+export const pareceEspanol = (s: string): boolean =>
+  esEspanol(s) || PALABRAS_COWORK.test(sinAcentos(s)) || COMILLAS_ESPANOLAS.test(s);
 
 export const enEspanol = (raiz: HTMLElement) => textosVisibles(raiz).filter((t) => pareceEspanol(t));
 

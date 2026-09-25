@@ -203,7 +203,7 @@ export default function CoworkPausasDialog({ open, onOpenChange, sessionId, nomb
                       <span className="font-medium text-foreground">{fechaHoraCorta(m.startedAt, f)}</span>
                       <span className="tabular-nums text-primary">{minutosLegibles(m.segundos)}</span>
                       {m.abierto && <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold text-primary">{t("cowork.pauses.ongoing")}</span>}
-                      <span className="text-muted-foreground">· {t("cowork.pauses.calledBy", { name: m.creador })}</span>
+                      <span className="text-muted-foreground">· {t("cowork.pauses.calledByInline", { name: m.creador })}</span>
                       {todas && <span className="text-muted-foreground">· {m.sesion}</span>}
                     </div>
                     <div className="mt-1 flex flex-wrap gap-1">
