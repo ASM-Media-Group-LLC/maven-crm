@@ -11,7 +11,9 @@ import { cn } from "@/lib/utils";
 import SelectorDeTablero from "@/pages/dashboard/SelectorDeTablero";
 import { format } from "date-fns";
 import { useFormato } from "@/hooks/useFormato";
-import { CLOSER_STAGES, STAGE_LABELS, getNextContactDate, isContactOverdue, needsContactDecision } from "@/pages/closers/hooks/useCloserLeads";
+import { CLOSER_STAGES, stageLabel, getNextContactDate, isContactOverdue, needsContactDecision } from "@/pages/closers/hooks/useCloserLeads";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 import { diasDelRango, useMisHoras, resumirHoras } from "@/hooks/useMisHoras";
 import { useMiTiempoCowork, resumirTiempoCowork, pieTiempoCowork } from "@/hooks/useMiTiempoCowork";
 import { useMiQa, useMisLeads, type LeadDelCloser } from "./useCloserDashboard";
@@ -38,6 +40,15 @@ const isoDia = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padSt
 const money = (n: number) => (n >= 1000 ? `$${(n / 1000).toFixed(1)}K` : `$${Math.round(n)}`);
 
 const CERRADAS = ["Confirmada", "Completada"];
+
+// PRESET_CONFIG (lib/range-presets) trae la etiqueta en español; acá se muestra
+// la traducida por la llave del preset, sin tocar el archivo compartido.
+const PRESET_LABEL_KEYS: Record<RangePreset, TranslationKey> = {
+  yesterday: "closers.dash.yesterday",
+  today: "common.today",
+  this_week: "common.thisWeek",
+  this_month: "common.thisMonth",
+};
 
 /** Días de atraso del seguimiento (0 = no está vencido). */
 function diasDeAtraso(l: LeadDelCloser): number {
@@ -73,6 +84,7 @@ function Kpi({ label, valor, pie, icono: Icono, color, tinte, barra }: {
 
 export default function CloserDashboard() {
   const f = useFormato();
+  const { t } = useLanguage();
   const [rango, setRango] = useState<{ from: Date; to: Date }>(() => rangeForPreset("this_week", new Date()));
   const [preset, setPreset] = useState<RangePreset | null>("this_week");
   const desde = isoDia(rango.from);
@@ -106,7 +118,7 @@ export default function CloserDashboard() {
     // acumulado queda al lado para no perder de vista el total.
     const cerradasRango = cerradas.filter((l) => {
       const f = l.completed_date ?? l.confirmed_date;
-      return !!f && f >= desde && f <= hasta;
+      return !!f && desde <= f && f <= hasta;
     });
     const usdRango = cerradasRango.reduce((s, l) => s + (l.monthly_monetization ?? 0), 0);
     return {
@@ -130,10 +142,10 @@ export default function CloserDashboard() {
             <div>
               <SelectorDeTablero actual="pipeline" />
               <p className="text-[11px] text-muted-foreground">
-                {pipeline.asignadas} asignada{pipeline.asignadas === 1 ? "" : "s"}
+                {t(pipeline.asignadas === 1 ? "closers.dash.assignedOne" : "closers.dash.assignedMany", { n: pipeline.asignadas })}
                 {pipeline.vencidos.length > 0
-                  ? <> · <span className="font-medium text-warning">{pipeline.vencidos.length} con seguimiento vencido</span></>
-                  : leads.length > 0 && <> · <span className="font-medium text-success">al día con los seguimientos</span></>}
+                  ? <> · <span className="font-medium text-warning">{t("closers.dash.overdueFollowUps", { n: pipeline.vencidos.length })}</span></>
+                  : leads.length > 0 && <> · <span className="font-medium text-success">{t("closers.dash.upToDate")}</span></>}
               </p>
             </div>
           </div>
@@ -144,14 +156,14 @@ export default function CloserDashboard() {
                   onClick={() => { setRango(rangeForPreset(p.key, new Date())); setPreset(p.key); }}
                   className={cn("rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
                     preset === p.key ? "bg-primary/15 text-primary ring-1 ring-primary/30" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground")}>
-                  {p.label}
+                  {t(PRESET_LABEL_KEYS[p.key])}
                 </button>
               ))}
             </div>
             <DateRangePicker
               from={rango.from} to={rango.to}
               onApply={(from, to) => { if (!from || !to) return; setRango({ from, to }); setPreset(null); }}
-              placeholder="Seleccionar rango"
+              placeholder={t("closers.dash.selectRange")}
             />
           </div>
         </div>
@@ -168,17 +180,19 @@ export default function CloserDashboard() {
             {/* Primero la plata: es lo que un closer trae a la mesa, y era lo
                 que faltaba en la primera versión de este tablero. */}
             <Kpi
-              label="Traído a la mesa"
-              valor={pipeline.usdRango > 0 ? `${money(pipeline.usdRango)}/mes` : "$0"}
+              label={t("closers.dash.broughtIn")}
+              valor={pipeline.usdRango > 0 ? t("closers.dash.perMonth", { amount: money(pipeline.usdRango) }) : "$0"}
               pie={pipeline.cerradasRango > 0
-                ? <>{pipeline.cerradasRango} cerrada{pipeline.cerradasRango === 1 ? "" : "s"} en el rango · {money(pipeline.usdMes)}/mes acumulado</>
-                : <>nada cerrado en el rango · {money(pipeline.usdMes)}/mes acumulado</>}
+                ? t(pipeline.cerradasRango === 1 ? "closers.dash.closedInRangeOne" : "closers.dash.closedInRangeMany", { n: pipeline.cerradasRango, amount: money(pipeline.usdMes) })
+                : t("closers.dash.nothingClosed", { amount: money(pipeline.usdMes) })}
               icono={DollarSign} color="bg-emerald-500" tinte="from-emerald-500/10"
             />
             <Kpi
-              label="Horas (Hubstaff)"
+              label={t("closers.dash.hoursHubstaff")}
               valor={hubstaff.horas > 0 ? hubstaff.horas.toFixed(1) : "—"}
-              pie={hubstaff.diasTrabajados > 0 ? `${hubstaff.diasTrabajados} día${hubstaff.diasTrabajados === 1 ? "" : "s"} con registro` : "sin registro en el rango"}
+              pie={hubstaff.diasTrabajados > 0
+                ? t(hubstaff.diasTrabajados === 1 ? "closers.dash.daysTrackedOne" : "closers.dash.daysTrackedMany", { n: hubstaff.diasTrabajados })
+                : t("closers.dash.nothingTracked")}
               icono={Clock} color="bg-sky-500" tinte="from-sky-500/10"
             />
             {/* El reloj de Cowork (cámara + pantalla, presente): va a reemplazar
@@ -190,24 +204,26 @@ export default function CloserDashboard() {
               icono={Timer} color="bg-violet-500" tinte="from-violet-500/10"
             />
             <Kpi
-              label="Productividad"
+              label={t("closers.dash.productivity")}
               valor={hubstaff.actividad != null ? `${hubstaff.actividad}%` : "—"}
               // Sin semáforo a propósito: es actividad de teclado y mouse, y
               // buena parte del trabajo de un closer pasa fuera de la pantalla.
-              pie="actividad de teclado y mouse"
+              pie={t("closers.dash.keyboardMouse")}
               icono={MousePointerClick} color="bg-violet-500" tinte="from-violet-500/10"
               barra={hubstaff.actividad != null ? { pct: hubstaff.actividad, clase: "bg-violet-500" } : undefined}
             />
             <Kpi
-              label="Cerradas"
+              label={t("closers.kpi.closed")}
               valor={String(pipeline.cerradas)}
-              pie="confirmadas + completadas, histórico"
+              pie={t("closers.dash.closedAllTime")}
               icono={CheckCircle2} color="bg-sky-500" tinte="from-sky-500/10"
             />
             <Kpi
-              label="QA de tus calls"
+              label={t("closers.dash.qaCalls")}
               valor={qa.score != null ? qa.score.toFixed(0) : "—"}
-              pie={qa.calls > 0 ? `${qa.calls} call${qa.calls === 1 ? "" : "s"} en el rango` : "sin calls evaluadas"}
+              pie={qa.calls > 0
+                ? t(qa.calls === 1 ? "closers.dash.callsInRangeOne" : "closers.dash.callsInRangeMany", { n: qa.calls })
+                : t("closers.dash.noCallsScored")}
               icono={Headphones} color="bg-amber-500" tinte="from-amber-500/10"
               barra={qa.score != null ? { pct: qa.score, clase: qa.score >= 70 ? "bg-success" : "bg-warning" } : undefined}
             />
@@ -221,7 +237,7 @@ export default function CloserDashboard() {
               <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-warning">
                 <Phone className="h-4 w-4 text-warning-foreground" />
               </span>
-              <h2 className="text-sm font-semibold">A contactar hoy</h2>
+              <h2 className="text-sm font-semibold">{t("closers.dash.toContactToday")}</h2>
               {pipeline.vencidos.length > 0 && (
                 <Badge variant="outline" className="rounded-full border-warning/30 bg-warning/10 text-[10px] text-warning">
                   {pipeline.vencidos.length}
@@ -229,7 +245,7 @@ export default function CloserDashboard() {
               )}
             </div>
             <Link to="/closers" className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
-              Abrir Closers <ArrowRight className="h-3 w-3" />
+              {t("closers.dash.openClosers")} <ArrowRight className="h-3 w-3" />
             </Link>
           </div>
           {leadsCargando ? (
@@ -237,7 +253,7 @@ export default function CloserDashboard() {
           ) : pipeline.vencidos.length === 0 ? (
             <p className="flex items-center justify-center gap-2 px-4 py-8 text-xs text-muted-foreground">
               <CheckCircle2 className="h-4 w-4 text-success" />
-              {leads.length === 0 ? "Todavía no tienes leads asignadas." : "Ningún seguimiento vencido. Al día."}
+              {leads.length === 0 ? t("closers.dash.noLeadsYet") : t("closers.dash.noneOverdue")}
             </p>
           ) : (
             <ul className="divide-y divide-white/5">
@@ -250,25 +266,25 @@ export default function CloserDashboard() {
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium leading-tight">@{l.instagram_handle}</p>
                     <p className="truncate text-[11px] text-muted-foreground">
-                      {l.contactos} de 6 contactos
-                      {l.last_contact_date && ` · último ${format(new Date(`${l.last_contact_date}T12:00:00`), "d MMM", { locale: f.fechas })}`}
+                      {t("closers.contact.countOf6", { n: l.contactos })}
+                      {l.last_contact_date && ` · ${t("closers.dash.last", { date: format(new Date(`${l.last_contact_date}T12:00:00`), "d MMM", { locale: f.fechas }) })}`}
                       {l.category && ` · ${l.category}`}
                     </p>
                   </div>
                   {l.monthly_monetization != null && l.monthly_monetization > 0 && (
-                    <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{money(l.monthly_monetization)}/mes</span>
+                    <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{t("closers.dash.perMonth", { amount: money(l.monthly_monetization) })}</span>
                   )}
                 </li>
               ))}
               {pipeline.vencidos.length > 12 && (
                 <li className="px-4 py-2 text-center text-[11px] text-muted-foreground">
-                  y {pipeline.vencidos.length - 12} más — están todas en Closers
+                  {t("closers.dash.andMore", { n: pipeline.vencidos.length - 12 })}
                 </li>
               )}
             </ul>
           )}
           <footer className="border-t border-white/5 px-4 py-2 text-[11px] text-muted-foreground">
-            Cadencia 1 · 3 · 5 · 8 · 15 · 29 días, contada desde tu último contacto: contactar pone la lead al día.
+            {t("closers.dash.cadence")}
           </footer>
         </section>
 
@@ -277,14 +293,14 @@ export default function CloserDashboard() {
           <div className="overflow-hidden rounded-2xl border border-white/10 bg-card/60 ring-1 ring-white/5">
             <div className="flex items-center gap-2 border-b border-white/5 px-4 py-3">
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              <h2 className="text-sm font-semibold">Tu pipeline</h2>
+              <h2 className="text-sm font-semibold">{t("closers.dash.yourPipeline")}</h2>
               <Badge variant="outline" className="ml-auto rounded-full text-[10px] font-normal text-muted-foreground">
-                estado de hoy
+                {t("closers.dash.asOfToday")}
               </Badge>
             </div>
             <div className="p-4">
               {leads.length === 0 ? (
-                <p className="text-xs text-muted-foreground">Sin leads asignadas.</p>
+                <p className="text-xs text-muted-foreground">{t("closers.dash.noAssignedLeads")}</p>
               ) : (
                 <div className="space-y-2">
                   {CLOSER_STAGES.map((s) => {
@@ -293,7 +309,7 @@ export default function CloserDashboard() {
                     return (
                       <div key={s}>
                         <div className="mb-1 flex items-center justify-between text-xs">
-                          <span className="text-muted-foreground">{STAGE_LABELS[s] ?? s}</span>
+                          <span className="text-muted-foreground">{stageLabel(t, s)}</span>
                           <span className="font-semibold tabular-nums">{n}</span>
                         </div>
                         <div className="h-1.5 overflow-hidden rounded-full bg-white/5">
@@ -307,7 +323,7 @@ export default function CloserDashboard() {
                   {pipeline.porDecidir.length > 0 && (
                     <p className="flex items-start gap-1.5 rounded-lg bg-warning/10 px-2.5 py-2 text-[11px] text-warning">
                       <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
-                      {pipeline.porDecidir.length} lead{pipeline.porDecidir.length === 1 ? "" : "s"} con los 6 contactos hechos: hay que decidir si seguir o marcarla No interesada.
+                      {t(pipeline.porDecidir.length === 1 ? "closers.dash.decideOne" : "closers.dash.decideMany", { n: pipeline.porDecidir.length })}
                     </p>
                   )}
                 </div>
@@ -318,7 +334,7 @@ export default function CloserDashboard() {
           <div className="overflow-hidden rounded-2xl border border-white/10 bg-card/60 ring-1 ring-white/5 lg:col-span-2">
             <div className="flex items-center gap-2 border-b border-white/5 px-4 py-3">
               <Clock className="h-4 w-4 text-muted-foreground" />
-              <h2 className="text-sm font-semibold">Tus horas, día por día</h2>
+              <h2 className="text-sm font-semibold">{t("closers.dash.yourHours")}</h2>
               {hubstaff.horas > 0 && (
                 <Badge variant="outline" className="rounded-full text-[10px]">
                   {hubstaff.horas.toFixed(1)} h{hubstaff.actividad != null && ` · ${hubstaff.actividad}%`}
@@ -329,14 +345,14 @@ export default function CloserDashboard() {
               {hsCargando ? (
                 <Skeleton className="h-28 rounded-xl" />
               ) : dias.length === 0 ? (
-                <p className="text-xs text-muted-foreground">Sin registro de Hubstaff en el rango.</p>
+                <p className="text-xs text-muted-foreground">{t("closers.dash.noHubstaff")}</p>
               ) : (
                 <div className="flex h-28 items-end gap-1">
                   {diasGrafico.map((d) => (
                     <div key={d.date} className="flex min-w-0 max-w-[64px] flex-1 flex-col items-center gap-1"
                       title={d.horas > 0
-                        ? `${format(new Date(`${d.date}T12:00:00`), "EEEE d MMM", { locale: f.fechas })}: ${d.horas.toFixed(1)} h${d.actividad != null ? ` · ${d.actividad}% de actividad` : ""}`
-                        : `${format(new Date(`${d.date}T12:00:00`), "EEEE d MMM", { locale: f.fechas })}: sin registro`}>
+                        ? `${format(new Date(`${d.date}T12:00:00`), "EEEE d MMM", { locale: f.fechas })}: ${d.horas.toFixed(1)} h${d.actividad != null ? ` · ${t("closers.dash.activityPct", { pct: d.actividad })}` : ""}`
+                        : `${format(new Date(`${d.date}T12:00:00`), "EEEE d MMM", { locale: f.fechas })}: ${t("closers.dash.noRecord")}`}>
                       <span className="text-[9px] tabular-nums text-muted-foreground">{d.horas > 0 ? d.horas.toFixed(1) : ""}</span>
                       <div className={cn("w-full rounded-t transition-[height] duration-700", d.horas > 0 ? "bg-sky-500" : "bg-white/[0.07]")}
                         style={{ height: `${d.horas > 0 ? Math.max(4, (d.horas / hubstaff.maxHoras) * 80) : 3}px` }} />

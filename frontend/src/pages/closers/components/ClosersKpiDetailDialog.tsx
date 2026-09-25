@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ListRow } from "@/components/ui/list-row";
 import CategorySectionHeader from "@/components/dashboard/CategorySectionHeader";
 import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
 import type { Formato } from "@/lib/formato";
 import type { ClosersKpiPopupResult, ClosersKpiPopupRow } from "../hooks/useClosersKpiPopup";
 
@@ -64,6 +65,7 @@ const ClosersKpiDetailDialog = ({
   popupKey,
 }: Props) => {
   const f = useFormato();
+  const { t } = useLanguage();
   const groups = result?.groups ?? [];
   const totalCount = result?.totalCount ?? 0;
   const isGrouped = result?.mode === "grouped";
@@ -111,9 +113,11 @@ const ClosersKpiDetailDialog = ({
               {!isLoading && totalCount > 0 && (
                 <p className="text-[11px] text-muted-foreground mt-1.5">
                   {subtitle ||
-                    `${totalCount.toLocaleString(f.idioma === "en" ? "en-US" : "es")} ${totalCount === 1 ? "registro" : "registros"}`}
+                    t(totalCount === 1 ? "closers.popup.recordOne" : "closers.popup.recordMany", {
+                      n: totalCount.toLocaleString(f.idioma === "en" ? "en-US" : "es"),
+                    })}
                   {isGrouped && groups.length > 0 &&
-                    ` · ${groups.length} ${groups.length === 1 ? "grupo" : "grupos"}`}
+                    ` · ${t(groups.length === 1 ? "closers.popup.groupOne" : "closers.popup.groupMany", { n: groups.length })}`}
                 </p>
               )}
             </div>
@@ -123,17 +127,17 @@ const ClosersKpiDetailDialog = ({
                   type="button"
                   onClick={() => setCollapsed(new Set())}
                   className="rounded-full bg-muted/40 px-2.5 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                  title="Expandir todas"
+                  title={t("closers.popup.expandAll")}
                 >
-                  Expandir
+                  {t("closers.popup.expand")}
                 </button>
                 <button
                   type="button"
                   onClick={() => setCollapsed(new Set(groups.map((g) => g.cat)))}
                   className="rounded-full bg-muted/40 px-2.5 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                  title="Colapsar todas"
+                  title={t("closers.popup.collapseAll")}
                 >
-                  Colapsar
+                  {t("closers.popup.collapse")}
                 </button>
               </div>
             )}
@@ -153,7 +157,7 @@ const ClosersKpiDetailDialog = ({
                 <Users className="h-6 w-6 text-muted-foreground" />
               </div>
               <p className="text-sm text-muted-foreground text-center">
-                Sin registros para mostrar.
+                {t("closers.popup.empty")}
               </p>
             </div>
           ) : !isGrouped ? (
@@ -175,7 +179,7 @@ const ClosersKpiDetailDialog = ({
                     <div className="space-y-1.5 pl-1">
                       {g.rows.length === 0 ? (
                         <p className="text-xs text-muted-foreground italic pl-3 py-2">
-                          Sin registros visibles para esta categoría.
+                          {t("closers.popup.emptyGroup")}
                         </p>
                       ) : (
                         g.rows.map((row) => renderRow(row, f))

@@ -13,6 +13,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // Selector admin-only para "ver el panel de closers como X closer".
 // Trae los profiles con role=closer del tenant — list-style con search
@@ -30,6 +31,7 @@ interface Props {
 }
 
 const ViewAsCloserPicker = ({ value, onChange }: Props) => {
+  const { t } = useLanguage();
   const [open, setOpen] = useState(false);
 
   const { data: closers = [], isLoading } = useQuery({
@@ -66,24 +68,24 @@ const ViewAsCloserPicker = ({ value, onChange }: Props) => {
           aria-expanded={open}
         >
           <Eye className="h-4 w-4" />
-          {selected?.full_name ?? "Cerradores"}
+          {selected?.full_name ?? t("closers.viewAs.closers")}
           <ChevronDown className="h-3 w-3 opacity-60" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-64 p-0" align="end">
         <Command>
-          <CommandInput placeholder="Filtrar por nombre…" className="h-9" />
+          <CommandInput placeholder={t("closers.viewAs.filterByName")} className="h-9" />
           <CommandList>
             {isLoading ? (
-              <CommandEmpty>Cargando…</CommandEmpty>
+              <CommandEmpty>{t("common.loading")}</CommandEmpty>
             ) : closers.length === 0 ? (
-              <CommandEmpty>Sin closers en el tenant.</CommandEmpty>
+              <CommandEmpty>{t("closers.viewAs.none")}</CommandEmpty>
             ) : (
               <>
                 <CommandEmpty />
-                <CommandGroup heading="Ver como">
+                <CommandGroup heading={t("closers.viewAs.heading")}>
                   {closers.map((c) => {
-                    const label = c.full_name?.trim() || "(sin nombre)";
+                    const label = c.full_name?.trim() || t("closers.noNameParen");
                     const isSelected = value === c.id;
                     return (
                       <CommandItem
