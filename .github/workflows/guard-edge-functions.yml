@@ -30,7 +30,7 @@ jobs:
           deno-version: 2.9.5
 
       - name: Guard — aislamiento entre agencias
-        run: deno test --allow-read --no-check supabase/functions/public-api/
+        run: deno test --allow-read --no-check supabase/functions/public-api/ supabase/functions/manage-api-keys/
 
       # `deno test --no-check` no mira tipos: sin este paso, el tipo de msg() (clave que
       # existe, variables exactas) y los @ts-expect-error de mensajes.test.ts nunca

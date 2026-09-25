@@ -91,7 +91,6 @@ export const LEGADO_EN_ESPANOL: string[] = [
   "pages/Settings.tsx",
   "pages/VideoCallPage.tsx",
   "pages/admin/AddUserModal.tsx",
-  "pages/admin/AdminApiKeys.tsx",
   "pages/admin/AdminReportes.tsx",
   "pages/admin/AdminUsuarios.tsx",
   "pages/admin/AuditoriaRoles.tsx",

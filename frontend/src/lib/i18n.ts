@@ -26,6 +26,7 @@ import { admin } from "./i18n/admin";
 import { creadoresFicha } from "./i18n/creadoresFicha";
 import { cowork } from "./i18n/cowork";
 import { scouter } from "./i18n/scouter";
+import { apiKeys } from "./i18n/apiKeys";
 
 export type Language = "es" | "en";
 
@@ -76,6 +77,7 @@ const translations = {
   ...creadoresFicha,
   ...cowork,
   ...scouter,
+  ...apiKeys,
 } as const;
 
 export type TranslationKey = keyof typeof translations;
