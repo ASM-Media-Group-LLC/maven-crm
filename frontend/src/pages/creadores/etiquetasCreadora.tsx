@@ -38,6 +38,41 @@ export function etiquetaIdioma(t: T, idioma: string): string {
   return clave ? t(clave) : idioma;
 }
 
+// Tono de voz, personalidad de marca, estrategia de rechazo y plataforma de
+// videollamada: los selects del onboarding GUARDAN el valor en español ("Dulce",
+// "Rechazo suave", "Otro") y ese valor no se toca. Pero en la ficha son campos de
+// texto libre: lo que no es una de estas opciones se muestra tal cual.
+export const CLAVE_TONO: Record<string, TranslationKey> = {
+  Dulce: "creadores.tone.sweet",
+  Picante: "creadores.tone.spicy",
+  Dominante: "creadores.tone.dominant",
+  Tierna: "creadores.tone.tender",
+  Directa: "creadores.tone.direct",
+  Juguetona: "creadores.tone.playful",
+};
+const CLAVE_RECHAZO: Record<string, TranslationKey> = {
+  Humor: "creadores.step4.rejHumor",
+  Firmeza: "creadores.step4.rejFirm",
+  "Rechazo suave": "creadores.step4.rejSoft",
+};
+// Telegram, WhatsApp, Zoom y Skype son nombres propios: solo "Otro" se traduce.
+const CLAVE_PLATAFORMA: Record<string, TranslationKey> = {
+  Otro: "cr.offCatOther",
+};
+
+/** La etiqueta de una opción guardada, si lo es (sin distinguir mayúsculas ni
+ *  espacios de los bordes); si no, el texto tal cual lo escribieron. */
+function etiquetaDeOpcion(mapa: Record<string, TranslationKey>, t: T, valor: string): string {
+  const buscado = valor.trim().toLowerCase();
+  const clave = Object.entries(mapa).find(([guardado]) => guardado.toLowerCase() === buscado)?.[1];
+  return clave ? t(clave) : valor;
+}
+
+/** Tono de voz o personalidad de marca (comparten las opciones). */
+export const etiquetaTono = (t: T, valor: string) => etiquetaDeOpcion(CLAVE_TONO, t, valor);
+export const etiquetaRechazo = (t: T, valor: string) => etiquetaDeOpcion(CLAVE_RECHAZO, t, valor);
+export const etiquetaPlataformaVideollamada = (t: T, valor: string) => etiquetaDeOpcion(CLAVE_PLATAFORMA, t, valor);
+
 /** La etiqueta del status de una creadora; un valor desconocido se muestra tal cual. */
 export function etiquetaEstado(t: T, status: string | null | undefined): string {
   if (!status) return "—";

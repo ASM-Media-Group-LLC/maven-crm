@@ -10,6 +10,7 @@ import {
 import { BookOpen, Sparkles, ShieldAlert, Info } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { TranslationKey } from "@/lib/i18n";
+import { etiquetaTono } from "../../etiquetasCreadora";
 import {
   Tooltip, TooltipTrigger, TooltipContent, TooltipProvider,
 } from "@/components/ui/tooltip";
@@ -17,21 +18,14 @@ import {
 const NIVELES_ESTUDIO = ["Bachillerato", "Técnico", "Universitario", "Postgrado", "Otro"];
 const TONOS_VOZ = ["Dulce", "Picante", "Dominante", "Tierna", "Directa", "Juguetona"];
 
-// Estudios y tono se GUARDAN en español (el valor del select); esto es lo que se muestra.
+// Estudios y tono se GUARDAN en español (el valor del select); esto es lo que se
+// muestra. El tono sale de etiquetasCreadora: la ficha lo muestra con las mismas etiquetas.
 const ETIQUETA_ESTUDIOS: Record<string, TranslationKey> = {
   "Bachillerato": "creadores.edu.highSchool",
   "Técnico": "creadores.edu.technical",
   "Universitario": "creadores.edu.university",
   "Postgrado": "creadores.edu.postgrad",
   "Otro": "cr.offCatOther",
-};
-const ETIQUETA_TONO: Record<string, TranslationKey> = {
-  Dulce: "creadores.tone.sweet",
-  Picante: "creadores.tone.spicy",
-  Dominante: "creadores.tone.dominant",
-  Tierna: "creadores.tone.tender",
-  Directa: "creadores.tone.direct",
-  Juguetona: "creadores.tone.playful",
 };
 
 export interface Step2PsyData {
@@ -231,7 +225,7 @@ export default function Step2PsychologyLimits({ data, onChange }: Props) {
               <Select value={data.tonoVoz} onValueChange={(v) => onChange("tonoVoz", v)}>
                 <SelectTrigger><SelectValue placeholder={t("cr.selectTone")} /></SelectTrigger>
                 <SelectContent>
-                  {TONOS_VOZ.map((tono) => <SelectItem key={tono} value={tono}>{t(ETIQUETA_TONO[tono])}</SelectItem>)}
+                  {TONOS_VOZ.map((tono) => <SelectItem key={tono} value={tono}>{etiquetaTono(t, tono)}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

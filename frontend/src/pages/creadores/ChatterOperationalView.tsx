@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { parseCsv, parsePricing, NoData } from "./OperacionesTabContent";
 import VideoOnboarding from "@/components/creadores/VideoOnboarding";
 import { useLanguage } from "@/hooks/useLanguage";
+import { etiquetaTono } from "./etiquetasCreadora";
 
 interface ChatterOperationalViewProps {
   creatorId: string;
@@ -67,7 +68,7 @@ const ChatterOperationalView = ({ creator, creatorId }: ChatterOperationalViewPr
             <div>
               <p className="text-xs text-muted-foreground mb-1">{t("cr.toneOfVoice")}</p>
               {creator.tono_voz ? (
-                <p className="text-lg font-semibold capitalize">{creator.tono_voz}</p>
+                <p className="text-lg font-semibold capitalize">{etiquetaTono(t, creator.tono_voz)}</p>
               ) : <NoData />}
             </div>
             <div>

@@ -16,7 +16,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { useLanguage } from "@/hooks/useLanguage";
-import { traducir } from "@/lib/i18n";
 import {
   Popover,
   PopoverContent,
@@ -32,7 +31,9 @@ import {
 
 interface UserOption {
   id: string;
-  full_name: string;
+  // null = la persona no tiene nombre cargado. El «Sin nombre» se pone al dibujar
+  // (no acá: esto queda 5 minutos en la caché de react-query y no cambiaría de idioma).
+  full_name: string | null;
 }
 
 interface AssignmentModalProps {
@@ -61,7 +62,7 @@ function useUsersByRole(role: string) {
       if (profError) throw profError;
       return (profiles || []).map((p) => ({
         id: p.id,
-        full_name: p.full_name || traducir("creadores.sell.noName"),
+        full_name: p.full_name || null,
       })) as UserOption[];
     },
     staleTime: 5 * 60 * 1000,
@@ -84,7 +85,9 @@ export default function AssignmentModal({
   const { data: managers = [], isLoading: loadingManagers } = useUsersByRole("manager");
   const { data: chatters = [], isLoading: loadingChatters } = useUsersByRole("agent");
 
-  const selectedManagerName = managers.find((m) => m.id === selectedManager)?.full_name;
+  const nombre = (u: UserOption) => u.full_name || t("creadores.sell.noName");
+  const managerElegido = managers.find((m) => m.id === selectedManager);
+  const selectedManagerName = managerElegido ? nombre(managerElegido) : undefined;
 
   const toggleChatter = (id: string) => {
     setSelectedChatters((prev) => {
@@ -159,7 +162,7 @@ export default function AssignmentModal({
                     {managers.map((m) => (
                       <CommandItem
                         key={m.id}
-                        value={m.full_name}
+                        value={nombre(m)}
                         onSelect={() => {
                           setSelectedManager(m.id);
                           setManagerOpen(false);
@@ -171,7 +174,7 @@ export default function AssignmentModal({
                             selectedManager === m.id ? "opacity-100" : "opacity-0"
                           )}
                         />
-                        {m.full_name}
+                        {nombre(m)}
                       </CommandItem>
                     ))}
                   </CommandGroup>
@@ -194,7 +197,7 @@ export default function AssignmentModal({
                   const chatter = chatters.find((c) => c.id === id);
                   return (
                     <Badge key={id} variant="secondary" className="gap-1 pr-1">
-                      {chatter?.full_name || "..."}
+                      {chatter ? nombre(chatter) : "..."}
                       <button
                         type="button"
                         onClick={() => removeChatter(id)}
@@ -243,7 +246,7 @@ export default function AssignmentModal({
                       return (
                         <CommandItem
                           key={c.id}
-                          value={c.full_name}
+                          value={nombre(c)}
                           onSelect={() => toggleChatter(c.id)}
                         >
                           <Check
@@ -252,7 +255,7 @@ export default function AssignmentModal({
                               isSelected ? "opacity-100" : "opacity-0"
                             )}
                           />
-                          {c.full_name}
+                          {nombre(c)}
                         </CommandItem>
                       );
                     })}

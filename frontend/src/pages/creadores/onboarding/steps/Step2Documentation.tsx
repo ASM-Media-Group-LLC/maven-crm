@@ -13,7 +13,7 @@ import InstagramIcon from "@/components/icons/InstagramIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
 import XIcon from "@/components/icons/XIcon";
 import { useLanguage } from "@/hooks/useLanguage";
-import { traducir } from "@/lib/i18n";
+import type { TranslationKey } from "@/lib/i18n";
 
 export interface Step2Data {
   idDocumentFront: UploadedFile[];
@@ -30,13 +30,14 @@ export interface Step2Data {
   linkOtrasPlataformas: string;
 }
 
+// Clave del diccionario, no el texto: se traduce al dibujarla (ver Step1Errors).
 export interface Step2Errors {
-  dataConfirmed?: string;
+  dataConfirmed?: TranslationKey;
 }
 
 export function validateStep2(data: Step2Data): Step2Errors {
   const errors: Step2Errors = {};
-  if (!data.dataConfirmed) errors.dataConfirmed = traducir("creadores.step2.mustConfirm");
+  if (!data.dataConfirmed) errors.dataConfirmed = "creadores.step2.mustConfirm";
   return errors;
 }
 
@@ -313,7 +314,7 @@ export default function Step2Documentation({ data, errors, tempId, onChange, cre
           />
           <div>
             <Label htmlFor="confirm-data" className="cursor-pointer">{t("cr.confirmDataCorrect")}</Label>
-            {errors.dataConfirmed && <p className="text-xs text-destructive mt-1">{errors.dataConfirmed}</p>}
+            {errors.dataConfirmed && <p className="text-xs text-destructive mt-1">{t(errors.dataConfirmed)}</p>}
           </div>
         </div>
 

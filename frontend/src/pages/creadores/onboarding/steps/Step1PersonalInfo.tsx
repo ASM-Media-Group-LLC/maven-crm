@@ -11,7 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { Info } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { useLanguage } from "@/hooks/useLanguage";
-import { traducir, type TranslationKey } from "@/lib/i18n";
+import type { TranslationKey } from "@/lib/i18n";
 
 const COUNTRIES = [
   "Afganistán","Albania","Alemania","Andorra","Angola","Arabia Saudita","Argelia","Argentina",
@@ -102,20 +102,22 @@ export interface Step1Data {
   ubicacionArtistica: string;
 }
 
+// Los errores se guardan como CLAVE del diccionario y se traducen al dibujarlos:
+// así, si alguien cambia el idioma con un error en pantalla, cambia también.
 export interface Step1Errors {
-  name?: string;
-  email?: string;
-  phone?: string;
-  age?: string;
+  name?: TranslationKey;
+  email?: TranslationKey;
+  phone?: TranslationKey;
+  age?: TranslationKey;
 }
 
 export function validateStep1(data: Step1Data): Step1Errors {
   const errors: Step1Errors = {};
-  if (!data.name.trim()) errors.name = traducir("creadores.step1.errName");
-  if (!data.email.trim()) errors.email = traducir("creadores.step1.errEmail");
-  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) errors.email = traducir("creadores.step1.errEmailInvalid");
-  if (!data.phone.trim()) errors.phone = traducir("creadores.step1.errPhone");
-  if (data.age && Number(data.age) < 18) errors.age = traducir("creadores.step1.errAge");
+  if (!data.name.trim()) errors.name = "creadores.step1.errName";
+  if (!data.email.trim()) errors.email = "creadores.step1.errEmail";
+  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) errors.email = "creadores.step1.errEmailInvalid";
+  if (!data.phone.trim()) errors.phone = "creadores.step1.errPhone";
+  if (data.age && Number(data.age) < 18) errors.age = "creadores.step1.errAge";
   return errors;
 }
 
@@ -154,7 +156,7 @@ export default function Step1PersonalInfo({ data, errors, onChange }: Props) {
       <div className="space-y-1.5">
         <Label>{t("cr.fullNameReq")}</Label>
         <Input value={data.name} onChange={(e) => onChange("name", e.target.value)} placeholder={t("common.fullName")} />
-        {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
+        {errors.name && <p className="text-xs text-destructive">{t(errors.name)}</p>}
       </div>
       <div className="space-y-1.5">
         <Label>{t("cr.middleName")}</Label>
@@ -167,17 +169,17 @@ export default function Step1PersonalInfo({ data, errors, onChange }: Props) {
       <div className="space-y-1.5">
         <Label>{t("creadores.step1.emailReq")}</Label>
         <Input type="email" value={data.email} onChange={(e) => onChange("email", e.target.value)} placeholder={t("cr.emailPh")} />
-        {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
+        {errors.email && <p className="text-xs text-destructive">{t(errors.email)}</p>}
       </div>
       <div className="space-y-1.5">
         <Label>{t("cr.phoneReq")}</Label>
         <PhoneInput value={data.phone} onChange={(v) => onChange("phone", v)} />
-        {errors.phone && <p className="text-xs text-destructive">{errors.phone}</p>}
+        {errors.phone && <p className="text-xs text-destructive">{t(errors.phone)}</p>}
       </div>
       <div className="space-y-1.5">
         <Label>{t("creadores.step1.age")}</Label>
         <Input type="number" min={18} value={data.age} onChange={(e) => onChange("age", e.target.value)} placeholder="18" />
-        {errors.age && <p className="text-xs text-destructive">{errors.age}</p>}
+        {errors.age && <p className="text-xs text-destructive">{t(errors.age)}</p>}
       </div>
       <div className="space-y-1.5">
         <Label>{t("common.birthDate")}</Label>

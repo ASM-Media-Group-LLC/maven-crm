@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { traducir, type TranslationKey } from "@/lib/i18n";
+import type { TranslationKey } from "@/lib/i18n";
 
 export interface OnboardingCreator {
   id: string;
@@ -74,14 +74,15 @@ export function calculateCurrentStep(creator: OnboardingCreator): number {
   return 4;
 }
 
-export function getStepLabel(step: number, dbStatus: string | null): string {
-  if (dbStatus === "pendiente_verificacion") return traducir("creadores.status.pendingVerification");
+/** La CLAVE de la etiqueta del paso: se traduce con t() al dibujarla. */
+export function getStepLabel(step: number, dbStatus: string | null): TranslationKey | null {
+  if (dbStatus === "pendiente_verificacion") return "creadores.status.pendingVerification";
   switch (step) {
-    case 1: return traducir("creadores.onb.stepPersonal");
-    case 2: return traducir("creadores.onb.stepPsych");
-    case 3: return traducir("creadores.onb.stepDocs");
-    case 4: return traducir("creadores.onb.stepPricing");
-    default: return "";
+    case 1: return "creadores.onb.stepPersonal";
+    case 2: return "creadores.onb.stepPsych";
+    case 3: return "creadores.onb.stepDocs";
+    case 4: return "creadores.onb.stepPricing";
+    default: return null;
   }
 }
 

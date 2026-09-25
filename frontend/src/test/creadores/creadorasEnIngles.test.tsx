@@ -10,13 +10,16 @@
 //
 // Lo que es DATO (el nombre de la creadora, su país, su categoría, lo que
 // escribió ella) viene de los fixtures en inglés o neutro a propósito: acá se
-// mide la interfaz, no el contenido.
+// mide la interfaz, no el contenido. La excepción son las OPCIONES que guardan los
+// selects del onboarding en español («Dulce», «Rechazo suave», «Otro»): esas la
+// interfaz las tiene que mostrar con su etiqueta, así que el fixture las trae tal
+// cual se guardan.
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import type { ReactNode } from "react";
-import { LanguageProvider } from "@/hooks/useLanguage";
+import { LanguageProvider, useLanguage } from "@/hooks/useLanguage";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { esEspanol } from "../i18n/detectarEspanol";
 import translations from "@/lib/i18n";
@@ -35,13 +38,13 @@ const CREADORA = {
   profile_photo_url: null, birth_date: "1995-04-10", age: 30, registration_date: "2026-01-15",
   created_at: ISO_HOY, updated_at: ISO_HOY, entered_crm_at: "2026-02-01T00:00:00Z", languages: ["English"],
   blu_infloww_active: true, internal_notes: "VIP", bio: "Hi", instagram_followers: 150000,
-  tono_voz: "sweet", apodos_permitidos: "babe, princess", palabras_prohibidas: "ugly", emoji_frecuente: "🔥",
+  tono_voz: "Dulce", apodos_permitidos: "babe, princess", palabras_prohibidas: "ugly", emoji_frecuente: "🔥",
   contenido_jamas_haria: "Meetups", frases_venta: "Want something special?", hobbies: "Yoga",
-  mascotas_nombres: "Luna", comida_favorita: "Sushi", personalidad_marca: "Playful", tono_emocional: "Warm",
+  mascotas_nombres: "Luna", comida_favorita: "Sushi", personalidad_marca: "Directa", tono_emocional: "Warm",
   terminos_afecto: "baby", como_quieres_que_te_llamen: "Janie", gfe_disponible: true, currency: "USD",
   precios_contenido: { cat1: { price: 20, notes: "" }, custom: { price: 50, notes: "24h" }, videocalls: { price: 80 } },
-  respuesta_sexo_en_persona: "Never", respuesta_usuario_grosero: "Block", estrategia_rechazo: "Humor",
-  plataforma_videollamada: "Zoom", usuarios_vip: "whale1", estrategia_recuperacion: "Discounts", restricciones_seguridad: "No face",
+  respuesta_sexo_en_persona: "Never", respuesta_usuario_grosero: "Block", estrategia_rechazo: "Rechazo suave",
+  plataforma_videollamada: "Otro", usuarios_vip: "whale1", estrategia_recuperacion: "Discounts", restricciones_seguridad: "No face",
   assigned_manager_profile_id: "m1",
   creator_business: {
     id: "b1", assigned_agency: "Kash Plus", manager_type: "Full", kash_type: "Plus", start_date: "2026-01-15",
@@ -162,13 +165,18 @@ import ProspectosPage from "@/pages/creadores/prospectos/ProspectosPage";
 import NuevoCreadorForm from "@/pages/creadores/NuevoCreadorForm";
 import LineamientosSoloLectura from "@/pages/creadores/LineamientosSoloLectura";
 import ChatterOperationalView from "@/pages/creadores/ChatterOperationalView";
+import AssignmentModal from "@/pages/creadores/onboarding/AssignmentModal";
+import CommissionTiersEditor, { type CommissionTier } from "@/components/commission/CommissionTiersEditor";
+import { useState } from "react";
 
 /** Todo el texto visible y los atributos que se leen en pantalla. */
 function textosVisibles(raiz: HTMLElement): string[] {
   const out: string[] = [];
   const walker = document.createTreeWalker(raiz, NodeFilter.SHOW_TEXT);
   for (let n = walker.nextNode(); n; n = walker.nextNode()) {
-    if (n.parentElement?.closest("code, pre, script, style")) continue;
+    // Lo que hay dentro de un <textarea> es su VALOR (lo que se edita y se guarda,
+    // como el de un <input>), no texto de la interfaz.
+    if (n.parentElement?.closest("code, pre, script, style, textarea")) continue;
     const t = (n.textContent ?? "").trim();
     if (t) out.push(t);
   }
@@ -189,7 +197,24 @@ const ES_DEL_DICCIONARIO = new Set(
     .filter((par) => par.es !== par.en)
     .map((par) => par.es),
 );
-const enEspanol = () => textosVisibles(document.body).filter((t) => esEspanol(t) || ES_DEL_DICCIONARIO.has(t));
+// Un texto armado con partes («Core operations · Precios») no es exactamente el
+// `es` de ninguna clave: se mira también cada parte.
+const PARTES = /\s[·•–—|]\s/;
+const enEspanol = () =>
+  textosVisibles(document.body).filter(
+    (t) => esEspanol(t) || ES_DEL_DICCIONARIO.has(t) || t.split(PARTES).some((parte) => ES_DEL_DICCIONARIO.has(parte.trim())),
+  );
+
+/** Para cambiar el idioma con algo ya en pantalla, como lo hace el botón ES/EN. */
+function BotonesIdioma() {
+  const { setLanguage } = useLanguage();
+  return (
+    <>
+      <button type="button" onClick={() => setLanguage("es")}>ES</button>
+      <button type="button" onClick={() => setLanguage("en")}>EN</button>
+    </>
+  );
+}
 
 function montar(ui: ReactNode, ruta = "/", patron = "/") {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -258,6 +283,11 @@ describe("Creadoras en inglés", () => {
     montar(<CreadorProfileContent />, "/creadores/c1", "/creadores/:id");
     await screen.findByText("Character sheet");
     expect(screen.getByText("Export spec sheet")).toBeTruthy();
+    // Las opciones guardadas en español se muestran con su etiqueta.
+    expect(screen.getByText("Sweet")).toBeTruthy();
+    expect(screen.getByText("Direct")).toBeTruthy();
+    expect(screen.getByText("Soft rejection")).toBeTruthy();
+    expect(screen.getByText("Other")).toBeTruthy();
     expect(enEspanol()).toEqual([]);
 
     // Operaciones editando.
@@ -307,6 +337,30 @@ describe("Creadoras en inglés", () => {
     expect(enEspanol()).toEqual([]);
   }, LENTO);
 
+  it("el popup de una creadora del dashboard: el manager en singular", async () => {
+    montar(<CreadorasDashboardContent />);
+    await screen.findByText("Latest additions");
+    fireEvent.click(screen.getAllByRole("button", { name: /Janie/ })[0]);
+    const popup = await screen.findByRole("dialog");
+    expect(within(popup).getByText("View full profile")).toBeTruthy();
+    expect(within(popup).getByText("Manager")).toBeTruthy();
+    expect(within(popup).queryByText("Managers")).toBeNull();
+    expect(enEspanol()).toEqual([]);
+  }, LENTO);
+
+  it("el modal de un lineamiento del catálogo muestra la categoría y el título traducidos", async () => {
+    montar(<CreadorProfileContent />, "/creadores/c1", "/creadores/:id");
+    await screen.findByText("Character sheet");
+    abrirPestana("Guidelines");
+    await screen.findByText("Operating guidelines");
+    // g1 es «Operación Core» / «Precios»: los dos se guardan en español.
+    fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
+    const modal = await screen.findByRole("dialog");
+    expect(within(modal).getByText("Edit guideline")).toBeTruthy();
+    expect(within(modal).getByText("Core operations · Prices")).toBeTruthy();
+    expect(enEspanol()).toEqual([]);
+  }, LENTO);
+
   it("la ficha de una creadora en revisión muestra la verificación en inglés", async () => {
     TABLAS.v_creators = [EN_REVISION];
     try {
@@ -323,6 +377,7 @@ describe("Creadoras en inglés", () => {
     await screen.findByText("Character and voice");
     await screen.findByText("Core operations");
     expect(screen.getByText("Limits")).toBeTruthy();
+    expect(screen.getByText("Sweet")).toBeTruthy();
     expect(enEspanol()).toEqual([]);
   }, LENTO);
 
@@ -371,6 +426,83 @@ describe("Creadoras en inglés", () => {
     fireEvent.click(screen.getAllByRole("button", { name: /New profile/ })[0]);
     await screen.findByRole("dialog");
     expect(enEspanol()).toEqual([]);
+  }, LENTO);
+});
+
+// Los errores de validación y el «Sin nombre» se guardan en el estado (o en la
+// caché de react-query) como CLAVE y se traducen al dibujarlos: si se guardara el
+// texto ya traducido, al cambiar de idioma con el error en pantalla quedaría el
+// idioma de antes.
+describe("Creadoras: cambiar de idioma con un mensaje ya en pantalla", () => {
+  beforeEach(() => {
+    localStorage.setItem("app-language", "en");
+  });
+
+  it("los errores del paso 1 y del paso de documentos del onboarding", async () => {
+    const paso1 = montar(<><BotonesIdioma /><OnboardingWizard onCancel={() => {}} initialStep={1} /></>);
+    fireEvent.click(await screen.findByRole("button", { name: "Next" }));
+    expect(await screen.findByText("Name is required")).toBeTruthy();
+    expect(screen.getByText("Email is required")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "ES" }));
+    expect(await screen.findByText("Nombre es requerido")).toBeTruthy();
+    expect(screen.getByText("Email es requerido")).toBeTruthy();
+    paso1.unmount();
+
+    localStorage.setItem("app-language", "en");
+    montar(<><BotonesIdioma /><OnboardingWizard onCancel={() => {}} initialStep={3} /></>);
+    fireEvent.click(await screen.findByRole("button", { name: "Next" }));
+    expect(await screen.findByText("You must confirm the details")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "ES" }));
+    expect(await screen.findByText("Debe confirmar los datos")).toBeTruthy();
+  }, LENTO);
+
+  it("el error de los tramos de comisión", async () => {
+    function Tramos() {
+      const [tramos, setTramos] = useState<CommissionTier[]>([{ min_revenue: 0, max_revenue: null, percentage: 10 }]);
+      return (
+        <CommissionTiersEditor
+          commissionType="tiered"
+          fixedPercentage={0}
+          tiers={tramos}
+          onTypeChange={() => {}}
+          onFixedPercentageChange={() => {}}
+          onTiersChange={setTramos}
+        />
+      );
+    }
+    montar(<><BotonesIdioma /><Tramos /></>);
+    // [mínimo, porcentaje]: el máximo del último tramo es el botón «Sin límite».
+    const porcentaje = screen.getAllByRole("spinbutton")[1];
+    fireEvent.change(porcentaje, { target: { value: "150" } });
+    expect(await screen.findByText("Tier 1: the percentage must be between 0 and 100")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "ES" }));
+    expect(await screen.findByText("Tramo 1: porcentaje debe estar entre 0 y 100")).toBeTruthy();
+  }, LENTO);
+
+  it("el «Sin nombre» de quien no tiene nombre, en el modal de asignación", async () => {
+    const perfiles = TABLAS.profiles;
+    TABLAS.user_roles = [{ user_id: "x1" }];
+    TABLAS.profiles = [{ id: "x1", full_name: null }];
+    try {
+      montar(
+        <>
+          <BotonesIdioma />
+          <AssignmentModal open onOpenChange={() => {}} onConfirm={() => {}} isSubmitting={false} />
+        </>,
+      );
+      // Elegir a la persona sin nombre como manager: queda escrita en el botón.
+      const [elegirManager] = await screen.findAllByRole("combobox");
+      await waitFor(() => expect(elegirManager).not.toBeDisabled());
+      fireEvent.click(elegirManager);
+      fireEvent.click(await screen.findByRole("option", { name: "No name" }));
+      await waitFor(() => expect(within(elegirManager).getByText("No name")).toBeTruthy());
+      // El modal deja el resto de la página aria-hidden: el botón está, pero «oculto».
+      fireEvent.click(screen.getByRole("button", { name: "ES", hidden: true }));
+      await waitFor(() => expect(within(elegirManager).getByText("Sin nombre")).toBeTruthy());
+    } finally {
+      TABLAS.profiles = perfiles;
+      delete TABLAS.user_roles;
+    }
   }, LENTO);
 });
 

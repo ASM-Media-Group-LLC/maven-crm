@@ -16,6 +16,7 @@ import ChatterOperationalView from "./ChatterOperationalView";
 import { useVistaTrabajo } from "./vistaTrabajo";
 import type { TranslationKey } from "@/lib/i18n";
 import { useLanguage } from "@/hooks/useLanguage";
+import { etiquetaTono, etiquetaRechazo, etiquetaPlataformaVideollamada } from "./etiquetasCreadora";
 
 interface OperacionesTabContentProps {
   creator: {
@@ -97,8 +98,11 @@ export const NoData = () => {
   return <span className="text-sm text-muted-foreground italic">{t("creadores.notConfigured")}</span>;
 };
 
-// `key` es la columna de creators; `label` la clave de su título.
-const crisisScripts: { key: string; label: TranslationKey }[] = [
+// `key` es la columna de creators; `label` la clave de su título. `etiqueta`, si
+// está, traduce las opciones guardadas del select del onboarding (lo demás es
+// texto libre y se muestra tal cual).
+type Etiquetador = (t: (k: TranslationKey) => string, valor: string) => string;
+const crisisScripts: { key: string; label: TranslationKey; etiqueta?: Etiquetador }[] = [
   { key: "respuesta_sexo_en_persona", label: "creadores.ops.crisisMeetInPerson" },
   { key: "respuesta_usuario_grosero", label: "creadores.ops.crisisRude" },
   { key: "respuesta_pedir_desnudos", label: "creadores.ops.crisisFreeMaterial" },
@@ -106,7 +110,7 @@ const crisisScripts: { key: string; label: TranslationKey }[] = [
   { key: "respuesta_muestra_intimas", label: "creadores.ops.crisisIntimate" },
   { key: "estrategia_material_gratis", label: "creadores.ops.crisisFreeStrategy" },
   { key: "estrategia_problemas_personales", label: "creadores.ops.crisisPersonal" },
-  { key: "estrategia_rechazo", label: "creadores.ops.crisisRejection" },
+  { key: "estrategia_rechazo", label: "creadores.ops.crisisRejection", etiqueta: etiquetaRechazo },
 ];
 
 // Campos de texto editables (todos columnas planas de creators).
@@ -223,7 +227,7 @@ const OperacionesTabContent = ({ creator, creatorId }: OperacionesTabContentProp
             <div>
               <p className="text-xs text-muted-foreground mb-1">{t("cr.toneOfVoice")}</p>
               {isEditing ? <EIn field="tono_voz" placeholder={t("creadores.ops.toneOfVoicePh")} /> : creator.tono_voz ? (
-                <p className="text-lg font-semibold capitalize">{creator.tono_voz}</p>
+                <p className="text-lg font-semibold capitalize">{etiquetaTono(t, creator.tono_voz)}</p>
               ) : <NoData />}
             </div>
             <div>
@@ -247,7 +251,7 @@ const OperacionesTabContent = ({ creator, creatorId }: OperacionesTabContentProp
             <div>
               <p className="text-xs text-muted-foreground mb-1">{t("creadores.ops.brandPersonality")}</p>
               {isEditing ? <ETx field="personalidad_marca" /> : creator.personalidad_marca ? (
-                <p className="text-sm">{creator.personalidad_marca}</p>
+                <p className="text-sm">{etiquetaTono(t, creator.personalidad_marca)}</p>
               ) : <NoData />}
             </div>
             <div>
@@ -325,13 +329,13 @@ const OperacionesTabContent = ({ creator, creatorId }: OperacionesTabContentProp
             </div>
           ) : hasCrisisData ? (
             <div className="space-y-4">
-              {crisisScripts.map(({ key, label }) => {
+              {crisisScripts.map(({ key, label, etiqueta }) => {
                 const value = (creator as Record<string, unknown>)[key] as string | null;
                 if (!value) return null;
                 return (
                   <div key={key} className="rounded-lg border p-3 space-y-1">
                     <p className="text-xs font-bold text-muted-foreground">{t(label)}</p>
-                    <p className="text-sm">{value}</p>
+                    <p className="text-sm">{etiqueta ? etiqueta(t, value) : value}</p>
                   </div>
                 );
               })}
@@ -433,7 +437,7 @@ const OperacionesTabContent = ({ creator, creatorId }: OperacionesTabContentProp
               <div className="flex-1">
                 <p className="text-xs text-muted-foreground">{t("creadores.ops.videocallPlatform")}</p>
                 {isEditing ? <EIn field="plataforma_videollamada" /> : creator.plataforma_videollamada ? (
-                  <p className="text-sm font-medium">{creator.plataforma_videollamada}</p>
+                  <p className="text-sm font-medium">{etiquetaPlataformaVideollamada(t, creator.plataforma_videollamada)}</p>
                 ) : <NoData />}
               </div>
             </div>

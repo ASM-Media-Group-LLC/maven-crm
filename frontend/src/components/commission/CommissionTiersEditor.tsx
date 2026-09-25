@@ -7,7 +7,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { cn } from "@/lib/utils";
 import { useFormato } from "@/hooks/useFormato";
 import type { Formato } from "@/lib/formato";
-import { traducir } from "@/lib/i18n";
+import type { TranslationKey } from "@/lib/i18n";
 import { useLanguage } from "@/hooks/useLanguage";
 
 export interface CommissionTier {
@@ -29,16 +29,23 @@ function fmt(n: number, f: Formato) {
   return new Intl.NumberFormat(f.intl("es-CO"), { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
 }
 
-function validateTiers(tiers: CommissionTier[]): string | null {
-  if (tiers.length === 0) return traducir("creadores.tiers.errNone");
+// El error se guarda en el estado como CLAVE (+ el número de tramo) y se traduce
+// al dibujarlo: si alguien cambia el idioma con el error en pantalla, cambia también.
+export interface ErrorDeTramos {
+  clave: TranslationKey;
+  params?: Record<string, number>;
+}
+
+function validateTiers(tiers: CommissionTier[]): ErrorDeTramos | null {
+  if (tiers.length === 0) return { clave: "creadores.tiers.errNone" };
   for (let i = 0; i < tiers.length; i++) {
     const t = tiers[i];
-    if (t.percentage < 0 || t.percentage > 100) return traducir("creadores.tiers.errPct", { n: i + 1 });
-    if (t.max_revenue !== null && t.max_revenue <= t.min_revenue) return traducir("creadores.tiers.errMax", { n: i + 1 });
+    if (t.percentage < 0 || t.percentage > 100) return { clave: "creadores.tiers.errPct", params: { n: i + 1 } };
+    if (t.max_revenue !== null && t.max_revenue <= t.min_revenue) return { clave: "creadores.tiers.errMax", params: { n: i + 1 } };
     if (i > 0 && tiers[i - 1].max_revenue !== null && t.min_revenue !== tiers[i - 1].max_revenue + 1) {
-      return traducir("creadores.tiers.errContiguous", { n: i + 1 });
+      return { clave: "creadores.tiers.errContiguous", params: { n: i + 1 } };
     }
-    if (i < tiers.length - 1 && t.max_revenue === null) return traducir("creadores.tiers.errOnlyLastUnlimited");
+    if (i < tiers.length - 1 && t.max_revenue === null) return { clave: "creadores.tiers.errOnlyLastUnlimited" };
   }
   return null;
 }
@@ -55,7 +62,7 @@ export default function CommissionTiersEditor({
 }: CommissionTiersEditorProps) {
   const f = useFormato();
   const { t } = useLanguage();
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ErrorDeTramos | null>(null);
 
   const addTier = () => {
     const lastMax = tiers.length > 0 ? (tiers[tiers.length - 1].max_revenue ?? 0) : 0;
@@ -192,7 +199,7 @@ export default function CommissionTiersEditor({
             <Plus className="h-3.5 w-3.5" /> {t("creadores.tiers.add")}
           </Button>
 
-          {error && <p className="text-xs text-destructive">{error}</p>}
+          {error && <p className="text-xs text-destructive">{t(error.clave, error.params)}</p>}
 
           {tiers.length > 0 && !error && (
             <div className="rounded-md border border-border bg-muted/20 p-3 space-y-1">

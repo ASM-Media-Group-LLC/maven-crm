@@ -446,7 +446,7 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
       }
     } else {
       if (!step1.name.trim()) {
-        setStep1Errors({ name: t("creadores.wiz.nameForDraft") });
+        setStep1Errors({ name: "creadores.wiz.nameForDraft" });
         setStep(1);
         return;
       }

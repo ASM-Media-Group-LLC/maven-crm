@@ -54,6 +54,14 @@ const categoriaVisible = (t: (k: TranslationKey) => string, guardada: string) =>
   return cat ? t(cat.label) : guardada;
 };
 
+// Igual con el título: el de un ítem del catálogo se muestra con su etiqueta
+// (form.title sigue siendo el título guardado, en español); lo escrito a mano,
+// tal cual.
+const tituloVisible = (t: (k: TranslationKey) => string, categoria: string, titulo: string) => {
+  const item = CATEGORIES.find((c) => c.category === categoria)?.items.find((i) => i.title === titulo);
+  return item ? t(item.label) : titulo;
+};
+
 const LineamientosTabContent = ({ creatorId }: Props) => {
   const { t } = useLanguage();
   const queryClient = useQueryClient();
@@ -430,7 +438,7 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
             <DialogTitle>{editingId ? t("creadores.guide.editTitle") : t("creadores.guide.newTitle")}</DialogTitle>
             <DialogDescription>
               {form.guideline_type && form.title
-                ? `${categoriaVisible(t, form.guideline_type)} · ${form.title}`
+                ? `${categoriaVisible(t, form.guideline_type)} · ${tituloVisible(t, form.guideline_type, form.title)}`
                 : editingId
                   ? t("creadores.guide.editDesc")
                   : t("creadores.guide.newDesc")}

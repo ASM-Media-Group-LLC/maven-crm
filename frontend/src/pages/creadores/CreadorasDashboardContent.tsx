@@ -461,7 +461,7 @@ const CreadorasDashboardContent = () => {
               { label: t("common.country"), value: c.country ?? "—" },
               { label: t("common.category"), value: c.category ?? "—" },
               { label: t("creadores.dash.registered"), value: c.created_at ? format(new Date(c.created_at), "dd MMM yyyy", { locale: f.fechas }) : "—" },
-              { label: t("creadores.list.managersPh"), value: c.creator_business?.manager_type ?? "—" },
+              { label: t("creadores.dash.manager"), value: c.creator_business?.manager_type ?? "—" },
             ];
             return (
               <>
