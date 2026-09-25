@@ -7,6 +7,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { cn } from "@/lib/utils";
 import { useFormato } from "@/hooks/useFormato";
 import type { Formato } from "@/lib/formato";
+import { traducir } from "@/lib/i18n";
+import { useLanguage } from "@/hooks/useLanguage";
 
 export interface CommissionTier {
   min_revenue: number;
@@ -28,15 +30,15 @@ function fmt(n: number, f: Formato) {
 }
 
 function validateTiers(tiers: CommissionTier[]): string | null {
-  if (tiers.length === 0) return "Agrega al menos un tramo";
+  if (tiers.length === 0) return traducir("creadores.tiers.errNone");
   for (let i = 0; i < tiers.length; i++) {
     const t = tiers[i];
-    if (t.percentage < 0 || t.percentage > 100) return `Tramo ${i + 1}: porcentaje debe estar entre 0 y 100`;
-    if (t.max_revenue !== null && t.max_revenue <= t.min_revenue) return `Tramo ${i + 1}: máximo debe ser mayor al mínimo`;
+    if (t.percentage < 0 || t.percentage > 100) return traducir("creadores.tiers.errPct", { n: i + 1 });
+    if (t.max_revenue !== null && t.max_revenue <= t.min_revenue) return traducir("creadores.tiers.errMax", { n: i + 1 });
     if (i > 0 && tiers[i - 1].max_revenue !== null && t.min_revenue !== tiers[i - 1].max_revenue + 1) {
-      return `Tramo ${i + 1}: el mínimo debe coincidir con el máximo del tramo anterior`;
+      return traducir("creadores.tiers.errContiguous", { n: i + 1 });
     }
-    if (i < tiers.length - 1 && t.max_revenue === null) return `Solo el último tramo puede tener máximo "Sin límite"`;
+    if (i < tiers.length - 1 && t.max_revenue === null) return traducir("creadores.tiers.errOnlyLastUnlimited");
   }
   return null;
 }
@@ -52,6 +54,7 @@ export default function CommissionTiersEditor({
   onTiersChange,
 }: CommissionTiersEditorProps) {
   const f = useFormato();
+  const { t } = useLanguage();
   const [error, setError] = useState<string | null>(null);
 
   const addTier = () => {
@@ -91,7 +94,7 @@ export default function CommissionTiersEditor({
 
   return (
     <div className="space-y-3">
-      <Label className="text-sm font-medium">Porcentaje Agencia</Label>
+      <Label className="text-sm font-medium">{t("creadores.tiers.agencyPct")}</Label>
       <RadioGroup
         value={commissionType}
         onValueChange={(v) => {
@@ -102,11 +105,11 @@ export default function CommissionTiersEditor({
       >
         <label className="flex items-center gap-2 text-sm cursor-pointer">
           <RadioGroupItem value="fixed" />
-          Fijo
+          {t("creadores.tiers.fixed")}
         </label>
         <label className="flex items-center gap-2 text-sm cursor-pointer">
           <RadioGroupItem value="tiered" />
-          Por rangos
+          {t("creadores.tiers.tiered")}
         </label>
       </RadioGroup>
 
@@ -121,15 +124,15 @@ export default function CommissionTiersEditor({
             placeholder="15"
             className="w-full"
           />
-          <p className="text-xs text-muted-foreground mt-1">Porcentaje fijo aplicado a todas las ganancias</p>
+          <p className="text-xs text-muted-foreground mt-1">{t("creadores.tiers.fixedHelp")}</p>
         </div>
       ) : (
         <div className="space-y-2">
           {/* Header */}
           {tiers.length > 0 && (
             <div className="grid grid-cols-[1fr_1fr_100px_36px] gap-2 text-xs font-medium text-muted-foreground px-1">
-              <span>Mín. (USD)</span>
-              <span>Máx. (USD)</span>
+              <span>{t("creadores.tiers.min")}</span>
+              <span>{t("creadores.tiers.max")}</span>
               <span>%</span>
               <span />
             </div>
@@ -160,7 +163,7 @@ export default function CommissionTiersEditor({
                   onClick={() => updateTier(i, "max_revenue", tier.min_revenue + 10000)}
                   className="h-9 px-3 rounded-md border border-input bg-muted/30 text-sm text-muted-foreground flex items-center gap-1 hover:bg-muted/50 transition-colors"
                 >
-                  <Infinity className="h-3.5 w-3.5" /> Sin límite
+                  <Infinity className="h-3.5 w-3.5" /> {t("creadores.tiers.noLimit")}
                 </button>
               )}
               <Input
@@ -176,6 +179,8 @@ export default function CommissionTiersEditor({
                 variant="ghost"
                 size="icon"
                 className="h-9 w-9 text-muted-foreground hover:text-destructive"
+                aria-label={t("creadores.tiers.remove")}
+                title={t("creadores.tiers.remove")}
                 onClick={() => removeTier(i)}
               >
                 <Trash2 className="h-4 w-4" />
@@ -184,17 +189,17 @@ export default function CommissionTiersEditor({
           ))}
 
           <Button type="button" variant="outline" size="sm" onClick={addTier} className="gap-1.5">
-            <Plus className="h-3.5 w-3.5" /> Agregar tramo
+            <Plus className="h-3.5 w-3.5" /> {t("creadores.tiers.add")}
           </Button>
 
           {error && <p className="text-xs text-destructive">{error}</p>}
 
           {tiers.length > 0 && !error && (
             <div className="rounded-md border border-border bg-muted/20 p-3 space-y-1">
-              <p className="text-xs font-medium text-muted-foreground">Resumen de tramos</p>
-              {tiers.map((t, i) => (
+              <p className="text-xs font-medium text-muted-foreground">{t("creadores.tiers.summary")}</p>
+              {tiers.map((tramo, i) => (
                 <p key={i} className="text-xs">
-                  {fmt(t.min_revenue, f)} – {t.max_revenue !== null ? fmt(t.max_revenue, f) : "∞"}: <span className="font-semibold">{t.percentage}%</span>
+                  {fmt(tramo.min_revenue, f)} – {tramo.max_revenue !== null ? fmt(tramo.max_revenue, f) : "∞"}: <span className="font-semibold">{tramo.percentage}%</span>
                 </p>
               ))}
             </div>

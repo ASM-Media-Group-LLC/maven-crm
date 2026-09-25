@@ -30,16 +30,9 @@ import VerificationSection from "./VerificationSection";
 import { useOffboarding } from "./useOffboarding";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useVistaTrabajo } from "./vistaTrabajo";
-
-const statusLabel: Record<string, string> = {
-  active: "Activa",
-  onboarding: "Onboarding",
-  leaving: "Retiro",
-  terminated: "Terminada",
-  paused: "Pausada",
-  pendiente_verificacion: "En Revisión",
-  borrador: "Borrador",
-};
+import { etiquetaEstado } from "./etiquetasCreadora";
+import type { TranslationKey } from "@/lib/i18n";
+import { useLanguage } from "@/hooks/useLanguage";
 
 const statusVariant: Record<string, "success-soft" | "primary-soft" | "warning-soft" | "destructive-soft" | "secondary-soft"> = {
   active: "success-soft",
@@ -64,14 +57,16 @@ const getFlagEmoji = (code: string | null) => {
   return code.toUpperCase().split("").map((c) => String.fromCodePoint(127397 + c.charCodeAt(0))).join("");
 };
 
-const STATUS_OFFBOARDING: Record<string, { label: string; variant: string }> = {
-  en_proceso: { label: "En Proceso", variant: "bg-primary/15 text-primary border-primary/30" },
-  pendiente_aprobacion: { label: "Pend. Aprobación", variant: "bg-warning/15 text-warning border-warning/30" },
-  pendiente_cierre: { label: "Pend. Cierre", variant: "bg-accent/15 text-accent-foreground border-accent/30" },
-  finalizado: { label: "Finalizado", variant: "bg-muted text-muted-foreground border-border" },
+// Las claves son creator_offboardings.status (DATO); `label` es la clave de su etiqueta.
+const STATUS_OFFBOARDING: Record<string, { label: TranslationKey; variant: string }> = {
+  en_proceso: { label: "cr.offStatusInProgress", variant: "bg-primary/15 text-primary border-primary/30" },
+  pendiente_aprobacion: { label: "cr.offStatusPendingApprovalShort", variant: "bg-warning/15 text-warning border-warning/30" },
+  pendiente_cierre: { label: "cr.offStatusPendingClosureShort", variant: "bg-accent/15 text-accent-foreground border-accent/30" },
+  finalizado: { label: "cr.offStatusDone", variant: "bg-muted text-muted-foreground border-border" },
 };
 
 function OffboardingSummaryCard({ creatorId }: { creatorId: string }) {
+  const { t } = useLanguage();
   const { offboarding, approvals } = useOffboarding(creatorId);
   if (!offboarding) return null;
   const st = STATUS_OFFBOARDING[offboarding.status] ?? STATUS_OFFBOARDING.en_proceso;
@@ -90,10 +85,10 @@ function OffboardingSummaryCard({ creatorId }: { creatorId: string }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold">Offboarding</span>
-            <Badge variant="outline" className={`text-[10px] ${st.variant}`}>{st.label}</Badge>
+            <Badge variant="outline" className={`text-[10px] ${st.variant}`}>{t(st.label)}</Badge>
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Aprobaciones: {approvalCount}/2 · Checklist: {checkDone}/5
+            {t("creadores.profile.approvalsChecklist", { a: approvalCount, c: checkDone })}
           </p>
         </div>
         <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
@@ -105,6 +100,7 @@ function OffboardingSummaryCard({ creatorId }: { creatorId: string }) {
 
 const CreadorProfileContent = () => {
   const f = useFormato();
+  const { t } = useLanguage();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
@@ -141,9 +137,9 @@ const CreadorProfileContent = () => {
     return (
       <main className="flex-1 p-6">
         <Button variant="ghost" size="sm" onClick={goBack} className="gap-1.5 mb-4">
-          <ArrowLeft className="h-4 w-4" /> Volver
+          <ArrowLeft className="h-4 w-4" /> {t("common.back")}
         </Button>
-        <p className="text-muted-foreground">Creadora no encontrada.</p>
+        <p className="text-muted-foreground">{t("creadores.profile.notFound")}</p>
       </main>
     );
   }
@@ -174,7 +170,7 @@ const CreadorProfileContent = () => {
     <main className="flex-1 overflow-y-auto">
       <div className="px-3 pt-4 sm:px-6">
         <Button variant="ghost" size="sm" onClick={goBack} className="gap-1.5 text-muted-foreground">
-          <ArrowLeft className="h-4 w-4" /> Volver
+          <ArrowLeft className="h-4 w-4" /> {t("common.back")}
         </Button>
       </div>
 
@@ -220,7 +216,7 @@ const CreadorProfileContent = () => {
                 </a>
               )}
               {displayAge != null && (
-                <Badge variant="secondary-soft">{displayAge} años</Badge>
+                <Badge variant="secondary-soft">{t("creadores.profile.yearsOld", { n: displayAge })}</Badge>
               )}
             </div>
           </div>
@@ -234,17 +230,17 @@ const CreadorProfileContent = () => {
                 const { generateCreatorPdf } = await import("./generateCreatorPdf");
                 generateCreatorPdf(c);
               }}>
-                <Download className="h-4 w-4" /> Exportar Ficha Técnica
+                <Download className="h-4 w-4" /> {t("creadores.profile.exportSheet")}
               </Button>
             )}
             {!vistaTrabajo && (c as any).entered_crm_at && (
               <Badge
                 variant="success-soft"
                 className="gap-1"
-                title={`Detectada automáticamente al completar onboarding (status ≠ borrador)`}
+                title={t("creadores.profile.enteredCrmHint")}
               >
                 <CheckCircle2 className="h-3 w-3" />
-                Ingresada al CRM · {format(new Date((c as any).entered_crm_at), "d MMM yyyy", { locale: f.fechas })}
+                {t("creadores.profile.enteredCrm", { date: format(new Date((c as any).entered_crm_at), "d MMM yyyy", { locale: f.fechas }) })}
               </Badge>
             )}
             {c.status && (
@@ -253,13 +249,13 @@ const CreadorProfileContent = () => {
                 className={!vistaTrabajo ? "cursor-pointer hover:opacity-80 transition-opacity" : ""}
                 onClick={!vistaTrabajo ? () => setStatusModalOpen(true) : undefined}
               >
-                {statusLabel[c.status] ?? c.status}
+                {etiquetaEstado(t, c.status)}
               </Badge>
             )}
             {birthdayDays != null && (
               <Badge variant="secondary-soft" className="gap-1">
                 <Cake className="h-3 w-3" />
-                {birthdayDays === 0 ? "¡Hoy!" : `${birthdayDays} días para su cumpleaños`}
+                {birthdayDays === 0 ? t("creadores.profile.birthdayToday") : t("creadores.profile.birthdayIn", { n: birthdayDays })}
               </Badge>
             )}
           </div>
@@ -277,27 +273,27 @@ const CreadorProfileContent = () => {
       <div className="px-6 mt-4 pb-6">
         <Tabs defaultValue="operaciones">
           <TabsList className="w-full justify-start overflow-x-auto">
-            <TabsTrigger value="operaciones">{vistaTrabajo ? "Cómo escribirle" : "Operaciones"}</TabsTrigger>
+            <TabsTrigger value="operaciones">{vistaTrabajo ? t("creadores.profile.tabHowToWrite") : t("creadores.profile.tabOperations")}</TabsTrigger>
             {/* Vista de trabajo: además de la operativa, los lineamientos y las
                 redes públicas, las dos en solo lectura. Nada de Información
                 (teléfono, dirección, notas internas), Documentos, Monetización,
                 Tickets ni Historial. */}
             {vistaTrabajo && (
               <>
-                <TabsTrigger value="lineamientos">Lineamientos</TabsTrigger>
-                <TabsTrigger value="redes">Redes</TabsTrigger>
+                <TabsTrigger value="lineamientos">{t("creadores.profile.tabGuidelines")}</TabsTrigger>
+                <TabsTrigger value="redes">{t("creadores.profile.tabSocials")}</TabsTrigger>
               </>
             )}
             {!vistaTrabajo && (
               <>
-                <TabsTrigger value="info">Información</TabsTrigger>
-                <TabsTrigger value="lineamientos">Lineamientos</TabsTrigger>
-                <TabsTrigger value="redes">Redes</TabsTrigger>
-                <TabsTrigger value="monetizacion">Monetización</TabsTrigger>
-                <TabsTrigger value="documentos">Documentos</TabsTrigger>
-                <TabsTrigger value="notas">Notas</TabsTrigger>
-                <TabsTrigger value="tickets">Tickets</TabsTrigger>
-                <TabsTrigger value="historial">Historial</TabsTrigger>
+                <TabsTrigger value="info">{t("creadores.profile.tabInfo")}</TabsTrigger>
+                <TabsTrigger value="lineamientos">{t("creadores.profile.tabGuidelines")}</TabsTrigger>
+                <TabsTrigger value="redes">{t("creadores.profile.tabSocials")}</TabsTrigger>
+                <TabsTrigger value="monetizacion">{t("creadores.profile.tabMonetization")}</TabsTrigger>
+                <TabsTrigger value="documentos">{t("creadores.profile.tabDocuments")}</TabsTrigger>
+                <TabsTrigger value="notas">{t("creadores.profile.tabNotes")}</TabsTrigger>
+                <TabsTrigger value="tickets">{t("creadores.profile.tabTickets")}</TabsTrigger>
+                <TabsTrigger value="historial">{t("creadores.profile.tabHistory")}</TabsTrigger>
               </>
             )}
           </TabsList>

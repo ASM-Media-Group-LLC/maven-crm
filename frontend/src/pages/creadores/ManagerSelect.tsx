@@ -7,6 +7,7 @@
 // sobre creators.assigned_manager_profile_id) se alimenta igual desde cualquiera.
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAssignableManagers } from "@/hooks/useAssignableManagers";
+import { useLanguage } from "@/hooks/useLanguage";
 
 export const SIN_MANAGER = "__none__";
 
@@ -25,12 +26,13 @@ interface Props {
 }
 
 export function ManagerSelect({ value, onChange, className }: Props) {
+  const { t } = useLanguage();
   const { data: managers = [] } = useAssignableManagers();
   return (
     <Select value={value || SIN_MANAGER} onValueChange={(v) => onChange(v === SIN_MANAGER ? "" : v)}>
-      <SelectTrigger className={className}><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+      <SelectTrigger className={className}><SelectValue placeholder={t("common.select")} /></SelectTrigger>
       <SelectContent>
-        <SelectItem value={SIN_MANAGER}>Sin manager</SelectItem>
+        <SelectItem value={SIN_MANAGER}>{t("creadores.manager.none")}</SelectItem>
         {managers.map((m) => <SelectItem key={m.id} value={m.id}>{m.full_name ?? m.id}</SelectItem>)}
       </SelectContent>
     </Select>
@@ -39,7 +41,8 @@ export function ManagerSelect({ value, onChange, className }: Props) {
 
 // Nombre de la manager asignada para mostrar (null si no tiene).
 export function useManagerName(profileId: string | null | undefined): string | null {
+  const { t } = useLanguage();
   const { data: managers = [] } = useAssignableManagers();
   if (!profileId) return null;
-  return managers.find((m) => m.id === profileId)?.full_name ?? "(fuera del rol manager)";
+  return managers.find((m) => m.id === profileId)?.full_name ?? t("creadores.manager.outsideRole");
 }

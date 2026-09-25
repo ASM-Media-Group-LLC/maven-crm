@@ -8,6 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import CreateTicketModal from "./CreateTicketModal";
+import type { TranslationKey } from "@/lib/i18n";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface Props {
   creatorId: string;
@@ -20,11 +22,19 @@ const priorityVariant: Record<string, "destructive-soft" | "warning-soft" | "sec
   low: "primary-soft",
 };
 
-const statusLabel: Record<string, string> = {
-  open: "Abierto",
-  in_progress: "En Progreso",
-  resolved: "Resuelto",
-  closed: "Cerrado",
+// Las llaves son los valores guardados en `tickets`; acá solo se elige la etiqueta.
+const priorityLabel: Record<string, TranslationKey> = {
+  urgent: "tickets.priority.urgent",
+  high: "tickets.priority.high",
+  medium: "tickets.priority.medium",
+  low: "tickets.priority.low",
+};
+
+const statusLabel: Record<string, TranslationKey> = {
+  open: "tickets.status.open",
+  in_progress: "cr.inProgressCap",
+  resolved: "tickets.status.resolved",
+  closed: "tickets.status.closed",
 };
 
 const statusVariant: Record<string, "primary-soft" | "warning-soft" | "success-soft" | "secondary-soft"> = {
@@ -34,15 +44,16 @@ const statusVariant: Record<string, "primary-soft" | "warning-soft" | "success-s
   closed: "secondary-soft",
 };
 
-const typeLabel: Record<string, string> = {
-  complaint: "Queja",
-  technical: "Técnico",
-  billing: "Facturación",
-  content: "Contenido",
-  general: "General",
+const typeLabel: Record<string, TranslationKey> = {
+  complaint: "tickets.type.complaint",
+  technical: "tickets.type.technical",
+  billing: "tickets.type.billing",
+  content: "tickets.type.content",
+  general: "tickets.type.general",
 };
 
 const TicketsTabContent = ({ creatorId }: Props) => {
+  const { t } = useLanguage();
   const [modalOpen, setModalOpen] = useState(false);
 
   const { data: tickets = [], isLoading } = useQuery({
@@ -65,50 +76,50 @@ const TicketsTabContent = ({ creatorId }: Props) => {
           <div className="space-y-1.5">
             <CardTitle className="flex items-center gap-2 text-lg">
               <Ticket className="h-5 w-5" />
-              Tickets de Customer Service
+              {t("creadores.tickets.title")}
             </CardTitle>
-            <CardDescription>Tickets relacionados con esta creadora</CardDescription>
+            <CardDescription>{t("creadores.tickets.subtitle")}</CardDescription>
           </div>
           <Button size="sm" onClick={() => setModalOpen(true)}>
             <Plus className="h-4 w-4" />
-            Nuevo Ticket
+            {t("creadores.tickets.new")}
           </Button>
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <p className="text-sm text-muted-foreground text-center py-8">Cargando tickets...</p>
+            <p className="text-sm text-muted-foreground text-center py-8">{t("tickets.loadingTickets")}</p>
           ) : tickets.length === 0 ? (
             <EmptyState
               icon={<Ticket className="h-8 w-8 text-muted-foreground" />}
-              title="No hay tickets registrados"
-              description="Crea un ticket para comenzar"
+              title={t("creadores.tickets.empty")}
+              description={t("creadores.tickets.emptyDesc")}
               action={
                 <Button variant="outline" onClick={() => setModalOpen(true)}>
-                  Crear Primer Ticket
+                  {t("creadores.tickets.createFirst")}
                 </Button>
               }
             />
           ) : (
             <div className="space-y-3">
-              {tickets.map((t: any) => (
+              {tickets.map((tk: any) => (
                 <div
-                  key={t.id}
+                  key={tk.id}
                   className="flex items-center justify-between rounded-lg border p-4 hover:bg-muted/30 transition-colors"
                 >
                   <div className="space-y-1 min-w-0 flex-1">
-                    <p className="font-medium truncate">{t.title}</p>
+                    <p className="font-medium truncate">{tk.title}</p>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <span>{typeLabel[t.ticket_type] ?? t.ticket_type}</span>
-                      {t.company && <span>· {t.company}</span>}
-                      <span>· {format(new Date(t.created_at), "dd/MM/yyyy")}</span>
+                      <span>{typeLabel[tk.ticket_type] ? t(typeLabel[tk.ticket_type]) : tk.ticket_type}</span>
+                      {tk.company && <span>· {tk.company}</span>}
+                      <span>· {format(new Date(tk.created_at), "dd/MM/yyyy")}</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0 ml-4">
-                    <Badge variant={priorityVariant[t.priority] ?? "secondary-soft"} className="capitalize">
-                      {t.priority}
+                    <Badge variant={priorityVariant[tk.priority] ?? "secondary-soft"} className="capitalize">
+                      {priorityLabel[tk.priority] ? t(priorityLabel[tk.priority]) : tk.priority}
                     </Badge>
-                    <Badge variant={statusVariant[t.status] ?? "secondary-soft"}>
-                      {statusLabel[t.status] ?? t.status}
+                    <Badge variant={statusVariant[tk.status] ?? "secondary-soft"}>
+                      {statusLabel[tk.status] ? t(statusLabel[tk.status]) : tk.status}
                     </Badge>
                   </div>
                 </div>

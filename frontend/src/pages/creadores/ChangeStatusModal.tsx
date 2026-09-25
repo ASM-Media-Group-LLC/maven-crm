@@ -23,6 +23,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { etiquetaEstado, etiquetaEstadoGuardada } from "./etiquetasCreadora";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface ChangeStatusModalProps {
   creatorId: string;
@@ -32,12 +34,13 @@ interface ChangeStatusModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
+// `value` es el status que se GUARDA en creators.status; la etiqueta se elige al mostrar.
 const statusOptions = [
-  { value: "active", label: "Activa", color: "bg-success" },
-  { value: "onboarding", label: "Onboarding", color: "bg-primary" },
-  { value: "paused", label: "Pausada", color: "bg-muted-foreground" },
-  { value: "leaving", label: "Retiro", color: "bg-warning" },
-  { value: "terminated", label: "Terminada", color: "bg-destructive" },
+  { value: "active", color: "bg-success" },
+  { value: "onboarding", color: "bg-primary" },
+  { value: "paused", color: "bg-muted-foreground" },
+  { value: "leaving", color: "bg-warning" },
+  { value: "terminated", color: "bg-destructive" },
 ];
 
 const ChangeStatusModal = ({
@@ -47,6 +50,7 @@ const ChangeStatusModal = ({
   open,
   onOpenChange,
 }: ChangeStatusModalProps) => {
+  const { t } = useLanguage();
   const [newStatus, setNewStatus] = useState("");
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
@@ -58,7 +62,7 @@ const ChangeStatusModal = ({
   const isValid = newStatus && newStatus !== currentStatus && note.trim().length > 0;
 
   const handleCancel = () => {
-    toast({ title: "Edición cancelada" });
+    toast({ title: t("creadores.editCancelled") });
     resetAndClose();
   };
 
@@ -79,8 +83,11 @@ const ChangeStatusModal = ({
         .eq("id", creatorId);
       if (updateErr) throw updateErr;
 
-      const oldLabel = statusOptions.find((s) => s.value === currentStatus)?.label ?? currentStatus;
-      const newLabel = statusOptions.find((s) => s.value === newStatus)?.label ?? newStatus;
+      // En español a propósito: el historial y la nota los leen otras personas.
+      // Un status fuera de la lista se guarda tal cual, como antes.
+      const guardada = (s: string) => (statusOptions.some((o) => o.value === s) ? etiquetaEstadoGuardada(s) : s);
+      const oldLabel = guardada(currentStatus);
+      const newLabel = guardada(newStatus);
 
       const { error: histErr } = await supabase.from("creator_history").insert({
         creator_id: creatorId,
@@ -116,18 +123,18 @@ const ChangeStatusModal = ({
       queryClient.invalidateQueries({ queryKey: ["creator_offboarding", creatorId] });
 
       toast({
-        title: "Estado actualizado exitosamente",
-        description: offboardingId ? "Se creó el proceso de offboarding." : undefined,
+        title: t("creadores.changeStatus.updated"),
+        description: offboardingId ? t("creadores.changeStatus.offboardingCreated") : undefined,
         action: offboardingId ? (
           <Button variant="outline" size="sm" onClick={() => navigate(`/creadores/offboarding/${offboardingId}`)}>
-            Ver Offboarding
+            {t("creadores.table.viewOffboarding")}
           </Button>
         ) : undefined,
       });
       resetAndClose();
     } catch (err: any) {
       toast({
-        title: "Error al cambiar estado",
+        title: t("creadores.changeStatus.error"),
         description: err.message,
         variant: "destructive",
       });
@@ -140,28 +147,28 @@ const ChangeStatusModal = ({
     <Dialog open={open} onOpenChange={(v) => { if (!v) handleCancel(); }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Cambiar Estado de Creadora</DialogTitle>
+          <DialogTitle>{t("creadores.changeStatus.title")}</DialogTitle>
           <DialogDescription>{creatorName}</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
           {/* Current status */}
           <div className="space-y-1.5">
-            <Label className="text-muted-foreground text-xs">Estado Actual</Label>
+            <Label className="text-muted-foreground text-xs">{t("creadores.changeStatus.current")}</Label>
             <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
               {currentOption && (
                 <span className={`h-2.5 w-2.5 rounded-full ${currentOption.color}`} />
               )}
-              <span className="text-sm font-medium">{currentOption?.label ?? currentStatus}</span>
+              <span className="text-sm font-medium">{etiquetaEstado(t, currentStatus)}</span>
             </div>
           </div>
 
           {/* New status select */}
           <div className="space-y-1.5">
-            <Label>Nuevo Estado *</Label>
+            <Label>{t("creadores.changeStatus.newReq")}</Label>
             <Select value={newStatus} onValueChange={setNewStatus}>
               <SelectTrigger>
-                <SelectValue placeholder="Selecciona un estado" />
+                <SelectValue placeholder={t("creadores.changeStatus.selectPh")} />
               </SelectTrigger>
               <SelectContent>
                 {statusOptions
@@ -170,7 +177,7 @@ const ChangeStatusModal = ({
                     <SelectItem key={s.value} value={s.value}>
                       <span className="flex items-center gap-2">
                         <span className={`h-2.5 w-2.5 rounded-full ${s.color}`} />
-                        {s.label}
+                        {etiquetaEstado(t, s.value)}
                       </span>
                     </SelectItem>
                   ))}
@@ -180,25 +187,25 @@ const ChangeStatusModal = ({
 
           {/* Note */}
           <div className="space-y-1.5">
-            <Label>Nota Obligatoria *</Label>
+            <Label>{t("creadores.changeStatus.noteReq")}</Label>
             <Textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="Explica el motivo del cambio de estado..."
+              placeholder={t("creadores.changeStatus.notePh")}
               rows={3}
             />
             <p className="text-xs text-muted-foreground">
-              Esta nota se guardará en el historial y en las notas de la creadora
+              {t("creadores.changeStatus.noteHelp")}
             </p>
           </div>
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={handleCancel} disabled={saving}>
-            Cancelar
+            {t("common.cancel")}
           </Button>
           <Button onClick={handleSubmit} disabled={!isValid || saving}>
-            {saving ? "Guardando..." : "Cambiar Estado"}
+            {saving ? t("creadores.saving") : t("creadores.changeStatus.submit")}
           </Button>
         </DialogFooter>
       </DialogContent>

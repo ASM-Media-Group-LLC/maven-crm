@@ -12,6 +12,7 @@ import { useCreadores, type CreadorFilters } from "./useCreadores";
 import { useScouterCompanies } from "@/hooks/useScouterLeads";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useAuth } from "@/hooks/useAuth";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // Default arranca con status="active" porque el listado se usa 90% del
 // tiempo para operar sobre creadoras activas. Si el user quiere ver
@@ -29,6 +30,7 @@ const defaultFilters: CreadorFilters = {
 };
 
 const CreadoresContent = () => {
+  const { t } = useLanguage();
   const [filters, setFilters] = useState<CreadorFilters>(defaultFilters);
   const [view, setView] = useState<"table" | "grid">("table");
   const [page, setPage] = useState(1);
@@ -57,7 +59,7 @@ const CreadoresContent = () => {
         action={
           <Button onClick={() => navigate("/creadores/nuevo")}>
             <Plus className="mr-2 h-4 w-4" />
-            Agregar Creador
+            {t("creadores.list.addCreator")}
           </Button>
         }
       />

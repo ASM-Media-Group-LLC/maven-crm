@@ -5,8 +5,10 @@ import { ArrowLeft } from "lucide-react";
 import OnboardingWizard from "./OnboardingWizard";
 import { useOnboarding, calculateCurrentStep } from "./useOnboarding";
 import { PageHeader } from "@/components/ui/page-header";
+import { useLanguage } from "@/hooks/useLanguage";
 
 const OnboardingWizardPage = () => {
+  const { t } = useLanguage();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { data: creators = [] } = useOnboarding();
@@ -24,29 +26,29 @@ const OnboardingWizardPage = () => {
                 <BreadcrumbList>
                   <BreadcrumbItem>
                     <BreadcrumbLink asChild>
-                      <Link to="/creadores">Creadores</Link>
+                      <Link to="/creadores">{t("nav.creators")}</Link>
                     </BreadcrumbLink>
                   </BreadcrumbItem>
                   <BreadcrumbSeparator />
                   <BreadcrumbItem>
                     <BreadcrumbLink asChild>
-                      <Link to="/creadores/onboarding">Onboarding</Link>
+                      <Link to="/creadores/onboarding">{t("nav.creators.onboarding")}</Link>
                     </BreadcrumbLink>
                   </BreadcrumbItem>
                   <BreadcrumbSeparator />
                   <BreadcrumbItem>
                     <BreadcrumbPage>
-                      {isEditing ? (creator?.name || "Editar") : "Nuevo Onboarding"}
+                      {isEditing ? (creator?.name || t("common.edit")) : t("creadores.onb.new")}
                     </BreadcrumbPage>
                   </BreadcrumbItem>
                 </BreadcrumbList>
               </Breadcrumb>
 
               <div className="flex items-center gap-3 mt-3">
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleCancel}>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleCancel} aria-label={t("common.back")} title={t("common.back")}>
                   <ArrowLeft className="h-4 w-4" />
                 </Button>
-                <PageHeader title={isEditing ? "Continuar Onboarding" : "Nuevo Onboarding"} />
+                <PageHeader title={isEditing ? t("creadores.onb.continue") : t("creadores.onb.new")} />
               </div>
             </div>
 

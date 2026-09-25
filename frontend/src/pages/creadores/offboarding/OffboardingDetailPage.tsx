@@ -34,7 +34,7 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { useLanguage } from "@/hooks/useLanguage";
-import type { TranslationKey } from "@/lib/i18n";
+import { getTranslation, type TranslationKey } from "@/lib/i18n";
 
 // Allowed approver user IDs (Luis Ortega + Grace Gelves)
 const ALLOWED_APPROVER_IDS = [
@@ -114,7 +114,7 @@ const OffboardingDetailPage = () => {
   if (isLoading) {
     return (
       <main className="flex-1 p-6 flex items-center justify-center text-muted-foreground">
-        Cargando...
+        {t("common.loading")}
       </main>
     );
   }
@@ -122,7 +122,7 @@ const OffboardingDetailPage = () => {
   if (!offboarding) {
     return (
       <main className="flex-1 p-6 flex flex-col items-center justify-center gap-3">
-        <p className="text-muted-foreground">Offboarding no encontrado</p>
+        <p className="text-muted-foreground">{t("creadores.off.notFound")}</p>
         <Button variant="outline" onClick={() => navigate("/creadores/offboarding")}>
           <ArrowLeft className="h-4 w-4 mr-1.5" /> {t("common.back")}
         </Button>
@@ -136,7 +136,7 @@ const OffboardingDetailPage = () => {
   const checklistPct = Math.round((checklistDone / CHECKLIST_ITEMS.length) * 100);
   const impact = financialImpact ?? { lastRevenue: 0, avgMonthly: 0, estimatedLost: 0 };
 
-  const creatorName = creatorInfo?.name ?? "Creator";
+  const creatorName = creatorInfo?.name ?? t("cr.creator");
   const artisticName = creatorInfo?.artistic_name;
   const instagramHandle = creatorInfo?.instagram_handle;
 
@@ -157,8 +157,8 @@ const OffboardingDetailPage = () => {
         estimated_lost_revenue: impact.estimatedLost,
       } as Partial<Offboarding>,
       {
-        onSuccess: () => toast({ title: "Offboarding actualizado" }),
-        onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+        onSuccess: () => toast({ title: t("creadores.off.updated") }),
+        onError: (err: any) => toast({ title: t("common.error"), description: err.message, variant: "destructive" }),
       }
     );
   };
@@ -171,13 +171,13 @@ const OffboardingDetailPage = () => {
     if (!user?.id) return;
     approve.mutate(user.id, {
       onSuccess: () => toast({ title: t("cr.approvalRegistered") }),
-      onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+      onError: (err: any) => toast({ title: t("common.error"), description: err.message, variant: "destructive" }),
     });
   };
 
   const handleStatusChange = (newStatus: string) => {
     updateOffboarding.mutate({ status: newStatus } as Partial<Offboarding>, {
-      onSuccess: () => toast({ title: "Estado actualizado" }),
+      onSuccess: () => toast({ title: t("creadores.off.statusUpdated") }),
     });
   };
 
@@ -187,32 +187,35 @@ const OffboardingDetailPage = () => {
   };
 
   const generateComunicado = () => {
+    // El comunicado se GUARDA (comunicado_generado) y lo leen otras personas: va en
+    // español sea cual sea el idioma de quien lo genera.
+    const tEs = (k: TranslationKey, p?: Record<string, string | number>) => getTranslation(k, "es", p);
     const text = `
 ═══════════════════════════════════════
-  ${t("cr.commTitle")} — ${creatorName}
+  ${tEs("cr.commTitle")} — ${creatorName}
 ═══════════════════════════════════════
 
-▸ ${t("common.name")}: ${creatorName}
-▸ ${t("cr.commArtisticName")}: ${artisticName ?? "N/A"}
+▸ ${tEs("common.name")}: ${creatorName}
+▸ ${tEs("cr.commArtisticName")}: ${artisticName ?? "N/A"}
 ▸ Instagram: ${instagramHandle ?? "N/A"}
-▸ ${t("cr.commExitDate")}: ${offboarding.exit_date ?? t("common.pending")}
+▸ ${tEs("cr.commExitDate")}: ${offboarding.exit_date ?? tEs("common.pending")}
 
-── ${t("cr.commReasons")} ──────────────────────────
-▸ ${t("cr.commOperational")}: ${form.motivo_operativo || "N/A"}
-▸ ${t("cr.commCommercial")}: ${form.motivo_comercial || "N/A"}
-▸ ${t("cr.commFinal")}: ${form.motivo_final || "N/A"}
-▸ ${t("common.category")}: ${(() => { const c = CATEGORIAS.find((x) => x.value === form.categoria); return c ? t(c.key) : "N/A"; })()}
+── ${tEs("cr.commReasons")} ──────────────────────────
+▸ ${tEs("cr.commOperational")}: ${form.motivo_operativo || "N/A"}
+▸ ${tEs("cr.commCommercial")}: ${form.motivo_comercial || "N/A"}
+▸ ${tEs("cr.commFinal")}: ${form.motivo_final || "N/A"}
+▸ ${tEs("common.category")}: ${(() => { const c = CATEGORIAS.find((x) => x.value === form.categoria); return c ? tEs(c.key) : "N/A"; })()}
 
-── ${t("cr.commFinancialImpact")} ───────────────
-▸ ${t("cr.commLastRevenue")}: $${impact.lastRevenue.toLocaleString()}
-▸ ${t("cr.commAvgMonthly")}: $${impact.avgMonthly.toLocaleString()}
-▸ ${t("cr.commEstLost")}: $${impact.estimatedLost.toLocaleString()}
+── ${tEs("cr.commFinancialImpact")} ───────────────
+▸ ${tEs("cr.commLastRevenue")}: $${impact.lastRevenue.toLocaleString()}
+▸ ${tEs("cr.commAvgMonthly")}: $${impact.avgMonthly.toLocaleString()}
+▸ ${tEs("cr.commEstLost")}: $${impact.estimatedLost.toLocaleString()}
 
-── ${t("cr.commAdminNotes")} ────────────
-${form.comentarios || t("cr.commNoComments")}
+── ${tEs("cr.commAdminNotes")} ────────────
+${form.comentarios || tEs("cr.commNoComments")}
 
-── ${t("cr.commApprovals")} ─────────────────────
-▸ ${t("cr.commApprovalsDone", { n: approvalCount })}
+── ${tEs("cr.commApprovals")} ─────────────────────
+▸ ${tEs("cr.commApprovalsDone", { n: approvalCount })}
 
 ═══════════════════════════════════════
     `.trim();
@@ -228,7 +231,7 @@ ${form.comentarios || t("cr.commNoComments")}
     <div className="flex flex-1 flex-col overflow-hidden">
       {/* Sticky Header */}
       <div className="shrink-0 sticky top-0 z-10 bg-background/30 backdrop-blur-xl border-b border-white/10 px-6 py-3 flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/creadores/offboarding")}>
+            <Button variant="ghost" size="icon" onClick={() => navigate("/creadores/offboarding")} aria-label={t("common.back")} title={t("common.back")}>
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <div className="min-w-0 flex-1">
@@ -279,8 +282,8 @@ ${form.comentarios || t("cr.commNoComments")}
                 </CardHeader>
                 <CardContent className="space-y-2 text-sm">
                   {[
-                    { l: "Nombre", v: creatorName },
-                    { l: "Username", v: artisticName ?? "—" },
+                    { l: t("common.name"), v: creatorName },
+                    { l: t("creadores.off.username"), v: artisticName ?? "—" },
                     { l: "Instagram", v: instagramHandle ?? "—" },
                     { l: t("cr.exitDate"), v: offboarding.exit_date ?? t("common.pending") },
                   ].map((r) => (
@@ -311,12 +314,12 @@ ${form.comentarios || t("cr.commNoComments")}
                     </Select>
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs">Comentarios</Label>
+                    <Label className="text-xs">{t("creadores.off.comments")}</Label>
                     <Textarea
                       rows={2}
                       value={form.comentarios}
                       onChange={(e) => setForm((f) => ({ ...f, comentarios: e.target.value }))}
-                      placeholder="Notas adicionales..."
+                      placeholder={t("creadores.off.commentsPh")}
                     />
                   </div>
                 </CardContent>
@@ -330,9 +333,9 @@ ${form.comentarios || t("cr.commNoComments")}
               </CardHeader>
               <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {[
-                  { key: "motivo_operativo", label: "Motivo Operativo", placeholder: "Razón operativa..." },
-                  { key: "motivo_comercial", label: "Motivo Comercial", placeholder: "Razón comercial..." },
-                  { key: "motivo_final", label: "Motivo Final", placeholder: "Motivo definitivo..." },
+                  { key: "motivo_operativo", label: t("creadores.off.reasonOperational"), placeholder: t("cr.operationalReasonPh") },
+                  { key: "motivo_comercial", label: t("creadores.off.reasonCommercial"), placeholder: t("cr.commercialReasonPh") },
+                  { key: "motivo_final", label: t("creadores.off.reasonFinal"), placeholder: t("creadores.off.reasonFinalPh") },
                 ].map((m) => (
                   <div key={m.key} className="space-y-1.5">
                     <Label className="text-xs">{m.label}</Label>
@@ -352,8 +355,8 @@ ${form.comentarios || t("cr.commNoComments")}
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                    <ShieldCheck className="h-4 w-4 text-primary" /> Aprobaciones
-                    <Badge variant="outline" className="text-[10px] ml-auto">{approvalCount} de 2 requeridas</Badge>
+                    <ShieldCheck className="h-4 w-4 text-primary" /> {t("creadores.off.approvals")}
+                    <Badge variant="outline" className="text-[10px] ml-auto">{t("creadores.off.requiredOf2", { n: approvalCount })}</Badge>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
@@ -365,7 +368,7 @@ ${form.comentarios || t("cr.commNoComments")}
                       <span className="text-sm font-medium">{getApproverName(a.approver_id)}</span>
                       {a.approved ? (
                         <Badge className="bg-primary/15 text-primary border-primary/30 text-[10px]">
-                          <Check className="h-3 w-3 mr-1" /> Aprobado
+                          <Check className="h-3 w-3 mr-1" /> {t("creadores.off.approved")}
                         </Badge>
                       ) : (
                         <Badge variant="outline" className="text-[10px]">{t("common.pending")}</Badge>
@@ -375,12 +378,12 @@ ${form.comentarios || t("cr.commNoComments")}
                   {canApprove && !userAlreadyApproved && user?.id && (
                     <Button size="sm" className="w-full mt-2" onClick={handleApprove} disabled={approve.isPending}>
                       <ShieldCheck className="h-4 w-4 mr-1.5" />
-                      {approve.isPending ? "Aprobando..." : "Aprobar Offboarding"}
+                      {approve.isPending ? t("creadores.off.approving") : t("creadores.off.approve")}
                     </Button>
                   )}
                   {!canApprove && !userAlreadyApproved && (
                     <p className="text-xs text-muted-foreground italic mt-2">
-                      Solo administradores y líderes autorizados pueden aprobar.
+                      {t("creadores.off.onlyApprovers")}
                     </p>
                   )}
                 </CardContent>
@@ -417,15 +420,15 @@ ${form.comentarios || t("cr.commNoComments")}
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                  <DollarSign className="h-4 w-4 text-destructive" /> Impacto Financiero
+                  <DollarSign className="h-4 w-4 text-destructive" /> {t("creadores.off.financialImpact")}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {[
                     { label: t("cr.commLastRevenue"), value: impact.lastRevenue, color: "text-primary" },
-                    { label: "Promedio Mensual", value: impact.avgMonthly, color: "text-warning" },
-                    { label: "Revenue Perdido (12m)", value: impact.estimatedLost, color: "text-destructive" },
+                    { label: t("cr.commAvgMonthly"), value: impact.avgMonthly, color: "text-warning" },
+                    { label: t("creadores.off.lostRevenue12m"), value: impact.estimatedLost, color: "text-destructive" },
                   ].map((m) => (
                     <div key={m.label} className="rounded-xl border border-border p-4">
                       <p className="text-xs text-muted-foreground">{m.label}</p>
@@ -442,11 +445,11 @@ ${form.comentarios || t("cr.commNoComments")}
             <div className="flex items-center gap-3 pb-6">
               <Button onClick={handleSaveForm} disabled={updateOffboarding.isPending} className="gap-1.5">
                 <Save className="h-4 w-4" />
-                {updateOffboarding.isPending ? "Guardando..." : "Guardar Cambios"}
+                {updateOffboarding.isPending ? t("creadores.saving") : t("creadores.edit.saveChanges")}
               </Button>
               <Button variant="outline" onClick={generateComunicado} className="gap-1.5">
                 {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                {copied ? "Copiado" : "Generar Comunicado de Salida"}
+                {copied ? t("creadores.off.copied") : t("creadores.off.generateAnnouncement")}
               </Button>
             </div>
           </main>

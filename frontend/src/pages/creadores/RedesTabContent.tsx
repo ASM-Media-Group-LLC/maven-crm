@@ -18,6 +18,8 @@ import { maskPhone } from "@/lib/country-utils";
 import { useUserRole } from "@/hooks/useUserRole";
 import type { CreatorFull } from "./useCreadores";
 import ExtraAccountsInline from "./ExtraAccountsInline";
+import type { TranslationKey } from "@/lib/i18n";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface RedesTabContentProps {
   creator: CreatorFull;
@@ -71,7 +73,10 @@ interface PlatformConfig {
   inputType?: string;
 }
 
-const platforms: PlatformConfig[] = [
+type T = (key: TranslationKey, params?: Record<string, string | number>) => string;
+
+// Una función y no una constante: las etiquetas dependen del idioma de la interfaz.
+const buildPlatforms = (t: T): PlatformConfig[] => [
   {
     key: "instagram_handle",
     label: "Instagram",
@@ -83,10 +88,10 @@ const platforms: PlatformConfig[] = [
   },
   {
     key: "instagram_followers",
-    label: "Seguidores Instagram",
-    editLabel: "Seguidores Instagram",
+    label: t("creadores.socials.igFollowers"),
+    editLabel: t("creadores.socials.igFollowers"),
     icon: <InstagramIcon className="h-5 w-5" />,
-    placeholder: "Ej: 150000",
+    placeholder: t("creadores.socials.igFollowersPh"),
     displayValue: (c) => c.instagram_followers ? c.instagram_followers.toLocaleString() : "—",
     buildUrl: () => "",
     editOnly: true,
@@ -95,9 +100,9 @@ const platforms: PlatformConfig[] = [
   {
     key: "whatsapp_number",
     label: "WhatsApp",
-    editLabel: "WhatsApp (Número o Link API)",
+    editLabel: t("creadores.socials.waEditLabel"),
     icon: <Phone className="h-5 w-5" />,
-    placeholder: "+1234567890 o https://wa.me/...",
+    placeholder: t("creadores.socials.waPh"),
     displayValue: (c) => c.whatsapp_number || "—",
     // WhatsApp se renderiza SIEMPRE vía <WaChatButton> (cero dígitos, abre la bandeja);
     // nunca como link wa.me crudo. Dejamos buildUrl vacío a propósito para que el patrón
@@ -181,14 +186,14 @@ const platforms: PlatformConfig[] = [
     label: "Telegram",
     editLabel: "Telegram URL",
     icon: <TelegramIcon className="h-5 w-5" />,
-    placeholder: "https://t.me/usuario_o_canal",
+    placeholder: t("creadores.socials.telegramPh"),
     displayValue: (c) => displayHandle(c.telegram_handle) || "—",
     buildUrl: (c) => buildSocialUrl("telegram", c.telegram_handle),
   },
   {
     key: "other_url",
-    label: "Otra",
-    editLabel: "Otra red / Link",
+    label: t("creadores.socials.other"),
+    editLabel: t("creadores.edit.otherLink"),
     icon: <Link className="h-5 w-5" />,
     placeholder: "https://...",
     displayValue: (c) => c.other_url || "—",
@@ -197,6 +202,8 @@ const platforms: PlatformConfig[] = [
 ];
 
 const RedesTabContent = ({ creator, creatorId, soloLectura = false }: RedesTabContentProps) => {
+  const { t } = useLanguage();
+  const platforms = buildPlatforms(t);
   const queryClient = useQueryClient();
   const { isAdmin, role } = useUserRole();
   const canManage = !soloLectura && (isAdmin || role === "manager");
@@ -240,7 +247,7 @@ const RedesTabContent = ({ creator, creatorId, soloLectura = false }: RedesTabCo
 
   const cancelEditing = () => {
     setIsEditing(false);
-    toast("Edición cancelada");
+    toast(t("creadores.editCancelled"));
   };
 
   const handleSave = async () => {
@@ -301,18 +308,18 @@ const RedesTabContent = ({ creator, creatorId, soloLectura = false }: RedesTabCo
       await queryClient.invalidateQueries({ queryKey: ["creator", creatorId] });
 
       if (savedAny && !permBlocked) {
-        toast.success(canManage ? "Redes actualizadas" : "WhatsApp cargado");
+        toast.success(canManage ? t("creadores.socials.updated") : t("creadores.socials.waSaved"));
         setIsEditing(false);
       } else if (savedAny && permBlocked) {
-        toast.success("WhatsApp cargado · el resto de los campos solo los edita un manager/admin");
+        toast.success(t("creadores.socials.waSavedRestBlocked"));
         setIsEditing(false);
       } else if (permBlocked) {
-        toast.error("No se pudo guardar: no tienes permiso para editar esta creadora.");
+        toast.error(t("creadores.socials.noPermission"));
       } else {
-        toast("Sin cambios para guardar.");
+        toast(t("creadores.socials.noChanges"));
       }
     } catch {
-      toast.error("Error al guardar redes");
+      toast.error(t("creadores.socials.saveError"));
     } finally {
       setSaving(false);
     }
@@ -326,20 +333,20 @@ const RedesTabContent = ({ creator, creatorId, soloLectura = false }: RedesTabCo
     <>
       <div className="flex items-center justify-between mt-4 mb-2">
         <div>
-          <h2 className="text-lg font-semibold">Redes Sociales</h2>
-          <p className="text-sm text-muted-foreground">Enlaces a perfiles en redes sociales</p>
+          <h2 className="text-lg font-semibold">{t("creadores.edit.socials")}</h2>
+          <p className="text-sm text-muted-foreground">{t("creadores.socials.subtitle")}</p>
         </div>
         {soloLectura ? null : !isEditing ? (
           <Button variant="outline" size="sm" className="gap-1.5" onClick={startEditing}>
-            <Edit className="h-3.5 w-3.5" /> Editar
+            <Edit className="h-3.5 w-3.5" /> {t("common.edit")}
           </Button>
         ) : (
           <div className="flex gap-2">
             <Button variant="ghost" size="sm" onClick={cancelEditing} disabled={saving}>
-              <X className="h-3.5 w-3.5 mr-1" /> Cancelar
+              <X className="h-3.5 w-3.5 mr-1" /> {t("common.cancel")}
             </Button>
             <Button size="sm" className="gap-1.5" onClick={handleSave} disabled={saving}>
-              <Save className="h-3.5 w-3.5" /> {saving ? "Guardando…" : "Guardar"}
+              <Save className="h-3.5 w-3.5" /> {saving ? t("creadores.savingEllipsis") : t("common.save")}
             </Button>
           </div>
         )}
@@ -355,7 +362,7 @@ const RedesTabContent = ({ creator, creatorId, soloLectura = false }: RedesTabCo
                 type={platform.inputType || "text"}
                 value={editData[platform.key]}
                 onChange={(e) => updateField(platform.key, e.target.value)}
-                placeholder={platform.key === "whatsapp_number" && !isAdmin ? "Cargar número (no se muestra el actual)" : platform.placeholder}
+                placeholder={platform.key === "whatsapp_number" && !isAdmin ? t("creadores.socials.waNewPh") : platform.placeholder}
                 disabled={!canManage && platform.key !== "whatsapp_number"}
               />
               {MULTI_NET[platform.key] && (

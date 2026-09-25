@@ -6,6 +6,7 @@ import InstagramIcon from "@/components/icons/InstagramIcon";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import { useLanguage } from "@/hooks/useLanguage";
 
 const MAX_BYTES = 5 * 1024 * 1024; // 5 MB — coincide con el límite del bucket
 const ALLOWED = ["image/jpeg", "image/png", "image/webp"];
@@ -20,6 +21,7 @@ interface Props {
 }
 
 const ProfilePhotoEditor = ({ creatorId, photoUrl, initials, instagramHandle, canEdit }: Props) => {
+  const { t } = useLanguage();
   const qc = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState<null | "upload" | "instagram">(null);
@@ -36,11 +38,11 @@ const ProfilePhotoEditor = ({ creatorId, photoUrl, initials, instagramHandle, ca
     if (!file) return;
 
     if (!ALLOWED.includes(file.type)) {
-      toast.error("Formato no válido", { description: "Usa una imagen JPG, PNG o WebP." });
+      toast.error(t("creadores.photo.badFormat"), { description: t("creadores.photo.badFormatDesc") });
       return;
     }
     if (file.size > MAX_BYTES) {
-      toast.error("La imagen es muy pesada", { description: "El máximo es 5 MB." });
+      toast.error(t("creadores.photo.tooBig"), { description: t("creadores.photo.tooBigDesc") });
       return;
     }
 
@@ -52,11 +54,11 @@ const ProfilePhotoEditor = ({ creatorId, photoUrl, initials, instagramHandle, ca
       const { data, error } = await supabase.functions.invoke("creator-avatar-fetch", { body: form });
       const res = data as { ok?: boolean; error?: string } | null;
       if (error) throw new Error(error.message);
-      if (!res?.ok) throw new Error(res?.error || "No se pudo subir la foto.");
+      if (!res?.ok) throw new Error(res?.error || t("creadores.photo.uploadFailedDot"));
       refresh();
-      toast.success("Foto actualizada");
+      toast.success(t("creadores.photo.updated"));
     } catch (err) {
-      toast.error("No se pudo subir la foto", { description: (err as Error).message });
+      toast.error(t("creadores.photo.uploadFailed"), { description: (err as Error).message });
     } finally {
       setBusy(null);
     }
@@ -71,11 +73,11 @@ const ProfilePhotoEditor = ({ creatorId, photoUrl, initials, instagramHandle, ca
       });
       const res = data as { ok?: boolean; error?: string } | null;
       if (error) throw new Error(error.message);
-      if (!res?.ok) throw new Error(res?.error || "No se pudo obtener la foto de Instagram.");
+      if (!res?.ok) throw new Error(res?.error || t("creadores.photo.igFailedDot"));
       refresh();
-      toast.success("Foto actualizada desde Instagram");
+      toast.success(t("creadores.photo.igUpdated"));
     } catch (err) {
-      toast.error("No se pudo actualizar la foto desde Instagram", { description: (err as Error).message });
+      toast.error(t("creadores.photo.igFailed"), { description: (err as Error).message });
     } finally {
       setBusy(null);
     }
@@ -107,8 +109,8 @@ const ProfilePhotoEditor = ({ creatorId, photoUrl, initials, instagramHandle, ca
         type="button"
         onClick={() => fileRef.current?.click()}
         disabled={loading}
-        aria-label="Subir foto de perfil"
-        title="Subir una foto desde tu equipo"
+        aria-label={t("creadores.photo.uploadAria")}
+        title={t("creadores.photo.uploadTitle")}
         className="group relative block rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed"
       >
         {avatar}
@@ -122,7 +124,7 @@ const ProfilePhotoEditor = ({ creatorId, photoUrl, initials, instagramHandle, ca
           ) : (
             <>
               <Camera className="h-5 w-5 text-white" />
-              <span className="text-[10px] font-medium leading-none text-white">Subir foto</span>
+              <span className="text-[10px] font-medium leading-none text-white">{t("creadores.photo.upload")}</span>
             </>
           )}
         </span>
@@ -136,7 +138,7 @@ const ProfilePhotoEditor = ({ creatorId, photoUrl, initials, instagramHandle, ca
           size="sm"
           onClick={fetchFromInstagram}
           disabled={loading}
-          title="Traer automáticamente la foto de perfil desde Instagram"
+          title={t("creadores.photo.igTitle")}
           className="h-7 gap-1.5 px-2 text-xs"
         >
           {busy === "instagram" ? (
@@ -144,7 +146,7 @@ const ProfilePhotoEditor = ({ creatorId, photoUrl, initials, instagramHandle, ca
           ) : (
             <InstagramIcon className="h-3.5 w-3.5" />
           )}
-          Actualizar foto
+          {t("creadores.photo.refresh")}
         </Button>
       )}
     </div>

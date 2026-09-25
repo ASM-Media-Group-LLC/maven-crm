@@ -21,6 +21,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { SALE_PLATFORMS } from "@/pages/closers/hooks/useCloserLeads";
+import { conNombre } from "./etiquetasCreadora";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface Props {
   open: boolean;
@@ -48,6 +50,7 @@ const KASH = "Kash";
  * DEFINER, permiso Closers/Asignar Closer).
  */
 const SellPlatformDialog = ({ open, onOpenChange, creatorId, instagramHandle, creatorName }: Props) => {
+  const { t } = useLanguage();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [platform, setPlatform] = useState<string>("");
@@ -74,7 +77,7 @@ const SellPlatformDialog = ({ open, onOpenChange, creatorId, instagramHandle, cr
 
   const sell = useMutation({
     mutationFn: async () => {
-      if (!platform) throw new Error("Elige qué venderle.");
+      if (!platform) throw new Error(t("creadores.sell.pickWhat"));
       const closer = closerId === POOL ? null : closerId;
 
       // ── Kash = la agencia → RECLUTAMIENTO, no venta de plataforma ──
@@ -84,8 +87,8 @@ const SellPlatformDialog = ({ open, onOpenChange, creatorId, instagramHandle, cr
       if (platform === KASH) {
         const monet = Number(monetization);
         const pct = Number(commission);
-        if (!monet || monet <= 0) throw new Error("Ingresa la monetización estimada (USD/mes).");
-        if (!pct || pct <= 0 || pct > 100) throw new Error("Ingresa el % de comisión de la agencia (1-100).");
+        if (!monet || monet <= 0) throw new Error(t("creadores.sell.enterMonetization"));
+        if (!pct || pct <= 0 || pct > 100) throw new Error(t("creadores.sell.enterCommission"));
         const { data, error } = await (supabase as any).rpc("create_recruitment_deal_for_creator", {
           p_creator_id: creatorId,
           p_closer_id: closer,
@@ -97,7 +100,7 @@ const SellPlatformDialog = ({ open, onOpenChange, creatorId, instagramHandle, cr
       }
 
       const amt = Number(amount);
-      if (!amt || amt <= 0) throw new Error("Ingresa el monto mensual de la suscripción.");
+      if (!amt || amt <= 0) throw new Error(t("creadores.sell.enterAmount"));
       // RPC nuevo: no está en los tipos generados de Supabase → cast.
       const { data, error } = await (supabase as any).rpc("create_platform_deal_for_creator", {
         p_creator_id: creatorId,
@@ -113,14 +116,14 @@ const SellPlatformDialog = ({ open, onOpenChange, creatorId, instagramHandle, cr
       queryClient.invalidateQueries({ queryKey: ["closer-creators-counts"] });
       const esKash = platform === KASH;
       toast({
-        title: esKash ? "De vuelta al pipeline" : "Enviada a Closers",
+        title: esKash ? t("creadores.sell.backToPipeline") : t("creadores.sell.sentToClosers"),
         description: esKash
           ? (closerId === POOL
-              ? `${creatorName} entró al pool para re-reclutarla para la agencia.`
-              : `${creatorName} asignada para re-reclutarla para la agencia.`)
+              ? t("creadores.sell.kashPool", { name: creatorName })
+              : t("creadores.sell.kashAssigned", { name: creatorName }))
           : (closerId === POOL
-              ? `${creatorName} entró al pool para vender ${platform}.`
-              : `${creatorName} asignada para vender ${platform}.`),
+              ? t("creadores.sell.platformPool", { name: creatorName, platform })
+              : t("creadores.sell.platformAssigned", { name: creatorName, platform })),
       });
       onOpenChange(false);
       setPlatform("");
@@ -130,7 +133,7 @@ const SellPlatformDialog = ({ open, onOpenChange, creatorId, instagramHandle, cr
       setCloserId(POOL);
     },
     onError: (e: Error) => {
-      toast({ title: "No se pudo crear el deal", description: e.message, variant: "destructive" });
+      toast({ title: t("creadores.sell.dealError"), description: e.message, variant: "destructive" });
     },
   });
 
@@ -138,28 +141,28 @@ const SellPlatformDialog = ({ open, onOpenChange, creatorId, instagramHandle, cr
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{esKash ? "Volver al pipeline (Kash)" : "Vender plataforma"}</DialogTitle>
+          <DialogTitle>{esKash ? t("creadores.sell.kashTitle") : t("creadores.table.sellPlatform")}</DialogTitle>
           <DialogDescription>
             {creatorName}
             {instagramHandle ? ` · @${instagramHandle.replace(/^@/, "")}` : ""}{" "}
             {esKash
-              ? "vuelve al pipeline de closers como RECLUTAMIENTO para la agencia: se cierra por comisión % sobre su monetización, no por suscripción."
-              : "vuelve al pipeline de closers para venderle una plataforma. Paga una suscripción mensual (sin comisión %)."}
+              ? t("creadores.sell.kashDesc")
+              : t("creadores.sell.platformDesc")}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
           <div className="space-y-1.5">
-            <Label>¿Qué le vendemos?</Label>
+            <Label>{t("creadores.sell.whatToSell")}</Label>
             <Select value={platform} onValueChange={setPlatform}>
               <SelectTrigger>
-                <SelectValue placeholder="Elige..." />
+                <SelectValue placeholder={t("creadores.sell.choosePh")} />
               </SelectTrigger>
               <SelectContent>
                 {/* Kash = la agencia → dispara el flujo de RECLUTAMIENTO. Va
                     primero y con etiqueta explícita para que no se confunda con
                     las plataformas del portfolio. */}
-                <SelectItem value={KASH}>Kash — la agencia (re-reclutar)</SelectItem>
+                <SelectItem value={KASH}>{t("creadores.sell.kashOption")}</SelectItem>
                 {SALE_PLATFORMS.map((p) => (
                   <SelectItem key={p} value={p}>
                     {p}
@@ -172,18 +175,18 @@ const SellPlatformDialog = ({ open, onOpenChange, creatorId, instagramHandle, cr
           {esKash && (
             <>
               <div className="space-y-1.5">
-                <Label>Monetización estimada (USD/mes)</Label>
+                <Label>{t("creadores.sell.estMonetization")}</Label>
                 <Input
                   type="number"
                   min="0"
                   step="1"
                   value={monetization}
                   onChange={(e) => setMonetization(e.target.value)}
-                  placeholder="Ej. 8000 — lo que factura hoy en OF"
+                  placeholder={t("creadores.sell.estMonetizationPh")}
                 />
               </div>
               <div className="space-y-1.5">
-                <Label>Comisión de la agencia (%)</Label>
+                <Label>{t("creadores.sell.agencyCommission")}</Label>
                 <Input
                   type="number"
                   min="1"
@@ -191,41 +194,40 @@ const SellPlatformDialog = ({ open, onOpenChange, creatorId, instagramHandle, cr
                   step="1"
                   value={commission}
                   onChange={(e) => setCommission(e.target.value)}
-                  placeholder="Ej. 30"
+                  placeholder={t("creadores.sell.egPh", { n: 30 })}
                 />
               </div>
               <p className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">
-                Si sigue en el roster (saliendo o pausada), al cerrarla usa <strong>Reactivar</strong> en
-                Creadoras — no "Convertir a Creadora", que falla porque la ficha ya existe.
+                {conNombre(t("creadores.sell.reactivateHint"), t("creadores.sell.reactivate"))}
               </p>
             </>
           )}
 
           {!esKash && (
           <div className="space-y-1.5">
-            <Label>Suscripción mensual (USD)</Label>
+            <Label>{t("creadores.sell.monthlySub")}</Label>
             <Input
               type="number"
               min="0"
               step="1"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              placeholder="Ej. 50"
+              placeholder={t("creadores.sell.egPh", { n: 50 })}
             />
           </div>
           )}
 
           <div className="space-y-1.5">
-            <Label>Closer (opcional)</Label>
+            <Label>{t("creadores.sell.closerOptional")}</Label>
             <Select value={closerId} onValueChange={setCloserId}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={POOL}>Dejar en el pool (sin asignar)</SelectItem>
+                <SelectItem value={POOL}>{t("creadores.sell.leaveInPool")}</SelectItem>
                 {closers.map((cl) => (
                   <SelectItem key={cl.id} value={cl.id}>
-                    {cl.full_name || "Sin nombre"}
+                    {cl.full_name || t("creadores.sell.noName")}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -235,10 +237,10 @@ const SellPlatformDialog = ({ open, onOpenChange, creatorId, instagramHandle, cr
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={sell.isPending}>
-            Cancelar
+            {t("common.cancel")}
           </Button>
           <Button onClick={() => sell.mutate()} disabled={sell.isPending}>
-            {sell.isPending ? "Creando..." : "Crear deal"}
+            {sell.isPending ? t("creadores.tickets.creating") : t("creadores.sell.createDeal")}
           </Button>
         </DialogFooter>
       </DialogContent>

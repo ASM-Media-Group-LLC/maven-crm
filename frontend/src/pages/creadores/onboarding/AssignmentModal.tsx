@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { useLanguage } from "@/hooks/useLanguage";
+import { traducir } from "@/lib/i18n";
 import {
   Popover,
   PopoverContent,
@@ -60,7 +61,7 @@ function useUsersByRole(role: string) {
       if (profError) throw profError;
       return (profiles || []).map((p) => ({
         id: p.id,
-        full_name: p.full_name || "Sin nombre",
+        full_name: p.full_name || traducir("creadores.sell.noName"),
       })) as UserOption[];
     },
     staleTime: 5 * 60 * 1000,
@@ -114,10 +115,10 @@ export default function AssignmentModal({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Users className="h-5 w-5 text-primary" />
-            Asignación Operativa
+            {t("creadores.assign.title")}
           </DialogTitle>
           <DialogDescription>
-            Asigna el equipo que gestionará esta cuenta antes de completar el onboarding.
+            {t("creadores.assign.desc")}
           </DialogDescription>
         </DialogHeader>
 
@@ -126,7 +127,7 @@ export default function AssignmentModal({
           <div className="space-y-2">
             <Label className="flex items-center gap-1.5">
               <UserCheck className="h-4 w-4 text-primary" />
-              Manager <span className="text-xs text-muted-foreground">(opcional)</span>
+              Manager <span className="text-xs text-muted-foreground">{t("creadores.assign.optional")}</span>
             </Label>
             <Popover open={managerOpen} onOpenChange={setManagerOpen}>
               <PopoverTrigger asChild>
@@ -140,7 +141,7 @@ export default function AssignmentModal({
                   {loadingManagers ? (
                     <span className="flex items-center gap-2 text-muted-foreground">
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      Cargando...
+                      {t("common.loading")}
                     </span>
                   ) : selectedManagerName ? (
                     selectedManagerName
@@ -197,6 +198,7 @@ export default function AssignmentModal({
                       <button
                         type="button"
                         onClick={() => removeChatter(id)}
+                        aria-label={t("creadores.assign.removeChatter")}
                         className="ml-0.5 rounded-full p-0.5 hover:bg-muted-foreground/20"
                       >
                         <X className="h-3 w-3" />
@@ -219,13 +221,13 @@ export default function AssignmentModal({
                   {loadingChatters ? (
                     <span className="flex items-center gap-2 text-muted-foreground">
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      Cargando...
+                      {t("common.loading")}
                     </span>
                   ) : (
                     <span className="text-muted-foreground">
                       {selectedChatters.length > 0
-                        ? `${selectedChatters.length} seleccionado(s)`
-                        : "Seleccionar chatters..."}
+                        ? t("creadores.assign.nSelected", { n: selectedChatters.length })
+                        : t("creadores.assign.selectChatters")}
                     </span>
                   )}
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -262,16 +264,16 @@ export default function AssignmentModal({
         </div>
 
         <p className="text-xs text-muted-foreground">
-          Puedes omitir esta asignación y completarla después desde el perfil de la creadora.
+          {t("creadores.assign.skipHint")}
         </p>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
-            Cancelar
+            {t("common.cancel")}
           </Button>
           <Button onClick={handleConfirm} disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Completar Onboarding
+            {t("creadores.assign.complete")}
           </Button>
         </DialogFooter>
       </DialogContent>

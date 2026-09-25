@@ -21,7 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import type { OnboardingCreator } from "./useOnboarding";
+import { ETIQUETA_ESTADO_ONBOARDING, type OnboardingCreator } from "./useOnboarding";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useFormato } from "@/hooks/useFormato";
 
@@ -74,17 +74,17 @@ const OnboardingTable = ({ data, onManage }: Props) => {
           <TableHeader className="sticky top-0 z-10 bg-card">
             <TableRow>
               <TableHead>{t("cr.creator")}</TableHead>
-              <TableHead>Agencia</TableHead>
+              <TableHead>{t("creadores.table.colAgency")}</TableHead>
               <TableHead>{t("cr.startDate")}</TableHead>
-              <TableHead>Progreso</TableHead>
-              <TableHead>Estado</TableHead>
+              <TableHead>{t("creadores.onb.progress")}</TableHead>
+              <TableHead>{t("common.status")}</TableHead>
               <TableHead>Docs</TableHead>
-              <TableHead className="text-right">Acciones</TableHead>
+              <TableHead className="text-right">{t("common.actions")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {data.map((item) => {
-              const displayName = item.name?.trim() || "Sin nombre";
+              const displayName = item.name?.trim() || t("creadores.sell.noName");
               const sc = statusConfig[item.status];
               const StatusIcon = sc.icon;
               const pending = isPendingVerification(item);
@@ -111,7 +111,7 @@ const OnboardingTable = ({ data, onManage }: Props) => {
                       )}
                     </div>
                   </TableCell>
-                  <TableCell className="text-sm">{item.company}</TableCell>
+                  <TableCell className="text-sm">{item.company || t("creadores.onb.noCompany")}</TableCell>
                   <TableCell className="text-sm">
                     {item.startDate ? format(new Date(item.startDate), "dd MMM yyyy", { locale: f.fechas }) : "—"}
                   </TableCell>
@@ -124,7 +124,7 @@ const OnboardingTable = ({ data, onManage }: Props) => {
                   <TableCell>
                     <Badge variant="outline" className={`${sc.className} ${pending ? "badge-pending-verification" : ""}`}>
                       <StatusIcon className="h-3 w-3 mr-1" />
-                      {pending ? "En Revisión" : item.status}
+                      {pending ? t("creadores.status.pendingVerification") : t(ETIQUETA_ESTADO_ONBOARDING[item.status])}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -141,7 +141,7 @@ const OnboardingTable = ({ data, onManage }: Props) => {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
-                      <Button variant="secondary" size="icon" className="h-8 w-8" onClick={() => onManage?.(item)}>
+                      <Button variant="secondary" size="icon" className="h-8 w-8" onClick={() => onManage?.(item)} aria-label={t("creadores.onb.manage")} title={t("creadores.onb.manage")}>
                         <Settings2 className="h-4 w-4" />
                       </Button>
                       {isAdmin && (
@@ -167,7 +167,7 @@ const OnboardingTable = ({ data, onManage }: Props) => {
             {data.length === 0 && (
               <TableRow>
                 <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                  No hay creadores en onboarding
+                  {t("cr.noCreatorsOnboarding")}
                 </TableCell>
               </TableRow>
             )}

@@ -3,10 +3,34 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 
 const WORK_AREAS = ["Chat", "Video", "Fotos", "Streaming", "Redes Sociales", "Marketing"];
 const SERVICES = ["Contenido Exclusivo", "Chat Personalizado", "Videos Custom", "Lives", "Otro"];
 const TRAITS = ["Extrovertida", "Creativa", "Disciplinada", "Emprendedora", "Detallista", "Proactiva", "Comunicativa"];
+
+// Estos valores se GUARDAN tal cual; esto es lo que se muestra.
+const ETIQUETA: Record<string, TranslationKey> = {
+  "Chat": "creadores.step3.area.chat",
+  "Video": "creadores.step3.area.video",
+  "Fotos": "creadores.step3.area.photos",
+  "Streaming": "creadores.step3.area.streaming",
+  "Redes Sociales": "creadores.step3.area.socials",
+  "Marketing": "creadores.step3.area.marketing",
+  "Contenido Exclusivo": "creadores.step3.svc.exclusive",
+  "Chat Personalizado": "creadores.step3.svc.customChat",
+  "Videos Custom": "creadores.step3.svc.customVideos",
+  "Lives": "creadores.step3.svc.lives",
+  Otro: "cr.offCatOther",
+  "Extrovertida": "creadores.step3.trait.outgoing",
+  "Creativa": "creadores.step3.trait.creative",
+  "Disciplinada": "creadores.step3.trait.disciplined",
+  "Emprendedora": "creadores.step3.trait.entrepreneurial",
+  "Detallista": "creadores.step3.trait.detailOriented",
+  "Proactiva": "creadores.step3.trait.proactive",
+  "Comunicativa": "creadores.step3.trait.communicative",
+};
+const etiqueta = (t: (k: TranslationKey) => string, v: string) => (ETIQUETA[v] ? t(ETIQUETA[v]) : v);
 
 export interface Step3Data {
   experience: number;
@@ -30,7 +54,7 @@ export default function Step3ProfessionalProfile({ data, onChange }: Props) {
     <div className="space-y-6">
       {/* Experience Slider */}
       <div className="space-y-3">
-        <Label>Años de experiencia: {data.experience}</Label>
+        <Label>{t("creadores.step3.experience", { n: data.experience })}</Label>
         <Slider
           value={[data.experience]}
           onValueChange={([v]) => onChange("experience", v)}
@@ -52,7 +76,7 @@ export default function Step3ProfessionalProfile({ data, onChange }: Props) {
                 checked={data.workAreas.includes(area)}
                 onCheckedChange={() => onChange("workAreas", toggleArray(data.workAreas, area))}
               />
-              {area}
+              {etiqueta(t, area)}
             </label>
           ))}
         </div>
@@ -68,7 +92,7 @@ export default function Step3ProfessionalProfile({ data, onChange }: Props) {
                 checked={data.services.includes(svc)}
                 onCheckedChange={() => onChange("services", toggleArray(data.services, svc))}
               />
-              {svc}
+              {etiqueta(t, svc)}
             </label>
           ))}
         </div>
@@ -86,7 +110,7 @@ export default function Step3ProfessionalProfile({ data, onChange }: Props) {
               variant={data.traits.includes(trait) ? "default" : "outline"}
               onClick={() => onChange("traits", toggleArray(data.traits, trait))}
             >
-              {trait}
+              {etiqueta(t, trait)}
             </Button>
           ))}
         </div>

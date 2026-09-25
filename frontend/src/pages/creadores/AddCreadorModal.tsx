@@ -24,11 +24,13 @@ import { useAddCreador } from "./useCreadores";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { normalizeHandle } from "@/lib/handle-utils";
+import type { TranslationKey } from "@/lib/i18n";
+import { useLanguage } from "@/hooks/useLanguage";
 
 const schema = z.object({
-  name: z.string().min(1, "Nombre requerido"),
+  name: z.string().min(1, "creadores.add.nameRequired"),
   artistic_name: z.string().optional(),
-  email: z.string().email("Email inválido").optional().or(z.literal("")),
+  email: z.string().email("common.invalidEmail").optional().or(z.literal("")),
   phone: z.string().optional(),
   category: z.string().optional(),
   country: z.string().optional(),
@@ -46,6 +48,7 @@ interface Props {
 }
 
 const AddCreadorModal = ({ open, onOpenChange }: Props) => {
+  const { t } = useLanguage();
   const { mutateAsync, isPending } = useAddCreador();
   const {
     register,
@@ -71,8 +74,8 @@ const AddCreadorModal = ({ open, onOpenChange }: Props) => {
             .maybeSingle();
           if (existing) {
             toast({
-              title: "Duplicado detectado",
-              description: `Ya existe un creador con este handle: ${existing.name}`,
+              title: t("creadores.add.duplicate"),
+              description: t("creadores.add.duplicateDesc", { name: existing.name }),
               variant: "destructive",
             });
             return;
@@ -92,11 +95,11 @@ const AddCreadorModal = ({ open, onOpenChange }: Props) => {
         instagram_handle: data.instagram_handle || null,
         onlyfans_url: data.onlyfans_url || null,
       });
-      toast({ title: "Creador agregado exitosamente" });
+      toast({ title: t("creadores.add.added") });
       reset();
       onOpenChange(false);
     } catch {
-      toast({ title: "Error al agregar creador", variant: "destructive" });
+      toast({ title: t("creadores.add.addError"), variant: "destructive" });
     }
   };
 
@@ -104,54 +107,54 @@ const AddCreadorModal = ({ open, onOpenChange }: Props) => {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Agregar Creador</DialogTitle>
-          <DialogDescription>Completa los datos del nuevo creador.</DialogDescription>
+          <DialogTitle>{t("creadores.list.addCreator")}</DialogTitle>
+          <DialogDescription>{t("creadores.add.desc")}</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label htmlFor="name">Nombre *</Label>
+              <Label htmlFor="name">{t("creadores.add.nameReq")}</Label>
               <Input id="name" {...register("name")} />
-              {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
+              {errors.name && <p className="text-xs text-destructive">{t(errors.name.message as TranslationKey)}</p>}
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="artistic_name">Nombre artístico</Label>
+              <Label htmlFor="artistic_name">{t("cr.stageName")}</Label>
               <Input id="artistic_name" {...register("artistic_name")} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="email">Email</Label>
               <Input id="email" type="email" {...register("email")} />
-              {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
+              {errors.email && <p className="text-xs text-destructive">{t(errors.email.message as TranslationKey)}</p>}
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="phone">Teléfono</Label>
+              <Label htmlFor="phone">{t("common.phone")}</Label>
               <Input id="phone" {...register("phone")} />
             </div>
             <div className="space-y-1.5">
-              <Label>Estado</Label>
+              <Label>{t("common.status")}</Label>
               <Select defaultValue="onboarding" onValueChange={(v) => setValue("status", v)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="onboarding">Onboarding</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="paused">Paused</SelectItem>
-                  <SelectItem value="leaving">Leaving</SelectItem>
-                  <SelectItem value="terminated">Terminated</SelectItem>
+                  <SelectItem value="onboarding">{t("creadores.status.onboarding")}</SelectItem>
+                  <SelectItem value="active">{t("common.activeF")}</SelectItem>
+                  <SelectItem value="paused">{t("creadores.status.paused")}</SelectItem>
+                  <SelectItem value="leaving">{t("creadores.status.leaving")}</SelectItem>
+                  <SelectItem value="terminated">{t("creadores.status.terminated")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="category">Categoría</Label>
+              <Label htmlFor="category">{t("common.category")}</Label>
               <Input id="category" {...register("category")} />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="country">País</Label>
+              <Label htmlFor="country">{t("common.country")}</Label>
               <Input id="country" {...register("country")} />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="city">Ciudad</Label>
+              <Label htmlFor="city">{t("common.city")}</Label>
               <Input id="city" {...register("city")} />
             </div>
             <div className="space-y-1.5">
@@ -165,10 +168,10 @@ const AddCreadorModal = ({ open, onOpenChange }: Props) => {
           </div>
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-              Cancelar
+              {t("common.cancel")}
             </Button>
             <Button type="submit" disabled={isPending}>
-              {isPending ? "Guardando…" : "Agregar"}
+              {isPending ? t("creadores.savingEllipsis") : t("common.add")}
             </Button>
           </DialogFooter>
         </form>

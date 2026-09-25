@@ -6,8 +6,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { toast } from "sonner";
-import { parseCsv, parsePricing, priceLabels } from "./OperacionesTabContent";
+import { parseCsv, parsePricing, NoData } from "./OperacionesTabContent";
 import VideoOnboarding from "@/components/creadores/VideoOnboarding";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface ChatterOperationalViewProps {
   creatorId: string;
@@ -26,26 +27,25 @@ interface ChatterOperationalViewProps {
   };
 }
 
-const NoData = () => <span className="text-sm text-muted-foreground italic">Sin configurar</span>;
-
 const ChatterOperationalView = ({ creator, creatorId }: ChatterOperationalViewProps) => {
+  const { t } = useLanguage();
   const apodos = parseCsv(creator.apodos_permitidos);
-  const pricing = parsePricing(creator.precios_contenido);
+  const pricing = parsePricing(creator.precios_contenido, t);
   const currencySymbol = creator.currency === "EUR" ? "€" : "$";
 
   const handleCopy = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
-      toast.success("Frase copiada al portapapeles");
+      toast.success(t("creadores.ops.lineCopied"));
     } catch {
-      toast.error("No se pudo copiar");
+      toast.error(t("common.couldNotCopy"));
     }
   };
 
   const crisisItems = [
-    { key: "respuesta_sexo_en_persona", label: "Si pide encuentro en persona", value: creator.respuesta_sexo_en_persona },
-    { key: "respuesta_pedir_desnudos", label: "Si pide desnudos gratis", value: creator.respuesta_pedir_desnudos },
-    { key: "respuesta_usuario_grosero", label: "Si el usuario es grosero / insulta", value: creator.respuesta_usuario_grosero },
+    { key: "respuesta_sexo_en_persona", label: t("creadores.ops.crisisMeetInPerson"), value: creator.respuesta_sexo_en_persona },
+    { key: "respuesta_pedir_desnudos", label: t("creadores.ops.crisisNudes"), value: creator.respuesta_pedir_desnudos },
+    { key: "respuesta_usuario_grosero", label: t("creadores.ops.crisisRudeInsults"), value: creator.respuesta_usuario_grosero },
   ];
 
   return (
@@ -59,19 +59,19 @@ const ChatterOperationalView = ({ creator, creatorId }: ChatterOperationalViewPr
       <Card className="border-2 border-t-[3px] border-t-primary">
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
-            <MessageCircle className="h-4 w-4 text-primary" /> Personaje y Voz
+            <MessageCircle className="h-4 w-4 text-primary" /> {t("creadores.ops.characterAndVoice")}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <p className="text-xs text-muted-foreground mb-1">Tono de voz</p>
+              <p className="text-xs text-muted-foreground mb-1">{t("cr.toneOfVoice")}</p>
               {creator.tono_voz ? (
                 <p className="text-lg font-semibold capitalize">{creator.tono_voz}</p>
               ) : <NoData />}
             </div>
             <div>
-              <p className="text-xs text-muted-foreground mb-1">Emojis frecuentes</p>
+              <p className="text-xs text-muted-foreground mb-1">{t("creadores.ops.frequentEmojis")}</p>
               {creator.emoji_frecuente ? (
                 <p className="text-lg">{creator.emoji_frecuente}</p>
               ) : <NoData />}
@@ -79,7 +79,7 @@ const ChatterOperationalView = ({ creator, creatorId }: ChatterOperationalViewPr
           </div>
 
           <div>
-            <p className="text-xs text-muted-foreground mb-1.5">Apodos permitidos</p>
+            <p className="text-xs text-muted-foreground mb-1.5">{t("creadores.ops.allowedNicknames")}</p>
             {apodos.length > 0 ? (
               <div className="flex flex-wrap gap-1.5">
                 {apodos.map((a) => (
@@ -93,7 +93,7 @@ const ChatterOperationalView = ({ creator, creatorId }: ChatterOperationalViewPr
             <div className="pt-2 border-t">
               <div className="flex items-center justify-between mb-1.5">
                 <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Heart className="h-3 w-3" /> Frases de venta
+                  <Heart className="h-3 w-3" /> {t("creadores.ops.salesLines")}
                 </p>
                 <Button
                   variant="outline"
@@ -101,7 +101,7 @@ const ChatterOperationalView = ({ creator, creatorId }: ChatterOperationalViewPr
                   className="h-7 text-xs gap-1"
                   onClick={() => handleCopy(creator.frases_venta!)}
                 >
-                  <Copy className="h-3 w-3" /> Copiar
+                  <Copy className="h-3 w-3" /> {t("common.copy")}
                 </Button>
               </div>
               <p className="text-sm bg-muted/50 rounded-lg p-3 italic">"{creator.frases_venta}"</p>
@@ -114,11 +114,11 @@ const ChatterOperationalView = ({ creator, creatorId }: ChatterOperationalViewPr
       <Card className="border-2 border-t-[3px] border-t-accent">
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center justify-between">
-            <span>Menú de Precios</span>
+            <span>{t("creadores.ops.priceMenu")}</span>
             <div className="flex items-center gap-2">
               {creator.gfe_disponible && (
                 <Badge variant="success-soft" className="text-xs font-bold">
-                  GFE Disponible
+                  {t("creadores.ops.gfeAvailable")}
                 </Badge>
               )}
               {creator.currency && (
@@ -132,13 +132,13 @@ const ChatterOperationalView = ({ creator, creatorId }: ChatterOperationalViewPr
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Servicio</TableHead>
-                  <TableHead className="text-right">Precio ({currencySymbol})</TableHead>
+                  <TableHead>{t("creadores.ops.service")}</TableHead>
+                  <TableHead className="text-right">{t("creadores.ops.priceIn", { symbol: currencySymbol })}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {pricing.map((p) => (
-                  <TableRow key={p.service}>
+                  <TableRow key={p.key}>
                     <TableCell className="font-medium">{p.service}</TableCell>
                     <TableCell className="text-right text-lg font-bold">{currencySymbol}{p.price}</TableCell>
                   </TableRow>
@@ -153,14 +153,14 @@ const ChatterOperationalView = ({ creator, creatorId }: ChatterOperationalViewPr
       <Card className="border-2 border-t-[3px] border-t-destructive">
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
-            <Shield className="h-4 w-4 text-destructive" /> Protocolo de Respuesta
+            <Shield className="h-4 w-4 text-destructive" /> {t("creadores.ops.responseProtocol")}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <Alert variant="destructive" className="border-2">
             <AlertTriangle className="h-5 w-5" />
             <AlertTitle className="text-sm font-bold">
-              Esta modelo JAMÁS hará:
+              {t("creadores.ops.willNeverDoCaps")}
             </AlertTitle>
             <AlertDescription className="mt-1">
               {creator.contenido_jamas_haria ? (

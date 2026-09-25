@@ -11,9 +11,26 @@ import {
 import { DollarSign, MessageCircle, Calendar, StickyNote, Info } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 
 const DAYS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 const SHIFTS = ["Mañana", "Tarde", "Noche"];
+
+// Días y turnos son las llaves que se GUARDAN en el horario; esto es lo que se muestra.
+const ETIQUETA_DIA: Record<string, TranslationKey> = {
+  "Lunes": "creadores.day.mon",
+  "Martes": "creadores.day.tue",
+  "Miércoles": "creadores.day.wed",
+  "Jueves": "creadores.day.thu",
+  "Viernes": "creadores.day.fri",
+  "Sábado": "creadores.day.sat",
+  "Domingo": "creadores.day.sun",
+};
+const ETIQUETA_TURNO: Record<string, TranslationKey> = {
+  "Mañana": "creadores.shift.morning",
+  "Tarde": "creadores.shift.afternoon",
+  "Noche": "creadores.shift.night",
+};
 
 const SERVICES = [
   { key: "cat_1", i18n: "cr.svcContentX" as const },
@@ -110,7 +127,7 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
         <AccordionTrigger className="hover:no-underline">
           <div className="flex items-center gap-2 text-sm font-semibold">
             <DollarSign className="h-4 w-4 text-primary" />
-            Precios por Servicio
+            {t("creadores.step4.pricesBySvc")}
           </div>
         </AccordionTrigger>
         <AccordionContent>
@@ -118,10 +135,10 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50">
-                  <TableHead className="font-medium">Servicio</TableHead>
+                  <TableHead className="font-medium">{t("creadores.ops.service")}</TableHead>
                   <TableHead className="font-medium w-[200px]">
                     <div className="flex items-center gap-2">
-                      <span>Precio sugerido</span>
+                      <span>{t("creadores.step4.suggestedPrice")}</span>
                       <Select value={data.currency || "USD"} onValueChange={(v) => onChange("currency", v)}>
                         <SelectTrigger className="w-[100px] h-7 text-xs">
                           <SelectValue />
@@ -159,7 +176,7 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
                         value={(data.pricing[key]?.notes) || ""}
                         onChange={(e) => updatePricing(key, "notes", e.target.value)}
                         className="h-9"
-                        placeholder={key === "contenido_personalizado" || key === "colaboraciones_externas" ? "Tiempo de entrega estimado..." : "Observaciones..."}
+                        placeholder={key === "contenido_personalizado" || key === "colaboraciones_externas" ? t("creadores.step4.deliveryPh") : t("creadores.step4.notesPh")}
                       />
                     </TableCell>
                   </TableRow>
@@ -175,7 +192,7 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
         <AccordionTrigger className="hover:no-underline">
           <div className="flex items-center gap-2 text-sm font-semibold">
             <MessageCircle className="h-4 w-4 text-primary" />
-            Configuración de Interacción
+            {t("creadores.step4.interaction")}
           </div>
         </AccordionTrigger>
         <AccordionContent>
@@ -186,11 +203,11 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
                 <Select value={data.orientacionPerfil} onValueChange={(v) => onChange("orientacionPerfil", v)}>
                   <SelectTrigger><SelectValue placeholder={t("common.selectEllipsis")} /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Heterosexual">Heterosexual</SelectItem>
-                    <SelectItem value="Bisexual">Bisexual</SelectItem>
-                    <SelectItem value="Lesbiana">Lesbiana</SelectItem>
-                    <SelectItem value="Gay">Gay</SelectItem>
-                    <SelectItem value="Otro">Otro</SelectItem>
+                    <SelectItem value="Heterosexual">{t("creadores.step4.orHetero")}</SelectItem>
+                    <SelectItem value="Bisexual">{t("creadores.step4.orBi")}</SelectItem>
+                    <SelectItem value="Lesbiana">{t("creadores.step4.orLesbian")}</SelectItem>
+                    <SelectItem value="Gay">{t("creadores.step4.orGay")}</SelectItem>
+                    <SelectItem value="Otro">{t("cr.offCatOther")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -203,7 +220,7 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
                     <SelectItem value="WhatsApp">WhatsApp</SelectItem>
                     <SelectItem value="Zoom">Zoom</SelectItem>
                     <SelectItem value="Skype">Skype</SelectItem>
-                    <SelectItem value="Otro">Otro</SelectItem>
+                    <SelectItem value="Otro">{t("cr.offCatOther")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -221,7 +238,7 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
               <Textarea
                 value={data.restriccionesSeguridad}
                 onChange={(e) => onChange("restriccionesSeguridad", e.target.value)}
-                placeholder="Describe restricciones..."
+                placeholder={t("creadores.step4.restrictionsPh")}
                 rows={3}
               />
             </div>
@@ -251,10 +268,10 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
                 <Select value={data.personalidadMarca} onValueChange={(v) => onChange("personalidadMarca", v)}>
                   <SelectTrigger><SelectValue placeholder={t("common.selectEllipsis")} /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Dulce">Dulce</SelectItem>
-                    <SelectItem value="Directa">Directa</SelectItem>
-                    <SelectItem value="Juguetona">Juguetona</SelectItem>
-                    <SelectItem value="Dominante">Dominante</SelectItem>
+                    <SelectItem value="Dulce">{t("creadores.tone.sweet")}</SelectItem>
+                    <SelectItem value="Directa">{t("creadores.tone.direct")}</SelectItem>
+                    <SelectItem value="Juguetona">{t("creadores.tone.playful")}</SelectItem>
+                    <SelectItem value="Dominante">{t("creadores.tone.dominant")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -263,9 +280,9 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
                 <Select value={data.estrategiaRechazo} onValueChange={(v) => onChange("estrategiaRechazo", v)}>
                   <SelectTrigger><SelectValue placeholder={t("common.selectEllipsis")} /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Humor">Humor</SelectItem>
-                    <SelectItem value="Firmeza">Firmeza</SelectItem>
-                    <SelectItem value="Rechazo suave">Rechazo suave</SelectItem>
+                    <SelectItem value="Humor">{t("creadores.step4.rejHumor")}</SelectItem>
+                    <SelectItem value="Firmeza">{t("creadores.step4.rejFirm")}</SelectItem>
+                    <SelectItem value="Rechazo suave">{t("creadores.step4.rejSoft")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -332,7 +349,7 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
         <AccordionTrigger className="hover:no-underline">
           <div className="flex items-center gap-2 text-sm font-semibold">
             <Calendar className="h-4 w-4 text-primary" />
-            Horarios y Disponibilidad
+            {t("creadores.step4.schedule")}
             <Tooltip>
               <TooltipTrigger asChild>
                 <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
@@ -392,7 +409,7 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
                                 onChange("schedule", newSchedule);
                               }}
                             />
-                            <span>{s}</span>
+                            <span>{t(ETIQUETA_TURNO[s])}</span>
                           </div>
                         </th>
                       );
@@ -412,7 +429,7 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
                                 onChange("schedule", { ...data.schedule, [day]: checked ? [...SHIFTS] : [] });
                               }}
                             />
-                            <span>{day}</span>
+                            <span>{t(ETIQUETA_DIA[day])}</span>
                           </div>
                         </td>
                         {SHIFTS.map((shift) => (
@@ -438,7 +455,7 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
         <AccordionTrigger className="hover:no-underline">
           <div className="flex items-center gap-2 text-sm font-semibold">
             <StickyNote className="h-4 w-4 text-primary" />
-            Notas Adicionales
+            {t("creadores.step4.extraNotes")}
           </div>
         </AccordionTrigger>
         <AccordionContent>
@@ -446,7 +463,7 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
             <Textarea
               value={data.notes}
               onChange={(e) => onChange("notes", e.target.value)}
-              placeholder="Acuerdos especiales, observaciones..."
+              placeholder={t("creadores.step4.extraNotesPh")}
               rows={4}
             />
           </div>
@@ -461,7 +478,7 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
         <AccordionTrigger className="hover:no-underline">
           <div className="flex items-center gap-2 text-sm font-semibold">
             <DollarSign className="h-4 w-4 text-primary" />
-            ¿Modelo activa en Blu / Infloww?
+            {t("creadores.step4.bluQ")}
             <span className="text-destructive">*</span>
           </div>
         </AccordionTrigger>
@@ -481,7 +498,7 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
                     : "border-border bg-card hover:bg-muted/60"
                 }`}
               >
-                Sí, activa en Blu/Infloww
+                {t("creadores.step4.bluYes")}
               </button>
               <button
                 type="button"
@@ -492,7 +509,7 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
                     : "border-border bg-card hover:bg-muted/60"
                 }`}
               >
-                No, todavía no
+                {t("creadores.step4.bluNo")}
               </button>
             </div>
           </div>

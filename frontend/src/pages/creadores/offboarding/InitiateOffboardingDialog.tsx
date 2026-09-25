@@ -81,7 +81,7 @@ export default function InitiateOffboardingDialog({ open, onOpenChange, onSucces
     setSubmitting(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("No autenticado");
+      if (!user) throw new Error(t("creadores.off.notAuthenticated"));
 
       // Update creator status to leaving
       await supabase.from("creators").update({ status: "leaving" }).eq("id", selectedId);
@@ -89,7 +89,7 @@ export default function InitiateOffboardingDialog({ open, onOpenChange, onSucces
       // Create offboarding record
       const offboardingId = await createOffboardingRecord(selectedId, user.id);
 
-      toast.success("Offboarding iniciado correctamente");
+      toast.success(t("creadores.off.started"));
       onOpenChange(false);
       onSuccess?.();
       navigate(`/creadores/offboarding/${offboardingId}`);
@@ -104,7 +104,7 @@ export default function InitiateOffboardingDialog({ open, onOpenChange, onSucces
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Iniciar Offboarding</DialogTitle>
+          <DialogTitle>{t("creadores.off.start")}</DialogTitle>
         </DialogHeader>
 
         <div className="relative">
@@ -124,7 +124,7 @@ export default function InitiateOffboardingDialog({ open, onOpenChange, onSucces
             </div>
           ) : filtered.length === 0 ? (
             <p className="text-center text-sm text-muted-foreground py-8">
-              No hay creadoras disponibles
+              {t("creadores.off.noCreators")}
             </p>
           ) : (
             <div className="space-y-1 px-2">
@@ -162,11 +162,11 @@ export default function InitiateOffboardingDialog({ open, onOpenChange, onSucces
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
-            Cancelar
+            {t("common.cancel")}
           </Button>
           <Button onClick={handleSubmit} disabled={!selectedId || submitting}>
             {submitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-            Iniciar Offboarding
+            {t("creadores.off.start")}
           </Button>
         </DialogFooter>
       </DialogContent>

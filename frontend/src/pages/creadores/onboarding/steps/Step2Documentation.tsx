@@ -13,6 +13,7 @@ import InstagramIcon from "@/components/icons/InstagramIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
 import XIcon from "@/components/icons/XIcon";
 import { useLanguage } from "@/hooks/useLanguage";
+import { traducir } from "@/lib/i18n";
 
 export interface Step2Data {
   idDocumentFront: UploadedFile[];
@@ -35,7 +36,7 @@ export interface Step2Errors {
 
 export function validateStep2(data: Step2Data): Step2Errors {
   const errors: Step2Errors = {};
-  if (!data.dataConfirmed) errors.dataConfirmed = "Debe confirmar los datos";
+  if (!data.dataConfirmed) errors.dataConfirmed = traducir("creadores.step2.mustConfirm");
   return errors;
 }
 
@@ -88,7 +89,7 @@ function DocUploader({
             <div key={i} className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
               <FileText className="h-4 w-4 text-primary shrink-0" />
               <span className="truncate flex-1">{f.name}</span>
-              <button onClick={() => onRemove(i)} className="text-muted-foreground hover:text-destructive">
+              <button onClick={() => onRemove(i)} className="text-muted-foreground hover:text-destructive" aria-label={t("creadores.new.removeFile")}>
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -151,7 +152,7 @@ export default function Step2Documentation({ data, errors, tempId, onChange, cre
           <Label className="text-sm font-semibold">{t("cr.idDocument")}</Label>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <DocUploader
-              label="Frente"
+              label={t("creadores.step2.front")}
               icon={Upload}
               files={data.idDocumentFront}
               fieldKey="idDocumentFront"
@@ -159,7 +160,7 @@ export default function Step2Documentation({ data, errors, tempId, onChange, cre
               onRemove={(i) => removeFile("idDocumentFront", i)}
             />
             <DocUploader
-              label="Reverso"
+              label={t("creadores.step2.back")}
               icon={Upload}
               files={data.idDocumentBack}
               fieldKey="idDocumentBack"
@@ -194,7 +195,7 @@ export default function Step2Documentation({ data, errors, tempId, onChange, cre
                 <div key={i} className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
                   <ImageIcon className="h-4 w-4 text-primary shrink-0" />
                   <span className="truncate flex-1">{f.name}</span>
-                  <button onClick={() => removeFile("profilePhotos", i)} className="text-muted-foreground hover:text-destructive">
+                  <button onClick={() => removeFile("profilePhotos", i)} className="text-muted-foreground hover:text-destructive" aria-label={t("creadores.new.removeFile")}>
                     <X className="h-4 w-4" />
                   </button>
                 </div>
@@ -207,13 +208,13 @@ export default function Step2Documentation({ data, errors, tempId, onChange, cre
         <div className="space-y-2 pt-2">
           <div className="flex items-center gap-2">
             <Gift className="h-4 w-4 text-primary" />
-            <Label className="text-sm font-medium">Wishlist</Label>
+            <Label className="text-sm font-medium">{t("creadores.step2.wishlist")}</Label>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
               </TooltipTrigger>
               <TooltipContent className="max-w-xs">
-                Facilita que tus fans te envíen regalos. Es una de las formas más efectivas de generar ingresos extra sin esfuerzo.
+                {t("creadores.step2.wishlistTip")}
               </TooltipContent>
             </Tooltip>
           </div>
@@ -235,7 +236,7 @@ export default function Step2Documentation({ data, errors, tempId, onChange, cre
                 <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
               </TooltipTrigger>
               <TooltipContent className="max-w-xs">
-                Nos ayudan a estudiar tu estilo de comunicación actual para replicar tu voz con precisión en el chat.
+                {t("creadores.step2.socialsTip")}
               </TooltipContent>
             </Tooltip>
           </div>
@@ -283,9 +284,9 @@ export default function Step2Documentation({ data, errors, tempId, onChange, cre
           </div>
 
           <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Otras plataformas donde vendes contenido</Label>
+            <Label className="text-xs text-muted-foreground">{t("creadores.step2.otherPlatforms")}</Label>
             <Textarea
-              placeholder="Fansly, Chaturbate, etc."
+              placeholder={t("creadores.step2.otherPlatformsPh")}
               value={data.otrasPlataformas}
               onChange={(e) => onChange("otrasPlataformas", e.target.value)}
               rows={2}
