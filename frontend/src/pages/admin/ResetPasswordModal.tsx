@@ -5,6 +5,8 @@ import { Input } from "@/components/ui/input";
 import { KeyRound, Copy, Check, AlertTriangle, Mail, MailX } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { adminInvoke, SessionExpiredError } from "@/lib/adminInvoke";
+import { useLanguage } from "@/hooks/useLanguage";
+import { ConFormato } from "./ConFormato";
 
 interface ResetPasswordModalProps {
   open: boolean;
@@ -27,6 +29,7 @@ const ResetPasswordModal = ({ open, onOpenChange, userName, userId }: ResetPassw
   const [isLoading, setIsLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
+  const { t } = useLanguage();
 
   const handleReset = async () => {
     setIsLoading(true);
@@ -40,7 +43,7 @@ const ResetPasswordModal = ({ open, onOpenChange, userName, userId }: ResetPassw
       setEmailError(data.email_error ?? null);
       setStep("result");
     } catch (e: any) {
-      const title = e instanceof SessionExpiredError ? "Sesión expirada" : "Error";
+      const title = e instanceof SessionExpiredError ? t("common.sessionExpired") : t("common.error");
       toast({ title, description: e.message, variant: "destructive" });
     } finally {
       setIsLoading(false);
@@ -50,7 +53,7 @@ const ResetPasswordModal = ({ open, onOpenChange, userName, userId }: ResetPassw
   const handleCopy = async () => {
     await navigator.clipboard.writeText(tempPassword);
     setCopied(true);
-    toast({ title: "Copiado al portapapeles" });
+    toast({ title: t("admin.copiedToClipboard") });
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -73,9 +76,9 @@ const ResetPasswordModal = ({ open, onOpenChange, userName, userId }: ResetPassw
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-warning/15 text-warning">
               <KeyRound className="h-5 w-5" />
             </div>
-            <DialogTitle>Restablecer Contraseña</DialogTitle>
+            <DialogTitle>{t("admin.resetPw.title")}</DialogTitle>
           </div>
-          <DialogDescription className="sr-only">Restablecer contraseña del usuario</DialogDescription>
+          <DialogDescription className="sr-only">{t("admin.resetPw.srDescription")}</DialogDescription>
         </DialogHeader>
 
         {step === "confirm" ? (
@@ -83,26 +86,26 @@ const ResetPasswordModal = ({ open, onOpenChange, userName, userId }: ResetPassw
             <div className="flex items-start gap-3 rounded-lg border border-warning/30 bg-warning/10 p-4">
               <AlertTriangle className="h-5 w-5 text-warning mt-0.5 shrink-0" />
               <p className="text-sm text-warning">
-                ¿Estás seguro de restablecer la contraseña de <strong>{userName || "este usuario"}</strong>? Se generará una contraseña temporal.
+                <ConFormato texto={t("admin.resetPw.confirm", { name: userName || t("admin.thisUser") })} />
               </p>
             </div>
             <DialogFooter className="gap-2 sm:gap-0">
               <Button variant="outline" onClick={handleClose} disabled={isLoading}>
-                Cancelar
+                {t("common.cancel")}
               </Button>
               <Button
                 onClick={handleReset}
                 disabled={isLoading}
                 className="bg-warning hover:bg-warning/90 text-white"
               >
-                {isLoading ? "Restableciendo..." : "Restablecer Contraseña"}
+                {isLoading ? t("admin.resetPw.resetting") : t("admin.resetPw.title")}
               </Button>
             </DialogFooter>
           </>
         ) : (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              La contraseña ha sido restablecida exitosamente.
+              {t("admin.resetPw.done")}
             </p>
 
             {/* Estado del email — verde si Resend respondió 2xx, amber
@@ -112,40 +115,40 @@ const ResetPasswordModal = ({ open, onOpenChange, userName, userId }: ResetPassw
               <div className="flex items-start gap-2 rounded-lg border border-success/30 bg-success/10 p-3">
                 <Mail className="mt-0.5 h-4 w-4 shrink-0 text-success" />
                 <p className="text-sm text-success">
-                  Email enviado al usuario con la contraseña temporal.
-                  Como respaldo te dejamos el password abajo por si el
-                  correo no llega.
+                  {t("admin.resetPw.emailSent")}
                 </p>
               </div>
             ) : (
               <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 p-3">
                 <MailX className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
                 <div className="text-sm text-warning">
-                  <p className="font-medium">No se envió el email.</p>
+                  <p className="font-medium">{t("admin.resetPw.emailNotSent")}</p>
                   <p className="mt-0.5 text-xs text-warning">
+                    {/* El texto del error lo manda el edge tal cual: es un DATO, se
+                        compara con el valor exacto del servidor. */}
                     {emailError === "RESEND_API_KEY no configurada"
-                      ? "Falta configurar RESEND_API_KEY en los secrets de Supabase. Mientras tanto, comparte la contraseña con el usuario manualmente desde acá."
-                      : emailError ?? "Comparte la contraseña con el usuario manualmente."}
+                      ? t("admin.resetPw.noResendKey")
+                      : emailError ?? t("admin.resetPw.shareManually")}
                   </p>
                 </div>
               </div>
             )}
 
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Contraseña temporal</label>
+              <label className="text-sm font-medium">{t("admin.addUser.tempPassword")}</label>
               <div className="flex gap-2">
                 <Input value={tempPassword} readOnly className="font-mono" />
-                <Button variant="outline" size="icon" onClick={handleCopy} className="shrink-0">
+                <Button variant="outline" size="icon" onClick={handleCopy} className="shrink-0" aria-label={t("common.copy")}>
                   {copied ? <Check className="h-4 w-4 text-success" /> : <Copy className="h-4 w-4" />}
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
-                El usuario deberá cambiar esta contraseña al iniciar sesión.
+                {t("admin.resetPw.mustChange")}
               </p>
             </div>
 
             <DialogFooter>
-              <Button onClick={handleClose}>Cerrar</Button>
+              <Button onClick={handleClose}>{t("common.close")}</Button>
             </DialogFooter>
           </div>
         )}

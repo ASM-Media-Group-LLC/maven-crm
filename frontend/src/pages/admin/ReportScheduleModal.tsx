@@ -19,6 +19,26 @@ import {
   type ReportScheduleWithRecipients,
 } from "@/hooks/useReportSchedules";
 import { filterMetricsByPermissions, DEFAULT_METRICS_BY_MODULE, METRICS_CATALOG, metricsAreFromFallback } from "@/hooks/reportMetricsCatalog";
+import { useLanguage } from "@/hooks/useLanguage";
+import { useFormato } from "@/hooks/useFormato";
+import type { TranslationKey } from "@/lib/i18n";
+import { ConFormato } from "./ConFormato";
+import { etiquetaMetrica } from "./etiquetasMetricas";
+
+// La llave (value del Select, report_schedules.period) no cambia; solo lo que se ve.
+const PERIODOS: { value: ReportPeriod; label: TranslationKey; enFrase: TranslationKey }[] = [
+  { value: "daily", label: "admin.reports.periodDaily", enFrase: "admin.schedule.periodLowerDaily" },
+  { value: "weekly", label: "admin.reports.periodWeekly", enFrase: "admin.schedule.periodLowerWeekly" },
+  { value: "quincenal", label: "admin.reports.periodBiweekly", enFrase: "admin.schedule.periodLowerBiweekly" },
+  { value: "monthly", label: "admin.reports.periodMonthly", enFrase: "admin.schedule.periodLowerMonthly" },
+  { value: "annual", label: "admin.reports.periodAnnual", enFrase: "admin.schedule.periodLowerAnnual" },
+];
+
+// 1 = lunes … 7 = domingo, como lo guarda dispatch_weekdays.
+const DIAS_CORTOS: TranslationKey[] = [
+  "admin.schedule.wd1", "admin.schedule.wd2", "admin.schedule.wd3", "admin.schedule.wd4",
+  "admin.schedule.wd5", "admin.schedule.wd6", "admin.schedule.wd7",
+];
 
 interface Props {
   open: boolean;
@@ -27,6 +47,8 @@ interface Props {
 }
 
 const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
+  const { t } = useLanguage();
+  const f = useFormato();
   const isEdit = !!schedule;
   const [name, setName] = useState("");
   const [roleName, setRoleName] = useState<string>("");
@@ -182,13 +204,13 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
     const v = emailInput.trim().toLowerCase();
     if (!v) return;
     if (!isValidEmail(v)) {
-      toast.error("Email inválido", {
-        description: "Verifica que no tenga puntos antes/después del @ y que tenga un dominio válido.",
+      toast.error(t("common.invalidEmail"), {
+        description: t("admin.schedule.invalidEmailDesc"),
       });
       return;
     }
     if (recipients.includes(v)) {
-      toast.error("Ese email ya está en la lista");
+      toast.error(t("admin.schedule.duplicateEmail"));
       return;
     }
     setRecipients([...recipients, v]);
@@ -197,25 +219,32 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
 
   const removeEmail = (e: string) => setRecipients(recipients.filter((x) => x !== e));
 
+  // Nombres de mes y día en el idioma de la interfaz (1 = enero / 1 = lunes).
+  // El 1/1/2024 fue lunes: de ahí sale el día de la semana.
+  const nombreDelMes = (mes: number) =>
+    new Date(2024, mes - 1, 1).toLocaleDateString(f.intl("es-CO"), { month: "long" });
+  const nombreDelDia = (dia: number) =>
+    new Date(2024, 0, dia).toLocaleDateString(f.intl("es-CO"), { weekday: "long" });
+
   const handleSave = async () => {
     if (!name.trim()) {
-      toast.error("Falta el nombre");
+      toast.error(t("admin.schedule.missingName"));
       return;
     }
     if (recipients.length === 0) {
-      toast.error("Agrega al menos un destinatario");
+      toast.error(t("admin.schedule.addRecipient"));
       return;
     }
     if (!roleName) {
-      toast.error("Elige un rol");
+      toast.error(t("admin.schedule.pickRole"));
       return;
     }
     if (roleName === COMBINED_ROLE_SENTINEL && combinedRoles.length < 2) {
-      toast.error("Elige al menos 2 roles para combinar");
+      toast.error(t("admin.schedule.pickTwoRoles"));
       return;
     }
     if (selectedMetrics.length === 0) {
-      toast.error("Selecciona al menos una métrica");
+      toast.error(t("admin.schedule.pickMetric"));
       return;
     }
     setSaving(true);
@@ -242,7 +271,7 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
       let dispatchMonthOfYearPayload: number | null = null;
       if (period === "weekly") {
         if (dispatchWeekdays.length === 0) {
-          toast.error("Elige al menos un día de la semana");
+          toast.error(t("admin.schedule.pickWeekday"));
           setSaving(false);
           return;
         }
@@ -293,7 +322,7 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
           },
           recipients: recipientsPayload,
         });
-        toast.success("Reporte actualizado");
+        toast.success(t("admin.schedule.updated"));
       } else {
         await createSchedule.mutateAsync({
           name: name.trim(),
@@ -309,11 +338,11 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
           combined_roles: combinedRolesPayload,
           recipients: recipientsPayload,
         });
-        toast.success("Reporte creado");
+        toast.success(t("admin.schedule.created"));
       }
       onOpenChange(false);
     } catch (e: any) {
-      toast.error("Error al guardar", { description: e.message });
+      toast.error(t("common.errorSaving"), { description: e.message });
     } finally {
       setSaving(false);
     }
@@ -329,41 +358,44 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
           wrapper interno. */}
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader className="shrink-0">
-          <DialogTitle>{isEdit ? "Editar reporte" : "Nuevo reporte"}</DialogTitle>
+          <DialogTitle>{isEdit ? t("admin.schedule.editTitle") : t("admin.reports.new")}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 flex-1 overflow-y-auto -mx-2 px-2">
           <div className="space-y-1.5">
-            <Label htmlFor="report-name">Nombre *</Label>
+            <Label htmlFor="report-name">{t("admin.schedule.name")}</Label>
             <Input
               id="report-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Ej: Reporte semanal LLGs"
+              placeholder={t("admin.schedule.namePlaceholder")}
               maxLength={120}
             />
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="report-subject">Asunto del email (opcional)</Label>
+            <Label htmlFor="report-subject">{t("admin.schedule.subject")}</Label>
             <Input
               id="report-subject"
               value={emailSubject}
               onChange={(e) => setEmailSubject(e.target.value)}
-              placeholder={`Maven CRM · Reporte ${period === "daily" ? "diario" : period === "weekly" ? "semanal" : period === "monthly" ? "mensual" : "anual"} ${roleName || "rol"}`}
+              placeholder={t("admin.schedule.subjectPlaceholder", {
+                period: t(PERIODOS.find((p) => p.value === period)?.enFrase ?? "admin.schedule.periodLowerWeekly"),
+                role: roleName || t("common.role").toLowerCase(),
+              })}
               maxLength={200}
             />
             <p className="text-[11px] text-muted-foreground">
-              Si lo dejas vacío, se genera automático según rol y periodicidad.
+              {t("admin.schedule.subjectHint")}
             </p>
           </div>
 
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1.5">
-              <Label>Rol *</Label>
+              <Label>{t("admin.schedule.role")}</Label>
               <Select value={roleName} onValueChange={handleRoleChange}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Elige un rol" />
+                  <SelectValue placeholder={t("admin.schedule.pickRole")} />
                 </SelectTrigger>
                 <SelectContent>
                   {roles.map((r) => (
@@ -376,28 +408,26 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
                       aparece debajo un multi-checkbox para tildar los
                       roles que se quieren incluir como secciones. */}
                   <SelectItem value={COMBINED_ROLE_SENTINEL}>
-                    Combinado (varios roles)
+                    {t("admin.schedule.combined")}
                   </SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Periodicidad *</Label>
+              <Label>{t("admin.schedule.frequency")}</Label>
               <Select value={period} onValueChange={(v) => setPeriod(v as ReportPeriod)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="daily">Diario</SelectItem>
-                  <SelectItem value="weekly">Semanal</SelectItem>
-                  <SelectItem value="quincenal">Quincenal</SelectItem>
-                  <SelectItem value="monthly">Mensual</SelectItem>
-                  <SelectItem value="annual">Anual</SelectItem>
+                  {PERIODOS.map((p) => (
+                    <SelectItem key={p.value} value={p.value}>{t(p.label)}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Hora envío *</Label>
+              <Label>{t("admin.schedule.sendTime")}</Label>
               <Select value={String(dispatchHour)} onValueChange={(v) => setDispatchHour(Number(v))}>
                 <SelectTrigger>
                   <SelectValue />
@@ -421,10 +451,10 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
           {roleName === COMBINED_ROLE_SENTINEL && (
             <div className="rounded-md border border-border bg-muted/30 p-3 space-y-2">
               <p className="text-xs font-medium text-muted-foreground">
-                Roles a combinar ({combinedRoles.length})
+                {t("admin.schedule.rolesToCombine", { n: combinedRoles.length })}
               </p>
               {roles.length === 0 ? (
-                <p className="text-xs text-muted-foreground italic">Cargando roles…</p>
+                <p className="text-xs text-muted-foreground italic">{t("admin.schedule.loadingRoles")}</p>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-x-4 gap-y-1.5">
                   {roles.map((r) => (
@@ -442,9 +472,9 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
           )}
 
           <div className="space-y-1.5">
-            <Label>Destinatarios *</Label>
+            <Label>{t("admin.schedule.recipients")}</Label>
             <p className="text-[11px] text-muted-foreground -mt-1">
-              Email libre — pueden ser users de Maven o externos.
+              {t("admin.schedule.recipientsHint")}
             </p>
             <div className="flex gap-2">
               <Input
@@ -456,10 +486,10 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
                     addEmail();
                   }
                 }}
-                placeholder="ejemplo@dominio.com"
+                placeholder={t("admin.schedule.emailPlaceholder")}
                 type="email"
               />
-              <Button type="button" variant="outline" size="icon" onClick={addEmail} title="Agregar">
+              <Button type="button" variant="outline" size="icon" onClick={addEmail} title={t("common.add")} aria-label={t("common.add")}>
                 <Plus className="h-4 w-4" />
               </Button>
             </div>
@@ -472,6 +502,7 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
                       type="button"
                       onClick={() => removeEmail(e)}
                       className="hover:bg-muted-foreground/20 rounded-full p-0.5"
+                      aria-label={`${t("admin.manageUsers.remove")} ${e}`}
                     >
                       <X className="h-3 w-3" />
                     </button>
@@ -490,18 +521,15 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
           {(period === "weekly" || period === "daily") && (
             <div className="space-y-1.5">
               <Label>
-                Días de la semana
+                {t("admin.schedule.weekdays")}
                 {period === "weekly" ? " *" : (
                   <span className="text-muted-foreground font-normal text-xs ml-1">
-                    (opcional — vacío = todos los días)
+                    {t("admin.schedule.weekdaysOptional")}
                   </span>
                 )}
               </Label>
               <div className="flex flex-wrap gap-1.5">
-                {[
-                  { v: 1, l: "Lun" }, { v: 2, l: "Mar" }, { v: 3, l: "Mié" },
-                  { v: 4, l: "Jue" }, { v: 5, l: "Vie" }, { v: 6, l: "Sáb" }, { v: 7, l: "Dom" },
-                ].map((d) => {
+                {DIAS_CORTOS.map((clave, i) => ({ v: i + 1, l: t(clave) })).map((d) => {
                   const isSelected = dispatchWeekdays.includes(d.v);
                   return (
                     <button
@@ -526,22 +554,22 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
               <p className="text-[11px] text-muted-foreground">
                 {period === "daily"
                   ? dispatchWeekdays.length === 0
-                    ? "Vacío: el reporte se manda todos los días."
-                    : `Solo en los días marcados (${dispatchWeekdays.length}/7).`
-                  : "El reporte se manda en cada uno de los días elegidos."}
+                    ? t("admin.schedule.dailyEmpty")
+                    : t("admin.schedule.dailyOnly", { n: dispatchWeekdays.length })
+                  : t("admin.schedule.weeklyEach")}
               </p>
             </div>
           )}
 
           {period === "quincenal" && (
             <div className="space-y-1.5">
-              <Label>Días del mes *</Label>
+              <Label>{t("admin.schedule.daysOfMonth")}</Label>
               <div className="flex items-center gap-2">
                 <Select value={String(dispatchDayOfMonth)} onValueChange={(v) => setDispatchDayOfMonth(Number(v))}>
                   <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
                   <SelectContent className="max-h-72">
                     {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
-                      <SelectItem key={d} value={String(d)}>Día {d}</SelectItem>
+                      <SelectItem key={d} value={String(d)}>{t("admin.schedule.dayN", { n: d })}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -550,33 +578,33 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
                     checked={dispatchUseSecondDay}
                     onCheckedChange={(v) => setDispatchUseSecondDay(!!v)}
                   />
-                  + un 2do día
+                  {t("admin.schedule.secondDay")}
                 </label>
                 {dispatchUseSecondDay && (
                   <Select value={String(dispatchDayOfMonth2)} onValueChange={(v) => setDispatchDayOfMonth2(Number(v))}>
                     <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
                     <SelectContent className="max-h-72">
                       {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
-                        <SelectItem key={d} value={String(d)}>Día {d}</SelectItem>
+                        <SelectItem key={d} value={String(d)}>{t("admin.schedule.dayN", { n: d })}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 )}
               </div>
               <p className="text-[11px] text-muted-foreground">
-                Cap a día 28 para evitar conflictos con febrero.
+                {t("admin.schedule.cap28")}
               </p>
             </div>
           )}
 
           {period === "monthly" && (
             <div className="space-y-1.5">
-              <Label>Día del mes *</Label>
+              <Label>{t("admin.schedule.dayOfMonth")}</Label>
               <Select value={String(dispatchDayOfMonth)} onValueChange={(v) => setDispatchDayOfMonth(Number(v))}>
                 <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
                 <SelectContent className="max-h-72">
                   {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
-                    <SelectItem key={d} value={String(d)}>Día {d}</SelectItem>
+                    <SelectItem key={d} value={String(d)}>{t("admin.schedule.dayN", { n: d })}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -586,17 +614,17 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
           {period === "annual" && (
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label>Mes *</Label>
+                <Label>{t("admin.schedule.month")}</Label>
                 <Select value={String(dispatchMonthOfYear)} onValueChange={(v) => setDispatchMonthOfYear(Number(v))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"]
-                      .map((m, i) => (<SelectItem key={i+1} value={String(i+1)}>{m}</SelectItem>))}
+                    {Array.from({ length: 12 }, (_, i) => nombreDelMes(i + 1))
+                      .map((m, i) => (<SelectItem key={i+1} value={String(i+1)}>{m.charAt(0).toUpperCase() + m.slice(1)}</SelectItem>))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>Día *</Label>
+                <Label>{t("admin.schedule.day")}</Label>
                 <Select value={String(dispatchDayOfMonth)} onValueChange={(v) => setDispatchDayOfMonth(Number(v))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent className="max-h-72">
@@ -613,24 +641,25 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
           <div className="rounded-md border border-border/60 bg-muted/20 p-2.5 text-[11px] text-muted-foreground">
             {(() => {
               const hh = `${String(dispatchHour).padStart(2, "0")}:00`;
-              const weekdayLabels = ["", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"];
-              const monthLabels = ["", "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
-              if (period === "daily") return `Cada día a las ${hh} Miami recibirás los datos del día anterior (00:00 a 23:59).`;
+              if (period === "daily") return t("admin.schedule.sumDaily", { hh });
               if (period === "weekly") {
-                const list = dispatchWeekdays.length === 0 ? "(elige días)"
-                  : dispatchWeekdays.sort((a, b) => a - b).map((d) => weekdayLabels[d]).join(", ");
-                return `Los ${list} a las ${hh} Miami recibirás los últimos 7 días.`;
+                const list = dispatchWeekdays.length === 0 ? t("admin.schedule.sumPickDays")
+                  : [...dispatchWeekdays].sort((a, b) => a - b).map((d) => nombreDelDia(d)).join(", ");
+                return t("admin.schedule.sumWeekly", { days: list, hh });
               }
               if (period === "quincenal") {
                 const list = dispatchUseSecondDay
-                  ? `días ${Math.min(dispatchDayOfMonth, dispatchDayOfMonth2)} y ${Math.max(dispatchDayOfMonth, dispatchDayOfMonth2)}`
-                  : `día ${dispatchDayOfMonth}`;
-                return `Los ${list} de cada mes a las ${hh} Miami recibirás los últimos 15 días.`;
+                  ? t("admin.schedule.sumTwoDays", {
+                      a: Math.min(dispatchDayOfMonth, dispatchDayOfMonth2),
+                      b: Math.max(dispatchDayOfMonth, dispatchDayOfMonth2),
+                    })
+                  : t("admin.schedule.sumOneDay", { a: dispatchDayOfMonth });
+                return t("admin.schedule.sumBiweekly", { days: list, hh });
               }
               if (period === "monthly") {
-                return `El día ${dispatchDayOfMonth} de cada mes a las ${hh} Miami recibirás los datos del mes pasado.`;
+                return t("admin.schedule.sumMonthly", { d: dispatchDayOfMonth, hh });
               }
-              return `El ${dispatchDayOfMonth} de ${monthLabels[dispatchMonthOfYear]} a las ${hh} Miami recibirás los datos del año anterior.`;
+              return t("admin.schedule.sumAnnual", { d: dispatchDayOfMonth, month: nombreDelMes(dispatchMonthOfYear), hh });
             })()}
           </div>
 
@@ -641,19 +670,17 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
                 Chatters) con header de sección. Dentro de cada grupo,
                 mismo patrón (selected al top, unselected abajo). */}
           <div className="space-y-2">
-            <Label>Métricas a incluir *</Label>
+            <Label>{t("admin.schedule.metrics")}</Label>
             {usingFallbackMetrics && (
               <div className="rounded-md border border-warning/40 bg-warning/10 px-2.5 py-2 text-[11px] text-warning">
-                ⚠ El rol "{roleName}" no tiene permisos explícitos configurados para los módulos del catálogo de reportes.
-                Te muestro <strong>todas</strong> las métricas del módulo <strong>{roleToModule(roleName)}</strong> para que elijas las que apliquen.
-                Si quieres restringir esto en el futuro, configura permisos del rol en <em>Administración → Roles</em>.
+                <ConFormato texto={t("admin.schedule.fallbackWarning", { role: roleName, module: roleToModule(roleName) })} />
               </div>
             )}
             {availableMetrics.length === 0 ? (
               <p className="text-[11px] text-muted-foreground italic">
                 {roleName
-                  ? `El módulo "${roleToModule(roleName)}" no tiene métricas en el catálogo.`
-                  : "Elige un rol para ver las métricas disponibles."}
+                  ? t("admin.schedule.noMetricsInModule", { module: roleToModule(roleName) })
+                  : t("admin.schedule.pickRoleForMetrics")}
               </p>
             ) : (
               <div className="rounded-md border border-border/60 bg-muted/10 p-2.5 max-h-72 overflow-y-auto space-y-1.5">
@@ -699,7 +726,7 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
                           )
                         }
                       />
-                      <span className="flex-1 truncate">{m.label}</span>
+                      <span className="flex-1 truncate">{etiquetaMetrica(t, m)}</span>
                       <Button
                         type="button"
                         variant="ghost"
@@ -707,8 +734,8 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
                         disabled={isFirst}
                         onClick={() => moveMetric(m.key, -1)}
                         className="h-6 w-6 shrink-0"
-                        aria-label="Subir"
-                        title="Subir"
+                        aria-label={t("admin.schedule.moveUp")}
+                        title={t("admin.schedule.moveUp")}
                       >
                         <ChevronUp className="h-3.5 w-3.5" />
                       </Button>
@@ -719,8 +746,8 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
                         disabled={isLast}
                         onClick={() => moveMetric(m.key, 1)}
                         className="h-6 w-6 shrink-0"
-                        aria-label="Bajar"
-                        title="Bajar"
+                        aria-label={t("admin.schedule.moveDown")}
+                        title={t("admin.schedule.moveDown")}
                       >
                         <ChevronDown className="h-3.5 w-3.5" />
                       </Button>
@@ -739,7 +766,7 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
                           setSelectedMetrics([...selectedMetrics, m.key])
                         }
                       />
-                      {m.label}
+                      {etiquetaMetrica(t, m)}
                     </label>
                   );
 
@@ -804,17 +831,17 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
             {availableMetrics.length > 0 && (
               <p className="text-[10px] text-muted-foreground">
                 {roleName === COMBINED_ROLE_SENTINEL
-                  ? "Métricas agrupadas por rol — cada grupo es una sección del email. Usa ▲▼ para reordenar dentro del grupo."
-                  : "Métricas seleccionadas aparecen arriba en el orden de las columnas del correo. Usa ▲▼ para reordenar."}
+                  ? t("admin.schedule.combinedHint")
+                  : t("admin.schedule.singleHint")}
               </p>
             )}
           </div>
         </div>
 
         <DialogFooter className="shrink-0">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>{t("common.cancel")}</Button>
           <Button onClick={handleSave} disabled={saving}>
-            {saving ? "Guardando..." : isEdit ? "Guardar cambios" : "Crear reporte"}
+            {saving ? t("admin.saving") : isEdit ? t("admin.schedule.saveChanges") : t("admin.schedule.createReport")}
           </Button>
         </DialogFooter>
       </DialogContent>

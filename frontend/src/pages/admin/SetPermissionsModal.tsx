@@ -8,7 +8,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ChevronDown, ChevronRight, Copy, Menu as MenuIcon, MousePointerClick, Database } from "lucide-react";
 import { toast } from "sonner";
-import { useRolePermissions, useRoles, MODULES_CONFIG, moduleLabel, type RolePermission } from "./useRoles";
+import { useRolePermissions, useRoles, MODULES_CONFIG, type RolePermission } from "./useRoles";
+import { etiquetaPermiso, nombreVisibleDeSeccion } from "./etiquetasPermisos";
 import { UNIVERSAL_MODULES } from "@/hooks/usePermissions";
 import { useLanguage } from "@/hooks/useLanguage";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,12 +24,6 @@ interface SetPermissionsModalProps {
 type PermState = Record<string, { can_access: boolean; data_scope: string }>;
 
 const getKey = (mod: string, sub: string | null) => (sub ? `${mod}::${sub}` : mod);
-
-const getDataScopeLabels = (t: (key: any) => string): Record<string, string> => ({
-  all: t("permissions.allData"),
-  subordinates: t("permissions.subordinates"),
-  self: t("permissions.selfOnly"),
-});
 
 const getDataScopeOptions = (t: (key: any) => string) => [
   { value: "all", label: t("permissions.allData") },
@@ -96,11 +91,11 @@ const SetPermissionsModal = ({ open, onOpenChange, roleId, roleName }: SetPermis
         });
       });
       setState(next);
-      toast.success(`Permisos copiados de ${sourceName}`, {
-        description: "Recuerda guardar para aplicarlos.",
+      toast.success(t("admin.perm.copiedFrom", { role: sourceName }), {
+        description: t("admin.perm.rememberToSave"),
       });
     } catch (e) {
-      toast.error("No se pudo copiar", { description: (e as Error).message });
+      toast.error(t("common.couldNotCopy"), { description: (e as Error).message });
     } finally {
       setCopyingFrom(false);
     }
@@ -331,7 +326,7 @@ const SetPermissionsModal = ({ open, onOpenChange, roleId, roleName }: SetPermis
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm" className="gap-2 shrink-0" disabled={copyingFrom}>
                     <Copy className="h-3.5 w-3.5" />
-                    {copyingFrom ? "Copiando…" : "Copiar de otro rol"}
+                    {copyingFrom ? t("admin.perm.copying") : t("admin.perm.copyFrom")}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="min-w-[200px]">
@@ -392,7 +387,7 @@ const SetPermissionsModal = ({ open, onOpenChange, roleId, roleName }: SetPermis
               return (
                 <div key={group} className="space-y-1.5">
                   <h3 className="px-1 text-xs font-bold text-muted-foreground/70">
-                    {group}
+                    {etiquetaPermiso(t, group)}
                   </h3>
                   <div className="overflow-hidden rounded-lg border border-border">
                     {groupModules.map((mod, idx) => {
@@ -428,7 +423,7 @@ const SetPermissionsModal = ({ open, onOpenChange, roleId, roleName }: SetPermis
                                 onCheckedChange={() => toggleModule(mod.module)}
                                 className="h-4 w-4 shrink-0"
                               />
-                              <span className="truncate text-sm font-semibold">{moduleLabel(mod.module)}</span>
+                              <span className="truncate text-sm font-semibold">{etiquetaPermiso(t, mod.module)}</span>
                               {hasSubtabs && (
                                 <span className="ml-1 shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
                                   {enabledSubtabs}/{mod.subtabs.length}
@@ -447,7 +442,7 @@ const SetPermissionsModal = ({ open, onOpenChange, roleId, roleName }: SetPermis
                                         key={key}
                                         checked={state[key]?.can_access ?? false}
                                         onToggle={() => toggleSub(mod.module, key)}
-                                        label={fn}
+                                        label={etiquetaPermiso(t, fn)}
                                       />
                                     );
                                   })}
@@ -486,13 +481,14 @@ const SetPermissionsModal = ({ open, onOpenChange, roleId, roleName }: SetPermis
                                       <CheckRow
                                         checked={state[stKey]?.can_access ?? false}
                                         onToggle={() => toggleSub(mod.module, stKey)}
-                                        label={st.name}
+                                        label={etiquetaPermiso(t, st.name)}
                                         className="pl-6"
                                       />
                                       {kids.map((kid) => {
                                         const kidKey = getKey(mod.module, kid.name);
                                         // strip the "Parent: " / "Chatters: " prefix for display when present
-                                        const label = kid.name.includes(": ") ? kid.name.split(": ").slice(1).join(": ") : kid.name;
+                                        // (la llave sigue siendo kid.name: solo cambia lo que se ve)
+                                        const label = etiquetaPermiso(t, nombreVisibleDeSeccion(kid.name));
                                         return (
                                           <CheckRow
                                             key={kidKey}

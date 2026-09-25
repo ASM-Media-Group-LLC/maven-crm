@@ -8,6 +8,8 @@ import { AtSign, Check, Copy, KeyRound, Loader2, Mail, User, UserCheck } from "l
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { DOMINIO_CASILLA, sugerirDireccion } from "@/lib/direccionCorreo";
+import { useLanguage } from "@/hooks/useLanguage";
+import { ConFormato } from "./ConFormato";
 
 /**
  * Alta de usuario: NOMBRE, APELLIDO, ROL y el TIPO de correo.
@@ -60,6 +62,7 @@ interface AddUserModalProps {
 }
 
 const AddUserModal = ({ open, onOpenChange, onConfirm, isLoading, credenciales }: AddUserModalProps) => {
+  const { t } = useLanguage();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [role, setRole] = useState("employee");
@@ -135,7 +138,7 @@ const AddUserModal = ({ open, onOpenChange, onConfirm, isLoading, credenciales }
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <UserCheck className="h-5 w-5 text-success" />
-                Usuario creado
+                {t("admin.addUser.created")}
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-3">
@@ -143,20 +146,18 @@ const AddUserModal = ({ open, onOpenChange, onConfirm, isLoading, credenciales }
                 /* Casilla Maven: la contraseña se entrega en mano. */
                 <>
                   <p className="text-sm text-muted-foreground">
-                    Entregale estos datos a la persona. La contraseña
-                    <strong> no se muestra de nuevo</strong>: si se pierde, se le
-                    hace un reset desde acá mismo.
+                    <ConFormato texto={t("admin.addUser.handOver")} />
                   </p>
 
                   <Credencial
-                    etiqueta="Correo de acceso"
+                    etiqueta={t("admin.addUser.loginEmail")}
                     valor={credenciales.email}
                     icono={Mail}
                     copiado={copiado === "correo"}
                     onCopiar={() => copiar(credenciales.email, "correo")}
                   />
                   <Credencial
-                    etiqueta="Contraseña temporal"
+                    etiqueta={t("admin.addUser.tempPassword")}
                     valor={credenciales.temp_password}
                     icono={KeyRound}
                     mono
@@ -166,14 +167,13 @@ const AddUserModal = ({ open, onOpenChange, onConfirm, isLoading, credenciales }
 
                   {credenciales.mailbox_ok ? (
                     <p className="text-xs text-muted-foreground">
-                      La casilla de correo quedó creada y aparece en la pestaña
-                      Correo al entrar.
+                      {t("admin.addUser.mailboxCreated")}
                     </p>
                   ) : (
                     <p className="rounded-lg bg-warning/10 px-3 py-2 text-xs text-muted-foreground">
-                      El acceso a Maven quedó bien, pero la casilla de correo no
-                      se pudo crear{credenciales.mailbox_error ? ` (${credenciales.mailbox_error})` : ""}.
-                      Se puede reintentar después sin romper nada.
+                      {t("admin.addUser.mailboxFailed", {
+                        detail: credenciales.mailbox_error ? ` (${credenciales.mailbox_error})` : "",
+                      })}
                     </p>
                   )}
                 </>
@@ -181,12 +181,13 @@ const AddUserModal = ({ open, onOpenChange, onConfirm, isLoading, credenciales }
                 /* Correo externo y el envío salió: no hay nada que entregar. */
                 <>
                   <p className="text-sm text-muted-foreground">
-                    La contraseña temporal ya le llegó por correo a{" "}
-                    <strong className="text-foreground">{credenciales.email_sent_to}</strong>.
-                    No hay nada que entregar en mano.
+                    <ConFormato
+                      texto={t("admin.addUser.emailSentTo", { email: credenciales.email_sent_to ?? "" })}
+                      claseNegrita="text-foreground"
+                    />
                   </p>
                   <Credencial
-                    etiqueta="Correo de acceso"
+                    etiqueta={t("admin.addUser.loginEmail")}
                     valor={credenciales.email}
                     icono={Mail}
                     copiado={copiado === "correo"}
@@ -199,20 +200,21 @@ const AddUserModal = ({ open, onOpenChange, onConfirm, isLoading, credenciales }
                    entrar y nadie se entera. */
                 <>
                   <p className="rounded-lg bg-warning/10 px-3 py-2 text-sm text-muted-foreground">
-                    La cuenta quedó creada pero <strong>el correo con la
-                    contraseña no salió</strong>
-                    {credenciales.email_error ? ` (${credenciales.email_error})` : ""}.
-                    Entregale estos datos en mano:
+                    <ConFormato
+                      texto={t("admin.addUser.emailNotSent", {
+                        detail: credenciales.email_error ? ` (${credenciales.email_error})` : "",
+                      })}
+                    />
                   </p>
                   <Credencial
-                    etiqueta="Correo de acceso"
+                    etiqueta={t("admin.addUser.loginEmail")}
                     valor={credenciales.email}
                     icono={Mail}
                     copiado={copiado === "correo"}
                     onCopiar={() => copiar(credenciales.email, "correo")}
                   />
                   <Credencial
-                    etiqueta="Contraseña temporal"
+                    etiqueta={t("admin.addUser.tempPassword")}
                     valor={credenciales.temp_password}
                     icono={KeyRound}
                     mono
@@ -223,23 +225,23 @@ const AddUserModal = ({ open, onOpenChange, onConfirm, isLoading, credenciales }
               )}
             </div>
             <DialogFooter>
-              <Button onClick={() => onOpenChange(false)}>Listo</Button>
+              <Button onClick={() => onOpenChange(false)}>{t("admin.addUser.done")}</Button>
             </DialogFooter>
           </>
         ) : (
           /* ── Vista de ALTA: nombre, apellido y rol ── */
           <>
             <DialogHeader>
-              <DialogTitle>Agregar Usuario</DialogTitle>
+              <DialogTitle>{t("admin.users.addUser")}</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="firstName">Nombre</Label>
+                <Label htmlFor="firstName">{t("admin.firstName")}</Label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="firstName"
-                    placeholder="Nombre"
+                    placeholder={t("admin.firstName")}
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
                     className="pl-9"
@@ -251,13 +253,13 @@ const AddUserModal = ({ open, onOpenChange, onConfirm, isLoading, credenciales }
 
               <div className="space-y-2">
                 <Label htmlFor="lastName">
-                  Apellido <span className="font-normal text-muted-foreground">(opcional)</span>
+                  {t("admin.lastName")} <span className="font-normal text-muted-foreground">{t("admin.optional")}</span>
                 </Label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="lastName"
-                    placeholder="Apellido"
+                    placeholder={t("admin.lastName")}
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
                     className="pl-9"
@@ -267,7 +269,7 @@ const AddUserModal = ({ open, onOpenChange, onConfirm, isLoading, credenciales }
               </div>
 
               <div className="space-y-2">
-                <Label>Correo de acceso</Label>
+                <Label>{t("admin.addUser.loginEmail")}</Label>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
@@ -279,8 +281,8 @@ const AddUserModal = ({ open, onOpenChange, onConfirm, isLoading, credenciales }
                         : "border-border text-muted-foreground hover:bg-muted/50")
                     }
                   >
-                    <span className="block font-semibold">Casilla Maven</span>
-                    <span className="block text-[11px] opacity-80">Se genera del nombre</span>
+                    <span className="block font-semibold">{t("admin.addUser.mavenMailbox")}</span>
+                    <span className="block text-[11px] opacity-80">{t("admin.addUser.fromName")}</span>
                   </button>
                   <button
                     type="button"
@@ -292,7 +294,7 @@ const AddUserModal = ({ open, onOpenChange, onConfirm, isLoading, credenciales }
                         : "border-border text-muted-foreground hover:bg-muted/50")
                     }
                   >
-                    <span className="block font-semibold">Correo externo</span>
+                    <span className="block font-semibold">{t("admin.addUser.externalEmail")}</span>
                     <span className="block text-[11px] opacity-80">Gmail, etc.</span>
                   </button>
                 </div>
@@ -303,10 +305,7 @@ const AddUserModal = ({ open, onOpenChange, onConfirm, isLoading, credenciales }
                   <div className="flex items-start gap-2 rounded-lg bg-primary/5 px-3 py-2.5">
                     <AtSign className="mt-0.5 h-4 w-4 shrink-0 text-primary/70" />
                     <p className="text-xs text-muted-foreground">
-                      Va a entrar con <strong className="text-foreground">{sugerida}</strong>,
-                      que es también su casilla de correo. Si ese nombre ya está
-                      ocupado, se le agrega un número solo. La contraseña la
-                      entregas tú en mano al terminar.
+                      <ConFormato texto={t("admin.addUser.willSignInWith", { email: sugerida })} claseNegrita="text-foreground" />
                     </p>
                   </div>
                 )
@@ -316,7 +315,7 @@ const AddUserModal = ({ open, onOpenChange, onConfirm, isLoading, credenciales }
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                       type="email"
-                      placeholder="persona@gmail.com"
+                      placeholder={t("admin.addUser.externalPlaceholder")}
                       value={emailExterno}
                       onChange={(e) => setEmailExterno(e.target.value)}
                       className="pl-9"
@@ -325,18 +324,16 @@ const AddUserModal = ({ open, onOpenChange, onConfirm, isLoading, credenciales }
                     />
                   </div>
                   <p className="rounded-lg bg-primary/5 px-3 py-2.5 text-xs text-muted-foreground">
-                    Va a entrar con ese correo y <strong className="text-foreground">la
-                    contraseña temporal le llega ahí</strong> — no hay nada que
-                    entregar en mano. No se le crea casilla @{DOMINIO_CASILLA}.
+                    <ConFormato texto={t("admin.addUser.externalHint", { domain: DOMINIO_CASILLA })} claseNegrita="text-foreground" />
                   </p>
                 </div>
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="role">Rol</Label>
+                <Label htmlFor="role">{t("common.role")}</Label>
                 <Select value={role} onValueChange={setRole}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar rol" />
+                    <SelectValue placeholder={t("admin.selectRole")} />
                   </SelectTrigger>
                   <SelectContent>
                     {roles.map((r) => (
@@ -350,11 +347,11 @@ const AddUserModal = ({ open, onOpenChange, onConfirm, isLoading, credenciales }
 
               <DialogFooter className="gap-2 sm:gap-0">
                 <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
-                  Cancelar
+                  {t("common.cancel")}
                 </Button>
                 <Button type="submit" disabled={isLoading || !puedeEnviar}>
                   {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                  Agregar
+                  {t("common.add")}
                 </Button>
               </DialogFooter>
             </form>
@@ -380,6 +377,8 @@ function Credencial({
   copiado: boolean;
   onCopiar: () => void;
 }) {
+  const { t } = useLanguage();
+  const etiquetaCopiar = `${t("common.copy")}: ${etiqueta}`;
   return (
     <div className="space-y-1">
       <p className="text-xs font-medium text-muted-foreground">{etiqueta}</p>
@@ -388,7 +387,7 @@ function Credencial({
         <span className={mono ? "flex-1 font-mono text-sm tracking-wider" : "flex-1 truncate text-sm"}>
           {valor}
         </span>
-        <Button type="button" size="icon" variant="ghost" className="h-7 w-7 shrink-0" onClick={onCopiar}>
+        <Button type="button" size="icon" variant="ghost" className="h-7 w-7 shrink-0" onClick={onCopiar} aria-label={etiquetaCopiar}>
           {copiado ? <Check className="h-3.5 w-3.5 text-success" /> : <Copy className="h-3.5 w-3.5" />}
         </Button>
       </div>

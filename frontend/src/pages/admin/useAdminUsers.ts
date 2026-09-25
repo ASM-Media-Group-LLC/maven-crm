@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { adminInvoke, SessionExpiredError } from "@/lib/adminInvoke";
 import type { AppRole } from "@/hooks/useUserRole";
+import { traducir } from "@/lib/i18n";
 
 export interface AdminUser {
   /** false para uno mismo y para cuentas de nivel >= al propio. Solo UX. */
@@ -109,13 +110,13 @@ export const useAdminUsers = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-users"] });
-      toast({ title: "Rol actualizado", description: "El rol del usuario ha sido cambiado exitosamente." });
+      toast({ title: traducir("admin.toast.roleUpdated"), description: traducir("admin.toast.userRoleChanged") });
     },
     onError: (error: Error) => {
       if (error instanceof SessionExpiredError) {
-        toast({ title: "Sesión expirada", description: error.message, variant: "destructive" });
+        toast({ title: traducir("common.sessionExpired"), description: error.message, variant: "destructive" });
       } else {
-        toast({ title: "Error", description: error.message, variant: "destructive" });
+        toast({ title: traducir("common.error"), description: error.message, variant: "destructive" });
       }
     },
   });

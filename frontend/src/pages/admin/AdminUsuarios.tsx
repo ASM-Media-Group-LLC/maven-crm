@@ -25,6 +25,7 @@ import { useToast } from "@/hooks/use-toast";
 import { avisarPersona } from "@/lib/avisoPersona";
 import { adminInvoke, SessionExpiredError } from "@/lib/adminInvoke";
 import { PageHeader } from "@/components/ui/page-header";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // Búsqueda tolerante: sin distinguir mayúsculas ni tildes, porque el roster está
 // lleno de apellidos acentuados (Suárez, Durán, Pinzón) y nadie los tipea con tilde.
@@ -32,6 +33,7 @@ const norm = (s: string) =>
   s.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
 
 const AdminUsuarios = () => {
+  const { t } = useLanguage();
   const [credenciales, setCredenciales] = useState<CredencialesCreadas | null>(null);
   const navigate = useNavigate();
   // Esta pantalla vive en dos lados: embebida en Settings (?sub=usuarios) y con
@@ -110,11 +112,11 @@ const AdminUsuarios = () => {
     // acá se saltea o salen dos avisos del mismo error.
     onError: (e: Error, variables) => {
       if (e instanceof SessionExpiredError) {
-        toast({ title: "Sesión expirada", description: e.message, variant: "destructive" });
+        toast({ title: t("common.sessionExpired"), description: e.message, variant: "destructive" });
         return;
       }
       if ((variables as { action?: string } | undefined)?.action === "create_user") return;
-      toast({ title: "No se pudo completar la acción", description: e.message, variant: "destructive" });
+      toast({ title: t("admin.users.actionFailed"), description: e.message, variant: "destructive" });
     },
   });
 
@@ -150,11 +152,11 @@ const AdminUsuarios = () => {
 
   const canManageRoles = canAccess("Administración", "Roles");
   const tabs = [
-    { key: "usuarios" as const, label: "Usuarios" },
+    { key: "usuarios" as const, label: t("admin.usersLabel") },
     ...(canManageRoles ? [{ key: "roles" as const, label: "Roles" }] : []),
     // Quien puede eliminar puede recuperar; purgar antes del plazo es solo-admin
     // y eso lo gatea la propia tabla (y la edge, que es lo que manda).
-    { key: "papelera" as const, label: "Eliminadas" },
+    { key: "papelera" as const, label: t("admin.users.tabDeleted") },
   ];
 
   return (
@@ -168,22 +170,22 @@ const AdminUsuarios = () => {
                   className="mb-3 inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
                 >
                   <ArrowLeft className="h-4 w-4" />
-                  Volver a Settings
+                  {t("admin.users.backToSettings")}
                 </button>
               )}
               <PageHeader
-                title="Gestión de Usuarios"
-                subtitle="Administra los usuarios y roles de la plataforma"
+                title={t("admin.users.title")}
+                subtitle={t("admin.users.subtitle")}
                 actions={
                   activeTab === "usuarios" ? (
                     <Button variant="outline" size="sm" onClick={() => setAddUserOpen(true)}>
                       <Plus className="h-4 w-4 mr-1" />
-                      Agregar Usuario
+                      {t("admin.users.addUser")}
                     </Button>
                   ) : activeTab === "roles" ? (
                     <Button variant="outline" size="sm" onClick={() => setCreateRoleOpen(true)}>
                       <Plus className="h-4 w-4 mr-1" />
-                      Nuevo Rol
+                      {t("admin.users.newRole")}
                     </Button>
                   ) : null
                 }
@@ -227,17 +229,17 @@ const AdminUsuarios = () => {
                 <div className="relative flex-1 max-w-sm">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder={activeTab === "usuarios" ? "Buscar por nombre o correo..." : "Buscar rol..."}
+                    placeholder={activeTab === "usuarios" ? t("admin.users.searchUsers") : t("admin.users.searchRoles")}
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     className="pl-9"
                   />
                 </div>
                 <div className="hidden sm:flex gap-1 border rounded-md p-0.5">
-                  <Button variant={view === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setView("list")}>
+                  <Button variant={view === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setView("list")} aria-label={t("admin.users.listView")}>
                     <List className="h-4 w-4" />
                   </Button>
-                  <Button variant={view === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setView("grid")}>
+                  <Button variant={view === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setView("grid")} aria-label={t("admin.users.gridView")}>
                     <LayoutGrid className="h-4 w-4" />
                   </Button>
                 </div>
@@ -266,7 +268,7 @@ const AdminUsuarios = () => {
                   ) : filtered.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
                       <Users className="h-12 w-12 mb-3 opacity-40" />
-                      <p>No se encontraron usuarios</p>
+                      <p>{t("admin.users.empty")}</p>
                     </div>
                   ) : vistaEfectiva === "list" ? (
                     <UsersTable
@@ -280,8 +282,8 @@ const AdminUsuarios = () => {
                         adminAction.mutate(
                           { action: "remove_role", user_id: user.id },
                           { onSuccess: () => avisarPersona({
-                            nombre: user.full_name || "Sin nombre", foto: user.avatar_url, seed: user.avatar_seed,
-                            titulo: "Rol quitado", detalle: user.full_name || undefined, tono: "ojo",
+                            nombre: user.full_name || t("admin.noName"), foto: user.avatar_url, seed: user.avatar_seed,
+                            titulo: t("admin.users.roleRemoved"), detalle: user.full_name || undefined, tono: "ojo",
                           }) }
                         );
                       }}
@@ -298,8 +300,8 @@ const AdminUsuarios = () => {
                         adminAction.mutate(
                           { action: "remove_role", user_id: user.id },
                           { onSuccess: () => avisarPersona({
-                            nombre: user.full_name || "Sin nombre", foto: user.avatar_url, seed: user.avatar_seed,
-                            titulo: "Rol quitado", detalle: user.full_name || undefined, tono: "ojo",
+                            nombre: user.full_name || t("admin.noName"), foto: user.avatar_url, seed: user.avatar_seed,
+                            titulo: t("admin.users.roleRemoved"), detalle: user.full_name || undefined, tono: "ojo",
                           }) }
                         );
                       }}
@@ -325,8 +327,8 @@ const AdminUsuarios = () => {
                           { onSuccess: () => {
                             setEditOpen(false);
                             avisarPersona({
-                              nombre: selectedUser.full_name || "Sin nombre", foto: selectedUser.avatar_url, seed: selectedUser.avatar_seed,
-                              titulo: "Usuario actualizado", detalle: selectedUser.full_name || undefined, tono: "bien",
+                              nombre: selectedUser.full_name || t("admin.noName"), foto: selectedUser.avatar_url, seed: selectedUser.avatar_seed,
+                              titulo: t("admin.users.userUpdated"), detalle: selectedUser.full_name || undefined, tono: "bien",
                             });
                           } }
                         );
@@ -354,7 +356,7 @@ const AdminUsuarios = () => {
                   <DeleteUserDialog
                     open={deleteOpen}
                     onOpenChange={setDeleteOpen}
-                    userName={selectedUser?.full_name || "Sin nombre"}
+                    userName={selectedUser?.full_name || t("admin.noName")}
                     onConfirm={() => {
                       if (selectedUser) {
                         adminAction.mutate(
@@ -363,9 +365,9 @@ const AdminUsuarios = () => {
                             setDeleteOpen(false);
                             const freed = (res as { mailbox_removed?: string | null } | undefined)?.mailbox_removed;
                             avisarPersona({
-                              nombre: selectedUser.full_name || "Sin nombre", foto: selectedUser.avatar_url, seed: selectedUser.avatar_seed,
-                              titulo: `${selectedUser.full_name || "El usuario"} quedó eliminado`,
-                              detalle: freed ? `Se liberó el puesto de correo (${freed}).` : undefined,
+                              nombre: selectedUser.full_name || t("admin.noName"), foto: selectedUser.avatar_url, seed: selectedUser.avatar_seed,
+                              titulo: t("admin.users.deletedTitle", { name: selectedUser.full_name || t("admin.users.theUser") }),
+                              detalle: freed ? t("admin.users.mailboxFreed", { mailbox: freed }) : undefined,
                               tono: "ojo",
                             });
                           } }
@@ -391,7 +393,7 @@ const AdminUsuarios = () => {
                   // sobre todo el de error— hable de esa persona y no de
                   // "Error" a secas. Todavía no tiene avatar en la base, así
                   // que el muñequito sale del nombre.
-                  const quien = [data.first_name, data.last_name].filter(Boolean).join(" ").trim() || "el usuario";
+                  const quien = [data.first_name, data.last_name].filter(Boolean).join(" ").trim() || t("admin.users.theUserLower");
                   adminAction.mutate(
                     { action: "create_user", ...data },
                     {
@@ -399,7 +401,7 @@ const AdminUsuarios = () => {
                         if (e instanceof SessionExpiredError) return; // ya lo avisa el onError general
                         avisarPersona({
                           nombre: quien,
-                          titulo: `No se pudo crear a ${quien}`,
+                          titulo: t("admin.users.couldNotCreate", { name: quien }),
                           detalle: e.message,
                           tono: "mal",
                           duracion: 9000,

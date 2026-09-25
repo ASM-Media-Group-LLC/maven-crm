@@ -8,11 +8,17 @@ export interface AuditoriaUser {
   roles: { role: string; custom_role_id: string | null; custom_role_name: string | null }[];
 }
 
+// El hallazgo viaja como DATO (qué es + sus números) y la pantalla arma el texto
+// en su idioma. Antes se guardaba la frase en español en la caché de react-query.
 export interface HealthCheckDetail {
   type: "warning" | "error";
-  category: string;
-  message: string;
-  affected: string[];
+  kind: "users_without_role" | "orphan_permission";
+  /** users_without_role: cuántos son. */
+  count?: number;
+  /** orphan_permission: el módulo (la llave de role_permissions). */
+  module?: string;
+  /** Nombres (o ids) afectados. null = una persona sin nombre cargado. */
+  affected: (string | null)[];
   priority: "critical" | "high" | "medium" | "low";
 }
 
@@ -46,6 +52,7 @@ export interface AuditoriaData {
   users: AuditoriaUser[];
   role_matrix: Record<string, RoleMatrixEntry>;
   audit_entries: AuditLogEntry[];
+  /** id → nombre. "" = la persona existe pero no tiene nombre cargado. */
   profilesMap: Record<string, string>;
 }
 
@@ -70,7 +77,7 @@ export const useAuditoriaData = () => {
       // Build profiles map for activity log
       const profilesMap: Record<string, string> = {};
       for (const p of profiles) {
-        profilesMap[p.id] = p.full_name || "Sin nombre";
+        profilesMap[p.id] = p.full_name || "";
       }
 
       const validRoleIds = new Set(roles.map((r) => r.id));
@@ -97,9 +104,9 @@ export const useAuditoriaData = () => {
       if (usersWithoutRoles.length > 0) {
         details.push({
           type: "warning",
-          category: "Usuarios sin rol",
-          message: `${usersWithoutRoles.length} usuarios sin rol asignado`,
-          affected: usersWithoutRoles.map((u) => u.full_name || "Sin nombre"),
+          kind: "users_without_role",
+          count: usersWithoutRoles.length,
+          affected: usersWithoutRoles.map((u) => u.full_name || null),
           priority: "high",
         });
       }
@@ -108,8 +115,8 @@ export const useAuditoriaData = () => {
       for (const op of orphanPerms) {
         details.push({
           type: "error",
-          category: "Permiso huérfano",
-          message: `Permiso para módulo "${op.module || "undefined"}" sin rol válido`,
+          kind: "orphan_permission",
+          module: op.module || "undefined",
           affected: [op.role_id],
           priority: "high",
         });

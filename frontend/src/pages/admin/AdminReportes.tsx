@@ -27,6 +27,9 @@ import {
 } from "@/hooks/useReportSchedules";
 import ReportScheduleModal from "./ReportScheduleModal";
 import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
+import { ConFormato } from "./ConFormato";
 
 // Settings → Administración → Reportes
 // CRUD de reports programados. Los reports se mandan via cron diario y
@@ -37,6 +40,7 @@ import { useFormato } from "@/hooks/useFormato";
 // cuando el user hace click en "Vista previa".
 const ReportPreviewToggle = ({ scheduleId }: { scheduleId: string }) => {
   const f = useFormato();
+  const { t } = useLanguage();
   const [open, setOpen] = useState(false);
   const { data: preview, isLoading, isError, error } = useReportPreview(scheduleId, open);
 
@@ -48,25 +52,28 @@ const ReportPreviewToggle = ({ scheduleId }: { scheduleId: string }) => {
         className="inline-flex items-center gap-1.5 rounded-md border border-border/60 bg-muted/20 px-2.5 py-1 text-[11px] font-medium text-muted-foreground hover:bg-muted/40 hover:text-foreground transition-colors"
       >
         <Eye className="h-3 w-3" />
-        Vista previa del email
+        {t("admin.reports.previewToggle")}
         {open ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
       </button>
       {open && (
         <div className="mt-2 w-full rounded-lg border border-border/60 bg-white">
           {isLoading ? (
             <div className="p-6 text-center text-xs text-muted-foreground">
-              Generando preview…
+              {t("admin.reports.generatingPreview")}
             </div>
           ) : isError ? (
             <div className="p-4 text-center text-xs text-destructive">
-              Error al generar preview: {(error as any)?.message ?? "desconocido"}
+              {t("admin.reports.previewError", { error: (error as Error | null)?.message ?? t("admin.reports.unknownError") })}
             </div>
           ) : preview ? (
             <div className="space-y-2 p-3">
               <div className="rounded bg-muted/30 px-3 py-2 text-[11px] text-foreground">
-                <div><span className="font-semibold text-muted-foreground">Asunto:</span> {preview.subject}</div>
+                <div><span className="font-semibold text-muted-foreground">{t("admin.reports.subject")}</span> {preview.subject}</div>
                 <div className="text-muted-foreground">
-                  {preview.row_count} {preview.row_count === 1 ? "fila" : "filas"} · rango usado: {new Date(preview.from).toLocaleString(f.intl("es-CO"))} → {new Date(preview.to).toLocaleString(f.intl("es-CO"))}
+                  {t(preview.row_count === 1 ? "admin.reports.rowsOne" : "admin.reports.rowsOther", { n: preview.row_count })} · {t("admin.reports.rangeUsed", {
+                    from: new Date(preview.from).toLocaleString(f.intl("es-CO")),
+                    to: new Date(preview.to).toLocaleString(f.intl("es-CO")),
+                  })}
                 </div>
               </div>
               {/* Wrapper full-width con scroll horizontal SOLO si el email
@@ -88,12 +95,13 @@ const ReportPreviewToggle = ({ scheduleId }: { scheduleId: string }) => {
   );
 };
 
-const PERIOD_LABELS: Record<ReportPeriod, string> = {
-  daily: "Diario",
-  weekly: "Semanal",
-  quincenal: "Quincenal",
-  monthly: "Mensual",
-  annual: "Anual",
+// La llave es report_schedules.period (un dato); solo se traduce la etiqueta.
+const PERIOD_LABELS: Record<ReportPeriod, TranslationKey> = {
+  daily: "admin.reports.periodDaily",
+  weekly: "admin.reports.periodWeekly",
+  quincenal: "admin.reports.periodBiweekly",
+  monthly: "admin.reports.periodMonthly",
+  annual: "admin.reports.periodAnnual",
 };
 
 const PERIOD_TONES: Record<ReportPeriod, string> = {
@@ -106,6 +114,7 @@ const PERIOD_TONES: Record<ReportPeriod, string> = {
 
 const AdminReportes = () => {
   const f = useFormato();
+  const { t } = useLanguage();
   const { data: schedules = [], isLoading } = useReportSchedules();
   const deleteSchedule = useDeleteReportSchedule();
   const updateSchedule = useUpdateReportSchedule();
@@ -119,7 +128,7 @@ const AdminReportes = () => {
 
   const handleSendNow = (s: ReportScheduleWithRecipients) => {
     if (s.recipients.length === 0) {
-      toast.error("Agrega al menos un destinatario antes de enviar");
+      toast.error(t("admin.reports.noRecipientsToast"));
       return;
     }
     setSendConfirm(s);
@@ -132,11 +141,11 @@ const AdminReportes = () => {
     setSendingId(s.id);
     try {
       await sendNow.mutateAsync(s.id);
-      toast.success("Reporte enviado", {
-        description: "El email se mandó a los destinatarios. La próxima ejecución programada no se modificó.",
+      toast.success(t("admin.reports.sent"), {
+        description: t("admin.reports.sentDesc"),
       });
     } catch (e: any) {
-      toast.error("Error al enviar", { description: e.message });
+      toast.error(t("admin.reports.sendError"), { description: e.message });
     } finally {
       setSendingId(null);
     }
@@ -155,30 +164,30 @@ const AdminReportes = () => {
     setDeleteConfirm(null);
     try {
       await deleteSchedule.mutateAsync(s.id);
-      toast.success("Reporte eliminado");
+      toast.success(t("admin.reports.deleted"));
     } catch (e: any) {
-      toast.error("Error al eliminar", { description: e.message });
+      toast.error(t("common.errorDeleting"), { description: e.message });
     }
   };
 
   const handleToggle = async (s: ReportScheduleWithRecipients) => {
     try {
       await updateSchedule.mutateAsync({ id: s.id, patch: { is_active: !s.is_active } });
-      toast.success(s.is_active ? "Reporte pausado" : "Reporte activado");
+      toast.success(s.is_active ? t("admin.reports.paused") : t("admin.reports.activated"));
     } catch (e: any) {
-      toast.error("Error", { description: e.message });
+      toast.error(t("common.error"), { description: e.message });
     }
   };
 
   return (
     <div className="space-y-4 p-6 lg:p-8">
       <PageHeader
-        title="Reportes programados"
-        subtitle="Reportes automáticos por email — configura módulo, periodicidad y destinatarios."
+        title={t("admin.reports.title")}
+        subtitle={t("admin.reports.subtitle")}
         actions={
           <Button onClick={() => { setEditing(null); setModalOpen(true); }}>
             <Plus className="h-4 w-4 mr-1.5" />
-            Nuevo reporte
+            {t("admin.reports.new")}
           </Button>
         }
       />
@@ -195,14 +204,13 @@ const AdminReportes = () => {
             <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 mb-3">
               <Send className="h-5 w-5 text-primary" />
             </div>
-            <p className="text-base font-semibold">Sin reportes configurados</p>
+            <p className="text-base font-semibold">{t("admin.reports.emptyTitle")}</p>
             <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
-              Configura un reporte automático y se enviará por email con la
-              periodicidad que elijas (diario, semanal, mensual o anual).
+              {t("admin.reports.emptyBody")}
             </p>
             <Button className="mt-4" onClick={() => { setEditing(null); setModalOpen(true); }}>
               <Plus className="h-4 w-4 mr-1.5" />
-              Crear primer reporte
+              {t("admin.reports.createFirst")}
             </Button>
           </CardContent>
         </Card>
@@ -229,21 +237,21 @@ const AdminReportes = () => {
                         className={`inline-flex items-center gap-1 rounded-full ring-1 px-2 py-0.5 text-[10px] font-bold ${PERIOD_TONES[s.period]}`}
                       >
                         <Clock className="h-3 w-3" />
-                        {PERIOD_LABELS[s.period]} · {String(s.dispatch_hour ?? 8).padStart(2, "0")}:00 Miami
+                        {PERIOD_LABELS[s.period] ? t(PERIOD_LABELS[s.period]) : s.period} · {String(s.dispatch_hour ?? 8).padStart(2, "0")}:00 Miami
                       </span>
                       {!s.is_active && (
                         <Badge variant="secondary" className="text-[10px]">
-                          Pausado
+                          {t("admin.reports.pausedBadge")}
                         </Badge>
                       )}
                     </div>
                     <div className="flex items-center gap-1.5 text-xs text-muted-foreground flex-wrap">
                       <Mail className="h-3 w-3 shrink-0" />
                       {s.recipients.length === 0 ? (
-                        <span className="text-warning">Sin destinatarios</span>
+                        <span className="text-warning">{t("admin.reports.noRecipients")}</span>
                       ) : (
                         <span>
-                          {s.recipients.length} {s.recipients.length === 1 ? "destinatario" : "destinatarios"}:{" "}
+                          {t(s.recipients.length === 1 ? "admin.reports.recipientCountOne" : "admin.reports.recipientCountOther", { n: s.recipients.length })}:{" "}
                           {s.recipients.slice(0, 3).map((r) => r.email).join(", ")}
                           {s.recipients.length > 3 && ` +${s.recipients.length - 3}`}
                         </span>
@@ -251,7 +259,7 @@ const AdminReportes = () => {
                     </div>
                     {s.last_dispatched_at && (
                       <p className="text-[10px] text-muted-foreground">
-                        Último envío: {new Date(s.last_dispatched_at).toLocaleString(f.intl("es-CO"))}
+                        {t("admin.reports.lastSent", { date: new Date(s.last_dispatched_at).toLocaleString(f.intl("es-CO")) })}
                       </p>
                     )}
                   </div>
@@ -262,31 +270,33 @@ const AdminReportes = () => {
                       className="gap-1.5"
                       onClick={() => handleSendNow(s)}
                       disabled={sendingId === s.id || s.recipients.length === 0}
-                      title="Enviar ahora"
+                      title={t("admin.reports.sendNow")}
                     >
                       {sendingId === s.id ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       ) : (
                         <Send className="h-3.5 w-3.5" />
                       )}
-                      Enviar ahora
+                      {t("admin.reports.sendNow")}
                     </Button>
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => handleToggle(s)}
-                      title={s.is_active ? "Pausar" : "Activar"}
+                      title={s.is_active ? t("admin.reports.pause") : t("admin.reports.activate")}
+                      aria-label={s.is_active ? t("admin.reports.pause") : t("admin.reports.activate")}
                     >
                       <Power className={`h-4 w-4 ${s.is_active ? "text-success" : "text-muted-foreground"}`} />
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={() => handleEdit(s)} title="Editar">
+                    <Button variant="ghost" size="sm" onClick={() => handleEdit(s)} title={t("common.edit")} aria-label={t("common.edit")}>
                       <Edit3 className="h-4 w-4" />
                     </Button>
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => handleDelete(s)}
-                      title="Borrar"
+                      title={t("admin.reports.delete")}
+                      aria-label={t("admin.reports.delete")}
                     >
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
@@ -313,20 +323,23 @@ const AdminReportes = () => {
       <AlertDialog open={!!sendConfirm} onOpenChange={(o) => !o && setSendConfirm(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Enviar reporte ahora</AlertDialogTitle>
+            <AlertDialogTitle>{t("admin.reports.sendConfirmTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Se va a enviar <strong>"{sendConfirm?.name}"</strong> al instante a{" "}
-              <strong>
-                {sendConfirm?.recipients.length} destinatario
-                {sendConfirm && sendConfirm.recipients.length === 1 ? "" : "s"}
-              </strong>
-              . La próxima ejecución programada del cron <strong>no se modifica</strong>.
+              <ConFormato
+                texto={t("admin.reports.sendConfirmBody", {
+                  name: sendConfirm?.name ?? "",
+                  recipients: t(
+                    sendConfirm?.recipients.length === 1 ? "admin.reports.recipientCountOne" : "admin.reports.recipientCountOther",
+                    { n: sendConfirm?.recipients.length ?? 0 },
+                  ),
+                })}
+              />
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel />
             <AlertDialogAction onClick={confirmSendNow}>
-              <Send className="h-3.5 w-3.5 mr-1.5" /> Enviar ahora
+              <Send className="h-3.5 w-3.5 mr-1.5" /> {t("admin.reports.sendNow")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -335,9 +348,9 @@ const AdminReportes = () => {
       <AlertDialog open={!!deleteConfirm} onOpenChange={(o) => !o && setDeleteConfirm(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Borrar reporte</AlertDialogTitle>
+            <AlertDialogTitle>{t("admin.reports.deleteTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              ¿Seguro que quieres borrar <strong>"{deleteConfirm?.name}"</strong>? Esta acción no se puede deshacer.
+              <ConFormato texto={t("admin.reports.deleteBody", { name: deleteConfirm?.name ?? "" })} />
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -346,7 +359,7 @@ const AdminReportes = () => {
               onClick={confirmDelete}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Borrar
+              <Trash2 className="h-3.5 w-3.5 mr-1.5" /> {t("admin.reports.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

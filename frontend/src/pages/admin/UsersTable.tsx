@@ -10,6 +10,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useLanguage } from "@/hooks/useLanguage";
 
 const roleBadgeVariant: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
   admin: "destructive",
@@ -30,6 +31,7 @@ interface UsersTableProps {
 
 const UsersTable = ({ users, onEditRole, onEdit, onResetPassword, onMigrarCorreo, onDelete, onRemoveRole }: UsersTableProps) => {
   const f = useFormato();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user: authUser } = useAuth();
@@ -44,12 +46,12 @@ const UsersTable = ({ users, onEditRole, onEdit, onResetPassword, onMigrarCorreo
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Usuario</TableHead>
-            <TableHead>Correo</TableHead>
-            <TableHead>Rol</TableHead>
-            {hayFichasHR && <TableHead>Ficha HR</TableHead>}
-            <TableHead>Fecha de registro</TableHead>
-            <TableHead className="sticky right-0 bg-card text-right shadow-[inset_6px_0_6px_-6px_rgba(0,0,0,0.35)]">Acciones</TableHead>
+            <TableHead>{t("common.user")}</TableHead>
+            <TableHead>{t("common.email")}</TableHead>
+            <TableHead>{t("common.role")}</TableHead>
+            {hayFichasHR && <TableHead>{t("admin.users.colHrRecord")}</TableHead>}
+            <TableHead>{t("admin.users.colRegistered")}</TableHead>
+            <TableHead className="sticky right-0 bg-card text-right shadow-[inset_6px_0_6px_-6px_rgba(0,0,0,0.35)]">{t("common.actions")}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -62,7 +64,7 @@ const UsersTable = ({ users, onEditRole, onEdit, onResetPassword, onMigrarCorreo
                       profiles.avatar_seed, no en avatar_url) y las iniciales salían
                       de un [0] que parte por la mitad los nombres con emoji. */}
                   <UserAvatar name={user.full_name} src={user.avatar_url} seed={user.avatar_seed} size="sm" />
-                  <span className="font-medium">{user.full_name || "Sin nombre"}</span>
+                  <span className="font-medium">{user.full_name || t("admin.noName")}</span>
                 </div>
               </TableCell>
               <TableCell className="text-muted-foreground text-sm max-w-[200px]">
@@ -72,11 +74,11 @@ const UsersTable = ({ users, onEditRole, onEdit, onResetPassword, onMigrarCorreo
                 {user.email ? (
                   <button
                     type="button"
-                    title={`${user.email} — clic para copiar`}
+                    title={t("admin.clickToCopy", { email: user.email })}
                     onClick={(e) => {
                       e.stopPropagation();
                       navigator.clipboard.writeText(user.email!);
-                      toast({ title: "Correo copiado", description: user.email! });
+                      toast({ title: t("admin.emailCopied"), description: user.email! });
                     }}
                     className="block w-full truncate text-left hover:text-foreground hover:underline decoration-dotted underline-offset-2 cursor-copy"
                   >
@@ -96,7 +98,8 @@ const UsersTable = ({ users, onEditRole, onEdit, onResetPassword, onMigrarCorreo
                       // Ahora aparece sólo al pasar el mouse por la fila.
                       <button
                         onClick={(e) => { e.stopPropagation(); onRemoveRole(user); }}
-                        title={`Quitar el rol ${user.role} a ${user.full_name ?? "esta persona"}`}
+                        title={t("admin.users.removeRoleOf", { role: user.role, name: user.full_name ?? t("admin.thisPerson") })}
+                        aria-label={t("admin.users.removeRoleOf", { role: user.role, name: user.full_name ?? t("admin.thisPerson") })}
                         className="ml-0.5 rounded-full p-0.5 opacity-0 transition-opacity hover:bg-black/10 focus-visible:opacity-100 group-hover/fila:opacity-100 dark:hover:bg-white/20"
                       >
                         <X className="h-3 w-3" />
@@ -104,7 +107,7 @@ const UsersTable = ({ users, onEditRole, onEdit, onResetPassword, onMigrarCorreo
                     )}
                   </Badge>
                 ) : (
-                  <span className="text-muted-foreground text-sm">Sin rol</span>
+                  <span className="text-muted-foreground text-sm">{t("admin.noRole")}</span>
                 )}
               </TableCell>
               {hayFichasHR && (
@@ -130,11 +133,11 @@ const UsersTable = ({ users, onEditRole, onEdit, onResetPassword, onMigrarCorreo
                   <div className="flex justify-end gap-1">
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(user)}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(user)} aria-label={t("common.edit")}>
                           <Pencil className="h-4 w-4" />
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent>Editar</TooltipContent>
+                      <TooltipContent>{t("common.edit")}</TooltipContent>
                     </Tooltip>
                     {/* Cambiar correo / crear casilla: TAMBIÉN sobre uno mismo.
                         `manageable` es false en tu propia fila, así que un admin no
@@ -146,11 +149,11 @@ const UsersTable = ({ users, onEditRole, onEdit, onResetPassword, onMigrarCorreo
                     {(user.manageable || user.id === authUser?.id) && (
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onMigrarCorreo(user)}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onMigrarCorreo(user)} aria-label={t("admin.users.changeEmail")}>
                             <AtSign className="h-4 w-4" />
                           </Button>
                         </TooltipTrigger>
-                        <TooltipContent>Cambiar correo / crear casilla</TooltipContent>
+                        <TooltipContent>{t("admin.users.changeEmail")}</TooltipContent>
                       </Tooltip>
                     )}
                     {/* Jerarquía (24/08): estas solo se muestran si la RPC dijo que
@@ -160,27 +163,27 @@ const UsersTable = ({ users, onEditRole, onEdit, onResetPassword, onMigrarCorreo
                       <>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEditRole(user)}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEditRole(user)} aria-label={t("admin.users.assignRole")}>
                               <UserCog className="h-4 w-4" />
                             </Button>
                           </TooltipTrigger>
-                          <TooltipContent>Asignar rol</TooltipContent>
+                          <TooltipContent>{t("admin.users.assignRole")}</TooltipContent>
                         </Tooltip>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onResetPassword(user)}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onResetPassword(user)} aria-label={t("admin.users.resetPassword")}>
                               <KeyRound className="h-4 w-4" />
                             </Button>
                           </TooltipTrigger>
-                          <TooltipContent>Reset contraseña</TooltipContent>
+                          <TooltipContent>{t("admin.users.resetPassword")}</TooltipContent>
                         </Tooltip>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => onDelete(user)}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => onDelete(user)} aria-label={t("common.delete")}>
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </TooltipTrigger>
-                          <TooltipContent>Eliminar</TooltipContent>
+                          <TooltipContent>{t("common.delete")}</TooltipContent>
                         </Tooltip>
                       </>
                     )}
