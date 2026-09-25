@@ -17,6 +17,12 @@
 --    * La base exige que ese usuario sea de la MISMA agencia que la llave, y que
 --      esté activo al crearla. Una llave de la agencia A no puede actuar como
 --      alguien de la agencia B.
+--    * Y lo vuelve a mirar en CADA pedido (api_key_persona_vigente): si a esa
+--      persona le dan de baja, la bloquean o sale de la agencia, la llave deja de
+--      servir. ⚠️ La baja se mira por el BLOQUEO de auth.users y no solo por
+--      profiles.deleted_at: esa columna la puede volver a null la propia persona con
+--      la sesión que le queda (hasta ~1 h después de la baja), y con eso revivía su
+--      llave. El bloqueo no lo toca nadie más que admin-user-actions.
 --    * Una llave NO cambia de identidad después de creada. Si hace falta otra,
 --      se crea otra llave.
 --
@@ -84,6 +90,8 @@ begin
   end if;
   if not exists (
     select 1 from public.profiles where id = new.acts_as_user_id and deleted_at is null
+  ) or exists (
+    select 1 from auth.users where id = new.acts_as_user_id and banned_until > now()
   ) then
     raise exception 'api_keys: el usuario como el que actúa la llave no está activo';
   end if;
@@ -120,6 +128,42 @@ create trigger api_keys_actua_como_inmutable
 
 alter table public.api_keys alter column acts_as_user_id set not null;
 
+-- ¿La persona como la que actúa la llave sigue pudiendo actuar? Activa (sin baja),
+-- sin bloqueo, y todavía miembro de la agencia de la llave. Tres lecturas por clave
+-- primaria o índice, sin escrituras. Interna: solo la llaman las funciones de acá.
+create or replace function public.api_key_persona_vigente(_usuario uuid, _agencia uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (select 1 from public.profiles p where p.id = _usuario and p.deleted_at is null)
+     and not exists (select 1 from auth.users u where u.id = _usuario and u.banned_until > now())
+     and exists (select 1 from public.tenant_members tm
+                  where tm.user_id = _usuario and tm.tenant_id = _agencia);
+$$;
+
+revoke all on function public.api_key_persona_vigente(uuid, uuid) from public, anon, authenticated;
+
+-- Lo mismo por id de llave, SOLO LECTURA. public-api la usa cuando api_key_consumir
+-- falla (p. ej. la base en modo solo lectura): el límite queda abierto a propósito,
+-- pero la llave de alguien dado de baja no.
+create or replace function public.api_key_vigente(_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select public.api_key_persona_vigente(k.acts_as_user_id, k.tenant_id)
+    from public.api_keys k
+   where k.id = _id;
+$$;
+
+revoke all on function public.api_key_vigente(uuid) from public, anon, authenticated;
+grant execute on function public.api_key_vigente(uuid) to service_role;
+
 -- ─── 2. límite por hora ───────────────────────────────────────────────────────
 
 alter table public.api_keys
@@ -139,9 +183,9 @@ alter table public.api_keys
 -- No hace falta contar los rechazos para que sigan rechazados: en una ventana fija
 -- el contador no baja hasta la hora siguiente.
 --
--- También devuelve como quién actúa la llave y si esa persona sigue activa, en la
--- misma ida a la base: una llave de alguien dado de baja deja de servir, sin sumar
--- una consulta más por pedido. Y public-api no necesita pedir la columna nueva en la
+-- También devuelve como quién actúa la llave y si esa persona sigue vigente
+-- (api_key_persona_vigente), en la misma ida a la base: una llave de alguien dado de
+-- baja, bloqueado o que salió de la agencia deja de servir, sin sumar un pedido más. Y public-api no necesita pedir la columna nueva en la
 -- búsqueda de la llave: si esta migración todavía no está, esa búsqueda sigue igual.
 create or replace function public.api_key_consumir(_id uuid)
 returns table (permitido boolean, limite integer, restantes integer, reinicio timestamptz,
@@ -166,8 +210,7 @@ begin
             greatest(k.limite_por_hora - k.ventana_pedidos, 0),
             _hora + interval '1 hour',
             k.acts_as_user_id,
-            exists (select 1 from public.profiles p
-                     where p.id = k.acts_as_user_id and p.deleted_at is null);
+            public.api_key_persona_vigente(k.acts_as_user_id, k.tenant_id);
   if found then
     return;
   end if;
@@ -179,8 +222,7 @@ begin
          0,
          _hora + interval '1 hour',
          k.acts_as_user_id,
-         exists (select 1 from public.profiles p
-                  where p.id = k.acts_as_user_id and p.deleted_at is null)
+         public.api_key_persona_vigente(k.acts_as_user_id, k.tenant_id)
     from public.api_keys k
    where k.id = _id;
 end;

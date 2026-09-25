@@ -36,7 +36,7 @@ type ApiKey = {
   status: "active" | "revoked" | "expired";
   // Como quién actúa la key: fija desde que se crea (quien la crea). Opcionales
   // mientras convivan el front nuevo y un manage-api-keys anterior.
-  acts_as?: { id: string; name: string | null } | null;
+  acts_as?: { id: string; name: string | null; active: boolean | null } | null;
   limite_por_hora?: number;
 };
 type ListResp = { keys: ApiKey[]; scope_catalog: ScopeDef[]; scope_groups: string[]; max_active_keys: number };
@@ -227,7 +227,7 @@ const AdminApiKeys = () => {
                   <th className="px-4 py-3 font-medium">API key</th>
                   <th className="px-4 py-3 font-medium">Creada</th>
                   <th className="px-4 py-3 font-medium">Creada por</th>
-                  <th className="px-4 py-3 font-medium" title="La key actúa en Maven como esta persona, con lo que esta persona puede ver y hacer. No cambia nunca.">Actúa como</th>
+                  <th className="px-4 py-3 font-medium" title="La key opera a nombre de esta persona (GET /me) y deja de funcionar si la dan de baja. No cambia nunca. Los datos se entregan según los permisos (scopes) de la key, no según los de esta persona.">Actúa como</th>
                   <th className="px-4 py-3 font-medium">IP whitelist</th>
                   <th className="px-4 py-3 font-medium">Expira</th>
                   <th className="px-4 py-3 font-medium">Estado</th>
@@ -254,7 +254,13 @@ const AdminApiKeys = () => {
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">{k.expires_at ? fmt(k.expires_at, f.intl("es-CO")) : "Nunca"}</td>
                     <td className="px-4 py-3">
-                      {k.status === "active" && <Badge variant="outline" className="border-success/40 text-success">Activa</Badge>}
+                      {k.status === "active" && k.acts_as?.active === false && (
+                        <Badge variant="outline" className="border-destructive/40 text-destructive"
+                          title="La persona como la que actúa esta key fue dada de baja: el API la rechaza con 401. Revocala y creá otra.">
+                          Persona dada de baja
+                        </Badge>
+                      )}
+                      {k.status === "active" && k.acts_as?.active !== false && <Badge variant="outline" className="border-success/40 text-success">Activa</Badge>}
                       {k.status === "revoked" && <Badge variant="outline" className="border-destructive/40 text-destructive">Revocada</Badge>}
                       {k.status === "expired" && <Badge variant="outline" className="text-muted-foreground">Vencida</Badge>}
                     </td>
@@ -416,12 +422,12 @@ const AdminApiKeys = () => {
             <div>
               <div className="mb-1 font-medium">Autenticación</div>
               <p className="text-xs text-muted-foreground">Envía la key en <code className="rounded bg-muted px-1 py-0.5">Authorization: Bearer mvk_live_…</code> (o el header <code className="rounded bg-muted px-1 py-0.5">X-API-Key</code>).</p>
-              <p className="mt-1 text-xs text-muted-foreground">Cada key actúa como una persona de Maven (quien la creó) y eso no cambia nunca. Si esa persona deja Maven, la key deja de funcionar (401). <code className="rounded bg-muted px-1 py-0.5">GET /me</code> dice cuál es.</p>
+              <p className="mt-1 text-xs text-muted-foreground">Cada key opera a nombre de una persona de Maven (quien la creó) y eso no cambia nunca. Si esa persona deja Maven o la agencia, la key deja de funcionar (401). <code className="rounded bg-muted px-1 py-0.5">GET /me</code> dice cuál es. Los datos se entregan según los scopes de la key.</p>
             </div>
             <div>
               <div className="mb-1 font-medium">Límite</div>
               <p className="text-xs text-muted-foreground">
-                1.000 pedidos por hora por key; se reinicia a la hora en punto. Cada respuesta trae <code className="rounded bg-muted px-1 py-0.5">X-RateLimit-Limit</code>, <code className="rounded bg-muted px-1 py-0.5">X-RateLimit-Remaining</code> y <code className="rounded bg-muted px-1 py-0.5">X-RateLimit-Reset</code> (epoch en segundos). Pasado el límite: <code className="rounded bg-muted px-1 py-0.5">429</code> con <code className="rounded bg-muted px-1 py-0.5">Retry-After</code> (segundos).
+                1.000 pedidos por hora por key; se reinicia a la hora en punto. Las respuestas a una key válida traen <code className="rounded bg-muted px-1 py-0.5">X-RateLimit-Limit</code>, <code className="rounded bg-muted px-1 py-0.5">X-RateLimit-Remaining</code> y <code className="rounded bg-muted px-1 py-0.5">X-RateLimit-Reset</code> (epoch en segundos). Pasado el límite: <code className="rounded bg-muted px-1 py-0.5">429</code> con <code className="rounded bg-muted px-1 py-0.5">Retry-After</code> (segundos).
               </p>
             </div>
             <div>

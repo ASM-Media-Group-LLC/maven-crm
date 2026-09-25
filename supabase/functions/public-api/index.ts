@@ -40,7 +40,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 // las edge functions, y este módulo solo lo usa public-api.
 import { decidir, esComoUsuario } from "./aislamiento.ts";
 import { clienteComoUsuario, comoUsuarioConfigurado } from "./como-usuario.ts";
-import { RECURSOS_COMO_USUARIO } from "./recursos-como-usuario.ts";
+import { servirComoUsuario } from "./recursos-como-usuario.ts";
 
 const corsHeaders = (req: Request) =>
   corsFor(req, {
@@ -75,6 +75,15 @@ const noDisponible = (req: Request, donde: string, err: unknown) => {
     message: "El servicio no está disponible en este momento. Reintentá en unos segundos.",
   }, 503, { "Retry-After": "30" });
 };
+
+// La llave vive mientras la persona como la que actúa siga vigente: sin baja, sin
+// bloqueo y en la agencia de la llave. Si no, deja de servir aunque nadie se haya
+// acordado de revocarla.
+const personaNoVigente = (req: Request) =>
+  json(req, {
+    error: "unauthorized",
+    message: "La persona como la que actúa esta API key ya no está activa en esta agencia de Maven",
+  }, 401);
 
 async function sha256hex(s: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
@@ -256,14 +265,14 @@ Deno.serve(async (req) => {
           `Se reinicia a las ${consumo.reinicio}.`,
       }, 429, { "Retry-After": String(espera) });
     }
-    // La llave vive mientras viva la persona como la que actúa. Si le dieron de baja,
-    // sus llaves dejan de servir aunque nadie se haya acordado de revocarlas.
-    if (!consumo.usuario_activo) {
-      return json(req, {
-        error: "unauthorized",
-        message: "La persona como la que actúa esta API key ya no está activa en Maven",
-      }, 401);
-    }
+    if (!consumo.usuario_activo) return personaNoVigente(req);
+  } else {
+    // El contador falló (p. ej. la base en modo solo lectura). El límite queda
+    // abierto a propósito, pero la baja no: una sola lectura, y solo en este camino.
+    // Si tampoco responde (o la migración todavía no está), no se sabe: se sirve.
+    const { data: vigente, error: vErr } = await admin.rpc("api_key_vigente", { _id: keyRow.id as string });
+    if (vErr) console.error("[public-api] persona de la llave:", vErr.message);
+    if (!vErr && vigente === false) return personaNoVigente(req);
   }
 
   // Cuántas agencias hay en Maven. Los recursos que no saben de qué agencia es cada
@@ -318,8 +327,6 @@ Deno.serve(async (req) => {
   // ===== Recursos que actúan como la persona de la llave =====
   // Sin service_role: la pared es la RLS de la base. Ver ./recursos-como-usuario.ts.
   if (esComoUsuario(recursoClave)) {
-    const servir = RECURSOS_COMO_USUARIO[recursoClave];
-    if (!servir) return noDisponible(req, "recurso como usuario", `sin handler: ${recursoClave}`);
     if (!consumo?.actua_como) return noDisponible(req, "como quién actúa la llave", consumoErr ?? "sin respuesta");
     if (!comoUsuarioConfigurado()) return noDisponible(req, "sesión como usuario", "falta el secreto MAVEN_JWT_SECRET");
     let yo: Awaited<ReturnType<typeof clienteComoUsuario>>;
@@ -329,9 +336,9 @@ Deno.serve(async (req) => {
       return noDisponible(req, "sesión como usuario", e);
     }
     if (!yo) return noDisponible(req, "sesión como usuario", "falta el secreto MAVEN_JWT_SECRET");
-    let r: Awaited<ReturnType<typeof servir>>;
+    let r: Awaited<ReturnType<typeof servirComoUsuario>>;
     try {
-      r = await servir(yo, {
+      r = await servirComoUsuario(recursoClave, yo, {
         agenciaDeLaLlave: tenantId,
         actuaComo: consumo.actua_como,
         cupo: { limite: consumo.limite, restantes: consumo.restantes, reinicio: consumo.reinicio },

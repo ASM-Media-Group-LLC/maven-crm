@@ -18,8 +18,11 @@
 //                    dice la verdad sobre quién es de qué agencia.
 //  * `como_usuario` — NO corre con service_role: consulta con la sesión de la persona
 //                    como la que actúa la llave (./como-usuario.ts), así que la pared
-//                    es la RLS de la base, la misma que la app. La base garantiza que
-//                    esa persona es de la agencia de la llave. Su código vive en
+//                    es la RLS de la base, la misma que la app. Que esa persona sea
+//                    de la agencia de la llave se verifica TRES veces: al crearla
+//                    (trigger), en cada pedido (api_key_consumir → 401) y, antes de
+//                    cualquier handler, que la base vea la sesión en esa agencia
+//                    (servirComoUsuario → 503). Su código vive en
 //                    ./recursos-como-usuario.ts, que el test obliga a no tocar `admin`.
 //  * `sin_agencia` — no hay forma confiable de saber de qué agencia es cada fila.
 //                    Con UNA agencia todas son de ella y se sirven igual que siempre.
@@ -100,6 +103,7 @@ export const INFRAESTRUCTURA: ReadonlySet<string> = new Set([
   "tenant_members",
   "increment_api_key_usage",
   "api_key_consumir",
+  "api_key_vigente",
 ]);
 
 /** Recursos que se sirven con la sesión del usuario y nunca con service_role. */

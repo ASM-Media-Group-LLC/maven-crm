@@ -113,22 +113,26 @@ Deno.serve(async (req) => {
     const SELECT_COLS =
       "id, name, key_prefix, last_four, scopes, ip_whitelist, created_at, created_by_email, last_used_at, request_count, expires_at, revoked_at, acts_as_user_id, limite_por_hora";
 
-    // Como quién actúa cada llave, con nombre: es lo primero que tiene que ver quien
-    // la administra, porque todo lo que la llave haga con permisos de usuario lo hace
-    // a nombre de esa persona.
+    // Como quién actúa cada llave, con nombre y si sigue activa: es lo primero que
+    // tiene que ver quien la administra. Si a esa persona la dieron de baja, el API
+    // rechaza la llave con 401 aunque acá diga "Activa"; sin esto no hay cómo saberlo.
+    // `active` es null si no se pudo leer (no se adivina).
     const conPersona = async <T extends { acts_as_user_id?: string | null }>(filas: T[]) => {
       const ids = [...new Set(filas.map((f) => f.acts_as_user_id).filter((x): x is string => !!x))];
-      const nombres = new Map<string, string | null>();
+      const personas = new Map<string, { name: string | null; active: boolean }>();
       if (ids.length) {
-        const { data: perfiles } = await admin.from("profiles").select("id, full_name").in("id", ids);
-        for (const p of perfiles ?? []) {
-          nombres.set((p as { id: string }).id, (p as { full_name: string | null }).full_name ?? null);
+        const { data: perfiles, error: pErr } = await admin
+          .from("profiles").select("id, full_name, deleted_at").in("id", ids);
+        if (pErr) console.error("[manage-api-keys] personas de las llaves:", pErr.message);
+        for (const p of (perfiles ?? []) as { id: string; full_name: string | null; deleted_at: string | null }[]) {
+          personas.set(p.id, { name: p.full_name ?? null, active: !p.deleted_at });
         }
       }
-      return filas.map((f) => ({
-        ...f,
-        acts_as: f.acts_as_user_id ? { id: f.acts_as_user_id, name: nombres.get(f.acts_as_user_id) ?? null } : null,
-      }));
+      return filas.map((f) => {
+        const id = f.acts_as_user_id;
+        const p = id ? personas.get(id) : undefined;
+        return { ...f, acts_as: id ? { id, name: p?.name ?? null, active: p ? p.active : null } : null };
+      });
     };
 
     // === LIST ===

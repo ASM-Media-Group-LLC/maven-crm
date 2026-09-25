@@ -99,9 +99,10 @@ Deno.test("hoy ningún recurso de DATOS dice estar aislado (y con 2 agencias se 
   // esta lista sin haber arreglado el dato, estás abriendo una fuga.
   //
   //  * me — 24/09/2026. Devuelve a la persona como la que actúa la llave y su
-  //    agencia, leídas con SU sesión (current_tenant_id() y su propio perfil). La
-  //    base garantiza que esa persona es de la agencia de la llave
-  //    (api_keys_validar_actua_como) y que no cambia (api_keys_actua_como_inmutable).
+  //    agencia, leídas con SU sesión. Que esa persona es de la agencia de la llave
+  //    se verifica al crearla (api_keys_validar_actua_como), en cada pedido
+  //    (api_key_consumir → 401) y antes de servir (servirComoUsuario compara
+  //    current_tenant_id() de la sesión → 503). No cambia (api_keys_actua_como_inmutable).
   const PROMOVIDOS_CON_VERIFICACION: string[] = ["me"];
 
   const promovidos = Object.entries(AISLAMIENTO_POR_RECURSO)
@@ -230,14 +231,35 @@ Deno.test("como_usuario: los handlers nunca ven service_role", () => {
   // La razón de ser de este modo: la RLS y los triggers de la base son la pared. Con
   // service_role, los guardias del Messenger se apartan y una llave escribiría a
   // nombre de cualquiera.
-  for (const prohibido of [/\badmin\b/, /service_role/i, /SERVICE_ROLE/, /createClient/, /Deno\.env/]) {
+  //
+  // Mirar identificadores no alcanza: `import { adminClient } from "../_shared/…"`
+  // trae un cliente service_role sin que aparezca la palabra. Por eso: el archivo
+  // solo puede importar TIPOS, y cada handler tiene que estar definido en él.
+  for (const prohibido of [/admin/i, /service_?role/i, /serviceClient/i, /createClient/, /Deno\.env/, /\bimport\s*\(/, /\bfetch\s*\(/]) {
     assert(!prohibido.test(RECURSOS_USUARIO), `recursos-como-usuario.ts usa ${prohibido}`);
+  }
+  // Por sentencia y no por línea: un import partido en varias líneas también cuenta.
+  const importsDeValores = RECURSOS_USUARIO.match(/^\s*import\s+(?!type\b)[^;]*/gm) ?? [];
+  assertEquals(importsDeValores, [], "recursos-como-usuario.ts importa valores, no solo tipos");
+  const reexports = RECURSOS_USUARIO.match(/^\s*export\s*(\*|\{)[^;]*\bfrom\b/gm) ?? [];
+  assertEquals(reexports, [], "recursos-como-usuario.ts reexporta de otro archivo");
+  const mapa = RECURSOS_USUARIO.match(/RECURSOS_COMO_USUARIO\s*:[^=]*=\s*\{([\s\S]*?)\}/);
+  assert(mapa, "no se encontró RECURSOS_COMO_USUARIO");
+  const handlers = [...mapa[1].matchAll(/:\s*([A-Za-z_$][\w$]*)/g)].map((m) => m[1]);
+  assert(handlers.length >= 1, "el mapa de handlers quedó vacío o cambió de forma");
+  for (const h of handlers) {
+    assert(
+      new RegExp(`export\\s+const\\s+${h}\\s*:\\s*Handler\\s*=`).test(RECURSOS_USUARIO),
+      `el handler ${h} no está definido en recursos-como-usuario.ts`,
+    );
   }
   assert(!/SERVICE_ROLE/.test(COMO_USUARIO), "como-usuario.ts arma su cliente con service_role");
   assert(/SUPABASE_ANON_KEY/.test(COMO_USUARIO), "como-usuario.ts no arma su cliente con la clave anónima");
-  // El router le pasa el cliente de la persona, y solo ese.
-  assert(/await\s+servir\(\s*yo\s*,/.test(PUBLIC_API), "el router no le pasa `yo` al handler");
-  assert(!/servir\(\s*admin\b/.test(PUBLIC_API), "el router le pasa `admin` a un handler como_usuario");
+  // El router entra por servirComoUsuario (que verifica la sesión) con el cliente de
+  // la persona, y solo ese. Nada de despachar handlers sueltos.
+  assert(/await\s+servirComoUsuario\(\s*recursoClave\s*,\s*yo\s*,/.test(PUBLIC_API), "el router no entra por servirComoUsuario con `yo`");
+  assert(!/servirComoUsuario\([^)]*\badmin\b/.test(PUBLIC_API), "el router le pasa `admin` a lo como_usuario");
+  assert(!/RECURSOS_COMO_USUARIO/.test(PUBLIC_API), "el router despacha handlers sin pasar por servirComoUsuario");
   // Si falta el secreto se responde 503; no se cae a service_role.
   const tramo = PUBLIC_API.slice(PUBLIC_API.indexOf("esComoUsuario(recursoClave)"));
   assert(tramo.length > 100, "no se encontró la rama como_usuario del router");
@@ -260,6 +282,13 @@ Deno.test("límite: cada pedido pasa por api_key_consumir, una sola vez, despué
   // Y antes de rutear: ningún recurso se sirve sin haber pasado por el contador.
   const ruteo = PUBLIC_API.indexOf("const parts =");
   assert(ruteo > 0 && consumo < ruteo, "el cupo se consume después de rutear");
+});
+
+Deno.test("baja: si el contador falla, la llave de alguien dado de baja igual se corta", () => {
+  // El límite queda abierto si el contador falla; la baja no.
+  const tramo = PUBLIC_API.slice(PUBLIC_API.indexOf('rpc("api_key_consumir"'));
+  assert(/\}\s*else\s*\{[\s\S]{0,600}\.rpc\(\s*"api_key_vigente"/.test(tramo), "sin contador no se mira si la persona sigue vigente");
+  assert(/vigente\s*===\s*false\s*\)\s*return\s+personaNoVigente/.test(tramo), "sin contador, una persona no vigente no da 401");
 });
 
 Deno.test("límite: pasado el cupo, 429 con Retry-After; persona inactiva, 401", () => {
