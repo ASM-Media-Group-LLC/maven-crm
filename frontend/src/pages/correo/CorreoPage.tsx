@@ -1609,8 +1609,18 @@ function FilaMensaje({
         "relative flex min-w-0 flex-1 items-center gap-3 rounded-2xl px-2.5 py-2.5 text-left transition-all duration-150",
         activo
           ? "bg-primary/12 before:absolute before:inset-y-2 before:left-0 before:w-[3px] before:rounded-r before:bg-gradient-to-b before:from-accent before:to-primary"
-          : !seleccionado && "hover:bg-primary/5",
-        sinLeer && !activo && !seleccionado && "bg-primary/[0.04]",
+          : sinLeer && !seleccionado
+            // ⚠️ El sombreado del NO LEÍDO es el mismo de Messenger, y por la
+            // misma razón. Estaba en 0.04: sobre el fondo oscuro no se veía, y
+            // Messenger ya había pasado por eso — «0.04 y después 0.09 seguían
+            // siendo casi invisibles, sobre todo en modo claro» (ChatSidebar).
+            // Tinte a 0.16 más una barra de acento de 3px (sombra interna, no
+            // empuja el layout), que se nota aunque el primario sea claro.
+            //
+            // El hover sube a 0.22 y no baja: con el `hover:bg-primary/5` de
+            // las leídas, pasar el mouse por una fila sin leer la ACLARABA.
+            ? "bg-primary/[0.16] shadow-[inset_3px_0_0_0_hsl(var(--primary))] hover:bg-primary/[0.22]"
+            : !seleccionado && "hover:bg-primary/5",
       )}
     >
       <UserAvatar name={nombre} size="md" className={cn("shrink-0", activo && "ring-2 ring-primary/20")} />
