@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // Canales de venta por los que se contactó a un contacto vía WhatsApp.
 // "Contactado por un canal" = existe al menos UN mensaje OUTBOUND (direction='out')
@@ -43,8 +44,11 @@ const EMPTY: BuiltData = {
 };
 
 export function useContactSalesChannels(enabled: boolean) {
+  // El idioma va en la llave: la etiqueta de repuesto ("Canal") se arma adentro
+  // de la consulta, y sin esto quedaba en el idioma de la primera carga.
+  const { t, language } = useLanguage();
   const { data, isLoading } = useQuery<BuiltData>({
-    queryKey: ["contact-sales-channels"],
+    queryKey: ["contact-sales-channels", language],
     enabled,
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
@@ -78,7 +82,7 @@ export function useContactSalesChannels(enabled: boolean) {
         const list: ContactChannel[] = Array.from(channelMap.entries()).map(
           ([channelId, lastAt]) => ({
             channelId,
-            label: channelLabelById.get(channelId) || "Canal",
+            label: channelLabelById.get(channelId) || t("contactos.channelFallback"),
             lastAt,
           }),
         );

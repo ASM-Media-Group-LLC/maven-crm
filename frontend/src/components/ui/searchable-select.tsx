@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { useTSiHay } from "@/hooks/useTSiHay";
 
 export interface SearchableSelectOption {
   value: string;
@@ -53,12 +54,18 @@ export function SearchableSelect({
   value,
   onValueChange,
   options,
-  placeholder = "Seleccionar…",
-  searchPlaceholder = "Buscar…",
-  emptyMessage = "Sin resultados.",
+  placeholder: placeholderProp,
+  searchPlaceholder: searchPlaceholderProp,
+  emptyMessage: emptyMessageProp,
   triggerClassName,
   popoverWidth,
 }: SearchableSelectProps) {
+  // Los textos por defecto salen del diccionario: con la app en inglés una
+  // pantalla que no pasa placeholder mostraba "Seleccionar…" igual.
+  const t = useTSiHay();
+  const placeholder = placeholderProp ?? t("common.selectEllipsis");
+  const searchPlaceholder = searchPlaceholderProp ?? t("shared.ui.searchEllipsis");
+  const emptyMessage = emptyMessageProp ?? t("common.noResults");
   const [open, setOpen] = useState(false);
   const selected = useMemo(
     () => options.find((o) => o.value === value),

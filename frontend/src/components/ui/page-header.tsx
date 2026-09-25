@@ -2,6 +2,7 @@ import * as React from "react";
 import { MoreHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useTSiHay } from "@/hooks/useTSiHay";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
@@ -56,6 +57,7 @@ function muestraTextoEnMovil(nodo: React.ReactNode): boolean {
 
 export function PageHeader({ title, subtitle, icon, actions, className }: PageHeaderProps) {
   const isMobile = useIsMobile();
+  const t = useTSiHay();
   const lista = React.useMemo(() => aplanar(actions), [actions]);
   // En el teléfono, más de dos acciones se pliegan detrás de un botón de tres
   // puntos que abre una hoja inferior con todas apiladas (fase 3 del rediseño).
@@ -90,13 +92,13 @@ export function PageHeader({ title, subtitle, icon, actions, className }: PageHe
       {actions != null && plegar && (
         <Sheet>
           <SheetTrigger asChild>
-            <Button variant="outline" size="icon" className="ml-auto shrink-0" aria-label="Más acciones">
+            <Button variant="outline" size="icon" className="ml-auto shrink-0" aria-label={t("shared.ui.moreActions")}>
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </SheetTrigger>
           <SheetContent side="bottom" className="rounded-t-card pb-safe">
             <SheetHeader className="text-left">
-              <SheetTitle className="font-display">Acciones</SheetTitle>
+              <SheetTitle className="font-display">{t("common.actions")}</SheetTitle>
             </SheetHeader>
             {/* En la hoja hay ancho de sobra, así que las etiquetas que el
                 botón esconde en el teléfono (`hidden sm:inline`) se muestran:

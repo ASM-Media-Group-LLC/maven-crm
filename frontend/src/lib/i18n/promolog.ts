@@ -364,8 +364,10 @@ export const promolog = {
   "promolog.storyMany": { es: "historias", en: "stories" },
   "promolog.evidenceCount": { es: "Evidencia · {count} {noun}", en: "Evidence · {count} {noun}" },
   "promolog.promotedCount": { es: "{count} promovió", en: "{count} promoted" },
-  "promolog.notPromotedCount": { es: "{count} no", en: "{count} no" },
+  "promolog.notPromotedCount": { es: "{count} no", en: "{count} not promoted" },
   "promolog.aiPct": { es: "IA: {pct}%", en: "AI: {pct}%" },
+  // La hora de la promo (ViewPromologEntryModal): en inglés "Time", no "Hour".
+  "promolog.time": { es: "Hora", en: "Time" },
   "promolog.openOriginal": { es: "Abrir original", en: "Open original" },
 
   // ─── Tabla de promos (PromologTable) ─────────────────────────────────────

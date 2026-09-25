@@ -56,7 +56,7 @@ export const LEGADO_EN_ESPANOL: string[] = [
   "components/scouter/SpammerDetailModal.tsx",
   "hooks/reportMetricsCatalog.ts",
   "hooks/useAgencyQa.ts",
-  "hooks/useChat.ts",
+  // Traducido; quedan los criterios originales del scorecard (ORIGINAL_CRITERIA), que se guardan en la base con su label_en al lado: son dato.
   "hooks/useChatterEvaluator.ts",
   "hooks/useEmployee.ts",
   "hooks/useEmployees.ts",
@@ -64,7 +64,6 @@ export const LEGADO_EN_ESPANOL: string[] = [
   "hooks/useFinancialConfig.ts",
   "hooks/useFondosPropios.ts",
   "hooks/useHubstaffAgentDetail.ts",
-  "hooks/useLiveKit.ts",
   "hooks/useScouterLeads.ts",
   "hooks/useSkin.ts",
   "hooks/useSpammerAccounts.ts",

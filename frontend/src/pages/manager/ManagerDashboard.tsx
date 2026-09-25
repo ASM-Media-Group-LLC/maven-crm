@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import SelectorDeTablero from "@/pages/dashboard/SelectorDeTablero";
 import { format } from "date-fns";
 import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
 import { usePromoScoresRango } from "@/pages/promolog/usePromoPeriodScores";
 import { useDashboard2Summary } from "@/pages/sales-performance/useDashboard2Summary";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -144,6 +145,7 @@ export default function ManagerDashboard({ forzado = false }: {
   forzado?: boolean;
 } = {}) {
   const f = useFormato();
+  const { t } = useLanguage();
   const [rango, setRango] = useState<{ from: Date; to: Date }>(() => rangeForPreset("this_week", new Date()));
   const [preset, setPreset] = useState<RangePreset | null>("this_week");
   const desde = isoDia(rango.from);
@@ -309,7 +311,7 @@ export default function ManagerDashboard({ forzado = false }: {
             <Kpi
               label="Cowork"
               valor={cowork.horas > 0 ? cowork.horas.toFixed(1) : "—"}
-              pie={pieTiempoCowork(cowork, coworkCargando)}
+              pie={pieTiempoCowork(cowork, coworkCargando, t)}
               icono={Timer} color="bg-violet-500" tinte="from-violet-500/10"
             />
             <Kpi

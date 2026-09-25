@@ -27,6 +27,7 @@ import { creadoresFicha } from "./i18n/creadoresFicha";
 import { cowork } from "./i18n/cowork";
 import { scouter } from "./i18n/scouter";
 import { apiKeys } from "./i18n/apiKeys";
+import { compartido } from "./i18n/compartido";
 
 export type Language = "es" | "en";
 
@@ -78,6 +79,7 @@ const translations = {
   ...cowork,
   ...scouter,
   ...apiKeys,
+  ...compartido,
 } as const;
 
 export type TranslationKey = keyof typeof translations;

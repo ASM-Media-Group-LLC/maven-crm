@@ -30,9 +30,12 @@ vi.mock("@/hooks/useUserRole", () => ({
 }));
 
 // El provider de idioma no aporta nada acá: `t` devuelve la clave y listo.
-vi.mock("@/hooks/useLanguage", () => ({
-  useLanguage: () => ({ t: (k: string) => k, language: "es", setLanguage: () => {} }),
-}));
+// `useLanguageSiHay` también: lo usan las primitivas de components/ui/ (el
+// encabezado de la página) y useFormato.
+vi.mock("@/hooks/useLanguage", () => {
+  const idioma = { t: (k: string) => k, language: "es", setLanguage: () => {} };
+  return { useLanguage: () => idioma, useLanguageSiHay: () => idioma };
+});
 
 // Las sub-páginas reales arrastran media app (edge functions, storage, tablas).
 // Acá sólo importa CUÁL se monta, así que van stubbeadas.

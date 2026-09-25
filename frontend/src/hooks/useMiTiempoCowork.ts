@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import type { TranslationKey } from "@/lib/i18n";
 
 // MI TIEMPO EN COWORK, día por día: el reloj que va a reemplazar a Hubstaff
 // (ver cowork_tiempo_hubstaff). Sale del RPC `cowork_tiempo_diario`, que con
@@ -50,9 +51,19 @@ export function resumirTiempoCowork(dias: DiaDeCowork[]) {
   return { horas, horasEnSala, horasMeet, diasConReloj: dias.filter((d) => d.horas > 0).length };
 }
 
-/** "31.5 h · 34.2 h en sala" — el pie de la tarjeta. */
-export function pieTiempoCowork(r: ReturnType<typeof resumirTiempoCowork>, cargando: boolean): string {
-  if (r.diasConReloj === 0) return cargando ? "cargando…" : "sin tiempo en Cowork en el rango";
-  const meet = r.horasMeet > 0 ? ` · ${r.horasMeet.toFixed(1)} h en meet grupal` : "";
-  return `${r.diasConReloj} día${r.diasConReloj === 1 ? "" : "s"} · ${r.horasEnSala.toFixed(1)} h en sala${meet}`;
+type ResumenDeCowork = ReturnType<typeof resumirTiempoCowork>;
+/** El `t` de `useLanguage()`. */
+type Traductor = (key: TranslationKey, params?: Record<string, string | number>) => string;
+
+/** "2 días · 34.2 h en sala" — el pie de la tarjeta.
+ *
+ *  Recibe el `t` de quien lo dibuja (el de `useLanguage()`) y no usa
+ *  `traducir()`: es texto de PANTALLA, y tiene que cambiar de idioma en el
+ *  momento en que la persona toca el botón, no en el próximo render que pase. */
+export function pieTiempoCowork(r: ResumenDeCowork, cargando: boolean, t: Traductor): string {
+  if (r.diasConReloj === 0) return cargando ? t("shared.coworkTime.loading") : t("shared.coworkTime.none");
+  const dias = t(r.diasConReloj === 1 ? "shared.coworkTime.dayOne" : "shared.coworkTime.dayMany", { n: r.diasConReloj });
+  const partes = [dias, t("shared.coworkTime.inRoom", { hours: r.horasEnSala.toFixed(1) })];
+  if (r.horasMeet > 0) partes.push(t("shared.coworkTime.inMeet", { hours: r.horasMeet.toFixed(1) }));
+  return partes.join(" · ");
 }
