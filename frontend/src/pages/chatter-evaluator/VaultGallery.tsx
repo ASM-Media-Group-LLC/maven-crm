@@ -28,6 +28,7 @@ import {
   GripVertical,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useLanguage } from "@/hooks/useLanguage";
 import {
   useAddVaultItem,
   useDeleteVaultItem,
@@ -59,6 +60,7 @@ const VaultThumb = ({
   editable?: boolean;
   dragHandleProps?: React.HTMLAttributes<HTMLDivElement>;
 }) => {
+  const { t } = useLanguage();
   const [errored, setErrored] = useState(false);
 
   return (
@@ -72,7 +74,7 @@ const VaultThumb = ({
         {errored ? (
           <div className="flex h-full w-full flex-col items-center justify-center gap-1 p-2 text-xs text-destructive">
             <AlertCircle className="h-5 w-5" />
-            <span className="truncate">URL rota</span>
+            <span className="truncate">{t("chatters.vault.brokenUrl")}</span>
           </div>
         ) : item.media_type === "video" ? (
           <>
@@ -104,7 +106,7 @@ const VaultThumb = ({
           <div
             {...dragHandleProps}
             className="absolute left-1 top-1 z-10 hidden cursor-grab rounded bg-black/60 p-1 text-white opacity-0 transition-opacity group-hover:opacity-100 active:cursor-grabbing md:block"
-            title="Arrastra para reordenar"
+            title={t("chatters.vault.dragToReorder")}
           >
             <GripVertical className="h-3 w-3" />
           </div>
@@ -112,7 +114,7 @@ const VaultThumb = ({
             type="button"
             onClick={(e) => { e.stopPropagation(); onDelete?.(); }}
             className="absolute right-1 top-1 z-10 rounded bg-destructive/90 p-1 text-destructive-foreground opacity-0 transition-opacity hover:bg-destructive group-hover:opacity-100"
-            title="Eliminar"
+            title={t("common.delete")}
           >
             <Trash2 className="h-3 w-3" />
           </button>
@@ -127,6 +129,7 @@ const VaultThumb = ({
 };
 
 export const VaultGallery = ({ items, profileId, profileKey, editable = false }: Props) => {
+  const { t } = useLanguage();
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const [orderedItems, setOrderedItems] = useState(items);
   const [confirmDelete, setConfirmDelete] = useState<ChatterVaultItem | null>(null);
@@ -151,10 +154,10 @@ export const VaultGallery = ({ items, profileId, profileKey, editable = false }:
         ok++;
       } catch (e) {
         fail++;
-        toast.error(`Falló subir ${file.name}`, { description: (e as Error).message });
+        toast.error(t("chatters.vault.uploadFailedN", { name: file.name }), { description: (e as Error).message });
       }
     }
-    if (ok > 0) toast.success(`${ok} archivo(s) subido(s)`);
+    if (ok > 0) toast.success(t("chatters.vault.uploadedN", { n: ok }));
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -163,9 +166,9 @@ export const VaultGallery = ({ items, profileId, profileKey, editable = false }:
     try {
       await delMut.mutateAsync({ item: confirmDelete });
       setConfirmDelete(null);
-      toast.success("Item eliminado");
+      toast.success(t("chatters.vault.itemDeleted"));
     } catch (e) {
-      toast.error("No se pudo eliminar", { description: (e as Error).message });
+      toast.error(t("common.couldNotDelete"), { description: (e as Error).message });
     }
   };
 
@@ -181,7 +184,7 @@ export const VaultGallery = ({ items, profileId, profileKey, editable = false }:
         orderedIds: next.map((i) => i.id),
       });
     } catch (e) {
-      toast.error("No se pudo reordenar", { description: (e as Error).message });
+      toast.error(t("chatters.vault.couldNotReorder"), { description: (e as Error).message });
       setOrderedItems(items); // revert
     }
   };
@@ -205,7 +208,7 @@ export const VaultGallery = ({ items, profileId, profileKey, editable = false }:
             className="gap-2"
           >
             {addMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-            Subir archivos
+            {t("chatters.vault.uploadFiles")}
           </Button>
         </div>
       )}
@@ -214,7 +217,7 @@ export const VaultGallery = ({ items, profileId, profileKey, editable = false }:
         <Card className="p-6">
           <div className="flex flex-col items-center gap-2 text-center text-muted-foreground">
             <ImageIcon className="h-6 w-6" />
-            <p className="text-sm">Sin contenido en el vault todavía.</p>
+            <p className="text-sm">{t("chatters.vault.empty")}</p>
           </div>
         </Card>
       ) : editable ? (
@@ -286,10 +289,10 @@ export const VaultGallery = ({ items, profileId, profileKey, editable = false }:
       <AlertDialog open={!!confirmDelete} onOpenChange={(o) => !o && setConfirmDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Eliminar item</AlertDialogTitle>
+            <AlertDialogTitle>{t("chatters.vault.deleteItem")}</AlertDialogTitle>
             <AlertDialogDescription>
               {confirmDelete
-                ? `¿Eliminar "${confirmDelete.name}" del vault? No se puede deshacer.`
+                ? t("chatters.vault.deleteConfirm", { name: confirmDelete.name })
                 : ""}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -304,7 +307,7 @@ export const VaultGallery = ({ items, profileId, profileKey, editable = false }:
               disabled={delMut.isPending}
             >
               {delMut.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Eliminar
+              {t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

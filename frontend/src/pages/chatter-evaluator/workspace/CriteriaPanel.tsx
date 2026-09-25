@@ -14,6 +14,7 @@ import {
 import { Check, Minus, X, Send, Loader2, RotateCcw } from "lucide-react";
 import { useChatterCriteria, useResetCriteria } from "@/hooks/useChatterEvaluator";
 import { toast } from "sonner";
+import { useLanguage } from "@/hooks/useLanguage";
 import type { ChatterSession } from "../types";
 
 export type CriterionVerdict = "pass" | "partial" | "fail" | null;
@@ -58,6 +59,7 @@ export const CriteriaPanel = ({
   onSubmitEvaluation,
   isSubmitting,
 }: Props) => {
+  const { t, language } = useLanguage();
   const criteriaQ = useChatterCriteria();
   const criteria = useMemo(() => criteriaQ.data ?? [], [criteriaQ.data]);
   const resetMut = useResetCriteria();
@@ -89,23 +91,23 @@ export const CriteriaPanel = ({
   }, [criteria, scores]);
 
   const badge =
-    scorePct >= 80 ? { label: "APROBADO", color: "text-success" } :
-    scorePct >= 50 ? { label: "A CRITERIO", color: "text-warning" } :
-    { label: "NO APTO", color: "text-destructive" };
+    scorePct >= 80 ? { label: t("chatters.crit.badgeApproved"), color: "text-success" } :
+    scorePct >= 50 ? { label: t("chatters.crit.badgeBorderline"), color: "text-warning" } :
+    { label: t("chatters.crit.badgeNotFit"), color: "text-destructive" };
 
   return (
     <div className="flex h-full flex-col">
       <div className="border-b p-4">
         <div className="flex items-center justify-between gap-2">
           <h2 className="text-sm font-semibold text-muted-foreground">
-            Criterios
+            {t("chatters.crit.title")}
           </h2>
           <Button
             type="button"
             size="sm"
             variant="ghost"
             className="h-7 gap-1 px-2 text-[11px]"
-            title="Restablecer criterios originales"
+            title={t("chatters.crit.resetTitle")}
             onClick={() => setConfirmReset(true)}
             disabled={resetMut.isPending}
           >
@@ -119,11 +121,11 @@ export const CriteriaPanel = ({
         </div>
         {session ? (
           <p className="mt-1 truncate text-xs text-muted-foreground">
-            Evaluando: <strong>{session.chatter_name}</strong>
+            {t("chatters.crit.evaluating")} <strong>{session.chatter_name}</strong>
           </p>
         ) : (
           <p className="mt-1 text-xs text-muted-foreground">
-            Selecciona una sesión para evaluar.
+            {t("chatters.crit.selectSession")}
           </p>
         )}
       </div>
@@ -135,18 +137,18 @@ export const CriteriaPanel = ({
           <div className={`text-sm font-semibold ${badge.color}`}>{badge.label}</div>
         </div>
         <div className="mt-1 text-[10px] text-muted-foreground">
-          {passes} cumple · {partials} parcial · {fails} no cumple · {total} total
+          {t("chatters.crit.tally", { pass: passes, partial: partials, fail: fails, total })}
         </div>
       </div>
 
       {/* List */}
       <div className="min-h-0 flex-1 overflow-y-auto p-3 space-y-2">
         {criteriaQ.isLoading && (
-          <p className="text-xs text-muted-foreground">Cargando…</p>
+          <p className="text-xs text-muted-foreground">{t("common.loading")}</p>
         )}
         {!criteriaQ.isLoading && criteria.length === 0 && (
           <Card className="p-3 text-xs text-muted-foreground">
-            No hay criterios activos. Agrega algunos en{" "}
+            {t("chatters.crit.noneActive")}{" "}
             <span className="underline">Admin</span>.
           </Card>
         )}
@@ -154,7 +156,7 @@ export const CriteriaPanel = ({
           const v = scores[c.id] ?? null;
           return (
             <div key={c.id} className="rounded-md border bg-card p-2">
-              <div className="mb-2 text-xs leading-snug">{c.label}</div>
+              <div className="mb-2 text-xs leading-snug">{language === "en" && c.label_en ? c.label_en : c.label}</div>
               <div className="grid grid-cols-3 gap-1">
                 <button
                   type="button"
@@ -162,7 +164,7 @@ export const CriteriaPanel = ({
                   className={`flex items-center justify-center gap-1 rounded px-2 py-1.5 text-xs transition-colors ${verdictButtonClass(v === "pass", "pass")}`}
                   disabled={!session}
                 >
-                  <Check className="h-3 w-3" /> Sí
+                  <Check className="h-3 w-3" /> {t("chatters.crit.yes")}
                 </button>
                 <button
                   type="button"
@@ -170,7 +172,7 @@ export const CriteriaPanel = ({
                   className={`flex items-center justify-center gap-1 rounded px-2 py-1.5 text-xs transition-colors ${verdictButtonClass(v === "partial", "partial")}`}
                   disabled={!session}
                 >
-                  <Minus className="h-3 w-3" /> Parc.
+                  <Minus className="h-3 w-3" /> {t("chatters.crit.partialShort")}
                 </button>
                 <button
                   type="button"
@@ -178,7 +180,7 @@ export const CriteriaPanel = ({
                   className={`flex items-center justify-center gap-1 rounded px-2 py-1.5 text-xs transition-colors ${verdictButtonClass(v === "fail", "fail")}`}
                   disabled={!session}
                 >
-                  <X className="h-3 w-3" /> No
+                  <X className="h-3 w-3" /> {t("chatters.crit.no")}
                 </button>
               </div>
             </div>
@@ -194,17 +196,16 @@ export const CriteriaPanel = ({
           className="w-full gap-2"
         >
           {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-          Enviar evaluación
+          {t("chatters.crit.submit")}
         </Button>
       </div>
 
       <AlertDialog open={confirmReset} onOpenChange={setConfirmReset}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Restablecer criterios</AlertDialogTitle>
+            <AlertDialogTitle>{t("chatters.crit.resetDialogTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Esto reemplaza todos los criterios actuales por los 10 originales
-              de Roleplaychatters. Cualquier criterio personalizado se borra.
+              {t("chatters.crit.resetDialogDesc")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -215,10 +216,10 @@ export const CriteriaPanel = ({
                 resetMut.mutate(undefined, {
                   onSuccess: () => {
                     setConfirmReset(false);
-                    toast.success("Criterios originales restablecidos");
+                    toast.success(t("chatters.crit.resetDone"));
                   },
                   onError: (err) =>
-                    toast.error("No se pudo restablecer", {
+                    toast.error(t("chatters.crit.resetFailed"), {
                       description: (err as Error).message,
                     }),
                 });
@@ -226,7 +227,7 @@ export const CriteriaPanel = ({
               disabled={resetMut.isPending}
             >
               {resetMut.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Restablecer
+              {t("chatters.crit.reset")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -8,6 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UserAvatar } from "@/components/UserAvatar";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/hooks/useLanguage";
+import { useFormato } from "@/hooks/useFormato";
+import type { TranslationKey } from "@/lib/i18n";
 import SelectorDeTablero from "@/pages/dashboard/SelectorDeTablero";
 import { isoDia, money, useChatterPeriodo, type ChatterPeriodo } from "@/pages/chatters/useChatterRendimiento";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
@@ -33,6 +36,15 @@ const TURNO_ESTILO: Record<Shift, { icono: typeof Sun; texto: string; punto: str
   am:  { icono: Sun,    texto: "text-amber-500",  punto: "bg-amber-500",  tinte: "from-amber-500/10" },
   pm:  { icono: Sunset, texto: "text-violet-400", punto: "bg-violet-500", tinte: "from-violet-500/10" },
   mad: { icono: Moon,   texto: "text-sky-400",    punto: "bg-sky-500",    tinte: "from-sky-500/10" },
+};
+
+// El `key` del preset es el dato (rangeForPreset lo lee); lo que se muestra
+// sale del diccionario y no del `label` en español de lib/range-presets.
+const ETIQUETA_PRESET: Record<RangePreset, TranslationKey> = {
+  yesterday: "chatters.equipo.yesterday",
+  today: "common.today",
+  this_week: "common.thisWeek",
+  this_month: "common.thisMonth",
 };
 
 const MEDALLA = ["bg-amber-400/90 text-amber-950", "bg-zinc-300/80 text-zinc-800", "bg-orange-700/80 text-orange-50"];
@@ -83,6 +95,7 @@ function Kpi({
 
 // Clickeable cuando hay `onClick`: abre el feedback del TL de esa persona.
 function Persona({ nombre, extra, onClick }: { nombre: string; extra?: string; onClick?: () => void }) {
+  const { t } = useLanguage();
   const contenido = (
     <>
       <UserAvatar name={nombre} size="xs" />
@@ -93,13 +106,15 @@ function Persona({ nombre, extra, onClick }: { nombre: string; extra?: string; o
   const clases = "inline-flex items-center gap-1.5 rounded-full bg-white/5 py-1 pl-1 pr-2.5 text-xs ring-1 ring-white/5 transition-colors hover:bg-white/10";
   if (!onClick) return <span className={clases}>{contenido}</span>;
   return (
-    <button type="button" onClick={onClick} title="Registrar feedback" className={`${clases} hover:ring-primary/40`}>
+    <button type="button" onClick={onClick} title={t("chatters.equipo.logFeedback")} className={`${clases} hover:ring-primary/40`}>
       {contenido}
     </button>
   );
 }
 
 export default function EquipoDashboard() {
+  const { t } = useLanguage();
+  const fmt = useFormato();
   const [orden, setOrden] = useState<Orden>("nota");
   // Chatter cuyo feedback está abierto (clic en el nombre en "Hoy en turno").
   const [feedbackDe, setFeedbackDe] = useState<{ id: string; nombre: string } | null>(null);
@@ -196,7 +211,7 @@ export default function EquipoDashboard() {
   // Tres motivos distintos, y se nombran: "flojo" y "sin datos" no son lo
   // mismo (ver chatter-dashboard-sin-datos: un 0 reparte notas injustas).
   const atencion = useMemo(() => {
-    const flojos = filas.filter((f) => f.activo && f.nota_promedio != null && Number(f.nota_promedio) < 6 && f.dias_con_nota >= 2);
+    const flojos = filas.filter((f) => Number(f.nota_promedio) < 6 && f.nota_promedio != null && f.activo && f.dias_con_nota >= 2);
     const sinDatos = filas.filter((f) => f.activo && f.dias_con_nota === 0 && !descansaronTodoElRango.has(f.identity_id));
     const bajoMeta = filas.filter((f) => {
       if (!f.activo) return false;
@@ -212,11 +227,11 @@ export default function EquipoDashboard() {
       p.nivel = Math.max(p.nivel, nivel) as 0 | 1 | 2;
       porPersona.set(f.identity_id, p);
     };
-    for (const f of flojos) sumar(f, `nota ${Number(f.nota_promedio).toFixed(1)}`, 2);
-    for (const f of bajoMeta) sumar(f, `${pct(Number(f.ventas_total ?? 0), Number(f.ventas_esperadas_total ?? 0))}% de su meta`, 1);
-    for (const f of sinDatos) sumar(f, "sin datos · no es un cero", 0);
+    for (const f of flojos) sumar(f, t("chatters.equipo.scoreN", { n: Number(f.nota_promedio).toFixed(1) }), 2);
+    for (const f of bajoMeta) sumar(f, t("chatters.equipo.pctOfTheirGoal", { pct: pct(Number(f.ventas_total ?? 0), Number(f.ventas_esperadas_total ?? 0)) ?? 0 }), 1);
+    for (const f of sinDatos) sumar(f, t("chatters.equipo.noDataNotZero"), 0);
     return { gente: [...porPersona.entries()].sort((a, b) => b[1].nivel - a[1].nivel), hay: porPersona.size };
-  }, [filas]);
+  }, [filas, t]);
 
   const ordenadas = useMemo(() => {
     const copia = [...filas];
@@ -255,9 +270,9 @@ export default function EquipoDashboard() {
             <div>
               <SelectorDeTablero actual="equipo" />
               <p className="text-[11px] text-muted-foreground">
-                {resumen.total > 0 ? `${resumen.total} chatters` : "Sin chatters en el rango"}
+                {resumen.total > 0 ? t("chatters.equipo.nChatters", { n: resumen.total }) : t("chatters.equipo.noChattersInRange")}
                 {resumen.cumplimiento != null && (
-                  <> · <span className={cn("font-medium", tono.texto)}>{resumen.cumplimiento}% de la meta</span></>
+                  <> · <span className={cn("font-medium", tono.texto)}>{t("chatters.equipo.pctOfGoal", { pct: resumen.cumplimiento })}</span></>
                 )}
               </p>
             </div>
@@ -274,7 +289,7 @@ export default function EquipoDashboard() {
                     preset === p.key ? "bg-primary/15 text-primary ring-1 ring-primary/30" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
                   )}
                 >
-                  {p.label}
+                  {t(ETIQUETA_PRESET[p.key])}
                 </button>
               ))}
             </div>
@@ -286,7 +301,7 @@ export default function EquipoDashboard() {
                 setRango({ from, to });
                 setPreset(null);
               }}
-              placeholder="Seleccionar rango"
+              placeholder={t("chatters.equipo.selectRange")}
             />
           </div>
         </div>
@@ -301,39 +316,39 @@ export default function EquipoDashboard() {
         ) : (
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
             <Kpi
-              label="Ventas del equipo"
+              label={t("chatters.equipo.teamSales")}
               valor={money(resumen.ventas)}
-              pie={resumen.esperado > 0 ? <>esperado {money(resumen.esperado)}</> : "sin meta calculada"}
+              pie={resumen.esperado > 0 ? t("chatters.dash.expectedN", { x: money(resumen.esperado) }) : t("chatters.equipo.noGoalCalculated")}
               icono={DollarSign} color="bg-emerald-500" tinte="from-emerald-500/10"
             />
             <Kpi
-              label="Cumplimiento"
+              label={t("chatters.equipo.attainment")}
               valor={resumen.cumplimiento != null ? `${resumen.cumplimiento}%` : "—"}
-              pie="ventas contra lo esperado"
+              pie={t("chatters.equipo.salesVsExpected")}
               icono={Gauge} color="bg-sky-500" tinte="from-sky-500/10"
               barra={resumen.cumplimiento != null ? { pct: resumen.cumplimiento, clase: tono.barra } : undefined}
             />
             <Kpi
-              label="Nota promedio"
+              label={t("chatters.equipo.avgScore")}
               valor={resumen.nota != null ? resumen.nota.toFixed(1) : "—"}
               // Honestidad: de cuántos hay dato. Un promedio de 3 de 19 no es
               // el promedio del equipo.
-              pie={`${resumen.conNota} de ${resumen.total} con dato`}
+              pie={t("chatters.equipo.nWithData", { n: resumen.conNota, total: resumen.total })}
               icono={Zap} color="bg-violet-500" tinte="from-violet-500/10"
               barra={resumen.nota != null ? { pct: (resumen.nota / 10) * 100, clase: tonoNota(resumen.nota).punto } : undefined}
             />
             <Kpi
-              label="Horas"
-              valor={Math.round(resumen.horas).toLocaleString("es")}
-              pie="Hubstaff, todo el equipo"
+              label={t("common.hours")}
+              valor={Math.round(resumen.horas).toLocaleString(fmt.intl("es-ES"))}
+              pie={t("chatters.equipo.hubstaffWholeTeam")}
               icono={Clock} color="bg-amber-500" tinte="from-amber-500/10"
             />
             <Kpi
               label="Cowork"
-              valor={cowork.horas > 0 ? Math.round(cowork.horas).toLocaleString("es") : "—"}
+              valor={cowork.horas > 0 ? Math.round(cowork.horas).toLocaleString(fmt.intl("es-ES")) : "—"}
               pie={cowork.personasConReloj > 0
-                ? `reloj de Cowork · ${cowork.personasConReloj} de ${filas.length} con tiempo`
-                : coworkCargando ? "cargando…" : "reloj de Cowork · sin tiempo en el rango"}
+                ? t("chatters.equipo.coworkClockN", { n: cowork.personasConReloj, total: filas.length })
+                : coworkCargando ? t("chatters.equipo.loadingLower") : t("chatters.equipo.coworkClockNone")}
               icono={Timer} color="bg-violet-500" tinte="from-violet-500/10"
             />
           </div>
@@ -343,24 +358,24 @@ export default function EquipoDashboard() {
         <section className="grid grid-cols-1 items-start gap-3 lg:grid-cols-3">
           <div className="overflow-hidden rounded-2xl border border-white/10 bg-card/60 ring-1 ring-white/5 lg:col-span-2">
             <div className="flex items-center gap-2 border-b border-white/5 px-4 py-3">
-              <h2 className="text-sm font-semibold">Hoy en turno</h2>
-              <Badge variant="outline" className="rounded-full text-[10px]">{hoy.enTurno} de {miembros.length}</Badge>
+              <h2 className="text-sm font-semibold">{t("chatters.equipo.onShiftToday")}</h2>
+              <Badge variant="outline" className="rounded-full text-[10px]">{t("chatters.equipo.nOfTotal", { n: hoy.enTurno, total: miembros.length })}</Badge>
             </div>
             {rosterCargando ? (
               <div className="space-y-2 p-4">{Array.from({ length: 3 }, (_, i) => <Skeleton key={i} className="h-8 rounded-lg" />)}</div>
             ) : hoy.porTurno.size === 0 ? (
-              <p className="px-4 py-8 text-center text-xs text-muted-foreground">Nadie asignado en el roster vigente.</p>
+              <p className="px-4 py-8 text-center text-xs text-muted-foreground">{t("chatters.equipo.nobodyAssigned")}</p>
             ) : (
               <div className="divide-y divide-white/5">
-                {(["am", "pm", "mad"] as Shift[]).map((t) => {
-                  const gente = hoy.porTurno.get(t) ?? [];
+                {(["am", "pm", "mad"] as Shift[]).map((sh) => {
+                  const gente = hoy.porTurno.get(sh) ?? [];
                   if (gente.length === 0) return null;
-                  const e = TURNO_ESTILO[t];
+                  const e = TURNO_ESTILO[sh];
                   return (
-                    <div key={t} className={cn("bg-gradient-to-r to-transparent px-4 py-3", e.tinte)}>
+                    <div key={sh} className={cn("bg-gradient-to-r to-transparent px-4 py-3", e.tinte)}>
                       <p className={cn("mb-2 flex items-center gap-1.5 text-xs font-semibold", e.texto)}>
-                        <e.icono className="h-3.5 w-3.5" /> {TURNOS[t].label}
-                        <span className="font-normal text-muted-foreground">{TURNOS[t].horas}</span>
+                        <e.icono className="h-3.5 w-3.5" /> {TURNOS[sh].label}
+                        <span className="font-normal text-muted-foreground">{TURNOS[sh].horas}</span>
                         <span className="ml-auto font-normal text-muted-foreground">{gente.length}</span>
                       </p>
                       <div className="flex flex-wrap gap-1.5">
@@ -383,12 +398,12 @@ export default function EquipoDashboard() {
           <div className="overflow-hidden rounded-2xl border border-white/10 bg-card/60 ring-1 ring-white/5">
             <div className="flex items-center gap-2 border-b border-white/5 px-4 py-3">
               <CalendarOff className="h-4 w-4 text-muted-foreground" />
-              <h2 className="text-sm font-semibold">Descansan hoy</h2>
+              <h2 className="text-sm font-semibold">{t("chatters.equipo.offToday")}</h2>
               {hoy.libres.length > 0 && <Badge variant="outline" className="rounded-full text-[10px]">{hoy.libres.length}</Badge>}
             </div>
             <div className="p-4">
               {hoy.libres.length === 0 ? (
-                <p className="text-xs text-muted-foreground">Nadie descansa hoy.</p>
+                <p className="text-xs text-muted-foreground">{t("chatters.equipo.nobodyOffToday")}</p>
               ) : (
                 <div className="flex flex-wrap gap-1.5">
                   {hoy.libres.map((id) => (
@@ -417,7 +432,7 @@ export default function EquipoDashboard() {
               <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-warning">
                 <AlertTriangle className="h-4 w-4 text-white" />
               </span>
-              <h2 className="text-sm font-semibold">A quién empujar</h2>
+              <h2 className="text-sm font-semibold">{t("chatters.equipo.whoToPush")}</h2>
               <Badge variant="outline" className="rounded-full border-warning/30 bg-warning/10 text-[10px] text-warning">{atencion.hay}</Badge>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -439,10 +454,10 @@ export default function EquipoDashboard() {
         {/* ── EQUIPO ── */}
         <section className="overflow-hidden rounded-2xl border border-white/10 bg-card/60 ring-1 ring-white/5">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/5 px-4 py-3">
-            <h2 className="text-sm font-semibold">Equipo</h2>
+            <h2 className="text-sm font-semibold">{t("common.team")}</h2>
             <div className="flex items-center gap-2">
               <div className="inline-flex items-center rounded-full border border-white/10 bg-card/50 p-0.5">
-                {([["nota", "Por nota"], ["ventas", "Por ventas"]] as Array<[Orden, string]>).map(([k, l]) => (
+                {([["nota", t("chatters.equipo.byScore")], ["ventas", t("chatters.equipo.bySales")]] as Array<[Orden, string]>).map(([k, l]) => (
                   <button key={k} type="button" onClick={() => setOrden(k)}
                     className={cn("rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors",
                       orden === k ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground")}>
@@ -452,14 +467,14 @@ export default function EquipoDashboard() {
               </div>
               {/* `back` para que Rendimiento pueda ofrecer "volver al dashboard". */}
               <Link to="/chatter-evaluator/rendimiento?back=/dashboard" className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
-                Ver rendimiento <ArrowRight className="h-3 w-3" />
+                {t("chatters.equipo.viewPerformance")} <ArrowRight className="h-3 w-3" />
               </Link>
             </div>
           </div>
           {cargando ? (
             <div className="space-y-2 p-4">{Array.from({ length: 5 }, (_, i) => <Skeleton key={i} className="h-12 rounded-lg" />)}</div>
           ) : ordenadas.length === 0 ? (
-            <p className="px-4 py-8 text-center text-xs text-muted-foreground">Sin datos del equipo en este rango.</p>
+            <p className="px-4 py-8 text-center text-xs text-muted-foreground">{t("chatters.equipo.noTeamData")}</p>
           ) : (
             <ul className="divide-y divide-white/5">
               {ordenadas.map((f) => (
@@ -496,6 +511,7 @@ function Motivo({ nombre, detalle, icono: Icono, clase }: { nombre: string; deta
 }
 
 function Fila({ f, puesto, maxVentas, descanso, coworkHoras }: { f: ChatterPeriodo; puesto: number | null; maxVentas: number; descanso: boolean; coworkHoras?: number }) {
+  const { t } = useLanguage();
   const cumplimiento = pct(Number(f.ventas_total ?? 0), Number(f.ventas_esperadas_total ?? 0));
   const nota = f.nota_promedio == null ? null : Number(f.nota_promedio);
   const tn = tonoNota(nota);
@@ -513,15 +529,15 @@ function Fila({ f, puesto, maxVentas, descanso, coworkHoras }: { f: ChatterPerio
             {f.display_name}
             {!f.activo && (
               <span className="rounded-full bg-white/5 px-1.5 py-0.5 text-xs font-normal text-muted-foreground">
-                Inactivo
+                {t("common.inactive")}
               </span>
             )}
           </p>
           <p className="truncate text-[11px] text-muted-foreground">
             {f.dias_con_nota > 0
-              ? `${f.dias_con_nota} de ${f.dias_del_periodo} días con dato`
-              : descanso ? "descansó" : "sin datos en el rango"}
-            {f.modelos_distintas > 0 && ` · ${f.modelos_distintas} modelo${f.modelos_distintas === 1 ? "" : "s"}`}
+              ? t("chatters.equipo.daysWithData", { n: f.dias_con_nota, total: f.dias_del_periodo })
+              : descanso ? t("chatters.equipo.wasOff") : t("chatters.equipo.noDataInRange")}
+            {f.modelos_distintas > 0 && ` · ${t(f.modelos_distintas === 1 ? "chatters.equipo.modelsOne" : "chatters.equipo.modelsMany", { n: f.modelos_distintas })}`}
             {f.horas_total != null && ` · ${Math.round(Number(f.horas_total))} h`}
             {coworkHoras != null && coworkHoras > 0 && ` · Cowork ${Math.round(coworkHoras)} h`}
             {/* El feedback del TL ya está dentro de la nota; acá se dice cuánto
@@ -537,7 +553,7 @@ function Fila({ f, puesto, maxVentas, descanso, coworkHoras }: { f: ChatterPerio
           <p className="font-display text-sm font-bold tabular-nums leading-tight">{money(f.ventas_total)}</p>
           {cumplimiento != null && (
             <p className={cn("text-[11px] tabular-nums", tonoCumplimiento(cumplimiento).texto)}>
-              {cumplimiento}% de su meta
+              {t("chatters.equipo.pctOfTheirGoal", { pct: cumplimiento })}
             </p>
           )}
         </div>
@@ -548,10 +564,10 @@ function Fila({ f, puesto, maxVentas, descanso, coworkHoras }: { f: ChatterPerio
         {descanso ? (
           <span
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full ring-2 ring-white/10 bg-white/[0.03]"
-            title="Descansó en este rango"
+            title={t("chatters.equipo.wasOffInRange")}
           >
             <CalendarOff className="h-4 w-4 text-muted-foreground" />
-            <span className="sr-only">Descansó en este rango</span>
+            <span className="sr-only">{t("chatters.equipo.wasOffInRange")}</span>
           </span>
         ) : (
           <span className={cn("flex h-9 w-9 shrink-0 flex-col items-center justify-center rounded-full ring-2", tn.anillo)}>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { Sun, Moon } from "lucide-react";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // Per-tab font size for the chat messages container. Mirrors the
 // chatFontSize control in the original Roleplaychatters (index.html line
@@ -57,6 +58,7 @@ interface FontZoomProps {
 
 /** A- / A+ pair, same as the original .chat-zoom layout. */
 export const FontZoom = ({ onDark }: FontZoomProps) => {
+  const { t } = useLanguage();
   const apply = (dir: -1 | 1) => {
     const next = Math.max(
       FONT_MIN,
@@ -69,10 +71,10 @@ export const FontZoom = ({ onDark }: FontZoomProps) => {
     : "rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-muted-foreground hover:border-foreground hover:text-foreground";
   return (
     <div className="flex items-center gap-1">
-      <button type="button" onClick={() => apply(-1)} title="Más pequeño" className={cls} aria-label="Reducir fuente">
+      <button type="button" onClick={() => apply(-1)} title={t("chatters.ws.smaller")} className={cls} aria-label={t("chatters.ws.decreaseFont")}>
         A−
       </button>
-      <button type="button" onClick={() => apply(1)} title="Más grande" className={cls} aria-label="Aumentar fuente">
+      <button type="button" onClick={() => apply(1)} title={t("chatters.ws.larger")} className={cls} aria-label={t("chatters.ws.increaseFont")}>
         A+
       </button>
     </div>
@@ -86,6 +88,7 @@ interface ThemeToggleProps {
 /** 🌙 / ☀️ toggle. Wraps next-themes so it integrates with the rest of
  *  Maven's theming. Default theme stays whatever ThemeProvider was set to. */
 export const ThemeToggle = ({ onDark }: ThemeToggleProps) => {
+  const { t } = useLanguage();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -98,8 +101,8 @@ export const ThemeToggle = ({ onDark }: ThemeToggleProps) => {
       type="button"
       onClick={() => setTheme(isLight ? "dark" : "light")}
       className={cls}
-      title={isLight ? "Modo oscuro" : "Modo claro"}
-      aria-label={isLight ? "Cambiar a modo oscuro" : "Cambiar a modo claro"}
+      title={isLight ? t("chatters.ws.darkMode") : t("chatters.ws.lightMode")}
+      aria-label={isLight ? t("chatters.ws.switchToDark") : t("chatters.ws.switchToLight")}
     >
       {isLight ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
     </button>
@@ -107,11 +110,10 @@ export const ThemeToggle = ({ onDark }: ThemeToggleProps) => {
 };
 
 // ---- Language (chatter-side) ----------------------------------------------
-// Per-tab language pick. The chatter UI labels stay Spanish in this
-// migration (the original showed translations for static UI labels too,
-// but the high-value bit is the per-character info which has dedicated
-// `*_en` columns). When set to "en", profile field reads fall back to the
-// `_en` variant via pVal.
+// Per-tab language pick for the ROLEPLAY CONTENT (the character's info,
+// which has dedicated `*_en` columns). It is NOT the UI language: the labels
+// around it follow the Maven ES/EN toggle (useLanguage). When set to "en",
+// profile field reads fall back to the `_en` variant via pVal.
 const LANG_KEY = "maven.chatter.lang";
 export type ChatterLang = "es" | "en";
 
@@ -158,6 +160,7 @@ interface LangSelectProps {
 }
 
 export const LangSelect = ({ onDark }: LangSelectProps) => {
+  const { t } = useLanguage();
   const [lang, setLang] = useChatterLang();
   const cls = onDark
     ? "rounded-md border border-white/30 bg-white/10 px-2 py-1 text-[11px] font-bold text-white outline-none hover:border-white"
@@ -167,11 +170,11 @@ export const LangSelect = ({ onDark }: LangSelectProps) => {
       value={lang}
       onChange={(e) => setLang(e.target.value === "en" ? "en" : "es")}
       className={cls}
-      aria-label="Idioma"
-      title="Idioma"
+      aria-label={t("chatters.ws.characterLanguage")}
+      title={t("chatters.ws.characterLanguage")}
     >
-      <option value="es">🇪🇸 ES</option>
-      <option value="en">🇬🇧 EN</option>
+      <option value="es">{"🇪🇸 ES"}</option>
+      <option value="en">{"🇬🇧 EN"}</option>
     </select>
   );
 };

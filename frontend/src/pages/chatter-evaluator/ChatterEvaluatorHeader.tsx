@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useChatterSessions } from "@/hooks/useChatterEvaluator";
 import { NewSessionDialog } from "./NewSessionDialog";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // Header compartido de /chatter-evaluator/* — título fijo, subtabs en
 // posición constante (Dashboard / History / Admin) y acciones a la
@@ -14,6 +15,7 @@ import { NewSessionDialog } from "./NewSessionDialog";
 // acción — al igual que el workspace screen es un modo dedicado, no un
 // subtab más.
 const ChatterEvaluatorHeader = () => {
+  const { t } = useLanguage();
   const { pathname } = useLocation();
   const { canAccess } = usePermissions();
   const canSeeAdmin = canAccess("Chatters", "Admin");
@@ -54,14 +56,14 @@ const ChatterEvaluatorHeader = () => {
             )}
             <Button onClick={() => setNewSessionOpen(true)} size="sm" className="gap-1.5">
               <Plus className="h-4 w-4" />
-              Nueva sesión
+              {t("chatters.sess.new")}
             </Button>
           </>
         }
       />
       <div className="flex items-center justify-between gap-3">
         <SubtabNav className="shrink-0 overflow-x-auto">
-          {tabs.filter((t) => t.show).map((tab) => {
+          {tabs.filter((tab) => tab.show).map((tab) => {
             const Icon = tab.icon;
             return (
               <Link

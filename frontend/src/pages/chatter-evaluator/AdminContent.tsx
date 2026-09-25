@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import ChatterEvaluatorHeader from "./ChatterEvaluatorHeader";
 import { toast } from "sonner";
+import { useLanguage } from "@/hooks/useLanguage";
 import {
   useChatterCriteria,
   useChatterConfig,
@@ -66,6 +67,7 @@ import type { ChatterCriterion } from "./types";
 // (index.html line 1283 onward) — same default fields, same key/avatar
 // layout — but with Maven's color palette and using shadcn primitives.
 const ProfilesSection = () => {
+  const { t } = useLanguage();
   const profilesQ = useChatterProfiles();
   const del = useDeleteChatterProfile();
   const [newOpen, setNewOpen] = useState(false);
@@ -78,18 +80,18 @@ const ProfilesSection = () => {
       <CardContent className="space-y-4 p-6">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold">Modelos</h2>
+            <h2 className="text-lg font-semibold">{t("chatters.admin.models")}</h2>
             <p className="text-xs text-muted-foreground">
-              Personajes que los chatters interpretan durante una sesión.
+              {t("chatters.admin.modelsDesc")}
             </p>
           </div>
           <Button onClick={() => setNewOpen(true)} className="gap-2">
-            <UserPlus className="h-4 w-4" /> Nuevo modelo
+            <UserPlus className="h-4 w-4" /> {t("chatters.newProfile.title")}
           </Button>
         </div>
 
         {profilesQ.isLoading && (
-          <p className="text-xs text-muted-foreground">Cargando…</p>
+          <p className="text-xs text-muted-foreground">{t("common.loading")}</p>
         )}
 
         {!profilesQ.isLoading && profiles.length === 0 && (
@@ -97,10 +99,10 @@ const ProfilesSection = () => {
             <EmptyState
               className="py-8"
               icon={<UserPlus className="h-8 w-8 text-muted-foreground" />}
-              title="Todavía no hay modelos."
+              title={t("chatters.admin.noModels")}
               action={
                 <Button variant="outline" size="sm" onClick={() => setNewOpen(true)} className="gap-1">
-                  <Plus className="h-3 w-3" /> Crear el primero
+                  <Plus className="h-3 w-3" /> {t("chatters.admin.createFirst")}
                 </Button>
               }
             />
@@ -144,7 +146,7 @@ const ProfilesSection = () => {
                     </div>
                   </div>
                   <div className="flex items-center gap-1">
-                    <Button asChild size="icon" variant="ghost" className="h-8 w-8" title="Editar">
+                    <Button asChild size="icon" variant="ghost" className="h-8 w-8" title={t("common.edit")}>
                       <Link to={`/chatter-evaluator/${p.key}/edit`}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Link>
@@ -153,7 +155,7 @@ const ProfilesSection = () => {
                       size="icon"
                       variant="ghost"
                       className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                      title="Eliminar"
+                      title={t("common.delete")}
                       onClick={() => setConfirmDelete(p)}
                     >
                       <Trash2 className="h-3.5 w-3.5" />
@@ -171,10 +173,10 @@ const ProfilesSection = () => {
       <AlertDialog open={!!confirmDelete} onOpenChange={(o) => !o && setConfirmDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Eliminar modelo</AlertDialogTitle>
+            <AlertDialogTitle>{t("chatters.admin.deleteModel")}</AlertDialogTitle>
             <AlertDialogDescription>
               {confirmDelete
-                ? `¿Eliminar el modelo "${confirmDelete.name}"? Esto borra el perfil, su vault y todas las sesiones asociadas. No se puede deshacer.`
+                ? t("chatters.admin.deleteModelConfirm", { name: confirmDelete.name })
                 : ""}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -188,10 +190,10 @@ const ProfilesSection = () => {
                 del.mutate(confirmDelete.id, {
                   onSuccess: () => {
                     setConfirmDelete(null);
-                    toast.success("Modelo eliminado");
+                    toast.success(t("chatters.admin.modelDeleted"));
                   },
                   onError: (err) =>
-                    toast.error("No se pudo eliminar", {
+                    toast.error(t("common.couldNotDelete"), {
                       description: (err as Error).message,
                     }),
                 });
@@ -199,7 +201,7 @@ const ProfilesSection = () => {
               disabled={del.isPending}
             >
               {del.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Eliminar
+              {t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -210,6 +212,7 @@ const ProfilesSection = () => {
 
 // ---------- Criteria editor ----------
 const CriteriaSection = () => {
+  const { t } = useLanguage();
   const criteriaQ = useChatterCriteria();
   const upsert = useUpsertCriterion();
   const del = useDeleteCriterion();
@@ -234,7 +237,7 @@ const CriteriaSection = () => {
     if (!editing) return;
     const label = editing.label.trim();
     if (!label) {
-      toast.error("La etiqueta en español es obligatoria");
+      toast.error(t("chatters.admin.spanishLabelRequired"));
       return;
     }
     const label_en = editing.label_en.trim() || null;
@@ -246,7 +249,7 @@ const CriteriaSection = () => {
           id: editing.id,
           patch: { label, label_en },
         });
-        toast.success("Criterio actualizado");
+        toast.success(t("chatters.admin.criterionUpdated"));
       } else {
         await upsert.mutateAsync({
           patch: {
@@ -257,11 +260,11 @@ const CriteriaSection = () => {
             is_active: true,
           },
         });
-        toast.success("Criterio agregado");
+        toast.success(t("chatters.admin.criterionAdded"));
       }
       setEditing(null);
     } catch (e) {
-      toast.error("Error", { description: (e as Error).message });
+      toast.error(t("common.error"), { description: (e as Error).message });
     }
   };
 
@@ -272,7 +275,7 @@ const CriteriaSection = () => {
         patch: { label: c.label, label_en: c.label_en, is_active: active },
       });
     } catch (e) {
-      toast.error("Error", { description: (e as Error).message });
+      toast.error(t("common.error"), { description: (e as Error).message });
     }
   };
 
@@ -281,9 +284,9 @@ const CriteriaSection = () => {
     try {
       await del.mutateAsync(confirmDelete.id);
       setConfirmDelete(null);
-      toast.success("Criterio eliminado");
+      toast.success(t("chatters.admin.criterionDeleted"));
     } catch (e) {
-      toast.error("Error", { description: (e as Error).message });
+      toast.error(t("common.error"), { description: (e as Error).message });
     }
   };
 
@@ -297,7 +300,7 @@ const CriteriaSection = () => {
       await reorder.mutateAsync(next.map((c) => c.id));
     } catch (e) {
       setItems(serverItems);
-      toast.error("No se pudo reordenar", { description: (e as Error).message });
+      toast.error(t("chatters.vault.couldNotReorder"), { description: (e as Error).message });
     }
   };
 
@@ -306,19 +309,19 @@ const CriteriaSection = () => {
       <CardContent className="space-y-3 p-6">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold">Criterios de evaluación</h2>
+            <h2 className="text-lg font-semibold">{t("chatters.admin.criteria")}</h2>
             <p className="text-xs text-muted-foreground">
-              Lista por defecto que ven los examiners cuando crean una sesión.
+              {t("chatters.admin.criteriaDesc")}
             </p>
           </div>
           <Button onClick={openCreate} size="sm" variant="outline" className="gap-1">
-            <Plus className="h-4 w-4" /> Agregar
+            <Plus className="h-4 w-4" /> {t("common.add")}
           </Button>
         </div>
 
-        {criteriaQ.isLoading && <p className="text-sm text-muted-foreground">Cargando…</p>}
+        {criteriaQ.isLoading && <p className="text-sm text-muted-foreground">{t("common.loading")}</p>}
         {!criteriaQ.isLoading && items.length === 0 && (
-          <p className="text-sm text-muted-foreground">Sin criterios todavía.</p>
+          <p className="text-sm text-muted-foreground">{t("chatters.admin.noCriteria")}</p>
         )}
 
         <DragDropContext onDragEnd={handleDragEnd}>
@@ -341,17 +344,17 @@ const CriteriaSection = () => {
                         <button
                           onClick={() => openEdit(c)}
                           className="flex-1 min-w-0 grid grid-cols-1 md:grid-cols-2 gap-2 rounded text-left transition-colors hover:bg-muted/50 px-1 py-0.5"
-                          title="Editar criterio"
+                          title={t("chatters.admin.editCriterion")}
                         >
                           <span className="truncate text-sm">{c.label}</span>
                           <span className="truncate text-xs text-muted-foreground">
-                            {c.label_en || "(sin EN)"}
+                            {c.label_en || t("chatters.admin.noEn")}
                           </span>
                         </button>
                         <Switch
                           checked={c.is_active}
                           onCheckedChange={(v) => handleToggle(c, v)}
-                          aria-label="Activo"
+                          aria-label={t("common.active")}
                         />
                         <Button
                           onClick={() => setConfirmDelete(c)}
@@ -375,10 +378,10 @@ const CriteriaSection = () => {
       <AlertDialog open={!!confirmDelete} onOpenChange={(o) => !o && setConfirmDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Eliminar criterio</AlertDialogTitle>
+            <AlertDialogTitle>{t("chatters.admin.deleteCriterion")}</AlertDialogTitle>
             <AlertDialogDescription>
               {confirmDelete
-                ? `¿Eliminar "${confirmDelete.label}"? No se puede deshacer.`
+                ? t("chatters.admin.deleteCriterionConfirm", { name: confirmDelete.label })
                 : ""}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -393,7 +396,7 @@ const CriteriaSection = () => {
               disabled={del.isPending}
             >
               {del.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Eliminar
+              {t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -405,13 +408,13 @@ const CriteriaSection = () => {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>
-              {editing?.id ? "Editar criterio" : "Nuevo criterio"}
+              {editing?.id ? t("chatters.admin.editCriterion") : t("chatters.admin.newCriterion")}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div>
               <Label htmlFor="crit_es" className="text-xs">
-                Etiqueta (ES) <span className="text-destructive">*</span>
+                {t("chatters.admin.labelEs")} <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="crit_es"
@@ -420,12 +423,12 @@ const CriteriaSection = () => {
                 onChange={(e) =>
                   setEditing((curr) => (curr ? { ...curr, label: e.target.value } : curr))
                 }
-                placeholder="Ej: Conexión emocional real"
+                placeholder={t("chatters.admin.labelEsPh")}
                 className="mt-1"
               />
             </div>
             <div>
-              <Label htmlFor="crit_en" className="text-xs">Etiqueta (EN)</Label>
+              <Label htmlFor="crit_en" className="text-xs">{t("chatters.admin.labelEn")}</Label>
               <Input
                 id="crit_en"
                 value={editing?.label_en ?? ""}
@@ -439,7 +442,7 @@ const CriteriaSection = () => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditing(null)} disabled={upsert.isPending}>
-              Cancelar
+              {t("common.cancel")}
             </Button>
             <Button
               onClick={handleSaveEdit}
@@ -447,7 +450,7 @@ const CriteriaSection = () => {
               className="gap-2"
             >
               {upsert.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-              {editing?.id ? "Guardar" : "Agregar"}
+              {editing?.id ? t("common.save") : t("common.add")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -458,6 +461,7 @@ const CriteriaSection = () => {
 
 // ---------- Config editor ----------
 const ConfigSection = () => {
+  const { t } = useLanguage();
   const cfgQ = useChatterConfig();
   const update = useUpdateChatterConfig();
 
@@ -492,7 +496,7 @@ const ConfigSection = () => {
     const e = newEmail.trim().toLowerCase();
     if (!e || emails.includes(e)) return;
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) {
-      toast.error("Email inválido");
+      toast.error(t("common.invalidEmail"));
       return;
     }
     setEmails([...emails, e]);
@@ -510,28 +514,28 @@ const ConfigSection = () => {
         fan_name: fanName,
         fan_avatar_url: fanAvatar,
       });
-      toast.success("Config guardada");
+      toast.success(t("chatters.admin.configSaved"));
     } catch (e) {
-      toast.error("Error", { description: (e as Error).message });
+      toast.error(t("common.error"), { description: (e as Error).message });
     }
   };
 
   return (
     <Card>
       <CardContent className="space-y-5 p-6">
-        <h2 className="text-lg font-semibold">Configuración global</h2>
+        <h2 className="text-lg font-semibold">{t("chatters.admin.globalConfig")}</h2>
 
         <div>
-          <Label>Emails de notificación</Label>
+          <Label>{t("chatters.admin.notificationEmails")}</Label>
           <div className="mt-2 flex gap-2">
             <Input
               value={newEmail}
-              placeholder="usuario@dominio.com"
+              placeholder={t("chatters.admin.emailPh")}
               onChange={(e) => setNewEmail(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addEmail())}
             />
             <Button onClick={addEmail} variant="outline" size="sm" className="gap-1">
-              <Plus className="h-4 w-4" /> Agregar
+              <Plus className="h-4 w-4" /> {t("common.add")}
             </Button>
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
@@ -544,24 +548,24 @@ const ConfigSection = () => {
                 <button
                   onClick={() => removeEmail(e)}
                   className="text-muted-foreground hover:text-destructive"
-                  aria-label={`Eliminar ${e}`}
+                  aria-label={t("chatters.admin.deleteN", { name: e })}
                 >
                   <X className="h-3 w-3" />
                 </button>
               </div>
             ))}
             {emails.length === 0 && (
-              <p className="text-xs text-muted-foreground">Sin emails configurados.</p>
+              <p className="text-xs text-muted-foreground">{t("chatters.admin.noEmails")}</p>
             )}
           </div>
         </div>
 
         <div className="border-t pt-5">
           <Label className="flex items-center gap-1.5">
-            <Bell className="h-3.5 w-3.5" /> Notificaciones internas Maven
+            <Bell className="h-3.5 w-3.5" /> {t("chatters.admin.inAppNotifications")}
           </Label>
           <p className="mt-1 text-xs text-muted-foreground">
-            Empleados que reciben una notificación dentro de Maven cuando se envía una evaluación.
+            {t("chatters.admin.inAppNotificationsDesc")}
           </p>
           <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
             <PopoverTrigger asChild>
@@ -579,8 +583,8 @@ const ConfigSection = () => {
                   }}
                   placeholder={
                     notifyUserIds.length === 0
-                      ? "Seleccionar empleados…"
-                      : `${notifyUserIds.length} seleccionado(s) — escribe para filtrar`
+                      ? t("chatters.admin.selectEmployees")
+                      : t("chatters.admin.nSelectedTypeToFilter", { n: notifyUserIds.length })
                   }
                   className="w-full pr-8"
                 />
@@ -594,11 +598,11 @@ const ConfigSection = () => {
             >
               <div className="max-h-72 overflow-y-auto p-1">
                 {usersQ.isLoading && (
-                  <div className="p-3 text-xs text-muted-foreground">Cargando…</div>
+                  <div className="p-3 text-xs text-muted-foreground">{t("common.loading")}</div>
                 )}
                 {!usersQ.isLoading && (usersQ.data ?? []).length === 0 && (
                   <div className="p-3 text-xs text-muted-foreground">
-                    No hay usuarios Maven todavía.
+                    {t("chatters.admin.noMavenUsers")}
                   </div>
                 )}
                 {(() => {
@@ -612,13 +616,13 @@ const ConfigSection = () => {
                   if (!usersQ.isLoading && q && filtered.length === 0) {
                     return (
                       <div className="p-3 text-xs text-muted-foreground">
-                        Sin resultados para "{pickerFilter}".
+                        {t("chatters.admin.noResultsFor", { q: pickerFilter })}
                       </div>
                     );
                   }
                   return filtered.map((u) => {
                     const selected = notifyUserIds.includes(u.id);
-                    const name = u.full_name || "Sin nombre";
+                    const name = u.full_name || t("chatters.newSess.noName");
                     return (
                       <button
                         key={u.id}
@@ -665,7 +669,7 @@ const ConfigSection = () => {
                     <button
                       onClick={() => toggleNotifyUser(id)}
                       className="text-muted-foreground hover:text-destructive"
-                      aria-label={`Quitar ${name}`}
+                      aria-label={t("chatters.newProfile.removeN", { name: name })}
                     >
                       <X className="h-3 w-3" />
                     </button>
@@ -677,10 +681,10 @@ const ConfigSection = () => {
         </div>
 
         <div className="border-t pt-5">
-          <h3 className="mb-3 text-sm font-semibold">JavixBuster (fan compartido)</h3>
+          <h3 className="mb-3 text-sm font-semibold">{t("chatters.admin.sharedFan")}</h3>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <div>
-              <Label htmlFor="fan_name">Nombre</Label>
+              <Label htmlFor="fan_name">{t("common.name")}</Label>
               <Input
                 id="fan_name"
                 value={fanName}
@@ -697,14 +701,14 @@ const ConfigSection = () => {
             </div>
           </div>
           <p className="mt-2 text-xs text-muted-foreground">
-            Cliente ficticio mostrado a todos los chatters durante las sesiones.
+            {t("chatters.admin.sharedFanDesc")}
           </p>
         </div>
 
         <div className="flex justify-end pt-2">
           <Button onClick={handleSave} disabled={update.isPending} className="gap-2">
             {update.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            Guardar config
+            {t("chatters.admin.saveConfig")}
           </Button>
         </div>
       </CardContent>
