@@ -44,6 +44,7 @@ const leer = (ruta: string) => sinComentarios(Deno.readTextFileSync(new URL(ruta
 const PUBLIC_API = leer("./index.ts");
 const RECURSOS_USUARIO = leer("./recursos-como-usuario.ts");
 const COMO_USUARIO = leer("./como-usuario.ts");
+const PETICION = leer("./peticion.ts");
 const MANAGE_KEYS = sinComentarios(
   Deno.readTextFileSync(new URL("../manage-api-keys/index.ts", import.meta.url)),
 );
@@ -71,6 +72,8 @@ Deno.test("como_usuario que puede mezclar agencias: se apaga con DOS, 503 si no 
   // conversación con alguien de otra agencia. Hasta que eso se cierre, con dos
   // agencias no se sirve.
   assert(decidir("del_usuario_mezclado", 1, MAPA_DE_PRUEBA).ok);
+  const vacio = decidir("pendiente_vacio", 2, { pendiente_vacio: { tipo: "como_usuario", pendienteConVariasAgencias: "" } });
+  assert(!vacio.ok && vacio.estado === 403, "un pendiente vacío dejó el recurso abierto con 2 agencias");
   const dos = decidir("del_usuario_mezclado", 2, MAPA_DE_PRUEBA);
   assert(!dos.ok && dos.estado === 403, "con 2 agencias se sirvió");
   for (const agencias of [null, 0]) {
@@ -258,11 +261,13 @@ Deno.test("como_usuario: cada recurso declara su scope, y es un scope que existe
   assertEquals(sinScope, ["me"], "un recurso como_usuario quedó sin scope");
 });
 
-Deno.test("IP: la whitelist se compara contra la IP que pone el proxy, no la que manda el cliente", () => {
+Deno.test("IP: la whitelist usa la IP de peticion.ts (probada por comportamiento en peticion.test.ts)", () => {
   // El primer valor de X-Forwarded-For lo escribe el que llama: con él, cualquiera
   // se ponía una IP de la whitelist.
-  assert(!/x-forwarded-for/i.test(PUBLIC_API), "public-api lee X-Forwarded-For");
-  assert(/headers\.get\(\s*"cf-connecting-ip"\s*\)/.test(PUBLIC_API), "public-api no lee cf-connecting-ip");
+  assert(/import\s*\{[^}]*\bclientIp\b[^}]*\}\s*from\s*"\.\/peticion\.ts"/.test(PUBLIC_API), "index.ts no usa el clientIp de peticion.ts");
+  assert(!/function\s+clientIp\b/.test(PUBLIC_API), "index.ts define su propio clientIp");
+  assert(!/headers\.get\(\s*"(x-forwarded-for|x-client-ip|true-client-ip|forwarded)"/i.test(PUBLIC_API), "index.ts lee una cabecera que escribe el cliente");
+  assert(/ipAllowed\(\s*ip\s*,/.test(PUBLIC_API) && /const ip = clientIp\(req\)/.test(PUBLIC_API), "la whitelist no compara contra clientIp(req)");
 });
 
 Deno.test("como_usuario: los handlers nunca ven service_role", () => {
@@ -311,7 +316,13 @@ Deno.test("como_usuario: los handlers nunca ven service_role", () => {
   assert(inicioRama > 0 && finRama > inicioRama, "no se encontró la rama como_usuario del router");
   const rama = PUBLIC_API.slice(inicioRama, finRama);
   assert(!/\badmin\b/.test(rama), "la rama como_usuario del router usa `admin`");
-  assert(!/RECURSOS_COMO_USUARIO/.test(PUBLIC_API), "el router despacha handlers sin pasar por servirComoUsuario");
+  // En la rama solo se llaman estas funciones: ninguna otra puede servir datos (un
+  // handler armado afuera con `admin` y llamado acá saltearía el scope y la agencia).
+  const llamadas = [...rama.matchAll(/(?<![.\w$])([A-Za-z_$][\w$]*)\s*\(/g)].map((m) => m[1]);
+  const PERMITIDAS = new Set(["if", "catch", "esComoUsuario", "noDisponible", "comoUsuarioConfigurado", "clienteComoUsuario", "servirComoUsuario", "json"]);
+  assertEquals([...new Set(llamadas.filter((f) => !PERMITIDAS.has(f)))], [], "la rama como_usuario llama a algo que no es la entrada");
+  assert(!/RECURSOS_COMO_USUARIO|SCOPE_REQUERIDO|crearServidorComoUsuario/.test(PUBLIC_API),
+    "el router despacha handlers o arma su propia entrada sin pasar por servirComoUsuario");
   // Si falta el secreto se responde 503; no se cae a service_role.
   const tramo = PUBLIC_API.slice(PUBLIC_API.indexOf("esComoUsuario(recursoClave)"));
   assert(tramo.length > 100, "no se encontró la rama como_usuario del router");
@@ -349,6 +360,7 @@ Deno.test("límite: pasado el cupo, 429 con Retry-After; persona inactiva, 401",
   assert(/429\s*,\s*\{\s*"Retry-After"/.test(tramo.slice(0, 600)), "pasado el cupo no se responde 429 con Retry-After");
   assert(/if\s*\(\s*!consumo\.usuario_activo\s*\)/.test(PUBLIC_API), "no se corta la llave de alguien dado de baja");
   for (const h of ["X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset"]) {
-    assert(PUBLIC_API.includes(`"${h}"`), `falta la cabecera ${h}`);
+    assert(PETICION.includes(`"${h}"`), `falta la cabecera ${h}`);
   }
+  assert(/cabecerasDelPedido\.set\(\s*req\s*,\s*cabeceras\s*\)/.test(PUBLIC_API), "las cabeceras del cupo no se ponen en la respuesta");
 });

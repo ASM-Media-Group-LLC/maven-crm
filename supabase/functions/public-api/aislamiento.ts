@@ -166,7 +166,8 @@ export function decidir(
   }
   const modo = mapa[recurso];
   if (modo.tipo === "columna" || modo.tipo === "miembros") return { ok: true };
-  if (modo.tipo === "como_usuario" && !modo.pendienteConVariasAgencias) return { ok: true };
+  // `=== undefined` y no por verdad: un pendiente vacío ("") igual cuenta como pendiente.
+  if (modo.tipo === "como_usuario" && modo.pendienteConVariasAgencias === undefined) return { ok: true };
   const pendiente = modo.tipo === "sin_agencia" ? modo.pendiente : modo.pendienteConVariasAgencias;
   if (agencias === 1) return { ok: true };
   if (agencias !== null && agencias >= 2) {

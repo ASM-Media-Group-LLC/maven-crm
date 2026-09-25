@@ -83,38 +83,43 @@ export const SCOPE_REQUERIDO: Record<string, string | null> = {
   me: null,
 };
 
-/** La única entrada desde el router. Verifica la sesión y recién ahí despacha.
+/** Arma la entrada: verifica la sesión y recién ahí despacha.
+ *
+ *  Es una FÁBRICA para que los tests prueben recursos que no existen (un "privado"
+ *  con scope) sin que la entrada de producción acepte mapas inyectados: el router
+ *  usa `servirComoUsuario`, ya armada con los mapas de este archivo y de 3
+ *  argumentos, y el test prohíbe que index.ts nombre la fábrica o los mapas.
  *
  *  current_tenant_id() lee auth.uid(): si la base no reconociera la sesión (secreto
  *  equivocado, `sub` que no es nadie) o viera a la persona en OTRA agencia (se mudó;
  *  o está en dos y la base elige la otra), no coincide con la agencia de la llave y
  *  se responde 503 sin tocar ningún dato. Una lectura, antes de cualquier handler. */
-export async function servirComoUsuario(
-  recurso: string,
-  yo: SupabaseClient,
-  ctx: Contexto,
-  // Inyectables SOLO para los tests (ejercitar un recurso con scope sin tener que
-  // publicarlo). El router no los pasa.
-  handlers: Record<string, Handler> = RECURSOS_COMO_USUARIO,
-  scopeRequerido: Record<string, string | null> = SCOPE_REQUERIDO,
-): Promise<Resultado> {
-  if (!Object.hasOwn(handlers, recurso) || !Object.hasOwn(scopeRequerido, recurso)) {
-    return { ok: false, estado: 503, detalle: `sin handler o sin scope declarado: ${recurso}` };
-  }
-  // (1) El scope, ANTES de tocar la base: sin él no se gasta ni una consulta.
-  const scope = scopeRequerido[recurso];
-  if (scope !== null && !ctx.scopes.includes(scope)) {
-    return { ok: false, estado: 403, error: "forbidden", mensaje: `Falta el scope ${scope}` };
-  }
-  // (2) Que la base vea la sesión como alguien de la agencia de la llave.
-  const agencia = await yo.rpc("current_tenant_id");
-  if (agencia.error) return { ok: false, estado: 503, detalle: `current_tenant_id: ${agencia.error.message}` };
-  if (agencia.data !== ctx.agenciaDeLaLlave) {
-    return {
-      ok: false,
-      estado: 503,
-      detalle: `la sesión fabricada no es de la agencia de la llave (base: ${agencia.data ?? "nadie"})`,
-    };
-  }
-  return handlers[recurso](yo, ctx);
+export function crearServidorComoUsuario(
+  handlers: Record<string, Handler>,
+  scopeRequerido: Record<string, string | null>,
+) {
+  return async (recurso: string, yo: SupabaseClient, ctx: Contexto): Promise<Resultado> => {
+    if (!Object.hasOwn(handlers, recurso) || !Object.hasOwn(scopeRequerido, recurso)) {
+      return { ok: false, estado: 503, detalle: `sin handler o sin scope declarado: ${recurso}` };
+    }
+    // (1) El scope, ANTES de tocar la base: sin él no se gasta ni una consulta.
+    const scope = scopeRequerido[recurso];
+    if (scope !== null && !ctx.scopes.includes(scope)) {
+      return { ok: false, estado: 403, error: "forbidden", mensaje: `Falta el scope ${scope}` };
+    }
+    // (2) Que la base vea la sesión como alguien de la agencia de la llave.
+    const agencia = await yo.rpc("current_tenant_id");
+    if (agencia.error) return { ok: false, estado: 503, detalle: `current_tenant_id: ${agencia.error.message}` };
+    if (agencia.data !== ctx.agenciaDeLaLlave) {
+      return {
+        ok: false,
+        estado: 503,
+        detalle: `la sesión fabricada no es de la agencia de la llave (base: ${agencia.data ?? "nadie"})`,
+      };
+    }
+    return handlers[recurso](yo, ctx);
+  };
 }
+
+/** La única entrada desde el router. */
+export const servirComoUsuario = crearServidorComoUsuario(RECURSOS_COMO_USUARIO, SCOPE_REQUERIDO);

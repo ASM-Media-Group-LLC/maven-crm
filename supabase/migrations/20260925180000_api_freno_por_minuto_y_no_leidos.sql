@@ -68,21 +68,27 @@ declare
   _hora   timestamptz := date_trunc('hour', now());
   _minuto timestamptz := date_trunc('minute', now());
 begin
+  -- ⚠️ Las ventanas SOLO avanzan. now() es el del inicio de la transacción: un
+  -- pedido que arrancó a las 12:00:59,998 puede escribir DESPUÉS de uno de las
+  -- 12:01:00,001. Con "=" y "set = _minuto", el viejo encontraba la ventana 12:01,
+  -- la creía distinta, se colaba y la hacía volver a 12:00 con 1 (se perdía la
+  -- cuenta del minuto nuevo). Con ">=" y greatest(), el viejo cuenta en la ventana
+  -- más nueva y respeta su límite.
   return query
   update public.api_keys k
-     set ventana_pedidos = case when k.ventana_inicio = _hora then k.ventana_pedidos + 1 else 1 end,
-         ventana_inicio  = _hora,
-         minuto_pedidos  = case when k.minuto_inicio = _minuto then k.minuto_pedidos + 1 else 1 end,
-         minuto_inicio   = _minuto,
+     set ventana_pedidos = case when k.ventana_inicio >= _hora then k.ventana_pedidos + 1 else 1 end,
+         ventana_inicio  = greatest(coalesce(k.ventana_inicio, _hora), _hora),
+         minuto_pedidos  = case when k.minuto_inicio >= _minuto then k.minuto_pedidos + 1 else 1 end,
+         minuto_inicio   = greatest(coalesce(k.minuto_inicio, _minuto), _minuto),
          request_count   = k.request_count + 1,
          last_used_at    = now()
    where k.id = _id
-     and not (k.ventana_inicio is not distinct from _hora and k.ventana_pedidos >= k.limite_por_hora)
-     and not (k.minuto_inicio is not distinct from _minuto and k.minuto_pedidos >= k.limite_por_minuto)
+     and not (coalesce(k.ventana_inicio >= _hora, false) and k.ventana_pedidos >= k.limite_por_hora)
+     and not (coalesce(k.minuto_inicio >= _minuto, false) and k.minuto_pedidos >= k.limite_por_minuto)
   returning true,
             k.limite_por_hora,
             greatest(k.limite_por_hora - k.ventana_pedidos, 0),
-            _hora + interval '1 hour',
+            k.ventana_inicio + interval '1 hour',
             k.acts_as_user_id,
             public.api_key_persona_vigente(k.acts_as_user_id, k.tenant_id),
             k.limite_por_minuto,
@@ -95,16 +101,16 @@ begin
   return query
   select false,
          k.limite_por_hora,
-         case when k.ventana_inicio is not distinct from _hora
+         case when coalesce(k.ventana_inicio >= _hora, false)
               then greatest(k.limite_por_hora - k.ventana_pedidos, 0)
               else k.limite_por_hora end,
-         case when k.ventana_inicio is not distinct from _hora and k.ventana_pedidos >= k.limite_por_hora
-              then _hora + interval '1 hour'
-              else _minuto + interval '1 minute' end,
+         case when coalesce(k.ventana_inicio >= _hora, false) and k.ventana_pedidos >= k.limite_por_hora
+              then greatest(k.ventana_inicio, _hora) + interval '1 hour'
+              else greatest(coalesce(k.minuto_inicio, _minuto), _minuto) + interval '1 minute' end,
          k.acts_as_user_id,
          public.api_key_persona_vigente(k.acts_as_user_id, k.tenant_id),
          k.limite_por_minuto,
-         case when k.ventana_inicio is not distinct from _hora and k.ventana_pedidos >= k.limite_por_hora
+         case when coalesce(k.ventana_inicio >= _hora, false) and k.ventana_pedidos >= k.limite_por_hora
               then 'hora' else 'minuto' end
     from public.api_keys k
    where k.id = _id;

@@ -43,6 +43,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { decidir, esComoUsuario } from "./aislamiento.ts";
 import { clienteComoUsuario, comoUsuarioConfigurado } from "./como-usuario.ts";
 import { servirComoUsuario } from "./recursos-como-usuario.ts";
+import { cabecerasDeCupo, clientIp, ipAllowed } from "./peticion.ts";
 
 const corsHeaders = (req: Request) =>
   corsFor(req, {
@@ -90,41 +91,6 @@ const personaNoVigente = (req: Request) =>
 async function sha256hex(s: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
   return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-// --- IP whitelist ---
-// La IP de verdad la ponen Cloudflare (cf-connecting-ip) y el proxy de Supabase
-// (x-real-ip), y el cliente no las puede cambiar. X-Forwarded-For NO: su primer
-// valor lo escribe el que llama, así que con él cualquiera se ponía una IP de la
-// whitelist y la whitelist no servía de nada.
-function clientIp(req: Request): string | null {
-  const ip = req.headers.get("cf-connecting-ip") ?? req.headers.get("x-real-ip");
-  return ip?.trim() || null;
-}
-function ipv4ToInt(ip: string): number | null {
-  const p = ip.split(".");
-  if (p.length !== 4) return null;
-  let n = 0;
-  for (const o of p) { const x = Number(o); if (!Number.isInteger(x) || x < 0 || x > 255) return null; n = (n << 8) + x; }
-  return n >>> 0;
-}
-function ipv4InCidr(ip: string, cidr: string): boolean {
-  const [base, bitsStr] = cidr.split("/");
-  const bits = Number(bitsStr);
-  const a = ipv4ToInt(ip), b = ipv4ToInt(base);
-  if (a === null || b === null || !Number.isInteger(bits) || bits < 0 || bits > 32) return false;
-  if (bits === 0) return true;
-  const mask = bits === 32 ? 0xffffffff : (~((1 << (32 - bits)) - 1)) >>> 0;
-  return (a & mask) === (b & mask);
-}
-function ipAllowed(ip: string | null, whitelist: string[]): boolean {
-  if (!whitelist || whitelist.length === 0) return true; // sin restricción
-  if (!ip) return false;
-  for (const entry of whitelist) {
-    if (entry === ip) return true;
-    if (entry.includes("/") && ipv4InCidr(ip, entry)) return true;
-  }
-  return false;
 }
 
 // --- Normalización de redes: { handle, url } por red. Si el valor ya es URL, se respeta. ---
@@ -258,18 +224,9 @@ Deno.serve(async (req) => {
     ? null
     : ((Array.isArray(consumoFilas) ? consumoFilas[0] : consumoFilas) as Consumo | undefined) ?? null;
   if (consumo) {
-    // X-RateLimit-* son SIEMPRE los de la hora. Si lo que se agotó es el minuto,
-    // `reinicio` es el próximo minuto y solo va en Retry-After.
-    const porMinuto = consumo.motivo === "minuto";
-    const reinicioSeg = Math.ceil(new Date(consumo.reinicio).getTime() / 1000);
-    const reinicioHoraSeg = porMinuto ? Math.ceil(Date.now() / 3_600_000) * 3_600 : reinicioSeg;
-    cabecerasDelPedido.set(req, {
-      "X-RateLimit-Limit": String(consumo.limite),
-      "X-RateLimit-Remaining": String(consumo.restantes),
-      "X-RateLimit-Reset": String(reinicioHoraSeg),
-    });
+    const { porMinuto, cabeceras, esperaSeg: espera } = cabecerasDeCupo(consumo, Date.now());
+    cabecerasDelPedido.set(req, cabeceras);
     if (!consumo.permitido) {
-      const espera = Math.max(1, reinicioSeg - Math.floor(Date.now() / 1000));
       return json(req, {
         error: "rate_limited",
         message: porMinuto

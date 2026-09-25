@@ -7,6 +7,7 @@ import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   type Contexto,
   type Handler,
+  crearServidorComoUsuario,
   RECURSOS_COMO_USUARIO,
   servirComoUsuario,
   servirMe,
@@ -109,32 +110,30 @@ Deno.test("/me/loquesea: 404 sin tocar datos", async () => {
 // ─── El scope, antes de tocar la base ───────────────────────────────────────
 
 const PRIVADO: Handler = () => Promise.resolve({ ok: true, cuerpo: { secreto: true } });
+const conPrivado = crearServidorComoUsuario({ privado: PRIVADO }, { privado: "privado:read" });
 
 Deno.test("sin el scope del recurso: 403 y NI UNA consulta a la base", async () => {
   // Con la llave de hoy (actúa como el CEO) y sin esto, cualquier recurso nuevo le
   // quedaba abierto a las 3 llaves aunque no tuvieran su permiso.
   const explota = new Proxy({}, { get: () => { throw new Error("tocó la base"); } }) as SupabaseClient;
   for (const scopes of [[], ["creators:read"], ["privado:reads"], ["PRIVADO:READ"]]) {
-    const r = await servirComoUsuario("privado", explota, { ...CTX, scopes },
-      { privado: PRIVADO }, { privado: "privado:read" });
+    const r = await conPrivado("privado", explota, { ...CTX, scopes });
     assert(!r.ok && r.estado === 403, `con scopes=${JSON.stringify(scopes)} pasó`);
   }
 });
 
 Deno.test("con el scope: sigue y verifica la agencia antes del handler", async () => {
   const { cliente } = clienteFalso(ok(AGENCIA), PERFIL);
-  const r = await servirComoUsuario("privado", cliente, { ...CTX, scopes: ["privado:read"] },
-    { privado: PRIVADO }, { privado: "privado:read" });
+  const r = await conPrivado("privado", cliente, { ...CTX, scopes: ["privado:read"] });
   assert(r.ok);
   const otra = clienteFalso(ok(OTRA_AGENCIA), PERFIL).cliente;
-  const r2 = await servirComoUsuario("privado", otra, { ...CTX, scopes: ["privado:read"] },
-    { privado: PRIVADO }, { privado: "privado:read" });
+  const r2 = await conPrivado("privado", otra, { ...CTX, scopes: ["privado:read"] });
   assert(!r2.ok && r2.estado === 503, "con el scope pero otra agencia, pasó");
 });
 
 Deno.test("un recurso con handler pero sin scope declarado: 503, no se sirve", async () => {
   const explota = new Proxy({}, { get: () => { throw new Error("tocó la base"); } }) as SupabaseClient;
-  const r = await servirComoUsuario("privado", explota, { ...CTX, scopes: ["privado:read"] }, { privado: PRIVADO }, {});
+  const r = await crearServidorComoUsuario({ privado: PRIVADO }, {})("privado", explota, { ...CTX, scopes: ["privado:read"] });
   assert(!r.ok && r.estado === 503);
 });
 
@@ -142,4 +141,8 @@ Deno.test("/me no pide scope (cualquier llave puede preguntar quién es)", async
   const { cliente } = clienteFalso(ok(AGENCIA), PERFIL);
   const r = await servirComoUsuario("me", cliente, { ...CTX, scopes: [] });
   assert(r.ok);
+});
+
+Deno.test("la entrada de producción no acepta mapas inyectados (3 argumentos)", () => {
+  assertEquals(servirComoUsuario.length, 3);
 });
