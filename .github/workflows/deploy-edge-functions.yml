@@ -86,8 +86,10 @@ jobs:
       # mucho mejor que desplegar una fuga de datos entre clientes.
       # Corre SIEMPRE, no solo cuando cambia public-api: un cambio en _shared/
       # también la redespliega.
+      # Desde el 24/09 también cubre lo que ACTÚA COMO usuario (la sesión fabricada,
+      # /me, que esos handlers nunca vean service_role) y el límite por hora.
       - name: Guard — aislamiento entre agencias
-        run: deno test --allow-read --no-check supabase/functions/public-api/aislamiento.test.ts
+        run: deno test --allow-read --no-check supabase/functions/public-api/
 
       - name: Determinar qué deployar
         id: changes

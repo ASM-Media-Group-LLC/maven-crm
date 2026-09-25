@@ -14,6 +14,16 @@
 //   GET /public-api/cowork/time/segments cowork:read    (cada tramo del reloj, al detalle)
 //   GET /public-api/cowork/breaks       cowork:read     (cada pausa: baño o break, con tope y exceso)
 //   GET /public-api/cowork/meets        cowork:read     (cada meet grupal: quién lo invocó, quién estuvo y cuánto)
+//   GET /public-api/me                  (sin scope)     (como quién actúa la llave, y su cupo)
+//
+// LÍMITE: 1.000 pedidos por hora por llave (api_keys.limite_por_hora), en ventana
+// fija que se reinicia a la hora en punto. Pasado el límite, 429 con Retry-After.
+// Todas las respuestas llevan X-RateLimit-Limit / -Remaining / -Reset.
+//
+// ACTÚA COMO. Cada llave está atada a una persona real (api_keys.acts_as_user_id,
+// fija desde que se crea). Los recursos `como_usuario` se consultan con la sesión de
+// esa persona y no con service_role: ver ./como-usuario.ts. Si esa persona ya no está
+// activa en Maven, la llave deja de servir.
 //
 // La key se busca por su hash SHA-256; se chequea que no esté revocada ni vencida,
 // que la IP esté permitida (si tiene whitelist) y que tenga el scope del recurso.
@@ -28,18 +38,31 @@ import { corsFor } from "../_shared/cors.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 // Local a esta función y no en _shared/: un cambio en _shared/ redespliega TODAS
 // las edge functions, y este módulo solo lo usa public-api.
-import { decidir } from "./aislamiento.ts";
+import { decidir, esComoUsuario } from "./aislamiento.ts";
+import { clienteComoUsuario, comoUsuarioConfigurado } from "./como-usuario.ts";
+import { servirComoUsuario } from "./recursos-como-usuario.ts";
 
 const corsHeaders = (req: Request) =>
   corsFor(req, {
     "Access-Control-Allow-Headers": "authorization, x-api-key, content-type, apikey",
     "Access-Control-Allow-Methods": "GET, OPTIONS",
+    // Sin esto un navegador no deja leer el cupo que queda.
+    "Access-Control-Expose-Headers": "X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, Retry-After",
   });
+
+// Cabeceras que van en TODAS las respuestas de un pedido (el cupo que le queda a la
+// llave), una vez que se conocen. Por pedido y sin estado compartido entre pedidos.
+const cabecerasDelPedido = new WeakMap<Request, Record<string, string>>();
 
 const json = (req: Request, body: unknown, status = 200, extra: Record<string, string> = {}) =>
   new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders(req), "Content-Type": "application/json", ...extra },
+    headers: {
+      ...corsHeaders(req),
+      "Content-Type": "application/json",
+      ...(cabecerasDelPedido.get(req) ?? {}),
+      ...extra,
+    },
   });
 
 // Un fallo NUESTRO (la base no respondió) no puede verse como "tu llave es
@@ -52,6 +75,15 @@ const noDisponible = (req: Request, donde: string, err: unknown) => {
     message: "El servicio no está disponible en este momento. Reintentá en unos segundos.",
   }, 503, { "Retry-After": "30" });
 };
+
+// La llave vive mientras la persona como la que actúa siga vigente: sin baja, sin
+// bloqueo y en la agencia de la llave. Si no, deja de servir aunque nadie se haya
+// acordado de revocarla.
+const personaNoVigente = (req: Request) =>
+  json(req, {
+    error: "unauthorized",
+    message: "La persona como la que actúa esta API key ya no está activa en esta agencia de Maven",
+  }, 401);
 
 async function sha256hex(s: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
@@ -197,6 +229,52 @@ Deno.serve(async (req) => {
     return json(req, { error: "unauthorized", message: "Esta API key no pertenece a ninguna agencia" }, 401);
   }
 
+  // --- Límite por hora + como quién actúa la llave: una ida a la base por pedido ---
+  // Reemplaza a increment_api_key_usage (la misma fila, la misma escritura, con la
+  // ventana sumada). Pasado el límite NO escribe: rechaza leyendo, para que una llave
+  // desbocada no se convierta en escrituras sobre la base. Va DESPUÉS de la
+  // whitelist: si no, alguien con la llave filtrada pero desde otra IP podría
+  // gastarle el cupo al dueño.
+  //
+  // Si el contador falla, los recursos de siempre se sirven igual: un contador caído
+  // no puede dejar sin servicio a todas las integraciones, y antes de esto no había
+  // límite ninguno. Lo que actúa como usuario, en cambio, se cierra con 503: sin esta
+  // respuesta no se sabe como quién actuar.
+  type Consumo = {
+    permitido: boolean; limite: number; restantes: number; reinicio: string;
+    actua_como: string | null; usuario_activo: boolean;
+  };
+  const { data: consumoFilas, error: consumoErr } = await admin
+    .rpc("api_key_consumir", { _id: keyRow.id as string });
+  if (consumoErr) console.error("[public-api] límite por hora:", consumoErr.message);
+  const consumo: Consumo | null = consumoErr
+    ? null
+    : ((Array.isArray(consumoFilas) ? consumoFilas[0] : consumoFilas) as Consumo | undefined) ?? null;
+  if (consumo) {
+    const reinicioSeg = Math.ceil(new Date(consumo.reinicio).getTime() / 1000);
+    cabecerasDelPedido.set(req, {
+      "X-RateLimit-Limit": String(consumo.limite),
+      "X-RateLimit-Remaining": String(consumo.restantes),
+      "X-RateLimit-Reset": String(reinicioSeg),
+    });
+    if (!consumo.permitido) {
+      const espera = Math.max(1, reinicioSeg - Math.floor(Date.now() / 1000));
+      return json(req, {
+        error: "rate_limited",
+        message: `Esta API key llegó a su límite de ${consumo.limite} pedidos por hora. ` +
+          `Se reinicia a las ${consumo.reinicio}.`,
+      }, 429, { "Retry-After": String(espera) });
+    }
+    if (!consumo.usuario_activo) return personaNoVigente(req);
+  } else {
+    // El contador falló (p. ej. la base en modo solo lectura). El límite queda
+    // abierto a propósito, pero la baja no: una sola lectura, y solo en este camino.
+    // Si tampoco responde (o la migración todavía no está), no se sabe: se sirve.
+    const { data: vigente, error: vErr } = await admin.rpc("api_key_vigente", { _id: keyRow.id as string });
+    if (vErr) console.error("[public-api] persona de la llave:", vErr.message);
+    if (!vErr && vigente === false) return personaNoVigente(req);
+  }
+
   // Cuántas agencias hay en Maven. Los recursos que no saben de qué agencia es cada
   // fila solo se sirven cuando la respuesta es exactamente 1. Si la consulta falla,
   // null: `decidir` cierra con 503, no con 403.
@@ -204,9 +282,6 @@ Deno.serve(async (req) => {
     .from("tenants").select("id", { count: "exact", head: true });
   if (agErr) console.error("[public-api] conteo de agencias:", agErr.message);
   const cantidadDeAgencias = agErr ? null : (agencias ?? null);
-
-  // bump de uso (best-effort, atómico, no bloquea la respuesta)
-  admin.rpc("increment_api_key_usage", { _id: keyRow.id as string }).then(() => {}, () => {});
 
   // --- Routing ---
   const url = new URL(req.url);
@@ -222,6 +297,7 @@ Deno.serve(async (req) => {
       // Toda respuesta de esta llave es de esta agencia y de ninguna otra.
       agency_id: tenantId,
       resources: [
+        { path: "/me", scope: null },
         { path: "/creators", scope: "creators:read" },
         { path: "/creators/{id}", scope: "creators:read" },
         { path: "/contacts", scope: "contacts:read" },
@@ -246,6 +322,34 @@ Deno.serve(async (req) => {
   if (!veredicto.ok) {
     if (veredicto.estado === 503) return noDisponible(req, "puerta de aislamiento", veredicto.motivo);
     return json(req, { error: veredicto.error, message: veredicto.motivo }, veredicto.estado);
+  }
+
+  // ===== Recursos que actúan como la persona de la llave =====
+  // Sin service_role: la pared es la RLS de la base. Ver ./recursos-como-usuario.ts.
+  if (esComoUsuario(recursoClave)) {
+    if (!consumo?.actua_como) return noDisponible(req, "como quién actúa la llave", consumoErr ?? "sin respuesta");
+    if (!comoUsuarioConfigurado()) return noDisponible(req, "sesión como usuario", "falta el secreto MAVEN_JWT_SECRET");
+    let yo: Awaited<ReturnType<typeof clienteComoUsuario>>;
+    try {
+      yo = await clienteComoUsuario(consumo.actua_como);
+    } catch (e) {
+      return noDisponible(req, "sesión como usuario", e);
+    }
+    if (!yo) return noDisponible(req, "sesión como usuario", "falta el secreto MAVEN_JWT_SECRET");
+    let r: Awaited<ReturnType<typeof servirComoUsuario>>;
+    try {
+      r = await servirComoUsuario(recursoClave, yo, {
+        agenciaDeLaLlave: tenantId,
+        actuaComo: consumo.actua_como,
+        cupo: { limite: consumo.limite, restantes: consumo.restantes, reinicio: consumo.reinicio },
+      }, sub);
+    } catch (e) {
+      // Una caída de red hacia la base no puede salir como un 500 sin CORS.
+      return noDisponible(req, `/${recursoClave}`, e);
+    }
+    if (r.ok) return json(req, r.cuerpo);
+    if (r.estado === 503) return noDisponible(req, `/${recursoClave}`, r.detalle);
+    return json(req, { error: r.error, message: r.mensaje }, r.estado);
   }
 
   // ===== /creators =====
