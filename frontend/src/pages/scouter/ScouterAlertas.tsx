@@ -50,6 +50,12 @@ const fmtDate = (iso: string, locale: string): string => {
   }
 };
 
+// useSpammerAlerts (hooks/useSpammerTasks.ts) rellena el nombre que falta con
+// este texto en español. Es solo de pantalla: se reconoce acá para dibujarlo en
+// el idioma de la interfaz. Si el hook pasa a devolver null, el null ya cae en
+// la misma rama.
+const RELLENO_SIN_NOMBRE = "(sin nombre)";
+
 const ScouterAlertas = () => {
   const { t } = useLanguage();
   const f = useFormato();
@@ -61,6 +67,8 @@ const ScouterAlertas = () => {
   // 100% no son una alerta. Si quieres ver todo, usa el tab de Mis
   // Tareas con vista de manager.
   const alertRows = useMemo(() => rows.filter((r) => r.pending > 0), [rows]);
+  const nombreDelSpammer = (nombre: string | null) =>
+    !nombre || nombre === RELLENO_SIN_NOMBRE ? t("scouter.noNameParens") : nombre;
 
   // Stats agregadas para el header.
   const totalPendingTasks = alertRows.reduce((a, r) => a + r.pending_tasks, 0);
@@ -127,7 +135,7 @@ const ScouterAlertas = () => {
             <TableBody>
               {alertRows.map((r) => (
                 <TableRow key={`${r.spammer_id}-${r.date}`}>
-                  <TableCell className="font-medium">{r.spammer_name}</TableCell>
+                  <TableCell className="font-medium">{nombreDelSpammer(r.spammer_name)}</TableCell>
                   <TableCell className="text-xs text-muted-foreground">
                     {fmtDate(r.date, f.intl("es-ES"))}
                   </TableCell>

@@ -101,7 +101,10 @@ interface AssistantTurn {
   // (callFillAssistant manda solo role + content):
   //  - "llenaIgual": el prompt de "Llena igual"; se muestra traducido.
   //  - "listo": el cierre del asistente; `content` es su resumen (o vacío).
-  vista?: "llenaIgual" | "listo";
+  //  - "error": el aviso de que la llamada falló. Es solo de pantalla (está en
+  //    el idioma de la interfaz y la IA nunca lo dijo), así que este turno
+  //    entero se queda fuera de lo que se le manda a la IA.
+  vista?: "llenaIgual" | "listo" | "error";
 }
 
 // El pedido de "Llena igual". Es un PROMPT (lo lee Gemini junto con el
@@ -131,7 +134,9 @@ async function callFillAssistant(args: {
         name: args.name,
         description: args.description,
         current_config: args.current_config,
-        messages: args.messages.map(({ role, content }) => ({ role, content })),
+        messages: args.messages
+          .filter((m) => m.vista !== "error")
+          .map(({ role, content }) => ({ role, content })),
       },
     },
   );
@@ -679,7 +684,7 @@ const CompanyFormModal = ({
       const msg = (e as Error).message || t("scouter.ai.invokeError");
       console.error("AI assistant failed:", e);
       toast.error(msg);
-      setChatMessages([{ role: "assistant", content: `Error: ${msg}` }]);
+      setChatMessages([{ role: "assistant", content: `Error: ${msg}`, vista: "error" }]);
     } finally {
       setAiLoading(false);
     }
@@ -707,7 +712,7 @@ const CompanyFormModal = ({
       const msg = (e as Error).message || t("scouter.ai.invokeError");
       console.error("AI assistant failed:", e);
       toast.error(msg);
-      setChatMessages((m) => [...m, { role: "assistant", content: `Error: ${msg}` }]);
+      setChatMessages((m) => [...m, { role: "assistant", content: `Error: ${msg}`, vista: "error" }]);
     } finally {
       setAiLoading(false);
     }
@@ -732,7 +737,7 @@ const CompanyFormModal = ({
     } catch (e) {
       const msg = (e as Error).message || t("scouter.ai.invokeError");
       toast.error(msg);
-      setChatMessages((m) => [...m, { role: "assistant", content: `Error: ${msg}` }]);
+      setChatMessages((m) => [...m, { role: "assistant", content: `Error: ${msg}`, vista: "error" }]);
     } finally {
       setAiLoading(false);
     }

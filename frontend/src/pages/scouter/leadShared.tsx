@@ -105,6 +105,26 @@ export const countryToFlag = (country: string | null | undefined): string => {
   return COUNTRY_FLAGS[country] ?? COUNTRY_FLAGS[country.trim()] ?? "🌍";
 };
 
+// El balde que useScouterCountries (hooks/useScouterLeads.ts) agrega para los
+// leads SIN país. Es el VALUE del filtro —el hook lo compara tal cual para armar
+// el IS NULL—, así que nunca se traduce; lo que se traduce es la etiqueta.
+export const SIN_PAIS = "Sin país";
+
+/** Las opciones del filtro de país (Home y Búsquedas): el value es el país tal
+ *  cual viene del hook (o SIN_PAIS); la etiqueta del balde sin país se traduce. */
+export const opcionesDePais = (
+  paises: Array<{ country: string; count: number }>,
+  t: (key: TranslationKey) => string,
+) =>
+  paises.map((c) => ({
+    value: c.country,
+    label:
+      c.country === SIN_PAIS
+        ? `🌍 ${t("scouter.filter.noCountry")} (${c.count})`
+        : `${countryToFlag(c.country)} ${c.country} (${c.count})`,
+    searchAdditional: c.country,
+  }));
+
 // ─── Verified badge (IG-style) ──────────────────────────────────────────
 export const VerifiedBadge = ({ size = 14 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none">

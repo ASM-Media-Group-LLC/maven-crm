@@ -74,6 +74,7 @@ export const scouter = {
   "scouter.filter.searchStatus": { es: "Buscar status…", en: "Search status…" },
   "scouter.filter.searchCountry": { es: "Buscar país…", en: "Search country…" },
   "scouter.filter.allCountries": { es: "Todos los países", en: "All countries" },
+  "scouter.filter.noCountry": { es: "Sin país", en: "No country" },
   "scouter.filter.aiQuality": { es: "Calidad IA", en: "AI quality" },
   "scouter.filter.searchQuality": { es: "Buscar calidad…", en: "Search quality…" },
   "scouter.filter.searchLeads": { es: "Buscar por handle, nombre, país…", en: "Search by handle, name, country…" },

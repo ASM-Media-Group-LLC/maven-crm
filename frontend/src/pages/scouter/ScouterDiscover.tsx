@@ -67,6 +67,7 @@ import {
   initialsBg,
   scoreColor,
   countryToFlag,
+  opcionesDePais,
 } from "./leadShared";
 
 // ─── CSS Animations (injected once) ───────────────────────────────────
@@ -1239,11 +1240,7 @@ const ScouterDiscover = () => {
           triggerClassName="w-[180px] h-9 text-xs"
           options={[
             { value: "all", label: t("scouter.filter.allCountries") },
-            ...(countriesQ.data ?? []).map((c) => ({
-              value: c.country,
-              label: `${countryToFlag(c.country)} ${c.country} (${c.count})`,
-              searchAdditional: c.country,
-            })),
+            ...opcionesDePais(countriesQ.data ?? [], t),
           ]}
         />
 

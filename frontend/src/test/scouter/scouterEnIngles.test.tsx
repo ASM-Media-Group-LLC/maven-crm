@@ -7,14 +7,22 @@
 // datos de prueba están en inglés a propósito: lo que se mira es el texto de la
 // pantalla, no el de la base (una bio o un país vienen como vienen).
 //
+// Además de `esEspanol`, cada texto se compara contra el lado `es` del
+// diccionario: así se ve un t() que alguien devolvió a texto a mano aunque la
+// frase no tenga acento ni una palabra de la lista del detector ("Detener
+// escaneo", "Saltar").
+//
 // Y lo que NO se traduce también se prueba: los submódulos de permisos que se
-// consultan siguen siendo las llaves en español de role_permissions, y el prompt
-// de "Llena igual" le llega a la IA en español aunque en pantalla se lea en inglés.
+// consultan siguen siendo las llaves en español de role_permissions, el prompt
+// de "Llena igual" le llega a la IA en español aunque en pantalla se lea en
+// inglés, el balde "Sin país" sigue siendo el value del filtro y el aviso de
+// error del asistente no se le manda a la IA.
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { LanguageProvider } from "@/hooks/useLanguage";
+import translations from "@/lib/i18n";
 import { esEspanol } from "../i18n/detectarEspanol";
 
 const estado = vi.hoisted(() => ({
@@ -23,7 +31,17 @@ const estado = vi.hoisted(() => ({
   permisos: [] as string[],
   invocaciones: [] as Array<{ fn: string; body: Record<string, unknown> }>,
   respuestasIa: [] as unknown[],
+  paisPedido: undefined as string | undefined,
 }));
+
+// El popover de los selectores (Radix) se mide con ResizeObserver, y jsdom no lo trae.
+if (!("ResizeObserver" in globalThis)) {
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver;
+}
 
 const HOY = new Date().toISOString().slice(0, 10);
 
@@ -110,11 +128,15 @@ vi.mock("@/integrations/supabase/client", () => ({
   },
 }));
 vi.mock("@/hooks/useScouterLeads", () => ({
-  useScouterLeads: () => consulta({ leads: [LEAD, LEAD_CONVERTIDO], total: 200 }),
+  useScouterLeads: (f: { country?: string }) => {
+    estado.paisPedido = f.country;
+    return consulta({ leads: [LEAD, LEAD_CONVERTIDO], total: 200 });
+  },
   useScouterStats: () => consulta({ total: 200, contactedDistinct: 40, interested: 12, noResponse: 9 }),
   useScouterCompanies: () => consulta(COMPANIAS),
   useScouterCompaniesAll: () => consulta(COMPANIAS),
-  useScouterCountries: () => consulta([{ country: "Colombia", count: 12 }]),
+  // "Sin país" es el balde que arma el hook para los leads sin país (country NULL).
+  useScouterCountries: () => consulta([{ country: "Colombia", count: 12 }, { country: "Sin país", count: 3 }]),
   useLeadFavoriteIds: () => consulta(new Set(["l1"])),
   useToggleLeadFavorite: () => mutacion(),
   useUpdateLead: () => mutacion(),
@@ -156,6 +178,8 @@ vi.mock("@/hooks/useSpammerTasks", () => ({
   useUploadScreenshot: () => mutacion(),
   useSpammerAlerts: () => consulta([
     { spammer_id: "s1", spammer_name: "Alex", date: "2026-09-24", total_assignments: 10, done: 4, pending: 6, pending_tasks: 15 },
+    // Así llega del hook un spammer sin full_name.
+    { spammer_id: "s2", spammer_name: "(sin nombre)", date: "2026-09-24", total_assignments: 2, done: 0, pending: 2, pending_tasks: 3 },
   ]),
 }));
 vi.mock("@/hooks/useSpammerAccounts", () => ({
@@ -207,7 +231,38 @@ function textosVisibles(raiz: HTMLElement): string[] {
   return out;
 }
 
-const enEspanol = (raiz: HTMLElement = document.body) => textosVisibles(raiz).filter((t) => esEspanol(t));
+// El lado `es` del diccionario que en inglés dice otra cosa. Se descarta lo que
+// también es el `en` de alguna clave (eso puede estar bien en pantalla) y lo que
+// no tiene al menos 3 letras propias.
+const EN_DE_ALGUNA_CLAVE = new Set(Object.values(translations).map((v) => v.en.trim()));
+const VARIABLE = /\{\w+\}/; // sin /g: .test() y .split() no guardan estado
+const escapar = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const ES_EXACTO = new Set<string>();
+const esPlantillas: string[] = [];
+for (const { es, en } of Object.values(translations)) {
+  const s = es.trim();
+  if (s === en.trim() || EN_DE_ALGUNA_CLAVE.has(s)) continue;
+  const partes = s.split(VARIABLE);
+  if (partes.join("").replace(/[^\p{L}]/gu, "").length < 3) continue;
+  if (partes.length > 1) esPlantillas.push(partes.map(escapar).join(".+?"));
+  else ES_EXACTO.add(s);
+}
+const ES_PLANTILLA = new RegExp(`^(?:${esPlantillas.join("|")})$`, "su");
+const esDelDiccionario = (t: string) => ES_EXACTO.has(t) || ES_PLANTILLA.test(t);
+
+/** El texto entero de cada elemento que solo tiene texto adentro: una frase
+ *  armada con {variables} en el JSX llega partida en varios nodos de texto. */
+function frasesEnteras(raiz: HTMLElement): string[] {
+  return Array.from(raiz.querySelectorAll("*"))
+    .filter((el) => el.children.length === 0 && !el.closest("code, pre, style, script"))
+    .map((el) => (el.textContent ?? "").replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+}
+
+const enEspanol = (raiz: HTMLElement = document.body) => [
+  ...textosVisibles(raiz).filter((t) => esEspanol(t) || esDelDiccionario(t)),
+  ...frasesEnteras(raiz).filter((t) => esDelDiccionario(t)),
+];
 
 function montar(ui = <ScouterAssist />) {
   // Pasar a Closers usa useMutation directo (no un hook de los mockeados).
@@ -245,6 +300,26 @@ describe("Scouter Assist en inglés", () => {
       "Home", "Searches", "Favorites", "Leads", "Analytics", "Settings", "My tasks", "Alerts",
     ]);
     expect(enEspanol()).toEqual([]);
+  });
+
+  it("el filtro de país en Home y en Búsquedas: el balde sin país", async () => {
+    // Un combobox no toma el nombre de su contenido: se lo busca por el texto.
+    const selectorDePais = (texto: string) =>
+      screen.getAllByRole("combobox").filter((el) => el.textContent === texto);
+    montar();
+    for (const pestana of ["Home", "Searches"]) {
+      abrirPestana(pestana);
+      const [selector] = selectorDePais("All countries");
+      fireEvent.click(selector);
+      const sinPais = await screen.findByRole("option", { name: "🌍 No country (3)" });
+      expect(screen.getByRole("option", { name: "🇨🇴 Colombia (12)" })).toBeTruthy();
+      expect(enEspanol()).toEqual([]);
+      fireEvent.click(sinPais);
+      // Se lee en inglés, pero lo que se filtra es el balde del hook (IS NULL).
+      expect(selectorDePais("🌍 No country (3)")).toHaveLength(1);
+      expect(estado.paisPedido).toBe("Sin país");
+      expect(enEspanol()).toEqual([]);
+    }
   });
 
   it("el popup del lead: leyendo, editando, descartando y pasando a Closers", async () => {
@@ -286,6 +361,7 @@ describe("Scouter Assist en inglés", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /^Stop$/ }));
     const detener = await screen.findByRole("dialog");
+    expect(within(detener).getByText("Stop scan")).toBeTruthy();
     expect(within(detener).getByText("There's 1 job running. Cancel all?")).toBeTruthy();
     expect(enEspanol(detener)).toEqual([]);
     fireEvent.click(within(detener).getByRole("button", { name: "Back" }));
@@ -317,7 +393,8 @@ describe("Scouter Assist en inglés", () => {
     expect(enEspanol()).toEqual([]);
 
     abrirPestana("Alerts");
-    expect(screen.getByText("1 spammer · 15 pending tasks")).toBeTruthy();
+    expect(screen.getByText("2 spammers · 18 pending tasks")).toBeTruthy();
+    expect(screen.getByText("(no name)")).toBeTruthy();
     expect(enEspanol()).toEqual([]);
   });
 
@@ -350,6 +427,27 @@ describe("Scouter Assist en inglés", () => {
       content: "Llena la config con la mejor inferencia que tengas con la info actual; no preguntes más. Si dudas, deja las dudas en scoring_notes.",
     });
     expect(enEspanol(form)).toEqual([]);
+  });
+
+  it("Settings: si el asistente falla, el aviso se lee en inglés y NO se le manda a la IA", async () => {
+    montar();
+    abrirPestana("Settings");
+    fireEvent.click(screen.getByRole("button", { name: /New company/ }));
+    const form = await screen.findByRole("dialog");
+    // Sin respuesta en la cola, invoke devuelve data null: "respuesta vacía".
+    fireEvent.change(within(form).getByPlaceholderText(/Management agency/), { target: { value: "Agency" } });
+    fireEvent.click(within(form).getByRole("button", { name: /Improve with AI/ }));
+    await within(form).findByText("Error: The assistant sent an empty response");
+    expect(enEspanol(form)).toEqual([]);
+
+    estado.respuestasIa.push({ ready: false, question: "Which niche?" });
+    fireEvent.change(within(form).getByPlaceholderText("Answer the question…"), { target: { value: "Fitness models" } });
+    fireEvent.click(within(form).getByRole("button", { name: "Send" }));
+    await within(form).findByText("Which niche?");
+    // El aviso sigue en pantalla, pero la IA solo ve lo que escribió la persona.
+    expect(within(form).getByText("Error: The assistant sent an empty response")).toBeTruthy();
+    const ultima = estado.invocaciones[estado.invocaciones.length - 1];
+    expect(ultima.body.messages).toEqual([{ role: "user", content: "Fitness models" }]);
   });
 
   it("Mis Tareas: tarjetas de tareas, progreso y el detalle de un spammer", async () => {
@@ -409,11 +507,14 @@ describe("Scouter Assist: lo que NO se traduce", () => {
     }
   });
 
-  it("en español la pantalla sigue diciendo lo de antes", () => {
+  it("en español la pantalla sigue diciendo lo de antes", async () => {
     localStorage.setItem("app-language", "es");
     montar();
     expect(screen.getByText("Total scouteadas")).toBeTruthy();
     expect(screen.getByRole("tab", { name: "Mis Tareas" })).toBeTruthy();
     expect(screen.getByText("Página 1 de 4")).toBeTruthy();
+    const [pais] = screen.getAllByRole("combobox").filter((el) => el.textContent === "Todos los países");
+    fireEvent.click(pais);
+    expect(await screen.findByRole("option", { name: "🌍 Sin país (3)" })).toBeTruthy();
   });
 });
