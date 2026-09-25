@@ -25,7 +25,8 @@ import {
   INFRAESTRUCTURA,
   type ModoDeAislamiento,
 } from "./aislamiento.ts";
-import { RECURSOS_COMO_USUARIO } from "./recursos-como-usuario.ts";
+import { RECURSOS_COMO_USUARIO, SCOPE_REQUERIDO } from "./recursos-como-usuario.ts";
+import { isValidScope } from "../_shared/api-scopes.ts";
 
 /** El código sin comentarios: de bloque, líneas que son solo comentario, y el
  *  comentario al final de una línea de código (`x, // nota`). Este último solo si
@@ -53,6 +54,7 @@ const MAPA_DE_PRUEBA: Record<string, ModoDeAislamiento> = {
   por_columna: { tipo: "columna", columna: "tenant_id" },
   por_miembros: { tipo: "miembros" },
   del_usuario: { tipo: "como_usuario" },
+  del_usuario_mezclado: { tipo: "como_usuario", pendienteConVariasAgencias: "puede mezclar agencias" },
   suelto: { tipo: "sin_agencia", pendiente: "no se sabe de quién es" },
 };
 
@@ -62,6 +64,21 @@ Deno.test("con DOS agencias: lo aislado se sirve, lo suelto se apaga con 403", (
   assert(decidir("del_usuario", 2, MAPA_DE_PRUEBA).ok);
   const v = decidir("suelto", 2, MAPA_DE_PRUEBA);
   assert(!v.ok && v.estado === 403, "un recurso sin agencia se sirvió con 2 agencias");
+});
+
+Deno.test("como_usuario que puede mezclar agencias: se apaga con DOS, 503 si no se pudo contar", () => {
+  // El Messenger: la sesión es la de la persona, pero nada en la base impide una
+  // conversación con alguien de otra agencia. Hasta que eso se cierre, con dos
+  // agencias no se sirve.
+  assert(decidir("del_usuario_mezclado", 1, MAPA_DE_PRUEBA).ok);
+  const dos = decidir("del_usuario_mezclado", 2, MAPA_DE_PRUEBA);
+  assert(!dos.ok && dos.estado === 403, "con 2 agencias se sirvió");
+  for (const agencias of [null, 0]) {
+    const v = decidir("del_usuario_mezclado", agencias, MAPA_DE_PRUEBA);
+    assert(!v.ok && v.estado === 503, `con agencias=${agencias} tenía que dar 503`);
+  }
+  // Y el que no la declara (/me) se sigue sirviendo con 2.
+  assert(decidir("del_usuario", 2, MAPA_DE_PRUEBA).ok);
 });
 
 Deno.test("con UNA agencia se sirve todo, igual que antes del arreglo", () => {
@@ -228,6 +245,24 @@ Deno.test("como_usuario: cada recurso declarado tiene su handler, y ninguno sobr
   assertEquals(conHandler, declarados);
   // Y los nombres heredados no cuentan como como_usuario.
   for (const r of ["constructor", "toString", "__proto__"]) assert(!esComoUsuario(r));
+});
+
+Deno.test("como_usuario: cada recurso declara su scope, y es un scope que existe", () => {
+  assertEquals(Object.keys(SCOPE_REQUERIDO).sort(), Object.keys(RECURSOS_COMO_USUARIO).sort(),
+    "un recurso como_usuario no declara qué scope necesita (o sobra uno)");
+  for (const [recurso, scope] of Object.entries(SCOPE_REQUERIDO)) {
+    assert(scope === null || isValidScope(scope), `${recurso} pide un scope que no existe: ${scope}`);
+  }
+  // Solo /me puede ir sin scope: saber como quién actúa la llave es lo mínimo.
+  const sinScope = Object.entries(SCOPE_REQUERIDO).filter(([, s]) => s === null).map(([r]) => r);
+  assertEquals(sinScope, ["me"], "un recurso como_usuario quedó sin scope");
+});
+
+Deno.test("IP: la whitelist se compara contra la IP que pone el proxy, no la que manda el cliente", () => {
+  // El primer valor de X-Forwarded-For lo escribe el que llama: con él, cualquiera
+  // se ponía una IP de la whitelist.
+  assert(!/x-forwarded-for/i.test(PUBLIC_API), "public-api lee X-Forwarded-For");
+  assert(/headers\.get\(\s*"cf-connecting-ip"\s*\)/.test(PUBLIC_API), "public-api no lee cf-connecting-ip");
 });
 
 Deno.test("como_usuario: los handlers nunca ven service_role", () => {

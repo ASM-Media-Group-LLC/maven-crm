@@ -17,8 +17,10 @@
 //   GET /public-api/me                  (sin scope)     (como quién actúa la llave, y su cupo)
 //
 // LÍMITE: 1.000 pedidos por hora por llave (api_keys.limite_por_hora), en ventana
-// fija que se reinicia a la hora en punto. Pasado el límite, 429 con Retry-After.
-// Todas las respuestas llevan X-RateLimit-Limit / -Remaining / -Reset.
+// fija que se reinicia a la hora en punto, y 60 por minuto (limite_por_minuto) para
+// que no se gasten todos de golpe. Pasado cualquiera de los dos, 429 con
+// Retry-After. Las respuestas a una llave válida llevan X-RateLimit-Limit /
+// -Remaining / -Reset, que son los de la hora.
 //
 // ACTÚA COMO. Cada llave está atada a una persona real (api_keys.acts_as_user_id,
 // fija desde que se crea). Los recursos `como_usuario` se consultan con la sesión de
@@ -91,10 +93,13 @@ async function sha256hex(s: string): Promise<string> {
 }
 
 // --- IP whitelist ---
+// La IP de verdad la ponen Cloudflare (cf-connecting-ip) y el proxy de Supabase
+// (x-real-ip), y el cliente no las puede cambiar. X-Forwarded-For NO: su primer
+// valor lo escribe el que llama, así que con él cualquiera se ponía una IP de la
+// whitelist y la whitelist no servía de nada.
 function clientIp(req: Request): string | null {
-  const xff = req.headers.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0].trim();
-  return req.headers.get("x-real-ip");
+  const ip = req.headers.get("cf-connecting-ip") ?? req.headers.get("x-real-ip");
+  return ip?.trim() || null;
 }
 function ipv4ToInt(ip: string): number | null {
   const p = ip.split(".");
@@ -243,6 +248,8 @@ Deno.serve(async (req) => {
   type Consumo = {
     permitido: boolean; limite: number; restantes: number; reinicio: string;
     actua_como: string | null; usuario_activo: boolean;
+    // Del freno por minuto. Opcionales: antes de su migración no vienen.
+    limite_minuto?: number | null; motivo?: "hora" | "minuto" | null;
   };
   const { data: consumoFilas, error: consumoErr } = await admin
     .rpc("api_key_consumir", { _id: keyRow.id as string });
@@ -251,18 +258,25 @@ Deno.serve(async (req) => {
     ? null
     : ((Array.isArray(consumoFilas) ? consumoFilas[0] : consumoFilas) as Consumo | undefined) ?? null;
   if (consumo) {
+    // X-RateLimit-* son SIEMPRE los de la hora. Si lo que se agotó es el minuto,
+    // `reinicio` es el próximo minuto y solo va en Retry-After.
+    const porMinuto = consumo.motivo === "minuto";
     const reinicioSeg = Math.ceil(new Date(consumo.reinicio).getTime() / 1000);
+    const reinicioHoraSeg = porMinuto ? Math.ceil(Date.now() / 3_600_000) * 3_600 : reinicioSeg;
     cabecerasDelPedido.set(req, {
       "X-RateLimit-Limit": String(consumo.limite),
       "X-RateLimit-Remaining": String(consumo.restantes),
-      "X-RateLimit-Reset": String(reinicioSeg),
+      "X-RateLimit-Reset": String(reinicioHoraSeg),
     });
     if (!consumo.permitido) {
       const espera = Math.max(1, reinicioSeg - Math.floor(Date.now() / 1000));
       return json(req, {
         error: "rate_limited",
-        message: `Esta API key llegó a su límite de ${consumo.limite} pedidos por hora. ` +
-          `Se reinicia a las ${consumo.reinicio}.`,
+        message: porMinuto
+          ? `Esta API key llegó a su límite de ${consumo.limite_minuto ?? 60} pedidos por minuto. ` +
+            `Reintentá en ${espera} s.`
+          : `Esta API key llegó a su límite de ${consumo.limite} pedidos por hora. ` +
+            `Se reinicia a las ${consumo.reinicio}.`,
       }, 429, { "Retry-After": String(espera) });
     }
     if (!consumo.usuario_activo) return personaNoVigente(req);
@@ -341,8 +355,15 @@ Deno.serve(async (req) => {
       r = await servirComoUsuario(recursoClave, yo, {
         agenciaDeLaLlave: tenantId,
         actuaComo: consumo.actua_como,
+        scopes,
+        ruta: rest.slice(1),
+        consulta: Object.fromEntries(url.searchParams),
+        llave: {
+          conWhitelist: ((keyRow.ip_whitelist as string[] | null) ?? []).length > 0,
+          venceEl: (keyRow.expires_at as string | null) ?? null,
+        },
         cupo: { limite: consumo.limite, restantes: consumo.restantes, reinicio: consumo.reinicio },
-      }, sub);
+      });
     } catch (e) {
       // Una caída de red hacia la base no puede salir como un 500 sin CORS.
       return noDisponible(req, `/${recursoClave}`, e);
