@@ -1233,6 +1233,11 @@ describe("tercera revisión", () => {
       if (!v || typeof v !== "object" || prof > 40 || v instanceof Node) return false;
       if (vistos.has(v)) return false;
       vistos.add(v);
+      if (v instanceof Map || v instanceof Set) {
+        for (const x of v.values()) if (buscar(x, prof + 1)) return true;
+        if (v instanceof Map) for (const x of v.keys()) if (buscar(x, prof + 1)) return true;
+        return false;
+      }
       for (const k of Object.keys(v)) {
         if (k === "_owner" || k === "return" || k === "alternate" || k === "stateNode" || k === "child" || k === "sibling") continue;
         if (buscar((v as Record<string, unknown>)[k], prof + 1)) return true;
@@ -1241,13 +1246,18 @@ describe("tercera revisión", () => {
     };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const pila: any[] = actual ? [actual] : [];
+    const fibras = new WeakSet<object>();
     while (pila.length) {
       const f = pila.pop();
-      if (buscar(f.memoizedProps, 0)) return true;
+      if (fibras.has(f)) continue;
+      fibras.add(f);
+      // También la fibra alterna (el árbol de antes): guarda props y estado viejos.
+      if (f.alternate) pila.push(f.alternate);
+      if (buscar(f.memoizedProps, 0) || buscar(f.pendingProps, 0)) return true;
       // Los hooks son una lista (memoizedState → next → next…): se recorre entera, sin
       // gastar profundidad; si no, un useRef del hook 12 quedaba fuera del alcance.
       for (let h = f.memoizedState; h && typeof h === "object"; h = h.next) {
-        if (buscar(h.memoizedState, 0)) return true;
+        if (buscar(h.memoizedState, 0) || buscar(h.baseState, 0)) return true;
         if (!("next" in h)) break;
       }
       if (f.child) pila.push(f.child);
@@ -1437,5 +1447,139 @@ describe("tercera revisión", () => {
     expect(screen.getByRole("dialog")).toBe(d);
     alta.resolver({ key: KEY });
     expect(await within(d).findByText(KEY)).toBeTruthy();
+  });
+});
+
+describe("cuarta revisión", () => {
+  it("si el webhook desaparece con la confirmación abierta, la salida muestra 'no tiene' (no el webhook viejo)", async () => {
+    const st = document.createElement("style");
+    st.textContent = '[role="dialog"][data-state="closed"] { animation-name: salir; }';
+    document.head.appendChild(st);
+    try {
+      const relectura = diferida<unknown>();
+      let listas = 0;
+      const acts = { acts_as: { id: OTRA, name: "Someone Else", active: true } };
+      servidor = (b) => {
+        if (b.action === "list") {
+          listas++;
+          return listas <= 2 ? Promise.resolve(lista([llave("act", { ...acts, webhook: webhook({ api_key_id: "act" }) })])) : relectura.promesa;
+        }
+        return Promise.reject(new Error("That webhook doesn't exist."));
+      };
+      montar();
+      await screen.findByText("Key act");
+      const d = await abrirCelda("Key act");
+      await waitFor(() => expect(listas).toBe(2));
+      fireEvent.click(within(d).getByRole("button", { name: /Pause/ }));
+      await waitFor(() => expect(avisos.error.length).toBe(1));
+      fireEvent.click(within(d).getByRole("button", { name: /Delete/ }));
+      await screen.findByRole("alertdialog");
+      relectura.resolver(lista([llave("act", { ...acts, webhook: null })]));
+      await within(d).findByText(/This key has no webhook/);
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+      fireEvent.click(within(d).getAllByRole("button", { name: "Close" })[0]);
+      await new Promise((r) => setTimeout(r, 30));
+      const sale = document.querySelector('[role="dialog"]');
+      if (sale) {
+        expect(sale.textContent).toContain("This key has no webhook");
+        expect(sale.textContent).not.toContain("hooks.example.com");
+      }
+    } finally {
+      st.remove();
+    }
+  });
+
+  it("la dueña sin Messenger en la key: si lo borran, tampoco ve el alta", async () => {
+    let listas = 0;
+    servidor = (b) => {
+      if (b.action === "list") {
+        listas++;
+        return Promise.resolve(lista([llave("sin", { scopes: ["creators:read"], webhook: listas <= 2 ? webhook({ api_key_id: "sin", status: "disabled", disabled_reason: "scope_removed" }) : null })]));
+      }
+      return Promise.reject(new Error("That webhook doesn't exist."));
+    };
+    montar();
+    await screen.findByText("Key sin");
+    const d = await abrirCelda("Key sin");
+    await waitFor(() => expect(listas).toBe(2));
+    fireEvent.click(within(d).getByRole("button", { name: /Delete/ }));
+    const c = await screen.findByRole("alertdialog");
+    fireEvent.click(within(c).getByRole("button", { name: "Delete" }));
+    await within(d).findByText(/This key has no webhook/);
+    expect(within(d).queryByLabelText("Your server's URL")).toBeNull();
+  });
+
+  it("con Pausar en vuelo se anuncia que trabaja; con una prueba en vuelo Borrar espera", async () => {
+    const pausa = diferida<unknown>();
+    const prueba = diferida<unknown>();
+    let estadoA = "active";
+    servidor = (b) => {
+      if (b.action === "list") return Promise.resolve(lista([llave("a", { webhook: webhook({ api_key_id: "a", status: estadoA }) }), llave("b", { webhook: webhook({ api_key_id: "b" }) })]));
+      if (b.action === "webhook_pause") { estadoA = "paused"; return pausa.promesa; }
+      return prueba.promesa;
+    };
+    montar();
+    await screen.findByText("Key a");
+    let d = await abrirCelda("Key a");
+    fireEvent.click(within(d).getByRole("button", { name: /Pause/ }));
+    await waitFor(() => expect(within(d).getAllByRole("status").some((r) => r.textContent === "Working…")).toBe(true));
+    pausa.resolver({ webhook: webhook({ api_key_id: "a", status: "paused" }) });
+    await waitFor(() => expect(within(d).queryByRole("button", { name: /Pause/ })).toBeNull());
+    await cerrarConEsc(d);
+    d = await abrirCelda("Key b");
+    fireEvent.click(within(d).getByRole("button", { name: /Send test/ }));
+    await waitFor(() => expect((within(d).getByRole("button", { name: /Delete/ }) as HTMLButtonElement).disabled).toBe(true));
+    prueba.resolver({ webhook: webhook({ api_key_id: "b" }), test: pruebaOk });
+    await waitFor(() => expect((within(d).getByRole("button", { name: /Delete/ }) as HTMLButtonElement).disabled).toBe(false));
+  });
+
+  it("crear una API key: dos toques crean UNA; después de crear o de un error, el modal se cierra", async () => {
+    const KEY = "mvk_live_abcdef_UNA-SOLA";
+    let n = 0;
+    servidor = (b) => {
+      if (b.action !== "create") return Promise.resolve(lista([llave("mia")]));
+      n++;
+      return n === 1 ? Promise.resolve({ key: KEY }) : Promise.reject(new Error("Name already in use."));
+    };
+    montar();
+    await screen.findByText("Key mia");
+    fireEvent.click(screen.getByRole("button", { name: /Create API key/ }));
+    let d = await screen.findByRole("dialog");
+    fireEvent.change(within(d).getByLabelText("Name"), { target: { value: "Nueva" } });
+    const crear = within(d).getByRole("button", { name: "Create key" });
+    fireEvent.click(crear);
+    fireEvent.click(crear);
+    expect(await within(d).findByText(KEY)).toBeTruthy();
+    expect(llamadasDe("create").length).toBe(1);
+    fireEvent.click(within(d).getByRole("button", { name: /Done/ }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    // Un alta que falla también suelta el candado.
+    fireEvent.click(screen.getByRole("button", { name: /Create API key/ }));
+    d = await screen.findByRole("dialog");
+    fireEvent.change(within(d).getByLabelText("Name"), { target: { value: "Otra" } });
+    fireEvent.click(within(d).getByRole("button", { name: "Create key" }));
+    await waitFor(() => expect(avisos.error).toContain("Name already in use."));
+    fireEvent.click(within(d).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("sin red el alta no se queda pausada: sale enseguida (y el modal no queda trabado)", async () => {
+    const { onlineManager } = await import("@tanstack/react-query");
+    servidor = (b) => b.action === "create" ? Promise.reject(new Error("Failed to fetch")) : Promise.resolve(lista([llave("mia")]));
+    montar();
+    await screen.findByText("Key mia");
+    fireEvent.click(screen.getByRole("button", { name: /Create API key/ }));
+    const d = await screen.findByRole("dialog");
+    fireEvent.change(within(d).getByLabelText("Name"), { target: { value: "Nueva" } });
+    onlineManager.setOnline(false);
+    try {
+      fireEvent.click(within(d).getByRole("button", { name: "Create key" }));
+      await waitFor(() => expect(llamadasDe("create").length).toBe(1));
+      await waitFor(() => expect(avisos.error).toContain("Failed to fetch"));
+      fireEvent.click(within(d).getByRole("button", { name: "Cancel" }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    } finally {
+      onlineManager.setOnline(true);
+    }
   });
 });

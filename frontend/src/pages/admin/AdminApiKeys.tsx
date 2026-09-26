@@ -131,6 +131,9 @@ const AdminApiKeys = () => {
   // dibujando el contenido.
   const [webhookDe, setWebhookDe] = useState<{ id: string; vez: number } | null>(null);
   const [webhookAbierto, setWebhookAbierto] = useState(false);
+  // Para onCerrado: si mientras terminaba de cerrarse ya se abrió otro, no se toca.
+  const webhookAbiertoRef = useRef(false);
+  webhookAbiertoRef.current = webhookAbierto;
   const abrirWebhook = (id: string) => {
     setWebhookDe((antes) => ({ id, vez: (antes?.vez ?? 0) + 1 }));
     setWebhookAbierto(true);
@@ -215,6 +218,8 @@ const AdminApiKeys = () => {
     // La key entera viaja UNA vez: vive en freshKey y la mutación la suelta (si no,
     // quedaba en la MutationCache mientras la página siguiera abierta).
     gcTime: 0,
+    // Sin red no se pausa (el modal quedaba sin poder cerrarse): falla enseguida.
+    networkMode: "always",
     onSuccess: (res) => { setFreshKey(res.key); qc.invalidateQueries({ queryKey: ["api-keys"] }); toast.success(t("apiKeys.toast.created")); },
     onError: (e) => toast.error((e as Error)?.message ?? t("apiKeys.toast.createFailed")),
     onSettled: () => { createMutPendiente.current = false; queueMicrotask(() => createMut.reset()); },
@@ -407,7 +412,8 @@ const AdminApiKeys = () => {
       <DialogoWebhook key={webhookDe?.vez ?? 0} abierto={webhookAbierto}
         llave={webhookDe ? keys.find((k) => k.id === webhookDe.id) ?? null : null}
         desconocido={data?.webhooks_unknown === true} listaConError={isError}
-        youId={data?.you?.id} caras={caras} onCerrar={() => setWebhookAbierto(false)} />
+        youId={data?.you?.id} caras={caras} onCerrar={() => setWebhookAbierto(false)}
+        onCerrado={() => { if (!webhookAbiertoRef.current) setWebhookDe(null); }} />
 
       {/* Modal crear / editar / mostrar key */}
       <Dialog open={modalMode !== null} onOpenChange={(o) => { if (!o) closeModal(); }}>
@@ -549,7 +555,9 @@ const AdminApiKeys = () => {
                 <Button className="gap-1.5" disabled={!canSubmit}
                   onClick={() => {
                     if (modalMode === "edit") { updateMut.mutate(); return; }
-                    // Se marca ACÁ (onMutate corre después de un await): desde el toque, no se cierra.
+                    // Se marca ACÁ (onMutate corre después de un await): desde el toque, no se
+                    // cierra. Y un segundo toque antes de que se dibuje isPending no crea otra.
+                    if (createMutPendiente.current) return;
                     createMutPendiente.current = true;
                     createMut.mutate();
                   }}>

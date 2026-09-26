@@ -232,13 +232,16 @@ type ListaEnCache = { keys: { id: string; webhook?: WebhookResumen | null }[] };
 /** El diálogo del webhook de una key. Se monta de nuevo en cada apertura
  *  (AdminApiKeys le pone key): el secreto y el resultado de una prueba nunca pasan
  *  de una key a otra. `llave` sale de la lista, fresca tras cada acción. */
-export function DialogoWebhook({ abierto, llave, youId, desconocido = false, listaConError = false, caras, onCerrar }: {
+export function DialogoWebhook({ abierto, llave, youId, desconocido = false, listaConError = false, caras, onCerrar, onCerrado }: {
   abierto: boolean; llave: LlaveConWebhook | null; youId: string | null | undefined;
   /** webhooks_unknown: la lista vino, pero sin los webhooks. */
   desconocido?: boolean;
   /** La última relectura de la lista falló: lo que hay es de antes. */
   listaConError?: boolean;
   caras?: Map<string, Cara>; onCerrar: () => void;
+  /** Terminó de cerrarse (después de la animación): quien lo monta lo desmonta, y con
+   *  él se va de la memoria todo lo que tuvo (el secreto también en la fibra alterna). */
+  onCerrado?: () => void;
 }) {
   const qc = useQueryClient();
   const { t, language } = useLanguage();
@@ -295,6 +298,11 @@ export function DialogoWebhook({ abierto, llave, youId, desconocido = false, lis
     deLaLista ?? (sinDato ? ultimoConocido.current ?? recienDeEsta : recienVisto.current ? null : recienDeEsta);
   const viejo = (sinDato || listaConError) && !!w;
 
+  // Si el webhook desaparece con la confirmación abierta (lo borró otra persona), la
+  // confirmación se baja: si no, quedaba "abierta" sin dibujarse, congelaba la salida en
+  // el webhook viejo y reaparecía sola si volvía otro.
+  if (borrar && (!llave || !w)) setBorrar(false);
+
   const esDueno = !!youId && llave?.acts_as?.id === youId;
   const cara = (id: string | null | undefined) => (id ? caras?.get(id) : undefined);
 
@@ -322,6 +330,8 @@ export function DialogoWebhook({ abierto, llave, youId, desconocido = false, lis
       action: "webhook_create", lang, key_id: llave!.id, url: url.trim(), exclude_own: sinPropios,
     }),
     gcTime: 0,
+    // Sin red no se pausa: falla enseguida (si no, el diálogo quedaba sin poder cerrarse).
+    networkMode: "always",
     onSuccess: (res) => {
       setSecreto(res.secret); setRecien(res.webhook); setUrl("");
       ponerEnLista(res.webhook.api_key_id, res.webhook);
@@ -335,6 +345,7 @@ export function DialogoWebhook({ abierto, llave, youId, desconocido = false, lis
   const probar = useMutation({
     mutationFn: (v: { accion: "webhook_test" | "webhook_resume"; id: string }) =>
       adminInvoke<PruebaResp>("manage-api-keys", { action: v.accion, lang, id: v.id }),
+    networkMode: "always",
     onSuccess: (res, v) => {
       // El secreto NO se borra: si la prueba no llegó (el integrador todavía no lo
       // tiene), hay que poder copiarlo igual. Se va al cerrar.
@@ -354,6 +365,7 @@ export function DialogoWebhook({ abierto, llave, youId, desconocido = false, lis
   });
   const pausar = useMutation({
     mutationFn: (id: string) => adminInvoke<{ webhook: WebhookResumen }>("manage-api-keys", { action: "webhook_pause", lang, id }),
+    networkMode: "always",
     onSuccess: (res) => {
       setPrueba(null);
       toast.success(t("apiKeys.webhook.toast.paused"));
@@ -367,6 +379,7 @@ export function DialogoWebhook({ abierto, llave, youId, desconocido = false, lis
   });
   const quitar = useMutation({
     mutationFn: (v: { id: string; keyId: string }) => adminInvoke("manage-api-keys", { action: "webhook_delete", lang, id: v.id }),
+    networkMode: "always",
     onSuccess: (_res, v) => {
       ponerEnLista(v.keyId, null);
       toast.success(t("apiKeys.webhook.toast.deleted"));
@@ -691,6 +704,7 @@ export function DialogoWebhook({ abierto, llave, youId, desconocido = false, lis
           // estado Y del cuerpo congelado (que lo tenía en su <code> y en CopyButton).
           ultimoCuerpo.current = null;
           setSecreto(null); setPrueba(null);
+          onCerrado?.();
         }}>
         {cuerpo}
       </DialogContent>
