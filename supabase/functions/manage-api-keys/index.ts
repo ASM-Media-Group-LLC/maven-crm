@@ -15,7 +15,7 @@ import {
   SCOPE_GROUPS,
 } from "./api-scopes.ts";
 import { type ClaveDeMensaje, type Idioma, idiomaDe, msg } from "./mensajes.ts";
-import { crearDatos, servirWebhook, webhooksDeLlaves } from "./webhooks.ts";
+import { conWebhooks, crearDatos, servirWebhook, webhooksDeLlaves } from "./webhooks.ts";
 
 // Igual que Infloww: hasta 3 keys válidas a la vez, POR AGENCIA. Antes se contaba
 // para toda la plataforma: con las 3 de la primera agencia, la segunda no habría
@@ -186,9 +186,9 @@ Deno.serve(async (req) => {
       // Si no se pudo consultar, webhooks_unknown: la página dice "no se sabe" (y
       // no ofrece Registrar ni esconde Pausar), en vez de "sin webhook".
       const webhooks = await webhooksDeLlaves(crearDatos(admin, tenantId), (data ?? []).map((k: { id: string }) => k.id));
-      const keys = (await conPersona(data ?? [])).map((k) => ({ ...k, status: statusOf(k), webhook: webhooks?.get(k.id) ?? null }));
+      const { keys, webhooks_unknown } = conWebhooks((await conPersona(data ?? [])).map((k) => ({ ...k, status: statusOf(k) })), webhooks);
       return json(req, {
-        keys, webhooks_unknown: webhooks === null,
+        keys, webhooks_unknown,
         scope_catalog: SCOPE_CATALOG, scope_groups: SCOPE_GROUPS, max_active_keys: MAX_ACTIVE_KEYS,
         // Quién está mirando: una key nueva actúa como esta persona. La página lo
         // usa para decir de quién son las conversaciones que leería con Messenger.

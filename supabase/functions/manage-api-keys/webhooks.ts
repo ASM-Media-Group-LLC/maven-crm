@@ -147,9 +147,16 @@ export interface Datos {
   cerrarEntrega(id: string, cambios: Record<string, unknown>): Promise<boolean>;
 }
 
-/** El ÚNICO log del módulo: dónde, y un código (el de la base o el nombre del
- *  error). Nunca el mensaje, details ni la fila. */
-function anotarFalla(donde: string, codigo: string): void {
+/** Dónde falló: una lista cerrada, para que nadie meta en el log algo del pedido
+ *  (la URL, el cuerpo) por el primer argumento. */
+type Donde =
+  | Accion
+  | "llave" | "vigencia" | "agencias" | "endpoint" | "endpoint de la llave" | "endpoints de las llaves" | "entregas"
+  | "nombres" | "alta" | "cambio" | "turno de la prueba" | "baja" | "entrega" | "cierre de la entrega";
+
+/** El ÚNICO log del módulo: dónde, y un código (el de la base, el nombre del
+ *  error o uno fijo de acá). Nunca el mensaje, details ni la fila. */
+function anotarFalla(donde: Donde, codigo: string): void {
   console.error(`[manage-api-keys] webhooks ${donde}: ${codigo}`);
 }
 
@@ -220,6 +227,16 @@ export async function webhooksDeLlaves(datos: Datos, apiKeyIds: string[]): Promi
   return new Map(filas.map((f) => [f.api_key_id, resumir(f, nombres)]));
 }
 
+/** Lo que `list` agrega: el webhook de cada llave y si se pudo saber. Con el mapa
+ *  en null (no se pudo consultar) cada llave va con webhook null Y
+ *  webhooks_unknown: la página no ofrece Registrar ni esconde Pausar. */
+export function conWebhooks<K extends { id: string }>(keys: K[], mapa: Map<string, Resumen> | null) {
+  return {
+    keys: keys.map((k) => ({ ...k, webhook: mapa?.get(k.id) ?? null })),
+    webhooks_unknown: mapa === null,
+  };
+}
+
 // ─── las acciones ────────────────────────────────────────────────────────────
 
 export interface Contexto {
@@ -238,6 +255,8 @@ export type Respuesta = { estado: number; cuerpo: Record<string, unknown> };
 export const ACCIONES_WEBHOOK = [
   "webhook_create", "webhook_test", "webhook_resume", "webhook_pause", "webhook_delete", "webhook_deliveries",
 ] as const;
+type Accion = (typeof ACCIONES_WEBHOOK)[number];
+const esAccion = (a: string): a is Accion => (ACCIONES_WEBHOOK as readonly string[]).includes(a);
 
 const MOTIVOS_URL: Record<MotivoUrl, ClaveDeMensaje> = {
   url_invalida: "webhookUrlInvalida",
@@ -284,11 +303,29 @@ function llaveUsable(k: Llave, ahoraMs: number): boolean {
 
 type ErrorDe = (estado: number, clave: ClaveDeMensaje, vars?: Record<string, string | number>) => Respuesta;
 
+/** La prueba llegó y aun así no quedó activo: el porqué, desde cómo quedó la fila. */
+function porQueNoSeActivo(fila: FilaEndpoint, cerrada: boolean, rechazo: string | null): ClaveDeMensaje {
+  if (fila.status === "active") return "webhookYaEstabaActivo";
+  if (!cerrada) return "webhookPruebaSinAnotar";
+  // Lo detuvo la base mientras salía la prueba: se dice por qué.
+  const porMotivo: Partial<Record<string, ClaveDeMensaje>> = {
+    key_revoked: "webhookLlaveNoActiva",
+    key_expired: "webhookLlaveNoActiva",
+    scope_removed: "webhookLlaveSinMessenger",
+    person_inactive: "webhookPersonaNoVigente",
+    multi_agency: "webhookVariasAgencias",
+  };
+  const motivo = fila.disabled_reason ? porMotivo[fila.disabled_reason] : undefined;
+  if (motivo) return motivo;
+  // P0001 es una regla del trigger (la llave o la persona); otro código, la base.
+  return rechazo !== null && rechazo !== "P0001" ? "webhookActivacionFallo" : "webhookNoSePudoActivar";
+}
+
 /** Despacha una acción webhook_*. Nunca tira: todo termina en una Respuesta con un
  *  mensaje en el idioma de la página. */
 export async function servirWebhook(accion: string, body: Record<string, unknown>, ctx: Contexto): Promise<Respuesta> {
   const error: ErrorDe = (estado, clave, vars) => ({ estado, cuerpo: { error: msg(ctx.idioma, clave, vars) } });
-  if (!(ACCIONES_WEBHOOK as readonly string[]).includes(accion)) return error(400, "accionDesconocida", { accion });
+  if (!esAccion(accion)) return error(400, "accionDesconocida", { accion });
   try {
     return await servir(accion, body, ctx, error);
   } catch (e) {
@@ -298,7 +335,7 @@ export async function servirWebhook(accion: string, body: Record<string, unknown
   }
 }
 
-async function servir(accion: string, body: Record<string, unknown>, ctx: Contexto, error: ErrorDe): Promise<Respuesta> {
+async function servir(accion: Accion, body: Record<string, unknown>, ctx: Contexto, error: ErrorDe): Promise<Respuesta> {
   const m = (clave: ClaveDeMensaje, vars?: Record<string, string | number>) => msg(ctx.idioma, clave, vars);
   const ahora = ctx.ahora ?? Date.now;
   const uuid = ctx.uuid ?? (() => crypto.randomUUID());
@@ -347,15 +384,25 @@ async function servir(accion: string, body: Record<string, unknown>, ctx: Contex
       secret_last4: ultimos4,
       created_by: callerId,
     });
+    let guardado: FilaEndpoint | null = alta.ok ? alta.valor : null;
     if (!alta.ok) {
       if (alta.codigo === "23505") return error(409, "webhookYaExiste");
       // Una regla del trigger: la llave, la persona o la agencia cambiaron entre
       // las comprobaciones de arriba y el insert.
       if (alta.codigo === "P0001") return error(409, "webhookReglaBase");
-      return error(500, "webhookErrorBase");
+      // Sin código = la base no contestó (un corte, un 504): el INSERT pudo haber
+      // quedado. No es un fallo, es no saber: el id es nuestro, así que se mira.
+      if (alta.codigo !== null) return error(500, "webhookErrorBase");
+      try {
+        guardado = await datos.endpoint(id);
+      } catch (e) {
+        if (e instanceof FalloDeLectura) return error(503, "webhookAltaIncierta");
+        throw e;
+      }
+      if (!guardado) return error(500, "webhookErrorBase");
     }
     // El secreto viaja UNA sola vez: después solo quedan los últimos 4.
-    return { estado: 201, cuerpo: { webhook: resumir(alta.valor), secret: secreto } };
+    return { estado: 201, cuerpo: { webhook: resumir(guardado!), secret: secreto } };
   }
 
   // Todas las demás son sobre un endpoint que ya existe (en ESTA agencia).
@@ -407,8 +454,12 @@ async function servir(accion: string, body: Record<string, unknown>, ctx: Contex
     ep.id,
     ctx.entorno,
   );
-  // Con la clave puesta y aun así no abre: el secreto guardado no sirve más.
-  if (!secreto) return error(409, "webhookSecretoIlegible");
+  // Con la clave puesta y aun así no abre: la clave del servidor cambió (o el
+  // cifrado se tocó). Le pasa a TODOS a la vez, así que queda en el log.
+  if (!secreto) {
+    anotarFalla(accion, "secreto ilegible");
+    return error(409, "webhookSecretoIlegible");
+  }
 
   // El turno, ANTES de mandar y en una sola escritura: de dos pedidos a la vez
   // pasa uno (el UPDATE toma el lock de la fila y el otro vuelve a evaluar el WHERE).
@@ -421,15 +472,17 @@ async function servir(accion: string, body: Record<string, unknown>, ctx: Contex
   // Se anota ANTES de mandar: si la función se corta a mitad, queda la prueba
   // pendiente (la limpieza de 14 días se la lleva) y no un envío sin rastro.
   if (!(await datos.crearEntrega({ id: entregaId, endpoint_id: ep.id, event_type: "webhook.test", body: cuerpo }))) {
-    return error(500, "webhookErrorBase");
+    // El trigger la rechaza si el endpoint ya no está: lo borraron en el medio.
+    return (await datos.endpoint(ep.id)) ? error(500, "webhookErrorBase") : error(404, "webhookNoExiste");
   }
   const encabezados = await encabezadosFirmados(secreto, entregaId, cuerpo, ahora());
   const resultado = await (ctx.enviar ?? enviarWebhook)({ href: ep.url, cuerpo, encabezados, resolver: ctx.resolver });
   const d = decidir(resultado);
   const llego = d.accion === "entregado";
 
-  // Primero la entrega, después el endpoint (contrato de la migración).
-  await datos.cerrarEntrega(entregaId, {
+  // Primero la entrega, después el endpoint (contrato de la migración): la base no
+  // activa sin una prueba ENTREGADA, así que el cierre tiene que haber terminado.
+  const cerrada = await datos.cerrarEntrega(entregaId, {
     attempts: 1,
     last_attempt_at: "now",
     last_status_code: d.codigo,
@@ -439,9 +492,10 @@ async function servir(accion: string, body: Record<string, unknown>, ctx: Contex
     ...(llego ? { state: "delivered", delivered_at: "now" } : { state: "dropped", drop_reason: "test_failed" }),
   });
 
-  // `actual` es la foto que devolvió la última escritura; `fresca`, si todavía vale.
-  let actual: FilaEndpoint = turno.valor;
-  let fresca = true;
+  // `actual`: la fila que devolvió la última escritura DESPUÉS de mandar, o null si
+  // hay que releerla. La del turno no sirve: es de antes de mandar (hasta 10 s), y
+  // en el medio otra admin pudo pausarlo o borrarlo, o la base detenerlo.
+  let actual: FilaEndpoint | null = null;
   // En uno recién registrado la prueba es toda su historia: se anota, y explica por
   // qué no se activó. En activo, pausado o detenido los last_* son del despachador
   // (por qué se detuvo, el último timbre): la prueba no los pisa; queda en su fila
@@ -453,16 +507,16 @@ async function servir(accion: string, body: Record<string, unknown>, ctx: Contex
       last_error: d.error,
       ...(llego ? { last_success_at: "now" } : {}),
     }, ["pending"]);
-    if (anotado.ok && anotado.valor) actual = anotado.valor;
-    else fresca = false;
+    actual = anotado.ok ? anotado.valor : null;
   }
 
   // La prueba ACTIVA solo un endpoint recién registrado; en uno activo, pausado o
   // detenido es solo "¿llega?". Reanudar es la otra acción.
   let activado = false;
-  let aviso: string | null = null;
+  let rechazo: string | null = null; // el código, si la base no dejó activar
   const debeActivar = llego && (reanudar ? parado : ep.status === "pending");
-  if (debeActivar) {
+  // Si la entrega no quedó cerrada, la base no va a activar: ni se intenta.
+  if (debeActivar && cerrada) {
     const r = await datos.actualizarEndpoint(ep.id, {
       status: "active",
       paused_at: null,
@@ -476,20 +530,17 @@ async function servir(accion: string, body: Record<string, unknown>, ctx: Contex
       // de fallos): si no, seguiría mostrando el error por el que se detuvo.
       ...(reanudar ? { last_attempt_at: "now", last_success_at: "now", last_status_code: d.codigo, last_error: null } : {}),
     }, reanudar ? ["paused", "disabled"] : ["pending"]);
-    if (r.ok && r.valor) {
-      actual = r.valor;
-      fresca = true;
-      activado = true;
-    } else {
-      fresca = false;
-    }
+    actual = r.ok ? r.valor : null;
+    activado = actual !== null;
+    if (!r.ok) rechazo = r.codigo ?? "sin código";
   }
 
-  // Si una escritura no devolvió la fila (otro la movió en el medio, o la base no
-  // dejó activar), se vuelve a leer: la respuesta cuenta cómo quedó DE VERDAD. La
-  // prueba ya salió: si la relectura falla, se contesta igual, sin el webhook.
+  // Si después de mandar ninguna escritura devolvió la fila (no hubo ninguna, otro
+  // la movió en el medio, o la base no dejó activar), se vuelve a leer: la
+  // respuesta cuenta cómo quedó DE VERDAD. La prueba ya salió: si la relectura
+  // falla, se contesta igual, con webhook null y el aviso de que no se sabe.
   let webhook: FilaEndpoint | null | undefined = actual;
-  if (!fresca) {
+  if (!webhook) {
     try {
       webhook = await datos.endpoint(ep.id);
     } catch (e) {
@@ -498,11 +549,9 @@ async function servir(accion: string, body: Record<string, unknown>, ctx: Contex
     }
     if (webhook === null) return error(404, "webhookNoExiste");
   }
-  if (debeActivar && !activado) {
-    aviso = webhook === undefined
-      ? m("webhookErrorLectura")
-      : m(webhook.status === "active" ? "webhookYaEstabaActivo" : "webhookNoSePudoActivar");
-  }
+  let aviso: string | null = null;
+  if (webhook === undefined) aviso = m("webhookErrorLectura");
+  else if (debeActivar && !activado) aviso = m(porQueNoSeActivo(webhook, cerrada, rechazo));
 
   return {
     estado: 200,
@@ -540,19 +589,19 @@ export const COLS_ENTREGA = CLAVES_ENTREGA.join(", ");
  *  `.eq("tenant_id", tenantId)`: esta función usa service_role, que salta la RLS.
  *  Un test lo verifica sentencia por sentencia, y otro con un cliente que anota. */
 export function crearDatos(admin: Cliente, tenantId: string): Datos {
-  const falla = (donde: string, e: ErrorDeLaBase) => {
+  const falla = (donde: Donde, e: ErrorDeLaBase) => {
     // Solo el código: error.details trae la fila (con la URL y el secreto cifrado).
     if (e) anotarFalla(donde, e.code || "sin código");
   };
   /** Una lectura: si la base falló, se anota y se corta (FalloDeLectura). */
-  const leido = <T>(donde: string, e: ErrorDeLaBase, valor: T): T => {
+  const leido = <T>(donde: Donde, e: ErrorDeLaBase, valor: T): T => {
     if (e) {
       falla(donde, e);
       throw new FalloDeLectura(donde);
     }
     return valor;
   };
-  const escrito = <T>(donde: string, e: ErrorDeLaBase, valor: T): Escritura<T> => {
+  const escrito = <T>(donde: Donde, e: ErrorDeLaBase, valor: T): Escritura<T> => {
     falla(donde, e);
     return e ? { ok: false, codigo: e.code || null } : { ok: true, valor };
   };

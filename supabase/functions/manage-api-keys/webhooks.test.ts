@@ -10,6 +10,7 @@ import {
   ARRANQUE_MS,
   CLAVES_ENTREGA,
   COLS_ENTREGA,
+  conWebhooks,
   type Contexto,
   crearDatos,
   type Datos,
@@ -88,6 +89,11 @@ function baseFalsa(o: Opciones = {}) {
       escrituras.push(`actualizarEndpoint ${JSON.stringify({ cambios, siEstado })}`);
       if (cfg.falla.actualizarEndpoint && "status" in cambios) return Promise.resolve({ ok: false as const, codigo: cfg.falla.actualizarEndpoint });
       const e = endpoints.get(id);
+      // Como el trigger: sin una prueba ENTREGADA de ese endpoint, no se activa.
+      if (e && cambios.status === "active" && e.status !== "active" && siEstado.includes(e.status) &&
+        !entregas.some((d) => d.endpoint_id === id && d.event_type === "webhook.test" && d.state === "delivered")) {
+        return Promise.resolve({ ok: false as const, codigo: "P0001" });
+      }
       if (!e || !siEstado.includes(e.status)) return Promise.resolve({ ok: true as const, valor: null });
       const nuevo = { ...e, ...cambios } as FilaEndpoint;
       endpoints.set(id, nuevo);
@@ -508,6 +514,207 @@ Deno.test("carrera: si la relectura falla después de mandar, se contesta igual 
   assertEquals([r.estado, r.cuerpo.webhook, prueba(r).delivered, prueba(r).notice], [200, null, true, es("webhookErrorLectura")]);
 });
 
+
+// ─── lo que pasa MIENTRAS sale la prueba ─────────────────────────────────────
+
+Deno.test("carrera: sobre un activo, pausado o detenido, si lo borran mientras sale → 404; si lo pausan o lo detienen, el estado real", async () => {
+  for (const estado of ["active", "paused", "disabled"] as Estado[]) {
+    const extra = estado === "disabled" ? { disabled_reason: "receiver_failing", disabled_at: "x" } : {};
+    const a = await enEstado(estado, extra);
+    const r = await servirWebhook("webhook_test", { id: a.id }, { ...a.ctx, enviar: envio(a.ctx, () => (a.base.endpoints.delete(a.id), Promise.resolve(OK_204))) });
+    assertEquals([r.estado, r.cuerpo.error], [404, es("webhookNoExiste")], `${estado}: borrado`);
+  }
+  const b = await enEstado("active");
+  const pausada = await servirWebhook("webhook_test", { id: b.id }, {
+    ...b.ctx,
+    enviar: envio(b.ctx, () => (b.base.endpoints.set(b.id, { ...fila(b.base, b.id), status: "paused", paused_by: OTRA_ADMIN, paused_at: "t" }), Promise.resolve(OK_204))),
+  });
+  assertEquals((pausada.cuerpo.webhook as Record<string, unknown>).status, "paused");
+  assertEquals((pausada.cuerpo.webhook as Record<string, unknown>).paused_by, { id: OTRA_ADMIN, name: "Ana" });
+  const c = await enEstado("active");
+  const detenida = await servirWebhook("webhook_test", { id: c.id }, {
+    ...c.ctx,
+    enviar: envio(c.ctx, () => (c.base.endpoints.set(c.id, { ...fila(c.base, c.id), status: "disabled", disabled_reason: "key_revoked", disabled_at: "t" }), Promise.resolve(OK_204))),
+  });
+  assertEquals([(detenida.cuerpo.webhook as Record<string, unknown>).status, prueba(detenida).notice], ["disabled", null]);
+});
+
+Deno.test("carrera: reanudar que no llega y lo borran mientras sale → 404", async () => {
+  const a = await enEstado("paused", { paused_at: "x", paused_by: OTRA_ADMIN });
+  const r = await servirWebhook("webhook_resume", { id: a.id }, {
+    ...a.ctx,
+    enviar: envio(a.ctx, () => (a.base.endpoints.delete(a.id), Promise.resolve<Resultado>({ tipo: "respuesta", estado: 503, retryAfterS: null, latenciaMs: 3 }))),
+  });
+  assertEquals([r.estado, r.cuerpo.error], [404, es("webhookNoExiste")]);
+});
+
+Deno.test("carrera: si mientras sale una prueba que FALLA otro lo activa y el despachador anota, no le pisa los last_* y cuenta el estado real", async () => {
+  const x = await registrar();
+  const r = await servirWebhook("webhook_test", { id: x.id }, {
+    ...x.ctx,
+    enviar: envio(x.ctx, () => {
+      x.base.endpoints.set(x.id, { ...fila(x.base, x.id), status: "active", last_attempt_at: "t-despachador", last_status_code: 500, last_error: "http_500" });
+      return Promise.resolve<Resultado>({ tipo: "respuesta", estado: 401, retryAfterS: null, latenciaMs: 5 });
+    }),
+  });
+  assertEquals([r.estado, prueba(r).delivered, prueba(r).activated, prueba(r).notice], [200, false, false, null]);
+  const f = fila(x.base, x.id);
+  assertEquals([f.status, f.last_attempt_at, f.last_status_code, f.last_error], ["active", "t-despachador", 500, "http_500"], "la anotación va SOLO sobre pending");
+  const w = r.cuerpo.webhook as Record<string, unknown>;
+  assertEquals([w.status, w.last_status_code], ["active", 500], "la respuesta cuenta cómo quedó, no la foto de antes de mandar");
+
+  const y = await registrar();
+  const borrada = await servirWebhook("webhook_test", { id: y.id }, {
+    ...y.ctx,
+    enviar: envio(y.ctx, () => (y.base.endpoints.delete(y.id), Promise.resolve<Resultado>({ tipo: "respuesta", estado: 401, retryAfterS: null, latenciaMs: 5 }))),
+  });
+  assertEquals([borrada.estado, borrada.cuerpo.error], [404, es("webhookNoExiste")]);
+});
+
+Deno.test("carrera: si la relectura falla, el aviso dice que no se sabe SIEMPRE (webhook null solo se leería como 'sin webhook')", async () => {
+  const x = await registrar();
+  const r = await servirWebhook("webhook_test", { id: x.id }, {
+    ...x.ctx,
+    enviar: envio(x.ctx, () => {
+      x.base.endpoints.set(x.id, { ...fila(x.base, x.id), status: "active" });
+      x.base.datos.endpoint = () => Promise.reject(new FalloDeLectura("endpoint"));
+      return Promise.resolve<Resultado>({ tipo: "respuesta", estado: 401, retryAfterS: null, latenciaMs: 5 });
+    }),
+  });
+  assertEquals([r.estado, prueba(r).delivered, r.cuerpo.webhook, prueba(r).notice], [200, false, null, es("webhookErrorLectura")]);
+  const a = await enEstado("active");
+  const r2 = await servirWebhook("webhook_test", { id: a.id }, {
+    ...a.ctx,
+    enviar: envio(a.ctx, () => ((a.base.datos.endpoint = () => Promise.reject(new FalloDeLectura("endpoint"))), Promise.resolve(OK_204))),
+  });
+  assertEquals([r2.estado, r2.cuerpo.webhook, prueba(r2).notice], [200, null, es("webhookErrorLectura")]);
+});
+
+Deno.test("carrera: reanudar y le revocan la llave mientras sale → dice por qué no se activó (la llave), con el detenido", async () => {
+  const casos: Array<[string, ClaveDeMensaje]> = [
+    ["key_revoked", "webhookLlaveNoActiva"], ["key_expired", "webhookLlaveNoActiva"], ["scope_removed", "webhookLlaveSinMessenger"],
+    ["person_inactive", "webhookPersonaNoVigente"], ["multi_agency", "webhookVariasAgencias"],
+  ];
+  for (const [motivo, clave] of casos) {
+    const a = await enEstado("paused", { paused_at: "x", paused_by: OTRA_ADMIN });
+    const r = await servirWebhook("webhook_resume", { id: a.id }, {
+      ...a.ctx,
+      enviar: envio(a.ctx, () => {
+        // La base lo detiene, y por eso mismo después no deja activarlo (P0001).
+        a.base.endpoints.set(a.id, { ...fila(a.base, a.id), status: "disabled", disabled_reason: motivo, disabled_at: "t", paused_at: null, paused_by: null });
+        a.base.cfg.falla = { actualizarEndpoint: "P0001" };
+        return Promise.resolve(OK_204);
+      }),
+    });
+    assertEquals([r.estado, prueba(r).activated, prueba(r).notice], [200, false, es(clave)], motivo);
+    assertEquals((r.cuerpo.webhook as Record<string, unknown>).disabled_reason, motivo);
+  }
+});
+
+Deno.test("activar: la base rechaza por otra cosa que una regla (no P0001) → 'probá de nuevo', no culpa a la llave", async () => {
+  const { ctx, id } = await enEstado("paused", { paused_at: "x", paused_by: OTRA_ADMIN }, { falla: { actualizarEndpoint: "57014" } });
+  const r = await servirWebhook("webhook_resume", { id }, ctx);
+  assertEquals([r.estado, prueba(r).activated, prueba(r).notice], [200, false, es("webhookActivacionFallo")]);
+});
+
+Deno.test("prueba: el endpoint se toca recién con la entrega CERRADA (la base no activa sin una prueba entregada)", async () => {
+  for (const [estado, accion] of [["pending", "webhook_test"], ["paused", "webhook_resume"]] as const) {
+    const { base, ctx, id } = await enEstado(estado, estado === "paused" ? { paused_at: "x", paused_by: OTRA_ADMIN } : {});
+    const cerrar = base.datos.cerrarEntrega;
+    base.datos.cerrarEntrega = async (i, c) => {
+      await new Promise((r) => setTimeout(r, 5)); // la base tarda en contestar
+      return cerrar(i, c);
+    };
+    const r = await servirWebhook(accion, { id }, ctx);
+    assertEquals([prueba(r).activated, prueba(r).notice, fila(base, id).status], [true, null, "active"], accion);
+  }
+});
+
+Deno.test("prueba: si no se pudo cerrar la entrega, ni se intenta activar, y el aviso lo dice", async () => {
+  for (const [estado, accion] of [["pending", "webhook_test"], ["paused", "webhook_resume"]] as const) {
+    const { base, ctx, id } = await enEstado(estado, estado === "paused" ? { paused_at: "x", paused_by: OTRA_ADMIN } : {});
+    base.datos.cerrarEntrega = () => Promise.resolve(false);
+    const r = await servirWebhook(accion, { id }, ctx);
+    assertEquals([r.estado, prueba(r).delivered, prueba(r).activated, prueba(r).notice], [200, true, false, es("webhookPruebaSinAnotar")], accion);
+    assert(!base.escrituras.some((x) => x.includes('"status":"active"')), `${accion}: no se intentó activar`);
+    assertEquals(fila(base, id).status, estado);
+  }
+});
+
+Deno.test("prueba: si la entrega no se pudo anotar porque lo borraron, 404; si sigue ahí, 500", async () => {
+  const a = await registrar();
+  a.base.datos.crearEntrega = () => (a.base.endpoints.delete(a.id), Promise.resolve(false));
+  const r = await servirWebhook("webhook_test", { id: a.id }, a.ctx);
+  assertEquals([r.estado, r.cuerpo.error, a.ctx.envios.length], [404, es("webhookNoExiste"), 0]);
+});
+
+Deno.test("prueba: el cuerpo y la firma llevan la hora de AHORA (un receptor rechaza una firma vieja)", async () => {
+  const { ctx, id } = await registrar();
+  await servirWebhook("webhook_test", { id }, ctx);
+  const e = ctx.envios[0];
+  assertEquals(e.encabezados["webhook-timestamp"], String(Math.floor(AHORA / 1000)), "en segundos, de ahora");
+  assertEquals(JSON.parse(e.cuerpo).created_at, new Date(AHORA).toISOString());
+});
+
+Deno.test("prueba que contesta 300: no es 'entregada' (un 3xx no se sigue y cuenta como fallo)", async () => {
+  const { ctx, id } = await registrar();
+  const r = await servirWebhook("webhook_test", { id }, { ...ctx, enviar: envio(ctx, { tipo: "respuesta", estado: 300, retryAfterS: null, latenciaMs: 5 }) });
+  assertEquals([prueba(r).delivered, prueba(r).message], [false, es("webhookPruebaHttp", { codigo: 300 })]);
+});
+
+Deno.test("prueba sobre un pausado: la respuesta trae cuándo y quién (con nombre) lo pausó", async () => {
+  const { ctx, id } = await enEstado("paused", { paused_at: "t-pausa", paused_by: OTRA_ADMIN });
+  const r = await servirWebhook("webhook_test", { id }, ctx);
+  const w = r.cuerpo.webhook as Record<string, unknown>;
+  assertEquals([w.status, w.paused_at, w.paused_by], ["paused", "t-pausa", { id: OTRA_ADMIN, name: "Ana" }]);
+});
+
+Deno.test("secreto que no abre con la clave actual: 409, y queda en el log (le pasa a todos a la vez)", async () => {
+  const { ctx, id } = await enEstado("active");
+  const logs: string[] = [];
+  const original = console.error;
+  console.error = (...a: unknown[]) => void logs.push(a.map(String).join(" "));
+  try {
+    const r = await servirWebhook("webhook_test", { id }, { ...ctx, entorno: (v) => (v === "WEBHOOK_SIGNING_KEK" ? "z".repeat(40) : undefined) });
+    assertEquals([r.estado, r.cuerpo.error], [409, es("webhookSecretoIlegible")]);
+  } finally {
+    console.error = original;
+  }
+  assertEquals(logs, ["[manage-api-keys] webhooks webhook_test: secreto ilegible"]);
+});
+
+// ─── alta: lo que no se sabe ─────────────────────────────────────────────────
+
+Deno.test("alta: se resuelve el HOST de la URL (no la URL entera, que lleva el token)", async () => {
+  const pedidos: string[] = [];
+  const r = await servirWebhook("webhook_create", { key_id: LLAVE, url: URL_OK }, contexto(baseFalsa(), {
+    resolver: (h) => (pedidos.push(h), Promise.resolve(["93.184.216.34"])),
+  }));
+  assertEquals(r.estado, 201);
+  assertEquals([...new Set(pedidos)], ["hooks.integrador.com"]);
+});
+
+Deno.test("alta: si la base no contestó el INSERT (sin código), se mira: guardado → 201 con el secreto; no está → 500; no se puede mirar → 503", async () => {
+  // Guardó, pero la respuesta se perdió.
+  const g = baseFalsa();
+  const crear = g.datos.crearEndpoint;
+  g.datos.crearEndpoint = async (f) => (await crear(f), { ok: false as const, codigo: null });
+  const r = await servirWebhook("webhook_create", { key_id: LLAVE, url: URL_OK }, contexto(g));
+  assertEquals(r.estado, 201);
+  const secreto = r.cuerpo.secret as string;
+  assertEquals(fila(g, (r.cuerpo.webhook as { id: string }).id).secret_last4, secreto.slice(-4), "el secreto es el de la fila que quedó");
+  // No guardó.
+  const n = baseFalsa();
+  n.datos.crearEndpoint = () => Promise.resolve({ ok: false as const, codigo: null });
+  const r2 = await servirWebhook("webhook_create", { key_id: LLAVE, url: URL_OK }, contexto(n));
+  assertEquals([r2.estado, r2.cuerpo.error, "secret" in r2.cuerpo], [500, es("webhookErrorBase"), false]);
+  // No se puede saber.
+  const u = baseFalsa();
+  u.datos.crearEndpoint = () => ((u.cfg.falla = { endpoint: "x" }), Promise.resolve({ ok: false as const, codigo: null }));
+  const r3 = await servirWebhook("webhook_create", { key_id: LLAVE, url: URL_OK }, contexto(u));
+  assertEquals([r3.estado, r3.cuerpo.error, "secret" in r3.cuerpo], [503, es("webhookAltaIncierta"), false]);
+});
+
 // ─── pausar, borrar, entregas ────────────────────────────────────────────────
 
 Deno.test("pausar: cualquier admin, solo un activo, y queda quién", async () => {
@@ -565,6 +772,18 @@ Deno.test("entregas: solo las columnas de la lista (nunca el cuerpo firmado, el 
   assert(!JSON.stringify(r.cuerpo).includes("mvk_live_ab12cd"), "ni rastro del cuerpo firmado (lleva el prefijo de la llave)");
   for (const prohibida of ["body", "tenant_id", "endpoint_id"]) assert(!(CLAVES_ENTREGA as readonly string[]).includes(prohibida), prohibida);
   assertEquals(COLS_ENTREGA.split(", "), [...CLAVES_ENTREGA]);
+});
+
+Deno.test("entregas: lo que la página necesita para pintar cada fila, con sus valores", async () => {
+  const { base, ctx, id } = await registrar();
+  await servirWebhook("webhook_test", { id }, { ...ctx, enviar: envio(ctx, { tipo: "incierto", clase: "plazo", latenciaMs: 10_000 }) });
+  base.entregas[0].created_at = "t-creada";
+  const r = await servirWebhook("webhook_deliveries", { id }, { ...ctx, callerId: OTRA_ADMIN });
+  assertEquals((r.cuerpo.deliveries as unknown[])[0], {
+    id: base.entregas[0].id, event_type: "webhook.test", message_count: null, state: "dropped", drop_reason: "test_failed",
+    attempts: 1, last_attempt_at: "now", last_status_code: null, last_error: "plazo", latency_ms: 10_000, uncertain: true,
+    created_at: "t-creada", delivered_at: null,
+  });
 });
 
 Deno.test("los errores de la base: escribir → 500; leer → 503 y nunca 'no existe' (ni en pausar, borrar, entregas o probar)", async () => {
@@ -635,6 +854,16 @@ Deno.test("list: el webhook de cada llave, sin URL ni secreto, con quién lo pau
   assertEquals(await webhooksDeLlaves(base.datos, [LLAVE]), null, "no se sabe ≠ sin webhook");
 });
 
+Deno.test("list: conWebhooks pone el webhook de cada llave; sin mapa, todas en null Y webhooks_unknown", async () => {
+  const { base } = await registrar();
+  const mapa = (await webhooksDeLlaves(base.datos, [LLAVE]))!;
+  const keys = [{ id: LLAVE, name: "a" }, { id: LLAVE_SIN_MSG, name: "b" }];
+  const bien = conWebhooks(keys, mapa);
+  assertEquals([bien.webhooks_unknown, bien.keys[0].webhook?.api_key_id, bien.keys[1].webhook, bien.keys[0].name], [false, LLAVE, null, "a"]);
+  const noSe = conWebhooks(keys, null);
+  assertEquals([noSe.webhooks_unknown, noSe.keys.map((k) => k.webhook)], [true, [null, null]]);
+});
+
 Deno.test("resumen: exactamente estos campos, con los valores de la fila (lo que pinta el chip de estado)", async () => {
   const { base, r, id } = await registrar();
   const f = fila(base, id);
@@ -644,11 +873,11 @@ Deno.test("resumen: exactamente estos campos, con los valores de la fila (lo que
     last_attempt_at: null, last_success_at: null, last_status_code: null, last_error: null, last_test_at: null,
     consecutive_failures: 0, failing_since: null, next_attempt_at: null,
   });
-  base.endpoints.set(id, { ...f, status: "disabled", disabled_reason: "receiver_gone", disabled_at: "t", exclude_own: false, last_error: "http_410", last_status_code: 410, consecutive_failures: 3, failing_since: "f", next_attempt_at: "n", last_test_at: "p", last_attempt_at: "a", last_success_at: "s" });
+  base.endpoints.set(id, { ...f, status: "disabled", disabled_reason: "receiver_gone", disabled_at: "t", exclude_own: false, last_error: "http_410", last_status_code: 410, consecutive_failures: 3, failing_since: "f", next_attempt_at: "n", last_test_at: "p", last_attempt_at: "a", last_success_at: "s", paused_at: "pa" });
   const w = (await webhooksDeLlaves(base.datos, [LLAVE]))!.get(LLAVE)!;
   assertEquals(
-    [w.status, w.disabled_reason, w.disabled_at, w.exclude_own, w.last_error, w.last_status_code, w.consecutive_failures, w.failing_since, w.next_attempt_at, w.last_test_at, w.last_attempt_at, w.last_success_at],
-    ["disabled", "receiver_gone", "t", false, "http_410", 410, 3, "f", "n", "p", "a", "s"],
+    [w.status, w.disabled_reason, w.disabled_at, w.exclude_own, w.last_error, w.last_status_code, w.consecutive_failures, w.failing_since, w.next_attempt_at, w.last_test_at, w.last_attempt_at, w.last_success_at, w.paused_at],
+    ["disabled", "receiver_gone", "t", false, "http_410", 410, 3, "f", "n", "p", "a", "s", "pa"],
   );
 });
 
@@ -670,8 +899,10 @@ Deno.test("el secreto aparece SOLO en la respuesta del alta", async () => {
 const AGENCIA = "ffffffff-0000-4000-8000-000000000001";
 const EP = "dddddddd-0000-4000-8000-000000000099";
 type Llamada = [string, ...unknown[]];
-/** Un cliente de supabase-js que anota cada llamada de la cadena y contesta `respuesta`. */
-function clienteGrabador(respuesta: { data?: unknown; error?: unknown; count?: number | null } = {}) {
+type RespuestaFalsa = { data?: unknown; error?: unknown; count?: number | null };
+/** Un cliente de supabase-js que anota cada llamada de la cadena y contesta
+ *  `respuesta` (o lo que devuelva, según la tabla y las llamadas). */
+function clienteGrabador(respuesta: RespuestaFalsa | ((tabla: string, llamadas: Llamada[]) => RespuestaFalsa) = {}) {
   const consultas: { tabla: string; llamadas: Llamada[] }[] = [];
   const cadena = (tabla: string, primera?: Llamada) => {
     const c = { tabla, llamadas: (primera ? [primera] : []) as Llamada[] };
@@ -679,7 +910,7 @@ function clienteGrabador(respuesta: { data?: unknown; error?: unknown; count?: n
     const p: unknown = new Proxy({}, {
       get(_, prop) {
         if (prop === "then") {
-          const r = Promise.resolve({ data: null, error: null, count: null, ...respuesta });
+          const r = Promise.resolve({ data: null, error: null, count: null, ...(typeof respuesta === "function" ? respuesta(tabla, c.llamadas) : respuesta) });
           return r.then.bind(r);
         }
         return (...args: unknown[]) => (c.llamadas.push([String(prop), ...args]), p);
@@ -817,6 +1048,101 @@ Deno.test("crearDatos: con la base fallando, lo que la base trae en message/deta
   }
 });
 
+const columnasDe = (ll: Llamada[]) => String(ll.find((l) => l[0] === "select")?.[1] ?? "").split(",").map((x) => x.trim()).sort();
+/** Todas las de FilaEndpoint y Llave: si la interfaz gana un campo, esto no compila hasta sumarlo. */
+const COLUMNAS_FILA = Object.keys({
+  id: 1, api_key_id: 1, acts_as_user_id: 1, url: 1, url_host: 1, exclude_own: 1, status: 1, disabled_reason: 1, disabled_at: 1,
+  paused_by: 1, paused_at: 1, secret_cipher: 1, secret_nonce: 1, secret_key_version: 1, secret_last4: 1, next_attempt_at: 1,
+  consecutive_failures: 1, failing_since: 1, last_attempt_at: 1, last_success_at: 1, last_status_code: 1, last_error: 1,
+  last_test_at: 1, created_by: 1, created_at: 1,
+} satisfies Record<keyof FilaEndpoint, 1>).sort();
+const COLUMNAS_LLAVE = Object.keys({ id: 1, key_prefix: 1, scopes: 1, expires_at: 1, revoked_at: 1, acts_as_user_id: 1 } satisfies Record<keyof Llave, 1>).sort();
+
+Deno.test("crearDatos: cada lectura pide las columnas que el módulo usa, por su clave, y 0 filas es 'no hay' (maybeSingle)", async () => {
+  const g = clienteGrabador({ data: null });
+  const d = crearDatos(g.cliente, AGENCIA);
+  await d.llave(LLAVE); await d.endpoint(EP); await d.endpointDeLlave(LLAVE); await d.endpointsDeLlaves([LLAVE]);
+  assertEquals(g.consultas.map((c) => c.tabla), ["api_keys", "api_webhook_endpoints", "api_webhook_endpoints", "api_webhook_endpoints"]);
+  const [llaveLl, endpoint, deLlave, deLlaves] = g.consultas.map((c) => c.llamadas);
+  assertEquals(columnasDe(llaveLl), COLUMNAS_LLAVE);
+  for (const ll of [endpoint, deLlave, deLlaves]) assertEquals(columnasDe(ll), COLUMNAS_FILA);
+  assert(tiene(llaveLl, "eq", "id", LLAVE), "la llave, por su id");
+  assert(tiene(endpoint, "eq", "id", EP), "el endpoint, por su id");
+  assert(tiene(deLlave, "eq", "api_key_id", LLAVE), "el de la llave, por api_key_id");
+  for (const ll of [llaveLl, endpoint, deLlave]) {
+    assert(tiene(ll, "maybeSingle") && !tiene(ll, "single"), "con .single(), 0 filas es un error (PGRST116): 'no existe' pasaría a 503");
+  }
+  const v = clienteGrabador({ data: true });
+  await crearDatos(v.cliente, AGENCIA).llaveVigente(LLAVE);
+  assertEquals(v.consultas.map((c) => c.tabla), ["rpc:api_key_vigente"], "persona Y agencia de la llave");
+});
+
+Deno.test("crearDatos: las escrituras que el módulo lee después PIDEN la fila (sin .select, supabase-js devuelve data null)", async () => {
+  const g = clienteGrabador({ data: null });
+  const d = crearDatos(g.cliente, AGENCIA);
+  await d.crearEndpoint({ id: EP }); await d.actualizarEndpoint(EP, {}, ["active"]); await d.reservarPrueba(EP, 0); await d.borrarEndpoint(EP);
+  const [alta, cambio, turno, baja] = g.consultas.map((c) => c.llamadas);
+  for (const ll of [alta, cambio, turno]) assertEquals(columnasDe(ll), COLUMNAS_FILA);
+  assert(tiene(alta, "single"), "el alta devuelve UNA fila");
+  assert(tiene(baja, "select", "id"), "sin .select, delete devuelve data null y todo borrado sería 404");
+  const fila1 = { id: EP } as unknown as FilaEndpoint;
+  assertEquals(await crearDatos(clienteGrabador({ data: { id: EP } }).cliente, AGENCIA).crearEndpoint({ id: EP }), { ok: true, valor: fila1 });
+  const conFila = crearDatos(clienteGrabador({ data: [{ id: EP }] }).cliente, AGENCIA);
+  assertEquals(await conFila.actualizarEndpoint(EP, { status: "paused" }, ["active"]), { ok: true, valor: fila1 });
+  assertEquals(await conFila.borrarEndpoint(EP), true);
+  assertEquals(await crearDatos(clienteGrabador({ data: [] }).cliente, AGENCIA).borrarEndpoint(EP), false, "0 filas borradas = no estaba");
+});
+
+Deno.test("crearDatos: la entrega se anota y se cierra con lo que se le pasa (si no, la prueba queda pending y la base no activa)", async () => {
+  const g = clienteGrabador({ data: null });
+  const d = crearDatos(g.cliente, AGENCIA);
+  await d.crearEntrega({ id: EP, event_type: "webhook.test" });
+  await d.cerrarEntrega(EP, { attempts: 1, state: "delivered", delivered_at: "now" });
+  assert(tiene(g.consultas[0].llamadas, "insert", { id: EP, event_type: "webhook.test", tenant_id: AGENCIA }));
+  assert(tiene(g.consultas[1].llamadas, "update", { attempts: 1, state: "delivered", delivered_at: "now" }), JSON.stringify(g.consultas[1].llamadas));
+});
+
+Deno.test("crearDatos: con las lecturas bien y las ESCRITURAS fallando, nada de lo que trae la base sale (ni en la respuesta ni en el log)", async () => {
+  const MARCA = "MARCA-7c1e";
+  const { base, id } = await enEstado("active");
+  const ep = fila(base, id);
+  const esEscritura = (ll: Llamada[]) => ll.some((l) => l[0] === "insert" || l[0] === "update" || l[0] === "delete");
+  const g = clienteGrabador((tabla, ll) => {
+    if (esEscritura(ll)) {
+      // El turno pasa (para llegar a la entrega); el resto de las escrituras falla.
+      if (tabla === "api_webhook_endpoints" && tiene(ll, "update", { last_test_at: "now" })) return { data: [ep] };
+      return { error: { code: "XX000", message: MARCA, details: `${MARCA} ${URL_OK}`, hint: MARCA } };
+    }
+    if (tabla === "api_keys") return { data: llave() };
+    if (tabla === "rpc:api_key_vigente") return { data: true };
+    if (tabla === "tenants") return { count: 1 };
+    if (tabla === "api_webhook_endpoints") return { data: tiene(ll, "eq", "api_key_id", LLAVE) ? null : ep };
+    return { data: [] };
+  });
+  const logs: string[] = [];
+  const original = console.error;
+  console.error = (...a: unknown[]) => void logs.push(a.map(String).join(" "));
+  const estados: number[] = [];
+  try {
+    const ctx = contexto(baseFalsa(), { datos: crearDatos(g.cliente, AGENCIA) });
+    for (const accion of ["webhook_create", "webhook_test", "webhook_pause", "webhook_delete"]) {
+      const r = await servirWebhook(accion, { id, key_id: LLAVE, url: URL_OK }, { ...ctx, callerId: DUENA });
+      estados.push(r.estado);
+      const texto = JSON.stringify(r.cuerpo);
+      assert(!texto.includes(MARCA) && !texto.includes("secreto123"), accion);
+    }
+  } finally {
+    console.error = original;
+  }
+  assertEquals(estados, [500, 500, 500, 500]);
+  assertEquals(logs, [
+    "[manage-api-keys] webhooks alta: XX000",
+    "[manage-api-keys] webhooks entrega: XX000",
+    "[manage-api-keys] webhooks cambio: XX000",
+    "[manage-api-keys] webhooks baja: XX000",
+  ]);
+});
+
 // ─── estructura ──────────────────────────────────────────────────────────────
 
 const FUENTE = Deno.readTextFileSync(new URL("./webhooks.ts", import.meta.url));
@@ -841,12 +1167,14 @@ Deno.test("estructura: cada consulta a api_keys y api_webhook_* va atada a la ag
 });
 
 Deno.test("estructura: UN solo log en el módulo, y lleva dónde + un código (de la base o el nombre del error)", () => {
-  const logs = [...CODIGO.matchAll(/console\.\w+\(/g)];
-  assertEquals(logs.length, 1, "un solo console.* (anotarFalla)");
+  assertEquals([...CODIGO.matchAll(/\bconsole\b/g)].length, 1, "un solo console (anotarFalla)");
   assert(CODIGO.includes("console.error(`[manage-api-keys] webhooks ${donde}: ${codigo}`);"));
   // Y a anotarFalla solo le llega un código: el de la base o el nombre del error.
   const codigos = [...CODIGO.matchAll(/(?<!function )anotarFalla\(\w+, ([^;]*)\);/g)].map((m) => m[1]).sort();
-  assertEquals(codigos, ['(e as Error)?.name || "sin nombre"', 'e.code || "sin código"']);
+  assertEquals(codigos, ['"secreto ilegible"', '(e as Error)?.name || "sin nombre"', 'e.code || "sin código"']);
+  // Y el `donde` de falla/leido/escrito es siempre un texto fijo (además, el tipo Donde).
+  const sueltos = [...CODIGO.matchAll(/\b(?:falla|leido|escrito)\((?!"[a-z ]+",|donde, e\))/g)].map((x) => x[0]);
+  assertEquals(sueltos, [], "un `donde` que no es un texto fijo");
   assert(!/\.details\b/.test(CODIGO), "error.details trae la fila entera (con la URL y el secreto cifrado)");
   assert(!/\.message\b/.test(CODIGO), "error.message no se devuelve ni se loguea");
   assert(!/\.hint\b/.test(CODIGO));
@@ -856,11 +1184,17 @@ Deno.test("estructura: la rama de webhooks de index.ts no loguea nada ni arma re
   const index = Deno.readTextFileSync(new URL("./index.ts", import.meta.url));
   const desde = index.indexOf("// === WEBHOOKS");
   assert(desde > 0);
-  const rama = index.slice(desde, index.indexOf("accionDesconocida", desde));
-  assert(!/console\./.test(rama), rama);
+  const rama = index.slice(desde, index.indexOf("\n    }\n", desde));
+  assert(!/console/.test(rama), rama);
+  assertEquals([...rama.matchAll(/json\(/g)].length, 1, "una sola respuesta: la del módulo");
   assert(rama.includes("return json(req, r.cuerpo, r.estado);"));
+  assert(!/\btry\b|\bcatch\b/.test(rama), "sin un catch propio que arme otra respuesta");
 });
 
 Deno.test("estructura: todos los textos salen por los mensajes (nada escrito a mano)", () => {
-  assertEquals([...CODIGO.matchAll(/\b(error|mensaje|aviso|message|notice):\s*["'`]/g)].map((m) => m[0]), [], "hay un texto escrito a mano");
+  assertEquals([...CODIGO.matchAll(/\b(error|message|notice):(?!\s*(?:msg\(|m\(|mensajeDePrueba\(|aviso\b|null\b|ErrorDe\b))/g)].map((x) => x[0]), [], "hay un texto que no sale de los mensajes");
+  assertEquals([...CODIGO.matchAll(/\baviso\s*=(?!=)(?!\s*m\()/g)].map((x) => x[0]), [], "el aviso sale siempre de m(…)");
+  // Que las dos guardas de arriba de verdad cazan algo:
+  assert(/\b(error|message|notice):(?!\s*(?:msg\(|m\(|mensajeDePrueba\(|aviso\b|null\b|ErrorDe\b))/.test('cuerpo: { error: x ? m("a") : "a mano" }'));
+  assert(/\baviso\s*=(?!=)(?!\s*m\()/.test('aviso = "a mano"'));
 });

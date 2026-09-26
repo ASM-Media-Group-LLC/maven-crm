@@ -108,8 +108,20 @@ const MENSAJES = {
     en: "The key no longer has the Messenger permission. Create a new key and register the webhook there.",
   },
   webhookSecretoIlegible: {
-    es: "No se puede usar el secreto de este webhook: borralo y registralo de nuevo",
-    en: "This webhook's secret can't be used: delete it and register it again",
+    es: "El secreto de este webhook no abre con la clave actual del servidor. Avisale a quien administra Maven: si la clave cambió por error, volver a ponerla lo arregla; si cambió a propósito, borralo y registralo de nuevo.",
+    en: "This webhook's secret can't be opened with the server's current key. Tell whoever runs Maven: if the key changed by mistake, putting it back fixes it; if it changed on purpose, delete the webhook and register it again.",
+  },
+  webhookAltaIncierta: {
+    es: "No se sabe si el webhook quedó guardado. Actualizá la página: si aparece, borralo y registralo de nuevo (el secreto no se puede volver a mostrar).",
+    en: "It's unclear whether the webhook was saved. Refresh the page: if it shows up, delete it and register it again (the secret can't be shown again).",
+  },
+  webhookPruebaSinAnotar: {
+    es: "La prueba llegó, pero no se pudo anotar, así que el webhook no se activó. Probá de nuevo en unos segundos.",
+    en: "The test was delivered, but it couldn't be recorded, so the webhook wasn't activated. Try again in a few seconds.",
+  },
+  webhookActivacionFallo: {
+    es: "La prueba llegó, pero el webhook no se pudo activar. Probá de nuevo en unos segundos.",
+    en: "The test was delivered, but the webhook couldn't be activated. Try again in a few seconds.",
   },
   webhookVariasAgencias: {
     es: "Hay más de una agencia en Maven: los webhooks quedan apagados hasta resolverlo",

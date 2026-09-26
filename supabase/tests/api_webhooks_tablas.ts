@@ -1167,6 +1167,37 @@ for (const [salida, esperado] of [["paused", "endpoint_paused"], ["receiver_gone
   const altaConDos = await servirWebhook("webhook_create", { key_id: K_MSG, url: "https://hooks.integrador.com/tercera" }, ctx());
   check(conDos.estado === 409 && altaConDos.estado === 409 && escrituras.length === 0, `N: con dos agencias ni reanuda ni registra, sin escribir (${conDos.estado} ${altaConDos.estado})`);
   await db.exec(`delete from tenants where id = '${T2}'`);
+
+  // Carrera con un trigger de verdad: mientras sale una prueba que FALLA sobre un
+  // pending, revocan la llave y la base lo detiene. La anotación va solo sobre
+  // pending (no le escribe el 401 al detenido) y la respuesta cuenta el detenido.
+  await servirWebhook("webhook_delete", { id: ep2 }, ctx({ callerId: ANA }));
+  const alta3 = await servirWebhook("webhook_create", { key_id: K_MSG, url: "https://hooks.integrador.com/cuarta" }, ctx());
+  const ep3 = (alta3.cuerpo.webhook as { id: string } | undefined)?.id ?? "";
+  const enCarrera = await servirWebhook("webhook_test", { id: ep3 }, ctx({
+    enviar: async () => {
+      await db.exec(`update api_keys set revoked_at = now() where id = '${K_MSG}'`);
+      return { tipo: "respuesta", estado: 401, retryAfterS: null, latenciaMs: 4 };
+    },
+  }));
+  const quedo = await uno(db, `select status || '/' || disabled_reason s, last_status_code c, last_error e, last_attempt_at a from api_webhook_endpoints where id = '${ep3}'`);
+  check(alta3.estado === 201 && enCarrera.estado === 200 && quedo?.s === "disabled/key_revoked" && quedo?.c === null && quedo?.e === null && quedo?.a === null, `N: la prueba que falla no anota sobre lo que la base detuvo mientras salía (${enCarrera.estado} ${JSON.stringify(quedo)})`);
+  const w3 = enCarrera.cuerpo.webhook as { status?: string; disabled_reason?: string } | null;
+  check(w3?.status === "disabled" && w3?.disabled_reason === "key_revoked", `N: y la respuesta cuenta el detenido, no el pending de antes de mandar (${JSON.stringify(w3 && { s: w3.status, r: w3.disabled_reason })})`);
+  await db.exec(`update api_keys set revoked_at = null where id = '${K_MSG}'`);
+
+  // Y reanudar con la llave revocada mientras sale una prueba que SÍ llega: la base
+  // no deja activar (P0001) y el aviso dice por qué (la llave), no "probá de nuevo".
+  await correrElReloj(ep3);
+  const enCarrera2 = await servirWebhook("webhook_resume", { id: ep3 }, ctx({
+    enviar: async () => {
+      await db.exec(`update api_keys set revoked_at = now() where id = '${K_MSG}'`);
+      return { tipo: "respuesta", estado: 204, retryAfterS: null, latenciaMs: 4 };
+    },
+  }));
+  const t2 = enCarrera2.cuerpo.test as { activated?: boolean; notice?: string } | undefined;
+  check(enCarrera2.estado === 200 && t2?.activated === false && t2?.notice === "La key está revocada o vencida", `N: reanudar con la llave revocada en el medio: no activa y dice que es la llave (${enCarrera2.estado} ${JSON.stringify(t2)})`);
+  await db.exec(`update api_keys set revoked_at = null where id = '${K_MSG}'`);
 }
 
 console.log(ok.map((m) => "✓ " + m).join("\n"));
