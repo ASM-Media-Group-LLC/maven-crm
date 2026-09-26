@@ -16,6 +16,7 @@
 // PGlite tiene UNA sola conexión: las carreras (SKIP LOCKED, FOR SHARE) se
 // razonaron, no se prueban acá.
 import { PGlite } from "npm:@electric-sql/pglite@0.3";
+import { normalizarUrlDeWebhook } from "../functions/_shared/webhook-salida.ts";
 const MIG = Deno.readTextFileSync(
   Deno.args[0] ?? new URL("../migrations/20260926120000_api_webhooks_tablas.sql", import.meta.url),
 );
@@ -986,6 +987,29 @@ for (const [salida, esperado] of [["paused", "endpoint_paused"], ["receiver_gone
   await anda(db, `update profiles set deleted_at = now() where id = '${ALVARO}'`, "dar de baja anda aunque la tabla de endpoints no esté");
   await anda(db, `insert into tenants(id, slug, name) values ('${T2}', 'otra', 'Otra')`, "dar de alta una agencia anda aunque la tabla de endpoints no esté");
   await db.exec(`alter table api_webhook_endpoints_x rename to api_webhook_endpoints`);
+}
+
+// ════ M. lo que la edge acepta, la base también (y con el mismo host) ════
+{
+  const db = await nueva();
+  const entradas = [
+    "https://hooks.integrador.com/maven/abc?x=1", "https://INTEGRADOR.com:443/a b?c=d e", "https://bücher.de/ñandú",
+    "https://integrador.com", "https://integrador.com?x=1", "https://a.b.c.integrador.co.uk/p/q/r?s=t&u=%20v",
+    "https://integrador.com/<x>\"y\"", "https://integrador.com/a\\b", "https://x-y.integrador.io/" + "a".repeat(1900),
+  ];
+  for (const entrada of entradas) {
+    const r = normalizarUrlDeWebhook(entrada);
+    if (!r.ok) continue;
+    await db.exec("begin");
+    try {
+      await db.exec(`delete from api_webhook_endpoints; ${alta({ url: `'${r.href.replaceAll("'", "''")}'` })}`);
+      const host = (await uno(db, `select url_host h from api_webhook_endpoints`)).h;
+      check(host === r.host, `edge y base coinciden en el host de ${entrada.slice(0, 50)} (${host} / ${r.host})`);
+    } catch (e) {
+      mal.push(`la edge aceptó y la base rechazó ${entrada.slice(0, 50)} → ${String(e).slice(0, 90)}`);
+    }
+    await db.exec("rollback");
+  }
 }
 
 console.log(ok.map((m) => "✓ " + m).join("\n"));
