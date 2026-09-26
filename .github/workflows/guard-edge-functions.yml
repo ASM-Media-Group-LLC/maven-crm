@@ -61,6 +61,7 @@ jobs:
           supabase/functions/messenger-webhooks/estructura.test.ts
           supabase/functions/messenger-webhooks/datos.test.ts
           supabase/functions/messenger-webhooks/token.test.ts
+          supabase/functions/messenger-webhooks/carreras.test.ts
 
       # El banco contra la migración real (PGlite): las reglas de la base y lo que
       # escriben manage-api-keys y el despachador, con los triggers de verdad. Solo en

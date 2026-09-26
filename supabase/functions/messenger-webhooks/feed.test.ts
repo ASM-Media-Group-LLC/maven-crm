@@ -282,3 +282,37 @@ Deno.test("leerFeedComoPersona: la sesión recibe el fetch con plazo, su falla e
   clearTimeout(tope);
   assertEquals(r, { ok: false, permanente: false, falla: "plazo" }, "a los 300 ms, no nunca");
 });
+
+Deno.test("fetchConPlazo: un pedido que ya viene marcado como reintento (X-Retry-Count) se corta sin tocar la red", async () => {
+  const original = globalThis.fetch;
+  let llamadas = 0;
+  globalThis.fetch = (() => (llamadas++, Promise.resolve(new Response("{}")))) as typeof fetch;
+  try {
+    let err: unknown = null;
+    await fetchConPlazo(() => 5_000)("https://x", { headers: { "X-Retry-Count": "1" } }).catch((e) => (err = e));
+    assertEquals([(err as DOMException | null)?.name, llamadas], ["AbortError", 0]);
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+Deno.test("fetchConPlazo + supabase-js: un 503 con Retry-After largo NO hace dormir a supabase-js (vuelve en el acto)", async () => {
+  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+  const original = globalThis.fetch;
+  let pedidos = 0;
+  globalThis.fetch = (() => (pedidos++, Promise.resolve(new Response('{"code":"PGRST000","message":"x"}', { status: 503, headers: { "Content-Type": "application/json", "Retry-After": "30" } })))) as typeof fetch;
+  try {
+    const c = createClient("https://x.supabase.co", "k", {
+      global: { fetch: fetchConPlazo(() => 5_000) },
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    });
+    const t0 = Date.now();
+    const r = await c.from("api_keys").select("id").limit(1);
+    const ms = Date.now() - t0;
+    assert(r.error, "vuelve con el error");
+    assert(ms < 5_000, `tardó ${ms} ms: supabase-js durmió el Retry-After`);
+    assertEquals(pedidos, 1);
+  } finally {
+    globalThis.fetch = original;
+  }
+});
