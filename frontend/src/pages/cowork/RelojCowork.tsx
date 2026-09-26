@@ -5,7 +5,9 @@ import { useEffect, useState } from "react";
 import { Timer, Pause } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { suscribirReloj, leerReloj } from "@/lib/coworkLatido";
-import { segundosMostrados, formatoReloj, motivoDetenido, type RelojCowork as Reloj } from "@/lib/coworkReloj";
+import { segundosMostrados, formatoReloj, type RelojCowork as Reloj } from "@/lib/coworkReloj";
+import { useLanguage } from "@/hooks/useLanguage";
+import { claveMotivoDetenido } from "./textosCowork";
 
 /** Estado del reloj propio, con un tic por segundo mientras corre. */
 export function useRelojPropio(): { reloj: Reloj | null; segundos: number } {
@@ -22,14 +24,16 @@ export function useRelojPropio(): { reloj: Reloj | null; segundos: number } {
 
 export default function RelojCowork({ compacto = false, className }: { compacto?: boolean; className?: string }) {
   const { reloj, segundos } = useRelojPropio();
+  const { t } = useLanguage();
   if (!reloj) return null; // todavía no llegó el primer latido
   const corre = reloj.estado === "activo" || reloj.estado === "meet";
-  const motivo = motivoDetenido(reloj.estado);
+  const claveMotivo = claveMotivoDetenido(reloj.estado);
+  const motivo = claveMotivo ? t(claveMotivo) : null;
   return (
     <span
       data-testid="reloj-cowork"
       data-estado={reloj.estado}
-      title={corre ? "Tiempo trabajado hoy. Corre con cámara y pantalla compartida." : `Reloj detenido: ${motivo}. Hoy llevas ${formatoReloj(segundos)}.`}
+      title={corre ? t("cowork.clock.runningHint") : t("cowork.clock.stoppedHint", { reason: motivo ?? "", time: formatoReloj(segundos) })}
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full border px-2.5 h-7 text-[11px] font-medium tabular-nums shrink-0 transition-colors",
         corre
@@ -47,7 +51,7 @@ export default function RelojCowork({ compacto = false, className }: { compacto?
         <Pause className="h-3 w-3 shrink-0" />
       )}
       {!compacto && <Timer className="h-3 w-3 shrink-0 opacity-70" />}
-      <span>{compacto ? "" : "Hoy "}{formatoReloj(segundos)}</span>
+      <span>{compacto ? "" : `${t("cowork.clock.today")} `}{formatoReloj(segundos)}</span>
       {!corre && !compacto && motivo && <span className="hidden lg:inline font-normal opacity-80">· {motivo}</span>}
     </span>
   );

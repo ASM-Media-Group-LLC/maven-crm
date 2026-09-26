@@ -477,8 +477,11 @@ export const messenger = {
   "messenger.tile.calidad": { es: "Calidad: {calidad}", en: "Quality: {calidad}" },
   "messenger.tile.alejar": { es: "Alejar", en: "Zoom out" },
   "messenger.tile.acercar": { es: "Acercar", en: "Zoom in" },
-  "messenger.tile.verCompleta": { es: "Ver completa", en: "Show all" },
+  "messenger.tile.verCompleta": { es: "Ver completa", en: "Reset zoom" },
   "messenger.tile.anclarEnPantalla": { es: "Anclar en pantalla", en: "Pin to screen" },
+  // Sacar a alguien de la llamada: en inglés es "Remove", no "Delete". La usan
+  // el menú del recuadro (ParticipantTile) y el de la lista (CallParticipantsSidebar).
+  "messenger.tile.quitarDeLaLlamada": { es: "Eliminar", en: "Remove" },
   "messenger.tile.masOpcionesPara": { es: "Más opciones para {name}", en: "More options for {name}" },
   "messenger.tile.silenciarParaTodos": { es: "Silenciar para todos", en: "Mute for everyone" },
   "messenger.tile.silenciarA": { es: "¿Silenciar a {name}?", en: "Mute {name}?" },

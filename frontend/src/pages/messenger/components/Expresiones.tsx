@@ -3,7 +3,7 @@ import { Smile } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { EMOJI_CATALOG } from "@/pages/chatter-evaluator/workspace/EmojiBar";
+import { EMOJI_CATALOG, NOMBRE_CATEGORIA } from "@/pages/chatter-evaluator/workspace/EmojiBar";
 import { GifPanel } from "@/pages/inbox/GifPicker";
 import { StickerPanel } from "@/pages/inbox/StickerPicker";
 import { cn } from "@/lib/utils";
@@ -80,7 +80,10 @@ export default function Expresiones({
               )}
               {Object.entries(EMOJI_CATALOG).map(([grupo, lista]) => (
                 <section key={grupo} className="mb-2">
-                  <p className="mb-1 px-1 text-xs text-muted-foreground">{grupo}</p>
+                  {/* `grupo` es la llave del catálogo ("Caras"…); se muestra su etiqueta. */}
+                  <p className="mb-1 px-1 text-xs text-muted-foreground">
+                    {NOMBRE_CATEGORIA[grupo] ? t(NOMBRE_CATEGORIA[grupo]) : grupo}
+                  </p>
                   <div className="grid grid-cols-8 gap-0.5">
                     {lista.map((e) => (
                       <button key={`${grupo}-${e}`} type="button" onClick={() => onEmoji(e)} className="rounded-md py-1 text-2xl leading-none hover:bg-muted" aria-label={e}>

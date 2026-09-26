@@ -4,6 +4,7 @@ import { X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // Autocomplete buscable de leadgen_entries — usado en:
 //   · pages/contactos/NuevoContactoForm.tsx (form full-page de contacto)
@@ -44,6 +45,7 @@ interface Props {
   selectedLead: LeadAutocompleteLead | null;
   onLeadSelect: (lead: LeadAutocompleteLead | null) => void;
   error?: boolean;
+  /** Sin placeholder: "Nombre completo (o busca un lead existente)", en el idioma de la interfaz. */
   placeholder?: string;
 }
 
@@ -53,8 +55,9 @@ export function LeadAutocomplete({
   selectedLead,
   onLeadSelect,
   error,
-  placeholder = "Nombre completo (o busca un lead existente)",
+  placeholder,
 }: Props) {
+  const { t } = useLanguage();
   const [focused, setFocused] = useState(false);
   const blurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -63,8 +66,8 @@ export function LeadAutocomplete({
   // de tipear, no en cada tecla (antes "paola" = 5 RPC; ahora 1).
   const [debounced, setDebounced] = useState(trimmed);
   useEffect(() => {
-    const t = setTimeout(() => setDebounced(trimmed), 250);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setDebounced(trimmed), 250);
+    return () => clearTimeout(timer);
   }, [trimmed]);
 
   // Mostramos resultados cuando: el input está focuseado, hay 2+ caracteres,
@@ -128,7 +131,7 @@ export function LeadAutocomplete({
           }}
           onFocus={() => setFocused(true)}
           onBlur={handleBlur}
-          placeholder={placeholder}
+          placeholder={placeholder ?? t("leadgen.autocomplete.placeholder")}
           className={cn(error && "border-destructive", "pr-8")}
         />
         {selectedLead && (
@@ -139,7 +142,8 @@ export function LeadAutocomplete({
               onLeadSelect(null);
             }}
             className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 hover:bg-muted/60"
-            title="Quitar asociación al lead"
+            title={t("leadgen.autocomplete.unlink")}
+            aria-label={t("leadgen.autocomplete.unlink")}
           >
             <X className="h-3.5 w-3.5 text-muted-foreground" />
           </button>
@@ -153,11 +157,11 @@ export function LeadAutocomplete({
         >
           {isLoading ? (
             <p className="px-3 py-3 text-xs text-muted-foreground text-center">
-              Buscando…
+              {t("leadgen.autocomplete.searching")}
             </p>
           ) : leads.length === 0 ? (
             <p className="px-3 py-3 text-xs text-muted-foreground text-center">
-              Sin leads que matcheen. Si el lead no existe, agregalo primero en LeadGen.
+              {t("leadgen.autocomplete.noMatches")}
             </p>
           ) : (
             <ul className="divide-y divide-border/40">
@@ -182,7 +186,7 @@ export function LeadAutocomplete({
                       )}
                       {lead.phone_raw && (
                         <span className="text-[10px] text-success font-bold ml-auto shrink-0">
-                          📞 ya tiene tel
+                          {t("leadgen.autocomplete.hasPhone")}
                         </span>
                       )}
                     </div>

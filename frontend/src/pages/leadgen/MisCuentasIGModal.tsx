@@ -23,6 +23,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import SpammerAccountsTab from "../panel-de-control/SpammerAccountsTab";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface Props {
   open: boolean;
@@ -30,16 +31,14 @@ interface Props {
 }
 
 const MisCuentasIGModal = ({ open, onOpenChange }: Props) => {
+  const { t } = useLanguage();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader className="shrink-0">
-          <DialogTitle>Mis Cuentas IG</DialogTitle>
+          <DialogTitle>{t("leadgen.myIgAccounts")}</DialogTitle>
           <DialogDescription>
-            Cuentas de Instagram que usas para hacer outreach a creadoras.
-            La IA analiza qué tan creíble se ve cada una para que las
-            modelos respondan. Mientras peor la cuenta, menos respuestas
-            vas a sacar.
+            {t("leadgen.igAccounts.description")}
           </DialogDescription>
         </DialogHeader>
         <div className="flex-1 min-h-0 overflow-y-auto">

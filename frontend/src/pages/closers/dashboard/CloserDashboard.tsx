@@ -200,7 +200,7 @@ export default function CloserDashboard() {
             <Kpi
               label="Cowork"
               valor={cowork.horas > 0 ? cowork.horas.toFixed(1) : "—"}
-              pie={pieTiempoCowork(cowork, coworkCargando)}
+              pie={pieTiempoCowork(cowork, coworkCargando, t)}
               icono={Timer} color="bg-violet-500" tinte="from-violet-500/10"
             />
             <Kpi

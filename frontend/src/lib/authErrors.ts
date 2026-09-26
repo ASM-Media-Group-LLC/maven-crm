@@ -1,4 +1,5 @@
-// Traducción de errores de Supabase Auth a mensajes en español neutro.
+// Traducción de errores de Supabase Auth a mensajes para la persona, en el
+// idioma de la interfaz (traducir(): se arma en el momento de mostrar el aviso).
 //
 // El backend devuelve mensajes técnicos en inglés ("Invalid login credentials",
 // "Email not confirmed") justo en la pantalla más visible de la app y en el
@@ -6,27 +7,30 @@
 // (por `code` cuando existe, con fallback por substring del mensaje para
 // versiones/errores sin code) y el resto cae en un genérico útil.
 
+import { traducir } from "@/lib/i18n";
+
 interface AuthErrorLike {
   code?: string;
   message?: string;
   status?: number;
 }
 
-const GENERICO = "No se pudo iniciar sesión. Intenta de nuevo en un momento.";
+// Una función y no una constante: el idioma se lee en cada llamada.
+const generico = () => traducir("shared.authError.generic");
 
 export const traducirErrorAuth = (error: AuthErrorLike | null | undefined): string => {
-  if (!error) return GENERICO;
+  if (!error) return generico();
   const code = error.code ?? "";
   const msg = (error.message ?? "").toLowerCase();
 
   // Credenciales inválidas
   if (code === "invalid_credentials" || msg.includes("invalid login credentials") || msg.includes("invalid_grant")) {
-    return "Correo o contraseña incorrectos. Revisa e intenta de nuevo.";
+    return traducir("shared.authError.invalidCredentials");
   }
 
   // Correo sin confirmar
   if (code === "email_not_confirmed" || msg.includes("email not confirmed")) {
-    return "Tu correo aún no está confirmado. Revisa tu bandeja de entrada (y el spam) antes de entrar.";
+    return traducir("shared.authError.emailNotConfirmed");
   }
 
   // Rate limit / demasiados intentos
@@ -37,18 +41,18 @@ export const traducirErrorAuth = (error: AuthErrorLike | null | undefined): stri
     msg.includes("rate limit") ||
     msg.includes("too many requests")
   ) {
-    return "Demasiados intentos. Espera un momento e intenta de nuevo.";
+    return traducir("shared.authError.tooManyAttempts");
   }
 
   // Usuario suspendido
   if (code === "user_banned" || msg.includes("banned")) {
-    return "Esta cuenta está suspendida. Contacta a un administrador.";
+    return traducir("shared.authError.banned");
   }
 
   // Problema de red (fetch falló antes de llegar al servidor)
   if (msg.includes("failed to fetch") || msg.includes("network")) {
-    return "No se pudo conectar con el servidor. Revisa tu conexión a internet.";
+    return traducir("shared.authError.network");
   }
 
-  return GENERICO;
+  return generico();
 };

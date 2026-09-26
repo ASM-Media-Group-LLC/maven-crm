@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -15,31 +15,37 @@ import { getMiamiDateStr } from "./timezoneUtils";
 import { LEADGEN_COMPANIES } from "./leadgenConstants";
 import { useScouterCompanies, useCreateCompany } from "@/hooks/useScouterLeads";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronsUpDown, Check, Plus } from "lucide-react";
+import { ChevronsUpDown, Check, Plus, X } from "lucide-react";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 import EvidenceUploader from "@/components/leadgen/EvidenceUploader";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { normalizeHandle, detectPlatformFromUrl } from "@/lib/handle-utils";
 import { enqueueAvatarFetch } from "@/lib/avatarFetch";
-import { checkLeadAvailability, checkDuplicateOnlyFans, type LeadAvailabilityStatus } from "@/lib/lead-validation";
+import { checkDuplicateOnlyFans } from "@/lib/lead-validation";
+import { checkLeadAvailability, textoDisponibilidad, type DisponibilidadLead } from "./disponibilidadLead";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, Info } from "lucide-react";
 
 
 
-const leadSchema = z.object({
-  source_link: z.string().url("URL de perfil requerida"),
-  platform: z.string().min(1, "Plataforma requerida"),
-  quality: z.string().min(1, "Categoría requerida"),
-  company: z.string().min(1, "Compañía requerida"),
-  onlyfans_url: z.string().optional().refine(
-    (val) => !val || val.includes("onlyfans.com") || /^[a-zA-Z0-9._-]+$/.test(val),
-    "Debe ser una URL de OnlyFans válida o un handle"
-  ),
-  notes: z.string().max(500, "Máximo 500 caracteres").optional(),
-});
+// El esquema se arma con el `t` del idioma actual: sus mensajes son lo que
+// muestra <FormMessage />. react-hook-form relee el resolver en cada render.
+const crearLeadSchema = (t: (key: TranslationKey, params?: Record<string, string | number>) => string) =>
+  z.object({
+    source_link: z.string().url(t("leadgen.addLead.profileUrlRequired")),
+    platform: z.string().min(1, t("leadgen.addLead.platformRequired")),
+    quality: z.string().min(1, t("leadgen.form.categoryRequired")),
+    company: z.string().min(1, t("leadgen.addLead.companyRequired")),
+    onlyfans_url: z.string().optional().refine(
+      (val) => !val || val.includes("onlyfans.com") || /^[a-zA-Z0-9._-]+$/.test(val),
+      t("leadgen.addLead.onlyFansInvalid")
+    ),
+    notes: z.string().max(500, t("leadgen.form.maxChars", { max: 500 })).optional(),
+  });
 
-type LeadFormValues = z.infer<typeof leadSchema>;
+type LeadFormValues = z.infer<ReturnType<typeof crearLeadSchema>>;
 
 interface AddLeadModalProps {
   open: boolean;
@@ -49,6 +55,8 @@ interface AddLeadModalProps {
 const MAX_FILES = 8;
 
 const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
+  const { t } = useLanguage();
+  const leadSchema = useMemo(() => crearLeadSchema(t), [t]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const [isAddingCompany, setIsAddingCompany] = useState(false);
@@ -83,11 +91,11 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
   const watchedSourceLink = form.watch("source_link");
   const [debouncedSourceLink, setDebouncedSourceLink] = useState("");
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedSourceLink(watchedSourceLink || ""), 450);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setDebouncedSourceLink(watchedSourceLink || ""), 450);
+    return () => clearTimeout(timer);
   }, [watchedSourceLink]);
   const debouncedHandle = debouncedSourceLink ? normalizeHandle(debouncedSourceLink) : "";
-  const availability = useQuery<LeadAvailabilityStatus>({
+  const availability = useQuery<DisponibilidadLead>({
     queryKey: ["lead-availability", debouncedHandle],
     queryFn: () => checkLeadAvailability(debouncedHandle),
     enabled: debouncedHandle.length >= 2,
@@ -95,6 +103,10 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
   });
   const availabilityResult = availability.data;
   const isBlockedByAvailability = availabilityResult?.kind === "blocked";
+  // La frase se arma al dibujar, con el idioma de quien mira (el chequeo solo
+  // devuelve el motivo y sus datos).
+  const availabilityText =
+    availabilityResult && availabilityResult.kind !== "new" ? textoDisponibilidad(t, availabilityResult) : null;
 
   // Auto-detect platform when URL changes
   const handleUrlChange = (value: string, onChange: (v: string) => void) => {
@@ -111,12 +123,12 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
     setIsSubmitting(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("No autenticado");
+      if (!user) throw new Error(t("leadgen.notSignedIn"));
 
       // Extract handle from URL
       const normalizedHandle = normalizeHandle(data.source_link);
       if (!normalizedHandle) {
-        toast({ title: "URL inválida", description: "No se pudo extraer un handle de la URL proporcionada.", variant: "destructive" });
+        toast({ title: t("leadgen.addLead.invalidUrl"), description: t("leadgen.addLead.invalidUrlDesc"), variant: "destructive" });
         setIsSubmitting(false);
         return;
       }
@@ -129,9 +141,10 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
       // después del debounce.
       const finalCheck = await checkLeadAvailability(normalizedHandle);
       if (finalCheck.kind === "blocked") {
+        const { title, message } = textoDisponibilidad(t, finalCheck);
         toast({
-          title: `❌ ${finalCheck.title}`,
-          description: finalCheck.message,
+          title: `❌ ${title}`,
+          description: message,
           variant: "destructive",
         });
         setIsSubmitting(false);
@@ -143,11 +156,11 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
       if (data.onlyfans_url?.trim()) {
         const ofCheck = await checkDuplicateOnlyFans(data.onlyfans_url);
         if (ofCheck.existsInLeads || ofCheck.existsInContacts) {
-          const where = ofCheck.existsInLeads ? "leads" : "contactos";
-          const nameInfo = ofCheck.matchName ? ` para "${ofCheck.matchName}"` : "";
+          const where = ofCheck.existsInLeads ? t("leadgen.addLead.whereLeads") : t("leadgen.addLead.whereContacts");
+          const forName = ofCheck.matchName ? t("leadgen.addLead.forName", { name: ofCheck.matchName }) : "";
           toast({
-            title: "❌ OnlyFans duplicado",
-            description: `Esta URL ya está registrada en ${where}${nameInfo}. No se puede registrar.`,
+            title: t("leadgen.addLead.duplicateOf"),
+            description: t("leadgen.addLead.duplicateOfDesc", { where, forName }),
             variant: "destructive",
           });
           setIsSubmitting(false);
@@ -204,14 +217,14 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
         }
       }
 
-      toast({ title: "Lead agregado exitosamente" });
+      toast({ title: t("leadgen.addLead.added") });
       queryClient.invalidateQueries({ queryKey: ["leadgen-entries"] });
       queryClient.invalidateQueries({ queryKey: ["leadgen-entries-range"] });
       form.reset();
       setFiles([]);
       onOpenChange(false);
     } catch (err: any) {
-      toast({ title: "Error al agregar lead", description: err.message, variant: "destructive" });
+      toast({ title: t("leadgen.addLead.addError"), description: err.message, variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
@@ -222,8 +235,8 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
         <DialogHeader className="pr-8">
-          <DialogTitle>Nuevo Lead</DialogTitle>
-          <DialogDescription>Agrega un nuevo lead al sistema de generación.</DialogDescription>
+          <DialogTitle>{t("leadgen.addLead.title")}</DialogTitle>
+          <DialogDescription>{t("leadgen.addLead.description")}</DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
@@ -234,10 +247,10 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
                 name="source_link"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>URL del Perfil *</FormLabel>
+                    <FormLabel>{t("leadgen.addLead.profileUrl")}</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="https://instagram.com/usuario"
+                        placeholder={t("leadgen.addLead.profileUrlPlaceholder")}
                         value={field.value}
                         onChange={(e) => handleUrlChange(e.target.value, field.onChange)}
                         onBlur={field.onBlur}
@@ -246,7 +259,7 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
                       />
                     </FormControl>
                     <p className="text-xs text-muted-foreground">
-                      El handle se detectará automáticamente de la URL
+                      {t("leadgen.addLead.handleAutodetect")}
                     </p>
                     <FormMessage />
                   </FormItem>
@@ -256,7 +269,7 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
               {/* Banner de disponibilidad — corre en vivo cuando el LLG
                   cambia la URL. Rojo si bloquea, amarillo si permite con
                   historial, oculto si es nuevo. */}
-              {availabilityResult && availabilityResult.kind !== "new" && (
+              {availabilityResult && availabilityText && (
                 <div
                   className={cn(
                     "rounded-lg border p-3 flex items-start gap-2.5",
@@ -271,8 +284,8 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
                     <Info className="h-4 w-4 shrink-0 mt-0.5" />
                   )}
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-bold leading-tight">{availabilityResult.title}</p>
-                    <p className="text-xs mt-1 leading-snug">{availabilityResult.message}</p>
+                    <p className="text-sm font-bold leading-tight">{availabilityText.title}</p>
+                    <p className="text-xs mt-1 leading-snug">{availabilityText.message}</p>
                   </div>
                 </div>
               )}
@@ -282,10 +295,10 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
                 name="onlyfans_url"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>OnlyFans URL (opcional)</FormLabel>
+                    <FormLabel>{t("leadgen.addLead.onlyFansUrl")}</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="https://onlyfans.com/usuario"
+                        placeholder={t("leadgen.addLead.onlyFansPlaceholder")}
                         {...field}
                       />
                     </FormControl>
@@ -301,17 +314,17 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
                   name="platform"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Plataforma *</FormLabel>
+                      <FormLabel>{t("leadgen.addLead.platform")}</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
-                          <SelectTrigger><SelectValue placeholder="Selecciona" /></SelectTrigger>
+                          <SelectTrigger><SelectValue placeholder={t("leadgen.addLead.selectShort")} /></SelectTrigger>
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="instagram">Instagram</SelectItem>
                           <SelectItem value="tiktok">TikTok</SelectItem>
                           <SelectItem value="twitter">Twitter/X</SelectItem>
                           <SelectItem value="onlyfans">OnlyFans</SelectItem>
-                          <SelectItem value="otra">Otra</SelectItem>
+                          <SelectItem value="otra">{t("leadgen.addLead.platformOther")}</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -324,15 +337,15 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
                   name="quality"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Categoría *</FormLabel>
+                      <FormLabel>{t("leadgen.addLead.category")}</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
-                          <SelectTrigger><SelectValue placeholder="Selecciona" /></SelectTrigger>
+                          <SelectTrigger><SelectValue placeholder={t("leadgen.addLead.selectShort")} /></SelectTrigger>
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="A+">A+</SelectItem>
                           <SelectItem value="A">A</SelectItem>
-                          <SelectItem value="B+">B+ (Buena)</SelectItem>
+                          <SelectItem value="B+">{t("leadgen.quality.bPlusGood")}</SelectItem>
                           <SelectItem value="B">B</SelectItem>
                           <SelectItem value="C">C</SelectItem>
                         </SelectContent>
@@ -348,12 +361,12 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
                 name="company"
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
-                    <FormLabel>Compañía / Cuenta de Origen *</FormLabel>
+                    <FormLabel>{t("leadgen.addLead.company")}</FormLabel>
                     {isAddingCompany ? (
                       <div className="flex gap-2">
                         <FormControl>
                           <Input
-                            placeholder="Nombre de la nueva compañía"
+                            placeholder={t("leadgen.addLead.newCompanyName")}
                             value={customCompany}
                             onChange={(e) => setCustomCompany(e.target.value)}
                             autoFocus
@@ -406,16 +419,16 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
                         <PopoverTrigger asChild>
                           <FormControl>
                             <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal", !field.value && "text-muted-foreground")}>
-                              {field.value || "Selecciona la compañía"}
+                              {field.value || t("leadgen.form.selectCompany")}
                               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                             </Button>
                           </FormControl>
                         </PopoverTrigger>
                         <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                           <Command>
-                            <CommandInput placeholder="Buscar compañía..." />
+                            <CommandInput placeholder={t("leadgen.addLead.searchCompany")} />
                             <CommandList>
-                              <CommandEmpty>No se encontró la compañía.</CommandEmpty>
+                              <CommandEmpty>{t("leadgen.addLead.companyNotFound")}</CommandEmpty>
                               <CommandGroup className="max-h-60 overflow-y-auto">
                                 {companyList.map((company) => (
                                   <CommandItem key={company} value={company} onSelect={() => field.onChange(company)}>
@@ -426,7 +439,7 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
                               </CommandGroup>
                               <CommandGroup>
                                 <CommandItem onSelect={() => setIsAddingCompany(true)} className="text-primary">
-                                  + Agregar nueva compañía
+                                  {t("leadgen.addLead.addCompany")}
                                 </CommandItem>
                               </CommandGroup>
                             </CommandList>
@@ -447,9 +460,9 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
                 name="notes"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Notas</FormLabel>
+                    <FormLabel>{t("leadgen.form.notes")}</FormLabel>
                     <FormControl>
-                      <Textarea placeholder="Notas adicionales..." className="resize-none" {...field} />
+                      <Textarea placeholder={t("leadgen.form.notesPlaceholder")} className="resize-none" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -461,15 +474,15 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
                 onFilesChange={setFiles}
                 minFiles={0}
                 maxFiles={MAX_FILES}
-                label="Evidencia (opcional)"
-                description="Hasta 8 capturas. Click, drag&drop, o pega con Cmd/Ctrl+V."
+                label={t("leadgen.addLead.evidenceOptional")}
+                description={t("leadgen.addLead.evidenceHint", { max: MAX_FILES })}
               />
             </div>
 
             <DialogFooter className="pt-4">
               <Button type="submit" className="w-full" disabled={isSubmitting || isBlockedByAvailability}>
                 <Plus className="mr-2 h-4 w-4" />
-                {isSubmitting ? "Guardando..." : isBlockedByAvailability ? "No se puede agregar" : "Guardar Lead"}
+                {isSubmitting ? t("leadgen.saving") : isBlockedByAvailability ? t("leadgen.addLead.cantAdd") : t("leadgen.addLead.save")}
               </Button>
             </DialogFooter>
           </form>

@@ -8,6 +8,7 @@ import { Shield, UserCog, User, Headphones, DollarSign, Eye } from "lucide-react
 import { supabase } from "@/integrations/supabase/client";
 import type { AdminUser } from "./useAdminUsers";
 import type { AppRole } from "@/hooks/useUserRole";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface ChangeRoleModalProps {
   user: AdminUser | null;
@@ -36,6 +37,7 @@ const colorMap: Record<string, string> = {
 };
 
 const ChangeRoleModal = ({ user, open, onOpenChange, onConfirm, isLoading }: ChangeRoleModalProps) => {
+  const { t } = useLanguage();
   const [selectedRole, setSelectedRole] = useState<AppRole>(user?.role ?? "employee");
 
   // Fetch roles dynamically from roles_config
@@ -66,7 +68,7 @@ const ChangeRoleModal = ({ user, open, onOpenChange, onConfirm, isLoading }: Cha
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Cambiar Rol</DialogTitle>
+          <DialogTitle>{t("admin.changeRole.title")}</DialogTitle>
         </DialogHeader>
 
         {user && (
@@ -74,13 +76,13 @@ const ChangeRoleModal = ({ user, open, onOpenChange, onConfirm, isLoading }: Cha
             <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
               <UserAvatar name={user.full_name} src={user.avatar_url} seed={user.avatar_seed} size="md" />
               <div>
-                <p className="font-medium">{user.full_name || "Sin nombre"}</p>
-                <p className="text-sm text-muted-foreground">Rol actual: {user.role ?? "Sin rol"}</p>
+                <p className="font-medium">{user.full_name || t("admin.noName")}</p>
+                <p className="text-sm text-muted-foreground">{t("admin.changeRole.current", { role: user.role ?? t("admin.noRole") })}</p>
               </div>
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Nuevo rol</label>
+              <label className="text-sm font-medium">{t("admin.changeRole.newRole")}</label>
               <Select value={selectedRole} onValueChange={(v) => setSelectedRole(v as AppRole)}>
                 <SelectTrigger>
                   <SelectValue />
@@ -103,9 +105,9 @@ const ChangeRoleModal = ({ user, open, onOpenChange, onConfirm, isLoading }: Cha
         )}
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>{t("common.cancel")}</Button>
           <Button onClick={handleConfirm} disabled={isLoading || selectedRole === user?.role}>
-            {isLoading ? "Guardando..." : "Confirmar"}
+            {isLoading ? t("admin.saving") : t("common.confirm")}
           </Button>
         </DialogFooter>
       </DialogContent>

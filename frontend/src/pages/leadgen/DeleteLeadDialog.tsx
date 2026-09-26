@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { LeadGenEntry } from "./useLeadGen";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface Props {
   open: boolean;
@@ -16,6 +17,7 @@ interface Props {
 }
 
 const DeleteLeadDialog = ({ open, onOpenChange, lead }: Props) => {
+  const { t } = useLanguage();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isDeleting, setIsDeleting] = useState(false);
@@ -34,10 +36,10 @@ const DeleteLeadDialog = ({ open, onOpenChange, lead }: Props) => {
       queryClient.invalidateQueries({ queryKey: ["leadgen"] });
       queryClient.invalidateQueries({ queryKey: ["leadgen-by-range"] });
       queryClient.invalidateQueries({ queryKey: ["leadgen-summary"] });
-      toast({ title: `Lead "@${lead.model_handle}" eliminado` });
+      toast({ title: t("leadgen.delete.deleted", { handle: lead.model_handle }) });
       onOpenChange(false);
     } catch (err: any) {
-      toast({ title: "Error al eliminar", description: err.message, variant: "destructive" });
+      toast({ title: t("common.errorDeleting"), description: err.message, variant: "destructive" });
     } finally {
       setIsDeleting(false);
     }
@@ -49,10 +51,10 @@ const DeleteLeadDialog = ({ open, onOpenChange, lead }: Props) => {
         <AlertDialogHeader>
           <div className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-destructive" />
-            <AlertDialogTitle>Eliminar lead</AlertDialogTitle>
+            <AlertDialogTitle>{t("leadgen.delete.title")}</AlertDialogTitle>
           </div>
           <AlertDialogDescription>
-            Esta acción eliminará permanentemente el lead <strong>@{lead.model_handle}</strong>. Esta acción no se puede deshacer.
+            {t("leadgen.delete.descBefore")} <strong>@{lead.model_handle}</strong>{t("leadgen.delete.descAfter")}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -62,7 +64,7 @@ const DeleteLeadDialog = ({ open, onOpenChange, lead }: Props) => {
             disabled={isDeleting}
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
-            {isDeleting ? "Eliminando..." : "Eliminar"}
+            {isDeleting ? t("leadgen.delete.deleting") : t("common.delete")}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

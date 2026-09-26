@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ExternalLink, MessageCircle, Plus, Save, UserCheck, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MaskedPhone } from "@/components/MaskedPhone";
 import InstagramIcon from "@/components/icons/InstagramIcon";
@@ -62,6 +63,7 @@ const InfoCard = ({ label, children }: { label: string; children: React.ReactNod
 
 const ViewLeadModal = ({ open, onOpenChange, lead, onDelete }: Props) => {
   const f = useFormato();
+  const { t } = useLanguage();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [showNoteForm, setShowNoteForm] = useState(false);
@@ -97,10 +99,10 @@ const ViewLeadModal = ({ open, onOpenChange, lead, onDelete }: Props) => {
       queryClient.invalidateQueries({ queryKey: ["leadgen_notes", lead?.id] });
       setNoteText("");
       setShowNoteForm(false);
-      toast({ title: "Nota guardada" });
+      toast({ title: t("leadgen.view.noteSaved") });
     },
     onError: () => {
-      toast({ title: "Error al guardar nota", variant: "destructive" });
+      toast({ title: t("leadgen.view.noteSaveError"), variant: "destructive" });
     },
   });
 
@@ -126,7 +128,7 @@ const ViewLeadModal = ({ open, onOpenChange, lead, onDelete }: Props) => {
   const handleCancelNote = () => {
     setNoteText("");
     setShowNoteForm(false);
-    toast({ title: "Edición cancelada" });
+    toast({ title: t("leadgen.view.editCanceled") });
   };
 
   return (
@@ -146,7 +148,7 @@ const ViewLeadModal = ({ open, onOpenChange, lead, onDelete }: Props) => {
                       onClick={onDelete}
                     >
                       <Trash2 className="h-3.5 w-3.5" />
-                      Eliminar
+                      {t("common.delete")}
                     </Button>
                   )}
                   <Button
@@ -156,11 +158,11 @@ const ViewLeadModal = ({ open, onOpenChange, lead, onDelete }: Props) => {
                     onClick={() => setShowConvertModal(true)}
                   >
                     <UserCheck className="h-3.5 w-3.5" />
-                    Convertir a Contacto
+                    {t("leadgen.view.convertToContact")}
                   </Button>
                 </div>
               </div>
-              <DialogDescription className="sr-only">Detalle del lead</DialogDescription>
+              <DialogDescription className="sr-only">{t("leadgen.view.leadDetail")}</DialogDescription>
             </DialogHeader>
 
             <div className="flex items-center gap-2 flex-wrap">
@@ -180,34 +182,34 @@ const ViewLeadModal = ({ open, onOpenChange, lead, onDelete }: Props) => {
               <InfoCard label="Handle">
                 <span>@{lead.model_handle}</span>
               </InfoCard>
-              <InfoCard label="Fecha de entrada">
-                {format(createdDate, "dd MMM yyyy", { locale: f.fechas })}
+              <InfoCard label={t("leadgen.view.entryDate")}>
+                {format(createdDate, f.idioma === "en" ? "MMM dd, yyyy" : "dd MMM yyyy", { locale: f.fechas })}
               </InfoCard>
-              <InfoCard label="Hora">
+              <InfoCard label={t("leadgen.view.time")}>
                 {format(createdDate, "hh:mm a", { locale: f.fechas })}
               </InfoCard>
-              <InfoCard label="Ubicación">
+              <InfoCard label={t("common.location")}>
                 <span className="flex items-center gap-1.5">
                   {countryToFlag(lead.country_code)}
                   <span>{lead.country_code || "—"}{lead.city ? `, ${lead.city}` : ""}</span>
                 </span>
               </InfoCard>
-              <InfoCard label="Fuente">
+              <InfoCard label={t("leadgen.view.source")}>
                 <a
                   href={buildProfileUrl()}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-1 text-primary hover:underline truncate"
                 >
-                  Ver
+                  {t("common.view")}
                   <ExternalLink className="h-3 w-3 shrink-0" />
                 </a>
               </InfoCard>
-              <InfoCard label="Compañía">
+              <InfoCard label={t("common.company")}>
                 <span className="truncate block">{lead.company || "—"}</span>
               </InfoCard>
               {lead.phone_raw && (
-                <InfoCard label="Teléfono">
+                <InfoCard label={t("common.phone")}>
                   <MaskedPhone phone={lead.phone_e164 || lead.phone_raw} />
                 </InfoCard>
               )}
@@ -218,10 +220,10 @@ const ViewLeadModal = ({ open, onOpenChange, lead, onDelete }: Props) => {
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <MessageCircle className="h-4 w-4 text-muted-foreground" />
-                <h3 className="text-sm font-semibold">Notas del Lead</h3>
+                <h3 className="text-sm font-semibold">{t("leadgen.view.leadNotes")}</h3>
               </div>
               <p className="text-sm text-muted-foreground">
-                {lead.notes || "Sin notas"}
+                {lead.notes || t("leadgen.view.noNotes")}
               </p>
             </div>
 
@@ -238,12 +240,12 @@ const ViewLeadModal = ({ open, onOpenChange, lead, onDelete }: Props) => {
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <MessageCircle className="h-4 w-4 text-muted-foreground" />
-                  <h3 className="text-sm font-semibold">Notas Adicionales</h3>
+                  <h3 className="text-sm font-semibold">{t("leadgen.view.additionalNotes")}</h3>
                 </div>
                 {!showNoteForm && (
                   <Button variant="outline" size="sm" onClick={() => setShowNoteForm(true)}>
                     <Plus className="h-3.5 w-3.5 mr-1" />
-                    Agregar
+                    {t("common.add")}
                   </Button>
                 )}
               </div>
@@ -251,7 +253,7 @@ const ViewLeadModal = ({ open, onOpenChange, lead, onDelete }: Props) => {
               {showNoteForm && (
                 <div className="space-y-3 mb-4">
                   <Textarea
-                    placeholder="Escribe tu nota..."
+                    placeholder={t("leadgen.view.writeNote")}
                     value={noteText}
                     onChange={(e) => setNoteText(e.target.value)}
                     rows={3}
@@ -259,10 +261,10 @@ const ViewLeadModal = ({ open, onOpenChange, lead, onDelete }: Props) => {
                   <div className="flex gap-2">
                     <Button size="sm" onClick={handleSaveNote} disabled={!noteText.trim() || addNote.isPending}>
                       <Save className="h-3.5 w-3.5 mr-1" />
-                      Guardar
+                      {t("common.save")}
                     </Button>
                     <Button variant="outline" size="sm" onClick={handleCancelNote} disabled={addNote.isPending}>
-                      Cancelar
+                      {t("common.cancel")}
                     </Button>
                   </div>
                 </div>
@@ -274,7 +276,7 @@ const ViewLeadModal = ({ open, onOpenChange, lead, onDelete }: Props) => {
                     <div key={note.id} className="border rounded-lg p-3 space-y-1">
                       <p className="text-sm">{note.note_text}</p>
                       <p className="text-xs text-muted-foreground">
-                        {format(new Date(note.created_at), "dd MMM yyyy, hh:mm a", { locale: f.fechas })}
+                        {format(new Date(note.created_at), f.idioma === "en" ? "MMM dd, yyyy, hh:mm a" : "dd MMM yyyy, hh:mm a", { locale: f.fechas })}
                       </p>
                     </div>
                   ))}
@@ -283,7 +285,7 @@ const ViewLeadModal = ({ open, onOpenChange, lead, onDelete }: Props) => {
                 !showNoteForm && (
                   <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
                     <MessageCircle className="h-8 w-8 mb-2 opacity-40" />
-                    <p className="text-sm">No hay notas adicionales</p>
+                    <p className="text-sm">{t("leadgen.view.noAdditionalNotes")}</p>
                   </div>
                 )
               )}

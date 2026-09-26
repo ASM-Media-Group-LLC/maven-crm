@@ -5,6 +5,7 @@ import { Check, Loader2, Video, Users2 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/hooks/useLanguage";
 
 export interface SalaParaMeet {
   id: string;
@@ -21,6 +22,7 @@ export default function MeetGrupalDialog({ open, onOpenChange, salas, onConfirma
   salas: SalaParaMeet[];
   onConfirmar: (roomIds: string[]) => Promise<void>;
 }) {
+  const { t } = useLanguage();
   const [elegidas, setElegidas] = useState<string[]>([]);
   const [enviando, setEnviando] = useState(false);
   const alternar = (id: string) => setElegidas((e) => (e.includes(id) ? e.filter((x) => x !== id) : [...e, id]));
@@ -35,11 +37,8 @@ export default function MeetGrupalDialog({ open, onOpenChange, salas, onConfirma
     <Dialog open={open} onOpenChange={cerrar}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 font-display"><Video className="h-4 w-4 text-primary" /> Meet grupal</DialogTitle>
-          <DialogDescription>
-            Elige las salas: te llevas a toda su gente a una sala temporal. En su sala Cowork quedan con cámara,
-            micrófono y pantalla apagados hasta que vuelvan, y ese tiempo les sigue contando.
-          </DialogDescription>
+          <DialogTitle className="flex items-center gap-2 font-display"><Video className="h-4 w-4 text-primary" /> {t("cowork.meet.title")}</DialogTitle>
+          <DialogDescription>{t("cowork.meet.dialogDesc")}</DialogDescription>
         </DialogHeader>
         <div className="max-h-[50vh] space-y-1.5 overflow-y-auto pr-1">
           {salas.map((s) => {
@@ -64,20 +63,20 @@ export default function MeetGrupalDialog({ open, onOpenChange, salas, onConfirma
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-medium text-foreground">{s.name}</span>
                   <span className="block truncate text-[11px] text-muted-foreground">
-                    {vacia ? "Sin gente" : s.personas.join(", ")}{s.enPausa > 0 ? ` · ${s.enPausa} en pausa` : ""}
+                    {vacia ? t("cowork.meet.nobody") : s.personas.join(", ")}{s.enPausa > 0 ? ` · ${t("cowork.meet.pausedCount", { n: s.enPausa })}` : ""}
                   </span>
                 </span>
                 <span className="inline-flex shrink-0 items-center gap-1 text-[11px] tabular-nums text-muted-foreground"><Users2 className="h-3 w-3" />{s.personas.length}</span>
               </button>
             );
           })}
-          {salas.length === 0 && <p className="py-6 text-center text-sm text-muted-foreground">Esta sesión no tiene salas.</p>}
+          {salas.length === 0 && <p className="py-6 text-center text-sm text-muted-foreground">{t("cowork.meet.noRooms")}</p>}
         </div>
         <DialogFooter>
-          <Button variant="outline" className="rounded-full" onClick={() => cerrar(false)} disabled={enviando}>Cancelar</Button>
+          <Button variant="outline" className="rounded-full" onClick={() => cerrar(false)} disabled={enviando}>{t("common.cancel")}</Button>
           <Button className="gap-2 rounded-full" onClick={confirmar} disabled={!elegidas.length || enviando}>
             {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Video className="h-4 w-4" />}
-            Llevar al meet{personas > 0 ? ` (${personas} ${personas === 1 ? "persona" : "personas"})` : ""}
+            {personas === 0 ? t("cowork.meet.bring") : personas === 1 ? t("cowork.meet.bringOne") : t("cowork.meet.bringMany", { n: personas })}
           </Button>
         </DialogFooter>
       </DialogContent>

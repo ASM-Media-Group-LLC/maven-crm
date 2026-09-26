@@ -23,6 +23,8 @@ import {
   type SpammerDetailTask,
 } from "@/hooks/useSpammerDetail";
 import { initialsBg } from "@/pages/scouter/leadShared";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 
 // ─── Task icon map (mirrors TaskItem.tsx) ────────────────────────────────
 
@@ -34,12 +36,12 @@ const TASK_ICONS: Record<SpammerDetailTask["task_type"], React.ReactNode> = {
   story_react: <Sparkles className="h-3.5 w-3.5 text-pink-400" />,
 };
 
-const TASK_LABELS: Record<SpammerDetailTask["task_type"], string> = {
-  follow: "Seguir",
-  like: "Like",
-  comment: "Comentario",
-  story_view: "Ver historia",
-  story_react: "Reaccionar",
+const TASK_LABELS: Record<SpammerDetailTask["task_type"], TranslationKey> = {
+  follow: "scouter.task.type.follow",
+  like: "scouter.task.type.like",
+  comment: "scouter.task.type.comment",
+  story_view: "scouter.task.type.storyView",
+  story_react: "common.react",
 };
 
 // ─── Props ────────────────────────────────────────────────────────────────
@@ -61,6 +63,7 @@ export const SpammerDetailModal = ({
   spammerName,
   date,
 }: SpammerDetailModalProps) => {
+  const { t } = useLanguage();
   const { data: assignments, isLoading } = useSpammerDetail(spammerId, date);
   const [zoomedScreenshot, setZoomedScreenshot] = useState<string | null>(null);
 
@@ -68,12 +71,12 @@ export const SpammerDetailModal = ({
     if (!assignments) return null;
     const allTasks = assignments.flatMap((a) => a.tasks ?? []);
     const total = allTasks.length;
-    const done = allTasks.filter((t) => t.status === "done").length;
-    const skipped = allTasks.filter((t) => t.status === "skipped").length;
+    const done = allTasks.filter((tk) => tk.status === "done").length;
+    const skipped = allTasks.filter((tk) => tk.status === "skipped").length;
     const pending = total - done - skipped;
-    const comments = allTasks.filter((t) => t.task_type === "comment").length;
+    const comments = allTasks.filter((tk) => tk.task_type === "comment").length;
     const commentsWithProof = allTasks.filter(
-      (t) => t.task_type === "comment" && t.screenshot_url,
+      (tk) => tk.task_type === "comment" && tk.screenshot_url,
     ).length;
     return { total, done, skipped, pending, comments, commentsWithProof };
   })();
@@ -97,21 +100,21 @@ export const SpammerDetailModal = ({
           {stats && (
             <div className="flex flex-wrap items-center gap-2 pb-3 border-b border-border/40">
               <Badge variant="outline" className="font-mono">
-                {stats.done}/{stats.total} hechas
+                {t("scouter.detail.done", { done: stats.done, total: stats.total })}
               </Badge>
               {stats.pending > 0 && (
                 <Badge variant="outline" className="text-warning border-warning/30">
-                  {stats.pending} pendientes
+                  {t("scouter.detail.pending", { count: stats.pending })}
                 </Badge>
               )}
               {stats.skipped > 0 && (
                 <Badge variant="outline" className="text-muted-foreground">
-                  {stats.skipped} saltadas
+                  {t("scouter.detail.skipped", { count: stats.skipped })}
                 </Badge>
               )}
               {stats.comments > 0 && (
                 <Badge variant="outline" className="text-warning border-warning/30">
-                  {stats.commentsWithProof}/{stats.comments} comments con screenshot
+                  {t("scouter.detail.withScreenshot", { done: stats.commentsWithProof, total: stats.comments })}
                 </Badge>
               )}
             </div>
@@ -121,11 +124,11 @@ export const SpammerDetailModal = ({
           {isLoading ? (
             <div className="flex items-center justify-center py-12 gap-2 text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
-              <span className="text-sm">Cargando...</span>
+              <span className="text-sm">{t("common.loading")}</span>
             </div>
           ) : !assignments || assignments.length === 0 ? (
             <p className="text-sm text-muted-foreground py-8 text-center">
-              Sin asignaciones para este día.
+              {t("scouter.detail.noAssignments")}
             </p>
           ) : (
             <div className="space-y-3">
@@ -178,10 +181,10 @@ export const SpammerDetailModal = ({
 
                   {/* Tasks */}
                   <div className="space-y-1.5 pl-12">
-                    {(a.tasks ?? []).map((t) => (
+                    {(a.tasks ?? []).map((tk) => (
                       <TaskRow
-                        key={t.id}
-                        task={t}
+                        key={tk.id}
+                        task={tk}
                         onZoomScreenshot={setZoomedScreenshot}
                       />
                     ))}
@@ -203,7 +206,7 @@ export const SpammerDetailModal = ({
             type="button"
             className="absolute top-4 right-4 text-white/80 hover:text-white"
             onClick={() => setZoomedScreenshot(null)}
-            aria-label="Cerrar"
+            aria-label={t("common.close")}
           >
             <X className="h-6 w-6" />
           </button>
@@ -222,14 +225,15 @@ export const SpammerDetailModal = ({
 // ─── Task row ─────────────────────────────────────────────────────────────
 
 const TaskRow = ({
-  task: t,
+  task,
   onZoomScreenshot,
 }: {
   task: SpammerDetailTask;
   onZoomScreenshot: (url: string) => void;
 }) => {
-  const isDone = t.status === "done";
-  const isSkipped = t.status === "skipped";
+  const { t } = useLanguage();
+  const isDone = task.status === "done";
+  const isSkipped = task.status === "skipped";
   return (
     <div className="flex items-start gap-2 text-xs">
       <div className="mt-0.5 shrink-0">
@@ -243,13 +247,13 @@ const TaskRow = ({
       </div>
       <div className="flex-1 min-w-0 space-y-1">
         <div className="flex items-center gap-1.5">
-          {TASK_ICONS[t.task_type]}
+          {TASK_ICONS[task.task_type]}
           <span className="font-medium text-xs text-muted-foreground">
-            {TASK_LABELS[t.task_type]}
+            {t(TASK_LABELS[task.task_type])}
           </span>
-          {t.from_account && (
+          {task.from_account && (
             <span className="text-[10px] text-muted-foreground">
-              desde @{t.from_account.instagram_handle}
+              {t("scouter.task.from", { handle: task.from_account.instagram_handle })}
             </span>
           )}
         </div>
@@ -258,29 +262,29 @@ const TaskRow = ({
             isSkipped ? "line-through text-muted-foreground/70" : ""
           }`}
         >
-          {t.instruction}
+          {task.instruction}
         </p>
-        {t.suggested_comment && (
+        {task.suggested_comment && (
           <blockquote className="rounded-md border-l-2 border-amber-400/50 bg-amber-400/5 pl-2 pr-1 py-1 italic text-foreground/70">
-            {t.suggested_comment}
+            {task.suggested_comment}
           </blockquote>
         )}
-        {t.signed_screenshot_url && (
+        {task.signed_screenshot_url && (
           <button
             type="button"
-            onClick={() => onZoomScreenshot(t.signed_screenshot_url!)}
+            onClick={() => onZoomScreenshot(task.signed_screenshot_url!)}
             className="block mt-1 rounded border border-border overflow-hidden hover:opacity-80 transition-opacity"
           >
             <img
-              src={t.signed_screenshot_url}
+              src={task.signed_screenshot_url}
               alt="Screenshot"
               className="h-24 w-auto object-cover"
             />
           </button>
         )}
-        {t.task_type === "comment" && !t.screenshot_url && t.status === "pending" && (
+        {task.task_type === "comment" && !task.screenshot_url && task.status === "pending" && (
           <span className="text-[10px] text-muted-foreground italic">
-            Esperando screenshot del comentario
+            {t("scouter.detail.waitingScreenshot")}
           </span>
         )}
       </div>

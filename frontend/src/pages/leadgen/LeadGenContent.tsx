@@ -8,6 +8,8 @@ import {
 } from "lucide-react";
 import { format, isSameDay, subDays, startOfWeek, addDays, isToday, isFuture, startOfDay, startOfMonth, subMonths } from "date-fns";
 import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,11 +55,16 @@ const getWeekDays = (offset: number): Date[] => {
   const monday = startOfWeek(addDays(now, offset * 7), { weekStartsOn: 1 });
   return Array.from({ length: 7 }, (_, i) => addDays(monday, i));
 };
-const DAY_LABELS = ["LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB", "DOM"];
+// De lunes a domingo, igual que getWeekDays().
+const DAY_LABELS: TranslationKey[] = [
+  "leadgen.week.mon", "leadgen.week.tue", "leadgen.week.wed", "leadgen.week.thu",
+  "leadgen.week.fri", "leadgen.week.sat", "leadgen.week.sun",
+];
 
 const LeadGenContent = () => {
   const navigate = useNavigate();
   const f = useFormato();
+  const { t } = useLanguage();
   const { user } = useAuth();
   const { dataScope, isLoading: permsLoading } = usePermissions();
   const { isAdmin } = useUserRole();
@@ -100,9 +107,9 @@ const LeadGenContent = () => {
   // Build profiles map
   const profilesMap = useMemo(() => {
     const map: Record<string, string> = {};
-    profiles.forEach(p => { map[p.id] = p.full_name || "Sin nombre"; });
+    profiles.forEach(p => { map[p.id] = p.full_name || t("leadgen.noName"); });
     return map;
-  }, [profiles]);
+  }, [profiles, t]);
 
   // Enrich leads with agent names
   const enrichedLeads = useMemo(() => {
@@ -117,20 +124,20 @@ const LeadGenContent = () => {
         // del equipo entero — no aportan a su vista personal. Si en el
         // futuro hacemos KPIs per-agent, agregar acá.
         { id: "leads", label: "Leads", icon: CheckSquare },
-        { id: "leads-hora", label: "Rendimiento por Hora", icon: Clock },
+        { id: "leads-hora", label: t("leadgen.tab.hourly"), icon: Clock },
       ];
     }
     const baseTabs = [
       { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
       { id: "leads", label: "Leads", icon: CheckSquare },
-      { id: "agentes", label: "Agentes", icon: Users },
+      { id: "agentes", label: t("leadgen.tab.agents"), icon: Users },
     ];
     if (viewMode === "owner") {
-      baseTabs.push({ id: "supervisores", label: "Supervisores", icon: Shield });
+      baseTabs.push({ id: "supervisores", label: t("leadgen.tab.supervisors"), icon: Shield });
     }
-    baseTabs.push({ id: "rendimiento", label: "Rendimiento", icon: BarChart3 });
+    baseTabs.push({ id: "rendimiento", label: t("leadgen.tab.performance"), icon: BarChart3 });
     return baseTabs;
-  }, [viewMode]);
+  }, [viewMode, t]);
 
   // UI state.
   // Antes manejábamos `statsCollapsed` para encoger las KPI cards en
@@ -229,7 +236,7 @@ const LeadGenContent = () => {
     const rows = Object.entries(agentStatsRaw)
       .filter(([id]) => !!profilesMap[id])
       .map(([id, s]) => ({
-        name: profilesMap[id] || "Agente",
+        name: profilesMap[id] || t("leadgen.agentFallback"),
         phones: s.phones ?? 0,
         nuevos: s.nuevos ?? 0,
       }))
@@ -240,7 +247,7 @@ const LeadGenContent = () => {
         || a.name.localeCompare(b.name, "es"),
       );
     return rows[0] ? { name: rows[0].name, phones: rows[0].phones } : null;
-  }, [agentStatsRaw, profilesMap]);
+  }, [agentStatsRaw, profilesMap, t]);
 
   // Top 3 LLGs para el ranking del dashboard. Mismo orden de
   // tiebreaker que mejorLlg, sólo que cortamos a 3.
@@ -249,7 +256,7 @@ const LeadGenContent = () => {
     return Object.entries(agentStatsRaw)
       .filter(([id]) => !!profilesMap[id])
       .map(([id, s]) => ({
-        name: profilesMap[id] || "Agente",
+        name: profilesMap[id] || t("leadgen.agentFallback"),
         phones: s.phones ?? 0,
         nuevos: s.nuevos ?? 0,
       }))
@@ -260,7 +267,7 @@ const LeadGenContent = () => {
         || a.name.localeCompare(b.name, "es"),
       )
       .slice(0, 3);
-  }, [agentStatsRaw, profilesMap]);
+  }, [agentStatsRaw, profilesMap, t]);
 
   // Phones por día — alimenta el chart del dashboard. Default últimos
   // 30 días si no hay filtro activo.
@@ -278,7 +285,8 @@ const LeadGenContent = () => {
     // Si no, formato corto "4 may → 18 may".
     const sameMonth = dateFrom.getMonth() === dateTo.getMonth() && dateFrom.getFullYear() === dateTo.getFullYear();
     if (sameMonth) return format(dateFrom, "MMMM yyyy", { locale: f.fechas });
-    return `${format(dateFrom, "d MMM", { locale: f.fechas })} → ${format(dateTo, "d MMM", { locale: f.fechas })}`;
+    const corto = f.idioma === "en" ? "MMM d" : "d MMM";
+    return `${format(dateFrom, corto, { locale: f.fechas })} → ${format(dateTo, corto, { locale: f.fechas })}`;
   }, [dateFrom, dateTo, f]);
 
   const agentStats = useMemo(() => {
@@ -287,7 +295,7 @@ const LeadGenContent = () => {
       .filter(([agentId]) => !!profilesMap[agentId])
       .map(([agentId, stats]) => ({
         id: agentId,
-        name: profilesMap[agentId] || "Agente",
+        name: profilesMap[agentId] || t("leadgen.agentFallback"),
         total: stats.total,
         byQuality: stats.byQuality,
         firstLead: stats.firstLead,
@@ -320,7 +328,11 @@ const LeadGenContent = () => {
       return a.name.localeCompare(b.name, "es");
     };
     return rows.sort(cmp);
-  }, [agentStatsRaw, profilesMap, agentSortKey, agentSortDir]);
+  }, [agentStatsRaw, profilesMap, agentSortKey, agentSortDir, t]);
+  const agentesActivos = t(
+    agentStats.length === 1 ? "leadgen.agents.activeCount.one" : "leadgen.agents.activeCount.other",
+    { count: agentStats.length },
+  );
 
   const handleDateApply = useCallback((from: Date | undefined, to: Date | undefined) => {
     setDateFrom(from);
@@ -358,10 +370,10 @@ const LeadGenContent = () => {
           title="LeadGen"
           subtitle={
             <span className="whitespace-nowrap">
-              {viewMode === "agent" ? "Tus leads" : "Gestión de leads"} · {totalLeads.toLocaleString()} leads
+              {viewMode === "agent" ? t("leadgen.header.yourLeads") : t("leadgen.header.leadManagement")} · {t(totalLeads === 1 ? "leadgen.header.leadsCount.one" : "leadgen.header.leadsCount.other", { count: totalLeads.toLocaleString(f.intl()) })}
               {dateFrom && dateTo && (
                 <span className="ml-1">
-                  ({format(dateFrom, "d MMM", { locale: f.fechas })} — {format(dateTo, "d MMM", { locale: f.fechas })})
+                  ({format(dateFrom, f.idioma === "en" ? "MMM d" : "d MMM", { locale: f.fechas })} — {format(dateTo, f.idioma === "en" ? "MMM d" : "d MMM", { locale: f.fechas })})
                 </span>
               )}
             </span>
@@ -376,7 +388,7 @@ const LeadGenContent = () => {
                 from={dateFrom}
                 to={dateTo}
                 onApply={handleDateApply}
-                placeholder="Selecciona fechas"
+                placeholder={t("leadgen.header.selectDates")}
                 className="h-9"
               />
               {viewMode !== "agent" && (
@@ -393,18 +405,18 @@ const LeadGenContent = () => {
                 variant="outline"
                 size="sm"
                 onClick={() => setMisCuentasOpen(true)}
-                title="Estado de tus cuentas IG de outreach — qué tan creíble se ven y qué les falta para que las creadoras respondan"
+                title={t("leadgen.header.myIgAccountsHint")}
               >
                 <Activity className="h-4 w-4" />
-                Mis Cuentas IG
+                {t("leadgen.myIgAccounts")}
               </Button>
               <Button size="sm" onClick={() => setAddLeadOpen(true)}>
                 <Plus className="h-4 w-4" />
-                Agregar Lead
+                {t("leadgen.header.addLead")}
               </Button>
               <Button variant="outline" size="sm" onClick={() => setAddContactoOpen(true)}>
                 <UserPlus className="h-4 w-4" />
-                Agregar Contacto
+                {t("leadgen.header.addContact")}
               </Button>
             </>
           }
@@ -421,10 +433,10 @@ const LeadGenContent = () => {
               </div>
               <div className="min-w-0">
                 <p className="text-xs text-primary/80 font-bold leading-tight">
-                  Vista filtrada
+                  {t("leadgen.viewAs.filtered")}
                 </p>
                 <p className="text-sm font-semibold truncate">
-                  Viendo el panel como <span className="text-primary">{viewAsLgUserName || "este LLG"}</span>
+                  {t("leadgen.viewAs.viewingAs")} <span className="text-primary">{viewAsLgUserName || t("leadgen.viewAs.thisLlg")}</span>
                 </p>
               </div>
             </div>
@@ -438,7 +450,7 @@ const LeadGenContent = () => {
                 setPage(0);
               }}
             >
-              <X className="h-4 w-4 mr-1" /> Cancelar vista
+              <X className="h-4 w-4 mr-1" /> {t("leadgen.viewAs.exit")}
             </Button>
           </div>
         </div>
@@ -467,7 +479,7 @@ const LeadGenContent = () => {
         {viewMode !== "agent" && (
           <Button variant="outline" size="sm" onClick={() => navigate("/leadgen/base-datos")}>
             <Database className="h-4 w-4" />
-            Base de Datos
+            {t("leadgen.database")}
           </Button>
         )}
       </div>
@@ -483,7 +495,7 @@ const LeadGenContent = () => {
             <div className="relative flex-1 max-w-xs">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Buscar lead..."
+                placeholder={t("leadgen.searchLead")}
                 className="pl-9 h-9"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
@@ -495,18 +507,18 @@ const LeadGenContent = () => {
           {(activeTab === "leads" || activeTab === "leads-hora") && (
             <>
               <Select value={qualityFilter || undefined} onValueChange={(v) => setQualityFilter(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="w-full sm:w-[120px] h-9"><SelectValue placeholder="Categoría" /></SelectTrigger>
+                <SelectTrigger className="w-full sm:w-[120px] h-9"><SelectValue placeholder={t("common.category")} /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__all__">Todos</SelectItem>
+                  <SelectItem value="__all__">{t("common.all")}</SelectItem>
                   {QUALITY_OPTIONS.map(q => (
-                    <SelectItem key={q.value} value={q.value.toLowerCase()}>{q.label}</SelectItem>
+                    <SelectItem key={q.value} value={q.value.toLowerCase()}>{t(q.labelKey)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               <Select value={agencyFilter || undefined} onValueChange={(v) => setAgencyFilter(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="w-full sm:w-[160px] h-9"><SelectValue placeholder="Agencia" /></SelectTrigger>
+                <SelectTrigger className="w-full sm:w-[160px] h-9"><SelectValue placeholder={t("leadgen.filter.agency")} /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__all__">Todos</SelectItem>
+                  <SelectItem value="__all__">{t("common.all")}</SelectItem>
                   {LEADGEN_COMPANIES.map(c => (
                     <SelectItem key={c} value={c}>{c}</SelectItem>
                   ))}
@@ -569,12 +581,12 @@ const LeadGenContent = () => {
           <>
             {leadsLoading ? (
               <div className="flex items-center justify-center py-16">
-                <p className="text-muted-foreground text-sm">Cargando leads...</p>
+                <p className="text-muted-foreground text-sm">{t("leadgen.loadingLeads")}</p>
               </div>
             ) : filteredLeads.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16">
                 <FileText className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                <p className="text-muted-foreground text-sm">No hay leads para mostrar con estos filtros</p>
+                <p className="text-muted-foreground text-sm">{t("leadgen.leads.emptyFiltered")}</p>
               </div>
             ) : listView === "grid" ? (
               <div className="flex-1 min-h-0 overflow-auto">
@@ -608,14 +620,14 @@ const LeadGenContent = () => {
           {activeTab === "agentes" && (
             <div className="flex-1 min-h-0 overflow-auto space-y-6">
               <AnalyticsSectionBanner
-                title="Rendimiento de Agentes"
+                title={t("leadgen.agents.bannerTitle")}
                 subtitle={
                   dateFrom && dateTo
-                    ? `${format(dateFrom, f.idioma === "en" ? "MMMM d" : "d 'de' MMMM", { locale: f.fechas })} — ${format(dateTo, f.idioma === "en" ? "MMMM d, yyyy" : "d 'de' MMMM, yyyy", { locale: f.fechas })} · ${agentStats.length} agentes activos`
-                    : `${format(new Date(), f.idioma === "en" ? "MMMM d, yyyy" : "d 'de' MMMM, yyyy", { locale: f.fechas })} · ${agentStats.length} agentes activos`
+                    ? `${format(dateFrom, f.idioma === "en" ? "MMMM d" : "d 'de' MMMM", { locale: f.fechas })} — ${format(dateTo, f.idioma === "en" ? "MMMM d, yyyy" : "d 'de' MMMM, yyyy", { locale: f.fechas })} · ${agentesActivos}`
+                    : `${format(new Date(), f.idioma === "en" ? "MMMM d, yyyy" : "d 'de' MMMM, yyyy", { locale: f.fechas })} · ${agentesActivos}`
                 }
                 count={agentStats.length}
-                countLabel="Agentes Activos"
+                countLabel={t("leadgen.agents.activeLabel")}
               />
 
               {listView === "calendar" ? (
@@ -639,11 +651,11 @@ const LeadGenContent = () => {
                               {ag.total} leads
                               {(ag.nuevos > 0 || ag.recuperacion > 0) && (
                                 <span className="ml-1.5">
-                                  ({ag.nuevos} nv · {ag.recuperacion} rec)
+                                  {t("leadgen.agents.newRec", { new: ag.nuevos, rec: ag.recuperacion })}
                                 </span>
                               )}
                               {ag.phones > 0 && (
-                                <span className="ml-1.5 text-primary font-medium">· {ag.phones} tel</span>
+                                <span className="ml-1.5 text-primary font-medium">· {t(ag.phones === 1 ? "leadgen.telShort.one" : "leadgen.telShort.other", { count: ag.phones })}</span>
                               )}
                             </p>
                           </div>
@@ -674,7 +686,7 @@ const LeadGenContent = () => {
                         {/* Sortable headers: click toggle desc/asc.
                             Orden: Agente → Total → calidades (A+/A/B+/B/C)
                             → Nuevos → Recup → Tel → Acciones. */}
-                        <AgentSortHead label="Agente" sortKey="name"
+                        <AgentSortHead label={t("leadgen.col.agent")} sortKey="name"
                           currentKey={agentSortKey} dir={agentSortDir}
                           onSort={toggleAgentSort} align="left" />
                         <AgentSortHead label="Total" sortKey="total"
@@ -695,19 +707,19 @@ const LeadGenContent = () => {
                         <AgentSortHead label="C" sortKey="c"
                           currentKey={agentSortKey} dir={agentSortDir}
                           onSort={toggleAgentSort} />
-                        <AgentSortHead label="Nuevos" sortKey="nuevos"
+                        <AgentSortHead label={t("leadgen.col.newShort")} sortKey="nuevos"
                           currentKey={agentSortKey} dir={agentSortDir}
                           onSort={toggleAgentSort}
-                          tooltip="Leads nuevos (record_type ≠ reactivado)" />
-                        <AgentSortHead label="Recup." sortKey="recuperacion"
+                          tooltip={t("leadgen.col.newHint")} />
+                        <AgentSortHead label={t("leadgen.col.recoveredShort")} sortKey="recuperacion"
                           currentKey={agentSortKey} dir={agentSortDir}
                           onSort={toggleAgentSort}
-                          tooltip="Leads recuperación (record_type = reactivado)" />
-                        <AgentSortHead label="Tel" sortKey="phones"
+                          tooltip={t("leadgen.col.recoveredHint")} />
+                        <AgentSortHead label={t("leadgen.col.phonesShort")} sortKey="phones"
                           currentKey={agentSortKey} dir={agentSortDir}
                           onSort={toggleAgentSort}
-                          tooltip="Teléfonos obtenidos en el rango" />
-                        <TableHead className="sticky top-0 right-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))] w-[80px]">Acciones</TableHead>
+                          tooltip={t("leadgen.col.phonesHint")} />
+                        <TableHead className="sticky top-0 right-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))] w-[80px]">{t("common.actions")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -744,7 +756,7 @@ const LeadGenContent = () => {
                       {agentStats.length === 0 && (
                         <TableRow>
                           <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
-                            No hay agentes con leads en este rango
+                            {t("leadgen.agents.empty")}
                           </TableCell>
                         </TableRow>
                       )}
@@ -809,6 +821,7 @@ function AgentsWeeklyCalendar({
   onSelectAgent: (a: { id: string; name: string }) => void;
 }) {
   const f = useFormato();
+  const { t } = useLanguage();
   const weekDays = getWeekDays(weekOffset);
 
   const leadsInDay = (agentId: string, day: Date) =>
@@ -822,23 +835,23 @@ function AgentsWeeklyCalendar({
       <CardContent className="pt-4 px-4 pb-4">
         <div className="flex items-center justify-between mb-4">
           <Button variant="outline" size="sm" onClick={() => onWeekChange(weekOffset - 1)}>
-            <ChevronLeft className="h-4 w-4 mr-1" /> Anterior
+            <ChevronLeft className="h-4 w-4 mr-1" /> {t("common.previous")}
           </Button>
           <span className="text-sm font-medium text-muted-foreground">
             {format(weekDays[0], f.idioma === "en" ? "MMMM d" : "d 'de' MMMM", { locale: f.fechas })} – {format(weekDays[6], f.idioma === "en" ? "MMMM d, yyyy" : "d 'de' MMMM, yyyy", { locale: f.fechas })}
           </span>
           <Button variant="outline" size="sm" onClick={() => onWeekChange(weekOffset + 1)} disabled={weekOffset >= 0}>
-            Siguiente <ChevronRight className="h-4 w-4 ml-1" />
+            {t("common.next")} <ChevronRight className="h-4 w-4 ml-1" />
           </Button>
         </div>
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="min-w-[140px]">Agente</TableHead>
+                <TableHead className="min-w-[140px]">{t("leadgen.col.agent")}</TableHead>
                 {weekDays.map((day, i) => (
                   <TableHead key={i} className={`text-center min-w-[70px] ${isToday(day) ? "bg-primary/10 text-primary font-bold" : ""}`}>
-                    {DAY_LABELS[i]} {format(day, "d")}
+                    {t(DAY_LABELS[i])} {format(day, "d")}
                   </TableHead>
                 ))}
                 <TableHead className="text-center font-semibold">Total</TableHead>
@@ -864,9 +877,9 @@ function AgentsWeeklyCalendar({
             <tfoot>
               <TableRow className="border-t-2 bg-muted/30">
                 <TableCell className="font-bold text-sm">Total</TableCell>
-                {colTotals.map((t, i) => (
-                  <TableCell key={i} className={`text-center font-bold text-sm ${isToday(weekDays[i]) ? "bg-primary/10 text-primary" : ""} ${t === 0 || isFuture(startOfDay(weekDays[i])) ? "text-muted-foreground" : ""}`}>
-                    {isFuture(startOfDay(weekDays[i])) || t === 0 ? "—" : t}
+                {colTotals.map((colTotal, i) => (
+                  <TableCell key={i} className={`text-center font-bold text-sm ${isToday(weekDays[i]) ? "bg-primary/10 text-primary" : ""} ${colTotal === 0 || isFuture(startOfDay(weekDays[i])) ? "text-muted-foreground" : ""}`}>
+                    {isFuture(startOfDay(weekDays[i])) || colTotal === 0 ? "—" : colTotal}
                   </TableCell>
                 ))}
                 <TableCell className="text-center"><Badge variant="default">{grandTotal}</Badge></TableCell>

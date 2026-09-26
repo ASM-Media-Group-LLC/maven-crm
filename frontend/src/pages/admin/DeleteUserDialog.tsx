@@ -1,4 +1,6 @@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { useLanguage } from "@/hooks/useLanguage";
+import { ConFormato } from "./ConFormato";
 
 interface DeleteUserDialogProps {
   open: boolean;
@@ -8,23 +10,26 @@ interface DeleteUserDialogProps {
   isLoading: boolean;
 }
 
-const DeleteUserDialog = ({ open, onOpenChange, userName, onConfirm, isLoading }: DeleteUserDialogProps) => (
+const DeleteUserDialog = ({ open, onOpenChange, userName, onConfirm, isLoading }: DeleteUserDialogProps) => {
+  const { t } = useLanguage();
+  return (
   <AlertDialog open={open} onOpenChange={onOpenChange}>
     <AlertDialogContent>
       <AlertDialogHeader>
-        <AlertDialogTitle>¿Eliminar usuario?</AlertDialogTitle>
+        <AlertDialogTitle>{t("admin.deleteUser.title")}</AlertDialogTitle>
         <AlertDialogDescription>
-          Esta acción eliminará permanentemente al usuario <strong>{userName}</strong> y todos sus datos asociados. Si tiene casilla de correo de Maven, también se elimina y se libera su puesto en Zoho. Esta acción no se puede deshacer.
+          <ConFormato texto={t("admin.deleteUser.body", { name: userName })} />
         </AlertDialogDescription>
       </AlertDialogHeader>
       <AlertDialogFooter>
         <AlertDialogCancel />
         <AlertDialogAction onClick={onConfirm} disabled={isLoading} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-          {isLoading ? "Eliminando..." : "Eliminar"}
+          {isLoading ? t("admin.deleting") : t("common.delete")}
         </AlertDialogAction>
       </AlertDialogFooter>
     </AlertDialogContent>
   </AlertDialog>
-);
+  );
+};
 
 export default DeleteUserDialog;

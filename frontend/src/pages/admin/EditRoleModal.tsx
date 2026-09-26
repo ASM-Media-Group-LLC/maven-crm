@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useUserRole } from "@/hooks/useUserRole";
 import { FRANJA_POR_TIER, ROLE_TIER_LABELS, type RoleConfig, type RoleTier } from "./useRoles";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // Dos campos que juntos forman la jerarquía (Jhon, 08/09):
 //   · Nivel de acceso (tipo)  → la FRANJA: Empleado < Supervisor < Management < Admin.
@@ -24,6 +25,7 @@ interface EditRoleModalProps {
 
 const EditRoleModal = ({ open, onOpenChange, role, onConfirm, isLoading }: EditRoleModalProps) => {
   const { isAdmin } = useUserRole();
+  const { t } = useLanguage();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [aiQuota, setAiQuota] = useState("");
@@ -61,38 +63,38 @@ const EditRoleModal = ({ open, onOpenChange, role, onConfirm, isLoading }: EditR
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Editar Rol</DialogTitle>
+          <DialogTitle>{t("admin.editRole.title")}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1.5">
-            <Label>Nombre del rol</Label>
+            <Label>{t("admin.roles.name")}</Label>
             <Input value={name} onChange={(e) => setName(e.target.value.slice(0, 50))} disabled={role?.is_system} />
           </div>
 
           <div className="space-y-1.5">
-            <Label>Nivel de acceso</Label>
+            <Label>{t("admin.roles.accessLevel")}</Label>
             <Select value={tier} onValueChange={(v) => cambiarTier(v as RoleTier)} disabled={bloqueado}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {(Object.keys(ROLE_TIER_LABELS) as RoleTier[]).map((t) => (
-                  <SelectItem key={t} value={t}>{ROLE_TIER_LABELS[t]}</SelectItem>
+                {(Object.keys(ROLE_TIER_LABELS) as RoleTier[]).map((nivel) => (
+                  <SelectItem key={nivel} value={nivel}>{t(ROLE_TIER_LABELS[nivel])}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
               {bloqueado
-                ? "Rol de sistema: solo un admin puede cambiarle el nivel."
+                ? t("admin.editRole.systemLocked")
                 : role?.is_system && tier !== role.tier
-                  ? "⚠️ Rol de sistema: muchas reglas de la base dependen de su nivel. Cambiarlo afecta de inmediato a todas las personas con este rol."
-                  : "De menor a mayor: Empleado < Supervisor < Management < Admin. Un rol gestiona, y ve como «subordinados», a los de nivel inferior. Los menús se configuran en \"Permisos\"."}
+                  ? t("admin.editRole.systemWarning")
+                  : t("admin.editRole.levelHint")}
             </p>
           </div>
 
           {tier !== "admin" && (
             <div className="space-y-1.5">
-              <Label>Posición en el nivel <span className="text-muted-foreground font-normal">({minNivel}–{maxNivel})</span></Label>
+              <Label>{t("admin.editRole.position")} <span className="text-muted-foreground font-normal">({minNivel}–{maxNivel})</span></Label>
               <Input
                 type="number" min={minNivel} max={maxNivel} step={1}
                 value={level}
@@ -101,29 +103,29 @@ const EditRoleModal = ({ open, onOpenChange, role, onConfirm, isLoading }: EditR
               />
               <p className="text-xs text-muted-foreground">
                 {isAdmin
-                  ? `Afina la jerarquía entre roles del mismo nivel: a mayor número, más arriba. Un rol en ${minNivel + 5} ve como subordinados a los que están en ${minNivel}. Nunca sale de la franja de su nivel.`
-                  : "Solo un admin puede cambiar la posición."}
+                  ? t("admin.editRole.positionHint", { example: minNivel + 5, min: minNivel })
+                  : t("admin.editRole.positionAdminOnly")}
               </p>
             </div>
           )}
 
           <div className="space-y-1.5">
-            <Label>Descripción</Label>
+            <Label>{t("common.description")}</Label>
             <Textarea value={description} onChange={(e) => setDescription(e.target.value.slice(0, 300))} rows={3} />
           </div>
           <div className="space-y-1.5">
-            <Label>Cuota IA / día (copiloto del inbox)</Label>
+            <Label>{t("admin.editRole.aiQuota")}</Label>
             <Input type="number" min={0} value={aiQuota} onChange={(e) => setAiQuota(e.target.value)} placeholder="20 (default)" />
-            <p className="text-xs text-muted-foreground">Usos del copiloto ✨ por persona/día para este rol. Vacío = 20. Admin/management: sin tope.</p>
+            <p className="text-xs text-muted-foreground">{t("admin.editRole.aiQuotaHint")}</p>
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>{t("common.cancel")}</Button>
           <Button
             onClick={() => role && onConfirm(role.id, name.trim(), description.trim() || undefined, aiQuota.trim() === "" ? null : Number(aiQuota), tier, tier === "admin" ? 100 : level)}
             disabled={isLoading || !name.trim() || (tier !== "admin" && !nivelValido)}
           >
-            {isLoading ? "Guardando..." : "Guardar"}
+            {isLoading ? t("admin.saving") : t("common.save")}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -3,8 +3,10 @@ import AudioSink from "./AudioSink";
 import { Room, RoomEvent, Track } from "livekit-client";
 import { copiaSirve } from "@/lib/microDelSupervisor";
 import { VideoOff, Loader2, Monitor, Video, Copy } from "lucide-react";
-import { esOtraPestana, TITULO_OTRA_PESTANA, BOTON_USAR_AQUI } from "@/lib/sesionDuplicada";
+import { esOtraPestana } from "@/lib/sesionDuplicada";
 import { toast } from "sonner";
+import { useLanguage } from "@/hooks/useLanguage";
+import { traducir, type TranslationKey } from "@/lib/i18n";
 
 interface Props {
   roomId: string;
@@ -78,6 +80,7 @@ function VideoTile({ track }: { track: any }) {
 // deshabilitado. Solo se ADJUNTA (y por ende streamea) el track que se está viendo — el otro
 // queda pausado por adaptiveStream, así ver la pantalla no cuesta ancho de banda hasta pedirlo.
 function MonitorTile({ pv, viewingScreen, onSwap, showName = true }: { pv: PartVideo; viewingScreen: boolean; onSwap: () => void; showName?: boolean }) {
+  const { t } = useLanguage();
   const canSwap = !!pv.screen;
   const activeTrack = viewingScreen && pv.screen ? pv.screen : pv.camera;
   return (
@@ -87,7 +90,7 @@ function MonitorTile({ pv, viewingScreen, onSwap, showName = true }: { pv: PartV
       ) : (
         <div className="flex flex-col items-center justify-center h-full gap-1 text-muted-foreground/50">
           <VideoOff className="h-4 w-4" />
-          <span className="text-[9px] tactil:text-[11px]">Cámara apagada</span>
+          <span className="text-[9px] tactil:text-[11px]">{t("cowork.monitor.cameraOff")}</span>
         </div>
       )}
       <button
@@ -96,19 +99,19 @@ function MonitorTile({ pv, viewingScreen, onSwap, showName = true }: { pv: PartV
         onClick={onSwap}
         title={
           !canSwap
-            ? "No está compartiendo pantalla"
+            ? t("cowork.monitor.notSharing")
             : viewingScreen
-              ? "Ver cámara"
-              : "Ver pantalla compartida"
+              ? t("cowork.monitor.viewCamera")
+              : t("cowork.monitor.viewScreen")
         }
-        aria-label={viewingScreen ? "Ver cámara" : "Ver pantalla compartida"}
+        aria-label={viewingScreen ? t("cowork.monitor.viewCamera") : t("cowork.monitor.viewScreen")}
         className="absolute top-1 right-1 z-10 flex h-6 w-6 tactil:h-8 tactil:w-8 items-center justify-center rounded-md bg-black/50 text-white/90 backdrop-blur-sm transition hover:bg-black/70 disabled:cursor-not-allowed disabled:opacity-30"
       >
         {viewingScreen ? <Video className="h-3.5 w-3.5" /> : <Monitor className="h-3.5 w-3.5" />}
       </button>
       {showName && (pv.name || viewingScreen) && (
         <span className="absolute bottom-1 left-1 max-w-[85%] truncate rounded bg-black/50 px-1.5 py-0.5 text-[9px] tactil:text-[11px] text-white/90">
-          {pv.name}{viewingScreen ? " · pantalla" : ""}
+          {pv.name}{viewingScreen ? ` · ${t("cowork.monitor.screenSuffix")}` : ""}
         </span>
       )}
     </div>
@@ -133,10 +136,10 @@ function useClonPublicado(opts: {
   source: Track.Source;
   roomId: string;
   roomName?: string;
-  /** Para los avisos: "tu micrófono", "tu cámara", "tu pantalla". */
-  etiqueta: string;
+  /** El aviso si no se puede publicar: uno por micrófono, cámara y pantalla. */
+  claveFallo: TranslationKey;
 }) {
-  const { roomRef, status, activo, baseTrack, source, roomId, roomName, etiqueta } = opts;
+  const { roomRef, status, activo, baseTrack, source, roomId, roomName, claveFallo } = opts;
   const publishedCloneRef = useRef<MediaStreamTrack | null>(null);
   const baseDelCloneRef = useRef<MediaStreamTrack | null>(null);
   const [intentoPublicar, setIntentoPublicar] = useState(0);
@@ -182,14 +185,15 @@ function useClonPublicado(opts: {
           if (intentoPublicar !== 0) setIntentoPublicar(0);
           toast.dismiss(toastId);
         } catch (e) {
-          console.error(`[cowork monitor] no pude publicar ${etiqueta} en la sala:`, e);
+          console.error(`[cowork monitor] no pude publicar ${source} en la sala:`, e);
           if (clone) { try { clone.stop(); } catch { /* noop */ } }
           publishedCloneRef.current = null;
           baseDelCloneRef.current = null;
           if (!cancelado) {
             if (intentoPublicar === MAX_INTENTOS_PUBLICAR) {
-              toast.error(`No se está publicando ${etiqueta} en ${roomName ? `«${roomName}»` : "una sala"}`, {
-                description: "Se sigue reintentando solo; si no vuelve, apaga y vuelve a encender el botón de esa sala.",
+              // traducir() y no el hook: esto corre dentro de un efecto, cuando falla.
+              toast.error(traducir(claveFallo, { room: roomName ? traducir("cowork.monitor.quotedRoom", { room: roomName }) : traducir("cowork.monitor.aRoom") }), {
+                description: traducir("cowork.monitor.publishRetrying"),
                 duration: 15_000,
                 id: toastId,
               });
@@ -232,6 +236,7 @@ function useClonPublicado(opts: {
 // por sala (adaptiveStream → capa baja para thumbnails). El coordinador aparece como
 // "📢 Coordinador" (solo audio) en las salas donde tenga el micro activo.
 export default function CoworkRoomMonitor({ roomId, roomName, issueToken, showVideo, hearOn, broadcastOn, micBaseTrack, camOn = false, camBaseTrack = null, screenOn = false, screenBaseTrack = null, enabled = true, onSharersChange, onSpeakingChange, showNames = true, onParticipantsChange }: Props) {
+  const { t } = useLanguage();
   const [partVideos, setPartVideos] = useState<PartVideo[]>([]);
   const [audioTracks, setAudioTracks] = useState<Array<{ sid: string; track: any }>>([]);
   // Qué participantes están mostrando su PANTALLA en vez de su cámara (por identity).
@@ -292,7 +297,7 @@ export default function CoworkRoomMonitor({ roomId, roomName, issueToken, showVi
       const isScreen = source === Track.Source.ScreenShare;
       if (!isCam && !isScreen) return;
       const identity = participant?.identity ?? track?.sid ?? "?";
-      const name = participant?.name || participant?.identity || "Alguien";
+      const name = participant?.name || participant?.identity || traducir("cowork.common.someone");
       setPartVideos((prev) => {
         const i = prev.findIndex((p) => p.identity === identity);
         if (i === -1) {
@@ -338,7 +343,7 @@ export default function CoworkRoomMonitor({ roomId, roomName, issueToken, showVi
           (pub: any) => pub.source === Track.Source.ScreenShare && pub.kind === Track.Kind.Video,
         );
         if (sharing) {
-          names.push(p.name || p.identity || "Alguien");
+          names.push(p.name || p.identity || traducir("cowork.common.someone"));
           if (identity && !identity.startsWith("__")) sharerIds.push(identity);
         }
       });
@@ -375,7 +380,7 @@ export default function CoworkRoomMonitor({ roomId, roomName, issueToken, showVi
           // referencia nuestra; la identidad capturada al conectar es el
           // respaldo. Cualquiera de las dos alcanza para no contarme a mí.
           .filter((sp) => !sp?.isLocal && sp?.identity !== identidadLocalRef.current)
-          .map((sp) => sp?.name || sp?.identity || "Alguien");
+          .map((sp) => sp?.name || sp?.identity || traducir("cowork.common.someone"));
         onSpeakingRef.current?.(remotos);
       })
       // OJO con reintentar acá sin mirar la razón: si nos sacaron porque la
@@ -449,9 +454,9 @@ export default function CoworkRoomMonitor({ roomId, roomName, issueToken, showVi
 
   // Los tres broadcasts del coordinador hacia esta sala, con la MISMA mecánica
   // (clon del track base + copiaSirve + reintentos que no se rinden):
-  useClonPublicado({ roomRef, status, activo: broadcastOn, baseTrack: micBaseTrack, source: Track.Source.Microphone, roomId, roomName, etiqueta: "tu micrófono" });
-  useClonPublicado({ roomRef, status, activo: camOn, baseTrack: camBaseTrack, source: Track.Source.Camera, roomId, roomName, etiqueta: "tu cámara" });
-  useClonPublicado({ roomRef, status, activo: screenOn, baseTrack: screenBaseTrack, source: Track.Source.ScreenShare, roomId, roomName, etiqueta: "tu pantalla" });
+  useClonPublicado({ roomRef, status, activo: broadcastOn, baseTrack: micBaseTrack, source: Track.Source.Microphone, roomId, roomName, claveFallo: "cowork.monitor.publishFailed.mic" });
+  useClonPublicado({ roomRef, status, activo: camOn, baseTrack: camBaseTrack, source: Track.Source.Camera, roomId, roomName, claveFallo: "cowork.monitor.publishFailed.camera" });
+  useClonPublicado({ roomRef, status, activo: screenOn, baseTrack: screenBaseTrack, source: Track.Source.ScreenShare, roomId, roomName, claveFallo: "cowork.monitor.publishFailed.screen" });
 
   return (
     <>
@@ -468,21 +473,21 @@ export default function CoworkRoomMonitor({ roomId, roomName, issueToken, showVi
           // estaba rota cuando en realidad estaba llena y trabajando.
           <div className="flex flex-col items-center justify-center h-full gap-1 px-2 text-center">
             <Copy className="h-4 w-4 text-muted-foreground/50" />
-            <span className="text-[10px] tactil:text-[11px] text-muted-foreground/70">{TITULO_OTRA_PESTANA}</span>
+            <span className="text-[10px] tactil:text-[11px] text-muted-foreground/70">{t("cowork.monitor.otherWindow")}</span>
             <button
               type="button"
               onClick={() => setIntento((n) => n + 1)}
               className="text-[10px] underline text-primary hover:text-primary/80"
             >
-              {BOTON_USAR_AQUI}
+              {t("cowork.monitor.useHere")}
             </button>
           </div>
         ) : status === "error" ? (
-          <div className="flex items-center justify-center h-full text-[11px] tactil:text-[12px] text-muted-foreground/50 italic">Preview no disponible</div>
+          <div className="flex items-center justify-center h-full text-[11px] tactil:text-[12px] text-muted-foreground/50 italic">{t("cowork.monitor.previewUnavailable")}</div>
         ) : partVideos.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-1 text-muted-foreground/50">
             <VideoOff className="h-4 w-4" />
-            <span className="text-[10px] tactil:text-[11px]">Cámaras apagadas</span>
+            <span className="text-[10px] tactil:text-[11px]">{t("cowork.monitor.camerasOff")}</span>
           </div>
         ) : (
           <div className={`grid ${partVideos.length === 1 ? "grid-cols-1" : "grid-cols-2"} gap-1 h-full auto-rows-fr`}>

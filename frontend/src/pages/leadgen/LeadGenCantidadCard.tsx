@@ -2,6 +2,7 @@ import { Star, TrendingUp, ArrowUpRight, ArrowRight, ArrowDownRight, Users, Phon
 import StatChip from "@/components/StatChip";
 import { UserAvatar } from "@/components/UserAvatar";
 import { formatCompact } from "@/lib/format";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface ActiveFilter {
   type: "categoria" | "status" | null;
@@ -43,7 +44,9 @@ const categoryConfig = [
 // horizontal con avatar + nombre completo + métrica destacada. Mismo
 // estilo glass que las demás KpiCards (gradient corner + glow ámbar
 // para el "trophy").
-const MejorLlgCard = ({ data, rangeLabel }: { data: MejorLlg | null; rangeLabel?: string }) => (
+const MejorLlgCard = ({ data, rangeLabel }: { data: MejorLlg | null; rangeLabel?: string }) => {
+  const { t } = useLanguage();
+  return (
   <div className="group relative overflow-hidden rounded-xl border border-white/10 bg-card/60 bg-gradient-to-br from-amber-500/[0.05] to-transparent p-4 ring-1 ring-amber-400/10 md:col-span-2 lg:col-span-3">
     {/* Glow ámbar más fuerte que las demás cards — esta es la métrica destacada */}
     <div className="relative space-y-3">
@@ -51,7 +54,7 @@ const MejorLlgCard = ({ data, rangeLabel }: { data: MejorLlg | null; rangeLabel?
         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500">
           <Trophy className="h-5 w-5 text-white" />
         </div>
-        <p className="text-xs text-foreground/80 font-semibold">Mejor LLG</p>
+        <p className="text-xs text-foreground/80 font-semibold">{t("leadgen.dash.bestLlg")}</p>
       </div>
       {data ? (
         <div className="flex items-center gap-3">
@@ -61,17 +64,18 @@ const MejorLlgCard = ({ data, rangeLabel }: { data: MejorLlg | null; rangeLabel?
             <p className="text-sm text-muted-foreground flex items-center gap-1.5 mt-0.5">
               <Phone className="h-3.5 w-3.5" />
               <span className="font-semibold text-foreground tabular-nums">{data.phones}</span>
-              <span>teléfono{data.phones === 1 ? "" : "s"}</span>
+              <span>{t(data.phones === 1 ? "leadgen.phoneWord.one" : "leadgen.phoneWord.other")}</span>
               {rangeLabel && <span className="text-muted-foreground/60">· {rangeLabel}</span>}
             </p>
           </div>
         </div>
       ) : (
-        <p className="text-sm text-muted-foreground">Sin actividad en el rango.</p>
+        <p className="text-sm text-muted-foreground">{t("leadgen.noActivityInRange")}</p>
       )}
     </div>
   </div>
-);
+  );
+};
 
 const LeadGenCantidadCard = ({ stats, activeFilter, onFilterChange, mejorLlg, rangeLabel }: Props) => {
   const { total, qa, byQuality } = stats;

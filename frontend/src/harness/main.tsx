@@ -6,6 +6,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
+import { LanguageProvider } from "@/hooks/useLanguage";
 import UsersTable from "@/pages/admin/UsersTable";
 import UsersGrid from "@/pages/admin/UsersGrid";
 import type { AdminUser } from "@/pages/admin/useAdminUsers";
@@ -48,35 +49,40 @@ const USERS: AdminUser[] = [
 
 const noop = () => {};
 
+// UsersTable y UsersGrid llaman a useLanguage(), que tira sin proveedor: sin
+// esto la página se caía al montar. Con él también se puede mirar en inglés
+// (localStorage app-language=en y recargar).
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <MemoryRouter>
-      <div className="min-h-dvh bg-background p-6 text-foreground">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Vista lista
-        </h2>
-        <UsersTable
-          users={USERS}
-          onEditRole={noop}
-          onEdit={noop}
-          onResetPassword={noop}
-          onMigrarCorreo={noop}
-          onDelete={noop}
-          onRemoveRole={noop}
-        />
-        <h2 className="mb-3 mt-8 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Vista tarjetas
-        </h2>
-        <UsersGrid
-          users={USERS}
-          onEditRole={noop}
-          onEdit={noop}
-          onResetPassword={noop}
-          onMigrarCorreo={noop}
-          onDelete={noop}
-          onRemoveRole={noop}
-        />
-      </div>
-    </MemoryRouter>
+    <LanguageProvider>
+      <MemoryRouter>
+        <div className="min-h-dvh bg-background p-6 text-foreground">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            Vista lista
+          </h2>
+          <UsersTable
+            users={USERS}
+            onEditRole={noop}
+            onEdit={noop}
+            onResetPassword={noop}
+            onMigrarCorreo={noop}
+            onDelete={noop}
+            onRemoveRole={noop}
+          />
+          <h2 className="mb-3 mt-8 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            Vista tarjetas
+          </h2>
+          <UsersGrid
+            users={USERS}
+            onEditRole={noop}
+            onEdit={noop}
+            onResetPassword={noop}
+            onMigrarCorreo={noop}
+            onDelete={noop}
+            onRemoveRole={noop}
+          />
+        </div>
+      </MemoryRouter>
+    </LanguageProvider>
   </StrictMode>,
 );

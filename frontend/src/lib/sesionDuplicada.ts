@@ -1,4 +1,6 @@
 import { DisconnectReason } from "livekit-client";
+import type { TranslationKey } from "@/lib/i18n";
+import { compartido } from "@/lib/i18n/compartido";
 
 // Qué hacer cuando LiveKit nos desconecta, según POR QUÉ nos desconectó.
 //
@@ -42,16 +44,26 @@ export function debeReintentar(razon?: DisconnectReason | number | null): boolea
 
 // Los textos, acá y no repartidos por las pantallas, para que el supervisor y
 // la persona supervisada lean lo mismo y nadie tenga que adivinar qué pasó.
+// Viven en el diccionario (lib/i18n/compartido.ts); cada pantalla los dibuja
+// con `t(CLAVES_OTRA_PESTANA.titulo)`.
+//
+//  - titulo: dice el HECHO, no un error: no se rompió nada.
+//  - detalle: nombra las dos cosas que la persona necesita saber: por qué se
+//    cortó acá, y que puede traerlo de vuelta con un clic.
+//  - usarAqui: "Usar aquí" y no "Reconectar": lo que hace no es reintentar, es
+//    ELEGIR este lugar — y de paso deja al otro fuera. Conviene que el texto lo
+//    diga, porque la consecuencia le cae a la otra pestaña.
+export const CLAVES_OTRA_PESTANA = {
+  titulo: "shared.otherTab.title",
+  detalle: "shared.otherTab.detail",
+  usarAqui: "shared.otherTab.useHere",
+} as const satisfies Record<string, TranslationKey>;
 
-/** Título del cartel. Dice el HECHO, no un error: no se rompió nada. */
-export const TITULO_OTRA_PESTANA = "Abierto en otra ventana";
-
-/** Explicación. Nombra las dos cosas que la persona necesita saber: por qué
- *  se cortó acá, y que puede traerlo de vuelta con un clic. */
-export const DETALLE_OTRA_PESTANA =
-  "Tu cuenta abrió esto en otra pestaña o dispositivo. Solo puede estar activa en un lugar a la vez.";
-
-/** El botón. "Usar aquí" y no "Reconectar": lo que hace no es reintentar, es
- *  ELEGIR este lugar — y de paso deja al otro fuera. Conviene que el texto lo
- *  diga, porque la consecuencia le cae a la otra pestaña. */
-export const BOTON_USAR_AQUI = "Usar aquí";
+// El texto en español de las mismas claves, para las pantallas que todavía no
+// pasan por t() (el monitor de Cowork). Sale del diccionario: una sola fuente.
+/** @deprecated Dibujar `t(CLAVES_OTRA_PESTANA.titulo)`. */
+export const TITULO_OTRA_PESTANA = compartido[CLAVES_OTRA_PESTANA.titulo].es;
+/** @deprecated Dibujar `t(CLAVES_OTRA_PESTANA.detalle)`. */
+export const DETALLE_OTRA_PESTANA = compartido[CLAVES_OTRA_PESTANA.detalle].es;
+/** @deprecated Dibujar `t(CLAVES_OTRA_PESTANA.usarAqui)`. */
+export const BOTON_USAR_AQUI = compartido[CLAVES_OTRA_PESTANA.usarAqui].es;

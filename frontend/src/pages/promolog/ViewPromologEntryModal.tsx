@@ -71,7 +71,7 @@ const ViewPromologEntryModal = ({ open, onOpenChange, entry }: Props) => {
               <p className="text-sm">{entry.date}</p>
             </div>
             <div className="space-y-1">
-              <p className="text-xs text-muted-foreground font-medium">{t("common.hour")}</p>
+              <p className="text-xs text-muted-foreground font-medium">{t("promolog.time")}</p>
               <p className="text-sm">{entry.time}</p>
             </div>
           </div>

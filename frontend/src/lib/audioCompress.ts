@@ -92,7 +92,7 @@ export async function compressAudioIfNeeded(
   };
   const Mp3Encoder = lamejsModule.Mp3Encoder ?? lamejsModule.default?.Mp3Encoder;
   if (!Mp3Encoder) {
-    throw new Error("No se pudo cargar el codificador mp3.");
+    throw new Error(traducir("shared.audio.encoderFailed"));
   }
   const encoder = new Mp3Encoder(1, TARGET_SAMPLE_RATE, TARGET_BITRATE_KBPS);
 
@@ -122,7 +122,7 @@ export async function compressAudioIfNeeded(
   const tail = encoder.flush();
   if (tail.length > 0) mp3Chunks.push(tail);
 
-  onProgress?.(100, "Listo");
+  onProgress?.(100, traducir("shared.audio.done"));
 
   const mp3Blob = new Blob(mp3Chunks, { type: "audio/mpeg" });
   const cleanName = file.name.replace(/\.[a-z0-9]+$/i, "");
@@ -137,10 +137,7 @@ export async function compressAudioIfNeeded(
   if (compressedFile.size > MAX_COMPRESSED_BYTES) {
     const mb = (compressedFile.size / 1024 / 1024).toFixed(1);
     const limitMb = (MAX_COMPRESSED_BYTES / 1024 / 1024).toFixed(0);
-    throw new Error(
-      `El audio comprimido pesa ${mb}MB, supera el límite de ${limitMb}MB de Whisper. ` +
-        `Prueba recortar la llamada (la duración aprox. máxima es ~140 min) o dividirla en partes.`,
-    );
+    throw new Error(traducir("shared.audio.tooLarge", { mb, limitMb }));
   }
 
   return {

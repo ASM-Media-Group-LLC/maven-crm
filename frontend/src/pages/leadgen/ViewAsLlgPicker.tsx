@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
 import { useLeadGenLLGs } from "./useLeadGen";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // Selector admin-only para "ver el panel de LeadGen como X LLG".
 // Trae los profiles que tienen al menos una entry en leadgen_entries —
@@ -24,6 +25,7 @@ interface Props {
 }
 
 const ViewAsLlgPicker = ({ value, onChange }: Props) => {
+  const { t } = useLanguage();
   const [open, setOpen] = useState(false);
   const { data: llgs = [], isLoading } = useLeadGenLLGs();
 
@@ -51,18 +53,18 @@ const ViewAsLlgPicker = ({ value, onChange }: Props) => {
       </PopoverTrigger>
       <PopoverContent className="w-64 p-0" align="end">
         <Command>
-          <CommandInput placeholder="Filtrar por nombre…" className="h-9" />
+          <CommandInput placeholder={t("leadgen.viewAs.filterByName")} className="h-9" />
           <CommandList>
             {isLoading ? (
-              <CommandEmpty>Cargando…</CommandEmpty>
+              <CommandEmpty>{t("common.loading")}</CommandEmpty>
             ) : llgs.length === 0 ? (
-              <CommandEmpty>Sin LLGs registrados.</CommandEmpty>
+              <CommandEmpty>{t("leadgen.viewAs.noLlgs")}</CommandEmpty>
             ) : (
               <>
                 <CommandEmpty />
-                <CommandGroup heading="Ver como">
+                <CommandGroup heading={t("leadgen.viewAs.heading")}>
                   {llgs.map((l) => {
-                    const label = l.full_name?.trim() || "(sin nombre)";
+                    const label = l.full_name?.trim() || t("leadgen.noNameParens");
                     const isSelected = value === l.id;
                     return (
                       <CommandItem

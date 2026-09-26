@@ -20,6 +20,9 @@ import {
 } from "@/lib/audioDeLaLlamada";
 import { BackgroundProcessor, supportsBackgroundProcessors } from "@livekit/track-processors";
 import { toast } from "sonner";
+// Los avisos de la llamada van por traducir(): se arman en eventos de LiveKit y
+// callbacks, no en el JSX, y los lee la persona en su propio idioma.
+import { traducir } from "@/lib/i18n";
 import { puedeCompartirPantalla, motivoDeFalloAlCompartir } from "@/lib/compartirPantalla";
 import { supabase } from "@/integrations/supabase/client";
 import { avisarSalidaDeLlamada, mostrarAvisoDeSala, ID_AVISO_ME_SILENCIARON } from "@/lib/avisosDeLlamada";
@@ -120,7 +123,7 @@ function formatLiveKitConnectionError(err: any, livekitUrl?: string) {
   const host = livekitUrl ? livekitUrl.replace(/^wss?:\/\//, "").replace(/\/$/, "") : "LiveKit";
 
   if (/Abort handler called|serverUnreachable|websocket.*closed|ERR_CONNECTION_TIMED_OUT|timeout|timed out/i.test(rawMessage)) {
-    return `No se pudo conectar con el servidor de video (${host}). Verifica que LiveKit esté activo y que HTTPS/WSS en el puerto 443 sea accesible.`;
+    return traducir("shared.call.connectFailed", { host });
   }
 
   return rawMessage;
@@ -206,6 +209,10 @@ function mapConnectionQuality(q: ConnectionQuality): ConnectionQualityLevel {
 
 // ── Chat message cap to prevent unbounded memory growth ──────────
 const MAX_CHAT_MESSAGES = 500;
+
+// El id del aviso permanente "Dejaron de escucharte" (el que lleva el botón
+// «Reparar»). Uno solo para crearlo, cerrarlo y reemplazarlo al repararlo.
+const ID_AVISO_MIC_SIN_SALIDA = "mic-sin-salida";
 
 // ── Background processor timeouts (reduced for responsiveness) ───
 const BACKGROUND_ATTACH_TIMEOUT_MS = 6000;
@@ -407,17 +414,17 @@ export function useLiveKit() {
     if (!t || micVigiladoRef.current === t) return;
     micVigiladoRef.current = t;
     t.addEventListener("mute", () => {
-      toast.warning("Tu micrófono dejó de enviar audio", {
+      toast.warning(traducir("shared.call.micStopped"), {
         id: "mic-mudo",
-        description: "El sistema lo silenció o lo tomó otro programa (pasa al compartir pantalla con audio o al cambiar de dispositivo). Apaga y vuelve a prender el micrófono.",
+        description: traducir("shared.call.micStoppedDesc"),
         duration: 12000,
       });
     });
     t.addEventListener("unmute", () => toast.dismiss("mic-mudo"));
     t.addEventListener("ended", () => {
-      toast.error("Tu micrófono se desconectó", {
+      toast.error(traducir("shared.call.micDisconnected"), {
         id: "mic-mudo",
-        description: "Nadie te escucha. Apaga y vuelve a prender el micrófono, o revisa el dispositivo.",
+        description: traducir("shared.call.micDisconnectedDesc"),
         duration: 15000,
       });
     });
@@ -433,17 +440,17 @@ export function useLiveKit() {
     const pista = micPub?.track as LocalAudioTrack | undefined;
     if (pista) {
       pista.on(TrackEvent.UpstreamPaused, () => {
-        toast.error("Dejaron de escucharte", {
-          id: "mic-sin-salida",
-          description: "Tu micrófono figura encendido pero no está saliendo al aire. El sistema lo silenció o lo tomó otro programa.",
+        toast.error(traducir("shared.call.notHeard"), {
+          id: ID_AVISO_MIC_SIN_SALIDA,
+          description: traducir("shared.call.notHeardDesc"),
           duration: Infinity,
           action: {
-            label: "Reparar",
+            label: traducir("shared.call.repair"),
             onClick: () => { void repararMicroRef.current(); },
           },
         });
       });
-      pista.on(TrackEvent.UpstreamResumed, () => toast.dismiss("mic-sin-salida"));
+      pista.on(TrackEvent.UpstreamResumed, () => toast.dismiss(ID_AVISO_MIC_SIN_SALIDA));
     }
   }, []);
   // El fondo al que el hook tuvo que caerse por su cuenta (hoy solo "none",
@@ -827,13 +834,13 @@ export function useLiveKit() {
             guardarFondo("none");
             backgroundEffectRef.current = "none";
             bgRequestedEffectRef.current = "none";
-            toast.error("Tu fondo ya no está disponible", {
-              description: "Se quitó el efecto y tu cámara sale sin fondo. Elegí otro cuando quieras.",
+            toast.error(traducir("shared.call.bgGone"), {
+              description: traducir("shared.call.bgGoneDesc"),
               id: "fondo-perdido",
             });
           } else {
-            toast.error("No se pudo poner tu fondo", {
-              description: "Tu cámara está saliendo sin fondo. Volvé a elegirlo para reintentar.",
+            toast.error(traducir("shared.call.bgFailed"), {
+              description: traducir("shared.call.bgFailedDesc"),
               id: "fondo-perdido",
             });
           }
@@ -912,8 +919,8 @@ export function useLiveKit() {
       // se corrige lo que la interfaz muestra.
       if (effect !== "none") {
         setFondoCorregido("none");
-        toast.error("No se pudo aplicar tu fondo", {
-          description: "Tu cámara está saliendo sin fondo. Volvé a elegirlo para reintentar.",
+        toast.error(traducir("shared.call.bgApplyFailed"), {
+          description: traducir("shared.call.bgFailedDesc"),
           id: "fondo-fallo",
         });
       }
@@ -1297,9 +1304,9 @@ export function useLiveKit() {
         meSilencieYoRef.current = Date.now();
         // Con id: si enseguida llega el aviso del servidor con nombre y cara
         // ("Jhon silenció tu micrófono"), reemplaza a este en vez de apilarse.
-        toast.info("Alguien silenció tu micrófono", {
+        toast.info(traducir("shared.call.someoneMutedYou"), {
           id: ID_AVISO_ME_SILENCIARON,
-          description: "Puedes volver a activarlo cuando quieras.",
+          description: traducir("shared.call.canTurnBackOn"),
           duration: 8000,
         });
       });
@@ -1340,9 +1347,9 @@ export function useLiveKit() {
       // (lo tomó otro programa, el dispositivo guardado ya no está) no producía
       // ni una señal, y la persona se enteraba cuando alguien se lo decía.
       room.on(RoomEvent.LocalAudioSilenceDetected, () => {
-        toast.warning("Tu micrófono no está captando nada", {
+        toast.warning(traducir("shared.call.micSilent"), {
           id: "mic-sin-captura",
-          description: "Revisa que sea el dispositivo correcto y que no esté silenciado por el sistema.",
+          description: traducir("shared.call.micSilentDesc"),
           duration: 12000,
         });
       });
@@ -1610,9 +1617,9 @@ export function useLiveKit() {
       await (micPub?.track as LocalAudioTrack | undefined)?.stopProcessor?.();
     } catch { /* el procesador ya estaba caído */ }
     ncProcessorRef.current = null;
-    toast.warning("Cancelación de ruido apagada", {
+    toast.warning(traducir("shared.call.ncOff"), {
       id: "nc-fallo",
-      description: "El filtro dejó de procesar tu voz y te habrían dejado de escuchar. Sigues al aire sin él; puedes volver a activarlo desde el botón.",
+      description: traducir("shared.call.ncOffDesc"),
       duration: 10000,
     });
   }, []);
@@ -1651,9 +1658,9 @@ export function useLiveKit() {
   // este aviso de 15 s pisaba el toast permanente que lleva el botón «Reparar»
   // — o sea que tocar el botón del micro te borraba la única cura a mano.
   const avisarMicroIrrecuperable = useCallback(() => {
-    toast.error("No pude encender el micrófono", {
+    toast.error(traducir("shared.call.micWontStart"), {
       id: "mic-no-enciende",
-      description: "Otro programa puede tenerlo tomado. Prueba a elegir otro micrófono en el menú de la llamada y volver al de siempre.",
+      description: traducir("shared.call.micWontStartDesc"),
       duration: 15000,
     });
   }, []);
@@ -1671,9 +1678,9 @@ export function useLiveKit() {
     // que lleva el botón «Reparar»: se autodestruiría a los 15 s sin que nadie
     // lo haya tocado, y la persona quedaría muda y sin botón. Eso era aceptable
     // cuando repararMicro solo corría por un clic; ahora lo dispara el vigilante.
-    const avisoId = automatica ? "mic-reparando-solo" : "mic-sin-salida";
+    const avisoId = automatica ? "mic-reparando-solo" : ID_AVISO_MIC_SIN_SALIDA;
     try {
-      toast.loading("Reconectando el micrófono…", { id: avisoId });
+      toast.loading(traducir("shared.call.micReconnecting"), { id: avisoId });
       // ⚠️ Soltar el procesador ANTES de re-pedir el micrófono. LiveKit llama a
       // `processor.restart()` DENTRO de `setMediaStreamTrack`, antes del
       // `replaceTrack`: si la cadena de cancelación de ruido falla ahí, aborta
@@ -1690,12 +1697,12 @@ export function useLiveKit() {
       }
       micVigiladoRef.current = null;        // la pista cruda cambió: hay que volver a vigilarla
       vigilarMicro(room);
-      toast.success("Micrófono reconectado", { id: avisoId, duration: 6000, action: undefined });
+      toast.success(traducir("shared.call.micReconnected"), { id: avisoId, duration: 6000, action: undefined });
     } catch (err) {
       console.error("[LiveKit] no pude reparar el micrófono:", err);
-      toast.error("No pude reconectar el micrófono", {
+      toast.error(traducir("shared.call.micReconnectFailed"), {
         id: avisoId,
-        description: "Prueba a elegir otro micrófono en el menú de la llamada y volver al de siempre.",
+        description: traducir("shared.call.micReconnectFailedDesc"),
         duration: 15000,
       });
     }
@@ -1977,8 +1984,8 @@ export function useLiveKit() {
       // Los teléfonos no exponen getDisplayMedia. Se avisa ANTES de intentarlo,
       // para que el mensaje diga el motivo real en vez de un error del navegador.
       if (newState && !puedeCompartirPantalla()) {
-        toast.info("Compartir pantalla no está disponible acá", {
-          description: "Los teléfonos no lo permiten. Hazlo desde la computadora.",
+        toast.info(traducir("shared.call.screenShareUnavailable"), {
+          description: traducir("shared.call.screenShareUnavailableDesc"),
         });
         return;
       }
@@ -1990,7 +1997,7 @@ export function useLiveKit() {
       // NADA pasar, ni siquiera un mensaje de por qué.
       console.error("Screen share error:", err);
       const motivo = motivoDeFalloAlCompartir(err);
-      if (motivo) toast.error("No se pudo compartir la pantalla", { description: motivo });
+      if (motivo) toast.error(traducir("shared.call.screenShareFailed"), { description: motivo });
     }
   }, [debouncedRefresh]);
 
@@ -2053,7 +2060,7 @@ export function useLiveKit() {
         {
           id,
           sender: room.localParticipant.identity,
-          senderName: room.localParticipant.name || "Tú",
+          senderName: room.localParticipant.name || traducir("shared.call.you"),
           content: text,
           timestamp: ts,
         },
@@ -2073,7 +2080,7 @@ export function useLiveKit() {
   // LiveKit y la autorización la decide la base (can_moderate_livekit_room).
   const moderate = useCallback(async (action: string, payload: Record<string, unknown> = {}) => {
     const room = roomRef.current;
-    if (!room?.name) throw new Error("No estás en una llamada");
+    if (!room?.name) throw new Error(traducir("shared.call.notInCall"));
     const { data: { session } } = await supabase.auth.getSession();
     const res = await fetch(
       `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/livekit-moderate`,
@@ -2088,7 +2095,7 @@ export function useLiveKit() {
       }
     );
     const json = await res.json();
-    if (!res.ok) throw new Error(json.error || "No se pudo aplicar la acción");
+    if (!res.ok) throw new Error(json.error || traducir("shared.call.actionFailed"));
     return json;
   }, []);
 
