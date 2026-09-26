@@ -1,3 +1,5 @@
+import type { TranslationKey } from "@/lib/i18n";
+
 export const LEADGEN_COUNTRIES = [
   { code: "US", name: "Estados Unidos", flag: "🇺🇸" },
   { code: "MX", name: "México", flag: "🇲🇽" },
@@ -74,19 +76,14 @@ export const FLORIDA_CITIES = [
   "Lakeland", "Palm Bay", "Clearwater", "West Palm Beach", "Pompano Beach",
 ];
 
-export const PLATFORM_OPTIONS = [
-  { value: "IG", label: "Instagram" },
-  { value: "TT", label: "TikTok" },
-  { value: "X", label: "X (Twitter)" },
-  { value: "OTHER", label: "Otro" },
-];
-
-export const QUALITY_OPTIONS = [
-  { value: "A+", label: "A+ (Excelente)" },
-  { value: "A", label: "A (Alta)" },
-  { value: "B+", label: "B+ (Buena)" },
-  { value: "B", label: "B (Regular)" },
-  { value: "C", label: "C (Básica)" },
+// `value` es el dato (la calidad que se guarda y se compara); en pantalla va
+// `t(labelKey)`.
+export const QUALITY_OPTIONS: ReadonlyArray<{ value: string; labelKey: TranslationKey }> = [
+  { value: "A+", labelKey: "leadgen.quality.aPlusExcellent" },
+  { value: "A", labelKey: "leadgen.quality.aHigh" },
+  { value: "B+", labelKey: "leadgen.quality.bPlusGood" },
+  { value: "B", labelKey: "leadgen.quality.bFair" },
+  { value: "C", labelKey: "leadgen.quality.cBasic" },
 ];
 
 /** Get the platform URL for a lead */

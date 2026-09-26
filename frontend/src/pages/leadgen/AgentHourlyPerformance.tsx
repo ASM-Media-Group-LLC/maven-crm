@@ -6,6 +6,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { LeadGenEntry } from "./useLeadGen";
 import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 
 interface AgentHourlyPerformanceProps {
   leads: LeadGenEntry[];
@@ -13,12 +15,13 @@ interface AgentHourlyPerformanceProps {
 
 const OBJETIVO_POR_HORA = 20;
 
-const qualityCards = [
-  { key: "a+", label: "Top Quality", color: "text-emerald-500", bgIcon: "bg-emerald-500/20", hoverBg: "group-hover:bg-emerald-500/5" },
-  { key: "a", label: "Excelente", color: "text-blue-500", bgIcon: "bg-blue-500/20", hoverBg: "group-hover:bg-blue-500/5" },
-  { key: "b+", label: "Buena", color: "text-cyan-500", bgIcon: "bg-cyan-500/20", hoverBg: "group-hover:bg-cyan-500/5" },
-  { key: "b", label: "Regular", color: "text-violet-500", bgIcon: "bg-violet-500/20", hoverBg: "group-hover:bg-violet-500/5" },
-  { key: "c", label: "Básica", color: "text-muted-foreground", bgIcon: "bg-muted", hoverBg: "group-hover:bg-muted/50" },
+const qualityCards: Array<{ key: string; labelKey: TranslationKey | null; label?: string; color: string; bgIcon: string; hoverBg: string }> = [
+  // "Top Quality" ya estaba en inglés en las dos versiones.
+  { key: "a+", labelKey: null, label: "Top Quality", color: "text-emerald-500", bgIcon: "bg-emerald-500/20", hoverBg: "group-hover:bg-emerald-500/5" },
+  { key: "a", labelKey: "leadgen.quality.excellent", color: "text-blue-500", bgIcon: "bg-blue-500/20", hoverBg: "group-hover:bg-blue-500/5" },
+  { key: "b+", labelKey: "leadgen.quality.good", color: "text-cyan-500", bgIcon: "bg-cyan-500/20", hoverBg: "group-hover:bg-cyan-500/5" },
+  { key: "b", labelKey: "leadgen.quality.fair", color: "text-violet-500", bgIcon: "bg-violet-500/20", hoverBg: "group-hover:bg-violet-500/5" },
+  { key: "c", labelKey: "leadgen.quality.basic", color: "text-muted-foreground", bgIcon: "bg-muted", hoverBg: "group-hover:bg-muted/50" },
 ];
 
 const qualityBarColors: Record<string, string> = {
@@ -29,6 +32,7 @@ const qualityBarColors: Record<string, string> = {
 
 const AgentHourlyPerformance = ({ leads }: AgentHourlyPerformanceProps) => {
   const f = useFormato();
+  const { t } = useLanguage();
   const [now, setNow] = useState(new Date());
 
   useEffect(() => {
@@ -116,13 +120,13 @@ const AgentHourlyPerformance = ({ leads }: AgentHourlyPerformanceProps) => {
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/50 border">
           <span className="h-2 w-2 rounded-full bg-success animate-pulse" />
-          <span className="text-xs text-muted-foreground">Tiempo Activo</span>
+          <span className="text-xs text-muted-foreground">{t("leadgen.perf.activeTime")}</span>
           <span className="text-sm font-mono font-semibold">
             {String(activeHours).padStart(2, "0")}h {String(activeMinutes).padStart(2, "0")}min {String(activeSeconds).padStart(2, "0")}s
           </span>
         </div>
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/50 border">
-          <span className="text-xs text-muted-foreground">Última Hora</span>
+          <span className="text-xs text-muted-foreground">{t("leadgen.perf.lastHour")}</span>
           <span className="text-sm font-semibold">{lastHourLeads.length}</span>
           <Badge className={`text-xs ${lastHourDelta >= 0 ? "bg-success/20 text-success border-success/30" : "bg-destructive/20 text-destructive border-destructive/30"}`}>
             {lastHourDelta >= 0 ? `+${lastHourDelta}` : lastHourDelta}
@@ -137,13 +141,13 @@ const AgentHourlyPerformance = ({ leads }: AgentHourlyPerformanceProps) => {
             <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
             <div className="relative">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-medium text-muted-foreground">Última Hora</p>
+                <p className="text-sm font-medium text-muted-foreground">{t("leadgen.perf.lastHour")}</p>
                 <div className="h-8 w-8 rounded-md bg-primary/20 flex items-center justify-center text-primary">
                   <Clock className="h-4 w-4" />
                 </div>
               </div>
               <p className="text-3xl font-bold text-primary">{lastHourLeads.length}</p>
-              <p className="text-xs text-muted-foreground mt-1">Modelos contactados</p>
+              <p className="text-xs text-muted-foreground mt-1">{t("leadgen.perf.modelsContacted")}</p>
             </div>
           </CardContent>
         </Card>
@@ -152,13 +156,13 @@ const AgentHourlyPerformance = ({ leads }: AgentHourlyPerformanceProps) => {
             <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
             <div className="relative">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-medium text-muted-foreground">Total Hoy</p>
+                <p className="text-sm font-medium text-muted-foreground">{t("leadgen.perf.totalToday")}</p>
                 <div className="h-8 w-8 rounded-md bg-emerald-500/20 flex items-center justify-center text-emerald-500">
                   <Target className="h-4 w-4" />
                 </div>
               </div>
               <p className="text-3xl font-bold text-emerald-500">{todayLeads.length}</p>
-              <p className="text-xs text-muted-foreground mt-1">Modelos contactados</p>
+              <p className="text-xs text-muted-foreground mt-1">{t("leadgen.perf.modelsContacted")}</p>
             </div>
           </CardContent>
         </Card>
@@ -167,15 +171,15 @@ const AgentHourlyPerformance = ({ leads }: AgentHourlyPerformanceProps) => {
             <div className="absolute inset-0 bg-gradient-to-br from-violet-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
             <div className="relative">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-medium text-muted-foreground">Promedio por Hora</p>
+                <p className="text-sm font-medium text-muted-foreground">{t("leadgen.perf.avgPerHour")}</p>
                 <div className="h-8 w-8 rounded-md bg-violet-500/20 flex items-center justify-center text-violet-500">
                   <TrendingUp className="h-4 w-4" />
                 </div>
               </div>
               <p className="text-3xl font-bold text-violet-500">{avgPerHour}</p>
-              <p className="text-xs text-muted-foreground mt-1">Objetivo: {OBJETIVO_POR_HORA}/hora</p>
+              <p className="text-xs text-muted-foreground mt-1">{t("leadgen.perf.target", { count: OBJETIVO_POR_HORA })}</p>
               <p className={`text-xs font-semibold mt-0.5 ${diferencia >= 0 ? "text-success" : "text-destructive"}`}>
-                Esperados: {esperados} | {diferencia >= 0 ? `+${diferencia}` : diferencia}
+                {t("leadgen.perf.expected", { expected: esperados, diff: diferencia >= 0 ? `+${diferencia}` : diferencia })}
               </p>
             </div>
           </CardContent>
@@ -196,7 +200,7 @@ const AgentHourlyPerformance = ({ leads }: AgentHourlyPerformanceProps) => {
                   </div>
                 </div>
                 <p className={`text-2xl font-bold ${q.color}`}>{qualityCounts[q.key]}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{q.label}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{q.labelKey ? t(q.labelKey) : q.label}</p>
               </div>
             </CardContent>
           </Card>
@@ -208,20 +212,20 @@ const AgentHourlyPerformance = ({ leads }: AgentHourlyPerformanceProps) => {
         <CardContent className="p-5">
           <div className="flex items-center gap-2 mb-4">
             <BarChart3 className="h-5 w-5 text-primary" />
-            <h3 className="font-semibold">Resumen</h3>
+            <h3 className="font-semibold">{t("leadgen.perf.summary")}</h3>
           </div>
           <div className="grid grid-cols-3 gap-4">
             <div className="rounded-lg border bg-muted/30 p-4 text-center">
               <p className="text-2xl font-bold text-primary">{leads.length}</p>
-              <p className="text-xs text-muted-foreground mt-1">Total Leads</p>
+              <p className="text-xs text-muted-foreground mt-1">{t("leadgen.perf.totalLeads")}</p>
             </div>
             <div className="rounded-lg border bg-muted/30 p-4 text-center">
               <p className="text-2xl font-bold text-primary">{avgPerDay}</p>
-              <p className="text-xs text-muted-foreground mt-1">Promedio/Día</p>
+              <p className="text-xs text-muted-foreground mt-1">{t("leadgen.perf.avgPerDay")}</p>
             </div>
             <div className="rounded-lg border bg-muted/30 p-4 text-center">
               <p className="text-2xl font-bold text-primary">{hoursWorked.toFixed(1)}h</p>
-              <p className="text-xs text-muted-foreground mt-1">Horas Activas</p>
+              <p className="text-xs text-muted-foreground mt-1">{t("leadgen.perf.activeHours")}</p>
             </div>
           </div>
         </CardContent>
@@ -231,7 +235,7 @@ const AgentHourlyPerformance = ({ leads }: AgentHourlyPerformanceProps) => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardContent className="p-5">
-            <h3 className="font-semibold mb-4">Leads por Día</h3>
+            <h3 className="font-semibold mb-4">{t("leadgen.perf.leadsPerDay")}</h3>
             <div className="h-[250px]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={dailyData}>
@@ -248,7 +252,7 @@ const AgentHourlyPerformance = ({ leads }: AgentHourlyPerformanceProps) => {
 
         <Card>
           <CardContent className="p-5">
-            <h3 className="font-semibold mb-4">Leads por Hora (Hoy)</h3>
+            <h3 className="font-semibold mb-4">{t("leadgen.perf.leadsPerHourToday")}</h3>
             <div className="h-[250px]">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={hourlyData}>
@@ -268,7 +272,7 @@ const AgentHourlyPerformance = ({ leads }: AgentHourlyPerformanceProps) => {
       {qualityDistData.length > 0 && (
         <Card>
           <CardContent className="p-5">
-            <h3 className="font-semibold mb-4">Distribución por Categoría</h3>
+            <h3 className="font-semibold mb-4">{t("leadgen.perf.byCategory")}</h3>
             <div className="h-[220px]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={qualityDistData} layout="vertical" margin={{ left: 10 }}>

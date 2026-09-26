@@ -6,6 +6,8 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { UserAvatar } from "@/components/UserAvatar";
 import { Phone, Trophy, TrendingUp } from "lucide-react";
+import { useLanguage } from "@/hooks/useLanguage";
+import { useFormato } from "@/hooks/useFormato";
 
 // Extras del subtab Dashboard de LeadGen:
 //   · Top 3 LLGs (mini ranking por phones, mismo criterio que el hero)
@@ -57,6 +59,20 @@ const tooltipStyle: React.CSSProperties = {
 };
 
 const LeadGenDashboardExtras = ({ topLlgs, phonesDaily, byQuality, rangeLabel, loading }: Props) => {
+  const { t } = useLanguage();
+  const f = useFormato();
+  // El hook arma la etiqueta del eje como "dd/MM". En inglés va "MM/dd"; en
+  // español queda exactamente la que ya venía.
+  const chartData = useMemo(
+    () =>
+      f.idioma === "en"
+        ? phonesDaily.map((p) => {
+            const [dd, mm] = p.label.split("/");
+            return { ...p, label: `${mm}/${dd}` };
+          })
+        : phonesDaily,
+    [phonesDaily, f.idioma],
+  );
   // Datos del donut: solo categorías con count > 0 (no mostrar slices vacíos)
   const donutData = useMemo(() => {
     return QUALITY_ORDER
@@ -88,9 +104,9 @@ const LeadGenDashboardExtras = ({ topLlgs, phonesDaily, byQuality, rangeLabel, l
             )}
           </div>
           {loading ? (
-            <p className="text-sm text-muted-foreground">Cargando…</p>
+            <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
           ) : topLlgs.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Sin actividad en el rango.</p>
+            <p className="text-sm text-muted-foreground">{t("leadgen.noActivityInRange")}</p>
           ) : (
             <ol className="space-y-2">
               {topLlgs.map((llg, idx) => {
@@ -109,7 +125,7 @@ const LeadGenDashboardExtras = ({ topLlgs, phonesDaily, byQuality, rangeLabel, l
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate" title={llg.name}>{llg.name}</p>
                       <p className="text-[11px] text-muted-foreground">
-                        {llg.nuevos} nuevos · <span className="font-semibold text-foreground">{llg.phones} tel</span>
+                        {t("leadgen.newCount", { count: llg.nuevos })} · <span className="font-semibold text-foreground">{t(llg.phones === 1 ? "leadgen.telShort.one" : "leadgen.telShort.other", { count: llg.phones })}</span>
                       </p>
                     </div>
                   </li>
@@ -125,19 +141,19 @@ const LeadGenDashboardExtras = ({ topLlgs, phonesDaily, byQuality, rangeLabel, l
         <CardContent className="p-4 space-y-3">
           <div className="flex items-center gap-2">
             <Phone className="h-4 w-4 text-primary" />
-            <h3 className="text-sm font-semibold">Teléfonos obtenidos por día</h3>
+            <h3 className="text-sm font-semibold">{t("leadgen.dash.phonesPerDay")}</h3>
             <span className="text-xs text-muted-foreground ml-auto">
-              {totalPhones} total · {rangeLabel ?? "últimos 30 días"}
+              {t("leadgen.dash.totalCount", { count: totalPhones })} · {rangeLabel ?? t("leadgen.dash.last30Days")}
             </span>
           </div>
           <div className="h-[180px]">
             {phonesDaily.length === 0 ? (
               <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
-                Sin datos para el rango
+                {t("leadgen.dash.noDataForRange")}
               </div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={phonesDaily} margin={{ top: 5, right: 8, left: -20, bottom: 0 }}>
+                <AreaChart data={chartData} margin={{ top: 5, right: 8, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="phonesGradient" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.35} />
@@ -161,7 +177,7 @@ const LeadGenDashboardExtras = ({ topLlgs, phonesDaily, byQuality, rangeLabel, l
                   <Tooltip
                     contentStyle={tooltipStyle}
                     labelStyle={{ color: "hsl(var(--foreground))" }}
-                    formatter={(value: number) => [`${value} teléfono${value === 1 ? "" : "s"}`, ""]}
+                    formatter={(value: number) => [t(value === 1 ? "leadgen.phones.one" : "leadgen.phones.other", { count: value }), ""]}
                   />
                   <Area
                     type="monotone"
@@ -184,12 +200,12 @@ const LeadGenDashboardExtras = ({ topLlgs, phonesDaily, byQuality, rangeLabel, l
         <CardContent className="p-4 space-y-3">
           <div className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-emerald-500" />
-            <h3 className="text-sm font-semibold">Por categoría</h3>
+            <h3 className="text-sm font-semibold">{t("leadgen.dash.byCategory")}</h3>
           </div>
           <div className="h-[180px]">
             {donutData.length === 0 ? (
               <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
-                Sin datos
+                {t("common.noData")}
               </div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
