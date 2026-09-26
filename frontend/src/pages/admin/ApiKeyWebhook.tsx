@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Check, Loader2, Pause, Play, Send, Trash2, Webhook } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { adminInvoke } from "@/lib/adminInvoke";
@@ -62,9 +62,10 @@ export type LlaveConWebhook = {
 
 export const SCOPE_WEBHOOK = "messenger:read";
 
-// Motivos por los que la base lo detiene y que reanudar no arregla: la key o la
-// persona ya no sirven. El servidor igual lo rechazaría; acá ni se ofrece.
-const MOTIVOS_SIN_VUELTA = new Set(["key_revoked", "key_expired", "scope_removed", "person_inactive"]);
+// Motivos que reanudar no arregla: la key ya no sirve (revocada, vencida o sin el
+// permiso de Messenger; ninguna de las tres tiene vuelta). person_inactive NO está:
+// si restauran a la persona, el servidor deja reanudar.
+const MOTIVOS_SIN_VUELTA = new Set(["key_revoked", "key_expired", "scope_removed"]);
 
 const MOTIVOS: Record<string, TranslationKey> = {
   receiver_gone: "apiKeys.webhook.reason.receiver_gone",
@@ -99,6 +100,8 @@ const ERRORES: Record<string, TranslationKey> = {
 
 type T = (key: TranslationKey, params?: Record<string, string | number>) => string;
 
+const esDeMaven = (codigo: string | null | undefined) => !!codigo && codigo.startsWith("maven_");
+
 /** El last_error (o error_code) en palabras. Uno que no se conoce, tal cual: es
  *  un código corto, sin datos, y es mejor que esconderlo. */
 export function textoDelError(codigo: string | null, t: T): string | null {
@@ -106,7 +109,7 @@ export function textoDelError(codigo: string | null, t: T): string | null {
   const http = /^http_(\d{3})$/.exec(codigo);
   if (http) return t("apiKeys.webhook.err.http", { code: http[1] });
   if (ERRORES[codigo]) return t(ERRORES[codigo]);
-  if (codigo.startsWith("maven_")) return t("apiKeys.webhook.err.maven");
+  if (esDeMaven(codigo)) return t("apiKeys.webhook.err.maven");
   return codigo;
 }
 
@@ -114,21 +117,55 @@ export function textoDelMotivo(motivo: string | null, t: T): string {
   return motivo && MOTIVOS[motivo] ? t(MOTIVOS[motivo]) : t("apiKeys.webhook.reason.other");
 }
 
-type Chip = { texto: TranslationKey; variant: "success-soft" | "warning-soft" | "destructive-soft" | "secondary" };
-export function chipDelWebhook(w: WebhookResumen): Chip {
-  if (w.status === "pending") return { texto: "apiKeys.webhook.state.pending", variant: "warning-soft" };
-  if (w.status === "paused") return { texto: "apiKeys.webhook.state.paused", variant: "secondary" };
-  if (w.status === "disabled") return { texto: "apiKeys.webhook.state.disabled", variant: "destructive-soft" };
-  return w.consecutive_failures > 0
-    ? { texto: "apiKeys.webhook.state.failing", variant: "warning-soft" }
-    : { texto: "apiKeys.webhook.state.active", variant: "success-soft" };
+/** Cómo está DE VERDAD, que no siempre es el status de la fila:
+ *  - Con la key revocada, vencida o sin Messenger, o la persona fuera, el servidor
+ *    rechaza probar y reanudar aunque la fila siga pending/active/paused (ningún
+ *    trigger mira el vencimiento, y el despachador solo toca los activos con
+ *    trabajo): se muestra detenido, con el motivo de la key.
+ *  - "fallando" solo si hubo un intento fallido del receptor: el despachador sube
+ *    consecutive_failures ANTES de cada envío (el adelanto), pero last_attempt_at
+ *    recién después; un aviso que está saliendo no es un fallo.
+ *  - "demorado": una falla de Maven (maven_*) deja la espera sin tocar el intento. */
+export type Efectivo = {
+  estado: EstadoWebhook; motivo: string | null; porLaKey: boolean; fallando: boolean; demorado: boolean;
+};
+export function estadoEfectivo(w: WebhookResumen, k: LlaveConWebhook): Efectivo {
+  const motivoKey =
+    k.status === "revoked" ? "key_revoked"
+    : k.status === "expired" ? "key_expired"
+    : !k.scopes.includes(SCOPE_WEBHOOK) ? "scope_removed"
+    : k.acts_as?.active === false ? "person_inactive"
+    : null;
+  if (motivoKey) return { estado: "disabled", motivo: motivoKey, porLaKey: true, fallando: false, demorado: false };
+  const activo = w.status === "active";
+  const fallando = activo && w.consecutive_failures > 0 && !!w.last_error && !esDeMaven(w.last_error)
+    && !!w.last_attempt_at && !!w.failing_since && Date.parse(w.last_attempt_at) >= Date.parse(w.failing_since);
+  return {
+    estado: w.status,
+    motivo: w.status === "disabled" ? w.disabled_reason : null,
+    porLaKey: false,
+    fallando,
+    demorado: activo && !fallando && esDeMaven(w.last_error),
+  };
 }
 
-/** Qué se puede hacer con la key de esta fila. */
+type Chip = { texto: TranslationKey; variant: "success-soft" | "warning-soft" | "destructive-soft" | "secondary" };
+export function chipDe(ef: Efectivo): Chip {
+  if (ef.estado === "pending") return { texto: "apiKeys.webhook.state.pending", variant: "warning-soft" };
+  if (ef.estado === "paused") return { texto: "apiKeys.webhook.state.paused", variant: "secondary" };
+  if (ef.estado === "disabled") return { texto: "apiKeys.webhook.state.disabled", variant: "destructive-soft" };
+  if (ef.fallando) return { texto: "apiKeys.webhook.state.failing", variant: "warning-soft" };
+  if (ef.demorado) return { texto: "apiKeys.webhook.state.delayed", variant: "warning-soft" };
+  return { texto: "apiKeys.webhook.state.active", variant: "success-soft" };
+}
+
+/** Qué se puede hacer con la key de esta fila. Un webhook que existe se muestra
+ *  SIEMPRE (aunque a la key le hayan sacado Messenger: queda detenido y hay que
+ *  poder verlo y borrarlo). */
 export function queMostrar(k: LlaveConWebhook, youId: string | null | undefined, desconocido: boolean) {
+  if (k.webhook) return "webhook" as const;
   if (!k.scopes.includes(SCOPE_WEBHOOK)) return "nada" as const;
   if (desconocido || k.webhook === undefined) return "desconocido" as const;
-  if (k.webhook) return "webhook" as const;
   const esDueno = !!youId && k.acts_as?.id === youId;
   return k.status === "active" && esDueno ? ("registrar" as const) : ("sin" as const);
 }
@@ -149,21 +186,22 @@ export function CeldaWebhook({ llave, youId, desconocido, onAbrir }: {
   }
   if (que === "registrar") {
     return (
-      <Button variant="outline" size="sm" className="h-7 gap-1.5 px-2.5 text-xs" onClick={onAbrir}>
+      <Button variant="outline" size="sm" className="h-7 gap-1.5 px-2.5 text-xs" onClick={onAbrir} data-webhook-de={llave.id}>
         <Webhook className="h-3.5 w-3.5" /> {t("apiKeys.webhook.register")}
       </Button>
     );
   }
   if (que === "sin") return <span className="whitespace-nowrap text-muted-foreground/70">{t("apiKeys.webhook.none")}</span>;
   const w = llave.webhook!;
-  const chip = chipDelWebhook(w);
+  const chip = chipDe(estadoEfectivo(w, llave));
   return (
     // Adentro de un <button> va un <span> con el estilo del Badge (que es un <div>):
     // un div adentro de un botón no es HTML válido y el botón se queda sin nombre.
-    <button type="button" onClick={onAbrir} aria-haspopup="dialog"
-      className="group inline-flex min-w-0 max-w-full flex-col items-end gap-0.5 rounded-md text-right sm:items-start sm:text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+    // md: y no sm: porque tabla-movil pasa a tarjetas hasta 767 px.
+    <button type="button" onClick={onAbrir} aria-haspopup="dialog" data-webhook-de={llave.id}
+      className="group inline-flex min-w-0 max-w-full flex-col items-end gap-0.5 rounded-md text-right md:items-start md:text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
       <span className={cn(badgeVariants({ variant: chip.variant }), "whitespace-nowrap font-medium group-hover:underline")}>{t(chip.texto)}</span>
-      <span className="max-w-[14rem] truncate text-[11px] text-muted-foreground" title={w.url_host}>{w.url_host}</span>
+      <span className="max-w-[min(14rem,100%)] truncate text-[11px] text-muted-foreground" title={w.url_host}>{w.url_host}</span>
     </button>
   );
 }
@@ -184,35 +222,158 @@ function Dato({ etiqueta, children }: { etiqueta: string; children: React.ReactN
   );
 }
 
-/** El diálogo del webhook de una key. `llave` sale de la lista (fresca tras cada
- *  invalidación); si no tiene webhook y la persona es la dueña, es el alta. */
-export function DialogoWebhook({ llave, youId, caras, onCerrar }: {
-  llave: LlaveConWebhook | null; youId: string | null | undefined; caras?: Map<string, Cara>; onCerrar: () => void;
+type ListaEnCache = { keys: { id: string; webhook?: WebhookResumen | null }[] };
+
+/** El diálogo del webhook de una key. Se monta de nuevo en cada apertura
+ *  (AdminApiKeys le pone key): el secreto y el resultado de una prueba nunca pasan
+ *  de una key a otra. `llave` sale de la lista, fresca tras cada acción. */
+export function DialogoWebhook({ abierto, llave, youId, desconocido = false, caras, onCerrar }: {
+  abierto: boolean; llave: LlaveConWebhook | null; youId: string | null | undefined;
+  desconocido?: boolean; caras?: Map<string, Cara>; onCerrar: () => void;
 }) {
   const qc = useQueryClient();
   const { t, language } = useLanguage();
   const lang = language;
   const fecha = useFecha();
-  // El secreto vive SOLO acá, en memoria, hasta cerrar: no va a la caché de
-  // react-query, ni a la URL, ni a ningún log.
+  // El secreto vive SOLO acá, en memoria, mientras el diálogo está abierto. La
+  // mutación del alta se resetea apenas se copia (y no guarda nada: gcTime 0), así
+  // que no queda en la caché de react-query.
   const [secreto, setSecreto] = useState<string | null>(null);
-  // El que se acaba de registrar, hasta que la lista vuelva con él (si no, entre el
-  // alta y la relectura se vería otra vez el formulario).
+  // El que se acaba de registrar, hasta que la lista lo traiga.
   const [recien, setRecien] = useState<WebhookResumen | null>(null);
   const [url, setUrl] = useState("");
   const [sinPropios, setSinPropios] = useState(true);
-  const [prueba, setPrueba] = useState<Prueba | null>(null);
+  const [prueba, setPrueba] = useState<{ de: string; test: Prueba } | null>(null);
   const [pestana, setPestana] = useState("estado");
   const [soloFallidas, setSoloFallidas] = useState(false);
   const [borrar, setBorrar] = useState(false);
+  // Quién abrió el diálogo, para devolverle el foco al cerrar (no hay Trigger).
+  const abridor = useRef<HTMLElement | null>(typeof document !== "undefined" ? (document.activeElement as HTMLElement | null) : null);
+  const ultimoConocido = useRef<WebhookResumen | null>(null);
+  // Dos toques en el mismo cuadro llegan antes de que isPending se dibuje: sin esta
+  // guarda salían dos pedidos (dos borrados = un 404 de más; dos pruebas = un 429).
+  // Se suelta en el onSettled de cada mutación (el de las opciones, que corre
+  // siempre; el de cada mutate() no, si la mutación se resetea antes).
+  const enCurso = useRef(false);
+  const unaVez = (lanzar: () => void) => {
+    if (enCurso.current) return;
+    enCurso.current = true;
+    lanzar();
+  };
+  const soltar = () => { enCurso.current = false; };
+  const recienVisto = useRef(false);
 
-  const abierto = !!llave;
-  const w = llave?.webhook ?? (recien && recien.api_key_id === llave?.id ? recien : null);
+  // ── qué webhook se muestra ──
+  // null en la lista = no tiene; undefined o webhooks_unknown = NO SE SABE: ahí se
+  // sigue mostrando lo último que se supo (nunca el alta, nunca sin Pausar/Borrar).
+  const deLaLista = llave?.webhook;
+  const sinDato = desconocido || deLaLista === undefined;
+  const recienDeEsta = recien && recien.api_key_id === llave?.id ? recien : null;
+  if (deLaLista) {
+    ultimoConocido.current = deLaLista;
+    if (recienDeEsta && deLaLista.id === recienDeEsta.id) recienVisto.current = true;
+  }
+  const w: WebhookResumen | null =
+    deLaLista ?? (sinDato ? ultimoConocido.current ?? recienDeEsta : recienVisto.current ? null : recienDeEsta);
+  const viejo = sinDato && !!w;
+
   const esDueno = !!youId && llave?.acts_as?.id === youId;
   const cara = (id: string | null | undefined) => (id ? caras?.get(id) : undefined);
-  // La persona de la key, como en los demás modales de Maven (Cambiar rol,
-  // Compartir): su cara y qué puede hacer cada uno con el webhook.
+
+  const refrescar = () => qc.invalidateQueries({ queryKey: ["api-keys"] });
+  // Lo que devolvió el servidor va a la lista enseguida: sin esto, entre la acción y
+  // la relectura se veía el estado de antes (y el botón de antes, habilitado).
+  const ponerEnLista = (keyId: string, wh: WebhookResumen | null) => {
+    qc.setQueryData<ListaEnCache>(["api-keys"], (viejaLista) => viejaLista && {
+      ...viejaLista, keys: viejaLista.keys.map((k) => (k.id === keyId ? { ...k, webhook: wh } : k)),
+    });
+  };
+  // Un error también relee: 404/409/503 quieren decir "cambió" o "no se sabe".
+  const alFallar = (e: unknown) => {
+    void refrescar().then(() => {}, () => {});
+    toast.error((e as Error)?.message ?? t("apiKeys.loadError"));
+  };
+
+  const crear = useMutation({
+    mutationFn: () => adminInvoke<{ webhook: WebhookResumen; secret: string }>("manage-api-keys", {
+      action: "webhook_create", lang, key_id: llave!.id, url: url.trim(), exclude_own: sinPropios,
+    }),
+    gcTime: 0,
+    onSuccess: (res) => {
+      setSecreto(res.secret); setRecien(res.webhook); setUrl("");
+      ponerEnLista(res.webhook.api_key_id, res.webhook);
+      toast.success(t("apiKeys.webhook.toast.registered"));
+      void refrescar().then(() => {}, () => {});
+    },
+    onError: alFallar,
+    // El secreto ya está en el estado del diálogo: la mutación lo suelta.
+    onSettled: () => { soltar(); queueMicrotask(() => crear.reset()); },
+  });
+  const probar = useMutation({
+    mutationFn: (v: { accion: "webhook_test" | "webhook_resume"; id: string }) =>
+      adminInvoke<PruebaResp>("manage-api-keys", { action: v.accion, lang, id: v.id }),
+    onSuccess: (res, v) => {
+      // El secreto NO se borra: si la prueba no llegó (el integrador todavía no lo
+      // tiene), hay que poder copiarlo igual. Se va al cerrar.
+      setPrueba({ de: v.id, test: res.test });
+      if (res.webhook) ponerEnLista(res.webhook.api_key_id, res.webhook);
+      if (res.test.activated) toast.success(t("apiKeys.webhook.toast.activated"));
+      return refrescar();
+    },
+    onError: alFallar,
+    onSettled: soltar,
+  });
+  const pausar = useMutation({
+    mutationFn: (id: string) => adminInvoke<{ webhook: WebhookResumen }>("manage-api-keys", { action: "webhook_pause", lang, id }),
+    onSuccess: (res) => {
+      setPrueba(null);
+      if (res?.webhook) ponerEnLista(res.webhook.api_key_id, res.webhook);
+      toast.success(t("apiKeys.webhook.toast.paused"));
+      return refrescar();
+    },
+    onError: alFallar,
+    onSettled: soltar,
+  });
+  const quitar = useMutation({
+    mutationFn: (v: { id: string; keyId: string }) => adminInvoke("manage-api-keys", { action: "webhook_delete", lang, id: v.id }),
+    onSuccess: (_res, v) => {
+      ponerEnLista(v.keyId, null);
+      toast.success(t("apiKeys.webhook.toast.deleted"));
+      setBorrar(false);
+      onCerrar();
+      void refrescar().then(() => {}, () => {});
+    },
+    onError: (e) => { setBorrar(false); alFallar(e); },
+    onSettled: soltar,
+  });
+
+  const entregas = useQuery({
+    queryKey: ["api-keys", "webhook-deliveries", w?.id, soloFallidas],
+    queryFn: () => adminInvoke<{ webhook: WebhookResumen; deliveries: Entrega[] }>("manage-api-keys", {
+      action: "webhook_deliveries", lang, id: w!.id, only_failed: soloFallidas,
+    }),
+    enabled: abierto && !!w && pestana === "entregas",
+    // Salen avisos cada 15 s: mientras se mira, se relee.
+    staleTime: 0,
+    refetchInterval: abierto && pestana === "entregas" ? 15_000 : false,
+  });
+  // La respuesta de entregas trae el endpoint fresco: también va a la lista.
+  const frescoDeEntregas = entregas.data?.webhook;
+  useEffect(() => {
+    if (frescoDeEntregas) ponerEnLista(frescoDeEntregas.api_key_id, frescoDeEntregas);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [frescoDeEntregas]);
+
+  // Mientras se registra o se prueba NO se puede cerrar: la respuesta (el secreto,
+  // el resultado) tiene que caer en ESTE diálogo, no perderse ni pasar a otro.
+  const enVuelo = crear.isPending || probar.isPending;
+  const ocupado = enVuelo || pausar.isPending || quitar.isPending;
+  const cerrar = () => { if (!enVuelo && !quitar.isPending) onCerrar(); };
+  const urlValida = /^https:\/\/\S+$/i.test(url.trim());
+
   const tarjetaPersona = llave?.acts_as ? (
+    // La persona de la key, como en los demás modales de Maven (Cambiar rol,
+    // Compartir): su cara y qué puede hacer cada uno con el webhook.
     <div className="flex items-center gap-3 rounded-lg bg-muted/50 p-3">
       <UserAvatar name={llave.acts_as.name} src={cara(llave.acts_as.id)?.src} seed={cara(llave.acts_as.id)?.seed} size="md" />
       <div className="min-w-0">
@@ -229,56 +390,14 @@ export function DialogoWebhook({ llave, youId, caras, onCerrar }: {
     </div>
   ) : null;
 
-  const cerrar = () => {
-    setSecreto(null); setRecien(null); setUrl(""); setSinPropios(true); setPrueba(null);
-    setPestana("estado"); setSoloFallidas(false); setBorrar(false);
-    onCerrar();
-  };
-  const refrescar = () => qc.invalidateQueries({ queryKey: ["api-keys"] });
-  const alFallar = (e: unknown) => toast.error((e as Error)?.message ?? t("apiKeys.loadError"));
-
-  const crear = useMutation({
-    mutationFn: () => adminInvoke<{ webhook: WebhookResumen; secret: string }>("manage-api-keys", {
-      action: "webhook_create", lang, key_id: llave!.id, url: url.trim(), exclude_own: sinPropios,
-    }),
-    onSuccess: (res) => { setSecreto(res.secret); setRecien(res.webhook); setUrl(""); refrescar(); toast.success(t("apiKeys.webhook.toast.registered")); },
-    onError: alFallar,
-  });
-  const probar = useMutation({
-    mutationFn: (accion: "webhook_test" | "webhook_resume") =>
-      adminInvoke<PruebaResp>("manage-api-keys", { action: accion, lang, id: w!.id }),
-    onSuccess: (res) => {
-      setPrueba(res.test); setSecreto(null); setPestana("estado"); refrescar();
-      if (res.test.activated) toast.success(t("apiKeys.webhook.toast.activated"));
-    },
-    onError: alFallar,
-  });
-  const pausar = useMutation({
-    mutationFn: () => adminInvoke("manage-api-keys", { action: "webhook_pause", lang, id: w!.id }),
-    onSuccess: () => { setPrueba(null); refrescar(); toast.success(t("apiKeys.webhook.toast.paused")); },
-    onError: alFallar,
-  });
-  const quitar = useMutation({
-    mutationFn: () => adminInvoke("manage-api-keys", { action: "webhook_delete", lang, id: w!.id }),
-    onSuccess: () => { refrescar(); toast.success(t("apiKeys.webhook.toast.deleted")); cerrar(); },
-    onError: (e) => { setBorrar(false); alFallar(e); },
-  });
-
-  const entregas = useQuery({
-    queryKey: ["api-keys", "webhook-deliveries", w?.id, soloFallidas],
-    queryFn: () => adminInvoke<{ webhook: WebhookResumen; deliveries: Entrega[] }>("manage-api-keys", {
-      action: "webhook_deliveries", lang, id: w!.id, only_failed: soloFallidas,
-    }),
-    enabled: abierto && !!w && pestana === "entregas",
-  });
-
-  const ocupado = probar.isPending || pausar.isPending || quitar.isPending;
-  const urlValida = /^https:\/\/\S+$/i.test(url.trim());
+  const resultado = prueba && w && prueba.de === w.id ? <ResultadoDePrueba prueba={prueba.test} /> : null;
 
   let cuerpo: React.ReactNode = null;
   if (!llave) cuerpo = null;
-  else if (secreto && w) {
-    // ── recién registrado: el secreto, una sola vez ──
+  else if (secreto && recienDeEsta) {
+    // ── recién registrado: el secreto, que se ve hasta cerrar ──
+    const idPrueba = recienDeEsta.id;
+    const llego = prueba?.de === idPrueba && prueba.test.delivered;
     cuerpo = (
       <>
         <DialogHeader>
@@ -290,14 +409,27 @@ export function DialogoWebhook({ llave, youId, caras, onCerrar }: {
             <code className="block break-all font-mono text-sm text-foreground">{secreto}</code>
           </div>
           <div className="flex justify-end"><CopyButton text={secreto} label={t("apiKeys.webhook.secretCopy")} /></div>
-          <p className="text-sm text-muted-foreground"><ConFormato texto={t("apiKeys.webhook.nextTest")} /></p>
+          {prueba?.de === idPrueba ? <ResultadoDePrueba prueba={prueba.test} /> : (
+            <p className="text-sm text-muted-foreground"><ConFormato texto={t("apiKeys.webhook.nextTest")} /></p>
+          )}
         </div>
         <DialogFooter className="gap-2 sm:gap-0">
-          <Button variant="ghost" onClick={cerrar}>{t("apiKeys.webhook.later")}</Button>
-          <Button className="gap-1.5" disabled={probar.isPending} onClick={() => probar.mutate("webhook_test")}>
+          <Button variant="ghost" disabled={enVuelo} onClick={cerrar}>{llego ? t("apiKeys.webhook.done") : t("apiKeys.webhook.later")}</Button>
+          <Button className="gap-1.5" disabled={enVuelo} onClick={() => unaVez(() => probar.mutate({ accion: "webhook_test", id: idPrueba }))}>
             {probar.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} {t("apiKeys.webhook.sendTest")}
           </Button>
         </DialogFooter>
+      </>
+    );
+  } else if (!w && sinDato) {
+    // ── no se sabe si tiene: ni alta ni "no tiene" ──
+    cuerpo = (
+      <>
+        <DialogHeader>
+          <DialogTitle>{t("apiKeys.webhook.title", { name: llave.name })}</DialogTitle>
+          <DialogDescription>{t("apiKeys.webhook.unknownHint")}</DialogDescription>
+        </DialogHeader>
+        <DialogFooter><Button variant="outline" onClick={cerrar}>{t("common.close")}</Button></DialogFooter>
       </>
     );
   } else if (!w) {
@@ -314,11 +446,12 @@ export function DialogoWebhook({ llave, youId, caras, onCerrar }: {
             <div className="space-y-1.5">
               <Label htmlFor="webhook-url">{t("apiKeys.webhook.url")}</Label>
               <Input id="webhook-url" type="url" inputMode="url" autoComplete="off" spellCheck={false} autoFocus
-                placeholder={t("apiKeys.webhook.urlPlaceholder")} value={url} onChange={(e) => setUrl(e.target.value)} />
+                placeholder={t("apiKeys.webhook.urlPlaceholder")} value={url} disabled={crear.isPending}
+                onChange={(e) => setUrl(e.target.value)} />
               <p className="text-xs text-muted-foreground"><ConFormato texto={t("apiKeys.webhook.urlHint")} /></p>
             </div>
             <label className="flex cursor-pointer items-start gap-2.5 text-sm">
-              <input type="checkbox" className="mt-0.5 h-4 w-4 accent-primary" checked={sinPropios}
+              <input type="checkbox" className="mt-0.5 h-4 w-4 accent-primary" checked={sinPropios} disabled={crear.isPending}
                 onChange={(e) => setSinPropios(e.target.checked)} />
               <span>
                 <span className="font-medium">{t("apiKeys.webhook.excludeOwn")}</span>
@@ -328,9 +461,9 @@ export function DialogoWebhook({ llave, youId, caras, onCerrar }: {
           </div>
         )}
         <DialogFooter className="gap-2 sm:gap-0">
-          <Button variant="ghost" onClick={cerrar}>{t("common.cancel")}</Button>
+          <Button variant="ghost" disabled={crear.isPending} onClick={cerrar}>{t("common.cancel")}</Button>
           {esDueno && (
-            <Button className="gap-1.5" disabled={!urlValida || crear.isPending} onClick={() => crear.mutate()}>
+            <Button className="gap-1.5" disabled={!urlValida || crear.isPending} onClick={() => unaVez(() => crear.mutate())}>
               {crear.isPending && <Loader2 className="h-4 w-4 animate-spin" />} {t("apiKeys.webhook.registerButton")}
             </Button>
           )}
@@ -339,27 +472,35 @@ export function DialogoWebhook({ llave, youId, caras, onCerrar }: {
     );
   } else {
     // ── estado y entregas ──
-    const chip = chipDelWebhook(w);
-    const fallando = w.status === "active" && w.consecutive_failures > 0;
+    const ef = estadoEfectivo(w, llave);
+    const chip = chipDe(ef);
     const ayuda =
-      w.status === "disabled" ? textoDelMotivo(w.disabled_reason, t)
-      : w.status === "paused" ? t("apiKeys.webhook.help.paused")
-      : w.status === "pending" ? t("apiKeys.webhook.help.pending")
-      : fallando ? t("apiKeys.webhook.help.failing")
+      ef.estado === "disabled" ? textoDelMotivo(ef.motivo, t)
+      : ef.estado === "paused" ? t("apiKeys.webhook.help.paused")
+      : ef.estado === "pending" ? t("apiKeys.webhook.help.pending")
+      : ef.fallando ? t("apiKeys.webhook.help.failing")
+      : ef.demorado ? t("apiKeys.webhook.help.delayed")
       : t("apiKeys.webhook.help.active");
-    const puedeProbar = esDueno && (w.status === "pending" || w.status === "active");
-    const puedeReanudar = esDueno && (w.status === "paused" ||
-      (w.status === "disabled" && !MOTIVOS_SIN_VUELTA.has(w.disabled_reason ?? "")));
-    const errorUltimo = textoDelError(w.last_error, t);
+    const puedeProbar = esDueno && !ef.porLaKey && (ef.estado === "pending" || ef.estado === "active");
+    const puedeReanudar = esDueno && !ef.porLaKey && (ef.estado === "paused" ||
+      (ef.estado === "disabled" && !MOTIVOS_SIN_VUELTA.has(ef.motivo ?? "")));
+    const puedePausar = !ef.porLaKey && ef.estado === "active";
+    // El error del receptor va con su intento; uno de Maven, aparte y solo en activo
+    // (en pausado o detenido no se va a reintentar nada).
+    const errorDelIntento = esDeMaven(w.last_error) ? null : textoDelError(w.last_error, t);
     cuerpo = (
       <>
         <DialogHeader>
-          <DialogTitle className="flex flex-wrap items-center gap-2">
-            {t("apiKeys.webhook.title", { name: llave.name })}
-            <Badge variant={chip.variant} className="font-medium">{t(chip.texto)}</Badge>
-          </DialogTitle>
+          {/* El chip va AL LADO del título: un Badge es un <div> y no puede ir dentro del <h2>. */}
+          <div className="flex flex-wrap items-center gap-2 pr-6">
+            <DialogTitle>{t("apiKeys.webhook.title", { name: llave.name })}</DialogTitle>
+            <span className={cn(badgeVariants({ variant: chip.variant }), "font-medium")}>{t(chip.texto)}</span>
+          </div>
           <DialogDescription>{ayuda}</DialogDescription>
         </DialogHeader>
+        {viejo && (
+          <p role="status" className="rounded-md border border-warning/40 bg-warning/5 p-2 text-xs text-foreground">{t("apiKeys.webhook.stale")}</p>
+        )}
         <Tabs value={pestana} onValueChange={setPestana} className="min-w-0">
           <TabsList>
             <TabsTrigger value="estado">{t("apiKeys.webhook.tab.status")}</TabsTrigger>
@@ -367,7 +508,7 @@ export function DialogoWebhook({ llave, youId, caras, onCerrar }: {
           </TabsList>
           <TabsContent value="estado" className="space-y-4">
             {tarjetaPersona}
-            {prueba && <ResultadoDePrueba prueba={prueba} />}
+            {resultado}
             <dl className="divide-y divide-border/40">
               <Dato etiqueta={t("apiKeys.webhook.detail.host")}><code className="text-xs">{w.url_host}</code></Dato>
               <Dato etiqueta={t("apiKeys.webhook.detail.secret")}><code className="text-xs">whsec_…{w.secret_last4}</code></Dato>
@@ -379,19 +520,24 @@ export function DialogoWebhook({ llave, youId, caras, onCerrar }: {
               <Dato etiqueta={t("apiKeys.webhook.detail.lastSuccess")}>{fecha(w.last_success_at)}</Dato>
               <Dato etiqueta={t("apiKeys.webhook.detail.lastAttempt")}>
                 {fecha(w.last_attempt_at)}
-                {errorUltimo && <span className="block text-xs text-destructive">{errorUltimo}</span>}
+                {errorDelIntento && <span className="block text-xs text-destructive">{errorDelIntento}</span>}
               </Dato>
-              {w.consecutive_failures > 0 && (
+              {ef.fallando && (
                 <Dato etiqueta={t("apiKeys.webhook.detail.failures")}>
                   {w.failing_since
                     ? t("apiKeys.webhook.detail.failuresSince", { n: w.consecutive_failures, when: fecha(w.failing_since) })
                     : w.consecutive_failures}
                 </Dato>
               )}
-              {w.status === "active" && w.next_attempt_at && new Date(w.next_attempt_at).getTime() > Date.now() && (
+              {ef.demorado && (
+                <Dato etiqueta={t("apiKeys.webhook.detail.delay")}>
+                  <span className="text-warning">{textoDelError(w.last_error, t)}</span>
+                </Dato>
+              )}
+              {ef.estado === "active" && (ef.fallando || ef.demorado) && w.next_attempt_at && Date.parse(w.next_attempt_at) > Date.now() && (
                 <Dato etiqueta={t("apiKeys.webhook.detail.nextAttempt")}>{fecha(w.next_attempt_at)}</Dato>
               )}
-              {w.status === "paused" && (
+              {ef.estado === "paused" && (
                 <Dato etiqueta={t("apiKeys.webhook.state.paused")}>
                   {w.paused_by?.name ? (
                     <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -427,22 +573,42 @@ export function DialogoWebhook({ llave, youId, caras, onCerrar }: {
           </TabsContent>
         </Tabs>
         <DialogFooter className="flex-wrap gap-2 sm:justify-between sm:gap-2 sm:space-x-0">
-          <Button variant="ghost" className="gap-1.5 text-destructive hover:text-destructive" disabled={ocupado} onClick={() => setBorrar(true)}>
-            <Trash2 className="h-4 w-4" /> {t("apiKeys.webhook.delete")}
-          </Button>
+          {/* Con Trigger, al cerrar la confirmación el foco vuelve a este botón. */}
+          <AlertDialog open={borrar} onOpenChange={(o) => { if (!quitar.isPending) setBorrar(o); }}>
+            <AlertDialogTrigger asChild>
+              <Button variant="ghost" className="gap-1.5 text-destructive hover:text-destructive" disabled={ocupado}>
+                <Trash2 className="h-4 w-4" /> {t("apiKeys.webhook.delete")}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>{t("apiKeys.webhook.deleteTitle", { name: llave.name })}</AlertDialogTitle>
+                <AlertDialogDescription>{t("apiKeys.webhook.deleteBody", { host: w.url_host })}</AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={quitar.isPending} />
+                {/* bg-none: sin esto el degradé del botón de Maven tapa el rojo. */}
+                <AlertDialogAction className="gap-1.5 bg-none bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  disabled={quitar.isPending}
+                  onClick={(e) => { e.preventDefault(); unaVez(() => quitar.mutate({ id: w.id, keyId: llave.id })); }}>
+                  {quitar.isPending && <Loader2 className="h-4 w-4 animate-spin" />} {t("apiKeys.webhook.delete")}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
           <div className="flex flex-wrap justify-end gap-2">
-            {w.status === "active" && (
-              <Button variant="outline" className="gap-1.5" disabled={ocupado} onClick={() => pausar.mutate()}>
+            {puedePausar && (
+              <Button variant="outline" className="gap-1.5" disabled={ocupado} onClick={() => unaVez(() => pausar.mutate(w.id))}>
                 {pausar.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Pause className="h-4 w-4" />} {t("apiKeys.webhook.pause")}
               </Button>
             )}
             {puedeProbar && (
-              <Button className="gap-1.5" disabled={ocupado} onClick={() => probar.mutate("webhook_test")}>
+              <Button className="gap-1.5" disabled={ocupado} onClick={() => unaVez(() => probar.mutate({ accion: "webhook_test", id: w.id }))}>
                 {probar.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} {t("apiKeys.webhook.sendTest")}
               </Button>
             )}
             {puedeReanudar && (
-              <Button className="gap-1.5" disabled={ocupado} onClick={() => probar.mutate("webhook_resume")}>
+              <Button className="gap-1.5" disabled={ocupado} onClick={() => unaVez(() => probar.mutate({ accion: "webhook_resume", id: w.id }))}>
                 {probar.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />} {t("apiKeys.webhook.resume")}
               </Button>
             )}
@@ -453,31 +619,23 @@ export function DialogoWebhook({ llave, youId, caras, onCerrar }: {
   }
 
   return (
-    <>
-      <Dialog open={abierto} onOpenChange={(o) => { if (!o) cerrar(); }}>
-        {/* grid-cols-[minmax(0,1fr)]: que la tabla de entregas se desplace en su caja
-            y no ensanche el diálogo (mismo arreglo que la referencia del API). */}
-        <DialogContent className="max-h-[85vh] grid-cols-[minmax(0,1fr)] overflow-y-auto sm:max-w-3xl">
-          {cuerpo}
-        </DialogContent>
-      </Dialog>
-      <AlertDialog open={borrar && !!w} onOpenChange={(o) => { if (!o) setBorrar(false); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t("apiKeys.webhook.deleteTitle", { name: llave?.name ?? "" })}</AlertDialogTitle>
-            <AlertDialogDescription>{t("apiKeys.webhook.deleteBody", { host: w?.url_host ?? "" })}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel />
-            {/* bg-none: sin esto el degradé del botón de Maven tapa el rojo. */}
-            <AlertDialogAction className="bg-none bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={(e) => { e.preventDefault(); quitar.mutate(); }}>
-              {quitar.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : t("apiKeys.webhook.delete")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
+    <Dialog open={abierto && !!llave} onOpenChange={(o) => { if (!o) cerrar(); }}>
+      {/* grid-cols-[minmax(0,1fr)]: que la tabla de entregas se desplace en su caja
+          y no ensanche el diálogo (mismo arreglo que la referencia del API). */}
+      <DialogContent className="max-h-[85vh] grid-cols-[minmax(0,1fr)] overflow-y-auto sm:max-w-3xl"
+        onCloseAutoFocus={(e) => {
+          // Sin Trigger, Radix no sabe a quién devolverle el foco. Si el botón que lo
+          // abrió ya no está (la celda cambió de Registrar al chip), el de su fila.
+          e.preventDefault();
+          const destino = abridor.current?.isConnected ? abridor.current
+            : llave ? document.querySelector<HTMLElement>(`[data-webhook-de="${llave.id}"]`) : null;
+          destino?.focus();
+          // El secreto no espera a la próxima apertura: se va al terminar de cerrar.
+          setSecreto(null); setPrueba(null);
+        }}>
+        {cuerpo}
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -529,12 +687,14 @@ function TablaDeEntregas({ entregas, webhook }: { entregas: Entrega[]; webhook: 
             const prueba = e.event_type === "webhook.test";
             // Solo una puede estar en vuelo por webhook: la pendiente reintenta cuando
             // dice el endpoint (el dato viene fresco en la misma respuesta).
-            const reintenta = e.state === "pending" && !prueba && webhook.next_attempt_at
+            // "Reintenta" solo si ya falló un intento: la que está saliendo por primera
+            // vez (el despachador anota la espera ANTES de mandar) es solo "pendiente".
+            const reintenta = e.state === "pending" && !prueba && !!e.last_error && webhook.next_attempt_at
               && new Date(webhook.next_attempt_at).getTime() > Date.now() ? webhook.next_attempt_at : null;
             // En el teléfono cada celda es una fila "etiqueta — valor" (tabla-movil):
             // lo que tiene más de una parte va en UN div, o se reparte a lo ancho.
             return (
-              <tr key={e.id} className="border-b border-border/40 align-top last:border-0">
+              <tr key={e.id} className="border-b border-border/40 align-top md:last:border-0">
                 <td data-label={cols.cuando} className="whitespace-nowrap px-3 py-2 text-muted-foreground">{fecha(e.created_at)}</td>
                 <td data-label={cols.tipo} className="px-3 py-2">
                   <div title={e.event_type} className="whitespace-nowrap">
@@ -556,7 +716,7 @@ function TablaDeEntregas({ entregas, webhook }: { entregas: Entrega[]; webhook: 
                   </div>
                 </td>
                 <td data-label={cols.resultado} className="px-3 py-2">
-                  <div className="flex flex-col items-end gap-0.5 sm:items-start">
+                  <div className="flex flex-col items-end gap-0.5 md:items-start">
                     {e.state === "delivered" && (
                       <Badge variant="success-soft" className="whitespace-nowrap">
                         {t("apiKeys.webhook.deliveries.delivered")}{e.last_status_code ? ` · ${e.last_status_code}` : ""}

@@ -125,7 +125,18 @@ const AdminApiKeys = () => {
   const [revokeTarget, setRevokeTarget] = useState<ApiKey | null>(null);
   const [docsOpen, setDocsOpen] = useState(false);
   const [freshKey, setFreshKey] = useState<string | null>(null);
-  const [webhookDe, setWebhookDe] = useState<string | null>(null); // id de la key
+  // El webhook de qué key se mira. `vez` cambia en cada apertura y es la key del
+  // diálogo: se monta de nuevo, así nada (secreto, resultado de una prueba) pasa de
+  // una key a otra. Al cerrar se conserva `id` para que la animación de salida siga
+  // dibujando el contenido.
+  const [webhookDe, setWebhookDe] = useState<{ id: string; vez: number } | null>(null);
+  const [webhookAbierto, setWebhookAbierto] = useState(false);
+  const abrirWebhook = (id: string) => {
+    setWebhookDe((antes) => ({ id, vez: (antes?.vez ?? 0) + 1 }));
+    setWebhookAbierto(true);
+    // La lista puede tener hasta 5 min (staleTime global): al abrir, se relee.
+    void qc.invalidateQueries({ queryKey: ["api-keys"] }).then(() => {}, () => {});
+  };
 
   // Form
   const [name, setName] = useState("");
@@ -310,7 +321,7 @@ const AdminApiKeys = () => {
                           nombre y sus scopes se repartían a lo ancho. */}
                       <div>
                         {k.name}
-                        <div className="mt-0.5 flex flex-wrap justify-end gap-1 sm:justify-start">
+                        <div className="mt-0.5 flex flex-wrap justify-end gap-1 md:justify-start">
                           {k.scopes.map((s) => <Badge key={s} variant="secondary" className="font-normal text-[10px]">{s}</Badge>)}
                         </div>
                       </div>
@@ -344,7 +355,7 @@ const AdminApiKeys = () => {
                     </td>
                     <td data-label={t("apiKeys.col.webhook")} className="px-4 py-3">
                       <CeldaWebhook llave={k} youId={data?.you?.id} desconocido={data?.webhooks_unknown === true}
-                        onAbrir={() => setWebhookDe(k.id)} />
+                        onAbrir={() => abrirWebhook(k.id)} />
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
@@ -372,8 +383,10 @@ const AdminApiKeys = () => {
       )}
 
       {/* Webhook de una key: registrar, estado y entregas */}
-      <DialogoWebhook llave={webhookDe ? keys.find((k) => k.id === webhookDe) ?? null : null}
-        youId={data?.you?.id} caras={caras} onCerrar={() => setWebhookDe(null)} />
+      <DialogoWebhook key={webhookDe?.vez ?? 0} abierto={webhookAbierto}
+        llave={webhookDe ? keys.find((k) => k.id === webhookDe.id) ?? null : null}
+        desconocido={data?.webhooks_unknown === true}
+        youId={data?.you?.id} caras={caras} onCerrar={() => setWebhookAbierto(false)} />
 
       {/* Modal crear / editar / mostrar key */}
       <Dialog open={modalMode !== null} onOpenChange={(o) => { if (!o) closeModal(); }}>

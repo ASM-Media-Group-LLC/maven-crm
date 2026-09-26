@@ -291,6 +291,13 @@ export const apiKeys = {
   "apiKeys.webhook.state.failing": { es: "Activo · fallando", en: "Active · failing" },
   "apiKeys.webhook.state.paused": { es: "Pausado", en: "Paused" },
   "apiKeys.webhook.state.disabled": { es: "Detenido", en: "Stopped" },
+  "apiKeys.webhook.state.delayed": { es: "Activo · demorado", en: "Active · delayed" },
+  "apiKeys.webhook.stale": {
+    es: "No se pudo actualizar el estado: esto es lo último que se supo.",
+    en: "Couldn't refresh the status: this is the last thing we knew.",
+  },
+  "apiKeys.webhook.done": { es: "Listo", en: "Done" },
+  "apiKeys.webhook.detail.delay": { es: "Demora de Maven", en: "Maven delay" },
 
   "apiKeys.webhook.title": { es: "Webhook de “{name}”", en: "Webhook for “{name}”" },
   "apiKeys.webhook.registerTitle": { es: "Registrar un webhook en “{name}”", en: "Register a webhook on “{name}”" },
@@ -362,6 +369,10 @@ export const apiKeys = {
     es: "El servidor del integrador está fallando: Maven reintenta el mismo aviso con esperas cada vez más largas. Si falla 3 días seguidos, el webhook se detiene.",
     en: "The integrator's server is failing: Maven retries the same notification with longer and longer waits. If it fails for 3 days in a row, the webhook stops.",
   },
+  "apiKeys.webhook.help.delayed": {
+    es: "El último aviso se demoró por una falla de Maven, no del integrador. Maven lo reintenta solo.",
+    en: "The last notification was delayed by a Maven-side failure, not the integrator's. Maven retries it on its own.",
+  },
   "apiKeys.webhook.help.paused": {
     es: "Pausado: no sale ningún aviso. Al reanudar, Maven manda una prueba y arranca desde ese momento; lo de la pausa no se avisa, y el integrador lo lee del feed con su cursor.",
     en: "Paused: no notification goes out. On resume, Maven sends a test and starts from that moment; what happened during the pause isn't notified, and the integrator reads it from the feed with its cursor.",
@@ -387,8 +398,8 @@ export const apiKeys = {
     en: "The key no longer has the Messenger permission. Create a new key and register the webhook there.",
   },
   "apiKeys.webhook.reason.person_inactive": {
-    es: "La persona de la key fue dada de baja o ya no está en la agencia.",
-    en: "The key's person was offboarded or is no longer in the agency.",
+    es: "La persona de la key fue dada de baja o ya no está en la agencia. Si la vuelven a activar, se puede reanudar.",
+    en: "The key's person was offboarded or is no longer in the agency. If they're reactivated, it can be resumed.",
   },
   "apiKeys.webhook.reason.multi_agency": {
     es: "Hay más de una agencia en Maven: los webhooks quedan apagados hasta resolverlo.",
@@ -415,12 +426,12 @@ export const apiKeys = {
     en: "The secret can't be opened with the server's key: tell whoever runs Maven",
   },
   "apiKeys.webhook.err.maven_sesion": {
-    es: "Maven no pudo leer como la persona de la key; reintenta en 5 min",
-    en: "Maven couldn't read as the key's person; retrying in 5 min",
+    es: "Maven no pudo leer como la persona de la key",
+    en: "Maven couldn't read as the key's person",
   },
   "apiKeys.webhook.err.maven": {
-    es: "Falla de Maven, no del integrador; reintenta en 5 min",
-    en: "A Maven-side failure, not the integrator's; retrying in 5 min",
+    es: "Falla de Maven, no del integrador",
+    en: "A Maven-side failure, not the integrator's",
   },
 
   "apiKeys.webhook.pause": { es: "Pausar", en: "Pause" },
@@ -483,12 +494,12 @@ export const apiKeys = {
     en: "Each notification carries `webhook-id`, `webhook-timestamp` and `webhook-signature` (Standard Webhooks: HMAC-SHA256 with the `whsec_…` secret). Verify the signature over the body **exactly as received**, compare in constant time and reject timestamps more than 5 minutes off. The `standardwebhooks` libraries (Node, Python, Go and others) do it for you.",
   },
   "apiKeys.docs.webhooks.receiver": {
-    es: "Tu servidor contesta **2xx en menos de 5 s** y hace el trabajo después: lee `GET /messenger/feed?after=<su último next_cursor>` (la primera vez, `data.after` del aviso) con el mismo `exclude_own` del aviso, sigue `next_cursor` hasta `caught_up = true` y guarda el cursor. Deduplica por `message.id` e ignora tipos de evento que no conozca.",
-    en: "Your server answers **2xx within 5 s** and does the work afterwards: it reads `GET /messenger/feed?after=<its last next_cursor>` (the first time, the notification's `data.after`) with the notification's same `exclude_own`, follows `next_cursor` until `caught_up = true` and saves the cursor. It deduplicates by `message.id` and ignores event types it doesn't know.",
+    es: "Tu servidor contesta **2xx enseguida (en 1 o 2 s)**: Maven espera como mucho 10 s, con la conexión incluida. El trabajo lo hace después: lee `GET /messenger/feed?after=<su último next_cursor>` (la primera vez, `data.after` del aviso) con el mismo `exclude_own` del aviso, sigue `next_cursor` hasta `caught_up = true` y guarda el cursor. Deduplica por `message.id` e ignora tipos de evento que no conozca.",
+    en: "Your server answers **2xx right away (within 1 or 2 s)**: Maven waits 10 s at most, connection included. It does the work afterwards: it reads `GET /messenger/feed?after=<its last next_cursor>` (the first time, the notification's `data.after`) with the notification's same `exclude_own`, follows `next_cursor` until `caught_up = true` and saves the cursor. It deduplicates by `message.id` and ignores event types it doesn't know.",
   },
   "apiKeys.docs.webhooks.guarantees": {
-    es: "Garantías: **al menos una vez** (un aviso puede repetirse, con el mismo `webhook-id`), sin orden entre avisos (el feed sí está ordenado) y un solo aviso en vuelo por webhook. Si falla, se reintenta el mismo con esperas crecientes (30 s, 2 min, 10 min… hasta 8 h); si falla **3 días seguidos** o contesta **410**, el webhook se detiene. Un 3xx cuenta como fallo: no se siguen redirecciones.",
-    en: "Guarantees: **at least once** (a notification may repeat, with the same `webhook-id`), no order between notifications (the feed is ordered) and only one notification in flight per webhook. If it fails, the same one is retried with growing waits (30 s, 2 min, 10 min… up to 8 h); if it fails **3 days in a row** or answers **410**, the webhook stops. A 3xx counts as a failure: redirects aren't followed.",
+    es: "Garantías: **al menos una vez** (un aviso puede repetirse, con el mismo `webhook-id`), sin orden entre avisos (el feed sí está ordenado) y un solo aviso de mensajes en vuelo por webhook (una prueba puede llegar a la vez). Si falla, se reintenta el mismo con esperas crecientes (30 s, 2 min, 10 min… hasta 8 h); si falla **3 días seguidos** o contesta **410**, el webhook se detiene. Un 3xx cuenta como fallo: no se siguen redirecciones.",
+    en: "Guarantees: **at least once** (a notification may repeat, with the same `webhook-id`), no order between notifications (the feed is ordered) and only one message notification in flight per webhook (a test can arrive at the same time). If it fails, the same one is retried with growing waits (30 s, 2 min, 10 min… up to 8 h); if it fails **3 days in a row** or answers **410**, the webhook stops. A 3xx counts as a failure: redirects aren't followed.",
   },
   "apiKeys.docs.webhooks.fallback": {
     es: "**Obligatorio:** además del webhook, leé el feed con tu propio cursor **cada 15 minutos o menos**. Así un aviso perdido, una pausa o un webhook detenido solo demoran mensajes, nunca los pierden (son 4 pedidos por hora de los 1000 del límite).",
