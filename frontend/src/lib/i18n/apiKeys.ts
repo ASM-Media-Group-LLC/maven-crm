@@ -310,13 +310,13 @@ export const apiKeys = {
     en: "Checked, it only notifies what other people write to you. Unchecked, it also notifies what you send.",
   },
   "apiKeys.webhook.registerButton": { es: "Registrar webhook", en: "Register webhook" },
-  "apiKeys.webhook.onlyOwner": {
-    es: "Solo {name}, la persona de la key, puede registrar, probar o reanudar el webhook. Cualquier admin puede pausarlo, borrarlo y ver las entregas.",
-    en: "Only {name}, the key's person, can register, test or resume the webhook. Any admin can pause it, delete it and see the deliveries.",
+  "apiKeys.webhook.person.you": {
+    es: "Sos vos, la persona de la key: el webhook avisa lo nuevo de tus conversaciones. Solo vos podés registrarlo, probarlo o reanudarlo.",
+    en: "That's you, the key's person: the webhook notifies what's new in your conversations. Only you can register, test or resume it.",
   },
-  "apiKeys.webhook.onlyOwnerNoName": {
-    es: "Solo la persona de la key puede registrar, probar o reanudar el webhook. Cualquier admin puede pausarlo, borrarlo y ver las entregas.",
-    en: "Only the key's person can register, test or resume the webhook. Any admin can pause it, delete it and see the deliveries.",
+  "apiKeys.webhook.person.other": {
+    es: "La persona de la key: el webhook avisa lo nuevo de sus conversaciones. Solo esta persona puede registrarlo, probarlo o reanudarlo; cualquier admin puede pausarlo, borrarlo y ver las entregas.",
+    en: "The key's person: the webhook notifies what's new in their conversations. Only this person can register, test or resume it; any admin can pause it, delete it and see the deliveries.",
   },
 
   "apiKeys.webhook.secretTitle": { es: "Webhook registrado", en: "Webhook registered" },
@@ -346,7 +346,7 @@ export const apiKeys = {
   "apiKeys.webhook.detail.failures": { es: "Fallos seguidos", en: "Failures in a row" },
   "apiKeys.webhook.detail.failuresSince": { es: "{n}, desde el {when}", en: "{n}, since {when}" },
   "apiKeys.webhook.detail.nextAttempt": { es: "Próximo intento", en: "Next attempt" },
-  "apiKeys.webhook.detail.pausedBy": { es: "Pausado por {name} el {when}", en: "Paused by {name} on {when}" },
+  "apiKeys.webhook.detail.pausedOn": { es: "lo pausó el {when}", en: "paused it on {when}" },
   "apiKeys.webhook.detail.pausedWhen": { es: "Pausado el {when}", en: "Paused on {when}" },
   "apiKeys.webhook.detail.disabledOn": { es: "Detenido el {when}", en: "Stopped on {when}" },
 

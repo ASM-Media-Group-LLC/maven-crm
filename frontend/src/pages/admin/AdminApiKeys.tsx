@@ -22,7 +22,8 @@ import { PageHeader } from "@/components/ui/page-header";
 import { useFormato } from "@/hooks/useFormato";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { TranslationKey } from "@/lib/i18n";
-import { ConFormato, CopyButton } from "./apiKeysPiezas";
+import { ConFormato, CopyButton, Persona } from "./apiKeysPiezas";
+import { useCaras } from "./carasDePersonas";
 import { CeldaWebhook, DialogoWebhook, DocsWebhooks, type WebhookResumen } from "./ApiKeyWebhook";
 
 // Settings → Administración → API keys (SOLO admins).
@@ -140,6 +141,7 @@ const AdminApiKeys = () => {
   });
 
   const keys = useMemo<ApiKey[]>(() => data?.keys ?? [], [data]);
+  const caras = useCaras(keys.flatMap((k) => [k.acts_as?.id, k.webhook?.paused_by?.id]));
   const catalog = data?.scope_catalog?.length ? data.scope_catalog : FALLBACK_CATALOG;
   const groups = data?.scope_groups?.length ? data.scope_groups : FALLBACK_GROUPS;
   const maxActive = data?.max_active_keys ?? 3;
@@ -313,10 +315,10 @@ const AdminApiKeys = () => {
                         </div>
                       </div>
                     </td>
-                    <td data-label={t("apiKeys.col.key")} className="px-4 py-3"><code className="rounded bg-muted px-1.5 py-0.5 text-xs">{k.key_prefix}…{k.last_four ?? ""}</code></td>
+                    <td data-label={t("apiKeys.col.key")} className="px-4 py-3"><code className="whitespace-nowrap rounded bg-muted px-1.5 py-0.5 text-xs">{k.key_prefix}…{k.last_four ?? ""}</code></td>
                     <td data-label={t("apiKeys.col.created")} className="px-4 py-3 whitespace-nowrap text-muted-foreground">{fmt(k.created_at, f.intl("es-CO"))}</td>
                     <td data-label={t("apiKeys.col.createdBy")} className="px-4 py-3 whitespace-nowrap text-muted-foreground">{k.created_by_email ?? "—"}</td>
-                    <td data-label={t("apiKeys.col.actsAs")} className="px-4 py-3 whitespace-nowrap text-muted-foreground">{k.acts_as ? (k.acts_as.name ?? "—") : "—"}</td>
+                    <td data-label={t("apiKeys.col.actsAs")} className="px-4 py-3 whitespace-nowrap text-muted-foreground">{k.acts_as ? <Persona nombre={k.acts_as.name} cara={caras.get(k.acts_as.id)} /> : "—"}</td>
                     <td data-label={t("apiKeys.col.ipWhitelist")} className="px-4 py-3 text-muted-foreground">
                       {k.ip_whitelist?.length ? (
                         <span title={k.ip_whitelist.join(", ")}>{k.ip_whitelist.length} IP{k.ip_whitelist.length > 1 ? "s" : ""}</span>
@@ -371,7 +373,7 @@ const AdminApiKeys = () => {
 
       {/* Webhook de una key: registrar, estado y entregas */}
       <DialogoWebhook llave={webhookDe ? keys.find((k) => k.id === webhookDe) ?? null : null}
-        youId={data?.you?.id} onCerrar={() => setWebhookDe(null)} />
+        youId={data?.you?.id} caras={caras} onCerrar={() => setWebhookDe(null)} />
 
       {/* Modal crear / editar / mostrar key */}
       <Dialog open={modalMode !== null} onOpenChange={(o) => { if (!o) closeModal(); }}>
@@ -612,7 +614,9 @@ const AdminApiKeys = () => {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel />
-            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            {/* bg-none: el botón de Maven es un degradé (background-image) y
+                taparía el rojo: sin esto "Revocar" salía violeta. */}
+            <AlertDialogAction className="bg-none bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => revokeTarget && revokeMut.mutate(revokeTarget.id)}>
               {revokeMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : t("apiKeys.revoke")}
             </AlertDialogAction>

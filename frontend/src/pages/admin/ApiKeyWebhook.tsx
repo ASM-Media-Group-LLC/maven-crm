@@ -20,7 +20,9 @@ import { adminInvoke } from "@/lib/adminInvoke";
 import { useFormato } from "@/hooks/useFormato";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { TranslationKey } from "@/lib/i18n";
-import { ConFormato, CopyButton } from "./apiKeysPiezas";
+import { ConFormato, CopyButton, Persona } from "./apiKeysPiezas";
+import type { Cara } from "./carasDePersonas";
+import { UserAvatar } from "@/components/UserAvatar";
 
 // El webhook del Messenger de una API key (a lo sumo uno por key): la celda de la
 // tabla y el diálogo de registrar / estado / entregas. El contrato es el de
@@ -184,8 +186,8 @@ function Dato({ etiqueta, children }: { etiqueta: string; children: React.ReactN
 
 /** El diálogo del webhook de una key. `llave` sale de la lista (fresca tras cada
  *  invalidación); si no tiene webhook y la persona es la dueña, es el alta. */
-export function DialogoWebhook({ llave, youId, onCerrar }: {
-  llave: LlaveConWebhook | null; youId: string | null | undefined; onCerrar: () => void;
+export function DialogoWebhook({ llave, youId, caras, onCerrar }: {
+  llave: LlaveConWebhook | null; youId: string | null | undefined; caras?: Map<string, Cara>; onCerrar: () => void;
 }) {
   const qc = useQueryClient();
   const { t, language } = useLanguage();
@@ -207,7 +209,25 @@ export function DialogoWebhook({ llave, youId, onCerrar }: {
   const abierto = !!llave;
   const w = llave?.webhook ?? (recien && recien.api_key_id === llave?.id ? recien : null);
   const esDueno = !!youId && llave?.acts_as?.id === youId;
-  const nombreDueno = llave?.acts_as?.name?.trim() || null;
+  const cara = (id: string | null | undefined) => (id ? caras?.get(id) : undefined);
+  // La persona de la key, como en los demás modales de Maven (Cambiar rol,
+  // Compartir): su cara y qué puede hacer cada uno con el webhook.
+  const tarjetaPersona = llave?.acts_as ? (
+    <div className="flex items-center gap-3 rounded-lg bg-muted/50 p-3">
+      <UserAvatar name={llave.acts_as.name} src={cara(llave.acts_as.id)?.src} seed={cara(llave.acts_as.id)?.seed} size="md" />
+      <div className="min-w-0">
+        <p className="flex flex-wrap items-center gap-2 font-medium">
+          <span className="truncate">{llave.acts_as.name || "—"}</span>
+          {llave.acts_as.active === false && (
+            <Badge variant="destructive-soft" className="font-normal">{t("apiKeys.status.personGone")}</Badge>
+          )}
+        </p>
+        <p className="text-sm text-muted-foreground">
+          {esDueno ? t("apiKeys.webhook.person.you") : t("apiKeys.webhook.person.other")}
+        </p>
+      </div>
+    </div>
+  ) : null;
 
   const cerrar = () => {
     setSecreto(null); setRecien(null); setUrl(""); setSinPropios(true); setPrueba(null);
@@ -288,7 +308,8 @@ export function DialogoWebhook({ llave, youId, onCerrar }: {
           <DialogTitle>{t("apiKeys.webhook.registerTitle", { name: llave.name })}</DialogTitle>
           <DialogDescription><ConFormato texto={t("apiKeys.webhook.registerIntro")} /></DialogDescription>
         </DialogHeader>
-        {esDueno ? (
+        {tarjetaPersona}
+        {esDueno && (
           <div className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="webhook-url">{t("apiKeys.webhook.url")}</Label>
@@ -305,10 +326,6 @@ export function DialogoWebhook({ llave, youId, onCerrar }: {
               </span>
             </label>
           </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            {nombreDueno ? t("apiKeys.webhook.onlyOwner", { name: nombreDueno }) : t("apiKeys.webhook.onlyOwnerNoName")}
-          </p>
         )}
         <DialogFooter className="gap-2 sm:gap-0">
           <Button variant="ghost" onClick={cerrar}>{t("common.cancel")}</Button>
@@ -349,6 +366,7 @@ export function DialogoWebhook({ llave, youId, onCerrar }: {
             <TabsTrigger value="entregas">{t("apiKeys.webhook.tab.deliveries")}</TabsTrigger>
           </TabsList>
           <TabsContent value="estado" className="space-y-4">
+            {tarjetaPersona}
             {prueba && <ResultadoDePrueba prueba={prueba} />}
             <dl className="divide-y divide-border/40">
               <Dato etiqueta={t("apiKeys.webhook.detail.host")}><code className="text-xs">{w.url_host}</code></Dato>
@@ -375,9 +393,12 @@ export function DialogoWebhook({ llave, youId, onCerrar }: {
               )}
               {w.status === "paused" && (
                 <Dato etiqueta={t("apiKeys.webhook.state.paused")}>
-                  {w.paused_by?.name
-                    ? t("apiKeys.webhook.detail.pausedBy", { name: w.paused_by.name, when: fecha(w.paused_at) })
-                    : t("apiKeys.webhook.detail.pausedWhen", { when: fecha(w.paused_at) })}
+                  {w.paused_by?.name ? (
+                    <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <Persona nombre={w.paused_by.name} cara={cara(w.paused_by.id)} />
+                      <span>{t("apiKeys.webhook.detail.pausedOn", { when: fecha(w.paused_at) })}</span>
+                    </span>
+                  ) : t("apiKeys.webhook.detail.pausedWhen", { when: fecha(w.paused_at) })}
                 </Dato>
               )}
               {w.status === "disabled" && (
@@ -386,11 +407,6 @@ export function DialogoWebhook({ llave, youId, onCerrar }: {
                 </Dato>
               )}
             </dl>
-            {!esDueno && (
-              <p className="text-xs text-muted-foreground">
-                {nombreDueno ? t("apiKeys.webhook.onlyOwner", { name: nombreDueno }) : t("apiKeys.webhook.onlyOwnerNoName")}
-              </p>
-            )}
           </TabsContent>
           <TabsContent value="entregas" className="space-y-3">
             <label className="flex cursor-pointer items-center gap-2 text-sm">
@@ -453,7 +469,8 @@ export function DialogoWebhook({ llave, youId, onCerrar }: {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel />
-            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            {/* bg-none: sin esto el degradé del botón de Maven tapa el rojo. */}
+            <AlertDialogAction className="bg-none bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={(e) => { e.preventDefault(); quitar.mutate(); }}>
               {quitar.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : t("apiKeys.webhook.delete")}
             </AlertDialogAction>

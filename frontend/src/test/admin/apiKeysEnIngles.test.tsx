@@ -48,6 +48,9 @@ vi.mock("@/lib/adminInvoke", async () => {
   };
 });
 
+// Las caras salen de profiles (red): acá no hace falta ninguna.
+vi.mock("@/pages/admin/carasDePersonas", () => ({ useCaras: () => new Map() }));
+
 import AdminApiKeys from "@/pages/admin/AdminApiKeys";
 import { SessionExpiredError } from "@/lib/adminInvoke";
 import { apiKeys } from "@/lib/i18n/apiKeys";

@@ -3,6 +3,8 @@ import { Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useLanguage } from "@/hooks/useLanguage";
+import { UserAvatar } from "@/components/UserAvatar";
+import type { Cara } from "./carasDePersonas";
 
 // Piezas de Ajustes → API keys que usan la tabla de keys y el webhook.
 
@@ -44,5 +46,16 @@ export function CopyButton({ text, label, size = "sm" as "sm" | "default" }: { t
       {done ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
       {label ?? t("common.copy")}
     </Button>
+  );
+}
+
+/** Una persona como en el resto de Maven: su cara (foto → muñequito → iniciales)
+ *  y el nombre al lado. */
+export function Persona({ nombre, cara }: { nombre: string | null | undefined; cara?: Cara }) {
+  return (
+    <span className="inline-flex min-w-0 max-w-full items-center gap-2">
+      <UserAvatar name={nombre} src={cara?.src} seed={cara?.seed} size="xs" />
+      <span className="truncate">{nombre || "—"}</span>
+    </span>
   );
 }

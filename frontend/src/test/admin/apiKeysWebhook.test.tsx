@@ -64,6 +64,19 @@ vi.mock("sonner", () => ({
   },
 }));
 
+// Las caras (foto / muñequito) se leen de profiles: acá, un muñequito por persona
+// y la lista de ids que se pidieron.
+const carasPedidas = vi.hoisted(() => [] as string[][]);
+vi.mock("@/pages/admin/carasDePersonas", () => ({
+  useCaras: (ids: (string | null | undefined)[]) => {
+    carasPedidas.push(ids.filter((x): x is string => !!x));
+    return new Map([
+      ["3f1c2b7a-9d4e-4a51-8c0f-2e6b7d9a1c35", { src: null, seed: "semilla-yo" }],
+      ["9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d", { src: null, seed: "semilla-otra" }],
+    ]);
+  },
+}));
+
 import AdminApiKeys from "@/pages/admin/AdminApiKeys";
 import { textoDelError, chipDelWebhook, queMostrar } from "@/pages/admin/ApiKeyWebhook";
 
@@ -104,7 +117,15 @@ beforeEach(() => {
   llamadas.length = 0;
   avisos.ok.length = 0;
   avisos.error.length = 0;
+  carasPedidas.length = 0;
 });
+
+// El tsconfig de la app es ES2020: sin Array.prototype.at.
+const ultimo = <T,>(xs: T[]): T | undefined => xs[xs.length - 1];
+
+/** El muñequito DiceBear de alguien (UserAvatar con seed → <img alt={nombre}>). */
+const munequito = (raiz: HTMLElement, nombre: string) =>
+  Array.from(raiz.querySelectorAll("img")).find((i) => i.getAttribute("alt") === nombre && /dicebear|^data:image/.test(i.getAttribute("src") ?? ""));
 
 describe("la celda Webhook de la tabla", () => {
   it("cada caso muestra lo suyo (y no se confunde 'no tiene' con 'no se sabe')", async () => {
@@ -132,6 +153,19 @@ describe("la celda Webhook de la tabla", () => {
     expect(celdaWebhook("Key pau").textContent).toContain("Paused");
     expect(celdaWebhook("Key det").textContent).toContain("Stopped");
     expect(enEspanol(document.body)).toEqual([]);
+  });
+
+  it("'Actúa como' muestra la cara de la persona (foto / muñequito / iniciales)", async () => {
+    servidor = () => Promise.resolve(lista([
+      llave("mia"),
+      llave("ajena", { acts_as: { id: OTRA, name: "Someone Else", active: true } }),
+    ]));
+    montar();
+    await screen.findByText("Key mia");
+    const actua = (n: string) => fila(n).querySelector('td[data-label="Acts as"]') as HTMLElement;
+    expect(munequito(actua("Key mia"), "Alvaro Mejia")).toBeTruthy();
+    expect(munequito(actua("Key ajena"), "Someone Else")).toBeTruthy();
+    expect(ultimo(carasPedidas)).toEqual(expect.arrayContaining([YO, OTRA]));
   });
 
   it("si no se pudo consultar, NINGUNA key ofrece Registrar", async () => {
@@ -270,7 +304,9 @@ describe("estado: quién puede qué", () => {
     await screen.findByText("Key act");
     const d = await abrir("Key act");
     expect(within(d).queryByRole("button", { name: /Send test/ })).toBeNull();
-    expect(within(d).getByText(/Only Someone Else, the key's person/)).toBeTruthy();
+    expect(within(d).getByText(/Only this person can register, test or resume it/)).toBeTruthy();
+    // La tarjeta de la persona, como en los modales de Maven: su muñequito y su nombre.
+    expect(munequito(d, "Someone Else")).toBeTruthy();
     fireEvent.click(within(d).getByRole("button", { name: /Pause/ }));
     await waitFor(() => expect(llamadas.find((l) => l.action === "webhook_pause")).toEqual({ action: "webhook_pause", lang: "en", id: "w-act" }));
     expect(enEspanol(d)).toEqual([]);
@@ -286,7 +322,12 @@ describe("estado: quién puede qué", () => {
     let d = await abrir("Key mia");
     expect(within(d).getByRole("button", { name: /Resume/ })).toBeTruthy();
     expect(within(d).queryByRole("button", { name: /Pause/ })).toBeNull();
-    expect(within(d).getByText(/Paused by Someone Else on/)).toBeTruthy();
+    expect(within(d).getByText(/^paused it on /)).toBeTruthy();
+    expect(within(d).getByText(/That's you, the key's person/)).toBeTruthy();
+    // Dos caras: la de la persona de la key (yo) y la de quien lo pausó.
+    expect(munequito(d, "Alvaro Mejia")).toBeTruthy();
+    expect(munequito(d, "Someone Else")).toBeTruthy();
+    expect(ultimo(carasPedidas)).toEqual(expect.arrayContaining([YO, OTRA]));
     fireEvent.keyDown(d, { key: "Escape" });
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     d = await abrir("Key ajena");
@@ -379,7 +420,7 @@ describe("entregas", () => {
     expect(within(d).getAllByText(/It was cut off after sending/).length).toBeGreaterThan(0);
     expect(enEspanol(d)).toEqual([]);
     fireEvent.click(within(d).getByLabelText("Only the ones not delivered"));
-    await waitFor(() => expect(llamadas.filter((l) => l.action === "webhook_deliveries").at(-1)).toMatchObject({ only_failed: true }));
+    await waitFor(() => expect(ultimo(llamadas.filter((l) => l.action === "webhook_deliveries"))).toMatchObject({ only_failed: true }));
   });
 });
 
