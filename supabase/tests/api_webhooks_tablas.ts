@@ -16,7 +16,8 @@
 // PGlite tiene UNA sola conexión: las carreras (SKIP LOCKED, FOR SHARE) se
 // razonaron, no se prueban acá.
 import { PGlite } from "npm:@electric-sql/pglite@0.3";
-import { normalizarUrlDeWebhook } from "../functions/_shared/webhook-salida.ts";
+import { normalizarUrlDeWebhook, type Resultado } from "../functions/_shared/webhook-salida.ts";
+import { COLS_ENTREGA, type Contexto, type Datos, type FilaEndpoint, type Llave, servirWebhook } from "../functions/manage-api-keys/webhooks.ts";
 const MIG = Deno.readTextFileSync(
   Deno.args[0] ?? new URL("../migrations/20260926120000_api_webhooks_tablas.sql", import.meta.url),
 );
@@ -64,6 +65,9 @@ CREATE OR REPLACE FUNCTION public.api_key_persona_vigente(_usuario uuid, _agenci
      and not exists (select 1 from auth.users u where u.id = _usuario and u.banned_until > now())
      and exists (select 1 from public.tenant_members tm where tm.user_id = _usuario and tm.tenant_id = _agencia); $f$;
 revoke all on function public.api_key_persona_vigente(uuid, uuid) from public, anon, authenticated;
+CREATE OR REPLACE FUNCTION public.api_key_vigente(_id uuid) RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public' AS $f$
+  select public.api_key_persona_vigente(k.acts_as_user_id, k.tenant_id) from public.api_keys k where k.id = _id; $f$;
+revoke all on function public.api_key_vigente(uuid) from public, anon, authenticated;
 CREATE OR REPLACE FUNCTION public.api_keys_reglas_messenger() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $f$
 declare
   _tiene boolean := exists (select 1 from unnest(new.scopes) s where s like 'messenger:%');
@@ -1010,6 +1014,159 @@ for (const [salida, esperado] of [["paused", "endpoint_paused"], ["receiver_gone
     }
     await db.exec("rollback");
   }
+}
+
+// ════ N. las acciones de manage-api-keys (webhooks.ts) contra la base de verdad ════
+// Lo mismo que hace la edge, pero con un Datos en SQL: así cada escritura del PR 3
+// pasa por los triggers y los CHECKs reales (alta, turno de la prueba, prueba
+// entregada, activación, pausa, reanudar, baja) y por el aislamiento por agencia.
+{
+  const db = await nueva();
+  const fila = (r: Record<string, unknown> | undefined) => {
+    if (!r) return null;
+    const o: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(r)) o[k] = v instanceof Date ? v.toISOString() : v;
+    return o;
+  };
+  const q1 = async (sql: string, p: unknown[] = []) => fila((await db.query(sql, p)).rows[0] as Record<string, unknown> | undefined);
+  const escribir = async (sql: string, p: unknown[]) => {
+    try { return { ok: true as const, valor: fila((await db.query(sql, p)).rows[0] as Record<string, unknown> | undefined) }; }
+    catch (e) { return { ok: false as const, codigo: (e as { code?: string }).code ?? null }; }
+  };
+  const escrituras: string[] = [];
+  /** El Datos de la edge, en SQL y atado a la agencia T (como crearDatos). */
+  const datosDe = (T: string): Datos => ({
+    llave: async (id) => (await q1(`select id, key_prefix, scopes, expires_at, revoked_at, acts_as_user_id from api_keys where id = $1 and tenant_id = $2`, [id, T])) as unknown as Llave,
+    llaveVigente: async (id) => (await q1(`select api_key_vigente($1::uuid) v`, [id]))?.v === true,
+    agencias: async () => Number((await q1(`select count(*)::int n from tenants`))?.n),
+    endpoint: async (id) => (await q1(`select * from api_webhook_endpoints where id = $1 and tenant_id = $2`, [id, T])) as unknown as FilaEndpoint,
+    endpointDeLlave: async (k) => (await q1(`select * from api_webhook_endpoints where api_key_id = $1 and tenant_id = $2`, [k, T])) as unknown as FilaEndpoint,
+    endpointsDeLlaves: async (ks) => (await db.query(`select * from api_webhook_endpoints where api_key_id = any($1) and tenant_id = $2`, [ks, T])).rows.map((r) => fila(r as Record<string, unknown>)) as unknown as FilaEndpoint[],
+    entregas: async (id, limite, solo) => (await db.query(`select ${COLS_ENTREGA} from api_webhook_deliveries where endpoint_id = $1 and tenant_id = $2 ${solo ? "and state <> 'delivered'" : ""} order by created_at desc limit $3`, [id, T, limite])).rows.map((r) => fila(r as Record<string, unknown>)!),
+    nombres: async (ids) => new Map(((await db.query(`select id, full_name from profiles where id = any($1)`, [ids])).rows as { id: string; full_name: string }[]).map((p) => [p.id, p.full_name])),
+    crearEndpoint: async (f) => {
+      escrituras.push("crearEndpoint");
+      const c = { ...f, tenant_id: T };
+      const k = Object.keys(c);
+      const r = await escribir(`insert into api_webhook_endpoints(${k.join(",")}) values (${k.map((_, i) => `$${i + 1}`).join(",")}) returning *`, Object.values(c));
+      return r.ok ? { ok: true, valor: r.valor as unknown as FilaEndpoint } : r;
+    },
+    actualizarEndpoint: async (id, cambios, siEstado) => {
+      escrituras.push("actualizarEndpoint");
+      const k = Object.keys(cambios);
+      const r = await escribir(
+        `update api_webhook_endpoints set ${k.map((c, i) => `${c} = $${i + 1}`).join(", ")} where id = $${k.length + 1} and tenant_id = $${k.length + 2} and status = any($${k.length + 3}) returning *`,
+        [...Object.values(cambios), id, T, siEstado],
+      );
+      return r.ok ? { ok: true, valor: r.valor as unknown as FilaEndpoint | null } : r;
+    },
+    // Lo mismo que el .or(last_test_at.is.null, last_test_at.lt."…") de crearDatos.
+    reservarPrueba: async (id, antesMs) => {
+      escrituras.push("reservarPrueba");
+      const r = await escribir(`update api_webhook_endpoints set last_test_at = 'now' where id = $1 and tenant_id = $2 and (last_test_at is null or last_test_at < $3) returning *`, [id, T, new Date(antesMs).toISOString()]);
+      return r.ok ? { ok: true, valor: r.valor as unknown as FilaEndpoint | null } : r;
+    },
+    borrarEndpoint: async (id) => (escrituras.push("borrarEndpoint"), (await db.query(`delete from api_webhook_endpoints where id = $1 and tenant_id = $2 returning id`, [id, T])).rows.length > 0),
+    crearEntrega: async (f) => {
+      escrituras.push("crearEntrega");
+      const c = { ...f, tenant_id: T };
+      const k = Object.keys(c);
+      return (await escribir(`insert into api_webhook_deliveries(${k.join(",")}) values (${k.map((_, i) => `$${i + 1}`).join(",")}) returning id`, Object.values(c))).ok;
+    },
+    cerrarEntrega: async (id, cambios) => {
+      escrituras.push("cerrarEntrega");
+      const k = Object.keys(cambios);
+      const r = await escribir(`update api_webhook_deliveries set ${k.map((c, i) => `${c} = $${i + 1}`).join(", ")} where id = $${k.length + 1} and tenant_id = $${k.length + 2} and state = 'pending' returning id`, [...Object.values(cambios), id, T]);
+      if (!r.ok) mal.push(`la base rechazó el cierre de la entrega (${r.codigo})`);
+      return r.ok;
+    },
+  });
+  let n = 0;
+  const ctx = (extra: Partial<Contexto> = {}): Contexto => ({
+    datos: datosDe(T1), callerId: ALVARO, idioma: "es",
+    entorno: (v) => (v === "WEBHOOK_SIGNING_KEK" ? "k".repeat(40) : undefined),
+    resolver: () => Promise.resolve(["93.184.216.34"]),
+    uuid: () => `eeeeeeee-0000-4000-8000-${String(++n).padStart(12, "0")}`,
+    enviar: () => Promise.resolve<Resultado>({ tipo: "respuesta", estado: 204, retryAfterS: null, latenciaMs: 12 }),
+    ...extra,
+  });
+  /** Pasaron más de 12 s desde la última prueba. */
+  const correrElReloj = (id: string) => db.exec(`update api_webhook_endpoints set last_test_at = now() - interval '1 minute' where id = '${id}'`);
+  const estado = async (id: string) => (await uno(db, `select status from api_webhook_endpoints where id = '${id}'`))?.status;
+  const test = (r: { cuerpo: Record<string, unknown> }) => r.cuerpo.test as Record<string, unknown> | undefined;
+
+  const alta = await servirWebhook("webhook_create", { key_id: K_MSG, url: "https://Hooks.Integrador.com/maven?t=1" }, ctx());
+  check(alta.estado === 201, `N: el alta del módulo la acepta la base (${alta.estado} ${JSON.stringify(alta.cuerpo).slice(0, 80)})`);
+  const epId = (alta.cuerpo.webhook as { id: string }).id;
+  const creado = await uno(db, `select status, url, url_host, created_by::text c, tenant_id::text t from api_webhook_endpoints where id = '${epId}'`);
+  check(creado?.status === "pending" && creado?.url === "https://hooks.integrador.com/maven?t=1" && creado?.c === ALVARO && creado?.t === T1, "N: nace pending, con la URL normalizada, de la persona y la agencia");
+  const ajena = await servirWebhook("webhook_create", { key_id: K_ANA, url: "https://x.integrador.com/" }, ctx());
+  check(ajena.estado === 403, "N: la llave de otra persona: 403 (antes de llegar a la base)");
+  const prueba = await servirWebhook("webhook_test", { id: epId }, ctx());
+  check(prueba.estado === 200 && test(prueba)?.delivered === true && test(prueba)?.activated === true, `N: la prueba entregada ACTIVA en la base de verdad (${prueba.estado} ${JSON.stringify(test(prueba))})`);
+  const activo = await uno(db, `select status, cursor_at is not null c, cursor_id::text i, last_test_at is not null p, last_status_code s from api_webhook_endpoints where id = '${epId}'`);
+  check(activo?.status === "active" && activo?.c === true && activo?.i === "00000000-0000-0000-0000-000000000000" && activo?.p === true && activo?.s === 204, "N: activo, con el cursor desde ahora, el turno y la prueba anotados");
+  const d = await uno(db, `select state, attempts, last_status_code, delivered_at is not null e from api_webhook_deliveries where endpoint_id = '${epId}'`);
+  check(d?.state === "delivered" && d?.attempts === 1 && d?.last_status_code === 204 && d?.e === true, "N: la entrega de la prueba cumple el CHECK de 2xx con intento");
+
+  // El turno: una prueba enseguida de otra no sale ni escribe nada.
+  const antes = await uno(db, `select last_test_at::text t, (select count(*)::int from api_webhook_deliveries) n from api_webhook_endpoints where id = '${epId}'`);
+  escrituras.length = 0;
+  const seguida = await servirWebhook("webhook_test", { id: epId }, ctx());
+  const despues = await uno(db, `select last_test_at::text t, (select count(*)::int from api_webhook_deliveries) n from api_webhook_endpoints where id = '${epId}'`);
+  check(seguida.estado === 429 && despues?.t === antes?.t && despues?.n === antes?.n && escrituras.join() === "reservarPrueba", `N: la prueba seguida: 429, sin tocar la fila ni anotar entrega (${seguida.estado} ${escrituras.join()})`);
+
+  // Una prueba sobre un activo no pisa lo del despachador.
+  await db.exec(`update api_webhook_endpoints set last_status_code = 500, last_error = 'http_500', consecutive_failures = 2 where id = '${epId}'`);
+  await correrElReloj(epId);
+  const sobreActivo = await servirWebhook("webhook_test", { id: epId }, ctx({ enviar: () => Promise.resolve<Resultado>({ tipo: "respuesta", estado: 404, retryAfterS: null, latenciaMs: 3 }) }));
+  const tras = await uno(db, `select status, last_status_code s, last_error e, consecutive_failures f from api_webhook_endpoints where id = '${epId}'`);
+  check(sobreActivo.estado === 200 && test(sobreActivo)?.delivered === false && tras?.status === "active" && tras?.s === 500 && tras?.e === "http_500" && tras?.f === 2, "N: una prueba sobre un activo no pisa el detalle del despachador");
+
+  const pausa = await servirWebhook("webhook_pause", { id: epId }, ctx({ callerId: ANA }));
+  check(pausa.estado === 200 && (await uno(db, `select status, paused_by::text b from api_webhook_endpoints where id = '${epId}'`))?.b === ANA, "N: la pausa de otra admin la acepta la base");
+  await correrElReloj(epId);
+  const reanuda = await servirWebhook("webhook_resume", { id: epId }, ctx());
+  const limpio = await uno(db, `select status, paused_by, last_error, last_status_code s, consecutive_failures f from api_webhook_endpoints where id = '${epId}'`);
+  check(reanuda.estado === 200 && limpio?.status === "active" && limpio?.paused_by === null && limpio?.last_error === null && limpio?.s === 204 && limpio?.f === 0, `N: reanudar desde pausado pasa el trigger y arranca el detalle de cero (${reanuda.estado} ${JSON.stringify(limpio)})`);
+  const yaActivo = await servirWebhook("webhook_resume", { id: epId }, ctx());
+  check(yaActivo.estado === 409, "N: reanudar un activo: 409 'ya estaba activo'");
+  // detenido por la base (revocar la llave), y reanudar: la edge frena antes de mandar
+  await db.exec(`update api_keys set revoked_at = now() where id = '${K_MSG}'`);
+  check((await uno(db, `select status || '/' || disabled_reason s from api_webhook_endpoints where id = '${epId}'`))?.s === "disabled/key_revoked", "N: revocar la llave lo detiene");
+  await correrElReloj(epId);
+  let mandadas = 0;
+  const muerta = await servirWebhook("webhook_resume", { id: epId }, ctx({ enviar: () => (mandadas++, Promise.resolve<Resultado>({ tipo: "respuesta", estado: 204, retryAfterS: null, latenciaMs: 1 })) }));
+  check(muerta.estado === 409 && mandadas === 0, `N: reanudar con la llave revocada: 409 sin mandar nada (${muerta.estado})`);
+  await db.exec(`update api_keys set revoked_at = null where id = '${K_MSG}'`);
+  const revive = await servirWebhook("webhook_resume", { id: epId }, ctx());
+  check(revive.estado === 200 && (await estado(epId)) === "active", `N: reanudar desde detenido, con prueba, pasa el trigger (${revive.estado})`);
+  const entregas = await servirWebhook("webhook_deliveries", { id: epId, limit: 10 }, ctx({ callerId: ANA }));
+  const filas = entregas.cuerpo.deliveries as Record<string, unknown>[];
+  check(entregas.estado === 200 && filas.length === 4 && filas.every((f) => !("body" in f) && !("tenant_id" in f)), `N: las entregas (4 pruebas) las ve otra admin, sin el cuerpo (${filas?.length})`);
+  check((entregas.cuerpo.webhook as { status: string })?.status === "active", "N: las entregas traen el webhook al lado");
+  const baja = await servirWebhook("webhook_delete", { id: epId }, ctx({ callerId: ANA }));
+  check(baja.estado === 200 && (await uno(db, `select count(*)::int n from api_webhook_deliveries`))?.n === 0, "N: borrar se lleva el endpoint y sus entregas");
+
+  // Dos agencias: la base detiene todo; la edge ni registra ni prueba, y desde la
+  // otra agencia el endpoint no existe (ni se escribe nada).
+  const otraAlta = await servirWebhook("webhook_create", { key_id: K_MSG, url: "https://hooks.integrador.com/otra" }, ctx());
+  const ep2 = (otraAlta.cuerpo.webhook as { id: string } | undefined)?.id ?? "";
+  check(otraAlta.estado === 201, `N: después de borrar, la llave puede registrar otro (${otraAlta.estado})`);
+  await db.exec(`insert into tenants(id, slug, name) values ('${T2}', 'otra', 'Otra')`);
+  check((await uno(db, `select status || '/' || disabled_reason s from api_webhook_endpoints where id = '${ep2}'`))?.s === "disabled/multi_agency", "N: la segunda agencia lo detiene");
+  escrituras.length = 0;
+  const desdeT2 = [];
+  for (const accion of ["webhook_pause", "webhook_delete", "webhook_deliveries", "webhook_test", "webhook_resume"]) {
+    desdeT2.push((await servirWebhook(accion, { id: ep2 }, ctx({ datos: datosDe(T2) }))).estado);
+  }
+  check(desdeT2.every((e) => e === 404) && escrituras.length === 0, `N: desde la otra agencia el endpoint no existe y no se escribe nada (${desdeT2.join(",")} / ${escrituras.join()})`);
+  check((await uno(db, `select count(*)::int n from api_webhook_endpoints where id = '${ep2}'`))?.n === 1, "N: sigue ahí");
+  await correrElReloj(ep2);
+  const conDos = await servirWebhook("webhook_resume", { id: ep2 }, ctx());
+  const altaConDos = await servirWebhook("webhook_create", { key_id: K_MSG, url: "https://hooks.integrador.com/tercera" }, ctx());
+  check(conDos.estado === 409 && altaConDos.estado === 409 && escrituras.length === 0, `N: con dos agencias ni reanuda ni registra, sin escribir (${conDos.estado} ${altaConDos.estado})`);
+  await db.exec(`delete from tenants where id = '${T2}'`);
 }
 
 console.log(ok.map((m) => "✓ " + m).join("\n"));

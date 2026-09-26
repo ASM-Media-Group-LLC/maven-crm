@@ -38,6 +38,15 @@ jobs:
       - name: Guard — salida de los webhooks
         run: deno test --allow-read supabase/functions/_shared/webhook-salida.test.ts
 
+      # Las acciones de webhooks de manage-api-keys: el guard de arriba las corre sin
+      # tipos; acá el tipo de cada mensaje (clave que existe, variables) y de Datos.
+      - name: Tipos — manage-api-keys
+        run: >-
+          deno check
+          supabase/functions/manage-api-keys/index.ts
+          supabase/functions/manage-api-keys/webhooks.test.ts
+          supabase/functions/manage-api-keys/mensajes.test.ts
+
       # `deno test --no-check` no mira tipos: sin este paso, el tipo de msg() (clave que
       # existe, variables exactas) y los @ts-expect-error de mensajes.test.ts nunca
       # podrían fallar en CI. messenger.test.ts queda afuera: arrastra un error de tipos
