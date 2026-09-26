@@ -6,7 +6,7 @@
 // confunda con "no tiene", que cada código del servidor se lea en palabras, y que
 // todo esté en inglés cuando la pantalla está en inglés.
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, within, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, within, waitFor, act } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { LanguageProvider } from "@/hooks/useLanguage";
 import { esEspanol } from "../i18n/detectarEspanol";
@@ -281,7 +281,7 @@ describe("registrar: el secreto, UNA vez", () => {
       }
       return Promise.resolve({
         webhook: { ...conWebhook!, last_error: "http_401", last_status_code: 401 },
-        test: { delivered: false, status_code: 401, error_code: "http_401", latency_ms: 90, uncertain: true, activated: false,
+        test: { delivered: false, status_code: 401, error_code: "http_401", latency_ms: 90, uncertain: false, activated: false,
           message: "Your server answered 401.", notice: "It stays waiting for the test." },
       });
     };
@@ -299,7 +299,7 @@ describe("registrar: el secreto, UNA vez", () => {
     expect(within(d).queryByText(/Webhook activated/)).toBeNull();
     expect(avisos.ok).not.toContain("Webhook activated");
     expect(within(d).getByText("It stays waiting for the test.")).toBeTruthy();
-    expect(within(d).getByText(/It was cut off after sending/)).toBeTruthy();
+    expect(within(d).queryByText(/It was cut off after sending/)).toBeNull();
     expect(within(d).getByText(SECRETO)).toBeTruthy();
     expect(within(d).getByRole("button", { name: "Later" })).toBeTruthy();
   });
@@ -546,7 +546,9 @@ describe("estado: quién puede qué", () => {
     const si = within(confirma).getByRole("button", { name: "Delete" });
     fireEvent.click(si);
     fireEvent.click(si);
-    await waitFor(() => expect((within(confirma).getByRole("button", { name: /Delete/ }) as HTMLButtonElement).disabled).toBe(true));
+    // aria-disabled (no disabled): el foco no se cae a <body> mientras borra.
+    await waitFor(() => expect(within(confirma).getByRole("button", { name: /Delete/ }).getAttribute("aria-disabled")).toBe("true"));
+    expect(within(confirma).getByRole("status").textContent).toBe("Working…");
     borrado.resolver({ success: true, id: "w-act" });
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(llamadasDe("webhook_delete")).toEqual([{ action: "webhook_delete", lang: "en", id: "w-act" }]);
@@ -559,7 +561,7 @@ describe("estado: quién puede qué", () => {
       llave("fall", { webhook: fallando("fall") }),
       // El adelanto del despachador: consecutive_failures 1 y failing_since ahora, pero
       // el último intento (el que llegó) es de antes: se está mandando, no falló.
-      llave("sale", { webhook: webhook({ api_key_id: "sale", consecutive_failures: 1, failing_since: "2026-09-26T14:10:00Z", last_attempt_at: "2026-09-26T14:00:00Z", next_attempt_at: "2999-01-01T00:00:00Z" }) }),
+      llave("sale", { webhook: webhook({ api_key_id: "sale", consecutive_failures: 1, failing_since: "2026-09-26T14:10:00Z", last_attempt_at: "2026-09-26T14:00:00Z", last_error: "http_503", next_attempt_at: "2999-01-01T00:00:00Z" }) }),
     ]));
     montar();
     await screen.findByText("Key fall");
@@ -676,6 +678,7 @@ describe("entregas", () => {
           { ...base, id: "e2", event_type: "messages.created", message_count: 1, state: "pending", attempts: 2, last_error: "plazo" },
           { ...base, id: "e3", event_type: "webhook.test", message_count: null, state: "dropped", drop_reason: "test_failed", last_error: "tls" },
           { ...base, id: "e4", event_type: "messages.created", message_count: 5, state: "dropped", drop_reason: "algo_nuevo", uncertain: true, last_error: "cortado" },
+          { ...base, id: "e5", event_type: "webhook.test", message_count: null, state: "dropped", drop_reason: "test_failed", uncertain: true, last_error: "plazo" },
         ],
       });
     };
@@ -691,13 +694,17 @@ describe("entregas", () => {
     expect(within(d).getByText("Notification · 3 messages")).toBeTruthy();
     expect(within(d).getByText("Notification · 1 message")).toBeTruthy();
     expect(within(d).getByText("Notification · 5 messages")).toBeTruthy();
-    expect(within(d).getByText("Test")).toBeTruthy();
+    expect(within(d).getAllByText("Test").length).toBe(2);
     expect(within(d).getByText(/^Retrying /)).toBeTruthy();
-    expect(within(d).getByText("Didn't answer in time")).toBeTruthy();
+    expect(within(d).getAllByText("Didn't answer in time").length).toBe(2);
     expect(within(d).getByText("Dropped: the test wasn't delivered")).toBeTruthy();
     expect(within(d).getByText("Invalid HTTPS certificate")).toBeTruthy();
     expect(within(d).getByText("Dropped: another reason")).toBeTruthy();
-    expect(within(d).getAllByText(/It was cut off after sending/).length).toBeGreaterThan(0);
+    // La cortada ya dice "puede haber llegado": no se repite. La incierta por plazo sí lo dice,
+    // y su descarte no es "no llegó" sino "no se confirmó".
+    expect(within(d).getByText("Cut off after sending (it may have arrived)")).toBeTruthy();
+    expect(within(d).getAllByText(/It was cut off after sending/).length).toBe(1);
+    expect(within(d).getByText("Dropped: the test wasn't confirmed")).toBeTruthy();
     expect(enEspanol(d)).toEqual([]);
     fireEvent.click(within(d).getByLabelText("Only the ones not delivered"));
     await waitFor(() => expect(ultimo(llamadasDe("webhook_deliveries"))).toMatchObject({ only_failed: true }));
@@ -741,7 +748,8 @@ describe("la referencia del API", () => {
     fireEvent.click(screen.getAllByRole("button", { name: /API reference/ })[0]);
     const d = await screen.findByRole("dialog");
     expect(within(d).getByText("Webhooks (Messenger)")).toBeTruthy();
-    expect(within(d).getByText(/every 15 minutes or less/)).toBeTruthy();
+    expect(within(d).getByText(/\*?Required:?/)).toBeTruthy();
+    expect(within(d).getAllByText(/every 15 minutes or less/).length).toBe(2); // la sección y la ficha del feed
     expect(within(d).getByText(/Maven has no fixed outgoing IPs/)).toBeTruthy();
     expect(within(d).getByText(/a test can arrive at the same time/)).toBeTruthy();
     const ejemplos = Array.from(d.querySelectorAll("pre")).map((p) => p.textContent ?? "");
@@ -783,6 +791,8 @@ describe("los códigos y los estados", () => {
     expect(chipDe(ef({ consecutive_failures: 2, failing_since: "2026-09-26T08:00:00Z", last_error: "http_500" })))
       .toEqual({ texto: "apiKeys.webhook.state.failing", variant: "warning-soft" });
     expect(chipDe(ef({ last_error: "maven_base" }))).toEqual({ texto: "apiKeys.webhook.state.delayed", variant: "warning-soft" });
+    // Con racha del receptor, manda "fallando" aunque el último error sea de Maven.
+    expect(chipDe(ef({ consecutive_failures: 2, failing_since: "2026-09-26T08:00:00Z", last_error: "maven_base" })).texto).toBe("apiKeys.webhook.state.failing");
   });
 
   it("estadoEfectivo: la key manda sobre la fila, y 'fallando' pide un intento fallido de verdad", () => {
@@ -796,7 +806,397 @@ describe("los códigos y los estados", () => {
     // El adelanto: fallos > 0 pero el último intento es anterior a la racha.
     expect(ef({ consecutive_failures: 1, failing_since: "2026-09-26T14:10:00Z", last_attempt_at: "2026-09-26T14:00:00Z" }).fallando).toBe(false);
     expect(ef({ consecutive_failures: 1, failing_since: "2026-09-26T14:10:00Z", last_attempt_at: "2026-09-26T14:10:05Z", last_error: "conexion" }).fallando).toBe(true);
-    expect(ef({ consecutive_failures: 3, failing_since: "2026-09-26T08:00:00Z", last_error: "maven_base" }).fallando).toBe(false);
+    // Una falla de Maven pisa last_error sin cortar la racha del receptor: las dos cosas.
+    expect(ef({ consecutive_failures: 3, failing_since: "2026-09-26T08:00:00Z", last_error: "maven_base" })).toMatchObject({ fallando: true, demorado: true });
+    // Tras reanudar queda un last_error viejo con la racha nueva del adelanto: no es fallo.
+    expect(ef({ consecutive_failures: 1, failing_since: "2026-09-26T14:10:00Z", last_attempt_at: "2026-09-26T14:00:00Z", last_error: "http_503" }).fallando).toBe(false);
     expect(ef({ status: "paused", consecutive_failures: 3, failing_since: "2026-09-26T08:00:00Z", last_error: "http_500" }).fallando).toBe(false);
+  });
+});
+
+describe("segunda revisión: carreras, foco y lo que no tenía test", () => {
+  it("probar y después pausar: el segundo botón responde y el resultado viejo se va", async () => {
+    let estado: W = webhook({ api_key_id: "act" });
+    servidor = (b) => {
+      if (b.action === "list") return Promise.resolve(lista([llave("act", { webhook: estado })]));
+      if (b.action === "webhook_test") return Promise.resolve({ webhook: estado, test: { ...pruebaOk, activated: false } });
+      estado = { ...estado, status: "paused", paused_at: "2026-09-26T14:05:00Z", paused_by: { id: YO, name: "Alvaro Mejia" } };
+      return Promise.resolve({ webhook: estado });
+    };
+    montar();
+    await screen.findByText("Key act");
+    const d = await abrirCelda("Key act");
+    fireEvent.click(within(d).getByRole("button", { name: /Send test/ }));
+    await within(d).findByText("Your server answered 204.");
+    await waitFor(() => expect(within(d).getByRole("button", { name: /Pause/ }).getAttribute("aria-disabled")).toBe("false"));
+    fireEvent.click(within(d).getByRole("button", { name: /Pause/ }));
+    await waitFor(() => expect(llamadasDe("webhook_pause").length).toBe(1));
+    await waitFor(() => expect(within(d).queryByText("Your server answered 204.")).toBeNull());
+  });
+
+  it("pausar y después reanudar en el mismo diálogo", async () => {
+    let estado: W = webhook({ api_key_id: "act" });
+    servidor = (b) => {
+      if (b.action === "list") return Promise.resolve(lista([llave("act", { webhook: estado })]));
+      if (b.action === "webhook_pause") {
+        estado = { ...estado, status: "paused", paused_at: "2026-09-26T14:05:00Z", paused_by: { id: YO, name: "Alvaro Mejia" } };
+        return Promise.resolve({ webhook: estado });
+      }
+      estado = { ...estado, status: "active" };
+      return Promise.resolve({ webhook: estado, test: pruebaOk });
+    };
+    montar();
+    await screen.findByText("Key act");
+    const d = await abrirCelda("Key act");
+    fireEvent.click(within(d).getByRole("button", { name: /Pause/ }));
+    const reanudar = await within(d).findByRole("button", { name: /Resume/ });
+    await waitFor(() => expect(reanudar.getAttribute("aria-disabled")).toBe("false"));
+    fireEvent.click(within(d).getByRole("button", { name: /Resume/ }));
+    await waitFor(() => expect(llamadasDe("webhook_resume").length).toBe(1));
+  });
+
+  it("un borrado que falla se puede reintentar", async () => {
+    let n = 0;
+    servidor = (b) => {
+      if (b.action === "list") return Promise.resolve(lista([llave("act", { webhook: webhook({ api_key_id: "act" }) })]));
+      n++;
+      return n === 1 ? Promise.reject(new Error("Try again.")) : Promise.resolve({ success: true });
+    };
+    montar();
+    await screen.findByText("Key act");
+    const d = await abrirCelda("Key act");
+    fireEvent.click(within(d).getByRole("button", { name: /Delete/ }));
+    let c = await screen.findByRole("alertdialog");
+    fireEvent.click(within(c).getByRole("button", { name: "Delete" }));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    await waitFor(() => expect((within(d).getByRole("button", { name: /Delete/ }) as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(within(d).getByRole("button", { name: /Delete/ }));
+    c = await screen.findByRole("alertdialog");
+    fireEvent.click(within(c).getByRole("button", { name: "Delete" }));
+    await waitFor(() => expect(llamadasDe("webhook_delete").length).toBe(2));
+  });
+
+  it("si la relectura falla tras pausar, se ve lo que contestó el servidor (y la tabla sigue)", async () => {
+    let listas = 0;
+    servidor = (b) => {
+      if (b.action === "list") {
+        listas++;
+        return listas <= 2 ? Promise.resolve(lista([llave("act", { webhook: webhook({ api_key_id: "act" }) })])) : Promise.reject(new Error("net"));
+      }
+      return Promise.resolve({ webhook: webhook({ api_key_id: "act", status: "paused", paused_at: "2026-09-26T14:05:00Z" }) });
+    };
+    montar();
+    await screen.findByText("Key act");
+    const d = await abrirCelda("Key act");
+    await waitFor(() => expect(llamadasDe("list").length).toBe(2));
+    fireEvent.click(within(d).getByRole("button", { name: /Pause/ }));
+    await waitFor(() => expect(listas).toBeGreaterThan(2));
+    await within(d).findByText(/Paused: no notification goes out/);
+    expect(within(d).queryByRole("button", { name: /Pause/ })).toBeNull();
+    await cerrarConEsc(d);
+    // La tabla no se reemplaza por el error: sigue, con un aviso y Reintentar.
+    expect(screen.getByText("Key act")).toBeTruthy();
+    expect(celdaWebhook("Key act").textContent).toContain("Paused");
+    expect(screen.getByText(/Couldn't refresh the list/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
+  });
+
+  it("tras borrar, aunque la relectura falle, la celda vuelve a Registrar", async () => {
+    let listas = 0;
+    servidor = (b) => {
+      if (b.action === "list") {
+        listas++;
+        return listas <= 2 ? Promise.resolve(lista([llave("act", { webhook: webhook({ api_key_id: "act" }) })])) : Promise.reject(new Error("net"));
+      }
+      return Promise.resolve({ success: true, id: "w-act" });
+    };
+    montar();
+    await screen.findByText("Key act");
+    const d = await abrirCelda("Key act");
+    fireEvent.click(within(d).getByRole("button", { name: /Delete/ }));
+    const c = await screen.findByRole("alertdialog");
+    fireEvent.click(within(c).getByRole("button", { name: "Delete" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(within(celdaWebhook("Key act")).getByRole("button", { name: /Register/ })).toBeTruthy());
+  });
+
+  it("tras un rechazo, Pausar espera la relectura (un segundo toque no manda otro pedido)", async () => {
+    const relectura = diferida<unknown>();
+    let listas = 0;
+    servidor = (b) => {
+      if (b.action === "list") {
+        listas++;
+        return listas <= 2 ? Promise.resolve(lista([llave("act", { webhook: webhook({ api_key_id: "act" }) })])) : relectura.promesa;
+      }
+      return Promise.reject(new Error("Only an active webhook can be paused."));
+    };
+    montar();
+    await screen.findByText("Key act");
+    const d = await abrirCelda("Key act");
+    await waitFor(() => expect(llamadasDe("list").length).toBe(2));
+    fireEvent.click(within(d).getByRole("button", { name: /Pause/ }));
+    await waitFor(() => expect(avisos.error.length).toBe(1));
+    fireEvent.click(within(d).getByRole("button", { name: /Pause/ }));
+    expect(llamadasDe("webhook_pause").length).toBe(1);
+    relectura.resolver(lista([llave("act", { webhook: webhook({ api_key_id: "act", status: "paused" }) })]));
+    await waitFor(() => expect(within(d).queryByRole("button", { name: /Pause/ })).toBeNull());
+  });
+
+  it("después de una prueba, el diálogo se cierra y se pausa sin esperar la lista", async () => {
+    const relectura = diferida<unknown>();
+    let listas = 0;
+    servidor = (b) => {
+      if (b.action === "list") {
+        listas++;
+        return listas <= 2 ? Promise.resolve(lista([llave("act", { webhook: webhook({ api_key_id: "act" }) })])) : relectura.promesa;
+      }
+      return Promise.resolve({ webhook: webhook({ api_key_id: "act" }), test: pruebaOk });
+    };
+    montar();
+    await screen.findByText("Key act");
+    const d = await abrirCelda("Key act");
+    await waitFor(() => expect(llamadasDe("list").length).toBe(2));
+    fireEvent.click(within(d).getByRole("button", { name: /Send test/ }));
+    await within(d).findByText("Your server answered 204.");
+    await waitFor(() => expect(within(d).getByRole("button", { name: /Pause/ }).getAttribute("aria-disabled")).toBe("false"));
+    await cerrarConEsc(d);
+    relectura.resolver(lista([llave("act", { webhook: webhook({ api_key_id: "act" }) })]));
+  });
+
+  it("una prueba lanzada desde Entregas muestra su resultado (vuelve a Estado)", async () => {
+    servidor = (b) => {
+      if (b.action === "list") return Promise.resolve(lista([llave("act", { webhook: webhook({ api_key_id: "act" }) })]));
+      if (b.action === "webhook_deliveries") return Promise.resolve({ webhook: webhook({ api_key_id: "act" }), deliveries: [] });
+      return Promise.resolve({ webhook: webhook({ api_key_id: "act" }), test: { ...pruebaOk, activated: false, notice: "Not activated: the key's person isn't current." } });
+    };
+    montar();
+    await screen.findByText("Key act");
+    const d = await abrirCelda("Key act");
+    fireEvent.mouseDown(within(d).getByRole("tab", { name: "Deliveries" }));
+    await within(d).findByText("No deliveries yet.");
+    fireEvent.click(within(d).getByRole("button", { name: /Send test/ }));
+    expect(await within(d).findByText("Not activated: the key's person isn't current.")).toBeTruthy();
+  });
+
+  it("las entregas guardadas NO pisan un estado más nuevo al reabrir", async () => {
+    let estado: W = webhook({ api_key_id: "act" });
+    const reapertura = diferida<unknown>();
+    let listas = 0;
+    servidor = (b) => {
+      if (b.action === "list") {
+        listas++;
+        return listas === 4 ? reapertura.promesa : Promise.resolve(lista([llave("act", { webhook: estado })]));
+      }
+      if (b.action === "webhook_deliveries") return Promise.resolve({ webhook: webhook({ api_key_id: "act" }), deliveries: [] });
+      estado = { ...estado, status: "paused", paused_at: "2026-09-26T14:05:00Z" };
+      return Promise.resolve({ webhook: estado });
+    };
+    montar();
+    await screen.findByText("Key act");
+    let d = await abrirCelda("Key act");
+    fireEvent.mouseDown(within(d).getByRole("tab", { name: "Deliveries" }));
+    await within(d).findByText("No deliveries yet.");
+    fireEvent.mouseDown(within(d).getByRole("tab", { name: "Status" }));
+    fireEvent.click(within(d).getByRole("button", { name: /Pause/ }));
+    await waitFor(() => expect(within(d).queryByRole("button", { name: /Pause/ })).toBeNull());
+    await cerrarConEsc(d);
+    d = await abrirCelda("Key act");
+    await waitFor(() => expect(listas).toBe(4));
+    // Con la relectura de la reapertura todavía en vuelo: sigue pausado.
+    expect(celdaWebhook("Key act").textContent).toContain("Paused");
+    expect(within(d).queryByRole("button", { name: /Pause/ })).toBeNull();
+    reapertura.resolver(lista([llave("act", { webhook: estado })]));
+  });
+
+  it("si lo borran con el diálogo abierto y después no se puede consultar, no revive", async () => {
+    let listas = 0;
+    servidor = (b) => {
+      if (b.action === "list") {
+        listas++;
+        if (listas <= 2) return Promise.resolve(lista([llave("act", { acts_as: { id: OTRA, name: "Someone Else", active: true }, webhook: webhook({ api_key_id: "act" }) })]));
+        if (listas === 3) return Promise.resolve(lista([llave("act", { acts_as: { id: OTRA, name: "Someone Else", active: true }, webhook: null })]));
+        return Promise.resolve(lista([llave("act", { acts_as: { id: OTRA, name: "Someone Else", active: true }, webhook: null })], { webhooks_unknown: true }));
+      }
+      return Promise.reject(new Error("That webhook doesn't exist."));
+    };
+    montar();
+    await screen.findByText("Key act");
+    const d = await abrirCelda("Key act");
+    await waitFor(() => expect(listas).toBe(2));
+    fireEvent.click(within(d).getByRole("button", { name: /Pause/ }));
+    // La relectura dice "no tiene": quien no es la dueña ve eso, no el alta.
+    await within(d).findByText(/This key has no webhook/);
+    expect(within(d).queryByText(/Register a webhook/)).toBeNull();
+    // Una relectura siguiente que no puede consultar no lo resucita.
+    await act(async () => { await qc.invalidateQueries({ queryKey: ["api-keys"] }); });
+    await waitFor(() => expect(listas).toBe(4));
+    expect(within(d).queryByText("hooks.example.com")).toBeNull();
+    expect(within(d).queryByRole("button", { name: /Pause|Delete/ })).toBeNull();
+  });
+
+  it("mientras sale una prueba no se puede cerrar", async () => {
+    const pr = diferida<unknown>();
+    servidor = (b) => b.action === "list"
+      ? Promise.resolve(lista([llave("act", { webhook: webhook({ api_key_id: "act" }) })]))
+      : pr.promesa;
+    montar();
+    await screen.findByText("Key act");
+    const d = await abrirCelda("Key act");
+    fireEvent.click(within(d).getByRole("button", { name: /Send test/ }));
+    await waitFor(() => expect(llamadasDe("webhook_test").length).toBe(1));
+    fireEvent.keyDown(d, { key: "Escape" });
+    expect(screen.getByRole("dialog")).toBe(d);
+    pr.resolver({ webhook: webhook({ api_key_id: "act" }), test: pruebaOk });
+    await within(d).findByText("Your server answered 204.");
+  });
+
+  it("la cara de quien pausó se pide aunque no sea persona de ninguna key", async () => {
+    const TERCERA = "11111111-2222-4333-8444-555555555555";
+    servidor = () => Promise.resolve(lista([llave("mia", { webhook: webhook({ api_key_id: "mia", status: "paused", paused_by: { id: TERCERA, name: "Third" } }) })]));
+    montar();
+    await screen.findByText("Key mia");
+    expect(ultimo(carasPedidas)).toContain(TERCERA);
+  });
+
+  it("el foco vuelve al chip al cerrar; tras registrar, al chip nuevo; tras borrar, a su celda", async () => {
+    let conWebhook: W | null = null;
+    let ajena: W | null = webhook({ api_key_id: "ajena" });
+    servidor = (b) => {
+      if (b.action === "list") return Promise.resolve(lista([
+        llave("mia", { webhook: conWebhook }),
+        llave("ajena", { acts_as: { id: OTRA, name: "Someone Else", active: true }, webhook: ajena }),
+      ]));
+      if (b.action === "webhook_delete") { ajena = null; return Promise.resolve({ success: true }); }
+      conWebhook = webhook({ api_key_id: "mia", status: "pending" });
+      return Promise.resolve({ webhook: conWebhook, secret: SECRETO });
+    };
+    montar();
+    await screen.findByText("Key mia");
+    // chip → cerrar → chip
+    let chip = within(celdaWebhook("Key ajena")).getByRole("button");
+    chip.focus();
+    fireEvent.click(chip);
+    let d = await screen.findByRole("dialog");
+    await cerrarConEsc(d);
+    await waitFor(() => expect(document.activeElement).toBe(within(celdaWebhook("Key ajena")).getByRole("button")));
+    // Registrar → (desaparece) → el chip nuevo
+    const reg = within(celdaWebhook("Key mia")).getByRole("button", { name: /Register/ });
+    reg.focus();
+    fireEvent.click(reg);
+    d = await screen.findByRole("dialog");
+    fireEvent.change(within(d).getByLabelText("Your server's URL"), { target: { value: "https://hooks.example.com/x" } });
+    fireEvent.click(within(d).getByRole("button", { name: "Register webhook" }));
+    await within(d).findByText(SECRETO);
+    await waitFor(() => expect(celdaWebhook("Key mia").textContent).toContain("Waiting"));
+    fireEvent.click(within(d).getByRole("button", { name: "Later" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(document.activeElement).toBe(within(celdaWebhook("Key mia")).getByRole("button")));
+    // borrar el de otra persona → la celda queda "Sin webhook" (sin botón) → la celda
+    chip = within(celdaWebhook("Key ajena")).getByRole("button");
+    chip.focus();
+    fireEvent.click(chip);
+    d = await screen.findByRole("dialog");
+    fireEvent.click(within(d).getByRole("button", { name: /Delete/ }));
+    const c = await screen.findByRole("alertdialog");
+    fireEvent.click(within(c).getByRole("button", { name: "Delete" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(document.activeElement).toBe(celdaWebhook("Key ajena")));
+  });
+
+  it("entregas se releen cada 15 s mientras se mira la pestaña, y no con la pestaña cerrada", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      servidor = (b) => b.action === "list"
+        ? Promise.resolve(lista([llave("act", { webhook: webhook({ api_key_id: "act" }) })]))
+        : Promise.resolve({ webhook: webhook({ api_key_id: "act" }), deliveries: [] });
+      montar();
+      await screen.findByText("Key act");
+      const d = await abrirCelda("Key act");
+      fireEvent.mouseDown(within(d).getByRole("tab", { name: "Deliveries" }));
+      await within(d).findByText("No deliveries yet.");
+      const antes = llamadasDe("webhook_deliveries").length;
+      await vi.advanceTimersByTimeAsync(15_500);
+      await waitFor(() => expect(llamadasDe("webhook_deliveries").length).toBeGreaterThan(antes));
+      fireEvent.mouseDown(within(d).getByRole("tab", { name: "Status" }));
+      const despues = llamadasDe("webhook_deliveries").length;
+      await vi.advanceTimersByTimeAsync(31_000);
+      expect(llamadasDe("webhook_deliveries").length).toBe(despues);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("durante la animación de salida el diálogo sigue con su contenido (también tras borrar)", async () => {
+    const st = document.createElement("style");
+    st.textContent = '[role="dialog"][data-state="closed"] { animation-name: salir; }';
+    document.head.appendChild(st);
+    try {
+      servidor = (b) => b.action === "list"
+        ? Promise.resolve(lista([llave("act", { webhook: webhook({ api_key_id: "act" }) })]))
+        : Promise.resolve({ success: true });
+      montar();
+      await screen.findByText("Key act");
+      const d = await abrirCelda("Key act");
+      fireEvent.click(within(d).getByRole("button", { name: /Delete/ }));
+      const c = await screen.findByRole("alertdialog");
+      fireEvent.click(within(c).getByRole("button", { name: "Delete" }));
+      await waitFor(() => expect(llamadasDe("webhook_delete").length).toBe(1));
+      await new Promise((r) => setTimeout(r, 30));
+      const sigue = document.querySelector('[role="dialog"]');
+      expect(sigue).not.toBeNull();
+      expect(sigue!.textContent).toContain("hooks.example.com");
+      expect(document.querySelector("#webhook-url")).toBeNull();
+      expect(sigue!.textContent).not.toContain("Register a webhook");
+    } finally {
+      st.remove();
+    }
+  });
+
+  it("una prueba incierta dice 'no se sabe si llegó', no 'no llegó'", async () => {
+    servidor = (b) => b.action === "list"
+      ? Promise.resolve(lista([llave("act", { webhook: webhook({ api_key_id: "act" }) })]))
+      : Promise.resolve({ webhook: webhook({ api_key_id: "act" }), test: { delivered: false, status_code: null, error_code: "plazo", latency_ms: 10_000, uncertain: true, activated: false, message: "The server didn't answer within 10 seconds", notice: null } });
+    montar();
+    await screen.findByText("Key act");
+    const d = await abrirCelda("Key act");
+    fireEvent.click(within(d).getByRole("button", { name: /Send test/ }));
+    expect(await within(d).findByText("Delivery unconfirmed")).toBeTruthy();
+    expect(within(d).queryByText("Not delivered")).toBeNull();
+    expect(within(d).getByText(/It was cut off after sending/)).toBeTruthy();
+  });
+
+  it("con la hora del próximo intento ya pasada no se promete un reintento; un motivo nuevo tiene texto", async () => {
+    servidor = (b) => b.action === "list"
+      ? Promise.resolve(lista([
+        llave("fall", { webhook: { ...fallando("fall"), next_attempt_at: "2020-01-01T00:00:00Z" } }),
+        llave("nuevo", { webhook: webhook({ api_key_id: "nuevo", status: "disabled", disabled_reason: "motivo_del_futuro" }) }),
+      ]))
+      : Promise.resolve({
+        webhook: { ...fallando("fall"), next_attempt_at: "2020-01-01T00:00:00Z" },
+        deliveries: [{ id: "e", event_type: "messages.created", message_count: 2, state: "pending", drop_reason: null, attempts: 3, last_attempt_at: "2026-09-26T14:00:00Z", last_status_code: 503, last_error: "http_503", latency_ms: 50, uncertain: false, created_at: "2026-09-26T13:00:00Z", delivered_at: null }],
+      });
+    montar();
+    await screen.findByText("Key fall");
+    let d = await abrirCelda("Key fall");
+    expect(within(d).queryByText("Next attempt")).toBeNull();
+    fireEvent.mouseDown(within(d).getByRole("tab", { name: "Deliveries" }));
+    expect(await within(d).findByText("Pending")).toBeTruthy();
+    expect(within(d).queryByText(/^Retrying /)).toBeNull();
+    await cerrarConEsc(d);
+    d = await abrirCelda("Key nuevo");
+    expect(within(d).getByText("It's stopped.")).toBeTruthy();
+  });
+
+  it("la key recién creada tampoco queda en la MutationCache", async () => {
+    const KEY = "mvk_live_abcdef_ESTA-KEY-NO-TIENE-QUE-QUEDAR";
+    servidor = (b) => b.action === "create" ? Promise.resolve({ key: KEY }) : Promise.resolve(lista([llave("mia")]));
+    montar();
+    await screen.findByText("Key mia");
+    fireEvent.click(screen.getByRole("button", { name: /Create API key/ }));
+    const d = await screen.findByRole("dialog");
+    fireEvent.change(within(d).getByLabelText("Name"), { target: { value: "Nueva" } });
+    fireEvent.click(within(d).getByRole("button", { name: "Create key" }));
+    expect(await within(d).findByText(KEY)).toBeTruthy();
+    await waitFor(() => expect(JSON.stringify(qc.getMutationCache().getAll().map((m) => m.state.data))).not.toContain(KEY));
   });
 });

@@ -233,8 +233,8 @@ export const apiKeys = {
     en: "The history, newest to oldest, with a cursor: pass next_cursor in the before parameter for the previous page, or use the after parameter to get what's new in order. Each message: sender, kind (text | image | gif | video | voice_note | audio | file | system), text, attachment (url, name, hosted_by, storage_path), reply_to_id, is_thread_reply, is_edited, is_deleted. A deleted message comes without text or attachment. Filters: limit (max 100), before | after, thread_root_id, include=rich (adds the formatted text).",
   },
   "apiKeys.ep.feed": {
-    es: "Lo nuevo en TODAS las conversaciones, en orden: así recibe mensajes una integración (con webhook, el aviso le dice cuándo leer; sin webhook, lee cada tanto). Primer pedido con since (ISO, 72 h como máximo) o sin nada (últimos 15 min); después, siempre after=next_cursor. Si caught_up = true, esperá 30 s o más antes del próximo. Mira como mucho una hora por pedido. exclude_own=true saca lo que mandó la propia persona. Solo mensajes nuevos: ediciones y borrados se ven releyendo la conversación.",
-    en: "What's new across ALL conversations, in order: this is how an integration receives messages (with a webhook, the notification tells it when to read; without one, it reads every so often). First request with since (ISO, 72 h at most) or nothing (last 15 min); after that, always after=next_cursor. If caught_up = true, wait 30 s or more before the next one. It looks at one hour per request at most. exclude_own=true drops what the person sent themselves. New messages only: edits and deletions show up when you re-read the conversation.",
+    es: "Lo nuevo en TODAS las conversaciones, en orden: así recibe mensajes una integración (con webhook, el aviso le dice cuándo leer y además lee cada 15 min o menos como respaldo; sin webhook, lee cada tanto). Primer pedido con since (ISO, 72 h como máximo) o sin nada (últimos 15 min); después, siempre after=next_cursor. Si caught_up = true, esperá 30 s o más antes del próximo. Mira como mucho una hora por pedido. exclude_own=true saca lo que mandó la propia persona. Solo mensajes nuevos: ediciones y borrados se ven releyendo la conversación.",
+    en: "What's new across ALL conversations, in order: this is how an integration receives messages (with a webhook, the notification tells it when to read, and it still reads every 15 minutes or less as a fallback; without one, it reads every so often). First request with since (ISO, 72 h at most) or nothing (last 15 min); after that, always after=next_cursor. If caught_up = true, wait 30 s or more before the next one. It looks at one hour per request at most. exclude_own=true drops what the person sent themselves. New messages only: edits and deletions show up when you re-read the conversation.",
   },
   "apiKeys.ep.creators": {
     es: "Creadoras + redes (IG, TikTok, X, OnlyFans, Telegram…). Filtros: status, limit, offset.",
@@ -297,6 +297,15 @@ export const apiKeys = {
     en: "Couldn't refresh the status: this is the last thing we knew.",
   },
   "apiKeys.webhook.done": { es: "Listo", en: "Done" },
+  "apiKeys.webhook.working": { es: "Procesando…", en: "Working…" },
+  "apiKeys.webhook.noneBody": {
+    es: "Esta key no tiene webhook. Solo la persona de la key puede registrarlo.",
+    en: "This key has no webhook. Only the key's person can register one.",
+  },
+  "apiKeys.refreshFailed": {
+    es: "No se pudo actualizar la lista: lo que ves puede estar viejo.",
+    en: "Couldn't refresh the list: what you see may be out of date.",
+  },
   "apiKeys.webhook.detail.delay": { es: "Demora de Maven", en: "Maven delay" },
 
   "apiKeys.webhook.title": { es: "Webhook de “{name}”", en: "Webhook for “{name}”" },
@@ -370,8 +379,8 @@ export const apiKeys = {
     en: "The integrator's server is failing: Maven retries the same notification with longer and longer waits. If it fails for 3 days in a row, the webhook stops.",
   },
   "apiKeys.webhook.help.delayed": {
-    es: "El último aviso se demoró por una falla de Maven, no del integrador. Maven lo reintenta solo.",
-    en: "The last notification was delayed by a Maven-side failure, not the integrator's. Maven retries it on its own.",
+    es: "La última revisión se demoró por una falla de Maven, no del integrador. Maven la reintenta sola.",
+    en: "The last check was delayed by a Maven-side failure, not the integrator's. Maven retries it on its own.",
   },
   "apiKeys.webhook.help.paused": {
     es: "Pausado: no sale ningún aviso. Al reanudar, Maven manda una prueba y arranca desde ese momento; lo de la pausa no se avisa, y el integrador lo lee del feed con su cursor.",
@@ -449,6 +458,7 @@ export const apiKeys = {
 
   "apiKeys.webhook.test.delivered": { es: "Llegó", en: "Delivered" },
   "apiKeys.webhook.test.notDelivered": { es: "No llegó", en: "Not delivered" },
+  "apiKeys.webhook.test.maybe": { es: "No se sabe si llegó", en: "Delivery unconfirmed" },
   "apiKeys.webhook.test.activated": {
     es: "Webhook activado: desde ahora avisa los mensajes nuevos.",
     en: "Webhook activated: from now on it notifies new messages.",
@@ -482,6 +492,7 @@ export const apiKeys = {
   "apiKeys.webhook.drop.endpoint_paused": { es: "se pausó", en: "it was paused" },
   "apiKeys.webhook.drop.endpoint_disabled": { es: "se detuvo", en: "it was stopped" },
   "apiKeys.webhook.drop.test_failed": { es: "la prueba no llegó", en: "the test wasn't delivered" },
+  "apiKeys.webhook.drop.test_unconfirmed": { es: "la prueba no se confirmó", en: "the test wasn't confirmed" },
   "apiKeys.webhook.drop.other": { es: "otro motivo", en: "another reason" },
 
   "apiKeys.docs.webhooks": { es: "Webhooks (Messenger)", en: "Webhooks (Messenger)" },

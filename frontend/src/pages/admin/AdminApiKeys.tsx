@@ -146,7 +146,7 @@ const AdminApiKeys = () => {
   const [expiryDays, setExpiryDays] = useState<number>(30); // -1 = mantener (solo edición)
   const [confirmaMessenger, setConfirmaMessenger] = useState(false);
 
-  const { data, isLoading, isError, error } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["api-keys"],
     queryFn: () => adminInvoke<ListResp>("manage-api-keys", { action: "list", lang }),
   });
@@ -206,8 +206,12 @@ const AdminApiKeys = () => {
         // Solo si la persona lo confirmó en la pantalla: sin esto el servidor no la crea.
         ...(conMessenger && confirmaMessenger && data?.you?.id ? { acknowledge_messenger_reads_as: data.you.id } : {}),
       }),
+    // La key entera viaja UNA vez: vive en freshKey y la mutación la suelta (si no,
+    // quedaba en la MutationCache mientras la página siguiera abierta).
+    gcTime: 0,
     onSuccess: (res) => { setFreshKey(res.key); qc.invalidateQueries({ queryKey: ["api-keys"] }); toast.success(t("apiKeys.toast.created")); },
     onError: (e) => toast.error((e as Error)?.message ?? t("apiKeys.toast.createFailed")),
+    onSettled: () => { queueMicrotask(() => createMut.reset()); },
   });
 
   const updateMut = useMutation({
@@ -283,13 +287,13 @@ const AdminApiKeys = () => {
       {/* Tabla */}
       {isLoading ? (
         <div className="space-y-2">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-14 w-full" />)}</div>
-      ) : isError ? (
+      ) : isError && !data ? (
         <Card className="border-destructive/40">
           <CardContent className="flex items-center gap-2 p-4 text-sm text-destructive">
             <ShieldAlert className="h-4 w-4" /> {(error as Error)?.message ?? t("apiKeys.loadError")}
           </CardContent>
         </Card>
-      ) : keys.length === 0 ? (
+      ) : keys.length === 0 && !isError ? (
         <Card>
           <CardContent className="p-8 text-center text-sm text-muted-foreground">
             {t("apiKeys.empty", { button: t("apiKeys.createKey") })}
@@ -297,6 +301,14 @@ const AdminApiKeys = () => {
         </Card>
       ) : (
         <Card className="overflow-hidden">
+          {/* Una relectura que falla deja lo que ya había (react-query conserva data):
+              se avisa y se ofrece reintentar, en vez de esconder la tabla. */}
+          {isError && (
+            <div role="status" className="flex flex-wrap items-center justify-between gap-2 border-b border-warning/30 bg-warning/5 px-4 py-2 text-xs text-foreground">
+              <span>{t("apiKeys.refreshFailed")}</span>
+              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => void refetch()}>{t("common.retry")}</Button>
+            </div>
+          )}
           <div className="overflow-x-auto">
             <table className="tabla-movil w-full text-sm">
               <thead>
@@ -353,7 +365,9 @@ const AdminApiKeys = () => {
                       {k.status === "revoked" && <Badge variant="outline" className="border-destructive/40 text-destructive">{t("apiKeys.status.revoked")}</Badge>}
                       {k.status === "expired" && <Badge variant="outline" className="text-muted-foreground">{t("apiKeys.status.expired")}</Badge>}
                     </td>
-                    <td data-label={t("apiKeys.col.webhook")} className="px-4 py-3">
+                    {/* data-webhook-celda + tabIndex -1: si al cerrar el diálogo el botón que
+                        lo abrió ya no está, el foco vuelve a esta celda. */}
+                    <td data-label={t("apiKeys.col.webhook")} data-webhook-celda={k.id} tabIndex={-1} className="px-4 py-3 outline-none">
                       <CeldaWebhook llave={k} youId={data?.you?.id} desconocido={data?.webhooks_unknown === true}
                         onAbrir={() => abrirWebhook(k.id)} />
                     </td>

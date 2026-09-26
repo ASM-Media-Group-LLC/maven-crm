@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Check, Loader2, Pause, Play, Send, Trash2, Webhook } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -125,7 +125,8 @@ export function textoDelMotivo(motivo: string | null, t: T): string {
  *  - "fallando" solo si hubo un intento fallido del receptor: el despachador sube
  *    consecutive_failures ANTES de cada envío (el adelanto), pero last_attempt_at
  *    recién después; un aviso que está saliendo no es un fallo.
- *  - "demorado": una falla de Maven (maven_*) deja la espera sin tocar el intento. */
+ *  - "demorado": una falla de Maven (maven_*) deja la espera sin tocar el intento.
+ *    Puede coincidir con una racha del receptor: entonces manda "fallando". */
 export type Efectivo = {
   estado: EstadoWebhook; motivo: string | null; porLaKey: boolean; fallando: boolean; demorado: boolean;
 };
@@ -138,14 +139,18 @@ export function estadoEfectivo(w: WebhookResumen, k: LlaveConWebhook): Efectivo 
     : null;
   if (motivoKey) return { estado: "disabled", motivo: motivoKey, porLaKey: true, fallando: false, demorado: false };
   const activo = w.status === "active";
-  const fallando = activo && w.consecutive_failures > 0 && !!w.last_error && !esDeMaven(w.last_error)
+  // La racha se mira por las fechas, no por last_error: una falla de Maven pisa
+  // last_error sin cortar la racha del receptor (que sigue corriendo hacia las 72 h),
+  // y tras reanudar queda un last_error viejo con la racha en cero.
+  const fallando = activo && w.consecutive_failures > 0
     && !!w.last_attempt_at && !!w.failing_since && Date.parse(w.last_attempt_at) >= Date.parse(w.failing_since);
   return {
     estado: w.status,
     motivo: w.status === "disabled" ? w.disabled_reason : null,
     porLaKey: false,
     fallando,
-    demorado: activo && !fallando && esDeMaven(w.last_error),
+    // Puede ir junto con fallando: se muestran las dos cosas.
+    demorado: activo && esDeMaven(w.last_error),
   };
 }
 
@@ -195,8 +200,8 @@ export function CeldaWebhook({ llave, youId, desconocido, onAbrir }: {
   const w = llave.webhook!;
   const chip = chipDe(estadoEfectivo(w, llave));
   return (
-    // Adentro de un <button> va un <span> con el estilo del Badge (que es un <div>):
-    // un div adentro de un botón no es HTML válido y el botón se queda sin nombre.
+    // Adentro del botón va un span con el estilo del Badge (que dibuja un div): un
+    // div adentro de un botón no es HTML válido y el botón se queda sin nombre.
     // md: y no sm: porque tabla-movil pasa a tarjetas hasta 767 px.
     <button type="button" onClick={onAbrir} aria-haspopup="dialog" data-webhook-de={llave.id}
       className="group inline-flex min-w-0 max-w-full flex-col items-end gap-0.5 rounded-md text-right md:items-start md:text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
@@ -215,7 +220,7 @@ function useFecha() {
 
 function Dato({ etiqueta, children }: { etiqueta: string; children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-[minmax(0,11rem)_minmax(0,1fr)] gap-3 py-1.5 text-sm">
+    <div className="grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)] gap-3 py-1.5 text-sm md:grid-cols-[minmax(0,11rem)_minmax(0,1fr)]">
       <dt className="text-muted-foreground">{etiqueta}</dt>
       <dd className="min-w-0 [overflow-wrap:anywhere]">{children}</dd>
     </div>
@@ -250,6 +255,12 @@ export function DialogoWebhook({ abierto, llave, youId, desconocido = false, car
   // Quién abrió el diálogo, para devolverle el foco al cerrar (no hay Trigger).
   const abridor = useRef<HTMLElement | null>(typeof document !== "undefined" ? (document.activeElement as HTMLElement | null) : null);
   const ultimoConocido = useRef<WebhookResumen | null>(null);
+  // Lo último que se dibujó con el diálogo abierto: durante la animación de salida se
+  // sigue mostrando eso (si no, tras borrar se veía el alta, con su campo tomando el foco).
+  const ultimoCuerpo = useRef<React.ReactNode>(null);
+  // Esperando una relectura que dice cómo quedó (tras un error, o una prueba que no
+  // devolvió el endpoint): solo se frenan las acciones que dependen del estado.
+  const [releyendo, setReleyendo] = useState(false);
   // Dos toques en el mismo cuadro llegan antes de que isPending se dibuje: sin esta
   // guarda salían dos pedidos (dos borrados = un 404 de más; dos pruebas = un 429).
   // Se suelta en el onSettled de cada mutación (el de las opciones, que corre
@@ -272,6 +283,9 @@ export function DialogoWebhook({ abierto, llave, youId, desconocido = false, car
   if (deLaLista) {
     ultimoConocido.current = deLaLista;
     if (recienDeEsta && deLaLista.id === recienDeEsta.id) recienVisto.current = true;
+  } else if (deLaLista === null && !desconocido) {
+    // "No tiene" es un dato: lo que se sabía ya no vale (lo borraron).
+    ultimoConocido.current = null;
   }
   const w: WebhookResumen | null =
     deLaLista ?? (sinDato ? ultimoConocido.current ?? recienDeEsta : recienVisto.current ? null : recienDeEsta);
@@ -281,6 +295,10 @@ export function DialogoWebhook({ abierto, llave, youId, desconocido = false, car
   const cara = (id: string | null | undefined) => (id ? caras?.get(id) : undefined);
 
   const refrescar = () => qc.invalidateQueries({ queryKey: ["api-keys"] });
+  const releer = () => {
+    setReleyendo(true);
+    refrescar().then(() => setReleyendo(false), () => setReleyendo(false));
+  };
   // Lo que devolvió el servidor va a la lista enseguida: sin esto, entre la acción y
   // la relectura se veía el estado de antes (y el botón de antes, habilitado).
   const ponerEnLista = (keyId: string, wh: WebhookResumen | null) => {
@@ -288,9 +306,10 @@ export function DialogoWebhook({ abierto, llave, youId, desconocido = false, car
       ...viejaLista, keys: viejaLista.keys.map((k) => (k.id === keyId ? { ...k, webhook: wh } : k)),
     });
   };
-  // Un error también relee: 404/409/503 quieren decir "cambió" o "no se sabe".
+  // Un error también relee: 404/409/503 quieren decir "cambió" o "no se sabe". Hasta
+  // que llegue, Pausar/Probar/Reanudar esperan (un segundo toque daba otro 409).
   const alFallar = (e: unknown) => {
-    void refrescar().then(() => {}, () => {});
+    releer();
     toast.error((e as Error)?.message ?? t("apiKeys.loadError"));
   };
 
@@ -316,9 +335,15 @@ export function DialogoWebhook({ abierto, llave, youId, desconocido = false, car
       // El secreto NO se borra: si la prueba no llegó (el integrador todavía no lo
       // tiene), hay que poder copiarlo igual. Se va al cerrar.
       setPrueba({ de: v.id, test: res.test });
-      if (res.webhook) ponerEnLista(res.webhook.api_key_id, res.webhook);
+      // El resultado se ve en Estado: si se probó desde Entregas, se vuelve ahí.
+      setPestana("estado");
       if (res.test.activated) toast.success(t("apiKeys.webhook.toast.activated"));
-      return refrescar();
+      // Con el endpoint en la respuesta ya se sabe cómo quedó; sin él, hay que releer
+      // antes de ofrecer otra acción. En los dos casos, el diálogo no espera la lista.
+      if (res.webhook) {
+        ponerEnLista(res.webhook.api_key_id, res.webhook);
+        void refrescar().then(() => {}, () => {});
+      } else releer();
     },
     onError: alFallar,
     onSettled: soltar,
@@ -327,9 +352,11 @@ export function DialogoWebhook({ abierto, llave, youId, desconocido = false, car
     mutationFn: (id: string) => adminInvoke<{ webhook: WebhookResumen }>("manage-api-keys", { action: "webhook_pause", lang, id }),
     onSuccess: (res) => {
       setPrueba(null);
-      if (res?.webhook) ponerEnLista(res.webhook.api_key_id, res.webhook);
       toast.success(t("apiKeys.webhook.toast.paused"));
-      return refrescar();
+      if (res?.webhook) {
+        ponerEnLista(res.webhook.api_key_id, res.webhook);
+        void refrescar().then(() => {}, () => {});
+      } else releer();
     },
     onError: alFallar,
     onSettled: soltar,
@@ -357,17 +384,16 @@ export function DialogoWebhook({ abierto, llave, youId, desconocido = false, car
     staleTime: 0,
     refetchInterval: abierto && pestana === "entregas" ? 15_000 : false,
   });
-  // La respuesta de entregas trae el endpoint fresco: también va a la lista.
-  const frescoDeEntregas = entregas.data?.webhook;
-  useEffect(() => {
-    if (frescoDeEntregas) ponerEnLista(frescoDeEntregas.api_key_id, frescoDeEntregas);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [frescoDeEntregas]);
+  // El endpoint que trae la respuesta de entregas se usa SOLO para su tabla ("reintenta
+  // a las …"): no se escribe en la lista, porque puede venir de la caché (la consulta
+  // queda guardada al cambiar de pestaña) y pisaría un estado más nuevo.
 
   // Mientras se registra o se prueba NO se puede cerrar: la respuesta (el secreto,
   // el resultado) tiene que caer en ESTE diálogo, no perderse ni pasar a otro.
   const enVuelo = crear.isPending || probar.isPending;
   const ocupado = enVuelo || pausar.isPending || quitar.isPending;
+  // Las acciones que dependen del estado esperan también la relectura.
+  const esperaEstado = ocupado || releyendo;
   const cerrar = () => { if (!enVuelo && !quitar.isPending) onCerrar(); };
   const urlValida = /^https:\/\/\S+$/i.test(url.trim());
 
@@ -377,12 +403,12 @@ export function DialogoWebhook({ abierto, llave, youId, desconocido = false, car
     <div className="flex items-center gap-3 rounded-lg bg-muted/50 p-3">
       <UserAvatar name={llave.acts_as.name} src={cara(llave.acts_as.id)?.src} seed={cara(llave.acts_as.id)?.seed} size="md" />
       <div className="min-w-0">
-        <p className="flex flex-wrap items-center gap-2 font-medium">
+        <div className="flex flex-wrap items-center gap-2 font-medium">
           <span className="truncate">{llave.acts_as.name || "—"}</span>
           {llave.acts_as.active === false && (
             <Badge variant="destructive-soft" className="font-normal">{t("apiKeys.status.personGone")}</Badge>
           )}
-        </p>
+        </div>
         <p className="text-sm text-muted-foreground">
           {esDueno ? t("apiKeys.webhook.person.you") : t("apiKeys.webhook.person.other")}
         </p>
@@ -415,7 +441,8 @@ export function DialogoWebhook({ abierto, llave, youId, desconocido = false, car
         </div>
         <DialogFooter className="gap-2 sm:gap-0">
           <Button variant="ghost" disabled={enVuelo} onClick={cerrar}>{llego ? t("apiKeys.webhook.done") : t("apiKeys.webhook.later")}</Button>
-          <Button className="gap-1.5" disabled={enVuelo} onClick={() => unaVez(() => probar.mutate({ accion: "webhook_test", id: idPrueba }))}>
+          <Button className="gap-1.5 aria-disabled:opacity-50" aria-disabled={enVuelo}
+            onClick={() => { if (!enVuelo) unaVez(() => probar.mutate({ accion: "webhook_test", id: idPrueba })); }}>
             {probar.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} {t("apiKeys.webhook.sendTest")}
           </Button>
         </DialogFooter>
@@ -432,8 +459,20 @@ export function DialogoWebhook({ abierto, llave, youId, desconocido = false, car
         <DialogFooter><Button variant="outline" onClick={cerrar}>{t("common.close")}</Button></DialogFooter>
       </>
     );
+  } else if (!w && !esDueno) {
+    // ── no tiene (lo borraron con el diálogo abierto): quien no es la dueña no ve el alta ──
+    cuerpo = (
+      <>
+        <DialogHeader>
+          <DialogTitle>{t("apiKeys.webhook.title", { name: llave.name })}</DialogTitle>
+          <DialogDescription>{t("apiKeys.webhook.noneBody")}</DialogDescription>
+        </DialogHeader>
+        {tarjetaPersona}
+        <DialogFooter><Button variant="outline" onClick={cerrar}>{t("common.close")}</Button></DialogFooter>
+      </>
+    );
   } else if (!w) {
-    // ── alta (solo la dueña; a los demás la celda ni les ofrece abrir) ──
+    // ── alta (solo la dueña) ──
     cuerpo = (
       <>
         <DialogHeader>
@@ -441,7 +480,7 @@ export function DialogoWebhook({ abierto, llave, youId, desconocido = false, car
           <DialogDescription><ConFormato texto={t("apiKeys.webhook.registerIntro")} /></DialogDescription>
         </DialogHeader>
         {tarjetaPersona}
-        {esDueno && (
+        {(
           <div className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="webhook-url">{t("apiKeys.webhook.url")}</Label>
@@ -462,11 +501,9 @@ export function DialogoWebhook({ abierto, llave, youId, desconocido = false, car
         )}
         <DialogFooter className="gap-2 sm:gap-0">
           <Button variant="ghost" disabled={crear.isPending} onClick={cerrar}>{t("common.cancel")}</Button>
-          {esDueno && (
-            <Button className="gap-1.5" disabled={!urlValida || crear.isPending} onClick={() => unaVez(() => crear.mutate())}>
-              {crear.isPending && <Loader2 className="h-4 w-4 animate-spin" />} {t("apiKeys.webhook.registerButton")}
-            </Button>
-          )}
+          <Button className="gap-1.5" disabled={!urlValida || crear.isPending} onClick={() => unaVez(() => crear.mutate())}>
+            {crear.isPending && <Loader2 className="h-4 w-4 animate-spin" />} {t("apiKeys.webhook.registerButton")}
+          </Button>
         </DialogFooter>
       </>
     );
@@ -491,8 +528,8 @@ export function DialogoWebhook({ abierto, llave, youId, desconocido = false, car
     cuerpo = (
       <>
         <DialogHeader>
-          {/* El chip va AL LADO del título: un Badge es un <div> y no puede ir dentro del <h2>. */}
-          <div className="flex flex-wrap items-center gap-2 pr-6">
+          {/* El chip va AL LADO del título: el Badge dibuja un div, y un div no puede ir dentro del h2. */}
+          <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
             <DialogTitle>{t("apiKeys.webhook.title", { name: llave.name })}</DialogTitle>
             <span className={cn(badgeVariants({ variant: chip.variant }), "font-medium")}>{t(chip.texto)}</span>
           </div>
@@ -576,7 +613,7 @@ export function DialogoWebhook({ abierto, llave, youId, desconocido = false, car
           {/* Con Trigger, al cerrar la confirmación el foco vuelve a este botón. */}
           <AlertDialog open={borrar} onOpenChange={(o) => { if (!quitar.isPending) setBorrar(o); }}>
             <AlertDialogTrigger asChild>
-              <Button variant="ghost" className="gap-1.5 text-destructive hover:text-destructive" disabled={ocupado}>
+              <Button variant="ghost" className="gap-1.5 text-destructive hover:text-destructive" disabled={enVuelo}>
                 <Trash2 className="h-4 w-4" /> {t("apiKeys.webhook.delete")}
               </Button>
             </AlertDialogTrigger>
@@ -586,29 +623,36 @@ export function DialogoWebhook({ abierto, llave, youId, desconocido = false, car
                 <AlertDialogDescription>{t("apiKeys.webhook.deleteBody", { host: w.url_host })}</AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel disabled={quitar.isPending} />
+                {/* Mientras borra: aria-disabled y no disabled, para que el foco no caiga
+                    a <body>; la guarda unaVez y el onOpenChange evitan el doble pedido. */}
+                <AlertDialogCancel aria-disabled={quitar.isPending} className="aria-disabled:opacity-50" />
                 {/* bg-none: sin esto el degradé del botón de Maven tapa el rojo. */}
-                <AlertDialogAction className="gap-1.5 bg-none bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  disabled={quitar.isPending}
-                  onClick={(e) => { e.preventDefault(); unaVez(() => quitar.mutate({ id: w.id, keyId: llave.id })); }}>
+                <AlertDialogAction className="gap-1.5 bg-none bg-destructive text-destructive-foreground hover:bg-destructive/90 aria-disabled:opacity-50"
+                  aria-disabled={quitar.isPending}
+                  onClick={(e) => { e.preventDefault(); if (!quitar.isPending) unaVez(() => quitar.mutate({ id: w.id, keyId: llave.id })); }}>
                   {quitar.isPending && <Loader2 className="h-4 w-4 animate-spin" />} {t("apiKeys.webhook.delete")}
                 </AlertDialogAction>
+                <span role="status" className="sr-only">{quitar.isPending ? t("apiKeys.webhook.working") : ""}</span>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
           <div className="flex flex-wrap justify-end gap-2">
+            <span role="status" className="sr-only">{ocupado ? t("apiKeys.webhook.working") : ""}</span>
             {puedePausar && (
-              <Button variant="outline" className="gap-1.5" disabled={ocupado} onClick={() => unaVez(() => pausar.mutate(w.id))}>
+              <Button variant="outline" className="gap-1.5 aria-disabled:opacity-50" aria-disabled={esperaEstado}
+                onClick={() => { if (!esperaEstado) unaVez(() => pausar.mutate(w.id)); }}>
                 {pausar.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Pause className="h-4 w-4" />} {t("apiKeys.webhook.pause")}
               </Button>
             )}
             {puedeProbar && (
-              <Button className="gap-1.5" disabled={ocupado} onClick={() => unaVez(() => probar.mutate({ accion: "webhook_test", id: w.id }))}>
+              <Button className="gap-1.5 aria-disabled:opacity-50" aria-disabled={esperaEstado}
+                onClick={() => { if (!esperaEstado) unaVez(() => probar.mutate({ accion: "webhook_test", id: w.id })); }}>
                 {probar.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} {t("apiKeys.webhook.sendTest")}
               </Button>
             )}
             {puedeReanudar && (
-              <Button className="gap-1.5" disabled={ocupado} onClick={() => unaVez(() => probar.mutate({ accion: "webhook_resume", id: w.id }))}>
+              <Button className="gap-1.5 aria-disabled:opacity-50" aria-disabled={esperaEstado}
+                onClick={() => { if (!esperaEstado) unaVez(() => probar.mutate({ accion: "webhook_resume", id: w.id })); }}>
                 {probar.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />} {t("apiKeys.webhook.resume")}
               </Button>
             )}
@@ -618,6 +662,9 @@ export function DialogoWebhook({ abierto, llave, youId, desconocido = false, car
     );
   }
 
+  if (abierto) ultimoCuerpo.current = cuerpo;
+  else if (ultimoCuerpo.current) cuerpo = ultimoCuerpo.current;
+
   return (
     <Dialog open={abierto && !!llave} onOpenChange={(o) => { if (!o) cerrar(); }}>
       {/* grid-cols-[minmax(0,1fr)]: que la tabla de entregas se desplace en su caja
@@ -626,9 +673,11 @@ export function DialogoWebhook({ abierto, llave, youId, desconocido = false, car
         onCloseAutoFocus={(e) => {
           // Sin Trigger, Radix no sabe a quién devolverle el foco. Si el botón que lo
           // abrió ya no está (la celda cambió de Registrar al chip), el de su fila.
+          // La celda puede haber quedado sin botón ("Sin webhook" tras borrar): entonces
+          // la celda misma, que tiene tabIndex -1.
           e.preventDefault();
-          const destino = abridor.current?.isConnected ? abridor.current
-            : llave ? document.querySelector<HTMLElement>(`[data-webhook-de="${llave.id}"]`) : null;
+          const celda = llave ? document.querySelector<HTMLElement>(`[data-webhook-celda="${llave.id}"]`) : null;
+          const destino = abridor.current?.isConnected ? abridor.current : celda?.querySelector<HTMLElement>("button") ?? celda;
           destino?.focus();
           // El secreto no espera a la próxima apertura: se va al terminar de cerrar.
           setSecreto(null); setPrueba(null);
@@ -642,11 +691,15 @@ export function DialogoWebhook({ abierto, llave, youId, desconocido = false, car
 function ResultadoDePrueba({ prueba }: { prueba: Prueba }) {
   const { t } = useLanguage();
   const ok = prueba.delivered;
+  // Incierta = salió y no se sabe si llegó (se cortó después de mandar): ni verde ni
+  // "no llegó".
+  const dudosa = !ok && prueba.uncertain;
+  const marco = ok ? "border-success/40 bg-success/5" : dudosa ? "border-warning/40 bg-warning/5" : "border-destructive/40 bg-destructive/5";
   return (
-    <div role="status" className={`space-y-1 rounded-md border p-3 text-sm ${ok ? "border-success/40 bg-success/5" : "border-destructive/40 bg-destructive/5"}`}>
+    <div role="status" className={`space-y-1 rounded-md border p-3 text-sm ${marco}`}>
       <div className="flex flex-wrap items-center gap-2">
-        <Badge variant={ok ? "success-soft" : "destructive-soft"}>
-          {ok ? t("apiKeys.webhook.test.delivered") : t("apiKeys.webhook.test.notDelivered")}
+        <Badge variant={ok ? "success-soft" : dudosa ? "warning-soft" : "destructive-soft"}>
+          {ok ? t("apiKeys.webhook.test.delivered") : dudosa ? t("apiKeys.webhook.test.maybe") : t("apiKeys.webhook.test.notDelivered")}
         </Badge>
         {prueba.latency_ms !== null && <span className="text-xs tabular-nums text-muted-foreground">{prueba.latency_ms} ms</span>}
       </div>
@@ -709,33 +762,35 @@ function TablaDeEntregas({ entregas, webhook }: { entregas: Entrega[]; webhook: 
                   <div className="tabular-nums">
                     {e.attempts}
                     {e.attempts > 1 && e.last_attempt_at && (
-                      <span className="block whitespace-nowrap text-xs text-muted-foreground">
+                      <span className="block text-xs text-muted-foreground md:whitespace-nowrap">
                         {t("apiKeys.webhook.deliveries.lastAt", { when: fecha(e.last_attempt_at) })}
                       </span>
                     )}
                   </div>
                 </td>
                 <td data-label={cols.resultado} className="px-3 py-2">
-                  <div className="flex flex-col items-end gap-0.5 md:items-start">
+                  <div className="flex min-w-0 flex-col items-end gap-0.5 md:items-start">
                     {e.state === "delivered" && (
                       <Badge variant="success-soft" className="whitespace-nowrap">
                         {t("apiKeys.webhook.deliveries.delivered")}{e.last_status_code ? ` · ${e.last_status_code}` : ""}
                       </Badge>
                     )}
                     {e.state === "pending" && (
-                      <Badge variant="warning-soft" className="whitespace-nowrap">
+                      <Badge variant="warning-soft" className="md:whitespace-nowrap">
                         {reintenta ? t("apiKeys.webhook.deliveries.retrying", { when: fecha(reintenta) }) : t("apiKeys.webhook.deliveries.pending")}
                       </Badge>
                     )}
                     {e.state === "dropped" && (
                       <Badge variant="destructive-soft">
                         {t("apiKeys.webhook.deliveries.dropped", {
-                          reason: e.drop_reason && DESCARTES[e.drop_reason] ? t(DESCARTES[e.drop_reason]) : t("apiKeys.webhook.drop.other"),
+                          reason: e.drop_reason === "test_failed" && e.uncertain ? t("apiKeys.webhook.drop.test_unconfirmed")
+                            : e.drop_reason && DESCARTES[e.drop_reason] ? t(DESCARTES[e.drop_reason]) : t("apiKeys.webhook.drop.other"),
                         })}
                       </Badge>
                     )}
                     {error && e.state !== "delivered" && <span className="text-xs text-muted-foreground">{error}</span>}
-                    {e.uncertain && e.state !== "delivered" && (
+                    {/* "cortado" ya dice que puede haber llegado: no se repite. */}
+                    {e.uncertain && e.state !== "delivered" && e.last_error !== "cortado" && (
                       <span className="text-xs text-muted-foreground">{t("apiKeys.webhook.test.uncertain")}</span>
                     )}
                   </div>
