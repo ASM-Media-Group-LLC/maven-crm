@@ -12,6 +12,8 @@ import { Progress } from "@/components/ui/progress";
 import { useSpammerProgress } from "@/hooks/useSpammerProgress";
 import { useUserRole } from "@/hooks/useUserRole";
 import { SpammerDetailModal } from "./SpammerDetailModal";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
@@ -21,11 +23,16 @@ function addDays(dateStr: string, delta: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-function formatDisplayDate(dateStr: string): string {
+function formatDisplayDate(
+  dateStr: string,
+  t: (key: TranslationKey) => string,
+  enIngles: boolean,
+): string {
   const today = new Date().toISOString().slice(0, 10);
-  if (dateStr === today) return "Hoy";
+  if (dateStr === today) return t("common.today");
   const d = new Date(dateStr + "T00:00:00");
-  return d.toLocaleDateString("es", { weekday: "short", day: "numeric", month: "short" });
+  // "es" a secas es el que ya usaba: en español no cambia nada.
+  return d.toLocaleDateString(enIngles ? "en-US" : "es", { weekday: "short", day: "numeric", month: "short" });
 }
 
 // ─── Props ────────────────────────────────────────────────────────────────
@@ -38,6 +45,8 @@ interface ManagerDashboardProps {
 // ─── Component ────────────────────────────────────────────────────────────
 
 export const ManagerDashboard = ({ date, onDateChange }: ManagerDashboardProps) => {
+  // Arriba de todo: el componente sale antes (`return null`) según el rol.
+  const { t, language } = useLanguage();
   const { role, isLoading: roleLoading } = useUserRole();
   const { data: rows, isLoading } = useSpammerProgress(date);
   const [selectedSpammer, setSelectedSpammer] = useState<{
@@ -57,7 +66,7 @@ export const ManagerDashboard = ({ date, onDateChange }: ManagerDashboardProps) 
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Users className="h-4 w-4 text-muted-foreground" />
-          <h3 className="text-sm font-semibold">Progreso del equipo</h3>
+          <h3 className="text-sm font-semibold">{t("scouter.teamProgress")}</h3>
         </div>
 
         {/* Date navigation */}
@@ -66,19 +75,19 @@ export const ManagerDashboard = ({ date, onDateChange }: ManagerDashboardProps) 
             type="button"
             onClick={() => onDateChange(addDays(date, -1))}
             className="flex h-7 w-7 items-center justify-center rounded border border-border transition-colors hover:bg-muted"
-            aria-label="Día anterior"
+            aria-label={t("scouter.progress.previousDay")}
           >
             <ChevronLeft className="h-3.5 w-3.5" />
           </button>
           <span className="min-w-[80px] text-center text-xs font-medium text-muted-foreground">
-            {formatDisplayDate(date)}
+            {formatDisplayDate(date, t, language === "en")}
           </span>
           <button
             type="button"
             onClick={() => onDateChange(addDays(date, 1))}
             disabled={isToday}
             className="flex h-7 w-7 items-center justify-center rounded border border-border transition-colors hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
-            aria-label="Día siguiente"
+            aria-label={t("scouter.progress.nextDay")}
           >
             <ChevronRight className="h-3.5 w-3.5" />
           </button>
@@ -89,22 +98,22 @@ export const ManagerDashboard = ({ date, onDateChange }: ManagerDashboardProps) 
       {isLoading ? (
         <div className="flex items-center justify-center py-8 gap-2 text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
-          <span className="text-sm">Cargando...</span>
+          <span className="text-sm">{t("common.loading")}</span>
         </div>
       ) : !rows || rows.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
           <Users className="h-8 w-8 mb-2 opacity-30" />
-          <p className="text-sm">Sin datos para este día</p>
+          <p className="text-sm">{t("scouter.progress.noData")}</p>
         </div>
       ) : (
         <Table containerClassName="rounded-lg border border-border overflow-hidden">
           <TableHeader>
             <TableRow className="bg-muted/30 hover:bg-muted/30">
               <TableHead className="text-xs">Spammer</TableHead>
-              <TableHead className="text-xs text-right">Asignadas</TableHead>
-              <TableHead className="text-xs text-right">Completadas</TableHead>
-              <TableHead className="text-xs text-right">Pendientes</TableHead>
-              <TableHead className="text-xs min-w-[120px]">% Completado</TableHead>
+              <TableHead className="text-xs text-right">{t("scouter.progress.col.assigned")}</TableHead>
+              <TableHead className="text-xs text-right">{t("scouter.tasks.completed")}</TableHead>
+              <TableHead className="text-xs text-right">{t("common.pendingPl")}</TableHead>
+              <TableHead className="text-xs min-w-[120px]">{t("scouter.progress.col.completion")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -123,7 +132,7 @@ export const ManagerDashboard = ({ date, onDateChange }: ManagerDashboardProps) 
                 >
                   <TableCell className="text-sm font-medium">
                     {row.spammer_name ?? (
-                      <span className="text-muted-foreground italic text-xs">Sin nombre</span>
+                      <span className="text-muted-foreground italic text-xs">{t("scouter.noName")}</span>
                     )}
                   </TableCell>
                   <TableCell className="text-right text-sm tabular-nums">

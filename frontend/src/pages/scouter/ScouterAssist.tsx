@@ -6,6 +6,8 @@ import { Eye, Heart, Users, BarChart3, Wrench, Radar, Settings, ClipboardList, A
 import { PageHeader } from "@/components/ui/page-header";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useScouterCompanies } from "@/hooks/useScouterLeads";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 import ScouterHome from "./ScouterHome";
 import ScouterLeads from "./ScouterLeads";
 import ScouterFunnel from "./ScouterFunnel";
@@ -27,96 +29,92 @@ import ScouterAlertas from "./ScouterAlertas";
 // Permissions: the parent route is gated by `Scouter Assist`; each
 // subtab is independently gateable as a submodule so admins can grant
 // e.g. "Funnel only" later.
+//
+// ⚠️ `submodule` es la llave de role_permissions ("Mis Tareas", "Busquedas"…):
+// no se traduce nunca. Lo que se traduce es `label`, que es una clave de i18n.
 
 type SubKey = "home" | "busquedas" | "favoritas" | "leads" | "funnel" | "settings" | "mis-tareas" | "alertas";
 
 interface SubDef {
   key: SubKey;
-  label: string;
+  label: TranslationKey;
   submodule: string;
   icon: React.ComponentType<{ className?: string }>;
-  whatsComing: string;
+  whatsComing: TranslationKey;
   source: string;
 }
 
 const SUBS: SubDef[] = [
   {
     key: "home",
-    label: "Home",
+    label: "scouter.tab.home",
     submodule: "Home",
     icon: Eye,
-    whatsComing:
-      "Panel de descubrimiento de prospectos: filtros por país, categoría, seguidores, engagement. Lista priorizada por scoring.",
+    whatsComing: "scouter.tab.coming.home",
     source: "app/scouter/page.tsx → ScouterDiscoverPanel.tsx",
   },
   {
     key: "busquedas",
-    label: "Búsquedas",
+    label: "scouter.tab.searches",
     submodule: "Busquedas",
     icon: Radar,
-    whatsComing:
-      "Botón de escaneo con animación radar, consola live del worker, y grid de leads recién descubiertas aprobadas por IA.",
+    whatsComing: "scouter.tab.coming.searches",
     source: "app/scouter/page.tsx → ScouterDiscoverPanel.tsx (discover section)",
   },
   {
     key: "favoritas",
-    label: "Favoritas",
+    label: "scouter.tab.favorites",
     submodule: "Favoritas",
     icon: Heart,
-    whatsComing:
-      "Tablero de leads marcados como favoritos por el scouter. Acciones rápidas: archivar, mover a CRM, generar resumen IA.",
+    whatsComing: "scouter.tab.coming.favorites",
     source: "app/scouter/favoritas/page.tsx",
   },
   {
     key: "leads",
-    label: "Leads",
+    label: "scouter.tab.leads",
     submodule: "Leads",
     icon: Users,
-    whatsComing:
-      "Tabla CRM completa de leads con drawer lateral, edición inline, asignación a closers y export a Excel.",
+    whatsComing: "scouter.tab.coming.leads",
     source: "app/scouter/leads/page.tsx → LeadsCrm.tsx + LeadDrawer.tsx",
   },
   {
     // key + submodule se mantienen para no romper permisos guardados
     // en role_permissions; solo el label visible cambió a "Analytics".
     key: "funnel",
-    label: "Analytics",
+    label: "scouter.tab.analytics",
     submodule: "Funnel",
     icon: BarChart3,
-    whatsComing:
-      "Embudo del pipeline + progreso diario del equipo de spammers.",
+    whatsComing: "scouter.tab.coming.analytics",
     source: "app/scouter/funnel/page.tsx → ScouterFunnelPanel.tsx",
   },
   {
     key: "settings",
-    label: "Settings",
+    label: "scouter.tab.settings",
     submodule: "Settings",
     icon: Settings,
-    whatsComing:
-      "Gestión de compañías, configuración de búsqueda por IA, presupuesto Apify, y parámetros del scorer.",
+    whatsComing: "scouter.tab.coming.settings",
     source: "kash settings/scouter → ScouterSettings.tsx",
   },
   {
     key: "mis-tareas",
-    label: "Mis Tareas",
+    label: "scouter.tab.myTasks",
     submodule: "Mis Tareas",
     icon: ClipboardList,
-    whatsComing:
-      "Panel diario del spammer con 50 leads asignados por IA y micro-tareas de interacción.",
+    whatsComing: "scouter.tab.coming.myTasks",
     source: "scouter-daily-tasks → MisTareas.tsx",
   },
   {
     key: "alertas",
-    label: "Alertas",
+    label: "scouter.tab.alerts",
     submodule: "Alertas",
     icon: AlertTriangle,
-    whatsComing:
-      "Vista de manager con tareas pendientes acumuladas por spammer. Sirve para detectar quién deja tareas sin completar antes de que se rolleen al día siguiente.",
+    whatsComing: "scouter.tab.coming.alerts",
     source: "ScouterAlertas.tsx",
   },
 ];
 
 const ScouterAssist = () => {
+  const { t } = useLanguage();
   const { canAccess } = usePermissions();
   const visibleSubs = SUBS.filter((s) => canAccess("Scouter Assist", s.submodule));
   const [active, setActive] = useState<SubKey>(
@@ -169,7 +167,7 @@ const ScouterAssist = () => {
               return (
                 <TabsTrigger key={s.key} value={s.key} className="gap-1.5">
                   <Icon className="h-3.5 w-3.5" />
-                  {s.label}
+                  {t(s.label)}
                 </TabsTrigger>
               );
             })}
@@ -200,12 +198,12 @@ const ScouterAssist = () => {
                   <CardContent className="space-y-3 p-6">
                     <div className="flex items-center gap-2 text-xs font-semibold text-warning/90">
                       <Wrench className="h-3.5 w-3.5" />
-                      En migración
+                      {t("scouter.tab.inMigration")}
                     </div>
-                    <h2 className="text-lg font-semibold">{s.label}</h2>
-                    <p className="text-sm text-muted-foreground">{s.whatsComing}</p>
+                    <h2 className="text-lg font-semibold">{t(s.label)}</h2>
+                    <p className="text-sm text-muted-foreground">{t(s.whatsComing)}</p>
                     <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-[11px] font-mono text-muted-foreground">
-                      Origen: {s.source}
+                      {t("scouter.tab.source", { source: s.source })}
                     </div>
                   </CardContent>
                 </Card>

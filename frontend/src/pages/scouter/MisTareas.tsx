@@ -23,6 +23,8 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useAuth } from "@/hooks/useAuth";
 import type { DailyAssignment } from "@/hooks/useSpammerTasks";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
@@ -34,24 +36,28 @@ function todayIso(): string {
 
 type StatusFilter = "all" | "pending" | "done" | "skipped";
 
-const STATUS_FILTER_OPTIONS: Array<{ value: StatusFilter; label: string }> = [
-  { value: "all",     label: "Todos los estados" },
-  { value: "pending", label: "Pendientes" },
-  { value: "done",    label: "Completadas" },
-  { value: "skipped", label: "Saltadas" },
+// `value` es el status / ai_strategy que viene de la base: no se traduce.
+const STATUS_FILTER_OPTIONS: Array<{ value: StatusFilter; labelKey: TranslationKey }> = [
+  { value: "all",     labelKey: "common.allStatuses" },
+  { value: "pending", labelKey: "common.pendingPl" },
+  { value: "done",    labelKey: "scouter.tasks.completed" },
+  { value: "skipped", labelKey: "scouter.tasks.skipped" },
 ];
 
-const STRATEGY_OPTIONS = [
-  { value: "all",           label: "Todas las estrategias" },
+// Las estrategias que se dicen igual en inglés quedan como texto (`label`).
+const STRATEGY_OPTIONS: Array<{ value: string; label?: string; labelKey?: TranslationKey }> = [
+  { value: "all",           labelKey: "scouter.tasks.allStrategies" },
   { value: "warm_approach", label: "Warm approach" },
   { value: "cold_follow",   label: "Cold follow" },
-  { value: "multi_account", label: "Multi cuenta" },
+  { value: "multi_account", labelKey: "scouter.strategy.multiAccount" },
   { value: "re_engage",     label: "Re-engage" },
 ];
 
 // ─── Component ────────────────────────────────────────────────────────────
 
 const MisTareas = () => {
+  // Arriba de todo: el componente sale antes (cargando / onboarding).
+  const { t } = useLanguage();
   const [selectedDate, setSelectedDate] = useState<string>(todayIso());
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [accountFilter, setAccountFilter] = useState<string>("all");
@@ -157,7 +163,7 @@ const MisTareas = () => {
     return (
       <div className="flex items-center justify-center py-20 gap-2 text-muted-foreground">
         <Loader2 className="h-5 w-5 animate-spin" />
-        <span className="text-sm">Cargando...</span>
+        <span className="text-sm">{t("common.loading")}</span>
       </div>
     );
   }
@@ -185,12 +191,12 @@ const MisTareas = () => {
           onValueChange={(v) => setStatusFilter(v as StatusFilter)}
         >
           <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Estado" />
+            <SelectValue placeholder={t("common.status")} />
           </SelectTrigger>
           <SelectContent>
             {STATUS_FILTER_OPTIONS.map((o) => (
               <SelectItem key={o.value} value={o.value}>
-                {o.label}
+                {t(o.labelKey)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -199,10 +205,10 @@ const MisTareas = () => {
         {/* Account filter */}
         <Select value={accountFilter} onValueChange={setAccountFilter}>
           <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Cuenta spammer" />
+            <SelectValue placeholder={t("scouter.tasks.spammerAccount")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todas las cuentas</SelectItem>
+            <SelectItem value="all">{t("scouter.tasks.allAccounts")}</SelectItem>
             {accountOptions.map((a) => (
               <SelectItem key={a.id} value={a.id}>
                 @{a.handle}
@@ -214,12 +220,12 @@ const MisTareas = () => {
         {/* Strategy filter */}
         <Select value={strategyFilter} onValueChange={setStrategyFilter}>
           <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Estrategia" />
+            <SelectValue placeholder={t("scouter.tasks.strategy")} />
           </SelectTrigger>
           <SelectContent>
             {STRATEGY_OPTIONS.map((o) => (
               <SelectItem key={o.value} value={o.value}>
-                {o.label}
+                {o.labelKey ? t(o.labelKey) : o.label}
               </SelectItem>
             ))}
           </SelectContent>
@@ -227,8 +233,8 @@ const MisTareas = () => {
 
         <span className="text-xs text-muted-foreground whitespace-nowrap">
           {assignmentsQ.isLoading
-            ? "Cargando..."
-            : `${filtered.length} tarea${filtered.length === 1 ? "" : "s"}`}
+            ? t("common.loading")
+            : t(filtered.length === 1 ? "scouter.tasks.countOne" : "scouter.tasks.countOther", { count: filtered.length })}
         </span>
 
         {/* Top-up button — only visible to non-managers (a manager
@@ -245,10 +251,10 @@ const MisTareas = () => {
             className="ml-auto gap-2"
             title={
               cooldownRemainingMs > 0
-                ? `En cooldown — disponible en ${fmtCooldown(cooldownRemainingMs)}`
+                ? t("scouter.tasks.cooldownTitle", { time: fmtCooldown(cooldownRemainingMs) })
                 : !canTopUp
-                  ? `Ya tienes ${pendingCount}/${TOP_UP_TARGET} tareas pendientes`
-                  : `Generar ${TOP_UP_TARGET - pendingCount} tareas más`
+                  ? t("scouter.tasks.fullTitle", { pending: pendingCount, target: TOP_UP_TARGET })
+                  : t("scouter.tasks.generateTitle", { count: TOP_UP_TARGET - pendingCount })
             }
           >
             {generateTasks.isPending ? (
@@ -260,10 +266,10 @@ const MisTareas = () => {
             )}
             <span className="text-xs">
               {cooldownRemainingMs > 0 ? (
-                <>Espera {fmtCooldown(cooldownRemainingMs)}</>
+                <>{t("scouter.tasks.wait", { time: fmtCooldown(cooldownRemainingMs) })}</>
               ) : (
                 <>
-                  Llenar a {TOP_UP_TARGET}
+                  {t("scouter.tasks.fillTo", { target: TOP_UP_TARGET })}
                   <span className="ml-1 opacity-70">
                     ({pendingCount}/{TOP_UP_TARGET})
                   </span>
@@ -278,19 +284,19 @@ const MisTareas = () => {
       {assignmentsQ.isLoading ? (
         <div className="flex items-center justify-center py-12 gap-2 text-muted-foreground">
           <Loader2 className="h-5 w-5 animate-spin" />
-          <span className="text-sm">Cargando tareas...</span>
+          <span className="text-sm">{t("scouter.tasks.loading")}</span>
         </div>
       ) : filtered.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-muted/20 p-10 text-center space-y-2">
           <ClipboardList className="mx-auto h-8 w-8 text-muted-foreground/40" />
           <p className="text-sm font-medium">
             {assignments.length === 0
-              ? "No hay tareas para hoy"
-              : "Sin tareas con los filtros aplicados"}
+              ? t("scouter.tasks.noneToday")
+              : t("scouter.tasks.noneFiltered")}
           </p>
           {assignments.length === 0 && (
             <p className="text-xs text-muted-foreground">
-              Un admin debe generar la asignación diaria desde Settings.
+              {t("scouter.tasks.noneTodayHint")}
             </p>
           )}
         </div>
@@ -310,7 +316,7 @@ const MisTareas = () => {
       {isManagerRole && (
         <div className="pt-2">
           <div className="text-xs font-bold text-muted-foreground mb-3">
-            Vista de manager
+            {t("scouter.tasks.managerView")}
           </div>
           <ManagerDashboard date={selectedDate} onDateChange={setSelectedDate} />
         </div>

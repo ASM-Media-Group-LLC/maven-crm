@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { ImagePlus, Loader2, CheckCircle2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useUploadScreenshot } from "@/hooks/useSpammerTasks";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // ─── Props ────────────────────────────────────────────────────────────────
 
@@ -24,6 +25,7 @@ export const ScreenshotUpload = ({
   assignmentDate,
   onUploaded,
 }: ScreenshotUploadProps) => {
+  const { t } = useLanguage();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -70,7 +72,7 @@ export const ScreenshotUpload = ({
     return (
       <div className="flex items-center gap-2 rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-sm text-success">
         <CheckCircle2 className="h-4 w-4 shrink-0" />
-        <span className="font-medium">Screenshot subido</span>
+        <span className="font-medium">{t("scouter.screenshot.uploaded")}</span>
       </div>
     );
   }
@@ -85,7 +87,7 @@ export const ScreenshotUpload = ({
           className="flex w-full items-center gap-2 rounded-lg border border-dashed border-border bg-muted/20 px-3 py-2.5 text-sm text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
         >
           <ImagePlus className="h-4 w-4 shrink-0" />
-          <span>Adjuntar screenshot del comentario</span>
+          <span>{t("scouter.screenshot.attach")}</span>
         </button>
       )}
 
@@ -100,7 +102,7 @@ export const ScreenshotUpload = ({
                 type="button"
                 onClick={handleClearFile}
                 className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
-                aria-label="Quitar imagen"
+                aria-label={t("scouter.screenshot.remove")}
               >
                 <X className="h-2.5 w-2.5" />
               </button>
@@ -109,7 +111,7 @@ export const ScreenshotUpload = ({
           <div className="flex flex-1 flex-col gap-1 min-w-0">
             <span className="truncate text-xs text-muted-foreground">{selectedFile.name}</span>
             <Button size="sm" className="h-7 text-xs gap-1" onClick={handleUpload}>
-              Subir screenshot
+              {t("scouter.screenshot.upload")}
             </Button>
           </div>
         </div>
@@ -119,7 +121,7 @@ export const ScreenshotUpload = ({
       {isUploading && (
         <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin shrink-0" />
-          <span>Subiendo...</span>
+          <span>{t("scouter.screenshot.uploading")}</span>
         </div>
       )}
 

@@ -15,7 +15,9 @@ import {
   type ScouterLead,
   type AiQualityFilter,
 } from "@/hooks/useScouterLeads";
+import { useLanguage } from "@/hooks/useLanguage";
 import {
+  AI_QUALITY_OPTIONS,
   LeadDrawer,
   STATUS_META,
   STATUS_OPTIONS,
@@ -24,6 +26,7 @@ import {
   initialsBg,
   scoreColor,
   countryToFlag,
+  opcionesDePais,
 } from "./leadShared";
 
 // ─── Stat card compacto — versión chica de KpiCard, optimizada para
@@ -94,6 +97,7 @@ const LeadCard = ({
   onClick: () => void;
   onToggleFavorite: () => void;
 }) => {
+  const { t } = useLanguage();
   const statusCfg = STATUS_META[lead.status] ?? STATUS_META.discovery;
   const initial = (
     lead.name?.trim().charAt(0) ||
@@ -134,7 +138,7 @@ const LeadCard = ({
         <span
           className="absolute left-2 top-2 block h-[10px] w-[10px] rounded-full ring-1 ring-black/40"
           style={{ background: statusCfg.dot, boxShadow: "0 2px 6px rgba(0,0,0,0.3)" }}
-          title={statusCfg.label}
+          title={t(statusCfg.labelKey)}
         />
         {/* Verified — top-right */}
         {lead.verified && (
@@ -155,7 +159,7 @@ const LeadCard = ({
         <span
           role="button"
           tabIndex={0}
-          aria-label={isFavorite ? "Quitar de favoritos" : "Marcar como favorito"}
+          aria-label={isFavorite ? t("scouter.fav.remove") : t("scouter.fav.add")}
           onClick={(e) => {
             e.stopPropagation();
             onToggleFavorite();
@@ -250,7 +254,10 @@ const LeadCard = ({
                     ? "border-blue-400/60 text-blue-400"
                     : "border-border text-muted-foreground"
               }`}
-              title={`Similar a @${lead.lookalike_seed_handle} (${Math.round((lead.lookalike_score ?? 0) * 100)}%)`}
+              title={t("scouter.card.similarTo", {
+                handle: lead.lookalike_seed_handle,
+                pct: Math.round((lead.lookalike_score ?? 0) * 100),
+              })}
             >
               <span>≈</span>
               <span className="truncate max-w-[80px]">@{lead.lookalike_seed_handle}</span>
@@ -284,6 +291,8 @@ const Pagination = ({
   totalPages: number;
   onPageChange: (p: number) => void;
 }) => {
+  // Arriba del `return null`: un hook no puede quedar después de una salida.
+  const { t } = useLanguage();
   if (totalPages <= 1) return null;
 
   // Sliding window of up to 10 pages
@@ -308,7 +317,7 @@ const Pagination = ({
           className={btn}
           disabled={page === 1}
           onClick={() => onPageChange(1)}
-          aria-label="Primera página"
+          aria-label={t("scouter.page.first")}
         >
           <ChevronsLeft className="h-3.5 w-3.5" />
         </button>
@@ -317,7 +326,7 @@ const Pagination = ({
           className={btn}
           disabled={page === 1}
           onClick={() => onPageChange(page - 1)}
-          aria-label="Página anterior"
+          aria-label={t("scouter.page.previous")}
         >
           <ChevronLeft className="h-3.5 w-3.5" />
         </button>
@@ -336,7 +345,7 @@ const Pagination = ({
           className={btn}
           disabled={page === totalPages}
           onClick={() => onPageChange(page + 1)}
-          aria-label="Página siguiente"
+          aria-label={t("scouter.page.next")}
         >
           <ChevronRight className="h-3.5 w-3.5" />
         </button>
@@ -345,25 +354,17 @@ const Pagination = ({
           className={btn}
           disabled={page === totalPages}
           onClick={() => onPageChange(totalPages)}
-          aria-label="Última página"
+          aria-label={t("scouter.page.last")}
         >
           <ChevronsRight className="h-3.5 w-3.5" />
         </button>
       </div>
       <span className="text-xs text-muted-foreground">
-        Página {page} de {totalPages}
+        {t("scouter.page.of", { page, total: totalPages })}
       </span>
     </div>
   );
 };
-
-// ─── AI quality filter options ──────────────────────────────────────────
-const AI_QUALITY_OPTIONS: Array<{ value: AiQualityFilter; label: string }> = [
-  { value: "approved",  label: "✅ Aprobadas IA" },
-  { value: "high_fit",  label: "Solo high_fit" },
-  { value: "scored",    label: "Evaluadas (incluye low_fit)" },
-  { value: "all",       label: "Todas (sin filtro IA)" },
-];
 
 // ─── Main ────────────────────────────────────────────────────────────────
 interface ScouterHomeProps {
@@ -376,6 +377,7 @@ interface ScouterHomeProps {
 }
 
 const ScouterHome = ({ favoritesOnly = false, companyFilter: companyFilterProp, setCompanyFilter: setCompanyFilterProp }: ScouterHomeProps) => {
+  const { t } = useLanguage();
   // Spammers ven SOLO sus leads asignadas en Home — no el pool
   // completo del tenant. Admins/managers/supervisors siguen viendo
   // todo. Computamos el rol arriba porque el defaultStatus depende
@@ -486,12 +488,12 @@ const ScouterHome = ({ favoritesOnly = false, companyFilter: companyFilterProp, 
   // confirmed/active). Total scouteadas se mantiene.
   const statBlocks = useMemo(() => {
     return [
-      { key: "total", label: "Total scouteadas", big: stats.data?.total ?? 0, statusVal: "all" as const, color: "bg-blue-500" },
-      { key: "contacted", label: "Contactadas", big: stats.data?.contactedDistinct ?? 0, statusVal: "all" as const, color: "bg-amber-500" },
-      { key: "interested", label: "Interesadas", big: stats.data?.interested ?? 0, statusVal: "confirmed" as const, color: "bg-success" },
-      { key: "noResponse", label: "No responden", big: stats.data?.noResponse ?? 0, statusVal: "all" as const, color: "bg-destructive" },
+      { key: "total", label: t("scouter.home.totalScouted"), big: stats.data?.total ?? 0, statusVal: "all" as const, color: "bg-blue-500" },
+      { key: "contacted", label: t("scouter.home.contacted"), big: stats.data?.contactedDistinct ?? 0, statusVal: "all" as const, color: "bg-amber-500" },
+      { key: "interested", label: t("scouter.home.interested"), big: stats.data?.interested ?? 0, statusVal: "confirmed" as const, color: "bg-success" },
+      { key: "noResponse", label: t("scouter.home.noResponse"), big: stats.data?.noResponse ?? 0, statusVal: "all" as const, color: "bg-destructive" },
     ];
-  }, [stats.data]);
+  }, [stats.data, t]);
 
   return (
     <div className="space-y-5">
@@ -522,11 +524,12 @@ const ScouterHome = ({ favoritesOnly = false, companyFilter: companyFilterProp, 
         <SearchableSelect
           value={companyFilter}
           onValueChange={setCompanyFilter}
-          placeholder="Compañía"
-          searchPlaceholder="Buscar compañía…"
+          placeholder={t("common.company")}
+          searchPlaceholder={t("scouter.filter.searchCompany")}
+          emptyMessage={t("common.noResults")}
           triggerClassName="w-[180px] h-9 text-xs"
           options={[
-            { value: "all", label: `Todas (${companies.data?.length ?? 0})` },
+            { value: "all", label: t("scouter.filter.allCount", { count: companies.data?.length ?? 0 }) },
             ...(companies.data ?? []).map((c) => ({ value: c.id, label: c.name })),
           ]}
         />
@@ -535,41 +538,40 @@ const ScouterHome = ({ favoritesOnly = false, companyFilter: companyFilterProp, 
           value={statusFilter}
           onValueChange={setStatusFilter}
           placeholder="Status"
-          searchPlaceholder="Buscar status…"
+          searchPlaceholder={t("scouter.filter.searchStatus")}
+          emptyMessage={t("common.noResults")}
           triggerClassName="w-[160px] h-9 text-xs"
-          options={STATUS_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+          options={STATUS_OPTIONS.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
         />
 
         <SearchableSelect
           value={countryFilter}
           onValueChange={setCountryFilter}
-          placeholder="País"
-          searchPlaceholder="Buscar país…"
+          placeholder={t("common.country")}
+          searchPlaceholder={t("scouter.filter.searchCountry")}
+          emptyMessage={t("common.noResults")}
           triggerClassName="w-[180px] h-9 text-xs"
           options={[
-            { value: "all", label: "Todos los países" },
-            ...(countries.data ?? []).map((c) => ({
-              value: c.country,
-              label: `${countryToFlag(c.country)} ${c.country} (${c.count})`,
-              searchAdditional: c.country,
-            })),
+            { value: "all", label: t("scouter.filter.allCountries") },
+            ...opcionesDePais(countries.data ?? [], t),
           ]}
         />
 
         <SearchableSelect
           value={aiQuality}
           onValueChange={(v) => setAiQuality(v as AiQualityFilter)}
-          placeholder="Calidad IA"
-          searchPlaceholder="Buscar calidad…"
+          placeholder={t("scouter.filter.aiQuality")}
+          searchPlaceholder={t("scouter.filter.searchQuality")}
+          emptyMessage={t("common.noResults")}
           triggerClassName="w-[220px] h-9 text-xs"
-          options={AI_QUALITY_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+          options={AI_QUALITY_OPTIONS.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
         />
 
         {/* Search — full width remaining */}
         <div className="relative flex-1 min-w-[200px]">
           <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar por handle, nombre, país…"
+            placeholder={t("scouter.filter.searchLeads")}
             className="pl-8"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -578,7 +580,7 @@ const ScouterHome = ({ favoritesOnly = false, companyFilter: companyFilterProp, 
 
         <span className="text-xs text-muted-foreground whitespace-nowrap">
           {leads.isLoading
-            ? "Cargando…"
+            ? t("common.loading")
             : `${totalLeads} lead${totalLeads === 1 ? "" : "s"}`}
         </span>
       </div>
@@ -591,12 +593,12 @@ const ScouterHome = ({ favoritesOnly = false, companyFilter: companyFilterProp, 
       ) : visibleLeads.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-muted/20 p-10 text-center">
           <p className="text-sm font-medium">
-            {favoritesOnly ? "Sin favoritos todavía" : "Sin leads para mostrar"}
+            {favoritesOnly ? t("scouter.home.noFavorites") : t("scouter.noLeads")}
           </p>
           <p className="text-xs text-muted-foreground">
             {favoritesOnly
-              ? "Marca leads como favoritos desde el grid de Home tocando la estrella en la esquina inferior derecha."
-              : "Cuando el bot descubra cuentas IG aparecerán aquí. (El botón Descubrir llega en la próxima iteración.)"}
+              ? t("scouter.home.noFavoritesHint")
+              : t("scouter.home.noLeadsHint")}
           </p>
         </div>
       ) : (

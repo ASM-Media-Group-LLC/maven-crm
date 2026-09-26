@@ -18,6 +18,9 @@ import {
 } from "@/hooks/useSpammerTasks";
 import type { SpammerAccount } from "@/hooks/useSpammerAccounts";
 import { initialsBg } from "@/pages/scouter/leadShared";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
+import { textoConPieza } from "@/pages/scouter/textoConPieza";
 
 // ─── Task type icon map ───────────────────────────────────────────────────
 
@@ -29,12 +32,12 @@ const TASK_ICONS: Record<TaskType, React.ReactNode> = {
   story_react: <Sparkles className="h-4 w-4 text-pink-400" />,
 };
 
-const TASK_LABELS: Record<TaskType, string> = {
-  follow:      "Seguir",
-  like:        "Like",
-  comment:     "Comentario",
-  story_view:  "Ver historia",
-  story_react: "Reaccionar historia",
+const TASK_LABELS: Record<TaskType, TranslationKey> = {
+  follow:      "scouter.task.type.follow",
+  like:        "scouter.task.type.like",
+  comment:     "scouter.task.type.comment",
+  story_view:  "scouter.task.type.storyView",
+  story_react: "scouter.task.type.storyReact",
 };
 
 // ─── Props ────────────────────────────────────────────────────────────────
@@ -49,6 +52,7 @@ interface TaskItemProps {
 // ─── Component ────────────────────────────────────────────────────────────
 
 export const TaskItem = ({ task, accounts: _accounts, assignmentDate, leadId }: TaskItemProps) => {
+  const { t } = useLanguage();
   const completeMut = useCompleteTask();
   const skipMut = useSkipTask();
   const [optimisticDone, setOptimisticDone] = useState(false);
@@ -114,7 +118,7 @@ export const TaskItem = ({ task, accounts: _accounts, assignmentDate, leadId }: 
           </p>
           {/* Task type label */}
           <span className="mt-0.5 inline-block text-xs font-bold text-muted-foreground">
-            {TASK_LABELS[task.task_type]}
+            {t(TASK_LABELS[task.task_type])}
           </span>
         </div>
 
@@ -125,7 +129,7 @@ export const TaskItem = ({ task, accounts: _accounts, assignmentDate, leadId }: 
               checked={false}
               disabled={isBusy}
               onCheckedChange={handleCheck}
-              aria-label="Marcar como completada"
+              aria-label={t("scouter.task.markDone")}
               className="h-5 w-5 border-2"
             />
             <button
@@ -133,7 +137,7 @@ export const TaskItem = ({ task, accounts: _accounts, assignmentDate, leadId }: 
               disabled={isBusy}
               onClick={handleSkip}
               className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground opacity-50 transition-opacity hover:opacity-100 hover:text-foreground disabled:opacity-30"
-              aria-label="Saltar tarea"
+              aria-label={t("scouter.task.skipTask")}
             >
               <SkipForward className="h-3.5 w-3.5" />
             </button>
@@ -166,7 +170,11 @@ export const TaskItem = ({ task, accounts: _accounts, assignmentDate, leadId }: 
             )}
           </div>
           <span className="text-[11px] text-muted-foreground">
-            desde <span className="font-semibold text-foreground/80">@{fromAccount.instagram_handle}</span>
+            {textoConPieza(
+              t("scouter.task.from"),
+              "@{handle}",
+              <span className="font-semibold text-foreground/80">@{fromAccount.instagram_handle}</span>,
+            )}
           </span>
         </div>
       )}
@@ -178,7 +186,7 @@ export const TaskItem = ({ task, accounts: _accounts, assignmentDate, leadId }: 
             {task.suggested_comment}
           </blockquote>
           <p className="text-[11px] text-muted-foreground">
-            Agrega algo de tu cosecha para que suene natural.
+            {t("scouter.task.commentHint")}
           </p>
         </div>
       )}
@@ -209,7 +217,7 @@ export const TaskItem = ({ task, accounts: _accounts, assignmentDate, leadId }: 
             className="flex items-center gap-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground disabled:opacity-30"
           >
             <SkipForward className="h-3.5 w-3.5" />
-            Saltar
+            {t("scouter.task.skip")}
           </button>
         </div>
       )}
