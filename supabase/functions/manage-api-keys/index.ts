@@ -1,6 +1,8 @@
 // Gestión de API keys de Maven — SOLO admins.
-// Acciones: list | create | update | revoke. El secreto completo se devuelve UNA
-// sola vez al crear; después solo queda el hash + últimos 4 chars para mostrar.
+// Acciones: list | create | update | revoke, y las de los webhooks del Messenger
+// (webhook_create | webhook_test | webhook_resume | webhook_pause | webhook_delete |
+// webhook_deliveries, en ./webhooks.ts). El secreto completo se devuelve UNA sola
+// vez al crear; después solo queda el hash + últimos 4 chars para mostrar.
 // verify_jwt=false: validamos el JWT y el rol admin acá adentro (mismo gate que
 // el frontend: user_roles.role='admin').
 import { corsFor } from "../_shared/cors.ts";
@@ -13,6 +15,7 @@ import {
   SCOPE_GROUPS,
 } from "./api-scopes.ts";
 import { type ClaveDeMensaje, type Idioma, idiomaDe, msg } from "./mensajes.ts";
+import { conWebhooks, crearDatos, servirWebhook, webhooksDeLlaves } from "./webhooks.ts";
 
 // Igual que Infloww: hasta 3 keys válidas a la vez, POR AGENCIA. Antes se contaba
 // para toda la plataforma: con las 3 de la primera agencia, la segunda no habría
@@ -179,9 +182,14 @@ Deno.serve(async (req) => {
         admin.from("profiles").select("full_name").eq("id", callerId).maybeSingle(),
       ]);
       if (error) return json(req, { error: error.message }, 500);
-      const keys = (await conPersona(data ?? [])).map((k) => ({ ...k, status: statusOf(k) }));
+      // El webhook de cada llave (a lo sumo uno): lo que la página muestra al lado.
+      // Si no se pudo consultar, webhooks_unknown: la página dice "no se sabe" (y
+      // no ofrece Registrar ni esconde Pausar), en vez de "sin webhook".
+      const webhooks = await webhooksDeLlaves(crearDatos(admin, tenantId), (data ?? []).map((k: { id: string }) => k.id));
+      const { keys, webhooks_unknown } = conWebhooks((await conPersona(data ?? [])).map((k) => ({ ...k, status: statusOf(k) })), webhooks);
       return json(req, {
-        keys, scope_catalog: SCOPE_CATALOG, scope_groups: SCOPE_GROUPS, max_active_keys: MAX_ACTIVE_KEYS,
+        keys, webhooks_unknown,
+        scope_catalog: SCOPE_CATALOG, scope_groups: SCOPE_GROUPS, max_active_keys: MAX_ACTIVE_KEYS,
         // Quién está mirando: una key nueva actúa como esta persona. La página lo
         // usa para decir de quién son las conversaciones que leería con Messenger.
         you: { id: callerId, name: (yoPerfil as { full_name?: string | null } | null)?.full_name ?? null },
@@ -349,6 +357,16 @@ Deno.serve(async (req) => {
       if (error) return json(req, { error: error.message }, 500);
       if (!data?.length) return json(req, { error: m("noExisteOYaRevocada") }, 404);
       return json(req, { success: true, id });
+    }
+
+    // === WEBHOOKS del Messenger ===
+    if (typeof action === "string" && action.startsWith("webhook_")) {
+      const r = await servirWebhook(action, (body ?? {}) as Record<string, unknown>, {
+        datos: crearDatos(admin, tenantId),
+        callerId,
+        idioma,
+      });
+      return json(req, r.cuerpo, r.estado);
     }
 
     return json(req, { error: m("accionDesconocida", { accion: action ?? (idioma === "en" ? "(empty)" : "(vacía)") }) }, 400);
