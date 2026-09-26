@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useLanguage } from "@/hooks/useLanguage";
-import { useSaveSkin, useSaveUiPrefs, saveUiPrefsRemote } from "@/hooks/useUserProfile";
+import { useLanguage, useIdiomaDelPerfil, reescribirUiPrefs, type UiPrefsGuardadas } from "@/hooks/useLanguage";
+import { useSaveSkin } from "@/hooks/useUserProfile";
 import { aaLightnessForHue, CUSTOM_SKIN_SATURATION } from "@/lib/wcag";
 import type { TranslationKey } from "@/lib/i18n";
 
@@ -151,6 +152,40 @@ const storePrefs = (prefs: UiPrefs) => {
   window.dispatchEvent(new Event(PREFS_EVENT));
 };
 
+// Las claves de ui_prefs que son de la apariencia. Record con TODAS las de
+// UiPrefs a propósito: si sumás una preferencia y no la anotás acá, no compila.
+// Sin eso, apagarla no la borraría del perfil (ver guardarAparienciaEnPerfil).
+const CLAVES_DE_APARIENCIA: Record<keyof UiPrefs, true> = {
+  oled: true,
+  contrast: true,
+  customHue: true,
+  seasonalOptOut: true,
+  density: true,
+};
+
+// Persiste la apariencia en profiles.ui_prefs SIN pisar lo que no es suyo: el
+// mismo jsonb guarda el idioma (hooks/useLanguage.tsx). Hasta acá se escribía
+// la columna entera con las prefs de apariencia (saveUiPrefsRemote, en
+// useUserProfile.ts): con el idioma adentro, tocar el modo OLED lo borraba.
+//
+// Reemplaza las claves de apariencia en bloque (no las mezcla una por una):
+// apagar la densidad compacta la saca del objeto local, y con un simple
+// {...guardado, ...prefs} el "compact" del perfil sobreviviría y volvería en
+// el próximo login.
+export const guardarAparienciaEnPerfil = (prefs: UiPrefs): Promise<void> => {
+  const nuevas = sanitizeUiPrefs(prefs);
+  return reescribirUiPrefs((actual) => {
+    if (JSON.stringify(sanitizeUiPrefs(actual)) === JSON.stringify(nuevas)) return null;
+    const ajenas: UiPrefsGuardadas = {};
+    for (const [clave, valor] of Object.entries(actual)) {
+      // hasOwnProperty y no `in`: con `in`, una clave "toString" contaría
+      // como de apariencia (viene del prototipo) y se perdería.
+      if (!Object.prototype.hasOwnProperty.call(CLAVES_DE_APARIENCIA, clave)) ajenas[clave] = valor;
+    }
+    return { ...ajenas, ...nuevas };
+  });
+};
+
 /* ---- Skins de temporada ---- */
 
 export type SeasonId = "halloween" | "navidad";
@@ -253,7 +288,13 @@ export const applyStoredAppearance = () => applyAppearancePrefs();
 // instante, guarda en localStorage y persiste en profiles.ui_prefs.
 export const useUiPrefs = () => {
   const [prefs, setPrefsState] = useState<UiPrefs>(getStoredPrefs);
-  const save = useSaveUiPrefs();
+  const qc = useQueryClient();
+  const save = useMutation({
+    mutationFn: guardarAparienciaEnPerfil,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["my-profile"] });
+    },
+  });
 
   // Cambios hechos desde OTRO consumidor (ej: "Mantener el mío" del toast
   // con la card abierta) llegan por el evento y refrescan el estado local.
@@ -295,7 +336,7 @@ export const useSkin = () => {
         const prefs = { ...getStoredPrefs(), customHue: null };
         storePrefs(prefs);
         applyAppearancePrefs();
-        void saveUiPrefsRemote(prefs);
+        void guardarAparienciaEnPerfil(prefs);
       }
       // Persistencia remota fire-and-forget: si falla, el skin local igual
       // quedó aplicado y guardado; al próximo login el perfil (viejo) manda.
@@ -311,10 +352,12 @@ export const useSkin = () => {
 // al resolver la sesión, lee profiles.ui_skin — si difiere de localStorage el
 // perfil gana (es lo que el usuario eligió por última vez en ALGÚN
 // dispositivo; NULL o valor desconocido = default maven). localStorage manda
-// mientras la red no llega.
+// mientras la red no llega. La misma lectura trae el idioma guardado en
+// ui_prefs y se lo pasa al LanguageProvider (useIdiomaDelPerfil).
 export const useSkinSync = () => {
   const { user } = useAuth();
   const { t } = useLanguage();
+  const empezarLecturaDeIdioma = useIdiomaDelPerfil();
 
   useEffect(() => {
     applyStoredSkin();
@@ -350,7 +393,7 @@ export const useSkinSync = () => {
             const prefs = { ...getStoredPrefs(), seasonalOptOut: true };
             storePrefs(prefs);
             applyAppearancePrefs();
-            void saveUiPrefsRemote(prefs);
+            void guardarAparienciaEnPerfil(prefs);
           },
         },
       });
@@ -361,6 +404,7 @@ export const useSkinSync = () => {
   useEffect(() => {
     if (!user?.id) return;
     let cancelled = false;
+    const adoptarIdioma = empezarLecturaDeIdioma();
     void supabase
       .from("profiles")
       .select("ui_skin, ui_prefs")
@@ -381,9 +425,10 @@ export const useSkinSync = () => {
           storePrefs(remotePrefs);
           applyAppearancePrefs();
         }
+        adoptarIdioma(data?.ui_prefs);
       });
     return () => {
       cancelled = true;
     };
-  }, [user?.id]);
+  }, [user?.id, empezarLecturaDeIdioma]);
 };
