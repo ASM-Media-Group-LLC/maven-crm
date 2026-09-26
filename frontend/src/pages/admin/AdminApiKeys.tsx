@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  KeyRound, Plus, Copy, Check, Loader2, ShieldAlert, Trash2, Pencil, BookOpen, ExternalLink, X,
+  KeyRound, Plus, Check, Loader2, ShieldAlert, Trash2, Pencil, BookOpen, ExternalLink, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -22,6 +22,8 @@ import { PageHeader } from "@/components/ui/page-header";
 import { useFormato } from "@/hooks/useFormato";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { TranslationKey } from "@/lib/i18n";
+import { ConFormato, CopyButton } from "./apiKeysPiezas";
+import { CeldaWebhook, DialogoWebhook, DocsWebhooks, type WebhookResumen } from "./ApiKeyWebhook";
 
 // Settings → Administración → API keys (SOLO admins).
 // Gestión de la API pública de Maven, estilo Infloww: tabla + modal agrupado por
@@ -40,11 +42,16 @@ type ApiKey = {
   // mientras convivan el front nuevo y un manage-api-keys anterior.
   acts_as?: { id: string; name: string | null; active: boolean | null } | null;
   limite_por_hora?: number;
+  /** Su webhook del Messenger (a lo sumo uno). null = no tiene; undefined = el
+   *  servidor no lo mandó (se trata como "no se sabe"). */
+  webhook?: WebhookResumen | null;
 };
 type ListResp = {
   keys: ApiKey[]; scope_catalog: ScopeDef[]; scope_groups: string[]; max_active_keys: number;
   /** Quién está mirando: una key nueva actúa como esta persona. */
   you?: { id: string; name: string | null };
+  /** true = no se pudo consultar los webhooks: la tabla no ofrece Registrar. */
+  webhooks_unknown?: boolean;
 };
 
 // Leen conversaciones privadas: IPs exactas, vencimiento de 90 días como máximo y
@@ -91,27 +98,6 @@ const TEXTOS_GRUPO: Record<string, TranslationKey> = {
   Messenger: "apiKeys.group.Messenger",
 };
 
-/** Dibuja un texto del diccionario: lo que va entre `acentos graves` como código y
- *  lo que va entre **dobles asteriscos** en negrita. Así cada párrafo es UNA clave
- *  y se traduce entero (ver lib/i18n/apiKeys.ts). */
-function ConFormato({ texto }: { texto: string }) {
-  return (
-    <>
-      {texto.split(/(`[^`]+`)/g).map((trozo, i) =>
-        trozo.startsWith("`") && trozo.endsWith("`") && trozo.length > 1 ? (
-          <code key={i} className="rounded bg-muted px-1 py-0.5 [overflow-wrap:anywhere]">{trozo.slice(1, -1)}</code>
-        ) : (
-          trozo.split(/(\*\*[^*]+\*\*)/g).map((parte, j) =>
-            parte.startsWith("**") && parte.endsWith("**") && parte.length > 4
-              ? <strong key={`${i}-${j}`} className="font-semibold text-foreground">{parte.slice(2, -2)}</strong>
-              : <span key={`${i}-${j}`}>{parte}</span>,
-          )
-        ),
-      )}
-    </>
-  );
-}
-
 const API_BASE =
   `${import.meta.env.VITE_SUPABASE_URL ?? "https://lsagslbkliprespbyhts.supabase.co"}/functions/v1/public-api`;
 
@@ -127,26 +113,6 @@ function fmt(d: string | null, locale: string): string {
   return new Date(d).toLocaleDateString(locale, { day: "2-digit", month: "short", year: "numeric" });
 }
 
-function CopyButton({ text, label, size = "sm" as "sm" | "default" }: { text: string; label?: string; size?: "sm" | "default" }) {
-  const { t } = useLanguage();
-  const [done, setDone] = useState(false);
-  return (
-    <Button
-      type="button" variant="outline" size={size} className="gap-1.5"
-      onClick={async () => {
-        try {
-          await navigator.clipboard.writeText(text);
-          setDone(true); toast.success(t("apiKeys.copied"));
-          setTimeout(() => setDone(false), 2000);
-        } catch { toast.error(t("apiKeys.copyFailed")); }
-      }}
-    >
-      {done ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-      {label ?? t("common.copy")}
-    </Button>
-  );
-}
-
 const AdminApiKeys = () => {
   const qc = useQueryClient();
   const f = useFormato();
@@ -158,6 +124,7 @@ const AdminApiKeys = () => {
   const [revokeTarget, setRevokeTarget] = useState<ApiKey | null>(null);
   const [docsOpen, setDocsOpen] = useState(false);
   const [freshKey, setFreshKey] = useState<string | null>(null);
+  const [webhookDe, setWebhookDe] = useState<string | null>(null); // id de la key
 
   // Form
   const [name, setName] = useState("");
@@ -329,29 +296,34 @@ const AdminApiKeys = () => {
                   <th className="px-4 py-3 font-medium">{t("apiKeys.col.ipWhitelist")}</th>
                   <th className="px-4 py-3 font-medium">{t("apiKeys.col.expires")}</th>
                   <th className="px-4 py-3 font-medium">{t("common.status")}</th>
+                  <th className="px-4 py-3 font-medium">{t("apiKeys.col.webhook")}</th>
                   <th className="px-4 py-3 text-right font-medium">{t("common.actions")}</th>
                 </tr>
               </thead>
               <tbody>
                 {keys.map((k) => (
                   <tr key={k.id} className={`border-b border-border/40 ${k.status !== "active" ? "opacity-60" : ""}`}>
-                    <td className="px-4 py-3 font-medium">
-                      {k.name}
-                      <div className="mt-0.5 flex flex-wrap gap-1">
-                        {k.scopes.map((s) => <Badge key={s} variant="secondary" className="font-normal text-[10px]">{s}</Badge>)}
+                    <td data-label={t("common.name")} className="px-4 py-3 font-medium">
+                      {/* Un solo hijo: en el teléfono (tabla-movil) la celda es flex y el
+                          nombre y sus scopes se repartían a lo ancho. */}
+                      <div>
+                        {k.name}
+                        <div className="mt-0.5 flex flex-wrap justify-end gap-1 sm:justify-start">
+                          {k.scopes.map((s) => <Badge key={s} variant="secondary" className="font-normal text-[10px]">{s}</Badge>)}
+                        </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3"><code className="rounded bg-muted px-1.5 py-0.5 text-xs">{k.key_prefix}…{k.last_four ?? ""}</code></td>
-                    <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">{fmt(k.created_at, f.intl("es-CO"))}</td>
-                    <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">{k.created_by_email ?? "—"}</td>
-                    <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">{k.acts_as ? (k.acts_as.name ?? "—") : "—"}</td>
-                    <td className="px-4 py-3 text-muted-foreground">
+                    <td data-label={t("apiKeys.col.key")} className="px-4 py-3"><code className="rounded bg-muted px-1.5 py-0.5 text-xs">{k.key_prefix}…{k.last_four ?? ""}</code></td>
+                    <td data-label={t("apiKeys.col.created")} className="px-4 py-3 whitespace-nowrap text-muted-foreground">{fmt(k.created_at, f.intl("es-CO"))}</td>
+                    <td data-label={t("apiKeys.col.createdBy")} className="px-4 py-3 whitespace-nowrap text-muted-foreground">{k.created_by_email ?? "—"}</td>
+                    <td data-label={t("apiKeys.col.actsAs")} className="px-4 py-3 whitespace-nowrap text-muted-foreground">{k.acts_as ? (k.acts_as.name ?? "—") : "—"}</td>
+                    <td data-label={t("apiKeys.col.ipWhitelist")} className="px-4 py-3 text-muted-foreground">
                       {k.ip_whitelist?.length ? (
                         <span title={k.ip_whitelist.join(", ")}>{k.ip_whitelist.length} IP{k.ip_whitelist.length > 1 ? "s" : ""}</span>
                       ) : <span className="text-muted-foreground/70">{t("apiKeys.noRestriction")}</span>}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">{k.expires_at ? fmt(k.expires_at, f.intl("es-CO")) : t("apiKeys.never")}</td>
-                    <td className="px-4 py-3">
+                    <td data-label={t("apiKeys.col.expires")} className="px-4 py-3 whitespace-nowrap text-muted-foreground">{k.expires_at ? fmt(k.expires_at, f.intl("es-CO")) : t("apiKeys.never")}</td>
+                    <td data-label={t("common.status")} className="px-4 py-3">
                       {k.status === "active" && k.acts_as?.active === false && (
                         <Badge variant="outline" className="border-destructive/40 text-destructive"
                           title={t("apiKeys.status.personGoneHint")}>
@@ -367,6 +339,10 @@ const AdminApiKeys = () => {
                       )}
                       {k.status === "revoked" && <Badge variant="outline" className="border-destructive/40 text-destructive">{t("apiKeys.status.revoked")}</Badge>}
                       {k.status === "expired" && <Badge variant="outline" className="text-muted-foreground">{t("apiKeys.status.expired")}</Badge>}
+                    </td>
+                    <td data-label={t("apiKeys.col.webhook")} className="px-4 py-3">
+                      <CeldaWebhook llave={k} youId={data?.you?.id} desconocido={data?.webhooks_unknown === true}
+                        onAbrir={() => setWebhookDe(k.id)} />
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
@@ -392,6 +368,10 @@ const AdminApiKeys = () => {
           </div>
         </Card>
       )}
+
+      {/* Webhook de una key: registrar, estado y entregas */}
+      <DialogoWebhook llave={webhookDe ? keys.find((k) => k.id === webhookDe) ?? null : null}
+        youId={data?.you?.id} onCerrar={() => setWebhookDe(null)} />
 
       {/* Modal crear / editar / mostrar key */}
       <Dialog open={modalMode !== null} onOpenChange={(o) => { if (!o) closeModal(); }}>
@@ -615,6 +595,7 @@ const AdminApiKeys = () => {
               </div>
             </div>
             <p className="text-xs text-muted-foreground"><ConFormato texto={t("apiKeys.docs.pagination")} /></p>
+            <DocsWebhooks />
           </div>
           <DialogFooter><Button variant="outline" onClick={() => setDocsOpen(false)}>{t("common.close")}</Button></DialogFooter>
         </DialogContent>

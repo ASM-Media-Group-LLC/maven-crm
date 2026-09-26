@@ -126,8 +126,8 @@ export const apiKeys = {
   // Revocar
   "apiKeys.revokeDialog.title": { es: "¿Revocar “{name}”?", en: "Revoke “{name}”?" },
   "apiKeys.revokeDialog.body": {
-    es: "La key deja de funcionar inmediatamente y cualquier integración que la use empezará a recibir 401. No se puede deshacer.",
-    en: "The key stops working immediately and any integration using it will start getting 401. This can't be undone.",
+    es: "La key deja de funcionar inmediatamente y cualquier integración que la use empezará a recibir 401. Si tiene un webhook, también se detiene. No se puede deshacer.",
+    en: "The key stops working immediately and any integration using it will start getting 401. If it has a webhook, that stops too. This can't be undone.",
   },
 
   // Grupos y scopes (en español se usa el texto que manda el servidor; esto es para inglés)
@@ -233,8 +233,8 @@ export const apiKeys = {
     en: "The history, newest to oldest, with a cursor: pass next_cursor in the before parameter for the previous page, or use the after parameter to get what's new in order. Each message: sender, kind (text | image | gif | video | voice_note | audio | file | system), text, attachment (url, name, hosted_by, storage_path), reply_to_id, is_thread_reply, is_edited, is_deleted. A deleted message comes without text or attachment. Filters: limit (max 100), before | after, thread_root_id, include=rich (adds the formatted text).",
   },
   "apiKeys.ep.feed": {
-    es: "Lo nuevo en TODAS las conversaciones, en orden: así recibe mensajes una integración sin webhooks. Primer pedido con since (ISO, 72 h como máximo) o sin nada (últimos 15 min); después, siempre after=next_cursor. Si caught_up = true, esperá 30 s o más antes del próximo. Mira como mucho una hora por pedido. exclude_own=true saca lo que mandó la propia persona. Solo mensajes nuevos: ediciones y borrados se ven releyendo la conversación.",
-    en: "What's new across ALL conversations, in order: this is how an integration receives messages without webhooks. First request with since (ISO, 72 h at most) or nothing (last 15 min); after that, always after=next_cursor. If caught_up = true, wait 30 s or more before the next one. It looks at one hour per request at most. exclude_own=true drops what the person sent themselves. New messages only: edits and deletions show up when you re-read the conversation.",
+    es: "Lo nuevo en TODAS las conversaciones, en orden: así recibe mensajes una integración (con webhook, el aviso le dice cuándo leer; sin webhook, lee cada tanto). Primer pedido con since (ISO, 72 h como máximo) o sin nada (últimos 15 min); después, siempre after=next_cursor. Si caught_up = true, esperá 30 s o más antes del próximo. Mira como mucho una hora por pedido. exclude_own=true saca lo que mandó la propia persona. Solo mensajes nuevos: ediciones y borrados se ven releyendo la conversación.",
+    en: "What's new across ALL conversations, in order: this is how an integration receives messages (with a webhook, the notification tells it when to read; without one, it reads every so often). First request with since (ISO, 72 h at most) or nothing (last 15 min); after that, always after=next_cursor. If caught_up = true, wait 30 s or more before the next one. It looks at one hour per request at most. exclude_own=true drops what the person sent themselves. New messages only: edits and deletions show up when you re-read the conversation.",
   },
   "apiKeys.ep.creators": {
     es: "Creadoras + redes (IG, TikTok, X, OnlyFans, Telegram…). Filtros: status, limit, offset.",
@@ -276,4 +276,227 @@ export const apiKeys = {
     es: "Promoción diaria por creadora y red (promovió sí/no, historias). Filtros: from, to, creator_id, network.",
     en: "Daily promotion per creator and network (promoted yes/no, stories). Filters: from, to, creator_id, network.",
   },
+
+  // ── Webhooks del Messenger (columna, diálogo y referencia) ──
+  "apiKeys.col.webhook": { es: "Webhook", en: "Webhook" },
+  "apiKeys.webhook.none": { es: "Sin webhook", en: "No webhook" },
+  "apiKeys.webhook.register": { es: "Registrar", en: "Register" },
+  "apiKeys.webhook.unknown": { es: "No se pudo consultar", en: "Couldn't check" },
+  "apiKeys.webhook.unknownHint": {
+    es: "No se pudo saber si esta key tiene webhook. Recargá la página.",
+    en: "Couldn't tell whether this key has a webhook. Reload the page.",
+  },
+  "apiKeys.webhook.state.pending": { es: "Esperando la prueba", en: "Waiting for the test" },
+  "apiKeys.webhook.state.active": { es: "Activo", en: "Active" },
+  "apiKeys.webhook.state.failing": { es: "Activo · fallando", en: "Active · failing" },
+  "apiKeys.webhook.state.paused": { es: "Pausado", en: "Paused" },
+  "apiKeys.webhook.state.disabled": { es: "Detenido", en: "Stopped" },
+
+  "apiKeys.webhook.title": { es: "Webhook de “{name}”", en: "Webhook for “{name}”" },
+  "apiKeys.webhook.registerTitle": { es: "Registrar un webhook en “{name}”", en: "Register a webhook on “{name}”" },
+  "apiKeys.webhook.registerIntro": {
+    es: "Maven le avisa a tu servidor cada vez que hay mensajes nuevos que esta key puede leer. El aviso **no lleva contenido**: solo cuántos mensajes hay, en qué conversaciones y desde dónde leer. Tu servidor los lee con `GET /messenger/feed`, desde sus IPs fijas y con la key.",
+    en: "Maven notifies your server whenever there are new messages this key can read. The notification **carries no content**: only how many messages there are, in which conversations and where to read from. Your server reads them with `GET /messenger/feed`, from its fixed IPs and with the key.",
+  },
+  "apiKeys.webhook.url": { es: "URL de tu servidor", en: "Your server's URL" },
+  "apiKeys.webhook.urlPlaceholder": { es: "https://tu-servidor.com/maven/webhook", en: "https://your-server.com/maven/webhook" },
+  "apiKeys.webhook.urlHint": {
+    es: "Solo `https`, puerto 443, sin usuario ni `#`. No se puede editar: para cambiarla, borrá el webhook y registrá otro. Se trata como un secreto: después solo se muestra el dominio.",
+    en: "Only `https`, port 443, no username or `#`. It can't be edited: to change it, delete the webhook and register another one. It's treated as a secret: afterwards only the domain is shown.",
+  },
+  "apiKeys.webhook.excludeOwn": { es: "No avisar los mensajes que yo mando", en: "Don't notify the messages I send" },
+  "apiKeys.webhook.excludeOwnHint": {
+    es: "Marcado, solo avisa lo que te escriben otras personas. Desmarcado, también lo que mandás vos.",
+    en: "Checked, it only notifies what other people write to you. Unchecked, it also notifies what you send.",
+  },
+  "apiKeys.webhook.registerButton": { es: "Registrar webhook", en: "Register webhook" },
+  "apiKeys.webhook.onlyOwner": {
+    es: "Solo {name}, la persona de la key, puede registrar, probar o reanudar el webhook. Cualquier admin puede pausarlo, borrarlo y ver las entregas.",
+    en: "Only {name}, the key's person, can register, test or resume the webhook. Any admin can pause it, delete it and see the deliveries.",
+  },
+  "apiKeys.webhook.onlyOwnerNoName": {
+    es: "Solo la persona de la key puede registrar, probar o reanudar el webhook. Cualquier admin puede pausarlo, borrarlo y ver las entregas.",
+    en: "Only the key's person can register, test or resume the webhook. Any admin can pause it, delete it and see the deliveries.",
+  },
+
+  "apiKeys.webhook.secretTitle": { es: "Webhook registrado", en: "Webhook registered" },
+  "apiKeys.webhook.secretCopyNow": {
+    es: "Copiá el **secreto de firma** ahora y pasáselo al integrador: **no se vuelve a mostrar**. Con él verifica que cada aviso viene de Maven.",
+    en: "Copy the **signing secret** now and give it to the integrator: **it won't be shown again**. They use it to verify that each notification comes from Maven.",
+  },
+  "apiKeys.webhook.secretCopy": { es: "Copiar secreto", en: "Copy secret" },
+  "apiKeys.webhook.nextTest": {
+    es: "Para activarlo, mandá una prueba: Maven le manda a tu servidor un aviso firmado de tipo `webhook.test`, y tiene que contestar 2xx.",
+    en: "To activate it, send a test: Maven sends your server a signed `webhook.test` notification, and it has to answer 2xx.",
+  },
+  "apiKeys.webhook.sendTest": { es: "Enviar prueba", en: "Send test" },
+  "apiKeys.webhook.later": { es: "Después", en: "Later" },
+
+  "apiKeys.webhook.tab.status": { es: "Estado", en: "Status" },
+  "apiKeys.webhook.tab.deliveries": { es: "Entregas", en: "Deliveries" },
+  "apiKeys.webhook.detail.host": { es: "Dominio", en: "Domain" },
+  "apiKeys.webhook.detail.secret": { es: "Secreto", en: "Secret" },
+  "apiKeys.webhook.detail.own": { es: "Mensajes propios", en: "Own messages" },
+  "apiKeys.webhook.detail.ownExcluded": { es: "No se avisan", en: "Not notified" },
+  "apiKeys.webhook.detail.ownIncluded": { es: "Se avisan", en: "Notified" },
+  "apiKeys.webhook.detail.created": { es: "Registrado", en: "Registered" },
+  "apiKeys.webhook.detail.lastTest": { es: "Última prueba", en: "Last test" },
+  "apiKeys.webhook.detail.lastSuccess": { es: "Última entrega que llegó", en: "Last successful delivery" },
+  "apiKeys.webhook.detail.lastAttempt": { es: "Último intento", en: "Last attempt" },
+  "apiKeys.webhook.detail.failures": { es: "Fallos seguidos", en: "Failures in a row" },
+  "apiKeys.webhook.detail.failuresSince": { es: "{n}, desde el {when}", en: "{n}, since {when}" },
+  "apiKeys.webhook.detail.nextAttempt": { es: "Próximo intento", en: "Next attempt" },
+  "apiKeys.webhook.detail.pausedBy": { es: "Pausado por {name} el {when}", en: "Paused by {name} on {when}" },
+  "apiKeys.webhook.detail.pausedWhen": { es: "Pausado el {when}", en: "Paused on {when}" },
+  "apiKeys.webhook.detail.disabledOn": { es: "Detenido el {when}", en: "Stopped on {when}" },
+
+  "apiKeys.webhook.help.pending": {
+    es: "Todavía no está activo: mandá una prueba y que tu servidor la conteste con 2xx.",
+    en: "It isn't active yet: send a test and have your server answer it with 2xx.",
+  },
+  "apiKeys.webhook.help.active": {
+    es: "Maven revisa cada 15 segundos si hay mensajes nuevos y le avisa a tu servidor.",
+    en: "Maven checks every 15 seconds for new messages and notifies your server.",
+  },
+  "apiKeys.webhook.help.failing": {
+    es: "El servidor del integrador está fallando: Maven reintenta el mismo aviso con esperas cada vez más largas. Si falla 3 días seguidos, el webhook se detiene.",
+    en: "The integrator's server is failing: Maven retries the same notification with longer and longer waits. If it fails for 3 days in a row, the webhook stops.",
+  },
+  "apiKeys.webhook.help.paused": {
+    es: "Pausado: no sale ningún aviso. Al reanudar, Maven manda una prueba y arranca desde ese momento; lo de la pausa no se avisa, y el integrador lo lee del feed con su cursor.",
+    en: "Paused: no notification goes out. On resume, Maven sends a test and starts from that moment; what happened during the pause isn't notified, and the integrator reads it from the feed with its cursor.",
+  },
+  "apiKeys.webhook.reason.receiver_gone": {
+    es: "Tu servidor contestó 410: dice que esa URL ya no existe. Si la volviste a habilitar, reanudá.",
+    en: "Your server answered 410: it says that URL no longer exists. If you enabled it again, resume.",
+  },
+  "apiKeys.webhook.reason.receiver_failing": {
+    es: "Falló 3 días seguidos sin contestar 2xx. Cuando el servidor vuelva, reanudá.",
+    en: "It failed for 3 days in a row without answering 2xx. When the server is back, resume.",
+  },
+  "apiKeys.webhook.reason.key_revoked": {
+    es: "La key fue revocada. Este webhook no vuelve: creá una key nueva y registrá el webhook ahí.",
+    en: "The key was revoked. This webhook won't come back: create a new key and register the webhook there.",
+  },
+  "apiKeys.webhook.reason.key_expired": {
+    es: "La key venció. Creá una key nueva y registrá el webhook ahí.",
+    en: "The key expired. Create a new key and register the webhook there.",
+  },
+  "apiKeys.webhook.reason.scope_removed": {
+    es: "La key ya no tiene el permiso de Messenger. Creá una key nueva y registrá el webhook ahí.",
+    en: "The key no longer has the Messenger permission. Create a new key and register the webhook there.",
+  },
+  "apiKeys.webhook.reason.person_inactive": {
+    es: "La persona de la key fue dada de baja o ya no está en la agencia.",
+    en: "The key's person was offboarded or is no longer in the agency.",
+  },
+  "apiKeys.webhook.reason.multi_agency": {
+    es: "Hay más de una agencia en Maven: los webhooks quedan apagados hasta resolverlo.",
+    en: "There's more than one agency in Maven: webhooks stay off until that's resolved.",
+  },
+  "apiKeys.webhook.reason.config_error": {
+    es: "La URL ya no se acepta o hay un problema de configuración en Maven. Si reanudar no lo arregla, borralo y registralo de nuevo.",
+    en: "The URL is no longer allowed or there's a configuration problem in Maven. If resuming doesn't fix it, delete it and register it again.",
+  },
+  "apiKeys.webhook.reason.admin": { es: "Lo detuvo un administrador.", en: "An administrator stopped it." },
+  "apiKeys.webhook.reason.other": { es: "Está detenido.", en: "It's stopped." },
+
+  "apiKeys.webhook.err.http": { es: "El servidor contestó {code}", en: "The server answered {code}" },
+  "apiKeys.webhook.err.dns": { es: "No se encontró el servidor (DNS)", en: "Couldn't find the server (DNS)" },
+  "apiKeys.webhook.err.direccion_bloqueada": { es: "El nombre apunta a una dirección privada", en: "The name points to a private address" },
+  "apiKeys.webhook.err.conexion": { es: "No se pudo conectar", en: "Couldn't connect" },
+  "apiKeys.webhook.err.tls": { es: "Certificado HTTPS inválido", en: "Invalid HTTPS certificate" },
+  "apiKeys.webhook.err.plazo": { es: "No contestó a tiempo", en: "Didn't answer in time" },
+  "apiKeys.webhook.err.cortado": { es: "Se cortó después de mandar (puede haber llegado)", en: "Cut off after sending (it may have arrived)" },
+  "apiKeys.webhook.err.respuesta_invalida": { es: "La respuesta no se pudo leer", en: "The response couldn't be read" },
+  "apiKeys.webhook.err.host_prohibido": { es: "La URL ya no se acepta", en: "The URL is no longer allowed" },
+  "apiKeys.webhook.err.maven_secreto": {
+    es: "El secreto no abre con la clave del servidor: avisale a quien administra Maven",
+    en: "The secret can't be opened with the server's key: tell whoever runs Maven",
+  },
+  "apiKeys.webhook.err.maven_sesion": {
+    es: "Maven no pudo leer como la persona de la key; reintenta en 5 min",
+    en: "Maven couldn't read as the key's person; retrying in 5 min",
+  },
+  "apiKeys.webhook.err.maven": {
+    es: "Falla de Maven, no del integrador; reintenta en 5 min",
+    en: "A Maven-side failure, not the integrator's; retrying in 5 min",
+  },
+
+  "apiKeys.webhook.pause": { es: "Pausar", en: "Pause" },
+  "apiKeys.webhook.resume": { es: "Reanudar", en: "Resume" },
+  "apiKeys.webhook.delete": { es: "Borrar", en: "Delete" },
+  "apiKeys.webhook.deleteTitle": { es: "¿Borrar el webhook de “{name}”?", en: "Delete the webhook for “{name}”?" },
+  "apiKeys.webhook.deleteBody": {
+    es: "Maven deja de avisarle a {host} y el secreto deja de valer. Para volver hay que registrar uno nuevo, con otro secreto.",
+    en: "Maven stops notifying {host} and the secret stops being valid. To come back you have to register a new one, with a new secret.",
+  },
+  "apiKeys.webhook.toast.registered": { es: "Webhook registrado", en: "Webhook registered" },
+  "apiKeys.webhook.toast.paused": { es: "Webhook pausado", en: "Webhook paused" },
+  "apiKeys.webhook.toast.deleted": { es: "Webhook borrado", en: "Webhook deleted" },
+  "apiKeys.webhook.toast.activated": { es: "Webhook activado", en: "Webhook activated" },
+
+  "apiKeys.webhook.test.delivered": { es: "Llegó", en: "Delivered" },
+  "apiKeys.webhook.test.notDelivered": { es: "No llegó", en: "Not delivered" },
+  "apiKeys.webhook.test.activated": {
+    es: "Webhook activado: desde ahora avisa los mensajes nuevos.",
+    en: "Webhook activated: from now on it notifies new messages.",
+  },
+  "apiKeys.webhook.test.uncertain": {
+    es: "Se cortó después de mandar: puede haber llegado igual.",
+    en: "It was cut off after sending: it may have arrived anyway.",
+  },
+
+  "apiKeys.webhook.deliveries.onlyFailed": { es: "Solo las que no se entregaron", en: "Only the ones not delivered" },
+  "apiKeys.webhook.deliveries.empty": { es: "Todavía no hay entregas.", en: "No deliveries yet." },
+  "apiKeys.webhook.deliveries.loadError": { es: "No se pudieron cargar las entregas.", en: "Couldn't load the deliveries." },
+  "apiKeys.webhook.deliveries.retention": {
+    es: "Se guardan 14 días. Maven nunca guarda lo que contesta tu servidor, solo el código.",
+    en: "They're kept for 14 days. Maven never stores what your server answers, only the code.",
+  },
+  "apiKeys.webhook.deliveries.col.when": { es: "Cuándo", en: "When" },
+  "apiKeys.webhook.deliveries.col.type": { es: "Tipo", en: "Type" },
+  "apiKeys.webhook.deliveries.col.attempts": { es: "Intentos", en: "Attempts" },
+  "apiKeys.webhook.deliveries.col.result": { es: "Resultado", en: "Result" },
+  "apiKeys.webhook.deliveries.type.bellCount": { es: "Aviso · {n} mensajes", en: "Notification · {n} messages" },
+  "apiKeys.webhook.deliveries.type.bellOne": { es: "Aviso · 1 mensaje", en: "Notification · 1 message" },
+  "apiKeys.webhook.deliveries.lastAt": { es: "el último: {when}", en: "last one: {when}" },
+  "apiKeys.webhook.deliveries.type.test": { es: "Prueba", en: "Test" },
+  "apiKeys.webhook.deliveries.delivered": { es: "Entregado", en: "Delivered" },
+  "apiKeys.webhook.deliveries.pending": { es: "Pendiente", en: "Pending" },
+  "apiKeys.webhook.deliveries.retrying": { es: "Reintenta {when}", en: "Retrying {when}" },
+  "apiKeys.webhook.deliveries.dropped": { es: "Descartado: {reason}", en: "Dropped: {reason}" },
+  "apiKeys.webhook.drop.receiver_gone": { es: "el servidor dijo 410", en: "the server said 410" },
+  "apiKeys.webhook.drop.receiver_failing": { es: "3 días fallando", en: "3 days failing" },
+  "apiKeys.webhook.drop.endpoint_paused": { es: "se pausó", en: "it was paused" },
+  "apiKeys.webhook.drop.endpoint_disabled": { es: "se detuvo", en: "it was stopped" },
+  "apiKeys.webhook.drop.test_failed": { es: "la prueba no llegó", en: "the test wasn't delivered" },
+  "apiKeys.webhook.drop.other": { es: "otro motivo", en: "another reason" },
+
+  "apiKeys.docs.webhooks": { es: "Webhooks (Messenger)", en: "Webhooks (Messenger)" },
+  "apiKeys.docs.webhooks.what": {
+    es: "Con una key de Messenger se puede registrar un webhook (columna **Webhook** de la tabla). Maven revisa cada 15 s y, si hay mensajes nuevos, le manda a tu URL un **aviso firmado sin contenido**: cuántos, en qué conversaciones y los cursores. El contenido se lee con `GET /messenger/feed`.",
+    en: "A Messenger key can have a webhook (the table's **Webhook** column). Maven checks every 15 s and, if there are new messages, sends your URL a **signed notification with no content**: how many, in which conversations and the cursors. The content is read with `GET /messenger/feed`.",
+  },
+  "apiKeys.docs.webhooks.signature": {
+    es: "Cada aviso lleva `webhook-id`, `webhook-timestamp` y `webhook-signature` (Standard Webhooks: HMAC-SHA256 con el secreto `whsec_…`). Verificá la firma sobre el cuerpo **tal cual llega**, compará en tiempo constante y rechazá timestamps de más de 5 minutos. Las librerías `standardwebhooks` (Node, Python, Go y otras) lo hacen solas.",
+    en: "Each notification carries `webhook-id`, `webhook-timestamp` and `webhook-signature` (Standard Webhooks: HMAC-SHA256 with the `whsec_…` secret). Verify the signature over the body **exactly as received**, compare in constant time and reject timestamps more than 5 minutes off. The `standardwebhooks` libraries (Node, Python, Go and others) do it for you.",
+  },
+  "apiKeys.docs.webhooks.receiver": {
+    es: "Tu servidor contesta **2xx en menos de 5 s** y hace el trabajo después: lee `GET /messenger/feed?after=<su último next_cursor>` (la primera vez, `data.after` del aviso) con el mismo `exclude_own` del aviso, sigue `next_cursor` hasta `caught_up = true` y guarda el cursor. Deduplica por `message.id` e ignora tipos de evento que no conozca.",
+    en: "Your server answers **2xx within 5 s** and does the work afterwards: it reads `GET /messenger/feed?after=<its last next_cursor>` (the first time, the notification's `data.after`) with the notification's same `exclude_own`, follows `next_cursor` until `caught_up = true` and saves the cursor. It deduplicates by `message.id` and ignores event types it doesn't know.",
+  },
+  "apiKeys.docs.webhooks.guarantees": {
+    es: "Garantías: **al menos una vez** (un aviso puede repetirse, con el mismo `webhook-id`), sin orden entre avisos (el feed sí está ordenado) y un solo aviso en vuelo por webhook. Si falla, se reintenta el mismo con esperas crecientes (30 s, 2 min, 10 min… hasta 8 h); si falla **3 días seguidos** o contesta **410**, el webhook se detiene. Un 3xx cuenta como fallo: no se siguen redirecciones.",
+    en: "Guarantees: **at least once** (a notification may repeat, with the same `webhook-id`), no order between notifications (the feed is ordered) and only one notification in flight per webhook. If it fails, the same one is retried with growing waits (30 s, 2 min, 10 min… up to 8 h); if it fails **3 days in a row** or answers **410**, the webhook stops. A 3xx counts as a failure: redirects aren't followed.",
+  },
+  "apiKeys.docs.webhooks.fallback": {
+    es: "**Obligatorio:** además del webhook, leé el feed con tu propio cursor **cada 15 minutos o menos**. Así un aviso perdido, una pausa o un webhook detenido solo demoran mensajes, nunca los pierden (son 4 pedidos por hora de los 1000 del límite).",
+    en: "**Required:** besides the webhook, read the feed with your own cursor **every 15 minutes or less**. That way a lost notification, a pause or a stopped webhook only delays messages, never loses them (it's 4 requests per hour out of the 1000 limit).",
+  },
+  "apiKeys.docs.webhooks.limits": {
+    es: "Maven no tiene IPs de salida fijas: la firma es la prueba de que el aviso viene de Maven. El webhook deja de funcionar cuando la key vence (90 días como máximo): renovar es crear una key nueva y registrar el webhook de nuevo.",
+    en: "Maven has no fixed outgoing IPs: the signature is the proof that the notification comes from Maven. The webhook stops working when the key expires (90 days at most): renewing means creating a new key and registering the webhook again.",
+  },
+  "apiKeys.docs.webhooks.example": { es: "Ejemplo de aviso", en: "Example notification" },
 } as const satisfies Record<string, { es: string; en: string }>;
