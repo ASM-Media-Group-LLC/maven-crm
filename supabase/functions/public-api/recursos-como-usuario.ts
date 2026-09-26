@@ -125,6 +125,10 @@ const COLS_MI_PARTICIPACION = "conversation_id, role, joined_at, last_read_at, i
 /** Nadie tiene hoy más de 71 conversaciones; pasado esto se corta en vez de armar
  *  una bandeja carísima. */
 const TOPE_CONVERSACIONES = 500;
+/** El detalle del 503 cuando se pasa el tope. Exportado para que el despachador de
+ *  webhooks lo reconozca como una falla PERMANENTE (sin compararlo con un texto
+ *  copiado): con más conversaciones que esto, reintentar no lo arregla. */
+export const DETALLE_TOPE_CONVERSACIONES = `más de ${TOPE_CONVERSACIONES} conversaciones`;
 /** Grupos: tope de miembros que se devuelven (el mayor tiene 40). */
 const TOPE_MIEMBROS = 200;
 /** El feed mira como mucho esta ventana por pedido, por viejo que sea el cursor. */
@@ -175,7 +179,7 @@ async function misParticipaciones(yo: SupabaseClient, ctx: Contexto) {
     .eq("user_id", ctx.actuaComo).limit(TOPE_CONVERSACIONES + 1);
   if (error) return { error: `participaciones: ${error.message}` };
   const filas = (data ?? []) as MiParticipacion[];
-  if (filas.length > TOPE_CONVERSACIONES) return { error: `más de ${TOPE_CONVERSACIONES} conversaciones` };
+  if (filas.length > TOPE_CONVERSACIONES) return { error: DETALLE_TOPE_CONVERSACIONES };
   return { filas };
 }
 
