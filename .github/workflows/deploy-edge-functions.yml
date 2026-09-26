@@ -146,14 +146,47 @@ jobs:
             exit 0
           fi
           echo "Funciones a deployar:$FUNCS"
+
+          # ⚠️ REINTENTO ante fallas pasajeras del runner. El 24/09 (PR #1912)
+          # `manage-api-keys` murió con "failed to bundle function: exit 125":
+          # Docker no pudo arrancar el contenedor que empaqueta la función. No
+          # era el código — la función siguiente bajó la misma imagen y salió
+          # bien en la misma corrida —, pero el deploy quedó rojo y hubo que
+          # re-ejecutarlo a mano, con prod dos minutos a medio desplegar.
+          #
+          # Se reintenta CUALQUIER falla, no solo el 125: una caída de la API de
+          # Supabase también es pasajera, y un error de código de verdad falla
+          # igual los tres intentos y se reporta como antes. Redesplegar la
+          # misma función es idempotente.
+          #
+          # Si sale en el 2º o 3º intento queda un ::warning:: en el resumen:
+          # la inestabilidad tiene que VERSE aunque el deploy termine verde.
+          deploy_con_reintento() {
+            local fn="$1" intento espera
+            for intento in 1 2 3; do
+              if supabase functions deploy "$fn" --project-ref "$PROJECT_REF"; then
+                if [ "$intento" -gt 1 ]; then
+                  echo "::warning::$fn se desplegó en el intento $intento (hubo una falla pasajera antes)"
+                fi
+                return 0
+              fi
+              if [ "$intento" -lt 3 ]; then
+                espera=$((intento * 15))
+                echo "::warning::Falló el deploy de $fn (intento $intento de 3) — reintento en ${espera}s"
+                sleep "$espera"
+              fi
+            done
+            return 1
+          }
+
           FAILED=""
           for fn in $FUNCS; do
             if [ ! -f "supabase/functions/$fn/index.ts" ]; then
               echo "skip $fn (sin supabase/functions/$fn/index.ts)"; continue
             fi
             echo "== Deploy $fn =="
-            if ! supabase functions deploy "$fn" --project-ref "$PROJECT_REF"; then
-              echo "::error::Falló el deploy de $fn"
+            if ! deploy_con_reintento "$fn"; then
+              echo "::error::Falló el deploy de $fn tras 3 intentos"
               FAILED="$FAILED $fn"
             fi
           done
