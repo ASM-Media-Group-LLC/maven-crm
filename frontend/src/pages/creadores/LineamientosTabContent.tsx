@@ -28,6 +28,8 @@ import { toast } from "sonner";
 import type { Tables } from "@/integrations/supabase/types";
 import { CATEGORIES } from "./lineamientos/categoriesConfig";
 import GuidelineItemRow from "./lineamientos/GuidelineItemRow";
+import type { TranslationKey } from "@/lib/i18n";
+import { useLanguage } from "@/hooks/useLanguage";
 
 type Guideline = Tables<"creator_guidelines">;
 
@@ -45,7 +47,23 @@ interface FormData {
 
 const emptyForm: FormData = { title: "", guideline_type: "", content: "" };
 
+// El nombre que se MUESTRA de una categoría guardada (guideline_type). Lo que no
+// está en el catálogo (categorías creadas a mano, slugs viejos) se muestra tal cual.
+const categoriaVisible = (t: (k: TranslationKey) => string, guardada: string) => {
+  const cat = CATEGORIES.find((c) => c.category === guardada);
+  return cat ? t(cat.label) : guardada;
+};
+
+// Igual con el título: el de un ítem del catálogo se muestra con su etiqueta
+// (form.title sigue siendo el título guardado, en español); lo escrito a mano,
+// tal cual.
+const tituloVisible = (t: (k: TranslationKey) => string, categoria: string, titulo: string) => {
+  const item = CATEGORIES.find((c) => c.category === categoria)?.items.find((i) => i.title === titulo);
+  return item ? t(item.label) : titulo;
+};
+
 const LineamientosTabContent = ({ creatorId }: Props) => {
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
   const queryKey = ["creator_guidelines", creatorId];
 
@@ -113,10 +131,10 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey });
-      toast.success(editingId ? "Lineamiento actualizado" : "Lineamiento creado");
+      toast.success(editingId ? t("creadores.guide.updated") : t("creadores.guide.created"));
       closeModal();
     },
-    onError: () => toast.error("Error al guardar lineamiento"),
+    onError: () => toast.error(t("creadores.guide.saveError")),
   });
 
   const deleteMutation = useMutation({
@@ -126,10 +144,10 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey });
-      toast.success("Lineamiento eliminado");
+      toast.success(t("creadores.guide.deleted"));
       setDeleteId(null);
     },
-    onError: () => toast.error("Error al eliminar"),
+    onError: () => toast.error(t("common.errorDeleting")),
   });
 
   // --- Handlers ---
@@ -166,7 +184,7 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey });
-          toast.success("Lineamiento creado");
+          toast.success(t("creadores.guide.created"));
           if (keepOpen) {
             resetInlineForm();
           } else {
@@ -175,7 +193,7 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
           }
         },
         onError: () => {
-          toast.error("Error al guardar lineamiento");
+          toast.error(t("creadores.guide.saveError"));
         },
       }
     );
@@ -195,7 +213,7 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
 
   const handleSubmit = () => {
     if (!form.content.trim()) {
-      toast.error("Escribe el contenido del lineamiento");
+      toast.error(t("creadores.guide.contentRequired"));
       return;
     }
     upsertMutation.mutate({ ...form, id: editingId ?? undefined });
@@ -203,7 +221,7 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
 
   const handleCreateInlineCategory = () => {
     if (!inlineTitle.trim()) {
-      toast.error("Escribe el nombre de la categoría");
+      toast.error(t("creadores.guide.categoryNameRequired"));
       return;
     }
     upsertMutation.mutate(
@@ -215,7 +233,7 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey });
-          toast.success("Lineamiento creado");
+          toast.success(t("creadores.guide.created"));
           setInlineFormCategory(null);
           setInlineTitle("");
           setInlineDescription("");
@@ -236,7 +254,7 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
   // --- Render ---
   if (isLoading) {
     return (
-      <div className="py-12 text-center text-sm text-muted-foreground">Cargando lineamientos…</div>
+      <div className="py-12 text-center text-sm text-muted-foreground">{t("creadores.guide.loading")}</div>
     );
   }
 
@@ -249,8 +267,8 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
             <ClipboardList className="h-5 w-5 text-muted-foreground" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold leading-tight">Lineamientos Operativos</h3>
-            <p className="text-xs text-muted-foreground">{guidelines.length} registrados</p>
+            <h3 className="text-sm font-semibold leading-tight">{t("creadores.guide.title")}</h3>
+            <p className="text-xs text-muted-foreground">{t("creadores.guide.countRegistered", { n: guidelines.length })}</p>
           </div>
         </div>
         <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1">
@@ -261,7 +279,7 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
             onClick={() => { setShowList((v) => !v); setShowCategories(false); }}
           >
             <Eye className="h-4 w-4 mr-1" />
-            Ver
+            {t("common.view")}
           </Button>
           <Button
             variant={showCategories ? "secondary" : "ghost"}
@@ -269,7 +287,7 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
             onClick={() => { setShowCategories((v) => !v); setShowList(false); }}
           >
             <ClipboardList className="h-4 w-4 mr-1" />
-            Agregar
+            {t("common.add")}
           </Button>
         </div>
       </div>
@@ -281,7 +299,7 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
             <div key={cat.category}>
               <div className="flex items-center justify-between mb-2">
                 <h4 className="text-xs font-semibold text-muted-foreground">
-                  {cat.category}
+                  {t(cat.label)}
                 </h4>
                 <Button
                   variant="ghost"
@@ -294,7 +312,7 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
                   }}
                 >
                   <Plus className="h-3.5 w-3.5 mr-1" />
-                  Nueva categoría
+                  {t("creadores.guide.newCategory")}
                 </Button>
               </div>
               {inlineFormCategory === cat.category && (
@@ -302,19 +320,19 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
                   <Input
                     value={inlineTitle}
                     onChange={(e) => setInlineTitle(e.target.value)}
-                    placeholder="Nombre de la categoría (ej: Reglas de Video)"
+                    placeholder={t("creadores.guide.categoryNamePh")}
                   />
                   <Input
                     value={inlineDescription}
                     onChange={(e) => setInlineDescription(e.target.value)}
-                    placeholder="Descripción breve (opcional)"
+                    placeholder={t("creadores.guide.shortDescPh")}
                   />
                   <div className="flex justify-end gap-2">
                     <Button variant="ghost" size="sm" onClick={() => setInlineFormCategory(null)}>
-                      Cancelar
+                      {t("common.cancel")}
                     </Button>
                     <Button size="sm" onClick={handleCreateInlineCategory} disabled={upsertMutation.isPending || !inlineTitle.trim()}>
-                      {upsertMutation.isPending ? "Creando…" : "Crear categoría"}
+                      {upsertMutation.isPending ? t("creadores.guide.creating") : t("creadores.guide.createCategory")}
                     </Button>
                   </div>
                 </div>
@@ -347,7 +365,7 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
                       onInlineNoteChange={setInlineAddNote}
                       onInlineSubmit={() => handleInlineAddSubmit(false)}
                       onInlineSubmitAndAnother={() => handleInlineAddSubmit(true)}
-                      onInlineCancel={() => { setInlineAddingKey(null); resetInlineForm(); toast("Edición cancelada"); }}
+                      onInlineCancel={() => { setInlineAddingKey(null); resetInlineForm(); toast(t("creadores.editCancelled")); }}
                       isSaving={upsertMutation.isPending}
                     />
                   );
@@ -386,7 +404,7 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5">
                     <span className="text-xs font-medium text-muted-foreground">
-                      {g.guideline_type}
+                      {categoriaVisible(t, g.guideline_type)}
                     </span>
                     <span className="text-xs text-muted-foreground">·</span>
                     <span className="text-sm font-medium">{g.title}</span>
@@ -404,11 +422,11 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
       {guidelines.length === 0 && !showCategories && (
         <div className="flex flex-col items-center justify-center rounded-lg bg-muted/50 py-16 px-6">
           <ClipboardList className="h-12 w-12 text-muted-foreground mb-4" />
-          <h4 className="text-base font-semibold mb-1">Sin lineamientos</h4>
-          <p className="text-sm text-muted-foreground mb-5">Documenta como manejar esta cuenta</p>
+          <h4 className="text-base font-semibold mb-1">{t("creadores.guide.empty")}</h4>
+          <p className="text-sm text-muted-foreground mb-5">{t("creadores.guide.emptyDesc")}</p>
           <Button variant="outline" size="sm" onClick={() => setShowCategories(true)}>
             <Plus className="h-4 w-4 mr-1" />
-            Agregar
+            {t("common.add")}
           </Button>
         </div>
       )}
@@ -417,32 +435,32 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
       <Dialog open={modalOpen} onOpenChange={(o) => !o && closeModal()}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{editingId ? "Editar Lineamiento" : "Nuevo Lineamiento"}</DialogTitle>
+            <DialogTitle>{editingId ? t("creadores.guide.editTitle") : t("creadores.guide.newTitle")}</DialogTitle>
             <DialogDescription>
               {form.guideline_type && form.title
-                ? `${form.guideline_type} · ${form.title}`
+                ? `${categoriaVisible(t, form.guideline_type)} · ${tituloVisible(t, form.guideline_type, form.title)}`
                 : editingId
-                  ? "Modifica el contenido y guarda los cambios."
-                  : "Completa el contenido del lineamiento."}
+                  ? t("creadores.guide.editDesc")
+                  : t("creadores.guide.newDesc")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <Label>Contenido</Label>
+              <Label>{t("creadores.guide.content")}</Label>
               <Textarea
                 value={form.content}
                 onChange={(e) => setForm((f) => ({ ...f, content: e.target.value }))}
-                placeholder="Describe el lineamiento…"
+                placeholder={t("creadores.guide.contentPh")}
                 rows={6}
               />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={closeModal}>
-              Cancelar
+              {t("common.cancel")}
             </Button>
             <Button onClick={handleSubmit} disabled={upsertMutation.isPending}>
-              {upsertMutation.isPending ? "Guardando…" : "Guardar"}
+              {upsertMutation.isPending ? t("creadores.savingEllipsis") : t("common.save")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -452,8 +470,8 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
       <AlertDialog open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar lineamiento?</AlertDialogTitle>
-            <AlertDialogDescription>Esta acción no se puede deshacer.</AlertDialogDescription>
+            <AlertDialogTitle>{t("creadores.guide.deleteQ")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("common.cannotBeUndone")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel />
@@ -461,7 +479,7 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
               onClick={() => deleteId && deleteMutation.mutate(deleteId)}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Eliminar
+              {t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

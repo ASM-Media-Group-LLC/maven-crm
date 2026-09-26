@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import CreadoresSubtabs from "./CreadoresSubtabs";
 import { PageHeader } from "@/components/ui/page-header";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // Header compartido por las 5 páginas de /creadores/* — título fijo y
 // subtabs en posición constante entre rutas. Cada página puede pasar un
@@ -10,9 +11,11 @@ interface Props {
   action?: ReactNode;
 }
 
-const CreadoresHeader = ({ action }: Props) => (
+const CreadoresHeader = ({ action }: Props) => {
+  const { t } = useLanguage();
+  return (
   <header className="bg-background/30 backdrop-blur-xl px-4 pt-6 pb-4 border-b border-white/10 shrink-0 sm:px-6">
-    <PageHeader className="mb-4" title="Dashboard de Creadores" />
+    <PageHeader className="mb-4" title={t("creadores.header.title")} />
     {/* En el teléfono los subtabs ocupan el ancho (con scroll fino) y la acción
         baja a otra fila: antes la fila no envolvía y el botón quedaba fuera de
         la pantalla (Jhon, iPhone, 07/09/2026). */}
@@ -21,6 +24,7 @@ const CreadoresHeader = ({ action }: Props) => (
       {action && <div className="flex w-full justify-end sm:w-auto">{action}</div>}
     </div>
   </header>
-);
+  );
+};
 
 export default CreadoresHeader;

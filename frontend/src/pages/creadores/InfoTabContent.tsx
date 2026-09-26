@@ -22,14 +22,8 @@ import { ManagerSelect, managerAssignmentPatch, useManagerName } from "./Manager
 import { useModelCategories } from "@/hooks/useModelCategories";
 import { useFormato } from "@/hooks/useFormato";
 import { ExternalLink } from "lucide-react";
-
-const statusLabel: Record<string, string> = {
-  active: "Activa",
-  onboarding: "Onboarding",
-  leaving: "Retiro",
-  terminated: "Terminada",
-  paused: "Pausada",
-};
+import { etiquetaEstado } from "./etiquetasCreadora";
+import { useLanguage } from "@/hooks/useLanguage";
 
 const statusVariant: Record<string, "success-soft" | "primary-soft" | "warning-soft" | "destructive-soft" | "secondary-soft"> = {
   active: "success-soft",
@@ -108,6 +102,7 @@ const EditField = ({ label, children }: { label: string; children: React.ReactNo
 
 const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
   const f = useFormato();
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
   const c = creator;
   const biz = c.creator_business;
@@ -210,18 +205,18 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
   return (
     <>
       <div className="flex items-center justify-between mt-4 mb-2">
-        <h2 className="text-lg font-semibold">Información General</h2>
+        <h2 className="text-lg font-semibold">{t("creadores.info.title")}</h2>
         {!isEditing ? (
           <Button variant="outline" size="sm" className="gap-1.5" onClick={startEditing}>
-            <Edit className="h-3.5 w-3.5" /> Editar
+            <Edit className="h-3.5 w-3.5" /> {t("common.edit")}
           </Button>
         ) : (
           <div className="flex gap-2">
             <Button variant="ghost" size="sm" onClick={cancelEditing} disabled={saving}>
-              <X className="h-3.5 w-3.5 mr-1" /> Cancelar
+              <X className="h-3.5 w-3.5 mr-1" /> {t("common.cancel")}
             </Button>
             <Button size="sm" className="gap-1.5" onClick={handleSave} disabled={saving}>
-              <Save className="h-3.5 w-3.5" /> {saving ? "Guardando…" : "Guardar"}
+              <Save className="h-3.5 w-3.5" /> {saving ? t("creadores.savingEllipsis") : t("common.save")}
             </Button>
           </div>
         )}
@@ -230,9 +225,9 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-1 rounded-xl border border-white/10 bg-white/5 p-5">
         {/* Agencia Asignada */}
         {isEditing ? (
-          <EditField label="Agencia Asignada">
+          <EditField label={t("creadores.info.agency")}>
             <Select value={editData.assigned_agency} onValueChange={(v) => updateField("assigned_agency", v)}>
-              <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+              <SelectTrigger className="h-9 text-sm"><SelectValue placeholder={t("common.select")} /></SelectTrigger>
               <SelectContent>
                 {/* Un valor guardado fuera de la lista fija sigue visible/elegible. */}
                 {(editData.assigned_agency && !AGENCY_OPTIONS.includes(editData.assigned_agency)
@@ -243,7 +238,7 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
             </Select>
           </EditField>
         ) : (
-          <InfoField label="Agencia Asignada" value={
+          <InfoField label={t("creadores.info.agency")} value={
             ((biz as any)?.company?.name || biz?.assigned_agency) ? (
               <span className="text-primary cursor-pointer hover:underline">{(biz as any)?.company?.name ?? biz?.assigned_agency}</span>
             ) : null
@@ -252,29 +247,29 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
 
         {/* Categoría */}
         {isEditing ? (
-          <EditField label="Categoría">
+          <EditField label={t("common.category")}>
             <Select value={editData.category} onValueChange={(v) => updateField("category", v)}>
-              <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+              <SelectTrigger className="h-9 text-sm"><SelectValue placeholder={t("common.select")} /></SelectTrigger>
               <SelectContent>
                 {categoryOptions.map((cat) => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
               </SelectContent>
             </Select>
           </EditField>
         ) : (
-          <InfoField label="Categoría" value={c.category} />
+          <InfoField label={t("common.category")} value={c.category} />
         )}
 
         {/* Estado (read-only always) */}
-        <InfoField label="Estado" value={
+        <InfoField label={t("common.status")} value={
           c.status ? (
             <Badge variant={statusVariant[c.status] ?? "secondary-soft"} className="font-normal">
-              {statusLabel[c.status] ?? c.status}
+              {etiquetaEstado(t, c.status)}
             </Badge>
           ) : null
         } />
 
         {/* Fecha de Registro (read-only always) */}
-        <InfoField label="Fecha de Registro" value={
+        <InfoField label={t("creadores.info.registrationDate")} value={
           c.registration_date ? format(new Date(c.registration_date), f.idioma === "en" ? "MMMM dd, yyyy" : "dd 'de' MMMM 'de' yyyy", { locale: f.fechas }) : null
         } />
 
@@ -294,16 +289,16 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
 
         {/* País */}
         {isEditing ? (
-          <EditField label="País">
+          <EditField label={t("common.country")}>
             <Select value={editData.country} onValueChange={(v) => updateField("country", v)}>
-              <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+              <SelectTrigger className="h-9 text-sm"><SelectValue placeholder={t("common.select")} /></SelectTrigger>
               <SelectContent>
                 {countryOptions.map((co) => <SelectItem key={co} value={co}>{co}</SelectItem>)}
               </SelectContent>
             </Select>
           </EditField>
         ) : (
-          <InfoField label="País" value={
+          <InfoField label={t("common.country")} value={
             c.country ? (
               <span>{flag && <span className="mr-1">{flag}</span>}{c.country}</span>
             ) : null
@@ -312,27 +307,27 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
 
         {/* Ciudad */}
         {isEditing ? (
-          <EditField label="Ciudad">
-            <Input className="h-9 text-sm" value={editData.city} onChange={(e) => updateField("city", e.target.value)} placeholder="Ciudad" />
+          <EditField label={t("common.city")}>
+            <Input className="h-9 text-sm" value={editData.city} onChange={(e) => updateField("city", e.target.value)} placeholder={t("common.city")} />
           </EditField>
         ) : (
-          <InfoField label="Ciudad" value={c.city} />
+          <InfoField label={t("common.city")} value={c.city} />
         )}
 
         {/* Fecha de Nacimiento */}
         {isEditing ? (
-          <EditField label="Fecha de Nacimiento">
+          <EditField label={t("common.birthDate")}>
             <DateInput value={editData.birth_date} onChange={(v) => updateField("birth_date", v)} toYear={new Date().getFullYear()} />
           </EditField>
         ) : (
-          <InfoField label="Fecha de Nacimiento" value={
+          <InfoField label={t("common.birthDate")} value={
             c.birth_date ? format(new Date(c.birth_date), f.idioma === "en" ? "MMMM dd, yyyy" : "dd 'de' MMMM 'de' yyyy", { locale: f.fechas }) : null
           } />
         )}
 
         {/* Porcentaje con Agencia */}
         {isEditing ? (
-          <EditField label="Porcentaje con Agencia">
+          <EditField label={t("creadores.info.agencyPct")}>
             <div className="flex items-center gap-2">
               <Input
                 className="h-9 text-sm w-28"
@@ -349,17 +344,17 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
           </EditField>
         ) : biz?.commission_type === "tiered" && Array.isArray(biz?.commission_tiers) && (biz.commission_tiers as any[]).length > 0 ? (
           <div className="py-3 sm:col-span-2">
-            <p className="text-xs text-muted-foreground mb-1">Comisión por Rangos</p>
+            <p className="text-xs text-muted-foreground mb-1">{t("creadores.info.tieredCommission")}</p>
             <div className="rounded-xl border border-white/10 bg-white/5 p-3 space-y-1">
-              {(biz.commission_tiers as any[]).map((t: any, i: number) => (
+              {(biz.commission_tiers as any[]).map((tier: any, i: number) => (
                 <p key={i} className="text-sm">
-                  ${t.min_revenue?.toLocaleString()} – {t.max_revenue != null ? `$${t.max_revenue.toLocaleString()}` : "∞"}: <span className="font-semibold">{t.percentage}%</span>
+                  ${tier.min_revenue?.toLocaleString()} – {tier.max_revenue != null ? `$${tier.max_revenue.toLocaleString()}` : "∞"}: <span className="font-semibold">{tier.percentage}%</span>
                 </p>
               ))}
             </div>
           </div>
         ) : (
-          <InfoField label="Porcentaje con Agencia" value={biz?.agency_percentage != null ? `${biz.agency_percentage}%` : null} />
+          <InfoField label={t("creadores.info.agencyPct")} value={biz?.agency_percentage != null ? `${biz.agency_percentage}%` : null} />
         )}
 
         {/* WhatsApp: abre el chat en la bandeja de Maven (sin exponer el número) */}
@@ -372,16 +367,16 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
         {/* Notas Internas */}
         {isEditing ? (
           <div className="py-3 sm:col-span-2">
-            <p className="text-xs text-muted-foreground mb-1">Notas Internas</p>
+            <p className="text-xs text-muted-foreground mb-1">{t("creadores.info.internalNotes")}</p>
             <Textarea
               className="text-sm min-h-[80px]"
               value={editData.internal_notes}
               onChange={(e) => updateField("internal_notes", e.target.value)}
-              placeholder="Notas internas…"
+              placeholder={t("creadores.info.internalNotesPh")}
             />
           </div>
         ) : (
-          <InfoField label="Notas Internas" value={c.internal_notes} />
+          <InfoField label={t("creadores.info.internalNotes")} value={c.internal_notes} />
         )}
       </div>
     </>

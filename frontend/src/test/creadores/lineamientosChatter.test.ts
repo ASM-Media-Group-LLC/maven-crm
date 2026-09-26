@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { agruparVisibles } from "@/pages/creadores/LineamientosSoloLectura";
+import { getTranslation } from "@/lib/i18n";
 
 // Frontera de privacidad: qué lineamientos de la creadora ve el chatter que
 // abre el perfil por su roster. Lo que no está en la lista blanca NO se muestra
@@ -55,7 +56,8 @@ describe("lineamientos del chatter · lista blanca", () => {
       fila("limits", "Palabras prohibidas"),
       fila("Operación Core", "Límites"),
     ]);
-    expect(grupos.map((g) => g.etiqueta)).toEqual(["Operación core", "Límites", "Retención"]);
+    // La etiqueta es una clave del diccionario; se compara su texto en español.
+    expect(grupos.map((g) => getTranslation(g.etiqueta, "es"))).toEqual(["Operación core", "Límites", "Retención"]);
   });
 
   it("tolera datos sucios sin romperse", () => {
@@ -63,6 +65,6 @@ describe("lineamientos del chatter · lista blanca", () => {
       { guideline_type: "  LIMITS  ", title: null, content: "y" },
       { guideline_type: null, title: "sin sección", content: "y" },
     ]);
-    expect(grupos.map((g) => g.etiqueta)).toEqual(["Límites"]);
+    expect(grupos.map((g) => getTranslation(g.etiqueta, "es"))).toEqual(["Límites"]);
   });
 });

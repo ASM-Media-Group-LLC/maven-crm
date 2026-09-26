@@ -17,22 +17,46 @@ import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { useFormato } from "@/hooks/useFormato";
 import CreadoresHeader from "./CreadoresHeader";
+import { etiquetaEstado } from "./etiquetasCreadora";
+import type { TranslationKey } from "@/lib/i18n";
+import { useLanguage } from "@/hooks/useLanguage";
 
 const emptyFilters = { search: "", agency: "", status: "", category: "", country: "", city: "", manager: "" };
 
 // Estilo Panel de Control / Dashboard v2 — gradient corner blur + icono
 // con cuadrado coloreado + hover lift. La key se usa para navegar al
 // listado filtrado o al onboarding.
-const statusConfig = [
-  { key: "active",     label: "Activas",     icon: UserCheck,   bg: "bg-success" },
-  { key: "onboarding", label: "En Onboarding", icon: Clock,     bg: "bg-blue-500" },
-  { key: "paused",     label: "Pausadas",    icon: PauseCircle, bg: "bg-warning" },
-  { key: "leaving",    label: "En retiro",   icon: LogOut,      bg: "bg-destructive" },
-  { key: "terminated", label: "Terminadas",  icon: XCircle,     bg: "bg-slate-500" },
+const statusConfig: Array<{ key: string; label: TranslationKey; icon: typeof UserCheck; bg: string }> = [
+  { key: "active",     label: "creadores.kpi.active",     icon: UserCheck,   bg: "bg-success" },
+  { key: "onboarding", label: "creadores.kpi.onboarding", icon: Clock,       bg: "bg-blue-500" },
+  { key: "paused",     label: "creadores.kpi.paused",     icon: PauseCircle, bg: "bg-warning" },
+  { key: "leaving",    label: "creadores.dash.inRetirement", icon: LogOut,   bg: "bg-destructive" },
+  { key: "terminated", label: "creadores.kpi.terminated", icon: XCircle,     bg: "bg-slate-500" },
 ];
+
+// Llaves internas de los grupos "sin dato": solo se traducen al mostrarse.
+const SIN_CATEGORIA = "__sin_categoria__";
+const SIN_AGENCIA = "__sin_agencia__";
+const DESCONOCIDO = "__desconocido__";
+
+// creator_offboardings.categoria (DATO) → su etiqueta.
+const CATEGORIA_SALIDA: Record<string, TranslationKey> = {
+  voluntaria: "cr.offCatVoluntary",
+  involuntaria: "cr.offCatInvoluntary",
+  mutuo_acuerdo: "cr.offCatMutual",
+  incumplimiento: "cr.offCatBreach",
+  otro: "cr.offCatOther",
+};
 
 const CreadorasDashboardContent = () => {
   const f = useFormato();
+  const { t } = useLanguage();
+  // El nombre que se muestra de un grupo (las llaves "sin dato" se traducen).
+  const grupo = (k: string) =>
+    k === SIN_CATEGORIA ? t("creadores.dash.noCategory")
+    : k === SIN_AGENCIA ? t("creadores.dash.noAgency")
+    : k === DESCONOCIDO ? t("creadores.dash.unknown")
+    : k;
   const navigate = useNavigate();
   const { allCreators, isLoading } = useCreadores(emptyFilters);
   type StatusKey = "active" | "onboarding" | "paused" | "leaving" | "terminated";
@@ -62,7 +86,7 @@ const CreadorasDashboardContent = () => {
     const totalLostRevenue = items.reduce((sum, i) => sum + (i.estimated_lost_revenue ?? 0), 0);
     const byCategoria: Record<string, number> = {};
     for (const i of items) {
-      const cat = i.categoria ?? "Sin categoría";
+      const cat = i.categoria ?? SIN_CATEGORIA;
       byCategoria[cat] = (byCategoria[cat] ?? 0) + 1;
     }
     return {
@@ -104,7 +128,7 @@ const CreadorasDashboardContent = () => {
   const byAgency = useMemo(() => {
     const map: Record<string, number> = {};
     for (const c of allCreators) {
-      const a = c.creator_business?.company?.name ?? c.creator_business?.assigned_agency ?? "Sin agencia";
+      const a = c.creator_business?.company?.name ?? c.creator_business?.assigned_agency ?? SIN_AGENCIA;
       map[a] = (map[a] ?? 0) + 1;
     }
     return Object.entries(map).sort((a, b) => b[1] - a[1]);
@@ -114,7 +138,7 @@ const CreadorasDashboardContent = () => {
   const byCountry = useMemo(() => {
     const map: Record<string, number> = {};
     for (const c of allCreators) {
-      const country = c.country ?? "Desconocido";
+      const country = c.country ?? DESCONOCIDO;
       map[country] = (map[country] ?? 0) + 1;
     }
     return Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 5);
@@ -124,7 +148,7 @@ const CreadorasDashboardContent = () => {
   const byCategory = useMemo(() => {
     const map: Record<string, number> = {};
     for (const c of allCreators) {
-      const cat = c.category ?? "Sin categoría";
+      const cat = c.category ?? SIN_CATEGORIA;
       map[cat] = (map[cat] ?? 0) + 1;
     }
     return Object.entries(map).sort((a, b) => b[1] - a[1]);
@@ -192,7 +216,7 @@ const CreadorasDashboardContent = () => {
                           <span className="relative inline-flex rounded-full h-4 w-4 bg-destructive" />
                         </span>
                       </TooltipTrigger>
-                      <TooltipContent>Tienes {pendingCount} registros por verificar</TooltipContent>
+                      <TooltipContent>{t("creadores.dash.toVerify", { n: pendingCount })}</TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
                 )}
@@ -201,9 +225,9 @@ const CreadorasDashboardContent = () => {
                     <Icon className="h-5 w-5 text-white" />
                   </div>
                   <div>
-                    <p className="text-xs text-foreground/80 font-semibold">{label}</p>
+                    <p className="text-xs text-foreground/80 font-semibold">{t(label)}</p>
                     <p className="text-3xl font-bold tabular-nums leading-tight">{count}</p>
-                    <p className="text-[10px] text-muted-foreground mt-1">{pct}% del total</p>
+                    <p className="text-[10px] text-muted-foreground mt-1">{t("cr.pctOfTotal", { p: pct })}</p>
                   </div>
                 </div>
               </button>
@@ -218,17 +242,17 @@ const CreadorasDashboardContent = () => {
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
                 <TrendingUp className="h-4 w-4 text-primary" />
-                Por Agencia
+                {t("creadores.dash.byAgency")}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2.5">
-              {byAgency.length === 0 && <p className="text-xs text-muted-foreground">Sin datos</p>}
+              {byAgency.length === 0 && <p className="text-xs text-muted-foreground">{t("common.noData")}</p>}
               {byAgency.map(([agency, count]) => {
                 const pct = total > 0 ? Math.round((count / total) * 100) : 0;
                 return (
                   <div key={agency} className="space-y-1">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="truncate text-foreground font-medium">{agency}</span>
+                      <span className="truncate text-foreground font-medium">{grupo(agency)}</span>
                       <span className="text-muted-foreground shrink-0 ml-2">{count} · {pct}%</span>
                     </div>
                     <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
@@ -248,11 +272,11 @@ const CreadorasDashboardContent = () => {
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
                 <Globe className="h-4 w-4 text-success" />
-                Top 5 Países
+                {t("creadores.dash.top5Countries")}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2.5">
-              {byCountry.length === 0 && <p className="text-xs text-muted-foreground">Sin datos</p>}
+              {byCountry.length === 0 && <p className="text-xs text-muted-foreground">{t("common.noData")}</p>}
               {byCountry.map(([country, count], idx) => {
                 const pct = total > 0 ? Math.round((count / total) * 100) : 0;
                 return (
@@ -260,7 +284,7 @@ const CreadorasDashboardContent = () => {
                     <div className="flex items-center justify-between text-xs">
                       <span className="flex items-center gap-1.5">
                         <span className="text-muted-foreground font-mono w-4 shrink-0">#{idx + 1}</span>
-                        <span className="truncate font-medium text-foreground">{country}</span>
+                        <span className="truncate font-medium text-foreground">{grupo(country)}</span>
                       </span>
                       <span className="text-muted-foreground shrink-0 ml-2">{count} · {pct}%</span>
                     </div>
@@ -281,17 +305,17 @@ const CreadorasDashboardContent = () => {
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
                 <Tag className="h-4 w-4 text-warning" />
-                Por Categoría
+                {t("creadores.dash.byCategory")}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2.5">
-              {byCategory.length === 0 && <p className="text-xs text-muted-foreground">Sin datos</p>}
+              {byCategory.length === 0 && <p className="text-xs text-muted-foreground">{t("common.noData")}</p>}
               {byCategory.map(([cat, count]) => {
                 const pct = total > 0 ? Math.round((count / total) * 100) : 0;
                 return (
                   <div key={cat} className="space-y-1">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="truncate font-medium text-foreground">{cat}</span>
+                      <span className="truncate font-medium text-foreground">{grupo(cat)}</span>
                       <span className="text-muted-foreground shrink-0 ml-2">{count} · {pct}%</span>
                     </div>
                     <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
@@ -311,11 +335,11 @@ const CreadorasDashboardContent = () => {
         <div className="space-y-3">
           <h3 className="text-sm font-semibold flex items-center gap-2 text-foreground">
             <Users className="h-4 w-4 text-primary" />
-            Últimas Incorporaciones
+            {t("creadores.dash.latest")}
           </h3>
           {latestCreators.length === 0 ? (
             <div className="rounded-xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
-              Sin datos
+              {t("common.noData")}
             </div>
           ) : (
             <div className="space-y-2">
@@ -346,14 +370,14 @@ const CreadorasDashboardContent = () => {
                       </div>
                       <div className="hidden sm:flex items-center gap-4 text-right shrink-0">
                         <div>
-                          <p className="text-xs text-muted-foreground">Agencia</p>
+                          <p className="text-xs text-muted-foreground">{t("creadores.table.colAgency")}</p>
                           <p className="text-xs font-medium truncate max-w-[120px]">{c.creator_business?.company?.name ?? c.creator_business?.assigned_agency ?? "—"}</p>
                         </div>
                         <Badge variant="outline" className={`text-[10px] ${statusBadgeClass[c.status ?? ""] ?? ""}`}>
-                          {c.status}
+                          {etiquetaEstado(t, c.status)}
                         </Badge>
                         <div>
-                          <p className="text-xs text-muted-foreground">Registro</p>
+                          <p className="text-xs text-muted-foreground">{t("creadores.dash.registered")}</p>
                           <p className="text-xs font-medium whitespace-nowrap">
                             {c.created_at ? format(new Date(c.created_at), "dd MMM", { locale: f.fechas }) : "—"}
                           </p>
@@ -374,9 +398,9 @@ const CreadorasDashboardContent = () => {
             <CardContent className="p-4">
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <p className="text-xs text-muted-foreground font-medium">Modelos Perdidas</p>
+                  <p className="text-xs text-muted-foreground font-medium">{t("creadores.dash.lostModels")}</p>
                   <p className="text-3xl font-bold mt-1 text-destructive">{offboardingMetrics.totalFinalized}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{offboardingMetrics.totalInProgress} en proceso</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{t("creadores.dash.inProcess", { n: offboardingMetrics.totalInProgress })}</p>
                 </div>
                 <div className="p-2 rounded-lg bg-destructive/10 shrink-0">
                   <LogOut className="h-5 w-5 text-destructive" />
@@ -389,11 +413,11 @@ const CreadorasDashboardContent = () => {
             <CardContent className="p-4">
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <p className="text-xs text-muted-foreground font-medium">Revenue Perdido</p>
+                  <p className="text-xs text-muted-foreground font-medium">{t("creadores.dash.lostRevenue")}</p>
                   <p className="text-3xl font-bold mt-1 text-warning">
                     ${offboardingMetrics.totalLostRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Estimado 12 meses</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{t("creadores.dash.est12m")}</p>
                 </div>
                 <div className="p-2 rounded-lg bg-warning/10 shrink-0">
                   <DollarSign className="h-5 w-5 text-warning" />
@@ -406,16 +430,16 @@ const CreadorasDashboardContent = () => {
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 text-destructive" />
-                Motivos de Salida
+                {t("creadores.dash.exitReasons")}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
               {offboardingMetrics.byCategoria.length === 0 && (
-                <p className="text-xs text-muted-foreground">Sin datos</p>
+                <p className="text-xs text-muted-foreground">{t("common.noData")}</p>
               )}
               {offboardingMetrics.byCategoria.map(([cat, count]) => (
                 <div key={cat} className="flex items-center justify-between text-xs">
-                  <span className="capitalize font-medium text-foreground">{cat.replace("_", " ")}</span>
+                  <span className="capitalize font-medium text-foreground">{CATEGORIA_SALIDA[cat] ? t(CATEGORIA_SALIDA[cat]) : grupo(cat).replace("_", " ")}</span>
                   <Badge variant="outline" className="text-[10px]">{count}</Badge>
                 </div>
               ))}
@@ -432,12 +456,12 @@ const CreadorasDashboardContent = () => {
             const handle = (c.instagram_handle || "").replace(/^@/, "");
             const igUrl = handle ? `https://instagram.com/${handle}` : null;
             const stats: { label: string; value: string }[] = [
-              { label: "Estado", value: c.status ?? "—" },
-              { label: "Agencia", value: c.creator_business?.company?.name ?? c.creator_business?.assigned_agency ?? "—" },
-              { label: "País", value: c.country ?? "—" },
-              { label: "Categoría", value: c.category ?? "—" },
-              { label: "Registro", value: c.created_at ? format(new Date(c.created_at), "dd MMM yyyy", { locale: f.fechas }) : "—" },
-              { label: "Manager", value: c.creator_business?.manager_type ?? "—" },
+              { label: t("common.status"), value: etiquetaEstado(t, c.status) },
+              { label: t("creadores.table.colAgency"), value: c.creator_business?.company?.name ?? c.creator_business?.assigned_agency ?? "—" },
+              { label: t("common.country"), value: c.country ?? "—" },
+              { label: t("common.category"), value: c.category ?? "—" },
+              { label: t("creadores.dash.registered"), value: c.created_at ? format(new Date(c.created_at), "dd MMM yyyy", { locale: f.fechas }) : "—" },
+              { label: t("creadores.dash.manager"), value: c.creator_business?.manager_type ?? "—" },
             ];
             return (
               <>
@@ -458,7 +482,7 @@ const CreadorasDashboardContent = () => {
                         </p>
                       )}
                       <Badge variant="outline" className={`mt-2 text-[10px] ${statusBadgeClass[c.status ?? ""] ?? ""}`}>
-                        {c.status}
+                        {etiquetaEstado(t, c.status)}
                       </Badge>
                     </div>
                   </div>
@@ -482,7 +506,7 @@ const CreadorasDashboardContent = () => {
                       onClick={() => window.open(igUrl, "_blank", "noopener,noreferrer")}
                     >
                       <Instagram className="h-3.5 w-3.5" />
-                      Abrir Instagram
+                      {t("creadores.dash.openInstagram")}
                       <ExternalLink className="h-3 w-3" />
                     </Button>
                   )}
@@ -494,7 +518,7 @@ const CreadorasDashboardContent = () => {
                       setCreatorDetail(null);
                     }}
                   >
-                    Ver perfil completo
+                    {t("creadores.dash.viewFullProfile")}
                     <ArrowRight className="h-3.5 w-3.5" />
                   </Button>
                 </div>
@@ -517,31 +541,32 @@ const CreadorasDashboardContent = () => {
         <DialogContent className="max-w-[95vw] sm:max-w-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {statusPopup === "active" && `Creadoras Activas (${popupCreators.length})`}
-              {statusPopup === "onboarding" && `En Onboarding (${popupCreators.length})`}
-              {statusPopup === "paused" && `Creadoras Pausadas (${popupCreators.length})`}
-              {statusPopup === "leaving" && `En Retiro (${popupCreators.length})`}
-              {statusPopup === "terminated" && `Creadoras Terminadas (${popupCreators.length})`}
+              {statusPopup === "active" && t("creadores.dash.popupActive", { n: popupCreators.length })}
+              {statusPopup === "onboarding" && t("creadores.dash.popupOnboarding", { n: popupCreators.length })}
+              {statusPopup === "paused" && t("creadores.dash.popupPaused", { n: popupCreators.length })}
+              {statusPopup === "leaving" && t("creadores.dash.popupLeaving", { n: popupCreators.length })}
+              {statusPopup === "terminated" && t("creadores.dash.popupTerminated", { n: popupCreators.length })}
             </DialogTitle>
           </DialogHeader>
 
           {popupCreators.length === 0 ? (
             <div className="rounded-xl border border-white/10 bg-white/5 p-12 text-center text-sm text-muted-foreground">
-              Sin creadoras en este estado.
+              {t("creadores.dash.popupEmpty")}
             </div>
           ) : (() => {
             // Agrupar por categoría — mismo estándar que panel /
             // dashboard v2 / contactos.
             const buckets = new Map<string, typeof popupCreators>();
             for (const c of popupCreators) {
-              const key = c.category ?? "Sin categoría";
+              const key = c.category ?? SIN_CATEGORIA;
               const arr = buckets.get(key) ?? [];
               arr.push(c);
               buckets.set(key, arr);
             }
             const sortedCats = Array.from(buckets.keys()).sort((a, b) => {
-              const sa = CATEGORY_ORDER[a] ?? 999;
-              const sb = CATEGORY_ORDER[b] ?? 999;
+              // El grupo "sin categoría" va siempre al final.
+              const sa = a === SIN_CATEGORIA ? 1000 : CATEGORY_ORDER[a] ?? 999;
+              const sb = b === SIN_CATEGORIA ? 1000 : CATEGORY_ORDER[b] ?? 999;
               if (sa !== sb) return sa - sb;
               return a.localeCompare(b);
             });
@@ -575,7 +600,7 @@ const CreadorasDashboardContent = () => {
                     className="h-8 w-8 shrink-0"
                   />
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm truncate">{c.artistic_name || c.name || "Sin nombre"}</p>
+                    <p className="font-medium text-sm truncate">{c.artistic_name || c.name || t("creadores.sell.noName")}</p>
                     {handle && (
                       <p className="text-[10px] text-muted-foreground flex items-center gap-1 truncate">
                         <Instagram className="h-2.5 w-2.5 shrink-0" />
@@ -602,7 +627,7 @@ const CreadorasDashboardContent = () => {
                       rel="noopener noreferrer"
                       onClick={(e) => e.stopPropagation()}
                       className="text-muted-foreground hover:text-instagram-pink transition-colors shrink-0"
-                      title="Abrir Instagram"
+                      title={t("creadores.dash.openInstagram")}
                     >
                       <Instagram className="h-3.5 w-3.5" />
                     </a>
@@ -619,7 +644,7 @@ const CreadorasDashboardContent = () => {
                   return (
                     <div key={cat} className="space-y-2">
                       <CategorySectionHeader
-                        cat={cat}
+                        cat={grupo(cat)}
                         count={rows.length}
                         isCollapsed={isCollapsed}
                         onToggle={() => toggleCat(cat)}

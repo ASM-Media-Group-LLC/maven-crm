@@ -12,6 +12,7 @@ import { useUserRole } from "@/hooks/useUserRole";
 import CreadoresHeader from "../CreadoresHeader";
 import { useLanguage } from "@/hooks/useLanguage";
 
+// Llaves internas del filtro de estado (no se muestran: cada chip tiene su etiqueta).
 export const FILTRO_POR_DEFECTO = "En curso";
 
 const OnboardingContent = () => {
@@ -80,7 +81,7 @@ const OnboardingContent = () => {
           !isAgent ? (
             <Button onClick={() => navigate("/creadores/onboarding/nuevo")}>
               <Plus className="h-4 w-4 mr-2" />
-              Iniciar Onboarding
+              {t("creadores.onb.start")}
             </Button>
           ) : undefined
         }
@@ -133,15 +134,15 @@ const OnboardingContent = () => {
           {hasActiveFilters && (
             <Button variant="ghost" size="sm" onClick={clearFilters}>
               <X className="mr-1.5 h-4 w-4" />
-              Limpiar filtros
+              {t("creadores.list.clearFilters")}
             </Button>
           )}
 
           <div className="ml-auto flex items-center gap-1 rounded-lg border p-1">
-            <Button size="icon" variant={view === "table" ? "secondary" : "ghost"} className="h-8 w-8" onClick={() => setView("table")}>
+            <Button size="icon" variant={view === "table" ? "secondary" : "ghost"} className="h-8 w-8" onClick={() => setView("table")} aria-label={t("creadores.list.tableView")} title={t("creadores.list.tableView")}>
               <List className="h-4 w-4" />
             </Button>
-            <Button size="icon" variant={view === "grid" ? "secondary" : "ghost"} className="h-8 w-8" onClick={() => setView("grid")}>
+            <Button size="icon" variant={view === "grid" ? "secondary" : "ghost"} className="h-8 w-8" onClick={() => setView("grid")} aria-label={t("creadores.list.gridView")} title={t("creadores.list.gridView")}>
               <LayoutGrid className="h-4 w-4" />
             </Button>
           </div>

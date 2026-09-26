@@ -21,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface Props {
   creatorId: string;
@@ -29,6 +30,7 @@ interface Props {
 }
 
 const CreateTicketModal = ({ creatorId, open, onOpenChange }: Props) => {
+  const { t } = useLanguage();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [saving, setSaving] = useState(false);
@@ -43,7 +45,7 @@ const CreateTicketModal = ({ creatorId, open, onOpenChange }: Props) => {
 
   const handleCancel = () => {
     reset();
-    toast({ title: "Edición cancelada" });
+    toast({ title: t("tickets.edit.cancelled") });
     onOpenChange(false);
   };
 
@@ -59,7 +61,7 @@ const CreateTicketModal = ({ creatorId, open, onOpenChange }: Props) => {
 
   const handleSubmit = async () => {
     if (!title.trim()) {
-      toast({ title: "El título es requerido", variant: "destructive" });
+      toast({ title: t("tickets.edit.titleRequired"), variant: "destructive" });
       return;
     }
     setSaving(true);
@@ -76,10 +78,10 @@ const CreateTicketModal = ({ creatorId, open, onOpenChange }: Props) => {
 
     setSaving(false);
     if (error) {
-      toast({ title: "Error al crear ticket", description: error.message, variant: "destructive" });
+      toast({ title: t("tickets.toast.createError"), description: error.message, variant: "destructive" });
       return;
     }
-    toast({ title: "Ticket creado exitosamente" });
+    toast({ title: t("tickets.toast.created") });
     queryClient.invalidateQueries({ queryKey: ["tickets", creatorId] });
     reset();
     onOpenChange(false);
@@ -89,26 +91,26 @@ const CreateTicketModal = ({ creatorId, open, onOpenChange }: Props) => {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg max-h-[90vh]">
         <DialogHeader className="pr-8">
-          <DialogTitle>Crear Nuevo Ticket</DialogTitle>
-          <DialogDescription>Completa los detalles del ticket de soporte</DialogDescription>
+          <DialogTitle>{t("creadores.tickets.createTitle")}</DialogTitle>
+          <DialogDescription>{t("creadores.tickets.createDesc")}</DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-4 py-2 overflow-y-auto max-h-[60vh]">
           <div className="space-y-1.5">
-            <Label htmlFor="ticket-title">Título *</Label>
+            <Label htmlFor="ticket-title">{t("creadores.tickets.titleReq")}</Label>
             <Input
               id="ticket-title"
-              placeholder="Ticket title"
+              placeholder={t("tickets.column.title")}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
             />
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="ticket-desc">Descripción</Label>
+            <Label htmlFor="ticket-desc">{t("common.description")}</Label>
             <Textarea
               id="ticket-desc"
-              placeholder="Describe the problem or request..."
+              placeholder={t("creadores.tickets.descPh")}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
@@ -117,38 +119,38 @@ const CreateTicketModal = ({ creatorId, open, onOpenChange }: Props) => {
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label>Prioridad</Label>
+              <Label>{t("tickets.priority")}</Label>
               <Select value={priority} onValueChange={setPriority}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="low">Low</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="urgent">Urgent</SelectItem>
+                  <SelectItem value="low">{t("tickets.priority.low")}</SelectItem>
+                  <SelectItem value="medium">{t("tickets.priority.medium")}</SelectItem>
+                  <SelectItem value="high">{t("tickets.priority.high")}</SelectItem>
+                  <SelectItem value="urgent">{t("tickets.priority.urgent")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-1.5">
-              <Label>Tipo de Ticket</Label>
+              <Label>{t("creadores.tickets.type")}</Label>
               <Select value={ticketType} onValueChange={setTicketType}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="complaint">Queja (Complaint)</SelectItem>
-                  <SelectItem value="technical">Técnico (Technical)</SelectItem>
-                  <SelectItem value="billing">Facturación</SelectItem>
-                  <SelectItem value="content">Contenido</SelectItem>
-                  <SelectItem value="general">General</SelectItem>
+                  <SelectItem value="complaint">{t("tickets.type.complaint")}</SelectItem>
+                  <SelectItem value="technical">{t("tickets.type.technical")}</SelectItem>
+                  <SelectItem value="billing">{t("tickets.type.billing")}</SelectItem>
+                  <SelectItem value="content">{t("tickets.type.content")}</SelectItem>
+                  <SelectItem value="general">{t("tickets.type.general")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <Label>Compañía / Cuenta de Origen</Label>
+            <Label>{t("creadores.tickets.company")}</Label>
             <Select value={company} onValueChange={setCompany}>
               <SelectTrigger>
-                <SelectValue placeholder="Seleccionar compañía" />
+                <SelectValue placeholder={t("tickets.edit.selectCompany")} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="ora_miami">Ora Miami</SelectItem>
@@ -162,10 +164,10 @@ const CreateTicketModal = ({ creatorId, open, onOpenChange }: Props) => {
           </div>
 
           <div className="space-y-1.5">
-            <Label>Asignar a</Label>
+            <Label>{t("tickets.edit.assignTo")}</Label>
             <Select value={assignedTo} onValueChange={setAssignedTo}>
               <SelectTrigger>
-                <SelectValue placeholder="Sin asignar" />
+                <SelectValue placeholder={t("common.unassigned")} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="alvaro">alvaro (@alvaro)</SelectItem>
@@ -210,10 +212,10 @@ const CreateTicketModal = ({ creatorId, open, onOpenChange }: Props) => {
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="ticket-notes">Notas sobre el creator (opcional)</Label>
+            <Label htmlFor="ticket-notes">{t("creadores.tickets.notesOptional")}</Label>
             <Input
               id="ticket-notes"
-              placeholder="Información adicional"
+              placeholder={t("creadores.tickets.notesPh")}
               value={creatorNotes}
               onChange={(e) => setCreatorNotes(e.target.value)}
             />
@@ -222,10 +224,10 @@ const CreateTicketModal = ({ creatorId, open, onOpenChange }: Props) => {
 
         <DialogFooter>
           <Button variant="outline" onClick={handleCancel} disabled={saving}>
-            Cancelar
+            {t("common.cancel")}
           </Button>
           <Button onClick={handleSubmit} disabled={saving}>
-            {saving ? "Creando..." : "Create Ticket"}
+            {saving ? t("creadores.tickets.creating") : t("creadores.tickets.create")}
           </Button>
         </DialogFooter>
       </DialogContent>

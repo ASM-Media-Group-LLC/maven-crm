@@ -22,20 +22,20 @@ export default function StartOnboardingModal({ prospect, onClose }: Props) {
     <Dialog open={!!prospect} onOpenChange={() => onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Iniciar Onboarding</DialogTitle>
+          <DialogTitle>{t("creadores.onb.start")}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <Label>Perfil</Label>
+            <Label>{t("creadores.pros.profile")}</Label>
             <p className="text-sm font-medium">{prospect.name}</p>
           </div>
           <div className="space-y-1.5">
-            <Label>Agencia <span className="text-destructive">*</span></Label>
+            <Label>{t("creadores.table.colAgency")} <span className="text-destructive">*</span></Label>
             <Select value={agency} onValueChange={setAgency}>
               <SelectTrigger><SelectValue placeholder={t("cr.selectAgencyPh")} /></SelectTrigger>
               <SelectContent>
                 {AGENCY_ORDER.map((a) => (
-                  <SelectItem key={a} value={a}>{a}</SelectItem>
+                  <SelectItem key={a} value={a}>{a === "Otra" ? t("creadores.socials.other") : a}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -46,7 +46,7 @@ export default function StartOnboardingModal({ prospect, onClose }: Props) {
               disabled={!agency || mutation.isPending}
               onClick={() => mutation.mutate({ prospect, agency })}
             >
-              {mutation.isPending ? "Iniciando..." : "Confirmar e Iniciar"}
+              {mutation.isPending ? t("creadores.pros.starting") : t("creadores.pros.confirmStart")}
             </Button>
           </div>
         </div>

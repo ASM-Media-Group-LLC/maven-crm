@@ -17,16 +17,8 @@ import ViewCreadorModal from "./ViewCreadorModal";
 import type { CreatorWithBusiness } from "./useCreadores";
 import { buildSocialUrl } from "@/lib/utils";
 import { useUserRole } from "@/hooks/useUserRole";
-
-const statusLabel: Record<string, string> = {
-  active: "Activa",
-  onboarding: "Onboarding",
-  leaving: "Retiro",
-  terminated: "Terminada",
-  paused: "Pausada",
-  pendiente_verificacion: "En Revisión",
-  borrador: "Borrador",
-};
+import { etiquetaEstado } from "./etiquetasCreadora";
+import { useLanguage } from "@/hooks/useLanguage";
 
 const statusVariant: Record<string, "success-soft" | "primary-soft" | "warning-soft" | "destructive-soft" | "secondary-soft"> = {
   active: "success-soft",
@@ -70,6 +62,7 @@ interface Props {
 }
 
 const CreadoresGrid = ({ creators }: Props) => {
+  const { t } = useLanguage();
   const [viewingCreator, setViewingCreator] = useState<CreatorWithBusiness | null>(null);
   const { isAgent, isAdmin, isManager } = useUserRole();
   const canSeeAllData = isAdmin || isManager || !isAgent;
@@ -123,7 +116,7 @@ const CreadoresGrid = ({ creators }: Props) => {
                           variant={statusVariant[c.status] ?? "secondary-soft"}
                           className={`text-[10px] px-1.5 py-0 ${c.status === "pendiente_verificacion" ? "badge-pending-verification" : ""}`}
                         >
-                          {statusLabel[c.status] ?? c.status}
+                          {etiquetaEstado(t, c.status)}
                         </Badge>
                       )}
                       {/* Indicador Blu/Infloww — read-only en grid view.
@@ -244,7 +237,7 @@ const CreadoresGrid = ({ creators }: Props) => {
                               </button>
                             </DropdownMenuTrigger>
                           </TooltipTrigger>
-                          <TooltipContent>Ver plataformas</TooltipContent>
+                          <TooltipContent>{t("creadores.table.viewPlatforms")}</TooltipContent>
                         </Tooltip>
                         <DropdownMenuContent align="start" onClick={(e) => e.stopPropagation()}>
                           {externalLinks.map((link) => (
@@ -266,7 +259,7 @@ const CreadoresGrid = ({ creators }: Props) => {
         })}
         {creators.length === 0 && (
           <p className="col-span-full py-12 text-center text-muted-foreground">
-            No se encontraron creadores.
+            {t("creadores.table.empty")}
           </p>
         )}
       </div>

@@ -4,6 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 
 export interface ProspectRecord {
   id: string;
@@ -24,12 +25,14 @@ export interface ProspectRecord {
   updated_at: string;
 }
 
-export const PROSPECT_STATUSES = [
-  { value: "lead", label: "Lead" },
-  { value: "contactado", label: "Contactado" },
-  { value: "negociando", label: "Negociando" },
-  { value: "convertido", label: "Convertido" },
-  { value: "descartado", label: "Descartado" },
+// En estas listas `value` es lo que se GUARDA en creator_prospects; `label` es la
+// clave del diccionario con la que se muestra.
+export const PROSPECT_STATUSES: Array<{ value: string; label: TranslationKey }> = [
+  { value: "lead", label: "creadores.pros.stLead" },
+  { value: "contactado", label: "creadores.pros.stContacted" },
+  { value: "negociando", label: "creadores.pros.stNegotiating" },
+  { value: "convertido", label: "creadores.pros.stConverted" },
+  { value: "descartado", label: "creadores.pros.stDiscarded" },
 ];
 
 export const PROSPECT_STATUS_COLORS: Record<string, { bg: string; text: string }> = {
@@ -40,21 +43,22 @@ export const PROSPECT_STATUS_COLORS: Record<string, { bg: string; text: string }
   descartado: { bg: "bg-muted", text: "text-muted-foreground" },
 };
 
-export const PROSPECT_SOURCES = [
-  { value: "redes", label: "Redes Sociales" },
-  { value: "referido", label: "Referido" },
-  { value: "scouting", label: "Scouting" },
-  { value: "inbound", label: "Inbound" },
-  { value: "otro", label: "Otro" },
+export const PROSPECT_SOURCES: Array<{ value: string; label: TranslationKey }> = [
+  { value: "redes", label: "creadores.pros.srcSocials" },
+  { value: "referido", label: "creadores.pros.srcReferral" },
+  { value: "scouting", label: "creadores.pros.srcScouting" },
+  { value: "inbound", label: "creadores.pros.srcInbound" },
+  { value: "otro", label: "cr.offCatOther" },
 ];
 
-export const PROSPECT_PLATFORMS = [
+// Nombres propios: solo "Otra" tiene etiqueta traducida.
+export const PROSPECT_PLATFORMS: Array<{ value: string; label: string; labelKey?: TranslationKey }> = [
   { value: "OnlyFans", label: "OnlyFans" },
   { value: "Instagram", label: "Instagram" },
   { value: "TikTok", label: "TikTok" },
   { value: "Twitter", label: "Twitter/X" },
   { value: "YouTube", label: "YouTube" },
-  { value: "Otra", label: "Otra" },
+  { value: "Otra", label: "Otra", labelKey: "creadores.socials.other" },
 ];
 
 export const AGENCY_ORDER = [
@@ -93,7 +97,7 @@ export function useAddProspect() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["creator_prospects"] });
-      toast({ title: "Prospecto creado" });
+      toast({ title: t("creadores.pros.created") });
     },
     onError: () => toast({ title: t("cr.errCreateProspect"), variant: "destructive" }),
   });
@@ -111,7 +115,7 @@ export function useUpdateProspect() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["creator_prospects"] });
-      toast({ title: "Prospecto actualizado" });
+      toast({ title: t("creadores.pros.updated") });
     },
     onError: () => toast({ title: t("common.errorUpdating"), variant: "destructive" }),
   });
@@ -129,7 +133,7 @@ export function useDeleteProspect() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["creator_prospects"] });
-      toast({ title: "Prospecto eliminado" });
+      toast({ title: t("creadores.pros.deleted") });
     },
     onError: () => toast({ title: t("common.errorDeleting"), variant: "destructive" }),
   });
@@ -144,7 +148,7 @@ export function useStartOnboarding() {
 
   return useMutation({
     mutationFn: async ({ prospect, agency }: { prospect: ProspectRecord; agency: string }) => {
-      if (!user) throw new Error("No se pudo obtener el usuario autenticado");
+      if (!user) throw new Error(t("creadores.pros.noUser"));
       // SERVER-SIDE: el RPC lee phone/email REALES del prospecto (que el cliente ya ve
       // enmascarados) y crea creadora + creator_business + marca convertido en una transacción.
       const { data, error } = await supabase.rpc("start_prospect_onboarding", {
@@ -157,7 +161,7 @@ export function useStartOnboarding() {
     onSuccess: (creatorId) => {
       qc.invalidateQueries({ queryKey: ["creator_prospects"] });
       qc.invalidateQueries({ queryKey: ["creators"] });
-      toast({ title: "Onboarding iniciado" });
+      toast({ title: t("creadores.pros.onbStarted") });
       navigate(`/creadores/onboarding/${creatorId}`);
     },
     onError: () => toast({ title: t("cr.errStartOnboarding"), variant: "destructive" }),

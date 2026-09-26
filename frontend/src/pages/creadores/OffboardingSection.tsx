@@ -36,7 +36,7 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { useLanguage } from "@/hooks/useLanguage";
-import type { TranslationKey } from "@/lib/i18n";
+import { getTranslation, type TranslationKey } from "@/lib/i18n";
 
 const STATUS_LABELS: Record<string, { key: TranslationKey; variant: string }> = {
   en_proceso: { key: "cr.offStatusInProgress" as const, variant: "bg-primary/15 text-primary border-primary/30" },
@@ -143,9 +143,9 @@ const OffboardingSection = ({ creatorId, creatorName, artisticName, instagramHan
         estimated_lost_revenue: impact.estimatedLost,
       } as Partial<Offboarding>,
       {
-        onSuccess: () => toast({ title: "Offboarding actualizado" }),
+        onSuccess: () => toast({ title: t("creadores.off.updated") }),
         onError: (err: any) =>
-          toast({ title: "Error", description: err.message, variant: "destructive" }),
+          toast({ title: t("common.error"), description: err.message, variant: "destructive" }),
       }
     );
   };
@@ -159,43 +159,46 @@ const OffboardingSection = ({ creatorId, creatorName, artisticName, instagramHan
     approve.mutate(user.id, {
       onSuccess: () => toast({ title: t("cr.approvalRegistered") }),
       onError: (err: any) =>
-        toast({ title: "Error", description: err.message, variant: "destructive" }),
+        toast({ title: t("common.error"), description: err.message, variant: "destructive" }),
     });
   };
 
   const handleStatusChange = (newStatus: string) => {
     updateOffboarding.mutate({ status: newStatus } as Partial<Offboarding>, {
-      onSuccess: () => toast({ title: "Estado actualizado" }),
+      onSuccess: () => toast({ title: t("creadores.off.statusUpdated") }),
     });
   };
 
   const generateComunicado = () => {
+    // El comunicado se GUARDA (comunicado_generado) y lo leen otras personas: va en
+    // español sea cual sea el idioma de quien lo genera.
+    const tEs = (k: TranslationKey, p?: Record<string, string | number>) => getTranslation(k, "es", p);
     const text = `
 ═══════════════════════════════════════
-  ${t("cr.commTitle")} — ${creatorName}
+  ${tEs("cr.commTitle")} — ${creatorName}
 ═══════════════════════════════════════
 
-▸ ${t("common.name")}: ${creatorName}
-▸ ${t("cr.commArtisticName")}: ${artisticName ?? "N/A"}
+▸ ${tEs("common.name")}: ${creatorName}
+▸ ${tEs("cr.commArtisticName")}: ${artisticName ?? "N/A"}
 ▸ Instagram: ${instagramHandle ?? "N/A"}
-▸ ${t("cr.commExitDate")}: ${offboarding.exit_date ?? t("common.pending")}
+▸ ${tEs("cr.commExitDate")}: ${offboarding.exit_date ?? tEs("common.pending")}
 
-── ${t("cr.commReasons")} ──────────────────────────
-▸ ${t("cr.commOperational")}: ${form.motivo_operativo || "N/A"}
-▸ ${t("cr.commCommercial")}: ${form.motivo_comercial || "N/A"}
-▸ ${t("cr.commFinal")}: ${form.motivo_final || "N/A"}
-▸ ${t("common.category")}: ${(() => { const c = CATEGORIAS.find((x) => x.value === form.categoria); return c ? t(c.key) : "N/A"; })()}
+── ${tEs("cr.commReasons")} ──────────────────────────
+▸ ${tEs("cr.commOperational")}: ${form.motivo_operativo || "N/A"}
+▸ ${tEs("cr.commCommercial")}: ${form.motivo_comercial || "N/A"}
+▸ ${tEs("cr.commFinal")}: ${form.motivo_final || "N/A"}
+▸ ${tEs("common.category")}: ${(() => { const c = CATEGORIAS.find((x) => x.value === form.categoria); return c ? tEs(c.key) : "N/A"; })()}
 
-── ${t("cr.commFinancialImpact")} ───────────────
-▸ ${t("cr.commLastRevenue")}: $${impact.lastRevenue.toLocaleString()}
-▸ ${t("cr.commAvgMonthly")}: $${impact.avgMonthly.toLocaleString()}
-▸ ${t("cr.commEstLost")}: $${impact.estimatedLost.toLocaleString()}
+── ${tEs("cr.commFinancialImpact")} ───────────────
+▸ ${tEs("cr.commLastRevenue")}: $${impact.lastRevenue.toLocaleString()}
+▸ ${tEs("cr.commAvgMonthly")}: $${impact.avgMonthly.toLocaleString()}
+▸ ${tEs("cr.commEstLost")}: $${impact.estimatedLost.toLocaleString()}
 
-── ${t("cr.commAdminNotes")} ────────────
-${form.comentarios || t("cr.commNoComments")}
+── ${tEs("cr.commAdminNotes")} ────────────
+${form.comentarios || tEs("cr.commNoComments")}
 
-── ${t("cr.commApprovals")} ─────────────────────
-▸ ${t("cr.commApprovalsDone", { n: approvalCount })}
+── ${tEs("cr.commApprovals")} ─────────────────────
+▸ ${tEs("cr.commApprovalsDone", { n: approvalCount })}
 
 ═══════════════════════════════════════
     `.trim();
@@ -252,7 +255,7 @@ ${form.comentarios || t("cr.commNoComments")}
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-semibold flex items-center gap-2">
                   <User className="h-4 w-4 text-destructive" />
-                  Resumen del Creator
+                  {t("cr.creatorSummary")}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
@@ -261,7 +264,7 @@ ${form.comentarios || t("cr.commNoComments")}
                   <span className="font-medium">{creatorName}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Username</span>
+                  <span className="text-muted-foreground">{t("creadores.off.username")}</span>
                   <span className="font-medium">{artisticName ?? "—"}</span>
                 </div>
                 <div className="flex justify-between">
@@ -296,12 +299,12 @@ ${form.comentarios || t("cr.commNoComments")}
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Comentarios</Label>
+                  <Label className="text-xs">{t("creadores.off.comments")}</Label>
                   <Textarea
                     rows={2}
                     value={form.comentarios}
                     onChange={(e) => setForm((f) => ({ ...f, comentarios: e.target.value }))}
-                    placeholder="Notas adicionales..."
+                    placeholder={t("creadores.off.commentsPh")}
                   />
                 </div>
               </CardContent>
@@ -315,7 +318,7 @@ ${form.comentarios || t("cr.commNoComments")}
             </CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-1.5">
-                <Label className="text-xs">Motivo Operativo</Label>
+                <Label className="text-xs">{t("creadores.off.reasonOperational")}</Label>
                 <Textarea
                   rows={3}
                   value={form.motivo_operativo}
@@ -324,7 +327,7 @@ ${form.comentarios || t("cr.commNoComments")}
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs">Motivo Comercial</Label>
+                <Label className="text-xs">{t("creadores.off.reasonCommercial")}</Label>
                 <Textarea
                   rows={3}
                   value={form.motivo_comercial}
@@ -333,12 +336,12 @@ ${form.comentarios || t("cr.commNoComments")}
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs">Motivo Final</Label>
+                <Label className="text-xs">{t("creadores.off.reasonFinal")}</Label>
                 <Textarea
                   rows={3}
                   value={form.motivo_final}
                   onChange={(e) => setForm((f) => ({ ...f, motivo_final: e.target.value }))}
-                  placeholder="Motivo definitivo..."
+                  placeholder={t("creadores.off.reasonFinalPh")}
                 />
               </div>
             </CardContent>
@@ -351,9 +354,9 @@ ${form.comentarios || t("cr.commNoComments")}
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-semibold flex items-center gap-2">
                   <ShieldCheck className="h-4 w-4 text-success" />
-                  Aprobaciones
+                  {t("creadores.off.approvals")}
                   <Badge variant="outline" className="text-[10px] ml-auto">
-                    {approvalCount} de 2 requeridas
+                    {t("creadores.off.requiredOf2", { n: approvalCount })}
                   </Badge>
                 </CardTitle>
               </CardHeader>
@@ -366,7 +369,7 @@ ${form.comentarios || t("cr.commNoComments")}
                     <span className="text-sm font-medium">{getApproverName(a.approver_id)}</span>
                     {a.approved ? (
                       <Badge className="bg-success/15 text-success border-success/30 text-[10px]">
-                        <Check className="h-3 w-3 mr-1" /> Aprobado
+                        <Check className="h-3 w-3 mr-1" /> {t("creadores.off.approved")}
                       </Badge>
                     ) : (
                       <Badge variant="outline" className="text-[10px]">{t("common.pending")}</Badge>
@@ -382,7 +385,7 @@ ${form.comentarios || t("cr.commNoComments")}
                     disabled={approve.isPending}
                   >
                     <ShieldCheck className="h-4 w-4 mr-1.5" />
-                    {approve.isPending ? "Aprobando..." : "Aprobar Offboarding"}
+                    {approve.isPending ? t("creadores.off.approving") : t("creadores.off.approve")}
                   </Button>
                 )}
               </CardContent>
@@ -393,7 +396,7 @@ ${form.comentarios || t("cr.commNoComments")}
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-semibold flex items-center gap-2">
                   <CheckSquare className="h-4 w-4 text-warning" />
-                  Checklist de Cierre
+                  {t("cr.closureChecklist")}
                   <span className="text-xs text-muted-foreground ml-auto">{checklistDone}/{CHECKLIST_ITEMS.length}</span>
                 </CardTitle>
               </CardHeader>
@@ -422,15 +425,15 @@ ${form.comentarios || t("cr.commNoComments")}
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
                 <DollarSign className="h-4 w-4 text-destructive" />
-                Impacto Financiero
+                {t("creadores.off.financialImpact")}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {[
                   { label: t("cr.commLastRevenue"), value: impact.lastRevenue, color: "text-primary" },
-                  { label: "Promedio Mensual", value: impact.avgMonthly, color: "text-warning" },
-                  { label: "Revenue Perdido (12m)", value: impact.estimatedLost, color: "text-destructive" },
+                  { label: t("cr.commAvgMonthly"), value: impact.avgMonthly, color: "text-warning" },
+                  { label: t("creadores.off.lostRevenue12m"), value: impact.estimatedLost, color: "text-destructive" },
                 ].map((m) => (
                   <div
                     key={m.label}
@@ -450,11 +453,11 @@ ${form.comentarios || t("cr.commNoComments")}
           <div className="flex items-center gap-3">
             <Button onClick={handleSaveForm} disabled={updateOffboarding.isPending} className="gap-1.5">
               <Save className="h-4 w-4" />
-              {updateOffboarding.isPending ? "Guardando..." : "Guardar Cambios"}
+              {updateOffboarding.isPending ? t("creadores.saving") : t("creadores.edit.saveChanges")}
             </Button>
             <Button variant="outline" onClick={generateComunicado} className="gap-1.5">
               {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-              {copied ? "Copiado" : "Generar Comunicado de Salida"}
+              {copied ? t("creadores.off.copied") : t("creadores.off.generateAnnouncement")}
             </Button>
           </div>
         </CollapsibleContent>

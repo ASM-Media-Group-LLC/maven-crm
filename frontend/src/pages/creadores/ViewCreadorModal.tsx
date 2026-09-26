@@ -31,14 +31,8 @@ import {
 import { toast } from "sonner";
 import type { CreatorWithBusiness } from "./useCreadores";
 import { cleanHandle, buildSocialUrl, displayHandle } from "@/lib/utils";
-
-const statusLabel: Record<string, string> = {
-  active: "Activa",
-  onboarding: "Onboarding",
-  leaving: "Retiro",
-  terminated: "Terminada",
-  paused: "Pausada",
-};
+import { etiquetaEstado, conNombre, etiquetaIdioma } from "./etiquetasCreadora";
+import { useLanguage } from "@/hooks/useLanguage";
 
 const statusVariant: Record<string, "success-soft" | "primary-soft" | "warning-soft" | "destructive-soft" | "secondary-soft"> = {
   active: "success-soft",
@@ -113,6 +107,7 @@ const SocialLink = ({ icon, handle, url, rawHandle }: { icon: React.ReactNode; h
 
 const ViewCreadorModal = ({ open, onOpenChange, creator }: Props) => {
   const f = useFormato();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { isAdmin } = useUserRole();
@@ -129,12 +124,12 @@ const ViewCreadorModal = ({ open, onOpenChange, creator }: Props) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["creators"] });
-      toast.success("Creator eliminado correctamente");
+      toast.success(t("creadores.table.deleted"));
       setDeleteOpen(false);
       onOpenChange(false);
     },
     onError: (err: any) => {
-      toast.error("Error al eliminar creator", { description: err.message });
+      toast.error(t("creadores.table.deleteError"), { description: err.message });
     },
   });
 
@@ -153,8 +148,8 @@ const ViewCreadorModal = ({ open, onOpenChange, creator }: Props) => {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="shrink-0 rounded-full transition-opacity hover:opacity-80"
-                title="Ver Instagram"
-                aria-label="Ver Instagram"
+                title={t("creadores.view.viewInstagram")}
+                aria-label={t("creadores.view.viewInstagram")}
               >
                 <UserAvatar
                   name={c.name}
@@ -179,7 +174,7 @@ const ViewCreadorModal = ({ open, onOpenChange, creator }: Props) => {
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 hover:text-primary transition-colors"
-                    title="Ver Instagram"
+                    title={t("creadores.view.viewInstagram")}
                   >
                     {c.artistic_name || c.name}
                     <InstagramIcon className="h-4 w-4 opacity-70" />
@@ -199,47 +194,47 @@ const ViewCreadorModal = ({ open, onOpenChange, creator }: Props) => {
                 )}
                 {c.status && (
                   <Badge variant={statusVariant[c.status] ?? "secondary-soft"}>
-                    {statusLabel[c.status] ?? c.status}
+                    {etiquetaEstado(t, c.status)}
                   </Badge>
                 )}
               </div>
             </div>
             <Button variant="outline" size="sm" className="order-last w-full gap-1.5 sm:order-none sm:w-auto sm:shrink-0" onClick={() => { onOpenChange(false); navigate(`/creadores/${c.id}`); }}>
               <ExternalLink className="h-3.5 w-3.5" />
-              Perfil completo
+              {t("creadores.view.fullProfile")}
             </Button>
           </div>
         </DialogHeader>
 
         <Tabs defaultValue="info" className="mt-2">
           <TabsList className="w-full justify-start overflow-x-auto sm:justify-center">
-            <TabsTrigger value="info" className="shrink-0 sm:flex-1">Info</TabsTrigger>
-            <TabsTrigger value="redes" className="shrink-0 sm:flex-1">Redes</TabsTrigger>
-            <TabsTrigger value="notas" className="shrink-0 sm:flex-1">Notas (0)</TabsTrigger>
-            <TabsTrigger value="monetizacion" className="shrink-0 sm:flex-1">Monetización</TabsTrigger>
+            <TabsTrigger value="info" className="shrink-0 sm:flex-1">{t("creadores.view.tabInfo")}</TabsTrigger>
+            <TabsTrigger value="redes" className="shrink-0 sm:flex-1">{t("creadores.profile.tabSocials")}</TabsTrigger>
+            <TabsTrigger value="notas" className="shrink-0 sm:flex-1">{t("creadores.view.tabNotesCount", { n: 0 })}</TabsTrigger>
+            <TabsTrigger value="monetizacion" className="shrink-0 sm:flex-1">{t("creadores.profile.tabMonetization")}</TabsTrigger>
           </TabsList>
 
           <ScrollArea className="max-h-[45vh]">
             <TabsContent value="info" className="pr-3">
               <div className="grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-2 [&_span]:break-words">
-                <InfoField icon={MapPin} label="Ubicación" value={
+                <InfoField icon={MapPin} label={t("common.location")} value={
                   <span>{flag && <span className="mr-1">{flag}</span>}{c.city || c.country || "—"}</span>
                 } />
-                <InfoField icon={Building2} label="Agencia" value={c.creator_business?.company?.name ?? c.creator_business?.assigned_agency} />
-                <InfoField icon={Mail} label="Email" value={c.email} />
+                <InfoField icon={Building2} label={t("creadores.table.colAgency")} value={c.creator_business?.company?.name ?? c.creator_business?.assigned_agency} />
+                <InfoField icon={Mail} label={t("common.email")} value={c.email} />
                 <InfoField icon={Phone} label="WhatsApp" value={<WaChatButton creatorId={c.id} phone={toE164({ whatsapp: c.whatsapp_number, phone: c.phone })} name={c.name} />} />
                 <InfoField icon={Send} label="Telegram" value={(c.whatsapp_number || c.phone) ? <TgChatButton creatorId={c.id} phone={toE164({ whatsapp: c.whatsapp_number, phone: c.phone })} name={c.name} /> : null} />
-                <InfoField icon={UserCog} label="Tipo de Manager" value={c.creator_business?.manager_type} />
-                <InfoField icon={CalendarDays} label="Fecha de Registro" value={regDate} />
+                <InfoField icon={UserCog} label={t("creadores.view.managerType")} value={c.creator_business?.manager_type} />
+                <InfoField icon={CalendarDays} label={t("creadores.info.registrationDate")} value={regDate} />
               </div>
               {c.languages && c.languages.length > 0 && (
                 <div className="mt-3">
                   <p className="text-xs text-muted-foreground mb-1.5 flex items-center gap-1.5">
-                    <Globe className="h-4 w-4" /> Idiomas
+                    <Globe className="h-4 w-4" /> {t("creadores.step1.languages")}
                   </p>
                   <div className="flex gap-1.5 flex-wrap">
                     {c.languages.map((lang) => (
-                      <Badge key={lang} variant="secondary-soft" className="font-normal">{lang}</Badge>
+                      <Badge key={lang} variant="secondary-soft" className="font-normal">{etiquetaIdioma(t, lang)}</Badge>
                     ))}
                   </div>
                 </div>
@@ -251,11 +246,11 @@ const ViewCreadorModal = ({ open, onOpenChange, creator }: Props) => {
               <SocialLink icon={<TikTokIcon className="h-4 w-4" />} handle={c.tiktok_handle} rawHandle={c.tiktok_handle} url={buildSocialUrl("tiktok", c.tiktok_handle)} />
               <SocialLink icon={<XIcon className="h-4 w-4" />} handle={c.twitter_handle} rawHandle={c.twitter_handle} url={buildSocialUrl("twitter", c.twitter_handle)} />
               <SocialLink icon={<span className="text-xs font-bold">YT</span>} handle={c.youtube_handle} rawHandle={c.youtube_handle} url={buildSocialUrl("youtube", c.youtube_handle)} />
-              <SocialLink icon={<span className="text-xs font-bold">OF</span>} handle={c.onlyfans_url ? "Ver perfil" : null} url={c.onlyfans_url ?? ""} />
+              <SocialLink icon={<span className="text-xs font-bold">OF</span>} handle={c.onlyfans_url ? t("creadores.view.viewProfile") : null} url={c.onlyfans_url ?? ""} />
               <SocialLink icon={<TelegramIcon className="h-4 w-4" />} handle={c.telegram_handle} rawHandle={c.telegram_handle} url={buildSocialUrl("telegram", c.telegram_handle)} />
               <SocialLink icon={<span className="text-xs font-bold">R</span>} handle={c.reddit_handle} rawHandle={c.reddit_handle} url={buildSocialUrl("reddit", c.reddit_handle)} />
               <SocialLink icon={<Facebook className="h-4 w-4" />} handle={c.facebook_handle} rawHandle={c.facebook_handle} url={buildSocialUrl("facebook", c.facebook_handle)} />
-              <SocialLink icon={<LinkIcon className="h-4 w-4" />} handle={c.other_url ? "Ver" : null} url={c.other_url ?? ""} />
+              <SocialLink icon={<LinkIcon className="h-4 w-4" />} handle={c.other_url ? t("common.view") : null} url={c.other_url ?? ""} />
               {c.whatsapp_number && (
                 <div className="flex items-center justify-between py-3">
                   <div className="flex items-center gap-3">
@@ -277,11 +272,11 @@ const ViewCreadorModal = ({ open, onOpenChange, creator }: Props) => {
             </TabsContent>
 
             <TabsContent value="notas" className="pr-3">
-              <p className="text-sm text-muted-foreground text-center py-8">Sin notas</p>
+              <p className="text-sm text-muted-foreground text-center py-8">{t("creadores.view.noNotes")}</p>
             </TabsContent>
 
             <TabsContent value="monetizacion" className="pr-3">
-              <p className="text-sm text-muted-foreground text-center py-8">Sin datos</p>
+              <p className="text-sm text-muted-foreground text-center py-8">{t("common.noData")}</p>
             </TabsContent>
           </ScrollArea>
         </Tabs>
@@ -289,10 +284,10 @@ const ViewCreadorModal = ({ open, onOpenChange, creator }: Props) => {
         <DialogFooter className="flex-row items-center justify-between sm:justify-between">
           {isAdmin && (
             <Button variant="ghost" size="sm" className="text-destructive gap-1.5" onClick={() => setDeleteOpen(true)}>
-              <Trash2 className="h-4 w-4" /> Eliminar
+              <Trash2 className="h-4 w-4" /> {t("common.delete")}
             </Button>
           )}
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cerrar</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>{t("common.close")}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -300,9 +295,9 @@ const ViewCreadorModal = ({ open, onOpenChange, creator }: Props) => {
     <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>¿Eliminar creator?</AlertDialogTitle>
+          <AlertDialogTitle>{t("creadores.table.deleteQ")}</AlertDialogTitle>
           <AlertDialogDescription>
-            Estás a punto de eliminar a <strong>{c.name}</strong>. Esta acción no se puede deshacer.
+            {conNombre(t("creadores.table.deleteDesc"), c.name)}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -312,7 +307,7 @@ const ViewCreadorModal = ({ open, onOpenChange, creator }: Props) => {
             onClick={() => deleteCreator.mutate(c.id)}
             disabled={deleteCreator.isPending}
           >
-            {deleteCreator.isPending ? "Eliminando..." : "Eliminar"}
+            {deleteCreator.isPending ? t("cr.deleting") : t("common.delete")}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

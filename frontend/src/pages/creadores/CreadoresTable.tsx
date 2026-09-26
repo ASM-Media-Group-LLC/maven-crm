@@ -34,6 +34,7 @@ import EditCreadorModal from "./EditCreadorModal";
 import ViewCreadorModal from "./ViewCreadorModal";
 import ChangeStatusModal from "./ChangeStatusModal";
 import SellPlatformDialog from "./SellPlatformDialog";
+import { etiquetaEstado, conNombre } from "./etiquetasCreadora";
 import { useUserRole } from "@/hooks/useUserRole";
 import {
   AlertDialog,
@@ -45,16 +46,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-
-const statusLabel: Record<string, string> = {
-  active: "Activa",
-  onboarding: "Onboarding",
-  leaving: "Retiro",
-  terminated: "Terminada",
-  paused: "Pausada",
-  pendiente_verificacion: "En Revisión",
-  borrador: "Borrador",
-};
+import { useLanguage } from "@/hooks/useLanguage";
 
 const statusVariant: Record<string, "success-soft" | "primary-soft" | "warning-soft" | "destructive-soft" | "secondary-soft"> = {
   active: "success-soft",
@@ -104,6 +96,7 @@ interface Props {
 }
 
 const CreadoresTable = ({ creators }: Props) => {
+  const { t } = useLanguage();
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortAsc, setSortAsc] = useState(true);
   const [editingCreator, setEditingCreator] = useState<CreatorWithBusiness | null>(null);
@@ -148,13 +141,13 @@ const CreadoresTable = ({ creators }: Props) => {
       queryClient.invalidateQueries({ queryKey: ["ops-dashboard"] });
       toast.success(
         bluToggleTarget?.nextState
-          ? "Marcada como activa en Blu/Infloww"
-          : "Desmarcada de Blu/Infloww",
+          ? t("creadores.table.bluMarked")
+          : t("creadores.table.bluUnmarked"),
       );
       setBluToggleTarget(null);
     },
     onError: (err: any) => {
-      toast.error("No se pudo actualizar Blu/Infloww", { description: err.message });
+      toast.error(t("creadores.table.bluError"), { description: err.message });
     },
   });
 
@@ -165,11 +158,11 @@ const CreadoresTable = ({ creators }: Props) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["creators"] });
-      toast.success("Creator eliminado correctamente");
+      toast.success(t("creadores.table.deleted"));
       setDeletingCreator(null);
     },
     onError: (err: any) => {
-      toast.error("Error al eliminar creator", { description: err.message });
+      toast.error(t("creadores.table.deleteError"), { description: err.message });
     },
   });
 
@@ -221,14 +214,14 @@ const CreadoresTable = ({ creators }: Props) => {
     <Table containerClassName="overflow-visible max-md:overflow-x-auto" className="md:min-w-[900px]">
       <TableHeader>
         <TableRow>
-          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Creador" col="name" /></TableHead>
-          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Categoría" col="category" /></TableHead>
-          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Estado" col="status" /></TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label={t("creadores.table.colCreator")} col="name" /></TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label={t("common.category")} col="category" /></TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label={t("common.status")} col="status" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] text-center">Blu/Infloww</TableHead>
-          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Ubicación" col="country" /></TableHead>
-          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Agencia" col="agency" /></TableHead>
-          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Redes</TableHead>
-          <TableHead className="sticky top-0 right-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Acciones</TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label={t("common.location")} col="country" /></TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label={t("creadores.table.colAgency")} col="agency" /></TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">{t("creadores.profile.tabSocials")}</TableHead>
+          <TableHead className="sticky top-0 right-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">{t("common.actions")}</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -273,7 +266,7 @@ const CreadoresTable = ({ creators }: Props) => {
                     variant={statusVariant[c.status ?? ""] ?? "secondary-soft"}
                     className={c.status === "pendiente_verificacion" ? "badge-pending-verification" : ""}
                   >
-                    {statusLabel[c.status ?? ""] ?? c.status ?? "—"}
+                    {etiquetaEstado(t, c.status)}
                   </Badge>
                   <ChevronDown className="h-3 w-3 text-muted-foreground" />
                 </button>
@@ -293,8 +286,8 @@ const CreadoresTable = ({ creators }: Props) => {
                         }}
                         title={
                           interactive
-                            ? isActive ? "Activa — clic para desmarcar" : "Inactiva — clic para marcar"
-                            : isActive ? "Activa en Blu/Infloww" : "Inactiva en Blu/Infloww"
+                            ? isActive ? t("creadores.table.bluActiveClick") : t("creadores.table.bluInactiveClick")
+                            : isActive ? t("creadores.table.bluActive") : t("creadores.table.bluInactive")
                         }
                         className="data-[state=checked]:bg-success"
                       />
@@ -404,7 +397,7 @@ const CreadoresTable = ({ creators }: Props) => {
                               </button>
                             </DropdownMenuTrigger>
                           </TooltipTrigger>
-                          <TooltipContent>Ver plataformas</TooltipContent>
+                          <TooltipContent>{t("creadores.table.viewPlatforms")}</TooltipContent>
                         </Tooltip>
                         <DropdownMenuContent align="start">
                           {externalLinks.map((link) => (
@@ -424,11 +417,11 @@ const CreadoresTable = ({ creators }: Props) => {
               <TableCell className="sticky right-0 bg-card">
                 <div className="flex gap-1">
                   {!isCloser && (
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingCreator(c)}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingCreator(c)} aria-label={t("creadores.table.edit")} title={t("creadores.table.edit")}>
                       <Pencil className="h-4 w-4" />
                     </Button>
                   )}
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setViewingCreator(c)}>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setViewingCreator(c)} aria-label={t("creadores.table.view")} title={t("creadores.table.view")}>
                     <Eye className="h-4 w-4" />
                   </Button>
                   {canSellPlatform && (
@@ -444,7 +437,7 @@ const CreadoresTable = ({ creators }: Props) => {
                             <ShoppingCart className="h-4 w-4" />
                           </Button>
                         </TooltipTrigger>
-                        <TooltipContent>Vender plataforma</TooltipContent>
+                        <TooltipContent>{t("creadores.table.sellPlatform")}</TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
                   )}
@@ -467,14 +460,14 @@ const CreadoresTable = ({ creators }: Props) => {
                               if (data?.id) {
                                 navigate(`/creadores/offboarding/${data.id}`);
                               } else {
-                                toast("No se encontró proceso de offboarding para esta creadora.");
+                                toast(t("creadores.table.noOffboarding"));
                               }
                             }}
                           >
                             <LogOut className="h-4 w-4" />
                           </Button>
                         </TooltipTrigger>
-                        <TooltipContent>Ver Offboarding</TooltipContent>
+                        <TooltipContent>{t("creadores.table.viewOffboarding")}</TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
                    )}
@@ -486,7 +479,7 @@ const CreadoresTable = ({ creators }: Props) => {
         {sorted.length === 0 && (
           <TableRow>
             <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
-              No se encontraron creadores.
+              {t("creadores.table.empty")}
             </TableCell>
           </TableRow>
         )}
@@ -540,21 +533,13 @@ const CreadoresTable = ({ creators }: Props) => {
         <AlertDialogHeader>
           <AlertDialogTitle>
             {bluToggleTarget?.nextState
-              ? "¿Marcar como activa en Blu/Infloww?"
-              : "¿Desmarcar de Blu/Infloww?"}
+              ? t("creadores.table.bluMarkQ")
+              : t("creadores.table.bluUnmarkQ")}
           </AlertDialogTitle>
           <AlertDialogDescription>
-            {bluToggleTarget?.nextState ? (
-              <>
-                <strong>{bluToggleTarget.creator.name}</strong> va a contar como
-                ingreso al CRM (↑ alta) en el Panel de Control.
-              </>
-            ) : (
-              <>
-                <strong>{bluToggleTarget?.creator.name}</strong> va a contar como
-                baja (↓) en el Panel de Control. Puedes volver a marcarla cuando quieras.
-              </>
-            )}
+            {bluToggleTarget?.nextState
+              ? conNombre(t("creadores.table.bluMarkDesc"), bluToggleTarget.creator.name)
+              : conNombre(t("creadores.table.bluUnmarkDesc"), bluToggleTarget?.creator.name)}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -570,10 +555,10 @@ const CreadoresTable = ({ creators }: Props) => {
             disabled={toggleBluMutation.isPending}
           >
             {toggleBluMutation.isPending
-              ? "Guardando..."
+              ? t("creadores.saving")
               : bluToggleTarget?.nextState
-                ? "Sí, marcar"
-                : "Sí, desmarcar"}
+                ? t("creadores.table.yesMark")
+                : t("creadores.table.yesUnmark")}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
@@ -582,9 +567,9 @@ const CreadoresTable = ({ creators }: Props) => {
     <AlertDialog open={!!deletingCreator} onOpenChange={(open) => { if (!open) setDeletingCreator(null); }}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>¿Eliminar creator?</AlertDialogTitle>
+          <AlertDialogTitle>{t("creadores.table.deleteQ")}</AlertDialogTitle>
           <AlertDialogDescription>
-            Estás a punto de eliminar a <strong>{deletingCreator?.name}</strong>. Esta acción no se puede deshacer.
+            {conNombre(t("creadores.table.deleteDesc"), deletingCreator?.name)}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -596,7 +581,7 @@ const CreadoresTable = ({ creators }: Props) => {
               // otros componentes (ViewCreadorModal); gatear acá evita
               // que se ejecute la mutation si el rol perdió permiso.
               if (!canDeleteCreator) {
-                toast.error("No tienes permiso para eliminar creators.");
+                toast.error(t("creadores.table.noDeletePermission"));
                 setDeletingCreator(null);
                 return;
               }
@@ -604,7 +589,7 @@ const CreadoresTable = ({ creators }: Props) => {
             }}
             disabled={deleteCreator.isPending || !canDeleteCreator}
           >
-            {deleteCreator.isPending ? "Eliminando..." : "Eliminar"}
+            {deleteCreator.isPending ? t("cr.deleting") : t("common.delete")}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

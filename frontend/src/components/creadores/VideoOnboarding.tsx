@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useCreatorVideo, TIPOS_VIDEO, TOPE_VIDEOS } from "@/hooks/useCreatorVideo";
 import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
 
 /**
  * Videos de onboarding de la creadora (hasta 3): se graban una vez y los mira
@@ -30,6 +31,7 @@ export default function VideoOnboarding({
   ocultarSiVacio?: boolean;
 }) {
   const f = useFormato();
+  const { t } = useLanguage();
   const { videos, cargando, subir, urlParaVer, quitar, subiendo, progreso } = useCreatorVideo(creatorId);
   // Qué video está abierto y con qué URL firmada. Uno a la vez: dos <video>
   // reproduciendo en paralelo es ruido y ancho de banda tirado.
@@ -47,7 +49,7 @@ export default function VideoOnboarding({
     if (!file) return;
     try {
       await subir(file);
-      toast.success("Video subido");
+      toast.success(t("creadores.video.uploaded"));
     } catch (err) {
       toast.error((err as Error).message);
     }
@@ -69,7 +71,7 @@ export default function VideoOnboarding({
     try {
       if (abierto?.id === id) setAbierto(null);
       await quitar(id);
-      toast.success("Video eliminado");
+      toast.success(t("creadores.video.deleted"));
     } catch (err) {
       toast.error((err as Error).message);
     }
@@ -93,11 +95,11 @@ export default function VideoOnboarding({
       <div className="mb-3 flex items-center gap-2">
         <Clapperboard className="h-4 w-4 text-primary" />
         <h3 className="text-sm font-semibold">
-          {videos.length > 1 ? "Videos de onboarding" : "Video de onboarding"}
+          {videos.length > 1 ? t("creadores.video.titlePlural") : t("creadores.video.titleSingular")}
         </h3>
         {videos.length > 0 && (
           <span className="text-xs text-muted-foreground">
-            · {videos.length} de {TOPE_VIDEOS}
+            {t("creadores.video.countOf", { n: videos.length, max: TOPE_VIDEOS })}
           </span>
         )}
       </div>
@@ -120,7 +122,7 @@ export default function VideoOnboarding({
                   </span>
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-semibold">
-                      {v.titulo || `Video ${i + 1}`}
+                      {v.titulo || t("creadores.video.nth", { n: i + 1 })}
                     </span>
                     <span className="block text-xs text-muted-foreground">
                       {fechaDe(v.created_at)}
@@ -132,7 +134,8 @@ export default function VideoOnboarding({
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
-                    title="Quitar este video"
+                    title={t("creadores.video.remove")}
+                    aria-label={t("creadores.video.remove")}
                     onClick={() => void borrar(v.id)}
                   >
                     <Trash2 className="h-4 w-4" />
@@ -147,7 +150,7 @@ export default function VideoOnboarding({
                   playsInline
                   controlsList="nodownload"
                   className="max-h-[60vh] w-full rounded-b-xl bg-black"
-                  onError={() => toast.error("No se pudo reproducir el video")}
+                  onError={() => toast.error(t("creadores.video.playError"))}
                 />
               )}
             </div>
@@ -159,11 +162,11 @@ export default function VideoOnboarding({
         <div className="mt-2 flex flex-col gap-2 py-2">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
-            Subiendo… {progreso}%
+            {t("creadores.video.uploading", { p: progreso })}
           </div>
           <Progress value={progreso} className="h-2" />
           <p className="text-xs text-muted-foreground">
-            No cierres esta pantalla hasta que termine.
+            {t("creadores.video.dontClose")}
           </p>
         </div>
       )}
@@ -171,7 +174,7 @@ export default function VideoOnboarding({
       {!cargando && videos.length === 0 && !subiendo && (
         <div className="flex items-start gap-2 rounded-xl border border-dashed border-border/70 px-4 py-4 text-sm text-muted-foreground">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>Todavía no subió su video de onboarding.</span>
+          <span>{t("creadores.video.none")}</span>
         </div>
       )}
 
@@ -185,12 +188,12 @@ export default function VideoOnboarding({
             disabled={lleno}
           >
             <Upload className="mr-1.5 h-3.5 w-3.5" />
-            {videos.length === 0 ? "Subir video" : "Agregar otro"}
+            {videos.length === 0 ? t("creadores.video.upload") : t("creadores.video.addAnother")}
           </Button>
           <p className="mt-2 text-xs text-muted-foreground">
             {lleno
-              ? `Llegaste al máximo de ${TOPE_VIDEOS}. Quita uno para subir otro.`
-              : `MP4, MOV o WEBM · hasta 2 GB · máximo ${TOPE_VIDEOS} videos`}
+              ? t("creadores.video.maxReached", { max: TOPE_VIDEOS })
+              : t("creadores.video.limits", { max: TOPE_VIDEOS })}
           </p>
         </div>
       )}

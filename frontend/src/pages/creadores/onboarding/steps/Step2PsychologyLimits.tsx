@@ -9,12 +9,24 @@ import {
 } from "@/components/ui/accordion";
 import { BookOpen, Sparkles, ShieldAlert, Info } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
+import { etiquetaTono } from "../../etiquetasCreadora";
 import {
   Tooltip, TooltipTrigger, TooltipContent, TooltipProvider,
 } from "@/components/ui/tooltip";
 
 const NIVELES_ESTUDIO = ["Bachillerato", "Técnico", "Universitario", "Postgrado", "Otro"];
 const TONOS_VOZ = ["Dulce", "Picante", "Dominante", "Tierna", "Directa", "Juguetona"];
+
+// Estudios y tono se GUARDAN en español (el valor del select); esto es lo que se
+// muestra. El tono sale de etiquetasCreadora: la ficha lo muestra con las mismas etiquetas.
+const ETIQUETA_ESTUDIOS: Record<string, TranslationKey> = {
+  "Bachillerato": "creadores.edu.highSchool",
+  "Técnico": "creadores.edu.technical",
+  "Universitario": "creadores.edu.university",
+  "Postgrado": "creadores.edu.postgrad",
+  "Otro": "cr.offCatOther",
+};
 
 export interface Step2PsyData {
   rutinaDiaria: string;
@@ -72,7 +84,7 @@ export default function Step2PsychologyLimits({ data, onChange }: Props) {
         <AccordionTrigger className="hover:no-underline">
           <div className="flex items-center gap-2 text-sm font-semibold">
             <BookOpen className="h-4 w-4 text-primary" />
-            Biografía y Gustos
+            {t("creadores.psy.bioLikes")}
             <Tooltip>
               <TooltipTrigger asChild>
                 <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
@@ -84,19 +96,19 @@ export default function Step2PsychologyLimits({ data, onChange }: Props) {
         <AccordionContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
             <div className="space-y-1.5">
-              <Label>Hobbies</Label>
-              <Input value={data.hobbies} onChange={(e) => onChange("hobbies", e.target.value)} placeholder="Yoga, lectura, cocina..." />
+              <Label>{t("creadores.ops.hobbies")}</Label>
+              <Input value={data.hobbies} onChange={(e) => onChange("hobbies", e.target.value)} placeholder={t("creadores.psy.hobbiesPh")} />
             </div>
             <div className="space-y-1.5">
-              <Label>Comida favorita</Label>
-              <Input value={data.comidaFavorita} onChange={(e) => onChange("comidaFavorita", e.target.value)} placeholder="Sushi, pizza..." />
+              <Label>{t("creadores.ops.favoriteFood")}</Label>
+              <Input value={data.comidaFavorita} onChange={(e) => onChange("comidaFavorita", e.target.value)} placeholder={t("creadores.psy.favoriteFoodPh")} />
             </div>
             <div className="space-y-1.5">
-              <Label>Helado favorito</Label>
-              <Input value={data.heladoFavorito} onChange={(e) => onChange("heladoFavorito", e.target.value)} placeholder="Chocolate, vainilla..." />
+              <Label>{t("creadores.psy.favoriteIceCream")}</Label>
+              <Input value={data.heladoFavorito} onChange={(e) => onChange("heladoFavorito", e.target.value)} placeholder={t("creadores.psy.favoriteIceCreamPh")} />
             </div>
             <div className="space-y-1.5">
-              <Label>Bebida favorita</Label>
+              <Label>{t("creadores.psy.favoriteDrink")}</Label>
               <Input value={data.bebidaFavorita} onChange={(e) => onChange("bebidaFavorita", e.target.value)} placeholder={t("cr.drinkPh")} />
             </div>
             <div className="space-y-1.5">
@@ -109,14 +121,14 @@ export default function Step2PsychologyLimits({ data, onChange }: Props) {
             </div>
             <div className="space-y-1.5">
               <Label>{t("cr.petsNames")}</Label>
-              <Input value={data.mascotasNombres} onChange={(e) => onChange("mascotasNombres", e.target.value)} placeholder="Perro: Luna, Gato: Milo" />
+              <Input value={data.mascotasNombres} onChange={(e) => onChange("mascotasNombres", e.target.value)} placeholder={t("creadores.psy.petsPh")} />
             </div>
             <div className="space-y-1.5">
-              <Label>Hermanos / Hijos</Label>
+              <Label>{t("creadores.psy.siblingsKids")}</Label>
               <Input value={data.hermanos} onChange={(e) => onChange("hermanos", e.target.value)} placeholder={t("cr.siblingsPh")} />
             </div>
             <div className="space-y-1.5">
-              <Label>Viajes favoritos</Label>
+              <Label>{t("creadores.psy.favoriteTrips")}</Label>
               <Input value={data.viajesFavoritos} onChange={(e) => onChange("viajesFavoritos", e.target.value)} placeholder={t("cr.travelsPh")} />
             </div>
             <div className="space-y-1.5">
@@ -128,40 +140,40 @@ export default function Step2PsychologyLimits({ data, onChange }: Props) {
               <Select value={data.nivelEstudios} onValueChange={(v) => onChange("nivelEstudios", v)}>
                 <SelectTrigger><SelectValue placeholder={t("cr.selectLevel")} /></SelectTrigger>
                 <SelectContent>
-                  {NIVELES_ESTUDIO.map((n) => <SelectItem key={n} value={n}>{n}</SelectItem>)}
+                  {NIVELES_ESTUDIO.map((n) => <SelectItem key={n} value={n}>{t(ETIQUETA_ESTUDIOS[n])}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
               <Label>{t("cr.sleepSchedule")}</Label>
-              <Input value={data.horariosSueno} onChange={(e) => onChange("horariosSueno", e.target.value)} placeholder="Despierta 9am, duerme 1am" />
+              <Input value={data.horariosSueno} onChange={(e) => onChange("horariosSueno", e.target.value)} placeholder={t("creadores.psy.sleepPh")} />
             </div>
             <div className="space-y-1.5">
               <Label>{t("cr.sportTeam")}</Label>
               <Input value={data.deporteEquipo} onChange={(e) => onChange("deporteEquipo", e.target.value)} placeholder={t("cr.sportPh")} />
             </div>
             <div className="space-y-1.5">
-              <Label>Color favorito</Label>
-              <Input value={data.colorFavorito} onChange={(e) => onChange("colorFavorito", e.target.value)} placeholder="Rosa, negro..." />
+              <Label>{t("creadores.psy.favoriteColor")}</Label>
+              <Input value={data.colorFavorito} onChange={(e) => onChange("colorFavorito", e.target.value)} placeholder={t("creadores.psy.favoriteColorPh")} />
             </div>
             <div className="space-y-1.5">
-              <Label>Estado civil</Label>
+              <Label>{t("creadores.psy.maritalStatus")}</Label>
               <Input value={data.estadoCivil} onChange={(e) => onChange("estadoCivil", e.target.value)} placeholder={t("cr.maritalPh")} />
             </div>
             <div className="space-y-1.5">
               <Label>{t("cr.bestPhysicalFeature")}</Label>
-              <Input value={data.mejorAtributoFisico} onChange={(e) => onChange("mejorAtributoFisico", e.target.value)} placeholder="Ojos, sonrisa, cuerpo..." />
+              <Input value={data.mejorAtributoFisico} onChange={(e) => onChange("mejorAtributoFisico", e.target.value)} placeholder={t("creadores.psy.bestFeaturePh")} />
             </div>
             <div className="md:col-span-2 space-y-1.5">
               <Label>{t("cr.lookForInPartner")}</Label>
               <Textarea value={data.queBuscasPareja} onChange={(e) => onChange("queBuscasPareja", e.target.value)} placeholder={t("cr.lookForInPartnerPh")} rows={3} />
             </div>
             <div className="md:col-span-2 space-y-1.5">
-              <Label>Metas a largo plazo</Label>
+              <Label>{t("creadores.psy.longTermGoals")}</Label>
               <Textarea value={data.metasLargoPlazo} onChange={(e) => onChange("metasLargoPlazo", e.target.value)} placeholder={t("cr.longTermGoalsPh")} rows={3} />
             </div>
             <div className="md:col-span-2 space-y-1.5">
-              <Label>Rutina diaria</Label>
+              <Label>{t("creadores.psy.dailyRoutine")}</Label>
               <Textarea value={data.rutinaDiaria} onChange={(e) => onChange("rutinaDiaria", e.target.value)} placeholder={t("cr.dailyRoutinePh")} rows={3} />
             </div>
           </div>
@@ -173,7 +185,7 @@ export default function Step2PsychologyLimits({ data, onChange }: Props) {
         <AccordionTrigger className="hover:no-underline">
           <div className="flex items-center gap-2 text-sm font-semibold">
             <Sparkles className="h-4 w-4 text-primary" />
-            Personalidad y Tono
+            {t("creadores.psy.personalityTone")}
             <Tooltip>
               <TooltipTrigger asChild>
                 <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
@@ -194,14 +206,14 @@ export default function Step2PsychologyLimits({ data, onChange }: Props) {
             </div>
             <div className="space-y-1.5">
               <Label>{t("cr.whatFansCallYou")}</Label>
-              <Input value={data.comoQuieresQueTeLlamen} onChange={(e) => onChange("comoQuieresQueTeLlamen", e.target.value)} placeholder="Diosa, Reina, Princesa..." />
+              <Input value={data.comoQuieresQueTeLlamen} onChange={(e) => onChange("comoQuieresQueTeLlamen", e.target.value)} placeholder={t("creadores.psy.fansCallPh")} />
             </div>
             <div className="space-y-1.5">
-              <Label>Apodos permitidos</Label>
+              <Label>{t("creadores.ops.allowedNicknames")}</Label>
               <Input value={data.apodosPermitidos} onChange={(e) => onChange("apodosPermitidos", e.target.value)} placeholder={t("cr.petNamesPh")} />
             </div>
             <div className="space-y-1.5">
-              <Label>Palabras prohibidas</Label>
+              <Label>{t("creadores.ops.bannedWords")}</Label>
               <Input value={data.palabrasProhibidas} onChange={(e) => onChange("palabrasProhibidas", e.target.value)} placeholder={t("cr.bannedWordsPh")} />
             </div>
             <div className="space-y-1.5">
@@ -213,7 +225,7 @@ export default function Step2PsychologyLimits({ data, onChange }: Props) {
               <Select value={data.tonoVoz} onValueChange={(v) => onChange("tonoVoz", v)}>
                 <SelectTrigger><SelectValue placeholder={t("cr.selectTone")} /></SelectTrigger>
                 <SelectContent>
-                  {TONOS_VOZ.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                  {TONOS_VOZ.map((tono) => <SelectItem key={tono} value={tono}>{etiquetaTono(t, tono)}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -223,7 +235,7 @@ export default function Step2PsychologyLimits({ data, onChange }: Props) {
             </div>
             <div className="md:col-span-2 space-y-1.5">
               <Label>{t("cr.whatMakesYouLaugh")}</Label>
-              <Textarea value={data.queTeHaceReir} onChange={(e) => onChange("queTeHaceReir", e.target.value)} placeholder="Memes, comedia, situaciones absurdas..." rows={3} />
+              <Textarea value={data.queTeHaceReir} onChange={(e) => onChange("queTeHaceReir", e.target.value)} placeholder={t("creadores.psy.laughPh")} rows={3} />
             </div>
             <div className="md:col-span-2 space-y-1.5">
               <Label>{t("cr.whatMotivates")}</Label>
@@ -238,7 +250,7 @@ export default function Step2PsychologyLimits({ data, onChange }: Props) {
         <AccordionTrigger className="hover:no-underline">
           <div className="flex items-center gap-2 text-sm font-semibold">
             <ShieldAlert className="h-4 w-4 text-destructive" />
-            Límites y Manejo de Crisis
+            {t("creadores.psy.limitsCrisis")}
             <Tooltip>
               <TooltipTrigger asChild>
                 <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />

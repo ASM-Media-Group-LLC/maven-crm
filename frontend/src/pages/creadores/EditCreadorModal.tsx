@@ -30,6 +30,7 @@ import TelegramIcon from "@/components/icons/TelegramIcon";
 import ExtraAccountsInline from "./ExtraAccountsInline";
 import { useUserRole } from "@/hooks/useUserRole";
 import { ManagerSelect, managerAssignmentPatch } from "./ManagerSelect";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface Props {
   open: boolean;
@@ -42,6 +43,7 @@ interface Props {
 const CATEGORIES_FALLBACK = ["Elite", "A+", "A", "B+", "B", "C+", "C"] as const;
 
 const EditCreadorModal = ({ open, onOpenChange, creator }: Props) => {
+  const { t } = useLanguage();
   const [form, setForm] = useState({
     name: "",
     artistic_name: "",
@@ -138,18 +140,18 @@ const EditCreadorModal = ({ open, onOpenChange, creator }: Props) => {
       },
       {
         onSuccess: () => {
-          toast({ title: "Creador actualizado correctamente" });
+          toast({ title: t("creadores.edit.updated") });
           onOpenChange(false);
         },
         onError: (err) => {
-          toast({ title: "Error al actualizar", description: String(err), variant: "destructive" });
+          toast({ title: t("common.errorUpdating"), description: String(err), variant: "destructive" });
         },
       }
     );
   };
 
   // Identity bits para el header del modal.
-  const displayName = creator.artistic_name || creator.name || "Creadora";
+  const displayName = creator.artistic_name || creator.name || t("cr.creator");
   const igUrl = buildSocialUrl("instagram", creator.instagram_handle);
 
   // Sub-componente: nombre como link a IG si existe; sino texto plano.
@@ -203,7 +205,7 @@ const EditCreadorModal = ({ open, onOpenChange, creator }: Props) => {
               />
             )}
             <div className="min-w-0 flex-1">
-              <DialogTitle className="text-lg">Editar Creador</DialogTitle>
+              <DialogTitle className="text-lg">{t("creadores.edit.title")}</DialogTitle>
               <div className="mt-0.5">
                 <NameLink />
               </div>
@@ -216,7 +218,7 @@ const EditCreadorModal = ({ open, onOpenChange, creator }: Props) => {
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
           <section className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label>Nombre *</Label>
+              <Label>{t("creadores.add.nameReq")}</Label>
               <Input
                 value={form.name}
                 onChange={(e) => handleChange("name", e.target.value)}
@@ -224,30 +226,30 @@ const EditCreadorModal = ({ open, onOpenChange, creator }: Props) => {
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Nombre Artístico</Label>
+              <Label>{t("creadores.edit.stageName")}</Label>
               <Input value={form.artistic_name} onChange={(e) => handleChange("artistic_name", e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <Label>Email</Label>
+              <Label>{t("common.email")}</Label>
               <Input type="email" value={form.email} onChange={(e) => handleChange("email", e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <Label>Teléfono</Label>
+              <Label>{t("common.phone")}</Label>
               <Input value={form.phone} onChange={(e) => handleChange("phone", e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <Label>País</Label>
+              <Label>{t("common.country")}</Label>
               <Input value={form.country} onChange={(e) => handleChange("country", e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <Label>Ciudad</Label>
+              <Label>{t("common.city")}</Label>
               <Input value={form.city} onChange={(e) => handleChange("city", e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <Label>Categoría</Label>
+              <Label>{t("common.category")}</Label>
               <Select value={form.category} onValueChange={(v) => handleChange("category", v)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar" />
+                  <SelectValue placeholder={t("common.select")} />
                 </SelectTrigger>
                 <SelectContent>
                   {CATEGORIES.map((c) => (
@@ -263,45 +265,45 @@ const EditCreadorModal = ({ open, onOpenChange, creator }: Props) => {
           </section>
 
           <section className="space-y-3 pt-2 border-t border-border/60">
-            <h4 className="text-xs font-semibold text-foreground/70 pt-3">Redes Sociales</h4>
+            <h4 className="text-xs font-semibold text-foreground/70 pt-3">{t("creadores.edit.socials")}</h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>Instagram</Label>
-                <Input value={form.instagram_handle} onChange={(e) => handleChange("instagram_handle", e.target.value)} placeholder="@usuario" />
+                <Input value={form.instagram_handle} onChange={(e) => handleChange("instagram_handle", e.target.value)} placeholder={t("cr.userHandlePh")} />
                 <ExtraAccountsInline creatorId={creator?.id} network="instagram" canManage={canManageAccounts} primaryFilled={!!(form.instagram_handle || "").trim()} onPromoteToPrimary={(v) => handleChange("instagram_handle", v)} />
               </div>
               <div className="space-y-1.5">
                 <Label>Twitter/X</Label>
-                <Input value={form.twitter_handle} onChange={(e) => handleChange("twitter_handle", e.target.value)} placeholder="@usuario" />
+                <Input value={form.twitter_handle} onChange={(e) => handleChange("twitter_handle", e.target.value)} placeholder={t("cr.userHandlePh")} />
                 <ExtraAccountsInline creatorId={creator?.id} network="x" canManage={canManageAccounts} primaryFilled={!!(form.twitter_handle || "").trim()} onPromoteToPrimary={(v) => handleChange("twitter_handle", v)} />
               </div>
               <div className="space-y-1.5">
                 <Label>TikTok</Label>
-                <Input value={form.tiktok_handle} onChange={(e) => handleChange("tiktok_handle", e.target.value)} placeholder="@usuario" />
+                <Input value={form.tiktok_handle} onChange={(e) => handleChange("tiktok_handle", e.target.value)} placeholder={t("cr.userHandlePh")} />
                 <ExtraAccountsInline creatorId={creator?.id} network="tiktok" canManage={canManageAccounts} primaryFilled={!!(form.tiktok_handle || "").trim()} onPromoteToPrimary={(v) => handleChange("tiktok_handle", v)} />
               </div>
               <div className="space-y-1.5">
                 <Label>YouTube</Label>
-                <Input value={form.youtube_handle} onChange={(e) => handleChange("youtube_handle", e.target.value)} placeholder="@canal" />
+                <Input value={form.youtube_handle} onChange={(e) => handleChange("youtube_handle", e.target.value)} placeholder={t("creadores.edit.channelPh")} />
                 <ExtraAccountsInline creatorId={creator?.id} network="youtube" canManage={canManageAccounts} primaryFilled={!!(form.youtube_handle || "").trim()} onPromoteToPrimary={(v) => handleChange("youtube_handle", v)} />
               </div>
               <div className="space-y-1.5">
                 <Label>Telegram</Label>
-                <Input value={form.telegram_handle} onChange={(e) => handleChange("telegram_handle", e.target.value)} placeholder="@usuario o t.me/..." />
+                <Input value={form.telegram_handle} onChange={(e) => handleChange("telegram_handle", e.target.value)} placeholder={t("creadores.edit.telegramPh")} />
                 <ExtraAccountsInline creatorId={creator?.id} network="telegram" canManage={canManageAccounts} primaryFilled={!!(form.telegram_handle || "").trim()} onPromoteToPrimary={(v) => handleChange("telegram_handle", v)} />
               </div>
               <div className="space-y-1.5">
                 <Label>Reddit</Label>
-                <Input value={form.reddit_handle} onChange={(e) => handleChange("reddit_handle", e.target.value)} placeholder="u/usuario" />
+                <Input value={form.reddit_handle} onChange={(e) => handleChange("reddit_handle", e.target.value)} placeholder={t("creadores.edit.redditPh")} />
                 <ExtraAccountsInline creatorId={creator?.id} network="reddit" canManage={canManageAccounts} primaryFilled={!!(form.reddit_handle || "").trim()} onPromoteToPrimary={(v) => handleChange("reddit_handle", v)} />
               </div>
               <div className="space-y-1.5">
                 <Label>Facebook</Label>
-                <Input value={form.facebook_handle} onChange={(e) => handleChange("facebook_handle", e.target.value)} placeholder="usuario o URL" />
+                <Input value={form.facebook_handle} onChange={(e) => handleChange("facebook_handle", e.target.value)} placeholder={t("creadores.edit.facebookPh")} />
                 <ExtraAccountsInline creatorId={creator?.id} network="facebook" canManage={canManageAccounts} primaryFilled={!!(form.facebook_handle || "").trim()} onPromoteToPrimary={(v) => handleChange("facebook_handle", v)} />
               </div>
               <div className="space-y-1.5">
-                <Label>Otra red / Link</Label>
+                <Label>{t("creadores.edit.otherLink")}</Label>
                 <Input value={form.other_url} onChange={(e) => handleChange("other_url", e.target.value)} placeholder="https://..." />
                 <ExtraAccountsInline creatorId={creator?.id} network="other" canManage={canManageAccounts} primaryFilled={!!(form.other_url || "").trim()} onPromoteToPrimary={(v) => handleChange("other_url", v)} />
               </div>
@@ -319,20 +321,20 @@ const EditCreadorModal = ({ open, onOpenChange, creator }: Props) => {
           </section>
 
           <section className="space-y-1.5 pt-2 border-t border-border/60">
-            <h4 className="text-xs font-semibold text-foreground/70 pt-3">Biografía</h4>
+            <h4 className="text-xs font-semibold text-foreground/70 pt-3">{t("creadores.edit.bio")}</h4>
             <Textarea
               value={form.bio}
               onChange={(e) => handleChange("bio", e.target.value)}
-              placeholder="Breve descripción del creador..."
+              placeholder={t("creadores.edit.bioPh")}
               rows={3}
             />
           </section>
         </div>
 
         <DialogFooter className="px-6 py-4 border-t border-border/60 bg-card">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>{t("common.cancel")}</Button>
           <Button onClick={handleSave} disabled={updateMutation.isPending}>
-            {updateMutation.isPending ? "Guardando..." : "Guardar Cambios"}
+            {updateMutation.isPending ? t("creadores.saving") : t("creadores.edit.saveChanges")}
           </Button>
         </DialogFooter>
       </DialogContent>

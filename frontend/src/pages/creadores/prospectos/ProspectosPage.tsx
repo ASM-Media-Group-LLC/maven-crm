@@ -85,6 +85,8 @@ export default function ProspectosPage() {
 
   // Agency tabs from data
   const agencyTabs = AGENCY_ORDER;
+  // "Otra" es un valor GUARDADO (plataforma o agencia); solo cambia cómo se muestra.
+  const visible = (v: string | null | undefined) => (v === "Otra" ? t("creadores.socials.other") : v);
 
   function openEdit(item: ProspectRecord) {
     setEditForm({
@@ -116,7 +118,7 @@ export default function ProspectosPage() {
         {/* Header */}
         <header className="shrink-0 bg-background/30 backdrop-blur-xl border-b border-white/10 px-6 pt-6 pb-4">
           <PageHeader
-            title="Casting"
+            title={t("creadores.pros.title")}
             subtitle={t("cr.prospectsSubtitle")}
             actions={
               <Button size="sm" onClick={() => setShowAdd(true)}>
@@ -146,7 +148,7 @@ export default function ProspectosPage() {
           <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1">
             <Button variant={!agencyTab ? "secondary" : "ghost"} size="sm" onClick={() => setAgencyTab("")}>{t("common.all")}</Button>
             {agencyTabs.map((a) => (
-              <Button key={a} variant={agencyTab === a ? "secondary" : "ghost"} size="sm" onClick={() => setAgencyTab(a)}>{a}</Button>
+              <Button key={a} variant={agencyTab === a ? "secondary" : "ghost"} size="sm" onClick={() => setAgencyTab(a)}>{visible(a)}</Button>
             ))}
           </div>
 
@@ -157,19 +159,19 @@ export default function ProspectosPage() {
               <Input placeholder={t("cr.prospectSearchPh")} className="pl-8" value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
             <Select value={statusFilter || undefined} onValueChange={(v) => setStatusFilter(v === "__all__" ? "" : v)}>
-              <SelectTrigger className="w-40"><SelectValue placeholder="Estado" /></SelectTrigger>
+              <SelectTrigger className="w-40"><SelectValue placeholder={t("common.status")} /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="__all__">{t("common.all")}</SelectItem>
-                {PROSPECT_STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                {PROSPECT_STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{t(s.label)}</SelectItem>)}
               </SelectContent>
             </Select>
             <div className="inline-flex items-center rounded-md border border-border">
-              <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8 rounded-r-none" onClick={() => setViewMode("list")}><ListIcon className="h-4 w-4" /></Button>
-              <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8 rounded-l-none" onClick={() => setViewMode("grid")}><LayoutGrid className="h-4 w-4" /></Button>
+              <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8 rounded-r-none" onClick={() => setViewMode("list")} aria-label={t("creadores.pros.listView")} title={t("creadores.pros.listView")}><ListIcon className="h-4 w-4" /></Button>
+              <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8 rounded-l-none" onClick={() => setViewMode("grid")} aria-label={t("creadores.list.gridView")} title={t("creadores.list.gridView")}><LayoutGrid className="h-4 w-4" /></Button>
             </div>
             {hasFilters && (
               <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={() => { setSearch(""); setStatusFilter(""); }}>
-                <X className="h-3.5 w-3.5 mr-1" />Limpiar filtros
+                <X className="h-3.5 w-3.5 mr-1" />{t("creadores.list.clearFilters")}
               </Button>
             )}
           </div>
@@ -181,13 +183,13 @@ export default function ProspectosPage() {
                 <Table>
                   <TableHeader>
                     <TableRow className="sticky top-0 z-10 bg-card border-b">
-                      <TableHead className="text-xs font-medium text-muted-foreground">Creador</TableHead>
-                      <TableHead className="text-xs font-medium text-muted-foreground">Plataforma</TableHead>
+                      <TableHead className="text-xs font-medium text-muted-foreground">{t("creadores.table.colCreator")}</TableHead>
+                      <TableHead className="text-xs font-medium text-muted-foreground">{t("creadores.pros.platform")}</TableHead>
                       <TableHead className="text-xs font-medium text-muted-foreground">{t("common.category")}</TableHead>
-                      <TableHead className="text-xs font-medium text-muted-foreground">Agencia</TableHead>
+                      <TableHead className="text-xs font-medium text-muted-foreground">{t("creadores.table.colAgency")}</TableHead>
                       <TableHead className="text-xs font-medium text-muted-foreground">{t("common.date")}</TableHead>
-                      <TableHead className="text-xs font-medium text-muted-foreground">Estado</TableHead>
-                      <TableHead className="text-xs font-medium text-muted-foreground sticky right-0 bg-card">Acciones</TableHead>
+                      <TableHead className="text-xs font-medium text-muted-foreground">{t("common.status")}</TableHead>
+                      <TableHead className="text-xs font-medium text-muted-foreground sticky right-0 bg-card">{t("common.actions")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -218,13 +220,13 @@ export default function ProspectosPage() {
                                 </div>
                               </div>
                             </TableCell>
-                            <TableCell className="text-sm text-muted-foreground">{p.platform ?? "—"}</TableCell>
+                            <TableCell className="text-sm text-muted-foreground">{visible(p.platform) ?? "—"}</TableCell>
                             <TableCell className="text-sm text-muted-foreground">{p.category ?? "—"}</TableCell>
-                            <TableCell className="text-sm text-muted-foreground">{p.agency ?? "—"}</TableCell>
+                            <TableCell className="text-sm text-muted-foreground">{visible(p.agency) ?? "—"}</TableCell>
                             <TableCell className="text-sm whitespace-nowrap">{format(new Date(p.created_at), "dd/MM/yyyy")}</TableCell>
                             <TableCell>
                               <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium", statusColors.bg, statusColors.text)}>
-                                {PROSPECT_STATUSES.find((s) => s.value === p.status)?.label ?? p.status}
+                                {(() => { const s = PROSPECT_STATUSES.find((x) => x.value === p.status); return s ? t(s.label) : p.status; })()}
                               </span>
                             </TableCell>
                             <TableCell className="sticky right-0 bg-card group-hover:bg-muted/30">
@@ -241,9 +243,9 @@ export default function ProspectosPage() {
                                 {p.status !== "convertido" && p.status !== "descartado" && (
                                   <Tooltip><TooltipTrigger asChild>
                                     <Button size="sm" className="h-7 px-2 text-xs ml-1" onClick={() => setOnboardItem(p)}>
-                                      <Rocket className="h-3.5 w-3.5 mr-1" />Onboarding
+                                      <Rocket className="h-3.5 w-3.5 mr-1" />{t("creadores.pros.onboarding")}
                                     </Button>
-                                  </TooltipTrigger><TooltipContent side="left">Iniciar Onboarding</TooltipContent></Tooltip>
+                                  </TooltipTrigger><TooltipContent side="left">{t("creadores.onb.start")}</TooltipContent></Tooltip>
                                 )}
                               </div>
                             </TableCell>
@@ -262,7 +264,7 @@ export default function ProspectosPage() {
                 Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-44 rounded-lg" />)
               ) : filtered.length === 0 ? (
                 <div className="col-span-full text-center py-12 text-muted-foreground">
-                  {prospects.length === 0 ? "No hay perfiles registrados." : "Sin resultados para los filtros aplicados."}
+                  {prospects.length === 0 ? t("cr.noProfiles") : t("cr.noResultsFilters")}
                 </div>
               ) : (
                 filtered.map((p) => {
@@ -278,17 +280,17 @@ export default function ProspectosPage() {
                             </div>
                             <div>
                               <p className="text-sm font-medium leading-tight">{p.name}</p>
-                              <p className="text-xs text-muted-foreground truncate max-w-[160px]">{p.instagram ? `@${p.instagram.replace(/^@/, "")}` : "Sin Instagram"}</p>
+                              <p className="text-xs text-muted-foreground truncate max-w-[160px]">{p.instagram ? `@${p.instagram.replace(/^@/, "")}` : t("creadores.pros.noInstagram")}</p>
                             </div>
                           </div>
                           <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium shrink-0", statusColors.bg, statusColors.text)}>
-                            {PROSPECT_STATUSES.find((s) => s.value === p.status)?.label ?? p.status}
+                            {(() => { const s = PROSPECT_STATUSES.find((x) => x.value === p.status); return s ? t(s.label) : p.status; })()}
                           </span>
                         </div>
                         <div className="space-y-1 text-xs text-muted-foreground">
-                          <p><span className="font-medium text-foreground">Plataforma:</span> {p.platform ?? "—"}</p>
-                          {p.agency && <p><span className="font-medium text-foreground">Agencia:</span> {p.agency}</p>}
-                          <p><span className="font-medium text-foreground">Fuente:</span> {PROSPECT_SOURCES.find((s) => s.value === p.source)?.label ?? "—"}</p>
+                          <p><span className="font-medium text-foreground">{t("creadores.pros.platformColon")}</span> {visible(p.platform) ?? "—"}</p>
+                          {p.agency && <p><span className="font-medium text-foreground">{t("creadores.pros.agencyColon")}</span> {visible(p.agency)}</p>}
+                          <p><span className="font-medium text-foreground">{t("creadores.pros.sourceColon")}</span> {(() => { const s = PROSPECT_SOURCES.find((x) => x.value === p.source); return s ? t(s.label) : "—"; })()}</p>
                           <p><span className="font-medium text-foreground">{t("cr.dateColon")}</span> {format(new Date(p.created_at), "dd/MM/yyyy")}</p>
                         </div>
                         <div className="flex items-center gap-1 pt-1 border-t border-border">
@@ -297,7 +299,7 @@ export default function ProspectosPage() {
                           <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive hover:text-destructive" onClick={() => setDeleteItem(p)}><Trash2 className="h-3 w-3 mr-1" />{t("common.delete")}</Button>
                           {p.status !== "convertido" && p.status !== "descartado" && (
                             <Button size="sm" className="h-7 text-xs ml-auto" onClick={() => setOnboardItem(p)}>
-                              <Rocket className="h-3 w-3 mr-1" />Onboarding
+                              <Rocket className="h-3 w-3 mr-1" />{t("creadores.pros.onboarding")}
                             </Button>
                           )}
                         </div>
@@ -320,24 +322,24 @@ export default function ProspectosPage() {
                   <div><p className="text-xs text-muted-foreground">{t("common.name")}</p><p className="font-medium">{viewItem.name}</p></div>
                   <div><p className="text-xs text-muted-foreground">Instagram</p><p>{viewItem.instagram ? `@${viewItem.instagram.replace(/^@/, "")}` : "—"}</p></div>
                   <div><p className="text-xs text-muted-foreground">TikTok</p><p>{viewItem.tiktok ? `@${viewItem.tiktok.replace(/^@/, "")}` : "—"}</p></div>
-                  <div><p className="text-xs text-muted-foreground">Plataforma</p><p>{viewItem.platform ?? "—"}</p></div>
+                  <div><p className="text-xs text-muted-foreground">{t("creadores.pros.platform")}</p><p>{visible(viewItem.platform) ?? "—"}</p></div>
                   <div><p className="text-xs text-muted-foreground">{t("common.category")}</p><p>{viewItem.category ?? "—"}</p></div>
-                  <div><p className="text-xs text-muted-foreground">Agencia</p><p>{viewItem.agency ?? "—"}</p></div>
+                  <div><p className="text-xs text-muted-foreground">{t("creadores.table.colAgency")}</p><p>{visible(viewItem.agency) ?? "—"}</p></div>
                   <div><p className="text-xs text-muted-foreground">{t("common.country")}</p><p>{viewItem.country ?? "—"}</p></div>
-                  <div><p className="text-xs text-muted-foreground">Email</p><p>{viewItem.email ?? "—"}</p></div>
+                  <div><p className="text-xs text-muted-foreground">{t("common.email")}</p><p>{viewItem.email ?? "—"}</p></div>
                   <div><p className="text-xs text-muted-foreground">{t("common.phone")}</p><p><MaskedPhone phone={viewItem.phone} /></p></div>
-                  <div><p className="text-xs text-muted-foreground">Fuente</p><p>{PROSPECT_SOURCES.find((s) => s.value === viewItem.source)?.label ?? "—"}</p></div>
+                  <div><p className="text-xs text-muted-foreground">{t("creadores.pros.source")}</p><p>{(() => { const s = PROSPECT_SOURCES.find((x) => x.value === viewItem.source); return s ? t(s.label) : "—"; })()}</p></div>
                   <div><p className="text-xs text-muted-foreground">{t("common.date")}</p><p>{format(new Date(viewItem.created_at), "dd/MM/yyyy")}</p></div>
                   <div>
-                    <p className="text-xs text-muted-foreground">Estado</p>
+                    <p className="text-xs text-muted-foreground">{t("common.status")}</p>
                     {(() => {
                       const c = PROSPECT_STATUS_COLORS[viewItem.status] ?? { bg: "bg-muted", text: "text-muted-foreground" };
-                      return <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium", c.bg, c.text)}>{PROSPECT_STATUSES.find((s) => s.value === viewItem.status)?.label ?? viewItem.status}</span>;
+                      return <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium", c.bg, c.text)}>{(() => { const s = PROSPECT_STATUSES.find((x) => x.value === viewItem.status); return s ? t(s.label) : viewItem.status; })()}</span>;
                     })()}
                   </div>
                 </div>
                 {viewItem.notes && (
-                  <div><p className="text-xs text-muted-foreground">Notas</p><p className="whitespace-pre-wrap">{viewItem.notes}</p></div>
+                  <div><p className="text-xs text-muted-foreground">{t("creadores.ops.notes")}</p><p className="whitespace-pre-wrap">{viewItem.notes}</p></div>
                 )}
               </div>
             )}
@@ -365,10 +367,10 @@ export default function ProspectosPage() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Plataforma Principal</Label>
+                  <Label>{t("creadores.pros.mainPlatform")}</Label>
                   <Select value={addForm.platform || undefined} onValueChange={(v) => setAddForm((f) => ({ ...f, platform: v }))}>
                     <SelectTrigger><SelectValue placeholder={t("common.selectEllipsis")} /></SelectTrigger>
-                    <SelectContent>{PROSPECT_PLATFORMS.map((p) => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}</SelectContent>
+                    <SelectContent>{PROSPECT_PLATFORMS.map((p) => <SelectItem key={p.value} value={p.value}>{p.labelKey ? t(p.labelKey) : p.label}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
@@ -378,10 +380,10 @@ export default function ProspectosPage() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Agencia</Label>
+                  <Label>{t("creadores.table.colAgency")}</Label>
                   <Select value={addForm.agency || undefined} onValueChange={(v) => setAddForm((f) => ({ ...f, agency: v }))}>
                     <SelectTrigger><SelectValue placeholder={t("common.selectEllipsis")} /></SelectTrigger>
-                    <SelectContent>{AGENCY_ORDER.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}</SelectContent>
+                    <SelectContent>{AGENCY_ORDER.map((a) => <SelectItem key={a} value={a}>{visible(a)}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
@@ -391,7 +393,7 @@ export default function ProspectosPage() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Email</Label>
+                  <Label>{t("common.email")}</Label>
                   <Input type="email" value={addForm.email} onChange={(e) => setAddForm((f) => ({ ...f, email: e.target.value }))} />
                 </div>
                 <div className="space-y-1.5">
@@ -400,20 +402,20 @@ export default function ProspectosPage() {
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label>Fuente</Label>
+                <Label>{t("creadores.pros.source")}</Label>
                 <Select value={addForm.source || undefined} onValueChange={(v) => setAddForm((f) => ({ ...f, source: v }))}>
                   <SelectTrigger><SelectValue placeholder={t("common.selectEllipsis")} /></SelectTrigger>
-                  <SelectContent>{PROSPECT_SOURCES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
+                  <SelectContent>{PROSPECT_SOURCES.map((s) => <SelectItem key={s.value} value={s.value}>{t(s.label)}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>Notas</Label>
+                <Label>{t("creadores.ops.notes")}</Label>
                 <Textarea rows={3} value={addForm.notes} onChange={(e) => setAddForm((f) => ({ ...f, notes: e.target.value }))} />
               </div>
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setShowAdd(false)}>{t("common.cancel")}</Button>
                 <Button onClick={handleAdd} disabled={!addForm.name.trim() || addMutation.isPending}>
-                  {addMutation.isPending ? "Guardando..." : "Crear Prospecto"}
+                  {addMutation.isPending ? t("creadores.saving") : t("creadores.pros.create")}
                 </Button>
               </div>
             </div>
@@ -441,10 +443,10 @@ export default function ProspectosPage() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Plataforma</Label>
+                  <Label>{t("creadores.pros.platform")}</Label>
                   <Select value={editForm.platform || undefined} onValueChange={(v) => setEditForm((f) => ({ ...f, platform: v }))}>
                     <SelectTrigger><SelectValue placeholder={t("common.selectEllipsis")} /></SelectTrigger>
-                    <SelectContent>{PROSPECT_PLATFORMS.map((p) => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}</SelectContent>
+                    <SelectContent>{PROSPECT_PLATFORMS.map((p) => <SelectItem key={p.value} value={p.value}>{p.labelKey ? t(p.labelKey) : p.label}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
@@ -454,10 +456,10 @@ export default function ProspectosPage() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Agencia</Label>
+                  <Label>{t("creadores.table.colAgency")}</Label>
                   <Select value={editForm.agency || undefined} onValueChange={(v) => setEditForm((f) => ({ ...f, agency: v }))}>
                     <SelectTrigger><SelectValue placeholder={t("common.selectEllipsis")} /></SelectTrigger>
-                    <SelectContent>{AGENCY_ORDER.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}</SelectContent>
+                    <SelectContent>{AGENCY_ORDER.map((a) => <SelectItem key={a} value={a}>{visible(a)}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
@@ -467,7 +469,7 @@ export default function ProspectosPage() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Email</Label>
+                  <Label>{t("common.email")}</Label>
                   <Input type="email" value={editForm.email} onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))} />
                 </div>
                 <div className="space-y-1.5">
@@ -476,27 +478,27 @@ export default function ProspectosPage() {
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label>Estado</Label>
+                <Label>{t("common.status")}</Label>
                 <Select value={editForm.status} onValueChange={(v) => setEditForm((f) => ({ ...f, status: v }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{PROSPECT_STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
+                  <SelectContent>{PROSPECT_STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{t(s.label)}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>Fuente</Label>
+                <Label>{t("creadores.pros.source")}</Label>
                 <Select value={editForm.source || undefined} onValueChange={(v) => setEditForm((f) => ({ ...f, source: v }))}>
                   <SelectTrigger><SelectValue placeholder={t("common.selectEllipsis")} /></SelectTrigger>
-                  <SelectContent>{PROSPECT_SOURCES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
+                  <SelectContent>{PROSPECT_SOURCES.map((s) => <SelectItem key={s.value} value={s.value}>{t(s.label)}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>Notas</Label>
+                <Label>{t("creadores.ops.notes")}</Label>
                 <Textarea rows={3} value={editForm.notes} onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))} />
               </div>
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setEditItem(null)}>{t("common.cancel")}</Button>
                 <Button onClick={handleUpdate} disabled={!editForm.name.trim() || updateMutation.isPending}>
-                  {updateMutation.isPending ? "Guardando..." : "Guardar Cambios"}
+                  {updateMutation.isPending ? t("creadores.saving") : t("creadores.edit.saveChanges")}
                 </Button>
               </div>
             </div>

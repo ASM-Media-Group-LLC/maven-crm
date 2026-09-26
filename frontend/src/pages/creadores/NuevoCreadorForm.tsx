@@ -26,28 +26,38 @@ import { useScouterCompanies } from "@/hooks/useScouterLeads";
 import { useModelCategories } from "@/hooks/useModelCategories";
 import CommissionTiersEditor, { type CommissionTier } from "@/components/commission/CommissionTiersEditor";
 import { PageHeader } from "@/components/ui/page-header";
+import type { TranslationKey } from "@/lib/i18n";
+import { etiquetaIdioma } from "./etiquetasCreadora";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // Fallback estático sólo si scouter_companies todavía no cargó. La
 // fuente real son las compañías canónicas de la DB.
 const AGENCIES_FALLBACK = ["Kash", "Atomick", "Unlok", "Ora", "Exchange", "PicLink", "Content Protector", "Trafix", "Proyecto Medellín", "Pagomundo", "BLU"];
 const LANGUAGES = ["Español", "English", "Italiano", "Português", "Français", "Deutsch", "Русский"];
-const STATUSES = [
-  { value: "onboarding", label: "En Onboarding" },
-  { value: "active", label: "Activa" },
-  { value: "paused", label: "Pausada" },
-  { value: "leaving", label: "En Retiro" },
-  { value: "terminated", label: "Terminada" },
+// En estas listas `value` es lo que se GUARDA; `label` es la clave de lo que se muestra.
+const STATUSES: Array<{ value: string; label: TranslationKey }> = [
+  { value: "onboarding", label: "creadores.kpi.onboarding" },
+  { value: "active", label: "common.activeF" },
+  { value: "paused", label: "creadores.status.paused" },
+  { value: "leaving", label: "creadores.new.statusLeaving" },
+  { value: "terminated", label: "creadores.status.terminated" },
 ];
 // Fallback estático — la fuente real es model_categories (canónica).
-const CATEGORIES_FALLBACK = [
-  { value: "Elite", label: "Elite (Top Tier)" },
-  { value: "A+",    label: "A+ (Premium)" },
-  { value: "A",     label: "A (Alta)" },
-  { value: "B+",    label: "B+ (Media Alta)" },
-  { value: "B",     label: "B (Media)" },
-  { value: "C+",    label: "C+ (Media Baja)" },
-  { value: "C",     label: "C (Básica)" },
+const CATEGORIES_FALLBACK: Array<{ value: string; label: TranslationKey }> = [
+  { value: "Elite", label: "creadores.new.catElite" },
+  { value: "A+",    label: "creadores.new.catAPlus" },
+  { value: "A",     label: "creadores.new.catA" },
+  { value: "B+",    label: "creadores.new.catBPlus" },
+  { value: "B",     label: "creadores.new.catB" },
+  { value: "C+",    label: "creadores.new.catCPlus" },
+  { value: "C",     label: "creadores.new.catC" },
 ];
+// Métodos de pago y países se guardan tal cual; solo estos cambian de nombre en pantalla.
+const PAYMENT_METHOD_LABEL: Record<string, TranslationKey> = {
+  "Cuenta Bancaria Colombia": "creadores.new.payBankCo",
+  "Cuenta Bancaria Estados Unidos": "creadores.new.payBankUs",
+  Otro: "cr.offCatOther",
+};
 const PAYMENT_METHODS = ["PayPal", "Crypto", "Zelle", "Pagomundo", "Directa24", "Paxom", "Cuenta Bancaria Colombia", "Cuenta Bancaria Estados Unidos", "Otro"];
 const COUNTRIES = [
   "Afganistán", "Albania", "Alemania", "Andorra", "Angola", "Arabia Saudita", "Argelia", "Argentina",
@@ -68,11 +78,11 @@ const COUNTRIES = [
 ];
 
 const AVAILABLE_PLATFORMS = ["Content Protector", "Blu", "PickLink", "ORA", "Lumina"];
-const PLATFORM_FREQUENCIES = [
-  { value: "mensual", label: "Mensual" },
-  { value: "quincenal", label: "Quincenal" },
-  { value: "semanal", label: "Semanal" },
-  { value: "anual", label: "Anual" },
+const PLATFORM_FREQUENCIES: Array<{ value: string; label: TranslationKey }> = [
+  { value: "mensual", label: "creadores.new.freqMonthly" },
+  { value: "quincenal", label: "creadores.new.freqBiweekly" },
+  { value: "semanal", label: "creadores.new.freqWeekly" },
+  { value: "anual", label: "creadores.new.freqYearly" },
 ];
 
 interface PlatformEntry {
@@ -157,15 +167,16 @@ const defaultForm: FormData = {
   platforms: [],
 };
 
-const STEPS = [
-  { id: 1, label: "Datos Personales", icon: User },
-  { id: 2, label: "Contacto y Redes", icon: Share2 },
-  { id: 3, label: "Operación", icon: Settings },
-  { id: 4, label: "Plataformas Activas", icon: Package },
-  { id: 5, label: "Condiciones Comerciales", icon: DollarSign },
+const STEPS: Array<{ id: number; label: TranslationKey; icon: typeof User }> = [
+  { id: 1, label: "creadores.new.step1", icon: User },
+  { id: 2, label: "creadores.new.step2", icon: Share2 },
+  { id: 3, label: "creadores.new.step3", icon: Settings },
+  { id: 4, label: "creadores.new.step4", icon: Package },
+  { id: 5, label: "creadores.new.step5", icon: DollarSign },
 ];
 
 const NuevoCreadorForm = () => {
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [form, setForm] = useState<FormData>(defaultForm);
@@ -183,7 +194,7 @@ const NuevoCreadorForm = () => {
   const { data: modelCats = [] } = useModelCategories();
   const CATEGORIES = modelCats.length > 0
     ? modelCats.map((mc) => ({ value: mc.code, label: mc.label }))
-    : CATEGORIES_FALLBACK;
+    : CATEGORIES_FALLBACK.map((c) => ({ value: c.value, label: t(c.label) }));
   const tempId = useMemo(() => crypto.randomUUID(), []);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [uploadModal, setUploadModal] = useState<{ open: boolean; category: UploadCategory }>({ open: false, category: "contracts" });
@@ -224,22 +235,22 @@ const NuevoCreadorForm = () => {
   const validateStep = useCallback((s: number): Record<string, string> => {
     const e: Record<string, string> = {};
     if (s === 1) {
-      if (!form.assigned_agency) e.assigned_agency = "La agencia es obligatoria";
-      if (!form.name.trim()) e.name = "El nombre es obligatorio";
-      if (!form.age || form.age < 18) e.age = "La edad mínima es 18 años";
-      if (!form.birth_date) e.birth_date = "La fecha de nacimiento es obligatoria";
-      if (!form.country) e.country = "El país es obligatorio";
-      if (!form.city.trim()) e.city = "La ciudad es obligatoria";
-      if (form.languages.length === 0) e.languages = "Selecciona al menos un idioma";
+      if (!form.assigned_agency) e.assigned_agency = t("creadores.new.errAgency");
+      if (!form.name.trim()) e.name = t("creadores.new.errName");
+      if (!form.age || form.age < 18) e.age = t("creadores.new.errAge");
+      if (!form.birth_date) e.birth_date = t("creadores.new.errBirthDate");
+      if (!form.country) e.country = t("creadores.new.errCountry");
+      if (!form.city.trim()) e.city = t("creadores.new.errCity");
+      if (form.languages.length === 0) e.languages = t("creadores.new.errLanguages");
     }
     if (s === 2) {
-      if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = "El email no es válido";
+      if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = t("creadores.new.errEmail");
     }
     if (s === 5) {
-      if (!form.payment_method) e.payment_method = "El método de pago es obligatorio";
+      if (!form.payment_method) e.payment_method = t("creadores.new.errPayment");
     }
     return e;
-  }, [form]);
+  }, [form, t]);
 
   const goNext = () => {
     setErrors({});
@@ -257,7 +268,7 @@ const NuevoCreadorForm = () => {
     const validationErrors = validateStep(5);
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
-      toast({ title: "Revisa los campos marcados", variant: "destructive" });
+      toast({ title: t("creadores.new.checkFields"), variant: "destructive" });
       return;
     }
 
@@ -330,10 +341,10 @@ const NuevoCreadorForm = () => {
           (list || []).map((username) => ({ network, username })),
         ),
       });
-      toast({ title: "Creador guardado exitosamente" });
+      toast({ title: t("creadores.new.saved") });
       navigate("/creadores");
     } catch (err: any) {
-      toast({ title: "Error al guardar", description: err.message, variant: "destructive" });
+      toast({ title: t("common.errorSaving"), description: err.message, variant: "destructive" });
     }
   };
 
@@ -348,11 +359,11 @@ const NuevoCreadorForm = () => {
           onClick={() => navigate("/creadores")}
         >
           <ArrowLeft className="h-4 w-4 mr-1" />
-          Volver a Creadores
+          {t("creadores.new.backToCreators")}
         </Button>
         <PageHeader
-          title="Nuevo Creador"
-          subtitle="Completa los detalles del nuevo creador"
+          title={t("creadores.new.title")}
+          subtitle={t("creadores.new.subtitle")}
           icon={<Users className="h-5 w-5" />}
         />
       </div>
@@ -380,7 +391,7 @@ const NuevoCreadorForm = () => {
                 )}>
                   {step > s.id ? <Check className="h-3.5 w-3.5" /> : s.id}
                 </span>
-                <span className="hidden sm:inline">{s.label}</span>
+                <span className="hidden sm:inline">{t(s.label)}</span>
               </button>
               {i < STEPS.length - 1 && (
                 <div className={cn("h-px flex-1 mx-2 transition-colors", step > s.id ? "bg-gradient-to-r from-accent to-primary" : "bg-border")} />
@@ -399,56 +410,56 @@ const NuevoCreadorForm = () => {
             <Card>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
-                  <User className="h-4 w-4" /> Datos Personales
+                  <User className="h-4 w-4" /> {t("creadores.new.step1")}
                 </CardTitle>
               </CardHeader>
               <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Field label="Agencia Asignada *" error={errors.assigned_agency} fieldKey="assigned_agency">
+                <Field label={t("creadores.new.agencyReq")} error={errors.assigned_agency} fieldKey="assigned_agency">
                   <Select value={form.assigned_agency} onValueChange={(v) => set("assigned_agency", v)}>
-                    <SelectTrigger className={errors.assigned_agency ? "border-destructive" : ""}><SelectValue placeholder="Seleccionar agencia" /></SelectTrigger>
+                    <SelectTrigger className={errors.assigned_agency ? "border-destructive" : ""}><SelectValue placeholder={t("creadores.new.selectAgency")} /></SelectTrigger>
                     <SelectContent>
                       {AGENCIES.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </Field>
-                <Field label="Estado">
+                <Field label={t("common.status")}>
                   <Select value={form.status} onValueChange={(v) => set("status", v)}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                      {STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{t(s.label)}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </Field>
-                <Field label="Nombre Completo *" error={errors.name} fieldKey="name">
-                  <Input value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="Nombre completo" className={errors.name ? "border-destructive" : ""} />
+                <Field label={t("creadores.new.fullNameReq")} error={errors.name} fieldKey="name">
+                  <Input value={form.name} onChange={(e) => set("name", e.target.value)} placeholder={t("common.fullName")} className={errors.name ? "border-destructive" : ""} />
                 </Field>
-                <Field label="Nombre Artístico">
-                  <Input value={form.artistic_name} onChange={(e) => set("artistic_name", e.target.value)} placeholder="Nombre artístico" />
+                <Field label={t("creadores.edit.stageName")}>
+                  <Input value={form.artistic_name} onChange={(e) => set("artistic_name", e.target.value)} placeholder={t("cr.stageName")} />
                 </Field>
-                <Field label="Edad *" error={errors.age} fieldKey="age">
+                <Field label={t("creadores.new.ageReq")} error={errors.age} fieldKey="age">
                   <Input type="number" value={form.age || ""} onChange={(e) => set("age", Number(e.target.value))} min={18} className={errors.age ? "border-destructive" : ""} />
                 </Field>
-                <Field label="Fecha de Nacimiento *" error={errors.birth_date} fieldKey="birth_date">
+                <Field label={t("creadores.new.birthDateReq")} error={errors.birth_date} fieldKey="birth_date">
                   <DateInput value={form.birth_date} onChange={(v) => set("birth_date", v)} toYear={new Date().getFullYear()} className={errors.birth_date ? "[&_input]:border-destructive" : ""} />
                 </Field>
-                <Field label="País *" error={errors.country} fieldKey="country">
+                <Field label={t("creadores.new.countryReq")} error={errors.country} fieldKey="country">
                   <Select value={form.country} onValueChange={(v) => set("country", v)}>
-                    <SelectTrigger className={errors.country ? "border-destructive" : ""}><SelectValue placeholder="Seleccionar país" /></SelectTrigger>
+                    <SelectTrigger className={errors.country ? "border-destructive" : ""}><SelectValue placeholder={t("cr.selectCountry")} /></SelectTrigger>
                     <SelectContent>
-                      {COUNTRIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                      {COUNTRIES.map((c) => <SelectItem key={c} value={c}>{c === "Otro" ? t("cr.offCatOther") : c}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </Field>
-                <Field label="Ciudad *" error={errors.city} fieldKey="city">
-                  <Input value={form.city} onChange={(e) => set("city", e.target.value)} placeholder="Ciudad" className={errors.city ? "border-destructive" : ""} />
+                <Field label={t("creadores.new.cityReq")} error={errors.city} fieldKey="city">
+                  <Input value={form.city} onChange={(e) => set("city", e.target.value)} placeholder={t("common.city")} className={errors.city ? "border-destructive" : ""} />
                 </Field>
                 <div className="sm:col-span-2 space-y-2" data-field="languages">
-                  <Label className={cn("text-sm font-medium", errors.languages && "text-destructive")}>Idiomas *</Label>
+                  <Label className={cn("text-sm font-medium", errors.languages && "text-destructive")}>{t("creadores.new.languagesReq")}</Label>
                   <div className="flex flex-wrap gap-4">
                     {LANGUAGES.map((lang) => (
                       <label key={lang} className="flex items-center gap-2 text-sm cursor-pointer">
                         <Checkbox checked={form.languages.includes(lang)} onCheckedChange={() => toggleLanguage(lang)} />
-                        {lang}
+                        {etiquetaIdioma(t, lang)}
                       </label>
                     ))}
                   </div>
@@ -463,15 +474,15 @@ const NuevoCreadorForm = () => {
             <Card>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
-                  <Share2 className="h-4 w-4" /> Contacto y Redes Sociales
+                  <Share2 className="h-4 w-4" /> {t("creadores.new.contactSocials")}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Field label="Email" error={errors.email} fieldKey="email">
-                    <Input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} placeholder="email@ejemplo.com" className={errors.email ? "border-destructive" : ""} />
+                  <Field label={t("common.email")} error={errors.email} fieldKey="email">
+                    <Input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} placeholder={t("creadores.new.emailPh")} className={errors.email ? "border-destructive" : ""} />
                   </Field>
-                  <Field label="Teléfono">
+                  <Field label={t("common.phone")}>
                     <PhoneInput value={form.phone} onChange={(v) => set("phone", v)} />
                   </Field>
                   <Field label="Instagram URL">
@@ -498,7 +509,7 @@ const NuevoCreadorForm = () => {
                     <BufferedAccountsInline network="onlyfans" accounts={extraAccts.onlyfans ?? []} onChange={(l) => setExtraAccts((p) => ({ ...p, onlyfans: l }))} />
                   </Field>
                   <Field label="Telegram URL">
-                    <Input value={form.telegram_handle} onChange={(e) => set("telegram_handle", e.target.value)} placeholder="https://t.me/usuario_o_canal" />
+                    <Input value={form.telegram_handle} onChange={(e) => set("telegram_handle", e.target.value)} placeholder={t("creadores.socials.telegramPh")} />
                     <BufferedAccountsInline network="telegram" accounts={extraAccts.telegram ?? []} onChange={(l) => setExtraAccts((p) => ({ ...p, telegram: l }))} />
                   </Field>
                   <Field label="Reddit URL">
@@ -509,17 +520,17 @@ const NuevoCreadorForm = () => {
                     <Input value={form.facebook_handle} onChange={(e) => set("facebook_handle", e.target.value)} placeholder="https://facebook.com/username" />
                     <BufferedAccountsInline network="facebook" accounts={extraAccts.facebook ?? []} onChange={(l) => setExtraAccts((p) => ({ ...p, facebook: l }))} />
                   </Field>
-                  <Field label="Otra red / Link">
+                  <Field label={t("creadores.edit.otherLink")}>
                     <Input value={form.other_url} onChange={(e) => set("other_url", e.target.value)} placeholder="https://..." />
                     <BufferedAccountsInline network="other" accounts={extraAccts.other ?? []} onChange={(l) => setExtraAccts((p) => ({ ...p, other: l }))} />
                   </Field>
                 </div>
                 <div className="space-y-4">
-                  <Field label="URL de Foto de Perfil">
+                  <Field label={t("creadores.new.photoUrl")}>
                     <Input value={form.profile_photo_url} onChange={(e) => set("profile_photo_url", e.target.value)} placeholder="https://..." />
                   </Field>
-                  <Field label="Biografía">
-                    <Textarea value={form.bio} onChange={(e) => set("bio", e.target.value)} placeholder="Descripción del creador..." rows={4} />
+                  <Field label={t("creadores.edit.bio")}>
+                    <Textarea value={form.bio} onChange={(e) => set("bio", e.target.value)} placeholder={t("creadores.new.bioPh")} rows={4} />
                   </Field>
                 </div>
               </CardContent>
@@ -531,20 +542,20 @@ const NuevoCreadorForm = () => {
             <Card>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
-                  <Settings className="h-4 w-4" /> Operación y Documentación
+                  <Settings className="h-4 w-4" /> {t("creadores.new.opsDocs")}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Field label="Categoría de Modelo">
+                  <Field label={t("creadores.new.modelCategory")}>
                     <Select value={form.category} onValueChange={(v) => set("category", v)}>
-                      <SelectTrigger><SelectValue placeholder="Seleccionar categoría" /></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder={t("creadores.new.selectCategory")} /></SelectTrigger>
                       <SelectContent>
                         {CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </Field>
-                  <Field label="Fecha de Inicio Oficial">
+                  <Field label={t("creadores.new.officialStart")}>
                     <DateInput value={form.start_date} onChange={(v) => set("start_date", v)} />
                   </Field>
                 </div>
@@ -553,22 +564,22 @@ const NuevoCreadorForm = () => {
                 <div className="space-y-4">
                   <div>
                     <div className="flex items-center justify-between mb-1">
-                      <p className="text-sm font-medium">Contrato Firmado & Documentos</p>
+                      <p className="text-sm font-medium">{t("creadores.new.contractDocs")}</p>
                       <Button variant="outline" size="sm" onClick={() => openUpload("contracts")}>
-                        <Upload className="mr-2 h-4 w-4" /> Subir Archivos
+                        <Upload className="mr-2 h-4 w-4" /> {t("creadores.new.uploadFiles")}
                       </Button>
                     </div>
-                    <p className="text-xs text-muted-foreground">Formatos: PDF, Word (.doc, .docx) e Imágenes. Máximo 10MB por archivo.</p>
+                    <p className="text-xs text-muted-foreground">{t("creadores.new.contractFormats")}</p>
                     <UploadedFilesList files={filesByCategory("contracts")} onRemove={removeUploadedFile} />
                   </div>
                   <div>
                     <div className="flex items-center justify-between mb-1">
-                      <p className="text-sm font-medium">Fotos y Videos Extras</p>
+                      <p className="text-sm font-medium">{t("creadores.new.extras")}</p>
                       <Button variant="outline" size="sm" onClick={() => openUpload("extras")}>
-                        <Upload className="mr-2 h-4 w-4" /> Subir Archivos
+                        <Upload className="mr-2 h-4 w-4" /> {t("creadores.new.uploadFiles")}
                       </Button>
                     </div>
-                    <p className="text-xs text-muted-foreground">Formatos: Imágenes y Videos. Máximo 20MB por archivo.</p>
+                    <p className="text-xs text-muted-foreground">{t("creadores.new.extrasFormats")}</p>
                     <UploadedFilesList files={filesByCategory("extras")} onRemove={removeUploadedFile} />
                   </div>
                 </div>
@@ -589,18 +600,18 @@ const NuevoCreadorForm = () => {
             <Card>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
-                  <Package className="h-4 w-4" /> Plataformas Activas
+                  <Package className="h-4 w-4" /> {t("creadores.new.step4")}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-sm text-muted-foreground">
-                  Agrega las plataformas que tiene activas la creadora con su monto y periodicidad de pago.
+                  {t("creadores.new.platformsDesc")}
                 </p>
 
                 {form.platforms.length === 0 && (
                   <div className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
                     <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">No hay plataformas agregadas aún</p>
+                    <p className="text-sm">{t("creadores.new.noPlatforms")}</p>
                   </div>
                 )}
 
@@ -608,31 +619,31 @@ const NuevoCreadorForm = () => {
                   <div key={platform.id} className="rounded-lg border p-4 space-y-3">
                     <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
                       <div className="space-y-1.5">
-                        <Label className="text-sm">Plataforma</Label>
+                        <Label className="text-sm">{t("creadores.pros.platform")}</Label>
                         <Select value={platform.name} onValueChange={(v) => updatePlatform(platform.id, "name", v)}>
-                          <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+                          <SelectTrigger><SelectValue placeholder={t("common.select")} /></SelectTrigger>
                           <SelectContent>
                             {AVAILABLE_PLATFORMS.filter((p) => !usedPlatformNames.includes(p) || p === platform.name).map((p) => (
                               <SelectItem key={p} value={p}>{p}</SelectItem>
                             ))}
-                            <SelectItem value="Otra">Otra (personalizada)</SelectItem>
+                            <SelectItem value="Otra">{t("creadores.new.otherCustom")}</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
 
                       {platform.name === "Otra" && (
                         <div className="space-y-1.5">
-                          <Label className="text-sm">Nombre</Label>
+                          <Label className="text-sm">{t("common.name")}</Label>
                           <Input
                             value={platform.customName}
                             onChange={(e) => updatePlatform(platform.id, "customName", e.target.value)}
-                            placeholder="Nombre de la plataforma"
+                            placeholder={t("creadores.new.platformNamePh")}
                           />
                         </div>
                       )}
 
                       <div className="space-y-1.5">
-                        <Label className="text-sm">Monto ($)</Label>
+                        <Label className="text-sm">{t("creadores.new.amountUsd")}</Label>
                         <Input
                           type="number"
                           value={platform.amount || ""}
@@ -643,19 +654,19 @@ const NuevoCreadorForm = () => {
                       </div>
 
                       <div className="space-y-1.5">
-                        <Label className="text-sm">Frecuencia</Label>
+                        <Label className="text-sm">{t("creadores.new.frequency")}</Label>
                         <Select value={platform.frequency} onValueChange={(v) => updatePlatform(platform.id, "frequency", v)}>
                           <SelectTrigger><SelectValue /></SelectTrigger>
                           <SelectContent>
                             {PLATFORM_FREQUENCIES.map((f) => (
-                              <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
+                              <SelectItem key={f.value} value={f.value}>{t(f.label)}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                       </div>
 
                       <div className="flex items-end">
-                        <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive" onClick={() => removePlatform(platform.id)}>
+                        <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive" onClick={() => removePlatform(platform.id)} aria-label={t("creadores.new.removePlatform")} title={t("creadores.new.removePlatform")}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
@@ -664,7 +675,7 @@ const NuevoCreadorForm = () => {
                 ))}
 
                 <Button variant="outline" size="sm" onClick={addPlatform} className="w-full">
-                  <Plus className="mr-2 h-4 w-4" /> Agregar plataforma
+                  <Plus className="mr-2 h-4 w-4" /> {t("creadores.new.addPlatform")}
                 </Button>
               </CardContent>
             </Card>
@@ -675,7 +686,7 @@ const NuevoCreadorForm = () => {
             <Card>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
-                  <DollarSign className="h-4 w-4" /> Condiciones Comerciales
+                  <DollarSign className="h-4 w-4" /> {t("creadores.new.step5")}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -683,43 +694,43 @@ const NuevoCreadorForm = () => {
                   commissionType={form.commission_type}
                   fixedPercentage={form.agency_percentage}
                   tiers={form.commission_tiers}
-                  onTypeChange={(t) => set("commission_type", t)}
+                  onTypeChange={(tipo) => set("commission_type", tipo)}
                   onFixedPercentageChange={(v) => set("agency_percentage", v)}
-                  onTiersChange={(t) => set("commission_tiers", t)}
+                  onTiersChange={(rangos) => set("commission_tiers", rangos)}
                 />
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Field label="Método de Pago *" error={errors.payment_method} fieldKey="payment_method">
+                  <Field label={t("creadores.new.paymentReq")} error={errors.payment_method} fieldKey="payment_method">
                     <Select value={form.payment_method} onValueChange={(v) => set("payment_method", v)}>
-                      <SelectTrigger className={errors.payment_method ? "border-destructive" : ""}><SelectValue placeholder="Seleccionar método" /></SelectTrigger>
+                      <SelectTrigger className={errors.payment_method ? "border-destructive" : ""}><SelectValue placeholder={t("creadores.new.selectMethod")} /></SelectTrigger>
                       <SelectContent>
-                        {PAYMENT_METHODS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                        {PAYMENT_METHODS.map((m) => <SelectItem key={m} value={m}>{PAYMENT_METHOD_LABEL[m] ? t(PAYMENT_METHOD_LABEL[m]) : m}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </Field>
-                  <Field label="Fecha en la que inicia a cobrar">
+                  <Field label={t("creadores.new.billingStart")}>
                     <DateInput value={form.billing_start_date} onChange={(v) => set("billing_start_date", v)} />
                   </Field>
-                  <Field label="Periodicidad de Cobro">
+                  <Field label={t("creadores.new.billingFrequency")}>
                     <Select value={form.billing_frequency} onValueChange={(v) => set("billing_frequency", v)}>
-                      <SelectTrigger><SelectValue placeholder="Seleccionar periodicidad" /></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder={t("creadores.new.selectFrequency")} /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="semanal">Semanal</SelectItem>
-                        <SelectItem value="quincenal">Quincenal</SelectItem>
-                        <SelectItem value="mensual">Mensual</SelectItem>
+                        <SelectItem value="semanal">{t("creadores.new.freqWeekly")}</SelectItem>
+                        <SelectItem value="quincenal">{t("creadores.new.freqBiweekly")}</SelectItem>
+                        <SelectItem value="mensual">{t("creadores.new.freqMonthly")}</SelectItem>
                       </SelectContent>
                     </Select>
                   </Field>
-                  <Field label="Dirección de Facturación">
-                    <Input value={form.billing_address} onChange={(e) => set("billing_address", e.target.value)} placeholder="Dirección completa" />
+                  <Field label={t("creadores.new.billingAddress")}>
+                    <Input value={form.billing_address} onChange={(e) => set("billing_address", e.target.value)} placeholder={t("creadores.new.fullAddressPh")} />
                   </Field>
                 </div>
 
-                <Field label="Notas Internas">
+                <Field label={t("creadores.info.internalNotes")}>
                   <Textarea
                     value={form.internal_notes}
                     onChange={(e) => set("internal_notes", e.target.value)}
-                    placeholder="Observaciones del equipo, comentarios del closer, etc..."
+                    placeholder={t("creadores.new.internalNotesPh")}
                     rows={4}
                   />
                 </Field>
@@ -732,16 +743,16 @@ const NuevoCreadorForm = () => {
       {/* Footer Navigation */}
       <footer className="bg-background border-t border-border px-6 py-4 flex items-center justify-between shrink-0">
         <Button variant="outline" onClick={goPrev} disabled={step === 1}>
-          <ChevronLeft className="mr-1 h-4 w-4" /> Anterior
+          <ChevronLeft className="mr-1 h-4 w-4" /> {t("common.previous")}
         </Button>
-        <span className="text-sm text-muted-foreground">Paso {step} de {STEPS.length}</span>
+        <span className="text-sm text-muted-foreground">{t("creadores.new.stepOf", { n: step, total: STEPS.length })}</span>
         {step < STEPS.length ? (
           <Button onClick={goNext}>
-            Siguiente <ChevronRight className="ml-1 h-4 w-4" />
+            {t("common.next")} <ChevronRight className="ml-1 h-4 w-4" />
           </Button>
         ) : (
           <Button onClick={handleSubmit} disabled={mutation.isPending}>
-            {mutation.isPending ? "Guardando…" : "Guardar Creador"}
+            {mutation.isPending ? t("creadores.savingEllipsis") : t("creadores.new.saveCreator")}
           </Button>
         )}
       </footer>
@@ -760,6 +771,7 @@ function Field({ label, error, fieldKey, children }: { label: string; error?: st
 }
 
 function UploadedFilesList({ files, onRemove }: { files: UploadedFile[]; onRemove: (url: string) => void }) {
+  const { t } = useLanguage();
   if (!files.length) return null;
   return (
     <div className="mt-2 space-y-1">
@@ -771,7 +783,7 @@ function UploadedFilesList({ files, onRemove }: { files: UploadedFile[]; onRemov
             <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
           )}
           <span className="truncate flex-1">{f.name}</span>
-          <button onClick={() => onRemove(f.url)} className="text-muted-foreground hover:text-destructive">
+          <button onClick={() => onRemove(f.url)} className="text-muted-foreground hover:text-destructive" aria-label={t("creadores.new.removeFile")} title={t("creadores.new.removeFile")}>
             <X className="h-4 w-4" />
           </button>
         </div>
