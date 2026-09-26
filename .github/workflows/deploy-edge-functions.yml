@@ -119,7 +119,15 @@ jobs:
           fi
 
           # Nombre de cada función cambiada = primer segmento tras supabase/functions/
-          FUNCS="$(echo "$CHANGED" | sed -n 's#^supabase/functions/\([^/]*\)/.*#\1#p' | sort -u | grep -v '^_' | tr '\n' ' ')"
+          #
+          # ⚠️ El `|| true` del grep NO es cosmético. `grep` sale con 1 cuando no
+          # selecciona ninguna línea, y con `set -euo pipefail` eso tiraba el paso
+          # entero justo en el caso "no hay nada que desplegar": un diff sin
+          # funciones (solo cambió este workflow) o con solo carpetas `_` que no
+          # son `_shared` (p. ej. `_tests/`). Estuvo roto desde siempre y nadie lo
+          # vio porque casi nunca cambia el workflow solo; salió al mergear #1935
+          # con un "Run failed" falso y sin desplegar nada.
+          FUNCS="$(echo "$CHANGED" | sed -n 's#^supabase/functions/\([^/]*\)/.*#\1#p' | sort -u | { grep -v '^_' || true; } | tr '\n' ' ')"
           echo "Funciones cambiadas: [$FUNCS]"
           echo "deploy_all=false" >> "$GITHUB_OUTPUT"
           echo "funcs=$FUNCS" >> "$GITHUB_OUTPUT"
