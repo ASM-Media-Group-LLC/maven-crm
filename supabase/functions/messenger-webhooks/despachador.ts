@@ -23,8 +23,12 @@
 //     el endpoint, y el intento en el timbre. Si la corrida se muere a mitad del envío
 //     (el runtime corta un trabajo en segundo plano), el turno siguiente ya encuentra
 //     el fallo contado y espera: nunca queda un reenvío cada 15 s;
-//   * después de mandar, primero el timbre y después el endpoint, una sola escritura
-//     final (la que suelta el reclamo);
+//   * después de mandar, primero el intento en el timbre y después el endpoint, una
+//     sola escritura final (la que suelta el reclamo). Si el endpoint se detiene (410,
+//     72 h), el timbre NO se descarta aparte: lo descarta el trigger en la MISMA
+//     transacción que la detención. Así una detención que no llega a escribirse deja
+//     el timbre pendiente (se vuelve a decidir con el mismo) en vez de un endpoint
+//     activo sin timbre, que arrancaría una racha nueva de 72 h;
 //   * toda falla PROPIA (la base, la llave, el feed) termina con una espera de 5 min y
 //     una clase maven_* en last_error; nunca un reintento en el turno siguiente. No
 //     suma consecutive_failures: eso es del receptor (72 h → receiver_failing).
@@ -69,6 +73,8 @@ export const PAGINAS_POR_CORRIDA = 48;
 export const MINIMO_PARA_LEER_MS = 2_000;
 /** No se manda con menos que esto: el timbre queda para el turno siguiente. */
 export const MINIMO_PARA_MANDAR_MS = 3_000;
+/** Lo que se reserva para las dos escrituras de antes del envío (adelanto y marca). */
+export const MARGEN_ANOTAR_MS = 1_000;
 /** Lo que se le deja a las escrituras de después, fuera del plazo del envío. */
 export const MARGEN_ESCRITURA_MS = 2_000;
 /** Si falla algo nuestro (la base, la llave, el feed), no el receptor. */
@@ -188,14 +194,21 @@ export interface DetalleLog {
   ms?: number;
 }
 
+const ID_LOG = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const CLASE_LOG = /^[a-z0-9_]{1,40}$/;
+/** Además de los tipos, en tiempo de ejecución: un `as` o un String(err) no pasan. */
+const idLog = (v: string) => (ID_LOG.test(v) ? v : "?");
+const claseLog = (v: string) => (CLASE_LOG.test(v) ? v : "?");
+const numeroLog = (v: number) => (Number.isFinite(v) ? String(Math.round(v)) : "?");
+
 /** El único armado de una línea de log. */
 export function lineaDeLog(endpoint: string | null, accion: AccionLog, d: DetalleLog = {}): string {
-  let l = `[messenger-webhooks] ${endpoint ?? "-"} ${accion}`;
-  if (d.clase) l += ` ${d.clase}`;
-  if (d.timbre) l += ` timbre ${d.timbre}`;
-  if (d.intento !== undefined) l += ` intento ${d.intento}`;
-  if (d.envio !== undefined && d.envio !== null) l += ` ${d.envio}`;
-  if (d.ms !== undefined) l += ` ${d.ms}ms`;
+  let l = `[messenger-webhooks] ${endpoint === null ? "-" : idLog(endpoint)} ${claseLog(accion)}`;
+  if (d.clase) l += ` ${claseLog(d.clase)}`;
+  if (d.timbre) l += ` timbre ${idLog(d.timbre)}`;
+  if (d.intento !== undefined) l += ` intento ${numeroLog(d.intento)}`;
+  if (d.envio !== undefined && d.envio !== null) l += ` ${typeof d.envio === "number" ? numeroLog(d.envio) : claseLog(d.envio)}`;
+  if (d.ms !== undefined) l += ` ${numeroLog(d.ms)}ms`;
   return l;
 }
 
@@ -402,14 +415,16 @@ async function atender(ep: Endpoint, c: Corrida): Promise<AccionLog> {
     }
     if (!v.valor) return await detener("person_inactive", "antes");
 
-    // ── b. el secreto ── (la clave está: se miró al empezar; si igual no abre, no se
-    // arregla sola)
+    // ── b. el secreto ── La clave está (se miró al empezar) y aun así no abre: casi
+    // seguro la KEK del servidor cambió o quedó a medio rotar, y eso se arregla
+    // cargando la buena. Es una falla PROPIA: se espera, no se detiene (detener
+    // obligaría a cada persona a reanudar a mano).
     const secreto = await abrirSecreto(
       { cipher: ep.secret_cipher, nonce: ep.secret_nonce, version: ep.secret_key_version },
       ep.id,
       c.entorno,
     );
-    if (!secreto) return await detener("config_error", "antes", {}, "secreto");
+    if (!secreto) return await esperar("secreto");
 
     // ── c. ¿hay un timbre pendiente? se reintenta ──
     const t = await d.timbrePendiente(ep.id, ep.tenant_id);
@@ -454,7 +469,9 @@ async function atender(ep: Endpoint, c: Corrida): Promise<AccionLog> {
       }
       if (pagina.cantidad === 0) {
         // Nada para avisar: el cursor avanza hasta donde se leyó.
-        const r = await escribir({ ...mover(decodificarCursor(pagina.siguiente)), ...(limpiarError ? { last_error: null } : {}) }, "antes", true);
+        // Con el plazo propio de las escrituras finales: si el bucle salió por tiempo, al
+        // cliente "antes" le quedaría medio segundo.
+        const r = await escribir({ ...mover(decodificarCursor(pagina.siguiente)), ...(limpiarError ? { last_error: null } : {}) }, "despues", true);
         if (r === null) {
           retener = true;
           return anotar("error", { clase: "base" });
@@ -483,7 +500,16 @@ async function atender(ep: Endpoint, c: Corrida): Promise<AccionLog> {
       } catch {
         return await esperar("cuerpo");
       }
-      if (queda() < MINIMO_PARA_LEER_MS) return anotar("sin_tiempo");
+      if (queda() < MINIMO_PARA_LEER_MS) {
+        // Sin tiempo para timbrar: se guarda al menos lo que se caminó en vacío, para no
+        // releerlo en el turno siguiente.
+        const cambios = mover(avanzado);
+        if (Object.keys(cambios).length) {
+          const r = await escribir(cambios, "despues", true);
+          if (r === null) retener = true;
+        }
+        return anotar("sin_tiempo");
+      }
       const alta = await d.timbrar(g, hasta, { id, body: cuerpo, cantidad: pagina.cantidad }, limpiarError);
       if (alta === "perdio") return anotar("perdio");
       if (alta === "ya_hay_uno") return anotar("ya_hay_timbre");
@@ -497,7 +523,9 @@ async function atender(ep: Endpoint, c: Corrida): Promise<AccionLog> {
     }
 
     // ── e. antes de mandar: el intento se anota PRIMERO ──
-    if (queda() < MINIMO_PARA_MANDAR_MS) return anotar("sin_tiempo", { timbre: timbre.id });
+    // Se reserva lo de las dos escrituras de antes: si no, el envío podía salir con
+    // plazo ≤ 0 (sin_enviar "dns") y contarse como fallo del receptor.
+    if (queda() < MARGEN_ANOTAR_MS + MARGEN_ESCRITURA_MS + MINIMO_PARA_MANDAR_MS) return anotar("sin_tiempo", { timbre: timbre.id });
     // Un timbre sin intentos arranca una racha nueva: si la escritura de éxito de un
     // timbre anterior se perdió, la racha vieja no puede detenerlo en falso.
     const nueva = timbre.attempts === 0;
@@ -521,6 +549,9 @@ async function atender(ep: Endpoint, c: Corrida): Promise<AccionLog> {
 
     // ── f. mandar ──
     const plazo = Math.min(PLAZO_ENVIO_MS, queda() - MARGEN_ESCRITURA_MS);
+    // Las escrituras de antes tardaron más de lo reservado (la base lenta): no se manda
+    // con un plazo que no alcanza. El adelanto ya dejó la espera; el finally suelta.
+    if (plazo < MINIMO_PARA_MANDAR_MS) return anotar("sin_tiempo", { timbre: timbre.id });
     const encabezados = await encabezadosFirmados(secreto, timbre.id, timbre.body, c.ahora());
     const resultado = await c.enviar({ href: ep.url, cuerpo: timbre.body, encabezados, resolver: c.resolver, plazoMs: plazo });
     const r = decidirEntrega(resultado);
@@ -548,9 +579,9 @@ async function atender(ep: Endpoint, c: Corrida): Promise<AccionLog> {
     }
 
     if (r.accion === "detener") {
-      const a = await d.anotarTimbre(timbre.id, ep.tenant_id, {
-        ...intento, state: "dropped", drop_reason: r.motivo === "receiver_gone" ? "receiver_gone" : "endpoint_disabled",
-      }, "despues");
+      // Solo el intento: el descarte (receiver_gone, o endpoint_disabled para la URL que
+      // ya no se acepta) lo hace el trigger al detener, en la misma transacción.
+      const a = await d.anotarTimbre(timbre.id, ep.tenant_id, intento, "despues");
       if (a !== true) return anotar(a === false ? "perdio" : "error", { ...det, clase: "anotacion" });
       anotar("detenido", det);
       return await detener(r.motivo, "despues", ultimo);
@@ -560,7 +591,8 @@ async function atender(ep: Endpoint, c: Corrida): Promise<AccionLog> {
     // de antes de este intento.
     const ahoraMs = c.ahora();
     if (vencioElHorizonte(fallandoDesde ? new Date(fallandoDesde) : null, ahoraMs)) {
-      const a = await d.anotarTimbre(timbre.id, ep.tenant_id, { ...intento, state: "dropped", drop_reason: "receiver_failing" }, "despues");
+      // Igual: el intento, y el descarte (receiver_failing) lo hace el trigger al detener.
+      const a = await d.anotarTimbre(timbre.id, ep.tenant_id, intento, "despues");
       if (a !== true) return anotar(a === false ? "perdio" : "error", { ...det, clase: "anotacion" });
       anotar("detenido", det);
       return await detener("receiver_failing", "despues", ultimo);

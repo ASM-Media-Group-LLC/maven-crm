@@ -12,8 +12,11 @@
 // espera y nunca queda un reenvío cada 15 s.
 //
 // Apagado de emergencia: desactivar el job messenger-webhooks-tick (Dashboard →
-// Integrations → Cron, o cron.alter_job(..., active := false)). En 15 s no queda
-// actividad. Borrar la función NO la apaga: el CI la vuelve a subir.
+// Integrations → Cron, o cron.alter_job(..., active := false)). El turno que ya estaba
+// corriendo termina solo: los POST paran a los ~20 s y las últimas escrituras a los
+// ~35 s; contá con hasta 1 minuto si pg_net venía atrasado. Se verifica con
+// select count(*) from api_webhook_deliveries where last_attempt_at > now() - interval
+// '1 minute' (= 0). Borrar la función NO la apaga: el CI la vuelve a subir.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { kekConfigurada } from "../_shared/webhook-salida.ts";
@@ -35,8 +38,12 @@ Deno.serve(async (req) => {
   if (!(await tokenValido(req.headers.get("X-Cron-Token"), esperado))) return json({ error: "Unauthorized" }, 401);
   // El cuerpo no se usa (el cron manda {}): no se lee.
   await req.body?.cancel().catch(() => {});
-  // Sin los secretos no se hace nada (y sin tocar la base).
-  if (!comoUsuarioConfigurado() || !kekConfigurada()) return json({ error: "sin_configurar" }, 503);
+  // Sin los secretos no se hace nada (y sin tocar la base). Se anota: si no, un secreto
+  // que falta dejaría a los integradores sin timbres sin ningún rastro en los logs.
+  if (!comoUsuarioConfigurado() || !kekConfigurada()) {
+    console.log(lineaDeLog(null, "sin_configurar"));
+    return json({ error: "sin_configurar" }, 503);
+  }
 
   const fin = Date.now() + PRESUPUESTO_MS;
   const cliente = (restanteMs: () => number) =>

@@ -9,11 +9,21 @@ import { codificarCursor, decodificarCursor } from "../public-api/messenger-form
 import { aMicros, type BaseFalsa, crearBaseFalsa, deMicros, feedFalso, type FilaEp, type Opciones } from "./base-falsa.ts";
 import {
   despachar,
+  EN_PARALELO,
+  type Endpoint,
   type Entorno,
   ESPERA_FALLA_PROPIA_MS,
   lineaDeLog,
+  MARGEN_ANOTAR_MS,
+  MARGEN_ESCRITURA_MS,
+  MINIMO_PARA_LEER_MS,
+  MINIMO_PARA_MANDAR_MS,
+  motivoDeLlave,
   PAGINAS_POR_CORRIDA,
+  PLAZO_DESPUES_MS,
   PRESUPUESTO_MS,
+  RECLAMO_MAX,
+  RECLAMO_S,
 } from "./despachador.ts";
 import type { PaginaDelFeed } from "./feed.ts";
 
@@ -242,10 +252,19 @@ Deno.test("llave muerta o persona fuera: se detiene con el motivo, sin leer el f
   }
 });
 
-Deno.test("secreto que no abre (otra KEK) o feed que rechaza el pedido (o el tope): config_error", async () => {
-  const b1 = await escenario();
-  await correr(b1, { entorno: (v) => (v === "WEBHOOK_SIGNING_KEK" ? "z".repeat(40) : undefined) }).corrida;
-  assertEquals([ep(b1).status, ep(b1).disabled_reason], ["disabled", "config_error"]);
+Deno.test("secreto que no abre (otra KEK, o a medio rotar): se ESPERA, no se detiene, y se cura solo con la KEK buena", async () => {
+  const b1 = await escenario({ ep: { consecutive_failures: 2 } });
+  const { corrida, envios } = correr(b1, { entorno: (v) => (v === "WEBHOOK_SIGNING_KEK" ? "z".repeat(40) : undefined) });
+  assertEquals((await corrida).cuerpo.resultados, [{ id: EP, accion: "espera" }]);
+  const f = ep(b1);
+  assertEquals([f.status, f.last_error, f.consecutive_failures, f.next_attempt_at, envios.length], ["active", "maven_secreto", 2, (AHORA + ESPERA_FALLA_PROPIA_MS) * 1000, 0]);
+  // Pasa la espera y se carga la KEK buena: anda.
+  b1.pasar(ESPERA_FALLA_PROPIA_MS + 1_000);
+  const r2 = correr(b1, { paginas: [pagina(1, cursor(enUs(AHORA + ESPERA_FALLA_PROPIA_MS - 9_000), MAXI))] });
+  assertEquals((await r2.corrida).cuerpo.resultados, [{ id: EP, accion: "entregado" }]);
+});
+
+Deno.test("feed que rechaza el pedido (o el tope de conversaciones): config_error", async () => {
   for (const falla of ["tope", "feed_400", "feed_403", "feed_404"] as const) {
     const b = await escenario();
     const { corrida, envios } = correr(b, { paginas: [{ ok: false, permanente: true, falla }] });
@@ -490,4 +509,287 @@ Deno.test("logs: solo la plantilla, sin la URL, el token, el cuerpo ni el secret
     for (const prohibido of ["secreto123", "hooks.integrador.com", "whsec_", SECRETO, KEK, '"data"']) assert(!l.includes(prohibido), `${prohibido} en ${l}`);
   }
   assertEquals(lineaDeLog(null, "sin_configurar"), "[messenger-webhooks] - sin_configurar");
+});
+
+Deno.test("lineaDeLog: nada de texto libre, aunque alguien fuerce los tipos (un `as` o un String(err))", () => {
+  const url = "https://hooks.integrador.com/x?token=secreto123";
+  const l = lineaDeLog(url, "error" as never, { clase: `falló: ${url}` as never, timbre: `x ${url}`, envio: `http_503 ${url}`, intento: Number.NaN, ms: 1.6 });
+  assert(!l.includes("secreto123") && !l.includes("hooks.integrador.com"), l);
+  assertEquals(l, "[messenger-webhooks] ? error ? timbre ? intento ? ? 2ms");
+});
+
+
+// ─── lo que encontró la revisión por mutaciones ──────────────────────────────
+
+/** Cinco endpoints listos (EP primero), todos con la misma llave. */
+const CINCO = [EP, ...[1, 2, 3, 4].map((n) => `40000000-0000-4000-8000-0000000010${n}0`)];
+async function cinco(o: Opciones = {}) {
+  const b = await escenario(o);
+  for (const id of CINCO.slice(1)) await agregarEndpoint(b, id, LLAVE, { next_attempt_at: AHORA * 1000 - 500 });
+  return b;
+}
+const T_PEND = "70000000-0000-4000-8000-0000000000b1";
+const pendiente = (b: BaseFalsa, attempts: number) =>
+  b.timbres.set(T_PEND, {
+    id: T_PEND, endpoint_id: EP, tenant_id: AGENCIA, event_type: "messages.created", body: '{"x":1}', message_count: 1,
+    state: "pending", drop_reason: null, attempts, last_attempt_at: null, last_status_code: null, last_error: null,
+    latency_ms: null, uncertain: false, created_at: AHORA * 1000, delivered_at: null,
+  });
+const R204: Resultado = { tipo: "respuesta", estado: 204, retryAfterS: null, latenciaMs: 1 };
+const R503: Resultado = { tipo: "respuesta", estado: 503, retryAfterS: null, latenciaMs: 77 };
+const escriturasEp = (b: BaseFalsa) => b.llamadas.filter((l) => l.startsWith("actualizarEndpoint") || l === "soltar");
+
+Deno.test("la corrida: los topes que protegen a la base, y nunca vive más que su reclamo", () => {
+  assertEquals(
+    [PRESUPUESTO_MS, PLAZO_DESPUES_MS, RECLAMO_MAX, RECLAMO_S, EN_PARALELO, PAGINAS_POR_CORRIDA, MINIMO_PARA_LEER_MS, MINIMO_PARA_MANDAR_MS, MARGEN_ESCRITURA_MS, ESPERA_FALLA_PROPIA_MS],
+    [20_000, 5_000, 5, 60, 4, 48, 2_000, 3_000, 2_000, 300_000],
+  );
+  // Lo más largo: el presupuesto, más hasta tres escrituras de después (timbre, endpoint, soltar).
+  assert(PRESUPUESTO_MS + 3 * PLAZO_DESPUES_MS < RECLAMO_S * 1000);
+});
+
+Deno.test("reclama RECLAMO_MAX por RECLAMO_S y atiende de a EN_PARALELO", async () => {
+  const b = await cinco();
+  await agregarEndpoint(b, "40000000-0000-4000-8000-000000001050", LLAVE, { next_attempt_at: AHORA * 1000 - 400 });
+  let pedido: number[] = [];
+  const reclamar = b.datos.reclamar;
+  b.datos.reclamar = (m, s) => ((pedido = [m, s]), reclamar(m, s));
+  let enVuelo = 0, maximo = 0;
+  const { corrida } = correr(b, {
+    leerFeed: async () => {
+      maximo = Math.max(maximo, ++enVuelo);
+      await new Promise((r) => setTimeout(r, 5));
+      enVuelo--;
+      return pagina(0, SIGUIENTE, false);
+    },
+  });
+  const r = (await corrida).cuerpo.resultados!;
+  assertEquals(pedido, [5, 60]);
+  assertEquals(r.length, 5, "6 listos, 5 reclamados");
+  assertEquals(maximo, 4, "de a 4, ni 1 ni todos");
+});
+
+Deno.test("el pedido al feed: el vencimiento de la llave y hasta el fin del presupuesto", async () => {
+  const b = await escenario();
+  const { corrida, feed } = correr(b);
+  await corrida;
+  const p = feed.pedidos[0];
+  assertEquals(p.venceEl, b.llaves.get(LLAVE)!.expires_at, "sin venceEl el feed contesta 403 y el endpoint se detiene por config_error");
+  assertEquals(p.hastaMs, AHORA + PRESUPUESTO_MS);
+});
+
+Deno.test("el cuerpo: key_prefix de la llave, created_at del intento y has_more; la página llena con más por delante es la del timbre", async () => {
+  const b = await escenario();
+  const c1 = cursor(enUs(AHORA - 4 * 60_000), MAXI);
+  const { corrida, feed } = correr(b, { paginas: [pagina(100, c1, true), pagina(0, SIGUIENTE, false)] });
+  assertEquals((await corrida).cuerpo.resultados, [{ id: EP, accion: "entregado" }]);
+  assertEquals(feed.pedidos.length, 1, "no se sigue leyendo más allá de la página con mensajes");
+  const cuerpo = JSON.parse(timbresDe(b)[0].body);
+  assertEquals([cuerpo.key_prefix, cuerpo.created_at, cuerpo.data.count, cuerpo.data.has_more], ["mvk_live_ab12cd", new Date(AHORA).toISOString(), 100, true]);
+  assertEquals([cuerpo.data.after, cuerpo.data.until], [feed.pedidos[0].despues, c1]);
+});
+
+Deno.test("la firma lleva la hora del intento (la ventana del receptor es de 5 min)", async () => {
+  const b = await escenario();
+  const { corrida, envios } = correr(b);
+  await corrida;
+  assertEquals(envios[0].encabezados["webhook-timestamp"], String(Math.floor(AHORA / 1000)));
+});
+
+Deno.test("al día: UNA lectura del feed y UNA escritura (la que suelta); reintentar y esperar tampoco sueltan aparte", async () => {
+  const b = await escenario();
+  const { corrida, feed } = correr(b, { paginas: [pagina(0, SIGUIENTE, false)] });
+  assertEquals((await corrida).cuerpo.resultados, [{ id: EP, accion: "al_dia" }]);
+  assertEquals(feed.pedidos.length, 1, "al día no se vuelve a leer");
+  assertEquals(escriturasEp(b), ["actualizarEndpoint:despues"], "la del cursor va con el plazo de las escrituras finales");
+  const b2 = await escenario();
+  await correr(b2, { respuesta: R503 }).corrida;
+  assertEquals(escriturasEp(b2), ["actualizarEndpoint:antes", "actualizarEndpoint:despues"]);
+  const b3 = await escenario({ falla: { llave: "error" } });
+  await correr(b3).corrida;
+  assertEquals(escriturasEp(b3), ["actualizarEndpoint:despues"], "la espera: una escritura, con el plazo de después");
+});
+
+Deno.test("presupuesto: con menos de MINIMO_PARA_LEER no se toca ni la llave; con lo reservado justo se manda con MINIMO_PARA_MANDAR", async () => {
+  const b = await escenario();
+  assertEquals((await correr(b, { fin: AHORA + 1_999 }).corrida).cuerpo.resultados, [{ id: EP, accion: "sin_tiempo" }]);
+  assert(!b.llamadas.includes("llave"), "ni una consulta con el tiempo agotado");
+  assertEquals(ep(b).lease_until, null);
+  const b2 = await escenario();
+  const { corrida, envios } = correr(b2, { fin: AHORA + MARGEN_ANOTAR_MS + MARGEN_ESCRITURA_MS + MINIMO_PARA_MANDAR_MS });
+  await corrida;
+  assertEquals(envios.map((e) => e.plazoMs), [MINIMO_PARA_MANDAR_MS + MARGEN_ANOTAR_MS]);
+});
+
+Deno.test("el feed deja de leer cuando el presupuesto baja de MINIMO_PARA_LEER, y guarda lo avanzado sin espera", async () => {
+  const b = await escenario();
+  let k = 0;
+  const { corrida, feed } = correr(b, {
+    fin: AHORA + 5_500,
+    paginas: () => (b.pasar(1_000), pagina(0, cursor(enUs(AHORA - 5 * 60_000 + ++k * 1_000), MAXI), true)),
+  });
+  assertEquals((await corrida).cuerpo.resultados, [{ id: EP, accion: "cursor" }]);
+  assertEquals(feed.pedidos.length, 4);
+  assertEquals([ep(b).last_error, ep(b).lease_until, deMicros(ep(b).cursor_at!)], [null, null, deMicros(aMicros(enUs(AHORA - 5 * 60_000 + 4_000), 0))]);
+});
+
+Deno.test("freno: la primera falla de la BASE (lectura o escritura) hace que no se empiece ningún endpoint más; una forma rara no frena", async () => {
+  const casos: Array<[string, Opciones, PaginaDelFeed[] | undefined]> = [
+    ["llave", { falla: { llave: "error" } }, undefined],
+    ["vigencia", { falla: { llaveVigente: "error" } }, undefined],
+    ["pendiente", { falla: { timbrePendiente: "error" } }, undefined],
+    ["timbrar", { falla: { timbrar: "error" } }, undefined],
+    ["marca del intento", { falla: { anotarTimbre: "error" } }, undefined],
+    ["escritura del cursor", { falla: { actualizarEndpoint: "error" } }, [pagina(0, SIGUIENTE, false)]],
+    ["feed: sesion", {}, [{ ok: false, permanente: false, falla: "sesion" }]],
+    ["feed: base", {}, [{ ok: false, permanente: false, falla: "base" }]],
+    ["feed: plazo", {}, [{ ok: false, permanente: false, falla: "plazo" }]],
+  ];
+  for (const [nombre, o, paginas] of casos) {
+    const b = await cinco(o);
+    const r = (await correr(b, { paginas }).corrida).cuerpo.resultados!;
+    const frenados = r.filter((x) => x.accion === "freno");
+    assertEquals(frenados.length, 1, `${nombre}: ${r.map((x) => x.accion)}`);
+    const f = ep(b, frenados[0].id);
+    assert(f.lease_until !== null && f.last_error === null, `${nombre}: el frenado queda reclamado y sin escribir`);
+  }
+  const b = await cinco();
+  const r = (await correr(b, { paginas: [{ ok: false, permanente: false, falla: "forma" }] }).corrida).cuerpo.resultados!;
+  assertEquals(r.filter((x) => x.accion === "freno").length, 0, "forma no es la base");
+});
+
+Deno.test("una escritura que falla por la base NO suelta el reclamo (60 s de espera, no el turno siguiente)", async () => {
+  const casos: Array<[string, () => Promise<BaseFalsa>, PaginaDelFeed[] | undefined]> = [
+    ["detención", async () => {
+      const b = await escenario({ falla: { actualizarEndpoint: "error" } });
+      b.llaves.get(LLAVE)!.revoked_at = "2026-09-25T00:00:00Z";
+      return b;
+    }, undefined],
+    ["cursor", () => escenario({ falla: { actualizarEndpoint: "error" } }), [pagina(0, SIGUIENTE, false)]],
+    ["adelanto", () => escenario({ falla: { actualizarEndpoint: "error" } }), undefined],
+    ["la espera de una excepción", () => escenario({ falla: { timbrePendiente: "tira", actualizarEndpoint: "tira" } }), undefined],
+  ];
+  for (const [nombre, armar, paginas] of casos) {
+    const b = await armar();
+    const { corrida, envios } = correr(b, { paginas });
+    await corrida;
+    assert(ep(b).lease_until !== null, `${nombre}: sigue reclamado`);
+    assert(!b.llamadas.includes("soltar"), `${nombre}: sin soltar`);
+    assertEquals(envios.length, 0, nombre);
+  }
+});
+
+Deno.test("si el intento no quedó anotado ANTES (adelanto o marca con error de base), no se manda", async () => {
+  for (const falla of ["actualizarEndpoint", "anotarTimbre"] as const) {
+    const b = await escenario({ falla: { [falla]: "error" } });
+    const { corrida, envios } = correr(b);
+    assertEquals([envios.length, (await corrida).cuerpo.resultados![0].accion], [0, "error"], falla);
+  }
+});
+
+Deno.test("el adelanto deja la espera del escalón que toca: si la corrida muere mandando, el backoff igual crece", async () => {
+  const b = await escenario({ ep: { consecutive_failures: 2, failing_since: (AHORA - 3_600_000) * 1000 } });
+  pendiente(b, 2);
+  let foto: FilaEp | null = null;
+  await correr(b, { respuesta: () => ((foto = { ...ep(b) }), Promise.resolve(R204)) }).corrida;
+  assertEquals((foto as unknown as FilaEp).next_attempt_at, (AHORA + 600_000) * 1000, "tercer fallo: 10 min, no 30 s");
+});
+
+Deno.test("Retry-After más largo que el escalón manda (hasta 1 h)", async () => {
+  const b = await escenario();
+  await correr(b, { respuesta: { tipo: "respuesta", estado: 429, retryAfterS: 1_800, latenciaMs: 1 } }).corrida;
+  assertEquals(ep(b).next_attempt_at, (AHORA + 1_800_000) * 1000);
+});
+
+Deno.test("un timbre NUEVO con la racha vieja de MÁS de 72 h no se detiene: el horizonte es el de la racha nueva", async () => {
+  const b = await escenario({ ep: { consecutive_failures: 15, failing_since: (AHORA - 73 * 3_600_000) * 1000 } });
+  const r = (await correr(b, { respuesta: R503 }).corrida).cuerpo.resultados;
+  assertEquals(r, [{ id: EP, accion: "reintentar" }]);
+  assertEquals([ep(b).status, ep(b).consecutive_failures, timbresDe(b)[0].state], ["active", 1, "pending"]);
+});
+
+Deno.test("después de un 503 quedan la latencia y la hora del intento, en el timbre y en el endpoint", async () => {
+  const b = await escenario();
+  await correr(b, { respuesta: R503 }).corrida;
+  const t = timbresDe(b)[0];
+  assertEquals([t.latency_ms, t.last_attempt_at, ep(b).last_attempt_at], [77, AHORA * 1000, AHORA * 1000]);
+});
+
+Deno.test("una lectura buena limpia el maven_* aunque la corrida no llegue a mandar", async () => {
+  const b = await escenario({ ep: { last_error: "maven_base" } });
+  await correr(b, { fin: AHORA + 2_500 }).corrida;
+  assertEquals([ep(b).last_error, timbresDe(b).length], [null, 1]);
+});
+
+Deno.test("página con mensajes y un cursor ilegible, o un cuerpo que no se arma: espera de 5 min con su clase", async () => {
+  for (const [pag, clase] of [[pagina(1, "no-es-un-cursor"), "maven_forma"], [pagina(101, SIGUIENTE), "maven_cuerpo"]] as const) {
+    const b = await escenario();
+    await correr(b, { paginas: [pag] }).corrida;
+    assertEquals([ep(b).last_error, ep(b).next_attempt_at, timbresDe(b).length], [clase, (AHORA + ESPERA_FALLA_PROPIA_MS) * 1000, 0], clase);
+  }
+});
+
+Deno.test("agencias que TIRA: no se sabe cuántas hay → no se reclama nada; reclamar que tira → 503", async () => {
+  const b = await escenario({ falla: { agencias: "tira" } });
+  const inf = await correr(b).corrida;
+  assertEquals([inf.cuerpo.motivo, b.llamadas], ["agencias_sin_verificar", ["agencias"]]);
+  const b2 = await escenario({ falla: { reclamar: "tira" } });
+  assertEquals((await correr(b2).corrida).estado, 503);
+});
+
+Deno.test("motivoDeLlave: vence justo ahora = vencida; llave de OTRA agencia = config_error", () => {
+  const k = b0Llave();
+  const e = { tenant_id: AGENCIA, acts_as_user_id: PERSONA } as Endpoint;
+  assertEquals(motivoDeLlave(k, e, AHORA), null);
+  assertEquals(motivoDeLlave({ ...k, expires_at: new Date(AHORA).toISOString() }, e, AHORA), "key_expired");
+  assertEquals(motivoDeLlave({ ...k, tenant_id: "99999999-0000-4000-8000-000000000000" }, e, AHORA), "config_error");
+  assertEquals(motivoDeLlave({ ...k, ip_whitelist: null }, e, AHORA), "config_error");
+});
+function b0Llave() {
+  return {
+    id: LLAVE, tenant_id: AGENCIA, key_prefix: "mvk_live_ab12cd", scopes: ["messenger:read"],
+    expires_at: new Date(AHORA + 1).toISOString(), revoked_at: null, acts_as_user_id: PERSONA, ip_whitelist: ["1.2.3.4"],
+  };
+}
+
+Deno.test("el informe y los logs dicen lo que pasó", async () => {
+  // Espera que perdió la guarda = perdio; detención que no se pudo escribir = error.
+  const b = await escenario({ falla: { llave: "error" }, antes: { actualizarEndpoint: (x) => void (x.endpoints.get(EP)!.cursor_id = MAXI) } });
+  assertEquals((await correr(b).corrida).cuerpo.resultados, [{ id: EP, accion: "perdio" }]);
+  const b2 = await escenario({ falla: { actualizarEndpoint: "error" } });
+  b2.llaves.get(LLAVE)!.revoked_at = "2026-09-25T00:00:00Z";
+  assertEquals((await correr(b2).corrida).cuerpo.resultados, [{ id: EP, accion: "error" }]);
+  // Cada dato en su lugar.
+  assertEquals(
+    lineaDeLog(EP, "reintentar", { clase: "anotacion", timbre: "70000000-0000-4000-8000-0000000000c1", intento: 3, envio: 503, ms: 12 }),
+    `[messenger-webhooks] ${EP} reintentar anotacion timbre 70000000-0000-4000-8000-0000000000c1 intento 3 503 12ms`,
+  );
+  const b3 = await escenario();
+  const r3 = correr(b3);
+  await r3.corrida;
+  assertEquals(r3.logs, [`[messenger-webhooks] ${EP} entregado timbre 60000000-0000-4000-8000-000000000001 intento 1 204 40ms`]);
+  const b4 = await escenario({ agencias: 2 });
+  const r4 = correr(b4);
+  await r4.corrida;
+  assertEquals(r4.logs, ["[messenger-webhooks] - multi_agency varias_agencias"]);
+});
+
+
+Deno.test("el envío nunca sale con un plazo que no alcanza: o sale con ≥ 3 s, o queda para el turno siguiente", async () => {
+  // Sin lo reservado para las dos escrituras previas: ni se anota el intento.
+  const a = await escenario();
+  const ra = correr(a, { fin: AHORA + MARGEN_ANOTAR_MS + MARGEN_ESCRITURA_MS + MINIMO_PARA_MANDAR_MS - 1 });
+  assertEquals((await ra.corrida).cuerpo.resultados, [{ id: EP, accion: "sin_tiempo" }]);
+  assertEquals([ra.envios.length, timbresDe(a)[0].attempts, ep(a).consecutive_failures], [0, 0, 0]);
+  // Las escrituras previas se comen lo reservado (la base lenta): no se manda con 2,5 s;
+  // el adelanto ya dejó la espera.
+  const b = await escenario({ antes: { actualizarEndpoint: (x) => x.pasar(2_000) } });
+  const rb = correr(b, { fin: AHORA + 6_500 });
+  assertEquals((await rb.corrida).cuerpo.resultados, [{ id: EP, accion: "sin_tiempo" }]);
+  assertEquals([rb.envios.length, ep(b).lease_until, ep(b).next_attempt_at > b.reloj.us], [0, null, true]);
+  // Con tiempo: sale con lo que queda menos lo de las escrituras de después.
+  const c = await escenario({ antes: { actualizarEndpoint: (x) => x.pasar(2_000) } });
+  const rc = correr(c, { fin: AHORA + 9_000 });
+  await rc.corrida;
+  assertEquals(rc.envios.map((e) => e.plazoMs), [5_000]);
 });

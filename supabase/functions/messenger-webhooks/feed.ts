@@ -95,38 +95,61 @@ export function clasificar503(detalle: string): PaginaDelFeed {
   return NO_PERMANENTE("base");
 }
 
+/** Cómo se fabrica la sesión de la persona (en producción, clienteComoUsuario). */
+export type FabricarSesion = (persona: string, opciones: { fetch: typeof fetch }) => Promise<SupabaseClient | null>;
+
 /** Una página del feed como la persona: fabrica la sesión (con un fetch que corta
- *  cada pedido a tiempo) y lee. Nunca tira. */
-export const leerFeedComoPersona: LeerFeed = async (p) => {
-  const conPlazo = fetchConPlazo(() => p.hastaMs - Date.now());
-  let yo: SupabaseClient | null;
-  try {
-    yo = await clienteComoUsuario(p.persona, { fetch: conPlazo });
-  } catch {
-    return NO_PERMANENTE("sesion");
-  }
-  // Sin MAVEN_JWT_SECRET no hay sesión: cerrado, nunca cae a service_role.
-  if (!yo) return NO_PERMANENTE("sesion");
-  const restante = Math.max(0, p.hastaMs - Date.now());
-  let reloj: ReturnType<typeof setTimeout> | undefined;
-  const plazo = new Promise<PaginaDelFeed>((resolve) => {
-    reloj = setTimeout(() => resolve(NO_PERMANENTE("plazo")), restante);
-  });
-  try {
-    return await Promise.race([leerFeedCon(yo, p), plazo]);
-  } finally {
-    clearTimeout(reloj);
-  }
-};
+ *  cada pedido a tiempo) y lee. Nunca tira. La fábrica se inyecta SOLO para probarla
+ *  (clienteComoUsuario lee Deno.env y los tests corren sin --allow-env). */
+export function crearLeerFeedComoPersona(fabricar: FabricarSesion = clienteComoUsuario): LeerFeed {
+  return async (p) => {
+    const conPlazo = fetchConPlazo(() => p.hastaMs - Date.now());
+    let yo: SupabaseClient | null;
+    try {
+      yo = await fabricar(p.persona, { fetch: conPlazo });
+    } catch {
+      return NO_PERMANENTE("sesion");
+    }
+    // Sin MAVEN_JWT_SECRET no hay sesión: cerrado, nunca cae a service_role.
+    if (!yo) return NO_PERMANENTE("sesion");
+    const restante = Math.max(0, p.hastaMs - Date.now());
+    let reloj: ReturnType<typeof setTimeout> | undefined;
+    const plazo = new Promise<PaginaDelFeed>((resolve) => {
+      reloj = setTimeout(() => resolve(NO_PERMANENTE("plazo")), restante);
+    });
+    try {
+      return await Promise.race([leerFeedCon(yo, p), plazo]);
+    } finally {
+      clearTimeout(reloj);
+    }
+  };
+}
+
+export const leerFeedComoPersona: LeerFeed = crearLeerFeedComoPersona();
 
 /** fetch que corta cada pedido cuando se acaba el plazo (al menos 500 ms, a lo sumo
  *  5 s): una base lenta no puede estirar una corrida más allá de su reclamo. */
 export function fetchConPlazo(restanteMs: () => number): typeof fetch {
-  return (entrada, init) => {
+  return async (entrada, init) => {
+    // ⚠️ supabase-js (postgrest-js) REINTENTA por su cuenta todo GET/HEAD que falla por
+    // red —incluido este corte, que llega como TimeoutError y no como AbortError— y todo
+    // 503/520 (respetando Retry-After sin tope): hasta 3 veces, con 1+2+4 s de espera
+    // que ningún plazo corta. Un pedido de 0,5 s se volvía 4 pedidos y 9 s justo con la
+    // base caída. Acá no se reintenta nada: el reintento lo decide el despachador (la
+    // espera de 5 min, el freno). Un pedido que ya viene marcado como reintento se corta,
+    // cualquier falla sale como AbortError (que no se reintenta) y un 503/520 como 502.
+    if (new Headers(init?.headers).has("X-Retry-Count")) throw new DOMException("sin reintentos", "AbortError");
     const ms = Math.min(Math.max(restanteMs(), 500), 5_000);
     const corte = AbortSignal.timeout(ms);
     const signal = init?.signal ? AbortSignal.any([init.signal, corte]) : corte;
-    return fetch(entrada, { ...init, signal });
+    let r: Response;
+    try {
+      r = await fetch(entrada, { ...init, signal });
+    } catch {
+      throw new DOMException("fetchConPlazo", "AbortError");
+    }
+    if (r.status !== 503 && r.status !== 520) return r;
+    return new Response(r.body, { status: 502, statusText: r.statusText, headers: r.headers });
   };
 }
 

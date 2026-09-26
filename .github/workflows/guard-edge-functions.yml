@@ -50,8 +50,8 @@ jobs:
           supabase/functions/manage-api-keys/webhooks.test.ts
           supabase/functions/manage-api-keys/mensajes.test.ts
 
-      # El despachador de timbres: con tipos (las acciones y clases de los logs son
-      # uniones cerradas; un texto libre no compila).
+      # El despachador de timbres, con tipos (las acciones y clases de los logs son
+      # uniones cerradas; y lineaDeLog además limpia en tiempo de ejecución).
       - name: Tipos — messenger-webhooks
         run: >-
           deno check
@@ -59,6 +59,8 @@ jobs:
           supabase/functions/messenger-webhooks/despachador.test.ts
           supabase/functions/messenger-webhooks/feed.test.ts
           supabase/functions/messenger-webhooks/estructura.test.ts
+          supabase/functions/messenger-webhooks/datos.test.ts
+          supabase/functions/messenger-webhooks/token.test.ts
 
       # El banco contra la migración real (PGlite): las reglas de la base y lo que
       # escriben manage-api-keys y el despachador, con los triggers de verdad. Solo en

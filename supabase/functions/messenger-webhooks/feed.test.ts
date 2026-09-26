@@ -179,3 +179,106 @@ Deno.test("fetchConPlazo: corta el pedido al vencer (entre 0,5 y 5 s) y respeta 
     globalThis.fetch = original;
   }
 });
+
+
+// ─── lo que encontró la revisión por mutaciones ──────────────────────────────
+
+Deno.test("leerFeedCon: páginas de 100, sin vencimiento no hay feed, y una excepción NO es permanente", async () => {
+  const { cliente, llamadas } = clienteFalso(responderFeed);
+  assert((await leerFeedCon(cliente, pedido())).ok);
+  const msgs = llamadas.find((l) => l.tabla === "chat_messages")!;
+  assert(msgs.ops.some(([n, a]) => n === "limit" && a[0] === 101), "limit 100 (+1 para saber si hay más)");
+  assertEquals(await leerFeedCon(clienteFalso(responderFeed).cliente, pedido({ venceEl: null })), { ok: false, permanente: true, falla: "feed_403" });
+  const tira = { rpc: () => { throw new Error(CANARIO); }, from: () => { throw new Error(CANARIO); } } as unknown as SupabaseClient;
+  assertEquals(await leerFeedCon(tira, pedido()), { ok: false, permanente: false, falla: "base" }, "un bug o una red caída no detiene el endpoint");
+});
+
+Deno.test("fetchConPlazo: el plazo va de 0,5 a 5 s y se combina con la señal del que llama (las dos cortan)", async () => {
+  const timeoutOriginal = AbortSignal.timeout;
+  const fetchOriginal = globalThis.fetch;
+  const vistos: number[] = [];
+  AbortSignal.timeout = (ms: number) => (vistos.push(ms), timeoutOriginal.call(AbortSignal, ms));
+  globalThis.fetch = ((_: unknown, init?: RequestInit) =>
+    new Promise((_res, rej) => init?.signal?.addEventListener("abort", () => rej(init!.signal!.reason)))) as typeof fetch;
+  try {
+    for (const [restante, esperado] of [[60_000, 5_000], [1_234, 1_234], [-5, 500]]) {
+      const c = new AbortController();
+      const p = fetchConPlazo(() => restante)("https://x", { signal: c.signal }).catch(() => "cortado");
+      c.abort();
+      await p;
+      assertEquals(vistos.at(-1), esperado, `restante ${restante}`);
+    }
+    const propio = new AbortController();
+    const t0 = Date.now();
+    const p = fetchConPlazo(() => 5_000)("https://x", { signal: propio.signal }).catch(() => "cortado");
+    propio.abort();
+    assertEquals(await p, "cortado");
+    assert(Date.now() - t0 < 1_000, "la señal del que llama corta en el acto, no a los 5 s");
+    const t1 = Date.now();
+    assertEquals(await fetchConPlazo(() => 600)("https://x", { signal: new AbortController().signal }).catch(() => "cortado"), "cortado");
+    assert(Date.now() - t1 < 1_500, "y el plazo corta aunque el que llama traiga su señal");
+  } finally {
+    AbortSignal.timeout = timeoutOriginal;
+    globalThis.fetch = fetchOriginal;
+  }
+});
+
+
+// Con el cliente DE VERDAD (supabase-js, el mismo import que index.ts y como-usuario.ts).
+Deno.test("fetchConPlazo + supabase-js: un GET que cuelga o da 503 es UN pedido de ≤ el plazo (supabase-js reintenta 3 veces por su cuenta)", async () => {
+  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+  const { crearDatosDespacho } = await import("./datos.ts");
+  const fetchOriginal = globalThis.fetch;
+  for (const modo of ["503", "cuelga"] as const) {
+    let pedidos = 0;
+    globalThis.fetch = ((_: unknown, init?: RequestInit) => {
+      pedidos++;
+      if (modo === "503") {
+        return Promise.resolve(new Response('{"code":"PGRST000","message":"x"}', { status: 503, headers: { "Content-Type": "application/json", "Retry-After": "0" } }));
+      }
+      return new Promise((_res, rej) => init?.signal?.addEventListener("abort", () => rej(init!.signal!.reason)));
+    }) as typeof fetch;
+    try {
+      const c = createClient("https://x.supabase.co", "k", {
+        global: { fetch: fetchConPlazo(() => 500) },
+        auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+      });
+      const datos = crearDatosDespacho({ antes: c, despues: c });
+      const t0 = Date.now();
+      assertEquals(await datos.llave(YO, AGENCIA), { ok: false });
+      assertEquals(pedidos, 1, `${modo}: un solo pedido (hubo ${pedidos})`);
+      assert(Date.now() - t0 < 1_500, `${modo}: ${Date.now() - t0} ms`);
+    } finally {
+      globalThis.fetch = fetchOriginal;
+    }
+  }
+});
+
+Deno.test("leerFeedComoPersona: la sesión recibe el fetch con plazo, su falla es 'sesion', y el feed entero se corta en hastaMs (sin timers colgados)", async () => {
+  const { crearLeerFeedComoPersona } = await import("./feed.ts");
+  const timeoutOriginal = AbortSignal.timeout;
+  const fetchOriginal = globalThis.fetch;
+  const vistos: number[] = [];
+  let recibido: typeof fetch | undefined;
+  AbortSignal.timeout = (ms: number) => (vistos.push(ms), timeoutOriginal.call(AbortSignal, ms));
+  globalThis.fetch = (() => Promise.resolve(new Response("{}"))) as typeof fetch;
+  try {
+    const leer = crearLeerFeedComoPersona((_persona, o) => ((recibido = o.fetch), Promise.resolve(clienteFalso(responderFeed).cliente)));
+    assert((await leer(pedido({ hastaMs: Date.now() + 1_500 }))).ok);
+    await recibido!("https://x");
+    assert(vistos.length === 1 && vistos[0] > 1_000 && vistos[0] <= 1_500, `plazo del fetch de la sesión: ${vistos}`);
+  } finally {
+    AbortSignal.timeout = timeoutOriginal;
+    globalThis.fetch = fetchOriginal;
+  }
+  assertEquals(await crearLeerFeedComoPersona(() => Promise.resolve(null))(pedido()), { ok: false, permanente: false, falla: "sesion" });
+  assertEquals(await crearLeerFeedComoPersona(() => Promise.reject(new Error("x")))(pedido()), { ok: false, permanente: false, falla: "sesion" });
+  const colgado = { rpc: () => new Promise(() => {}), from: () => new Promise(() => {}) } as unknown as SupabaseClient;
+  let tope: ReturnType<typeof setTimeout> | undefined;
+  const r = await Promise.race([
+    crearLeerFeedComoPersona(() => Promise.resolve(colgado))(pedido({ hastaMs: Date.now() + 300 })),
+    new Promise((res) => (tope = setTimeout(() => res("colgado"), 2_000))),
+  ]);
+  clearTimeout(tope);
+  assertEquals(r, { ok: false, permanente: false, falla: "plazo" }, "a los 300 ms, no nunca");
+});
