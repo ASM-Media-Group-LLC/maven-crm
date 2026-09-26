@@ -91,6 +91,11 @@ jobs:
       - name: Guard — aislamiento entre agencias
         run: deno test --allow-read --no-check supabase/functions/public-api/ supabase/functions/manage-api-keys/
 
+      # Mismo criterio: si la salida de los webhooks deja de bloquear lo que tiene
+      # que bloquear, no se despliega nada.
+      - name: Guard — salida de los webhooks
+        run: deno test --allow-read supabase/functions/_shared/webhook-salida.test.ts
+
       - name: Determinar qué deployar
         id: changes
         run: |
