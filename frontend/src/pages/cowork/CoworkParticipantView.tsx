@@ -26,6 +26,9 @@ import { hablar } from "@/lib/voz";
 import { playMessageNotification } from "@/lib/notificationSound";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { marcarDescartada, fueDescartada, olvidarDescartada } from "@/lib/solicitudPrivada";
+import { useLanguage } from "@/hooks/useLanguage";
+import { traducir } from "@/lib/i18n";
+import { MENSAJE_LLAMADA_PRIVADA, MENSAJE_PEDIR_AYUDA, NOMBRE_PAUSA } from "./textosCowork";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -61,6 +64,9 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   const { joinMeetGrupal, salirDeMeetGrupal } = cowork;
   const navigate = useNavigate();
   const isMobile = useIsMobile();
+  // Los avisos que salen de efectos y de la config de la llamada usan traducir():
+  // meter `t` en esas dependencias reiniciaría la llamada al cambiar el idioma.
+  const { t } = useLanguage();
   const [displayName, setDisplayName] = useState("User");
   const [connectedLkRoom, setConnectedLkRoom] = useState<string | null>(null);
   const [manuallyLeft, setManuallyLeft] = useState(false);
@@ -275,13 +281,15 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
       // Pasarse un minuto es una cosa; haberse gastado el presupuesto del día
       // es otra, y merece que se lo digan con esas palabras.
       const diaAgotado = breakKind !== "break" && pasadoMs >= LIMITE_DIARIO_AGOTADO_MS;
+      // La VOZ sigue en español: el motor de voz está fijo en español (lib/voz)
+      // y leer inglés con esa voz no se entiende. El cartel sí va en su idioma.
       hablar(diaAgotado ? fraseDiaAgotado() : fraseFinDePausa(breakKind));
       toast.warning(
-        diaAgotado ? "Excediste tu tiempo de baño del día" : "Se acabó tu tiempo de pausa",
+        diaAgotado ? traducir("cowork.participant.bathroomDayOver") : traducir("cowork.participant.pauseOver"),
         {
           description: diaAgotado
-            ? "El baño son 10 minutos por día en total. Por favor, regresa a tu puesto."
-            : "Vuelve a tu puesto y quita la pausa para que quede registrado.",
+            ? traducir("cowork.participant.bathroomDayOverDesc")
+            : traducir("cowork.participant.pauseOverDesc"),
           duration: 10_000,
           id: "fin-pausa",
         },
@@ -293,7 +301,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   }, [breakStartedAt, breakLimite, breakKind, banoConsumido]);
 
   const etiquetaPausa = (kind: "bano" | "break") => {
-    const nombre = kind === "break" ? "Break" : "Baño";
+    const nombre = t(NOMBRE_PAUSA[kind]);
     const min = limitesPausa[kind];
     return min != null ? `${nombre} (${min} min)` : nombre;
   };
@@ -321,7 +329,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
       });
       actualizarLatido({ onBreak: !cerrando });
     } catch (e) {
-      toast.error("No se pudo registrar la pausa", { description: (e as Error).message });
+      toast.error(traducir("cowork.participant.pauseError"), { description: (e as Error).message });
     }
   }, [breakStartedAt, trackMediaState, cowork]);
 
@@ -340,7 +348,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     // abra las fija de nuevo al cargar su fila.
     fijarReglas(null);
     try { await cowork.leaveRoom?.(); } catch { /* best-effort */ }
-    toast.success("Saliste de la sala");
+    toast.success(traducir("cowork.participant.leftRoom"));
     // Solo se lo lleva a otro lado si esta MIRANDO Cowork: ahi la pantalla se
     // queda sin contenido y hay que mandarlo a alguna parte.
     //
@@ -529,7 +537,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
       olvidarDescartada(oneOnOneRequestId);
       dismissedRequestRef.current = null;
       reconnectToMainRoom();
-      toast.info("Llamada privada con supervisor finalizada");
+      toast.info(traducir("cowork.participant.privateCallEnded"));
     }
   }, [cowork.hostRequests, oneOnOneRequestId, reconnectToMainRoom]);
 
@@ -570,7 +578,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   }, [cowork.joinOneOnOne, oneOnOneRequestId]);
 
   const getMeetToken = useCallback(async () => {
-    if (!meetId) throw new Error("Sin meet");
+    if (!meetId) throw new Error("No group meet");
     const result = await joinMeetGrupal(meetId);
     return { token: result.token, url: result.url };
   }, [joinMeetGrupal, meetId]);
@@ -585,14 +593,14 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     setMeetId(miMeet.id);
     setMeetRoom(miMeet.livekit_room_name);
     setConnectedLkRoom(null);
-    toast.info("Tu supervisor te llevó a un meet grupal");
+    toast.info(traducir("cowork.participant.broughtToMeet"));
   }, [miMeet, meetId]);
 
   // El meet terminó (el supervisor se fue) o me sacaron: vuelvo a mi sala como estaba.
   useEffect(() => {
     if (!meetId || miMeet?.id === meetId) return;
     volverDelMeet();
-    toast.info("El meet grupal terminó: volviste a tu sala");
+    toast.info(traducir("cowork.participant.meetEnded"));
   }, [miMeet?.id, meetId, volverDelMeet]);
 
   const salirDelMeet = useCallback(async () => {
@@ -641,7 +649,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
       onMediaStateChange: handleMediaStateChange,
       onFaceStateChange: handleFaceStateChange,
       supervisorEncuadre: true,
-      leaveLabel: "Salir y volver al dashboard",
+      leaveLabel: traducir("cowork.participant.leaveAndBack"),
       leaveIcon: LogOut,
     });
   }, [connectedLkRoom, oneOnOneRoom, meetRoom, displayName, myRoom?.name, startCall,
@@ -654,14 +662,11 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
           <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-warning/15 text-warning">
             <Copy className="h-5 w-5" />
           </div>
-          <h2 className="text-base font-semibold text-foreground">Cowork ya está abierto en otra pestaña</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Tu cámara, tu pantalla y tu reloj siguen en la otra. Si esta pestaña también entrara, el supervisor
-            te vería sin cámara y te llegarían alertas que no son.
-          </p>
+          <h2 className="text-base font-semibold text-foreground">{t("cowork.participant.otherTabTitle")}</h2>
+          <p className="mt-1 text-sm text-muted-foreground">{t("cowork.participant.otherTabDesc")}</p>
           <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-center">
-            <Button className="rounded-full" onClick={() => void tomarEstaPestana()}>Usar esta pestaña</Button>
-            <Button variant="outline" className="rounded-full" onClick={() => navigate("/dashboard")}>Volver al dashboard</Button>
+            <Button className="rounded-full" onClick={() => void tomarEstaPestana()}>{t("cowork.participant.useThisTab")}</Button>
+            <Button variant="outline" className="rounded-full" onClick={() => navigate("/dashboard")}>{t("cowork.common.backToDashboard")}</Button>
           </div>
         </div>
       </div>
@@ -682,7 +687,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
         await cowork.joinSession(cowork.session.id, "participant", undefined, lastRoomId);
         cowork.refetch();
       } catch (e: any) {
-        toast.error(e.message || "No se pudo volver a tu sala");
+        toast.error(e.message || t("cowork.participant.resumeError"));
       } finally {
         setResuming(false);
       }
@@ -697,7 +702,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
         setRoomCode("");
         cowork.refetch();
       } catch (e: any) {
-        toast.error(e.message || "No se pudo entrar con ese código");
+        toast.error(e.message || t("cowork.common.codeError"));
       } finally {
         setJoiningByCode(false);
       }
@@ -711,20 +716,20 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             <DoorOpen className="h-7 w-7 text-primary" />
           </div>
           <div className="flex flex-col items-center gap-1">
-            <p className="text-foreground font-semibold text-center">Todavía no estás en una sala</p>
+            <p className="text-foreground font-semibold text-center">{t("cowork.participant.noRoomYet")}</p>
             <p className="text-xs text-muted-foreground/70">{cowork.session?.name}</p>
           </div>
 
           {lastRoomId && (
             <Button onClick={resumeLastRoom} disabled={resuming} className="w-full rounded-full gap-2">
               {resuming ? <Loader2 className="h-4 w-4 animate-spin" /> : <DoorOpen className="h-4 w-4" />}
-              Volver a mi sala
+              {t("cowork.participant.backToMyRoom")}
             </Button>
           )}
 
           <div className="w-full flex flex-col gap-2">
             <span className="text-xs text-muted-foreground text-center">
-              {lastRoomId ? "O entra con el código de otra sala" : "Entra con el código que te dio tu supervisor"}
+              {lastRoomId ? t("cowork.participant.orOtherCode") : t("cowork.participant.enterSupervisorCode")}
             </span>
             <div className="flex gap-2">
               <Input
@@ -741,7 +746,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
                 className="rounded-full gap-1 shrink-0"
               >
                 {joiningByCode ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
-                Entrar
+                {t("cowork.common.enter")}
               </Button>
             </div>
           </div>
@@ -752,7 +757,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             className="rounded-full text-muted-foreground"
             onClick={() => navigate("/cowork", { replace: true })}
           >
-            Volver a Cowork
+            {t("cowork.participant.backToCowork")}
           </Button>
         </div>
       </div>
@@ -766,8 +771,10 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   const handleRequestHost = async () => {
     dismissedRequestRef.current = null;
     try {
-      await cowork.requestHost(myAssignment.room_id, "Necesito ayuda");
-      toast.success("Solicitud enviada al supervisor");
+      // El mensaje se GUARDA en la solicitud y lo lee el supervisor: va en
+      // español siempre; el tablero lo muestra en el idioma de quien lo lee.
+      await cowork.requestHost(myAssignment.room_id, MENSAJE_PEDIR_AYUDA);
+      toast.success(t("cowork.participant.requestSent"));
     } catch (e: any) {
       toast.error(e.message);
     }
@@ -776,8 +783,8 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   const handleRequestOneOnOne = async () => {
     pendingOneOnOneRef.current = true;
     try {
-      const result = await cowork.requestHost(myAssignment.room_id, "Llamada privada", true);
-      toast.success("Solicitud de llamada privada enviada al supervisor");
+      const result = await cowork.requestHost(myAssignment.room_id, MENSAJE_LLAMADA_PRIVADA, true);
+      toast.success(t("cowork.participant.privateRequestSent"));
       const roomName = result?.oneone_livekit_room || result?.request?.oneone_livekit_room;
       const reqId = result?.request?.id;
       if (roomName && reqId) {
@@ -809,11 +816,11 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
           {isInOneOnOne ? (
             <>
               <Crown className="h-4 w-4 text-warning shrink-0" />
-              <span className="text-warning text-sm font-medium truncate">Llamada privada con supervisor</span>
+              <span className="text-warning text-sm font-medium truncate">{t("cowork.participant.privateCallWithSupervisor")}</span>
             </>
           ) : (
             <>
-              <span className="text-foreground text-sm font-medium truncate">{myRoom?.name || "Sala"}</span>
+              <span className="text-foreground text-sm font-medium truncate">{myRoom?.name || t("cowork.common.room")}</span>
               <span className="text-muted-foreground/70 text-xs hidden sm:inline">{cowork.session?.name}</span>
             </>
           )}
@@ -827,33 +834,33 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
         <div className="hidden md:flex items-center gap-2">
           {dismissedActiveRequest && !isInOneOnOne && (
             <Button variant="ghost" size="sm" className="text-warning hover:text-warning/80 hover:bg-warning/10 gap-1.5 animate-pulse rounded-full" onClick={handleReconnectPrivateCall}>
-              <PhoneCall className="h-4 w-4" /> Reconectar a llamada privada
+              <PhoneCall className="h-4 w-4" /> {t("cowork.participant.reconnectPrivate")}
             </Button>
           )}
           <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground hover:bg-muted gap-1.5 rounded-full" disabled={isInOneOnOne} onClick={handleRequestHost}>
-            <Hand className="h-4 w-4" /> {myOpenRequest && !isInOneOnOne ? "Solicitud enviada" : "Pedir supervisor"}
+            <Hand className="h-4 w-4" /> {myOpenRequest && !isInOneOnOne ? t("cowork.participant.requestSentShort") : t("cowork.participant.askSupervisor")}
           </Button>
           <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground hover:bg-muted gap-1.5 rounded-full" disabled={!!myOpenRequest || isInOneOnOne} onClick={handleRequestOneOnOne}>
-            <Phone className="h-4 w-4" /> {isInOneOnOne ? "En llamada privada..." : "Llamada privada supervisor"}
+            <Phone className="h-4 w-4" /> {isInOneOnOne ? t("cowork.participant.inPrivateCall") : t("cowork.participant.privateCallShort")}
           </Button>
           <Button
             variant="ghost"
             size="sm"
             className={`gap-1.5 rounded-full ${breakStartedAt ? "text-warning hover:text-warning/80 hover:bg-warning/10" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
             onClick={breakStartedAt ? () => toggleBreak() : undefined}
-            title={breakStartedAt ? "Avisar que volviste" : "Avisar que te ausentás un momento"}
+            title={breakStartedAt ? t("cowork.participant.imBack") : t("cowork.participant.stepAway")}
             asChild={!breakStartedAt}
           >
             {breakStartedAt ? (
               <>
                 <Coffee className="h-4 w-4" />
-                <span>{breakKind === "break" ? "Break" : "Baño"} ·</span>
+                <span>{t(NOMBRE_PAUSA[breakKind === "break" ? "break" : "bano"])} ·</span>
                 {(() => {
                   const c = cuentaPausa(breakElapsed, breakLimite, consumidoDe(breakKind));
                   return (
                     <span className={cn("tabular-nums", clasesPausa(c.estado))}>
                       {c.texto}
-                      {c.excedida && <span className="ml-1 font-normal">pasado</span>}
+                      {c.excedida && <span className="ml-1 font-normal">{t("cowork.participant.over")}</span>}
                     </span>
                   );
                 })()}
@@ -863,7 +870,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <span className="inline-flex items-center gap-1.5 cursor-pointer">
-                      <Coffee className="h-4 w-4" /> Pausa
+                      <Coffee className="h-4 w-4" /> {t("cowork.participant.pause")}
                     </span>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
@@ -886,7 +893,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
               <button
                 type="button"
                 onClick={() => toggleBreak()}
-                title="Avisar que volviste"
+                title={t("cowork.participant.imBack")}
                 className={cn(
                   "flex items-center gap-1 rounded-full px-2.5 h-8 text-[11px] tabular-nums shrink-0",
                   // Fondo y borde para que se lea como un botón: sin esto queda
@@ -914,16 +921,16 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             <DropdownMenuContent align="end" className="rounded-xl">
               <DropdownMenuItem onClick={handleRequestHost} disabled={isInOneOnOne}>
                 <Hand className="h-4 w-4 mr-2" />
-                {myOpenRequest && !isInOneOnOne ? "Solicitud enviada" : "Pedir supervisor"}
+                {myOpenRequest && !isInOneOnOne ? t("cowork.participant.requestSentShort") : t("cowork.participant.askSupervisor")}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={handleRequestOneOnOne} disabled={!!myOpenRequest || isInOneOnOne}>
                 <Phone className="h-4 w-4 mr-2" />
-                {isInOneOnOne ? "En llamada privada..." : "Llamada privada con supervisor"}
+                {isInOneOnOne ? t("cowork.participant.inPrivateCall") : t("cowork.participant.privateCallWithSupervisor")}
               </DropdownMenuItem>
               {breakStartedAt ? (
                 <DropdownMenuItem onClick={() => toggleBreak()}>
                   <Coffee className="h-4 w-4 mr-2" />
-                  <span>{breakKind === "break" ? "Break" : "Baño"} ·&nbsp;</span>
+                  <span>{t(NOMBRE_PAUSA[breakKind === "break" ? "break" : "bano"])} ·&nbsp;</span>
                   {(() => {
                     const c = cuentaPausa(breakElapsed, breakLimite, consumidoDe(breakKind));
                     return <span className={cn("tabular-nums", clasesPausa(c.estado))}>{c.texto}</span>;
@@ -959,15 +966,15 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             <div className={cn("flex shrink-0 items-center gap-2 border-b px-3 py-2", breakStartedAt ? "border-warning/30 bg-warning/10" : "border-primary/30 bg-primary/10")}>
               <Video className="h-4 w-4 shrink-0 text-primary" />
               <div className="min-w-0 flex-1 text-xs">
-                <span className="font-medium text-foreground">Estás en un meet grupal.</span>{" "}
+                <span className="font-medium text-foreground">{t("cowork.participant.inMeet")}</span>{" "}
                 <span className="text-muted-foreground">
                   {breakStartedAt
-                    ? "Sigues en break: prende el micrófono o la cámara para salir del break."
-                    : "En tu sala quedaste con cámara, micro y pantalla apagados hasta que vuelvas."}
+                    ? t("cowork.participant.inMeetOnBreak")
+                    : t("cowork.participant.inMeetRoomOff")}
                 </span>
               </div>
               <Button size="sm" className="h-8 shrink-0 gap-1.5 rounded-full" onClick={() => void salirDelMeet()}>
-                <DoorOpen className="h-3.5 w-3.5" /> Volver a mi sala
+                <DoorOpen className="h-3.5 w-3.5" /> {t("cowork.participant.backToMyRoom")}
               </Button>
             </div>
             <div className="min-h-0 flex-1">
@@ -975,7 +982,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
                 key={`meet-${meetRoom}`}
                 roomName={meetRoom}
                 displayName={displayName}
-                callDisplayName="Meet grupal"
+                callDisplayName={t("cowork.meet.title")}
                 isAdmin={false}
                 onLeave={() => void salirDelMeet()}
                 hideShareLink
@@ -985,7 +992,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
                 initialCamOn={!breakStartedAt}
                 getToken={getMeetToken}
                 onMediaStateChange={mediaEnMeet}
-                leaveLabel="Volver a mi sala Cowork"
+                leaveLabel={t("cowork.participant.backToMyCoworkRoom")}
                 leaveIcon={DoorOpen}
               />
             </div>
@@ -995,7 +1002,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             key={`oneOnOne-${oneOnOneRoom}`}
             roomName={oneOnOneRoom}
             displayName={displayName}
-            callDisplayName="Llamada privada con supervisor"
+            callDisplayName={t("cowork.participant.privateCallWithSupervisor")}
             isAdmin={false}
             onLeave={async () => {
               const reqId = oneOnOneRequestId;
@@ -1016,7 +1023,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             initialMicOn={false}
             initialCamOn={false}
             getToken={getOneOnOneToken}
-            leaveLabel="Regresar a la sala"
+            leaveLabel={t("cowork.participant.backToRoom")}
             leaveIcon={ArrowLeft}
           />
         ) : connectedLkRoom ? (
