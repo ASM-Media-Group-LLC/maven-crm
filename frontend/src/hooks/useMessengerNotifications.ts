@@ -16,22 +16,28 @@ import { tienePushEnEsteDispositivo } from "@/lib/pushDispositivo";
 import { esMovil } from "@/lib/plataformaPwa";
 import { avisarPersona } from "@/lib/avisoPersona";
 import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 import { useReanudarAlVolver } from "@/hooks/useReanudarAlVolver";
 import { useCanalQueRevive } from "@/hooks/useCanalQueRevive";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
-// Etiqueta legible cuando el mensaje no trae texto.
-const MEDIA_LABEL: Record<string, string> = {
-  image: "📷 Foto",
-  file: "📎 Archivo",
-  system: "Mensaje",
+type Traductor = (key: TranslationKey, params?: Record<string, string | number>) => string;
+
+// Etiqueta legible cuando el mensaje no trae texto. La llave es el `type` del
+// mensaje (dato); lo que se lee sale del diccionario, en el idioma de quien
+// RECIBE el aviso.
+const MEDIA_LABEL: Record<string, TranslationKey> = {
+  image: "messenger.preview.foto",
+  file: "shared.msgNotif.file",
+  system: "shared.msgNotif.message",
 };
 
-function previewOf(content: string | null, type: string, fileName: string | null): string {
-  const t = (content ?? "").trim();
-  if (t) return t.length > 120 ? t.slice(0, 120) + "…" : t;
+function previewOf(content: string | null, type: string, fileName: string | null, t: Traductor): string {
+  const texto = (content ?? "").trim();
+  if (texto) return texto.length > 120 ? texto.slice(0, 120) + "…" : texto;
   if (type === "file" && fileName) return `📎 ${fileName}`;
-  return MEDIA_LABEL[type] ?? "Nuevo mensaje";
+  const clave = MEDIA_LABEL[type];
+  return clave ? t(clave) : t("shared.msgNotif.newMessage");
 }
 
 // No-molestar RESPETANDO el horario. Antes dnd_enabled apagaba TODO 24/7. Sin franja
@@ -357,7 +363,7 @@ export function useMessengerNotifications() {
             .conversation ?? null;
           const isGroup = conv?.type === "group";
 
-          let senderName = "Alguien";
+          let senderName = tRef.current("shared.msgNotif.someone");
           let senderFoto: string | null = null;
           let senderSeed: string | null = null;
           try {
@@ -373,13 +379,15 @@ export function useMessengerNotifications() {
             /* nombre genérico */
           }
 
-          const preview = previewOf(m.content ?? null, m.type ?? "text", m.file_name ?? null);
-          const title = isGroup ? conv?.name || "Grupo" : senderName;
+          const preview = previewOf(m.content ?? null, m.type ?? "text", m.file_name ?? null, tRef.current);
+          const title = isGroup ? conv?.name || tRef.current("shared.msgNotif.group") : senderName;
           const body = isGroup ? `${senderName}: ${preview}` : preview;
 
           // Título de la pestaña parpadeando mientras no estés mirando (Google Chat).
           alertTitleRef.current(
-            isGroup ? `💬 ${senderName} escribió en ${title}` : `💬 ${senderName} te escribió`
+            isGroup
+              ? tRef.current("shared.msgNotif.wroteIn", { name: senderName, title })
+              : tRef.current("shared.msgNotif.wroteYou", { name: senderName })
           );
 
           // Sonido: respeta el ajuste global, el mute PROPIO de bandejas/chats

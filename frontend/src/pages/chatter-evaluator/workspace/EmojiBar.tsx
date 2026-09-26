@@ -59,8 +59,8 @@ export const EMOJI_CATALOG: Record<string, string[]> = {
 };
 
 // El nombre de la categoría es la LLAVE del catálogo (la usa también el
-// Messenger); lo que se muestra sale de acá.
-const NOMBRE_CATEGORIA: Record<string, TranslationKey> = {
+// Messenger, en Expresiones); lo que se muestra sale de acá.
+export const NOMBRE_CATEGORIA: Record<string, TranslationKey> = {
   Caras: "chatters.emoji.cat.caras",
   Amor: "chatters.emoji.cat.amor",
   Cuerpo: "chatters.emoji.cat.cuerpo",

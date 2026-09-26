@@ -327,6 +327,11 @@ export const chatters = {
   "chatters.emoji.cat.gestos": { es: "Gestos", en: "Gestures" },
   "chatters.emoji.cat.objetos": { es: "Objetos", en: "Objects" },
   "chatters.emoji.cat.otros": { es: "Otros", en: "Other" },
+  // Control de volumen del evaluador (VolumeControl).
+  "chatters.volume.mute": { es: "Silenciar", en: "Mute" },
+  "chatters.volume.unmute": { es: "Activar sonido", en: "Unmute" },
+  "chatters.volume.sound": { es: "Sonido", en: "Sound" },
+  "chatters.volume.volume": { es: "Volumen", en: "Volume" },
 
   // ─── Panel de criterios (CriteriaPanel) ─────────────────────────────────────
   // Los criterios se muestran con su `label_en` de la base si existe; lo que se

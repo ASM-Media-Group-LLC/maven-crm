@@ -15,6 +15,9 @@
 import type { Room, Participant } from "livekit-client";
 import { supabase } from "@/integrations/supabase/client";
 import { avisarPersona } from "@/lib/avisoPersona";
+// Los avisos los arma quien los RECIBE a partir de un evento de la sala (no son
+// un mensaje que alguien escribió): van por traducir(), en el idioma de cada uno.
+import { traducir } from "@/lib/i18n";
 
 const DURACION_MS = 5_000;
 
@@ -75,12 +78,13 @@ export async function avisarSalidaDeLlamada(
   if (!debeAvisarSalida(p, room)) return false;
   const uuid = uuidDeIdentity(p.identity);
   const perfil = uuid ? await perfilBreveDe(uuid) : null;
-  const nombre = perfil?.nombre || p.name?.trim() || (uuid ? "Alguien de Maven" : "Un invitado");
+  const nombre = perfil?.nombre || p.name?.trim() ||
+    traducir(uuid ? "shared.callNotice.someoneFromMaven" : "shared.callNotice.guest");
   avisarPersona({
     nombre,
     foto: perfil?.foto ?? null,
     seed: perfil?.seed ?? null,
-    titulo: `${nombre} salió de la reunión`,
+    titulo: traducir("shared.callNotice.left", { name: nombre }),
     tono: "neutral",
     duracion: DURACION_MS,
     // Mismo id por persona: si sale y vuelve a salir rápido, se reemplaza.
@@ -129,32 +133,32 @@ export async function mostrarAvisoDeSala(payload: unknown, miIdentity: string): 
     if (loHiceYo && !soyYo) return false;
     if (soyYo) {
       const quien = await cara(por);
-      avisarPersona({ ...quien, titulo: `${quien.nombre} silenció tu micrófono`, detalle: "Puedes volver a activarlo cuando quieras.", tono: "ojo", duracion: 8_000, id: ID_AVISO_ME_SILENCIARON });
+      avisarPersona({ ...quien, titulo: traducir("shared.callNotice.mutedYou", { name: quien.nombre }), detalle: traducir("shared.call.canTurnBackOn"), tono: "ojo", duracion: 8_000, id: ID_AVISO_ME_SILENCIARON });
       return true;
     }
     const quien = await cara(objetivo);
-    avisarPersona({ ...quien, titulo: `${por.nombre} silenció a ${quien.nombre}`, tono: "neutral", duracion: DURACION_MS, id: `silenciado-${objetivo.uuid ?? objetivo.identity}` });
+    avisarPersona({ ...quien, titulo: traducir("shared.callNotice.mutedOther", { by: por.nombre, name: quien.nombre }), tono: "neutral", duracion: DURACION_MS, id: `silenciado-${objetivo.uuid ?? objetivo.identity}` });
     return true;
   }
 
   if (clase === "silenciados-todos") {
     if (loHiceYo) return false;
     const quien = await cara(por);
-    avisarPersona({ ...quien, titulo: `${quien.nombre} silenció a todos`, detalle: "Puedes volver a activar tu micrófono cuando quieras.", tono: "ojo", duracion: 8_000, id: ID_AVISO_ME_SILENCIARON });
+    avisarPersona({ ...quien, titulo: traducir("shared.callNotice.mutedAll", { name: quien.nombre }), detalle: traducir("shared.callNotice.canUnmuteMic"), tono: "ojo", duracion: 8_000, id: ID_AVISO_ME_SILENCIARON });
     return true;
   }
 
   if (clase === "grabando") {
     if (loHiceYo) return false;
     const quien = await cara(por);
-    avisarPersona({ ...quien, titulo: `${quien.nombre} empezó a grabar la reunión`, detalle: "Toda la sala ve el punto rojo mientras dure.", tono: "ojo", duracion: 10_000, id: "grabacion" });
+    avisarPersona({ ...quien, titulo: traducir("shared.callNotice.recording", { name: quien.nombre }), detalle: traducir("shared.callNotice.recordingDesc"), tono: "ojo", duracion: 10_000, id: "grabacion" });
     return true;
   }
 
   if (clase === "grabacion-detenida") {
     if (loHiceYo) return false;
     const quien = await cara(por);
-    avisarPersona({ ...quien, titulo: `${quien.nombre} detuvo la grabación`, tono: "neutral", duracion: DURACION_MS, id: "grabacion" });
+    avisarPersona({ ...quien, titulo: traducir("shared.callNotice.recordingStopped", { name: quien.nombre }), tono: "neutral", duracion: DURACION_MS, id: "grabacion" });
     return true;
   }
   return false;

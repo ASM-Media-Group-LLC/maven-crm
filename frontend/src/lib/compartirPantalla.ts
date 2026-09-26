@@ -23,6 +23,8 @@
 // MediaProjection en Android) a la que una página web no tiene acceso. No es
 // que Meet sepa algo que nosotros no: es que no está corriendo en un navegador.
 
+import { traducir } from "@/lib/i18n";
+
 function esTactil(): boolean {
   try {
     return window.matchMedia("(pointer: coarse)").matches;
@@ -46,11 +48,13 @@ export function puedeCompartirPantalla(): boolean {
  *  hay nada que decir: cerrar el diálogo del navegador es una decisión, no un
  *  error, y avisarla sería regañar a alguien por cambiar de opinión. */
 export function motivoDeFalloAlCompartir(err: unknown): string | null {
+  // traducir() y no un texto fijo: el motivo es la descripción del aviso que ve
+  // quien tocó el botón, en su idioma (hooks/useLiveKit → toggleScreenShare).
   if (!puedeCompartirPantalla()) {
-    return "Los teléfonos no permiten compartir la pantalla. Hazlo desde la computadora.";
+    return traducir("shared.screenShare.phones");
   }
   const nombre = (err as { name?: string } | null)?.name;
   if (nombre === "NotAllowedError" || nombre === "AbortError") return null;  // canceló
-  if (nombre === "NotFoundError") return "No se encontró ninguna pantalla para compartir.";
-  return (err as Error | null)?.message || "No se pudo compartir la pantalla.";
+  if (nombre === "NotFoundError") return traducir("shared.screenShare.notFound");
+  return (err as Error | null)?.message || traducir("shared.screenShare.failed");
 }

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // Mirrors the original Roleplaychatters volume control (index.html, btnSound
 // + volumeSlider). Persisted in localStorage so the choice survives reloads
@@ -120,6 +121,7 @@ interface VolumeControlProps {
 }
 
 export const VolumeControl = ({ className, onDark }: VolumeControlProps) => {
+  const { t } = useLanguage();
   const [volume, setVolume] = useState<number>(() => getSoundVolume());
 
   // Register audio unlock listeners only when this component mounts
@@ -171,8 +173,8 @@ export const VolumeControl = ({ className, onDark }: VolumeControlProps) => {
         type="button"
         onClick={handleToggle}
         className={btnClasses}
-        title={volume > 0 ? "Silenciar" : "Activar sonido"}
-        aria-label="Sonido"
+        title={volume > 0 ? t("chatters.volume.mute") : t("chatters.volume.unmute")}
+        aria-label={t("chatters.volume.sound")}
       >
         {iconFor(volume)}
       </button>
@@ -183,7 +185,7 @@ export const VolumeControl = ({ className, onDark }: VolumeControlProps) => {
         value={Math.round(volume * 100)}
         onChange={handleSlide}
         className={sliderClasses}
-        aria-label="Volumen"
+        aria-label={t("chatters.volume.volume")}
       />
     </div>
   );

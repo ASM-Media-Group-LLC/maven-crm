@@ -15,7 +15,7 @@ import { useAutoPiP } from "./useAutoPiP";
 import { suscribirOrdenesDePausa } from "@/lib/ordenesDePausa";
 
 import { Loader2, WifiOff, Copy, ChevronLeft, ChevronRight, DoorOpen, Check } from "lucide-react";
-import { TITULO_OTRA_PESTANA, DETALLE_OTRA_PESTANA, BOTON_USAR_AQUI } from "@/lib/sesionDuplicada";
+import { CLAVES_OTRA_PESTANA } from "@/lib/sesionDuplicada";
 import { cn } from "@/lib/utils";
 import { puedeCompartirPantalla } from "@/lib/compartirPantalla";
 import { toast } from "sonner";
@@ -682,14 +682,14 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
       {lk.otraPestanaTomoLaSesion && (
         <div className="shrink-0 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 py-2 px-3 bg-warning/15 text-warning text-xs font-medium text-center">
           <Copy className="h-3.5 w-3.5 shrink-0" />
-          <span>{TITULO_OTRA_PESTANA}.</span>
-          <span className="font-normal opacity-80">{DETALLE_OTRA_PESTANA}</span>
+          <span>{t(CLAVES_OTRA_PESTANA.titulo)}.</span>
+          <span className="font-normal opacity-80">{t(CLAVES_OTRA_PESTANA.detalle)}</span>
           <button
             type="button"
             onClick={() => setReintentoManual((n) => n + 1)}
             className="underline underline-offset-2 hover:opacity-80"
           >
-            {BOTON_USAR_AQUI}
+            {t(CLAVES_OTRA_PESTANA.usarAqui)}
           </button>
         </div>
       )}

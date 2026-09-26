@@ -33,6 +33,8 @@ export const contactos = {
   "contactos.agent": { es: "Agente", en: "Agent" },
   "contactos.searchAgent": { es: "Buscar agente...", en: "Search agent..." },
   "contactos.salesChannel": { es: "Canal de venta", en: "Sales channel" },
+  // Un canal que llegó en las filas pero no en la lista de canales (useContactSalesChannels).
+  "contactos.channelFallback": { es: "Canal", en: "Channel" },
   "contactos.notContacted": { es: "Sin contactar", en: "Not contacted" },
   "contactos.twoPlusChannels": { es: "2+ canales", en: "2+ channels" },
   "contactos.oneChannel": { es: "1 canal", en: "1 channel" },

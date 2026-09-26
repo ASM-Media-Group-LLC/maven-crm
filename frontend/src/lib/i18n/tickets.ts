@@ -222,7 +222,7 @@ export const tickets = {
     en: "{count} creators in Maven — search by name or handle. It links to the profile; it isn't free text.",
   },
   "tickets.form.searchMavenUser": { es: "Buscar empleado de Maven…", en: "Search Maven employee…" },
-  "tickets.form.addEvidence": { es: "Agregar otra prueba", en: "Add another link" },
+  "tickets.form.addEvidence": { es: "Agregar otra prueba", en: "Add another proof" },
   "tickets.form.instagramPlaceholder": {
     es: "https://www.instagram.com/usuario/",
     en: "https://www.instagram.com/username/",

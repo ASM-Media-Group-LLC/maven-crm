@@ -207,7 +207,12 @@ export const NewSessionDialog = ({ open, onOpenChange }: Props) => {
   // Lista para el select de "Asignar a". Siempre asegurar que el current
   // user aparezca como primera opción aunque la query aún esté cargando o
   // su rol falte momentáneamente en la lista.
-  const evaluators = evaluatorsQ.data ?? [];
+  // El hook deja el nombre vacío si la persona no tiene uno: el repuesto va acá,
+  // en el idioma de la pantalla (y así lo usan también la inicial del avatar y
+  // la vista de "listo").
+  const evaluators = (evaluatorsQ.data ?? []).map((e) =>
+    e.full_name ? e : { ...e, full_name: t("chatters.newSess.noName") },
+  );
   const orderedEvaluators = (() => {
     if (!user?.id) return evaluators;
     const self = evaluators.find((e) => e.user_id === user.id);

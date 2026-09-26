@@ -22,6 +22,10 @@ import { addPending, removePending, pendingForConversation } from "@/pages/messe
 import { perfilesGarantizados } from "@/hooks/perfilesGarantizados";
 import { queHacerConLaCarga, esperaDeReintento } from "@/hooks/queHacerConLaCarga";
 import { toast } from "sonner";
+// Los avisos van por traducir(): salen de callbacks y promesas, no del JSX.
+// Los mensajes de sistema que se INSERTAN en chat_messages no pasan por acá: son
+// dato y los lee cada miembro del chat.
+import { traducir } from "@/lib/i18n";
 
 // Cada cuánto se recarga la lista entera aunque no haya pasado nada. Es solo la
 // red de seguridad: los mensajes nuevos se aplican en memoria por realtime y los
@@ -602,7 +606,7 @@ export function useChat() {
         const abortarApertura = (motivo: string) => {
           console.error("[startDirectChat] no pude comprobar si el DM existía:", motivo);
           setConversations((prev) => prev.filter((c) => c.id !== newConvId));
-          toast.error("Sin conexión: no pude abrir el chat. Inténtalo de nuevo.");
+          toast.error(traducir("shared.chat.offlineOpen"));
         };
         const participacionesMias = await supabase
           .from("chat_participants")
@@ -654,7 +658,7 @@ export function useChat() {
 
         if (createConvError) {
           setConversations((prev) => prev.filter((c) => c.id !== newConvId));
-          toast.error("Error al crear conversación");
+          toast.error(traducir("shared.chat.errorCreatingConversation"));
           return;
         }
 
@@ -665,7 +669,7 @@ export function useChat() {
         if (addCreatorError) {
           await supabase.from("chat_conversations").delete().eq("id", newConvId);
           setConversations((prev) => prev.filter((c) => c.id !== newConvId));
-          toast.error("Error al crear conversación");
+          toast.error(traducir("shared.chat.errorCreatingConversation"));
           return;
         }
 
@@ -677,7 +681,7 @@ export function useChat() {
           await supabase.from("chat_participants").delete().eq("conversation_id", newConvId);
           await supabase.from("chat_conversations").delete().eq("id", newConvId);
           setConversations((prev) => prev.filter((c) => c.id !== newConvId));
-          toast.error("Error al crear conversación");
+          toast.error(traducir("shared.chat.errorCreatingConversation"));
           return;
         }
       })();
@@ -723,7 +727,7 @@ export function useChat() {
 
         if (createConvError) {
           setConversations(prev => prev.filter(c => c.id !== newConvId));
-          toast.error("Error al crear grupo");
+          toast.error(traducir("shared.chat.errorCreatingGroup"));
           return;
         }
 
@@ -734,7 +738,7 @@ export function useChat() {
         if (addCreatorError) {
           await supabase.from("chat_conversations").delete().eq("id", newConvId);
           setConversations(prev => prev.filter(c => c.id !== newConvId));
-          toast.error("Error al crear grupo");
+          toast.error(traducir("shared.chat.errorCreatingGroup"));
           return;
         }
 
@@ -751,12 +755,12 @@ export function useChat() {
             await supabase.from("chat_participants").delete().eq("conversation_id", newConvId);
             await supabase.from("chat_conversations").delete().eq("id", newConvId);
             setConversations(prev => prev.filter(c => c.id !== newConvId));
-            toast.error("Error al crear grupo");
+            toast.error(traducir("shared.chat.errorCreatingGroup"));
             return;
           }
         }
 
-        toast.success(`Grupo "${name}" creado`);
+        toast.success(traducir("shared.chat.groupCreated", { name }));
       })();
 
       return newConvId;
@@ -781,11 +785,11 @@ export function useChat() {
 
         if (error) throw error;
 
-        toast.success("Conversación eliminada");
+        toast.success(traducir("shared.chat.conversationDeleted"));
         return true;
       } catch (err) {
         console.error("Error deleting conversation:", err);
-        toast.error("Error al eliminar conversación");
+        toast.error(traducir("shared.chat.errorDeletingConversation"));
         // Rollback: restore previous state
         setConversations(prevConversations);
         return false;
@@ -888,7 +892,7 @@ export function useChat() {
 
     if (error || !data || data.length === 0) {
       applyMuted(!muted); // revertir
-      toast.error(muted ? "No se pudo silenciar" : "No se pudo reactivar");
+      toast.error(traducir(muted ? "shared.chat.couldNotMute" : "shared.chat.couldNotUnmute"));
     }
   }, [user]);
 
@@ -1511,7 +1515,7 @@ export function useMessages(
       // Si el mensaje todavía se está enviando (id optimista), el UPDATE no matchearía
       // ninguna fila real y la edición se perdería en silencio → bloquear hasta que persista.
       if (optimisticIdsRef.current.has(messageId)) {
-        toast.info("Espera a que el mensaje termine de enviarse");
+        toast.info(traducir("shared.chat.waitUntilSent"));
         return;
       }
       // La caja de edición es texto plano, así que el texto rico (negritas,
@@ -1526,7 +1530,7 @@ export function useMessages(
         .update({ content: newContent, is_edited: true, content_rich: null })
         .eq("id", messageId);
       if (error) {
-        toast.error("Error al editar mensaje");
+        toast.error(traducir("shared.chat.errorEditingMessage"));
         void loadMessagesRef.current?.();
       }
     },
@@ -1546,7 +1550,7 @@ export function useMessages(
     // Igual que editMessage: si el id es optimista (aún enviándose), el UPDATE no
     // matchearía nada y el borrado se perdería en silencio → bloquear hasta que persista.
     if (optimisticIdsRef.current.has(messageId)) {
-      toast.info("Espera a que el mensaje termine de enviarse");
+      toast.info(traducir("shared.chat.waitUntilSent"));
       return;
     }
     // Optimistic soft delete (también el adjunto: la RPC vacía content y file_url)
@@ -1559,7 +1563,7 @@ export function useMessages(
     const { data, error } = await supabase.rpc("delete_chat_message" as never, { p_message_id: messageId } as never);
     const res = data as unknown as { ok?: boolean } | null;
     if (error || (res && res.ok === false)) {
-      toast.error("Error al eliminar mensaje");
+      toast.error(traducir("shared.chat.errorDeletingMessage"));
       void loadMessagesRef.current?.();
     }
   }, [user]);

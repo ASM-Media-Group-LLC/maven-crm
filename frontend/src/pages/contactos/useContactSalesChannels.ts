@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // Canales de venta por los que se contactó a un contacto vía WhatsApp.
 // "Contactado por un canal" = existe al menos UN mensaje OUTBOUND (direction='out')
@@ -43,6 +44,13 @@ const EMPTY: BuiltData = {
 };
 
 export function useContactSalesChannels(enabled: boolean) {
+  // ⚠️ El idioma NO va en la llave de la consulta: cambiarlo volvía a correr la
+  // RPC entera y, mientras recargaba, `byContactId` quedaba VACÍO → el filtro de
+  // canal de ContactosContent recargaba la tabla dos veces y en "sin contactar"
+  // mostraba por un momento filas sin filtrar. La consulta guarda la etiqueta
+  // cruda ("" si el canal no vino en la lista) y el repuesto ("Canal") se pone
+  // más abajo, fuera de la consulta.
+  const { t } = useLanguage();
   const { data, isLoading } = useQuery<BuiltData>({
     queryKey: ["contact-sales-channels"],
     enabled,
@@ -78,7 +86,7 @@ export function useContactSalesChannels(enabled: boolean) {
         const list: ContactChannel[] = Array.from(channelMap.entries()).map(
           ([channelId, lastAt]) => ({
             channelId,
-            label: channelLabelById.get(channelId) || "Canal",
+            label: channelLabelById.get(channelId) || "",
             lastAt,
           }),
         );
@@ -100,6 +108,25 @@ export function useContactSalesChannels(enabled: boolean) {
 
   const built = data ?? EMPTY;
 
+  // El repuesto de la etiqueta, en el idioma de ahora. Solo se arma un mapa nuevo
+  // si algún canal llegó sin nombre; los ids no cambian, así que el filtro de
+  // canal (que lee ids) no se entera del cambio de idioma.
+  const repuesto = t("contactos.channelFallback");
+  const byContactId = useMemo(() => {
+    let conRepuesto: Map<string, ContactChannel[]> | null = null;
+    for (const [contactId, list] of built.byContactId.entries()) {
+      if (!list.some((ch) => !ch.label)) continue;
+      conRepuesto ??= new Map(built.byContactId);
+      conRepuesto.set(
+        contactId,
+        list
+          .map((ch) => (ch.label ? ch : { ...ch, label: repuesto }))
+          .sort((a, b) => a.label.localeCompare(b.label)),
+      );
+    }
+    return conRepuesto ?? built.byContactId;
+  }, [built.byContactId, repuesto]);
+
   // closers_contacts ids contactados por CUALQUIERA de los canales dados.
   const contactIdsForChannels = useMemo(() => {
     return (channelIds: string[]): string[] => {
@@ -120,7 +147,7 @@ export function useContactSalesChannels(enabled: boolean) {
   );
 
   return {
-    byContactId: built.byContactId,
+    byContactId,
     channels: built.channels,
     contactIdsForChannels,
     allContactedIds,

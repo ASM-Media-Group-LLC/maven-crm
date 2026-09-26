@@ -478,7 +478,7 @@ const ParticipantTile = memo(function ParticipantTile({
               )}
               {isAdmin && !participant.isLocal && onRemoveParticipant && (
                 <DropdownMenuItem onClick={() => onRemoveParticipant(participant.identity)} className="text-destructive focus:bg-muted">
-                  <UserX className="h-3.5 w-3.5 mr-2" /> {t("common.delete")}
+                  <UserX className="h-3.5 w-3.5 mr-2" /> {t("messenger.tile.quitarDeLaLlamada")}
                 </DropdownMenuItem>
               )}
             </DropdownMenuContent>
