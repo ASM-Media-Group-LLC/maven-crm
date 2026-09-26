@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ROLE_TIER_LABELS, type RoleTier } from "./useRoles";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface CreateRoleModalProps {
   open: boolean;
@@ -15,6 +16,7 @@ interface CreateRoleModalProps {
 }
 
 const CreateRoleModal = ({ open, onOpenChange, onConfirm, isLoading }: CreateRoleModalProps) => {
+  const { t } = useLanguage();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [tier, setTier] = useState<RoleTier>("member");
@@ -30,40 +32,40 @@ const CreateRoleModal = ({ open, onOpenChange, onConfirm, isLoading }: CreateRol
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Crear Nuevo Rol</DialogTitle>
+          <DialogTitle>{t("admin.createRole.title")}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1.5">
-            <Label>Nombre del rol</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value.slice(0, 50))} placeholder="ej. supervisor" />
+            <Label>{t("admin.roles.name")}</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value.slice(0, 50))} placeholder={t("admin.createRole.namePlaceholder")} />
             <p className="text-xs text-muted-foreground">{name.length}/50</p>
           </div>
           <div className="space-y-1.5">
-            <Label>Nivel de acceso</Label>
+            <Label>{t("admin.roles.accessLevel")}</Label>
             <Select value={tier} onValueChange={(v) => setTier(v as RoleTier)}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {(Object.keys(ROLE_TIER_LABELS) as RoleTier[]).map((t) => (
-                  <SelectItem key={t} value={t}>{ROLE_TIER_LABELS[t]}</SelectItem>
+                {(Object.keys(ROLE_TIER_LABELS) as RoleTier[]).map((nivel) => (
+                  <SelectItem key={nivel} value={nivel}>{t(ROLE_TIER_LABELS[nivel])}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              Define qué ve a nivel base de datos (RLS). Los permisos finos de menús se configuran después con "Permisos".
+              {t("admin.createRole.levelHint")}
             </p>
           </div>
           <div className="space-y-1.5">
-            <Label>Descripción</Label>
-            <Textarea value={description} onChange={(e) => setDescription(e.target.value.slice(0, 300))} placeholder="Descripción del rol..." rows={3} />
+            <Label>{t("common.description")}</Label>
+            <Textarea value={description} onChange={(e) => setDescription(e.target.value.slice(0, 300))} placeholder={t("admin.createRole.descPlaceholder")} rows={3} />
             <p className="text-xs text-muted-foreground">{description.length}/300</p>
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>{t("common.cancel")}</Button>
           <Button onClick={handleSubmit} disabled={isLoading || !name.trim()}>
-            {isLoading ? "Creando..." : "Crear"}
+            {isLoading ? t("admin.creating") : t("common.create")}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -8,6 +8,7 @@ import { User, Loader2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { AdminUser } from "./useAdminUsers";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface EditUserModalProps {
   open: boolean;
@@ -18,6 +19,7 @@ interface EditUserModalProps {
 }
 
 const EditUserModal = ({ open, onOpenChange, user, onConfirm, isLoading }: EditUserModalProps) => {
+  const { t } = useLanguage();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [role, setRole] = useState("employee");
@@ -56,17 +58,17 @@ const EditUserModal = ({ open, onOpenChange, user, onConfirm, isLoading }: EditU
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Editar Usuario</DialogTitle>
-          <DialogDescription className="sr-only">Editar información del usuario</DialogDescription>
+          <DialogTitle>{t("admin.editUser.title")}</DialogTitle>
+          <DialogDescription className="sr-only">{t("admin.editUser.srDescription")}</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="edit-firstName">Nombre</Label>
+            <Label htmlFor="edit-firstName">{t("admin.firstName")}</Label>
             <div className="relative">
               <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 id="edit-firstName"
-                placeholder="Nombre"
+                placeholder={t("admin.firstName")}
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
                 className="pl-9"
@@ -77,12 +79,12 @@ const EditUserModal = ({ open, onOpenChange, user, onConfirm, isLoading }: EditU
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="edit-lastName">Apellido</Label>
+            <Label htmlFor="edit-lastName">{t("admin.lastName")}</Label>
             <div className="relative">
               <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 id="edit-lastName"
-                placeholder="Apellido"
+                placeholder={t("admin.lastName")}
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
                 className="pl-9"
@@ -93,10 +95,10 @@ const EditUserModal = ({ open, onOpenChange, user, onConfirm, isLoading }: EditU
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="edit-role">Rol</Label>
+            <Label htmlFor="edit-role">{t("common.role")}</Label>
             <Select value={role} onValueChange={setRole}>
               <SelectTrigger>
-                <SelectValue placeholder="Seleccionar rol" />
+                <SelectValue placeholder={t("admin.selectRole")} />
               </SelectTrigger>
               <SelectContent>
                 {roles.map((r) => (
@@ -109,25 +111,25 @@ const EditUserModal = ({ open, onOpenChange, user, onConfirm, isLoading }: EditU
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="edit-aiquota">Override cuota IA/día (opcional)</Label>
+            <Label htmlFor="edit-aiquota">{t("admin.editUser.aiQuota")}</Label>
             <Input
               id="edit-aiquota"
               type="number"
               min={0}
-              placeholder="Usar la del rol"
+              placeholder={t("admin.editUser.aiQuotaPlaceholder")}
               value={aiOverride}
               onChange={(e) => setAiOverride(e.target.value)}
             />
-            <p className="text-xs text-muted-foreground">Pisa la cuota del rol para esta persona. Vacío = usar la del rol.</p>
+            <p className="text-xs text-muted-foreground">{t("admin.editUser.aiQuotaHint")}</p>
           </div>
 
           <DialogFooter className="gap-2 sm:gap-0">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
-              Cancelar
+              {t("common.cancel")}
             </Button>
             <Button type="submit" disabled={isLoading || !firstName.trim() || !lastName.trim()}>
               {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Guardar
+              {t("common.save")}
             </Button>
           </DialogFooter>
         </form>

@@ -6,6 +6,8 @@ import { AtSign, AlertTriangle, Mail, MailX, ArrowRight, Check } from "lucide-re
 import { useToast } from "@/hooks/use-toast";
 import { adminInvoke, SessionExpiredError } from "@/lib/adminInvoke";
 import { DOMINIO_CASILLA, sugerirParaMigrar, yaTieneCasillaDelEquipo } from "@/lib/direccionCorreo";
+import { useLanguage } from "@/hooks/useLanguage";
+import { ConFormato } from "./ConFormato";
 
 /**
  * Cambiar el correo de acceso de alguien y crearle su casilla del equipo.
@@ -48,6 +50,7 @@ const MigrarCorreoModal = ({ open, onOpenChange, userId, userName, emailActual, 
   const [cargando, setCargando] = useState(false);
   const [resultado, setResultado] = useState<RespuestaMigrar | null>(null);
   const { toast } = useToast();
+  const { t } = useLanguage();
 
   // Al abrir se propone la dirección: mismo usuario, dominio del equipo.
   useEffect(() => {
@@ -72,7 +75,7 @@ const MigrarCorreoModal = ({ open, onOpenChange, userId, userName, emailActual, 
       setResultado(data);
       onMigrado?.();
     } catch (e: any) {
-      const title = e instanceof SessionExpiredError ? "Sesión expirada" : "No se pudo cambiar el correo";
+      const title = e instanceof SessionExpiredError ? t("common.sessionExpired") : t("admin.migrate.failed");
       toast({ title, description: e.message, variant: "destructive" });
     } finally {
       setCargando(false);
@@ -92,10 +95,10 @@ const MigrarCorreoModal = ({ open, onOpenChange, userId, userName, emailActual, 
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/15 text-primary">
               <AtSign className="h-5 w-5" />
             </div>
-            <DialogTitle>Correo de {userName || "este usuario"}</DialogTitle>
+            <DialogTitle>{t("admin.migrate.title", { name: userName || t("admin.thisUser") })}</DialogTitle>
           </div>
           <DialogDescription className="sr-only">
-            Cambiar el correo de acceso y crear la casilla del equipo
+            {t("admin.migrate.srDescription")}
           </DialogDescription>
         </DialogHeader>
 
@@ -104,7 +107,7 @@ const MigrarCorreoModal = ({ open, onOpenChange, userId, userName, emailActual, 
             <div className="flex items-start gap-2 rounded-lg border border-success/30 bg-success/10 p-3">
               <Check className="mt-0.5 h-4 w-4 shrink-0 text-success" />
               <div className="text-sm text-success">
-                <p className="font-medium">Correo cambiado.</p>
+                <p className="font-medium">{t("admin.migrate.changed")}</p>
                 <p className="mt-0.5 break-all font-mono text-xs">{resultado.email}</p>
               </div>
             </div>
@@ -117,40 +120,39 @@ const MigrarCorreoModal = ({ open, onOpenChange, userId, userName, emailActual, 
                 <Mail className="mt-0.5 h-4 w-4 shrink-0 text-success" />
                 <p className="text-sm text-success">
                   {resultado.mailbox.outcome === "reused"
-                    ? "La casilla ya existía: se le restableció la contraseña y quedó vinculada."
-                    : "Casilla creada en el dominio del equipo."}
+                    ? t("admin.migrate.mailboxReused")
+                    : t("admin.migrate.mailboxCreated")}
                 </p>
               </div>
             ) : (
               <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 p-3">
                 <MailX className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
                 <div className="text-sm text-warning">
-                  <p className="font-medium">El correo de acceso SÍ cambió, pero la casilla no se creó.</p>
+                  <p className="font-medium">{t("admin.migrate.mailboxFailed")}</p>
                   <p className="mt-0.5 text-xs">
-                    {resultado.mailbox?.error ?? "Sin detalle."} Puede entrar a Maven igual, pero todavía no tiene dónde recibir correo.
+                    {resultado.mailbox?.error ?? t("admin.migrate.noDetail")} {t("admin.migrate.canStillSignIn")}
                   </p>
                 </div>
               </div>
             )}
 
             <div className="rounded-lg border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
-              Avísale que desde ahora entra con <strong className="text-foreground">{resultado.email}</strong>.
-              La contraseña de Maven es la misma de antes.
+              <ConFormato texto={t("admin.migrate.tellThem", { email: resultado.email ?? "" })} claseNegrita="text-foreground" />
             </div>
 
             <DialogFooter>
-              <Button onClick={cerrar}>Cerrar</Button>
+              <Button onClick={cerrar}>{t("common.close")}</Button>
             </DialogFooter>
           </div>
         ) : (
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Entra hoy con</label>
+              <label className="text-sm font-medium">{t("admin.migrate.signsInToday")}</label>
               <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2">
                 <span className="break-all font-mono text-sm text-muted-foreground">{emailActual || "—"}</span>
                 {yaEstaEnElDominio && (
                   <span className="ml-auto shrink-0 rounded-full bg-success/15 px-2 py-0.5 text-[10px] text-success">
-                    ya es del equipo
+                    {t("admin.migrate.alreadyTeam")}
                   </span>
                 )}
               </div>
@@ -161,38 +163,37 @@ const MigrarCorreoModal = ({ open, onOpenChange, userId, userName, emailActual, 
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-sm font-medium" htmlFor="nuevo-correo">Pasará a entrar con</label>
+              <label className="text-sm font-medium" htmlFor="nuevo-correo">{t("admin.migrate.willSignIn")}</label>
               <Input
                 id="nuevo-correo"
                 value={nuevo}
                 onChange={(e) => setNuevo(e.target.value)}
-                placeholder={`nombre.apellido@${DOMINIO_CASILLA}`}
+                placeholder={t("admin.migrate.placeholder", { domain: DOMINIO_CASILLA })}
                 className="font-mono"
                 autoComplete="off"
                 spellCheck={false}
               />
               <p className="text-xs text-muted-foreground">
-                Se propone el mismo usuario con el dominio del equipo. Puedes cambiarlo.
-                Si esa dirección ya está tomada, el sistema le agrega un número.
+                {t("admin.migrate.hint")}
               </p>
             </div>
 
             <div className="flex items-start gap-3 rounded-lg border border-warning/30 bg-warning/10 p-3">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
               <div className="text-sm text-warning">
-                <p className="font-medium">El cambio es inmediato.</p>
+                <p className="font-medium">{t("admin.migrate.immediate")}</p>
                 <ul className="mt-1 list-disc space-y-0.5 pl-4 text-xs">
-                  <li>Desde ese momento <strong>solo</strong> entra con el correo nuevo (la contraseña no cambia).</li>
-                  <li>Se le crea la casilla, y eso <strong>ocupa un puesto</strong> del plan de correo.</li>
-                  <li>Su casilla anterior no se toca: si ya no la usa, hay que darla de baja aparte.</li>
+                  <li><ConFormato texto={t("admin.migrate.bulletOnlyNew")} /></li>
+                  <li><ConFormato texto={t("admin.migrate.bulletSeat")} /></li>
+                  <li>{t("admin.migrate.bulletOldMailbox")}</li>
                 </ul>
               </div>
             </div>
 
             <DialogFooter className="gap-2 sm:gap-0">
-              <Button variant="outline" onClick={cerrar} disabled={cargando}>Cancelar</Button>
+              <Button variant="outline" onClick={cerrar} disabled={cargando}>{t("common.cancel")}</Button>
               <Button onClick={migrar} disabled={cargando || !valido}>
-                {cargando ? "Cambiando..." : "Cambiar correo y crear casilla"}
+                {cargando ? t("admin.migrate.changing") : t("admin.migrate.submit")}
               </Button>
             </DialogFooter>
           </div>

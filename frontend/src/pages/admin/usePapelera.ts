@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { adminInvoke, SessionExpiredError } from "@/lib/adminInvoke";
 import { useToast } from "@/hooks/use-toast";
+import { traducir } from "@/lib/i18n";
 
 /** Una cuenta eliminada que todavía se puede recuperar. */
 export interface CuentaEnPapelera {
@@ -51,7 +52,7 @@ export function usePapelera(activa: boolean) {
 
   const alFallar = (e: Error) => {
     toast({
-      title: e instanceof SessionExpiredError ? "Sesión expirada" : "Error",
+      title: traducir(e instanceof SessionExpiredError ? "common.sessionExpired" : "common.error"),
       description: e.message,
       variant: "destructive",
     });

@@ -2,19 +2,23 @@ import { AlertTriangle, AlertCircle, Info, ChevronDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import type { HealthCheckDetail } from "./useAuditoriaData";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
+import { etiquetaPermiso } from "../etiquetasPermisos";
 
 interface Props {
   checks: { critical: number; high: number; medium: number; low: number; details: HealthCheckDetail[] };
 }
 
-const severityConfig = {
-  critical: { label: "Crítico", color: "bg-destructive/10 text-destructive border-destructive/20", icon: AlertCircle },
-  high: { label: "Alto", color: "bg-warning/10 text-warning border-warning/20", icon: AlertTriangle },
-  medium: { label: "Medio", color: "bg-warning/10 text-warning border-warning/20", icon: Info },
-  low: { label: "Bajo", color: "bg-muted text-muted-foreground border-border", icon: Info },
+const severityConfig: Record<HealthCheckDetail["priority"], { label: TranslationKey; color: string; icon: typeof Info }> = {
+  critical: { label: "common.critical", color: "bg-destructive/10 text-destructive border-destructive/20", icon: AlertCircle },
+  high: { label: "admin.audit.sevHigh", color: "bg-warning/10 text-warning border-warning/20", icon: AlertTriangle },
+  medium: { label: "admin.audit.sevMedium", color: "bg-warning/10 text-warning border-warning/20", icon: Info },
+  low: { label: "admin.audit.sevLow", color: "bg-muted text-muted-foreground border-border", icon: Info },
 };
 
 const AuditoriaHealthChecks = ({ checks }: Props) => {
+  const { t } = useLanguage();
   const totalIssues = checks.critical + checks.high + checks.medium + checks.low;
 
   if (totalIssues === 0) {
@@ -23,18 +27,18 @@ const AuditoriaHealthChecks = ({ checks }: Props) => {
         <div className="h-8 w-8 rounded-full bg-success/20 flex items-center justify-center">
           <Info className="h-4 w-4 text-success" />
         </div>
-        <p className="text-sm font-medium text-success">Sin problemas detectados</p>
+        <p className="text-sm font-medium text-success">{t("admin.audit.noIssues")}</p>
       </div>
     );
   }
 
-  // Group details by unique category+message
-  const grouped = checks.details.reduce<Record<string, HealthCheckDetail & { count: number }>>((acc, d) => {
-    const key = `${d.category}::${d.message}`;
+  // Group details by unique kind + data (lo que antes era categoría + mensaje)
+  const grouped = checks.details.reduce<Record<string, HealthCheckDetail & { repeticiones: number }>>((acc, d) => {
+    const key = `${d.kind}::${d.module ?? ""}::${d.count ?? ""}`;
     if (!acc[key]) {
-      acc[key] = { ...d, count: 1 };
+      acc[key] = { ...d, repeticiones: 1 };
     } else {
-      acc[key].count++;
+      acc[key].repeticiones++;
       acc[key].affected = [...acc[key].affected, ...d.affected];
     }
     return acc;
@@ -52,7 +56,7 @@ const AuditoriaHealthChecks = ({ checks }: Props) => {
           return (
             <Badge key={sev} variant="outline" className={cfg.color}>
               <cfg.icon className="h-3 w-3 mr-1" />
-              {checks[sev]} {cfg.label}
+              {checks[sev]} {t(cfg.label)}
             </Badge>
           );
         })}
@@ -69,10 +73,16 @@ const AuditoriaHealthChecks = ({ checks }: Props) => {
                   <div className="flex items-center gap-2">
                     <cfg.icon className="h-4 w-4 shrink-0" />
                     <div>
-                      <span className="text-sm font-medium">{detail.category}</span>
-                      <span className="text-xs ml-2 opacity-75">{detail.message}</span>
-                      {detail.count > 1 && (
-                        <Badge variant="secondary" className="ml-2 text-[10px] h-4">x{detail.count}</Badge>
+                      <span className="text-sm font-medium">
+                        {detail.kind === "users_without_role" ? t("admin.audit.checkNoRole") : t("admin.audit.checkOrphan")}
+                      </span>
+                      <span className="text-xs ml-2 opacity-75">
+                        {detail.kind === "users_without_role"
+                          ? t("admin.audit.checkNoRoleMessage", { n: detail.count ?? 0 })
+                          : t("admin.audit.checkOrphanMessage", { module: etiquetaPermiso(t, detail.module ?? "") })}
+                      </span>
+                      {detail.repeticiones > 1 && (
+                        <Badge variant="secondary" className="ml-2 text-[10px] h-4">x{detail.repeticiones}</Badge>
                       )}
                     </div>
                   </div>
@@ -80,11 +90,11 @@ const AuditoriaHealthChecks = ({ checks }: Props) => {
                 </CollapsibleTrigger>
                 <CollapsibleContent className="pt-2">
                   <div className="flex flex-wrap gap-1.5 mt-1">
-                    {detail.affected.filter(Boolean).map((name, i) => (
-                      <Badge key={i} variant="secondary" className="text-xs">{name}</Badge>
+                    {detail.affected.map((name, i) => (
+                      <Badge key={i} variant="secondary" className="text-xs">{name || t("admin.noName")}</Badge>
                     ))}
-                    {detail.affected.filter(Boolean).length === 0 && (
-                      <span className="text-xs opacity-60">Sin datos de afectados</span>
+                    {detail.affected.length === 0 && (
+                      <span className="text-xs opacity-60">{t("admin.audit.noAffected")}</span>
                     )}
                   </div>
                 </CollapsibleContent>

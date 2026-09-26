@@ -20,6 +20,8 @@ import { Search, UserMinus, UserPlus, Loader2 } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { useAdminUsers } from "./useAdminUsers";
 import type { RoleConfig } from "./useRoles";
+import { useLanguage } from "@/hooks/useLanguage";
+import { ConFormato } from "./ConFormato";
 
 interface ManageRoleUsersModalProps {
   open: boolean;
@@ -44,6 +46,7 @@ const ManageRoleUsersModal = ({
   onRemove,
   isMutating,
 }: ManageRoleUsersModalProps) => {
+  const { t } = useLanguage();
   const [assignedSearch, setAssignedSearch] = useState("");
   const [availableSearch, setAvailableSearch] = useState("");
   const [pendingAssign, setPendingAssign] = useState<PendingAssign | null>(null);
@@ -92,26 +95,26 @@ const ManageRoleUsersModal = ({
         <DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>
-              Gestionar usuarios — <span className="capitalize">{role?.name ?? ""}</span>
+              {t("admin.roles.manageUsers")} — <span className="capitalize">{role?.name ?? ""}</span>
             </DialogTitle>
             <DialogDescription>
               {role
-                ? `${role.user_count} usuario${role.user_count !== 1 ? "s" : ""} con este rol.`
+                ? t(role.user_count === 1 ? "admin.manageUsers.countOne" : "admin.manageUsers.countOther", { n: role.user_count })
                 : ""}
             </DialogDescription>
           </DialogHeader>
 
           <Tabs defaultValue="assigned" className="flex-1 flex flex-col min-h-0">
             <TabsList className="grid grid-cols-2">
-              <TabsTrigger value="assigned">Asignados ({role?.user_count ?? 0})</TabsTrigger>
-              <TabsTrigger value="available">Agregar</TabsTrigger>
+              <TabsTrigger value="assigned">{t("admin.manageUsers.assigned", { n: role?.user_count ?? 0 })}</TabsTrigger>
+              <TabsTrigger value="available">{t("common.add")}</TabsTrigger>
             </TabsList>
 
             <TabsContent value="assigned" className="flex-1 flex flex-col min-h-0 mt-3 space-y-3">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Buscar usuario..."
+                  placeholder={t("admin.manageUsers.searchUser")}
                   value={assignedSearch}
                   onChange={(e) => setAssignedSearch(e.target.value)}
                   className="pl-9"
@@ -123,7 +126,7 @@ const ManageRoleUsersModal = ({
                   <EmptyState
                     className="py-12"
                     icon={<UserPlus className="h-8 w-8 text-muted-foreground" />}
-                    title={role?.user_count === 0 ? "Aún no hay usuarios con este rol." : "No hay resultados."}
+                    title={role?.user_count === 0 ? t("admin.manageUsers.noneYet") : t("common.noResults")}
                   />
                 ) : (
                   <ul className="divide-y">
@@ -131,17 +134,17 @@ const ManageRoleUsersModal = ({
                       <li key={m.id} className="flex items-center justify-between p-3 hover:bg-muted/40">
                         <div className="flex items-center gap-3 min-w-0">
                           <UserAvatar name={m.full_name} src={m.avatar_url} size="sm" />
-                          <span className="text-sm truncate">{m.full_name}</span>
+                          <span className="text-sm truncate">{m.full_name || t("admin.noName")}</span>
                         </div>
                         <Button
                           variant="ghost"
                           size="sm"
                           className="text-destructive hover:text-destructive shrink-0"
-                          onClick={() => handleRemoveClick(m.id, m.full_name)}
+                          onClick={() => handleRemoveClick(m.id, m.full_name || t("admin.noName"))}
                           disabled={isMutating}
                         >
                           <UserMinus className="h-4 w-4 mr-1" />
-                          Quitar
+                          {t("admin.manageUsers.remove")}
                         </Button>
                       </li>
                     ))}
@@ -154,7 +157,7 @@ const ManageRoleUsersModal = ({
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Buscar usuario por nombre o email..."
+                  placeholder={t("admin.manageUsers.searchByNameOrEmail")}
                   value={availableSearch}
                   onChange={(e) => setAvailableSearch(e.target.value)}
                   className="pl-9"
@@ -170,7 +173,7 @@ const ManageRoleUsersModal = ({
                   <EmptyState
                     className="py-12"
                     icon={<UserPlus className="h-8 w-8 text-muted-foreground" />}
-                    title={users.length === 0 ? "No hay usuarios." : "Todos los usuarios ya tienen este rol o no coinciden con la búsqueda."}
+                    title={users.length === 0 ? t("admin.manageUsers.noUsers") : t("admin.manageUsers.allHaveRole")}
                   />
                 ) : (
                   <ul className="divide-y">
@@ -179,7 +182,7 @@ const ManageRoleUsersModal = ({
                         <div className="flex items-center gap-3 min-w-0">
                           <UserAvatar name={u.full_name ?? "U"} src={u.avatar_url} size="sm" />
                           <div className="min-w-0">
-                            <p className="text-sm truncate">{u.full_name || "Sin nombre"}</p>
+                            <p className="text-sm truncate">{u.full_name || t("admin.noName")}</p>
                             <div className="flex items-center gap-2 mt-0.5">
                               {u.email && (
                                 <span className="text-xs text-muted-foreground truncate">{u.email}</span>
@@ -196,11 +199,11 @@ const ManageRoleUsersModal = ({
                           variant="ghost"
                           size="sm"
                           className="shrink-0"
-                          onClick={() => handleAddClick(u.id, u.full_name ?? "Sin nombre", u.role)}
+                          onClick={() => handleAddClick(u.id, u.full_name || t("admin.noName"), u.role)}
                           disabled={isMutating}
                         >
                           <UserPlus className="h-4 w-4 mr-1" />
-                          Agregar
+                          {t("common.add")}
                         </Button>
                       </li>
                     ))}
@@ -212,7 +215,7 @@ const ManageRoleUsersModal = ({
 
           <DialogFooter>
             <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Cerrar
+              {t("common.close")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -224,15 +227,17 @@ const ManageRoleUsersModal = ({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Cambiar rol del usuario?</AlertDialogTitle>
+            <AlertDialogTitle>{t("admin.manageUsers.changeRoleTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
               {pendingAssign && role && (
-                <>
-                  <span className="font-medium">{pendingAssign.userName}</span> tiene actualmente el rol{" "}
-                  <Badge variant="outline" className="capitalize ml-1">{pendingAssign.currentRole}</Badge>. Al
-                  agregarlo a <Badge variant="outline" className="capitalize ml-1">{role.name}</Badge> se
-                  reemplazará su rol actual (un usuario solo puede tener un rol).
-                </>
+                <ConFormato
+                  texto={t("admin.manageUsers.changeRoleBody")}
+                  piezas={{
+                    name: <span className="font-medium">{pendingAssign.userName}</span>,
+                    current: <Badge variant="outline" className="capitalize ml-1">{pendingAssign.currentRole}</Badge>,
+                    next: <Badge variant="outline" className="capitalize ml-1">{role.name}</Badge>,
+                  }}
+                />
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -246,7 +251,7 @@ const ManageRoleUsersModal = ({
                 setPendingAssign(null);
               }}
             >
-              Reemplazar rol
+              {t("admin.manageUsers.replaceRole")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -258,13 +263,13 @@ const ManageRoleUsersModal = ({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Quitar usuario del rol?</AlertDialogTitle>
+            <AlertDialogTitle>{t("admin.manageUsers.removeTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
               {pendingRemove && role && (
-                <>
-                  <span className="font-medium">{pendingRemove.userName}</span> quedará sin rol asignado.
-                  No podrá acceder a módulos hasta que le asignes otro rol.
-                </>
+                <ConFormato
+                  texto={t("admin.manageUsers.removeBody")}
+                  piezas={{ name: <span className="font-medium">{pendingRemove.userName}</span> }}
+                />
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -279,7 +284,7 @@ const ManageRoleUsersModal = ({
                 setPendingRemove(null);
               }}
             >
-              Quitar del rol
+              {t("admin.manageUsers.removeFromRole")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

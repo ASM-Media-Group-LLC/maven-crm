@@ -17,21 +17,24 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PageHeader } from "@/components/ui/page-header";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 
 type Tab = "resumen" | "matriz" | "actividad";
 
 const AuditoriaRoles = () => {
   const { data, isLoading } = useAuditoriaData();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState<Tab>("resumen");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
-  const tabs: { key: Tab; label: string }[] = [
-    { key: "resumen", label: "Resumen" },
-    { key: "matriz", label: "Matriz de Permisos" },
-    { key: "actividad", label: "Actividad" },
+  const tabs: { key: Tab; label: TranslationKey }[] = [
+    { key: "resumen", label: "admin.audit.tabSummary" },
+    { key: "matriz", label: "admin.audit.tabMatrix" },
+    { key: "actividad", label: "admin.activity" },
   ];
 
   // Get unique roles for filter
@@ -73,14 +76,14 @@ const AuditoriaRoles = () => {
                   onClick={() => navigate("/admin")}
                   className="hover:text-foreground transition-colors"
                 >
-                  Administración
+                  {t("admin.administration")}
                 </button>
                 <ChevronRight className="h-3.5 w-3.5" />
-                <span className="text-foreground">Auditoría</span>
+                <span className="text-foreground">{t("admin.audit.crumb")}</span>
               </div>
               <PageHeader
-                title="Auditoría de Roles"
-                subtitle="Reporte en tiempo real del estado de roles y permisos"
+                title={t("admin.audit.title")}
+                subtitle={t("admin.audit.subtitle")}
               />
             </header>
 
@@ -97,14 +100,14 @@ const AuditoriaRoles = () => {
 
                   {/* Tabs */}
                   <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1">
-                    {tabs.map((t) => (
+                    {tabs.map((tab) => (
                       <Button
-                        key={t.key}
-                        variant={activeTab === t.key ? "secondary" : "ghost"}
+                        key={tab.key}
+                        variant={activeTab === tab.key ? "secondary" : "ghost"}
                         size="sm"
-                        onClick={() => setActiveTab(t.key)}
+                        onClick={() => setActiveTab(tab.key)}
                       >
-                        {t.label}
+                        {t(tab.label)}
                       </Button>
                     ))}
                   </div>
@@ -118,24 +121,24 @@ const AuditoriaRoles = () => {
                       </div>
                       <div>
                         <div className="flex items-center justify-between mb-3">
-                          <h2 className="text-lg font-semibold">Usuarios y Roles</h2>
+                          <h2 className="text-lg font-semibold">{t("admin.audit.usersAndRoles")}</h2>
                           <div className="flex items-center gap-2">
                             <Select value={statusFilter} onValueChange={setStatusFilter}>
                               <SelectTrigger className="w-[140px] h-9">
-                                <SelectValue placeholder="Estado" />
+                                <SelectValue placeholder={t("common.status")} />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="all">Todos</SelectItem>
-                                <SelectItem value="with_role">Con rol</SelectItem>
-                                <SelectItem value="without_role">Sin rol</SelectItem>
+                                <SelectItem value="all">{t("common.all")}</SelectItem>
+                                <SelectItem value="with_role">{t("admin.audit.withRole")}</SelectItem>
+                                <SelectItem value="without_role">{t("admin.noRole")}</SelectItem>
                               </SelectContent>
                             </Select>
                             <Select value={roleFilter} onValueChange={setRoleFilter}>
                               <SelectTrigger className="w-[140px] h-9">
-                                <SelectValue placeholder="Rol" />
+                                <SelectValue placeholder={t("common.role")} />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="all">Todos los roles</SelectItem>
+                                <SelectItem value="all">{t("admin.audit.allRoles")}</SelectItem>
                                 {availableRoles.map((r) => (
                                   <SelectItem key={r} value={r} className="capitalize">{r}</SelectItem>
                                 ))}
@@ -144,7 +147,7 @@ const AuditoriaRoles = () => {
                             <div className="relative max-w-xs">
                               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                               <Input
-                                placeholder="Buscar usuario..."
+                                placeholder={t("admin.manageUsers.searchUser")}
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
                                 className="pl-9"
