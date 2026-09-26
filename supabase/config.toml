@@ -7,6 +7,9 @@ verify_jwt = false
 [functions.manage-api-keys]
 verify_jwt = false
 
+[functions.messenger-webhooks]
+verify_jwt = false  # la despierta solo el cron, con X-Cron-Token (tiempo constante); sin camino de usuario
+
 # API pública de Maven. verify_jwt=false: la auth es la API key (mvk_live_...), no una sesión Maven.
 [functions.public-api]
 verify_jwt = false

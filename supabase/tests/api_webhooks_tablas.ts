@@ -8,9 +8,8 @@
 // PGlite en node_modules, donde no está. --no-lock: que no toque el deno.lock de
 // las edge functions.
 //
-// NO corre en CI: se corre a mano antes de tocar estas tablas (los PRs 3 y 4 de
-// webhooks, o cualquier migración que cambie sus reglas). Sale con código 1 si
-// algo falla. El esquema base (columnas, api_keys_reglas_messenger,
+// Corre en el guard de cada PR (guard-edge-functions.yml) y a mano antes de tocar
+// estas tablas. Sale con código 1 si algo falla. El esquema base (columnas, api_keys_reglas_messenger,
 // api_key_persona_vigente y los permisos por defecto de public) está copiado de
 // prod el 26/09/2026: si esas piezas cambian en prod, hay que copiarlas de nuevo.
 // PGlite tiene UNA sola conexión: las carreras (SKIP LOCKED, FOR SHARE) se
@@ -18,9 +17,16 @@
 import { PGlite } from "npm:@electric-sql/pglite@0.3";
 import { normalizarUrlDeWebhook, type Resultado } from "../functions/_shared/webhook-salida.ts";
 import { COLS_ENTREGA, type Contexto, type Datos, type FilaEndpoint, type Llave, servirWebhook } from "../functions/manage-api-keys/webhooks.ts";
+import { sellarSecreto } from "../functions/_shared/webhook-salida.ts";
+import { codificarCursor } from "../functions/public-api/messenger-formato.ts";
+import { type DatosDespacho, despachar, type Endpoint as EndpointDespacho, type Guarda } from "../functions/messenger-webhooks/despachador.ts";
+import type { PaginaDelFeed } from "../functions/messenger-webhooks/feed.ts";
 const MIG = Deno.readTextFileSync(
   Deno.args[0] ?? new URL("../migrations/20260926120000_api_webhooks_tablas.sql", import.meta.url),
 );
+// La del despachador (PR 4): api_webhooks_timbrar y el gate con el respaldo de dos
+// agencias. Se aplica en todas las bases, como queda prod.
+const MIG4 = Deno.readTextFileSync(new URL("../migrations/20260926160000_api_webhooks_despachador.sql", import.meta.url));
 const ok: string[] = [], mal: string[] = [];
 const check = (c: boolean, m: string) => (c ? ok : mal).push(m);
 
@@ -122,6 +128,7 @@ async function nueva(): Promise<PGlite> {
   const db = new PGlite();
   await db.exec(BASE);
   await db.exec("begin;\n" + MIG + "\ncommit;");
+  await db.exec("begin;\n" + MIG4 + "\ncommit;");
   return db;
 }
 const q = async (db: PGlite, sql: string) => (await db.query(sql)).rows as any[];
@@ -876,7 +883,9 @@ for (const [salida, esperado] of [["paused", "endpoint_paused"], ["receiver_gone
   check((await estado(db)).status === "active", "(y el endpoint quedó como estaba: la pared es el turno y la edge)");
   await retroceder(db, `update api_webhook_endpoints set cursor_at = now() - interval '1 minute' where id = '${EP}'`);
   await msg(db, C1, BETO, "30 seconds");
-  check(await hay(db) === false, "igual el turno del cron no despierta a nadie con dos agencias, aunque haya un mensaje nuevo");
+  // Con la migración del despachador, el turno SÍ despierta a la edge: es el respaldo
+  // (la edge, con dos agencias, no lee ni manda nada y detiene todo; bloque O).
+  check(await hay(db) === true, "con dos agencias y el endpoint sin detener, el turno despierta a la edge (el respaldo del trigger)");
   check((await q(db, `select * from api_webhooks_con_trabajo()`)).length === 0, "y con_trabajo, sola, tampoco devuelve nada");
 }
 // H8. la limpieza borra las PRUEBAS pendientes viejas (no se reintentan) y deja el timbre pendiente
@@ -1198,6 +1207,189 @@ for (const [salida, esperado] of [["paused", "endpoint_paused"], ["receiver_gone
   const t2 = enCarrera2.cuerpo.test as { activated?: boolean; notice?: string } | undefined;
   check(enCarrera2.estado === 200 && t2?.activated === false && t2?.notice === "La key está revocada o vencida", `N: reanudar con la llave revocada en el medio: no activa y dice que es la llave (${enCarrera2.estado} ${JSON.stringify(t2)})`);
   await db.exec(`update api_keys set revoked_at = null where id = '${K_MSG}'`);
+}
+
+
+// ════ O. el despachador (PR 4, messenger-webhooks) contra la base de verdad ════
+// Con la migración 20260926160000 (api_webhooks_timbrar y el gate con el respaldo de
+// dos agencias) y un DatosDespacho en SQL que devuelve las filas con to_jsonb, o sea
+// con los instantes como los da PostgREST. El reclamo se devuelve con microsegundos a
+// propósito (PGlite solo tiene milisegundos): una guarda que los recortara falla acá.
+{
+  const db = await nueva();
+  const KEK_O = "k".repeat(40);
+  const ENTORNO_O = (v: string) => (v === "WEBHOOK_SIGNING_KEK" ? KEK_O : undefined);
+  const EP_O = "40000000-0000-0000-0000-0000000000aa";
+  const MAXI = "ffffffff-ffff-ffff-ffff-ffffffffffff";
+  const js = async (sql: string, p: unknown[] = []) => ((await db.query(`select to_jsonb(x) j from (${sql}) x`, p)).rows as { j: Record<string, unknown> }[]).map((r) => r.j);
+  const escribir = async (sql: string, p: unknown[]): Promise<boolean | null> => {
+    try { return (await db.query(sql, p)).rows.length > 0; } catch { return null; }
+  };
+  const sets = (cambios: Record<string, unknown>, desde: number) => Object.keys(cambios).map((c, i) => `${c} = $${desde + i}`).join(", ");
+  const datos: DatosDespacho = {
+    agencias: async () => Number((await uno(db, "select count(*)::int n from tenants")).n),
+    detenerPorAgencias: async () => (await escribir(`update api_webhook_endpoints set status = 'disabled', disabled_reason = 'multi_agency', disabled_at = now(), paused_at = null, paused_by = null where status <> 'disabled' returning id`, [])) !== null,
+    reclamar: async (max, s) => {
+      const filas = await js(`select * from api_webhooks_reclamar($1, $2)`, [max, s]);
+      // Microsegundos en el reclamo, como en prod.
+      for (const f of filas) await db.query(`update api_webhook_endpoints set lease_until = lease_until + interval '0.000123 seconds' where id = $1`, [f.id]);
+      const ids = filas.map((f) => f.id as string);
+      return ids.length ? (await js(`select * from api_webhook_endpoints where id = any($1)`, [ids])) as unknown as EndpointDespacho[] : [];
+    },
+    llave: async (id, t) => ({ ok: true, valor: ((await js(`select id, tenant_id, key_prefix, scopes, expires_at, revoked_at, acts_as_user_id, ip_whitelist from api_keys where id = $1 and tenant_id = $2`, [id, t]))[0] ?? null) as never }),
+    llaveVigente: async (id) => ({ ok: true, valor: (await uno(db, `select api_key_vigente('${id}') v`)).v === true }),
+    timbrePendiente: async (e, t) => ({ ok: true, valor: ((await js(`select id, body, attempts, uncertain from api_webhook_deliveries where endpoint_id = $1 and tenant_id = $2 and state = 'pending' and event_type = 'messages.created'`, [e, t]))[0] ?? null) as never }),
+    timbrar: async (g: Guarda, n, t, limpiar) => {
+      try {
+        const r = await db.query(`select api_webhooks_timbrar($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) r`, [g.id, g.tenantId, g.reclamo, g.cursorAt, g.cursorId, n.t, n.i, t.id, t.body, t.cantidad, limpiar]);
+        return (r.rows[0] as { r: string }).r === "ok" ? "ok" : "perdio";
+      } catch (e) {
+        return (e as { code?: string }).code === "23505" ? "ya_hay_uno" : "error";
+      }
+    },
+    actualizarEndpoint: (g, cambios) => {
+      const k = Object.keys(cambios).length;
+      return escribir(
+        `update api_webhook_endpoints set ${sets(cambios, 1)} where id = $${k + 1} and tenant_id = $${k + 2} and lease_until = $${k + 3} and status = 'active' and cursor_at = $${k + 4} and cursor_id = $${k + 5} returning id`,
+        [...Object.values(cambios), g.id, g.tenantId, g.reclamo, g.cursorAt, g.cursorId],
+      );
+    },
+    anotarTimbre: (id, t, cambios) => {
+      const k = Object.keys(cambios).length;
+      return escribir(`update api_webhook_deliveries set ${sets(cambios, 1)} where id = $${k + 1} and tenant_id = $${k + 2} and state = 'pending' returning id`, [...Object.values(cambios), id, t]);
+    },
+    soltar: async (id, t, reclamo) => void (await db.query(`update api_webhook_endpoints set lease_until = null where id = $1 and tenant_id = $2 and lease_until = $3`, [id, t, reclamo])),
+  };
+  const ahoraDb = async () => (await uno(db, `select to_jsonb(now() - interval '10 seconds') t`)).t as string;
+  let nUuid = 0;
+  const correrO = async (paginas: (n: number) => Promise<PaginaDelFeed> | PaginaDelFeed, respuesta: Resultado | (() => Promise<Resultado>)) => {
+    const envios: string[] = [];
+    let n = 0;
+    const inf = await despachar({
+      datos,
+      leerFeed: async () => await paginas(n++),
+      sesionConfigurada: () => true,
+      entorno: ENTORNO_O,
+      uuid: () => `70000000-0000-4000-8000-${String(++nUuid).padStart(12, "0")}`,
+      azar: () => 0.5,
+      log: () => {},
+      enviar: async (e) => (envios.push(e.cuerpo), typeof respuesta === "function" ? await respuesta() : respuesta),
+    });
+    return { inf, envios };
+  };
+  const R204: Resultado = { tipo: "respuesta", estado: 204, retryAfterS: null, latenciaMs: 5 };
+  const R503: Resultado = { tipo: "respuesta", estado: 503, retryAfterS: null, latenciaMs: 5 };
+  const conMensajes = async () => ({ ok: true as const, cantidad: 2, conversaciones: [C1], siguiente: codificarCursor({ t: await ahoraDb(), i: MAXI }), hayMas: false });
+  const epO = async () => await uno(db, `select status, disabled_reason r, consecutive_failures f, lease_until is null suelto, next_attempt_at <= now() ya, cursor_id::text ci, last_error e from api_webhook_endpoints where id = '${EP_O}'`);
+  const timbresO = async () => await q(db, `select id::text, state, drop_reason d, attempts a, last_status_code c from api_webhook_deliveries where endpoint_id = '${EP_O}' and event_type = 'messages.created' order by created_at, id`);
+  // Un mensaje nuevo para la persona y el cursor un rato atrás (con µs): el gate da true.
+  const hayAlgo = async (hace = "20 minutes") => {
+    await retroceder(db, `update api_webhook_endpoints set cursor_at = now() - interval '1 hour' - interval '0.000456 seconds', next_attempt_at = now() - interval '1 second' where id = '${EP_O}'`);
+    await msg(db, C1, BETO, hace);
+  };
+
+  // El endpoint, con el secreto sellado de verdad, activo como lo deja la prueba.
+  const sellado = (await sellarSecreto("whsec_" + btoa("s".repeat(33)), EP_O, ENTORNO_O))!;
+  await db.exec(alta({ id: `'${EP_O}'`, secret_cipher: `'${sellado.cipher}'`, secret_nonce: `'${sellado.nonce}'` }));
+  await activar(db, EP_O);
+
+  // 1. timbre nuevo, entregado
+  await hayAlgo();
+  check(await hay(db), "O: con un mensaje nuevo, el gate da true");
+  const r1 = await correrO(() => conMensajes(), R204);
+  const t1 = await timbresO();
+  const e1 = await epO();
+  check((r1.inf.cuerpo.resultados ?? [])[0]?.accion === "entregado" && r1.envios.length === 1, `O: el despachador lo entrega (${JSON.stringify(r1.inf.cuerpo.resultados)})`);
+  check(t1.length === 1 && t1[0].state === "delivered" && t1[0].a === 1 && t1[0].c === 204, `O: el timbre pasa los CHECKs y queda entregado (${JSON.stringify(t1)})`);
+  check(e1.status === "active" && e1.f === 0 && e1.suelto === true && e1.ci === MAXI, `O: el endpoint con el cursor nuevo, sin racha y suelto (${JSON.stringify(e1)})`);
+  check(!(await hay(db)), "O: y el gate vuelve a false (nada después del cursor)");
+
+  // 2. un 503: queda pendiente con espera; el reintento (mismo timbre) se entrega
+  await hayAlgo("15 minutes");
+  const r2 = await correrO(() => conMensajes(), R503);
+  const t2 = (await timbresO()).filter((t) => t.state === "pending");
+  const e2 = await epO();
+  check((r2.inf.cuerpo.resultados ?? [])[0]?.accion === "reintentar" && t2.length === 1 && t2[0].a === 1 && e2.f === 1 && e2.ya === false, `O: 503 → pendiente, 1 fallo y espera (${JSON.stringify([t2, e2])})`);
+  check(!(await hay(db)), "O: durante la espera el gate da false");
+  await db.exec(`update api_webhook_endpoints set next_attempt_at = now() - interval '1 second' where id = '${EP_O}'`);
+  const r2b = await correrO(() => conMensajes(), R204);
+  const t2b = (await timbresO()).find((t) => t.id === t2[0].id);
+  check((r2b.inf.cuerpo.resultados ?? [])[0]?.accion === "entregado" && t2b?.state === "delivered" && t2b?.a === 2 && r2b.envios[0] === r2.envios[0], `O: el reintento manda los MISMOS bytes y se entrega (${JSON.stringify(t2b)})`);
+  check((await epO()).f === 0, "O: la racha vuelve a cero");
+
+  // 3. la pausa llega durante el envío: el trigger descarta el timbre y el despachador no anota nada más
+  await hayAlgo("14 minutes");
+  const r3 = await correrO(() => conMensajes(), async () => {
+    await db.exec(`update api_webhook_endpoints set status = 'paused', paused_at = now(), paused_by = '${ANA}' where id = '${EP_O}'`);
+    return R204;
+  });
+  const t3 = (await timbresO()).at(-1);
+  const e3 = await epO();
+  check((r3.inf.cuerpo.resultados ?? [])[0]?.accion === "perdio" && t3?.state === "dropped" && t3?.d === "endpoint_paused" && e3.status === "paused" && e3.suelto === true, `O: pausa en el medio → carrera perdida, timbre descartado, suelto (${JSON.stringify([t3, e3])})`);
+
+  // 4. Resume en el medio de la lectura (ABA): timbrar no pasa la guarda y no crea nada
+  await activar(db, EP_O);
+  await hayAlgo("13 minutes");
+  const antes4 = (await timbresO()).length;
+  const r4 = await correrO(async () => {
+    // Otra admin pausa y la persona reanuda (con prueba): el cursor arranca de nuevo.
+    await db.exec(`update api_webhook_endpoints set status = 'paused', paused_at = now() where id = '${EP_O}'`);
+    await activar(db, EP_O);
+    return await conMensajes();
+  }, R204);
+  check((r4.inf.cuerpo.resultados ?? [])[0]?.accion === "perdio" && (await timbresO()).length === antes4 && r4.envios.length === 0, `O: Resume en el medio → no se crea ni se manda nada (${JSON.stringify(r4.inf.cuerpo.resultados)})`);
+
+  // 5. 410: timbre descartado (receiver_gone) y endpoint detenido
+  await hayAlgo("12 minutes");
+  await correrO(() => conMensajes(), { tipo: "respuesta", estado: 410, retryAfterS: null, latenciaMs: 5 });
+  const t5 = (await timbresO()).at(-1);
+  const e5 = await epO();
+  check(t5?.state === "dropped" && t5?.d === "receiver_gone" && e5.status === "disabled" && e5.r === "receiver_gone" && e5.suelto === true, `O: 410 → receiver_gone en los dos (${JSON.stringify([t5, e5])})`);
+
+  // 6. 72 h fallando: el intento y el descarte juntos, y detenido por receiver_failing
+  await activar(db, EP_O);
+  await hayAlgo("11 minutes");
+  await correrO(() => conMensajes(), R503);
+  await db.exec(`update api_webhook_endpoints set failing_since = now() - interval '73 hours', consecutive_failures = 15, next_attempt_at = now() - interval '1 second' where id = '${EP_O}'`);
+  await correrO(() => conMensajes(), R503);
+  const t6 = (await timbresO()).at(-1);
+  const e6 = await epO();
+  check(t6?.state === "dropped" && t6?.d === "receiver_failing" && t6?.a === 2 && e6.status === "disabled" && e6.r === "receiver_failing", `O: 72 h → receiver_failing en los dos (${JSON.stringify([t6, e6])})`);
+
+  // 7. llave revocada con el trigger caído: el despachador la detiene él mismo
+  await activar(db, EP_O);
+  await hayAlgo("10 minutes");
+  await db.exec(`alter table api_keys disable trigger api_webhooks_por_llave; update api_keys set revoked_at = now() where id = '${K_MSG}'; alter table api_keys enable trigger api_webhooks_por_llave;`);
+  check((await epO()).status === "active", "O: (con el trigger apagado, la revocación no lo detuvo)");
+  const r7 = await correrO(() => conMensajes(), R204);
+  const e7 = await epO();
+  check(e7.status === "disabled" && e7.r === "key_revoked" && r7.envios.length === 0, `O: el despachador ve la llave revocada y lo detiene sin mandar (${JSON.stringify(e7)})`);
+  await db.exec(`update api_keys set revoked_at = null where id = '${K_MSG}'`);
+
+  // 8. timbrar directo: con un timbre ya pendiente da 23505 y NO mueve el cursor
+  await activar(db, EP_O);
+  await db.exec(`insert into api_webhook_deliveries(endpoint_id, event_type, body, message_count) values ('${EP_O}', 'messages.created', '{}', 1)`);
+  const [fila8] = await js(`select * from api_webhooks_reclamar(1, 60)`);
+  if (fila8) {
+    const g8: Guarda = { id: EP_O, tenantId: T1, reclamo: fila8.lease_until as string, cursorAt: fila8.cursor_at as string, cursorId: fila8.cursor_id as string };
+    const r8 = await datos.timbrar(g8, { t: await ahoraDb(), i: MAXI }, { id: "70000000-0000-4000-8000-0000000000f8", body: "{}", cantidad: 1 }, false);
+    const c8 = await uno(db, `select to_jsonb(cursor_at) c from api_webhook_endpoints where id = '${EP_O}'`);
+    check(r8 === "ya_hay_uno" && c8.c === fila8.cursor_at, `O: timbrar con uno pendiente → 23505 y el cursor sin mover (${r8})`);
+    const r8b = await datos.timbrar({ ...g8, cursorId: MAXI }, { t: await ahoraDb(), i: MAXI }, { id: "70000000-0000-4000-8000-0000000000f9", body: "{}", cantidad: 1 }, false);
+    check(r8b === "perdio", `O: timbrar con la guarda vieja → perdio, sin crear nada (${r8b})`);
+  } else {
+    check(false, "O: no se pudo reclamar para probar timbrar");
+  }
+  await db.exec(`update api_webhook_deliveries set state = 'dropped', drop_reason = 'endpoint_paused' where endpoint_id = '${EP_O}' and state = 'pending'`);
+
+  // 9. dos agencias con el trigger caído: el gate despierta igual y el despachador detiene todo
+  await db.exec(`update api_webhook_endpoints set lease_until = null where id = '${EP_O}'`);
+  await db.exec(`alter table tenants disable trigger api_webhooks_por_agencias; insert into tenants(id, slug, name) values ('${T2}', 'otra', 'Otra'); alter table tenants enable trigger api_webhooks_por_agencias;`);
+  check((await epO()).status === "active" && await hay(db), "O: con dos agencias y un endpoint sin detener, el gate da true (el respaldo)");
+  const r9 = await correrO(() => conMensajes(), R204);
+  check(r9.inf.cuerpo.motivo === "varias_agencias" && (await epO()).r === "multi_agency" && r9.envios.length === 0, `O: el despachador detiene todo con multi_agency (${JSON.stringify(r9.inf.cuerpo)})`);
+  check(!(await hay(db)), "O: y el gate vuelve a false");
+  await db.exec(`delete from tenants where id = '${T2}'`);
 }
 
 console.log(ok.map((m) => "✓ " + m).join("\n"));

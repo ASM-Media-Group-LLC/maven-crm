@@ -89,7 +89,7 @@ jobs:
       # Desde el 24/09 también cubre lo que ACTÚA COMO usuario (la sesión fabricada,
       # /me, que esos handlers nunca vean service_role) y el límite por hora.
       - name: Guard — aislamiento entre agencias
-        run: deno test --allow-read --no-check supabase/functions/public-api/ supabase/functions/manage-api-keys/
+        run: deno test --allow-read --no-check supabase/functions/public-api/ supabase/functions/manage-api-keys/ supabase/functions/messenger-webhooks/
 
       # Mismo criterio: si la salida de los webhooks deja de bloquear lo que tiene
       # que bloquear, no se despliega nada.
@@ -133,6 +133,20 @@ jobs:
           # vio porque casi nunca cambia el workflow solo; salió al mergear #1935
           # con un "Run failed" falso y sin desplegar nada.
           FUNCS="$(echo "$CHANGED" | sed -n 's#^supabase/functions/\([^/]*\)/.*#\1#p' | sort -u | { grep -v '^_' || true; } | tr '\n' ' ')"
+
+          # IMPORTS CRUZADOS: el bundle de una función lleva una COPIA de lo que importa
+          # de otra carpeta. Si cambia la carpeta importada, hay que redesplegar también
+          # a las que la importan; si no, siguen corriendo el código viejo. La tabla la
+          # verifica messenger-webhooks/estructura.test.ts: un import cruzado nuevo sin
+          # su regla acá rompe el guard.
+          #   public-api/        → messenger-webhooks (el feed como la persona) y
+          #                        manage-api-keys (vía _shared/webhook-salida.ts)
+          #   parrilla-generate/ → parrilla-weekly
+          # (here-string y no `echo | grep -q`: con pipefail, un SIGPIPE del echo haría
+          # que el if diera falso y la regla no se aplicara)
+          if grep -q '^supabase/functions/public-api/' <<< "$CHANGED"; then FUNCS="$FUNCS messenger-webhooks manage-api-keys"; fi
+          if grep -q '^supabase/functions/parrilla-generate/' <<< "$CHANGED"; then FUNCS="$FUNCS parrilla-weekly"; fi
+          FUNCS="$(echo $FUNCS | tr ' ' '\n' | sort -u | { grep -v '^$' || true; } | tr '\n' ' ')"
           echo "Funciones cambiadas: [$FUNCS]"
           echo "deploy_all=false" >> "$GITHUB_OUTPUT"
           echo "funcs=$FUNCS" >> "$GITHUB_OUTPUT"

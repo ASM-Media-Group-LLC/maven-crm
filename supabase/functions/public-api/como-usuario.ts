@@ -78,13 +78,19 @@ export function comoUsuarioConfigurado(): boolean {
 }
 
 /** Cliente de Supabase que consulta COMO `userId`: con la RLS y los triggers de la
- *  app. `null` si falta el secreto — el llamador responde 503, nunca cae a service_role. */
-export async function clienteComoUsuario(userId: string): Promise<SupabaseClient | null> {
+ *  app. `null` si falta el secreto — el llamador responde 503, nunca cae a service_role.
+ *
+ *  `fetch` es opcional: el despachador de webhooks (messenger-webhooks) le pasa uno
+ *  con plazo por pedido, para que una base lenta no le estire la corrida. */
+export async function clienteComoUsuario(
+  userId: string,
+  opciones: { fetch?: typeof fetch } = {},
+): Promise<SupabaseClient | null> {
   const secreto = Deno.env.get("MAVEN_JWT_SECRET");
   if (!secreto) return null;
   const token = await fabricarToken(userId, secreto);
   return createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
-    global: { headers: { Authorization: `Bearer ${token}` } },
+    global: { headers: { Authorization: `Bearer ${token}` }, ...(opciones.fetch ? { fetch: opciones.fetch } : {}) },
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   });
 }
