@@ -898,7 +898,12 @@ describe("segunda revisión: carreras, foco y lo que no tenía test", () => {
     expect(screen.getByText("Key act")).toBeTruthy();
     expect(celdaWebhook("Key act").textContent).toContain("Paused");
     expect(screen.getByText(/Couldn't refresh the list/)).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
+    // Reintentar relee y, si anda, el aviso se va.
+    const antes = llamadasDe("list").length;
+    listas = -100; // desde acá la lista contesta bien
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(llamadasDe("list").length).toBeGreaterThan(antes));
+    await waitFor(() => expect(screen.queryByText(/Couldn't refresh the list/)).toBeNull());
   });
 
   it("tras borrar, aunque la relectura falle, la celda vuelve a Registrar", async () => {
@@ -936,10 +941,18 @@ describe("segunda revisión: carreras, foco y lo que no tenía test", () => {
     await waitFor(() => expect(llamadasDe("list").length).toBe(2));
     fireEvent.click(within(d).getByRole("button", { name: /Pause/ }));
     await waitFor(() => expect(avisos.error.length).toBe(1));
+    expect(within(d).getByRole("button", { name: /Pause/ }).getAttribute("aria-disabled")).toBe("true");
+    // Borrar y Cerrar no esperan la relectura.
+    expect((within(d).getByRole("button", { name: /Delete/ }) as HTMLButtonElement).disabled).toBe(false);
+    expect(within(d).getAllByRole("status").some((r) => r.textContent === "Working…")).toBe(true);
     fireEvent.click(within(d).getByRole("button", { name: /Pause/ }));
+    await act(async () => { await new Promise((r) => setTimeout(r, 30)); });
     expect(llamadasDe("webhook_pause").length).toBe(1);
-    relectura.resolver(lista([llave("act", { webhook: webhook({ api_key_id: "act", status: "paused" }) })]));
-    await waitFor(() => expect(within(d).queryByRole("button", { name: /Pause/ })).toBeNull());
+    // La relectura dice que sigue activo: Pausar vuelve a funcionar.
+    relectura.resolver(lista([llave("act", { webhook: webhook({ api_key_id: "act" }) })]));
+    await waitFor(() => expect(within(d).getByRole("button", { name: /Pause/ }).getAttribute("aria-disabled")).toBe("false"));
+    fireEvent.click(within(d).getByRole("button", { name: /Pause/ }));
+    await waitFor(() => expect(llamadasDe("webhook_pause").length).toBe(2));
   });
 
   it("después de una prueba, el diálogo se cierra y se pausa sin esperar la lista", async () => {
@@ -1131,9 +1144,12 @@ describe("segunda revisión: carreras, foco y lo que no tenía test", () => {
     st.textContent = '[role="dialog"][data-state="closed"] { animation-name: salir; }';
     document.head.appendChild(st);
     try {
-      servidor = (b) => b.action === "list"
-        ? Promise.resolve(lista([llave("act", { webhook: webhook({ api_key_id: "act" }) })]))
-        : Promise.resolve({ success: true });
+      let tiene = true;
+      servidor = (b) => {
+        if (b.action === "list") return Promise.resolve(lista([llave("act", { webhook: tiene ? webhook({ api_key_id: "act" }) : null })]));
+        tiene = false;
+        return Promise.resolve({ success: true });
+      };
       montar();
       await screen.findByText("Key act");
       const d = await abrirCelda("Key act");
@@ -1147,6 +1163,8 @@ describe("segunda revisión: carreras, foco y lo que no tenía test", () => {
       expect(sigue!.textContent).toContain("hooks.example.com");
       expect(document.querySelector("#webhook-url")).toBeNull();
       expect(sigue!.textContent).not.toContain("Register a webhook");
+      // La confirmación no queda congelada abierta encima de la salida.
+      expect(document.querySelector('[role="alertdialog"][data-state="open"]')).toBeNull();
     } finally {
       st.remove();
     }
@@ -1198,5 +1216,226 @@ describe("segunda revisión: carreras, foco y lo que no tenía test", () => {
     fireEvent.click(within(d).getByRole("button", { name: "Create key" }));
     expect(await within(d).findByText(KEY)).toBeTruthy();
     await waitFor(() => expect(JSON.stringify(qc.getMutationCache().getAll().map((m) => m.state.data))).not.toContain(KEY));
+  });
+});
+
+describe("tercera revisión", () => {
+  /** ¿El texto está en algún lado del árbol de React (props, estado, refs)? Así se ve
+   *  si el secreto quedó retenido aunque no esté en el DOM. */
+  function enLasFibras(contenedor: HTMLElement, texto: string): boolean {
+    const clave = Object.keys(contenedor).find((k) => k.startsWith("__reactContainer$"));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const hostRoot = clave ? (contenedor as any)[clave] : null;
+    const actual = hostRoot?.stateNode?.current ?? hostRoot;
+    const vistos = new WeakSet<object>();
+    const buscar = (v: unknown, prof: number): boolean => {
+      if (typeof v === "string") return v.includes(texto);
+      if (!v || typeof v !== "object" || prof > 40 || v instanceof Node) return false;
+      if (vistos.has(v)) return false;
+      vistos.add(v);
+      for (const k of Object.keys(v)) {
+        if (k === "_owner" || k === "return" || k === "alternate" || k === "stateNode" || k === "child" || k === "sibling") continue;
+        if (buscar((v as Record<string, unknown>)[k], prof + 1)) return true;
+      }
+      return false;
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const pila: any[] = actual ? [actual] : [];
+    while (pila.length) {
+      const f = pila.pop();
+      if (buscar(f.memoizedProps, 0)) return true;
+      // Los hooks son una lista (memoizedState → next → next…): se recorre entera, sin
+      // gastar profundidad; si no, un useRef del hook 12 quedaba fuera del alcance.
+      for (let h = f.memoizedState; h && typeof h === "object"; h = h.next) {
+        if (buscar(h.memoizedState, 0)) return true;
+        if (!("next" in h)) break;
+      }
+      if (f.child) pila.push(f.child);
+      if (f.sibling) pila.push(f.sibling);
+    }
+    return false;
+  }
+
+  it("después de cerrar, el secreto no queda en ninguna parte del árbol de React", async () => {
+    let conWebhook: W | null = null;
+    servidor = (b) => {
+      if (b.action === "list") return Promise.resolve(lista([llave("mia", { webhook: conWebhook })]));
+      conWebhook = webhook({ api_key_id: "mia", status: "pending" });
+      return Promise.resolve({ webhook: conWebhook, secret: SECRETO });
+    };
+    const { container } = montar();
+    await screen.findByText("Key mia");
+    fireEvent.click(within(celdaWebhook("Key mia")).getByRole("button", { name: /Register/ }));
+    const d = await screen.findByRole("dialog");
+    fireEvent.change(within(d).getByLabelText("Your server's URL"), { target: { value: "https://hooks.example.com/x" } });
+    fireEvent.click(within(d).getByRole("button", { name: "Register webhook" }));
+    await within(d).findByText(SECRETO);
+    expect(enLasFibras(container, SECRETO)).toBe(true); // la sonda sí lo ve mientras está abierto
+    fireEvent.click(within(d).getByRole("button", { name: "Later" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(enLasFibras(container, SECRETO)).toBe(false));
+  });
+
+  it("una prueba que vuelve sin el endpoint: Pausar espera la relectura (y lo anuncia)", async () => {
+    const relectura = diferida<unknown>();
+    let listas = 0;
+    servidor = (b) => {
+      if (b.action === "list") {
+        listas++;
+        return listas <= 2 ? Promise.resolve(lista([llave("act", { webhook: webhook({ api_key_id: "act" }) })])) : relectura.promesa;
+      }
+      if (b.action === "webhook_test") return Promise.resolve({ webhook: null, test: { ...pruebaOk, activated: false } });
+      return Promise.resolve({ webhook: webhook({ api_key_id: "act", status: "paused" }) });
+    };
+    montar();
+    await screen.findByText("Key act");
+    const d = await abrirCelda("Key act");
+    await waitFor(() => expect(listas).toBe(2));
+    fireEvent.click(within(d).getByRole("button", { name: /Send test/ }));
+    await within(d).findByText("Your server answered 204.");
+    await waitFor(() => expect(within(d).getByRole("button", { name: /Pause/ }).getAttribute("aria-disabled")).toBe("true"));
+    expect(within(d).getByRole("button", { name: /Send test/ }).getAttribute("aria-disabled")).toBe("true");
+    fireEvent.click(within(d).getByRole("button", { name: /Pause/ }));
+    fireEvent.click(within(d).getByRole("button", { name: /Send test/ }));
+    await act(async () => { await new Promise((r) => setTimeout(r, 30)); });
+    expect(llamadasDe("webhook_pause").length).toBe(0);
+    expect(llamadasDe("webhook_test").length).toBe(1);
+    relectura.resolver(lista([llave("act", { webhook: webhook({ api_key_id: "act" }) })]));
+    await waitFor(() => expect(within(d).getByRole("button", { name: /Pause/ }).getAttribute("aria-disabled")).toBe("false"));
+  });
+
+  it("mientras borra, ni Cancelar ni Esc cierran la confirmación", async () => {
+    const borrado = diferida<unknown>();
+    let tiene = true;
+    servidor = (b) => {
+      if (b.action === "list") return Promise.resolve(lista([llave("act", { webhook: tiene ? webhook({ api_key_id: "act" }) : null })]));
+      tiene = false;
+      return borrado.promesa;
+    };
+    montar();
+    await screen.findByText("Key act");
+    const d = await abrirCelda("Key act");
+    fireEvent.click(within(d).getByRole("button", { name: /Delete/ }));
+    const c = await screen.findByRole("alertdialog");
+    fireEvent.click(within(c).getByRole("button", { name: "Delete" }));
+    await waitFor(() => expect(llamadasDe("webhook_delete").length).toBe(1));
+    fireEvent.click(within(c).getByRole("button", { name: "Cancel" }));
+    fireEvent.keyDown(c, { key: "Escape" });
+    await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+    expect(screen.getByRole("alertdialog")).toBe(c);
+    borrado.resolver({ success: true });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("con una pausa en vuelo, Borrar espera (no se abre una confirmación que se traga el toque)", async () => {
+    const pausa = diferida<unknown>();
+    servidor = (b) => b.action === "list"
+      ? Promise.resolve(lista([llave("act", { webhook: webhook({ api_key_id: "act" }) })]))
+      : pausa.promesa;
+    montar();
+    await screen.findByText("Key act");
+    const d = await abrirCelda("Key act");
+    fireEvent.click(within(d).getByRole("button", { name: /Pause/ }));
+    await waitFor(() => expect(llamadasDe("webhook_pause").length).toBe(1));
+    expect((within(d).getByRole("button", { name: /Delete/ }) as HTMLButtonElement).disabled).toBe(true);
+    pausa.resolver({ webhook: webhook({ api_key_id: "act", status: "paused" }) });
+    await waitFor(() => expect((within(d).getByRole("button", { name: /Delete/ }) as HTMLButtonElement).disabled).toBe(false));
+  });
+
+  it("receptor fallando y además una demora de Maven: el diálogo muestra las dos cosas", async () => {
+    servidor = () => Promise.resolve(lista([
+      llave("dos", { webhook: webhook({ api_key_id: "dos", consecutive_failures: 5, failing_since: "2026-09-26T08:00:00Z", last_attempt_at: "2026-09-26T13:00:00Z", last_error: "maven_base", next_attempt_at: "2999-01-01T00:00:00Z" }) }),
+    ]));
+    montar();
+    await screen.findByText("Key dos");
+    expect(celdaWebhook("Key dos").textContent).toContain("Active · failing");
+    const d = await abrirCelda("Key dos");
+    expect(within(d).getByText(/The integrator's server is failing/)).toBeTruthy();
+    expect(within(d).getByText("Failures in a row")).toBeTruthy();
+    expect(within(d).getByText("Maven delay")).toBeTruthy();
+    expect(within(d).getByText("A Maven-side failure, not the integrator's")).toBeTruthy();
+  });
+
+  it("si lo borran y la key de la dueña está revocada, no se le ofrece el alta", async () => {
+    let listas = 0;
+    servidor = (b) => {
+      if (b.action === "list") {
+        listas++;
+        return Promise.resolve(lista([llave("rev", { status: "revoked", webhook: listas <= 2 ? webhook({ api_key_id: "rev", status: "disabled", disabled_reason: "key_revoked" }) : null })]));
+      }
+      return Promise.reject(new Error("That webhook doesn't exist."));
+    };
+    montar();
+    await screen.findByText("Key rev");
+    const d = await abrirCelda("Key rev");
+    await waitFor(() => expect(listas).toBe(2));
+    fireEvent.click(within(d).getByRole("button", { name: /Delete/ }));
+    const c = await screen.findByRole("alertdialog");
+    fireEvent.click(within(c).getByRole("button", { name: "Delete" }));
+    await within(d).findByText(/This key has no webhook/);
+    expect(within(d).queryByLabelText("Your server's URL")).toBeNull();
+  });
+
+  it("si la última relectura falló, el diálogo avisa que lo que muestra puede estar viejo", async () => {
+    let listas = 0;
+    servidor = (b) => {
+      if (b.action === "list") {
+        listas++;
+        return listas === 1 ? Promise.resolve(lista([llave("act", { webhook: webhook({ api_key_id: "act" }) })])) : Promise.reject(new Error("net"));
+      }
+      return Promise.reject(new Error("x"));
+    };
+    montar();
+    await screen.findByText("Key act");
+    const d = await abrirCelda("Key act");
+    await waitFor(() => expect(listas).toBe(2));
+    expect(await within(d).findByText(/Couldn't refresh the status/)).toBeTruthy();
+    expect(within(d).getByRole("button", { name: /Delete/ })).toBeTruthy();
+  });
+
+  it("en la vista del secreto, 'Enviar prueba' no pierde el foco mientras prueba (aria-disabled)", async () => {
+    const pr = diferida<unknown>();
+    let conWebhook: W | null = null;
+    servidor = (b) => {
+      if (b.action === "list") return Promise.resolve(lista([llave("mia", { webhook: conWebhook })]));
+      if (b.action === "webhook_create") {
+        conWebhook = webhook({ api_key_id: "mia", status: "pending" });
+        return Promise.resolve({ webhook: conWebhook, secret: SECRETO });
+      }
+      return pr.promesa;
+    };
+    montar();
+    await screen.findByText("Key mia");
+    fireEvent.click(within(celdaWebhook("Key mia")).getByRole("button", { name: /Register/ }));
+    const d = await screen.findByRole("dialog");
+    fireEvent.change(within(d).getByLabelText("Your server's URL"), { target: { value: "https://hooks.example.com/x" } });
+    fireEvent.click(within(d).getByRole("button", { name: "Register webhook" }));
+    await within(d).findByText(SECRETO);
+    const enviar = within(d).getByRole("button", { name: /Send test/ });
+    fireEvent.click(enviar);
+    await waitFor(() => expect(enviar.getAttribute("aria-disabled")).toBe("true"));
+    expect((enviar as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(enviar);
+    await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+    expect(llamadasDe("webhook_test").length).toBe(1);
+    pr.resolver({ webhook: conWebhook, test: pruebaOk });
+    await within(d).findByText("Your server answered 204.");
+  });
+
+  it("crear una API key: con el pedido en vuelo no se cierra, y la key se ve igual", async () => {
+    const KEY = "mvk_live_abcdef_LA-KEY-QUE-NO-SE-PUEDE-PERDER";
+    const alta = diferida<unknown>();
+    servidor = (b) => b.action === "create" ? alta.promesa : Promise.resolve(lista([llave("mia")]));
+    montar();
+    await screen.findByText("Key mia");
+    fireEvent.click(screen.getByRole("button", { name: /Create API key/ }));
+    const d = await screen.findByRole("dialog");
+    fireEvent.change(within(d).getByLabelText("Name"), { target: { value: "Nueva" } });
+    fireEvent.click(within(d).getByRole("button", { name: "Create key" }));
+    fireEvent.keyDown(d, { key: "Escape" });
+    await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+    expect(screen.getByRole("dialog")).toBe(d);
+    alta.resolver({ key: KEY });
+    expect(await within(d).findByText(KEY)).toBeTruthy();
   });
 });

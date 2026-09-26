@@ -232,9 +232,13 @@ type ListaEnCache = { keys: { id: string; webhook?: WebhookResumen | null }[] };
 /** El diálogo del webhook de una key. Se monta de nuevo en cada apertura
  *  (AdminApiKeys le pone key): el secreto y el resultado de una prueba nunca pasan
  *  de una key a otra. `llave` sale de la lista, fresca tras cada acción. */
-export function DialogoWebhook({ abierto, llave, youId, desconocido = false, caras, onCerrar }: {
+export function DialogoWebhook({ abierto, llave, youId, desconocido = false, listaConError = false, caras, onCerrar }: {
   abierto: boolean; llave: LlaveConWebhook | null; youId: string | null | undefined;
-  desconocido?: boolean; caras?: Map<string, Cara>; onCerrar: () => void;
+  /** webhooks_unknown: la lista vino, pero sin los webhooks. */
+  desconocido?: boolean;
+  /** La última relectura de la lista falló: lo que hay es de antes. */
+  listaConError?: boolean;
+  caras?: Map<string, Cara>; onCerrar: () => void;
 }) {
   const qc = useQueryClient();
   const { t, language } = useLanguage();
@@ -289,7 +293,7 @@ export function DialogoWebhook({ abierto, llave, youId, desconocido = false, car
   }
   const w: WebhookResumen | null =
     deLaLista ?? (sinDato ? ultimoConocido.current ?? recienDeEsta : recienVisto.current ? null : recienDeEsta);
-  const viejo = sinDato && !!w;
+  const viejo = (sinDato || listaConError) && !!w;
 
   const esDueno = !!youId && llave?.acts_as?.id === youId;
   const cara = (id: string | null | undefined) => (id ? caras?.get(id) : undefined);
@@ -459,8 +463,9 @@ export function DialogoWebhook({ abierto, llave, youId, desconocido = false, car
         <DialogFooter><Button variant="outline" onClick={cerrar}>{t("common.close")}</Button></DialogFooter>
       </>
     );
-  } else if (!w && !esDueno) {
-    // ── no tiene (lo borraron con el diálogo abierto): quien no es la dueña no ve el alta ──
+  } else if (!w && queMostrar(llave, youId, desconocido) !== "registrar") {
+    // ── no tiene (lo borraron con el diálogo abierto) y no se puede registrar: quien
+    // no es la dueña, o la dueña con la key revocada o vencida, no ven el alta ──
     cuerpo = (
       <>
         <DialogHeader>
@@ -613,7 +618,7 @@ export function DialogoWebhook({ abierto, llave, youId, desconocido = false, car
           {/* Con Trigger, al cerrar la confirmación el foco vuelve a este botón. */}
           <AlertDialog open={borrar} onOpenChange={(o) => { if (!quitar.isPending) setBorrar(o); }}>
             <AlertDialogTrigger asChild>
-              <Button variant="ghost" className="gap-1.5 text-destructive hover:text-destructive" disabled={enVuelo}>
+              <Button variant="ghost" className="gap-1.5 text-destructive hover:text-destructive" disabled={enVuelo || pausar.isPending}>
                 <Trash2 className="h-4 w-4" /> {t("apiKeys.webhook.delete")}
               </Button>
             </AlertDialogTrigger>
@@ -637,7 +642,7 @@ export function DialogoWebhook({ abierto, llave, youId, desconocido = false, car
             </AlertDialogContent>
           </AlertDialog>
           <div className="flex flex-wrap justify-end gap-2">
-            <span role="status" className="sr-only">{ocupado ? t("apiKeys.webhook.working") : ""}</span>
+            <span role="status" className="sr-only">{esperaEstado ? t("apiKeys.webhook.working") : ""}</span>
             {puedePausar && (
               <Button variant="outline" className="gap-1.5 aria-disabled:opacity-50" aria-disabled={esperaEstado}
                 onClick={() => { if (!esperaEstado) unaVez(() => pausar.mutate(w.id)); }}>
@@ -662,8 +667,11 @@ export function DialogoWebhook({ abierto, llave, youId, desconocido = false, car
     );
   }
 
-  if (abierto) ultimoCuerpo.current = cuerpo;
-  else if (ultimoCuerpo.current) cuerpo = ultimoCuerpo.current;
+  // Con la confirmación de borrar abierta no se guarda: así, en la salida (tras borrar)
+  // se dibuja el cuerpo con la confirmación cerrada, que se va con su animación.
+  if (abierto) {
+    if (!borrar) ultimoCuerpo.current = cuerpo;
+  } else if (ultimoCuerpo.current) cuerpo = ultimoCuerpo.current;
 
   return (
     <Dialog open={abierto && !!llave} onOpenChange={(o) => { if (!o) cerrar(); }}>
@@ -679,7 +687,9 @@ export function DialogoWebhook({ abierto, llave, youId, desconocido = false, car
           const celda = llave ? document.querySelector<HTMLElement>(`[data-webhook-celda="${llave.id}"]`) : null;
           const destino = abridor.current?.isConnected ? abridor.current : celda?.querySelector<HTMLElement>("button") ?? celda;
           destino?.focus();
-          // El secreto no espera a la próxima apertura: se va al terminar de cerrar.
+          // El secreto no espera a la próxima apertura: se va al terminar de cerrar, del
+          // estado Y del cuerpo congelado (que lo tenía en su <code> y en CopyButton).
+          ultimoCuerpo.current = null;
           setSecreto(null); setPrueba(null);
         }}>
         {cuerpo}

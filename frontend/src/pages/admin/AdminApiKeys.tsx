@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   KeyRound, Plus, Check, Loader2, ShieldAlert, Trash2, Pencil, BookOpen, ExternalLink, X,
@@ -145,6 +145,7 @@ const AdminApiKeys = () => {
   const [ipText, setIpText] = useState("");
   const [expiryDays, setExpiryDays] = useState<number>(30); // -1 = mantener (solo edición)
   const [confirmaMessenger, setConfirmaMessenger] = useState(false);
+  const createMutPendiente = useRef(false);
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["api-keys"],
@@ -187,7 +188,12 @@ const AdminApiKeys = () => {
     setIpText((k.ip_whitelist ?? []).join("\n"));
     setExpiryDays(-1); setFreshKey(null); setModalMode("edit");
   };
-  const closeModal = () => { setModalMode(null); setEditing(null); setFreshKey(null); };
+  // Con el alta en vuelo no se cierra: la key llega UNA vez y, con el modal cerrado,
+  // quedaba creada (ocupando un cupo) sin que nadie la viera.
+  const closeModal = () => {
+    if (createMutPendiente.current) return;
+    setModalMode(null); setEditing(null); setFreshKey(null);
+  };
 
   const expiresAtFromChoice = (): string | null | undefined => {
     if (expiryDays === -1) return undefined; // mantener (no tocar)
@@ -211,7 +217,7 @@ const AdminApiKeys = () => {
     gcTime: 0,
     onSuccess: (res) => { setFreshKey(res.key); qc.invalidateQueries({ queryKey: ["api-keys"] }); toast.success(t("apiKeys.toast.created")); },
     onError: (e) => toast.error((e as Error)?.message ?? t("apiKeys.toast.createFailed")),
-    onSettled: () => { queueMicrotask(() => createMut.reset()); },
+    onSettled: () => { createMutPendiente.current = false; queueMicrotask(() => createMut.reset()); },
   });
 
   const updateMut = useMutation({
@@ -367,7 +373,8 @@ const AdminApiKeys = () => {
                     </td>
                     {/* data-webhook-celda + tabIndex -1: si al cerrar el diálogo el botón que
                         lo abrió ya no está, el foco vuelve a esta celda. */}
-                    <td data-label={t("apiKeys.col.webhook")} data-webhook-celda={k.id} tabIndex={-1} className="px-4 py-3 outline-none">
+                    <td data-label={t("apiKeys.col.webhook")} data-webhook-celda={k.id} tabIndex={-1}
+                      className="px-4 py-3 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
                       <CeldaWebhook llave={k} youId={data?.you?.id} desconocido={data?.webhooks_unknown === true}
                         onAbrir={() => abrirWebhook(k.id)} />
                     </td>
@@ -399,7 +406,7 @@ const AdminApiKeys = () => {
       {/* Webhook de una key: registrar, estado y entregas */}
       <DialogoWebhook key={webhookDe?.vez ?? 0} abierto={webhookAbierto}
         llave={webhookDe ? keys.find((k) => k.id === webhookDe.id) ?? null : null}
-        desconocido={data?.webhooks_unknown === true}
+        desconocido={data?.webhooks_unknown === true} listaConError={isError}
         youId={data?.you?.id} caras={caras} onCerrar={() => setWebhookAbierto(false)} />
 
       {/* Modal crear / editar / mostrar key */}
@@ -538,9 +545,14 @@ const AdminApiKeys = () => {
                 </div>
               )}
               <DialogFooter>
-                <Button variant="ghost" onClick={closeModal}>{t("common.cancel")}</Button>
+                <Button variant="ghost" onClick={closeModal} disabled={createMut.isPending}>{t("common.cancel")}</Button>
                 <Button className="gap-1.5" disabled={!canSubmit}
-                  onClick={() => (modalMode === "edit" ? updateMut.mutate() : createMut.mutate())}>
+                  onClick={() => {
+                    if (modalMode === "edit") { updateMut.mutate(); return; }
+                    // Se marca ACÁ (onMutate corre después de un await): desde el toque, no se cierra.
+                    createMutPendiente.current = true;
+                    createMut.mutate();
+                  }}>
                   {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
                   {modalMode === "edit" ? t("common.save") : t("apiKeys.form.create")}
                 </Button>
