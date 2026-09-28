@@ -25,14 +25,16 @@ import {
  *  Al editar NO se ofrece anidarla en sí misma ni en una de sus hijas: sería
  *  un ciclo (la base también lo frena, pero el menú no debe proponerlo). */
 export default function EtiquetaFormDialog({
-  etiqueta, madreInicial = null, onCerrar, onCreada,
+  etiqueta, madreInicial = null, nombreInicial, onCerrar, onCreada,
 }: {
   etiqueta?: EtiquetaDeCorreo;
   madreInicial?: string | null;
+  /** Lo que ya se escribió en el buscador de «Etiquetar como» / «Mover a». */
+  nombreInicial?: string;
   onCerrar: () => void;
   /** Para etiquetar lo seleccionado apenas se crea, como el «Crear nueva» del
    *  «Etiquetar como» de Gmail. */
-  onCreada?: (id: string) => void;
+  onCreada?: (id: string, nombre: string) => void;
 }) {
   const { t } = useLanguage();
   const etiquetas = useEtiquetas();
@@ -40,7 +42,7 @@ export default function EtiquetaFormDialog({
   const actualizar = useActualizarEtiqueta();
   const editando = !!etiqueta;
 
-  const [nombre, setNombre] = useState(etiqueta?.nombre ?? "");
+  const [nombre, setNombre] = useState(etiqueta?.nombre ?? nombreInicial ?? "");
   const [anidar, setAnidar] = useState(!!(etiqueta?.parentId ?? madreInicial));
   const [madre, setMadre] = useState<string | null>(etiqueta?.parentId ?? madreInicial);
 
@@ -71,7 +73,7 @@ export default function EtiquetaFormDialog({
       crear.mutate({ nombre: n, parentId }, {
         onSuccess: (id) => {
           toast.success(t("mail.labels.created"));
-          onCreada?.(id);
+          onCreada?.(id, n);
           onCerrar();
         },
         onError: alFallar,

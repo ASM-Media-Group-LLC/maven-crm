@@ -1,3 +1,4 @@
+import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ParDeColores } from "@/lib/correo/coloresEtiqueta";
 
@@ -5,11 +6,13 @@ import type { ParDeColores } from "@/lib/correo/coloresEtiqueta";
  *  (con la ruta, «Padre/Hija») sobre el fondo de la etiqueta y en su color de
  *  texto. Sin color = gris del tema, que se lee en claro y en oscuro. */
 export default function PastillaEtiqueta({
-  nombre, color, className,
+  nombre, color, className, onQuitar,
 }: {
   nombre: string;
   color: ParDeColores | null;
   className?: string;
+  /** La × del correo abierto: quita la etiqueta (en «Recibidos», archiva). */
+  onQuitar?: () => void;
 }) {
   return (
     <span
@@ -22,6 +25,17 @@ export default function PastillaEtiqueta({
       style={color ? { backgroundColor: color.fondo, color: color.texto } : undefined}
     >
       <span className="truncate">{nombre}</span>
+      {onQuitar && (
+        <button
+          type="button"
+          onClick={onQuitar}
+          aria-label={`Quitar ${nombre}`}
+          title={`Quitar ${nombre}`}
+          className="-mr-0.5 ml-1 shrink-0 rounded-sm opacity-70 hover:opacity-100"
+        >
+          <X className="h-3 w-3" />
+        </button>
+      )}
     </span>
   );
 }

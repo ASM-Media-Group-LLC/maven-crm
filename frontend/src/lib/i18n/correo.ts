@@ -76,6 +76,13 @@ export const correo = {
   "mail.labels.collapse": { es: "Ocultar subetiquetas de {name}", en: "Hide sublabels of {name}" },
   "mail.labels.saveError": { es: "No se pudo guardar la etiqueta", en: "Couldn\u2019t save the label" },
 
+  // Correo · «Etiquetar como:» y «Mover a:» (selección y correo abierto)
+  "mail.labels.labelAs": { es: "Etiquetar como:", en: "Label as:" },
+  "mail.labels.moveTo": { es: "Mover a:", en: "Move to:" },
+  "mail.labels.none": { es: "Todavía no creaste ninguna.", en: "You haven\u2019t created any yet." },
+  "mail.labels.createNew": { es: "Crear nueva", en: "Create new" },
+  "mail.labels.createNamed": { es: "«{name}» (crear nueva)", en: "\u201c{name}\u201d (create new)" },
+
   // Correo · el diálogo de color personalizado
   "mail.labels.custom.title": { es: "Agregar color personalizado", en: "Add custom color" },
   "mail.labels.custom.preview": {
