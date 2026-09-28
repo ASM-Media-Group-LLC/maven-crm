@@ -30,6 +30,9 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { useDepartments } from "@/hooks/useEmployees";
 import { PageHeader } from "@/components/ui/page-header";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
+import { ConFormato } from "@/pages/admin/ConFormato";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface OnboardingRecord {
@@ -58,10 +61,10 @@ interface OnboardingRecord {
   task_completed: number;
 }
 
-const ONBOARDING_STATUSES = [
-  { value: "pending", label: "Pendiente" },
-  { value: "in_progress", label: "En Progreso" },
-  { value: "completed", label: "Completado" },
+const ONBOARDING_STATUSES: { value: string; label: TranslationKey }[] = [
+  { value: "pending", label: "common.pending" },
+  { value: "in_progress", label: "hrg.opt.trainStatus.in_progress" },
+  { value: "completed", label: "common.completed" },
 ];
 
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
@@ -126,6 +129,11 @@ export default function HROnboarding() {
   const { data: departments = [] } = useDepartments();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { t } = useLanguage();
+  const estado = (s: string) => {
+    const o = ONBOARDING_STATUSES.find((x) => x.value === s);
+    return o ? t(o.label) : s;
+  };
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -149,10 +157,10 @@ export default function HROnboarding() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["hr-onboardings"] });
-      toast({ title: "Onboarding actualizado" });
+      toast({ title: t("hrg.onb.updated") });
       setEditItem(null);
     },
-    onError: () => toast({ title: "Error al actualizar", variant: "destructive" }),
+    onError: () => toast({ title: t("common.errorUpdating"), variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
@@ -164,10 +172,10 @@ export default function HROnboarding() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["hr-onboardings"] });
-      toast({ title: "Onboarding eliminado" });
+      toast({ title: t("hrg.onb.deleted") });
       setDeleteItem(null);
     },
-    onError: () => toast({ title: "Error al eliminar", variant: "destructive" }),
+    onError: () => toast({ title: t("common.errorDeleting"), variant: "destructive" }),
   });
 
   // ─── KPIs ─────────────────────────────────────────────────────────────────
@@ -203,10 +211,10 @@ export default function HROnboarding() {
       <header className="shrink-0 bg-background/30 backdrop-blur-xl border-b border-white/10 px-6 pt-6 pb-4">
         <PageHeader
           title="Onboarding"
-          subtitle="Gestión de nuevos empleados en proceso de integración"
+          subtitle={t("hrg.onb.listSubtitle")}
           actions={
             <Button size="sm" onClick={() => navigate("/hr/onboarding/nuevo")}>
-              <Plus className="h-4 w-4 mr-1" />Iniciar Onboarding
+              <Plus className="h-4 w-4 mr-1" />{t("hrg.onb.start")}
             </Button>
           }
         />
@@ -221,17 +229,17 @@ export default function HROnboarding() {
             Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
           ) : (
             <>
-              <StatChip label="Total Onboarding" value={String(onboardings.length)} icon={<Users className="h-3.5 w-3.5" />} color="bg-primary" hint="Todos los procesos" onClick={() => setKpiPopup("total")} />
-              <StatChip label="Pendientes" value={String(totalPending)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-primary" hint={onboardings.length > 0 ? `${((totalPending / onboardings.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("pending")} />
-              <StatChip label="En Progreso" value={String(totalInProgress)} icon={<Loader2 className="h-3.5 w-3.5" />} color="bg-warning" hint={onboardings.length > 0 ? `${((totalInProgress / onboardings.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("inProgress")} />
-              <StatChip label="Completados" value={String(totalCompleted)} icon={<CheckCircle className="h-3.5 w-3.5" />} color="bg-success" hint={onboardings.length > 0 ? `${((totalCompleted / onboardings.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("completed")} />
+              <StatChip label={t("hrg.onb.kpi.total")} value={String(onboardings.length)} icon={<Users className="h-3.5 w-3.5" />} color="bg-primary" hint={t("hrg.onb.kpi.totalHint")} onClick={() => setKpiPopup("total")} />
+              <StatChip label={t("common.pendingPl")} value={String(totalPending)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-primary" hint={onboardings.length > 0 ? t("hrg.ofTotal", { pct: ((totalPending / onboardings.length) * 100).toFixed(0) }) : "—"} onClick={() => setKpiPopup("pending")} />
+              <StatChip label={t("hrg.opt.trainStatus.in_progress")} value={String(totalInProgress)} icon={<Loader2 className="h-3.5 w-3.5" />} color="bg-warning" hint={onboardings.length > 0 ? t("hrg.ofTotal", { pct: ((totalInProgress / onboardings.length) * 100).toFixed(0) }) : "—"} onClick={() => setKpiPopup("inProgress")} />
+              <StatChip label={t("hrg.completedPl")} value={String(totalCompleted)} icon={<CheckCircle className="h-3.5 w-3.5" />} color="bg-success" hint={onboardings.length > 0 ? t("hrg.ofTotal", { pct: ((totalCompleted / onboardings.length) * 100).toFixed(0) }) : "—"} onClick={() => setKpiPopup("completed")} />
             </>
           )}
         </div>
 
         {/* Department Tabs */}
         <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1">
-          <Button variant={!deptTab ? "secondary" : "ghost"} size="sm" onClick={() => setDeptTab("")}>Todos</Button>
+          <Button variant={!deptTab ? "secondary" : "ghost"} size="sm" onClick={() => setDeptTab("")}>{t("common.all")}</Button>
           {departments.map((d: any) => (
             <Button key={d.id} variant={deptTab === d.id ? "secondary" : "ghost"} size="sm" onClick={() => setDeptTab(d.id)}>{d.name}</Button>
           ))}
@@ -241,29 +249,29 @@ export default function HROnboarding() {
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Buscar por nombre o email..." className="pl-8" value={search} onChange={(e) => setSearch(e.target.value)} />
+            <Input placeholder={t("hrg.onb.searchPlaceholder")} className="pl-8" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
 
           <Select value={statusFilter || undefined} onValueChange={(v) => setStatusFilter(v === "__all__" ? "" : v)}>
-            <SelectTrigger className="w-40"><SelectValue placeholder="Estado" /></SelectTrigger>
+            <SelectTrigger className="w-40"><SelectValue placeholder={t("common.status")} /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="__all__">Todos</SelectItem>
-              {ONBOARDING_STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+              <SelectItem value="__all__">{t("common.all")}</SelectItem>
+              {ONBOARDING_STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{t(s.label)}</SelectItem>)}
             </SelectContent>
           </Select>
 
           <div className="inline-flex items-center rounded-md border border-border">
-            <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8 rounded-r-none" onClick={() => setViewMode("list")}>
+            <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8 rounded-r-none" onClick={() => setViewMode("list")} aria-label={t("hrg.dir.viewTable")}>
               <ListIcon className="h-4 w-4" />
             </Button>
-            <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8 rounded-l-none" onClick={() => setViewMode("grid")}>
+            <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8 rounded-l-none" onClick={() => setViewMode("grid")} aria-label={t("hrg.dir.viewGrid")}>
               <LayoutGrid className="h-4 w-4" />
             </Button>
           </div>
 
           {hasFilters && (
             <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={clearFilters}>
-              <X className="h-3.5 w-3.5 mr-1" />Limpiar filtros
+              <X className="h-3.5 w-3.5 mr-1" />{t("hrg.clearFilters")}
             </Button>
           )}
         </div>
@@ -275,14 +283,14 @@ export default function HROnboarding() {
               <Table>
                 <TableHeader>
                   <TableRow className="sticky top-0 z-10 bg-card border-b">
-                    <TableHead className="text-xs font-medium text-muted-foreground">Empleado</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">Posición</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">Área</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">Fecha Inicio</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">{t("hrg.employee")}</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">{t("hrg.position")}</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">{t("common.area")}</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">{t("hrg.startDate")}</TableHead>
                     <TableHead className="text-xs font-medium text-muted-foreground">Buddy</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">Progreso</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">Estado</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground sticky right-0 bg-card">Acciones</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">{t("hrg.progress")}</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">{t("common.status")}</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground sticky right-0 bg-card">{t("common.actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -294,9 +302,9 @@ export default function HROnboarding() {
                     <TableRow>
                       <TableCell colSpan={8}>
                         {onboardings.length === 0 ? (
-                          <EmptyState seed="hr-onboarding" title="No hay procesos de onboarding" description={'Haz clic en "Iniciar Onboarding" para empezar.'} />
+                          <EmptyState seed="hr-onboarding" title={t("hrg.onb.empty")} description={t("hrg.onb.emptyHint")} />
                         ) : (
-                          <EmptyState seed="hr-onboarding" title="Sin resultados" description="No hay coincidencias con los filtros aplicados." />
+                          <EmptyState seed="hr-onboarding" title={t("common.noResultsShort")} description={t("common.noMatches")} />
                         )}
                       </TableCell>
                     </TableRow>
@@ -332,20 +340,20 @@ export default function HROnboarding() {
                           </TableCell>
                           <TableCell>
                             <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium", statusColors.bg, statusColors.text)}>
-                              {ONBOARDING_STATUSES.find((s) => s.value === ob.status)?.label ?? ob.status}
+                              {estado(ob.status)}
                             </span>
                           </TableCell>
                           <TableCell className="sticky right-0 bg-card group-hover:bg-muted/30">
                             <div className="flex items-center gap-1">
                               <Tooltip><TooltipTrigger asChild>
                                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setViewItem(ob)}><Eye className="h-3.5 w-3.5" /></Button>
-                              </TooltipTrigger><TooltipContent side="left">Ver</TooltipContent></Tooltip>
+                              </TooltipTrigger><TooltipContent side="left">{t("common.view")}</TooltipContent></Tooltip>
                               <Tooltip><TooltipTrigger asChild>
                                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEdit(ob)}><Pencil className="h-3.5 w-3.5" /></Button>
-                              </TooltipTrigger><TooltipContent side="left">Editar</TooltipContent></Tooltip>
+                              </TooltipTrigger><TooltipContent side="left">{t("common.edit")}</TooltipContent></Tooltip>
                               <Tooltip><TooltipTrigger asChild>
                                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => setDeleteItem(ob)}><Trash2 className="h-3.5 w-3.5" /></Button>
-                              </TooltipTrigger><TooltipContent side="left">Eliminar</TooltipContent></Tooltip>
+                              </TooltipTrigger><TooltipContent side="left">{t("common.delete")}</TooltipContent></Tooltip>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -364,9 +372,9 @@ export default function HROnboarding() {
             ) : filtered.length === 0 ? (
               <div className="col-span-full">
                 {onboardings.length === 0 ? (
-                  <EmptyState seed="hr-onboarding" title="No hay procesos de onboarding" description={'Haz clic en "Iniciar Onboarding" para empezar.'} />
+                  <EmptyState seed="hr-onboarding" title={t("hrg.onb.empty")} description={t("hrg.onb.emptyHint")} />
                 ) : (
-                  <EmptyState seed="hr-onboarding" title="Sin resultados" description="No hay coincidencias con los filtros aplicados." />
+                  <EmptyState seed="hr-onboarding" title={t("common.noResultsShort")} description={t("common.noMatches")} />
                 )}
               </div>
             ) : (
@@ -385,17 +393,17 @@ export default function HROnboarding() {
                           </div>
                           <div>
                             <p className="text-sm font-medium leading-tight">{emp?.first_name} {emp?.last_name}</p>
-                            <p className="text-xs text-muted-foreground truncate max-w-[160px]">{emp?.email ?? "Sin email"}</p>
+                            <p className="text-xs text-muted-foreground truncate max-w-[160px]">{emp?.email ?? t("hrg.noEmail")}</p>
                           </div>
                         </div>
                         <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium shrink-0", statusColors.bg, statusColors.text)}>
-                          {ONBOARDING_STATUSES.find((s) => s.value === ob.status)?.label ?? ob.status}
+                          {estado(ob.status)}
                         </span>
                       </div>
                       <div className="space-y-1 text-xs text-muted-foreground">
-                        <p><span className="font-medium text-foreground">Posición:</span> {emp?.positions?.name ?? "—"}</p>
-                        {emp?.departments?.name && <p><span className="font-medium text-foreground">Área:</span> {emp.departments.name}</p>}
-                        <p><span className="font-medium text-foreground">Inicio:</span> {ob.start_date ? format(new Date(ob.start_date), "dd/MM/yyyy") : "—"}</p>
+                        <p><span className="font-medium text-foreground">{t("hrg.position")}:</span> {emp?.positions?.name ?? "—"}</p>
+                        {emp?.departments?.name && <p><span className="font-medium text-foreground">{t("common.area")}:</span> {emp.departments.name}</p>}
+                        <p><span className="font-medium text-foreground">{t("hrg.onb.start.short")}:</span> {ob.start_date ? format(new Date(ob.start_date), "dd/MM/yyyy") : "—"}</p>
                         {ob.buddy && <p><span className="font-medium text-foreground">Buddy:</span> {ob.buddy.first_name} {ob.buddy.last_name}</p>}
                       </div>
                       <div className="flex items-center gap-2">
@@ -403,9 +411,9 @@ export default function HROnboarding() {
                         <span className="text-xs text-muted-foreground">{ob.task_completed}/{ob.task_total}</span>
                       </div>
                       <div className="flex items-center gap-1 pt-1 border-t border-border">
-                        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setViewItem(ob)}><Eye className="h-3 w-3 mr-1" />Ver</Button>
-                        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => openEdit(ob)}><Pencil className="h-3 w-3 mr-1" />Editar</Button>
-                        <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive hover:text-destructive" onClick={() => setDeleteItem(ob)}><Trash2 className="h-3 w-3 mr-1" />Eliminar</Button>
+                        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setViewItem(ob)}><Eye className="h-3 w-3 mr-1" />{t("common.view")}</Button>
+                        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => openEdit(ob)}><Pencil className="h-3 w-3 mr-1" />{t("common.edit")}</Button>
+                        <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive hover:text-destructive" onClick={() => setDeleteItem(ob)}><Trash2 className="h-3 w-3 mr-1" />{t("common.delete")}</Button>
                       </div>
                     </CardContent>
                   </Card>
@@ -419,7 +427,7 @@ export default function HROnboarding() {
       {/* ── View Modal ────────────────────────────────────────────────────── */}
       <Dialog open={!!viewItem} onOpenChange={() => setViewItem(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Detalle del Onboarding</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t("hrg.onb.detailTitle")}</DialogTitle></DialogHeader>
           {viewItem && (() => {
             const emp = viewItem.employees;
             const progress = getProgress(viewItem);
@@ -427,20 +435,20 @@ export default function HROnboarding() {
             return (
               <div className="space-y-3 text-sm">
                 <div className="grid grid-cols-2 gap-3">
-                  <div><p className="text-xs text-muted-foreground">Empleado</p><p className="font-medium">{emp?.first_name} {emp?.last_name}</p></div>
-                  <div><p className="text-xs text-muted-foreground">Email</p><p>{emp?.email ?? "—"}</p></div>
-                  <div><p className="text-xs text-muted-foreground">Posición</p><p>{emp?.positions?.name ?? "—"}</p></div>
-                  <div><p className="text-xs text-muted-foreground">Área</p><p>{emp?.departments?.name ?? "—"}</p></div>
-                  <div><p className="text-xs text-muted-foreground">Fecha Inicio</p><p>{viewItem.start_date ? format(new Date(viewItem.start_date), "dd/MM/yyyy") : "—"}</p></div>
-                  <div><p className="text-xs text-muted-foreground">Buddy/Mentor</p><p>{viewItem.buddy ? `${viewItem.buddy.first_name} ${viewItem.buddy.last_name}` : "—"}</p></div>
+                  <div><p className="text-xs text-muted-foreground">{t("hrg.employee")}</p><p className="font-medium">{emp?.first_name} {emp?.last_name}</p></div>
+                  <div><p className="text-xs text-muted-foreground">{t("common.email")}</p><p>{emp?.email ?? "—"}</p></div>
+                  <div><p className="text-xs text-muted-foreground">{t("hrg.position")}</p><p>{emp?.positions?.name ?? "—"}</p></div>
+                  <div><p className="text-xs text-muted-foreground">{t("common.area")}</p><p>{emp?.departments?.name ?? "—"}</p></div>
+                  <div><p className="text-xs text-muted-foreground">{t("hrg.startDate")}</p><p>{viewItem.start_date ? format(new Date(viewItem.start_date), "dd/MM/yyyy") : "—"}</p></div>
+                  <div><p className="text-xs text-muted-foreground">{t("hrg.onb.buddy")}</p><p>{viewItem.buddy ? `${viewItem.buddy.first_name} ${viewItem.buddy.last_name}` : "—"}</p></div>
                   <div>
-                    <p className="text-xs text-muted-foreground">Estado</p>
+                    <p className="text-xs text-muted-foreground">{t("common.status")}</p>
                     <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium", sc.bg, sc.text)}>
-                      {ONBOARDING_STATUSES.find((s) => s.value === viewItem.status)?.label ?? viewItem.status}
+                      {estado(viewItem.status)}
                     </span>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">Progreso</p>
+                    <p className="text-xs text-muted-foreground">{t("hrg.progress")}</p>
                     <div className="flex items-center gap-2 mt-1">
                       <Progress value={progress} className="h-2 flex-1" />
                       <span className="text-xs">{progress}%</span>
@@ -448,7 +456,7 @@ export default function HROnboarding() {
                   </div>
                 </div>
                 {viewItem.notes && (
-                  <div><p className="text-xs text-muted-foreground">Notas</p><p className="whitespace-pre-wrap">{viewItem.notes}</p></div>
+                  <div><p className="text-xs text-muted-foreground">{t("hrg.notes")}</p><p className="whitespace-pre-wrap">{viewItem.notes}</p></div>
                 )}
               </div>
             );
@@ -459,27 +467,27 @@ export default function HROnboarding() {
       {/* ── Edit Modal ────────────────────────────────────────────────────── */}
       <Dialog open={!!editItem} onOpenChange={() => setEditItem(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Editar Onboarding</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t("hrg.onb.editTitle")}</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <Label>Empleado</Label>
+              <Label>{t("hrg.employee")}</Label>
               <Input value={editItem ? `${editItem.employees?.first_name} ${editItem.employees?.last_name}` : ""} disabled />
             </div>
             <div className="space-y-1.5">
-              <Label>Estado</Label>
+              <Label>{t("common.status")}</Label>
               <Select value={editForm.status} onValueChange={(v) => setEditForm((f) => ({ ...f, status: v }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{ONBOARDING_STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
+                <SelectContent>{ONBOARDING_STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{t(s.label)}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Notas</Label>
+              <Label>{t("hrg.notes")}</Label>
               <Textarea rows={3} value={editForm.notes} onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))} />
             </div>
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setEditItem(null)}>Cancelar</Button>
+              <Button variant="outline" onClick={() => setEditItem(null)}>{t("common.cancel")}</Button>
               <Button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending}>
-                {updateMutation.isPending ? "Guardando..." : "Guardar Cambios"}
+                {updateMutation.isPending ? t("hrg.saving") : t("hrg.saveChanges")}
               </Button>
             </div>
           </div>
@@ -490,15 +498,18 @@ export default function HROnboarding() {
       <AlertDialog open={!!deleteItem} onOpenChange={() => setDeleteItem(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar onboarding?</AlertDialogTitle>
+            <AlertDialogTitle>{t("hrg.onb.deleteTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Se eliminará permanentemente el onboarding de <strong>{deleteItem?.employees?.first_name} {deleteItem?.employees?.last_name}</strong> y todas sus tareas. Esta acción no se puede deshacer.
+              <ConFormato
+                texto={t("hrg.onb.deleteBody")}
+                piezas={{ name: <strong>{deleteItem?.employees?.first_name} {deleteItem?.employees?.last_name}</strong> }}
+              />
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel />
             <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => deleteItem && deleteMutation.mutate(deleteItem.id)}>
-              {deleteMutation.isPending ? "Eliminando..." : "Eliminar"}
+              {deleteMutation.isPending ? t("hrg.deleting") : t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -507,12 +518,13 @@ export default function HROnboarding() {
       <KpiDetailDialog
         open={kpiPopup !== null}
         onOpenChange={(o) => !o && setKpiPopup(null)}
+        emptyText={t("hrg.noRecordsToShow")}
         title={(() => {
           switch (kpiPopup) {
-            case "total": return `Total Onboarding — ${onboardings.length}`;
-            case "pending": return `Pendientes — ${totalPending}`;
-            case "inProgress": return `En Progreso — ${totalInProgress}`;
-            case "completed": return `Completados — ${totalCompleted}`;
+            case "total": return t("hrg.kpiTitle", { label: t("hrg.onb.kpi.total"), value: onboardings.length });
+            case "pending": return t("hrg.kpiTitle", { label: t("common.pendingPl"), value: totalPending });
+            case "inProgress": return t("hrg.kpiTitle", { label: t("hrg.opt.trainStatus.in_progress"), value: totalInProgress });
+            case "completed": return t("hrg.kpiTitle", { label: t("hrg.completedPl"), value: totalCompleted });
             default: return "";
           }
         })()}
@@ -525,9 +537,9 @@ export default function HROnboarding() {
           const tone = (status: string): KpiRow["rightTone"] =>
             status === "completed" ? "success" : status === "in_progress" ? "warning" : "default";
           return list.slice(0, 100).map((o: any): KpiRow => ({
-            primary: o.employees ? `${o.employees.first_name ?? ""} ${o.employees.last_name ?? ""}`.trim() : "Sin nombre",
+            primary: o.employees ? `${o.employees.first_name ?? ""} ${o.employees.last_name ?? ""}`.trim() : t("hrg.noName"),
             secondary: o.position ?? o.start_date ? format(new Date(o.start_date), "dd MMM yyyy") : undefined,
-            right: o.status ?? "—",
+            right: o.status ? estado(o.status) : "—",
             rightTone: tone(o.status ?? ""),
           }));
         })()}

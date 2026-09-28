@@ -22,37 +22,44 @@ import { format } from "date-fns";
 import { EMPLOYEE_STATUS_OPTIONS, CONTRACT_TYPES, WORK_MODALITIES } from "@/lib/hrConstants";
 import { useAuth } from "@/hooks/useAuth";
 import { PageHeader } from "@/components/ui/page-header";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
+import { ConFormato } from "@/pages/admin/ConFormato";
+import { etiquetaHrO } from "./etiquetasHr";
 
 /* ── KPI Cards ── usan StatChip del reskin */
-const kpiCards = [
-  { label: "Total Activos", subtitle: "En operación", icon: UserCheck, key: "active" as const, color: "bg-success" },
-  { label: "Remotos", subtitle: "Trabajo remoto", icon: Wifi, key: "remote" as const, color: "bg-primary" },
-  { label: "Híbridos", subtitle: "Modalidad híbrida", icon: Laptop, key: "hybrid" as const, color: "bg-warning" },
-  { label: "Presenciales", subtitle: "En oficina", icon: Building2, key: "onsite" as const, color: "bg-primary" },
+const kpiCards: { label: TranslationKey; subtitle: TranslationKey; icon: typeof UserCheck; key: "active" | "remote" | "hybrid" | "onsite"; color: string }[] = [
+  { label: "hrg.dir.kpi.active", subtitle: "hrg.dir.kpi.activeHint", icon: UserCheck, key: "active", color: "bg-success" },
+  { label: "hrg.dir.kpi.remote", subtitle: "hrg.dir.kpi.remoteHint", icon: Wifi, key: "remote", color: "bg-primary" },
+  { label: "hrg.dir.kpi.hybrid", subtitle: "hrg.dir.kpi.hybridHint", icon: Laptop, key: "hybrid", color: "bg-warning" },
+  { label: "hrg.dir.kpi.onsite", subtitle: "hrg.dir.kpi.onsiteHint", icon: Building2, key: "onsite", color: "bg-primary" },
 ];
 
-const MODALITY_BADGE: Record<string, { label: string; variant: "default" | "secondary" | "outline" }> = {
-  remoto: { label: "Remoto", variant: "default" },
-  hibrido: { label: "Híbrido", variant: "secondary" },
-  presencial: { label: "Presencial", variant: "outline" },
+// La modalidad guardada (employees.work_modality) → cómo se pinta el badge. La
+// etiqueta sale de etiquetasHr.
+const MODALITY_BADGE: Record<string, "default" | "secondary" | "outline"> = {
+  remoto: "default",
+  hibrido: "secondary",
+  presencial: "outline",
 };
 
 /* ── Directory Table ── */
 function DirectoryTable({ employees, isLoading, navigate, onDelete, onChangeStatus }: { employees: any[]; isLoading: boolean; navigate: any; onDelete: (id: string) => void; onChangeStatus: (emp: any) => void }) {
+  const { t } = useLanguage();
   return (
     <div className="border rounded-lg overflow-hidden">
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Empleado</TableHead>
-            <TableHead>Código</TableHead>
-            <TableHead>Departamento</TableHead>
-            <TableHead>Cargo</TableHead>
-            <TableHead>Modalidad</TableHead>
-            <TableHead>Contrato</TableHead>
-            <TableHead>Ingreso</TableHead>
-            <TableHead>Estado</TableHead>
-            <TableHead className="w-28">Acciones</TableHead>
+            <TableHead>{t("hrg.employee")}</TableHead>
+            <TableHead>{t("common.code")}</TableHead>
+            <TableHead>{t("hrg.department")}</TableHead>
+            <TableHead>{t("hrg.opt.histField.position_id")}</TableHead>
+            <TableHead>{t("hrg.dir.modality")}</TableHead>
+            <TableHead>{t("hrg.dir.contract")}</TableHead>
+            <TableHead>{t("hrg.dir.hired")}</TableHead>
+            <TableHead>{t("common.status")}</TableHead>
+            <TableHead className="w-28">{t("common.actions")}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -66,11 +73,11 @@ function DirectoryTable({ employees, isLoading, navigate, onDelete, onChangeStat
             ))
           ) : employees.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={9} className="text-center text-muted-foreground py-12">No se encontraron empleados</TableCell>
+              <TableCell colSpan={9} className="text-center text-muted-foreground py-12">{t("hrg.dir.empty")}</TableCell>
             </TableRow>
           ) : (
             employees.map((emp) => {
-              const mod = MODALITY_BADGE[emp.work_modality] ?? { label: emp.work_modality ?? "—", variant: "outline" as const };
+              const mod = { label: etiquetaHrO(t, "modality", emp.work_modality), variant: MODALITY_BADGE[emp.work_modality] ?? "outline" };
               return (
                 <TableRow key={emp.id} className="cursor-pointer" onClick={() => navigate(`/hr/empleado/${emp.id}`)}>
                   <TableCell>
@@ -92,21 +99,21 @@ function DirectoryTable({ employees, isLoading, navigate, onDelete, onChangeStat
                   <TableCell><EmployeeAreaBadge departmentName={emp.departments?.name} departmentCode={emp.departments?.code} /></TableCell>
                   <TableCell className="text-sm">{emp.positions?.name ?? "—"}</TableCell>
                   <TableCell><Badge variant={mod.variant}>{mod.label}</Badge></TableCell>
-                  <TableCell className="text-xs capitalize">{CONTRACT_TYPES.find(c => c.value === emp.contract_type)?.label ?? emp.contract_type ?? "—"}</TableCell>
+                  <TableCell className="text-xs capitalize">{etiquetaHrO(t, "contract", emp.contract_type)}</TableCell>
                   <TableCell className="text-xs">{emp.hire_date ? format(new Date(emp.hire_date), "dd/MM/yyyy") : "—"}</TableCell>
                   <TableCell><EmployeeStatusBadge status={emp.status} /></TableCell>
                   <TableCell onClick={(e) => e.stopPropagation()}>
                     <div className="flex gap-1">
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => navigate(`/hr/empleado/${emp.id}`)}>
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => navigate(`/hr/empleado/${emp.id}`)} aria-label={t("common.view")}>
                         <Eye className="h-3.5 w-3.5" />
                       </Button>
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => navigate(`/hr/empleado/${emp.id}`)}>
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => navigate(`/hr/empleado/${emp.id}`)} aria-label={t("common.edit")}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => onChangeStatus(emp)}>
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => onChangeStatus(emp)} aria-label={t("hrg.dir.changeStatus")}>
                         <RefreshCw className="h-3.5 w-3.5" />
                       </Button>
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive hover:text-destructive" onClick={() => onDelete(emp.id)}>
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive hover:text-destructive" onClick={() => onDelete(emp.id)} aria-label={t("common.delete")}>
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
@@ -123,17 +130,18 @@ function DirectoryTable({ employees, isLoading, navigate, onDelete, onChangeStat
 
 /* ── Directory Grid ── */
 function DirectoryGrid({ employees, isLoading, navigate, onDelete }: { employees: any[]; isLoading: boolean; navigate: any; onDelete: (id: string) => void }) {
+  const { t } = useLanguage();
   if (isLoading) return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
       {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-44 rounded-lg" />)}
     </div>
   );
-  if (employees.length === 0) return <div className="text-center text-muted-foreground py-12">No se encontraron empleados</div>;
+  if (employees.length === 0) return <div className="text-center text-muted-foreground py-12">{t("hrg.dir.empty")}</div>;
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
       {employees.map((emp) => {
-        const mod = MODALITY_BADGE[emp.work_modality] ?? { label: emp.work_modality ?? "—", variant: "outline" as const };
+        const mod = { label: etiquetaHrO(t, "modality", emp.work_modality), variant: MODALITY_BADGE[emp.work_modality] ?? "outline" };
         return (
           <Card key={emp.id} className="cursor-pointer hover:border-primary/40 transition-colors" onClick={() => navigate(`/hr/empleado/${emp.id}`)}>
             <CardContent className="p-4 space-y-3">
@@ -155,7 +163,7 @@ function DirectoryGrid({ employees, isLoading, navigate, onDelete }: { employees
                   <EmployeeAreaBadge departmentName={emp.departments?.name} departmentCode={emp.departments?.code} />
                   <Badge variant={mod.variant} className="text-xs">{mod.label}</Badge>
                 </div>
-                <p className="text-xs text-muted-foreground">{emp.positions?.name ?? "Sin cargo"}</p>
+                <p className="text-xs text-muted-foreground">{emp.positions?.name ?? t("hrg.dir.noPosition")}</p>
               </div>
               <div className="flex items-center justify-between">
                 <EmployeeStatusBadge status={emp.status} />
@@ -183,6 +191,7 @@ function ChangeStatusModal({ employee, open, onClose }: { employee: any; open: b
   const updateEmployee = useUpdateEmployee();
   const createHistory = useCreateEmployeeHistory();
   const { user } = useAuth();
+  const { t } = useLanguage();
 
   const handleSubmit = async () => {
     if (!newStatus || !reason.trim() || !employee) return;
@@ -205,32 +214,32 @@ function ChangeStatusModal({ employee, open, onClose }: { employee: any; open: b
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Cambiar Estado</DialogTitle>
+          <DialogTitle>{t("hrg.dir.changeStatus")}</DialogTitle>
           <DialogDescription>
             {employee ? `${employee.first_name} ${employee.last_name}` : ""}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label>Nuevo Estado</Label>
+            <Label>{t("hrg.dir.newStatus")}</Label>
             <Select value={newStatus} onValueChange={setNewStatus}>
-              <SelectTrigger><SelectValue placeholder="Seleccionar estado" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder={t("hrg.dir.selectStatus")} /></SelectTrigger>
               <SelectContent>
                 {EMPLOYEE_STATUS_OPTIONS.filter(s => s.value !== employee?.status).map(s => (
-                  <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                  <SelectItem key={s.value} value={s.value}>{etiquetaHrO(t, "empStatus", s.value)}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>Motivo <span className="text-destructive">*</span></Label>
-            <Textarea placeholder="Motivo del cambio de estado..." value={reason} onChange={(e) => setReason(e.target.value)} />
+            <Label>{t("hrg.dir.reason")} <span className="text-destructive">*</span></Label>
+            <Textarea placeholder={t("hrg.dir.reasonPlaceholder")} value={reason} onChange={(e) => setReason(e.target.value)} />
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button variant="outline" onClick={onClose}>{t("common.cancel")}</Button>
           <Button onClick={handleSubmit} disabled={!newStatus || !reason.trim() || updateEmployee.isPending}>
-            {updateEmployee.isPending ? "Guardando..." : "Confirmar"}
+            {updateEmployee.isPending ? t("hrg.saving") : t("common.confirm")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -241,6 +250,7 @@ function ChangeStatusModal({ employee, open, onClose }: { employee: any; open: b
 /* ── Main Page ── */
 export default function EmployeeDirectory() {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const { data: employees = [], isLoading } = useEmployees();
   const { data: departments = [] } = useDepartments();
   const deleteEmployee = useDeleteEmployee();
@@ -287,12 +297,12 @@ export default function EmployeeDirectory() {
       {/* ── Header ── */}
       <header className="bg-background/30 backdrop-blur-xl px-6 pt-6 pb-4 border-b border-white/10 shrink-0">
         <PageHeader
-          title="Empleados Activos"
-          subtitle={`Hub de gestión del equipo activo · ${activeEmps.length} activos de ${employees.length} total`}
+          title={t("hrg.dir.title")}
+          subtitle={t("hrg.dir.subtitle", { active: activeEmps.length, total: employees.length })}
           actions={
             <Button onClick={() => navigate("/hr/empleado/nuevo")}>
               <Plus className="h-4 w-4 mr-2" />
-              Nuevo Empleado
+              {t("hrg.dir.new")}
             </Button>
           }
         />
@@ -303,13 +313,13 @@ export default function EmployeeDirectory() {
         {/* KPI Cards — clickeables, abren modal con la lista filtrada */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {kpiCards.map((card) => (
-            <StatChip key={card.key} label={card.label} value={kpiValues[card.key]} icon={<card.icon className="h-3.5 w-3.5" />} color={card.color} hint={card.subtitle} onClick={() => setKpiPopup(card.key)} />
+            <StatChip key={card.key} label={t(card.label)} value={kpiValues[card.key]} icon={<card.icon className="h-3.5 w-3.5" />} color={card.color} hint={t(card.subtitle)} onClick={() => setKpiPopup(card.key)} />
           ))}
         </div>
 
         {/* Department tab bar */}
         <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1 flex-wrap">
-          <Button variant={!deptFilter ? "secondary" : "ghost"} size="sm" className="text-sm" onClick={() => setDeptFilter("")}>Todos</Button>
+          <Button variant={!deptFilter ? "secondary" : "ghost"} size="sm" className="text-sm" onClick={() => setDeptFilter("")}>{t("common.all")}</Button>
           {departments.map((d) => (
             <Button key={d.id} variant={deptFilter === d.id ? "secondary" : "ghost"} size="sm" className="text-sm" onClick={() => setDeptFilter(deptFilter === d.id ? "" : d.id)}>
               {d.name}
@@ -321,41 +331,41 @@ export default function EmployeeDirectory() {
         <div className="flex flex-wrap gap-3 items-center">
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Buscar por nombre, código o email..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
+            <Input placeholder={t("hrg.dir.searchPlaceholder")} className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
           <Select value={statusFilter || undefined} onValueChange={(v) => setStatusFilter(v === "__all__" ? "" : v)}>
-            <SelectTrigger className="w-36"><SelectValue placeholder="Estado" /></SelectTrigger>
+            <SelectTrigger className="w-36"><SelectValue placeholder={t("common.status")} /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="__all__">Todos</SelectItem>
-              {EMPLOYEE_STATUS_OPTIONS.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+              <SelectItem value="__all__">{t("common.all")}</SelectItem>
+              {EMPLOYEE_STATUS_OPTIONS.map(s => <SelectItem key={s.value} value={s.value}>{etiquetaHrO(t, "empStatus", s.value)}</SelectItem>)}
             </SelectContent>
           </Select>
           <Select value={modalityFilter || undefined} onValueChange={(v) => setModalityFilter(v === "__all__" ? "" : v)}>
-            <SelectTrigger className="w-36"><SelectValue placeholder="Modalidad" /></SelectTrigger>
+            <SelectTrigger className="w-36"><SelectValue placeholder={t("hrg.dir.modality")} /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="__all__">Todas</SelectItem>
-              {WORK_MODALITIES.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
+              <SelectItem value="__all__">{t("common.allF")}</SelectItem>
+              {WORK_MODALITIES.map(m => <SelectItem key={m.value} value={m.value}>{etiquetaHrO(t, "modality", m.value)}</SelectItem>)}
             </SelectContent>
           </Select>
           <Select value={contractFilter || undefined} onValueChange={(v) => setContractFilter(v === "__all__" ? "" : v)}>
-            <SelectTrigger className="w-40"><SelectValue placeholder="Contrato" /></SelectTrigger>
+            <SelectTrigger className="w-40"><SelectValue placeholder={t("hrg.dir.contract")} /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="__all__">Todos</SelectItem>
-              {CONTRACT_TYPES.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+              <SelectItem value="__all__">{t("common.all")}</SelectItem>
+              {CONTRACT_TYPES.map(c => <SelectItem key={c.value} value={c.value}>{etiquetaHrO(t, "contract", c.value)}</SelectItem>)}
             </SelectContent>
           </Select>
           <div className="flex gap-1 border rounded-md p-0.5">
-            <Button variant={viewMode === "table" ? "secondary" : "ghost"} size="sm" className="h-8 w-8 p-0" onClick={() => setViewMode("table")}>
+            <Button variant={viewMode === "table" ? "secondary" : "ghost"} size="sm" className="h-8 w-8 p-0" onClick={() => setViewMode("table")} aria-label={t("hrg.dir.viewTable")}>
               <LayoutList className="h-4 w-4" />
             </Button>
-            <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="sm" className="h-8 w-8 p-0" onClick={() => setViewMode("grid")}>
+            <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="sm" className="h-8 w-8 p-0" onClick={() => setViewMode("grid")} aria-label={t("hrg.dir.viewGrid")}>
               <LayoutGrid className="h-4 w-4" />
             </Button>
           </div>
         </div>
 
         {/* Results count */}
-        <p className="text-xs text-muted-foreground">{filtered.length} resultado{filtered.length !== 1 ? "s" : ""}</p>
+        <p className="text-xs text-muted-foreground">{t(filtered.length === 1 ? "hrg.dir.result" : "hrg.dir.results", { n: filtered.length })}</p>
 
         {/* Table / Grid */}
         {viewMode === "table"
@@ -368,9 +378,12 @@ export default function EmployeeDirectory() {
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar empleado?</AlertDialogTitle>
+            <AlertDialogTitle>{t("hrg.dir.deleteTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Se eliminará permanentemente a <strong>{toDelete?.first_name} {toDelete?.last_name}</strong> y todos sus registros asociados. Esta acción no se puede deshacer.
+              <ConFormato
+                texto={t("hrg.dir.deleteBody")}
+                piezas={{ name: <strong>{toDelete?.first_name} {toDelete?.last_name}</strong> }}
+              />
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -379,7 +392,7 @@ export default function EmployeeDirectory() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => { if (deleteId) { deleteEmployee.mutate(deleteId); setDeleteId(null); } }}
             >
-              Eliminar
+              {t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -391,12 +404,13 @@ export default function EmployeeDirectory() {
       <KpiDetailDialog
         open={kpiPopup !== null}
         onOpenChange={(o) => !o && setKpiPopup(null)}
+        emptyText={t("hrg.noRecordsToShow")}
         title={(() => {
           switch (kpiPopup) {
-            case "active": return `Total Activos — ${activeEmps.length}`;
-            case "remote": return `Remotos — ${totalRemote}`;
-            case "hybrid": return `Híbridos — ${totalHybrid}`;
-            case "onsite": return `Presenciales — ${totalOnsite}`;
+            case "active": return t("hrg.kpiTitle", { label: t("hrg.dir.kpi.active"), value: activeEmps.length });
+            case "remote": return t("hrg.kpiTitle", { label: t("hrg.dir.kpi.remote"), value: totalRemote });
+            case "hybrid": return t("hrg.kpiTitle", { label: t("hrg.dir.kpi.hybrid"), value: totalHybrid });
+            case "onsite": return t("hrg.kpiTitle", { label: t("hrg.dir.kpi.onsite"), value: totalOnsite });
             default: return "";
           }
         })()}
@@ -407,9 +421,9 @@ export default function EmployeeDirectory() {
           else if (kpiPopup === "hybrid") list = activeEmps.filter((e: any) => e.work_modality === "hibrido");
           else if (kpiPopup === "onsite") list = activeEmps.filter((e: any) => e.work_modality === "presencial");
           return list.slice(0, 100).map((e: any): KpiRow => ({
-            primary: `${e.first_name ?? ""} ${e.last_name ?? ""}`.trim() || e.full_name || "Sin nombre",
+            primary: `${e.first_name ?? ""} ${e.last_name ?? ""}`.trim() || e.full_name || t("hrg.noName"),
             secondary: e.position ?? e.department_name ?? undefined,
-            right: e.work_modality ?? "—",
+            right: etiquetaHrO(t, "modality", e.work_modality),
           }));
         })()}
       />

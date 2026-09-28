@@ -6,13 +6,16 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { HRPageHeader } from "@/components/hr/HRPageHeader";
-import { useHrRoster, HR_ROLE_LABEL } from "./useHrPeople";
+import { useHrRoster } from "./useHrPeople";
+import { useLanguage } from "@/hooks/useLanguage";
+import { rolHr } from "./etiquetasHr";
 
 // Roster de TODO el personal (v_hr_roster, 64) → ficha por persona. Reemplaza el viejo
 // "directorio" basado en employees (1 fila). Búsqueda + filtro por rol; click abre la ficha.
 
 export default function HRPersonnel() {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const { data: people = [], isLoading } = useHrRoster();
   const [q, setQ] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
@@ -36,8 +39,8 @@ export default function HRPersonnel() {
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <div className="shrink-0 px-6 pt-6">
         <HRPageHeader
-          title="Personal"
-          subtitle={`Ficha por persona con horas, puntualidad, costo e ingreso (Hubstaff/BLU) · ${people.length} personas`}
+          title={t("hrg.pers.title")}
+          subtitle={t("hrg.pers.subtitle", { count: people.length })}
           icon={Users}
         />
       </div>
@@ -46,13 +49,13 @@ export default function HRPersonnel() {
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <div className="relative min-w-[220px] flex-1">
             <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar persona…" className="pl-8" />
+            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("common.searchPerson")} className="pl-8" />
           </div>
           <div className="flex flex-wrap gap-1">
             {["all", ...roles].map((r) => (
               <button key={r} onClick={() => setRoleFilter(r)}
                 className={`rounded-full px-2.5 py-0.5 text-[11px] ${roleFilter === r ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70"}`}>
-                {r === "all" ? "Todos" : (HR_ROLE_LABEL[r] ?? r)}
+                {r === "all" ? t("common.all") : rolHr(t, r)}
               </button>
             ))}
           </div>
@@ -63,7 +66,7 @@ export default function HRPersonnel() {
             {Array.from({ length: 9 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-lg" />)}
           </div>
         ) : filtered.length === 0 ? (
-          <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">Sin resultados.</CardContent></Card>
+          <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">{t("common.noResults")}</CardContent></Card>
         ) : (
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {filtered.map((p) => (
@@ -75,7 +78,7 @@ export default function HRPersonnel() {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{p.name}</p>
                   <div className="flex items-center gap-1.5">
-                    <Badge variant="secondary-soft" className="text-[10px]">{HR_ROLE_LABEL[p.role] ?? p.role}</Badge>
+                    <Badge variant="secondary-soft" className="text-[10px]">{rolHr(t, p.role)}</Badge>
                     {p.in_hubstaff && (
                       <span className="inline-flex items-center gap-0.5 text-[10px] text-success">
                         <Activity className="h-3 w-3" /> Hubstaff

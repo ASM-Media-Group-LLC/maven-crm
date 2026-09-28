@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { traducir } from "@/lib/i18n";
 
 export function useEmployee(id: string | undefined) {
   return useQuery({
@@ -114,10 +115,10 @@ export function useUpdateEmployee() {
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: ["employee", id] });
       queryClient.invalidateQueries({ queryKey: ["employees"] });
-      toast({ title: "Empleado actualizado correctamente" });
+      toast({ title: traducir("hrg.emp.updated") });
     },
     onError: () => {
-      toast({ title: "Error al actualizar el empleado", variant: "destructive" });
+      toast({ title: traducir("hrg.emp.updateError"), variant: "destructive" });
     },
   });
 }
@@ -161,10 +162,10 @@ export function useCreateEmployeeHistory() {
     },
     onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ["employee-history", vars.employee_id] });
-      toast({ title: "Cambio registrado en historial" });
+      toast({ title: traducir("hrg.emp.historySaved") });
     },
     onError: () => {
-      toast({ title: "Error al registrar cambio", variant: "destructive" });
+      toast({ title: traducir("hrg.emp.historyError"), variant: "destructive" });
     },
   });
 }
