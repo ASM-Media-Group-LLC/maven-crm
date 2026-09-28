@@ -528,10 +528,39 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     onFaceStateChangeRef.current?.(faceWatch);
   }, [faceWatch]);
 
+  // ⚠️ EL BUG ERA LA LISTA DE DEPENDENCIAS.
+  //
+  // El efecto reportaba `camaraRealOn` pero su lista de dependencias miraba
+  // `localCamOn`, que es OTRA variable. Y con la pantalla compartida —que es
+  // justo cuando importa— `localCamOn` queda CLAVADO en false: la lista de
+  // participantes trae DOS recuadros para quien comparte (`tilesDeParticipante`
+  // en useLiveKit.ts) y el PRIMERO es el de la pantalla, con `isCameraOff: true`
+  // escrito a mano; el `find(p => p.isLocal)` de arriba agarra ese. Entonces la
+  // dependencia no cambiaba nunca, el efecto no se volvía a ejecutar y el
+  // `setInterval` re-mandaba cada 10 s el `camaraRealOn` que había quedado
+  // atrapado en el closure.
+  //
+  // Reportado por Maria Villegas el 28/09/2026: su cara visible en la grilla de
+  // Maven y el reloj diciendo "cámara apagada" durante 5 minutos, con el tramo
+  // empezando 3 segundos después de re-entrar a la sala. Prender y apagar la
+  // cámara no la destrababa —no cambia ninguna dependencia—; solo tocar el
+  // micrófono o dejar de compartir.
+  //
+  // ⚠️ FALLA EN LAS DOS DIRECCIONES, y por eso urge: congelado en `false` no le
+  // cuenta tiempo que trabajó; congelado en `true` le cuenta tiempo con la
+  // cámara apagada. Este reloj reemplaza a Hubstaff: mueve pago.
+  //
+  // Lo que arregla el bug son las DEPENDENCIAS: ahora miran `camaraRealOn`, que
+  // es el valor que de verdad se reporta, así que un cambio sale en el momento
+  // y no hasta 10 s después.
+  // El ref es aparte y es defensivo: hace que el repetidor lea siempre el valor
+  // vigente, así que si mañana alguien agrega un cuarto dato al aviso y se
+  // olvida de ponerlo en las dependencias, el repetidor no puede volver a
+  // quedarse pegado. Mismo patrón que `onMediaStateChangeRef` de acá arriba.
+  const mediaReportadaRef = useRef({ micOn: false, camOn: false, screenShareOn: false });
+  mediaReportadaRef.current = { micOn: localMicOn, camOn: camaraRealOn, screenShareOn: localScreenShare };
   useEffect(() => {
-    const avisar = () => onMediaStateChangeRef.current?.({
-      micOn: localMicOn, camOn: camaraRealOn, screenShareOn: localScreenShare,
-    });
+    const avisar = () => onMediaStateChangeRef.current?.(mediaReportadaRef.current);
     avisar();
     // Se repite cada 10 s aunque no cambie nada. El aviso "solo al cambiar"
     // deja a la persona invisible para el supervisor si ESE aviso se pierde
@@ -539,7 +568,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     // cualquier hueco en 10 segundos de atraso en vez de un turno entero.
     const id = window.setInterval(avisar, 10_000);
     return () => window.clearInterval(id);
-  }, [localMicOn, localCamOn, localScreenShare]);
+  }, [localMicOn, camaraRealOn, localScreenShare]);
 
   const effectiveLayout: "grid" | "sidebar" = useMemo(() => {
     if (pinnedSid) return "sidebar";
