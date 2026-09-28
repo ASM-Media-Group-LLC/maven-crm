@@ -17,7 +17,9 @@
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 import { corsFor } from "../_shared/cors.ts";
 import { ahoraMas, firmar, verificar, VENCE } from "../_shared/drive-firma.ts";
-import { armarIndice, HttpError, nombreValido, planDeSubida, TAMANO_PARTE, type ItemParaIndice } from "./logica.ts";
+import {
+  armarIndice, chequearCupo, hayLugarEnElNas, HttpError, nombreValido, planDeSubida, TAMANO_PARTE, type ItemParaIndice,
+} from "./logica.ts";
 
 Deno.serve(async (req) => {
   const CORS = corsFor(req, { "Access-Control-Allow-Methods": "POST, OPTIONS" });
@@ -73,6 +75,22 @@ Deno.serve(async (req) => {
       const { data: tenant, error: eT } = await comoLaPersona.rpc("current_tenant_id");
       if (eT || !tenant) throw new HttpError("No encontré tu agencia", 403);
 
+      // El cupo de la persona (50 GB salvo que un admin le haya puesto otro).
+      const { data: uso, error: eU } = await comoLaPersona.rpc("drive_uso");
+      if (eU) throw new HttpError(eU.message, 500);
+      const fila = (Array.isArray(uso) ? uso[0] : uso) as { usado: number; cupo: number } | undefined;
+      chequearCupo(Number(fila?.usado ?? 0), Number(fila?.cupo ?? 0), size);
+
+      // Y que haya lugar en el NAS, ANTES de crear la ficha: si no entra, que
+      // se sepa ahora y no a mitad de la subida. Si el NAS no contesta, la
+      // subida fallaría igual: mejor decirlo ya.
+      const salud = await fetch(`${nas}/salud`, { signal: AbortSignal.timeout(8000) })
+        .then((r) => r.json()).catch(() => null) as { raices?: { ok: boolean; libre?: number; total?: number }[] } | null;
+      if (!salud?.raices) throw new HttpError("El NAS no responde. Probá en unos minutos.", 503);
+      if (!hayLugarEnElNas(salud.raices, size, plan.partes > 0)) {
+        throw new HttpError("El NAS no tiene lugar para este archivo. Avisale a un admin.", 507);
+      }
+
       const id = crypto.randomUUID();
       // ⚠️ La agencia va en la RUTA física del NAS, no solo en la ficha.
       const storageKey = `${tenant}/${id}`;
@@ -89,7 +107,8 @@ Deno.serve(async (req) => {
       const up = crypto.randomUUID();
       const partes: string[] = [];
       for (let i = 0; i < plan.partes; i++) {
-        partes.push(await permisoNas({ op: "parte", k: storageKey, up, i, max: TAMANO_PARTE }, VENCE.subir));
+        // `total`: la primera parte elige disco para el archivo entero.
+        partes.push(await permisoNas({ op: "parte", k: storageKey, up, i, max: TAMANO_PARTE, total: size }, VENCE.subir));
       }
       return responder({
         id, tamano_parte: TAMANO_PARTE, partes,
