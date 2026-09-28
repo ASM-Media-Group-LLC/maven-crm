@@ -13,7 +13,8 @@ describe("el visor de adjuntos tiene UNA sola X", () => {
   });
 
   it("el visor sigue dibujando la suya, en el encabezado", () => {
-    expect(visor).toMatch(/aria-label="Cerrar"/);
+    // El texto pasa por el diccionario (i18n, ola 3): se busca la clave de «Cerrar».
+    expect(visor).toMatch(/aria-label=\{t\("common\.close"\)\}/);
   });
 
   it("⚠️ el diálogo la sigue poniendo por DEFECTO", () => {

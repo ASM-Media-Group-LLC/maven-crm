@@ -19,6 +19,7 @@ import { CompartirGrabacionDialog } from "./CompartirGrabacionDialog";
 import { invokeRecordings } from "@/hooks/useRecordings";
 import { useFormato } from "@/hooks/useFormato";
 import type { Formato } from "@/lib/formato";
+import { useLanguage } from "@/hooks/useLanguage";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
@@ -68,6 +69,7 @@ export default function GrabacionesPage() {
   } = useRecordings();
   const { isAdmin } = useUserRole();
   const f = useFormato();
+  const { t } = useLanguage();
   const [trabajando, setTrabajando] = useState<string | null>(null);
   const [viendo, setViendo] = useState<{ rec: RecordingRow; url: string } | null>(null);
   // Compartir con gente de Maven (pedido de Jhon, 09/09/2026): la lista de
@@ -87,10 +89,10 @@ export default function GrabacionesPage() {
     setTrabajando(r.id);
     try {
       await invokeRecordings("stop", { recording_id: r.id, recipients: [] });
-      toast.success("Grabación detenida", { description: "Queda en la lista en unos segundos." });
+      toast.success(t("grab.stopped"), { description: t("grab.stoppedDesc") });
       await refresh();
     } catch (e) {
-      toast.error((e as Error).message || "No se pudo detener la grabación");
+      toast.error((e as Error).message || t("grab.stopError"));
     } finally {
       setTrabajando(null);
     }
@@ -102,7 +104,7 @@ export default function GrabacionesPage() {
     try {
       setViendo({ rec: r, url: await view(r.id) });
     } catch (e) {
-      toast.error((e as Error).message || "No se pudo abrir la grabación");
+      toast.error((e as Error).message || t("grab.openError"));
     } finally {
       setTrabajando(null);
     }
@@ -113,7 +115,7 @@ export default function GrabacionesPage() {
     try {
       await download(r.id);
     } catch (e) {
-      toast.error((e as Error).message || "No se pudo generar la descarga");
+      toast.error((e as Error).message || t("grab.downloadError"));
     } finally {
       setTrabajando(null);
     }
@@ -123,9 +125,9 @@ export default function GrabacionesPage() {
     setTrabajando(r.id);
     try {
       await remove(r.id);
-      toast.success("Grabación borrada");
+      toast.success(t("grab.deleted"));
     } catch (e) {
-      toast.error((e as Error).message || "No se pudo borrar");
+      toast.error((e as Error).message || t("grab.deleteError"));
     } finally {
       setTrabajando(null);
     }
@@ -140,27 +142,27 @@ export default function GrabacionesPage() {
     <main className="flex-1 min-h-0 overflow-y-auto">
       <div className="flex w-full flex-col gap-5 p-4 md:p-6">
       <PageHeader
-        title="Grabaciones"
-        subtitle="Reuniones grabadas en Meet y Cowork"
+        title={t("nav.recordings")}
+        subtitle={t("grab.subtitle")}
         icon={<Clapperboard />}
       />
 
       {/* El espacio y el vencimiento, siempre a la vista. */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         <StatChip
-          label="Grabaciones"
+          label={t("nav.recordings")}
           value={usage ? String(usage.total_recordings) : "—"}
           color="bg-primary"
           icon={<Clapperboard className="h-3.5 w-3.5" />}
         />
         <StatChip
-          label="Espacio usado"
+          label={t("grab.spaceUsed")}
           value={usage ? formatBytes(usage.total_bytes) : "—"}
           color="bg-sky-500"
           icon={<HardDrive className="h-3.5 w-3.5" />}
         />
         <StatChip
-          label="Vencen esta semana"
+          label={t("grab.expiringThisWeek")}
           value={usage ? String(usage.expiring_next_week) : "—"}
           color={usage && usage.expiring_next_week > 0 ? "bg-warning" : "bg-muted-foreground/40"}
           icon={<Clock className="h-3.5 w-3.5" />}
@@ -174,8 +176,7 @@ export default function GrabacionesPage() {
       <div className="flex items-start gap-2 rounded-2xl border border-warning/25 bg-warning/10 px-4 py-3 text-[13px] leading-snug text-warning">
         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
         <span>
-          Toda grabación <b>se borra a los 90 días, sin excepciones</b>. Si necesitas
-          conservar una por más tiempo, descárgala a tu equipo antes de que venza.
+          {t("grab.warnBefore")}<b>{t("grab.warnBold")}</b>{t("grab.warnAfter")}
         </span>
       </div>
 
@@ -190,7 +191,7 @@ export default function GrabacionesPage() {
           <Input
             value={filtros.q}
             onChange={(e) => setFiltros({ ...filtros, q: e.target.value })}
-            placeholder="Buscar por título o sala…"
+            placeholder={t("grab.searchPlaceholder")}
             className="h-9 rounded-full pl-9 pr-9"
           />
           {filtros.q && (
@@ -198,7 +199,7 @@ export default function GrabacionesPage() {
               type="button"
               onClick={() => setFiltros({ ...filtros, q: "" })}
               className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:bg-muted"
-              aria-label="Limpiar búsqueda"
+              aria-label={t("common.clearSearch")}
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -206,24 +207,25 @@ export default function GrabacionesPage() {
         </div>
 
         <div className="flex shrink-0 items-center gap-1.5">
+          {/* `id` es el filtro que va al servidor (dato); Meet y Cowork son nombres propios. */}
           {([
-            { id: "todas", label: "Todas" },
+            { id: "todas", label: t("common.allF") },
             { id: "meet", label: "Meet" },
             { id: "cowork", label: "Cowork" },
-          ] as const).map((f) => (
+          ] as const).map((fuente) => (
             <button
-              key={f.id}
+              key={fuente.id}
               type="button"
-              onClick={() => setFiltros({ ...filtros, fuente: f.id })}
-              aria-pressed={filtros.fuente === f.id}
+              onClick={() => setFiltros({ ...filtros, fuente: fuente.id })}
+              aria-pressed={filtros.fuente === fuente.id}
               className={cn(
                 "rounded-full px-3 py-1.5 text-xs font-semibold transition-colors",
-                filtros.fuente === f.id
+                filtros.fuente === fuente.id
                   ? "bg-primary/15 text-primary"
                   : "text-muted-foreground hover:bg-muted",
               )}
             >
-              {f.label}
+              {fuente.label}
             </button>
           ))}
           <button
@@ -237,7 +239,7 @@ export default function GrabacionesPage() {
                 : "text-muted-foreground hover:bg-muted",
             )}
           >
-            Solo mías
+            {t("grab.onlyMine")}
           </button>
         </div>
       </div>
@@ -252,18 +254,18 @@ export default function GrabacionesPage() {
           // desconcertante: parece que se borraron.
           <div className="flex flex-col items-center gap-3 rounded-3xl border border-dashed border-border/70 px-6 py-10 text-center">
             <p className="text-sm text-muted-foreground">
-              Ninguna grabación coincide con lo que buscaste.
+              {t("grab.noMatch")}
             </p>
             <Button variant="outline" size="sm" className="rounded-full" onClick={() => setFiltros(FILTROS_VACIOS)}>
-              Quitar filtros
+              {t("grab.clearFilters")}
             </Button>
           </div>
         ) : (
           <EmptyState
             className="rounded-3xl border border-dashed border-border/70"
             seed="empty-grabaciones"
-            title="Todavía no hay grabaciones"
-            description="Dentro de una reunión de Meet o de una sala de Cowork verás el botón Grabar arriba a la izquierda. Al detener, eliges con quién compartirla."
+            title={t("grab.empty")}
+            description={t("grab.emptyDesc")}
           />
         )
       ) : (
@@ -274,7 +276,7 @@ export default function GrabacionesPage() {
             const mia = r.started_by === myUserId;
             const ocupado = trabajando === r.id;
             const grabador = grabadores[r.started_by];
-            const nombreGrabador = mia ? "Tú" : (grabador?.full_name || "Alguien del equipo");
+            const nombreGrabador = mia ? t("grab.you") : (grabador?.full_name || t("grab.someoneFromTeam"));
             return (
               <div key={r.id} className="flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3">
                 <div className={cn(
@@ -289,14 +291,14 @@ export default function GrabacionesPage() {
                     <span className="truncate font-semibold text-foreground">{r.title || r.room_name}</span>
                     {r.status === "recording" && (
                       <span className="flex shrink-0 items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-[11px] font-semibold text-destructive">
-                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-destructive" /> En curso
+                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-destructive" /> {t("grab.status.recording")}
                       </span>
                     )}
                     {r.status === "processing" && (
-                      <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">Procesando…</span>
+                      <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">{t("grab.status.processing")}</span>
                     )}
                     {r.status === "failed" && (
-                      <span className="shrink-0 rounded-full bg-destructive/10 px-2 py-0.5 text-[11px] font-semibold text-destructive">Falló</span>
+                      <span className="shrink-0 rounded-full bg-destructive/10 px-2 py-0.5 text-[11px] font-semibold text-destructive">{t("grab.status.failed")}</span>
                     )}
                   </div>
                   <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
@@ -309,7 +311,7 @@ export default function GrabacionesPage() {
                         <span className={cn(
                           dias <= 2 ? "font-semibold text-destructive" : dias <= 7 ? "font-medium text-warning" : "",
                         )}>
-                          {dias <= 0 ? "vence hoy" : `vence en ${dias} ${dias === 1 ? "día" : "días"}`}
+                          {dias <= 0 ? t("grab.expiresToday") : t(dias === 1 ? "grab.expiresInOne" : "grab.expiresInMany", { n: dias })}
                         </span>
                       </>
                     )}
@@ -319,7 +321,7 @@ export default function GrabacionesPage() {
                   <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground" data-testid="grabo">
                     <UserAvatar name={grabador?.full_name ?? nombreGrabador} src={grabador?.avatar_url} seed={grabador?.avatar_seed} size="xs" />
                     <span className="truncate">
-                      {r.status === "recording" ? "Está grabando" : r.status === "failed" ? "Intentó grabar" : "Grabó"}{" "}
+                      {r.status === "recording" ? t("grab.by.recording") : r.status === "failed" ? t("grab.by.failed") : t("grab.by.done")}{" "}
                       <span className="font-medium text-foreground">{nombreGrabador}</span>
                     </span>
                   </div>
@@ -339,8 +341,8 @@ export default function GrabacionesPage() {
                     <button
                       type="button"
                       className="grid h-8 w-8 place-items-center rounded-full bg-primary text-primary-foreground shadow-sm transition hover:brightness-110 disabled:opacity-50"
-                      title="Ver"
-                      aria-label="Ver grabación"
+                      title={t("common.view")}
+                      aria-label={t("grab.viewAria")}
                       disabled={ocupado}
                       onClick={() => void handleVer(r)}
                     >
@@ -351,8 +353,8 @@ export default function GrabacionesPage() {
                     <button
                       type="button"
                       className="grid h-8 w-8 place-items-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-50"
-                      title="Descargar"
-                      aria-label="Descargar grabación"
+                      title={t("common.download")}
+                      aria-label={t("grab.downloadAria")}
                       disabled={ocupado}
                       onClick={() => void handleDownload(r)}
                     >
@@ -363,8 +365,8 @@ export default function GrabacionesPage() {
                     <button
                       type="button"
                       className="grid h-8 w-8 place-items-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-50"
-                      title="Compartir con gente de Maven"
-                      aria-label="Compartir grabación"
+                      title={t("grab.shareTitle")}
+                      aria-label={t("grab.share.title")}
                       disabled={ocupado}
                       onClick={() => setCompartiendo(r)}
                     >
@@ -375,8 +377,8 @@ export default function GrabacionesPage() {
                     <button
                       type="button"
                       className="grid h-8 w-8 place-items-center rounded-full text-destructive transition hover:bg-destructive/10 disabled:opacity-50"
-                      title="Detener la grabación y guardarla hasta aquí"
-                      aria-label="Detener grabación"
+                      title={t("grab.stopTitle")}
+                      aria-label={t("grab.stop")}
                       disabled={ocupado}
                       onClick={() => setPorDetener(r)}
                     >
@@ -387,8 +389,8 @@ export default function GrabacionesPage() {
                     <button
                       type="button"
                       className="grid h-8 w-8 place-items-center rounded-full text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
-                      title="Borrar grabación"
-                      aria-label="Borrar grabación"
+                      title={t("grab.delete")}
+                      aria-label={t("grab.delete")}
                       disabled={ocupado}
                       onClick={() => setPorBorrar(r)}
                     >
@@ -408,8 +410,8 @@ export default function GrabacionesPage() {
               disabled={cargandoMas}
             >
               {cargandoMas
-                ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Cargando…</>
-                : "Cargar más"}
+                ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {t("common.loading")}</>
+                : t("grab.loadMore")}
             </Button>
           )}
         </div>
@@ -424,11 +426,10 @@ export default function GrabacionesPage() {
       <AlertDialog open={!!porBorrar} onOpenChange={(o) => { if (!o) setPorBorrar(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Borrar esta grabación?</AlertDialogTitle>
+            <AlertDialogTitle>{t("grab.deleteTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
               <b className="text-foreground">{porBorrar?.title || porBorrar?.room_name}</b>
-              {porBorrar?.started_at ? ` · ${fechaCorta(porBorrar.started_at, f)}` : ""}. El archivo se elimina ya
-              mismo, para ti y para todos con quienes esté compartida, y no se puede recuperar.
+              {porBorrar?.started_at ? ` · ${fechaCorta(porBorrar.started_at, f)}` : ""}. {t("grab.deleteDesc")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -437,7 +438,7 @@ export default function GrabacionesPage() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => { const r = porBorrar; setPorBorrar(null); if (r) void handleDelete(r); }}
             >
-              Borrar grabación
+              {t("grab.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -446,19 +447,18 @@ export default function GrabacionesPage() {
       <AlertDialog open={!!porDetener} onOpenChange={(o) => { if (!o) setPorDetener(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Detener esta grabación?</AlertDialogTitle>
+            <AlertDialogTitle>{t("grab.stopConfirmTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              <b className="text-foreground">{porDetener?.title || porDetener?.room_name}</b> queda guardada hasta este
-              momento en Grabaciones, para quien la inició. La sala sigue abierta.
+              <b className="text-foreground">{porDetener?.title || porDetener?.room_name}</b> {t("grab.stopConfirmDesc")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Seguir grabando</AlertDialogCancel>
+            <AlertDialogCancel>{t("grab.keepRecording")}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => { const r = porDetener; setPorDetener(null); if (r) void handleDetener(r); }}
             >
-              Detener grabación
+              {t("grab.stop")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -468,7 +468,7 @@ export default function GrabacionesPage() {
         <DialogContent className="max-w-4xl p-0 overflow-hidden">
           <DialogHeader className="px-4 pt-4">
             <DialogTitle className="text-base">
-              {viendo?.rec.title || (viendo?.rec.source === "cowork" ? "Sesión de Cowork" : "Reunión")}
+              {viendo?.rec.title || (viendo?.rec.source === "cowork" ? t("grab.coworkSession") : t("meet.guest.meetingFallback"))}
             </DialogTitle>
             <DialogDescription className="text-xs">
               {viendo && fechaCorta(viendo.rec.started_at, f)}
@@ -485,7 +485,8 @@ export default function GrabacionesPage() {
               playsInline
               controlsList="nodownload"
               className="w-full max-h-[70vh] bg-black"
-              onError={() => toast.error("No se pudo reproducir. Prueba descargarla.")}
+              onError={() => toast.error(t("grab.playError"))}
+
             />
           )}
         </DialogContent>

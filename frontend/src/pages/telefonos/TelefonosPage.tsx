@@ -18,6 +18,8 @@ import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
 import { Smartphone, Loader2, Play, RefreshCw, Power, Clock, LayoutDashboard, Activity, ListChecks } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
+import { useLanguage } from "@/hooks/useLanguage";
+import { traducir } from "@/lib/i18n";
 
 // Tab "Teléfonos" (Operaciones), estilo Maven (header + Tabs + KpiCards como Panel de control).
 // Subtabs Dashboard + Dispositivos (gateables por rol). El teléfono abre en una ventana flotante
@@ -66,6 +68,7 @@ const cp = (action: string, extra: Record<string, unknown> = {}) =>
 
 export default function TelefonosPage() {
   const { toast } = useToast();
+  const { t } = useLanguage();
   const { canAccess } = usePermissions();
   const canDash = canAccess("Telefonos", "Dashboard");
   const canDevices = canAccess("Telefonos", "Dispositivos");
@@ -93,9 +96,10 @@ export default function TelefonosPage() {
     setLoading(false);
     const res = data as { ok?: boolean; isAdmin?: boolean; phones?: Phone[]; error?: string } | null;
     if (error || !res?.ok) {
+      // traducir() y no t(): así `load` no cambia de identidad con el idioma (y no recarga).
       toast({
-        title: "No se pudieron cargar los teléfonos",
-        description: error?.message || res?.error || "Error desconocido",
+        title: traducir("phones.loadError"),
+        description: error?.message || res?.error || traducir("phones.unknownError"),
         variant: "destructive",
       });
       return;
@@ -136,10 +140,10 @@ export default function TelefonosPage() {
     clock.style.cssText = "font-size:12px;font-variant-numeric:tabular-nums;color:#9ca3af;min-width:38px;text-align:right";
     const extendBtn = doc.createElement("button");
     extendBtn.textContent = "+20";
-    extendBtn.title = "Extender 20 min";
+    extendBtn.title = t("phones.extend20");
     extendBtn.style.cssText = "background:#374151;color:#fff;border:0;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:12px";
     const closeBtn = doc.createElement("button");
-    closeBtn.textContent = "Cerrar";
+    closeBtn.textContent = t("common.close");
     closeBtn.style.cssText = "background:#dc2626;color:#fff;border:0;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;font-weight:600";
     right.append(clock, extendBtn, closeBtn);
     bar.append(titleEl, right);
@@ -259,7 +263,7 @@ export default function TelefonosPage() {
         pip = await PiP.requestWindow({ width: winW, height: winH });
         pip.document.body.style.cssText =
           "margin:0;height:100vh;display:flex;align-items:center;justify-content:center;background:#000;color:#9ca3af;font-family:system-ui,sans-serif;font-size:14px";
-        pip.document.body.textContent = "Iniciando teléfono…";
+        pip.document.body.textContent = t("phones.starting");
       } catch {
         pip = null;
       }
@@ -274,8 +278,8 @@ export default function TelefonosPage() {
     if (res?.inUse) {
       try { pip?.close(); } catch { /* noop */ }
       toast({
-        title: "Teléfono en uso",
-        description: `Lo está usando ${res.inUseBy ?? "otra persona"}. Espera a que lo cierre para abrirlo.`,
+        title: t("phones.inUseTitle"),
+        description: t("phones.inUseDesc", { name: res.inUseBy ?? t("phones.someoneElse") }),
         variant: "destructive",
       });
       return;
@@ -283,8 +287,8 @@ export default function TelefonosPage() {
     if (error || !res?.ok || !res.url) {
       try { pip?.close(); } catch { /* noop */ }
       toast({
-        title: "No se pudo abrir el teléfono",
-        description: error?.message || res?.error || "No llegó la URL",
+        title: t("phones.openError"),
+        description: error?.message || res?.error || t("phones.noUrl"),
         variant: "destructive",
       });
       return;
@@ -327,7 +331,7 @@ export default function TelefonosPage() {
         const n = s - 1;
         if (n === 120 && !warnedRef.current) {
           warnedRef.current = true;
-          toast({ title: "Te quedan 2 minutos", description: "Se cierra solo. Toca Extender si sigues." });
+          toast({ title: traducir("phones.twoMinLeft"), description: traducir("phones.twoMinLeftDesc") });
         }
         if (n <= 0) {
           closeRef.current();
@@ -360,7 +364,7 @@ export default function TelefonosPage() {
     });
     const res = data as { ok?: boolean; error?: string } | null;
     if (error || !res?.ok) {
-      toast({ title: "No se pudo asignar", description: error?.message || res?.error, variant: "destructive" });
+      toast({ title: t("common.errorAssigning"), description: error?.message || res?.error, variant: "destructive" });
       return;
     }
     setPhones((prev) => prev.map((x) => (x.id === p.id ? { ...x, assigned_to: userIds } : x)));
@@ -374,12 +378,12 @@ export default function TelefonosPage() {
   const Devices = (
     loading ? (
       <div className="flex items-center gap-2 text-muted-foreground">
-        <Loader2 className="h-4 w-4 animate-spin" /> Cargando…
+        <Loader2 className="h-4 w-4 animate-spin" /> {t("common.loading")}
       </div>
     ) : phones.length === 0 ? (
       <EmptyState
         seed="telefonos"
-        title={isAdmin ? "No hay teléfonos disponibles." : "No tienes teléfonos asignados todavía."}
+        title={isAdmin ? t("phones.emptyAdmin") : t("phones.emptyMine")}
       />
     ) : (
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -393,7 +397,7 @@ export default function TelefonosPage() {
                 </div>
                 {p.session ? (
                   <Badge className="bg-success hover:bg-success shrink-0">
-                    En uso{p.session.user_name ? ` · ${p.session.user_name}` : ""}
+                    {t("phones.inUse")}{p.session.user_name ? ` · ${p.session.user_name}` : ""}
                   </Badge>
                 ) : (
                   p.usecase_name && <Badge variant="secondary" className="shrink-0">{p.usecase_name}</Badge>
@@ -406,14 +410,14 @@ export default function TelefonosPage() {
                 ) : (
                   <Play className="h-4 w-4 mr-2" />
                 )}
-                Abrir
+                {t("phones.open")}
               </Button>
               {isAdmin && (
                 <div className="pt-2 border-t space-y-1.5">
-                  <div className="text-xs text-muted-foreground">Asignados (varios; uno logueado a la vez)</div>
+                  <div className="text-xs text-muted-foreground">{t("phones.assignedHelp")}</div>
                   <div className="flex flex-wrap gap-1">
                     {(p.assigned_to ?? []).length === 0 ? (
-                      <span className="text-xs italic text-muted-foreground">Sin asignar</span>
+                      <span className="text-xs italic text-muted-foreground">{t("common.unassigned")}</span>
                     ) : (
                       (p.assigned_to ?? []).filter(Boolean).map((aid) => (
                         <Badge key={aid} variant="secondary" className="gap-1 pr-1">
@@ -422,7 +426,8 @@ export default function TelefonosPage() {
                             type="button"
                             onClick={() => assign(p, (p.assigned_to ?? []).filter((x) => x !== aid))}
                             className="ml-0.5 rounded px-1 leading-none hover:bg-foreground/10"
-                            title="Quitar"
+                            title={t("phones.remove")}
+                            aria-label={t("phones.remove")}
                           >
                             ×
                           </button>
@@ -432,11 +437,11 @@ export default function TelefonosPage() {
                   </div>
                   <Select value="" onValueChange={(v) => { if (v) assign(p, [...(p.assigned_to ?? []), v]); }}>
                     <SelectTrigger className="h-8">
-                      <SelectValue placeholder="+ Agregar persona" />
+                      <SelectValue placeholder={t("phones.addPerson")} />
                     </SelectTrigger>
                     <SelectContent>
                       {users.filter((u) => !(p.assigned_to ?? []).includes(u.id)).length === 0 ? (
-                        <div className="px-2 py-1.5 text-xs text-muted-foreground">Todos asignados</div>
+                        <div className="px-2 py-1.5 text-xs text-muted-foreground">{t("phones.allAssigned")}</div>
                       ) : (
                         users
                           .filter((u) => !(p.assigned_to ?? []).includes(u.id))
@@ -460,35 +465,35 @@ export default function TelefonosPage() {
   const Dashboard = (
     <div className="space-y-4">
       <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-        <StatChip label="Teléfonos" value={phones.length} icon={<Smartphone className="h-3.5 w-3.5" />} color="bg-primary"
-          hint="Total disponibles" onClick={canDevices ? () => setTab("dispositivos") : undefined} />
-        <StatChip label="En uso ahora" value={inUseCount} icon={<Activity className="h-3.5 w-3.5" />} color="bg-success"
-          hint="Prendidos en este momento" onClick={canDevices ? () => setTab("dispositivos") : undefined} />
-        <StatChip label="Minutos" value={totalMin} icon={<Clock className="h-3.5 w-3.5" />} color="bg-primary" hint="Últimos 30 días" />
-        <StatChip label="Sesiones" value={totalSessions} icon={<ListChecks className="h-3.5 w-3.5" />} color="bg-warning" hint="Últimos 30 días" />
+        <StatChip label={t("phones.title")} value={phones.length} icon={<Smartphone className="h-3.5 w-3.5" />} color="bg-primary"
+          hint={t("phones.totalAvailable")} onClick={canDevices ? () => setTab("dispositivos") : undefined} />
+        <StatChip label={t("phones.inUseNow")} value={inUseCount} icon={<Activity className="h-3.5 w-3.5" />} color="bg-success"
+          hint={t("phones.onRightNow")} onClick={canDevices ? () => setTab("dispositivos") : undefined} />
+        <StatChip label={t("common.minutes")} value={totalMin} icon={<Clock className="h-3.5 w-3.5" />} color="bg-primary" hint={t("phones.last30")} />
+        <StatChip label={t("phones.sessions")} value={totalSessions} icon={<ListChecks className="h-3.5 w-3.5" />} color="bg-warning" hint={t("phones.last30")} />
       </div>
       <div className="grid gap-4 md:grid-cols-2">
         <Card><CardContent className="p-4">
-          <div className="text-sm font-medium mb-2">Minutos por persona (30 días)</div>
+          <div className="text-sm font-medium mb-2">{t("phones.minutesPerPerson")}</div>
           {!usage ? (
-            <div className="flex items-center gap-2 text-muted-foreground text-sm"><Loader2 className="h-4 w-4 animate-spin" /> Cargando…</div>
+            <div className="flex items-center gap-2 text-muted-foreground text-sm"><Loader2 className="h-4 w-4 animate-spin" /> {t("common.loading")}</div>
           ) : usage.byUser.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Todavía no hay uso registrado.</p>
+            <p className="text-sm text-muted-foreground">{t("phones.noUsage")}</p>
           ) : (
             <div className="space-y-1.5">
               {usage.byUser.map((u, i) => (
                 <div key={u.user_id || i} className="flex items-center justify-between text-sm">
                   <span className="truncate">{u.full_name || shortId(u.user_id)}</span>
-                  <span className="text-muted-foreground tabular-nums">{u.minutes} min · {u.sessions} ses.</span>
+                  <span className="text-muted-foreground tabular-nums">{t("phones.minSessions", { min: u.minutes, n: u.sessions })}</span>
                 </div>
               ))}
             </div>
           )}
         </CardContent></Card>
         <Card><CardContent className="p-4">
-          <div className="text-sm font-medium mb-2">Sesiones recientes</div>
+          <div className="text-sm font-medium mb-2">{t("phones.recentSessions")}</div>
           {!usage || usage.recent.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Sin sesiones recientes.</p>
+            <p className="text-sm text-muted-foreground">{t("phones.noRecentSessions")}</p>
           ) : (
             <div className="space-y-1.5">
               {usage.recent.map((r, i) => (
@@ -507,12 +512,12 @@ export default function TelefonosPage() {
   return (
     <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-5">
       <PageHeader
-        title="Teléfonos"
-        subtitle="Operá tus teléfonos asignados sin salir de Maven."
+        title={t("phones.title")}
+        subtitle={t("phones.subtitle")}
         actions={
           <Button variant="outline" size="sm" onClick={load} disabled={loading}>
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-            Actualizar
+            {t("dashboard.refresh")}
           </Button>
         }
       />
@@ -526,7 +531,7 @@ export default function TelefonosPage() {
           )}
           {canDevices && (
             <TabsTrigger value="dispositivos">
-              <Smartphone className="h-4 w-4 mr-1.5" /> Dispositivos
+              <Smartphone className="h-4 w-4 mr-1.5" /> {t("phones.devices")}
               {!loading ? ` (${phones.length})` : ""}
             </TabsTrigger>
           )}
@@ -550,9 +555,10 @@ export default function TelefonosPage() {
                   <Clock className="h-3 w-3" />
                   {fmt(secsLeft)}
                 </span>
-                <Button variant="ghost" size="sm" onClick={extend} className="h-7 px-2" title="Extender 20 min">+20</Button>
+                <Button variant="ghost" size="sm" onClick={extend} className="h-7 px-2" title={t("phones.extend20")}>+20</Button>
                 <Button variant="ghost" size="sm" onClick={close} className="h-7 px-2">
-                  <Power className="h-4 w-4 mr-1" /> Cerrar
+                  <Power className="h-4 w-4 mr-1" /> {t("common.close")}
+
                 </Button>
               </span>
             </DialogTitle>

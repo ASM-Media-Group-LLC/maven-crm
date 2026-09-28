@@ -821,7 +821,7 @@ const AdminTab = ({ canAccess, isAdmin }: { canAccess: ReturnType<typeof usePerm
             to="/settings?sub=api-keys"
             icon={KeyRound}
             title="API keys"
-            description="Acceso programático de solo-lectura (creadoras y sus redes)."
+            description={t("settings.apiKeysDesc")}
           />
         )}
         {/* Panel de control vivía como entrada suelta del menú lateral; es una
@@ -830,8 +830,9 @@ const AdminTab = ({ canAccess, isAdmin }: { canAccess: ReturnType<typeof usePerm
           <Row
             to="/panel-de-control"
             icon={Gauge}
-            title="Panel de control"
-            description="Funnel operativo en tiempo real: del contacto LLG al ingreso en el CRM."
+            title={t("nav.controlPanel")}
+            description={t("settings.controlPanelDesc")}
+
           />
         )}
       </CardContent>

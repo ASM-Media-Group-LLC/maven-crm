@@ -97,6 +97,8 @@ import {
 import type { ParDeColores } from "@/lib/correo/coloresEtiqueta";
 import { asuntoDeReenvio, destinatariosRespuesta, direccionesDe, participantesDe, tieneVariosInvolucrados } from "@/lib/mailAddr";
 import { toast } from "sonner";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 
 /**
  * Correo dentro de Maven.
@@ -122,23 +124,35 @@ import { toast } from "sonner";
  *  sacarlo de ahí sería cancelar el posponer sin que nadie lo pidió. */
 const SE_VACIAN_AL_MOVER = new Set(["INBOX", "Notification", "Newsletter", "Correo no deseado", "Papelera"]);
 
-/** Nombre e ícono por carpeta. Los nombres crudos vienen del servidor. */
-const CARPETAS: Record<string, { nombre: string; icono: LucideIcon }> = {
-  INBOX: { nombre: "Recibidos", icono: Inbox },
-  Enviado: { nombre: "Enviados", icono: Send },
-  Borrador: { nombre: "Borradores", icono: PenLine },
-  "Correo no deseado": { nombre: "Spam", icono: ShieldAlert },
-  Papelera: { nombre: "Papelera", icono: Trash2 },
-  Archive: { nombre: "Archivados", icono: Archive },
-  Notification: { nombre: "Notificaciones", icono: Bell },
-  Newsletter: { nombre: "Boletines", icono: Newspaper },
-  Plantillas: { nombre: "Plantillas", icono: FileText },
-  Snoozed: { nombre: "Pospuestos", icono: Clock },
+/** Nombre e ícono por carpeta. Los nombres crudos vienen del servidor (son la
+ *  LLAVE: "Papelera", "Correo no deseado"… se comparan y viajan a la edge tal
+ *  cual); acá solo se elige cómo se muestran. Una carpeta que no está en el mapa
+ *  (una que alguien creó a mano) se muestra con su nombre. */
+const CARPETAS: Record<string, { nombre: TranslationKey; icono: LucideIcon }> = {
+  INBOX: { nombre: "mail.folder.inbox", icono: Inbox },
+  Enviado: { nombre: "mail.folder.sent", icono: Send },
+  Borrador: { nombre: "mail.folder.drafts", icono: PenLine },
+  "Correo no deseado": { nombre: "mail.folder.spam", icono: ShieldAlert },
+  Papelera: { nombre: "mail.folder.trash", icono: Trash2 },
+  Archive: { nombre: "mail.folder.archive", icono: Archive },
+  Notification: { nombre: "mail.folder.notifications", icono: Bell },
+  Newsletter: { nombre: "mail.folder.newsletters", icono: Newspaper },
+  Plantillas: { nombre: "mail.folder.templates", icono: FileText },
+  Snoozed: { nombre: "mail.folder.snoozed", icono: Clock },
 };
 
-function nombreCarpeta(f: string): string {
-  return CARPETAS[f]?.nombre ?? f;
-}
+/** El asunto que se guarda cuando un correo no trae ninguno (lo pone el
+ *  servidor y lo compara lib/mailHilos): es DATO, no se traduce. Lo que se
+ *  muestra en su lugar sí. */
+const SIN_ASUNTO = "(sin asunto)";
+
+/** Cómo se dice cada opción de posponer. `clave` es de lib/posponer. */
+const ROTULO_POSPONER: Record<string, TranslationKey> = {
+  tarde: "mail.snooze.afternoon",
+  manana: "mail.snooze.tomorrow",
+  semana: "mail.snooze.nextWeek",
+  mes: "mail.snooze.inAMonth",
+};
 
 function iconoCarpeta(f: string): LucideIcon {
   return CARPETAS[f]?.icono ?? Mail;
@@ -194,6 +208,8 @@ function FilaDetalle({ etiqueta, gente }: { etiqueta: string; gente: { nombre: s
 
 export default function CorreoPage() {
   const formatoUi = useFormato();
+  const { t } = useLanguage();
+  const nombreCarpeta = (f: string): string => (CARPETAS[f] ? t(CARPETAS[f].nombre) : f);
   const { data: buzon, isLoading: cargandoBuzon, error: errorBuzon } = useMailbox();
   const [params, setParams] = useSearchParams();
   const hayBuzon = !!buzon?.is_active;
@@ -358,15 +374,15 @@ export default function CorreoPage() {
   const masiva = useMailBulk();
   const [confirmarBorrado, setConfirmarBorrado] = useState<MailSummary[] | null>(null);
   const NOMBRE_OP: Record<OperacionMasiva, (n: number) => string> = {
-    seen: (n) => `${n} ${n === 1 ? "correo marcado" : "correos marcados"} como leído${n === 1 ? "" : "s"}`,
-    unseen: (n) => `${n} ${n === 1 ? "correo marcado" : "correos marcados"} como no leído${n === 1 ? "" : "s"}`,
-    archive: (n) => `${n} ${n === 1 ? "correo archivado" : "correos archivados"}`,
-    spam: (n) => `${n} ${n === 1 ? "correo movido" : "correos movidos"} a Spam`,
-    move: (n) => `${n} ${n === 1 ? "correo movido" : "correos movidos"}`,
-    snooze: (n) => `${n} ${n === 1 ? "correo pospuesto" : "correos pospuestos"}`,
+    seen: (n) => t(n === 1 ? "mail.bulk.seenOne" : "mail.bulk.seenMany", { n }),
+    unseen: (n) => t(n === 1 ? "mail.bulk.unseenOne" : "mail.bulk.unseenMany", { n }),
+    archive: (n) => t(n === 1 ? "mail.bulk.archivedOne" : "mail.bulk.archivedMany", { n }),
+    spam: (n) => t(n === 1 ? "mail.bulk.spamOne" : "mail.bulk.spamMany", { n }),
+    move: (n) => t(n === 1 ? "mail.bulk.movedOne" : "mail.bulk.movedMany", { n }),
+    snooze: (n) => t(n === 1 ? "mail.bulk.snoozedOne" : "mail.bulk.snoozedMany", { n }),
     delete: (n) => carpeta === "Papelera"
-      ? `${n} ${n === 1 ? "correo eliminado" : "correos eliminados"} definitivamente`
-      : `${n} ${n === 1 ? "correo movido" : "correos movidos"} a la Papelera`,
+      ? t(n === 1 ? "mail.bulk.deletedOne" : "mail.bulk.deletedMany", { n })
+      : t(n === 1 ? "mail.bulk.trashedOne" : "mail.bulk.trashedMany", { n }),
   };
   /** Pone o saca una etiqueta de lo seleccionado.
    *
@@ -383,14 +399,15 @@ export default function CorreoPage() {
     const elegidos = correos ?? items.filter((m) => seleccion.has(claveDe(m)));
     const ids = elegidos.map((m) => m.messageId).filter(Boolean) as string[];
     if (!ids.length) {
-      toast.error("Estos correos no tienen identificador: vuelve a abrir la carpeta e inténtalo.");
+      // «Estos correos no tienen identificador…»
+      toast.error(t("mail.noIdentifier"));
       return;
     }
     const sinId = elegidos.length - ids.length;
     etiquetar.mutate({ messageIds: ids, labelId, poner }, {
       onSuccess: () => {
-        toast.success(poner ? "Etiqueta puesta" : "Etiqueta quitada", {
-          description: sinId ? `${sinId} sin identificador quedaron sin etiquetar.` : undefined,
+        toast.success(poner ? t("mail.labels.applied") : t("mail.labels.removed"), {
+          description: sinId ? t("mail.labels.skippedNoId", { n: sinId }) : undefined,
         });
         if (!correos) setSeleccion(new Set());
       },
@@ -419,15 +436,16 @@ export default function CorreoPage() {
     const conId = elegidos.filter((m) => m.messageId);
     const ids = conId.map((m) => m.messageId!) as string[];
     if (!ids.length) {
-      toast.error("Estos correos no tienen identificador: vuelve a abrir la carpeta e inténtalo.");
+      toast.error(t("mail.noIdentifier"));
       return;
     }
     const sinId = elegidos.length - conId.length;
     const desde = etiquetaVista;
     etiquetar.mutate({ messageIds: ids, labelId, poner: true }, {
       onSuccess: () => {
-        const aviso = (n: number) => `${n === 1 ? "Movido" : `${n} movidos`} a «${ruta}»`;
-        const detalle = sinId ? `${sinId} sin identificador se quedaron donde estaban.` : undefined;
+        const aviso = (n: number) =>
+          n === 1 ? t("mail.moved.one", { name: ruta }) : t("mail.moved.many", { n, name: ruta });
+        const detalle = sinId ? t("mail.moved.skippedNoId", { n: sinId }) : undefined;
         if (desde) {
           if (desde !== labelId) etiquetar.mutate({ messageIds: ids, labelId: desde, poner: false });
           toast.success(aviso(conId.length), { description: detalle });
@@ -505,11 +523,11 @@ export default function CorreoPage() {
           onSuccess: (r) => {
             toast.success((aviso ?? NOMBRE_OP[op])(delGrupo.length - (r.omitidos ?? 0)), {
               description: r.omitidos
-                ? `${r.omitidos} sin identificador: vuelve a abrir la carpeta e inténtalo.`
+                ? t("mail.bulk.skippedNoId", { n: r.omitidos })
                 : undefined,
             });
           },
-          onError: (e) => toast.error((e as Error).message || "No se pudo aplicar la acción"),
+          onError: (e) => toast.error((e as Error).message || t("mail.bulk.error")),
         },
       );
     }
@@ -527,7 +545,7 @@ export default function CorreoPage() {
         from: (m.from_addr as string) ?? "",
         to: (m.to_addr as string) ?? "",
         cc: (m.cc_addr as string) ?? undefined,
-        subject: (m.subject as string) ?? "(sin asunto)",
+        subject: (m.subject as string) ?? SIN_ASUNTO,
         date: (m.date as string) ?? "",
         snippet: (m.snippet as string) ?? "",
         messageId: (m.message_id as string) ?? undefined,
@@ -623,7 +641,7 @@ export default function CorreoPage() {
   if (errorBuzon) {
     return (
       <Aviso
-        titulo="No se pudo leer el estado de tu correo"
+        titulo={t("mail.statusError")}
         detalle={(errorBuzon as Error).message}
       />
     );
@@ -634,8 +652,8 @@ export default function CorreoPage() {
       <EmptyState
         className="mx-auto max-w-xl py-20"
         seed="empty-correo"
-        title="Todavía no tienes casilla"
-        description="Tu cuenta de correo se crea junto con tu usuario de Maven. Pídele a un administrador que la active y esta pantalla se llena sola."
+        title={t("mail.noMailbox")}
+        description={t("mail.noMailboxDesc")}
       />
     );
   }
@@ -701,7 +719,7 @@ export default function CorreoPage() {
         // decir que no entran es castigar al navegador por un límite que ya
         // se conocía. El correo se reenvía igual, sin los archivos.
         toast.warning(
-          `Los adjuntos pesan ${(pesa / 1024 / 1024).toFixed(1)} MB y el tope es 20 MB: se reenvía el texto sin ellos.`,
+          t("mail.fwd.tooBig", { mb: (pesa / 1024 / 1024).toFixed(1) }),
         );
       } else {
         try {
@@ -710,7 +728,7 @@ export default function CorreoPage() {
           });
         } catch (e) {
           // Que falle un adjunto no puede impedir reenviar el mensaje.
-          toast.error(`No se pudieron traer los adjuntos: ${(e as Error).message}`);
+          toast.error(t("mail.fwd.fetchError", { error: (e as Error).message }));
         }
       }
     }
@@ -746,7 +764,7 @@ export default function CorreoPage() {
     setRedactar({
       to: direccionesDe(m.to).join(", "),
       cc: m.cc ? direccionesDe(m.cc).join(", ") || undefined : undefined,
-      subject: m.subject === "(sin asunto)" ? "" : m.subject,
+      subject: m.subject === SIN_ASUNTO ? "" : m.subject,
       cuerpoHtml: m.html ?? undefined,
       serverDraftUid: sel.uid != null ? Number(sel.uid) : undefined,
     });
@@ -774,7 +792,7 @@ export default function CorreoPage() {
             size="icon"
             className="rounded-full md:hidden"
             onClick={() => setSel(null)}
-            aria-label="Volver a la lista"
+            aria-label={t("mail.backToList")}
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
@@ -785,14 +803,14 @@ export default function CorreoPage() {
           size="icon"
           className="hidden rounded-full hover:bg-primary/8 lg:inline-flex"
           onClick={alternarCarpetas}
-          aria-label={carpetasAbiertas ? "Ocultar las carpetas" : "Mostrar las carpetas"}
+          aria-label={carpetasAbiertas ? t("mail.hideFolders") : t("mail.showFolders")}
           aria-expanded={carpetasAbiertas}
-          title={carpetasAbiertas ? "Ocultar las carpetas" : "Mostrar las carpetas"}
+          title={carpetasAbiertas ? t("mail.hideFolders") : t("mail.showFolders")}
         >
           <PanelLeft className="h-4 w-4" />
         </Button>
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-lg font-semibold tracking-tight">Correo</h1>
+          <h1 className="truncate text-lg font-semibold tracking-tight">{t("nav.mail")}</h1>
           <p className="truncate text-xs text-muted-foreground">{buzon.email_address}</p>
         </div>
         <Button
@@ -800,8 +818,8 @@ export default function CorreoPage() {
           size="icon"
           className="rounded-full hover:bg-primary/8"
           onClick={() => setFirmaAbierta(true)}
-          aria-label="Editar firma"
-          title="Firma del correo"
+          aria-label={t("mail.editSignature")}
+          title={t("mail.sig.title")}
         >
           <Signature className="h-4 w-4" />
         </Button>
@@ -811,7 +829,7 @@ export default function CorreoPage() {
           className="rounded-full hover:bg-primary/8"
           onClick={() => lista.refetch()}
           disabled={lista.isFetching}
-          aria-label="Actualizar"
+          aria-label={t("dashboard.refresh")}
         >
           <RefreshCw className={cn("h-4 w-4", lista.isFetching && "animate-spin")} />
         </Button>
@@ -821,7 +839,7 @@ export default function CorreoPage() {
           className="rounded-full bg-gradient-to-r from-accent to-primary text-white shadow-sm transition-opacity hover:opacity-90"
         >
           <PenSquare className="h-4 w-4 sm:mr-2" />
-          <span className="hidden sm:inline">Redactar</span>
+          <span className="hidden sm:inline">{t("mail.compose")}</span>
         </Button>
       </div>
 
@@ -833,7 +851,7 @@ export default function CorreoPage() {
         )}>
           {carpetasAbiertas ? (
             <p className="px-3 pb-1 pt-2 text-xs font-semibold text-muted-foreground">
-              Carpetas
+              {t("mail.folders")}
             </p>
           ) : (
             <div className="pb-1 pt-2" aria-hidden />
@@ -853,7 +871,7 @@ export default function CorreoPage() {
               <button
                 key={f}
                 onClick={() => irACarpeta(f)}
-                title={carpetasAbiertas ? undefined : `${nombreCarpeta(f)}${unread > 0 ? ` · ${unread} sin leer` : ""}`}
+                title={carpetasAbiertas ? undefined : `${nombreCarpeta(f)}${unread > 0 ? ` · ${t("mail.nUnread", { n: unread })}` : ""}`}
                 aria-label={nombreCarpeta(f)}
                 aria-current={activa ? "page" : undefined}
                 className={cn(
@@ -952,7 +970,7 @@ export default function CorreoPage() {
                   setQueryActiva("");
                 }
               }}
-              placeholder={`Buscar en ${nombreCarpeta(carpeta)}…`}
+              placeholder={t("mail.searchIn", { folder: nombreCarpeta(carpeta) })}
               autoComplete="off"
               className="h-7 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/60"
             />
@@ -963,8 +981,8 @@ export default function CorreoPage() {
                   setBusqueda("");
                   setQueryActiva("");
                 }}
-                title="Limpiar búsqueda"
-                aria-label="Limpiar búsqueda"
+                title={t("common.clearSearch")}
+                aria-label={t("common.clearSearch")}
                 className="shrink-0 text-muted-foreground hover:text-foreground"
               >
                 <X className="h-4 w-4" />
@@ -981,23 +999,16 @@ export default function CorreoPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {carpeta === "Papelera" ? "¿Eliminar definitivamente?" : "¿Mover a la Papelera?"}
+              {carpeta === "Papelera" ? t("mail.del.foreverTitle") : t("mail.del.trashTitle")}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {carpeta === "Papelera" ? (
-                <>
-                  {confirmarBorrado?.length === 1 ? "Este correo" : `Estos ${confirmarBorrado?.length ?? 0} correos`} ya
-                  {confirmarBorrado?.length === 1 ? " está" : " están"} en la Papelera: se borran del servidor y no se pueden recuperar.
-                </>
-              ) : (
-                <>
-                  {confirmarBorrado?.length === 1 ? (
-                    <>El correo se mueve a la Papelera. Desde ahí se puede recuperar hasta que lo elimines definitivamente.</>
-                  ) : (
-                    <>Los {confirmarBorrado?.length ?? 0} correos se mueven a la Papelera. Desde ahí se pueden recuperar hasta que los elimines definitivamente.</>
-                  )}
-                </>
-              )}
+              {carpeta === "Papelera"
+                ? (confirmarBorrado?.length === 1
+                    ? t("mail.del.foreverOne")
+                    : t("mail.del.foreverMany", { n: confirmarBorrado?.length ?? 0 }))
+                : (confirmarBorrado?.length === 1
+                    ? t("mail.del.trashOne")
+                    : t("mail.del.trashMany", { n: confirmarBorrado?.length ?? 0 }))}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1006,7 +1017,7 @@ export default function CorreoPage() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => { const e = confirmarBorrado; setConfirmarBorrado(null); if (e) lanzarMasiva("delete", e); }}
             >
-              {carpeta === "Papelera" ? "Eliminar definitivamente" : "Mover a la Papelera"}
+              {carpeta === "Papelera" ? t("mail.deleteForever") : t("mail.moveToTrash")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1023,30 +1034,30 @@ export default function CorreoPage() {
                 <Checkbox
                   checked={todos ? true : algunos ? "indeterminate" : false}
                   onCheckedChange={() => setSeleccion(todos ? new Set() : new Set(items.map(claveDe)))}
-                  aria-label={todos ? "Quitar la selección" : "Seleccionar todos"}
-                  title={todos ? "Quitar la selección" : "Seleccionar todos"}
+                  aria-label={todos ? t("mail.sel.clear") : t("mail.sel.all")}
+                  title={todos ? t("mail.sel.clear") : t("mail.sel.all")}
                 />
                 {n > 0 ? (
                   <>
-                    <span className="ml-1 text-xs font-medium text-foreground">{n} {n === 1 ? "seleccionado" : "seleccionados"}</span>
+                    <span className="ml-1 text-xs font-medium text-foreground">{t(n === 1 ? "mail.sel.selectedOne" : "mail.sel.selectedMany", { n })}</span>
                     <div className="ml-1 flex items-center gap-0.5">
-                      <AccionBarra icono={MailOpen} etiqueta="Marcar como leído" onClick={() => ejecutarMasiva("seen", items)} disabled={!hayNoLeidos || masiva.isPending} />
-                      <AccionBarra icono={Mail} etiqueta="Marcar como no leído" onClick={() => ejecutarMasiva("unseen", items)} disabled={masiva.isPending} />
+                      <AccionBarra icono={MailOpen} etiqueta={t("mail.act.markRead")} onClick={() => ejecutarMasiva("seen", items)} disabled={!hayNoLeidos || masiva.isPending} />
+                      <AccionBarra icono={Mail} etiqueta={t("mail.act.markUnread")} onClick={() => ejecutarMasiva("unseen", items)} disabled={masiva.isPending} />
                       <span className="mx-1 h-4 w-px bg-border/70" />
-                      <AccionBarra icono={Archive} etiqueta="Archivar" onClick={() => ejecutarMasiva("archive", items)} disabled={masiva.isPending || carpeta === "Archive"} />
-                      <AccionBarra icono={ShieldAlert} etiqueta="Marcar como spam" onClick={() => ejecutarMasiva("spam", items)} disabled={masiva.isPending || carpeta === "Correo no deseado"} />
-                      <AccionBarra icono={Trash2} etiqueta={carpeta === "Papelera" ? "Eliminar definitivamente" : "Eliminar"} onClick={() => ejecutarMasiva("delete", items)} disabled={masiva.isPending} />
+                      <AccionBarra icono={Archive} etiqueta={t("mail.act.archive")} onClick={() => ejecutarMasiva("archive", items)} disabled={masiva.isPending || carpeta === "Archive"} />
+                      <AccionBarra icono={ShieldAlert} etiqueta={t("mail.act.markSpam")} onClick={() => ejecutarMasiva("spam", items)} disabled={masiva.isPending || carpeta === "Correo no deseado"} />
+                      <AccionBarra icono={Trash2} etiqueta={carpeta === "Papelera" ? t("mail.deleteForever") : t("common.delete")} onClick={() => ejecutarMasiva("delete", items)} disabled={masiva.isPending} />
                       <span className="mx-1 h-4 w-px bg-border/70" />
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <button
                             type="button"
-                            title="Posponer"
+                            title={t("mail.act.snooze")}
                             disabled={masiva.isPending}
                             className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
                           >
                             <Clock className="h-4 w-4" />
-                            <span className="sr-only">Posponer</span>
+                            <span className="sr-only">{t("mail.act.snooze")}</span>
                           </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="start" className="w-56">
@@ -1061,7 +1072,7 @@ export default function CorreoPage() {
                                   ejecutarMasiva("snooze", items, undefined, o.cuando!.toISOString())
                                 }
                               >
-                                <span className="flex-1">{o.rotulo}</span>
+                                <span className="flex-1">{ROTULO_POSPONER[o.clave] ? t(ROTULO_POSPONER[o.clave]) : o.rotulo}</span>
                                 <span className="ml-3 text-[10px] tabular-nums text-muted-foreground">
                                   {format(o.cuando, "d MMM HH:mm", { locale: formatoUi.fechas })}
                                 </span>
@@ -1074,12 +1085,12 @@ export default function CorreoPage() {
                         <DropdownMenuTrigger asChild>
                           <button
                             type="button"
-                            title="Mover a"
+                            title={t("mail.act.moveTo")}
                             disabled={masiva.isPending}
                             className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
                           >
                             <FolderInput className="h-4 w-4" />
-                            <span className="sr-only">Mover a</span>
+                            <span className="sr-only">{t("mail.act.moveTo")}</span>
                           </button>
                         </DropdownMenuTrigger>
                         <MenuMoverA
@@ -1095,12 +1106,12 @@ export default function CorreoPage() {
                         <DropdownMenuTrigger asChild>
                           <button
                             type="button"
-                            title="Etiquetar"
+                            title={t("mail.act.label")}
                             disabled={etiquetar.isPending}
                             className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
                           >
                             <Tag className="h-4 w-4" />
-                            <span className="sr-only">Etiquetar</span>
+                            <span className="sr-only">{t("mail.act.label")}</span>
                           </button>
                         </DropdownMenuTrigger>
                         <MenuEtiquetarComo
@@ -1117,7 +1128,7 @@ export default function CorreoPage() {
                       onClick={() => setSeleccion(new Set())}
                       className="ml-auto text-xs text-muted-foreground hover:text-foreground"
                     >
-                      Quitar selección
+                      {t("mail.sel.clearShort")}
                     </button>
                   </>
                 ) : !etiquetaVista && !enBusqueda && totalCarpeta !== undefined ? (
@@ -1133,7 +1144,7 @@ export default function CorreoPage() {
                   />
                 ) : (
                   <span className="ml-1 text-xs text-muted-foreground">
-                    {items.length} {items.length === 1 ? "correo" : "correos"}
+                    {t(items.length === 1 ? "mail.countOne" : "mail.countMany", { n: items.length })}
                   </span>
                 )}
               </div>
@@ -1154,7 +1165,7 @@ export default function CorreoPage() {
                 ))}
               {errorItems && (
                 <Aviso
-                  titulo={enBusqueda ? "No se pudo buscar" : "No se pudieron traer los mensajes"}
+                  titulo={enBusqueda ? t("mail.searchError") : t("mail.listError")}
                   detalle={(errorItems as Error).message}
                 />
               )}
@@ -1162,12 +1173,12 @@ export default function CorreoPage() {
                 enBusqueda ? (
                   <VacioSuave
                     icono={Search}
-                    texto={`No se encontró "${queryActiva}" en ${nombreCarpeta(carpeta)}.`}
+                    texto={t("mail.searchEmpty", { q: queryActiva, folder: nombreCarpeta(carpeta) })}
                   />
                 ) : (
                   <VacioSuave
                     icono={iconoCarpeta(carpeta)}
-                    texto={`No hay correos en ${nombreCarpeta(carpeta)}.`}
+                    texto={t("mail.folderEmpty", { folder: nombreCarpeta(carpeta) })}
                   />
                 )
               )}
@@ -1206,7 +1217,7 @@ export default function CorreoPage() {
                     // Mirando una etiqueta, Gmail marca con «Recibidos» lo que
                     // SIGUE en la bandeja: así se ve qué falta mover.
                     return etiquetaVista && h.mensajes.some((m) => m.folder === "INBOX")
-                      ? [{ id: "__recibidos", ruta: "Recibidos", color: null }, ...suyas]
+                      ? [{ id: "__recibidos", ruta: t("mail.folder.inbox"), color: null }, ...suyas]
                       : suyas;
                   })()}
                   // Sin leer si CUALQUIERA del hilo lo está: si no, una
@@ -1225,7 +1236,7 @@ export default function CorreoPage() {
               <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-accent/10 to-primary/10">
                 <Mail className="h-7 w-7 text-primary/70" />
               </div>
-              <p className="text-sm text-muted-foreground">Elige un correo para leerlo.</p>
+              <p className="text-sm text-muted-foreground">{t("mail.pickOne")}</p>
             </div>
           ) : mensaje.isLoading ? (
             <div className="w-full space-y-4 px-4 py-6 sm:px-6">
@@ -1241,7 +1252,7 @@ export default function CorreoPage() {
             </div>
           ) : mensaje.error ? (
             <Aviso
-              titulo="No se pudo abrir el correo"
+              titulo={t("mail.openError")}
               detalle={(mensaje.error as Error).message}
             />
           ) : mensaje.data ? (
@@ -1262,12 +1273,12 @@ export default function CorreoPage() {
                     <DropdownMenuTrigger asChild>
                       <button
                         type="button"
-                        title="Mover a"
+                        title={t("mail.act.moveTo")}
                         disabled={masiva.isPending || etiquetar.isPending}
                         className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
                       >
                         <FolderInput className="h-4 w-4" />
-                        <span className="sr-only">Mover a</span>
+                        <span className="sr-only">{t("mail.act.moveTo")}</span>
                       </button>
                     </DropdownMenuTrigger>
                     <MenuMoverA
@@ -1288,12 +1299,12 @@ export default function CorreoPage() {
                     <DropdownMenuTrigger asChild>
                       <button
                         type="button"
-                        title="Etiquetar"
+                        title={t("mail.act.label")}
                         disabled={etiquetar.isPending}
                         className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
                       >
                         <Tag className="h-4 w-4" />
-                        <span className="sr-only">Etiquetar</span>
+                        <span className="sr-only">{t("mail.act.label")}</span>
                       </button>
                     </DropdownMenuTrigger>
                     <MenuEtiquetarComo
@@ -1308,14 +1319,14 @@ export default function CorreoPage() {
 
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
                   <h2 className="text-xl font-semibold leading-snug tracking-tight sm:text-2xl">
-                    {sinPrefijos(mensaje.data.subject) || mensaje.data.subject}
+                    {asuntoVisible(sinPrefijos(mensaje.data.subject) || mensaje.data.subject, t)}
                   </h2>
                   {/* Las pastillas con × junto al asunto, como Gmail: TODAS
                       las etiquetas de la conversación (acá no se esconde
                       ninguna) y «Recibidos» si sigue en la bandeja. */}
                   {abiertoEnRecibidos.length > 0 && (
                     <PastillaEtiqueta
-                      nombre="Recibidos"
+                      nombre={t("mail.folder.inbox")}
                       color={null}
                       onQuitar={() => lanzarMasiva("archive", abiertoEnRecibidos)}
                     />
@@ -1354,10 +1365,10 @@ export default function CorreoPage() {
                       const copia = participantesDe(mensaje.data.cc ?? "");
                       const total = para.length + copia.length;
                       const resumen = para.length === 0
-                        ? "(sin destinatario)"
+                        ? t("mail.noRecipient")
                         : total === 1
                           ? (para[0].nombre || para[0].email)
-                          : `${para[0].nombre || para[0].email} y ${total - 1} más`;
+                          : t("mail.andNMore", { name: para[0].nombre || para[0].email, n: total - 1 });
                       return (
                         <>
                           <button
@@ -1366,7 +1377,7 @@ export default function CorreoPage() {
                             aria-expanded={verDestinatarios}
                             className="mt-0.5 flex max-w-full items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
                           >
-                            <span className="truncate">Para {resumen}</span>
+                            <span className="truncate">{t("mail.to")} {resumen}</span>
                             <ChevronDown
                               className={cn(
                                 "h-3 w-3 shrink-0 transition-transform",
@@ -1377,9 +1388,9 @@ export default function CorreoPage() {
 
                           {verDestinatarios && (
                             <div className="mt-2 space-y-2 rounded-xl border border-border/60 bg-muted/30 p-3 text-xs">
-                              <FilaDetalle etiqueta="De" gente={participantesDe(mensaje.data.from ?? "")} />
-                              <FilaDetalle etiqueta="Para" gente={para} />
-                              {copia.length > 0 && <FilaDetalle etiqueta="Copia" gente={copia} />}
+                              <FilaDetalle etiqueta={t("mail.from")} gente={participantesDe(mensaje.data.from ?? "")} />
+                              <FilaDetalle etiqueta={t("mail.to")} gente={para} />
+                              {copia.length > 0 && <FilaDetalle etiqueta={t("mail.cc")} gente={copia} />}
                             </div>
                           )}
                         </>
@@ -1420,10 +1431,10 @@ export default function CorreoPage() {
                             onClick={() => setAdjuntoAbierto(i)}
                             title={
                               uid == null
-                                ? "Este adjunto no se puede abrir"
+                                ? t("mail.att.cantOpen")
                                 : sePuedeVer
-                                  ? `Ver ${a.filename}`
-                                  : `${a.filename} — este tipo de archivo hay que descargarlo`
+                                  ? t("mail.att.view", { name: a.filename })
+                                  : t("mail.att.mustDownload", { name: a.filename })
                             }
                             className="inline-flex min-w-0 items-center gap-1.5 rounded-l-full py-1.5 pl-3 pr-2 disabled:cursor-not-allowed"
                           >
@@ -1443,11 +1454,11 @@ export default function CorreoPage() {
                                 { onError: (e) => toast.error((e as Error).message) },
                               )
                             }
-                            aria-label={`Descargar ${a.filename}`}
+                            aria-label={t("mail.viewer.downloadFile", { name: a.filename })}
                             title={
                               uid == null
-                                ? "No se puede descargar este adjunto"
-                                : `Descargar ${a.filename}`
+                                ? t("mail.att.cantDownload")
+                                : t("mail.viewer.downloadFile", { name: a.filename })
                             }
                             className="shrink-0 rounded-r-full border-l border-border/40 py-1.5 pl-2 pr-3 disabled:cursor-not-allowed"
                           >
@@ -1479,7 +1490,7 @@ export default function CorreoPage() {
 
                 {cargandoHilo && hiloAntes.length + hiloDespues.length === 0 && (
                   <p className="mt-4 text-xs text-muted-foreground">
-                    Buscando el resto de la conversación…
+                    {t("mail.loadingThread")}
                   </p>
                 )}
 
@@ -1498,7 +1509,7 @@ export default function CorreoPage() {
                       onClick={editarBorrador}
                     >
                       <PenLine className="mr-2 h-4 w-4" />
-                      Editar borrador
+                      {t("mail.editDraft")}
                     </Button>
                   ) : (
                     <>
@@ -1509,7 +1520,7 @@ export default function CorreoPage() {
                         onClick={responder}
                       >
                         <Reply className="mr-2 h-4 w-4" />
-                        Responder
+                        {t("common.reply")}
                       </Button>
                       {hayVariosDestinatarios && (
                         <Button
@@ -1519,7 +1530,7 @@ export default function CorreoPage() {
                           onClick={responderATodos}
                         >
                           <ReplyAll className="mr-2 h-4 w-4" />
-                          Responder a todos
+                          {t("mail.replyAll")}
                         </Button>
                       )}
                       <Button
@@ -1534,7 +1545,7 @@ export default function CorreoPage() {
                         ) : (
                           <Forward className="mr-2 h-4 w-4" />
                         )}
-                        {bajarParaReenviar.isPending ? "Trayendo adjuntos…" : "Reenviar"}
+                        {bajarParaReenviar.isPending ? t("mail.fwd.fetching") : t("mail.forward")}
                       </Button>
                     </>
                   )}
@@ -1714,6 +1725,7 @@ function FilaMensaje({
   etiquetas?: { id: string; ruta: string; color: ParDeColores | null }[];
 }) {
   const formatoUi = useFormato();
+  const { t } = useLanguage();
   // Con varios destinatarios ("a@x, b@y") se muestra el primero.
   const quien = mostrarDestinatario ? (m.to || m.from).split(",")[0] : m.from;
   const nombre = nombreDe(quien);
@@ -1731,7 +1743,7 @@ function FilaMensaje({
       <Checkbox
         checked={seleccionado}
         onCheckedChange={onToggleSeleccion}
-        aria-label={seleccionado ? "Quitar de la selección" : "Seleccionar este correo"}
+        aria-label={seleccionado ? t("mail.sel.remove") : t("mail.sel.this")}
         className={cn(
           "shrink-0 transition-opacity",
           seleccionado ? "opacity-100" : "opacity-40 group-hover:opacity-100 [@media(hover:none)]:opacity-70",
@@ -1771,7 +1783,7 @@ function FilaMensaje({
             )}
           >
             {mostrarDestinatario && (
-              <span className="font-normal text-muted-foreground">Para </span>
+              <span className="font-normal text-muted-foreground">{t("mail.to")} </span>
             )}
             {nombre}
             {/* El globo con la cantidad, como en Gmail: es lo que convierte un
@@ -1805,7 +1817,7 @@ function FilaMensaje({
               sinLeer ? "font-medium text-foreground/90" : "text-muted-foreground",
             )}
           >
-            {asuntoDelHilo || m.subject || "(sin asunto)"}
+            {asuntoVisible(asuntoDelHilo || m.subject, t)}
           </span>
         </div>
         {m.snippet ? (
@@ -1817,6 +1829,12 @@ function FilaMensaje({
     </button>
     </div>
   );
+}
+
+/** El asunto como se muestra: sin asunto (vacío o el marcador que guarda el
+ *  servidor) se dice en el idioma de quien mira. */
+function asuntoVisible(asunto: string | undefined, t: ReturnType<typeof useLanguage>["t"]): string {
+  return !asunto || asunto === SIN_ASUNTO ? t("mail.noSubject") : asunto;
 }
 
 function VacioSuave({ icono: Icono, texto }: { icono: LucideIcon; texto: string }) {
@@ -1859,16 +1877,21 @@ function Paginador({
   onAnterior?: () => void;
   onSiguiente?: () => void;
 }) {
+  const { t } = useLanguage();
+  const formatoUi = useFormato();
   const boton = "inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-30";
   return (
     <div className="ml-auto flex items-center gap-0.5">
       <span className={cn("mr-1 text-xs tabular-nums text-muted-foreground", cargando && "opacity-60")}>
-        {total === 0 ? "0" : `${desde}–${Math.max(desde, hasta)}`} de {total.toLocaleString("es")}
+        {t("mail.page.of", {
+          range: total === 0 ? "0" : `${desde}–${Math.max(desde, hasta)}`,
+          total: total.toLocaleString(formatoUi.intl("es-ES")),
+        })}
       </span>
-      <button type="button" className={boton} onClick={onAnterior} disabled={!onAnterior} aria-label="Más recientes" title="Más recientes">
+      <button type="button" className={boton} onClick={onAnterior} disabled={!onAnterior} aria-label={t("mail.page.newer")} title={t("mail.page.newer")}>
         <ChevronLeft className="h-4 w-4" />
       </button>
-      <button type="button" className={boton} onClick={onSiguiente} disabled={!onSiguiente} aria-label="Más antiguos" title="Más antiguos">
+      <button type="button" className={boton} onClick={onSiguiente} disabled={!onSiguiente} aria-label={t("mail.page.older")} title={t("mail.page.older")}>
         <ChevronRight className="h-4 w-4" />
       </button>
     </div>
@@ -1878,6 +1901,7 @@ function Paginador({
 function AccionBarra({
   icono: Icono, etiqueta, onClick, disabled, pronto,
 }: { icono: LucideIcon; etiqueta: string; onClick?: () => void; disabled?: boolean; pronto?: boolean }) {
+  const { t } = useLanguage();
   const inactivo = pronto || disabled;
   return (
     <button
@@ -1885,7 +1909,8 @@ function AccionBarra({
       onClick={inactivo ? undefined : onClick}
       disabled={inactivo}
       aria-label={etiqueta}
-      title={pronto ? `${etiqueta} · pronto` : etiqueta}
+      title={pronto ? `${etiqueta} · ${t("mail.act.soon")}` : etiqueta}
+
       className={cn(
         "grid h-8 w-8 place-items-center rounded-full text-muted-foreground transition",
         inactivo ? "cursor-not-allowed opacity-35" : "hover:bg-muted hover:text-foreground",

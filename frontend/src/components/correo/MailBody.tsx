@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { ImageOff, MoreHorizontal } from "lucide-react";
 import { partirCitado, partirCitadoTexto } from "@/lib/mailCita";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/hooks/useLanguage";
 
 /**
  * Pinta el cuerpo de un correo.
@@ -102,6 +103,7 @@ function textoPlano(t: string): string {
 }
 
 export function MailBody({ html, text, remoteImages, truncated }: Props) {
+  const { t: tr } = useLanguage();
   const [cargarRemotas, setCargarRemotas] = useState(false);
   const [verCita, setVerCita] = useState(false);
   const [alto, setAlto] = useState(160);   // provisorio: se remide con el contenido
@@ -127,10 +129,10 @@ export function MailBody({ html, text, remoteImages, truncated }: Props) {
         : (partido.propio ?? "");
     const armarTexto = () => {
       const t = verCita || !partidoTexto.citado ? text : partidoTexto.propio;
-      return t ? textoPlano(t) : "<p><em>(sin contenido)</em></p>";
+      return t ? textoPlano(t) : `<p><em>${tr("mail.body.empty")}</em></p>`;
     };
     return documento(html ? armarHtml() : armarTexto(), cargarRemotas);
-  }, [html, text, cargarRemotas, verCita, partido, partidoTexto]);
+  }, [html, text, cargarRemotas, verCita, partido, partidoTexto, tr]);
 
   // Medimos la altura del contenido para que el correo se lea de corrido, sin
   // un scroll dentro de otro scroll. Se vuelve a medir cuando cambia el
@@ -186,9 +188,9 @@ export function MailBody({ html, text, remoteImages, truncated }: Props) {
           <ImageOff className="h-4 w-4 shrink-0 text-primary/70" />
           <span className="text-muted-foreground">
             {remoteImages === 1
-              ? "Se bloqueó 1 imagen externa."
-              : `Se bloquearon ${remoteImages} imágenes externas.`}{" "}
-            Cargarlas le avisa a quien lo envió que abriste el correo.
+              ? tr("mail.body.blockedOne")
+              : tr("mail.body.blockedMany", { n: remoteImages })}{" "}
+            {tr("mail.body.blockedHint")}
           </span>
           <Button
             size="sm"
@@ -196,14 +198,14 @@ export function MailBody({ html, text, remoteImages, truncated }: Props) {
             className="ml-auto rounded-full"
             onClick={() => setCargarRemotas(true)}
           >
-            Mostrar imágenes
+            {tr("mail.body.showImages")}
           </Button>
         </div>
       )}
 
       {truncated && (
         <p className="rounded-2xl bg-warning/10 px-4 py-2.5 text-sm text-muted-foreground">
-          El correo es muy largo y se muestra recortado.
+          {tr("mail.body.truncated")}
         </p>
       )}
 
@@ -212,7 +214,7 @@ export function MailBody({ html, text, remoteImages, truncated }: Props) {
           redondeado lo integra al tema oscuro en vez de verse pegado. */}
       <iframe
         ref={ref}
-        title="Contenido del correo"
+        title={tr("mail.body.frameTitle")}
         srcDoc={srcDoc}
         sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
         referrerPolicy="no-referrer"
@@ -228,8 +230,9 @@ export function MailBody({ html, text, remoteImages, truncated }: Props) {
           type="button"
           onClick={() => setVerCita((v) => !v)}
           aria-expanded={verCita}
-          aria-label={verCita ? "Ocultar lo citado" : "Mostrar lo citado"}
-          title={verCita ? "Ocultar lo citado" : "Mostrar lo citado"}
+          aria-label={verCita ? tr("mail.body.hideQuoted") : tr("mail.body.showQuoted")}
+          title={verCita ? tr("mail.body.hideQuoted") : tr("mail.body.showQuoted")}
+
           className={cn(
             "flex h-5 items-center rounded-full bg-muted px-2 transition-colors",
             "hover:bg-muted-foreground/25",

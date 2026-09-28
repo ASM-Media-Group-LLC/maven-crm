@@ -3,6 +3,8 @@ import { BarChart3, Check, ChevronDown, Megaphone, Target, User, Users } from "l
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useRoleTier } from "@/hooks/useRoleTier";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 
 // EL TÍTULO DEL TABLERO ES UN DESPLEGABLE (para admin).
 //
@@ -16,20 +18,21 @@ import { cn } from "@/lib/utils";
 
 export type ClaveTablero = "ventas" | "equipo" | "roster" | "pipeline" | "chatter";
 
+// `clave` viaja en la URL (?ver=) y es dato; titulo/depto/detalle son claves del diccionario.
 export const TABLEROS: Array<{
   clave: ClaveTablero;
-  titulo: string;
-  depto: string;
-  detalle: string;
+  titulo: TranslationKey;
+  depto: TranslationKey;
+  detalle: TranslationKey;
   icono: typeof Users;
   /** true = la data es de la persona que mira, no del departamento. */
   personal?: boolean;
 }> = [
-  { clave: "ventas",   titulo: "Dashboard Ventas",     depto: "Dirección · Ventas",       detalle: "Ingresos de todas las creadoras y los tops del equipo", icono: BarChart3 },
-  { clave: "equipo",   titulo: "Tu equipo de chatters", depto: "Supervisión de chatters",  detalle: "Turno de hoy, cumplimiento y a quién empujar",         icono: Users },
-  { clave: "roster",   titulo: "Tu roster",            depto: "Managers de creadoras",    detalle: "Tu nota del bot, tus creadoras y su promoción",        icono: Megaphone, personal: true },
-  { clave: "pipeline", titulo: "Tu pipeline",          depto: "Closers",                  detalle: "A contactar hoy, lo cerrado y tus horas",              icono: Target,    personal: true },
-  { clave: "chatter",  titulo: "Tu día",               depto: "Chatters",                 detalle: "Turno, creadoras asignadas, nota y ventas",            icono: User,      personal: true },
+  { clave: "ventas",   titulo: "dashboard.board.sales.title",    depto: "dashboard.board.sales.dept",    detalle: "dashboard.board.sales.detail",    icono: BarChart3 },
+  { clave: "equipo",   titulo: "dashboard.board.team.title",     depto: "dashboard.board.team.dept",     detalle: "dashboard.board.team.detail",     icono: Users },
+  { clave: "roster",   titulo: "dashboard.board.roster.title",   depto: "dashboard.board.roster.dept",   detalle: "dashboard.board.roster.detail",   icono: Megaphone, personal: true },
+  { clave: "pipeline", titulo: "dashboard.board.pipeline.title", depto: "dashboard.board.pipeline.dept", detalle: "dashboard.board.pipeline.detail", icono: Target,    personal: true },
+  { clave: "chatter",  titulo: "dashboard.board.chatter.title",  depto: "dashboard.board.chatter.dept",  detalle: "dashboard.board.chatter.detail",  icono: User,      personal: true },
 ];
 
 export const tableroDe = (v: string | null): ClaveTablero | null =>
@@ -45,8 +48,9 @@ export default function SelectorDeTablero({ actual, titulo, clase }: {
 }) {
   const [params, setParams] = useSearchParams();
   const { tier } = useRoleTier();
-  const ficha = TABLEROS.find((t) => t.clave === actual);
-  const texto = titulo ?? ficha?.titulo ?? "Dashboard";
+  const { t } = useLanguage();
+  const ficha = TABLEROS.find((tab) => tab.clave === actual);
+  const texto = titulo ?? (ficha ? t(ficha.titulo) : t("dashboard.title"));
 
   const claseTitulo = clase ?? "font-display text-lg font-bold leading-tight tracking-tight";
 
@@ -71,21 +75,21 @@ export default function SelectorDeTablero({ actual, titulo, clase }: {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-80">
         <DropdownMenuLabel className="text-[11px] font-normal text-muted-foreground">
-          Ver el tablero de otro departamento
+          {t("dashboard.board.pickOther")}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        {TABLEROS.map((t) => (
-          <DropdownMenuItem key={t.clave} onClick={() => elegir(t.clave)} className="gap-2.5 py-2">
+        {TABLEROS.map((tab) => (
+          <DropdownMenuItem key={tab.clave} onClick={() => elegir(tab.clave)} className="gap-2.5 py-2">
             <span className={cn("mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg",
-              t.clave === actual ? "bg-primary/15 text-primary" : "bg-white/5 text-muted-foreground")}>
-              <t.icono className="h-3.5 w-3.5" />
+              tab.clave === actual ? "bg-primary/15 text-primary" : "bg-white/5 text-muted-foreground")}>
+              <tab.icono className="h-3.5 w-3.5" />
             </span>
             <span className="min-w-0 flex-1">
               <span className="flex items-center gap-1.5">
-                <span className="truncate text-sm font-medium">{t.depto}</span>
-                {t.clave === actual && <Check className="h-3.5 w-3.5 shrink-0 text-primary" />}
+                <span className="truncate text-sm font-medium">{t(tab.depto)}</span>
+                {tab.clave === actual && <Check className="h-3.5 w-3.5 shrink-0 text-primary" />}
               </span>
-              <span className="block text-[11px] leading-snug text-muted-foreground">{t.detalle}</span>
+              <span className="block text-[11px] leading-snug text-muted-foreground">{t(tab.detalle)}</span>
             </span>
           </DropdownMenuItem>
         ))}
@@ -94,7 +98,8 @@ export default function SelectorDeTablero({ actual, titulo, clase }: {
             la data sale de quien mira (los RPC son "cada quien ve lo suyo"), así
             que sirven para revisar la PANTALLA, no la data de otra persona. */}
         <p className="px-2 py-1.5 text-[11px] leading-snug text-muted-foreground">
-          Roster, closers y chatters son tableros personales: muestran <strong>tu</strong> data, no la de otra persona.
+          {t("dashboard.board.personalBefore")}<strong>{t("dashboard.board.personalYour")}</strong>{t("dashboard.board.personalAfter")}
+
         </p>
       </DropdownMenuContent>
     </DropdownMenu>
