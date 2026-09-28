@@ -27,3 +27,96 @@ export function planDeSubida(size: number) {
   return size <= TAMANO_PARTE ? { partes: 0 } : { partes: Math.ceil(size / TAMANO_PARTE) };
 }
 
+
+// ── El índice diario ────────────────────────────────────────────────────────
+// En el disco los archivos no tienen nombre ni carpeta (<agencia>/<id>): el
+// árbol vive solo en la base. Sin copia de seguridad (decisión de Jhon), si se
+// perdiera la base los archivos seguirían ahí pero nadie sabría cuál es cuál.
+// El índice que la mini guarda cada noche en el mismo NAS es esa llave.
+
+export interface FilaDeIndice {
+  agencia_id: string;
+  agencia: string;
+  ruta: string;
+  tipo: string;
+  nombre: string;
+  dueno: string;
+  correo_dueno: string;
+  tamano: number | null;
+  sha256: string;
+  estado: string;
+  en_papelera: boolean;
+  /** Dónde está en el disco: /Volumes/NASx/maven-drive/<esto>. */
+  archivo_en_disco: string;
+  creado: string;
+  modificado: string;
+  abierto_por_ultima_vez: string;
+}
+
+export interface ItemParaIndice {
+  id: string;
+  tenant_id: string;
+  owner_id: string | null;
+  parent_id: string | null;
+  tipo: string;
+  nombre: string;
+  size: number | null;
+  sha256: string | null;
+  storage_key: string | null;
+  estado: string;
+  trashed_at: string | null;
+  created_at: string;
+  updated_at: string;
+  last_opened_at: string | null;
+}
+
+/** Arma las filas del índice con la ruta legible de cada cosa
+ *  («Contabilidad/2026/Balance.pdf»). Una madre que no está (no debería
+ *  pasar) se marca como «(sin carpeta)» en vez de cortar la ruta en silencio;
+ *  un ciclo (lo impide un trigger) no cuelga el armado. */
+export function armarIndice(
+  items: ItemParaIndice[],
+  agencias: Map<string, string>,
+  nombres: Map<string, string>,
+  correos: Map<string, string>,
+): FilaDeIndice[] {
+  const porId = new Map(items.map((i) => [i.id, i]));
+  const rutas = new Map<string, string>();
+  const rutaDe = (i: ItemParaIndice): string => {
+    const hecha = rutas.get(i.id);
+    if (hecha !== undefined) return hecha;
+    const partes: string[] = [];
+    const vistos = new Set<string>();
+    let actual: ItemParaIndice | undefined = i;
+    while (actual && !vistos.has(actual.id) && partes.length < 60) {
+      vistos.add(actual.id);
+      partes.unshift(actual.nombre);
+      if (!actual.parent_id) break;
+      const madre = porId.get(actual.parent_id);
+      if (!madre) { partes.unshift("(sin carpeta)"); break; }
+      actual = madre;
+    }
+    const r = partes.join("/");
+    rutas.set(i.id, r);
+    return r;
+  };
+  return items
+    .map((i) => ({
+      agencia_id: i.tenant_id,
+      agencia: agencias.get(i.tenant_id) ?? "",
+      ruta: rutaDe(i),
+      tipo: i.tipo,
+      nombre: i.nombre,
+      dueno: (i.owner_id && nombres.get(i.owner_id)) || "",
+      correo_dueno: (i.owner_id && correos.get(i.owner_id)) || "",
+      tamano: i.size,
+      sha256: i.sha256 ?? "",
+      estado: i.estado,
+      en_papelera: !!i.trashed_at,
+      archivo_en_disco: i.storage_key ?? "",
+      creado: i.created_at,
+      modificado: i.updated_at,
+      abierto_por_ultima_vez: i.last_opened_at ?? "",
+    }))
+    .sort((a, b) => a.agencia_id.localeCompare(b.agencia_id) || a.ruta.localeCompare(b.ruta, "es"));
+}
