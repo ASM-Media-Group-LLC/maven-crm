@@ -18,6 +18,7 @@ import {
   type MailAttachment,
 } from "@/hooks/useMailbox";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/hooks/useLanguage";
 
 type Tipo =
   | "pdf" | "imagen" | "texto" | "convertible" | "office"
@@ -26,7 +27,7 @@ type Tipo =
 
 /** Lo que el navegador reproduce sin ayuda de nadie. Hoy no llega ni un audio
  *  ni un video al correo, pero cuando llegue no hay nada que construir: el
- *  `<audio>` y el `<video>` del navegador ya saben. */
+ *  `audio` y el `video` del navegador ya saben. */
 const AUDIO = ["mp3", "m4a", "aac", "ogg", "oga", "opus", "wav", "flac", "weba"];
 const VIDEO = ["mp4", "m4v", "webm", "ogv", "mov"];
 
@@ -138,6 +139,7 @@ export default function AdjuntoVisor({
   onDescargar,
   descargando,
 }: Props) {
+  const { t } = useLanguage();
   const abierto = indice != null && indice >= 0 && indice < adjuntos.length;
   const actual = abierto ? adjuntos[indice] : null;
   const tipo = actual ? tipoDeAdjunto(actual) : "ninguno";
@@ -234,7 +236,7 @@ export default function AdjuntoVisor({
     staleTime: Infinity,
     queryFn: async (): Promise<Uint8Array> => {
       const r = await fetch(conversion.data!);
-      if (!r.ok) throw new Error("No se pudo traer el documento convertido");
+      if (!r.ok) throw new Error(t("mail.viewer.convertedFetchError"));
       return new Uint8Array(await r.arrayBuffer());
     },
   });
@@ -276,7 +278,7 @@ export default function AdjuntoVisor({
             </DialogTitle>
             <p className="mt-0.5 text-xs text-muted-foreground">
               {pesoLegible(actual.sizeBytes)}
-              {adjuntos.length > 1 && ` · ${indice + 1} de ${adjuntos.length}`}
+              {adjuntos.length > 1 && ` · ${t("mail.viewer.nOfM", { n: indice + 1, m: adjuntos.length })}`}
             </p>
           </div>
           <Button
@@ -291,14 +293,14 @@ export default function AdjuntoVisor({
             ) : (
               <Download className="mr-2 h-4 w-4" />
             )}
-            Descargar
+            {t("common.download")}
           </Button>
           <Button
             size="icon"
             variant="ghost"
             className="h-8 w-8 shrink-0 rounded-full"
             onClick={() => onIndice(null)}
-            aria-label="Cerrar"
+            aria-label={t("common.close")}
           >
             <X className="h-4 w-4" />
           </Button>
@@ -308,8 +310,8 @@ export default function AdjuntoVisor({
           {!sePuedeVer ? (
             <Mensaje
               icono={<FileQuestion className="h-8 w-8 text-muted-foreground" />}
-              titulo="Este archivo no se puede ver aquí"
-              detalle="Se pueden ver aquí los PDF, las imágenes, el texto y los documentos de Office. Este hay que descargarlo y abrirlo con el programa que le corresponde."
+              titulo={t("mail.viewer.cantView")}
+              detalle={t("mail.viewer.cantViewDesc")}
               accion={
                 <Button
                   size="sm"
@@ -319,21 +321,21 @@ export default function AdjuntoVisor({
                   disabled={descargando}
                 >
                   <Download className="mr-2 h-4 w-4" />
-                  Descargar {actual.filename}
+                  {t("mail.viewer.downloadFile", { name: actual.filename })}
                 </Button>
               }
             />
           ) : bytes.isPending ? (
             <Mensaje
               icono={<Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />}
-              titulo="Abriendo el archivo…"
-              detalle="Se está trayendo del servidor de correo."
+              titulo={t("mail.viewer.opening")}
+              detalle={t("mail.viewer.openingDesc")}
             />
           ) : bytes.isError ? (
             <Mensaje
               icono={<FileQuestion className="h-8 w-8 text-destructive" />}
-              titulo="No se pudo abrir el archivo"
-              detalle={(bytes.error as Error)?.message || "El servidor de correo no respondió."}
+              titulo={t("mail.viewer.openError")}
+              detalle={(bytes.error as Error)?.message || t("mail.viewer.mailServerDown")}
               accion={
                 <Button
                   size="sm"
@@ -341,7 +343,7 @@ export default function AdjuntoVisor({
                   className="rounded-full"
                   onClick={() => void bytes.refetch()}
                 >
-                  Reintentar
+                  {t("common.retry")}
                 </Button>
               }
             />
@@ -379,16 +381,16 @@ export default function AdjuntoVisor({
             enOffice.isError || editorOffice.error ? (
               <Mensaje
                 icono={<FileQuestion className="h-8 w-8 text-destructive" />}
-                titulo="No se pudo abrir el documento"
+                titulo={t("oficina.doc.openError")}
                 detalle={
                   (enOffice.error as Error)?.message || editorOffice.error ||
-                  "El servidor de Oficina no respondió."
+                  t("mail.viewer.officeServerDown")
                 }
                 accion={
                   <Button size="sm" variant="outline" className="rounded-full"
                     onClick={() => onDescargar(indice)} disabled={descargando}>
                     <Download className="mr-2 h-4 w-4" />
-                    Descargar {actual.filename}
+                    {t("mail.viewer.downloadFile", { name: actual.filename })}
                   </Button>
                 }
               />
@@ -398,7 +400,7 @@ export default function AdjuntoVisor({
                   <div className="absolute inset-0 z-10 grid place-items-center bg-background">
                     <div className="flex flex-col items-center gap-3">
                       <Loader2 className="h-7 w-7 animate-spin text-muted-foreground" />
-                      <p className="text-sm text-muted-foreground">Abriendo el documento…</p>
+                      <p className="text-sm text-muted-foreground">{t("oficina.doc.opening")}</p>
                     </div>
                   </div>
                 )}
@@ -411,24 +413,24 @@ export default function AdjuntoVisor({
             ) : conversion.isError || pdfConvertido.isError ? (
               <Mensaje
                 icono={<FileQuestion className="h-8 w-8 text-destructive" />}
-                titulo="No se pudo preparar la vista"
+                titulo={t("mail.viewer.prepareError")}
                 detalle={
                   ((conversion.error ?? pdfConvertido.error) as Error)?.message ||
-                  "El conversor no respondió."
+                  t("mail.viewer.converterDown")
                 }
                 accion={
                   <Button size="sm" variant="outline" className="rounded-full"
                     onClick={() => onDescargar(indice)} disabled={descargando}>
                     <Download className="mr-2 h-4 w-4" />
-                    Descargar {actual.filename}
+                    {t("mail.viewer.downloadFile", { name: actual.filename })}
                   </Button>
                 }
               />
             ) : (
               <Mensaje
                 icono={<Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />}
-                titulo="Preparando la vista…"
-                detalle="Los documentos de Office se convierten para poder leerlos aquí. Se hace una sola vez por archivo."
+                titulo={t("mail.viewer.preparing")}
+                detalle={t("mail.viewer.preparingDesc")}
               />
             )
           ) : bytesPdf ? (
@@ -453,7 +455,7 @@ export default function AdjuntoVisor({
               onClick={() => onIndice(indice - 1)}
             >
               <ChevronLeft className="mr-1 h-4 w-4" />
-              Anterior
+              {t("common.previous")}
             </Button>
             <span className="text-xs tabular-nums text-muted-foreground">
               {indice + 1} / {adjuntos.length}
@@ -465,7 +467,7 @@ export default function AdjuntoVisor({
               disabled={!haySiguiente}
               onClick={() => onIndice(indice + 1)}
             >
-              Siguiente
+              {t("common.next")}
               <ChevronRight className="ml-1 h-4 w-4" />
             </Button>
           </footer>
@@ -476,12 +478,14 @@ export default function AdjuntoVisor({
 }
 
 function FlechaLateral({ lado, onClick }: { lado: "izq" | "der"; onClick: () => void }) {
+  const { t } = useLanguage();
   const Icono = lado === "izq" ? ChevronLeft : ChevronRight;
   return (
     <button
       type="button"
       onClick={onClick}
-      aria-label={lado === "izq" ? "Anterior" : "Siguiente"}
+      aria-label={lado === "izq" ? t("common.previous") : t("common.next")}
+
       className={cn(
         "absolute top-1/2 z-10 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full",
         "border border-border/60 bg-background/90 text-foreground shadow-sm backdrop-blur",

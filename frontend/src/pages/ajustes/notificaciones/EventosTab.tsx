@@ -10,16 +10,28 @@ import { useNotificationSettings } from "@/hooks/useNotificationSettings";
 import { usePermissions } from "@/hooks/usePermissions";
 import { CATALOGO_DE_EVENTOS, type CanalDeAviso, type ModuloDeAvisos } from "@/lib/catalogoDeEventos";
 import { urlDeTab } from "./tabs";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 
 // Qué eventos avisan y por dónde. Cada interruptor escribe una fila en
 // notification_preferences que leen el servidor (campana, push y correo) y los
 // hooks del cliente (sonido/tarjeta dentro de Maven). El catálogo dice qué
 // canales aplican a cada evento; donde un canal no existe la celda queda vacía.
-const CANALES: { canal: CanalDeAviso; label: string; icon: typeof Bell; ayuda: string }[] = [
-  { canal: "in_app", label: "En Maven", icon: Bell, ayuda: "La campana y el aviso dentro de Maven" },
-  { canal: "push", label: "Celular", icon: Smartphone, ayuda: "El teléfono, con Maven cerrada" },
-  { canal: "email", label: "Correo", icon: Mail, ayuda: "El correo de tu cuenta (viene apagado)" },
+const CANALES: { canal: CanalDeAviso; label: TranslationKey; icon: typeof Bell; ayuda: TranslationKey }[] = [
+  { canal: "in_app", label: "settings.notif.ev.inMaven", icon: Bell, ayuda: "settings.notif.ev.inMavenHelp" },
+  { canal: "push", label: "settings.notif.ev.phone", icon: Smartphone, ayuda: "settings.notif.ev.phoneHelp" },
+  { canal: "email", label: "settings.notif.ev.email", icon: Mail, ayuda: "settings.notif.ev.emailHelp" },
 ];
+
+// El nombre del módulo se GUARDA en notification_preferences.module (es dato y
+// no cambia); acá solo se elige cómo se muestra. Uno que no esté en el mapa se
+// muestra tal cual (los nombres propios: Messenger, Cowork, Closers).
+const NOMBRE_DEL_MODULO: Record<string, TranslationKey> = {
+  Correo: "settings.notif.ev.mod.mail",
+  Bandeja: "settings.notif.ev.mod.inbox",
+  Evaluador: "settings.notif.ev.mod.evaluator",
+  Creadoras: "settings.notif.ev.mod.creators",
+};
 // En Maven y Celular son opt-out; el interruptor "Todo" del módulo mueve esos
 // dos. El correo es opt-in y se prende evento por evento.
 const CANALES_DE_TODO: CanalDeAviso[] = ["in_app", "push"];
@@ -32,6 +44,8 @@ const EventosTab = () => {
   const { preferences, isLoading, upsertPreference, upsertVarias, isCanalActivo } = useNotificationPreferences();
   const { settings } = useNotificationSettings();
   const { canAccess } = usePermissions();
+  const { t } = useLanguage();
+  const nombreDe = (modulo: string) => (NOMBRE_DEL_MODULO[modulo] ? t(NOMBRE_DEL_MODULO[modulo]) : modulo);
 
   const modulos = CATALOGO_DE_EVENTOS.filter((m) => m.permiso === null || canAccess(m.permiso));
 
@@ -39,7 +53,7 @@ const EventosTab = () => {
     const columna = canal === "push" ? "channel_push" : canal === "email" ? "channel_email" : "channel_in_app";
     upsertPreference.mutate(
       { module: modulo, notification_type: type, [columna]: activo },
-      { onError: () => toast.error("No se pudo guardar la preferencia") },
+      { onError: () => toast.error(t("settings.notif.ev.couldNotSave")) },
     );
   };
 
@@ -56,8 +70,9 @@ const EventosTab = () => {
         channel_push: e.canales.includes("push") ? activo : true,
       })),
       {
-        onSuccess: () => toast.success(activo ? `${m.modulo}: avisos encendidos` : `${m.modulo}: avisos apagados`),
-        onError: () => toast.error("No se pudo guardar la preferencia"),
+        onSuccess: () =>
+          toast.success(t(activo ? "settings.notif.ev.allOn" : "settings.notif.ev.allOff", { module: nombreDe(m.modulo) })),
+        onError: () => toast.error(t("settings.notif.ev.couldNotSave")),
       },
     );
   };
@@ -66,7 +81,7 @@ const EventosTab = () => {
     return (
       <Card>
         <CardContent className="py-12 text-center text-muted-foreground text-sm">
-          No tienes acceso a módulos con avisos configurables.
+          {t("settings.notif.ev.noModules")}
         </CardContent>
       </Card>
     );
@@ -79,22 +94,22 @@ const EventosTab = () => {
     <div className="space-y-4" data-cargando={isLoading || undefined}>
       <Card className="border-border">
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Qué te avisa Maven y por dónde</CardTitle>
+          <CardTitle className="text-base">{t("settings.notif.ev.title")}</CardTitle>
           <CardDescription className="text-xs space-y-1">
             <span className="block">
               <Bell className="inline h-3 w-3 mr-1 -mt-0.5" />
-              <strong>En Maven</strong>: la campana y el aviso (sonido, tarjeta) con Maven abierta.
+              <strong>{t("settings.notif.ev.inMaven")}</strong>: {t("settings.notif.ev.inMavenLong")}
             </span>
             <span className="block">
               <Smartphone className="inline h-3 w-3 mr-1 -mt-0.5" />
-              <strong>Celular</strong>: llega al teléfono aunque Maven esté cerrada.{" "}
+              <strong>{t("settings.notif.ev.phone")}</strong>: {t("settings.notif.ev.phoneLong")}{" "}
               {settings.push_enabled ? (
-                "Lo tienes activo."
+                t("settings.notif.ev.pushOn")
               ) : (
                 <>
-                  Para que lleguen, activa el push en la pestaña{" "}
+                  {t("settings.notif.ev.pushOffBefore")}{" "}
                   <Link to={urlDeTab("canales")} className="underline underline-offset-2 hover:text-foreground">
-                    Canales
+                    {t("settings.notif.tab.channels")}
                   </Link>
                   .
                 </>
@@ -102,14 +117,14 @@ const EventosTab = () => {
             </span>
             <span className="block">
               <Mail className="inline h-3 w-3 mr-1 -mt-0.5" />
-              <strong>Correo</strong>: llega a {user?.email ?? "tu correo de Maven"}. Viene apagado en todos los
-              eventos; préndelo solo donde lo quieras.
+              <strong>{t("settings.notif.ev.email")}</strong>:{" "}
+              {t("settings.notif.ev.emailLong", { email: user?.email ?? t("settings.notif.ev.yourMavenEmail") })}
             </span>
             {(apagados > 0 || porCorreo > 0) && (
               <span className="block text-muted-foreground/80">
-                {apagados > 0 && `${apagados} ${apagados === 1 ? "aviso apagado" : "avisos apagados"}`}
+                {apagados > 0 && t(apagados === 1 ? "settings.notif.ev.offOne" : "settings.notif.ev.offMany", { n: apagados })}
                 {apagados > 0 && porCorreo > 0 && " · "}
-                {porCorreo > 0 && `${porCorreo} ${porCorreo === 1 ? "evento por correo" : "eventos por correo"}`}
+                {porCorreo > 0 && t(porCorreo === 1 ? "settings.notif.ev.byEmailOne" : "settings.notif.ev.byEmailMany", { n: porCorreo })}
                 .
               </span>
             )}
@@ -122,20 +137,20 @@ const EventosTab = () => {
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <CardTitle className="text-base">{m.modulo}</CardTitle>
+                <CardTitle className="text-base">{nombreDe(m.modulo)}</CardTitle>
                 <CardDescription className="text-xs">
-                  {m.eventos.length === 1 ? "1 evento" : `${m.eventos.length} eventos`}
+                  {m.eventos.length === 1 ? t("settings.notif.ev.oneEvent") : t("settings.notif.ev.nEvents", { n: m.eventos.length })}
                 </CardDescription>
               </div>
               <label
                 className="flex items-center gap-2 shrink-0 cursor-pointer"
-                title="Prende o apaga En Maven y Celular de todos los eventos del módulo. El correo no se toca."
+                title={t("settings.notif.ev.allHelp")}
               >
-                <span className="text-xs text-muted-foreground">Todo</span>
+                <span className="text-xs text-muted-foreground">{t("settings.notif.ev.all")}</span>
                 <Switch
                   checked={todoActivo(m)}
                   onCheckedChange={() => cambiarTodo(m)}
-                  aria-label={`Todos los avisos de ${m.modulo}`}
+                  aria-label={t("settings.notif.ev.allAria", { module: nombreDe(m.modulo) })}
                 />
               </label>
             </div>
@@ -144,11 +159,11 @@ const EventosTab = () => {
           <CardContent className="pt-3">
             <div className="grid gap-1">
               <div className={`${COLUMNAS} px-2`}>
-                <span className="text-xs font-medium text-muted-foreground">Evento</span>
+                <span className="text-xs font-medium text-muted-foreground">{t("settings.notif.ev.event")}</span>
                 {CANALES.map(({ canal, label, icon: Icon, ayuda }) => (
-                  <div key={canal} className="flex items-center justify-center gap-1" title={ayuda}>
-                    <Icon className="h-3.5 w-3.5 md:h-3 md:w-3 text-muted-foreground" aria-label={label} />
-                    <span className="hidden md:inline text-[11px] font-medium text-muted-foreground">{label}</span>
+                  <div key={canal} className="flex items-center justify-center gap-1" title={t(ayuda)}>
+                    <Icon className="h-3.5 w-3.5 md:h-3 md:w-3 text-muted-foreground" aria-label={t(label)} />
+                    <span className="hidden md:inline text-[11px] font-medium text-muted-foreground">{t(label)}</span>
                   </div>
                 ))}
               </div>
@@ -170,15 +185,16 @@ const EventosTab = () => {
                         <Switch
                           checked={isCanalActivo(e.type, canal)}
                           onCheckedChange={(v) => cambiar(m.modulo, e.type, canal, v)}
-                          aria-label={`${e.label} · ${label}`}
+                          aria-label={`${e.label} · ${t(label)}`}
                         />
                       </div>
                     ) : (
                       <div
                         key={canal}
                         className="flex justify-center text-muted-foreground/40"
-                        title="Este aviso no existe por este canal"
-                        aria-label={`${e.label} · ${label}: no aplica`}
+                        title={t("settings.notif.ev.naHelp")}
+                        aria-label={t("settings.notif.ev.naAria", { event: e.label, channel: t(label) })}
+
                       >
                         <Minus className="h-4 w-4" />
                       </div>

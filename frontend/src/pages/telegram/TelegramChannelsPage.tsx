@@ -18,6 +18,7 @@ import { ExternalLink, Radio, Inbox, Pencil, Users, Loader2, RefreshCw } from "l
 import { usePermissions } from "@/hooks/usePermissions";
 import { PageHeader } from "@/components/ui/page-header";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // Panel del gateway de Telegram (Dokploy) — ahí se vincula la cuenta (teléfono + código).
 // El gateway de Telegram se sirve por HTTP (nip.io sin TLS) — verificado en vivo.
@@ -33,6 +34,7 @@ interface TgChannelRow {
 const TelegramChannelsPage = () => {
   const { canAccess } = usePermissions();
   const { toast } = useToast();
+  const { t } = useLanguage();
   const qc = useQueryClient();
   const canEdit = canAccess("Telegram", "Cuentas");
 
@@ -51,12 +53,12 @@ const TelegramChannelsPage = () => {
       const { data, error } = await supabase.functions.invoke("tg-sync-channels", {});
       const res = data as { ok?: boolean; synced?: number; accounts?: number; error?: string } | null;
       if (error || !res?.ok) {
-        if (opts?.manual) toast({ title: "No se pudo sincronizar", description: res?.error || error?.message || "Error", variant: "destructive" });
+        if (opts?.manual) toast({ title: t("tg.ch.syncError"), description: res?.error || error?.message || t("common.error"), variant: "destructive" });
         return;
       }
       qc.invalidateQueries({ queryKey: ["tg-channels"] });
       qc.invalidateQueries({ queryKey: ["my-tg-channels"] });
-      if (opts?.manual) toast({ title: `Sincronizado: ${res.accounts} línea(s)` });
+      if (opts?.manual) toast({ title: t("tg.ch.synced", { n: res.accounts ?? 0 }) });
     } finally {
       setSyncing(false);
     }
@@ -107,11 +109,11 @@ const TelegramChannelsPage = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast({ title: "Línea actualizada" });
+      toast({ title: t("tg.ch.updated") });
       setEditing(null);
       qc.invalidateQueries({ queryKey: ["tg-channels"] });
     },
-    onError: (e: Error) => toast({ title: "No se pudo guardar", description: e.message, variant: "destructive" }),
+    onError: (e: Error) => toast({ title: t("common.couldNotSave"), description: e.message, variant: "destructive" }),
   });
 
   const filteredUsers = users.filter(
@@ -123,12 +125,12 @@ const TelegramChannelsPage = () => {
       {/* Header */}
       <PageHeader
         icon={<TelegramIcon />}
-        title="Telegram · Cuentas"
-        subtitle="Líneas del canal Telegram — vinculación y auto-asignación."
+        title={t("nav.cat.tgAccounts")}
+        subtitle={t("tg.ch.subtitle")}
         actions={
           canAccess("Telegram", "Bandeja") && (
             <Button asChild variant="ghost" size="sm" className="gap-1.5 text-xs">
-              <Link to="/telegram/bandeja"><Inbox className="h-4 w-4" /> Bandeja</Link>
+              <Link to="/telegram/bandeja"><Inbox className="h-4 w-4" /> {t("tg.ch.inbox")}</Link>
             </Button>
           )
         }
@@ -138,22 +140,21 @@ const TelegramChannelsPage = () => {
       <div className="rounded-lg border bg-card p-5 space-y-3">
         <div className="flex items-center gap-2">
           <Users className="h-4 w-4 text-telegram" />
-          <h2 className="text-sm font-semibold">Líneas y auto-asignación</h2>
+          <h2 className="text-sm font-semibold">{t("tg.ch.linesTitle")}</h2>
           {canEdit && (
-            <Button variant="ghost" size="sm" className="ml-auto h-7 gap-1.5 text-xs" disabled={syncing} onClick={() => syncChannels({ manual: true })} title="Traer las cuentas vinculadas del gateway">
-              <RefreshCw className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} /> Sincronizar
+            <Button variant="ghost" size="sm" className="ml-auto h-7 gap-1.5 text-xs" disabled={syncing} onClick={() => syncChannels({ manual: true })} title={t("tg.ch.syncHelp")}>
+              <RefreshCw className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} /> {t("tg.ch.sync")}
             </Button>
           )}
         </div>
         <p className="text-[11px] text-muted-foreground">
-          Cada conversación NUEVA de una línea se asigna automáticamente a quien marques (puedes elegir
-          varias personas) — igual que en WhatsApp. Las líneas aparecen aquí solas al recibir su primer mensaje.
+          {t("tg.ch.linesHelp")}
         </p>
         {isLoading ? (
           <div className="flex justify-center py-6 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" /></div>
         ) : channels.length === 0 ? (
           <p className="py-4 text-center text-sm text-muted-foreground">
-            Todavía no hay líneas registradas — aparecen al recibir el primer mensaje.
+            {t("tg.ch.noLines")}
           </p>
         ) : (
           <div className="divide-y rounded-md border">
@@ -168,12 +169,12 @@ const TelegramChannelsPage = () => {
                     {c.account_id}
                     {" · "}
                     {(c.default_assignees ?? []).length > 0
-                      ? `auto-asigna a ${(c.default_assignees ?? []).map(userName).join(", ")}`
-                      : "sin auto-asignación"}
+                      ? t("tg.ch.autoAssignsTo", { names: (c.default_assignees ?? []).map(userName).join(", ") })
+                      : t("tg.ch.noAutoAssign")}
                   </div>
                 </div>
                 {canEdit && (
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => openEdit(c)} title="Editar línea">
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => openEdit(c)} title={t("tg.ch.editLine")} aria-label={t("tg.ch.editLine")}>
                     <Pencil className="h-4 w-4" />
                   </Button>
                 )}
@@ -187,20 +188,18 @@ const TelegramChannelsPage = () => {
       <div className="rounded-lg border bg-card p-5 space-y-3">
         <div className="flex items-center gap-2">
           <Radio className="h-4 w-4 text-telegram" />
-          <h2 className="text-sm font-semibold">Vincular una cuenta de Telegram</h2>
+          <h2 className="text-sm font-semibold">{t("tg.ch.linkTitle")}</h2>
         </div>
         <p className="text-sm text-muted-foreground">
-          Las cuentas se vinculan en el <b>panel del gateway</b> (por <b>teléfono + código</b> que llega a la app
-          de Telegram). Son cuentas de usuario (MTProto) multi-línea: pueden conversar y unirse a canales.
+          {t("tg.ch.linkP1")}<b>{t("tg.ch.linkPanel")}</b>{t("tg.ch.linkP2")}<b>{t("tg.ch.linkPhoneCode")}</b>{t("tg.ch.linkP3")}
         </p>
         <Button asChild size="sm">
           <a href={TG_GATEWAY_MANAGER} target="_blank" rel="noreferrer">
-            Abrir panel del gateway <ExternalLink className="h-4 w-4 ml-1" />
+            {t("tg.ch.openPanel")} <ExternalLink className="h-4 w-4 ml-1" />
           </a>
         </Button>
         <p className="text-[11px] text-muted-foreground">
-          Ojo: como en WhatsApp, una cuenta se puede restringir si se usa para contacto en frío masivo.
-          Pensado para conversaciones tibias / entrantes.
+          {t("tg.ch.warning")}
         </p>
       </div>
 
@@ -208,20 +207,19 @@ const TelegramChannelsPage = () => {
       <Dialog open={!!editing} onOpenChange={(o) => { if (!o) setEditing(null); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Editar línea {editing?.account_id}</DialogTitle>
+            <DialogTitle>{t("tg.ch.editLineTitle", { id: editing?.account_id ?? "" })}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <Label>Etiqueta</Label>
-              <Input value={editLabel} onChange={(e) => setEditLabel(e.target.value)} placeholder="Ej: Kash Miami" className="h-9" />
+              <Label>{t("tg.ch.label")}</Label>
+              <Input value={editLabel} onChange={(e) => setEditLabel(e.target.value)} placeholder={t("tg.ch.labelPlaceholder")} className="h-9" />
             </div>
             <div className="space-y-1.5">
-              <Label>Auto-asignar conversaciones nuevas a</Label>
+              <Label>{t("tg.ch.autoAssignLabel")}</Label>
               <p className="text-[11px] text-muted-foreground">
-                Cada conversación NUEVA de esta línea se asigna automáticamente a quien marques
-                (puedes elegir varias personas). Las existentes no se tocan.
+                {t("tg.ch.autoAssignHelp")}
               </p>
-              <Input value={assigneeSearch} onChange={(e) => setAssigneeSearch(e.target.value)} placeholder="Buscar persona…" className="h-8 text-sm" />
+              <Input value={assigneeSearch} onChange={(e) => setAssigneeSearch(e.target.value)} placeholder={t("common.searchPerson")} className="h-8 text-sm" />
               <div className="max-h-44 space-y-1 overflow-auto rounded-md border p-2">
                 {filteredUsers.map((u) => {
                   const on = editAssignees.includes(u.id);
@@ -242,15 +240,16 @@ const TelegramChannelsPage = () => {
               </div>
               {editAssignees.length > 0 && (
                 <p className="text-[11px] text-muted-foreground">
-                  {editAssignees.length} persona(s) — auto-asignación activa en esta línea
+                  {t("tg.ch.autoAssignActive", { n: editAssignees.length })}
                 </p>
               )}
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" size="sm" onClick={() => setEditing(null)}>Cancelar</Button>
+            <Button variant="outline" size="sm" onClick={() => setEditing(null)}>{t("common.cancel")}</Button>
             <Button size="sm" onClick={() => updateChannel.mutate()} disabled={updateChannel.isPending}>
-              {updateChannel.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Guardar"}
+              {updateChannel.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : t("common.save")}
+
             </Button>
           </DialogFooter>
         </DialogContent>

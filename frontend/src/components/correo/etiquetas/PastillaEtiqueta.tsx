@@ -1,5 +1,6 @@
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/hooks/useLanguage";
 import type { ParDeColores } from "@/lib/correo/coloresEtiqueta";
 
 /** La pastilla de una etiqueta junto al asunto, como en Gmail: el nombre
@@ -14,6 +15,7 @@ export default function PastillaEtiqueta({
   /** La × del correo abierto: quita la etiqueta (en «Recibidos», archiva). */
   onQuitar?: () => void;
 }) {
+  const { t } = useLanguage();
   return (
     <span
       title={nombre}
@@ -29,8 +31,8 @@ export default function PastillaEtiqueta({
         <button
           type="button"
           onClick={onQuitar}
-          aria-label={`Quitar ${nombre}`}
-          title={`Quitar ${nombre}`}
+          aria-label={t("mail.labels.removeNamed", { name: nombre })}
+          title={t("mail.labels.removeNamed", { name: nombre })}
           className="-mr-0.5 ml-1 shrink-0 rounded-sm opacity-70 hover:opacity-100"
         >
           <X className="h-3 w-3" />

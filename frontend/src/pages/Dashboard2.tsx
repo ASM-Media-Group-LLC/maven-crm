@@ -72,6 +72,7 @@ import {
 import { CHART_AXIS, CHART_COLOR, CHART_GRID, CHART_SERIES } from "@/lib/chartTheme";
 import { MavenTooltip } from "@/components/charts/MavenTooltip";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useLanguage } from "@/hooks/useLanguage";
 // jspdf + jspdf-autotable are loaded on demand inside exportPdf() so
 // the (large) PDF chunk only enters the bundle when the user actually
 // clicks export. Saves ~140 KB gzipped on the cold-load critical path.
@@ -116,6 +117,7 @@ const SPARKLINE_MESES = 4;
 const Dashboard2 = () => {
   const navigate = useNavigate();
   const formatoUi = useFormato();
+  const { t } = useLanguage();
   const { isAdmin } = useUserRole();
   // La data de ingresos ya NO se baja cruda (13k+ filas, 14 requests, sin caché): se
   // agrega SERVER-SIDE por el RPC get_dashboard2_creator_summary. Las llamadas (período
@@ -225,11 +227,11 @@ const Dashboard2 = () => {
   const handlePhotoUpload = async (file: File) => {
     if (!creatorDetail) return;
     if (!file.type.startsWith("image/")) {
-      toast.error("El archivo debe ser una imagen");
+      toast.error(t("dashboard.d2.photoNotImage"));
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      toast.error("La imagen no debe superar 5 MB");
+      toast.error(t("dashboard.d2.photoTooBig"));
       return;
     }
     setPhotoUploading(true);
@@ -248,7 +250,7 @@ const Dashboard2 = () => {
       if (upErr) throw upErr;
       const { data: pub } = supabase.storage.from("creator-avatars").getPublicUrl(path);
       const newUrl = pub?.publicUrl;
-      if (!newUrl) throw new Error("No se pudo obtener la URL pública");
+      if (!newUrl) throw new Error(t("dashboard.d2.photoNoUrl"));
       const { error: dbErr } = await supabase
         .from("creators")
         .update({ profile_photo_url: newUrl })
@@ -258,9 +260,9 @@ const Dashboard2 = () => {
       setCreatorDetail({ ...creatorDetail, profilePhotoUrl: newUrl });
       // Invalidar caches para que el dashboard refresque.
       await queryClient.invalidateQueries({ queryKey: ["creator-info-dashboard2"] });
-      toast.success("Foto actualizada");
+      toast.success(t("dashboard.d2.photoUpdated"));
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Error al subir foto";
+      const msg = e instanceof Error ? e.message : t("dashboard.d2.photoUploadError");
       toast.error(msg);
     } finally {
       setPhotoUploading(false);
@@ -287,24 +289,26 @@ const Dashboard2 = () => {
   const [activePreset, setActivePreset] = useState<RangePreset | null>("this_month");
 
   const selectedPeriod = useMemo(() => {
-    const f = range.from, t = range.to;
-    if (!f || !t) {
+    // `hasta` y no `t`: `t` es el traductor.
+    const f = range.from, hasta = range.to;
+    if (!f || !hasta) {
       // "Todo" → todo el histórico hasta hoy.
-      return { startStr: "2000-01-01", endStr: format(new Date(), "yyyy-MM-dd"), label: "Todo el histórico", value: "all" };
+      // `labelPdf` fijo en español: es el título del PDF que se exporta (ver abajo).
+      return { startStr: "2000-01-01", endStr: format(new Date(), "yyyy-MM-dd"), label: t("common.entireHistory"), labelPdf: "Todo el histórico", value: "all" };
     }
     const startStr = format(f, "yyyy-MM-dd");
-    const endStr = format(t, "yyyy-MM-dd");
-    const sameMonth = f.getFullYear() === t.getFullYear() && f.getMonth() === t.getMonth();
-    const isFullMonth = sameMonth && f.getDate() === 1 && t.getDate() === endOfMonth(f).getDate();
+    const endStr = format(hasta, "yyyy-MM-dd");
+    const sameMonth = f.getFullYear() === hasta.getFullYear() && f.getMonth() === hasta.getMonth();
+    const isFullMonth = sameMonth && f.getDate() === 1 && hasta.getDate() === endOfMonth(f).getDate();
     const label = isFullMonth
       ? cap(format(f, "MMMM yyyy", { locale: formatoUi.fechas }))
-      : `${format(f, "d MMM", { locale: formatoUi.fechas })} – ${format(t, "d MMM yyyy", { locale: formatoUi.fechas })}`;
+      : `${format(f, "d MMM", { locale: formatoUi.fechas })} – ${format(hasta, "d MMM yyyy", { locale: formatoUi.fechas })}`;
     // Idioma fijo a propósito: es el título del PDF que se exporta, que está todo en español.
     const labelPdf = isFullMonth
       ? cap(format(f, "MMMM yyyy", { locale: es }))
-      : `${format(f, "d MMM", { locale: es })} – ${format(t, "d MMM yyyy", { locale: es })}`;
+      : `${format(f, "d MMM", { locale: es })} – ${format(hasta, "d MMM yyyy", { locale: es })}`;
     return { startStr, endStr, label, labelPdf, value: `${startStr}_${endStr}` };
-  }, [range, formatoUi]);
+  }, [range, formatoUi, t]);
 
   // Resumen por creadora del período seleccionado (agregado server-side, 1 request,
   // cacheado). Reemplaza el `allRows` crudo. isLoading/isError/refetch del dashboard
@@ -367,7 +371,7 @@ const Dashboard2 = () => {
       if (activeFans <= 0) continue;
       const arpuMonthly = r.total / activeFans / months;
       const ltv = avgLifespanMonths != null ? arpuMonthly * avgLifespanMonths : 0;
-      perCreator.push({ creator_id: r.creator_id, name: r.artistic_name || r.blu_creator_name || "Sin nombre", activeFans, arpuMonthly, ltv, gross: r.total });
+      perCreator.push({ creator_id: r.creator_id, name: r.artistic_name || r.blu_creator_name || t("dashboard.noName"), activeFans, arpuMonthly, ltv, gross: r.total });
       aggGross += r.total;
       aggActive += activeFans;
     }
@@ -375,7 +379,7 @@ const Dashboard2 = () => {
     const aggArpuMonthly = aggActive > 0 ? aggGross / aggActive / months : null;
     const aggLtv = aggArpuMonthly != null && avgLifespanMonths != null ? aggArpuMonthly * avgLifespanMonths : null;
     return { avgLifespanMonths, aggArpuMonthly, aggLtv, totalActiveFans: Math.round(aggActive), perCreator };
-  }, [deepDiveTab, selSummary, selectedPeriod, topFans]);
+  }, [deepDiveTab, selSummary, selectedPeriod, topFans, t]);
 
   // Período anterior (= mismo largo, justo antes del rango) para los deltas MoM.
   const prevPeriod = useMemo(() => {
@@ -472,7 +476,7 @@ const Dashboard2 = () => {
       const activeFans = r.max_active_fans;
       out.push({
         creatorId: r.group_key,
-        name: r.artistic_name || r.blu_creator_name || "Sin nombre",
+        name: r.artistic_name || r.blu_creator_name || t("dashboard.noName"),
         instagramHandle: info?.ig || null,
         profilePhotoUrl: info?.photo || null,
         platform: plat || "OnlyFans",
@@ -493,7 +497,7 @@ const Dashboard2 = () => {
       });
     }
     return out;
-  }, [selSummary, creatorInfoMap]);
+  }, [selSummary, creatorInfoMap, t]);
 
   // ¿Hay data para el período? (para distinguir "sin datos" de un $0 real, y de un error de fetch)
   const hasData = rawCreators.length > 0;
@@ -546,11 +550,11 @@ const Dashboard2 = () => {
     if (paretoGroup === "80") {
       const items = paretoAnalysis.top.map((c) => ({ name: c.name, value: c.total, isResto: false }));
       const restTotal = paretoAnalysis.totalRevenue - paretoAnalysis.topRevenue;
-      if (restTotal > 0) items.push({ name: `Resto (${paretoAnalysis.rest.length})`, value: restTotal, isResto: true });
+      if (restTotal > 0) items.push({ name: t("dashboard.d2.rest", { n: paretoAnalysis.rest.length }), value: restTotal, isResto: true });
       return items;
     }
     return paretoAnalysis.rest.map((c) => ({ name: c.name, value: c.total, isResto: false }));
-  }, [paretoAnalysis, paretoGroup]);
+  }, [paretoAnalysis, paretoGroup, t]);
 
   const pieGroupTotal = useMemo(() => pieData.reduce((s, d) => s + d.value, 0), [pieData]);
 
@@ -613,22 +617,22 @@ const Dashboard2 = () => {
     for (const c of rawCreators) {
       const prev = prevMonthMap.get(c.creatorId);
       if (c.total === 0 && prev && prev > 0) {
-        items.push({ type: "zero", creator: c, detail: `Vendía ${fmtInline(prev)} → ahora $0` });
+        items.push({ type: "zero", creator: c, detail: t("dashboard.d2.alertZero", { prev: fmtInline(prev) }) });
       } else if (prev && prev > 0 && c.total > 0) {
         const change = ((c.total - prev) / prev) * 100;
         if (change <= -30) {
-          items.push({ type: "drop", creator: c, detail: `Cayó ${Math.abs(change).toFixed(0)}% (${fmtInline(prev)} → ${fmtInline(c.total)})` });
+          items.push({ type: "drop", creator: c, detail: t("dashboard.d2.alertDrop", { pct: Math.abs(change).toFixed(0), prev: fmtInline(prev), now: fmtInline(c.total) }) });
         }
       }
       if (c.activeFans > 0 && c.newFans < 0) {
-        items.push({ type: "fanLoss", creator: c, detail: `Perdiendo fans: ${c.newFans} netos` });
+        items.push({ type: "fanLoss", creator: c, detail: t("dashboard.d2.alertFanLoss", { n: c.newFans }) });
       }
     }
     return items.sort((a, b) => {
       const order = { zero: 0, drop: 1, fanLoss: 2 };
       return order[a.type] - order[b.type];
     });
-  }, [rawCreators, prevMonthMap]);
+  }, [rawCreators, prevMonthMap, t]);
 
   // Projection
   const projection = useMemo(() => {
@@ -646,7 +650,7 @@ const Dashboard2 = () => {
         if (r.total <= 0) return null;
         const days = r.days_with_data;
         return {
-          name: r.artistic_name || r.blu_creator_name || "Sin nombre",
+          name: r.artistic_name || r.blu_creator_name || t("dashboard.noName"),
           ig: info?.ig || null,
           photo: info?.photo || null,
           total: r.total,
@@ -658,7 +662,7 @@ const Dashboard2 = () => {
       })
       .filter((c): c is NonNullable<typeof c> => c !== null)
       .sort((a, b) => b.projected - a.projected);
-  }, [projSummary, creatorInfoMap]);
+  }, [projSummary, creatorInfoMap, t]);
 
   const projectionTotal = useMemo(() => projection.reduce((s, c) => s + c.projected, 0), [projection]);
   // El día 1 del mes no hay suficientes días para proyectar (la useMemo devuelve []).
@@ -717,6 +721,8 @@ const Dashboard2 = () => {
     return day < 20;
   };
 
+  // ⚠️ El PDF que se exporta queda en español a propósito (se comparte fuera de la
+  // pantalla): sus títulos y columnas NO pasan por el diccionario.
   const exportPdf = async () => {
     if (!selectedPeriod) return;
     const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
@@ -773,7 +779,7 @@ const Dashboard2 = () => {
         <TableCell className="text-muted-foreground tabular-nums text-xs">{i + 1}</TableCell>
         <TableCell className="whitespace-nowrap">
           <div className="flex items-center gap-1.5">
-            {dashTab === "pareto" && isTop && <span className="inline-block h-2 w-2 rounded-full bg-primary shrink-0" title="Top 80/20" />}
+            {dashTab === "pareto" && isTop && <span className="inline-block h-2 w-2 rounded-full bg-primary shrink-0" title={t("dashboard.d2.top8020")} />}
             {c.instagramHandle && (
               <a href={`https://instagram.com/${c.instagramHandle.replace(/^@/, "")}`} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-instagram-pink transition-colors shrink-0" onClick={(e) => e.stopPropagation()}>
                 <Instagram className="h-3.5 w-3.5" />
@@ -827,8 +833,8 @@ const Dashboard2 = () => {
                         </span>
                       </TooltipTrigger>
                       <TooltipContent side="bottom" className="max-w-xs text-xs">
-                        <strong>Bruto</strong> = lo que reporta OF (100%). <strong>Neto</strong> = agencia (80%).
-                        Fuente: <code className="bg-muted px-1 rounded font-mono text-[10px]">creator_daily_earnings</code> (BLU, en vivo, incl. fan-reports). Ranking de OF no disponible desde BLU.
+                        <strong>{t("dashboard.d2.gross")}</strong> {t("dashboard.d2.grossExplain")} <strong>{t("dashboard.d2.net")}</strong> {t("dashboard.d2.netExplain")}{" "}
+                        {t("dashboard.d2.source")} <code className="bg-muted px-1 rounded font-mono text-[10px]">creator_daily_earnings</code> {t("dashboard.d2.sourceExplain")}
                       </TooltipContent>
                     </UITooltip>
                   </TooltipProvider>
@@ -862,7 +868,7 @@ const Dashboard2 = () => {
                     from={range.from}
                     to={range.to}
                     onApply={(from, to) => { setRange({ from, to }); setActivePreset(null); }}
-                    placeholder="Seleccionar rango"
+                    placeholder={t("dashboard.d2.pickRange")}
                   />
                   {isAdmin && (
                     <Button
@@ -873,7 +879,7 @@ const Dashboard2 = () => {
                       disabled={isLoading || creators.length === 0}
                     >
                       <Download className="h-3.5 w-3.5" />
-                      Exportar PDF
+                      {t("dashboard.d2.exportPdf")}
                     </Button>
                   )}
                 </div>
@@ -887,15 +893,15 @@ const Dashboard2 = () => {
                   de Panel de Control (Reclutamiento modelos / chatters). */}
               <Tabs value={dashTab} onValueChange={(v) => setDashTab(v as DashTab)}>
                 <TabsList className="flex-wrap h-auto">
-                  <TabsTrigger value="resumen">Resumen</TabsTrigger>
+                  <TabsTrigger value="resumen">{t("dashboard.d2.tab.summary")}</TabsTrigger>
                   <TabsTrigger value="creator-reports" className="gap-1.5">
                     <Users className="h-3.5 w-3.5" /> Creator Reports
                   </TabsTrigger>
                   <TabsTrigger value="metrics" className="gap-1.5">
-                    <BarChart3 className="h-3.5 w-3.5" /> Métricas detalladas
+                    <BarChart3 className="h-3.5 w-3.5" /> {t("dashboard.d2.tab.metrics")}
                   </TabsTrigger>
                   <TabsTrigger value="pareto" className="gap-1.5">
-                    <PieChart className="h-3.5 w-3.5" /> Análisis 80/20
+                    <PieChart className="h-3.5 w-3.5" /> {t("dashboard.d2.tab.pareto")}
                   </TabsTrigger>
                   <TabsTrigger value="alerts" className="gap-1.5">
                     <AlertTriangle className="h-3.5 w-3.5" /> Red Flags
@@ -906,10 +912,10 @@ const Dashboard2 = () => {
                     )}
                   </TabsTrigger>
                   <TabsTrigger value="projection" className="gap-1.5">
-                    <Target className="h-3.5 w-3.5" /> Proyección del mes
+                    <Target className="h-3.5 w-3.5" /> {t("dashboard.d2.tab.projection")}
                   </TabsTrigger>
                   <TabsTrigger value="deepdive" className="gap-1.5">
-                    <Telescope className="h-3.5 w-3.5" /> Más análisis
+                    <Telescope className="h-3.5 w-3.5" /> {t("dashboard.d2.tab.more")}
                   </TabsTrigger>
                 </TabsList>
 
@@ -945,12 +951,12 @@ const Dashboard2 = () => {
                 <div className="rounded-lg border border-border bg-card text-center py-12 px-6 text-sm">
                   {isError ? (
                     <div className="space-y-2">
-                      <p className="font-medium text-destructive">No se pudieron cargar los ingresos</p>
-                      <p className="text-xs text-muted-foreground">La consulta a BLU falló — no es que las ventas sean $0.</p>
-                      <Button variant="outline" size="sm" onClick={() => refetch()}>Reintentar</Button>
+                      <p className="font-medium text-destructive">{t("dashboard.d2.loadError")}</p>
+                      <p className="text-xs text-muted-foreground">{t("dashboard.d2.loadErrorDesc")}</p>
+                      <Button variant="outline" size="sm" onClick={() => refetch()}>{t("common.retry")}</Button>
                     </div>
                   ) : (
-                    <p className="text-muted-foreground">Sin datos para {selectedPeriod?.label}</p>
+                    <p className="text-muted-foreground">{t("dashboard.d2.noDataFor", { period: selectedPeriod?.label ?? "" })}</p>
                   )}
                 </div>
               )}
@@ -958,20 +964,20 @@ const Dashboard2 = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                   {/* Retención — sin popup todavía */}
                   <StatChip
-                    label="Retención"
+                    label={t("dashboard.d2.retention")}
                     value={`${hlKpis.renewalRate.toFixed(1)}%`}
-                    hint="Tasa de renovación"
+                    hint={t("dashboard.d2.renewalRate")}
                     color="bg-cyan-500"
                     icon={<Repeat className="h-3.5 w-3.5" />}
                   />
 
                   {/* Creadoras — clickable, abre lista */}
                   <StatChip
-                    label="Creadoras"
+                    label={t("dashboard.action.creators")}
                     value={hlKpis.activeCount}
                     hint={
                       <>
-                        {hlKpis.zeroCreators} inactivas
+                        {t("dashboard.d2.nInactive", { n: hlKpis.zeroCreators })}
                         {hlKpis.zeroCreators > 0 && <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-destructive/60 align-middle" />}
                       </>
                     }
@@ -993,7 +999,8 @@ const Dashboard2 = () => {
                   <StatChip
                     label="$/Fan"
                     value={hlKpis.totalFansAll > 0 ? `$${hlKpis.avgPerFanGlobal.toFixed(2)}` : "—"}
-                    hint={hlKpis.totalFansAll > 0 ? `${hlKpis.totalFansAll.toLocaleString()} fans` : "Sincronizando fans…"}
+                    hint={hlKpis.totalFansAll > 0 ? `${hlKpis.totalFansAll.toLocaleString()} fans` : t("dashboard.d2.syncingFans")}
+
                     color="bg-rose-500"
                     icon={<Heart className="h-3.5 w-3.5" />}
                   />
@@ -1024,7 +1031,7 @@ const Dashboard2 = () => {
                           que la card iguale en altura a Eficiencia sin
                           dejar un hueco vacío abajo. */}
                       <div className="flex-1 flex flex-col justify-center mt-3">
-                        <p className="text-xs text-foreground/80 font-semibold">Revenue Bruto</p>
+                        <p className="text-xs text-foreground/80 font-semibold">{t("dashboard.d2.grossRevenue")}</p>
                         <p className="text-5xl font-bold tabular-nums leading-tight tracking-tight">{fmtK(grandTotal)}</p>
                       </div>
                       <div className="flex items-center justify-between gap-2 pt-3 mt-auto border-t border-border/50 text-xs">
@@ -1051,15 +1058,15 @@ const Dashboard2 = () => {
                           {/* Título de sección — mismo peso visual que
                               "Concentración de Revenue" / "Velocidad de
                               Crecimiento" para que no se pierda. */}
-                          <p className="text-sm font-semibold text-foreground">Distribución de la Monetización</p>
-                          <p className="text-[11px] text-muted-foreground">Mensajería · Propinas · Suscripciones</p>
+                          <p className="text-sm font-semibold text-foreground">{t("dashboard.d2.monetization")}</p>
+                          <p className="text-[11px] text-muted-foreground">{t("dashboard.d2.monetizationSub")}</p>
                         </div>
                       </div>
                       <div className="space-y-2.5">
                         {[
-                          { label: "Mensajería", value: hlKpis.totalMsgs, pct: hlKpis.msgsPct, color: "bg-blue-500" },
-                          { label: "Propinas", value: hlKpis.totalTips, pct: hlKpis.tipsPct, color: "bg-rose-500" },
-                          { label: "Suscripciones", value: hlKpis.totalSubs, pct: hlKpis.subsPct, color: "bg-emerald-500" },
+                          { label: t("dashboard.d2.messaging"), value: hlKpis.totalMsgs, pct: hlKpis.msgsPct, color: "bg-blue-500" },
+                          { label: t("dashboard.d2.tips"), value: hlKpis.totalTips, pct: hlKpis.tipsPct, color: "bg-rose-500" },
+                          { label: t("dashboard.d2.subscriptions"), value: hlKpis.totalSubs, pct: hlKpis.subsPct, color: "bg-emerald-500" },
                         ].map((item) => (
                           <div key={item.label} className="flex items-center gap-3">
                             <span className="text-xs text-muted-foreground w-28 shrink-0 font-medium">{item.label}</span>
@@ -1084,8 +1091,8 @@ const Dashboard2 = () => {
                         ))}
                       </div>
                       <div className="flex items-center justify-between pt-2 border-t border-border text-[11px] text-muted-foreground">
-                        <span>Nuevas subs: <span className="font-semibold text-foreground tabular-nums">{hlKpis.totalNewSubs.toLocaleString()}</span></span>
-                        <span>Recurrentes: <span className="font-semibold text-foreground tabular-nums">{hlKpis.totalRecurring.toLocaleString()}</span></span>
+                        <span>{t("dashboard.d2.newSubsColon")} <span className="font-semibold text-foreground tabular-nums">{hlKpis.totalNewSubs.toLocaleString()}</span></span>
+                        <span>{t("dashboard.d2.recurringColon")} <span className="font-semibold text-foreground tabular-nums">{hlKpis.totalRecurring.toLocaleString()}</span></span>
                       </div>
                     </div>
                   </div>
@@ -1104,20 +1111,20 @@ const Dashboard2 = () => {
                         <Crown className="h-4 w-4 text-primary" />
                       </div>
                       <div>
-                        <p className="text-sm font-semibold text-foreground">Concentración de Revenue</p>
-                        <p className="text-[11px] text-muted-foreground">Análisis Pareto</p>
+                        <p className="text-sm font-semibold text-foreground">{t("dashboard.d2.concentration")}</p>
+                        <p className="text-[11px] text-muted-foreground">{t("dashboard.d2.paretoAnalysis")}</p>
                       </div>
                     </div>
                     <div className="space-y-2">
                       <div className="flex items-baseline justify-between">
                         <span className="text-2xl font-bold tabular-nums text-primary">{paretoAnalysis.topCount}</span>
-                        <span className="text-xs text-muted-foreground">de {paretoAnalysis.totalCount} creadoras = 80% revenue</span>
+                        <span className="text-xs text-muted-foreground">{t("dashboard.d2.ofNCreators80", { n: paretoAnalysis.totalCount })}</span>
                       </div>
                       <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
                         <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${paretoAnalysis.topPercent}%` }} />
                       </div>
                       <div className="flex justify-between text-[10px] text-muted-foreground">
-                        <span>Top {paretoAnalysis.topPercent.toFixed(0)}% genera {fmt(paretoAnalysis.topRevenue)}</span>
+                        <span>{t("dashboard.d2.topPctGenerates", { pct: paretoAnalysis.topPercent.toFixed(0), amount: fmt(paretoAnalysis.topRevenue) })}</span>
                       </div>
                     </div>
                     {hlKpis.topCreator && (
@@ -1136,27 +1143,27 @@ const Dashboard2 = () => {
                         <Activity className="h-4 w-4 text-success" />
                       </div>
                       <div>
-                        <p className="text-sm font-semibold text-foreground">Velocidad de Crecimiento</p>
-                        <p className="text-[11px] text-muted-foreground">vs período anterior</p>
+                        <p className="text-sm font-semibold text-foreground">{t("dashboard.d2.growthVelocity")}</p>
+                        <p className="text-[11px] text-muted-foreground">{t("dashboard.d2.vsPrevious")}</p>
                       </div>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-center">
                       <div className="rounded-lg bg-success/10 p-2">
                         <p className="text-lg font-bold tabular-nums text-success">{growthStats.growing}</p>
-                        <p className="text-[9px] text-muted-foreground">Creciendo</p>
+                        <p className="text-[9px] text-muted-foreground">{t("dashboard.d2.growing")}</p>
                       </div>
                       <div className="rounded-lg bg-muted p-2">
                         <p className="text-lg font-bold tabular-nums text-muted-foreground">{growthStats.stable}</p>
-                        <p className="text-[9px] text-muted-foreground">Estable</p>
+                        <p className="text-[9px] text-muted-foreground">{t("dashboard.d2.stable")}</p>
                       </div>
                       <div className="rounded-lg bg-destructive/10 p-2">
                         <p className="text-lg font-bold tabular-nums text-destructive">{growthStats.declining}</p>
-                        <p className="text-[9px] text-muted-foreground">Cayendo</p>
+                        <p className="text-[9px] text-muted-foreground">{t("dashboard.d2.declining")}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 pt-1 border-t border-border">
                       <span className="text-[10px] text-muted-foreground">
-                        {hlKpis.creatorsOver10k} creadoras &gt; $10k · {hlKpis.creatorsUnder1k} &lt; $1k
+                        {t("dashboard.d2.over10kUnder1k", { over: hlKpis.creatorsOver10k, under: hlKpis.creatorsUnder1k })}
                       </span>
                     </div>
                   </div>
@@ -1174,9 +1181,9 @@ const Dashboard2 = () => {
                 const drops = alerts.filter((a) => a.type === "drop");
                 const fanLoss = alerts.filter((a) => a.type === "fanLoss");
                 const sections = [
-                  { key: "zero" as const, emoji: "🔴", label: "Inactivas ($0)", desc: "Vendían el mes pasado, ahora $0", items: zeros, border: "border-destructive/40", bg: "bg-destructive/10", text: "text-destructive" },
-                  { key: "drop" as const, emoji: "🟠", label: "Caída > 30%", desc: "Revenue cayó más del 30%", items: drops, border: "border-orange-400/40", bg: "bg-orange-500/10", text: "text-orange-600 dark:text-orange-400" },
-                  { key: "fanLoss" as const, emoji: "🟡", label: "Perdiendo Fans", desc: "Fans netos negativos", items: fanLoss, border: "border-warning/40", bg: "bg-warning/10", text: "text-warning" },
+                  { key: "zero" as const, emoji: "🔴", label: t("dashboard.d2.al.zero"), desc: t("dashboard.d2.al.zeroDesc"), items: zeros, border: "border-destructive/40", bg: "bg-destructive/10", text: "text-destructive" },
+                  { key: "drop" as const, emoji: "🟠", label: t("dashboard.d2.al.drop"), desc: t("dashboard.d2.al.dropDesc"), items: drops, border: "border-orange-400/40", bg: "bg-orange-500/10", text: "text-orange-600 dark:text-orange-400" },
+                  { key: "fanLoss" as const, emoji: "🟡", label: t("dashboard.d2.al.fanLoss"), desc: t("dashboard.d2.al.fanLossDesc"), items: fanLoss, border: "border-warning/40", bg: "bg-warning/10", text: "text-warning" },
                 ];
                 const activeSection = sections.find((s) => s.key === alertTab);
                 const activeItems = activeSection?.items || [];
@@ -1202,7 +1209,7 @@ const Dashboard2 = () => {
                                 </p>
                               ))}
                               {s.items.length > 3 && (
-                                <p className="text-[9px] text-muted-foreground/60">+{s.items.length - 3} más…</p>
+                                <p className="text-[9px] text-muted-foreground/60">{t("dashboard.d2.nMore", { n: s.items.length - 3 })}</p>
                               )}
                             </div>
                           )}
@@ -1217,10 +1224,10 @@ const Dashboard2 = () => {
                         <div className="flex items-center gap-2 mb-2">
                           <span className="text-base">{activeSection.emoji}</span>
                           <h3 className={`text-sm font-bold ${activeSection.text}`}>{activeSection.label}</h3>
-                          <span className="text-xs text-muted-foreground">— {activeItems.length} creadora{activeItems.length !== 1 ? "s" : ""}</span>
+                          <span className="text-xs text-muted-foreground">— {t(activeItems.length === 1 ? "dashboard.d2.creatorOne" : "dashboard.d2.creatorMany", { n: activeItems.length })}</span>
                         </div>
                         {activeItems.length === 0 ? (
-                          <p className="text-sm text-muted-foreground py-3">Sin alertas en esta categoría ✓</p>
+                          <p className="text-sm text-muted-foreground py-3">{t("dashboard.d2.noAlertsCheck")}</p>
                         ) : (
                           <div className="space-y-1.5 max-h-[280px] overflow-y-auto">
                             {activeItems.map((a, i) => (
@@ -1254,23 +1261,23 @@ const Dashboard2 = () => {
                     <div className="flex items-center gap-2">
                       <Target className="h-5 w-5 text-primary" />
                       <h2 className="text-xl font-semibold text-foreground">
-                        Proyección {format(new Date(), "MMMM yyyy", { locale: formatoUi.fechas }).replace(/^\w/, (c) => c.toUpperCase())}
+                        {t("dashboard.d2.projectionFor", { month: format(new Date(), "MMMM yyyy", { locale: formatoUi.fechas }).replace(/^\w/, (c) => c.toUpperCase()) })}
                       </h2>
                     </div>
                     <div className="text-right">
-                      <p className="text-xs text-muted-foreground">Proyección bruto</p>
+                      <p className="text-xs text-muted-foreground">{t("dashboard.d2.grossProjection")}</p>
                       <p className="text-2xl font-bold tabular-nums">{projectionTooEarly ? "—" : fmt(projectionTotal)}</p>
                     </div>
                   </div>
                   <p className="text-xs text-muted-foreground">
                     {projectionTooEarly
-                      ? "La proyección estará disponible a partir del día 2 del mes."
-                      : `Basado en ${new Date().getDate() - 1} días. Fórmula: (acumulado / días) × días del mes.`}
+                      ? t("dashboard.d2.projectionFromDay2")
+                      : t("dashboard.d2.projectionBasis", { n: new Date().getDate() - 1 })}
                   </p>
                   {projectionTooEarly ? (
-                    <p className="text-sm text-muted-foreground">Aún no hay suficientes días del mes para proyectar.</p>
+                    <p className="text-sm text-muted-foreground">{t("dashboard.d2.projectionTooEarly")}</p>
                   ) : projection.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Sin datos del mes actual.</p>
+                    <p className="text-sm text-muted-foreground">{t("dashboard.d2.noCurrentMonthData")}</p>
                   ) : (
                     <div className="space-y-2">
                       {projection.map((c, i) => {
@@ -1301,20 +1308,21 @@ const Dashboard2 = () => {
                               </div>
                               <div className="hidden sm:flex items-center gap-4 text-right shrink-0">
                                 <div>
-                                  <p className="text-xs text-muted-foreground">$/Día</p>
+                                  <p className="text-xs text-muted-foreground">{t("dashboard.d2.perDay")}</p>
                                   <p className="text-sm font-medium tabular-nums">{fmt(c.dailyAvg)}</p>
                                 </div>
                                 <div>
-                                  <p className="text-xs text-muted-foreground">Días</p>
+                                  <p className="text-xs text-muted-foreground">{t("common.days")}</p>
                                   <p className="text-sm font-medium tabular-nums">{c.days}</p>
                                 </div>
                                 <div>
-                                  <p className="text-xs text-muted-foreground">Acumulado</p>
+                                  <p className="text-xs text-muted-foreground">{t("dashboard.d2.accumulated")}</p>
                                   <p className="text-sm font-medium tabular-nums">{fmt(c.total)}</p>
                                 </div>
                               </div>
                               <div className="text-right shrink-0 min-w-[90px]">
-                                <p className="text-xs text-muted-foreground">Proyectado</p>
+                                <p className="text-xs text-muted-foreground">{t("dashboard.d2.projected")}</p>
+
                                 <p className="text-base font-bold tabular-nums text-primary">{fmt(c.projected)}</p>
                               </div>
                               <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
@@ -1335,20 +1343,20 @@ const Dashboard2 = () => {
                 <div className="flex flex-wrap items-center gap-2.5 text-xs">
                   <div className="relative flex-1 sm:min-w-[160px] max-w-full sm:max-w-[220px]">
                     <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                    <Input placeholder="Buscar creadora…" value={searchText} onChange={(e) => setSearchText(e.target.value)} className="pl-8 h-8 text-xs" />
+                    <Input placeholder={t("dashboard.d2.searchCreator")} value={searchText} onChange={(e) => setSearchText(e.target.value)} className="pl-8 h-8 text-xs" />
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <Label className="text-[10px] text-muted-foreground">Mín $</Label>
+                    <Label className="text-[10px] text-muted-foreground">{t("dashboard.d2.min")}</Label>
                     <Input type="number" placeholder="0" value={minTotal} onChange={(e) => setMinTotal(e.target.value)} className="h-8 w-16 text-xs tabular-nums" />
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <Label className="text-[10px] text-muted-foreground">Máx $</Label>
+                    <Label className="text-[10px] text-muted-foreground">{t("dashboard.d2.max")}</Label>
                     <Input type="number" placeholder="∞" value={maxTotal} onChange={(e) => setMaxTotal(e.target.value)} className="h-8 w-16 text-xs tabular-nums" />
                   </div>
                   <div className="flex items-center gap-1.5 ml-auto">
                     <Switch id="show-zeros" checked={showZeros} onCheckedChange={setShowZeros} className="scale-90" />
                     <Label htmlFor="show-zeros" className="text-[10px] text-muted-foreground cursor-pointer">$0</Label>
-                    <span className="text-[10px] text-muted-foreground tabular-nums ml-2">{filteredCreators.length} creadoras</span>
+                    <span className="text-[10px] text-muted-foreground tabular-nums ml-2">{t("dashboard.d2.creatorMany", { n: filteredCreators.length })}</span>
                   </div>
                 </div>
               )}
@@ -1356,15 +1364,15 @@ const Dashboard2 = () => {
               {/* ══════ SORTING TOOLBAR ══════ */}
               {!isLoading && creators.length > 0 && (
                 <div className="flex flex-wrap items-center gap-2 text-xs">
-                  <span className="text-xs text-muted-foreground mr-1">Ordenar:</span>
+                  <span className="text-xs text-muted-foreground mr-1">{t("dashboard.d2.sortBy")}</span>
                   {[
-                    { col: "total" as SortKey, label: "Bruto" },
-                    { col: "net" as SortKey, label: "Neto" },
+                    { col: "total" as SortKey, label: t("dashboard.d2.gross") },
+                    { col: "net" as SortKey, label: t("dashboard.d2.net") },
                     { col: "subs" as SortKey, label: "Subs" },
                     { col: "tips" as SortKey, label: "Tips" },
-                    { col: "messages" as SortKey, label: "Mensajería" },
+                    { col: "messages" as SortKey, label: t("dashboard.d2.messaging") },
                     { col: "activeFans" as SortKey, label: "Fans" },
-                    { col: "name" as SortKey, label: "Nombre" },
+                    { col: "name" as SortKey, label: t("common.name") },
                   ].map((opt) => (
                     <button
                       key={opt.col}
@@ -1393,7 +1401,7 @@ const Dashboard2 = () => {
                 </div>
               ) : creators.length === 0 ? (
                 <div className="rounded-lg border border-border bg-card text-center py-12 text-muted-foreground text-sm">
-                  {rawCreators.length > 0 ? "No hay resultados con los filtros actuales" : `Sin datos para ${selectedPeriod?.label}`}
+                  {rawCreators.length > 0 ? t("dashboard.d2.noResultsFilters") : t("dashboard.d2.noDataFor", { period: selectedPeriod?.label ?? "" })}
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -1441,7 +1449,7 @@ const Dashboard2 = () => {
                           </div>
                         </div>
                         <div className="text-right shrink-0 w-[110px]">
-                          <p className="text-xs text-muted-foreground">Bruto</p>
+                          <p className="text-xs text-muted-foreground">{t("dashboard.d2.gross")}</p>
                           <p className="text-base font-bold tabular-nums">{fmt(c.total)}</p>
                           <p className="text-[10px] tabular-nums text-success">{fmt(c.net)} <span className="text-muted-foreground">net</span></p>
                         </div>
@@ -1467,12 +1475,12 @@ const Dashboard2 = () => {
                     {kpiListOpen === "revenue" ? (
                       <>
                         <DollarSign className="h-5 w-5 text-emerald-500" />
-                        Revenue por Creadora · {selectedPeriod?.label}
+                        {t("dashboard.d2.revenueByCreator", { period: selectedPeriod?.label ?? "" })}
                       </>
                     ) : (
                       <>
                         <Users className="h-5 w-5 text-blue-500" />
-                        Creadoras ({creators.length}) · {selectedPeriod?.label}
+                        {t("dashboard.d2.creatorsCount", { n: creators.length, period: selectedPeriod?.label ?? "" })}
                       </>
                     )}
                   </DialogTitle>
@@ -1480,7 +1488,7 @@ const Dashboard2 = () => {
                 <div className="space-y-3 mt-2">
                   {creators.length === 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-12">
-                      Sin datos para este período.
+                      {t("dashboard.d2.noDataPeriod")}
                     </p>
                   ) : (() => {
                     // Agrupar por categoría — mismo estándar que panel
@@ -1524,7 +1532,8 @@ const Dashboard2 = () => {
                       return (
                         <div key={cat} className="space-y-2">
                           <CategorySectionHeader
-                            cat={cat}
+                            // "Sin categoría" es la llave del balde (se ordena y se compara); en pantalla se traduce.
+                            cat={cat === "Sin categoría" ? t("dashboard.d2.noCategory") : cat}
                             count={rows.length}
                             isCollapsed={isCollapsed}
                             onToggle={() => toggleCat(cat)}
@@ -1578,18 +1587,18 @@ const Dashboard2 = () => {
                   const igHandle = c.instagramHandle?.replace(/^@/, "") || "";
                   const igUrl = igHandle ? `https://instagram.com/${igHandle}` : null;
                   const stats = [
-                    { label: "Bruto", value: fmt(c.total), highlight: true },
-                    { label: "Neto (80%)", value: fmt(c.net), highlight: true, color: "text-success" },
+                    { label: t("dashboard.d2.gross"), value: fmt(c.total), highlight: true },
+                    { label: t("dashboard.d2.net80"), value: fmt(c.net), highlight: true, color: "text-success" },
                     { label: "Subs", value: fmt(c.subs) },
-                    { label: "Nuevas Subs", value: fmt(c.newSubs) },
-                    { label: "Recurrentes", value: fmt(c.recurringSubs) },
+                    { label: t("dashboard.d2.newSubs"), value: fmt(c.newSubs) },
+                    { label: t("dashboard.d2.recurring"), value: fmt(c.recurringSubs) },
                     { label: "Tips", value: fmt(c.tips) },
-                    { label: "Mensajería", value: fmt(c.messages) },
-                    { label: "Fans activos", value: c.activeFans.toLocaleString() },
-                    { label: "Fans nuevos", value: c.newFans.toLocaleString() },
-                    { label: "$/Día", value: fmt(c.avgPerDay) },
+                    { label: t("dashboard.d2.messaging"), value: fmt(c.messages) },
+                    { label: t("dashboard.d2.activeFans"), value: c.activeFans.toLocaleString() },
+                    { label: t("dashboard.d2.newFans"), value: c.newFans.toLocaleString() },
+                    { label: t("dashboard.d2.perDay"), value: fmt(c.avgPerDay) },
                     { label: "$/Fan", value: fmt(c.avgPerFan) },
-                    { label: "Días activos", value: c.daysWithData.toString() },
+                    { label: t("dashboard.d2.activeDays"), value: c.daysWithData.toString() },
                   ];
                   return (
                     <>
@@ -1600,7 +1609,8 @@ const Dashboard2 = () => {
                             onClick={() => photoInputRef.current?.click()}
                             disabled={photoUploading}
                             className="relative group/avatar shrink-0 rounded-full overflow-hidden focus:outline-none focus:ring-2 focus:ring-primary disabled:cursor-default"
-                            title="Subir foto de perfil"
+                            title={t("dashboard.d2.uploadPhoto")}
+                            aria-label={t("dashboard.d2.uploadPhoto")}
                           >
                             <UserAvatar
                               name={c.name}
@@ -1668,7 +1678,7 @@ const Dashboard2 = () => {
                             onClick={() => window.open(igUrl, "_blank", "noopener,noreferrer")}
                           >
                             <Instagram className="h-3.5 w-3.5" />
-                            Abrir Instagram
+                            {t("dashboard.d2.openInstagram")}
                             <ExternalLink className="h-3 w-3" />
                           </Button>
                         )}
@@ -1680,7 +1690,7 @@ const Dashboard2 = () => {
                             setCreatorDetail(null);
                           }}
                         >
-                          Ver perfil completo
+                          {t("dashboard.d2.viewFullProfile")}
                           <ArrowRight className="h-3.5 w-3.5" />
                         </Button>
                       </div>
@@ -1698,10 +1708,10 @@ const Dashboard2 = () => {
                   const igHandle = p.ig?.replace(/^@/, "") || "";
                   const igUrl = igHandle ? `https://instagram.com/${igHandle}` : null;
                   const stats = [
-                    { label: "Acumulado", value: fmt(p.total) },
-                    { label: "$/Día", value: fmt(p.dailyAvg) },
-                    { label: "Días", value: p.days.toString() },
-                    { label: "Proyectado", value: fmt(p.projected), highlight: true },
+                    { label: t("dashboard.d2.accumulated"), value: fmt(p.total) },
+                    { label: t("dashboard.d2.perDay"), value: fmt(p.dailyAvg) },
+                    { label: t("common.days"), value: p.days.toString() },
+                    { label: t("dashboard.d2.projected"), value: fmt(p.projected), highlight: true },
                   ];
                   return (
                     <>
@@ -1722,7 +1732,7 @@ const Dashboard2 = () => {
                               </p>
                             )}
                             <p className="text-xs text-muted-foreground mt-1">
-                              Proyección {format(new Date(), "MMMM yyyy", { locale: formatoUi.fechas })}
+                              {t("dashboard.d2.projectionFor", { month: format(new Date(), "MMMM yyyy", { locale: formatoUi.fechas }) })}
                             </p>
                           </div>
                         </div>
@@ -1749,7 +1759,7 @@ const Dashboard2 = () => {
                             onClick={() => window.open(igUrl, "_blank", "noopener,noreferrer")}
                           >
                             <Instagram className="h-3.5 w-3.5" />
-                            Abrir Instagram
+                            {t("dashboard.d2.openInstagram")}
                             <ExternalLink className="h-3 w-3" />
                           </Button>
                         )}
@@ -1761,7 +1771,7 @@ const Dashboard2 = () => {
                             setProjectionDetail(null);
                           }}
                         >
-                          Ver perfil completo
+                          {t("dashboard.d2.viewFullProfile")}
                           <ArrowRight className="h-3.5 w-3.5" />
                         </Button>
                       </div>
@@ -1776,18 +1786,19 @@ const Dashboard2 = () => {
               <div className="px-6 pb-6 -mt-1 space-y-6">
                 <h2 className="text-xl font-semibold flex items-center gap-2">
                   <BarChart3 className="h-5 w-5 text-primary" />
-                  Métricas — {selectedPeriod?.label}
+                  {t("dashboard.d2.metricsFor", { period: selectedPeriod?.label ?? "" })}
                 </h2>
                 <div className="space-y-6">
                   {/* Retención & Fans — stat-chips compactos */}
                   <div>
-                    <h3 className="text-xs font-semibold text-muted-foreground mb-3">Retención & Fans</h3>
+                    <h3 className="text-xs font-semibold text-muted-foreground mb-3">{t("dashboard.d2.retentionFans")}</h3>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       {[
-                        { icon: <Repeat className="h-3.5 w-3.5" />, value: `${hlKpis.renewalRate.toFixed(1)}%`, label: "Retención", sub: "tasa de renovación", color: "bg-cyan-500" },
-                        { icon: <DollarSign className="h-3.5 w-3.5" />, value: fmt(hlKpis.avgPerFanGlobal), label: "$/Fan", sub: "promedio por fan", color: "bg-rose-500" },
-                        { icon: <Users className="h-3.5 w-3.5" />, value: hlKpis.totalNewSubs.toLocaleString(), label: "Nuevas Subs", sub: "este período", color: "bg-emerald-500" },
-                        { icon: <Repeat className="h-3.5 w-3.5" />, value: hlKpis.totalRecurring.toLocaleString(), label: "Recurrentes", sub: "renovaciones", color: "bg-violet-500" },
+                        { icon: <Repeat className="h-3.5 w-3.5" />, value: `${hlKpis.renewalRate.toFixed(1)}%`, label: t("dashboard.d2.retention"), sub: t("dashboard.d2.renewalRateLower"), color: "bg-cyan-500" },
+                        { icon: <DollarSign className="h-3.5 w-3.5" />, value: fmt(hlKpis.avgPerFanGlobal), label: "$/Fan", sub: t("dashboard.d2.avgPerFan"), color: "bg-rose-500" },
+                        { icon: <Users className="h-3.5 w-3.5" />, value: hlKpis.totalNewSubs.toLocaleString(), label: t("dashboard.d2.newSubs"), sub: t("dashboard.d2.thisPeriod"), color: "bg-emerald-500" },
+                        { icon: <Repeat className="h-3.5 w-3.5" />, value: hlKpis.totalRecurring.toLocaleString(), label: t("dashboard.d2.recurring"), sub: t("dashboard.d2.renewals"), color: "bg-violet-500" },
+
                       ].map((item, idx) => (
                         <StatChip
                           key={idx}
@@ -1815,7 +1826,7 @@ const Dashboard2 = () => {
                           <div className="relative space-y-3">
                             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500"><Crown className="h-5 w-5 text-white" /></div>
                             <div>
-                              <p className="text-xs text-foreground/80 font-semibold">Top creadora</p>
+                              <p className="text-xs text-foreground/80 font-semibold">{t("dashboard.d2.topCreator")}</p>
                               <p className="text-sm font-bold truncate">{hlKpis.topCreator?.name || "—"}</p>
                               <p className="text-2xl font-bold tabular-nums text-amber-500 leading-tight">{hlKpis.topCreator ? fmt(hlKpis.topCreator.total) : "$0"}</p>
                             </div>
@@ -1826,9 +1837,9 @@ const Dashboard2 = () => {
                           <div className="relative space-y-3">
                             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500"><Target className="h-5 w-5 text-white" /></div>
                             <div>
-                              <p className="text-xs text-foreground/80 font-semibold">Promedio</p>
+                              <p className="text-xs text-foreground/80 font-semibold">{t("common.average")}</p>
                               <p className="text-3xl font-bold tabular-nums leading-tight">{fmt(hlKpis.avgPerCreator)}</p>
-                              <p className="text-[10px] text-muted-foreground mt-1">{hlKpis.activeCount} activas</p>
+                              <p className="text-[10px] text-muted-foreground mt-1">{t("dashboard.d2.nActive", { n: hlKpis.activeCount })}</p>
                             </div>
                           </div>
                         </div>
@@ -1837,9 +1848,9 @@ const Dashboard2 = () => {
                           <div className="relative space-y-3">
                             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-destructive"><AlertTriangle className="h-5 w-5 text-white" /></div>
                             <div>
-                              <p className="text-xs text-foreground/80 font-semibold">Inactivas</p>
+                              <p className="text-xs text-foreground/80 font-semibold">{t("dashboard.rowInactive")}</p>
                               <p className="text-3xl font-bold tabular-nums leading-tight">{hlKpis.zeroCreators}</p>
-                              <p className="text-[10px] text-muted-foreground mt-1">$0 en ventas</p>
+                              <p className="text-[10px] text-muted-foreground mt-1">{t("dashboard.d2.zeroSales")}</p>
                             </div>
                           </div>
                         </div>
@@ -1848,7 +1859,7 @@ const Dashboard2 = () => {
                           <div className="relative space-y-3">
                             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500"><TrendingUp className="h-5 w-5 text-white" /></div>
                             <div>
-                              <p className="text-xs text-foreground/80 font-semibold">Distribución</p>
+                              <p className="text-xs text-foreground/80 font-semibold">{t("dashboard.d2.distribution")}</p>
                               <p className="text-base font-bold tabular-nums leading-tight">{hlKpis.creatorsOver10k} <span className="text-muted-foreground font-normal text-xs">{'>'} $10k</span></p>
                               <p className="text-base font-bold tabular-nums leading-tight">{hlKpis.creatorsUnder1k} <span className="text-muted-foreground font-normal text-xs">{'<'} $1k</span></p>
                             </div>
@@ -1866,21 +1877,21 @@ const Dashboard2 = () => {
               <div className="px-6 pb-6 -mt-1 space-y-6">
                 <h2 className="text-xl font-semibold flex items-center gap-2">
                   <PieChart className="h-5 w-5 text-primary" />
-                  Análisis 80/20 — {selectedPeriod?.label}
+                  {t("dashboard.d2.paretoFor", { period: selectedPeriod?.label ?? "" })}
                 </h2>
                 <div className="space-y-6">
                   <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2 bg-muted rounded-lg p-1">
-                      <Button variant={paretoView === "list" ? "default" : "ghost"} size="sm" className="h-7 text-xs px-3" onClick={() => setParetoView("list")}>Lista</Button>
-                      <Button variant={paretoView === "chart" ? "default" : "ghost"} size="sm" className="h-7 text-xs px-3" onClick={() => setParetoView("chart")}>Gráfico</Button>
+                      <Button variant={paretoView === "list" ? "default" : "ghost"} size="sm" className="h-7 text-xs px-3" onClick={() => setParetoView("list")}>{t("dashboard.d2.list")}</Button>
+                      <Button variant={paretoView === "chart" ? "default" : "ghost"} size="sm" className="h-7 text-xs px-3" onClick={() => setParetoView("chart")}>{t("dashboard.d2.chart")}</Button>
                     </div>
                     <div className="flex items-center gap-2 bg-muted rounded-lg p-1">
-                      <Button variant={paretoGroup === "80" ? "default" : "ghost"} size="sm" className="h-7 text-xs px-3" onClick={() => setParetoGroup("80")}>Top 20% (generan 80%)</Button>
-                      <Button variant={paretoGroup === "20" ? "default" : "ghost"} size="sm" className="h-7 text-xs px-3" onClick={() => setParetoGroup("20")}>Bottom 80% (generan 20%)</Button>
+                      <Button variant={paretoGroup === "80" ? "default" : "ghost"} size="sm" className="h-7 text-xs px-3" onClick={() => setParetoGroup("80")}>{t("dashboard.d2.top20")}</Button>
+                      <Button variant={paretoGroup === "20" ? "default" : "ghost"} size="sm" className="h-7 text-xs px-3" onClick={() => setParetoGroup("20")}>{t("dashboard.d2.bottom80")}</Button>
                     </div>
                     <div className="ml-auto text-right">
-                      <p className="text-sm font-bold tabular-nums">{paretoAnalysis.topCount} <span className="text-muted-foreground font-normal text-xs">de {paretoAnalysis.totalCount}</span></p>
-                      <p className="text-[10px] text-muted-foreground">generan 80% del revenue</p>
+                      <p className="text-sm font-bold tabular-nums">{paretoAnalysis.topCount} <span className="text-muted-foreground font-normal text-xs">{t("dashboard.d2.ofN", { n: paretoAnalysis.totalCount })}</span></p>
+                      <p className="text-[10px] text-muted-foreground">{t("dashboard.d2.generate80")}</p>
                     </div>
                   </div>
 
@@ -1908,25 +1919,25 @@ const Dashboard2 = () => {
                               <MavenTooltip
                                 formatter={(value, name, entry) => {
                                   const d = (entry.payload ?? {}) as { pctOfTotal?: number; cumPct?: number };
-                                  const pct = name === "Acumulado" ? d.cumPct : d.pctOfTotal;
+                                  const pct = name === t("dashboard.d2.accumulated") ? d.cumPct : d.pctOfTotal;
                                   return [`${fmt(Number(value))} · ${(pct ?? 0).toFixed(1)}%`, name];
                                 }}
                               />
                             }
                           />
-                          <Bar dataKey="value" name="Bruto" barSize={16} radius={[0, 4, 4, 0]} fill={CHART_SERIES[0]}>
+                          <Bar dataKey="value" name={t("dashboard.d2.gross")} barSize={16} radius={[0, 4, 4, 0]} fill={CHART_SERIES[0]}>
                             {paretoChartData.map((d, idx) => (
                               <Cell key={idx} fill={d.isResto ? "hsl(var(--muted-foreground) / 0.45)" : CHART_SERIES[0]} />
                             ))}
                             <LabelList dataKey="value" position="right" fill="hsl(var(--muted-foreground))" fontSize={10} formatter={(v: number) => fmtK(v)} />
                           </Bar>
-                          <Line type="monotone" dataKey="cum" name="Acumulado" stroke={CHART_COLOR.pink} strokeWidth={2} dot={{ r: 2, fill: CHART_COLOR.pink }} activeDot={{ r: 4 }} />
+                          <Line type="monotone" dataKey="cum" name={t("dashboard.d2.accumulated")} stroke={CHART_COLOR.pink} strokeWidth={2} dot={{ r: 2, fill: CHART_COLOR.pink }} activeDot={{ r: 4 }} />
                           {paretoGroup === "80" && paretoAnalysis.totalRevenue > 0 && (
                             <ReferenceLine
                               x={paretoAnalysis.totalRevenue * 0.8}
                               stroke="hsl(var(--warning))"
                               strokeDasharray="4 4"
-                              label={{ value: "80% del total", position: "insideBottomRight", fill: "hsl(var(--warning))", fontSize: 10 }}
+                              label={{ value: t("dashboard.d2.eightyOfTotal"), position: "insideBottomRight", fill: "hsl(var(--warning))", fontSize: 10 }}
                             />
                           )}
                         </ComposedChart>
@@ -1935,22 +1946,22 @@ const Dashboard2 = () => {
                       <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-xs text-muted-foreground">
                         <span className="flex items-center gap-1.5">
                           <span className="h-2 w-3 rounded-sm" style={{ background: CHART_SERIES[0] }} />
-                          Bruto por creadora
+                          {t("dashboard.d2.grossByCreator")}
                         </span>
                         <span className="flex items-center gap-1.5">
                           <span className="h-0.5 w-4 rounded-full" style={{ background: CHART_COLOR.pink }} />
-                          Acumulado
+                          {t("dashboard.d2.accumulated")}
                         </span>
                         {paretoGroup === "80" && (
                           <span className="flex items-center gap-1.5">
                             <span className="w-4 border-t-2 border-dashed" style={{ borderColor: "hsl(var(--warning))" }} />
-                            Corte 80%
+                            {t("dashboard.d2.cut80")}
                           </span>
                         )}
                       </div>
                       <div className="border-t border-border bg-muted/30 px-6 py-2.5 w-full text-center rounded-b-lg">
                         <p className="text-[10px] text-muted-foreground">
-                          Montos <strong>BRUTOS</strong> · {paretoGroup === "80" ? `Top ${paretoAnalysis.topCount} creadoras generan ${fmt(paretoAnalysis.topRevenue)}` : `Bottom ${paretoAnalysis.rest.length} generan ${fmt(paretoAnalysis.totalRevenue - paretoAnalysis.topRevenue)}`} de {fmt(paretoAnalysis.totalRevenue)} total
+                          {t("dashboard.d2.amounts")} <strong>{t("dashboard.d2.grossUpper")}</strong> · {paretoGroup === "80" ? t("dashboard.d2.topNGenerate", { n: paretoAnalysis.topCount, amount: fmt(paretoAnalysis.topRevenue) }) : t("dashboard.d2.bottomNGenerate", { n: paretoAnalysis.rest.length, amount: fmt(paretoAnalysis.totalRevenue - paretoAnalysis.topRevenue) })} {t("dashboard.d2.ofTotal", { total: fmt(paretoAnalysis.totalRevenue) })}
                         </p>
                       </div>
                     </div>
@@ -1960,7 +1971,7 @@ const Dashboard2 = () => {
                     <div className="space-y-5">
                       {paretoGroup === "80" && (
                       <div>
-                        <p className="text-xs font-semibold text-muted-foreground mb-3">🔥 Top {paretoAnalysis.topCount} — Bruto</p>
+                        <p className="text-xs font-semibold text-muted-foreground mb-3">🔥 {t("dashboard.d2.topNGross", { n: paretoAnalysis.topCount })}</p>
                         <div className="space-y-2">
                           {paretoAnalysis.top.map((c, i) => {
                             const pctOfTop = paretoAnalysis.topRevenue > 0 ? (c.total / paretoAnalysis.topRevenue) * 100 : 0;
@@ -2003,7 +2014,7 @@ const Dashboard2 = () => {
                       )}
                       {paretoGroup === "20" && (
                       <div>
-                        <p className="text-xs font-semibold text-muted-foreground mb-3">📉 Resto ({paretoAnalysis.rest.length})</p>
+                        <p className="text-xs font-semibold text-muted-foreground mb-3">📉 {t("dashboard.d2.rest", { n: paretoAnalysis.rest.length })}</p>
                         {paretoAnalysis.rest.length > 0 ? (
                           <div className="space-y-2">
                             {paretoAnalysis.rest.map((c, i) => {
@@ -2044,7 +2055,7 @@ const Dashboard2 = () => {
                               );
                             })}
                           </div>
-                        ) : <p className="text-sm text-muted-foreground">Ninguna.</p>}
+                        ) : <p className="text-sm text-muted-foreground">{t("dashboard.d2.none")}</p>}
                       </div>
                       )}
                     </div>
@@ -2065,23 +2076,24 @@ const Dashboard2 = () => {
                          from={range.from}
                          to={range.to}
                          onApply={(from, to) => { setRange({ from, to }); setActivePreset(null); }}
-                         placeholder="Seleccionar rango"
+                         placeholder={t("dashboard.d2.pickRange")}
                        />
                      </h2>
                   <div className="flex flex-wrap items-center gap-1 mt-3 bg-muted rounded-lg p-1">
                     {([
-                      { key: "mom" as const, icon: <GitCompare className="h-3.5 w-3.5" />, label: "MoM", desc: "Mes vs Mes" },
-                      { key: "ballenas" as const, icon: <Crown className="h-3.5 w-3.5" />, label: "Ballenas", desc: "Top spenders por creadora" },
-                      { key: "retencion" as const, icon: <Repeat className="h-3.5 w-3.5" />, label: "Retención", desc: "Retención de fans por cohorte" },
-                      { key: "chatter" as const, icon: <MessageSquare className="h-3.5 w-3.5" />, label: "Chatters", desc: "Rendimiento por chatter" },
-                      { key: "content_roi" as const, icon: <Layers className="h-3.5 w-3.5" />, label: "Content ROI", desc: "Promo (Promolog) → ingreso" },
-                      { key: "cohort" as const, icon: <Brain className="h-3.5 w-3.5" />, label: "Cohortes", desc: "Retención por cohorte de fans" },
-                      { key: "ltv" as const, icon: <UserCheck className="h-3.5 w-3.5" />, label: "LTV", desc: "Valor de vida del fan (estimado)" },
-                      { key: "compare" as const, icon: <Scale className="h-3.5 w-3.5" />, label: "Ranking", desc: "Posición por revenue" },
-                      { key: "scalability" as const, icon: <Target className="h-3.5 w-3.5" />, label: "Escalabilidad", desc: "Potencial de crecimiento" },
-                      { key: "channels" as const, icon: <BarChart3 className="h-3.5 w-3.5" />, label: "Canales", desc: "Msgs vs Tips vs Subs" },
-                      { key: "opportunities" as const, icon: <Sparkles className="h-3.5 w-3.5" />, label: "Oportunidades", desc: "Dónde hay potencial" },
-                      { key: "alerts" as const, icon: <ShieldAlert className="h-3.5 w-3.5" />, label: `Alertas (${alerts.length})`, desc: "Riesgos activos" },
+                      { key: "mom" as const, icon: <GitCompare className="h-3.5 w-3.5" />, label: "MoM", desc: t("dashboard.d2.dd.momDesc") },
+                      { key: "ballenas" as const, icon: <Crown className="h-3.5 w-3.5" />, label: t("dashboard.d2.dd.whales"), desc: t("dashboard.d2.dd.whalesDesc") },
+                      { key: "retencion" as const, icon: <Repeat className="h-3.5 w-3.5" />, label: t("dashboard.d2.retention"), desc: t("dashboard.d2.dd.retentionDesc") },
+                      { key: "chatter" as const, icon: <MessageSquare className="h-3.5 w-3.5" />, label: "Chatters", desc: t("dashboard.d2.dd.chattersDesc") },
+                      { key: "content_roi" as const, icon: <Layers className="h-3.5 w-3.5" />, label: "Content ROI", desc: t("dashboard.d2.dd.roiDesc") },
+                      { key: "cohort" as const, icon: <Brain className="h-3.5 w-3.5" />, label: t("dashboard.d2.dd.cohorts"), desc: t("dashboard.d2.dd.cohortsDesc") },
+                      { key: "ltv" as const, icon: <UserCheck className="h-3.5 w-3.5" />, label: "LTV", desc: t("dashboard.d2.dd.ltvDesc") },
+                      { key: "compare" as const, icon: <Scale className="h-3.5 w-3.5" />, label: "Ranking", desc: t("dashboard.d2.dd.rankingDesc") },
+                      { key: "scalability" as const, icon: <Target className="h-3.5 w-3.5" />, label: t("dashboard.d2.dd.scalability"), desc: t("dashboard.d2.dd.scalabilityDesc") },
+                      { key: "channels" as const, icon: <BarChart3 className="h-3.5 w-3.5" />, label: t("dashboard.d2.dd.channels"), desc: "Msgs vs Tips vs Subs" },
+                      { key: "opportunities" as const, icon: <Sparkles className="h-3.5 w-3.5" />, label: t("dashboard.d2.dd.opportunities"), desc: t("dashboard.d2.dd.opportunitiesDesc") },
+                      { key: "alerts" as const, icon: <ShieldAlert className="h-3.5 w-3.5" />, label: t("dashboard.d2.dd.alerts", { n: alerts.length }), desc: t("dashboard.d2.dd.alertsDesc") },
+
                     ]).filter((tab) => tab.key !== "content_roi" || vePromolog).map((tab) => (
                       <UITooltip key={tab.key}>
                         <TooltipTrigger asChild>
@@ -2115,26 +2127,26 @@ const Dashboard2 = () => {
                      return (
                        <div className="space-y-5">
                          <div className="rounded-lg bg-muted/40 px-4 py-2.5 border border-border">
-                           <p className="text-xs font-semibold text-foreground">📊 Comparativa Mes vs Mes (MoM)</p>
-                           <p className="text-[10px] text-muted-foreground mt-0.5">Compara el revenue de cada creadora entre el período seleccionado y el anterior. Identifica quién creció, quién cayó y en cuánto.</p>
+                           <p className="text-xs font-semibold text-foreground">📊 {t("dashboard.d2.mom.title")}</p>
+                           <p className="text-[10px] text-muted-foreground mt-0.5">{t("dashboard.d2.mom.desc")}</p>
                          </div>
                         <div className="grid grid-cols-4 gap-3">
                           <div className="rounded-xl border border-border bg-card p-3 text-center">
-                            <p className="text-[10px] text-muted-foreground uppercase">Actual</p>
+                            <p className="text-[10px] text-muted-foreground uppercase">{t("dashboard.d2.current")}</p>
                             <p className="text-lg font-bold tabular-nums">{fmtK(hlKpis.totalBruto)}</p>
                           </div>
                           <div className="rounded-xl border border-border bg-card p-3 text-center">
-                            <p className="text-[10px] text-muted-foreground uppercase">Anterior</p>
+                            <p className="text-[10px] text-muted-foreground uppercase">{t("common.previous")}</p>
                             <p className="text-lg font-bold tabular-nums">{fmtK(prevMonthTotal)}</p>
                           </div>
                           <div className="rounded-xl border border-border bg-card p-3 text-center">
-                            <p className="text-[10px] text-muted-foreground uppercase">Diferencia</p>
+                            <p className="text-[10px] text-muted-foreground uppercase">{t("dashboard.d2.difference")}</p>
                             <p className={`text-lg font-bold tabular-nums ${totalChangePercent >= 0 ? "text-success" : "text-destructive"}`}>
                               {totalChangePercent >= 0 ? "+" : ""}{fmtK(hlKpis.totalBruto - prevMonthTotal)}
                             </p>
                           </div>
                           <div className="rounded-xl border border-border bg-card p-3 text-center">
-                            <p className="text-[10px] text-muted-foreground uppercase">Cambio %</p>
+                            <p className="text-[10px] text-muted-foreground uppercase">{t("dashboard.d2.changePct")}</p>
                             <p className={`text-lg font-bold tabular-nums ${totalChangePercent >= 0 ? "text-success" : "text-destructive"}`}>
                               {totalChangePercent >= 0 ? "↑" : "↓"}{Math.abs(totalChangePercent).toFixed(1)}%
                             </p>
@@ -2147,12 +2159,12 @@ const Dashboard2 = () => {
                             <TableHeader className="sticky top-0 z-10 bg-card">
                               <TableRow>
                                  <TableHead className="w-8">#</TableHead>
-                                 <TableHead>Creadora</TableHead>
-                                 {ddHead("mom", "total", "Mes Actual")}
-                                 {ddHead("mom", "prev", "Mes Anterior")}
-                                 {ddHead("mom", "delta", "Diferencia")}
-                                 {ddHead("mom", "change", "Cambio %")}
-                                 <TableHead className="text-center w-32">Tendencia</TableHead>
+                                 <TableHead>{t("dashboard.d2.creator")}</TableHead>
+                                 {ddHead("mom", "total", t("dashboard.d2.currentMonth"))}
+                                 {ddHead("mom", "prev", t("dashboard.d2.previousMonth"))}
+                                 {ddHead("mom", "delta", t("dashboard.d2.difference"))}
+                                 {ddHead("mom", "change", t("dashboard.d2.changePct"))}
+                                 <TableHead className="text-center w-32">{t("dashboard.d2.trend")}</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -2170,7 +2182,7 @@ const Dashboard2 = () => {
                                     {c.delta >= 0 ? "+" : ""}{fmtShort(c.delta)}
                                   </TableCell>
                                   <TableCell className={`text-right tabular-nums text-sm font-medium ${c.change >= 0 ? "text-success" : "text-destructive"}`}>
-                                    {c.prev > 0 ? `${c.change >= 0 ? "+" : ""}${c.change.toFixed(0)}%` : "Nueva"}
+                                    {c.prev > 0 ? `${c.change >= 0 ? "+" : ""}${c.change.toFixed(0)}%` : t("common.newF")}
                                   </TableCell>
                                   <TableCell className="text-center">
                                     {/* #21 — sparkline con la FORMA de la curva diaria (caída
@@ -2187,14 +2199,14 @@ const Dashboard2 = () => {
                                             width={96}
                                             height={32}
                                             stroke={color}
-                                            title={`Ingreso diario de ${c.name} en el período (${serie.length} días con datos)`}
+                                            title={t("dashboard.d2.sparkTitle", { name: c.name, n: serie.length })}
                                           />
                                         );
                                       })()}
                                       <span>
-                                        {c.change > 10 && <Badge variant="outline" className="text-[9px] h-5 border-success/40 text-success">↑ Crece</Badge>}
-                                        {c.change <= 10 && c.change >= -10 && <Badge variant="outline" className="text-[9px] h-5 border-muted-foreground/30">= Estable</Badge>}
-                                        {c.change < -10 && <Badge variant="outline" className="text-[9px] h-5 border-destructive/40 text-destructive">↓ Cae</Badge>}
+                                        {c.change > 10 && <Badge variant="outline" className="text-[9px] h-5 border-success/40 text-success">↑ {t("dashboard.d2.grows")}</Badge>}
+                                        {c.change <= 10 && c.change >= -10 && <Badge variant="outline" className="text-[9px] h-5 border-muted-foreground/30">= {t("dashboard.d2.stable")}</Badge>}
+                                        {c.change < -10 && <Badge variant="outline" className="text-[9px] h-5 border-destructive/40 text-destructive">↓ {t("dashboard.d2.falls")}</Badge>}
                                       </span>
                                     </div>
                                   </TableCell>
@@ -2220,23 +2232,23 @@ const Dashboard2 = () => {
                      return (
                        <div className="space-y-5">
                          <div className="rounded-lg bg-muted/40 px-4 py-2.5 border border-border">
-                           <p className="text-xs font-semibold text-foreground">🏆 Ranking de Creadoras</p>
-                           <p className="text-[10px] text-muted-foreground mt-0.5">Posición de cada creadora por revenue bruto total. Muestra su participación en el total, eficiencia ($/Día, $/Fan) y tasa de retención de suscriptores.</p>
+                           <p className="text-xs font-semibold text-foreground">🏆 {t("dashboard.d2.rank.title")}</p>
+                           <p className="text-[10px] text-muted-foreground mt-0.5">{t("dashboard.d2.rank.desc")}</p>
                          </div>
-                         <p className="text-xs text-muted-foreground">Ranking completo por revenue bruto. Muestra participación individual, performance relativa y posición.</p>
+                         <p className="text-xs text-muted-foreground">{t("dashboard.d2.rank.sub")}</p>
                          <div className="rounded-lg border border-border bg-card overflow-auto max-h-[500px]">
                            <Table>
                              <TableHeader className="sticky top-0 z-10 bg-card">
                                <TableRow>
                                  <TableHead className="w-8">#</TableHead>
-                                 <TableHead>Creadora</TableHead>
-                                 {ddHead("compare", "total", "Bruto")}
+                                 <TableHead>{t("dashboard.d2.creator")}</TableHead>
+                                 {ddHead("compare", "total", t("dashboard.d2.gross"))}
                                  {ddHead("compare", "pct", "% Total")}
-                                 <TableHead className="w-[180px]">Participación</TableHead>
-                                 {ddHead("compare", "avgPerDay", "$/Día")}
+                                 <TableHead className="w-[180px]">{t("dashboard.d2.share")}</TableHead>
+                                 {ddHead("compare", "avgPerDay", t("dashboard.d2.perDay"))}
                                  {ddHead("compare", "avgPerFan", "$/Fan")}
                                  {ddHead("compare", "activeFans", "Fans")}
-                                 {ddHead("compare", "retention", "Retención")}
+                                 {ddHead("compare", "retention", t("dashboard.d2.retention"))}
                                </TableRow>
                              </TableHeader>
                              <TableBody>
@@ -2289,32 +2301,32 @@ const Dashboard2 = () => {
                      return (
                        <div className="space-y-5">
                          <div className="rounded-lg bg-muted/40 px-4 py-2.5 border border-border">
-                           <p className="text-xs font-semibold text-foreground">📈 Escalabilidad</p>
-                           <p className="text-[10px] text-muted-foreground mt-0.5">¿Cuánto más podría generar cada creadora? Se calcula un target de +20% sobre su actual y se sugiere la acción más efectiva para alcanzarlo.</p>
+                           <p className="text-xs font-semibold text-foreground">📈 {t("dashboard.d2.dd.scalability")}</p>
+                           <p className="text-[10px] text-muted-foreground mt-0.5">{t("dashboard.d2.scale.desc")}</p>
                          </div>
-                         <p className="text-xs text-muted-foreground">¿Cuánto más podría generar cada creadora? Target: +20% sobre su actual.</p>
+                         <p className="text-xs text-muted-foreground">{t("dashboard.d2.scale.sub")}</p>
                          <div className="rounded-lg border border-border bg-card overflow-auto max-h-[500px]">
                            <Table>
                              <TableHeader className="sticky top-0 z-10 bg-card">
                                <TableRow>
                                  <TableHead className="w-8">#</TableHead>
-                                 <TableHead>Creadora</TableHead>
-                                 {ddHead("scalability", "total", "Actual")}
+                                 <TableHead>{t("dashboard.d2.creator")}</TableHead>
+                                 {ddHead("scalability", "total", t("dashboard.d2.current"))}
                                  {ddHead("scalability", "target", "Target")}
-                                 {ddHead("scalability", "gap", "Falta")}
-                                 <TableHead className="w-[140px]">Progreso</TableHead>
-                                 <TableHead className="text-center">Sugerencia</TableHead>
+                                 {ddHead("scalability", "gap", t("dashboard.d2.gap"))}
+                                 <TableHead className="w-[140px]">{t("dashboard.d2.progress")}</TableHead>
+                                 <TableHead className="text-center">{t("dashboard.d2.suggestion")}</TableHead>
                                </TableRow>
                              </TableHeader>
                              <TableBody>
                               {active.map((c, i) => {
                                 const action = c.avgPerFan < hlKpis.avgPerFanGlobal * 0.5
-                                   ? "💰 Monetizar mejor"
+                                   ? `💰 ${t("dashboard.d2.act.monetize")}`
                                    : c.messages / (c.total || 1) < 0.3
-                                   ? "💬 Más mensajería"
+                                   ? `💬 ${t("dashboard.d2.act.moreMessages")}`
                                    : c.newFans <= 0
-                                   ? "📣 Adquirir fans"
-                                   : "✅ Mantener";
+                                   ? `📣 ${t("dashboard.d2.act.acquire")}`
+                                   : `✅ ${t("dashboard.d2.act.keep")}`;
                                  return (
                                    <TableRow key={c.creatorId}>
                                      <TableCell className="text-xs text-muted-foreground tabular-nums">{i + 1}</TableCell>
@@ -2345,10 +2357,11 @@ const Dashboard2 = () => {
                         <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 flex items-start gap-3">
                           <Sparkles className="h-4 w-4 text-primary mt-0.5 shrink-0" />
                           <div className="space-y-1">
-                            <p className="text-xs font-semibold text-foreground">Insight de Escalabilidad</p>
+                            <p className="text-xs font-semibold text-foreground">{t("dashboard.d2.scale.insight")}</p>
                             <p className="text-[11px] text-muted-foreground leading-relaxed">
-                              Si todas las creadoras activas ({active.length}) alcanzan su target +20%, el revenue bruto mensual pasaría de {fmtK(hlKpis.totalBruto)} a <strong className="text-primary">{fmtK(hlKpis.totalBruto * 1.2)}</strong>.
-                              La oportunidad más grande está en creadoras con $/Fan por debajo del promedio ({fmt(hlKpis.avgPerFanGlobal)}/fan) — mejorar su monetización genera mayor impacto.
+                              {t("dashboard.d2.scale.insight1", { n: active.length, from: fmtK(hlKpis.totalBruto) })}{" "}
+                              <strong className="text-primary">{fmtK(hlKpis.totalBruto * 1.2)}</strong>.{" "}
+                              {t("dashboard.d2.scale.insight2", { avg: fmt(hlKpis.avgPerFanGlobal) })}
                             </p>
                           </div>
                         </div>
@@ -2372,7 +2385,7 @@ const Dashboard2 = () => {
                         {items.length === 0 ? (
                           <div className="flex items-center gap-2 py-2">
                             <CheckCircle2 className="h-4 w-4 text-success" />
-                            <p className="text-sm text-muted-foreground">Sin alertas en esta categoría</p>
+                            <p className="text-sm text-muted-foreground">{t("dashboard.d2.noAlerts")}</p>
                           </div>
                         ) : (
                           <div className="space-y-1.5">
@@ -2397,19 +2410,19 @@ const Dashboard2 = () => {
                       <div className="space-y-4">
                         <div className="rounded-xl border border-border bg-card p-4 flex items-center gap-4">
                           <div className="flex-1">
-                            <p className="text-xs font-semibold text-foreground">Resumen de Alertas — {selectedPeriod?.label}</p>
+                            <p className="text-xs font-semibold text-foreground">{t("dashboard.d2.alertSummary", { period: selectedPeriod?.label ?? "" })}</p>
                             <p className="text-[10px] text-muted-foreground mt-0.5">
-                              {alerts.length} alertas activas: {zeros.length} inactivas, {drops.length} caídas severas, {fanLoss.length} perdiendo fans
+                              {t("dashboard.d2.alertSummaryLine", { n: alerts.length, zero: zeros.length, drop: drops.length, fan: fanLoss.length })}
                             </p>
                           </div>
                           <div className="flex gap-2">
                             <div className="text-center px-3">
                               <p className="text-lg font-bold tabular-nums text-destructive">{zeros.length}</p>
-                              <p className="text-[9px] text-muted-foreground">Inactivas</p>
+                              <p className="text-[9px] text-muted-foreground">{t("dashboard.rowInactive")}</p>
                             </div>
                             <div className="text-center px-3">
                               <p className="text-lg font-bold tabular-nums text-orange-500">{drops.length}</p>
-                              <p className="text-[9px] text-muted-foreground">Caída</p>
+                              <p className="text-[9px] text-muted-foreground">{t("dashboard.d2.drop")}</p>
                             </div>
                             <div className="text-center px-3">
                               <p className="text-lg font-bold tabular-nums text-warning">{fanLoss.length}</p>
@@ -2417,9 +2430,10 @@ const Dashboard2 = () => {
                             </div>
                           </div>
                         </div>
-                        {renderSection("Inactivas — Revenue $0", "🔴", zeros, "border-destructive/30", "bg-destructive/5")}
-                        {renderSection("Caída severa (>30%)", "🟠", drops, "border-orange-400/30", "bg-orange-500/5")}
-                        {renderSection("Pérdida de fans", "🟡", fanLoss, "border-warning/30", "bg-warning/5")}
+                        {renderSection(t("dashboard.d2.sec.inactive"), "🔴", zeros, "border-destructive/30", "bg-destructive/5")}
+                        {renderSection(t("dashboard.d2.sec.drop"), "🟠", drops, "border-orange-400/30", "bg-orange-500/5")}
+                        {renderSection(t("dashboard.d2.sec.fanLoss"), "🟡", fanLoss, "border-warning/30", "bg-warning/5")}
+
                       </div>
                     );
                   })()}
@@ -2436,16 +2450,16 @@ const Dashboard2 = () => {
                      return (
                        <div className="space-y-5">
                          <div className="rounded-lg bg-muted/40 px-4 py-2.5 border border-border">
-                           <p className="text-xs font-semibold text-foreground">💬 Análisis por Canal de Monetización</p>
-                           <p className="text-[10px] text-muted-foreground mt-0.5">Desglose de ingresos por canal (Mensajería, Tips, Suscripciones) para cada creadora. Si una creadora tiene &gt;70% en un solo canal, aparece con ⚠ indicando riesgo de dependencia.</p>
+                           <p className="text-xs font-semibold text-foreground">💬 {t("dashboard.d2.ch.title")}</p>
+                           <p className="text-[10px] text-muted-foreground mt-0.5">{t("dashboard.d2.ch.desc")}</p>
                          </div>
-                         <p className="text-xs text-muted-foreground">Desglose detallado por canal de monetización para cada creadora. Identifica dependencias y oportunidades de diversificación.</p>
+                         <p className="text-xs text-muted-foreground">{t("dashboard.d2.ch.sub")}</p>
                          <div className="rounded-lg border border-border bg-card overflow-auto max-h-[500px]">
                            <Table>
                              <TableHeader className="sticky top-0 z-10 bg-card">
                                <TableRow>
                                  <TableHead className="w-8">#</TableHead>
-                                 <TableHead>Creadora</TableHead>
+                                 <TableHead>{t("dashboard.d2.creator")}</TableHead>
                                  {ddHead("channels", "total", "Total")}
                                  {ddHead("channels", "messages", "Msgs $")}
                                  {ddHead("channels", "msgPct", "Msgs %")}
@@ -2453,7 +2467,7 @@ const Dashboard2 = () => {
                                  {ddHead("channels", "tipPct", "Tips %")}
                                  {ddHead("channels", "subs", "Subs $")}
                                  {ddHead("channels", "subPct", "Subs %")}
-                                 <TableHead className="text-center">Canal Dominante</TableHead>
+                                 <TableHead className="text-center">{t("dashboard.d2.ch.dominant")}</TableHead>
                                </TableRow>
                              </TableHeader>
                              <TableBody>
@@ -2486,9 +2500,9 @@ const Dashboard2 = () => {
                         <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 flex items-start gap-3">
                           <Sparkles className="h-4 w-4 text-primary mt-0.5 shrink-0" />
                           <div className="space-y-1">
-                            <p className="text-xs font-semibold text-foreground">Insight de Diversificación</p>
+                            <p className="text-xs font-semibold text-foreground">{t("dashboard.d2.ch.insight")}</p>
                             <p className="text-[11px] text-muted-foreground leading-relaxed">
-                              {active.filter(c => { const max = Math.max(c.total > 0 ? (c.messages / c.total) * 100 : 0, c.total > 0 ? (c.tips / c.total) * 100 : 0, c.total > 0 ? (c.subs / c.total) * 100 : 0); return max > 70; }).length} creadoras tienen &gt;70% concentrado en un solo canal — riesgo de dependencia. Diversificar canales reduce volatilidad.
+                              {t("dashboard.d2.ch.insightText", { n: active.filter(c => { const max = Math.max(c.total > 0 ? (c.messages / c.total) * 100 : 0, c.total > 0 ? (c.tips / c.total) * 100 : 0, c.total > 0 ? (c.subs / c.total) * 100 : 0); return max > 70; }).length })}
                             </p>
                           </div>
                         </div>
@@ -2506,18 +2520,18 @@ const Dashboard2 = () => {
                     return (
                       <div className="space-y-5">
                         <div className="rounded-lg bg-muted/40 px-4 py-2.5 border border-border">
-                          <p className="text-xs font-semibold text-foreground">🎯 Oportunidades de Crecimiento</p>
-                          <p className="text-[10px] text-muted-foreground mt-0.5">Tres categorías accionables: creadoras en racha de crecimiento, creadoras con muchos fans pero baja monetización, y creadoras con buena monetización pero pocos fans.</p>
+                          <p className="text-xs font-semibold text-foreground">🎯 {t("dashboard.d2.op.title")}</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">{t("dashboard.d2.op.desc")}</p>
                         </div>
-                        <p className="text-xs text-muted-foreground">Creadoras con mayor potencial de crecimiento basado en métricas actuales.</p>
+                        <p className="text-xs text-muted-foreground">{t("dashboard.d2.op.sub")}</p>
                         
                         <div className="rounded-xl border-2 border-emerald-500/30 bg-emerald-500/5 p-4 space-y-3">
                           <div className="flex items-center gap-2">
                             <span className="text-lg">🚀</span>
-                            <h3 className="text-sm font-bold text-foreground">Alto Crecimiento</h3>
-                            <span className="text-[10px] text-muted-foreground">Crecieron &gt;20% vs período anterior — mantener impulso</span>
+                            <h3 className="text-sm font-bold text-foreground">{t("dashboard.d2.op.highGrowth")}</h3>
+                            <span className="text-[10px] text-muted-foreground">{t("dashboard.d2.op.highGrowthDesc")}</span>
                           </div>
-                          {highGrowth.length === 0 ? <p className="text-sm text-muted-foreground">Sin creadoras en esta categoría</p> : (
+                          {highGrowth.length === 0 ? <p className="text-sm text-muted-foreground">{t("dashboard.d2.op.none")}</p> : (
                             <div className="space-y-1.5">
                               {highGrowth.map((c, i) => {
                                 const prev = prevMonthMap.get(c.creatorId) ?? 0;
@@ -2538,10 +2552,10 @@ const Dashboard2 = () => {
                         <div className="rounded-xl border-2 border-blue-500/30 bg-blue-500/5 p-4 space-y-3">
                           <div className="flex items-center gap-2">
                             <span className="text-lg">💎</span>
-                            <h3 className="text-sm font-bold text-foreground">Sub-monetizadas</h3>
-                            <span className="text-[10px] text-muted-foreground">$/Fan bajo vs promedio ({fmt(hlKpis.avgPerFanGlobal)}) pero +50 fans — oportunidad de monetización</span>
+                            <h3 className="text-sm font-bold text-foreground">{t("dashboard.d2.op.under")}</h3>
+                            <span className="text-[10px] text-muted-foreground">{t("dashboard.d2.op.underDesc", { avg: fmt(hlKpis.avgPerFanGlobal) })}</span>
                           </div>
-                          {lowMonetization.length === 0 ? <p className="text-sm text-muted-foreground">Sin creadoras en esta categoría</p> : (
+                          {lowMonetization.length === 0 ? <p className="text-sm text-muted-foreground">{t("dashboard.d2.op.none")}</p> : (
                             <div className="space-y-1.5">
                               {lowMonetization.map((c, i) => (
                                 <ListRow key={c.creatorId}>
@@ -2559,10 +2573,10 @@ const Dashboard2 = () => {
                         <div className="rounded-xl border-2 border-purple-500/30 bg-purple-500/5 p-4 space-y-3">
                           <div className="flex items-center gap-2">
                             <span className="text-lg">📣</span>
-                            <h3 className="text-sm font-bold text-foreground">Necesitan Audiencia</h3>
-                            <span className="text-[10px] text-muted-foreground">Buen $/Fan pero &lt;100 fans — necesitan adquisición</span>
+                            <h3 className="text-sm font-bold text-foreground">{t("dashboard.d2.op.audience")}</h3>
+                            <span className="text-[10px] text-muted-foreground">{t("dashboard.d2.op.audienceDesc")}</span>
                           </div>
-                          {underperforming.length === 0 ? <p className="text-sm text-muted-foreground">Sin creadoras en esta categoría</p> : (
+                          {underperforming.length === 0 ? <p className="text-sm text-muted-foreground">{t("dashboard.d2.op.none")}</p> : (
                             <div className="space-y-1.5">
                               {underperforming.map((c, i) => (
                                 <ListRow key={c.creatorId}>
@@ -2593,27 +2607,27 @@ const Dashboard2 = () => {
                     return (
                       <div className="space-y-5">
                         <div className="rounded-lg bg-muted/40 px-4 py-2.5 border border-border">
-                          <p className="text-xs font-semibold text-foreground">🐋 Ballenas — Top spenders por creadora</p>
-                          <p className="text-[10px] text-muted-foreground mt-0.5">Los fans que más gastaron (snapshot {snap}). Para retención/upsell: prioriza a los que están por expirar. Fuente: <code className="bg-muted px-1 rounded font-mono text-[10px]">creator_top_fans</code> (BLU fan-reports).</p>
+                          <p className="text-xs font-semibold text-foreground">🐋 {t("dashboard.d2.wh.title")}</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">{t("dashboard.d2.wh.desc", { snap })} {t("dashboard.d2.source")} <code className="bg-muted px-1 rounded font-mono text-[10px]">creator_top_fans</code> {t("dashboard.d2.wh.sourceTail")}</p>
                         </div>
                         <div className="grid grid-cols-3 gap-3">
                           <div className="rounded-xl border border-border bg-card p-3 text-center">
-                            <p className="text-[10px] text-muted-foreground uppercase">Ballenas</p>
+                            <p className="text-[10px] text-muted-foreground uppercase">{t("dashboard.d2.dd.whales")}</p>
                             <p className="text-lg font-bold tabular-nums">{topFans.length.toLocaleString()}</p>
                           </div>
                           <div className="rounded-xl border border-border bg-card p-3 text-center">
-                            <p className="text-[10px] text-muted-foreground uppercase">Gasto total (top)</p>
+                            <p className="text-[10px] text-muted-foreground uppercase">{t("dashboard.d2.wh.totalSpend")}</p>
                             <p className="text-lg font-bold tabular-nums">{fmtK(totalSpend)}</p>
                           </div>
                           <div className="rounded-xl border border-border bg-card p-3 text-center">
-                            <p className="text-[10px] text-muted-foreground uppercase">Expiran ≤7d</p>
+                            <p className="text-[10px] text-muted-foreground uppercase">{t("dashboard.d2.wh.expiring")}</p>
                             <p className="text-lg font-bold tabular-nums text-warning">{soon}</p>
                           </div>
                         </div>
                         {topFansLoading ? (
-                          <div className="p-8 text-center text-sm text-muted-foreground">Cargando ballenas…</div>
+                          <div className="p-8 text-center text-sm text-muted-foreground">{t("dashboard.d2.wh.loading")}</div>
                         ) : topFans.length === 0 ? (
-                          <div className="rounded-lg border border-border bg-card text-center py-12 text-sm text-muted-foreground">Sin ballenas todavía — espera la próxima sincronización de BLU.</div>
+                          <div className="rounded-lg border border-border bg-card text-center py-12 text-sm text-muted-foreground">{t("dashboard.d2.wh.empty")}</div>
                         ) : (
                           <div className="rounded-xl border border-border overflow-hidden">
                             <Table>
@@ -2621,11 +2635,11 @@ const Dashboard2 = () => {
                                 <TableRow>
                                   <TableHead className="w-10">#</TableHead>
                                   <TableHead>Fan</TableHead>
-                                  <TableHead>Creadora</TableHead>
-                                  <TableHead className="text-right">Gasto</TableHead>
-                                  <TableHead className="text-right">Mensajes</TableHead>
-                                  <TableHead>Estado</TableHead>
-                                  <TableHead>Expira</TableHead>
+                                  <TableHead>{t("dashboard.d2.creator")}</TableHead>
+                                  <TableHead className="text-right">{t("dashboard.d2.wh.spend")}</TableHead>
+                                  <TableHead className="text-right">{t("dashboard.d2.messaging")}</TableHead>
+                                  <TableHead>{t("common.status")}</TableHead>
+                                  <TableHead>{t("dashboard.d2.wh.expires")}</TableHead>
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
@@ -2641,8 +2655,9 @@ const Dashboard2 = () => {
                                       <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{fmtK(f.messages_gross)}</TableCell>
                                       <TableCell>
                                         {f.is_active === false
-                                          ? <Badge variant="outline" className="text-muted-foreground">Inactivo</Badge>
-                                          : <Badge variant="outline" className="text-success border-success/30">Activo</Badge>}
+                                          ? <Badge variant="outline" className="text-muted-foreground">{t("common.inactive")}</Badge>
+                                          : <Badge variant="outline" className="text-success border-success/30">{t("common.active")}</Badge>}
+
                                       </TableCell>
                                       <TableCell className={`text-sm tabular-nums whitespace-nowrap ${expSoon ? "text-warning font-medium" : "text-muted-foreground"}`}>
                                         {exp ? format(exp, "dd MMM yy", { locale: formatoUi.fechas }) : "—"}{expSoon && " ⚠"}
@@ -2687,17 +2702,17 @@ const Dashboard2 = () => {
                     return (
                       <div className="space-y-5">
                         <div className="rounded-lg bg-muted/40 px-4 py-2.5 border border-border">
-                          <p className="text-xs font-semibold text-foreground">🔁 Retención de fans por cohorte</p>
-                          <p className="text-[10px] text-muted-foreground mt-0.5">De cada grupo de fans nuevos, qué % sigue suscripto a los días 0–11 (cohortes últimos 60d: {snap}). Caída fuerte = problema de retención. Fuente: <code className="bg-muted px-1 rounded font-mono text-[10px]">creator_fan_retention</code> (BLU).</p>
+                          <p className="text-xs font-semibold text-foreground">🔁 {t("dashboard.d2.ret.title")}</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">{t("dashboard.d2.ret.desc", { snap })} {t("dashboard.d2.source")} <code className="bg-muted px-1 rounded font-mono text-[10px]">creator_fan_retention</code> (BLU).</p>
                         </div>
                         {retLoading ? (
-                          <div className="p-8 text-center text-sm text-muted-foreground">Cargando retención…</div>
+                          <div className="p-8 text-center text-sm text-muted-foreground">{t("dashboard.d2.ret.loading")}</div>
                         ) : rows.length === 0 ? (
-                          <div className="rounded-lg border border-border bg-card text-center py-12 text-sm text-muted-foreground">Sin datos de retención todavía — espera la próxima sincronización de BLU.</div>
+                          <div className="rounded-lg border border-border bg-card text-center py-12 text-sm text-muted-foreground">{t("dashboard.d2.ret.empty")}</div>
                         ) : (
                           <>
                             <div className="rounded-xl border border-border bg-card p-4">
-                              <p className="text-xs font-semibold text-foreground mb-3">Curva de retención (todas las creadoras, ponderada por fans)</p>
+                              <p className="text-xs font-semibold text-foreground mb-3">{t("dashboard.d2.ret.curve")}</p>
                               <div className="flex items-end gap-1.5 h-36">
                                 {curve.map((v, d) => (
                                   <div key={d} className="flex-1 flex flex-col items-center gap-1 h-full">
@@ -2712,15 +2727,15 @@ const Dashboard2 = () => {
                             </div>
                             <div className="rounded-xl border border-border overflow-hidden">
                               <div className="px-4 py-2.5 border-b border-border bg-muted/20">
-                                <p className="text-xs font-semibold text-foreground">Retención por creadora — peores primero (a afinar)</p>
+                                <p className="text-xs font-semibold text-foreground">{t("dashboard.d2.ret.byCreator")}</p>
                               </div>
                               <Table>
                                 <TableHeader>
                                   <TableRow>
-                                    <TableHead>Creadora</TableHead>
-                                    <TableHead className="text-right">Fans nuevos (60d)</TableHead>
-                                    <TableHead className="text-right">Ret. día 1</TableHead>
-                                    <TableHead className="text-right">Ret. día 7</TableHead>
+                                    <TableHead>{t("dashboard.d2.creator")}</TableHead>
+                                    <TableHead className="text-right">{t("dashboard.d2.ret.newFans60")}</TableHead>
+                                    <TableHead className="text-right">{t("dashboard.d2.ret.day1")}</TableHead>
+                                    <TableHead className="text-right">{t("dashboard.d2.ret.day7")}</TableHead>
                                   </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -2756,13 +2771,13 @@ const Dashboard2 = () => {
                     return (
                       <div className="space-y-5">
                         <div className="rounded-lg bg-muted/40 px-4 py-2.5 border border-border">
-                          <p className="text-xs font-semibold text-foreground">🧑‍💻 Rendimiento por chatter</p>
-                          <p className="text-[10px] text-muted-foreground mt-0.5">Ventas, conversión y tiempos por chatter (mes en curso: {snap}). Δ = vs período anterior. Fuente: <code className="bg-muted px-1 rounded font-mono text-[10px]">chatter_performance</code> (BLU employee-reports).</p>
+                          <p className="text-xs font-semibold text-foreground">🧑‍💻 {t("dashboard.d2.chat.title")}</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">{t("dashboard.d2.chat.desc", { snap })} {t("dashboard.d2.source")} <code className="bg-muted px-1 rounded font-mono text-[10px]">chatter_performance</code> {t("dashboard.d2.chat.sourceTail")}</p>
                         </div>
                         {chattersLoading ? (
-                          <div className="p-8 text-center text-sm text-muted-foreground">Cargando chatters…</div>
+                          <div className="p-8 text-center text-sm text-muted-foreground">{t("dashboard.d2.chat.loading")}</div>
                         ) : list.length === 0 ? (
-                          <div className="rounded-lg border border-border bg-card text-center py-12 text-sm text-muted-foreground">Sin datos de chatters todavía — espera la próxima sincronización de BLU.</div>
+                          <div className="rounded-lg border border-border bg-card text-center py-12 text-sm text-muted-foreground">{t("dashboard.d2.chat.empty")}</div>
                         ) : (
                           <>
                             <div className="grid grid-cols-3 gap-3">
@@ -2771,11 +2786,11 @@ const Dashboard2 = () => {
                                 <p className="text-lg font-bold tabular-nums">{list.length}</p>
                               </div>
                               <div className="rounded-xl border border-border bg-card p-3 text-center">
-                                <p className="text-[10px] text-muted-foreground uppercase">Ventas (total)</p>
+                                <p className="text-[10px] text-muted-foreground uppercase">{t("dashboard.d2.chat.totalSales")}</p>
                                 <p className="text-lg font-bold tabular-nums">{fmtK(totalSales)}</p>
                               </div>
                               <div className="rounded-xl border border-border bg-card p-3 text-center">
-                                <p className="text-[10px] text-muted-foreground uppercase">Conversión prom</p>
+                                <p className="text-[10px] text-muted-foreground uppercase">{t("dashboard.d2.chat.avgConv")}</p>
                                 <p className="text-lg font-bold tabular-nums">{avgConv != null ? `${avgConv.toFixed(1)}%` : "—"}</p>
                               </div>
                             </div>
@@ -2784,14 +2799,14 @@ const Dashboard2 = () => {
                                 <TableHeader>
                                   <TableRow>
                                     <TableHead>Chatter</TableHead>
-                                    <TableHead>Grupo</TableHead>
-                                    <TableHead className="text-right">Ventas</TableHead>
+                                    <TableHead>{t("dashboard.d2.chat.group")}</TableHead>
+                                    <TableHead className="text-right">{t("dashboard.d2.chat.sales")}</TableHead>
                                     <TableHead className="text-right">Δ</TableHead>
-                                    <TableHead className="text-right">Fans chat.</TableHead>
-                                    <TableHead className="text-right">Conv.</TableHead>
-                                    <TableHead className="text-right">$/fan pago</TableHead>
-                                    <TableHead className="text-right">Resp.</TableHead>
-                                    <TableHead className="text-right">Hrs (real/prog)</TableHead>
+                                    <TableHead className="text-right">{t("dashboard.d2.chat.fansChatted")}</TableHead>
+                                    <TableHead className="text-right">{t("dashboard.d2.chat.conv")}</TableHead>
+                                    <TableHead className="text-right">{t("dashboard.d2.chat.perPayingFan")}</TableHead>
+                                    <TableHead className="text-right">{t("dashboard.d2.chat.resp")}</TableHead>
+                                    <TableHead className="text-right">{t("dashboard.d2.chat.hours")}</TableHead>
                                   </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -2834,7 +2849,7 @@ const Dashboard2 = () => {
                       const d = r.date;
                       const isPromo = pd.get(r.creator_id)?.has(d) ?? false;
                       const inc = r.total_gross;
-                      const e = byC.get(r.creator_id) || { name: r.artistic_name || "Sin nombre", promoInc: 0, promoDays: 0, nonInc: 0, nonDays: 0 };
+                      const e = byC.get(r.creator_id) || { name: r.artistic_name || t("dashboard.noName"), promoInc: 0, promoDays: 0, nonInc: 0, nonDays: 0 };
                       if (isPromo) { e.promoInc += inc; e.promoDays++; aPromoInc += inc; aPromoDays++; }
                       else { e.nonInc += inc; e.nonDays++; aNonInc += inc; aNonDays++; }
                       byC.set(r.creator_id, e);
@@ -2853,22 +2868,22 @@ const Dashboard2 = () => {
                     return (
                       <div className="space-y-5">
                         <div className="rounded-lg bg-muted/40 px-4 py-2.5 border border-border">
-                          <p className="text-xs font-semibold text-foreground">📣 Content ROI — ¿promocionar mueve la aguja?</p>
-                          <p className="text-[10px] text-muted-foreground mt-0.5">Ingreso/día en días que la creadora promocionó (Promolog) vs días que no, en {selectedPeriod?.label}. "Lift" = cuánto más rinde un día con promo. Fuente: <code className="bg-muted px-1 rounded font-mono text-[10px]">promolog_entries</code> × <code className="bg-muted px-1 rounded font-mono text-[10px]">creator_daily_earnings</code>.</p>
+                          <p className="text-xs font-semibold text-foreground">📣 {t("dashboard.d2.roi.title")}</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">{t("dashboard.d2.roi.desc", { period: selectedPeriod?.label ?? "" })} {t("dashboard.d2.source")} <code className="bg-muted px-1 rounded font-mono text-[10px]">promolog_entries</code> × <code className="bg-muted px-1 rounded font-mono text-[10px]">creator_daily_earnings</code>.</p>
                         </div>
                         {promoLoading ? (
-                          <div className="p-8 text-center text-sm text-muted-foreground">Cargando promos…</div>
+                          <div className="p-8 text-center text-sm text-muted-foreground">{t("dashboard.d2.roi.loading")}</div>
                         ) : list.length === 0 ? (
-                          <div className="rounded-lg border border-border bg-card text-center py-12 text-sm text-muted-foreground">Sin días de promo en {selectedPeriod?.label}.</div>
+                          <div className="rounded-lg border border-border bg-card text-center py-12 text-sm text-muted-foreground">{t("dashboard.d2.roi.empty", { period: selectedPeriod?.label ?? "" })}</div>
                         ) : (
                           <>
                             <div className="grid grid-cols-3 gap-3">
                               <div className="rounded-xl border border-border bg-card p-3 text-center">
-                                <p className="text-[10px] text-muted-foreground uppercase">$/día CON promo</p>
+                                <p className="text-[10px] text-muted-foreground uppercase">{t("dashboard.d2.roi.withPromo")}</p>
                                 <p className="text-lg font-bold tabular-nums">{agAvgP != null ? fmtK(agAvgP) : "—"}</p>
                               </div>
                               <div className="rounded-xl border border-border bg-card p-3 text-center">
-                                <p className="text-[10px] text-muted-foreground uppercase">$/día SIN promo</p>
+                                <p className="text-[10px] text-muted-foreground uppercase">{t("dashboard.d2.roi.withoutPromo")}</p>
                                 <p className="text-lg font-bold tabular-nums">{agAvgN != null ? fmtK(agAvgN) : "—"}</p>
                               </div>
                               <div className="rounded-xl border border-border bg-card p-3 text-center">
@@ -2880,10 +2895,11 @@ const Dashboard2 = () => {
                               <Table>
                                 <TableHeader>
                                   <TableRow>
-                                    <TableHead>Creadora</TableHead>
-                                    <TableHead className="text-right">Días promo</TableHead>
-                                    <TableHead className="text-right">$/día c/promo</TableHead>
-                                    <TableHead className="text-right">$/día s/promo</TableHead>
+                                    <TableHead>{t("dashboard.d2.creator")}</TableHead>
+                                    <TableHead className="text-right">{t("dashboard.d2.roi.promoDays")}</TableHead>
+                                    <TableHead className="text-right">{t("dashboard.d2.roi.withPromoShort")}</TableHead>
+                                    <TableHead className="text-right">{t("dashboard.d2.roi.withoutPromoShort")}</TableHead>
+
                                     <TableHead className="text-right">Lift</TableHead>
                                   </TableRow>
                                 </TableHeader>
