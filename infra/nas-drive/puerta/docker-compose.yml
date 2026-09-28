@@ -40,11 +40,13 @@ services:
     network_mode: service:puerta-tailscale
     depends_on:
       - puerta-tailscale
-    # Primero por nombre (MagicDNS); si no resuelve, por IP de Tailscale.
+    # ⚠️ SOLO por nombre (MagicDNS), nunca por IP. La IP de Tailscale de la
+    # mini CAMBIÓ el 28/09 cuando se volvió a iniciar sesión (100.64.206.91 →
+    # 100.127.43.97), y con las dos como destino Caddy alternaba al azar: la
+    # mitad de los pedidos daban 502. El nombre sigue a la máquina.
     command: >
       caddy reverse-proxy --from :8080
       --to unlok-workstation.tail11d450.ts.net:8790
-      --to 100.64.206.91:8790
     restart: unless-stopped
 
 volumes:
