@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/select";
 import { Loader2, Trophy, Users, BarChart3, TrendingUp } from "lucide-react";
 import StatChip from "@/components/StatChip";
+import { ConFormato } from "@/pages/admin/ConFormato";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import {
   BarChart,
@@ -29,6 +30,8 @@ import {
   type QaWindow,
 } from "@/hooks/useAgencyQa";
 import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 
 // Analytics subtab — supervisor dashboard for Agency QA. Aggregates
 // every qa_calls row in the chosen window and surfaces:
@@ -41,11 +44,12 @@ import { useFormato } from "@/hooks/useFormato";
 // Out of scope (next slices): drill-down a closer/modelo individual,
 // export PDF, period-vs-period comparison, audio metrics rollup.
 
-const WINDOW_OPTIONS: Array<{ value: QaWindow; label: string }> = [
-  { value: "7d",  label: "Últimos 7 días" },
-  { value: "30d", label: "Últimos 30 días" },
-  { value: "90d", label: "Últimos 90 días" },
-  { value: "all", label: "Todo el histórico" },
+// `value` es el parámetro de la consulta (no se traduce); label/hint son claves.
+const WINDOW_OPTIONS: Array<{ value: QaWindow; label: TranslationKey; hint: TranslationKey }> = [
+  { value: "7d",  label: "agencyQa.window.7d",     hint: "agencyQa.analytics.hint.7d" },
+  { value: "30d", label: "agencyQa.window.30d",    hint: "agencyQa.analytics.hint.30d" },
+  { value: "90d", label: "agencyQa.window.90d",    hint: "agencyQa.analytics.hint.90d" },
+  { value: "all", label: "common.entireHistory",   hint: "agencyQa.analytics.hint.all" },
 ];
 
 const OUTCOME_COLORS: Record<string, string> = {
@@ -54,11 +58,11 @@ const OUTCOME_COLORS: Record<string, string> = {
   en_espera: "#ca8a04",
   unscored:  "#71717a",
 };
-const OUTCOME_LABELS: Record<string, string> = {
-  cerro:     "Exitoso",
-  no_cerro:  "Rechazado",
-  en_espera: "En espera",
-  unscored:  "Sin scorear",
+const OUTCOME_LABELS: Record<string, TranslationKey> = {
+  cerro:     "agencyQa.outcome.closed",
+  no_cerro:  "agencyQa.outcome.notClosed",
+  en_espera: "agencyQa.outcome.waiting",
+  unscored:  "agencyQa.outcome.unscored",
 };
 
 const formatPct = (n: number) => `${(n * 100).toFixed(1)}%`;
@@ -89,6 +93,7 @@ const Kpi = ({
 
 // ─── Main ──────────────────────────────────────────────────────────────
 const AgencyAnalytics = () => {
+  const { t } = useLanguage();
   const f = useFormato();
   const [window, setWindow] = useState<QaWindow>("30d");
   type KpiKey = "totales" | "close_rate" | "score" | "closers";
@@ -116,10 +121,8 @@ const AgencyAnalytics = () => {
       {/* Header + window selector */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold">Analytics de QA</h2>
-          <p className="text-xs text-muted-foreground">
-            Métricas agregadas de todas las llamadas analizadas en el período.
-          </p>
+          <h2 className="text-base font-semibold">{t("agencyQa.analytics.title")}</h2>
+          <p className="text-xs text-muted-foreground">{t("agencyQa.analytics.subtitle")}</p>
         </div>
         <Select value={window} onValueChange={(v) => setWindow(v as QaWindow)}>
           <SelectTrigger className="w-[200px]">
@@ -128,7 +131,7 @@ const AgencyAnalytics = () => {
           <SelectContent>
             {WINDOW_OPTIONS.map((o) => (
               <SelectItem key={o.value} value={o.value}>
-                {o.label}
+                {t(o.label)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -137,17 +140,15 @@ const AgencyAnalytics = () => {
 
       {q.isError ? (
         <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-6 text-sm">
-          <p className="font-semibold text-destructive">No se pudo cargar Analytics</p>
+          <p className="font-semibold text-destructive">{t("agencyQa.analytics.loadError")}</p>
           <p className="mt-1 text-xs text-destructive/80">
-            {(q.error as Error)?.message ??
-              "Error desconocido leyendo qa_calls."}
+            {(q.error as Error)?.message ?? t("agencyQa.analytics.unknownError")}
           </p>
           <p className="mt-2 text-xs text-muted-foreground">
-            Causa más probable: las migrations de Agency QA todavía no están
-            aplicadas en esta branch de Supabase. Aplica las migrations
-            (vía dashboard SQL editor o el bundle en
-            <code className="mx-1 rounded bg-muted/40 px-1">scripts/manual-pending-migrations.sql</code>
-            ) y refresca.
+            <ConFormato
+              texto={t("agencyQa.analytics.migrationsHint")}
+              piezas={{ file: <code className="mx-1 rounded bg-muted/40 px-1">scripts/manual-pending-migrations.sql</code> }}
+            />
           </p>
         </div>
       ) : q.isLoading || !data ? (
@@ -156,10 +157,9 @@ const AgencyAnalytics = () => {
         </div>
       ) : data.total_calls === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-muted/20 p-10 text-center">
-          <p className="text-sm font-medium">Sin datos en este período</p>
+          <p className="text-sm font-medium">{t("agencyQa.analytics.emptyTitle")}</p>
           <p className="text-xs text-muted-foreground">
-            Cuando el equipo cargue una QA desde "Nueva QA", el dashboard se llena
-            automáticamente. Prueba ampliar la ventana de tiempo si esperabas ver algo.
+            {t("agencyQa.analytics.emptyHint", { tab: t("agencyQa.tab.newQa") })}
           </p>
         </div>
       ) : (
@@ -167,9 +167,9 @@ const AgencyAnalytics = () => {
           {/* KPI strip — clickeables, abren modal */}
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             <Kpi
-              label="Análisis totales"
+              label={t("agencyQa.totalAnalyses")}
               value={data.total_calls}
-              hint={`en ${WINDOW_OPTIONS.find((w) => w.value === data.window)?.label.toLowerCase()}`}
+              hint={t(WINDOW_OPTIONS.find((w) => w.value === data.window)?.hint ?? "agencyQa.analytics.hint.all")}
               color="bg-primary"
               icon={<BarChart3 className="h-3.5 w-3.5" />}
               onClick={() => setKpiPopup("totales")}
@@ -177,13 +177,13 @@ const AgencyAnalytics = () => {
             <Kpi
               label="Close rate"
               value={formatPct(data.close_rate)}
-              hint={`${data.cerro} cerros`}
+              hint={t("agencyQa.analytics.closes", { n: data.cerro })}
               color="bg-success"
               icon={<Trophy className="h-3.5 w-3.5" />}
               onClick={() => setKpiPopup("close_rate")}
             />
             <Kpi
-              label="Score promedio"
+              label={t("agencyQa.avgScore")}
               value={data.avg_score}
               hint={`/ 100`}
               color={data.avg_score >= 70 ? "bg-success" : data.avg_score >= 50 ? "bg-warning" : "bg-destructive"}
@@ -191,9 +191,9 @@ const AgencyAnalytics = () => {
               onClick={() => setKpiPopup("score")}
             />
             <Kpi
-              label="Closers activos"
+              label={t("agencyQa.analytics.activeClosers")}
               value={data.active_closers}
-              hint={`${data.active_models} modelos con calls`}
+              hint={t("agencyQa.analytics.modelsWithCalls", { n: data.active_models })}
               color="bg-primary"
               icon={<Users className="h-3.5 w-3.5" />}
               onClick={() => setKpiPopup("closers")}
@@ -205,11 +205,11 @@ const AgencyAnalytics = () => {
             {/* Outcome donut */}
             <div className="rounded-xl border border-border bg-card p-4">
               <h3 className="mb-3 text-xs font-semibold text-muted-foreground">
-                Distribución de resultados
+                {t("agencyQa.analytics.distribution")}
               </h3>
               {outcomeData.length === 0 ? (
                 <p className="py-8 text-center text-xs text-muted-foreground">
-                  Sin resultados en el período.
+                  {t("agencyQa.analytics.noOutcomes")}
                 </p>
               ) : (
                 <div className="flex flex-col items-center gap-3 sm:flex-row sm:items-start">
@@ -239,7 +239,7 @@ const AgencyAnalytics = () => {
                           }}
                           formatter={(value: number, _name: string, item: any) => [
                             value,
-                            OUTCOME_LABELS[item.payload.key],
+                            t(OUTCOME_LABELS[item.payload.key]),
                           ]}
                         />
                       </PieChart>
@@ -255,7 +255,7 @@ const AgencyAnalytics = () => {
                               className="h-2.5 w-2.5 rounded-full"
                               style={{ background: OUTCOME_COLORS[d.key] }}
                             />
-                            {OUTCOME_LABELS[d.key]}
+                            {t(OUTCOME_LABELS[d.key])}
                           </span>
                           <span className="tabular-nums text-muted-foreground">
                             <span className="text-foreground">{d.value}</span> · {pct.toFixed(1)}%
@@ -271,11 +271,11 @@ const AgencyAnalytics = () => {
             {/* Weekly volume line */}
             <div className="rounded-xl border border-border bg-card p-4">
               <h3 className="mb-3 text-xs font-semibold text-muted-foreground">
-                Volumen por semana (últimas 12)
+                {t("agencyQa.analytics.weekly")}
               </h3>
               {weeklyData.length === 0 ? (
                 <p className="py-8 text-center text-xs text-muted-foreground">
-                  Sin actividad semanal.
+                  {t("agencyQa.analytics.noWeekly")}
                 </p>
               ) : (
                 <div className="h-56 w-full">
@@ -315,11 +315,11 @@ const AgencyAnalytics = () => {
             {/* Closer leaderboard */}
             <div className="rounded-xl border border-border bg-card p-4">
               <h3 className="mb-3 text-xs font-semibold text-muted-foreground">
-                Closer leaderboard (top 10 por avg score)
+                {t("agencyQa.analytics.leaderboard")}
               </h3>
               {data.closer_leaderboard.length === 0 ? (
                 <p className="py-8 text-center text-xs text-muted-foreground">
-                  Sin closers con calls en el período.
+                  {t("agencyQa.analytics.noClosers")}
                 </p>
               ) : (
                 <div className="h-72 w-full">
@@ -349,7 +349,7 @@ const AgencyAnalytics = () => {
                           fontSize: 12,
                         }}
                         formatter={(value: number, name: string, item: any) => {
-                          if (name === "avg_score") return [value, "Score avg"];
+                          if (name === "avg_score") return [value, t("agencyQa.scoreAvg")];
                           if (name === "calls") return [value, "Calls"];
                           if (name === "close_rate") return [`${(value * 100).toFixed(0)}%`, "Close rate"];
                           return [value, name];
@@ -369,11 +369,11 @@ const AgencyAnalytics = () => {
             {/* Top models */}
             <div className="rounded-xl border border-border bg-card p-4">
               <h3 className="mb-3 text-xs font-semibold text-muted-foreground">
-                Modelos con más calls (top 10)
+                {t("agencyQa.analytics.topModels")}
               </h3>
               {data.top_models.length === 0 ? (
                 <p className="py-8 text-center text-xs text-muted-foreground">
-                  Sin modelos con calls en el período.
+                  {t("agencyQa.analytics.noModels")}
                 </p>
               ) : (
                 <ul className="space-y-2">
@@ -385,7 +385,7 @@ const AgencyAnalytics = () => {
                         <div className="flex items-center justify-between text-sm">
                           <span className="min-w-0 truncate font-medium">{m.model_name}</span>
                           <span className="tabular-nums text-muted-foreground">
-                            <span className="text-foreground">{m.calls}</span> calls · avg{" "}
+                            <span className="text-foreground">{m.calls}</span> {t("agencyQa.analytics.callsAvg")}{" "}
                             <span className="font-bold" style={{ color: scoreColor(m.avg_score) }}>
                               {m.avg_score}
                             </span>
@@ -410,46 +410,47 @@ const AgencyAnalytics = () => {
       <KpiDetailDialog
         open={kpiPopup !== null}
         onOpenChange={(o) => !o && setKpiPopup(null)}
+        emptyText={t("agencyQa.analytics.noRecords")}
         title={(() => {
           if (!kpiPopup || !data) return "";
           switch (kpiPopup) {
-            case "totales": return `Análisis Totales — ${data.total_calls}`;
-            case "close_rate": return `Close Rate — ${formatPct(data.close_rate)}`;
-            case "score": return `Score Promedio — ${data.avg_score} / 100`;
-            case "closers": return `Closers Activos — ${data.active_closers}`;
+            case "totales": return t("agencyQa.analytics.popupTotal", { n: data.total_calls });
+            case "close_rate": return t("agencyQa.analytics.popupCloseRate", { pct: formatPct(data.close_rate) });
+            case "score": return t("agencyQa.analytics.popupScore", { n: data.avg_score });
+            case "closers": return t("agencyQa.analytics.popupClosers", { n: data.active_closers });
           }
         })()}
-        subtitle={`Ventana: ${WINDOW_OPTIONS.find((w) => w.value === window)?.label}`}
+        subtitle={t("agencyQa.analytics.windowLabel", { window: t(WINDOW_OPTIONS.find((w) => w.value === window)?.label ?? "common.entireHistory") })}
         rows={(() => {
           if (!kpiPopup || !data) return [];
           if (kpiPopup === "close_rate") {
             return [
-              { primary: "Total análisis", right: String(data.total_calls) },
-              { primary: "Cerros", right: String(data.cerro), rightTone: "success" as const },
+              { primary: t("agencyQa.analytics.totalAnalyses"), right: String(data.total_calls) },
+              { primary: t("agencyQa.analytics.closesRow"), right: String(data.cerro), rightTone: "success" as const },
               { primary: "Close rate", right: formatPct(data.close_rate), rightTone: "default" as const },
             ];
           }
           if (kpiPopup === "score") {
             return [
-              { primary: "Score promedio", right: String(data.avg_score), rightTone: data.avg_score >= 70 ? "success" as const : "warning" as const },
-              { primary: "Análisis incluidos", right: String(data.total_calls) },
+              { primary: t("agencyQa.avgScore"), right: String(data.avg_score), rightTone: data.avg_score >= 70 ? "success" as const : "warning" as const },
+              { primary: t("agencyQa.analytics.included"), right: String(data.total_calls) },
             ];
           }
           if (kpiPopup === "closers") {
             const top = (data as any).top_closers ?? [];
             return top.map((c: any): KpiRow => ({
-              primary: c.name ?? c.closer_name ?? "Sin nombre",
-              secondary: c.calls !== undefined ? `${c.calls} análisis` : undefined,
+              primary: c.name ?? c.closer_name ?? t("agencyQa.noName"),
+              secondary: c.calls !== undefined ? t("agencyQa.analytics.nAnalyses", { n: c.calls }) : undefined,
               right: c.score !== undefined ? String(c.score) : undefined,
             }));
           }
           if (kpiPopup === "totales") {
             return [
-              { primary: "Total análisis", right: String(data.total_calls), rightTone: "default" as const },
-              { primary: "Cerros", right: String(data.cerro), rightTone: "success" as const },
-              { primary: "Closers activos", right: String(data.active_closers) },
-              { primary: "Modelos con calls", right: String(data.active_models) },
-              { primary: "Score promedio", right: String(data.avg_score) },
+              { primary: t("agencyQa.analytics.totalAnalyses"), right: String(data.total_calls), rightTone: "default" as const },
+              { primary: t("agencyQa.analytics.closesRow"), right: String(data.cerro), rightTone: "success" as const },
+              { primary: t("agencyQa.analytics.activeClosers"), right: String(data.active_closers) },
+              { primary: t("agencyQa.analytics.modelsWithCallsRow"), right: String(data.active_models) },
+              { primary: t("agencyQa.avgScore"), right: String(data.avg_score) },
             ];
           }
           return [];

@@ -19,6 +19,8 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import AgencyModels from "./AgencyModels";
 import AgencyAnalytics from "./AgencyAnalytics";
@@ -59,13 +61,15 @@ type ClosersQaKey =
   | "analytics"
   | "notifications";
 
+// ⚠️ `submodule` es la LLAVE en role_permissions (canAccess): no se traduce.
+// `label` es la clave del diccionario; null = el nombre es igual en los dos idiomas
+// y va en `fixed` ("Dashboard", "QA History", "QA Chat").
 interface ClosersQaSub {
   key: ClosersQaKey;
-  label: string;
+  label: TranslationKey | null;
+  fixed?: string;
   submodule: string;
   icon: React.ComponentType<{ className?: string }>;
-  whatsComing: string;
-  source: string;
 }
 
 const CLOSERS_QA_SUBS: ClosersQaSub[] = [
@@ -73,83 +77,15 @@ const CLOSERS_QA_SUBS: ClosersQaSub[] = [
   // con QA History, así que la fusionamos: este tab ahora muestra el
   // leaderboard / distribución / métricas, y el listado vive solo en
   // QA History.
-  {
-    key: "calls",
-    label: "Dashboard",
-    submodule: "Calls",
-    icon: BarChart3,
-    whatsComing: "Dashboard de analytics: leaderboard, outcomes, métricas.",
-    source: "app/analytics/page.tsx",
-  },
-  {
-    key: "hubstaff",
-    label: "Productividad",
-    submodule: "Closers: Hubstaff",
-    icon: Clock,
-    whatsComing: "Esfuerzo (horas Hubstaff) vs cierre (pipeline + QA).",
-    source: "(Maven — v_closer_hubstaff)",
-  },
-  {
-    key: "asistencia",
-    label: "Asistencia",
-    submodule: "Closers: Asistencia",
-    icon: CalendarClock,
-    whatsComing: "Check-in y puntualidad desde Hubstaff.",
-    source: "(Maven — v_qa_attendance)",
-  },
-  {
-    key: "anomalias",
-    label: "Anomalías",
-    submodule: "Closers: Anomalías",
-    icon: ShieldAlert,
-    whatsComing: "Días raros de actividad (jornadas cortas/largas).",
-    source: "(Maven — v_qa_anomalies)",
-  },
-  {
-    key: "new-qa",
-    label: "Nueva QA",
-    submodule: "New QA",
-    icon: Plus,
-    whatsComing:
-      "Form para subir el audio — Whisper transcribe, Groq analiza.",
-    source: "app/new-qa/page.tsx → TranscriptUploader.tsx",
-  },
-  {
-    key: "qa-history",
-    label: "QA History",
-    submodule: "QA History",
-    icon: History,
-    whatsComing:
-      "Mis QAs recientes con estado de transcripción y análisis IA.",
-    source: "(propio de Maven — no existe en kash)",
-  },
-  {
-    key: "qa-chat",
-    label: "QA Chat",
-    submodule: "QA Chat",
-    icon: MessageSquare,
-    whatsComing:
-      "Chat con Clari (asistente IA) sobre todas las QAs: ranking, comparativas, tendencias.",
-    source: "app/qa/chat/page.tsx → ClariChatPanel.tsx",
-  },
-  {
-    key: "models",
-    label: "Modelos",
-    submodule: "Models",
-    icon: Users,
-    whatsComing:
-      "Catálogo de modelos con score histórico, leaderboard y trend por modelo.",
-    source: "app/models/* + app/models/[id]",
-  },
-  {
-    key: "notifications",
-    label: "Notificaciones",
-    submodule: "Notifications",
-    icon: Bell,
-    whatsComing:
-      "Config de emails: disparos por evento (cargada / analizada / score bajo / fallo) + lista de destinatarios.",
-    source: "(propio de Maven — sigue patrón Chatter Evaluator)",
-  },
+  { key: "calls", label: null, fixed: "Dashboard", submodule: "Calls", icon: BarChart3 },
+  { key: "hubstaff", label: "agencyQa.tab.productivity", submodule: "Closers: Hubstaff", icon: Clock },
+  { key: "asistencia", label: "agencyQa.tab.attendance", submodule: "Closers: Asistencia", icon: CalendarClock },
+  { key: "anomalias", label: "agencyQa.tab.anomalies", submodule: "Closers: Anomalías", icon: ShieldAlert },
+  { key: "new-qa", label: "agencyQa.tab.newQa", submodule: "New QA", icon: Plus },
+  { key: "qa-history", label: null, fixed: "QA History", submodule: "QA History", icon: History },
+  { key: "qa-chat", label: null, fixed: "QA Chat", submodule: "QA Chat", icon: MessageSquare },
+  { key: "models", label: "agencyQa.models", submodule: "Models", icon: Users },
+  { key: "notifications", label: "agencyQa.tab.notifications", submodule: "Notifications", icon: Bell },
 ];
 
 type RoleKey = "closers-qa" | "chatters-qa" | "managers-qa" | "llgs-qa";
@@ -157,7 +93,7 @@ type RoleKey = "closers-qa" | "chatters-qa" | "managers-qa" | "llgs-qa";
 interface RoleSection {
   key: RoleKey;
   label: string;
-  description: string;
+  description: TranslationKey;
   icon: React.ComponentType<{ className?: string }>;
   ready: boolean;
   comingSoon: string;
@@ -167,7 +103,7 @@ const ROLE_SECTIONS: RoleSection[] = [
   {
     key: "closers-qa",
     label: "Closers QA",
-    description: "Llamadas de venta de closers a modelos.",
+    description: "agencyQa.role.closers",
     icon: Headphones,
     ready: true,
     comingSoon: "",
@@ -175,7 +111,7 @@ const ROLE_SECTIONS: RoleSection[] = [
   {
     key: "chatters-qa",
     label: "Chatters QA",
-    description: "Medición y auditoría de chatters (reemplaza el sheet).",
+    description: "agencyQa.role.chatters",
     icon: MessageCircle,
     ready: true,
     comingSoon: "",
@@ -183,7 +119,7 @@ const ROLE_SECTIONS: RoleSection[] = [
   {
     key: "managers-qa",
     label: "Managers QA",
-    description: "Productividad, asistencia y anomalías (Hubstaff).",
+    description: "agencyQa.role.managers",
     icon: Briefcase,
     ready: true,
     comingSoon: "",
@@ -191,7 +127,7 @@ const ROLE_SECTIONS: RoleSection[] = [
   {
     key: "llgs-qa",
     label: "LLG's QA",
-    description: "Lead gen: esfuerzo (Hubstaff) × leads generados.",
+    description: "agencyQa.role.llg",
     icon: Megaphone,
     ready: true,
     comingSoon: "",
@@ -199,6 +135,7 @@ const ROLE_SECTIONS: RoleSection[] = [
 ];
 
 const ClosersQaSection = () => {
+  const { t } = useLanguage();
   const { canAccess } = usePermissions();
   const visibleSubs = CLOSERS_QA_SUBS.filter((s) =>
     canAccess("Agency QA", s.submodule),
@@ -260,9 +197,7 @@ const ClosersQaSection = () => {
     <div className="space-y-4">
       <div>
         <h2 className="text-xl font-bold tracking-tight">Closers QA</h2>
-        <p className="text-sm text-muted-foreground">
-          Auditorías de llamadas de venta de closers a modelos.
-        </p>
+        <p className="text-sm text-muted-foreground">{t("agencyQa.closers.subtitle")}</p>
       </div>
       <Tabs value={active} onValueChange={(v) => setActive(v as ClosersQaKey)}>
         <TabsList>
@@ -271,7 +206,7 @@ const ClosersQaSection = () => {
             return (
               <TabsTrigger key={s.key} value={s.key} className="gap-1.5">
                 <Icon className="h-3.5 w-3.5" />
-                {s.label}
+                {s.label ? t(s.label) : s.fixed}
               </TabsTrigger>
             );
           })}
@@ -302,21 +237,7 @@ const ClosersQaSection = () => {
               <AgencyQaChat />
             ) : s.key === "notifications" ? (
               <AgencyQaNotifications />
-            ) : (
-              <Card>
-                <CardContent className="space-y-3 p-6">
-                  <div className="flex items-center gap-2 text-xs font-semibold text-warning/90">
-                    <Wrench className="h-3.5 w-3.5" />
-                    En migración
-                  </div>
-                  <h2 className="text-lg font-semibold">{s.label}</h2>
-                  <p className="text-sm text-muted-foreground">{s.whatsComing}</p>
-                  <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-[11px] font-mono text-muted-foreground">
-                    Origen: {s.source}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+            ) : null}
           </TabsContent>
         ))}
       </Tabs>
@@ -324,23 +245,26 @@ const ClosersQaSection = () => {
   );
 };
 
-const ComingSoonSection = ({ section }: { section: RoleSection }) => (
-  <div className="space-y-4">
-    <div>
-      <h2 className="text-xl font-bold tracking-tight">{section.label}</h2>
-      <p className="text-sm text-muted-foreground">{section.description}</p>
+const ComingSoonSection = ({ section }: { section: RoleSection }) => {
+  const { t } = useLanguage();
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-xl font-bold tracking-tight">{section.label}</h2>
+        <p className="text-sm text-muted-foreground">{t(section.description)}</p>
+      </div>
+      <Card>
+        <CardContent className="space-y-3 p-6">
+          <div className="flex items-center gap-2 text-xs font-semibold text-warning/90">
+            <Wrench className="h-3.5 w-3.5" />
+            {t("common.comingSoon")}
+          </div>
+          <p className="text-sm text-muted-foreground">{section.comingSoon}</p>
+        </CardContent>
+      </Card>
     </div>
-    <Card>
-      <CardContent className="space-y-3 p-6">
-        <div className="flex items-center gap-2 text-xs font-semibold text-warning/90">
-          <Wrench className="h-3.5 w-3.5" />
-          Próximamente
-        </div>
-        <p className="text-sm text-muted-foreground">{section.comingSoon}</p>
-      </CardContent>
-    </Card>
-  </div>
-);
+  );
+};
 
 // Mapeo de RoleKey → label del submódulo de Agency QA en el sistema
 // de permisos. El admin puede prender/apagar cada uno desde Settings →
@@ -353,6 +277,7 @@ const ROLE_TO_SUBMODULE: Record<RoleKey, string> = {
 };
 
 const AgencyQA = () => {
+  const { t } = useLanguage();
   const { canAccess } = usePermissions();
   // Filtramos las 4 categorías por permiso. Si un rol no tiene acceso
   // a "Closers QA" (submódulo), no aparece su tab en el rail izquierdo.
@@ -388,13 +313,12 @@ const AgencyQA = () => {
               Company QA
             </h1>
             <p className="mt-1 text-[11px] text-muted-foreground/80">
-              Auditorías por rol
+              {t("agencyQa.rail.subtitle")}
             </p>
           </div>
           {visibleRoleSections.length === 0 && (
             <p className="px-2 py-3 text-[11px] italic text-muted-foreground">
-              Tu rol no tiene acceso a ninguna categoría. Pídele a un admin
-              que te habilite al menos una en Settings → Usuarios → Roles.
+              {t("agencyQa.rail.noAccess")}
             </p>
           )}
           {visibleRoleSections.map((sec) => {
@@ -433,14 +357,14 @@ const AgencyQA = () => {
           <RoleHubstaffSection
             role="manager"
             title="Managers QA"
-            description="Productividad, asistencia y anomalías (Hubstaff)."
+            description={t("agencyQa.role.managers")}
             productividad={<QaEffortPanel role="manager" />}
           />
         ) : activeRole === "llgs-qa" ? (
           <RoleHubstaffSection
             role="LLG"
             title="LLG's QA"
-            description="Lead gen: esfuerzo (Hubstaff) × leads generados."
+            description={t("agencyQa.role.llg")}
             productividad={<AgencyLlgHubstaff />}
           />
         ) : activeSection ? (

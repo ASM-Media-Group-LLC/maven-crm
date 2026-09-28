@@ -67,6 +67,9 @@ import {
 } from "@/hooks/useAgencyQa";
 import OutcomeBadge from "@/components/agency-qa/OutcomeBadge";
 import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
+import { getTranslation, type TranslationKey } from "@/lib/i18n";
+import { ConFormato } from "@/pages/admin/ConFormato";
 
 // CallDetailPage — port directo de Kash (kash-call-qa/app/calls/[id]/page.tsx)
 // con la paleta de colores de Maven: el dorado (--gold #c9a96e) se reemplaza
@@ -114,19 +117,26 @@ const scoreColor10 = (s10: number): string => {
   return "#dc2626";
 };
 
-const RED_FLAG_LABELS: Record<string, string> = {
-  trato_low_ticket: "Trato low-ticket",
-  script_rigido: "Script rígido",
-  no_deja_hablar: "No deja hablar",
-  ofrece_sin_diagnosticar: "Ofrece sin diagnosticar",
-  promesas_irreales: "Promesas irreales",
-  trato_invasivo: "Trato invasivo",
-  tono_corporativo: "Tono corporativo",
-  muletillas_excesivas: "Muletillas excesivas",
-  velocidad_inapropiada: "Velocidad inapropiada",
-  monologo_excesivo: "Monólogo excesivo",
-  otro: "Otro",
+// La clave es el `type` que escribe la IA en red_flags (dato). La etiqueta en
+// pantalla va en el idioma de la interfaz; la que se GUARDA como section_label
+// va siempre en español (la lee el re-análisis de la IA): ver redFlagEs.
+const RED_FLAG_LABELS: Record<string, TranslationKey> = {
+  trato_low_ticket: "agencyQa.redFlag.lowTicket",
+  script_rigido: "agencyQa.redFlag.rigidScript",
+  no_deja_hablar: "agencyQa.redFlag.interrupts",
+  ofrece_sin_diagnosticar: "agencyQa.redFlag.offersBlind",
+  promesas_irreales: "agencyQa.redFlag.unrealPromises",
+  trato_invasivo: "agencyQa.redFlag.invasive",
+  tono_corporativo: "agencyQa.redFlag.corporateTone",
+  muletillas_excesivas: "agencyQa.redFlag.fillerWords",
+  velocidad_inapropiada: "agencyQa.redFlag.pace",
+  monologo_excesivo: "agencyQa.redFlag.monologue",
+  otro: "agencyQa.redFlag.other",
 };
+const redFlagEs = (type: string): string =>
+  RED_FLAG_LABELS[type] ? getTranslation(RED_FLAG_LABELS[type], "es") : type;
+
+type Traductor = (key: TranslationKey, params?: Record<string, string | number>) => string;
 
 // ─── Section feedback ───────────────────────────────────────────
 type SectionFeedbackContext = {
@@ -157,6 +167,7 @@ const SectionThumbs = ({
   index: number;
   label?: string | null;
 }) => {
+  const { t } = useLanguage();
   const upsert = useUpsertQaSectionFeedback();
   const remove = useDeleteQaSectionFeedback();
   const existing = ctx.feedbackByKey.get(sectionKey(type, index)) ?? null;
@@ -197,7 +208,7 @@ const SectionThumbs = ({
       }
       await persistVote(1);
     } catch (err) {
-      toast.error("No se pudo guardar el voto", {
+      toast.error(t("agencyQa.detail.voteFailed"), {
         description: (err as Error).message,
       });
     }
@@ -225,7 +236,7 @@ const SectionThumbs = ({
       );
       setNoteOpen(true);
     } catch (err) {
-      toast.error("No se pudo guardar el voto", {
+      toast.error(t("agencyQa.detail.voteFailed"), {
         description: (err as Error).message,
       });
     }
@@ -238,7 +249,7 @@ const SectionThumbs = ({
         ? null
         : Math.max(0, Math.min(100, parseInt(scoreDraft, 10)));
     if (scoreDraft.trim() !== "" && Number.isNaN(numericScore)) {
-      toast.error("El score sugerido debe ser un número 0-100");
+      toast.error(t("agencyQa.detail.scoreRange"));
       return;
     }
     try {
@@ -253,9 +264,9 @@ const SectionThumbs = ({
         evaluator_name: ctx.evaluatorName,
       });
       setNoteOpen(false);
-      toast.success("Comentario guardado");
+      toast.success(t("agencyQa.detail.commentSaved"));
     } catch (err) {
-      toast.error("No se pudo guardar el comentario", {
+      toast.error(t("agencyQa.detail.commentFailed"), {
         description: (err as Error).message,
       });
     }
@@ -278,7 +289,7 @@ const SectionThumbs = ({
               ? "bg-success/20 text-success"
               : "text-muted-foreground hover:bg-muted/50"
           )}
-          title={isUp ? "Quitar 👍" : "Te gusta este análisis"}
+          title={isUp ? t("agencyQa.detail.removeUp") : t("agencyQa.detail.likeIt")}
         >
           <ThumbsUp className="h-3.5 w-3.5" />
         </button>
@@ -296,7 +307,7 @@ const SectionThumbs = ({
                   ? "bg-destructive/20 text-destructive"
                   : "text-muted-foreground hover:bg-muted/50"
               )}
-              title={isDown ? "Editar comentario" : "Marcar 👎 + comentar"}
+              title={isDown ? t("agencyQa.detail.editComment") : t("agencyQa.detail.downAndComment")}
             >
               <ThumbsDown className="h-3.5 w-3.5" />
             </button>
@@ -304,29 +315,28 @@ const SectionThumbs = ({
           <PopoverContent className="w-80 space-y-2 p-3" align="end">
             <div>
               <Label className="text-xs font-bold text-muted-foreground">
-                ¿Qué le corregirías a la IA?
+                {t("agencyQa.detail.whatToFix")}
               </Label>
               <p className="mt-1 text-[11px] text-muted-foreground">
-                Tu feedback se guarda y la IA lo va a tener en cuenta en las
-                próximas re-evaluaciones.
+                {t("agencyQa.detail.whatToFixHint")}
               </p>
             </div>
             <Textarea
               rows={4}
               value={noteDraft}
               onChange={(e) => setNoteDraft(e.target.value)}
-              placeholder="Ej: el score es muy bajo, en realidad el closer manejó bien la objeción de privacidad…"
+              placeholder={t("agencyQa.detail.notePlaceholder")}
               className="text-sm"
             />
             <Label className="text-xs font-bold text-muted-foreground">
-              Score sugerido (opcional, 0-100)
+              {t("agencyQa.detail.suggestedScore")}
             </Label>
             <Input
               type="number"
               min={0}
               max={100}
               inputMode="numeric"
-              placeholder="ej. 75"
+              placeholder={t("agencyQa.detail.scorePlaceholder75")}
               value={scoreDraft}
               onChange={(e) => setScoreDraft(e.target.value)}
               className="h-8 text-sm"
@@ -338,7 +348,7 @@ const SectionThumbs = ({
                 variant="ghost"
                 onClick={() => setNoteOpen(false)}
               >
-                Cerrar
+                {t("common.close")}
               </Button>
               <Button
                 type="button"
@@ -352,7 +362,7 @@ const SectionThumbs = ({
                 ) : (
                   <Save className="h-3 w-3" />
                 )}
-                Guardar
+                {t("common.save")}
               </Button>
             </div>
           </PopoverContent>
@@ -584,19 +594,20 @@ const barColor = (v: number): string => {
 };
 
 const CloserBars = ({ closer }: { closer: SpeakerLike }) => {
+  const { t } = useLanguage();
   const data = [
     {
-      name: "% habla",
+      name: t("agencyQa.detail.speakingPct"),
       value: Math.round(closer.talk_ratio * 100),
       color: "#6366f1",
     },
     {
-      name: "Palabras",
+      name: t("agencyQa.detail.words"),
       value: closer.word_count,
       color: "#10b981",
     },
     {
-      name: "Duración (s)",
+      name: t("agencyQa.detail.durationS"),
       value: Math.round(closer.estimated_duration_s),
       color: "#f59e0b",
     },
@@ -632,14 +643,15 @@ const ModelBars = ({
 }: {
   signals: NonNullable<CallAnalysis["model_signals"]>;
 }) => {
+  const { t } = useLanguage();
   const interest = interestScore(signals.interest_level);
   const complicity = complicityScore(signals.complicity_level);
   const objectionsCount = signals.objections?.length ?? 0;
 
   const data = [
-    { name: "Interés", value: interest, color: barColor(interest) },
-    { name: "Complicidad", value: complicity, color: barColor(complicity) },
-    { name: "Objeciones", value: objectionsCount, color: "#ca8a04" },
+    { name: t("agencyQa.detail.interest"), value: interest, color: barColor(interest) },
+    { name: t("agencyQa.detail.complicity"), value: complicity, color: barColor(complicity) },
+    { name: t("agencyQa.detail.objections"), value: objectionsCount, color: "#ca8a04" },
   ];
   return (
     <div className="h-72 w-full">
@@ -674,6 +686,8 @@ const AudioMetricsChart = ({
   metrics: { speakers: SpeakerLike[]; total_duration_s?: number };
   modelSignals: CallAnalysis["model_signals"] | null | undefined;
 }) => {
+  // Antes del return temprano.
+  const { t } = useLanguage();
   if (!metrics.speakers?.length) return null;
   // Identify the closer/model — Maven's transcribe doesn't tag, so we
   // treat first speaker as closer, second as model. If only 1 speaker,
@@ -696,8 +710,7 @@ const AudioMetricsChart = ({
               Closer
             </span>
             <span className="ml-auto text-[11px] text-muted-foreground">
-              {Math.round(closer.estimated_duration_s)}s ·{" "}
-              {closer.word_count} palabras
+              {t("agencyQa.detail.secondsWords", { s: Math.round(closer.estimated_duration_s), n: closer.word_count })}
             </span>
           </div>
           <CloserBars closer={closer} />
@@ -712,12 +725,11 @@ const AudioMetricsChart = ({
               className="text-xs font-bold"
               style={{ color: PRIMARY }}
             >
-              Modelo
+              {t("agencyQa.model")}
             </span>
             {model && (
               <span className="ml-auto text-[11px] text-muted-foreground">
-                {Math.round(model.estimated_duration_s)}s ·{" "}
-                {model.word_count} palabras
+                {t("agencyQa.detail.secondsWords", { s: Math.round(model.estimated_duration_s), n: model.word_count })}
               </span>
             )}
           </div>
@@ -725,8 +737,7 @@ const AudioMetricsChart = ({
             <ModelBars signals={modelSignals} />
           ) : (
             <div className="flex h-72 w-full items-center justify-center text-center text-sm text-muted-foreground">
-              Sin señales de la modelo. Re-analiza para calcular interés,
-              complicidad y objeciones.
+              {t("agencyQa.detail.noSignals")}
             </div>
           )}
         </div>
@@ -739,7 +750,7 @@ const AudioMetricsChart = ({
               className="text-xs font-bold"
               style={{ color: PRIMARY }}
             >
-              Interés
+              {t("agencyQa.detail.interest")}
             </span>{" "}
             <span className="text-muted-foreground">
               — {modelSignals.interest_reason}
@@ -750,7 +761,7 @@ const AudioMetricsChart = ({
               className="text-xs font-bold"
               style={{ color: PRIMARY }}
             >
-              Complicidad
+              {t("agencyQa.detail.complicity")}
             </span>{" "}
             <span className="text-muted-foreground">
               — {modelSignals.complicity_reason}
@@ -762,7 +773,7 @@ const AudioMetricsChart = ({
                 className="text-xs font-bold"
                 style={{ color: PRIMARY }}
               >
-                Global
+                {t("agencyQa.detail.overall")}
               </span>{" "}
               <span className="text-muted-foreground">
                 — {modelSignals.summary_of_model}
@@ -775,7 +786,7 @@ const AudioMetricsChart = ({
                 className="mb-1 text-xs font-bold"
                 style={{ color: PRIMARY }}
               >
-                Objeciones ({modelSignals.objections.length})
+                {t("agencyQa.detail.objectionsN", { n: modelSignals.objections.length })}
               </div>
               <ul className="flex flex-col gap-2">
                 {modelSignals.objections.map((o, i) => (
@@ -862,28 +873,29 @@ type DimensionGroup = {
   items: NonNullable<CallAnalysis["dimensions"]>;
 };
 const groupDimensions = (
-  dimensions: NonNullable<CallAnalysis["dimensions"]>
+  dimensions: NonNullable<CallAnalysis["dimensions"]>,
+  t: Traductor,
 ): DimensionGroup[] => {
   const fuertes = dimensions.filter((d) => d.score >= 80);
   const mejorar = dimensions.filter((d) => d.score >= 60 && d.score < 80);
   const debiles = dimensions.filter((d) => d.score < 60);
   return [
     {
-      title: "Puntos fuertes",
+      title: t("agencyQa.detail.strong"),
       caption: "Score ≥ 80/100",
       color: "#16a34a",
       bg: "rgba(22,163,74,0.08)",
       items: fuertes,
     },
     {
-      title: "Puntos a mejorar",
+      title: t("agencyQa.detail.toImprove"),
       caption: "Score 60–79/100",
       color: "#ca8a04",
       bg: "rgba(202,138,4,0.10)",
       items: mejorar,
     },
     {
-      title: "Puntos débiles",
+      title: t("agencyQa.detail.weak"),
       caption: "Score < 60/100",
       color: "#dc2626",
       bg: "rgba(220,38,38,0.08)",
@@ -899,12 +911,13 @@ const AnalysisSections = ({
   analysis: CallAnalysis;
   ctx?: SectionFeedbackContext;
 }) => {
+  const { t } = useLanguage();
   const dimensions = analysis.dimensions ?? [];
   const redFlags = analysis.red_flags ?? [];
   const keyMoments = analysis.key_moments ?? [];
   const improvements = analysis.improvements ?? [];
 
-  const groups = groupDimensions(dimensions);
+  const groups = groupDimensions(dimensions, t);
   const dimensionIndex = new Map<string, number>(
     dimensions.map((d, i) => [d.name, i])
   );
@@ -913,7 +926,7 @@ const AnalysisSections = ({
     <div className="flex flex-col gap-6">
       {dimensions.length > 0 && (
         <Collapsible
-          title="Evaluación por categorías"
+          title={t("agencyQa.detail.byCategory")}
           badge={dimensions.length}
         >
           <div className="flex flex-col gap-4 pt-4">
@@ -950,7 +963,7 @@ const AnalysisSections = ({
 
                 {g.items.length === 0 ? (
                   <p className="px-5 py-5 text-sm text-muted-foreground">
-                    Ninguna dimensión cae en este grupo.
+                    {t("agencyQa.detail.noDimensions")}
                   </p>
                 ) : (
                   <ul>
@@ -1005,7 +1018,7 @@ const AnalysisSections = ({
       )}
 
       {redFlags.length > 0 && (
-        <Collapsible title="Red flags detectados" badge={redFlags.length}>
+        <Collapsible title={t("agencyQa.detail.redFlags")} badge={redFlags.length}>
           <div className="flex flex-col gap-3 pt-4">
             {redFlags.map((rf, i) => (
               <div
@@ -1021,7 +1034,7 @@ const AnalysisSections = ({
                     >
                       <span>⚑</span>
                       <span>
-                        {RED_FLAG_LABELS[rf.type] ?? rf.type}
+                        {RED_FLAG_LABELS[rf.type] ? t(RED_FLAG_LABELS[rf.type]) : rf.type}
                       </span>
                     </div>
                     <p className="mt-2 text-sm">{rf.description}</p>
@@ -1036,7 +1049,7 @@ const AnalysisSections = ({
                       ctx={ctx}
                       type="red_flag"
                       index={i}
-                      label={RED_FLAG_LABELS[rf.type] ?? rf.type}
+                      label={redFlagEs(rf.type)}
                     />
                   )}
                 </div>
@@ -1047,7 +1060,7 @@ const AnalysisSections = ({
       )}
 
       {keyMoments.length > 0 && (
-        <Collapsible title="Momentos clave" badge={keyMoments.length}>
+        <Collapsible title={t("agencyQa.detail.keyMoments")} badge={keyMoments.length}>
           <div className="flex flex-col gap-3 pt-4">
             {keyMoments.map((m, i) => (
               <div
@@ -1067,7 +1080,11 @@ const AnalysisSections = ({
                         color: m.kind === "positivo" ? "#16a34a" : "#dc2626",
                       }}
                     >
-                      {m.kind}
+                      {m.kind === "positivo"
+                        ? t("agencyQa.detail.positive")
+                        : m.kind === "negativo"
+                          ? t("agencyQa.detail.negative")
+                          : m.kind}
                     </div>
                     <blockquote className="mt-2 border-l-2 border-border pl-3 text-sm italic">
                       &ldquo;{m.quote}&rdquo;
@@ -1093,7 +1110,7 @@ const AnalysisSections = ({
 
       {improvements.length > 0 && (
         <Collapsible
-          title="Acciones concretas de mejora"
+          title={t("agencyQa.detail.actions")}
           badge={improvements.length}
         >
           <ol className="flex flex-col gap-2 pt-4">
@@ -1130,6 +1147,7 @@ const AnalysisSections = ({
 
 // ─── Transcript collapse ────────────────────────────────────────
 const TranscriptCollapse = ({ transcript }: { transcript: string }) => {
+  const { t } = useLanguage();
   const [open, setOpen] = useState(false);
   return (
     <div className="flex flex-col gap-3">
@@ -1142,7 +1160,7 @@ const TranscriptCollapse = ({ transcript }: { transcript: string }) => {
           Transcript
         </h2>
         <span className="text-sm text-muted-foreground">
-          {open ? "Ocultar" : "Mostrar"}
+          {open ? t("agencyQa.detail.hide") : t("agencyQa.detail.show")}
         </span>
       </button>
       {open && (
@@ -1156,13 +1174,14 @@ const TranscriptCollapse = ({ transcript }: { transcript: string }) => {
 
 // ─── Reanalyze button ───────────────────────────────────────────
 const ReanalyzeButton = ({ callId }: { callId: string }) => {
+  const { t } = useLanguage();
   const analyze = useAnalyzeQaCall();
   const handleClick = async () => {
     try {
       const r = await analyze.mutateAsync({ callId, withFeedback: false });
-      toast.success(`Re-análisis listo · score ${r.score}/100`);
+      toast.success(t("agencyQa.detail.reanalysisReady", { score: r.score }));
     } catch (err) {
-      toast.error("Re-análisis falló", {
+      toast.error(t("agencyQa.detail.reanalysisFailed"), {
         description: (err as Error).message,
       });
     }
@@ -1181,13 +1200,14 @@ const ReanalyzeButton = ({ callId }: { callId: string }) => {
       ) : (
         <Sparkles className="h-3.5 w-3.5" />
       )}
-      Re-analizar
+      {t("agencyQa.detail.reanalyze")}
     </Button>
   );
 };
 
 // ─── HumanFeedbackForm ──────────────────────────────────────────
 const HumanFeedbackForm = ({ callId }: { callId: string }) => {
+  const { t } = useLanguage();
   const { user } = useAuth();
   const profileQ = useMyProfile();
   const create = useCreateQaHumanFeedback();
@@ -1205,7 +1225,7 @@ const HumanFeedbackForm = ({ callId }: { callId: string }) => {
   const handleSave = async () => {
     const trimmed = draft.trim();
     if (!trimmed) {
-      toast.error("Escribe algo de feedback antes de guardar");
+      toast.error(t("agencyQa.detail.writeFeedback"));
       return;
     }
     const numericScore =
@@ -1213,21 +1233,22 @@ const HumanFeedbackForm = ({ callId }: { callId: string }) => {
         ? null
         : Math.max(0, Math.min(100, parseInt(score, 10)));
     if (score.trim() !== "" && Number.isNaN(numericScore)) {
-      toast.error("El score humano debe ser un número 0-100");
+      toast.error(t("agencyQa.detail.humanScoreRange"));
       return;
     }
     try {
       await create.mutateAsync({
         call_id: callId,
+        // En español a propósito: evaluator_name se guarda en la base (dato).
         evaluator_name: defaultEvaluator || "Sin nombre",
         feedback_text: trimmed,
         human_score: numericScore,
       });
-      toast.success("Feedback guardado");
+      toast.success(t("agencyQa.detail.feedbackSaved"));
       setDraft("");
       setScore("");
     } catch (err) {
-      toast.error("No se pudo guardar el feedback", {
+      toast.error(t("agencyQa.detail.feedbackFailed"), {
         description: (err as Error).message,
       });
     }
@@ -1235,7 +1256,7 @@ const HumanFeedbackForm = ({ callId }: { callId: string }) => {
 
   const handleReanalyzeWithFeedback = async () => {
     if (!draft.trim()) {
-      toast.error("Primero escribe un feedback");
+      toast.error(t("agencyQa.detail.writeFirst"));
       return;
     }
     try {
@@ -1249,11 +1270,11 @@ const HumanFeedbackForm = ({ callId }: { callId: string }) => {
             : Math.max(0, Math.min(100, parseInt(score, 10))),
       });
       const r = await analyze.mutateAsync({ callId, withFeedback: true });
-      toast.success(`Re-análisis con feedback listo · score ${r.score}/100`);
+      toast.success(t("agencyQa.detail.reanalysisWithFeedback", { score: r.score }));
       setDraft("");
       setScore("");
     } catch (err) {
-      toast.error("Re-análisis falló", {
+      toast.error(t("agencyQa.detail.reanalysisFailed"), {
         description: (err as Error).message,
       });
     }
@@ -1263,12 +1284,12 @@ const HumanFeedbackForm = ({ callId }: { callId: string }) => {
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="feedback-text" className="text-xs">
-          Tu feedback (qué corregir / agregar al análisis IA)
+          {t("agencyQa.detail.yourFeedback")}
         </Label>
         <Textarea
           id="feedback-text"
           rows={3}
-          placeholder="Ej: la IA no detectó el cierre suave al final, la modelo aceptó la propuesta entre líneas."
+          placeholder={t("agencyQa.detail.feedbackPlaceholder")}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           className="text-sm"
@@ -1277,7 +1298,7 @@ const HumanFeedbackForm = ({ callId }: { callId: string }) => {
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-[160px_1fr_auto]">
         <div className="flex flex-col gap-1">
           <Label htmlFor="human-score" className="text-xs">
-            Score humano (0-100)
+            {t("agencyQa.detail.humanScore")}
           </Label>
           <Input
             id="human-score"
@@ -1285,7 +1306,7 @@ const HumanFeedbackForm = ({ callId }: { callId: string }) => {
             min={0}
             max={100}
             inputMode="numeric"
-            placeholder="ej. 85"
+            placeholder={t("agencyQa.detail.scorePlaceholder85")}
             value={score}
             onChange={(e) => setScore(e.target.value)}
             className="h-9 text-sm"
@@ -1305,7 +1326,7 @@ const HumanFeedbackForm = ({ callId }: { callId: string }) => {
             ) : (
               <Save className="h-3.5 w-3.5" />
             )}
-            Guardar feedback
+            {t("agencyQa.detail.saveFeedback")}
           </Button>
         </div>
         <div className="flex items-end">
@@ -1321,7 +1342,7 @@ const HumanFeedbackForm = ({ callId }: { callId: string }) => {
             ) : (
               <MessageSquareQuote className="h-3.5 w-3.5" />
             )}
-            Guardar y re-analizar
+            {t("agencyQa.detail.saveAndReanalyze")}
           </Button>
         </div>
       </div>
@@ -1337,6 +1358,7 @@ const CallDetailPage = ({
   callId: string;
   onBack: () => void;
 }) => {
+  const { t } = useLanguage();
   const f = useFormato();
   const callQ = useQaCall(callId);
   const audioUrlQ = useQaAudioSignedUrl(callQ.data?.audio_path ?? null);
@@ -1354,6 +1376,7 @@ const CallDetailPage = ({
   // (pantalla en blanco). Pasaba al abrir un QA recién subido (sin caché).
   const [resendOpen, setResendOpen] = useState(false);
 
+  // En español a propósito: va a qa_section_feedback.evaluator_name (dato).
   const evaluatorName =
     profileQ.data?.full_name?.trim() ||
     user?.user_metadata?.full_name?.trim() ||
@@ -1399,10 +1422,10 @@ const CallDetailPage = ({
   const handleResend = async () => {
     try {
       await fireWebhook.mutateAsync({ callId: call.id });
-      toast.success("Email reenviado");
+      toast.success(t("agencyQa.emailResent"));
       setResendOpen(false);
     } catch (err) {
-      toast.error("No se pudo reenviar el email", {
+      toast.error(t("agencyQa.couldNotResend"), {
         description: (err as Error).message,
       });
     }
@@ -1418,7 +1441,7 @@ const CallDetailPage = ({
           className="inline-flex h-11 items-center gap-2 rounded-full border border-border bg-muted/20 px-4 text-sm font-medium transition-colors hover:bg-muted/40"
         >
           <ArrowLeft className="h-4 w-4" />
-          Historial
+          {t("agencyQa.detail.history")}
         </button>
         <div className="flex items-center gap-2">
           <Button
@@ -1434,25 +1457,23 @@ const CallDetailPage = ({
             ) : (
               <Mail className="h-3.5 w-3.5" />
             )}
-            Reenviar email
+            {t("agencyQa.resendEmail")}
           </Button>
           <AlertDialog open={resendOpen} onOpenChange={setResendOpen}>
             <AlertDialogContent>
               <AlertDialogHeader>
                 <AlertDialogTitle className="flex items-center gap-2">
                   <Mail className="h-5 w-5 text-primary" />
-                  Reenviar email del QA
+                  {t("agencyQa.resendQaEmailTitle")}
                 </AlertDialogTitle>
                 <AlertDialogDescription>
-                  Vas a reenviar el reporte de{" "}
-                  <strong>
-                    {call.model?.name ?? "(sin modelo)"} ·{" "}
-                    {call.closer?.name ?? "(sin closer)"}
-                  </strong>{" "}
-                  a todos los destinatarios configurados.
+                  <ConFormato
+                    texto={t("agencyQa.resendQaEmailBody", {
+                      label: `${call.model?.name ?? t("agencyQa.noModel")} · ${call.closer?.name ?? t("agencyQa.noCloser")}`,
+                    })}
+                  />
                   <br />
-                  El correo automático ya se mandó al terminar el análisis.
-                  Solo reenvíalo si necesitas una segunda copia.
+                  {t("agencyQa.resendQaEmailWarn")}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -1465,10 +1486,10 @@ const CallDetailPage = ({
                   {fireWebhook.isPending ? (
                     <>
                       <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                      Reenviando…
+                      {t("agencyQa.resending")}
                     </>
                   ) : (
-                    "Reenviar"
+                    t("agencyQa.resend")
                   )}
                 </AlertDialogAction>
               </AlertDialogFooter>
@@ -1503,7 +1524,7 @@ const CallDetailPage = ({
                     target="_blank"
                     rel="noopener noreferrer"
                     className="block shrink-0 transition-transform"
-                    title="Ver Instagram"
+                    title={t("agencyQa.detail.viewInstagram")}
                   >
                     {inner}
                   </a>
@@ -1515,7 +1536,7 @@ const CallDetailPage = ({
                 <div className="flex flex-wrap items-center gap-2">
                   <ModelNameLink
                     modelId={call.model?.id ?? null}
-                    name={call.model?.name ?? "Sin modelo"}
+                    name={call.model?.name ?? t("agencyQa.detail.noModelName")}
                     igUrl={
                       (call.model as { ig_url?: string | null } | null)?.ig_url ?? null
                     }
@@ -1529,7 +1550,7 @@ const CallDetailPage = ({
                         href={igUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        title="Ver Instagram"
+                        title={t("agencyQa.detail.viewInstagram")}
                         className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-instagram-pink via-instagram-purple to-instagram-orange text-white shadow-md transition-transform"
                       >
                         <InstagramIcon className="h-3.5 w-3.5" />
@@ -1540,10 +1561,12 @@ const CallDetailPage = ({
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                   <span className="inline-flex items-center gap-1.5">
                     <User className="h-3.5 w-3.5" />
-                    Closer:{" "}
-                    <strong className="text-foreground/90">
-                      {call.closer?.name ?? "—"}
-                    </strong>
+                    <span>
+                      <ConFormato
+                        texto={t("agencyQa.detail.closerLabel", { name: call.closer?.name ?? "—" })}
+                        claseNegrita="text-foreground/90"
+                      />
+                    </span>
                   </span>
                   <span className="inline-flex items-center gap-1.5">
                     <Calendar className="h-3.5 w-3.5" />
@@ -1551,22 +1574,24 @@ const CallDetailPage = ({
                   </span>
                   <span className="inline-flex items-center gap-1.5">
                     <Sparkles className="h-3.5 w-3.5" />
-                    Evaluado por{" "}
-                    <strong className="text-foreground/90">
-                      {call.evaluator_name}
-                    </strong>
+                    <span>
+                      <ConFormato
+                        texto={t("agencyQa.detail.evaluatedBy", { name: call.evaluator_name })}
+                        claseNegrita="text-foreground/90"
+                      />
+                    </span>
                   </span>
                   {/* Tipo de llamada: las ventas de servicio/plataforma se evalúan
                       con otro framing (no reclutamiento). Distinguimos si la
                       modelo es de la agencia o externa. */}
                   {call.call_type === "venta_servicio" && (
                     <span className="inline-flex items-center gap-1 rounded-full border border-primary/40 bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
-                      Venta: {call.service_sold || "servicio"}
+                      {t("agencyQa.saleBadge", { service: call.service_sold || t("agencyQa.serviceFallback") })}
                     </span>
                   )}
                   {call.call_type === "venta_externa" && (
                     <span className="inline-flex items-center gap-1 rounded-full border border-warning/40 bg-warning/10 px-2.5 py-0.5 text-xs font-semibold text-warning">
-                      Venta externa: {call.service_sold || "plataforma"}
+                      {t("agencyQa.externalSaleBadge", { service: call.service_sold || t("agencyQa.platformFallback") })}
                     </span>
                   )}
                 </div>
@@ -1584,7 +1609,7 @@ const CallDetailPage = ({
             <div className="flex shrink-0 flex-col items-center gap-2">
               <ScoreGauge score={call.claude_score} size={150} />
               <span className="text-xs font-bold text-muted-foreground">
-                Score IA
+                {t("agencyQa.detail.aiScore")}
               </span>
               <OutcomeBadge outcome={analysis.call_outcome} size="lg" shadow />
             </div>
@@ -1601,11 +1626,11 @@ const CallDetailPage = ({
               className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold"
               style={{ background: PRIMARY_SOFT, color: PRIMARY }}
             >
-              Categoría: {call.model.category}
+              {t("agencyQa.detail.category", { category: call.model.category })}
             </span>
           )}
           <span className="text-xs text-muted-foreground">
-            Análisis: {fmtDateTime(call.created_at, f.intl("es-ES"))}
+            {t("agencyQa.detail.analysisAt", { date: fmtDateTime(call.created_at, f.intl("es-ES")) })}
           </span>
         </div>
         <ReanalyzeButton callId={call.id} />
@@ -1618,12 +1643,12 @@ const CallDetailPage = ({
             className="mb-3 text-base font-semibold"
             style={{ color: PRIMARY }}
           >
-            Audio de la llamada
+            {t("agencyQa.detail.callAudio")}
           </h2>
           {audioUrlQ.isLoading ? (
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              Generando link…
+              {t("agencyQa.detail.generatingLink")}
             </div>
           ) : audioUrlQ.data ? (
             <AudioWithCaptions
@@ -1634,7 +1659,7 @@ const CallDetailPage = ({
             />
           ) : (
             <p className="text-xs italic text-muted-foreground">
-              No se pudo cargar el audio.
+              {t("agencyQa.detail.audioFailed")}
             </p>
           )}
         </section>
@@ -1646,20 +1671,20 @@ const CallDetailPage = ({
           className="mb-3 text-base font-semibold"
           style={{ color: PRIMARY }}
         >
-          Ficha rápida
+          {t("agencyQa.detail.quickFacts")}
         </h2>
         {analysis.call_facts ? (
           <div className="flex flex-col gap-3">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <FactCard
                 icon="🎯"
-                label="Motivo principal"
+                label={t("agencyQa.detail.mainReason")}
                 value={analysis.call_facts.motivo_principal}
               />
               {analysis.call_facts.ubicacion && (
                 <FactCard
                   icon="📍"
-                  label="Ubicación"
+                  label={t("agencyQa.detail.location")}
                   value={analysis.call_facts.ubicacion}
                 />
               )}
@@ -1676,7 +1701,7 @@ const CallDetailPage = ({
                   className="text-xs font-bold"
                   style={{ color: PRIMARY }}
                 >
-                  Observaciones clave
+                  {t("agencyQa.detail.keyNotes")}
                 </span>
               </div>
               <ul className="flex flex-col gap-2">
@@ -1701,9 +1726,7 @@ const CallDetailPage = ({
               {analysis.summary}
             </p>
             <p className="text-xs text-muted-foreground">
-              Este análisis se generó con el formato anterior. Usa
-              &ldquo;Re-analizar&rdquo; arriba para obtener la ficha rápida
-              estructurada.
+              {t("agencyQa.detail.oldFormat", { button: t("agencyQa.detail.reanalyze") })}
             </p>
           </div>
         )}
@@ -1715,7 +1738,7 @@ const CallDetailPage = ({
           {hasDimensions && (
             <section className="flex-1 rounded-2xl border border-border bg-card p-4">
               <h2 className="mb-2 text-sm font-semibold text-muted-foreground">
-                Perfil visual
+                {t("agencyQa.detail.visualProfile")}
               </h2>
               <DimensionsRadar dimensions={analysis.dimensions!} />
             </section>
@@ -1724,7 +1747,7 @@ const CallDetailPage = ({
           {hasAudioMetrics && audioMetrics && (
             <section className="flex-1 rounded-2xl border border-border bg-card p-4">
               <h2 className="mb-2 text-sm font-semibold text-muted-foreground">
-                Métricas de audio
+                {t("agencyQa.detail.audioMetrics")}
               </h2>
               <AudioMetricsChart
                 metrics={
@@ -1737,7 +1760,7 @@ const CallDetailPage = ({
               />
               {audioMetrics.total_duration_s && (
                 <div className="mt-3 text-xs text-muted-foreground">
-                  Duración total: {Math.round(audioMetrics.total_duration_s)}s
+                  {t("agencyQa.detail.totalDuration", { s: Math.round(audioMetrics.total_duration_s) })}
                 </div>
               )}
             </section>
@@ -1760,7 +1783,7 @@ const CallDetailPage = ({
       {/* Human feedback */}
       <section className="mt-3 rounded-2xl border border-border bg-card p-4">
         <h2 className="mb-3 text-sm font-semibold text-muted-foreground">
-          Feedback humano
+          {t("agencyQa.detail.humanFeedback")}
         </h2>
         {lastFb && (
           <ul className="mb-4 flex flex-col gap-3">
@@ -1773,10 +1796,10 @@ const CallDetailPage = ({
               </div>
               {typeof lastFb.human_score === "number" && (
                 <div className="mt-1 text-xs text-muted-foreground">
-                  Score humano:{" "}
-                  <strong className="text-foreground">
-                    {lastFb.human_score}
-                  </strong>
+                  <ConFormato
+                    texto={t("agencyQa.detail.humanScoreLabel", { score: lastFb.human_score })}
+                    claseNegrita="text-foreground"
+                  />
                 </div>
               )}
               <p className="mt-2 whitespace-pre-wrap">
@@ -1808,6 +1831,7 @@ const ModelNameLink = ({
   name: string;
   igUrl: string | null;
 }) => {
+  const { t } = useLanguage();
   const targetUrl =
     igUrl ??
     `https://www.google.com/search?q=${encodeURIComponent(`${name} instagram`)}`;
@@ -1818,7 +1842,7 @@ const ModelNameLink = ({
       target="_blank"
       rel="noopener noreferrer"
       className="truncate text-2xl font-black tracking-tight transition-colors hover:text-instagram-pink"
-      title={isFallback ? `Buscar a ${name} en Instagram` : "Ver Instagram"}
+      title={isFallback ? t("agencyQa.detail.searchOnIg", { name }) : t("agencyQa.detail.viewInstagram")}
     >
       {name}
     </a>
@@ -1846,6 +1870,7 @@ const AudioWithCaptions = ({
   src: string;
   words: WordTiming[] | null;
 }) => {
+  const { t } = useLanguage();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [activeIdx, setActiveIdx] = useState<number>(-1);
 
@@ -1901,17 +1926,17 @@ const AudioWithCaptions = ({
         src={src}
         className="w-full"
       >
-        Tu navegador no soporta audio HTML5.
+        {t("agencyQa.detail.noAudioSupport")}
       </audio>
       {hasCaptions && (
         <div className="rounded-xl border border-violet-500/30 bg-gradient-to-br from-violet-500/10 via-indigo-500/5 to-transparent p-4">
           <p className="mb-1.5 text-xs font-bold text-violet-400">
-            Captions en vivo
+            {t("agencyQa.detail.liveCaptions")}
           </p>
           <p className="text-sm leading-relaxed text-foreground/80">
             {window.length === 0 ? (
               <span className="italic text-muted-foreground">
-                Aprieta play para ver el texto sincronizarse con el audio.
+                {t("agencyQa.detail.pressPlay")}
               </span>
             ) : (
               window.map(({ idx, w }) => {

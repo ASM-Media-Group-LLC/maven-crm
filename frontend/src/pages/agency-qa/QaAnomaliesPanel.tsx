@@ -4,39 +4,36 @@ import { AlertTriangle, Activity, Hourglass, Timer, CheckCircle2, ShieldAlert } 
 import { useQaAnomalies, type QaRole, type AnomalyTipo } from "./useQaHubstaff";
 import { useHubstaffSyncStatus } from "./chatters-qa/useHubstaffEffort";
 import { periodLabel } from "./chatters-qa/useChatterScorecards";
+import { useLanguage } from "@/hooks/useLanguage";
+import { ConFormato } from "@/pages/admin/ConFormato";
+import type { Language, TranslationKey } from "@/lib/i18n";
+import { haceCuanto } from "./haceCuanto";
 
 // Panel GENÉRICO de Anomalías de actividad — idéntico para los 4 QA por rol.
 // baja_actividad solo aplica a roles de escritorio (chatter/LLG); closers/managers están en
 // llamadas, así que la vista no les genera ese flag.
 
-const TIPO_META: Record<AnomalyTipo, { label: string; tone: string; icon: any }> = {
-  baja_actividad: { label: "Online inactivo", tone: "bg-destructive/15 text-destructive",  icon: Activity },
-  dia_corto:      { label: "Jornada corta",   tone: "bg-warning/15 text-warning", icon: Hourglass },
-  dia_largo:      { label: "Jornada larga",   tone: "bg-primary/15 text-primary",     icon: Timer },
+// La clave (baja_actividad / dia_corto / dia_largo) es el `tipo` que devuelve la vista: dato.
+const TIPO_META: Record<AnomalyTipo, { labelKey: TranslationKey; tone: string; icon: any }> = {
+  baja_actividad: { labelKey: "agencyQa.anomaly.lowActivity", tone: "bg-destructive/15 text-destructive",  icon: Activity },
+  dia_corto:      { labelKey: "agencyQa.anomaly.shortDay",    tone: "bg-warning/15 text-warning", icon: Hourglass },
+  dia_largo:      { labelKey: "agencyQa.anomaly.longDay",     tone: "bg-primary/15 text-primary",     icon: Timer },
 };
 
-const relativeTime = (iso: string | null): string => {
-  if (!iso) return "sin sincronizar";
-  const min = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
-  if (min < 1) return "recién";
-  if (min < 60) return `hace ${min} min`;
-  const h = Math.floor(min / 60);
-  if (h < 24) return `hace ${h}h`;
-  return `hace ${Math.floor(h / 24)}d`;
-};
-
-const dayLabel = (iso: string) => {
+// dd/mm en español, mm/dd en inglés.
+const dayLabel = (iso: string, lang: Language) => {
   const [, m, d] = iso.split("-");
-  return `${d}/${m}`;
+  return lang === "en" ? `${m}/${d}` : `${d}/${m}`;
 };
 
-const detalle = (tipo: AnomalyTipo, hours: number, act: number) => {
-  if (tipo === "baja_actividad") return `${hours}h trabajadas · ${act}% actividad`;
-  if (tipo === "dia_largo") return `${hours}h (revisar tiempo manual)`;
-  return hours < 0.1 ? "casi sin tiempo registrado" : `solo ${hours}h trabajadas`;
+const detalle = (t: (k: TranslationKey, p?: Record<string, string | number>) => string, tipo: AnomalyTipo, hours: number, act: number) => {
+  if (tipo === "baja_actividad") return t("agencyQa.anomaly.detailLow", { hours, act });
+  if (tipo === "dia_largo") return t("agencyQa.anomaly.detailLong", { hours });
+  return hours < 0.1 ? t("agencyQa.anomaly.detailNone") : t("agencyQa.anomaly.detailShort", { hours });
 };
 
 export default function QaAnomaliesPanel({ role }: { role: QaRole }) {
+  const { t, language } = useLanguage();
   const { data: rows = [], isLoading } = useQaAnomalies(role);
   const { data: sync } = useHubstaffSyncStatus();
 
@@ -48,14 +45,14 @@ export default function QaAnomaliesPanel({ role }: { role: QaRole }) {
   }, [rows]);
 
   if (isLoading) {
-    return <Card><CardContent className="p-6 text-sm text-muted-foreground">Cargando anomalías…</CardContent></Card>;
+    return <Card><CardContent className="p-6 text-sm text-muted-foreground">{t("agencyQa.anomaly.loading")}</CardContent></Card>;
   }
 
   if (!rows.length) {
     return (
       <Card>
         <CardContent className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
-          <CheckCircle2 className="h-4 w-4 text-success" /> Sin anomalías de actividad en el período. 👌
+          <CheckCircle2 className="h-4 w-4 text-success" /> {t("agencyQa.anomaly.empty")}
         </CardContent>
       </Card>
     );
@@ -66,23 +63,23 @@ export default function QaAnomaliesPanel({ role }: { role: QaRole }) {
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <h3 className="flex items-center gap-2 text-lg font-semibold">
-            <ShieldAlert className="h-4 w-4 text-warning" /> Anomalías de actividad
+            <ShieldAlert className="h-4 w-4 text-warning" /> {t("agencyQa.anomaly.title")}
           </h3>
           <p className="text-sm text-muted-foreground">
-            Días que merecen una mirada — {stats && periodLabel(stats.period)}.
+            {t("agencyQa.anomaly.subtitle", { period: stats ? periodLabel(stats.period, language) : "" })}
           </p>
         </div>
-        <span className="text-xs text-muted-foreground">Sincronizado {relativeTime(sync?.last_sync_at ?? null)}</span>
+        <span className="text-xs text-muted-foreground">{t("agencyQa.sync.synced", { when: haceCuanto(sync?.last_sync_at ?? null, t) })}</span>
       </div>
 
       {stats && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatCard icon={AlertTriangle} label="Días anómalos" value={String(stats.total)} tone="warn" />
-          <StatCard icon={Activity} label="Online inactivo" value={String(stats.byTipo["baja_actividad"] ?? 0)}
+          <StatCard icon={AlertTriangle} label={t("agencyQa.anomaly.days")} value={String(stats.total)} tone="warn" />
+          <StatCard icon={Activity} label={t("agencyQa.anomaly.lowActivity")} value={String(stats.byTipo["baja_actividad"] ?? 0)}
             tone={stats.byTipo["baja_actividad"] ? "bad" : "ok"} />
-          <StatCard icon={Hourglass} label="Jornadas cortas" value={String(stats.byTipo["dia_corto"] ?? 0)}
+          <StatCard icon={Hourglass} label={t("agencyQa.anomaly.shortDays")} value={String(stats.byTipo["dia_corto"] ?? 0)}
             tone={stats.byTipo["dia_corto"] ? "warn" : "ok"} />
-          <StatCard icon={Timer} label="Jornadas largas" value={String(stats.byTipo["dia_largo"] ?? 0)} />
+          <StatCard icon={Timer} label={t("agencyQa.anomaly.longDays")} value={String(stats.byTipo["dia_largo"] ?? 0)} />
         </div>
       )}
 
@@ -92,10 +89,10 @@ export default function QaAnomaliesPanel({ role }: { role: QaRole }) {
             <table className="tabla-movil w-full min-w-[560px] text-sm">
               <thead>
                 <tr className="border-b border-border text-xs text-muted-foreground">
-                  <th className="px-4 py-3 text-left font-semibold">Persona</th>
-                  <th className="px-3 py-3 text-left font-semibold">Día</th>
-                  <th className="px-3 py-3 text-left font-semibold">Anomalía</th>
-                  <th className="px-4 py-3 text-left font-semibold">Detalle</th>
+                  <th className="px-4 py-3 text-left font-semibold">{t("agencyQa.person")}</th>
+                  <th className="px-3 py-3 text-left font-semibold">{t("common.day")}</th>
+                  <th className="px-3 py-3 text-left font-semibold">{t("agencyQa.anomaly.col")}</th>
+                  <th className="px-4 py-3 text-left font-semibold">{t("agencyQa.anomaly.detail")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -105,13 +102,13 @@ export default function QaAnomaliesPanel({ role }: { role: QaRole }) {
                   return (
                     <tr key={`${r.hubstaff_user_id}-${r.date}-${i}`} className="border-b border-border/60">
                       <td className="px-4 py-2.5 font-medium">{r.name}</td>
-                      <td className="px-3 py-2.5 tabular-nums text-muted-foreground">{dayLabel(r.date)}</td>
+                      <td className="px-3 py-2.5 tabular-nums text-muted-foreground">{dayLabel(r.date, language)}</td>
                       <td className="px-3 py-2.5">
                         <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${meta.tone}`}>
-                          <Icon className="h-3 w-3" /> {meta.label}
+                          <Icon className="h-3 w-3" /> {t(meta.labelKey)}
                         </span>
                       </td>
-                      <td className="px-4 py-2.5 text-muted-foreground">{detalle(r.tipo, r.hours, r.act)}</td>
+                      <td className="px-4 py-2.5 text-muted-foreground">{detalle(t, r.tipo, r.hours, r.act)}</td>
                     </tr>
                   );
                 })}
@@ -122,9 +119,7 @@ export default function QaAnomaliesPanel({ role }: { role: QaRole }) {
       </Card>
 
       <p className="px-1 text-[11px] leading-relaxed text-muted-foreground">
-        <strong>Jornada corta</strong> = &lt;2.5h trabajadas (apareció poco). <strong>Jornada larga</strong> = &gt;12h.
-        <strong> Online inactivo</strong> (≥2h con &lt;35% actividad) solo aplica a roles de escritorio; en llamadas (closers/managers) no se mide.
-        Señales para revisar/coachear, no sanciones automáticas.
+        <ConFormato texto={t("agencyQa.anomaly.footnote")} />
       </p>
     </div>
   );
