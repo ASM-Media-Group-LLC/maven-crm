@@ -456,6 +456,12 @@ export function useMailBulk() {
       qc.invalidateQueries({ queryKey: ["mail-folders"] });
       qc.invalidateQueries({ queryKey: ["mail-search"] });
       qc.invalidateQueries({ queryKey: ["sidebar-badges"] });
+      // Y lo que se arma desde la caché CRUZANDO carpetas: la vista de una
+      // etiqueta y su contador. Un correo movido cambia de carpeta en la caché
+      // (el servidor traslada la fila); sin esto la etiqueta seguía mostrando
+      // la foto vieja durante su staleTime.
+      qc.invalidateQueries({ queryKey: ["mail-por-etiqueta"] });
+      qc.invalidateQueries({ queryKey: ["mail-labels-unread"] });
     },
   });
 }
