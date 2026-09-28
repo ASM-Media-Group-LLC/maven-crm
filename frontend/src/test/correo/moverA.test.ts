@@ -56,7 +56,9 @@ describe("la UI de Mover a", () => {
     expect(pagina).toMatch(/\(carpetas\.data \?\? \[\]\)/);
   });
 
-  it("no ofrece mover a la carpeta en la que ya estás", () => {
-    expect(pagina).toMatch(/\.filter\(\(f\) => f !== carpeta\)/);
+  it("no ofrece mover a la carpeta en la que ya estás (la de la lista, o la del correo abierto)", () => {
+    expect(pagina).toMatch(/\.filter\(\(f\) => f !== actual\)/);
+    expect(pagina).toMatch(/carpetasParaMover\(carpeta\)/);
+    expect(pagina).toMatch(/carpetasParaMover\(sel\.folder \?\? carpeta\)/);
   });
 });
