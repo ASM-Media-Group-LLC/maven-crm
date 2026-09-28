@@ -125,6 +125,39 @@ export default function GroupMembersPanel({
     alRevivir: () => void cargarSolicitudesRef.current?.(),
   });
 
+  // El ROL de los demás, en vivo, mientras el panel está abierto. Antes llegaba
+  // por el canal de la lista, que escuchaba TODAS las filas de chat_participants
+  // de todas mis conversaciones; como esa fila cambia cada vez que alguien lee,
+  // Realtime corría la RLS ~534 veces por hora por cada pestaña de Maven para
+  // esto solo. Ahora la lista escucha solo mi fila (canalDelChat.ts) y el rol
+  // ajeno, que solo se muestra acá, se escucha acá: filtrado por ESTA
+  // conversación. Un rol distinto del que tenemos → se recarga la lista.
+  const onMembersChangedRef = useRef(onMembersChanged);
+  onMembersChangedRef.current = onMembersChanged;
+  const rolesRef = useRef(new Map<string, string>());
+  rolesRef.current = new Map(conversation.participants.map((p) => [p.user_id, p.role]));
+  // Qué rol ya pedimos recargar por persona: mientras la recarga viaja, las
+  // lecturas de esa persona siguen llegando con el rol nuevo y no deben pedir otra.
+  const rolPedidoRef = useRef(new Map<string, string>());
+  useCanalQueRevive({
+    topic: `roles-${conversation.id}`,
+    armar: (canal) => canal
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "chat_participants", filter: `conversation_id=eq.${conversation.id}` }, (payload) => {
+        const fila = payload.new as { user_id?: string; role?: string } | null;
+        if (!fila?.user_id || !fila.role || fila.user_id === user?.id) return; // la mía llega por el canal del chat
+        const antes = rolesRef.current.get(fila.user_id);
+        if (antes === undefined || antes === fila.role) {
+          rolPedidoRef.current.delete(fila.user_id);
+          return;
+        }
+        if (rolPedidoRef.current.get(fila.user_id) === fila.role) return;
+        rolPedidoRef.current.set(fila.user_id, fila.role);
+        onMembersChangedRef.current();
+      }),
+    // Sin alRevivir a propósito: si se cortó el socket, el canal del chat
+    // también revive y la lista ya se recarga ahí (useChat, alSuscribir).
+  });
+
   const reqName = (uid: string, sinNombre = t("messenger.usuario")) => reqProfiles[uid]?.full_name || profiles[uid]?.full_name || sinNombre;
 
   const approveRequest = async (req: { id: string; user_id: string }) => {

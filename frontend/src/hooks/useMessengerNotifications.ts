@@ -18,8 +18,7 @@ import { avisarPersona } from "@/lib/avisoPersona";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { TranslationKey } from "@/lib/i18n";
 import { useReanudarAlVolver } from "@/hooks/useReanudarAlVolver";
-import { useCanalQueRevive } from "@/hooks/useCanalQueRevive";
-import type { RealtimeChannel } from "@supabase/supabase-js";
+import { registrarEnElCanalDelChat } from "@/hooks/canalDelChat";
 
 type Traductor = (key: TranslationKey, params?: Record<string, string | number>) => string;
 
@@ -89,7 +88,7 @@ export const LOTE_INCREMENTAL = 200;
  *  manipulado), no desfase normal entre el reloj del equipo y el del servidor. */
 export const TOLERANCIA_RELOJ_MS = 24 * 60 * 60 * 1000;
 /** Volver del segundo plano dispara DOS barridos (useReanudarAlVolver de este
- *  hook + alRevivir de useCanalQueRevive). El freno los junta en uno. */
+ *  hook + alRevivir del canal del chat). El freno los junta en uno. */
 export const FRENO_BARRIDO_MS = 10_000;
 /** La marca se guarda unos segundos ANTES del último mensaje visto: un mensaje
  *  que se confirma en la base justo después de nuestra consulta tiene fecha
@@ -256,9 +255,9 @@ export async function barridoDeEntregados(userId: string, ahoraMs = Date.now()):
  * La RLS de chat_messages (SELECT: is_chat_participant) limita el realtime a mis
  * conversaciones, así que todo INSERT que llega es de un chat propio.
  *
- * Canal con nombre ÚNICO + dependencia en user.id (no el objeto `user`): un nombre fijo se
- * dedupea por topic en supabase-js y la 2ª suscripción muere tras un refresh de token
- * (mismo criterio que useWaInboxNotifications).
+ * El evento llega por el CANAL DEL CHAT (canalDelChat.ts), el mismo de la lista, el globito
+ * y las menciones: UNA escucha del INSERT de chat_messages por pestaña en vez de una por
+ * hook. El registro va por user.id (no el objeto `user`): un refresh de token no re-registra.
  */
 export function useMessengerNotifications() {
   const { user } = useAuth();
@@ -290,17 +289,13 @@ export function useMessengerNotifications() {
   const myNameRef = useRef<string | null>(null);
 
   const userId = user?.id ?? null;
-  // Este canal no tenía reconexión de ningún tipo: al volver del segundo plano se
-  // recrea (el nombre ya es aleatorio, no hay zombi del mismo topic).
   // Textos del aviso de mención por t(); va por ref para que cambiar de idioma
-  // no re-suscriba el canal.
+  // no re-registre la escucha.
   const { t } = useLanguage();
   const tRef = useRef(t);
   tRef.current = t;
   const [version, setVersion] = useState(0);
   useReanudarAlVolver(() => setVersion((v) => v + 1));
-  // Declarado ARRIBA de los efectos a propósito: lo usan los dos.
-  const armarCanalRef = useRef<((canal: RealtimeChannel) => RealtimeChannel) | null>(null);
   const ultimoBarridoRef = useRef(0);
 
   // EFECTO 1 — se arma UNA vez por usuario. Nada acá depende de `version`: si
@@ -317,13 +312,11 @@ export function useMessengerNotifications() {
       .maybeSingle()
       .then(({ data }) => { myNameRef.current = data?.full_name ?? null; });
 
-    // El canal se arma acá (cierra sobre userId y los refs) pero VIVE en
-    // useCanalQueRevive, que lo levanta de nuevo si se muere.
-    armarCanalRef.current = (canal) => canal
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "chat_messages" },
-        async (payload) => {
+    // Qué hacer con cada mensaje se arma acá (cierra sobre userId y los refs);
+    // el evento llega por el canal del chat, que revive solo.
+    return registrarEnElCanalDelChat(userId, {
+      current: {
+        "chat_messages:INSERT": async (payload) => {
           const m = payload.new as {
             id?: string;
             conversation_id?: string;
@@ -449,8 +442,11 @@ export function useMessengerNotifications() {
             soundOk,
           );
         },
-      )
-;
+        // Mientras no hubo canal llegaron mensajes sin marcar "entregado": el
+        // efecto de abajo hace ese backfill al bumpear `version`.
+        alRevivir: () => setVersion((v) => v + 1),
+      },
+    });
   }, [userId]);
 
   // EFECTO 2 — el barrido, y SOLO el barrido. Sigue dependiendo de `version`
@@ -476,12 +472,4 @@ export function useMessengerNotifications() {
       clearTimeout(temporizador);
     };
   }, [userId, version]);
-
-  useCanalQueRevive({
-    topic: userId ? `chat-incoming-${userId}` : null,
-    armar: (canal) => armarCanalRef.current?.(canal) ?? canal,
-    // Mientras estuvo muerto llegaron mensajes sin marcar "entregado": el
-    // efecto de arriba hace ese backfill al bumpear `version`.
-    alRevivir: () => setVersion((v) => v + 1),
-  });
 }
