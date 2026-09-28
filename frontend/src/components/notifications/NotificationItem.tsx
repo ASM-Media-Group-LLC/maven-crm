@@ -40,7 +40,11 @@ export default function NotificationItem({ notification: n, onClickNotification,
   const isUnread = n.status === "new" || (!n.status && !n.is_read);
   const dotClass = getPriorityDotClass(n.priority);
   const claveModulo = n.module_origin ? MODULO_EN_INGLES[n.module_origin.toLowerCase()] : undefined;
-  const nombreModulo = language === "en" && claveModulo ? t(claveModulo) : n.module_origin;
+  // Con etiqueta del diccionario ya viene en sentence case («Chatter evaluator»):
+  // `capitalize` la pasaría a «Chatter Evaluator». Solo el valor crudo de la base
+  // (español, o uno sin traducción como «messenger») se sigue capitalizando.
+  const usaDiccionario = language === "en" && !!claveModulo;
+  const nombreModulo = usaDiccionario && claveModulo ? t(claveModulo) : n.module_origin;
 
   return (
     <div
@@ -66,7 +70,7 @@ export default function NotificationItem({ notification: n, onClickNotification,
             {formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: f.fechas })}
           </p>
           {n.module_origin && (
-            <span className="text-[10px] px-1.5 py-0 rounded bg-muted text-muted-foreground capitalize">
+            <span className={`text-[10px] px-1.5 py-0 rounded bg-muted text-muted-foreground${usaDiccionario ? "" : " capitalize"}`}>
               {nombreModulo}
             </span>
           )}

@@ -259,8 +259,9 @@ export const compartido = {
     en: "This can't be undone. All the messages in this conversation will be deleted.",
   },
 
-  // Clari (components/ClariAiChat.tsx + ClariAiFab.tsx). El saludo es solo de
-  // pantalla: no se guarda ni se le manda al modelo.
+  // Clari (components/ClariAiChat.tsx + ClariAiFab.tsx). El saludo no se guarda
+  // en la base, pero SÍ le llega al modelo como turno del asistente: viaja
+  // siempre en español por el campo `content` (el "en" es solo de pantalla).
   "shared.clari.welcomeHelp": {
     es: "¡Hola! 👋 Soy Clari. Te ayudo a navegar Maven — preguntame cómo hacer cualquier cosa en la app.",
     en: "Hi! 👋 I'm Clari. I'll help you find your way around Maven — ask me how to do anything in the app.",

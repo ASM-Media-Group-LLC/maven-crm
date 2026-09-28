@@ -106,6 +106,13 @@ const NOTIFICACIONES = [
     priority: "low", status: "new", deep_link_url: null, required_permission_module: null,
     required_permission_submodule: null, visibility_scope: null, role_target: null,
   },
+  {
+    // Nombre propio sin traducción: se muestra el valor crudo, capitalizado.
+    id: "n3", user_id: "u1", type: "lead_assigned", title: "Lead 7", message: null,
+    reference_id: null, reference_type: null, is_read: false, created_at: HACE(3), module_origin: "closers",
+    priority: "low", status: "new", deep_link_url: null, required_permission_module: null,
+    required_permission_submodule: null, visibility_scope: null, role_target: null,
+  },
 ];
 const mutacion = { mutate: () => {} };
 vi.mock("@/hooks/useNotifications", () => ({
@@ -304,6 +311,11 @@ describe("la campana de notificaciones en inglés", () => {
     // module_origin guardado en español → etiqueta en inglés.
     expect(screen.getByText("Creators")).toBeTruthy();
     expect(screen.getByText("Chatter evaluator")).toBeTruthy();
+    // La etiqueta del diccionario ya está en sentence case: sin `capitalize`
+    // (que la dibujaría «Chatter Evaluator»). El valor crudo sí se capitaliza.
+    expect(screen.getByText("Chatter evaluator").className).not.toMatch(/\bcapitalize\b/);
+    expect(screen.getByText("Creators").className).not.toMatch(/\bcapitalize\b/);
+    expect(screen.getByText("closers").className).toMatch(/\bcapitalize\b/);
     expect(screen.getAllByText(/ago$/).length).toBeGreaterThan(0);
     expect(enEspanol()).toEqual([]);
     // El tooltip de archivar solo existe mientras tiene el foco.
@@ -318,7 +330,7 @@ describe("la campana de notificaciones en inglés", () => {
     montar(<NotificationBell />);
     fireEvent.click(screen.getByTitle("Notificaciones"));
     expect(await screen.findByText("creadores")).toBeTruthy();
-    expect(screen.getByText("chatter-evaluator")).toBeTruthy();
+    expect(screen.getByText("chatter-evaluator").className).toMatch(/\bcapitalize\b/);
     expect(screen.getByText("Marcar todas")).toBeTruthy();
   });
 });
