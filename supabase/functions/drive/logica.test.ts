@@ -62,3 +62,22 @@ Deno.test("lo de la papelera y lo que se está subiendo también entra (marcado)
   assert(f.find((x) => x.nombre === "viejo.pdf")!.en_papelera === true, "papelera");
   assert(f.find((x) => x.nombre === "a medias.zip")!.estado === "subiendo", "subiendo");
 });
+
+import { chequearCupo, hayLugarEnElNas } from "./logica.ts";
+
+Deno.test("cupo: entra justo; un byte más, no — y el mensaje dice cuánto", () => {
+  const G = 1024 ** 3;
+  chequearCupo(49 * G, 50 * G, G);
+  let msg = "";
+  try { chequearCupo(49 * G, 50 * G, G + 1); } catch (e) { msg = (e as Error).message; }
+  assert(/No te alcanza el espacio: usás 49 GB de 50 GB/.test(msg), msg);
+});
+
+Deno.test("lugar en el NAS: 5% libre después de guardar, y el doble si va por partes", () => {
+  const disco = [{ ok: true, libre: 100, total: 1000 }];
+  assert(hayLugarEnElNas(disco, 50, false), "50 entra dejando 50 (5%)");
+  assert(!hayLugarEnElNas(disco, 51, false), "51 deja menos del 5%");
+  assert(!hayLugarEnElNas(disco, 30, true), "por partes necesita 60, deja 40 < 50");
+  assert(!hayLugarEnElNas([{ ok: false }], 1, false), "un disco caído no cuenta");
+  assert(hayLugarEnElNas([{ ok: true, libre: 10, total: 1000 }, disco[0]], 50, false), "alcanza con uno");
+});

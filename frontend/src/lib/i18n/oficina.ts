@@ -110,4 +110,16 @@ export const oficina = {
   "drive.compartir.listo": { es: "Compartido", en: "Shared" },
   "drive.ruta": { es: "Ubicación", en: "Location" },
   "drive.compartir.conQuien": { es: "Personas con acceso", en: "People with access" },
+  // Drive · cupo por persona
+  "drive.uso.barra": { es: "Usás {usado} de {cupo}", en: "{usado} of {cupo} used" },
+  "drive.uso.casiLleno": { es: "Te queda poco espacio. Vaciá la papelera o pedile a un admin más espacio.", en: "You’re running out of space. Empty the trash or ask an admin for more." },
+  "drive.cupos.boton": { es: "Espacio por persona", en: "Storage per person" },
+  "drive.cupos.titulo": { es: "Espacio del Drive por persona", en: "Drive storage per person" },
+  "drive.cupos.ayuda": { es: "Todos tienen {defecto} salvo que acá les pongas otro. Cuenta la papelera.", en: "Everyone gets {defecto} unless you set a different amount here. Trash counts." },
+  "drive.cupos.persona": { es: "Persona", en: "Person" },
+  "drive.cupos.usado": { es: "Usado", en: "Used" },
+  "drive.cupos.cupo": { es: "Espacio (GB)", en: "Storage (GB)" },
+  "drive.cupos.general": { es: "general", en: "default" },
+  "drive.cupos.volver": { es: "Volver al general", en: "Reset to default" },
+  "drive.cupos.guardado": { es: "Espacio guardado", en: "Storage saved" },
 } as const satisfies Record<string, { es: string; en: string }>;

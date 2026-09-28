@@ -58,10 +58,19 @@ async function buscar(conf, rel) {
   return null;
 }
 
-/** La raíz con más espacio libre, como el `mfs` de rclone union. Una raíz que
- *  no responde (disco desmontado, permiso de macOS) se saltea en vez de tirar
- *  todo el servidor. */
-async function raizConMasLugar(conf) {
+/** Lo que cada disco tiene que dejar libre: un disco lleno al 100% se vuelve
+ *  lento y frágil (y deja sin lugar al índice de la noche). */
+export const MARGEN_LIBRE = 0.05;
+
+/** La raíz con más espacio libre, como el `mfs` de rclone union, entre las que
+ *  pueden recibir `necesita` bytes sin bajar del margen. Una raíz que no
+ *  responde (disco desmontado, permiso de macOS) se saltea en vez de tirar
+ *  todo el servidor.
+ *
+ *  ⚠️ Antes elegía el disco con más lugar SIN mirar si el archivo entraba: con
+ *  los discos casi llenos, la subida fallaba a mitad de camino con un error
+ *  genérico. Ahora se avisa ANTES de escribir un byte (507). */
+async function raizConMasLugar(conf, necesita = 0) {
   let mejor = null;
   let libre = -1;
   for (const r of conf.raices) {
@@ -69,10 +78,12 @@ async function raizConMasLugar(conf) {
       await fsp.mkdir(r, { recursive: true });
       const s = await fsp.statfs(r);
       const l = s.bavail * s.bsize;
+      const total = s.blocks * s.bsize;
+      if (l - necesita < total * MARGEN_LIBRE) continue;
       if (l > libre) { libre = l; mejor = r; }
     } catch { /* se saltea */ }
   }
-  if (!mejor) throw Object.assign(new Error("ningún disco disponible"), { status: 507 });
+  if (!mejor) throw Object.assign(new Error("El NAS no tiene lugar para este archivo"), { status: 507 });
   return mejor;
 }
 
@@ -179,7 +190,8 @@ function topeDe(req, d) {
 async function subirEntero(conf, req, res, d) {
   const tope = topeDe(req, d);
   if (await buscar(conf, d.k)) return json(res, 409, { error: "ya existe" });
-  const raiz = await raizConMasLugar(conf);
+  const largo = Number(req.headers["content-length"]);
+  const raiz = await raizConMasLugar(conf, Number.isFinite(largo) ? largo : tope);
   const r = await escribirAtomico(raiz, d.k, req, tope);
   return json(res, 200, { ...r, recibo: recibo(conf.secreto, { k: d.k, ...r }) });
 }
@@ -193,7 +205,13 @@ async function subirParte(conf, req, res, d) {
   // Todas las partes de una subida van al MISMO disco: se juntan con un
   // rename, que no cruza discos. La primera elige; las demás la siguen.
   const existente = await buscar(conf, carpeta);
-  const raiz = existente ? existente.slice(0, -carpeta.length - 1) : await raizConMasLugar(conf);
+  // La PRIMERA parte elige disco para el archivo ENTERO, y dos veces: al
+  // juntarlas, las partes y el archivo final conviven un momento. Si no, la
+  // subida podía ir bien hasta la última parte y morir al completar.
+  const total = Number(d.total);
+  const raiz = existente
+    ? existente.slice(0, -carpeta.length - 1)
+    : await raizConMasLugar(conf, Number.isFinite(total) && total > 0 ? total * 2 : tope);
   const r = await escribirAtomico(raiz, path.join(carpeta, String(d.i)), req, tope);
   return json(res, 200, { i: d.i, size: r.size });
 }

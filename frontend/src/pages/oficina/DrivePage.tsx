@@ -34,6 +34,8 @@ import {
   useRutaDrive, useSubidasDrive, type DriveItem, type VistaDrive,
 } from "@/hooks/useDrive";
 import DriveCompartirDialog from "@/components/oficina/DriveCompartirDialog";
+import { BarraDeUso, CuposDialog } from "@/components/oficina/DriveCupos";
+import { useUserRole } from "@/hooks/useUserRole";
 
 const VISTAS: { id: VistaDrive; clave: TranslationKey; icono: typeof HardDrive }[] = [
   { id: "mia", clave: "drive.vista.mia", icono: HardDrive },
@@ -49,15 +51,8 @@ const VACIO: Record<VistaDrive, TranslationKey> = {
   papelera: "drive.vacio.papelera",
 };
 
-export function tamano(bytes: number | null | undefined): string {
-  if (bytes == null) return "—";
-  if (bytes < 1024) return `${bytes} B`;
-  const u = ["KB", "MB", "GB", "TB"];
-  let n = bytes / 1024;
-  let i = 0;
-  while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
-  return `${n < 10 ? n.toFixed(1) : Math.round(n)} ${u[i]}`;
-}
+export { tamano } from "@/lib/drive/formato";
+import { tamano } from "@/lib/drive/formato";
 
 function cuando(iso: string, f: Formato): string {
   const d = new Date(iso);
@@ -105,6 +100,8 @@ export default function DrivePage() {
   const [borrando, setBorrando] = useState<DriveItem | null>(null);
   const [compartiendo, setCompartiendo] = useState<DriveItem | null>(null);
   const [arrastrando, setArrastrando] = useState(false);
+  const [viendoCupos, setViendoCupos] = useState(false);
+  const { isAdmin } = useUserRole();
   const inputArchivos = useRef<HTMLInputElement>(null);
 
   // Subir y crear solo donde se puede: en Mi unidad, o dentro de una carpeta
@@ -140,7 +137,15 @@ export default function DrivePage() {
       <PageHeader
         title={t("drive.titulo")}
         subtitle={t("drive.descripcion")}
-        actions={sePuedeSubir ? (
+        actions={sePuedeSubir || isAdmin ? (
+          <>
+          {isAdmin && (
+            <Button variant="outline" className="rounded-full" onClick={() => setViendoCupos(true)}>
+              <HardDrive className="mr-1.5 h-4 w-4" />
+              {t("drive.cupos.boton")}
+            </Button>
+          )}
+          {sePuedeSubir && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button className="rounded-full">
@@ -159,6 +164,8 @@ export default function DrivePage() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          )}
+          </>
         ) : undefined}
       />
       <input
@@ -193,6 +200,8 @@ export default function DrivePage() {
           );
         })}
       </div>
+
+      <BarraDeUso />
 
       {/* Migas: Mi unidad › Contabilidad › 2026 */}
       {carpeta && (
@@ -400,6 +409,7 @@ export default function DrivePage() {
       )}
 
       {subidas.length > 0 && <PanelDeSubidas subidas={subidas} onCerrar={limpiar} />}
+      {viendoCupos && <CuposDialog onCerrar={() => setViendoCupos(false)} />}
     </Page>
   );
 }

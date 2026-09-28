@@ -120,3 +120,29 @@ export function armarIndice(
     }))
     .sort((a, b) => a.agencia_id.localeCompare(b.agencia_id) || a.ruta.localeCompare(b.ruta, "es"));
 }
+
+// ── Cupo y lugar ────────────────────────────────────────────────────────────
+
+const GB = 1024 * 1024 * 1024;
+export const legible = (b: number) =>
+  b >= GB ? `${(b / GB).toFixed(b >= 10 * GB ? 0 : 1)} GB` : `${Math.max(1, Math.round(b / (1024 * 1024)))} MB`;
+
+/** ¿Le alcanza el cupo? Cuenta la papelera y lo que se está subiendo (ya
+ *  ocupan o reservaron su lugar en el NAS). */
+export function chequearCupo(usado: number, cupo: number, size: number) {
+  if (usado + size > cupo) {
+    throw new HttpError(
+      `No te alcanza el espacio: usás ${legible(usado)} de ${legible(cupo)} y este archivo pesa ${legible(size)}. ` +
+        "Vaciá la papelera o pedile a un admin más espacio.",
+      413,
+    );
+  }
+}
+
+/** Lo mismo que exige el NAS (MARGEN_LIBRE de infra/nas-drive/server.mjs): el
+ *  archivo tiene que entrar en ALGÚN disco dejando 5% libre. Por partes, dos
+ *  veces el archivo (partes + archivo final conviven al juntarlas). */
+export function hayLugarEnElNas(raices: { ok: boolean; libre?: number; total?: number }[], size: number, porPartes: boolean) {
+  const necesita = porPartes ? size * 2 : size;
+  return raices.some((r) => r.ok && typeof r.libre === "number" && typeof r.total === "number" && r.libre - necesita >= r.total * 0.05);
+}

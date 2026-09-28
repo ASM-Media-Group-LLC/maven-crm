@@ -132,6 +132,8 @@ function useInvalidar() {
   return () => {
     qc.invalidateQueries({ queryKey: ["drive"] });
     qc.invalidateQueries({ queryKey: ["drive-ruta"] });
+    // Subir o borrar para siempre cambia el espacio usado.
+    qc.invalidateQueries({ queryKey: ["drive-uso"] });
   };
 }
 
@@ -308,4 +310,64 @@ export function useSubidasDrive() {
   }, [invalidar]);
 
   return { subidas, subir, limpiar: () => setSubidas((s) => s.filter((x) => x.estado === "subiendo")) };
+}
+
+// ── Cupo ─────────────────────────────────────────────────────────────────────
+
+export interface UsoDrive { usado: number; cupo: number }
+
+/** Cuánto uso y cuánto tengo (50 GB salvo que un admin me haya puesto otro).
+ *  Cuenta la papelera: sigue ocupando lugar en el NAS. */
+export function useUsoDrive() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["drive-uso", user?.id],
+    enabled: !!user,
+    staleTime: 30_000,
+    queryFn: async (): Promise<UsoDrive> => {
+      const { data, error } = await supabase.rpc("drive_uso" as never);
+      if (error) throw error;
+      const filas = data as unknown as { usado: number; cupo: number }[] | { usado: number; cupo: number } | null;
+      const f = Array.isArray(filas) ? filas[0] : filas ?? undefined;
+      return { usado: Number(f?.usado ?? 0), cupo: Number(f?.cupo ?? 0) };
+    },
+  });
+}
+
+export interface UsoDePersona { user_id: string; nombre: string; usado: number; cupo: number; cupo_propio: boolean }
+
+/** Para el admin: todas las personas de su agencia con su uso y su cupo. */
+export function useUsosDeMiAgencia(habilitado: boolean) {
+  return useQuery({
+    queryKey: ["drive-usos-agencia"],
+    enabled: habilitado,
+    staleTime: 30_000,
+    queryFn: async (): Promise<UsoDePersona[]> => {
+      const { data, error } = await supabase.rpc("drive_usos_de_mi_agencia" as never);
+      if (error) throw error;
+      return ((data ?? []) as UsoDePersona[]).map((u) => ({ ...u, usado: Number(u.usado), cupo: Number(u.cupo) }));
+    },
+  });
+}
+
+/** El admin cambia el cupo de alguien (en bytes) o lo vuelve al general
+ *  (null). */
+export function useGuardarCupo() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ userId, bytes }: { userId: string; bytes: number | null }) => {
+      if (bytes === null) {
+        const { error } = await tabla("drive_cupos").delete().eq("user_id", userId);
+        if (error) throw error;
+        return;
+      }
+      const { error } = await tabla("drive_cupos")
+        .upsert({ user_id: userId, bytes_max: Math.round(bytes) } as never, { onConflict: "user_id" });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["drive-usos-agencia"] });
+      qc.invalidateQueries({ queryKey: ["drive-uso"] });
+    },
+  });
 }

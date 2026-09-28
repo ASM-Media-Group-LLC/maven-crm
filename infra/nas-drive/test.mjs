@@ -188,3 +188,17 @@ test("el vector compartido con Maven: Node verifica lo mismo que verifica Deno",
   assert.equal(d.op, "recibo");
   assert.equal(firmar(s, d), p);
 });
+
+test("⚠️ si el archivo no entra en ningún disco (dejando 5% libre), 507 ANTES de escribir", async () => {
+  // Un disco de verdad tiene muchísimo más que esto libre, así que se pide
+  // algo imposible: más que el disco entero.
+  const k = clave();
+  const enorme = 1e18;
+  const r = await fetch(url({ op: "put", k, max: enorme }), { method: "PUT", body: "x", headers: { "Content-Length": "1" } });
+  assert.equal(r.status, 200, "un archivo chico entra");
+  const k2 = clave();
+  const up = randomUUID();
+  const p = await fetch(url({ op: "parte", k: k2, up, i: 0, max: 10, total: enorme }), { method: "PUT", body: "x" });
+  assert.equal(p.status, 507, "la primera parte reserva el archivo entero");
+  assert.match((await p.json()).error, /no tiene lugar/);
+});
