@@ -8,6 +8,8 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useMyTgChannels } from "@/hooks/useMyTgChannels";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
@@ -47,6 +49,7 @@ export function TgChatButton({
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
+  const { t } = useLanguage();
   const { data: channels = [] } = useMyTgChannels();
   const [busy, setBusy] = useState(false);
   const [gateMsg, setGateMsg] = useState<string | null>(null);
@@ -62,15 +65,17 @@ export function TgChatButton({
     });
     setBusy(false);
     const res = data as { ok?: boolean; error?: string; conversation_id?: string } | null;
-    if (res && res.ok === false) { setGateMsg(res.error || "No se pudo abrir el chat de Telegram."); return; }
+    // res.error lo escribe el servidor (tg-inbox-open) y se muestra tal cual.
+    if (res && res.ok === false) { setGateMsg(res.error || t("shared.openChat.tgFailed")); return; }
     if (error || !res?.conversation_id) {
-      toast({ title: "No se pudo abrir el chat", description: error?.message || "Error", variant: "destructive" });
+      toast({ title: t("shared.openChat.failed"), description: error?.message || t("common.error"), variant: "destructive" });
       return;
     }
-    const labels: Record<string, string> = { contactos: "Contactos", creadores: "Creadoras", closers: "Closers" };
+    // La clave es el primer tramo de la ruta (dato); la etiqueta, del diccionario.
+    const labels: Record<string, TranslationKey> = { contactos: "shared.openChat.fromContacts", creadores: "shared.openChat.fromCreators", closers: "nav.closers" };
     const seg = location.pathname.split("/").filter(Boolean)[0] || "";
     navigate(`/telegram/bandeja?c=${res.conversation_id}`, {
-      state: { backTo: location.pathname + location.search, backLabel: labels[seg] || "atrás" },
+      state: { backTo: location.pathname + location.search, backLabel: t(labels[seg] ?? "wa.backFallback") },
     });
   };
 
@@ -89,7 +94,7 @@ export function TgChatButton({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <div className="px-2 py-1.5 text-xs text-muted-foreground">¿Desde qué línea?</div>
+        <div className="px-2 py-1.5 text-xs text-muted-foreground">{t("shared.openChat.whichLine")}</div>
         {channels.map((ch) => (
           <DropdownMenuItem key={ch.account_id} onClick={() => open(ch.account_id)}>
             {ch.label || ch.account_id}
@@ -109,7 +114,7 @@ export function TgChatButton({
             <AlertDialogDescription>{gateMsg}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setGateMsg(null)}>Entendido</AlertDialogAction>
+            <AlertDialogAction onClick={() => setGateMsg(null)}>{t("common.understood")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

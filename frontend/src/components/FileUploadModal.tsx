@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 
 export type UploadCategory = "contracts" | "piclink" | "extras";
 
@@ -26,23 +28,24 @@ interface FileUploadModalProps {
   onFilesUploaded: (files: UploadedFile[]) => void;
 }
 
-const CATEGORY_CONFIG: Record<UploadCategory, { title: string; accept: string; formats: string; maxSize: number }> = {
+// title y formats son claves del diccionario: se dicen al dibujar el modal.
+const CATEGORY_CONFIG: Record<UploadCategory, { title: TranslationKey; accept: string; formats: TranslationKey; maxSize: number }> = {
   contracts: {
-    title: "Contrato Firmado & Documentos",
+    title: "shared.upload.contracts",
     accept: ".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.webp",
-    formats: "PDF, Word (.doc, .docx) e Imágenes (JPG, PNG, GIF)",
+    formats: "shared.upload.formatsContracts",
     maxSize: 10 * 1024 * 1024, // 10MB
   },
   piclink: {
-    title: "Fotos de PickLink (Comprobante)",
+    title: "shared.upload.piclink",
     accept: ".jpg,.jpeg,.png,.gif,.webp",
-    formats: "Imágenes (JPG, PNG, GIF, WebP)",
+    formats: "shared.upload.formatsPiclink",
     maxSize: 10 * 1024 * 1024,
   },
   extras: {
-    title: "Fotos y Videos Extras",
+    title: "shared.upload.extras",
     accept: ".jpg,.jpeg,.png,.gif,.webp,.mp4,.mov",
-    formats: "Imágenes (JPG, PNG, GIF) y Videos (MP4, MOV)",
+    formats: "shared.upload.formatsExtras",
     maxSize: 20 * 1024 * 1024, // 20MB
   },
 };
@@ -60,6 +63,7 @@ function getFileIcon(type: string) {
 }
 
 export default function FileUploadModal({ open, onClose, category, tempId, onFilesUploaded }: FileUploadModalProps) {
+  const { t } = useLanguage();
   const config = CATEGORY_CONFIG[category];
   const inputRef = useRef<HTMLInputElement>(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -72,13 +76,17 @@ export default function FileUploadModal({ open, onClose, category, tempId, onFil
     const valid: File[] = [];
     for (const f of arr) {
       if (f.size > config.maxSize) {
-        toast({ title: "Archivo muy grande", description: `${f.name} excede ${formatSize(config.maxSize)}`, variant: "destructive" });
+        toast({
+          title: t("shared.upload.tooLarge"),
+          description: t("shared.upload.tooLargeDesc", { name: f.name, max: formatSize(config.maxSize) }),
+          variant: "destructive",
+        });
         continue;
       }
       valid.push(f);
     }
     setSelectedFiles((prev) => [...prev, ...valid]);
-  }, [config.maxSize]);
+  }, [config.maxSize, t]);
 
   const removeFile = (index: number) => setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
 
@@ -101,7 +109,7 @@ export default function FileUploadModal({ open, onClose, category, tempId, onFil
 
       const { error } = await supabase.storage.from("creator-files").upload(path, file);
       if (error) {
-        toast({ title: "Error al subir", description: `${file.name}: ${error.message}`, variant: "destructive" });
+        toast({ title: t("shared.upload.failed"), description: `${file.name}: ${error.message}`, variant: "destructive" });
         continue;
       }
 
@@ -121,7 +129,7 @@ export default function FileUploadModal({ open, onClose, category, tempId, onFil
 
     if (uploaded.length) {
       onFilesUploaded(uploaded);
-      toast({ title: `${uploaded.length} archivo(s) subido(s) exitosamente` });
+      toast({ title: t("shared.upload.done", { n: uploaded.length }) });
     }
 
     setSelectedFiles([]);
@@ -142,9 +150,9 @@ export default function FileUploadModal({ open, onClose, category, tempId, onFil
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Upload className="h-5 w-5" /> {config.title}
+            <Upload className="h-5 w-5" /> {t(config.title)}
           </DialogTitle>
-          <DialogDescription>Selecciona o arrastra archivos para subir</DialogDescription>
+          <DialogDescription>{t("shared.upload.pickOrDrag")}</DialogDescription>
         </DialogHeader>
 
         {/* Drop zone */}
@@ -156,13 +164,13 @@ export default function FileUploadModal({ open, onClose, category, tempId, onFil
           onDrop={handleDrop}
         >
           <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">Arrastra archivos aquí o</p>
+          <p className="text-sm text-muted-foreground">{t("shared.upload.dragHere")}</p>
           <Button variant="outline" size="sm" className="mt-2" type="button"
             onClick={(e) => { e.stopPropagation(); inputRef.current?.click(); }}>
-            Seleccionar archivos
+            {t("shared.upload.selectFiles")}
           </Button>
-          <p className="text-xs text-muted-foreground mt-2">Formatos: {config.formats}</p>
-          <p className="text-xs text-muted-foreground">Máximo {formatSize(config.maxSize)} por archivo</p>
+          <p className="text-xs text-muted-foreground mt-2">{t("shared.upload.formats", { formats: t(config.formats) })}</p>
+          <p className="text-xs text-muted-foreground">{t("shared.upload.maxPerFile", { max: formatSize(config.maxSize) })}</p>
         </div>
 
         <input
@@ -177,7 +185,7 @@ export default function FileUploadModal({ open, onClose, category, tempId, onFil
         {/* Selected files list */}
         {selectedFiles.length > 0 && (
           <div className="space-y-2 max-h-40 overflow-auto">
-            <p className="text-sm font-medium">Archivos seleccionados ({selectedFiles.length})</p>
+            <p className="text-sm font-medium">{t("shared.upload.selected", { n: selectedFiles.length })}</p>
             {selectedFiles.map((f, i) => (
               <div key={i} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
                 <div className="flex items-center gap-2 min-w-0">
@@ -185,7 +193,13 @@ export default function FileUploadModal({ open, onClose, category, tempId, onFil
                   <span className="truncate">{f.name}</span>
                   <span className="text-muted-foreground text-xs shrink-0">{formatSize(f.size)}</span>
                 </div>
-                <button onClick={() => removeFile(i)} className="text-muted-foreground hover:text-destructive ml-2" disabled={uploading}>
+                <button
+                  type="button"
+                  onClick={() => removeFile(i)}
+                  className="text-muted-foreground hover:text-destructive ml-2"
+                  disabled={uploading}
+                  aria-label={t("shared.upload.remove", { name: f.name })}
+                >
                   <X className="h-4 w-4" />
                 </button>
               </div>
@@ -197,14 +211,14 @@ export default function FileUploadModal({ open, onClose, category, tempId, onFil
         {uploading && (
           <div className="space-y-1">
             <Progress value={progress} className="h-2" />
-            <p className="text-xs text-muted-foreground text-center">Subiendo... {progress}%</p>
+            <p className="text-xs text-muted-foreground text-center">{t("shared.upload.progress", { p: progress })}</p>
           </div>
         )}
 
         <DialogFooter>
-          <Button variant="outline" onClick={handleClose} disabled={uploading}>Cancelar</Button>
+          <Button variant="outline" onClick={handleClose} disabled={uploading}>{t("common.cancel")}</Button>
           <Button onClick={handleUpload} disabled={uploading || !selectedFiles.length}>
-            <Upload className="mr-2 h-4 w-4" /> {uploading ? "Subiendo…" : "Subir"}
+            <Upload className="mr-2 h-4 w-4" /> {uploading ? t("shared.upload.uploading") : t("shared.upload.upload")}
           </Button>
         </DialogFooter>
       </DialogContent>

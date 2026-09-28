@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { UserAvatar } from "@/components/UserAvatar";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/hooks/useLanguage";
 
 export interface PersonaDelEquipo {
   id: string;
@@ -18,7 +19,7 @@ export interface PersonaDelEquipo {
 // Pedido de Jhon (09/09/2026) para compartir grabaciones, con la forma de los
 // chips de "assigned creators" de Agency QA.
 export function SelectorDePersonas({
-  value, onChange, excluir = [], placeholder = "Buscar en el equipo…", className,
+  value, onChange, excluir = [], placeholder, className,
 }: {
   value: string[];
   onChange: (ids: string[]) => void;
@@ -27,6 +28,7 @@ export function SelectorDePersonas({
   placeholder?: string;
   className?: string;
 }) {
+  const { t } = useLanguage();
   const [personas, setPersonas] = useState<PersonaDelEquipo[]>([]);
   const [cargando, setCargando] = useState(true);
   const [filtro, setFiltro] = useState("");
@@ -73,7 +75,7 @@ export function SelectorDePersonas({
                   type="button"
                   onClick={() => toggle(id)}
                   className="rounded-full p-0.5 text-muted-foreground hover:bg-primary/20 hover:text-foreground"
-                  aria-label={`Quitar a ${p?.full_name ?? "esta persona"}`}
+                  aria-label={t("shared.people.remove", { name: p?.full_name ?? t("shared.people.thisPerson") })}
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -85,20 +87,20 @@ export function SelectorDePersonas({
 
       <div className="relative">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input value={filtro} onChange={(e) => setFiltro(e.target.value)} placeholder={placeholder} className="rounded-full pl-9" />
+        <Input value={filtro} onChange={(e) => setFiltro(e.target.value)} placeholder={placeholder ?? t("shared.people.searchTeam")} className="rounded-full pl-9" />
       </div>
 
       <div className="max-h-56 divide-y divide-border/40 overflow-y-auto rounded-xl border border-border/60">
         {cargando ? (
           <div className="flex items-center justify-center py-8 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" /></div>
         ) : visibles.length === 0 ? (
-          <p className="py-6 text-center text-sm text-muted-foreground">Sin resultados</p>
+          <p className="py-6 text-center text-sm text-muted-foreground">{t("common.noResultsShort")}</p>
         ) : (
           visibles.map((p) => (
             <label key={p.id} className="flex cursor-pointer items-center gap-3 px-3 py-2 hover:bg-muted/50">
               <Checkbox checked={elegidos.has(p.id)} onCheckedChange={() => toggle(p.id)} />
               <UserAvatar name={p.full_name ?? "?"} src={p.avatar_url} seed={p.avatar_seed} size="xs" />
-              <span className="truncate text-sm text-foreground">{p.full_name || "Sin nombre"}</span>
+              <span className="truncate text-sm text-foreground">{p.full_name || t("shared.people.noName")}</span>
             </label>
           ))
         )}

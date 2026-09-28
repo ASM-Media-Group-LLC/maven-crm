@@ -5,6 +5,8 @@ import { createPortal } from "react-dom";
 import { Minimize2, Maximize2, PhoneOff, PictureInPicture2, GripHorizontal, Volume2, VolumeX } from "lucide-react";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
 import { usePipWindow, docPipSupported } from "@/pages/cowork/usePipWindow";
+import { useLanguageSiHay } from "@/hooks/useLanguage";
+import { traducir } from "@/lib/i18n";
 
 // Llamada que SOBREVIVE a cambiar de página.
 //
@@ -88,6 +90,11 @@ export function PersistentCallProvider({ children }: { children: React.ReactNode
   // coordinador: si vivieran ahi, navegar a otra seccion lo dejaria sordo justo
   // cuando alguien esta pidiendo ayuda.
   useCoworkRequestAlerts();
+
+  // El texto de la ventanita en el idioma de la interfaz. Sin LanguageProvider
+  // (algún test monta el provider suelto) usa traducir(), que no tira: una
+  // etiqueta nunca puede ser la razón de que se caiga una llamada.
+  const t = useLanguageSiHay()?.t ?? traducir;
 
   const [config, setConfig] = useState<CallConfig | null>(null);
   const [outlet, setOutlet] = useState<HTMLElement | null>(null);
@@ -292,7 +299,7 @@ export function PersistentCallProvider({ children }: { children: React.ReactNode
           >
             <span className="flex items-center gap-1.5 text-[11px] text-foreground/80 truncate">
               <GripHorizontal className="h-3 w-3 shrink-0 text-muted-foreground" />
-              {config.callDisplayName || "En llamada"}
+              {config.callDisplayName || t("shared.floatCall.inCall")}
             </span>
             <span className="flex items-center gap-0.5 shrink-0">
               {/* Silencio local del audio entrante (p.ej. el Hub de Cowork).
@@ -303,9 +310,9 @@ export function PersistentCallProvider({ children }: { children: React.ReactNode
                 <button
                   type="button"
                   title={config.incomingAudioMuted
-                    ? "Silenciado solo para ti (ellos siguen hablando). Toca para volver a escuchar."
-                    : "Silenciar solo para ti: no los escuchas, tu micro no cambia."}
-                  aria-label={config.incomingAudioMuted ? "Volver a escuchar" : "Silenciar para mí"}
+                    ? t("shared.floatCall.mutedForYou")
+                    : t("shared.floatCall.muteForYou")}
+                  aria-label={config.incomingAudioMuted ? t("shared.floatCall.listenAgain") : t("shared.floatCall.muteForMe")}
                   onClick={() => {
                     const next = !config.incomingAudioMuted;
                     setConfig((c) => (c ? { ...c, incomingAudioMuted: next } : c));
@@ -321,8 +328,8 @@ export function PersistentCallProvider({ children }: { children: React.ReactNode
               {docPipSupported() && (
                 <button
                   type="button"
-                  title="Sacar del navegador"
-                  aria-label="Sacar del navegador"
+                  title={t("shared.floatCall.popOut")}
+                  aria-label={t("shared.floatCall.popOut")}
                   onClick={() => { void openPip({ width: 420, height: 300 }); }}
                   className="h-6 w-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-background/60"
                 >
@@ -331,8 +338,8 @@ export function PersistentCallProvider({ children }: { children: React.ReactNode
               )}
               <button
                 type="button"
-                title={minimizada ? "Agrandar" : "Minimizar"}
-                aria-label={minimizada ? "Agrandar" : "Minimizar"}
+                title={minimizada ? t("shared.window.expand") : t("shared.window.minimize")}
+                aria-label={minimizada ? t("shared.window.expand") : t("shared.window.minimize")}
                 onClick={() => setMinimizada((v) => !v)}
                 className="h-6 w-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-background/60"
               >
@@ -340,8 +347,8 @@ export function PersistentCallProvider({ children }: { children: React.ReactNode
               </button>
               <button
                 type="button"
-                title="Colgar"
-                aria-label="Colgar"
+                title={t("shared.floatCall.hangUp")}
+                aria-label={t("shared.floatCall.hangUp")}
                 onClick={() => { config.onLeave?.(); endCall(); }}
                 className="h-6 w-6 rounded-md flex items-center justify-center text-destructive hover:bg-destructive/10"
               >
@@ -364,9 +371,9 @@ export function PersistentCallProvider({ children }: { children: React.ReactNode
         <button
           type="button"
           title={config.incomingAudioMuted
-            ? "Silenciado solo para ti (ellos siguen hablando). Toca para volver a escuchar."
-            : "Silenciar solo para ti: no los escuchas, tu micro no cambia."}
-          aria-label={config.incomingAudioMuted ? "Volver a escuchar" : "Silenciar para mí"}
+            ? t("shared.floatCall.mutedForYou")
+            : t("shared.floatCall.muteForYou")}
+          aria-label={config.incomingAudioMuted ? t("shared.floatCall.listenAgain") : t("shared.floatCall.muteForMe")}
           onClick={() => {
             const next = !config.incomingAudioMuted;
             setConfig((c) => (c ? { ...c, incomingAudioMuted: next } : c));
