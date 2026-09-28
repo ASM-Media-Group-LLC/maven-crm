@@ -1,7 +1,7 @@
 // Drive de Oficina — la edge que da los PERMISOS para el NAS.
 //
 // El contenido de los archivos nunca pasa por acá: el navegador sube y baja
-// directo del NAS (infra/nas-drive) por el Cloudflare Tunnel, con un permiso
+// directo del NAS (infra/nas-drive) por la puerta de Dokploy (infra/nas-drive/puerta), con un permiso
 // firmado que sale de esta función. Acá se decide QUIÉN puede QUÉ, con la RLS
 // de drive_items como juez: si la persona no puede ver la ficha, no hay
 // permiso.
@@ -12,7 +12,7 @@
 //   abrir            { id, descargar? }                → URL para verlo/bajarlo
 //   borrar_para_siempre { id }                         → borra en el NAS y la ficha
 //
-// Variables: DRIVE_NAS_URL (la del túnel), DRIVE_SECRETO (el mismo del NAS).
+// Variables: DRIVE_NAS_URL (la de la puerta), DRIVE_SECRETO (el mismo del NAS).
 
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 import { corsFor } from "../_shared/cors.ts";

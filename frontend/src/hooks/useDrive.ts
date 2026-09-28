@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { describeFunctionError } from "@/hooks/useMailConnection";
 
 // Drive de Oficina. Las FICHAS (nombre, carpeta, dueño) se leen directo de la
-// base con la RLS de drive_items; el CONTENIDO va y viene del NAS por el túnel
+// base con la RLS de drive_items; el CONTENIDO va y viene del NAS por la puerta de Dokploy (Tailscale)
 // con un permiso firmado que da la edge `drive` (ver infra/nas-drive).
 
 export interface DriveItem {
@@ -256,7 +256,7 @@ function enviar(url: string, metodo: string, cuerpo: Blob | null, onProgreso: (n
       if (xhr.status >= 200 && xhr.status < 300) resolve(j);
       else reject(new Error((j as { error?: string } | null)?.error ?? `El NAS contestó ${xhr.status}`));
     };
-    // Sin respuesta del todo: el túnel o la mini no están. No es «el archivo
+    // Sin respuesta del todo: la puerta o la mini no están. No es «el archivo
     // es inválido»; es «el NAS no está».
     xhr.onerror = () => reject(new Error("No se pudo llegar al NAS"));
     xhr.send(cuerpo);
@@ -264,7 +264,7 @@ function enviar(url: string, metodo: string, cuerpo: Blob | null, onProgreso: (n
 }
 
 /** Sube archivos a una carpeta: pide el permiso a la edge, manda el archivo
- *  directo al NAS (entero o por partes de 95 MB) y confirma con el recibo que
+ *  directo al NAS (entero o por partes de 32 MB) y confirma con el recibo que
  *  firma el NAS. Las partes van de a una: el orden importa menos que no
  *  saturar la subida de la oficina. */
 export function useSubidasDrive() {

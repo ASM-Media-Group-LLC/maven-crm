@@ -1,10 +1,13 @@
 // Las reglas de la edge `drive` que no dependen de la red ni de la base:
 // separadas para poder probarlas sin levantar el servidor.
 
-/** Tope por archivo. Por partes de 95 MB, son ~216 partes. */
+/** Tope por archivo. Por partes de 32 MB, son 640 partes. */
 export const MAX_ARCHIVO = 20 * 1024 * 1024 * 1024;
-/** Tiene que coincidir con MAX_POR_PEDIDO del NAS (el proxy corta en 100 MB). */
-export const TAMANO_PARTE = 95 * 1024 * 1024;
+/** Cada parte es UN pedido HTTP, y tiene que entrar en la ventana del proxy:
+ *  el Traefik de Dokploy (la puerta al NAS, 28/09) corta a los ~60 s. 32 MB a
+ *  5 Mbps de subida son 51 s. Tiene que ser menor que MAX_POR_PEDIDO del NAS
+ *  (95 MB). */
+export const TAMANO_PARTE = 32 * 1024 * 1024;
 
 export class HttpError extends Error {
   constructor(message: string, public status = 400) { super(message); }

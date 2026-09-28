@@ -4,8 +4,9 @@ import { MAX_ARCHIVO, nombreValido, planDeSubida, TAMANO_PARTE } from "./logica.
 function assert(c: boolean, m: string) { if (!c) throw new Error(m); }
 const tira = (f: () => unknown) => { try { f(); return false; } catch { return true; } };
 
-Deno.test("la parte entra por el proxy de Cloudflare (corta en 100 MB)", () => {
-  assert(TAMANO_PARTE < 100 * 1024 * 1024, "la parte es demasiado grande para el túnel");
+Deno.test("la parte entra en la ventana del proxy y en el tope del NAS (95 MB)", () => {
+  assert(TAMANO_PARTE <= 32 * 1024 * 1024, "más de 32 MB no entra en ~60 s con una subida lenta");
+  assert(TAMANO_PARTE < 95 * 1024 * 1024, "el NAS rechaza pedidos de más de 95 MB");
 });
 
 Deno.test("hasta una parte va entero; más, por partes redondeando para arriba", () => {
