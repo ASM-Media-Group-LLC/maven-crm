@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { startOfDay, subDays, startOfWeek, startOfMonth, format } from "date-fns";
+import { useTSiHay } from "@/hooks/useTSiHay";
+import type { TranslationKey } from "@/lib/i18n";
 
 export interface ActivityDataPoint {
   label: string;
@@ -22,7 +24,25 @@ export interface TimelineEvent {
   label: string;
 }
 
+// Los días de la semana por getDay() (0 = domingo) y el nombre de cada tramo
+// de la línea de tiempo: se dibujan, así que salen del diccionario con el `t`
+// del hook y se rearman al cambiar el idioma.
+const DIAS: TranslationKey[] = [
+  "int.hubstaff.day.0", "int.hubstaff.day.1", "int.hubstaff.day.2", "int.hubstaff.day.3",
+  "int.hubstaff.day.4", "int.hubstaff.day.5", "int.hubstaff.day.6",
+];
+
+type Tramo = Exclude<TimelineEvent["type"], "start" | "end">;
+
+const TRAMO: Record<Tramo, TranslationKey> = {
+  high: "int.hubstaff.high",
+  medium: "int.hubstaff.medium",
+  low: "int.hubstaff.low",
+  break: "int.hubstaff.break",
+};
+
 export function useHubstaffAgentDetail(memberId: string, period: "daily" | "weekly" | "monthly") {
+  const t = useTSiHay();
   const activitiesQuery = useQuery({
     queryKey: ["hubstaff-agent-activities", memberId, period],
     enabled: !!memberId,
@@ -91,7 +111,6 @@ export function useHubstaffAgentDetail(memberId: string, period: "daily" | "week
     }
 
     if (period === "weekly") {
-      const dayNames = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
       const byDay = new Map<number, { mouse: number[]; keyboard: number[] }>();
       acts.forEach(a => {
         const dow = new Date(a.starts_at).getDay();
@@ -105,7 +124,7 @@ export function useHubstaffAgentDetail(memberId: string, period: "daily" | "week
         .map(d => {
           const v = byDay.get(d)!;
           return {
-            label: dayNames[d],
+            label: t(DIAS[d]),
             mouse: Math.round(v.mouse.reduce((s, x) => s + x, 0) / v.mouse.length),
             keyboard: Math.round(v.keyboard.reduce((s, x) => s + x, 0) / v.keyboard.length),
           };
@@ -143,21 +162,21 @@ export function useHubstaffAgentDetail(memberId: string, period: "daily" | "week
 
     const events: TimelineEvent[] = [];
     const first = new Date(todayActs[0].starts_at);
-    events.push({ time: format(first, "h:mm a"), type: "start", label: "Inicio de jornada" });
+    events.push({ time: format(first, "h:mm a"), type: "start", label: t("int.hubstaff.start") });
 
     // Group consecutive intervals by activity level
-    let currentType: TimelineEvent["type"] | null = null;
+    let currentType: Tramo | null = null;
     let segStart = first;
 
     todayActs.forEach((a, i) => {
       const overall = a.overall_activity ?? 0;
-      const type: TimelineEvent["type"] = overall > 60 ? "high" : overall > 30 ? "medium" : overall > 0 ? "low" : "break";
+      const type: Tramo = overall > 60 ? "high" : overall > 30 ? "medium" : overall > 0 ? "low" : "break";
       if (type !== currentType && currentType !== null) {
         const segEnd = new Date(a.starts_at);
         events.push({
           time: `${format(segStart, "h:mm a")} - ${format(segEnd, "h:mm a")}`,
           type: currentType,
-          label: currentType === "high" ? "Alta actividad" : currentType === "medium" ? "Actividad moderada" : currentType === "low" ? "Baja actividad" : "Pausa",
+          label: t(TRAMO[currentType]),
         });
         segStart = segEnd;
       }
@@ -167,9 +186,9 @@ export function useHubstaffAgentDetail(memberId: string, period: "daily" | "week
         events.push({
           time: `${format(segStart, "h:mm a")} - ${format(segEnd, "h:mm a")}`,
           type: currentType!,
-          label: currentType === "high" ? "Alta actividad" : currentType === "medium" ? "Actividad moderada" : currentType === "low" ? "Baja actividad" : "Pausa",
+          label: t(TRAMO[currentType!]),
         });
-        events.push({ time: format(segEnd, "h:mm a"), type: "end", label: "Última actividad registrada" });
+        events.push({ time: format(segEnd, "h:mm a"), type: "end", label: t("int.hubstaff.last") });
       }
     });
 

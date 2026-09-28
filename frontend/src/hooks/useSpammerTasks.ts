@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+// Avisos y errores de pantalla por traducir() (salen de mutaciones y consultas).
+import { traducir } from "@/lib/i18n";
 import type { SpammerAccount } from "@/hooks/useSpammerAccounts";
 import type { ScouterLead } from "@/hooks/useScouterLeads";
 
@@ -138,7 +140,9 @@ export interface CompleteTaskInput {
 
 export interface SpammerAlertRow {
   spammer_id: string;
-  spammer_name: string;
+  /** null si el spammer no tiene full_name: la pantalla dibuja el "(sin nombre)"
+   *  en su idioma (ScouterAlertas). */
+  spammer_name: string | null;
   date: string;
   total_assignments: number;
   done: number;
@@ -188,7 +192,7 @@ export const useSpammerAlerts = (lookbackDays = 7) =>
         const key = `${r.spammer_id}::${r.assigned_date}`;
         const slot = map.get(key) ?? {
           spammer_id: r.spammer_id,
-          spammer_name: r.spammer?.full_name ?? "(sin nombre)",
+          spammer_name: r.spammer?.full_name ?? null,
           date: r.assigned_date,
           total_assignments: 0,
           done: 0,
@@ -218,7 +222,7 @@ export const useCompleteTask = () => {
   return useMutation({
     mutationFn: async (input: CompleteTaskInput): Promise<void> => {
       const { data: userRes, error: userErr } = await supabase.auth.getUser();
-      if (userErr || !userRes.user) throw userErr ?? new Error("No hay sesión activa.");
+      if (userErr || !userRes.user) throw userErr ?? new Error(traducir("int.noSession"));
       const userId = userRes.user.id;
 
       // 1. Mark task done
@@ -257,7 +261,7 @@ export const useCompleteTask = () => {
       qc.invalidateQueries({ queryKey: ["spammer-progress"] });
     },
     onError: (e) => {
-      toast.error("No se pudo completar la tarea", { description: (e as Error).message });
+      toast.error(traducir("int.spammer.completeFailed"), { description: (e as Error).message });
     },
   });
 };
@@ -286,7 +290,7 @@ export const useSkipTask = () => {
       qc.invalidateQueries({ queryKey: ["spammer-progress"] });
     },
     onError: (e) => {
-      toast.error("No se pudo saltar la tarea", { description: (e as Error).message });
+      toast.error(traducir("int.spammer.skipFailed"), { description: (e as Error).message });
     },
   });
 };
@@ -363,7 +367,7 @@ export const useUploadScreenshot = () => {
   return useMutation({
     mutationFn: async (input: UploadScreenshotInput): Promise<string> => {
       const { data: userRes, error: userErr } = await supabase.auth.getUser();
-      if (userErr || !userRes.user) throw userErr ?? new Error("No hay sesión activa.");
+      if (userErr || !userRes.user) throw userErr ?? new Error(traducir("int.noSession"));
       const userId = userRes.user.id;
 
       // Resolve tenant_id via the same RPC pattern used in useScouterLeads
@@ -371,7 +375,7 @@ export const useUploadScreenshot = () => {
         supabase.rpc as unknown as (fn: string) => Promise<{ data: string | null; error: unknown }>
       )("current_tenant_id");
       if (tenantErr) throw tenantErr;
-      if (!tenantId) throw new Error("Tenant no resuelto.");
+      if (!tenantId) throw new Error(traducir("int.scouter.tenantMissing"));
 
       // Compress to WebP before upload
       const webpFile = await compressImageToWebP(input.file);
@@ -402,10 +406,10 @@ export const useUploadScreenshot = () => {
     onSuccess: (_storagePath, variables) => {
       qc.invalidateQueries({ queryKey: ["daily-assignments", variables.date] });
       qc.invalidateQueries({ queryKey: ["spammer-progress"] });
-      toast.success("Screenshot subido y tarea completada");
+      toast.success(traducir("int.spammer.screenshotDone"));
     },
     onError: (e) => {
-      toast.error("No se pudo subir el screenshot", { description: (e as Error).message });
+      toast.error(traducir("int.spammer.screenshotUploadFailed"), { description: (e as Error).message });
     },
   });
 };
@@ -451,13 +455,13 @@ export const useGenerateTasks = () => {
       }
 
       const { data: userRes, error: userErr } = await supabase.auth.getUser();
-      if (userErr || !userRes.user) throw userErr ?? new Error("No hay sesión activa.");
+      if (userErr || !userRes.user) throw userErr ?? new Error(traducir("int.noSession"));
 
       const { data: tenantId, error: tenantErr } = await (
         supabase.rpc as unknown as (fn: string) => Promise<{ data: string | null; error: unknown }>
       )("current_tenant_id");
       if (tenantErr) throw tenantErr;
-      if (!tenantId) throw new Error("Tenant no resuelto.");
+      if (!tenantId) throw new Error(traducir("int.scouter.tenantMissing"));
 
       const { data, error } = await supabase.functions.invoke("scouter-generate-tasks", {
         body: {
@@ -486,13 +490,13 @@ export const useGenerateTasks = () => {
       qc.invalidateQueries({ queryKey: ["daily-assignments", date] });
       qc.invalidateQueries({ queryKey: ["spammer-progress"] });
       if (data.created > 0) {
-        toast.success(`Se generaron ${data.created} tareas nuevas`);
+        toast.success(traducir("int.spammer.generated", { count: data.created }));
       } else {
-        toast.info(`Ya tienes ${data.target} tareas pendientes — no hace falta generar`);
+        toast.info(traducir("int.spammer.alreadyEnough", { count: data.target }));
       }
     },
     onError: (e) => {
-      toast.error("No se pudieron generar tareas", { description: (e as Error).message });
+      toast.error(traducir("int.spammer.generateFailed"), { description: (e as Error).message });
     },
   });
 };

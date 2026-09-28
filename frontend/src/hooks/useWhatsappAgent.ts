@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+// Avisos y errores de pantalla por traducir() (salen de mutaciones y consultas).
+import { traducir } from "@/lib/i18n";
 
 // Hooks para el panel admin del agente de WhatsApp.
 //
@@ -305,7 +307,7 @@ export function useToggleWhatsappBot() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["whatsapp", "groups"] });
-      toast.success("Configuración del bot actualizada");
+      toast.success(traducir("int.waBot.settingsUpdated"));
     },
     onError: (e: Error) => toast.error(`Error: ${e.message}`),
   });
@@ -347,7 +349,7 @@ export function useAssignBotToGroup() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["whatsapp", "groups"] });
-      toast.success("Bot del grupo actualizado");
+      toast.success(traducir("int.waBot.groupBotUpdated"));
     },
     onError: (e: Error) => toast.error(`Error: ${e.message}`),
   });
@@ -370,7 +372,7 @@ export function useAskWhatsappAgent() {
     },
     onSuccess: (data) => {
       if (data.ok) {
-        toast.success(`Bot respondió en ${data.iterations} iteración(es)`);
+        toast.success(traducir("int.waBot.replied", { count: data.iterations ?? 0 }));
       } else {
         toast.error(`Bot error: ${data.error ?? "unknown"}`);
       }
@@ -394,6 +396,7 @@ export function useResolveCommitment() {
         .update({
           status: outcome,
           resolved_at: new Date().toISOString(),
+          // Se guarda en la base y la lee quien revise el compromiso: dato, no se traduce.
           resolution_note: `Cerrado manualmente desde panel admin`,
         })
         .eq("id", id);
@@ -401,7 +404,7 @@ export function useResolveCommitment() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["whatsapp", "commitments"] });
-      toast.success("Compromiso cerrado");
+      toast.success(traducir("int.waBot.commitmentClosed"));
     },
     onError: (e: Error) => toast.error(`Error: ${e.message}`),
   });
@@ -490,7 +493,7 @@ export function useLinkWhatsappMember() {
     },
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: ["whatsapp", "members"] });
-      toast.success(vars.userId ? "Miembro linkeado a Maven" : "Link removido");
+      toast.success(traducir(vars.userId ? "int.waBot.memberLinked" : "int.waBot.linkRemoved"));
     },
     onError: (e: Error) => toast.error(`Error: ${e.message}`),
   });
@@ -508,7 +511,7 @@ export function useUpdateBotPersona() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["whatsapp", "groups"] });
-      toast.success("Persona del bot actualizada");
+      toast.success(traducir("int.waBot.personaUpdated"));
     },
     onError: (e: Error) => toast.error(`Error: ${e.message}`),
   });

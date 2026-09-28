@@ -2,6 +2,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { checkPreviousLead } from "@/lib/lead-validation";
+// Avisos y errores de pantalla por traducir() (salen de mutaciones). El balde
+// "Sin país" NO: es el value del filtro de país (se compara y viaja en la query).
+import { traducir } from "@/lib/i18n";
 
 // Types mirror the scouter_leads / scouter_companies tables. Kept inline
 // here (not in the generated Supabase types yet) so the rest of the app
@@ -390,7 +393,7 @@ export const useUpdateLead = () => {
       qc.invalidateQueries({ queryKey: ["scouter-stats"] });
     },
     onError: (e) => {
-      toast.error("No se pudo guardar", { description: (e as Error).message });
+      toast.error(traducir("common.couldNotSave"), { description: (e as Error).message });
     },
   });
 };
@@ -421,7 +424,7 @@ export const useDiscardLead = () => {
       tenantId: string;
     }) => {
       const cleaned = handle.replace(/^@+/, "").toLowerCase().trim();
-      if (!cleaned) throw new Error("Handle vacío");
+      if (!cleaned) throw new Error(traducir("int.scouter.emptyHandle"));
       const { data: { user } } = await supabase.auth.getUser();
 
       // 1) INSERT en blocklist. ON CONFLICT do nothing — si ya estaba
@@ -452,7 +455,7 @@ export const useDiscardLead = () => {
       qc.invalidateQueries({ queryKey: ["scouter-countries"] });
     },
     onError: (e) => {
-      toast.error("No se pudo descartar", { description: (e as Error).message });
+      toast.error(traducir("int.scouter.discardFailed"), { description: (e as Error).message });
     },
   });
 };
@@ -490,7 +493,7 @@ export const useToggleLeadFavorite = () => {
       qc.invalidateQueries({ queryKey: ["scouter-leads"] });
     },
     onError: (e) => {
-      toast.error("No se pudo actualizar el favorito", {
+      toast.error(traducir("int.scouter.favoriteFailed"), {
         description: (e as Error).message,
       });
     },
@@ -786,7 +789,7 @@ export const useCreateCompany = () => {
   return useMutation({
     mutationFn: async (input: CompanyInput): Promise<ScouterCompany> => {
       const tenantId = tenantQ.data;
-      if (!tenantId) throw new Error("Tenant no resuelto.");
+      if (!tenantId) throw new Error(traducir("int.scouter.tenantMissing"));
       const { data, error } = await sb
         .from("scouter_companies")
         .insert({
@@ -807,9 +810,9 @@ export const useCreateCompany = () => {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["scouter-companies"] });
       qc.invalidateQueries({ queryKey: ["scouter-companies-all"] });
-      toast.success("Compañía creada");
+      toast.success(traducir("int.scouter.companyCreated"));
     },
-    onError: (e) => toast.error("Error al crear compañía", { description: (e as Error).message }),
+    onError: (e) => toast.error(traducir("int.scouter.companyCreateFailed"), { description: (e as Error).message }),
   });
 };
 
@@ -829,9 +832,9 @@ export const useUpdateCompany = () => {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["scouter-companies"] });
       qc.invalidateQueries({ queryKey: ["scouter-companies-all"] });
-      toast.success("Compañía actualizada");
+      toast.success(traducir("int.scouter.companyUpdated"));
     },
-    onError: (e) => toast.error("Error al actualizar", { description: (e as Error).message }),
+    onError: (e) => toast.error(traducir("common.errorUpdating"), { description: (e as Error).message }),
   });
 };
 
@@ -897,11 +900,11 @@ export const useEnqueueDiscoverySeed = () => {
   return useMutation({
     mutationFn: async (input: EnqueueDiscoverSeedInput): Promise<ScouterJob> => {
       const tenantId = tenantQ.data;
-      if (!tenantId) throw new Error("Tenant no resuelto todavía. Reintenta en un segundo.");
+      if (!tenantId) throw new Error(traducir("int.scouter.tenantMissingRetry"));
       const cleaned = (input.seeds ?? [])
         .map((s) => s.trim().replace(/^@/, ""))
         .filter(Boolean);
-      if (cleaned.length === 0) throw new Error("Pasa al menos un @handle.");
+      if (cleaned.length === 0) throw new Error(traducir("int.scouter.needHandles"));
       const { data, error } = await sb
         .from("scouter_jobs")
         .insert({
@@ -922,12 +925,12 @@ export const useEnqueueDiscoverySeed = () => {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["scouter-jobs"] });
-      toast.success("Discovery encolado", {
-        description: "El worker lo va a tomar en el próximo tick (~15s).",
+      toast.success(traducir("int.scouter.discoveryQueued"), {
+        description: traducir("int.scouter.workerNextTick"),
       });
     },
     onError: (e) => {
-      toast.error("No se pudo encolar el discovery", { description: (e as Error).message });
+      toast.error(traducir("int.scouter.discoveryQueueFailed"), { description: (e as Error).message });
     },
   });
 };
@@ -943,9 +946,9 @@ export const useEnqueueDiscoveryHashtag = () => {
   return useMutation({
     mutationFn: async (input: EnqueueDiscoverHashtagInput): Promise<ScouterJob> => {
       const tenantId = tenantQ.data;
-      if (!tenantId) throw new Error("Tenant no resuelto todavía. Reintenta en un segundo.");
+      if (!tenantId) throw new Error(traducir("int.scouter.tenantMissingRetry"));
       const tag = input.hashtag.trim().replace(/^#/, "");
-      if (!tag) throw new Error("Pasa un hashtag.");
+      if (!tag) throw new Error(traducir("int.scouter.needHashtag"));
       const { data, error } = await sb
         .from("scouter_jobs")
         .insert({
@@ -963,12 +966,12 @@ export const useEnqueueDiscoveryHashtag = () => {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["scouter-jobs"] });
-      toast.success("Hashtag discovery encolado", {
-        description: "El worker lo va a tomar en el próximo tick (~15s).",
+      toast.success(traducir("int.scouter.hashtagQueued"), {
+        description: traducir("int.scouter.workerNextTick"),
       });
     },
     onError: (e) => {
-      toast.error("No se pudo encolar el hashtag", { description: (e as Error).message });
+      toast.error(traducir("int.scouter.hashtagQueueFailed"), { description: (e as Error).message });
     },
   });
 };
@@ -987,7 +990,7 @@ export const useEnqueueScoreLead = () => {
   return useMutation({
     mutationFn: async (input: EnqueueScoreLeadInput): Promise<ScouterJob> => {
       const tenantId = tenantQ.data;
-      if (!tenantId) throw new Error("Tenant no resuelto todavía.");
+      if (!tenantId) throw new Error(traducir("int.scouter.tenantMissing"));
       const { data, error } = await sb
         .from("scouter_jobs")
         .insert({
@@ -1006,10 +1009,10 @@ export const useEnqueueScoreLead = () => {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["scouter-jobs"] });
       qc.invalidateQueries({ queryKey: ["scouter-leads"] });
-      toast.success("Re-scoring encolado");
+      toast.success(traducir("int.scouter.rescoringQueued"));
     },
     onError: (e) => {
-      toast.error("No se pudo encolar el scoring", { description: (e as Error).message });
+      toast.error(traducir("int.scouter.scoringQueueFailed"), { description: (e as Error).message });
     },
   });
 };
@@ -1025,7 +1028,7 @@ export const useEnqueueEnrichProfile = () => {
   return useMutation({
     mutationFn: async (input: EnqueueEnrichProfileInput): Promise<ScouterJob> => {
       const tenantId = tenantQ.data;
-      if (!tenantId) throw new Error("Tenant no resuelto todavía.");
+      if (!tenantId) throw new Error(traducir("int.scouter.tenantMissing"));
       const { data, error } = await sb
         .from("scouter_jobs")
         .insert({
@@ -1044,10 +1047,10 @@ export const useEnqueueEnrichProfile = () => {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["scouter-jobs"] });
       qc.invalidateQueries({ queryKey: ["scouter-leads"] });
-      toast.success("Refresh de perfil encolado");
+      toast.success(traducir("int.scouter.refreshQueued"));
     },
     onError: (e) => {
-      toast.error("No se pudo encolar el refresh", { description: (e as Error).message });
+      toast.error(traducir("int.scouter.refreshQueueFailed"), { description: (e as Error).message });
     },
   });
 };
@@ -1075,10 +1078,10 @@ export const useCreateLeadManual = () => {
   return useMutation({
     mutationFn: async (input: ManualLeadInput): Promise<ScouterLead> => {
       const tenantId = tenantQ.data;
-      if (!tenantId) throw new Error("Tenant no resuelto. Reintenta en un segundo.");
+      if (!tenantId) throw new Error(traducir("int.scouter.tenantMissingRetry"));
       const handle = input.instagram_handle.trim().replace(/^@/, "").toLowerCase();
-      if (!handle) throw new Error("Pasa un @handle.");
-      if (!input.company_id) throw new Error("Selecciona una compañía.");
+      if (!handle) throw new Error(traducir("int.scouter.needHandle"));
+      if (!input.company_id) throw new Error(traducir("int.scouter.needCompany"));
 
       // Cross-system dedup contra Lead Gen. (No bloqueamos cross-company
       // dentro de Scouter — un mismo modelo puede calificar legítimamente
@@ -1088,10 +1091,8 @@ export const useCreateLeadManual = () => {
       const leadgenCheck = await checkPreviousLead(handle);
       if (leadgenCheck.existed) {
         const date = leadgenCheck.lastEntryDate?.slice(0, 10) ?? "?";
-        const agent = leadgenCheck.lastAgentName ? ` por ${leadgenCheck.lastAgentName}` : "";
-        throw new Error(
-          `Ya existe @${handle} en Lead Gen (cargado el ${date}${agent}). No se puede duplicar.`,
-        );
+        const agent = leadgenCheck.lastAgentName ? traducir("int.byAgent", { name: leadgenCheck.lastAgentName }) : "";
+        throw new Error(traducir("int.scouter.inLeadgen", { handle, date, agent }));
       }
 
       const { data: inserted, error } = await sb
@@ -1117,7 +1118,7 @@ export const useCreateLeadManual = () => {
       if (error) {
         // Friendly mensaje cuando hay duplicado (UNIQUE company_id+handle).
         if ((error.code === "23505") || /duplicate|unique/i.test(error.message)) {
-          throw new Error(`Ya existe un lead @${handle} para esta compañía.`);
+          throw new Error(traducir("int.scouter.duplicateForCompany", { handle }));
         }
         throw error;
       }
@@ -1132,12 +1133,12 @@ export const useCreateLeadManual = () => {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["scouter-leads"] });
       qc.invalidateQueries({ queryKey: ["scouter-stats"] });
-      toast.success("Lead agregado", {
-        description: "Pendiente de score IA — quedará en Leads → Discovery.",
+      toast.success(traducir("int.scouter.leadAdded"), {
+        description: traducir("int.scouter.leadAddedDesc"),
       });
     },
     onError: (e) => {
-      toast.error("No se pudo agregar el lead", { description: (e as Error).message });
+      toast.error(traducir("int.scouter.addLeadFailed"), { description: (e as Error).message });
     },
   });
 };
@@ -1245,10 +1246,10 @@ export const useRetryScouterJob = () => {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["scouter-jobs"] });
-      toast.success("Job re-encolado");
+      toast.success(traducir("int.scouter.jobRequeued"));
     },
     onError: (e) => {
-      toast.error("No se pudo re-encolar", { description: (e as Error).message });
+      toast.error(traducir("int.scouter.requeueFailed"), { description: (e as Error).message });
     },
   });
 };
@@ -1264,6 +1265,7 @@ export const useCancelScouterJob = () => {
         .from("scouter_jobs")
         .update({
           status: "failed",
+          // Se guarda en la base y lo lee quien mire el job: dato, no se traduce.
           last_error: "Cancelado por el usuario.",
           completed_at: new Date().toISOString(),
         })
@@ -1273,10 +1275,10 @@ export const useCancelScouterJob = () => {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["scouter-jobs"] });
-      toast.success("Job cancelado");
+      toast.success(traducir("int.scouter.jobCancelled"));
     },
     onError: (e) => {
-      toast.error("No se pudo cancelar", { description: (e as Error).message });
+      toast.error(traducir("int.scouter.cancelFailed"), { description: (e as Error).message });
     },
   });
 };
@@ -1374,7 +1376,7 @@ export const useMarkNotificationRead = () => {
       const { data: userRes, error: userErr } = await supabase.auth.getUser();
       if (userErr) throw userErr;
       const userId = userRes.user?.id;
-      if (!userId) throw new Error("No hay sesión activa.");
+      if (!userId) throw new Error(traducir("int.noSession"));
       // tenant_id se autocompletea con el DEFAULT current_tenant_id()
       // en la tabla. user_id explícito porque hace falta para la PK.
       const { error } = await sb
@@ -1446,7 +1448,7 @@ export const useToggleScouterAutopilot = () => {
   return useMutation({
     mutationFn: async (active: boolean): Promise<void> => {
       const tenantId = tenantQ.data;
-      if (!tenantId) throw new Error("Tenant no resuelto todavía.");
+      if (!tenantId) throw new Error(traducir("int.scouter.tenantMissing"));
       const { error: upErr } = await sb
         .from("scouter_autopilot")
         .upsert(
@@ -1480,7 +1482,7 @@ export const useToggleScouterAutopilot = () => {
       qc.invalidateQueries({ queryKey: ["scouter-jobs"] });
     },
     onError: (e) => {
-      toast.error("No se pudo cambiar el autopilot", { description: (e as Error).message });
+      toast.error(traducir("int.scouter.autopilotFailed"), { description: (e as Error).message });
     },
   });
 };
@@ -1496,7 +1498,7 @@ export const useSetAutopilotCompaniesFilter = () => {
   return useMutation({
     mutationFn: async (companyIds: string[] | null): Promise<void> => {
       const tenantId = tenantQ.data;
-      if (!tenantId) throw new Error("Tenant no resuelto todavía.");
+      if (!tenantId) throw new Error(traducir("int.scouter.tenantMissing"));
       const { error } = await sb
         .from("scouter_autopilot")
         .upsert(
@@ -1513,7 +1515,7 @@ export const useSetAutopilotCompaniesFilter = () => {
       qc.invalidateQueries({ queryKey: ["scouter-autopilot"] });
     },
     onError: (e) => {
-      toast.error("No se pudo guardar el scope", { description: (e as Error).message });
+      toast.error(traducir("int.scouter.scopeSaveFailed"), { description: (e as Error).message });
     },
   });
 };

@@ -16,18 +16,27 @@
 // (antes vivían en `BackgroundSelector.tsx`, que ahora los re-exporta para no
 // tocar a los seis archivos que ya los importaban de ahí).
 
+import type { TranslationKey } from "@/lib/i18n";
+import { conEtiqueta } from "@/lib/etiquetaTraducida";
+
 /** "none" | "blur" | "blur-strong" | "<id de plantilla>" | "custom:<id>" */
 export type BackgroundEffect = "none" | "blur" | "blur-strong" | string;
 
+// `id` es el dato (se guarda en localStorage como la elección de la persona). El
+// nombre sale del diccionario: `label` se traduce al leerlo (ver
+// lib/etiquetaTraducida.ts) con las mismas claves que usa nombreDelFondo().
+const plantilla = (id: string, labelKey: TranslationKey, archivo: string) =>
+  conEtiqueta({ id, src: `/backgrounds/${archivo}`, lowSrc: `/backgrounds/low/${archivo}` }, labelKey);
+
 export const BACKGROUND_TEMPLATES = [
-  { id: "tpl-office", label: "Oficina", src: "/backgrounds/bg-office.jpg", lowSrc: "/backgrounds/low/bg-office.jpg" },
-  { id: "tpl-bookshelf", label: "Biblioteca", src: "/backgrounds/bg-bookshelf.jpg", lowSrc: "/backgrounds/low/bg-bookshelf.jpg" },
-  { id: "tpl-beach", label: "Playa", src: "/backgrounds/bg-beach.jpg", lowSrc: "/backgrounds/low/bg-beach.jpg" },
-  { id: "tpl-mountains", label: "Montañas", src: "/backgrounds/bg-mountains.jpg", lowSrc: "/backgrounds/low/bg-mountains.jpg" },
-  { id: "tpl-cafe", label: "Café", src: "/backgrounds/bg-cafe.jpg", lowSrc: "/backgrounds/low/bg-cafe.jpg" },
-  { id: "tpl-livingroom", label: "Sala", src: "/backgrounds/bg-livingroom.jpg", lowSrc: "/backgrounds/low/bg-livingroom.jpg" },
-  { id: "tpl-forest", label: "Bosque", src: "/backgrounds/bg-forest.jpg", lowSrc: "/backgrounds/low/bg-forest.jpg" },
-  { id: "tpl-abstract", label: "Abstracto", src: "/backgrounds/bg-abstract.jpg", lowSrc: "/backgrounds/low/bg-abstract.jpg" },
+  plantilla("tpl-office", "messenger.bg.tplOficina", "bg-office.jpg"),
+  plantilla("tpl-bookshelf", "messenger.bg.tplBiblioteca", "bg-bookshelf.jpg"),
+  plantilla("tpl-beach", "messenger.bg.tplPlaya", "bg-beach.jpg"),
+  plantilla("tpl-mountains", "messenger.bg.tplMontanas", "bg-mountains.jpg"),
+  plantilla("tpl-cafe", "messenger.bg.tplCafe", "bg-cafe.jpg"),
+  plantilla("tpl-livingroom", "messenger.bg.tplSala", "bg-livingroom.jpg"),
+  plantilla("tpl-forest", "messenger.bg.tplBosque", "bg-forest.jpg"),
+  plantilla("tpl-abstract", "messenger.bg.tplAbstracto", "bg-abstract.jpg"),
 ];
 
 // ── Niveles de difuminado ────────────────────────────────────────────────────

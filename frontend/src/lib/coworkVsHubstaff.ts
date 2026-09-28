@@ -1,6 +1,12 @@
 // Fase 2 del reemplazo de Hubstaff: la comparación por persona que ve el
 // admin. Puro, para poder probarlo sin pantalla.
 
+// "Sin nombre" se arma con traducir(): esto corre dentro de la consulta de la
+// pantalla (useCoworkVsHubstaff), así que sale en el idioma que había al traer
+// los datos; si se cambia el idioma con la pantalla abierta, se corrige en la
+// próxima consulta.
+import { traducir } from "@/lib/i18n";
+
 export interface FilaDia {
   dia: string;
   profile_id: string;
@@ -48,7 +54,7 @@ export function agregarPorPersona(filas: FilaDia[]): ResumenPersona[] {
     let r = mapa.get(f.profile_id);
     if (!r) {
       r = {
-        profile_id: f.profile_id, nombre: f.nombre || "Sin nombre",
+        profile_id: f.profile_id, nombre: f.nombre || traducir("int.cvh.noName"),
         hubstaff_seg: 0, cowork_activo_seg: 0, cowork_en_sala_seg: 0, cowork_pausa_seg: 0,
         cowork_sin_camara_seg: 0, cowork_sin_pantalla_seg: 0, cowork_fuera_seg: 0,
         cobertura: null, diasHubstaff: 0, diasCowork: 0, dias: [],
@@ -68,7 +74,8 @@ export function agregarPorPersona(filas: FilaDia[]): ResumenPersona[] {
   }
   for (const r of mapa.values()) {
     r.cobertura = r.hubstaff_seg > 0 ? Math.min(r.cowork_activo_seg / r.hubstaff_seg, 9.99) : null;
-    r.dias.sort((a, b) => (a.dia < b.dia ? 1 : a.dia > b.dia ? -1 : 0));
+    // El más reciente primero. `dia` es "AAAA-MM-DD": el orden de texto es el de fecha.
+    r.dias.sort((a, b) => b.dia.localeCompare(a.dia));
   }
   // Primero quien más horas de Hubstaff tiene: es a quien más le importa la comparación.
   return [...mapa.values()].sort((a, b) => b.hubstaff_seg - a.hubstaff_seg || a.nombre.localeCompare(b.nombre));

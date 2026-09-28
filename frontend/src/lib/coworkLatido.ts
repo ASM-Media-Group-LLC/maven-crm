@@ -51,11 +51,14 @@ export function relojDeRespuesta(json: unknown, ahora: number): RelojCowork | nu
  *  que llegan en ráfaga (apagar cámara dispara dos o tres eventos). */
 export const RESPIRO_CAMBIO_MS = 1_500;
 
+type Intervalo = ReturnType<typeof setInterval>;
+type Espera = ReturnType<typeof setTimeout>;
+
 interface Vivo {
   sessionId: string;
   estado: Latido;
-  cada: ReturnType<typeof setInterval>;
-  pendiente: ReturnType<typeof setTimeout> | null;
+  cada: Intervalo;
+  pendiente: Espera | null;
   enviando: boolean;
 }
 
