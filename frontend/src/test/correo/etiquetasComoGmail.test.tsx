@@ -130,7 +130,7 @@ describe("el árbol de subetiquetas", () => {
   });
 });
 
-describe("qué se ve en la columna y qué va a «Más»", () => {
+describe("qué se ve en la columna y qué queda oculto", () => {
   const repartir = (todas: EtiquetaDeCorreo[], o: { noLeidos?: [string, number][]; vista?: string; plegadas?: string[] } = {}) => {
     const r = repartirEnColumna(arbolDeEtiquetas(todas), {
       noLeidos: new Map(o.noLeidos ?? []),
@@ -140,7 +140,7 @@ describe("qué se ve en la columna y qué va a «Más»", () => {
     return { arriba: r.arriba.map((n) => n.etiqueta.id), enMas: r.enMas.map((n) => n.etiqueta.id) };
   };
 
-  it("Ocultar la manda a «Más»", () => {
+  it("Ocultar la saca de la columna", () => {
     expect(repartir([et("a", "A"), et("b", "B", { enListaEtiquetas: "ocultar" })]))
       .toEqual({ arriba: ["a"], enMas: ["b"] });
   });
@@ -166,7 +166,7 @@ describe("qué se ve en la columna y qué va a «Más»", () => {
     expect(repartir([et("a", "A", { enListaEtiquetas: "ocultar" })], { vista: "a" }).arriba).toEqual(["a"]);
   });
 
-  it("plegar la madre esconde a las hijas pero NO las manda a «Más»", () => {
+  it("plegar la madre esconde a las hijas, pero no cuentan como ocultas", () => {
     const todas = [et("m", "M"), et("h", "H", { parentId: "m" })];
     expect(repartir(todas, { plegadas: ["m"] })).toEqual({ arriba: ["m"], enMas: [] });
   });
@@ -177,7 +177,7 @@ describe("el menú ⋮ de una etiqueta en la columna", () => {
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     return render(
       <QueryClientProvider client={qc}>
-        <EtiquetasColumna abierta etiquetaVista={null} onAbrir={vi.fn()} noLeidos={new Map()} onAdministrar={vi.fn()} />
+        <EtiquetasColumna abierta etiquetaVista={null} onAbrir={vi.fn()} noLeidos={new Map()} />
       </QueryClientProvider>,
     );
   };
@@ -253,13 +253,15 @@ describe("el menú ⋮ de una etiqueta en la columna", () => {
     await waitFor(() => expect(borrar).toHaveBeenCalledWith("h", expect.anything()));
   });
 
-  it("una etiqueta oculta queda en «Más», junto a «Administrar» y «Crear etiqueta nueva»", async () => {
-    etiquetasMock = [et("p", "Pagos", { enListaEtiquetas: "ocultar" })];
+  it("⚠️ una etiqueta oculta NO se dibuja, y al pie no hay «Más» (Jhon: «quitame ese submenú»)", async () => {
+    etiquetasMock = [et("p", "Pagos", { enListaEtiquetas: "ocultar" }), et("h", "HHRR")];
     montar();
     expect(screen.queryByRole("button", { name: "Pagos" })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Más" }));
-    expect(screen.getByRole("button", { name: "Pagos" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Administrar etiquetas" })).toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: "Crear etiqueta nueva" }).length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "HHRR" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Más" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Menos" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Administrar etiquetas" })).not.toBeInTheDocument();
+    // Crear sigue estando: el + del encabezado.
+    expect(screen.getAllByRole("button", { name: "Crear etiqueta nueva" })).toHaveLength(1);
   });
 });

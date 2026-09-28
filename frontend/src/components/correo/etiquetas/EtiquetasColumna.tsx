@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, ChevronUp, MoreVertical, Plus, Settings, Tag } from "lucide-react";
+import { ChevronDown, ChevronRight, MoreVertical, Plus, Tag } from "lucide-react";
 import { toast } from "sonner";
 import { DropdownMenu, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
@@ -34,24 +34,21 @@ type Dialogo =
   | { tipo: "eliminar"; etiqueta: EtiquetaDeCorreo; ruta: string; hijas: number };
 
 /** La sección «Etiquetas» de la columna del correo, como la de Gmail: el
- *  árbol de subetiquetas con su flecha para plegar, el ⋮ de cada una y «Más»
- *  con lo oculto, «Administrar etiquetas» y «Crear etiqueta nueva». Qué va
- *  arriba y qué va a «Más» lo decide `repartirEnColumna`. */
+ *  árbol de subetiquetas con su flecha para plegar y el ⋮ de cada una. Qué se
+ *  ve lo decide `repartirEnColumna`; lo oculto no se dibuja. */
 export default function EtiquetasColumna({
-  abierta, etiquetaVista, onAbrir, noLeidos, onAdministrar,
+  abierta, etiquetaVista, onAbrir, noLeidos,
 }: {
   /** La columna desplegada (con nombres) o plegada (solo iconos). */
   abierta: boolean;
   etiquetaVista: string | null;
   onAbrir: (id: string | null) => void;
   noLeidos: Map<string, number> | undefined;
-  onAdministrar: () => void;
 }) {
   const { t } = useLanguage();
   const etiquetas = useEtiquetas();
   const borrar = useBorrarEtiqueta();
   const [dialogo, setDialogo] = useState<Dialogo | null>(null);
-  const [verMas, setVerMas] = useState(false);
   const [plegadas, setPlegadas] = useState(leerPlegadas);
 
   const plegar = (id: string) => {
@@ -67,7 +64,10 @@ export default function EtiquetasColumna({
   const todas = etiquetas.data ?? [];
   const nodos = useMemo(() => arbolDeEtiquetas(etiquetas.data ?? []), [etiquetas.data]);
 
-  const { arriba, enMas } = useMemo(
+  // Lo oculto NO se dibuja: sin «Más» al pie (Jhon, 28/09: «quitame ese
+  // submenú»). Una etiqueta oculta se vuelve a mostrar desde «Administrar
+  // etiquetas» (en los menús Etiquetar y Mover a).
+  const { arriba } = useMemo(
     () => repartirEnColumna(nodos, { noLeidos, etiquetaVista, plegadas }),
     [nodos, noLeidos, etiquetaVista, plegadas],
   );
@@ -88,14 +88,11 @@ export default function EtiquetasColumna({
     });
   };
 
-  const fila = (n: NodoEtiqueta, enLaListaDeMas: boolean) => (
+  const fila = (n: NodoEtiqueta) => (
     <FilaEtiqueta
       key={n.etiqueta.id}
       nodo={n}
       abierta={abierta}
-      // En «Más» van planas y con la ruta completa: sin el árbol alrededor,
-      // «Reportes» solo no dice de quién es hija.
-      plana={enLaListaDeMas}
       activa={etiquetaVista === n.etiqueta.id}
       sinLeer={noLeidos?.get(n.etiqueta.id) ?? 0}
       plegada={plegadas.has(n.etiqueta.id)}
@@ -127,44 +124,7 @@ export default function EtiquetasColumna({
         todas.length > 0 && <div className="mx-3 my-2 border-t border-border/60" aria-hidden />
       )}
 
-      {arriba.map((n) => fila(n, false))}
-
-      {/* «Más» solo tiene sentido con la columna desplegada: plegada no hay
-          lugar para la ruta ni para los dos accesos de abajo. */}
-      {abierta && (
-        <>
-          <button
-            type="button"
-            onClick={() => setVerMas((v) => !v)}
-            aria-expanded={verMas}
-            className="flex w-full items-center gap-2.5 rounded-2xl px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-primary/5 hover:text-foreground"
-          >
-            {verMas ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            {verMas ? t("mail.labels.less") : t("mail.labels.more")}
-          </button>
-          {verMas && (
-            <>
-              {enMas.map((n) => fila(n, true))}
-              <button
-                type="button"
-                onClick={onAdministrar}
-                className="flex w-full items-center gap-2.5 rounded-2xl px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-primary/5 hover:text-foreground"
-              >
-                <Settings className="h-4 w-4" />
-                {t("mail.labels.manage")}
-              </button>
-              <button
-                type="button"
-                onClick={() => setDialogo({ tipo: "nueva", madre: null })}
-                className="flex w-full items-center gap-2.5 rounded-2xl px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-primary/5 hover:text-foreground"
-              >
-                <Plus className="h-4 w-4" />
-                {t("mail.labels.new")}
-              </button>
-            </>
-          )}
-        </>
-      )}
+      {arriba.map(fila)}
 
       {dialogo?.tipo === "nueva" && (
         <EtiquetaFormDialog madreInicial={dialogo.madre} onCerrar={() => setDialogo(null)} />
@@ -208,12 +168,11 @@ export default function EtiquetasColumna({
 }
 
 function FilaEtiqueta({
-  nodo, abierta, plana, activa, sinLeer, plegada, onPlegar, onAbrir,
+  nodo, abierta, activa, sinLeer, plegada, onPlegar, onAbrir,
   onColorPersonalizado, onModificar, onEliminar, onSubetiqueta,
 }: {
   nodo: NodoEtiqueta;
   abierta: boolean;
-  plana: boolean;
   activa: boolean;
   sinLeer: number;
   plegada: boolean;
@@ -227,9 +186,9 @@ function FilaEtiqueta({
   const { t } = useLanguage();
   const [menuAbierto, setMenuAbierto] = useState(false);
   const e = nodo.etiqueta;
-  const nombre = plana ? nodo.ruta : e.nombre;
-  const sangria = abierta && !plana ? nodo.nivel * 14 : 0;
-  const conFlecha = abierta && !plana && nodo.tieneHijas;
+  const nombre = e.nombre;
+  const sangria = abierta ? nodo.nivel * 14 : 0;
+  const conFlecha = abierta && nodo.tieneHijas;
 
   return (
     // ⚠️ Un div y no un botón: adentro van TRES botones (plegar, abrir y ⋮), y
