@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { invitadosNuevos } from "@/lib/avisoDeInvitado";
 import { playCoordinatorRequestSound } from "@/lib/coordinatorRequestSound";
 import { sonarUnaVezEntrePestanas } from "@/lib/sonarUnaVezEntrePestanas";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface GuestRequest {
   id: string;
@@ -22,6 +23,7 @@ interface GuestRequest {
 // organización. La decisión se ejecuta en la edge, que es la que además emite el
 // token del invitado; acá solo se dispara.
 export default function MeetGuestGate({ livekitRoom }: { livekitRoom: string }) {
+  const { t } = useLanguage();
   const [meetRoomId, setMeetRoomId] = useState<string | null>(null);
   const [requests, setRequests] = useState<GuestRequest[]>([]);
   const [deciding, setDeciding] = useState<string | null>(null);
@@ -147,11 +149,11 @@ export default function MeetGuestGate({ livekitRoom }: { livekitRoom: string }) 
         }
       );
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "No se pudo decidir");
-      toast.success(admit ? `${request.guest_name} puede entrar` : `${request.guest_name} fue rechazado`);
+      if (!res.ok) throw new Error(json.error || t("meet.gate.couldNotDecide"));
+      toast.success(t(admit ? "meet.gate.admitted" : "meet.gate.denied", { name: request.guest_name }));
       if (meetRoomId) fetchPending(meetRoomId);
     } catch (e) {
-      toast.error((e as Error).message || "No se pudo decidir");
+      toast.error((e as Error).message || t("meet.gate.couldNotDecide"));
     } finally {
       setDeciding(null);
     }
@@ -171,13 +173,14 @@ export default function MeetGuestGate({ livekitRoom }: { livekitRoom: string }) 
           </div>
           <div className="flex-1 min-w-0">
             <div className="text-sm font-medium text-foreground truncate">{request.guest_name}</div>
-            <div className="text-[11px] text-muted-foreground">quiere entrar · sin cuenta</div>
+            <div className="text-[11px] text-muted-foreground">{t("meet.gate.wantsIn")}</div>
           </div>
           <Button
             size="icon"
             variant="ghost"
             className="h-8 w-8 rounded-full text-destructive hover:text-destructive"
-            title="Rechazar"
+            title={t("meet.gate.deny")}
+            aria-label={t("meet.gate.deny")}
             disabled={deciding === request.id}
             onClick={() => decide(request, false)}
           >
@@ -186,7 +189,9 @@ export default function MeetGuestGate({ livekitRoom }: { livekitRoom: string }) 
           <Button
             size="icon"
             className="h-8 w-8 rounded-full"
-            title="Admitir"
+            title={t("meet.gate.admit")}
+            aria-label={t("meet.gate.admit")}
+
             disabled={deciding === request.id}
             onClick={() => decide(request, true)}
           >

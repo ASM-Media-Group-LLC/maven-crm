@@ -101,6 +101,7 @@ describe("el visor", () => {
   it("si falla, ofrece descargarlo en vez de dejar la pantalla muda", () => {
     const i = visor.indexOf('tipo === "office"');
     const j = visor.indexOf('tipo === "convertible"', i);
-    expect(visor.slice(i, j)).toMatch(/Descargar \{actual\.filename\}/);
+    // «Descargar {nombre}», ya por el diccionario (i18n, ola 3).
+    expect(visor.slice(i, j)).toMatch(/t\("mail\.viewer\.downloadFile", \{ name: actual\.filename \}\)/);
   });
 });

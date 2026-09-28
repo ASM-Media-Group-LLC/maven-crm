@@ -2,27 +2,30 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ListRow } from "@/components/ui/list-row";
 import { AlertTriangle, AlertCircle, Info } from "lucide-react";
+import { useLanguage } from "@/hooks/useLanguage";
 
 const PRIORITY_LEVELS = [
-  { key: "high", label: "Crítica", desc: "Errores, vencimientos, acciones urgentes", icon: AlertTriangle, color: "text-destructive" },
-  { key: "medium", label: "Importante", desc: "Asignaciones, aprobaciones, cambios relevantes", icon: AlertCircle, color: "text-warning" },
-  { key: "low", label: "Informativa", desc: "Actualizaciones generales, recordatorios suaves", icon: Info, color: "text-muted-foreground" },
+  { key: "high", label: "settings.notif.prio.high", desc: "settings.notif.prio.highDesc", icon: AlertTriangle, color: "text-destructive" },
+  { key: "medium", label: "settings.notif.prio.medium", desc: "settings.notif.prio.mediumDesc", icon: AlertCircle, color: "text-warning" },
+  { key: "low", label: "settings.notif.prio.low", desc: "settings.notif.prio.lowDesc", icon: Info, color: "text-muted-foreground" },
 ] as const;
 
+// `value` es dato (SelectItem); lo que se ve es `label`, clave del diccionario.
 const DELIVERY_OPTIONS = [
-  { value: "all", label: "Popup + Banner + Centro" },
-  { value: "popup", label: "Solo Popup automático" },
-  { value: "banner", label: "Solo Banner en dashboard" },
-  { value: "center_only", label: "Solo Notification Center" },
-];
+  { value: "all", label: "settings.notif.prio.all" },
+  { value: "popup", label: "settings.notif.prio.popup" },
+  { value: "banner", label: "settings.notif.prio.banner" },
+  { value: "center_only", label: "settings.notif.prio.center" },
+] as const;
 
 const PrioridadTab = () => {
+  const { t } = useLanguage();
   return (
     <Card className="border-border">
       <CardHeader className="pb-3">
-        <CardTitle className="text-base">Prioridad de Notificaciones</CardTitle>
+        <CardTitle className="text-base">{t("settings.notif.prio.title")}</CardTitle>
         <CardDescription className="text-xs">
-          Configura cómo se muestran las notificaciones según su nivel de prioridad.
+          {t("settings.notif.prio.desc")}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -31,8 +34,8 @@ const PrioridadTab = () => {
             <div className="flex items-start gap-3">
               <Icon className={`h-4 w-4 mt-0.5 ${color}`} />
               <div>
-                <span className="text-sm font-medium">{label}</span>
-                <p className="text-xs text-muted-foreground mt-0.5">{desc}</p>
+                <span className="text-sm font-medium">{t(label)}</span>
+                <p className="text-xs text-muted-foreground mt-0.5">{t(desc)}</p>
               </div>
             </div>
             <Select defaultValue={key === "high" ? "all" : key === "medium" ? "banner" : "center_only"}>
@@ -42,7 +45,7 @@ const PrioridadTab = () => {
               <SelectContent>
                 {DELIVERY_OPTIONS.map((opt) => (
                   <SelectItem key={opt.value} value={opt.value} className="text-xs">
-                    {opt.label}
+                    {t(opt.label)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -50,7 +53,8 @@ const PrioridadTab = () => {
           </ListRow>
         ))}
         <p className="text-[11px] text-muted-foreground px-1">
-          Nota: Los modos Popup y Banner estarán disponibles en futuras versiones. Actualmente todas las notificaciones se entregan al Notification Center.
+          {t("settings.notif.prio.note")}
+
         </p>
       </CardContent>
     </Card>

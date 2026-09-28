@@ -63,14 +63,14 @@ export default function DocumentoPage() {
     return (
       <Page>
         <div className="mx-auto max-w-lg py-10 text-center">
-          <p className="text-sm font-medium">No se pudo abrir el documento</p>
+          <p className="text-sm font-medium">{t("oficina.doc.openError")}</p>
           <p className="mt-1 text-xs text-muted-foreground">
             {(doc.error as Error)?.message ||
-              "Puede que lo hayan borrado o que no tengas acceso."}
+              t("oficina.doc.openErrorHint")}
           </p>
           <Button variant="outline" size="sm" className="mt-4 rounded-full"
             onClick={() => navigate("/oficina")}>
-            Volver a Oficina
+            {t("oficina.backToOffice")}
           </Button>
         </div>
       </Page>
@@ -88,7 +88,7 @@ export default function DocumentoPage() {
         <PageHeader
           icon={<FileText />}
           title={cargado.title}
-          subtitle={`Versión ${cargado.version}`}
+          subtitle={t("oficina.doc.version", { n: cargado.version })}
           actions={
             <>
               {/* Un solo botón: adentro del diálogo están las personas
@@ -104,7 +104,7 @@ export default function DocumentoPage() {
                 {t("doc.compartir")}
               </Button>
               <Button size="icon" variant="ghost" className="h-9 w-9 shrink-0 rounded-full"
-                aria-label="Volver a Oficina" onClick={() => navigate("/oficina")}>
+                aria-label={t("oficina.backToOffice")} onClick={() => navigate("/oficina")}>
                 <ArrowLeft className="h-4 w-4" />
               </Button>
             </>
@@ -115,7 +115,7 @@ export default function DocumentoPage() {
           <div className="flex items-start gap-2 rounded-panel border border-warning/40 bg-warning/10 px-3 py-2 text-xs">
             <WifiOff className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
             <p className="text-muted-foreground">
-              {fallo} · El documento está a salvo: lo último guardado sigue en su lugar.
+              {fallo} · {t("oficina.doc.safe")}
             </p>
           </div>
         )}
@@ -125,7 +125,8 @@ export default function DocumentoPage() {
             <div className="absolute inset-0 z-10 grid place-items-center bg-background">
               <div className="flex flex-col items-center gap-3">
                 <Loader2 className="h-7 w-7 animate-spin text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">Abriendo el documento…</p>
+                <p className="text-sm text-muted-foreground">{t("oficina.doc.opening")}</p>
+
               </div>
             </div>
           )}

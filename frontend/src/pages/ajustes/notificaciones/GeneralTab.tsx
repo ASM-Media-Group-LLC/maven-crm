@@ -4,32 +4,35 @@ import { Label } from "@/components/ui/label";
 import { useNotificationSettings } from "@/hooks/useNotificationSettings";
 import { toast } from "sonner";
 import { Bell, Zap, Layers, Eye, Volume2, AlertTriangle } from "lucide-react";
+import { useLanguage } from "@/hooks/useLanguage";
 
+// `key` es la columna de notification_settings (dato); `label`/`desc`, claves del diccionario.
 const GENERAL_OPTIONS = [
-  { key: "notifications_enabled", label: "Notificaciones activas", desc: "Activar o desactivar todas las notificaciones dentro de la plataforma", icon: Bell },
-  { key: "realtime_enabled", label: "Tiempo real", desc: "Mostrar notificaciones en tiempo real conforme llegan", icon: Zap },
-  { key: "group_similar", label: "Agrupar similares", desc: "Agrupar notificaciones del mismo tipo para reducir saturación", icon: Layers },
-  { key: "auto_mark_read_on_open", label: "Marcar como leídas al abrir", desc: "Marcar automáticamente como leídas al abrir el centro de notificaciones", icon: Eye },
-  { key: "sound_enabled", label: "Sonido", desc: "Reproducir sonido para notificaciones importantes", icon: Volume2 },
-  { key: "show_critical_banners", label: "Banners críticos", desc: "Mostrar banners emergentes para notificaciones de prioridad crítica", icon: AlertTriangle },
+  { key: "notifications_enabled", label: "settings.notif.gen.enabled", desc: "settings.notif.gen.enabledDesc", icon: Bell },
+  { key: "realtime_enabled", label: "settings.notif.gen.realtime", desc: "settings.notif.gen.realtimeDesc", icon: Zap },
+  { key: "group_similar", label: "settings.notif.gen.group", desc: "settings.notif.gen.groupDesc", icon: Layers },
+  { key: "auto_mark_read_on_open", label: "settings.notif.gen.autoRead", desc: "settings.notif.gen.autoReadDesc", icon: Eye },
+  { key: "sound_enabled", label: "settings.notif.gen.sound", desc: "settings.notif.gen.soundDesc", icon: Volume2 },
+  { key: "show_critical_banners", label: "settings.notif.gen.banners", desc: "settings.notif.gen.bannersDesc", icon: AlertTriangle },
 ] as const;
 
 const GeneralTab = () => {
   const { settings, updateSettings } = useNotificationSettings();
+  const { t } = useLanguage();
 
   const handleToggle = (key: string, current: boolean) => {
     updateSettings.mutate(
       { [key]: !current } as any,
-      { onSuccess: () => toast.success("Preferencia actualizada") }
+      { onSuccess: () => toast.success(t("settings.notif.prefUpdated")) }
     );
   };
 
   return (
     <Card className="border-border">
       <CardHeader className="pb-3">
-        <CardTitle className="text-base">Preferencias Generales</CardTitle>
+        <CardTitle className="text-base">{t("settings.notif.gen.title")}</CardTitle>
         <CardDescription className="text-xs">
-          Controla el comportamiento global del sistema de notificaciones.
+          {t("settings.notif.gen.desc")}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-1">
@@ -43,8 +46,8 @@ const GeneralTab = () => {
               <div className="flex items-start gap-3">
                 <Icon className="h-4 w-4 mt-0.5 text-muted-foreground" />
                 <div>
-                  <Label className="text-sm font-medium cursor-pointer">{label}</Label>
-                  <p className="text-xs text-muted-foreground mt-0.5">{desc}</p>
+                  <Label className="text-sm font-medium cursor-pointer">{t(label)}</Label>
+                  <p className="text-xs text-muted-foreground mt-0.5">{t(desc)}</p>
                 </div>
               </div>
               <Switch

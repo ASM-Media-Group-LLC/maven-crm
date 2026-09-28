@@ -28,6 +28,7 @@ import Link from "@tiptap/extension-link";
 import TextStyle from "@tiptap/extension-text-style";
 import { Color } from "@tiptap/extension-color";
 import Placeholder from "@tiptap/extension-placeholder";
+import { useLanguage } from "@/hooks/useLanguage";
 
 const COLORES = [
   "#111827", "#6b7280", "#dc2626", "#ea580c", "#16a34a", "#0891b2", "#2563eb", "#7c3aed",
@@ -40,6 +41,7 @@ export function MailSignatureDialog({
   abierto: boolean;
   onCerrar: () => void;
 }) {
+  const { t } = useLanguage();
   const firma = useMailSignature();
   const guardar = useSaveMailSignature();
   const [enabled, setEnabled] = useState(true);
@@ -56,7 +58,7 @@ export function MailSignatureDialog({
       Link.configure({ openOnClick: false, autolink: true, linkOnPaste: true }),
       TextStyle,
       Color,
-      Placeholder.configure({ placeholder: "Tu firma: nombre, cargo, teléfono…" }),
+      Placeholder.configure({ placeholder: t("mail.sig.placeholder") }),
     ],
     content: "",
     editorProps: {
@@ -92,7 +94,7 @@ export function MailSignatureDialog({
       // como "sin firma" y no inserte un párrafo huérfano.
       const html = editor.isEmpty ? "" : editor.getHTML();
       await guardar.mutateAsync({ html, enabled });
-      toast.success("Firma guardada");
+      toast.success(t("mail.sig.saved"));
       onCerrar();
     } catch (e) {
       toast.error((e as Error).message);
@@ -105,16 +107,16 @@ export function MailSignatureDialog({
     <Dialog open={abierto} onOpenChange={(v) => !v && onCerrar()}>
       <DialogContent className="w-[min(96vw,40rem)] max-w-xl gap-0 overflow-hidden p-0">
         <DialogHeader className="border-b border-border/60 px-5 py-3">
-          <DialogTitle className="text-base">Firma del correo</DialogTitle>
+          <DialogTitle className="text-base">{t("mail.sig.title")}</DialogTitle>
           <p className="text-xs text-muted-foreground">
-            Se agrega sola al final de cada correo que redactes o respondas.
+            {t("mail.sig.desc")}
           </p>
         </DialogHeader>
 
         {/* Barra mínima */}
         <div className="flex items-center gap-1 border-b border-border/40 px-3 py-1.5">
           <button
-            type="button" title="Negrita" aria-label="Negrita"
+            type="button" title={t("mail.ed.bold")} aria-label={t("mail.ed.bold")}
             aria-pressed={editor?.isActive("bold")}
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => editor?.chain().focus().toggleBold().run()}
@@ -123,7 +125,7 @@ export function MailSignatureDialog({
             <Bold className="h-4 w-4" />
           </button>
           <button
-            type="button" title="Cursiva" aria-label="Cursiva"
+            type="button" title={t("mail.ed.italic")} aria-label={t("mail.ed.italic")}
             aria-pressed={editor?.isActive("italic")}
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => editor?.chain().focus().toggleItalic().run()}
@@ -132,7 +134,7 @@ export function MailSignatureDialog({
             <Italic className="h-4 w-4" />
           </button>
           <button
-            type="button" title="Subrayado" aria-label="Subrayado"
+            type="button" title={t("mail.ed.underline")} aria-label={t("mail.ed.underline")}
             aria-pressed={editor?.isActive("underline")}
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => editor?.chain().focus().toggleUnderline().run()}
@@ -147,7 +149,7 @@ export function MailSignatureDialog({
           }}>
             <PopoverTrigger asChild>
               <button
-                type="button" title="Insertar link" aria-label="Insertar link"
+                type="button" title={t("mail.ed.insertLink")} aria-label={t("mail.ed.insertLink")}
                 aria-pressed={editor?.isActive("link")}
                 onMouseDown={(e) => e.preventDefault()}
                 className={cn(btn, editor?.isActive("link") && "bg-primary/15 text-primary")}
@@ -164,14 +166,14 @@ export function MailSignatureDialog({
                   placeholder="https://…"
                   className="h-8 flex-1 rounded-md border border-border bg-transparent px-2 text-sm outline-none"
                 />
-                <Button size="sm" className="h-8" onClick={aplicarLink}>Aplicar</Button>
+                <Button size="sm" className="h-8" onClick={aplicarLink}>{t("mail.ed.apply")}</Button>
               </div>
             </PopoverContent>
           </Popover>
 
           <Popover>
             <PopoverTrigger asChild>
-              <button type="button" title="Color de texto" aria-label="Color de texto" className={btn} onMouseDown={(e) => e.preventDefault()}>
+              <button type="button" title={t("mail.ed.textColor")} aria-label={t("mail.ed.textColor")} className={btn} onMouseDown={(e) => e.preventDefault()}>
                 <Palette className="h-4 w-4" />
               </button>
             </PopoverTrigger>
@@ -207,14 +209,15 @@ export function MailSignatureDialog({
             onChange={(e) => setEnabled(e.target.checked)}
             className="h-4 w-4 accent-primary"
           />
-          Agregar la firma automáticamente a cada correo
+          {t("mail.sig.auto")}
         </label>
 
         <DialogFooter className="border-t border-border/60 px-5 py-3">
-          <Button variant="ghost" onClick={onCerrar}>Cancelar</Button>
+          <Button variant="ghost" onClick={onCerrar}>{t("common.cancel")}</Button>
           <Button onClick={onGuardar} disabled={guardar.isPending}>
             {guardar.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Guardar firma
+            {t("mail.sig.save")}
+
           </Button>
         </DialogFooter>
       </DialogContent>

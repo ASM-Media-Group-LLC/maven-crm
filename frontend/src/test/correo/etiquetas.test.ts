@@ -29,7 +29,8 @@ describe("⚠️ la etiqueta se ata al message_id, NO al uid", () => {
   it("el hook etiqueta por messageId y avisa cuando falta", () => {
     expect(hook).toMatch(/messageIds/);
     expect(pagina).toMatch(/\.map\(\(m\) => m\.messageId\)\.filter\(Boolean\)/);
-    expect(pagina).toMatch(/no tienen identificador/);
+    // El aviso ya pasa por el diccionario (i18n, ola 3): «Estos correos no tienen identificador…».
+    expect(pagina).toMatch(/t\("mail\.noIdentifier"\)/);
   });
 });
 

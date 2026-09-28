@@ -32,10 +32,13 @@ vi.mock("@/hooks/useMailbox", async (original) => ({
 }));
 
 import CorreoPage from "@/pages/correo/CorreoPage";
+import { LanguageProvider } from "@/hooks/useLanguage";
 
 const montar = () => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={qc}><CorreoPage /></QueryClientProvider>);
+  return render(
+    <QueryClientProvider client={qc}><LanguageProvider><CorreoPage /></LanguageProvider></QueryClientProvider>,
+  );
 };
 
 const boton = () => screen.getByRole("button", { name: /(ocultar|mostrar) las carpetas/i });
