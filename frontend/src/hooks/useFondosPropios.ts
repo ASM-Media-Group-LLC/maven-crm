@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { toast } from "sonner";
+import { traducir } from "@/lib/i18n";
 import {
   MAX_FONDOS_PROPIOS,
   listarFondosPropios, guardarFondoPropio, borrarFondoPropio, urlDeFondoPropio,
@@ -11,11 +12,14 @@ import {
 // llamada, que antes tenían cada una su lista y divergían), y un hook exportado
 // desde un archivo que exporta un componente rompe el refresco en caliente.
 
-/** Qué se le dice a la persona cuando su imagen no se pudo guardar. */
-const MOTIVO_DE_FALLO: Record<FalloAlGuardar, string> = {
-  limite: `Se guardan hasta ${MAX_FONDOS_PROPIOS}. Borrá uno y volvé a intentar.`,
-  ilegible: "Este navegador no puede abrir esa imagen. Probá con un JPG o un PNG.",
-  "sin-almacen": "Este navegador no está guardando datos del sitio, así que el fondo no se puede recordar.",
+/** Qué se le dice a la persona cuando su imagen no se pudo guardar. Es una
+ *  función y no una constante: el texto se arma en el idioma que hay AL AVISAR. */
+const motivoDeFallo = (motivo: FalloAlGuardar): string => {
+  switch (motivo) {
+    case "limite": return traducir("callBg.limit", { max: MAX_FONDOS_PROPIOS });
+    case "ilegible": return traducir("callBg.unreadable");
+    case "sin-almacen": return traducir("callBg.noStorage");
+  }
 };
 
 /** Los fondos propios de la persona, ya con su URL de esta pestaña. */
@@ -40,7 +44,7 @@ export function useFondosPropios(activo: boolean) {
     }
     // El aviso dice lo que DE VERDAD pasó. Antes siempre culpaba al límite,
     // incluso con la lista vacía y el almacenamiento bloqueado.
-    toast.error("No se pudo guardar el fondo", { description: MOTIVO_DE_FALLO[motivo ?? "sin-almacen"] });
+    toast.error(traducir("callBg.saveFailed"), { description: motivoDeFallo(motivo ?? "sin-almacen") });
     return null;
   }, [recargar]);
 

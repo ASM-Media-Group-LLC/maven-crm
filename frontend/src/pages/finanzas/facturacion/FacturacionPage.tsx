@@ -37,15 +37,19 @@ import { exportTableToExcel } from "@/pages/finanzas/reportes/generateReport";
 import { format } from "date-fns";
 import { useFormato } from "@/hooks/useFormato";
 import type { Formato } from "@/lib/formato";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
+import { estadoFactura, estadoNotaDePago, metodoDePago, tipoDePago } from "../estados";
 
-const STATUS_BADGE: Record<string, { variant: "default" | "secondary" | "destructive" | "outline" | "warning"; label: string }> = {
-  borrador: { variant: "secondary", label: "Borrador" },
-  enviada: { variant: "outline", label: "Enviada" },
-  pagada: { variant: "default", label: "Pagada" },
-  parcial: { variant: "outline", label: "Parcial" },
-  vencida: { variant: "destructive", label: "Vencida" },
-  reversada: { variant: "destructive", label: "Reversada" },
-  cancelada: { variant: "destructive", label: "Cancelada" },
+// La etiqueta del estado sale de ../estados (en el idioma de la pantalla); acá solo el color.
+const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "outline" | "warning"> = {
+  borrador: "secondary",
+  enviada: "outline",
+  pagada: "default",
+  parcial: "outline",
+  vencida: "destructive",
+  reversada: "destructive",
+  cancelada: "destructive",
 };
 
 const getDisplayStatus = (inv: any): string => {
@@ -60,6 +64,15 @@ const getDisplayStatus = (inv: any): string => {
 
 const FACTURA_TABS = ["Invoices", "Notas de Pago", "Reversos", "Comisiones", "Mail", "Archivo de PagoMundo"] as const;
 type FacturaTab = typeof FACTURA_TABS[number];
+// El valor de la pestaña es interno (llave de los filtros por pestaña); esto es lo que se lee.
+const TAB_LABEL: Record<FacturaTab, TranslationKey> = {
+  "Invoices": "finanzas.billing.tab.invoices",
+  "Notas de Pago": "finanzas.billing.tab.notes",
+  "Reversos": "finanzas.billing.tab.reversals",
+  "Comisiones": "finanzas.common.commissions",
+  "Mail": "finanzas.billing.tab.mail",
+  "Archivo de PagoMundo": "finanzas.billing.tab.pagomundo",
+};
 
 function fmt(n: number, f: Formato) {
   return new Intl.NumberFormat(f.intl("es-CO"), { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
@@ -68,6 +81,7 @@ function fmt(n: number, f: Formato) {
 export default function FacturacionPage() {
   const navigate = useNavigate();
   const f = useFormato();
+  const { t } = useLanguage();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { methods: configuredPaymentMethods } = usePaymentMethods();
@@ -122,10 +136,10 @@ export default function FacturacionPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["payment_notes"] });
-      toast({ title: "Nota de pago eliminada" });
+      toast({ title: t("finanzas.billing.toast.noteDeleted") });
       setDeleteItem(null);
     },
-    onError: () => toast({ title: "Error al eliminar", variant: "destructive" }),
+    onError: () => toast({ title: t("common.errorDeleting"), variant: "destructive" }),
   });
 
   const createInvoice = useMutation({
@@ -136,9 +150,9 @@ export default function FacturacionPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
-      toast({ title: "Invoice creado" });
+      toast({ title: t("finanzas.billing.toast.created") });
     },
-    onError: () => toast({ title: "Error al crear", variant: "destructive" }),
+    onError: () => toast({ title: t("common.errorCreating"), variant: "destructive" }),
   });
 
   const reverseMutation = useMutation({
@@ -148,9 +162,9 @@ export default function FacturacionPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
-      toast({ title: "Invoice reversado" });
+      toast({ title: t("finanzas.billing.toast.reversed") });
     },
-    onError: () => toast({ title: "Error al reversar", variant: "destructive" }),
+    onError: () => toast({ title: t("finanzas.billing.toast.reverseError"), variant: "destructive" }),
   });
 
   const bulkSendMutation = useMutation({
@@ -160,10 +174,10 @@ export default function FacturacionPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
-      toast({ title: "Invoices enviados masivamente" });
+      toast({ title: t("finanzas.billing.toast.bulkSent") });
       setBulkSelected([]);
     },
-    onError: () => toast({ title: "Error en envío masivo", variant: "destructive" }),
+    onError: () => toast({ title: t("finanzas.billing.toast.bulkError"), variant: "destructive" }),
   });
 
   const cancelMutation = useMutation({
@@ -173,10 +187,10 @@ export default function FacturacionPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
-      toast({ title: "Invoice cancelado" });
+      toast({ title: t("finanzas.billing.toast.canceled") });
       setCancelItem(null);
     },
-    onError: () => toast({ title: "Error al cancelar", variant: "destructive" }),
+    onError: () => toast({ title: t("finanzas.billing.toast.cancelError"), variant: "destructive" }),
   });
 
   type TabFilters = { search: string; statusFilter: string; dateFrom?: Date; dateTo?: Date; viewMode: "list" | "grid" };
@@ -278,22 +292,22 @@ export default function FacturacionPage() {
           <TableHeader>
             <TableRow className="sticky top-0 z-10 bg-card border-b">
               {showBulkCheckbox && <TableHead className="w-10" />}
-              <TableHead className="text-xs font-medium text-muted-foreground">Número</TableHead>
-              <TableHead className="text-xs font-medium text-muted-foreground">Creador</TableHead>
-              <TableHead className="text-xs font-medium text-muted-foreground">Periodo</TableHead>
-              <TableHead className="text-xs font-medium text-muted-foreground">Vencimiento</TableHead>
-              <TableHead className="text-xs font-medium text-muted-foreground">Estado</TableHead>
-              <TableHead className="text-xs font-medium text-muted-foreground sticky right-0 bg-card">Acciones</TableHead>
+              <TableHead className="text-xs font-medium text-muted-foreground">{t("common.number")}</TableHead>
+              <TableHead className="text-xs font-medium text-muted-foreground">{t("finanzas.common.creator")}</TableHead>
+              <TableHead className="text-xs font-medium text-muted-foreground">{t("finanzas.common.period")}</TableHead>
+              <TableHead className="text-xs font-medium text-muted-foreground">{t("finanzas.common.dueDate")}</TableHead>
+              <TableHead className="text-xs font-medium text-muted-foreground">{t("common.status")}</TableHead>
+              <TableHead className="text-xs font-medium text-muted-foreground sticky right-0 bg-card">{t("common.actions")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? Array.from({ length: 5 }).map((_, i) => (
               <TableRow key={i}>{Array.from({ length: showBulkCheckbox ? 7 : 6 }).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}</TableRow>
             )) : filtered.length === 0 ? (
-              <TableRow><TableCell colSpan={showBulkCheckbox ? 7 : 6} className="text-center text-muted-foreground py-12">Sin resultados.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={showBulkCheckbox ? 7 : 6} className="text-center text-muted-foreground py-12">{t("finanzas.common.noResults")}</TableCell></TableRow>
             ) : filtered.map(inv => {
               const displayStatus = getDisplayStatus(inv);
-              const badge = STATUS_BADGE[displayStatus] ?? STATUS_BADGE.borrador;
+              const estado = STATUS_VARIANT[displayStatus] ? displayStatus : "borrador";
               const creatorName = (inv as any).creators?.artistic_name || (inv as any).creators?.name || "—";
               const initials = creatorName.slice(0, 2).toUpperCase();
               const canEdit = inv.status === "borrador" || inv.status === "enviada";
@@ -317,16 +331,16 @@ export default function FacturacionPage() {
                       : "—"}
                   </TableCell>
                   <TableCell className="text-sm whitespace-nowrap">{inv.due_date ? format(new Date(inv.due_date + "T12:00:00"), "dd/MM/yyyy") : "—"}</TableCell>
-                  <TableCell><Badge variant={badge.variant as any}>{badge.label}</Badge></TableCell>
+                  <TableCell><Badge variant={STATUS_VARIANT[estado] as any}>{estadoFactura(t, estado)}</Badge></TableCell>
                   <TableCell className="sticky right-0 bg-card group-hover:bg-muted">
                     <div className="flex items-center gap-1">
-                      <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setViewItem(inv)}><Eye className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">Ver</TooltipContent></Tooltip>
-                      <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleDownloadPdf(inv)}><Download className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">Descargar PDF</TooltipContent></Tooltip>
+                      <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setViewItem(inv)}><Eye className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">{t("common.view")}</TooltipContent></Tooltip>
+                      <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleDownloadPdf(inv)}><Download className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">{t("finanzas.billing.downloadPdf")}</TooltipContent></Tooltip>
                       {canEdit && (
-                        <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => setCancelItem(inv)}><Ban className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">Cancelar</TooltipContent></Tooltip>
+                        <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => setCancelItem(inv)}><Ban className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">{t("common.cancel")}</TooltipContent></Tooltip>
                       )}
                       {canEdit && (
-                        <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setReverseItem(inv)}><RotateCcw className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">Reversar</TooltipContent></Tooltip>
+                        <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setReverseItem(inv)}><RotateCcw className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">{t("finanzas.billing.reverse")}</TooltipContent></Tooltip>
                       )}
                     </div>
                   </TableCell>
@@ -343,32 +357,28 @@ export default function FacturacionPage() {
     <div className="flex flex-nowrap items-center gap-2 overflow-x-auto">
       <div className="relative flex-1 min-w-[200px]">
         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input placeholder="Buscar creador o número..." className="pl-8" value={currentFilters.search} onChange={e => updateFilter({ search: e.target.value })} />
+        <Input placeholder={t("finanzas.billing.searchPlaceholder")} className="pl-8" value={currentFilters.search} onChange={e => updateFilter({ search: e.target.value })} />
       </div>
       {showStatusFilter && (
         <Select value={currentFilters.statusFilter || undefined} onValueChange={v => updateFilter({ statusFilter: v === "__all__" ? "" : v })}>
-          <SelectTrigger className="w-36"><SelectValue placeholder="Estado" /></SelectTrigger>
+          <SelectTrigger className="w-36"><SelectValue placeholder={t("common.status")} /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="__all__">Todos</SelectItem>
-            <SelectItem value="borrador">Borrador</SelectItem>
-            <SelectItem value="enviada">Enviada</SelectItem>
-            <SelectItem value="pagada">Pagada</SelectItem>
-            <SelectItem value="parcial">Parcial</SelectItem>
-            <SelectItem value="vencida">Vencida</SelectItem>
-            <SelectItem value="reversada">Reversada</SelectItem>
-            <SelectItem value="cancelada">Cancelada</SelectItem>
+            <SelectItem value="__all__">{t("common.all")}</SelectItem>
+            {["borrador", "enviada", "pagada", "parcial", "vencida", "reversada", "cancelada"].map(estado => (
+              <SelectItem key={estado} value={estado}>{estadoFactura(t, estado)}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
       )}
-      <DateRangePicker from={currentFilters.dateFrom} to={currentFilters.dateTo} onApply={(f, t) => updateFilter({ dateFrom: f, dateTo: t })} />
+      <DateRangePicker from={currentFilters.dateFrom} to={currentFilters.dateTo} onApply={(desde, hasta) => updateFilter({ dateFrom: desde, dateTo: hasta })} />
       <div className="inline-flex items-center rounded-md border border-border">
-        <Button variant={currentFilters.viewMode === "list" ? "secondary" : "ghost"} size="sm" className="h-8 w-8 p-0 rounded-r-none" onClick={() => updateFilter({ viewMode: "list" })}><List className="h-4 w-4" /></Button>
-        <Button variant={currentFilters.viewMode === "grid" ? "secondary" : "ghost"} size="sm" className="h-8 w-8 p-0 rounded-l-none" onClick={() => updateFilter({ viewMode: "grid" })}><LayoutGrid className="h-4 w-4" /></Button>
+        <Button variant={currentFilters.viewMode === "list" ? "secondary" : "ghost"} size="sm" className="h-8 w-8 p-0 rounded-r-none" onClick={() => updateFilter({ viewMode: "list" })} aria-label={t("finanzas.common.viewList")}><List className="h-4 w-4" /></Button>
+        <Button variant={currentFilters.viewMode === "grid" ? "secondary" : "ghost"} size="sm" className="h-8 w-8 p-0 rounded-l-none" onClick={() => updateFilter({ viewMode: "grid" })} aria-label={t("finanzas.common.viewGrid")}><LayoutGrid className="h-4 w-4" /></Button>
       </div>
       {extraButtons}
       {hasFilters && (
         <Button variant="ghost" size="sm" className="text-xs text-muted-foreground shrink-0" onClick={() => setFiltersByTab(prev => ({ ...prev, [facturaTab]: { ...defaultFilters } }))}>
-          <X className="h-3.5 w-3.5 mr-1" />Limpiar
+          <X className="h-3.5 w-3.5 mr-1" />{t("finanzas.common.clear")}
         </Button>
       )}
     </div>
@@ -377,16 +387,16 @@ export default function FacturacionPage() {
   const renderInvoiceGrid = () => (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
       {filtered.length === 0 ? (
-        <div className="col-span-full text-center text-muted-foreground py-12">Sin resultados.</div>
+        <div className="col-span-full text-center text-muted-foreground py-12">{t("finanzas.common.noResults")}</div>
       ) : filtered.map(inv => {
         const displayStatus = getDisplayStatus(inv);
-        const badge = STATUS_BADGE[displayStatus] ?? STATUS_BADGE.borrador;
+        const estado = STATUS_VARIANT[displayStatus] ? displayStatus : "borrador";
         const creatorName = (inv as any).creators?.artistic_name || (inv as any).creators?.name || "—";
         return (
           <div key={inv.id} className="rounded-xl border border-white/10 bg-white/5 p-4 hover:bg-muted/30 transition-colors">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-mono text-muted-foreground">#{inv.invoice_number}</span>
-              <Badge variant={badge.variant as any}>{badge.label}</Badge>
+              <Badge variant={STATUS_VARIANT[estado] as any}>{estadoFactura(t, estado)}</Badge>
             </div>
             <p className="text-sm font-medium truncate">{creatorName}</p>
             <div className="mt-2 text-xs text-muted-foreground">
@@ -395,15 +405,15 @@ export default function FacturacionPage() {
                 : "—"}
             </div>
             <div className="mt-1 text-xs text-muted-foreground">
-              Vence: {inv.due_date ? format(new Date(inv.due_date + "T12:00:00"), "dd/MM/yyyy") : "—"}
+              {t("finanzas.billing.dueLabel", { date: inv.due_date ? format(new Date(inv.due_date + "T12:00:00"), "dd/MM/yyyy") : "—" })}
             </div>
             <div className="flex items-center gap-1 mt-3">
-              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setViewItem(inv)}><Eye className="h-3.5 w-3.5" /></Button>
-              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleDownloadPdf(inv)}><Download className="h-3.5 w-3.5" /></Button>
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setViewItem(inv)} aria-label={t("common.view")}><Eye className="h-3.5 w-3.5" /></Button>
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleDownloadPdf(inv)} aria-label={t("finanzas.billing.downloadPdf")}><Download className="h-3.5 w-3.5" /></Button>
               {(inv.status === "borrador" || inv.status === "enviada") && (
                 <>
-                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => setCancelItem(inv)}><Ban className="h-3.5 w-3.5" /></Button>
-                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setReverseItem(inv)}><RotateCcw className="h-3.5 w-3.5" /></Button>
+                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => setCancelItem(inv)} aria-label={t("common.cancel")}><Ban className="h-3.5 w-3.5" /></Button>
+                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setReverseItem(inv)} aria-label={t("finanzas.billing.reverse")}><RotateCcw className="h-3.5 w-3.5" /></Button>
                 </>
               )}
             </div>
@@ -416,10 +426,10 @@ export default function FacturacionPage() {
   const renderTabContent = () => {
     switch (facturaTab) {
       case "Notas de Pago": {
-        const NOTE_STATUS_BADGE: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
-          pending: { variant: "outline", label: "Pendiente" },
-          paid: { variant: "default", label: "Pagada" },
-          cancelled: { variant: "destructive", label: "Cancelada" },
+        const NOTE_STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+          pending: "outline",
+          paid: "default",
+          cancelled: "destructive",
         };
         const filteredNotes = paymentNotes.filter(n => {
           const name = n._creator?.artistic_name || n._creator?.name || "";
@@ -434,37 +444,37 @@ export default function FacturacionPage() {
           <>
             {renderFilterBar(
               <>
-                <Button size="sm" onClick={() => navigate("/finanzas/facturacion/notasdepago/nueva")}><Plus className="h-4 w-4 mr-1" />Crear Nota</Button>
+                <Button size="sm" onClick={() => navigate("/finanzas/facturacion/notasdepago/nueva")}><Plus className="h-4 w-4 mr-1" />{t("finanzas.billing.createNote")}</Button>
                 <Button size="sm" variant="outline" onClick={() => exportTableToExcel(filteredNotes.map(n => ({ Creador: n._creator?.artistic_name || n._creator?.name || "", Monto: n.amount, Tipo: n.payment_type, Metodo: n.payment_method, Estado: n.status, Vencimiento: n.due_date, Creado: n.created_at })), "notas-pago")}>
-                  <Download className="h-4 w-4 mr-1" />Exportar
+                  <Download className="h-4 w-4 mr-1" />{t("finanzas.common.export")}
                 </Button>
               </>
             )}
-            <p className="text-sm text-muted-foreground">{filteredNotes.length} notas de pago</p>
+            <p className="text-sm text-muted-foreground">{t("finanzas.billing.notesCount", { n: filteredNotes.length })}</p>
             <div className="rounded-lg border border-border overflow-hidden">
               <div className="overflow-auto max-h-[calc(100vh-30rem)]">
                 <Table>
                   <TableHeader>
                     <TableRow className="sticky top-0 z-10 bg-card border-b">
-                      <TableHead className="text-xs font-medium text-muted-foreground">Creador</TableHead>
-                      <TableHead className="text-xs font-medium text-muted-foreground">Monto</TableHead>
-                      <TableHead className="text-xs font-medium text-muted-foreground">Tipo</TableHead>
-                      <TableHead className="text-xs font-medium text-muted-foreground">Método</TableHead>
-                      <TableHead className="text-xs font-medium text-muted-foreground">Estado</TableHead>
-                      <TableHead className="text-xs font-medium text-muted-foreground">Vencimiento</TableHead>
-                      <TableHead className="text-xs font-medium text-muted-foreground">Creado</TableHead>
-                      <TableHead className="text-xs font-medium text-muted-foreground sticky right-0 bg-card">Acciones</TableHead>
+                      <TableHead className="text-xs font-medium text-muted-foreground">{t("finanzas.common.creator")}</TableHead>
+                      <TableHead className="text-xs font-medium text-muted-foreground">{t("finanzas.common.amount")}</TableHead>
+                      <TableHead className="text-xs font-medium text-muted-foreground">{t("common.type")}</TableHead>
+                      <TableHead className="text-xs font-medium text-muted-foreground">{t("common.method")}</TableHead>
+                      <TableHead className="text-xs font-medium text-muted-foreground">{t("common.status")}</TableHead>
+                      <TableHead className="text-xs font-medium text-muted-foreground">{t("finanzas.common.dueDate")}</TableHead>
+                      <TableHead className="text-xs font-medium text-muted-foreground">{t("finanzas.billing.created")}</TableHead>
+                      <TableHead className="text-xs font-medium text-muted-foreground sticky right-0 bg-card">{t("common.actions")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {isLoadingNotes ? Array.from({ length: 5 }).map((_, i) => (
                       <TableRow key={i}>{Array.from({ length: 8 }).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}</TableRow>
                     )) : filteredNotes.length === 0 ? (
-                      <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-12">Sin notas de pago.</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-12">{t("finanzas.billing.notesEmpty")}</TableCell></TableRow>
                     ) : filteredNotes.map(n => {
                       const creatorName = n._creator?.artistic_name || n._creator?.name || "—";
                       const initials = creatorName.slice(0, 2).toUpperCase();
-                      const badge = NOTE_STATUS_BADGE[n.status || "pending"] ?? NOTE_STATUS_BADGE.pending;
+                      const estadoNota = NOTE_STATUS_VARIANT[n.status || "pending"] ? (n.status || "pending") : "pending";
                       return (
                         <TableRow key={n.id} className="group hover:bg-muted/30 transition-colors">
                           <TableCell>
@@ -476,15 +486,15 @@ export default function FacturacionPage() {
                             </div>
                           </TableCell>
                           <TableCell className="text-sm font-medium">{fmt(Number(n.amount) || 0, f)}</TableCell>
-                          <TableCell className="text-sm">{n.payment_type || "—"}</TableCell>
-                          <TableCell className="text-sm">{n.payment_method || "—"}</TableCell>
-                          <TableCell><Badge variant={badge.variant}>{badge.label}</Badge></TableCell>
+                          <TableCell className="text-sm">{tipoDePago(t, n.payment_type)}</TableCell>
+                          <TableCell className="text-sm">{metodoDePago(t, n.payment_method)}</TableCell>
+                          <TableCell><Badge variant={NOTE_STATUS_VARIANT[estadoNota]}>{estadoNotaDePago(t, estadoNota)}</Badge></TableCell>
                           <TableCell className="text-sm whitespace-nowrap">{n.due_date ? format(new Date(n.due_date + "T12:00:00"), "dd/MM/yyyy") : "—"}</TableCell>
                           <TableCell className="text-sm whitespace-nowrap">{n.created_at ? format(new Date(n.created_at), "dd/MM/yyyy") : "—"}</TableCell>
                           <TableCell className="sticky right-0 bg-card group-hover:bg-muted">
                             <div className="flex items-center gap-1">
-                              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setViewNoteItem(n)}><Eye className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">Ver</TooltipContent></Tooltip>
-                              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => setDeleteItem(n)}><Trash2 className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">Eliminar</TooltipContent></Tooltip>
+                              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setViewNoteItem(n)}><Eye className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">{t("common.view")}</TooltipContent></Tooltip>
+                              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => setDeleteItem(n)}><Trash2 className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">{t("common.delete")}</TooltipContent></Tooltip>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -501,22 +511,22 @@ export default function FacturacionPage() {
       case "Reversos":
         return (
           <>
-            <p className="text-sm text-muted-foreground">{invoices.filter(i => i.status === "reversada").length} invoices reversados</p>
+            <p className="text-sm text-muted-foreground">{t("finanzas.billing.reversedCount", { n: invoices.filter(i => i.status === "reversada").length })}</p>
             <div className="rounded-lg border border-border overflow-hidden">
               <div className="overflow-auto max-h-[calc(100vh-24rem)]">
                 <Table>
                   <TableHeader>
                     <TableRow className="sticky top-0 z-10 bg-card border-b">
-                      <TableHead className="text-xs font-medium text-muted-foreground">Número</TableHead>
-                      <TableHead className="text-xs font-medium text-muted-foreground">Creador</TableHead>
-                      <TableHead className="text-xs font-medium text-muted-foreground">Monto</TableHead>
-                      <TableHead className="text-xs font-medium text-muted-foreground">Razón del Reverso</TableHead>
-                      <TableHead className="text-xs font-medium text-muted-foreground">Fecha</TableHead>
+                      <TableHead className="text-xs font-medium text-muted-foreground">{t("common.number")}</TableHead>
+                      <TableHead className="text-xs font-medium text-muted-foreground">{t("finanzas.common.creator")}</TableHead>
+                      <TableHead className="text-xs font-medium text-muted-foreground">{t("finanzas.common.amount")}</TableHead>
+                      <TableHead className="text-xs font-medium text-muted-foreground">{t("finanzas.billing.reversalReason")}</TableHead>
+                      <TableHead className="text-xs font-medium text-muted-foreground">{t("common.date")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {invoices.filter(i => i.status === "reversada").length === 0 ? (
-                      <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-12">Sin reversos registrados.</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-12">{t("finanzas.billing.reversalsEmpty")}</TableCell></TableRow>
                     ) : invoices.filter(i => i.status === "reversada").map(inv => (
                       <TableRow key={inv.id} className="hover:bg-muted/30">
                         <TableCell className="text-sm font-mono">#{inv.invoice_number}</TableCell>
@@ -544,10 +554,10 @@ export default function FacturacionPage() {
         return (
           <>
             <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">{filtered.length} invoices en borrador disponibles para envío masivo</p>
+              <p className="text-sm text-muted-foreground">{t("finanzas.billing.mailCount", { n: filtered.length })}</p>
               {bulkSelected.length > 0 && (
                 <Button size="sm" onClick={() => bulkSendMutation.mutate(bulkSelected)} disabled={bulkSendMutation.isPending}>
-                  <Send className="h-4 w-4 mr-1" />Enviar ({bulkSelected.length})
+                  <Send className="h-4 w-4 mr-1" />{t("finanzas.billing.sendCount", { n: bulkSelected.length })}
                 </Button>
               )}
             </div>
@@ -560,14 +570,14 @@ export default function FacturacionPage() {
           <div className="space-y-5">
             <div className="rounded-lg border border-dashed border-border p-12 text-center">
               <FileText className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
-              <h3 className="text-sm font-medium text-foreground mb-1">Generador de Archivos de Dispersión</h3>
+              <h3 className="text-sm font-medium text-foreground mb-1">{t("finanzas.billing.pm.title")}</h3>
               <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                Genera archivos CSV compatibles con PagoMundo para la dispersión de pagos a creadores. Selecciona los invoices pagados y genera el archivo de dispersión bancaria.
+                {t("finanzas.billing.pm.desc")}
               </p>
               <Button size="sm" variant="outline" className="mt-4" onClick={() => {
                 const pagados = invoices.filter(i => i.status === "pagada");
                 if (pagados.length === 0) {
-                  toast({ title: "Sin invoices pagados para dispersión", variant: "destructive" });
+                  toast({ title: t("finanzas.billing.pm.none"), variant: "destructive" });
                   return;
                 }
                 exportTableToExcel(pagados.map(inv => ({
@@ -579,9 +589,9 @@ export default function FacturacionPage() {
                   Metodo: inv.payment_method,
                   Vencimiento: inv.due_date,
                 })), "pagomundo-dispersion");
-                toast({ title: "Archivo de dispersión generado" });
+                toast({ title: t("finanzas.billing.pm.generated") });
               }}>
-                <Download className="h-4 w-4 mr-1" />Generar Archivo
+                <Download className="h-4 w-4 mr-1" />{t("finanzas.billing.pm.generate")}
               </Button>
             </div>
           </div>
@@ -592,9 +602,9 @@ export default function FacturacionPage() {
           <>
             {renderFilterBar(
               <>
-                <Button size="sm" onClick={() => setCrearOpen(true)}><Plus className="h-4 w-4 mr-1" />Crear Invoice</Button>
+                <Button size="sm" onClick={() => setCrearOpen(true)}><Plus className="h-4 w-4 mr-1" />{t("finanzas.common.createInvoice")}</Button>
                 <Button size="sm" variant="outline" onClick={() => exportTableToExcel(filtered.map(inv => ({ Numero: inv.invoice_number, Creador: (inv as any).creators?.artistic_name || (inv as any).creators?.name || "", Periodo: ((inv as any).period_start && (inv as any).period_end) ? `${(inv as any).period_start} — ${(inv as any).period_end}` : "", Vencimiento: inv.due_date })), "invoices")}>
-                  <Download className="h-4 w-4 mr-1" />Exportar
+                  <Download className="h-4 w-4 mr-1" />{t("finanzas.common.export")}
                 </Button>
               </>,
               true
@@ -609,8 +619,8 @@ export default function FacturacionPage() {
     <div className="flex flex-col h-full overflow-hidden">
       <header className="shrink-0 bg-background/30 backdrop-blur-xl border-b border-white/10 px-6 pt-6 pb-4">
         <PageHeader
-          title="Facturación"
-          subtitle={<>Gestión de invoices a creadores · {invoices.length} registros</>}
+          title={t("finanzas.common.billing")}
+          subtitle={t("finanzas.billing.subtitle", { n: invoices.length })}
         />
       </header>
 
@@ -619,18 +629,18 @@ export default function FacturacionPage() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {isLoading ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-lg" />) : (
             <>
-              <StatChip label="Total Invoices" value={String(invoices.length)} icon={<FileText className="h-3.5 w-3.5" />} color="bg-primary" hint="Todos" onClick={() => setKpiPopup("total")} />
-              <StatChip label="Pendientes" value={String(totalPendientes)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" hint="Enviadas + vencidas" onClick={() => setKpiPopup("pendientes")} />
-              <StatChip label="Monto Total" value={fmt(totalMonto, f)} icon={<DollarSign className="h-3.5 w-3.5" />} color="bg-success" hint="Suma" onClick={() => setKpiPopup("monto")} />
-              <StatChip label="Fee Total" value={fmt(totalFee, f)} icon={<DollarSign className="h-3.5 w-3.5" />} color="bg-destructive" hint="Fees cobrados" onClick={() => setKpiPopup("fee")} />
+              <StatChip label={t("finanzas.billing.kpi.total")} value={String(invoices.length)} icon={<FileText className="h-3.5 w-3.5" />} color="bg-primary" hint={t("common.all")} onClick={() => setKpiPopup("total")} />
+              <StatChip label={t("common.pendingPl")} value={String(totalPendientes)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" hint={t("finanzas.billing.kpi.pendingHint")} onClick={() => setKpiPopup("pendientes")} />
+              <StatChip label={t("finanzas.billing.kpi.totalAmount")} value={fmt(totalMonto, f)} icon={<DollarSign className="h-3.5 w-3.5" />} color="bg-success" hint={t("finanzas.billing.kpi.sum")} onClick={() => setKpiPopup("monto")} />
+              <StatChip label={t("finanzas.billing.kpi.totalFee")} value={fmt(totalFee, f)} icon={<DollarSign className="h-3.5 w-3.5" />} color="bg-destructive" hint={t("finanzas.billing.kpi.feeHint")} onClick={() => setKpiPopup("fee")} />
             </>
           )}
         </div>
 
         {/* Tab bar */}
         <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1 flex-wrap">
-          {FACTURA_TABS.map(t => (
-            <Button key={t} variant={facturaTab === t ? "secondary" : "ghost"} size="sm" onClick={() => { setFacturaTab(t); setBulkSelected([]); }}>{t}</Button>
+          {FACTURA_TABS.map(pestana => (
+            <Button key={pestana} variant={facturaTab === pestana ? "secondary" : "ghost"} size="sm" onClick={() => { setFacturaTab(pestana); setBulkSelected([]); }}>{t(TAB_LABEL[pestana])}</Button>
           ))}
         </div>
 
@@ -659,12 +669,12 @@ export default function FacturacionPage() {
       <AlertDialog open={!!deleteItem} onOpenChange={() => setDeleteItem(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar nota de pago?</AlertDialogTitle>
-            <AlertDialogDescription>Se eliminará esta nota de pago permanentemente.</AlertDialogDescription>
+            <AlertDialogTitle>{t("finanzas.billing.deleteNote.title")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("finanzas.billing.deleteNote.desc")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel />
-            <AlertDialogAction onClick={() => { if (!deleteItem) return; deletePaymentNoteMutation.mutate(deleteItem.id); }} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Eliminar</AlertDialogAction>
+            <AlertDialogAction onClick={() => { if (!deleteItem) return; deletePaymentNoteMutation.mutate(deleteItem.id); }} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">{t("common.delete")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -672,12 +682,12 @@ export default function FacturacionPage() {
       <AlertDialog open={!!cancelItem} onOpenChange={() => setCancelItem(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Cancelar invoice #{cancelItem?.invoice_number}?</AlertDialogTitle>
-            <AlertDialogDescription>El invoice se marcará como cancelado. Esta acción no elimina el registro.</AlertDialogDescription>
+            <AlertDialogTitle>{t("finanzas.billing.cancel.title", { number: cancelItem?.invoice_number ?? "" })}</AlertDialogTitle>
+            <AlertDialogDescription>{t("finanzas.billing.cancel.desc")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Volver</AlertDialogCancel>
-            <AlertDialogAction onClick={() => { if (!cancelItem) return; cancelMutation.mutate(cancelItem.id); }} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Confirmar Cancelación</AlertDialogAction>
+            <AlertDialogCancel>{t("common.back")}</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { if (!cancelItem) return; cancelMutation.mutate(cancelItem.id); }} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">{t("finanzas.billing.cancel.confirm")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -692,21 +702,22 @@ export default function FacturacionPage() {
       <KpiDetailDialog
         open={kpiPopup !== null}
         onOpenChange={(o) => !o && setKpiPopup(null)}
+        emptyText={t("finanzas.kpi.empty")}
         title={(() => {
           switch (kpiPopup) {
-            case "total": return `Total Invoices — ${invoices.length}`;
-            case "pendientes": return `Invoices Pendientes — ${totalPendientes}`;
-            case "monto": return `Monto Total — ${fmt(totalMonto, f)}`;
-            case "fee": return `Fees Cobrados — ${fmt(totalFee, f)}`;
+            case "total": return t("finanzas.billing.popup.total", { n: invoices.length });
+            case "pendientes": return t("finanzas.billing.popup.pending", { n: totalPendientes });
+            case "monto": return t("finanzas.billing.popup.amount", { amount: fmt(totalMonto, f) });
+            case "fee": return t("finanzas.billing.popup.fees", { amount: fmt(totalFee, f) });
             default: return "";
           }
         })()}
         subtitle={(() => {
           switch (kpiPopup) {
-            case "total": return "Listado completo";
-            case "pendientes": return "Status enviada o vencida";
-            case "monto": return "Sumatoria del campo amount";
-            case "fee": return "Sumatoria del campo fee_amount";
+            case "total": return t("finanzas.billing.popup.totalSub");
+            case "pendientes": return t("finanzas.billing.popup.pendingSub");
+            case "monto": return t("finanzas.billing.popup.amountSub");
+            case "fee": return t("finanzas.billing.popup.feesSub");
             default: return undefined;
           }
         })()}
@@ -717,7 +728,7 @@ export default function FacturacionPage() {
             status === "pagada" ? "success" : status === "vencida" ? "destructive" : status === "enviada" ? "warning" : "default";
           return list.map((i): KpiRow => ({
             primary: (i as any).recipient_name || `Invoice ${(i as any).invoice_number ?? i.id.slice(0, 8)}`,
-            secondary: `${i.status} · ${i.created_at ? format(new Date(i.created_at), "dd MMM yyyy") : "—"}`,
+            secondary: `${estadoFactura(t, i.status)} · ${i.created_at ? format(new Date(i.created_at), "dd MMM yyyy", { locale: f.fechas }) : "—"}`,
             right: kpiPopup === "fee" ? fmt(Number((i as any).fee_amount) || 0, f) : fmt(Number(i.amount) || 0, f),
             rightTone: tone(i.status as string),
           }));

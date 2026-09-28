@@ -18,6 +18,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
+import { ConFormato } from "@/pages/admin/ConFormato";
 
 interface Template {
   id: string;
@@ -33,8 +35,16 @@ interface Template {
   creator_name?: string;
 }
 
+// El nombre se guarda como "<compañía> - Invoice" o "<compañía> - Nota de pago" (ver
+// CreateTemplateModal), en español. Acá el tipo se agrega traducido, así que se le
+// quita el que trae guardado: si no, un template de nota de pago se leía
+// "Template - Nota de pago - Nota de pago" (y en inglés, mitad en cada idioma).
+const nombreDeTemplate = (tpl: { company_name: string | null; name: string }) =>
+  tpl.company_name || tpl.name.replace(/ - (Invoice|Nota de pago)$/, "");
+
 export default function TemplatesPage() {
   const f = useFormato();
+  const { t } = useLanguage();
   const [deleteTemplate, setDeleteTemplate] = useState<Template | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editTemplate, setEditTemplate] = useState<Template | null>(null);
@@ -46,9 +56,9 @@ export default function TemplatesPage() {
     if (!deleteTemplate) return;
     const { error } = await supabase.from("invoice_templates").delete().eq("id", deleteTemplate.id);
     if (error) {
-      toast({ title: "Error al eliminar", variant: "destructive" });
+      toast({ title: t("common.errorDeleting"), variant: "destructive" });
     } else {
-      toast({ title: `Template eliminado` });
+      toast({ title: t("finanzas.tpl.toast.deleted") });
       queryClient.invalidateQueries({ queryKey: ["invoice-templates"] });
     }
     setDeleteTemplate(null);
@@ -92,16 +102,16 @@ export default function TemplatesPage() {
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
       <header className="bg-background/30 backdrop-blur-xl px-6 pt-6 pb-4 border-b border-white/10 shrink-0">
         <nav className="text-sm text-muted-foreground mb-2">
-          <span>Facturación</span>
+          <span>{t("finanzas.common.billing")}</span>
           <span className="mx-2">›</span>
           <span className="text-foreground font-medium">Templates</span>
         </nav>
         <PageHeader
           title="Templates"
-          subtitle="Gestiona templates para invoices y notas de pago"
+          subtitle={t("finanzas.tpl.subtitle")}
           actions={
             <Button onClick={openCreate}>
-              <Plus className="h-4 w-4 mr-2" /> Crear Template
+              <Plus className="h-4 w-4 mr-2" /> {t("finanzas.tpl.create")}
             </Button>
           }
         />
@@ -109,40 +119,40 @@ export default function TemplatesPage() {
 
       <div className="flex-1 min-h-0 flex flex-col px-6 py-4">
         {isLoading ? (
-          <p className="text-muted-foreground text-sm">Cargando...</p>
+          <p className="text-muted-foreground text-sm">{t("common.loading")}</p>
         ) : templates.length === 0 ? (
-          <EmptyState seed="invoice-templates" title="No hay templates" description="Crea tu primer template para personalizar tus documentos" />
+          <EmptyState seed="invoice-templates" title={t("finanzas.tpl.empty")} description={t("finanzas.tpl.emptyDesc")} />
         ) : (
           <div className="rounded-lg border border-border overflow-hidden">
             <div className="overflow-auto max-h-[calc(100vh-20rem)]">
               <Table>
                 <TableHeader>
                   <TableRow className="sticky top-0 z-10 bg-card border-b">
-                    <TableHead className="text-xs font-medium text-muted-foreground">Nombre</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">Tipo</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">Fecha creación</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">Creador</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground sticky right-0 bg-card">Acciones</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">{t("common.name")}</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">{t("common.type")}</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">{t("finanzas.tpl.createdAt")}</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">{t("finanzas.tpl.createdBy")}</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground sticky right-0 bg-card">{t("common.actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {templates.map((t) => (
-                    <TableRow key={t.id} className="group hover:bg-muted/30 transition-colors">
-                      <TableCell className="text-sm font-medium">{`${t.company_name || t.name} - ${t.type === "invoice" ? "Invoice" : "Nota de pago"}`}</TableCell>
+                  {templates.map((tpl) => (
+                    <TableRow key={tpl.id} className="group hover:bg-muted/30 transition-colors">
+                      <TableCell className="text-sm font-medium">{`${nombreDeTemplate(tpl)} - ${tpl.type === "invoice" ? "Invoice" : t("finanzas.tpl.paymentNote")}`}</TableCell>
                       <TableCell>
-                        <Badge variant={t.type === "invoice" ? "default" : "secondary"}>
-                          {t.type === "invoice" ? "Invoice" : "Nota de pago"}
+                        <Badge variant={tpl.type === "invoice" ? "default" : "secondary"}>
+                          {tpl.type === "invoice" ? "Invoice" : t("finanzas.tpl.paymentNote")}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                        {new Date(t.created_at).toLocaleDateString(f.intl("es-ES"), { day: "2-digit", month: "short", year: "numeric" })}
+                        {new Date(tpl.created_at).toLocaleDateString(f.intl("es-ES"), { day: "2-digit", month: "short", year: "numeric" })}
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{t.creator_name}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{tpl.creator_name}</TableCell>
                       <TableCell className="sticky right-0 bg-card group-hover:bg-muted">
                         <div className="flex items-center gap-1">
-                          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setViewTemplate(t)}><Eye className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">Ver</TooltipContent></Tooltip>
-                          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEdit(t)}><Pencil className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">Editar</TooltipContent></Tooltip>
-                          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => setDeleteTemplate(t)}><Trash2 className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">Eliminar</TooltipContent></Tooltip>
+                          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setViewTemplate(tpl)}><Eye className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">{t("common.view")}</TooltipContent></Tooltip>
+                          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEdit(tpl)}><Pencil className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">{t("common.edit")}</TooltipContent></Tooltip>
+                          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => setDeleteTemplate(tpl)}><Trash2 className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">{t("common.delete")}</TooltipContent></Tooltip>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -181,15 +191,15 @@ export default function TemplatesPage() {
       <AlertDialog open={!!deleteTemplate} onOpenChange={() => setDeleteTemplate(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar template?</AlertDialogTitle>
+            <AlertDialogTitle>{t("finanzas.tpl.delete.title")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Estás a punto de eliminar el template <span className="font-semibold">"{deleteTemplate?.company_name || deleteTemplate?.name}"</span>. Esta acción no se puede deshacer.
+              <ConFormato texto={t("finanzas.tpl.delete.desc", { name: deleteTemplate?.company_name || deleteTemplate?.name || "" })} claseNegrita="font-semibold" />
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel />
             <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Eliminar
+              {t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

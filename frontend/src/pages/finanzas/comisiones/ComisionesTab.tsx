@@ -18,15 +18,18 @@ import { exportTableToExcel } from "@/pages/finanzas/reportes/generateReport";
 import { format } from "date-fns";
 import NuevaComisionModal from "./NuevaComisionModal";
 import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
+import { estadoComision, metodoDePago } from "../estados";
 
 function fmtUsd(n: number, locale: string) {
   return new Intl.NumberFormat(locale, { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
 }
 
-const STATUS_BADGE: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
-  pendiente: { variant: "outline", label: "Pendiente" },
-  pagado: { variant: "default", label: "Pagado" },
-  en_proceso: { variant: "secondary", label: "En Proceso" },
+// La etiqueta del estado sale de ../estados (en el idioma de la pantalla); acá solo el color.
+const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+  pendiente: "outline",
+  pagado: "default",
+  en_proceso: "secondary",
 };
 
 interface Props {
@@ -37,6 +40,7 @@ interface Props {
 
 export default function ComisionesTab({ renderFilterBar, currentFilters }: Props) {
   const f = useFormato();
+  const { t } = useLanguage();
   const fmt = (n: number) => fmtUsd(n, f.intl("es-CO"));
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -80,10 +84,10 @@ export default function ComisionesTab({ renderFilterBar, currentFilters }: Props
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["commissions"] });
-      toast({ title: "Comisión creada" });
+      toast({ title: t("finanzas.comm.toast.created") });
       setShowCreate(false);
     },
-    onError: () => toast({ title: "Error al crear comisión", variant: "destructive" }),
+    onError: () => toast({ title: t("finanzas.comm.toast.createError"), variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
@@ -93,10 +97,10 @@ export default function ComisionesTab({ renderFilterBar, currentFilters }: Props
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["commissions"] });
-      toast({ title: "Comisión eliminada" });
+      toast({ title: t("finanzas.comm.toast.deleted") });
       setDeleteId(null);
     },
-    onError: () => toast({ title: "Error al eliminar", variant: "destructive" }),
+    onError: () => toast({ title: t("common.errorDeleting"), variant: "destructive" }),
   });
 
   const updateCommMutation = useMutation({
@@ -112,10 +116,10 @@ export default function ComisionesTab({ renderFilterBar, currentFilters }: Props
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["commissions"] });
-      toast({ title: "Comisión actualizada" });
+      toast({ title: t("finanzas.comm.toast.updated") });
       setEditingCommId(null);
     },
-    onError: () => toast({ title: "Error al actualizar comisión", variant: "destructive" }),
+    onError: () => toast({ title: t("finanzas.comm.toast.updateError"), variant: "destructive" }),
   });
 
   const updateBlueMutation = useMutation({
@@ -131,10 +135,10 @@ export default function ComisionesTab({ renderFilterBar, currentFilters }: Props
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["commissions"] });
-      toast({ title: "Blue actualizado" });
+      toast({ title: t("finanzas.comm.toast.blueUpdated") });
       setEditingBlueId(null);
     },
-    onError: () => toast({ title: "Error al actualizar Blue", variant: "destructive" }),
+    onError: () => toast({ title: t("finanzas.comm.toast.blueUpdateError"), variant: "destructive" }),
   });
 
   const filtered = commissions.filter(c => {
@@ -151,7 +155,7 @@ export default function ComisionesTab({ renderFilterBar, currentFilters }: Props
     <>
       {renderFilterBar(
         <>
-          <Button size="sm" onClick={() => setShowCreate(true)}><Plus className="h-4 w-4 mr-1" />Crear Comisión</Button>
+          <Button size="sm" onClick={() => setShowCreate(true)}><Plus className="h-4 w-4 mr-1" />{t("finanzas.comm.create")}</Button>
           <Button size="sm" variant="outline" onClick={() => exportTableToExcel(filtered.map(c => {
             const cfg = (c.calculation_config || {}) as Record<string, any>;
             return {
@@ -163,34 +167,33 @@ export default function ComisionesTab({ renderFilterBar, currentFilters }: Props
               "Comision total": c.final_amount,
             };
           }), "comisiones")}>
-            <Download className="h-4 w-4 mr-1" />Exportar
+            <Download className="h-4 w-4 mr-1" />{t("finanzas.common.export")}
           </Button>
         </>
       )}
-      <p className="text-sm text-muted-foreground">{filtered.length} comisiones</p>
+      <p className="text-sm text-muted-foreground">{t("finanzas.comm.count", { n: filtered.length })}</p>
       <div className="rounded-lg border border-border overflow-hidden">
         <div className="overflow-auto max-h-[calc(100vh-30rem)]">
           <Table>
             <TableHeader>
               <TableRow className="sticky top-0 z-10 bg-card border-b">
-                <TableHead className="text-xs font-medium text-muted-foreground">Creador</TableHead>
-                <TableHead className="text-xs font-medium text-muted-foreground">Periodo</TableHead>
-                <TableHead className="text-xs font-medium text-muted-foreground">Ganancia</TableHead>
-                <TableHead className="text-xs font-medium text-muted-foreground">Comisión</TableHead>
+                <TableHead className="text-xs font-medium text-muted-foreground">{t("finanzas.common.creator")}</TableHead>
+                <TableHead className="text-xs font-medium text-muted-foreground">{t("finanzas.common.period")}</TableHead>
+                <TableHead className="text-xs font-medium text-muted-foreground">{t("finanzas.common.earnings")}</TableHead>
+                <TableHead className="text-xs font-medium text-muted-foreground">{t("finanzas.common.commission")}</TableHead>
                 <TableHead className="text-xs font-medium text-muted-foreground">Blue</TableHead>
-                <TableHead className="text-xs font-medium text-muted-foreground">Total a pagar</TableHead>
-                <TableHead className="text-xs font-medium text-muted-foreground sticky right-0 bg-card">Acciones</TableHead>
+                <TableHead className="text-xs font-medium text-muted-foreground">{t("finanzas.common.totalToPay")}</TableHead>
+                <TableHead className="text-xs font-medium text-muted-foreground sticky right-0 bg-card">{t("common.actions")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? Array.from({ length: 5 }).map((_, i) => (
                 <TableRow key={i}>{Array.from({ length: 7 }).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}</TableRow>
               )) : filtered.length === 0 ? (
-                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-12">Sin comisiones registradas.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-12">{t("finanzas.comm.empty")}</TableCell></TableRow>
               ) : filtered.map(c => {
                 const creatorName = c._creator?.artistic_name || c._creator?.name || "—";
                 const initials = creatorName.slice(0, 2).toUpperCase();
-                const badge = STATUS_BADGE[c.status] ?? STATUS_BADGE.pendiente;
                 return (
                   <TableRow key={c.id} className="group hover:bg-muted/30 transition-colors">
                     <TableCell>
@@ -267,8 +270,8 @@ export default function ComisionesTab({ renderFilterBar, currentFilters }: Props
                     <TableCell className="text-sm font-medium text-primary">{fmt(Number(c.final_amount) || 0)}</TableCell>
                     <TableCell className="sticky right-0 bg-card group-hover:bg-muted">
                       <div className="flex items-center gap-1">
-                        <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setViewItem(c)}><Eye className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">Ver</TooltipContent></Tooltip>
-                        <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => setDeleteId(c.id)}><Trash2 className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">Eliminar</TooltipContent></Tooltip>
+                        <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setViewItem(c)}><Eye className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">{t("common.view")}</TooltipContent></Tooltip>
+                        <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => setDeleteId(c.id)}><Trash2 className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">{t("common.delete")}</TooltipContent></Tooltip>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -284,23 +287,23 @@ export default function ComisionesTab({ renderFilterBar, currentFilters }: Props
       {/* View detail dialog */}
       <Dialog open={!!viewItem} onOpenChange={() => setViewItem(null)}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>Detalle de Comisión</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t("finanzas.comm.detailOf")}</DialogTitle></DialogHeader>
           {viewItem && (() => {
             const config = (viewItem.calculation_config || {}) as Record<string, any>;
             return (
             <div className="space-y-3 text-sm">
-              <div className="flex justify-between"><span className="text-muted-foreground">Creador</span><span className="font-medium">{viewItem._creator?.artistic_name || viewItem._creator?.name || "—"}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Periodo</span><span>{viewItem.period || "—"}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Ganancia</span><span className="font-medium">{fmt(Number(viewItem.base_amount) || 0)}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Comisión</span><span className="text-destructive font-medium">{config.percentage ? `${config.percentage}%` : "—"}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">{t("finanzas.common.creator")}</span><span className="font-medium">{viewItem._creator?.artistic_name || viewItem._creator?.name || "—"}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">{t("finanzas.common.period")}</span><span>{viewItem.period || "—"}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">{t("finanzas.common.earnings")}</span><span className="font-medium">{fmt(Number(viewItem.base_amount) || 0)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">{t("finanzas.common.commission")}</span><span className="text-destructive font-medium">{config.percentage ? `${config.percentage}%` : "—"}</span></div>
               {config.blue_package && config.blue_amount > 0 && (
                 <div className="flex justify-between"><span className="text-muted-foreground">Blue</span><span className="font-medium">{fmt(config.blue_amount)}</span></div>
               )}
-              <div className="flex justify-between"><span className="text-muted-foreground">Total a pagar</span><span className="text-primary font-medium">{fmt(Number(viewItem.final_amount) || 0)}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Estado</span><Badge variant={STATUS_BADGE[viewItem.status]?.variant || "outline"}>{STATUS_BADGE[viewItem.status]?.label || viewItem.status}</Badge></div>
-              {viewItem.payment_method && <div className="flex justify-between"><span className="text-muted-foreground">Método de Pago</span><span>{viewItem.payment_method}</span></div>}
-              {viewItem.payment_date && <div className="flex justify-between"><span className="text-muted-foreground">Fecha de Pago</span><span>{format(new Date(viewItem.payment_date + "T12:00:00"), "dd/MM/yyyy")}</span></div>}
-              {viewItem.notes && <div><span className="text-muted-foreground">Notas:</span><p className="mt-1 text-foreground">{viewItem.notes}</p></div>}
+              <div className="flex justify-between"><span className="text-muted-foreground">{t("finanzas.common.totalToPay")}</span><span className="text-primary font-medium">{fmt(Number(viewItem.final_amount) || 0)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">{t("common.status")}</span><Badge variant={STATUS_VARIANT[viewItem.status] || "outline"}>{estadoComision(t, viewItem.status)}</Badge></div>
+              {viewItem.payment_method && <div className="flex justify-between"><span className="text-muted-foreground">{t("finanzas.common.paymentMethod")}</span><span>{metodoDePago(t, viewItem.payment_method)}</span></div>}
+              {viewItem.payment_date && <div className="flex justify-between"><span className="text-muted-foreground">{t("finanzas.comm.paymentDate")}</span><span>{format(new Date(viewItem.payment_date + "T12:00:00"), "dd/MM/yyyy")}</span></div>}
+              {viewItem.notes && <div><span className="text-muted-foreground">{t("finanzas.common.notes")}:</span><p className="mt-1 text-foreground">{viewItem.notes}</p></div>}
             </div>);
           })()}
         </DialogContent>
@@ -310,12 +313,12 @@ export default function ComisionesTab({ renderFilterBar, currentFilters }: Props
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar comisión?</AlertDialogTitle>
-            <AlertDialogDescription>Se eliminará esta comisión permanentemente.</AlertDialogDescription>
+            <AlertDialogTitle>{t("finanzas.comm.delete.title")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("finanzas.comm.delete.desc")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel />
-            <AlertDialogAction onClick={() => deleteId && deleteMutation.mutate(deleteId)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Eliminar</AlertDialogAction>
+            <AlertDialogAction onClick={() => deleteId && deleteMutation.mutate(deleteId)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">{t("common.delete")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
