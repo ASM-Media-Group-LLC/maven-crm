@@ -9,14 +9,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import EmployeeAreaBadge from "@/components/hr/EmployeeAreaBadge";
 import { PageHeader } from "@/components/ui/page-header";
 import { useEmployees, useDepartments } from "@/hooks/useEmployees";
-
-const MODALITY_LABELS: Record<string, string> = {
-  remoto: "Remoto",
-  hibrido: "Híbrido",
-  presencial: "Presencial",
-};
+import { useLanguage } from "@/hooks/useLanguage";
+import { MODALIDAD_TRABAJO } from "./etiquetasRrhh";
 
 export default function HRDirectoryLookup() {
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const { data: employees, isLoading } = useEmployees();
   const { data: departments } = useDepartments();
@@ -50,8 +47,8 @@ export default function HRDirectoryLookup() {
       <div className="shrink-0 bg-background border-b px-6 pt-6 pb-4 space-y-4">
         {/* Header */}
         <PageHeader
-          title="Directorio"
-          subtitle={`Consulta rápida de datos del equipo · ${activeEmployees.length} empleados activos`}
+          title={t("hr.dir.title")}
+          subtitle={t("hr.dir.subtitle", { count: activeEmployees.length })}
         />
 
         {/* Department tab bar */}
@@ -61,7 +58,7 @@ export default function HRDirectoryLookup() {
             size="sm"
             onClick={() => setDeptFilter("all")}
           >
-            Todos
+            {t("common.all")}
           </Button>
           {departments?.map((d) => (
             <Button
@@ -79,7 +76,7 @@ export default function HRDirectoryLookup() {
         <div className="relative max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar por nombre, email, teléfono, cargo..."
+            placeholder={t("hr.dir.searchPlaceholder")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9"
@@ -98,20 +95,20 @@ export default function HRDirectoryLookup() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Empleado</TableHead>
-                <TableHead>Cargo</TableHead>
-                <TableHead>Departamento</TableHead>
+                <TableHead>{t("hr.employee")}</TableHead>
+                <TableHead>{t("hr.jobTitle")}</TableHead>
+                <TableHead>{t("hr.department")}</TableHead>
                 <TableHead>Email</TableHead>
-                <TableHead>Teléfono</TableHead>
-                <TableHead>Ubicación</TableHead>
-                <TableHead>Modalidad</TableHead>
+                <TableHead>{t("common.phone")}</TableHead>
+                <TableHead>{t("common.location")}</TableHead>
+                <TableHead>{t("hr.modality")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtered.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center text-muted-foreground py-12">
-                    No se encontraron empleados
+                    {t("hr.dir.noEmployees")}
                   </TableCell>
                 </TableRow>
               ) : (
@@ -141,7 +138,7 @@ export default function HRDirectoryLookup() {
                         </span>
                       ) : "—"}
                     </TableCell>
-                    <TableCell className="text-sm">{MODALITY_LABELS[emp.work_modality ?? ""] ?? "—"}</TableCell>
+                    <TableCell className="text-sm">{emp.work_modality && MODALIDAD_TRABAJO[emp.work_modality] ? t(MODALIDAD_TRABAJO[emp.work_modality]) : "—"}</TableCell>
                   </TableRow>
                 ))
               )}

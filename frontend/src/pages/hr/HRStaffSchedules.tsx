@@ -10,10 +10,12 @@ import { useToast } from "@/hooks/use-toast";
 import { CalendarClock, Search, Loader2, CheckCircle2, Copy } from "lucide-react";
 import { useQaStaff, useUserSchedule, saveUserSchedule, roleKindOf, type QaStaff } from "./useStaffSchedules";
 import { PageHeader } from "@/components/ui/page-header";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 
-const DAYS = [
-  { w: 1, label: "Lunes" }, { w: 2, label: "Martes" }, { w: 3, label: "Miércoles" },
-  { w: 4, label: "Jueves" }, { w: 5, label: "Viernes" }, { w: 6, label: "Sábado" }, { w: 7, label: "Domingo" },
+const DAYS: { w: number; label: TranslationKey }[] = [
+  { w: 1, label: "hr.wd.monday" }, { w: 2, label: "hr.wd.tuesday" }, { w: 3, label: "hr.wd.wednesday" },
+  { w: 4, label: "hr.wd.thursday" }, { w: 5, label: "hr.wd.friday" }, { w: 6, label: "hr.wd.saturday" }, { w: 7, label: "hr.wd.sunday" },
 ];
 const ROLE_LABEL: Record<string, string> = { Chatter: "Chatter", closer: "Closer", manager: "Manager", LLG: "LLG" };
 
@@ -21,6 +23,7 @@ type Row = { weekday: number; works: boolean; start: string; end: string };
 const emptyWeek = (): Row[] => DAYS.map((d) => ({ weekday: d.w, works: false, start: "", end: "" }));
 
 export default function HRStaffSchedules() {
+  const { t } = useLanguage();
   const { toast } = useToast();
   const qc = useQueryClient();
   const { data: staff = [], isLoading } = useQaStaff();
@@ -65,15 +68,15 @@ export default function HRStaffSchedules() {
   const save = async () => {
     if (!selected) return;
     const bad = week.find((d) => d.works && (!d.start || !d.end));
-    if (bad) { toast({ title: "Completa entrada y salida de los días marcados", variant: "destructive" }); return; }
+    if (bad) { toast({ title: t("hr.staffSched.missingTimes"), variant: "destructive" }); return; }
     setSaving(true);
     try {
       await saveUserSchedule(selected.profile_id, roleKindOf(selected.role), week);
-      toast({ title: "Horario guardado", description: selected.name });
+      toast({ title: t("hr.staffSched.saved"), description: selected.name });
       qc.invalidateQueries({ queryKey: ["qa-staff"] });
       qc.invalidateQueries({ queryKey: ["user-schedule", selected.profile_id] });
     } catch (e: any) {
-      toast({ title: "No se pudo guardar", description: e.message, variant: "destructive" });
+      toast({ title: t("common.couldNotSave"), description: e.message, variant: "destructive" });
     } finally {
       setSaving(false);
     }
@@ -82,12 +85,11 @@ export default function HRStaffSchedules() {
   return (
     <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto p-6">
       <PageHeader
-        title="Horario del personal"
+        title={t("hr.staffSched.title")}
         icon={<CalendarClock className="h-5 w-5" />}
         subtitle={
           <>
-            Horario real por persona y día de la semana. Lo usa la <strong>puntualidad</strong> de Asistencia (Hubstaff) —
-            cada quien con su horario (closers, chatters, managers, LLG; distinto por día si hace falta).
+            {t("hr.staffSched.subtitleA")} <strong>{t("hr.staffSched.subtitlePunctuality")}</strong> {t("hr.staffSched.subtitleB")}
           </>
         }
       />
@@ -98,21 +100,21 @@ export default function HRStaffSchedules() {
           <CardContent className="flex min-h-0 flex-1 flex-col gap-2 p-3">
             <div className="relative">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar persona…" className="pl-8" />
+              <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("common.searchPerson")} className="pl-8" />
             </div>
             <div className="flex flex-wrap gap-1">
               {["all", ...roles].map((r) => (
                 <button key={r} onClick={() => setRoleFilter(r)}
                   className={`rounded-full px-2 py-0.5 text-[11px] ${roleFilter === r ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70"}`}>
-                  {r === "all" ? "Todos" : (ROLE_LABEL[r] ?? r)}
+                  {r === "all" ? t("common.all") : (ROLE_LABEL[r] ?? r)}
                 </button>
               ))}
             </div>
             <ScrollArea className="min-h-0 flex-1">
               {isLoading ? (
-                <div className="flex items-center gap-2 p-3 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Cargando…</div>
+                <div className="flex items-center gap-2 p-3 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> {t("common.loading")}</div>
               ) : filtered.length === 0 ? (
-                <div className="p-3 text-sm text-muted-foreground">Sin resultados.</div>
+                <div className="p-3 text-sm text-muted-foreground">{t("common.noResults")}</div>
               ) : (
                 <div className="space-y-0.5 pr-2">
                   {filtered.map((s) => (
@@ -134,10 +136,10 @@ export default function HRStaffSchedules() {
           <CardContent className="p-4">
             {!selected ? (
               <div className="flex h-full items-center justify-center py-16 text-sm text-muted-foreground">
-                Elige una persona de la izquierda para cargar/editar su horario.
+                {t("hr.staffSched.pickPerson")}
               </div>
             ) : schedLoading ? (
-              <div className="flex items-center gap-2 py-10 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Cargando horario…</div>
+              <div className="flex items-center gap-2 py-10 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> {t("hr.staffSched.loadingSchedule")}</div>
             ) : (
               <div className="space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -146,12 +148,12 @@ export default function HRStaffSchedules() {
                     <div className="text-xs text-muted-foreground">{ROLE_LABEL[selected.role] ?? selected.role}</div>
                   </div>
                   <Button variant="outline" size="sm" onClick={copyToWeekdays} className="gap-1">
-                    <Copy className="h-3.5 w-3.5" /> Copiar a Lun–Vie
+                    <Copy className="h-3.5 w-3.5" /> {t("hr.staffSched.copyWeekdays")}
                   </Button>
                 </div>
                 <div className="divide-y rounded-md border">
                   {week.map((d) => {
-                    const label = DAYS.find((x) => x.w === d.weekday)!.label;
+                    const label = t(DAYS.find((x) => x.w === d.weekday)!.label);
                     return (
                       <div key={d.weekday} className="flex items-center gap-3 px-3 py-2">
                         <div className="flex w-32 items-center gap-2">
@@ -161,11 +163,11 @@ export default function HRStaffSchedules() {
                         {d.works ? (
                           <div className="flex items-center gap-2 text-sm">
                             <Input type="time" value={d.start} onChange={(e) => setDay(d.weekday, { start: e.target.value })} className="h-8 w-28" />
-                            <span className="text-muted-foreground">a</span>
+                            <span className="text-muted-foreground">{t("hr.staffSched.to")}</span>
                             <Input type="time" value={d.end} onChange={(e) => setDay(d.weekday, { end: e.target.value })} className="h-8 w-28" />
                           </div>
                         ) : (
-                          <span className="text-xs text-muted-foreground">Día libre</span>
+                          <span className="text-xs text-muted-foreground">{t("hr.staffSched.dayOff")}</span>
                         )}
                       </div>
                     );
@@ -173,12 +175,11 @@ export default function HRStaffSchedules() {
                 </div>
                 <div className="flex justify-end">
                   <Button onClick={save} disabled={saving}>
-                    {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Guardar horario"}
+                    {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : t("hr.staffSched.save")}
                   </Button>
                 </div>
                 <p className="text-[11px] text-muted-foreground">
-                  La puntualidad de Asistencia medirá la 1ª actividad de Hubstaff contra la hora de entrada de cada día.
-                  Tolerancia 10 min. Los días libres no cuentan.
+                  {t("hr.staffSched.footnote")}
                 </p>
               </div>
             )}

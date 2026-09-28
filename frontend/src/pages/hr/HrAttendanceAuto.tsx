@@ -5,19 +5,24 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useHrAttendance, HR_ROLE_LABEL } from "./useHrAttendance";
 import { useHubstaffSyncStatus } from "@/pages/agency-qa/chatters-qa/useHubstaffEffort";
 import { periodLabel } from "@/pages/agency-qa/chatters-qa/useChatterScorecards";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
+import { periodoDelMes, TURNO_ASISTENCIA } from "./etiquetasRrhh";
+
+type T = (key: TranslationKey, params?: Record<string, string | number>) => string;
 
 // Panel de Asistencia automática (RRHH) — TODO el personal trackeado en Hubstaff,
 // derivado de v_qa_attendance. Check-in (1ª actividad) vs horario cargado/turno deducido.
 // Tolerancia 10 min = a tiempo. Filtro por rol porque acá conviven todos los roles.
 
-const relativeTime = (iso: string | null): string => {
-  if (!iso) return "sin sincronizar";
+const relativeTime = (iso: string | null, t: T): string => {
+  if (!iso) return t("hr.att.neverSynced");
   const min = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
-  if (min < 1) return "recién";
-  if (min < 60) return `hace ${min} min`;
+  if (min < 1) return t("hr.att.justNow");
+  if (min < 60) return t("hr.att.minAgo", { n: min });
   const h = Math.floor(min / 60);
-  if (h < 24) return `hace ${h}h`;
-  return `hace ${Math.floor(h / 24)}d`;
+  if (h < 24) return t("hr.att.hoursAgo", { n: h });
+  return t("hr.att.daysAgo", { n: Math.floor(h / 24) });
 };
 
 const hhmm = (min: number | null | undefined) => {
@@ -27,6 +32,7 @@ const hhmm = (min: number | null | undefined) => {
 };
 
 export default function HrAttendanceAuto() {
+  const { t, language } = useLanguage();
   const { data: rows = [], isLoading } = useHrAttendance();
   const { data: sync } = useHubstaffSyncStatus();
   const [roleFilter, setRoleFilter] = useState<string>("all");
@@ -60,8 +66,8 @@ export default function HrAttendanceAuto() {
     return (
       <Card>
         <CardContent className="space-y-2 p-6 text-sm text-muted-foreground">
-          <div className="flex items-center gap-2 font-medium text-foreground"><CalendarClock className="h-4 w-4" /> Asistencia automática</div>
-          Todavía no hay datos de asistencia. El micro <code>hubstaff-bridge</code> sincroniza la 1ª actividad del día (live cada 5 min + corte cada 6h).
+          <div className="flex items-center gap-2 font-medium text-foreground"><CalendarClock className="h-4 w-4" /> {t("hr.att.autoTitle")}</div>
+          {t("hr.att.emptyA")} <code>hubstaff-bridge</code> {t("hr.att.emptyB")}
         </CardContent>
       </Card>
     );
@@ -72,23 +78,23 @@ export default function HrAttendanceAuto() {
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <h3 className="flex items-center gap-2 text-base font-semibold">
-            <CalendarClock className="h-4 w-4 text-success" /> Check-in y puntualidad
+            <CalendarClock className="h-4 w-4 text-success" /> {t("hr.att.title")}
           </h3>
           <p className="text-sm text-muted-foreground">
-            Hora de entrada (1ª actividad de Hubstaff) vs horario — {stats && periodLabel(stats.period)}.
+            {t("hr.att.subtitle", { period: stats ? periodoDelMes(stats.period, language, periodLabel) : "" })}
           </p>
         </div>
-        <span className="text-xs text-muted-foreground">Sincronizado {relativeTime(sync?.last_sync_at ?? null)}</span>
+        <span className="text-xs text-muted-foreground">{t("hr.att.synced", { when: relativeTime(sync?.last_sync_at ?? null, t) })}</span>
       </div>
 
       {stats && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatCard icon={Users} label="Personas" value={String(stats.count)} />
-          <StatCard icon={CheckCircle2} label="Puntualidad prom." value={`${stats.avgPunct}%`}
+          <StatCard icon={Users} label={t("hr.att.people")} value={String(stats.count)} />
+          <StatCard icon={CheckCircle2} label={t("hr.att.avgPunctuality")} value={`${stats.avgPunct}%`}
             tone={stats.avgPunct >= 90 ? "ok" : stats.avgPunct >= 75 ? "warn" : "bad"} />
-          <StatCard icon={Clock} label="Tardanzas (total)" value={String(stats.totalTard)}
+          <StatCard icon={Clock} label={t("hr.att.lateTotal")} value={String(stats.totalTard)}
             tone={stats.totalTard ? "warn" : "ok"} />
-          <StatCard icon={AlertTriangle} label="A revisar" value={String(stats.aRevisar)}
+          <StatCard icon={AlertTriangle} label={t("hr.att.toReview")} value={String(stats.aRevisar)}
             tone={stats.aRevisar ? "bad" : "ok"} />
         </div>
       )}
@@ -98,7 +104,7 @@ export default function HrAttendanceAuto() {
           {["all", ...roles].map((r) => (
             <button key={r} onClick={() => setRoleFilter(r)}
               className={`rounded-full px-2.5 py-0.5 text-[11px] ${roleFilter === r ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70"}`}>
-              {r === "all" ? "Todos" : (HR_ROLE_LABEL[r] ?? r)}
+              {r === "all" ? t("common.all") : (HR_ROLE_LABEL[r] ?? r)}
             </button>
           ))}
         </div>
@@ -110,15 +116,15 @@ export default function HrAttendanceAuto() {
             <table className="tabla-movil w-full min-w-[760px] text-sm">
               <thead>
                 <tr className="border-b border-border text-xs text-muted-foreground">
-                  <th className="px-4 py-3 text-left font-semibold">Persona</th>
-                  <th className="px-3 py-3 text-left font-semibold">Rol</th>
-                  <th className="px-3 py-3 text-left font-semibold">Turno</th>
-                  <th className="px-3 py-3 text-right font-semibold">Días</th>
-                  <th className="px-3 py-3 text-right font-semibold"><LogIn className="inline h-3 w-3" /> Entrada</th>
-                  <th className="px-3 py-3 text-right font-semibold">A tiempo</th>
-                  <th className="px-3 py-3 text-right font-semibold">Tardanzas</th>
-                  <th className="px-3 py-3 text-right font-semibold">Retraso prom.</th>
-                  <th className="px-4 py-3 text-left font-semibold">Estado</th>
+                  <th className="px-4 py-3 text-left font-semibold">{t("hr.att.person")}</th>
+                  <th className="px-3 py-3 text-left font-semibold">{t("common.role")}</th>
+                  <th className="px-3 py-3 text-left font-semibold">{t("hr.card.shift")}</th>
+                  <th className="px-3 py-3 text-right font-semibold">{t("common.days")}</th>
+                  <th className="px-3 py-3 text-right font-semibold"><LogIn className="inline h-3 w-3" /> {t("hr.att.checkIn")}</th>
+                  <th className="px-3 py-3 text-right font-semibold">{t("hr.card.onTime")}</th>
+                  <th className="px-3 py-3 text-right font-semibold">{t("hr.card.lateArrivals")}</th>
+                  <th className="px-3 py-3 text-right font-semibold">{t("hr.att.avgDelay")}</th>
+                  <th className="px-4 py-3 text-left font-semibold">{t("common.status")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -133,8 +139,8 @@ export default function HrAttendanceAuto() {
                       <td className="px-3 py-2.5 text-muted-foreground">{HR_ROLE_LABEL[r.role] ?? r.role}</td>
                       <td className="px-3 py-2.5 text-muted-foreground">
                         <span className="inline-flex items-center gap-1">
-                          {r.turno ?? "—"}
-                          {r.horario_cargado && <CalendarCheck2 className="h-3 w-3 text-success" aria-label="Horario cargado" />}
+                          {r.turno && TURNO_ASISTENCIA[r.turno] ? t(TURNO_ASISTENCIA[r.turno]) : (r.turno ?? "—")}
+                          {r.horario_cargado && <CalendarCheck2 className="h-3 w-3 text-success" aria-label={t("hr.att.scheduleLoaded")} />}
                         </span>
                       </td>
                       <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">{r.dias}</td>
@@ -144,7 +150,7 @@ export default function HrAttendanceAuto() {
                       <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">
                         {r.min_tarde_prom != null ? `+${r.min_tarde_prom}m` : "—"}
                       </td>
-                      <td className="px-4 py-2.5">{statusPill(pct, smallSample)}</td>
+                      <td className="px-4 py-2.5">{statusPill(pct, smallSample, t)}</td>
                     </tr>
                   );
                 })}
@@ -155,29 +161,29 @@ export default function HrAttendanceAuto() {
       </Card>
 
       <p className="px-1 text-[11px] leading-relaxed text-muted-foreground">
-        El <CalendarCheck2 className="inline h-3 w-3 text-success" /> indica que la persona tiene su <strong>horario cargado</strong>
-        {" "}(en <em>Horario del personal</em>) — ahí la puntualidad se mide contra su horario real. Sin él, el turno se deduce de la 1ª actividad.
-        "A tiempo" = arrancó dentro de <strong>10 min</strong> del inicio. Muestras &lt;4 días = "pocos datos".
+        {t("hr.att.legendA")} <CalendarCheck2 className="inline h-3 w-3 text-success" /> {t("hr.att.legendB")} <strong>{t("hr.att.legendLoaded")}</strong>
+        {" "}{t("hr.att.legendC")} <em>{t("hr.staffSched.title")}</em>{t("hr.att.legendD")}
+        {" "}{t("hr.att.legendE")} <strong>{t("hr.att.legendTenMin")}</strong> {t("hr.att.legendF")}
       </p>
     </div>
   );
 }
 
-function statusPill(pct: number, smallSample: boolean) {
+function statusPill(pct: number, smallSample: boolean, t: T) {
   if (smallSample) {
-    return <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">pocos datos</span>;
+    return <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">{t("hr.att.fewData")}</span>;
   }
   if (pct < 80) {
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-destructive/15 px-2 py-0.5 text-[11px] font-medium text-destructive">
-        <AlertTriangle className="h-3 w-3" /> impuntual
+        <AlertTriangle className="h-3 w-3" /> {t("hr.att.unpunctual")}
       </span>
     );
   }
   if (pct >= 100) {
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-medium text-success">
-        <CheckCircle2 className="h-3 w-3" /> puntual
+        <CheckCircle2 className="h-3 w-3" /> {t("hr.att.punctual")}
       </span>
     );
   }

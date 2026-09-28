@@ -31,6 +31,9 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { useDepartments } from "@/hooks/useEmployees";
 import { PageHeader } from "@/components/ui/page-header";
+import { useLanguage } from "@/hooks/useLanguage";
+import { useFormato } from "@/hooks/useFormato";
+import type { TranslationKey } from "@/lib/i18n";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface OffboardingRecord {
@@ -59,9 +62,10 @@ interface OffboardingRecord {
   task_completed: number;
 }
 
-const OFFBOARDING_STATUSES = [
-  { value: "in_progress", label: "En Progreso" },
-  { value: "completed", label: "Completado" },
+// status, termination_type y final_payment_status son DATOS de la base; lo que se ve es la clave.
+const OFFBOARDING_STATUSES: { value: string; label: TranslationKey }[] = [
+  { value: "in_progress", label: "common.inProgress" },
+  { value: "completed", label: "common.completed" },
 ];
 
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
@@ -69,17 +73,17 @@ const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
   completed: { bg: "bg-accent/15", text: "text-accent-foreground" },
 };
 
-const TERMINATION_TYPES: Record<string, string> = {
-  voluntary: "Voluntaria",
-  involuntary: "Involuntaria",
-  end_of_contract: "Fin de Contrato",
-  mutual_agreement: "Mutuo Acuerdo",
+const TERMINATION_TYPES: Record<string, TranslationKey> = {
+  voluntary: "hr.off.term.voluntary",
+  involuntary: "hr.off.term.involuntary",
+  end_of_contract: "hr.off.term.end_of_contract",
+  mutual_agreement: "hr.off.term.mutual_agreement",
 };
 
-const PAYMENT_STATUSES: Record<string, string> = {
-  pending: "Pendiente",
-  processing: "En Proceso",
-  paid: "Pagado",
+const PAYMENT_STATUSES: Record<string, TranslationKey> = {
+  pending: "hr.off.pay.pending",
+  processing: "hr.off.pay.processing",
+  paid: "hr.off.pay.paid",
 };
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
@@ -131,6 +135,15 @@ function getInitials(first: string, last: string): string {
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function HROffboarding() {
+  const { t } = useLanguage();
+  const f = useFormato();
+  const DMY = f.idioma === "en" ? "MM/dd/yyyy" : "dd/MM/yyyy";
+  const tipoSalida = (v: string) => (TERMINATION_TYPES[v] ? t(TERMINATION_TYPES[v]) : v);
+  const estadoPago = (v: string) => (PAYMENT_STATUSES[v] ? t(PAYMENT_STATUSES[v]) : v);
+  const estado = (v: string) => {
+    const s = OFFBOARDING_STATUSES.find((o) => o.value === v);
+    return s ? t(s.label) : v;
+  };
   const navigate = useNavigate();
   const { data: offboardings = [], isLoading } = useOffboardings();
   const { data: departments = [] } = useDepartments();
@@ -166,10 +179,10 @@ export default function HROffboarding() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["hr-offboardings"] });
-      toast({ title: "Offboarding actualizado" });
+      toast({ title: t("hr.off.updated") });
       setEditItem(null);
     },
-    onError: () => toast({ title: "Error al actualizar", variant: "destructive" }),
+    onError: () => toast({ title: t("common.errorUpdating"), variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
@@ -180,10 +193,10 @@ export default function HROffboarding() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["hr-offboardings"] });
-      toast({ title: "Offboarding eliminado" });
+      toast({ title: t("hr.off.deleted") });
       setDeleteItem(null);
     },
-    onError: () => toast({ title: "Error al eliminar", variant: "destructive" }),
+    onError: () => toast({ title: t("common.errorDeleting"), variant: "destructive" }),
   });
 
   // ─── KPIs ─────────────────────────────────────────────────────────────────
@@ -224,10 +237,10 @@ export default function HROffboarding() {
       <header className="shrink-0 bg-background/30 backdrop-blur-xl border-b border-white/10 px-6 pt-6 pb-4">
         <PageHeader
           title="Offboarding"
-          subtitle="Gestión de salida de empleados"
+          subtitle={t("hr.off.subtitle")}
           actions={
             <Button size="sm" onClick={() => navigate("/hr/offboarding/nuevo")}>
-              <Plus className="h-4 w-4 mr-1" />Iniciar Offboarding
+              <Plus className="h-4 w-4 mr-1" />{t("hr.off.start")}
             </Button>
           }
         />
@@ -242,17 +255,17 @@ export default function HROffboarding() {
             Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
           ) : (
             <>
-              <StatChip label="Total Offboarding" value={String(offboardings.length)} icon={<Users className="h-3.5 w-3.5" />} color="bg-primary" hint="Todos los procesos" onClick={() => setKpiPopup("total")} />
-              <StatChip label="En Progreso" value={String(totalInProgress)} icon={<Loader2 className="h-3.5 w-3.5" />} color="bg-warning" hint={offboardings.length > 0 ? `${((totalInProgress / offboardings.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("inProgress")} />
-              <StatChip label="Completados" value={String(totalCompleted)} icon={<CheckCircle className="h-3.5 w-3.5" />} color="bg-success" hint={offboardings.length > 0 ? `${((totalCompleted / offboardings.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("completed")} />
-              <StatChip label="Pago Pendiente" value={String(totalPendingPayment)} icon={<DollarSign className="h-3.5 w-3.5" />} color="bg-destructive" hint={offboardings.length > 0 ? `${((totalPendingPayment / offboardings.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("pendingPayment")} />
+              <StatChip label={t("hr.off.total")} value={String(offboardings.length)} icon={<Users className="h-3.5 w-3.5" />} color="bg-primary" hint={t("hr.off.allProcesses")} onClick={() => setKpiPopup("total")} />
+              <StatChip label={t("common.inProgress")} value={String(totalInProgress)} icon={<Loader2 className="h-3.5 w-3.5" />} color="bg-warning" hint={offboardings.length > 0 ? t("hr.pctOfTotal", { pct: ((totalInProgress / offboardings.length) * 100).toFixed(0) }) : "—"} onClick={() => setKpiPopup("inProgress")} />
+              <StatChip label={t("hr.off.completedPl")} value={String(totalCompleted)} icon={<CheckCircle className="h-3.5 w-3.5" />} color="bg-success" hint={offboardings.length > 0 ? t("hr.pctOfTotal", { pct: ((totalCompleted / offboardings.length) * 100).toFixed(0) }) : "—"} onClick={() => setKpiPopup("completed")} />
+              <StatChip label={t("hr.off.pendingPayment")} value={String(totalPendingPayment)} icon={<DollarSign className="h-3.5 w-3.5" />} color="bg-destructive" hint={offboardings.length > 0 ? t("hr.pctOfTotal", { pct: ((totalPendingPayment / offboardings.length) * 100).toFixed(0) }) : "—"} onClick={() => setKpiPopup("pendingPayment")} />
             </>
           )}
         </div>
 
         {/* Department Tabs */}
         <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1">
-          <Button variant={!deptTab ? "secondary" : "ghost"} size="sm" onClick={() => setDeptTab("")}>Todos</Button>
+          <Button variant={!deptTab ? "secondary" : "ghost"} size="sm" onClick={() => setDeptTab("")}>{t("common.all")}</Button>
           {departments.map((d: any) => (
             <Button key={d.id} variant={deptTab === d.id ? "secondary" : "ghost"} size="sm" onClick={() => setDeptTab(d.id)}>{d.name}</Button>
           ))}
@@ -262,13 +275,13 @@ export default function HROffboarding() {
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Buscar por nombre o email..." className="pl-8" value={search} onChange={(e) => setSearch(e.target.value)} />
+            <Input placeholder={t("hr.off.searchPlaceholder")} className="pl-8" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
           <Select value={statusFilter || undefined} onValueChange={(v) => setStatusFilter(v === "__all__" ? "" : v)}>
-            <SelectTrigger className="w-40"><SelectValue placeholder="Estado" /></SelectTrigger>
+            <SelectTrigger className="w-40"><SelectValue placeholder={t("common.status")} /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="__all__">Todos</SelectItem>
-              {OFFBOARDING_STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+              <SelectItem value="__all__">{t("common.all")}</SelectItem>
+              {OFFBOARDING_STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{t(s.label)}</SelectItem>)}
             </SelectContent>
           </Select>
           <div className="inline-flex items-center rounded-md border border-border">
@@ -281,7 +294,7 @@ export default function HROffboarding() {
           </div>
           {hasFilters && (
             <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={clearFilters}>
-              <X className="h-3.5 w-3.5 mr-1" />Limpiar filtros
+              <X className="h-3.5 w-3.5 mr-1" />{t("hr.clearFilters")}
             </Button>
           )}
         </div>
@@ -293,15 +306,15 @@ export default function HROffboarding() {
               <Table>
                 <TableHeader>
                   <TableRow className="sticky top-0 z-10 bg-card border-b">
-                    <TableHead className="text-xs font-medium text-muted-foreground">Empleado</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">Tipo Salida</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">Fecha Terminación</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">Accesos</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">Equipo</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">Pago Final</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">Progreso</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">Estado</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground sticky right-0 bg-card">Acciones</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">{t("hr.employee")}</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">{t("hr.off.exitType")}</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">{t("hr.off.terminationDate")}</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">{t("hr.off.access")}</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">{t("hr.off.equipment")}</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">{t("hr.off.finalPayment")}</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">{t("hr.progress")}</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">{t("common.status")}</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground sticky right-0 bg-card">{t("common.actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -313,9 +326,9 @@ export default function HROffboarding() {
                     <TableRow>
                       <TableCell colSpan={9}>
                         {offboardings.length === 0 ? (
-                          <EmptyState seed="hr-offboarding" title="No hay procesos de offboarding" description={'Haz clic en "Iniciar Offboarding" para empezar.'} />
+                          <EmptyState seed="hr-offboarding" title={t("hr.off.empty")} description={t("hr.off.emptyHint")} />
                         ) : (
-                          <EmptyState seed="hr-offboarding" title="Sin resultados" description="No hay coincidencias con los filtros aplicados." />
+                          <EmptyState seed="hr-offboarding" title={t("common.noResultsShort")} description={t("common.noMatches")} />
                         )}
                       </TableCell>
                     </TableRow>
@@ -338,21 +351,21 @@ export default function HROffboarding() {
                               </div>
                             </div>
                           </TableCell>
-                          <TableCell className="text-sm">{TERMINATION_TYPES[ob.termination_type] ?? ob.termination_type}</TableCell>
-                          <TableCell className="text-sm whitespace-nowrap">{format(new Date(ob.termination_date), "dd/MM/yyyy")}</TableCell>
+                          <TableCell className="text-sm">{tipoSalida(ob.termination_type)}</TableCell>
+                          <TableCell className="text-sm whitespace-nowrap">{format(new Date(ob.termination_date), DMY)}</TableCell>
                           <TableCell>
                             {ob.access_revoked
-                              ? <Badge variant="secondary" className="text-xs bg-accent/15 text-accent-foreground"><ShieldOff className="h-3 w-3 mr-1" />Revocados</Badge>
-                              : <Badge variant="secondary" className="text-xs bg-destructive/15 text-destructive"><AlertTriangle className="h-3 w-3 mr-1" />Pendiente</Badge>}
+                              ? <Badge variant="secondary" className="text-xs bg-accent/15 text-accent-foreground"><ShieldOff className="h-3 w-3 mr-1" />{t("hr.off.revoked")}</Badge>
+                              : <Badge variant="secondary" className="text-xs bg-destructive/15 text-destructive"><AlertTriangle className="h-3 w-3 mr-1" />{t("common.pending")}</Badge>}
                           </TableCell>
                           <TableCell>
                             {ob.equipment_returned
-                              ? <Badge variant="secondary" className="text-xs bg-accent/15 text-accent-foreground"><Package className="h-3 w-3 mr-1" />Devuelto</Badge>
-                              : <Badge variant="secondary" className="text-xs bg-destructive/15 text-destructive"><AlertTriangle className="h-3 w-3 mr-1" />Pendiente</Badge>}
+                              ? <Badge variant="secondary" className="text-xs bg-accent/15 text-accent-foreground"><Package className="h-3 w-3 mr-1" />{t("hr.off.returned")}</Badge>
+                              : <Badge variant="secondary" className="text-xs bg-destructive/15 text-destructive"><AlertTriangle className="h-3 w-3 mr-1" />{t("common.pending")}</Badge>}
                           </TableCell>
                           <TableCell>
                             <span className={cn("text-xs font-medium", ob.final_payment_status === "paid" ? "text-accent-foreground" : ob.final_payment_status === "processing" ? "text-warning" : "text-destructive")}>
-                              {PAYMENT_STATUSES[ob.final_payment_status] ?? ob.final_payment_status}
+                              {estadoPago(ob.final_payment_status)}
                             </span>
                           </TableCell>
                           <TableCell>
@@ -363,20 +376,20 @@ export default function HROffboarding() {
                           </TableCell>
                           <TableCell>
                             <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium", statusColors.bg, statusColors.text)}>
-                              {OFFBOARDING_STATUSES.find((s) => s.value === ob.status)?.label ?? ob.status}
+                              {estado(ob.status)}
                             </span>
                           </TableCell>
                           <TableCell className="sticky right-0 bg-card group-hover:bg-muted/30">
                             <div className="flex items-center gap-1">
                               <Tooltip><TooltipTrigger asChild>
                                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setViewItem(ob)}><Eye className="h-3.5 w-3.5" /></Button>
-                              </TooltipTrigger><TooltipContent side="left">Ver</TooltipContent></Tooltip>
+                              </TooltipTrigger><TooltipContent side="left">{t("common.view")}</TooltipContent></Tooltip>
                               <Tooltip><TooltipTrigger asChild>
                                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEdit(ob)}><Pencil className="h-3.5 w-3.5" /></Button>
-                              </TooltipTrigger><TooltipContent side="left">Editar</TooltipContent></Tooltip>
+                              </TooltipTrigger><TooltipContent side="left">{t("common.edit")}</TooltipContent></Tooltip>
                               <Tooltip><TooltipTrigger asChild>
                                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => setDeleteItem(ob)}><Trash2 className="h-3.5 w-3.5" /></Button>
-                              </TooltipTrigger><TooltipContent side="left">Eliminar</TooltipContent></Tooltip>
+                              </TooltipTrigger><TooltipContent side="left">{t("common.delete")}</TooltipContent></Tooltip>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -395,9 +408,9 @@ export default function HROffboarding() {
             ) : filtered.length === 0 ? (
               <div className="col-span-full">
                 {offboardings.length === 0 ? (
-                  <EmptyState seed="hr-offboarding" title="No hay procesos de offboarding" description={'Haz clic en "Iniciar Offboarding" para empezar.'} />
+                  <EmptyState seed="hr-offboarding" title={t("hr.off.empty")} description={t("hr.off.emptyHint")} />
                 ) : (
-                  <EmptyState seed="hr-offboarding" title="Sin resultados" description="No hay coincidencias con los filtros aplicados." />
+                  <EmptyState seed="hr-offboarding" title={t("common.noResultsShort")} description={t("common.noMatches")} />
                 )}
               </div>
             ) : (
@@ -420,18 +433,18 @@ export default function HROffboarding() {
                           </div>
                         </div>
                         <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium shrink-0", statusColors.bg, statusColors.text)}>
-                          {OFFBOARDING_STATUSES.find((s) => s.value === ob.status)?.label ?? ob.status}
+                          {estado(ob.status)}
                         </span>
                       </div>
                       <div className="space-y-1 text-xs text-muted-foreground">
-                        <p><span className="font-medium text-foreground">Tipo:</span> {TERMINATION_TYPES[ob.termination_type] ?? ob.termination_type}</p>
-                        <p><span className="font-medium text-foreground">Terminación:</span> {format(new Date(ob.termination_date), "dd/MM/yyyy")}</p>
+                        <p><span className="font-medium text-foreground">{t("common.type")}:</span> {tipoSalida(ob.termination_type)}</p>
+                        <p><span className="font-medium text-foreground">{t("hr.off.termination")}:</span> {format(new Date(ob.termination_date), DMY)}</p>
                         <div className="flex items-center gap-3">
                           <span className={ob.access_revoked ? "text-accent-foreground" : "text-destructive"}>
-                            <ShieldOff className="h-3 w-3 inline mr-0.5" />{ob.access_revoked ? "Revocados" : "Pendiente"}
+                            <ShieldOff className="h-3 w-3 inline mr-0.5" />{ob.access_revoked ? t("hr.off.revoked") : t("common.pending")}
                           </span>
                           <span className={ob.equipment_returned ? "text-accent-foreground" : "text-destructive"}>
-                            <Package className="h-3 w-3 inline mr-0.5" />{ob.equipment_returned ? "Devuelto" : "Pendiente"}
+                            <Package className="h-3 w-3 inline mr-0.5" />{ob.equipment_returned ? t("hr.off.returned") : t("common.pending")}
                           </span>
                         </div>
                       </div>
@@ -440,9 +453,9 @@ export default function HROffboarding() {
                         <span className="text-xs text-muted-foreground">{ob.task_completed}/{ob.task_total}</span>
                       </div>
                       <div className="flex items-center gap-1 pt-1 border-t border-border">
-                        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setViewItem(ob)}><Eye className="h-3 w-3 mr-1" />Ver</Button>
-                        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => openEdit(ob)}><Pencil className="h-3 w-3 mr-1" />Editar</Button>
-                        <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive hover:text-destructive" onClick={() => setDeleteItem(ob)}><Trash2 className="h-3 w-3 mr-1" />Eliminar</Button>
+                        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setViewItem(ob)}><Eye className="h-3 w-3 mr-1" />{t("common.view")}</Button>
+                        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => openEdit(ob)}><Pencil className="h-3 w-3 mr-1" />{t("common.edit")}</Button>
+                        <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive hover:text-destructive" onClick={() => setDeleteItem(ob)}><Trash2 className="h-3 w-3 mr-1" />{t("common.delete")}</Button>
                       </div>
                     </CardContent>
                   </Card>
@@ -456,7 +469,7 @@ export default function HROffboarding() {
       {/* ── View Modal ────────────────────────────────────────────────── */}
       <Dialog open={!!viewItem} onOpenChange={() => setViewItem(null)}>
         <DialogContent className="max-w-lg">
-          <DialogHeader><DialogTitle>Detalle del Offboarding</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t("hr.off.detail")}</DialogTitle></DialogHeader>
           {viewItem && (() => {
             const emp = viewItem.employees;
             const progress = getProgress(viewItem);
@@ -464,34 +477,34 @@ export default function HROffboarding() {
             return (
               <div className="space-y-4 text-sm">
                 <div className="grid grid-cols-2 gap-3">
-                  <div><p className="text-xs text-muted-foreground">Empleado</p><p className="font-medium">{emp?.first_name} {emp?.last_name}</p></div>
+                  <div><p className="text-xs text-muted-foreground">{t("hr.employee")}</p><p className="font-medium">{emp?.first_name} {emp?.last_name}</p></div>
                   <div><p className="text-xs text-muted-foreground">Email</p><p>{emp?.email ?? "—"}</p></div>
-                  <div><p className="text-xs text-muted-foreground">Área</p><p>{emp?.departments?.name ?? "—"}</p></div>
-                  <div><p className="text-xs text-muted-foreground">Posición</p><p>{emp?.positions?.name ?? "—"}</p></div>
-                  <div><p className="text-xs text-muted-foreground">Tipo Terminación</p><p>{TERMINATION_TYPES[viewItem.termination_type] ?? viewItem.termination_type}</p></div>
-                  <div><p className="text-xs text-muted-foreground">Fecha Terminación</p><p>{format(new Date(viewItem.termination_date), "dd/MM/yyyy")}</p></div>
-                  <div><p className="text-xs text-muted-foreground">Accesos Revocados</p><p>{viewItem.access_revoked ? "✅ Sí" : "❌ No"}</p></div>
-                  <div><p className="text-xs text-muted-foreground">Equipo Devuelto</p><p>{viewItem.equipment_returned ? "✅ Sí" : "❌ No"}</p></div>
-                  <div><p className="text-xs text-muted-foreground">Pago Final</p><p>{PAYMENT_STATUSES[viewItem.final_payment_status] ?? viewItem.final_payment_status}</p></div>
+                  <div><p className="text-xs text-muted-foreground">{t("common.area")}</p><p>{emp?.departments?.name ?? "—"}</p></div>
+                  <div><p className="text-xs text-muted-foreground">{t("common.position")}</p><p>{emp?.positions?.name ?? "—"}</p></div>
+                  <div><p className="text-xs text-muted-foreground">{t("hr.off.terminationType")}</p><p>{tipoSalida(viewItem.termination_type)}</p></div>
+                  <div><p className="text-xs text-muted-foreground">{t("hr.off.terminationDate")}</p><p>{format(new Date(viewItem.termination_date), DMY)}</p></div>
+                  <div><p className="text-xs text-muted-foreground">{t("hr.off.accessRevoked")}</p><p>{viewItem.access_revoked ? `✅ ${t("hr.yes")}` : `❌ ${t("hr.no")}`}</p></div>
+                  <div><p className="text-xs text-muted-foreground">{t("hr.off.equipmentReturned")}</p><p>{viewItem.equipment_returned ? `✅ ${t("hr.yes")}` : `❌ ${t("hr.no")}`}</p></div>
+                  <div><p className="text-xs text-muted-foreground">{t("hr.off.finalPayment")}</p><p>{estadoPago(viewItem.final_payment_status)}</p></div>
                   <div>
-                    <p className="text-xs text-muted-foreground">Estado</p>
+                    <p className="text-xs text-muted-foreground">{t("common.status")}</p>
                     <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium", sc.bg, sc.text)}>
-                      {OFFBOARDING_STATUSES.find((s) => s.value === viewItem.status)?.label ?? viewItem.status}
+                      {estado(viewItem.status)}
                     </span>
                   </div>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Progreso de Tareas</p>
+                  <p className="text-xs text-muted-foreground">{t("hr.off.taskProgress")}</p>
                   <div className="flex items-center gap-2 mt-1">
                     <Progress value={progress} className="h-2 flex-1" />
                     <span className="text-xs">{progress}%</span>
                   </div>
                 </div>
                 {viewItem.termination_reason && (
-                  <div><p className="text-xs text-muted-foreground">Motivo de Salida</p><p className="whitespace-pre-wrap">{viewItem.termination_reason}</p></div>
+                  <div><p className="text-xs text-muted-foreground">{t("hr.off.exitReason")}</p><p className="whitespace-pre-wrap">{viewItem.termination_reason}</p></div>
                 )}
                 {viewItem.exit_interview_notes && (
-                  <div><p className="text-xs text-muted-foreground">Notas Entrevista de Salida</p><p className="whitespace-pre-wrap">{viewItem.exit_interview_notes}</p></div>
+                  <div><p className="text-xs text-muted-foreground">{t("hr.off.exitInterviewNotes")}</p><p className="whitespace-pre-wrap">{viewItem.exit_interview_notes}</p></div>
                 )}
               </div>
             );
@@ -502,44 +515,44 @@ export default function HROffboarding() {
       {/* ── Edit Modal ────────────────────────────────────────────────── */}
       <Dialog open={!!editItem} onOpenChange={() => setEditItem(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Editar Offboarding</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t("hr.off.edit")}</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <Label>Empleado</Label>
+              <Label>{t("hr.employee")}</Label>
               <Input value={editItem ? `${editItem.employees?.first_name} ${editItem.employees?.last_name}` : ""} disabled />
             </div>
             <div className="space-y-1.5">
-              <Label>Estado</Label>
-              <Select value={editForm.status} onValueChange={(v) => setEditForm((f) => ({ ...f, status: v }))}>
+              <Label>{t("common.status")}</Label>
+              <Select value={editForm.status} onValueChange={(v) => setEditForm((prev) => ({ ...prev, status: v }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{OFFBOARDING_STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
+                <SelectContent>{OFFBOARDING_STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{t(s.label)}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="flex items-center justify-between">
-              <Label>Accesos Revocados</Label>
-              <Switch checked={editForm.access_revoked} onCheckedChange={(v) => setEditForm((f) => ({ ...f, access_revoked: v }))} />
+              <Label>{t("hr.off.accessRevoked")}</Label>
+              <Switch checked={editForm.access_revoked} onCheckedChange={(v) => setEditForm((prev) => ({ ...prev, access_revoked: v }))} />
             </div>
             <div className="flex items-center justify-between">
-              <Label>Equipo Devuelto</Label>
-              <Switch checked={editForm.equipment_returned} onCheckedChange={(v) => setEditForm((f) => ({ ...f, equipment_returned: v }))} />
+              <Label>{t("hr.off.equipmentReturned")}</Label>
+              <Switch checked={editForm.equipment_returned} onCheckedChange={(v) => setEditForm((prev) => ({ ...prev, equipment_returned: v }))} />
             </div>
             <div className="space-y-1.5">
-              <Label>Estado del Pago Final</Label>
-              <Select value={editForm.final_payment_status} onValueChange={(v) => setEditForm((f) => ({ ...f, final_payment_status: v }))}>
+              <Label>{t("hr.off.finalPaymentStatus")}</Label>
+              <Select value={editForm.final_payment_status} onValueChange={(v) => setEditForm((prev) => ({ ...prev, final_payment_status: v }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {Object.entries(PAYMENT_STATUSES).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+                  {Object.entries(PAYMENT_STATUSES).map(([k, v]) => <SelectItem key={k} value={k}>{t(v)}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Notas Entrevista de Salida</Label>
-              <Textarea rows={3} value={editForm.exit_interview_notes} onChange={(e) => setEditForm((f) => ({ ...f, exit_interview_notes: e.target.value }))} />
+              <Label>{t("hr.off.exitInterviewNotes")}</Label>
+              <Textarea rows={3} value={editForm.exit_interview_notes} onChange={(e) => setEditForm((prev) => ({ ...prev, exit_interview_notes: e.target.value }))} />
             </div>
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setEditItem(null)}>Cancelar</Button>
+              <Button variant="outline" onClick={() => setEditItem(null)}>{t("common.cancel")}</Button>
               <Button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending}>
-                {updateMutation.isPending ? "Guardando..." : "Guardar Cambios"}
+                {updateMutation.isPending ? t("hr.saving") : t("hr.saveChanges")}
               </Button>
             </div>
           </div>
@@ -550,15 +563,15 @@ export default function HROffboarding() {
       <AlertDialog open={!!deleteItem} onOpenChange={() => setDeleteItem(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar offboarding?</AlertDialogTitle>
+            <AlertDialogTitle>{t("hr.off.deleteTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Se eliminará permanentemente el offboarding de <strong>{deleteItem?.employees?.first_name} {deleteItem?.employees?.last_name}</strong> y todas sus tareas. Esta acción no se puede deshacer.
+              {t("hr.off.deleteDescA")} <strong>{deleteItem?.employees?.first_name} {deleteItem?.employees?.last_name}</strong> {t("hr.off.deleteDescB")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel />
             <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => deleteItem && deleteMutation.mutate(deleteItem.id)}>
-              {deleteMutation.isPending ? "Eliminando..." : "Eliminar"}
+              {deleteMutation.isPending ? t("hr.deleting") : t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -569,10 +582,10 @@ export default function HROffboarding() {
         onOpenChange={(o) => !o && setKpiPopup(null)}
         title={(() => {
           switch (kpiPopup) {
-            case "total": return `Total Offboarding — ${offboardings.length}`;
-            case "inProgress": return `En Progreso — ${totalInProgress}`;
-            case "completed": return `Completados — ${totalCompleted}`;
-            case "pendingPayment": return `Pago Pendiente — ${totalPendingPayment}`;
+            case "total": return `${t("hr.off.total")} — ${offboardings.length}`;
+            case "inProgress": return `${t("common.inProgress")} — ${totalInProgress}`;
+            case "completed": return `${t("hr.off.completedPl")} — ${totalCompleted}`;
+            case "pendingPayment": return `${t("hr.off.pendingPayment")} — ${totalPendingPayment}`;
             default: return "";
           }
         })()}
@@ -585,12 +598,13 @@ export default function HROffboarding() {
           const tone = (status: string): KpiRow["rightTone"] =>
             status === "completed" ? "success" : status === "in_progress" ? "warning" : "default";
           return list.slice(0, 100).map((o: any): KpiRow => ({
-            primary: o.employees ? `${o.employees.first_name ?? ""} ${o.employees.last_name ?? ""}`.trim() : "Sin nombre",
-            secondary: o.exit_reason ?? o.exit_date ? format(new Date(o.exit_date), "dd MMM yyyy") : undefined,
-            right: o.status ?? "—",
+            primary: o.employees ? `${o.employees.first_name ?? ""} ${o.employees.last_name ?? ""}`.trim() : t("hr.noName"),
+            secondary: o.termination_date ? format(new Date(o.termination_date), "dd MMM yyyy", { locale: f.fechas }) : undefined,
+            right: o.status ? estado(o.status) : "—",
             rightTone: tone(o.status ?? ""),
           }));
         })()}
+        emptyText={t("hr.kpiEmpty")}
       />
     </div>
   );

@@ -26,11 +26,14 @@ import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import { useHrProductivity } from "./useHrProductivity";
 import { useHrAttendance } from "./useHrAttendance";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
+import { etiqueta, CUALQUIER_AUSENCIA, ESTADO_EMPLEADO } from "./etiquetasRrhh";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface QuickAction {
   id: string;
-  label: string;
+  label: TranslationKey;
   icon: typeof Users;
   url: string | null;
   soon?: boolean;
@@ -38,16 +41,16 @@ interface QuickAction {
 
 // ─── All available quick actions catalog ────────────────────────────────────
 const ALL_ACTIONS: QuickAction[] = [
-  { id: "ausencias",     label: "Registrar Ausencia", icon: CalendarDays,  url: "/hr/ausencias" },
-  { id: "directorio",    label: "Ver Directorio",     icon: Users,          url: "/hr/directorio" },
-  { id: "nuevo",         label: "Agregar Empleado",   icon: UserPlus,       url: "/hr/empleado/nuevo" },
-  { id: "candidatos",    label: "Ver Candidatos",     icon: Briefcase,      url: "/hr/candidatos" },
-  { id: "incidentes",    label: "Ver Incidentes",     icon: ShieldAlert,    url: "/hr/incidentes" },
-  { id: "capacitacion",  label: "Ver Capacitación",   icon: BookOpen,       url: "/hr/capacitacion" },
-  { id: "desempeno",     label: "Ver Desempeño",      icon: TrendingUp,     url: "/hr/desempeno" },
-  { id: "asistencia",    label: "Control Asistencia", icon: ClipboardCheck, url: "/hr/asistencia" },
-  { id: "vacaciones",    label: "Vacaciones",          icon: CalendarDays,   url: "/hr/vacaciones" },
-  { id: "horarios",      label: "Horarios",            icon: Clock,          url: null, soon: true },
+  { id: "ausencias",     label: "hr.dash.qa.absence",     icon: CalendarDays,  url: "/hr/ausencias" },
+  { id: "directorio",    label: "hr.dash.qa.directory",   icon: Users,          url: "/hr/directorio" },
+  { id: "nuevo",         label: "hr.dash.qa.addEmployee", icon: UserPlus,       url: "/hr/empleado/nuevo" },
+  { id: "candidatos",    label: "hr.dash.qa.candidates",  icon: Briefcase,      url: "/hr/candidatos" },
+  { id: "incidentes",    label: "hr.dash.qa.incidents",   icon: ShieldAlert,    url: "/hr/incidentes" },
+  { id: "capacitacion",  label: "hr.dash.qa.training",    icon: BookOpen,       url: "/hr/capacitacion" },
+  { id: "desempeno",     label: "hr.dash.qa.performance", icon: TrendingUp,     url: "/hr/desempeno" },
+  { id: "asistencia",    label: "hr.dash.qa.attendance",  icon: ClipboardCheck, url: "/hr/asistencia" },
+  { id: "vacaciones",    label: "hr.dash.mod.vacations",  icon: CalendarDays,   url: "/hr/vacaciones" },
+  { id: "horarios",      label: "hr.dash.mod.schedules",  icon: Clock,          url: null, soon: true },
 ];
 
 const DEFAULT_ACTION_IDS = ["ausencias", "directorio", "nuevo", "candidatos"];
@@ -82,16 +85,9 @@ function usePendingAbsences() {
   });
 }
 
-const absenceTypeLabel: Record<string, string> = {
-  enfermedad: "Enfermedad",
-  vacaciones: "Vacaciones",
-  licencia: "Licencia",
-  permiso: "Permiso",
-  otro: "Otro",
-};
-
 // ─── Financial Summary from Finanzas ─────────────────────────────────────────
 function FinancialSummaryCards() {
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const f = useFormato();
   const { data: employees = [] } = useEmployees();
@@ -135,16 +131,16 @@ function FinancialSummaryCards() {
     : 0;
 
   const cards = [
-    { label: "Costo Nómina (mes)", value: `$${(payrollTotal ?? 0).toLocaleString(f.intl("es-CO"))}`, icon: DollarSignIcon, color: "bg-primary", path: "/finanzas/nomina" },
-    { label: "Salario Promedio", value: `$${Math.round(avgSalary).toLocaleString(f.intl("es-CO"))}`, icon: Wallet, color: "bg-primary", path: "/finanzas/control" },
-    { label: "Deducciones Pend.", value: String(pendingDeductions ?? 0), icon: AlertTriangle, color: "bg-warning", path: "/hr/deducciones" },
-    { label: "Horas Extra Acum.", value: `${(overtimeHours ?? 0).toFixed(1)}h`, icon: Clock, color: "bg-success", path: "/finanzas/horas-variables" },
+    { id: "payroll", label: t("hr.dash.fin.payroll"), value: `$${(payrollTotal ?? 0).toLocaleString(f.intl("es-CO"))}`, icon: DollarSignIcon, color: "bg-primary", path: "/finanzas/nomina" },
+    { id: "salary", label: t("hr.dash.fin.avgSalary"), value: `$${Math.round(avgSalary).toLocaleString(f.intl("es-CO"))}`, icon: Wallet, color: "bg-primary", path: "/finanzas/control" },
+    { id: "deductions", label: t("hr.dash.fin.pendingDeductions"), value: String(pendingDeductions ?? 0), icon: AlertTriangle, color: "bg-warning", path: "/hr/deducciones" },
+    { id: "overtime", label: t("hr.dash.fin.overtime"), value: `${(overtimeHours ?? 0).toFixed(1)}h`, icon: Clock, color: "bg-success", path: "/finanzas/horas-variables" },
   ];
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
       {cards.map(c => (
-        <StatChip key={c.label} label={c.label} value={c.value} icon={<c.icon className="h-3.5 w-3.5" />} color={c.color} onClick={() => navigate(c.path, { state: { fromHR: true } })} />
+        <StatChip key={c.id} label={c.label} value={c.value} icon={<c.icon className="h-3.5 w-3.5" />} color={c.color} onClick={() => navigate(c.path, { state: { fromHR: true } })} />
       ))}
     </div>
   );
@@ -152,6 +148,7 @@ function FinancialSummaryCards() {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 export default function HRDashboard() {
+  const { t } = useLanguage();
   const f = useFormato();
   const { data: employees = [], isLoading } = useEmployees();
   const { data: pendingAbsences = [], isLoading: absencesLoading } = usePendingAbsences();
@@ -216,7 +213,7 @@ export default function HRDashboard() {
       : 0;
   const avgAntiguedadMeses = Math.round(avgAntiguedadDays / 30);
 
-  const pct = (n: number) => total > 0 ? `${((n / total) * 100).toFixed(0)}% del total` : "—";
+  const pct = (n: number) => total > 0 ? t("hr.pctOfTotal", { pct: ((n / total) * 100).toFixed(0) }) : "—";
 
   // Active shortcuts
   const activeActions = selectedIds
@@ -224,29 +221,29 @@ export default function HRDashboard() {
     .filter(Boolean) as QuickAction[];
 
   const rotacionCards = [
-    { label: "Rotación 30d",   value: `${rotacion30d}%`,      color: "bg-destructive/10 border-destructive/20", icon: RotateCcw,    textColor: "text-destructive" },
-    { label: "Retiros 30d",    value: `${terminados30d}`,      color: "bg-warning/10 border-warning/20",              icon: TrendingDown,  textColor: "text-warning" },
-    { label: "% Ingresos 30d", value: `${pctIngresos30d}%`,   color: "bg-success/10 border-success/20",         icon: TrendingUp,    textColor: "text-success" },
-    { label: "Antigüedad Prom.", value: `${avgAntiguedadMeses}m`, color: "bg-primary/10 border-primary/20",     icon: Timer,         textColor: "text-primary" },
-    { label: "Rotación 12m",   value: `${rotacion12m}%`,      color: "bg-muted border-border",                  icon: Percent,       textColor: "text-muted-foreground" },
+    { id: "rot30", label: t("hr.dash.rot.turnover30"), value: `${rotacion30d}%`,      color: "bg-destructive/10 border-destructive/20", icon: RotateCcw,    textColor: "text-destructive" },
+    { id: "exits30", label: t("hr.dash.rot.exits30"), value: `${terminados30d}`,      color: "bg-warning/10 border-warning/20",              icon: TrendingDown,  textColor: "text-warning" },
+    { id: "hires30", label: t("hr.dash.rot.hires30"), value: `${pctIngresos30d}%`,   color: "bg-success/10 border-success/20",         icon: TrendingUp,    textColor: "text-success" },
+    { id: "tenure", label: t("hr.dash.rot.avgTenure"), value: `${avgAntiguedadMeses}m`, color: "bg-primary/10 border-primary/20",     icon: Timer,         textColor: "text-primary" },
+    { id: "rot12", label: t("hr.dash.rot.turnover12"), value: `${rotacion12m}%`,      color: "bg-muted border-border",                  icon: Percent,       textColor: "text-muted-foreground" },
   ];
 
   const teamStatus = [
-    { label: "Activos",      value: activos,    subtitle: pct(activos),    icon: UserCheck,  color: "bg-success/10 border-success/20",       textColor: "text-success" },
-    { label: "En Licencia",  value: enLicencia, subtitle: pct(enLicencia), icon: Clock,      color: "bg-warning/10 border-warning/20",        textColor: "text-warning" },
-    { label: "Vacaciones",   value: vacaciones, subtitle: pct(vacaciones), icon: CalendarDays, color: "bg-primary/10 border-primary/20",        textColor: "text-primary" },
-    { label: "Inactivos",    value: inactivos,  subtitle: pct(inactivos),  icon: UserMinus,  color: "bg-destructive/10 border-destructive/20", textColor: "text-destructive" },
-    { label: "Nuevos (30d)", value: nuevos30d,  subtitle: pct(nuevos30d),  icon: UserPlus,   color: "bg-primary/10 border-primary/20",        textColor: "text-primary" },
-    { label: "Total",        value: total,      subtitle: "plantilla",     icon: Users,      color: "bg-muted border-border",                  textColor: "text-foreground" },
+    { id: "active", label: t("common.activePl"), value: activos,    subtitle: pct(activos),    icon: UserCheck,  color: "bg-success/10 border-success/20",       textColor: "text-success" },
+    { id: "leave", label: t("hr.opt.empStatus.en_licencia"), value: enLicencia, subtitle: pct(enLicencia), icon: Clock,      color: "bg-warning/10 border-warning/20",        textColor: "text-warning" },
+    { id: "vacation", label: t("hr.opt.empStatus.vacaciones"), value: vacaciones, subtitle: pct(vacaciones), icon: CalendarDays, color: "bg-primary/10 border-primary/20",        textColor: "text-primary" },
+    { id: "inactive", label: t("hr.dash.team.inactive"), value: inactivos,  subtitle: pct(inactivos),  icon: UserMinus,  color: "bg-destructive/10 border-destructive/20", textColor: "text-destructive" },
+    { id: "new30", label: t("hr.dash.team.new30"), value: nuevos30d,  subtitle: pct(nuevos30d),  icon: UserPlus,   color: "bg-primary/10 border-primary/20",        textColor: "text-primary" },
+    { id: "total", label: t("hr.ann.kpiTotal"), value: total,      subtitle: t("hr.dash.team.headcount"),     icon: Users,      color: "bg-muted border-border",                  textColor: "text-foreground" },
   ];
 
   const hrModules = [
-    { label: "Asistencia",  icon: Activity,     url: "/hr/asistencia" },
-    { label: "Vacaciones",  icon: CalendarDays, url: "/hr/vacaciones" },
-    { label: "Horarios",    icon: Clock,        url: null },
-    { label: "Capacitación",icon: BookOpen,     url: "/hr/capacitacion" },
-    { label: "Incidentes",  icon: AlertTriangle,url: "/hr/incidentes" },
-    { label: "Candidatos",  icon: Briefcase,    url: "/hr/candidatos" },
+    { id: "attendance", label: t("hr.dash.mod.attendance"), icon: Activity,     url: "/hr/asistencia" },
+    { id: "vacations", label: t("hr.dash.mod.vacations"), icon: CalendarDays, url: "/hr/vacaciones" },
+    { id: "schedules", label: t("hr.dash.mod.schedules"), icon: Clock,        url: null },
+    { id: "training", label: t("hr.dash.mod.training"), icon: BookOpen,     url: "/hr/capacitacion" },
+    { id: "incidents", label: t("hr.dash.mod.incidents"), icon: AlertTriangle,url: "/hr/incidentes" },
+    { id: "candidates", label: t("hr.dash.mod.candidates"), icon: Briefcase,    url: "/hr/candidatos" },
   ];
 
   return (
@@ -255,11 +252,11 @@ export default function HRDashboard() {
       <header className="bg-background/30 backdrop-blur-xl px-6 pt-6 pb-4 border-b border-white/10 shrink-0">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold tracking-tight">Recursos Humanos</h2>
-            <p className="text-sm text-muted-foreground">Panel de control del equipo</p>
+            <h2 className="text-2xl font-bold tracking-tight">{t("hr.dash.title")}</h2>
+            <p className="text-sm text-muted-foreground">{t("hr.dash.subtitle")}</p>
           </div>
           <Button onClick={() => navigate("/hr/empleado/nuevo")} size="sm">
-            + Nuevo Empleado
+            {t("hr.dash.newEmployee")}
           </Button>
         </div>
       </header>
@@ -274,10 +271,10 @@ export default function HRDashboard() {
             Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-32 rounded-xl" />)
           ) : (
             <>
-              <StatChip label="Total Empleados" value={String(total)} icon={<Users className="h-3.5 w-3.5" />} color="bg-primary" hint="En nómina" onClick={() => setKpiPopup("total")} />
-              <StatChip label="Puntualidad equipo" value={avgPunct != null ? `${avgPunct}%` : "—"} icon={<UserCheck className="h-3.5 w-3.5" />} color="bg-success" hint={attRows.length ? `${attRows.length} trackeados · Hubstaff` : "Sin datos Hubstaff"} onClick={() => navigate("/hr/asistencia", { state: { fromHR: true } })} />
-              <StatChip label="Ausencias Pend." value={String(pendingAbsences.length)} icon={<AlertTriangle className="h-3.5 w-3.5" />} color="bg-warning" hint="Pendientes de revisión" onClick={() => setKpiPopup("ausencias")} />
-              <StatChip label="En Onboarding" value={String(nuevos30d)} icon={<UserPlus className="h-3.5 w-3.5" />} color="bg-success" hint="Ingresos últimos 30d" onClick={() => setKpiPopup("onboarding")} />
+              <StatChip label={t("hr.org.totalEmployees")} value={String(total)} icon={<Users className="h-3.5 w-3.5" />} color="bg-primary" hint={t("hr.dash.onPayroll")} onClick={() => setKpiPopup("total")} />
+              <StatChip label={t("hr.dash.teamPunctuality")} value={avgPunct != null ? `${avgPunct}%` : "—"} icon={<UserCheck className="h-3.5 w-3.5" />} color="bg-success" hint={attRows.length ? t("hr.dash.trackedHubstaff", { count: attRows.length }) : t("hr.dash.noHubstaff")} onClick={() => navigate("/hr/asistencia", { state: { fromHR: true } })} />
+              <StatChip label={t("hr.dash.pendingAbsences")} value={String(pendingAbsences.length)} icon={<AlertTriangle className="h-3.5 w-3.5" />} color="bg-warning" hint={t("hr.dash.pendingReview")} onClick={() => setKpiPopup("ausencias")} />
+              <StatChip label={t("hr.dash.onboarding")} value={String(nuevos30d)} icon={<UserPlus className="h-3.5 w-3.5" />} color="bg-success" hint={t("hr.dash.hiresLast30")} onClick={() => setKpiPopup("onboarding")} />
             </>
           )}
         </div>
@@ -288,23 +285,23 @@ export default function HRDashboard() {
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
                 <Activity className="h-4 w-4 text-muted-foreground" />
-                Productividad del equipo (Hubstaff)
-                <span className="text-xs font-normal text-muted-foreground">· últimos 7 días</span>
+                {t("hr.dash.productivity")}
+                <span className="text-xs font-normal text-muted-foreground">· {t("hr.dash.last7")}</span>
               </CardTitle>
               <Button variant="ghost" size="sm" className="text-xs h-7 gap-1" onClick={() => navigate("/hr/asistencia", { state: { fromHR: true } })}>
-                Ver asistencia <ChevronRight className="h-3 w-3" />
+                {t("hr.dash.viewAttendance")} <ChevronRight className="h-3 w-3" />
               </Button>
             </div>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {[
-                { label: "Horas trackeadas", value: prod ? `${prod.totalHours.toLocaleString(f.intl("es-CO"))}h` : "—", icon: Clock, color: "bg-primary/10 border-primary/20", textColor: "text-primary" },
-                { label: "Actividad prom.", value: prod ? `${prod.avgActivity}%` : "—", icon: Activity, color: "bg-accent/10 border-accent/20", textColor: "text-accent" },
-                { label: "Personas activas", value: prod ? String(prod.people) : "—", icon: Users, color: "bg-primary/10 border-primary/20", textColor: "text-primary" },
-                { label: "Puntualidad prom.", value: avgPunct != null ? `${avgPunct}%` : "—", icon: Percent, color: "bg-success/10 border-success/20", textColor: "text-success" },
+                { id: "hours", label: t("hr.card.trackedHours"), value: prod ? `${prod.totalHours.toLocaleString(f.intl("es-CO"))}h` : "—", icon: Clock, color: "bg-primary/10 border-primary/20", textColor: "text-primary" },
+                { id: "activity", label: t("hr.card.avgActivity"), value: prod ? `${prod.avgActivity}%` : "—", icon: Activity, color: "bg-accent/10 border-accent/20", textColor: "text-accent" },
+                { id: "people", label: t("hr.dash.activePeople"), value: prod ? String(prod.people) : "—", icon: Users, color: "bg-primary/10 border-primary/20", textColor: "text-primary" },
+                { id: "punct", label: t("hr.att.avgPunctuality"), value: avgPunct != null ? `${avgPunct}%` : "—", icon: Percent, color: "bg-success/10 border-success/20", textColor: "text-success" },
               ].map((c) => (
-                <div key={c.label} className={cn("rounded-lg border p-3 flex flex-col gap-1", c.color)}>
+                <div key={c.id} className={cn("rounded-lg border p-3 flex flex-col gap-1", c.color)}>
                   <div className="flex items-center gap-1.5">
                     <c.icon className={cn("h-3.5 w-3.5", c.textColor)} />
                     <span className="text-xs text-muted-foreground">{c.label}</span>
@@ -321,13 +318,13 @@ export default function HRDashboard() {
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <TrendingDown className="h-4 w-4 text-muted-foreground" />
-              Rotación y Retención
+              {t("hr.dash.turnoverRetention")}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
               {rotacionCards.map((card) => (
-                <div key={card.label} className={cn("rounded-lg border p-3 flex flex-col gap-1", card.color)}>
+                <div key={card.id} className={cn("rounded-lg border p-3 flex flex-col gap-1", card.color)}>
                   <div className="flex items-center gap-1.5">
                     <card.icon className={cn("h-3.5 w-3.5", card.textColor)} />
                     <span className="text-xs text-muted-foreground">{card.label}</span>
@@ -346,8 +343,8 @@ export default function HRDashboard() {
               <div className="flex items-center gap-2">
                 <Zap className="h-4 w-4 text-primary shrink-0" />
                 <div>
-                  <p className="text-base font-semibold leading-none">Acciones Rápidas</p>
-                  <p className="text-sm text-muted-foreground mt-0.5">Configura los atajos a las funciones que más utilizas en tu día a día</p>
+                  <p className="text-base font-semibold leading-none">{t("hr.dash.quickActions")}</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">{t("hr.dash.quickActionsDesc")}</p>
                 </div>
               </div>
               <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground shrink-0" onClick={openConfig}>
@@ -366,13 +363,13 @@ export default function HRDashboard() {
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
                     <action.icon className="h-5 w-5 text-primary" />
                   </div>
-                  <span className="flex-1 text-sm font-medium">{action.label}</span>
+                  <span className="flex-1 text-sm font-medium">{t(action.label)}</span>
                   <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
                 </div>
               ))}
               {activeActions.length === 0 && (
                 <p className="col-span-4 text-sm text-muted-foreground text-center py-4">
-                  No hay accesos configurados. Haz clic en el engranaje para agregar.
+                  {t("hr.dash.noShortcuts")}
                 </p>
               )}
             </div>
@@ -387,10 +384,10 @@ export default function HRDashboard() {
               <div className="flex items-center justify-between">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-                  Solicitudes Pendientes
+                  {t("hr.dash.pendingRequests")}
                 </CardTitle>
                 <Button variant="ghost" size="sm" className="text-xs h-7 gap-1" onClick={() => navigate("/hr/ausencias")}>
-                  Ver todas <ChevronRight className="h-3 w-3" />
+                  {t("hr.dash.viewAll")} <ChevronRight className="h-3 w-3" />
                 </Button>
               </div>
             </CardHeader>
@@ -398,7 +395,7 @@ export default function HRDashboard() {
               {absencesLoading ? (
                 Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-12 rounded" />)
               ) : pendingAbsences.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-6">No hay solicitudes pendientes</p>
+                <p className="text-sm text-muted-foreground text-center py-6">{t("hr.dash.noPendingRequests")}</p>
               ) : (
                 pendingAbsences.map((absence: any) => (
                   <div key={absence.id} className="flex items-center gap-3 p-2.5 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
@@ -410,12 +407,12 @@ export default function HRDashboard() {
                         {absence.employees?.first_name} {absence.employees?.last_name}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {absenceTypeLabel[absence.absence_type] ?? absence.absence_type} ·{" "}
+                        {etiqueta(t, CUALQUIER_AUSENCIA, absence.absence_type)} ·{" "}
                         {format(new Date(absence.start_date), "dd MMM", { locale: f.fechas })} →{" "}
                         {format(new Date(absence.end_date), "dd MMM yyyy", { locale: f.fechas })}
                       </p>
                     </div>
-                    <Badge variant="outline" className="text-xs shrink-0 border-warning/40 text-warning">Pendiente</Badge>
+                    <Badge variant="outline" className="text-xs shrink-0 border-warning/40 text-warning">{t("common.pending")}</Badge>
                   </div>
                 ))
               )}
@@ -427,14 +424,14 @@ export default function HRDashboard() {
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
                 <LayoutDashboard className="h-4 w-4 text-muted-foreground" />
-                Módulos HR
+                {t("hr.dash.hrModules")}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-3 gap-2">
                 {hrModules.map((mod) => (
                   <button
-                    key={mod.label}
+                    key={mod.id}
                     onClick={() => mod.url && navigate(mod.url, { state: { fromHR: true } })}
                     disabled={!mod.url}
                     className={cn(
@@ -456,7 +453,7 @@ export default function HRDashboard() {
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <DollarSignIcon className="h-4 w-4 text-muted-foreground" />
-              Resumen Financiero de Personal
+              {t("hr.dash.financialSummary")}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -466,12 +463,12 @@ export default function HRDashboard() {
 
         {/* Estado Actual de la Plantilla */}
         <div>
-          <p className="text-xs font-medium text-muted-foreground mb-3">Estado Actual de la Plantilla</p>
+          <p className="text-xs font-medium text-muted-foreground mb-3">{t("hr.dash.headcountStatus")}</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             {isLoading
               ? Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-lg" />)
               : teamStatus.map((item) => (
-                  <div key={item.label} className={cn("rounded-lg border p-3 flex flex-col gap-1.5", item.color)}>
+                  <div key={item.id} className={cn("rounded-lg border p-3 flex flex-col gap-1.5", item.color)}>
                     <div className="flex items-center gap-1.5">
                       <item.icon className={cn("h-3.5 w-3.5", item.textColor)} />
                       <span className="text-xs text-muted-foreground">{item.label}</span>
@@ -490,11 +487,11 @@ export default function HRDashboard() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Settings2 className="h-4 w-4" />
-              Configurar Acciones Rápidas
+              {t("hr.dash.configureQuickActions")}
             </DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground -mt-1">
-            Selecciona hasta {MAX_SHORTCUTS} accesos directos para mostrar en el dashboard.
+            {t("hr.dash.selectUpTo", { max: MAX_SHORTCUTS })}
           </p>
           <div className="space-y-2 py-1">
             {ALL_ACTIONS.map((action) => {
@@ -518,18 +515,18 @@ export default function HRDashboard() {
                   />
                   <action.icon className="h-4 w-4 text-muted-foreground shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <p className={cn("text-sm font-medium", action.soon && "text-muted-foreground")}>{action.label}</p>
-                    {action.soon && <p className="text-xs text-muted-foreground">Próximamente</p>}
+                    <p className={cn("text-sm font-medium", action.soon && "text-muted-foreground")}>{t(action.label)}</p>
+                    {action.soon && <p className="text-xs text-muted-foreground">{t("common.comingSoon")}</p>}
                   </div>
                   {isChecked && <Check className="h-3.5 w-3.5 text-primary shrink-0" />}
                 </div>
               );
             })}
           </div>
-          <p className="text-xs text-muted-foreground">{draftIds.length}/{MAX_SHORTCUTS} seleccionados</p>
+          <p className="text-xs text-muted-foreground">{t("hr.dash.selectedCount", { count: draftIds.length, max: MAX_SHORTCUTS })}</p>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setConfigOpen(false)}>Cancelar</Button>
-            <Button onClick={saveConfig}>Guardar cambios</Button>
+            <Button variant="outline" onClick={() => setConfigOpen(false)}>{t("common.cancel")}</Button>
+            <Button onClick={saveConfig}>{t("hr.saveChanges")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -539,17 +536,17 @@ export default function HRDashboard() {
         onOpenChange={(o) => !o && setKpiPopup(null)}
         title={(() => {
           switch (kpiPopup) {
-            case "total": return `Total Empleados — ${total}`;
-            case "ausencias": return `Ausencias Pendientes — ${pendingAbsences.length}`;
-            case "onboarding": return `En Onboarding — ${nuevos30d}`;
+            case "total": return `${t("hr.org.totalEmployees")} — ${total}`;
+            case "ausencias": return `${t("hr.dash.pendingAbsencesLong")} — ${pendingAbsences.length}`;
+            case "onboarding": return `${t("hr.dash.onboarding")} — ${nuevos30d}`;
             default: return "";
           }
         })()}
         subtitle={(() => {
           switch (kpiPopup) {
-            case "total": return "Empleados activos en nómina";
-            case "ausencias": return "Esperando revisión del manager";
-            case "onboarding": return "Ingresos de los últimos 30 días";
+            case "total": return t("hr.dash.kpiTotalSub");
+            case "ausencias": return t("hr.dash.kpiAbsencesSub");
+            case "onboarding": return t("hr.dash.kpiOnboardingSub");
             default: return undefined;
           }
         })()}
@@ -557,17 +554,17 @@ export default function HRDashboard() {
           if (!kpiPopup) return [];
           if (kpiPopup === "total") {
             return employees.slice(0, 100).map((e: any): KpiRow => ({
-              primary: `${e.first_name ?? ""} ${e.last_name ?? ""}`.trim() || e.full_name || "Sin nombre",
-              secondary: e.position ?? e.department_name ?? undefined,
-              right: e.status ?? "—",
+              primary: `${e.first_name ?? ""} ${e.last_name ?? ""}`.trim() || e.full_name || t("hr.noName"),
+              secondary: e.positions?.name ?? e.departments?.name ?? undefined,
+              right: etiqueta(t, ESTADO_EMPLEADO, e.status),
               rightTone: e.status === "activo" ? "success" : "default",
             }));
           }
           if (kpiPopup === "ausencias") {
             return pendingAbsences.slice(0, 100).map((a: any): KpiRow => ({
-              primary: a.employee_name ?? a.full_name ?? `Empleado ${a.employee_id?.slice?.(0, 8) ?? "—"}`,
-              secondary: a.absence_type ? `${a.absence_type} · ${a.start_date ? new Date(a.start_date).toLocaleDateString(f.intl("es-ES")) : "—"}` : a.start_date ? new Date(a.start_date).toLocaleDateString(f.intl("es-ES")) : undefined,
-              right: a.status ?? "Pendiente",
+              primary: a.employees ? `${a.employees.first_name ?? ""} ${a.employees.last_name ?? ""}`.trim() : t("hr.employeeWithId", { id: a.employee_id?.slice?.(0, 8) ?? "—" }),
+              secondary: a.absence_type ? `${etiqueta(t, CUALQUIER_AUSENCIA, a.absence_type)} · ${a.start_date ? new Date(a.start_date).toLocaleDateString(f.intl("es-ES")) : "—"}` : a.start_date ? new Date(a.start_date).toLocaleDateString(f.intl("es-ES")) : undefined,
+              right: t("common.pending"),
               rightTone: "warning",
             }));
           }
@@ -578,13 +575,14 @@ export default function HRDashboard() {
               .filter((e: any) => e.hire_date && new Date(e.hire_date) >= thirtyDaysAgo)
               .slice(0, 100)
               .map((e: any): KpiRow => ({
-                primary: `${e.first_name ?? ""} ${e.last_name ?? ""}`.trim() || "Sin nombre",
-                secondary: e.position ?? undefined,
+                primary: `${e.first_name ?? ""} ${e.last_name ?? ""}`.trim() || t("hr.noName"),
+                secondary: e.positions?.name ?? undefined,
                 right: e.hire_date ? new Date(e.hire_date).toLocaleDateString(f.intl("es-ES")) : "—",
               }));
           }
           return [];
         })()}
+        emptyText={t("hr.kpiEmpty")}
       />
     </div>
   );
