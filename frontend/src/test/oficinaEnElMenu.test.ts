@@ -27,12 +27,13 @@ const subtabsDelCatalogo = (() => {
 })();
 
 describe("Oficina como grupo del menú", () => {
-  it("el catálogo de permisos declara las cuatro secciones", () => {
+  it("el catálogo de permisos declara las cinco secciones", () => {
     expect(subtabsDelCatalogo).toEqual([
       "Calendario",
       "Documentos",
       "Hojas de cálculo",
       "Presentaciones",
+      "Drive",
     ]);
   });
 
@@ -51,7 +52,8 @@ describe("Oficina como grupo del menú", () => {
 });
 
 describe("las rutas de Oficina", () => {
-  it("existen las cuatro secciones", () => {
+  it("existen las cinco secciones", () => {
+    expect(rutas).toContain('path="/oficina/drive"');
     expect(rutas).toContain('path="/oficina"');
     expect(rutas).toContain('path="/oficina/hojas"');
     expect(rutas).toContain('path="/oficina/presentaciones"');
@@ -68,6 +70,7 @@ describe("las rutas de Oficina", () => {
     expect(rutas.indexOf('path="/oficina/hojas"')).toBeLessThan(doc);
     expect(rutas.indexOf('path="/oficina/presentaciones"')).toBeLessThan(doc);
     expect(rutas.indexOf('path="/oficina/calendario"')).toBeLessThan(doc);
+    expect(rutas.indexOf('path="/oficina/drive"')).toBeLessThan(doc);
   });
 
   it("cada sección entra por su propio submódulo", () => {
@@ -75,6 +78,7 @@ describe("las rutas de Oficina", () => {
     expect(rutas).toContain('module="Oficina" submodule="Hojas de cálculo"');
     expect(rutas).toContain('module="Oficina" submodule="Presentaciones"');
     expect(rutas).toContain('module="Oficina" submodule="Calendario"');
+    expect(rutas).toContain('module="Oficina" submodule="Drive"');
   });
 });
 
@@ -93,10 +97,10 @@ describe("el catálogo del buscador (⌘K)", () => {
     }
   });
 
-  it("las cuatro secciones de Oficina son buscables", () => {
+  it("las cinco secciones de Oficina son buscables", () => {
     const urls = NAV_CATALOG.filter((e) => e.module === "Oficina").map((e) => e.url);
     expect(urls).toEqual([
-      "/oficina/calendario", "/oficina", "/oficina/hojas", "/oficina/presentaciones",
+      "/oficina/calendario", "/oficina", "/oficina/hojas", "/oficina/presentaciones", "/oficina/drive",
     ]);
   });
 });
