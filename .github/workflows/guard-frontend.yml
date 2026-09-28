@@ -43,13 +43,17 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
-      # Node 20: el mismo que arma la imagen (Dockerfile: node:20-alpine).
+      # Node 24 y no el 20 de la imagen (Dockerfile: node:20-alpine, con
+      # `npm install`): el npm 10 que trae Node 20 rechaza este package-lock en
+      # `npm ci` («Missing: esbuild@0.28.2 from lock file», el peer opcional del
+      # vite 8 que usa vitest). El npm 11 de Node 24 lo acepta, igual que el de
+      # desarrollo.
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - name: npm ci
@@ -78,14 +82,14 @@ jobs:
       # encima de main tal como está AHORA) y hace falta su primer padre, que es
       # ese main. Contra él se compara: es exactamente lo que va a quedar.
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 2
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - name: npm ci
