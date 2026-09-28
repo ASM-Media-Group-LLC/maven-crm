@@ -10,6 +10,9 @@ vi.mock("react-router-dom", () => ({
   useSearchParams: () => [new URLSearchParams(), vi.fn()],
 }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+// La sección de Etiquetas usa el diccionario (t()).
+vi.mock("@/hooks/useLanguage", (original) =>
+  import("@/test/messenger/espanolEnTests").then((m) => m.idiomaEnEspanol(original)));
 
 vi.mock("@/hooks/useMailbox", async (original) => ({
   ...(await original<typeof import("@/hooks/useMailbox")>()),
@@ -34,7 +37,12 @@ vi.mock("@/hooks/useMailbox", async (original) => ({
 
 vi.mock("@/hooks/useEtiquetasCorreo", async (original) => ({
   ...(await original<typeof import("@/hooks/useEtiquetasCorreo")>()),
-  useEtiquetas: () => ({ data: [{ id: "e1", nombre: "HHRR", color: "#f59e0b" }], isLoading: false }),
+  useEtiquetas: () => ({
+    data: [{ id: "e1", nombre: "HHRR", parentId: null, color: null, enListaEtiquetas: "mostrar", enListaMensajes: true }],
+    isLoading: false,
+  }),
+  useActualizarEtiqueta: () => ({ mutate: vi.fn(), isPending: false }),
+  useBorrarEtiqueta: () => ({ mutate: vi.fn(), isPending: false }),
   useEtiquetasPorCorreo: () => ({ data: new Map() }),
   useNoLeidosPorEtiqueta: () => ({ data: new Map() }),
   useEtiquetarCorreos: () => ({ mutate: vi.fn(), isPending: false }),

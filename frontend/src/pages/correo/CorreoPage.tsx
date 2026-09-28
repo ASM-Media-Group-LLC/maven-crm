@@ -59,6 +59,9 @@ import {
   MailComposer, TOPE_ADJUNTOS, type BorradorInicial,
 } from "@/components/correo/MailComposer";
 import EtiquetasDialog from "@/components/correo/EtiquetasDialog";
+import EtiquetasColumna from "@/components/correo/etiquetas/EtiquetasColumna";
+import EtiquetaFormDialog from "@/components/correo/etiquetas/EtiquetaFormDialog";
+import PastillaEtiqueta from "@/components/correo/etiquetas/PastillaEtiqueta";
 import { MailSignatureDialog } from "@/components/correo/MailSignatureDialog";
 import {
   useMailbox,
@@ -84,10 +87,10 @@ import { resumenSinCita } from "@/lib/mailCita";
 import { useHiloCompleto } from "@/hooks/useHiloCompleto";
 import { opcionesDePosponer } from "@/lib/posponer";
 import {
-  useCorreosDeEtiqueta, useEtiquetarCorreos, useEtiquetas, useEtiquetasPorCorreo,
+  arbolDeEtiquetas, useCorreosDeEtiqueta, useEtiquetarCorreos, useEtiquetas, useEtiquetasPorCorreo,
   useNoLeidosPorEtiqueta,
-  type EtiquetaDeCorreo,
 } from "@/hooks/useEtiquetasCorreo";
+import type { ParDeColores } from "@/lib/correo/coloresEtiqueta";
 import { asuntoDeReenvio, destinatariosRespuesta, direccionesDe, participantesDe, tieneVariosInvolucrados } from "@/lib/mailAddr";
 import { toast } from "sonner";
 
@@ -108,6 +111,12 @@ import { toast } from "sonner";
  * (lista → mensaje) con las carpetas como píldoras arriba; recién en
  * escritorio aparece la columna de carpetas.
  */
+
+/** De dónde SALE un correo al «Mover a» una etiqueta: las bandejas. De
+ *  Enviados, Borradores, Archivados o una carpeta propia no hay de dónde
+ *  sacarlo, así que ahí solo se etiqueta (como en Gmail). Pospuestos tampoco:
+ *  sacarlo de ahí sería cancelar el posponer sin que nadie lo pidió. */
+const SE_VACIAN_AL_MOVER = new Set(["INBOX", "Notification", "Newsletter", "Correo no deseado", "Papelera"]);
 
 /** Nombre e ícono por carpeta. Los nombres crudos vienen del servidor. */
 const CARPETAS: Record<string, { nombre: string; icono: LucideIcon }> = {
@@ -146,21 +155,6 @@ function fechaLarga(iso: string): string {
   // Idioma fijo a propósito: va en la cita del correo que se le manda a otra persona.
   return format(d, "d 'de' MMMM 'de' yyyy, HH:mm", { locale: es });
 }
-
-/** El fondo de cada etiqueta. Tokens del tema: se ven bien en claro y en
- *  oscuro, y nadie puede elegir un color ilegible. */
-const FONDO_ETIQUETA: Record<string, string> = {
-  primary: "bg-primary", accent: "bg-accent", success: "bg-success",
-  warning: "bg-warning", destructive: "bg-destructive", muted: "bg-muted-foreground",
-};
-
-/** El color del icono de cada etiqueta en la columna. Mismos tokens que el
- *  fondo del punto de la lista, pero como TEXTO: un icono relleno del color
- *  entero le gana visualmente al icono de la carpeta de al lado. */
-const TEXTO_ETIQUETA: Record<string, string> = {
-  primary: "text-primary", accent: "text-accent", success: "text-success",
-  warning: "text-warning", destructive: "text-destructive", muted: "text-muted-foreground",
-};
 
 const CARPETAS_KEY = "maven.correo.carpetas";
 
@@ -226,6 +220,11 @@ export default function CorreoPage() {
   // Qué etiqueta se está mirando. Null = una carpeta normal.
   const [etiquetaVista, setEtiquetaVista] = useState<string | null>(null);
   const correosDeEtiqueta = useCorreosDeEtiqueta(etiquetaVista);
+  // Las etiquetas en el orden de la columna, con su ruta «Padre/Hija»: así
+  // se muestran en el menú Etiquetar y en las pastillas, como en Gmail.
+  const nodosEtiqueta = useMemo(() => arbolDeEtiquetas(etiquetas.data ?? []), [etiquetas.data]);
+  // «Crear nueva» desde el menú Etiquetar: se crea y se le pone a lo marcado.
+  const [creandoParaSeleccion, setCreandoParaSeleccion] = useState(false);
   // Tocar una carpeta SALE de la etiqueta. Antes el botón solo cambiaba
   // `carpeta`, y como la lista le da prioridad a la etiqueta, seguías viendo la
   // etiqueta con Enviados marcado al lado: había que desmarcarla a mano (Jhon,
@@ -370,6 +369,55 @@ export default function CorreoPage() {
     });
   };
 
+  /** «Mover a» una ETIQUETA, como Gmail: le pone la etiqueta y lo saca de
+   *  donde estaba. Así funcionan las «carpetas propias» en Gmail (Keila,
+   *  28/09: «para sacar los correos de la bandeja de entrada a su respectiva
+   *  carpeta»).
+   *
+   *  - Desde Recibidos (y Notificaciones, Boletines, Spam, Papelera): se
+   *    ARCHIVA. Sale de la bandeja y queda dentro de la etiqueta, que cruza
+   *    carpetas.
+   *  - Desde Enviados, Borradores, Archivados o una carpeta propia de Zoho: no
+   *    hay de dónde sacarlo; solo se etiqueta (Gmail hace lo mismo).
+   *  - Mirando una etiqueta: se le quita ESA y se le pone la nueva. No se
+   *    toca la carpeta.
+   *
+   *  ⚠️ Primero la etiqueta y DESPUÉS el archivado, y solo de los que la
+   *  recibieron: si se archivara uno sin `message_id` (que no se puede
+   *  etiquetar), saldría de Recibidos sin quedar en ningún lado. */
+  const moverAEtiqueta = (labelId: string, ruta: string) => {
+    const elegidos = items.filter((m) => seleccion.has(claveDe(m)));
+    const conId = elegidos.filter((m) => m.messageId);
+    const ids = conId.map((m) => m.messageId!) as string[];
+    if (!ids.length) {
+      toast.error("Estos correos no tienen identificador: vuelve a abrir la carpeta e inténtalo.");
+      return;
+    }
+    const sinId = elegidos.length - conId.length;
+    const desde = etiquetaVista;
+    etiquetar.mutate({ messageIds: ids, labelId, poner: true }, {
+      onSuccess: () => {
+        const aviso = (n: number) => `${n === 1 ? "Movido" : `${n} movidos`} a «${ruta}»`;
+        const detalle = sinId ? `${sinId} sin identificador se quedaron donde estaban.` : undefined;
+        if (desde) {
+          if (desde !== labelId) etiquetar.mutate({ messageIds: ids, labelId: desde, poner: false });
+          toast.success(aviso(conId.length), { description: detalle });
+          setSeleccion(new Set());
+          return;
+        }
+        const salen = conId.filter((m) => SE_VACIAN_AL_MOVER.has(m.folder ?? carpeta));
+        if (salen.length) {
+          lanzarMasiva("archive", salen, undefined, undefined, aviso);
+          if (detalle) toast.info(detalle);
+        } else {
+          toast.success(aviso(conId.length), { description: detalle });
+          setSeleccion(new Set());
+        }
+      },
+      onError: (e) => toast.error((e as Error).message),
+    });
+  };
+
   const ejecutarMasiva = (
     op: OperacionMasiva, items: MailSummary[], dest?: string, volverAt?: string,
   ) => {
@@ -383,6 +431,8 @@ export default function CorreoPage() {
   };
   const lanzarMasiva = (
     op: OperacionMasiva, elegidos: MailSummary[], dest?: string, volverAt?: string,
+    /** Otro texto para el aviso (p. ej. «Movido a Pagos» en vez de «archivado»). */
+    aviso?: (n: number) => string,
   ) => {
     const n = elegidos.length;
     if (sel && elegidos.some((m) => claveDe(m) === claveDe(sel)) && op !== "seen" && op !== "unseen") setSel(null);
@@ -407,7 +457,7 @@ export default function CorreoPage() {
           // El aviso cuenta LO DE ESTE GRUPO, no el total: con correos de dos
           // carpetas saldrían dos avisos diciendo el mismo número grande.
           onSuccess: (r) => {
-            toast.success(NOMBRE_OP[op](delGrupo.length - (r.omitidos ?? 0)), {
+            toast.success((aviso ?? NOMBRE_OP[op])(delGrupo.length - (r.omitidos ?? 0)), {
               description: r.omitidos
                 ? `${r.omitidos} sin identificador: vuelve a abrir la carpeta e inténtalo.`
                 : undefined,
@@ -783,65 +833,15 @@ export default function CorreoPage() {
           {/* ── Etiquetas ─────────────────────────────────────────────────
               Debajo de las carpetas, como en Gmail. Una etiqueta NO es una
               carpeta: cruza todas, así que un correo etiquetado y después
-              archivado sigue apareciendo acá. */}
-          {(etiquetas.data ?? []).length > 0 && carpetasAbiertas && (
-            <p className="flex items-center justify-between px-3 pb-1 pt-4 text-xs font-semibold text-muted-foreground">
-              Etiquetas
-              <button
-                type="button"
-                aria-label="Administrar etiquetas"
-                title="Administrar etiquetas"
-                onClick={() => setGestionandoEtiquetas(true)}
-                className="rounded-full p-0.5 transition-colors hover:bg-muted hover:text-foreground"
-              >
-                <Plus className="h-3.5 w-3.5" />
-              </button>
-            </p>
-          )}
-          {(etiquetas.data ?? []).map((e) => {
-            const activa = etiquetaVista === e.id;
-            const sinLeerEtiqueta = noLeidosPorEtiqueta.data?.get(e.id) ?? 0;
-            return (
-              <button
-                key={e.id}
-                onClick={() => { setEtiquetaVista(activa ? null : e.id); setSel(null); }}
-                title={carpetasAbiertas ? undefined : e.nombre}
-                aria-label={e.nombre}
-                aria-current={activa ? "page" : undefined}
-                className={cn(
-                  "relative flex w-full items-center gap-2.5 rounded-2xl py-2 text-left text-sm transition-colors",
-                  carpetasAbiertas ? "px-3" : "justify-center px-0",
-                  activa
-                    ? "bg-primary/12 font-medium text-foreground before:absolute before:inset-y-2 before:left-0 before:w-[3px] before:rounded-r before:bg-gradient-to-b before:from-accent before:to-primary"
-                    : sinLeerEtiqueta > 0
-                      ? "font-semibold text-foreground hover:bg-primary/5"
-                      : "text-muted-foreground hover:bg-primary/5 hover:text-foreground",
-                )}
-              >
-                {/* Icono de ETIQUETA, del color de la etiqueta: ocupa la misma
-                    columna que los iconos de las carpetas, así los dos bloques
-                    se leen como una sola lista y no como dos cosas pegadas. */}
-                <span className="relative shrink-0">
-                  <Tag className={cn("h-4 w-4", TEXTO_ETIQUETA[e.color])} />
-                  {!carpetasAbiertas && sinLeerEtiqueta > 0 && (
-                    <span className="absolute -right-2 -top-1.5 min-w-[15px] rounded-full bg-primary px-1 text-[9px] font-bold leading-[15px] text-primary-foreground">
-                      {sinLeerEtiqueta > 9 ? "9+" : sinLeerEtiqueta}
-                    </span>
-                  )}
-                </span>
-                {carpetasAbiertas && (
-                  <>
-                    <span className="truncate">{e.nombre}</span>
-                    {sinLeerEtiqueta > 0 && (
-                      <span className="ml-auto rounded-full bg-primary px-1.5 text-[10px] font-bold leading-4 text-primary-foreground">
-                        {sinLeerEtiqueta > 99 ? "99+" : sinLeerEtiqueta}
-                      </span>
-                    )}
-                  </>
-                )}
-              </button>
-            );
-          })}
+              archivado sigue apareciendo acá. El árbol, el ⋮ de cada una y
+              «Más» viven en EtiquetasColumna. */}
+          <EtiquetasColumna
+            abierta={carpetasAbiertas}
+            etiquetaVista={etiquetaVista}
+            onAbrir={(id) => { setEtiquetaVista(id); setSel(null); }}
+            noLeidos={noLeidosPorEtiqueta.data}
+            onAdministrar={() => setGestionandoEtiquetas(true)}
+          />
         </nav>
 
         {/* Lista */}
@@ -1042,6 +1042,29 @@ export default function CorreoPage() {
                                 {nombreCarpeta(f)}
                               </DropdownMenuItem>
                             ))}
+                          {/* Y las ETIQUETAS, como en Gmail: «Mover a Pagos» le
+                              pone la etiqueta y lo saca de Recibidos. Es la
+                              carpeta propia que pidió Keila. */}
+                          {nodosEtiqueta.some(({ etiqueta: e }) => e.id !== etiquetaVista) && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <p className="px-2 pb-1 pt-1.5 text-xs font-medium text-muted-foreground">Etiquetas</p>
+                              {nodosEtiqueta
+                                .filter(({ etiqueta: e }) => e.id !== etiquetaVista)
+                                .map(({ etiqueta: e, ruta }) => (
+                                  <DropdownMenuItem
+                                    key={e.id}
+                                    onSelect={() => moverAEtiqueta(e.id, ruta)}
+                                  >
+                                    <span
+                                      className={cn("mr-2 h-2.5 w-2.5 shrink-0 rounded-full", !e.color && "border border-muted-foreground/50")}
+                                      style={e.color ? { backgroundColor: e.color.fondo } : undefined}
+                                    />
+                                    <span className="truncate">{ruta}</span>
+                                  </DropdownMenuItem>
+                                ))}
+                            </>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                       <DropdownMenu>
@@ -1062,7 +1085,7 @@ export default function CorreoPage() {
                               Todavía no creaste ninguna.
                             </p>
                           )}
-                          {(etiquetas.data ?? []).map((e) => {
+                          {nodosEtiqueta.map(({ etiqueta: e, ruta }) => {
                             // La casilla muestra si TODOS los seleccionados ya
                             // la tienen: con algunos sí y otros no, tocar
                             // agrega (que es lo que se espera al etiquetar).
@@ -1076,12 +1099,19 @@ export default function CorreoPage() {
                                 onSelect={() => aplicarEtiqueta(e.id, !todos)}
                               >
                                 <Check className={cn("mr-2 h-4 w-4", todos ? "opacity-100" : "opacity-0")} />
-                                <span className={cn("mr-2 h-2 w-2 shrink-0 rounded-full", FONDO_ETIQUETA[e.color])} />
-                                <span className="truncate">{e.nombre}</span>
+                                <span
+                                  className={cn("mr-2 h-2.5 w-2.5 shrink-0 rounded-full", !e.color && "border border-muted-foreground/50")}
+                                  style={e.color ? { backgroundColor: e.color.fondo } : undefined}
+                                />
+                                <span className="truncate">{ruta}</span>
                               </DropdownMenuItem>
                             );
                           })}
                           <DropdownMenuSeparator />
+                          <DropdownMenuItem onSelect={() => setCreandoParaSeleccion(true)}>
+                            <Plus className="mr-2 h-4 w-4" />
+                            Crear nueva
+                          </DropdownMenuItem>
                           <DropdownMenuItem onSelect={() => setGestionandoEtiquetas(true)}>
                             <span className="mr-2 h-4 w-4" />
                             Administrar etiquetas…
@@ -1163,7 +1193,12 @@ export default function CorreoPage() {
                     for (const m of h.mensajes) {
                       for (const id of etiquetasPorCorreo.data?.get(m.messageId ?? "") ?? []) ids.add(id);
                     }
-                    return (etiquetas.data ?? []).filter((e) => ids.has(e.id));
+                    // «En la lista de mensajes: Ocultar» saca la pastilla; y la
+                    // de la etiqueta que estás mirando no se repite en cada
+                    // renglón (Gmail hace lo mismo).
+                    return nodosEtiqueta
+                      .filter(({ etiqueta: e }) => ids.has(e.id) && e.enListaMensajes && e.id !== etiquetaVista)
+                      .map(({ etiqueta: e, ruta }) => ({ id: e.id, ruta, color: e.color }));
                   })()}
                   // Sin leer si CUALQUIERA del hilo lo está: si no, una
                   // conversación con una respuesta nueva se vería leída.
@@ -1460,6 +1495,12 @@ export default function CorreoPage() {
 
       {/* Montado SOLO cuando está abierto: cerrado igual correría sus
           consultas y sus hooks para no mostrar nada. */}
+      {creandoParaSeleccion && (
+        <EtiquetaFormDialog
+          onCerrar={() => setCreandoParaSeleccion(false)}
+          onCreada={(id) => aplicarEtiqueta(id, true)}
+        />
+      )}
       {gestionandoEtiquetas && (
         <EtiquetasDialog abierto onCerrar={() => setGestionandoEtiquetas(false)} />
       )}
@@ -1585,7 +1626,7 @@ function FilaMensaje({
   /** El asunto con el que EMPEZÓ la conversación. */
   asuntoDelHilo?: string;
   /** Las que tiene puestas la conversación. */
-  etiquetas?: EtiquetaDeCorreo[];
+  etiquetas?: { id: string; ruta: string; color: ParDeColores | null }[];
 }) {
   const formatoUi = useFormato();
   // Con varios destinatarios ("a@x, b@y") se muestra el primero.
@@ -1667,24 +1708,20 @@ function FilaMensaje({
         </div>
         <div className="flex items-center gap-1.5">
           {sinLeer && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />}
+          {/* Las pastillas van ANTES del asunto, como en Gmail. Máximo tres y
+              cada una con tope de ancho: con más, el asunto desaparecería. La
+              lista completa está en el menú Etiquetar. */}
+          {etiquetas?.slice(0, 3).map((e) => (
+            <PastillaEtiqueta key={e.id} nombre={e.ruta} color={e.color} className="max-w-[7.5rem]" />
+          ))}
           <span
             className={cn(
-              "truncate text-[13px]",
+              "min-w-0 truncate text-[13px]",
               sinLeer ? "font-medium text-foreground/90" : "text-muted-foreground",
             )}
           >
             {asuntoDelHilo || m.subject || "(sin asunto)"}
           </span>
-          {/* Puntos de color y no píldoras con texto: en un renglón que ya
-              lleva nombre, asunto y resumen, tres píldoras se comen el asunto.
-              El nombre está en el `title` y en el menú de Etiquetar. */}
-          {etiquetas?.slice(0, 3).map((e) => (
-            <span
-              key={e.id}
-              title={e.nombre}
-              className={cn("h-2 w-2 shrink-0 rounded-full", FONDO_ETIQUETA[e.color])}
-            />
-          ))}
         </div>
         {m.snippet ? (
           <span className="mt-0.5 block truncate text-xs text-muted-foreground/70">
