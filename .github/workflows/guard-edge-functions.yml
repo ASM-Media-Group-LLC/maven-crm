@@ -47,6 +47,11 @@ jobs:
       - name: Guard — mover correos (IMAP)
         run: deno test --no-check supabase/functions/_shared/imap-mover.test.ts
 
+      # Drive: Maven y el NAS tienen que firmar IGUAL (vector compartido con
+      # infra/nas-drive), y las reglas de subida (tope, partes, nombres).
+      - name: Guard — Drive (firma y subidas)
+        run: deno test --no-check supabase/functions/_shared/drive-firma.test.ts supabase/functions/drive/logica.test.ts
+
       # Las acciones de webhooks de manage-api-keys: el guard de arriba las corre sin
       # tipos; acá el tipo de cada mensaje (clave que existe, variables) y de Datos.
       - name: Tipos — manage-api-keys
