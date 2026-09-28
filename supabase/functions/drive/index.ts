@@ -17,7 +17,7 @@
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 import { corsFor } from "../_shared/cors.ts";
 import { ahoraMas, firmar, verificar, VENCE } from "../_shared/drive-firma.ts";
-import { HttpError, nombreValido, planDeSubida, TAMANO_PARTE } from "./logica.ts";
+import { armarIndice, HttpError, nombreValido, planDeSubida, TAMANO_PARTE, type ItemParaIndice } from "./logica.ts";
 
 Deno.serve(async (req) => {
   const CORS = corsFor(req, { "Access-Control-Allow-Methods": "POST, OPTIONS" });
@@ -30,9 +30,23 @@ Deno.serve(async (req) => {
     const secreto = Deno.env.get("DRIVE_SECRETO") ?? "";
     if (!nas || secreto.length < 32) throw new HttpError("El Drive todavía no está conectado al NAS", 503);
 
+    const body = await req.json().catch(() => ({})) as Record<string, unknown>;
+    const url = Deno.env.get("SUPABASE_URL")!;
+
+    // ── El índice diario (lo pide la MINI, no una persona) ──────────────────
+    // Sin sesión de Maven: la mini se identifica con un permiso firmado con el
+    // mismo secreto del Drive (op "indice", vence en minutos). Va ANTES del
+    // chequeo de sesión justamente por eso. Devuelve el árbol de TODAS las
+    // agencias: solo el NAS tiene el secreto, y el índice se guarda en la
+    // carpeta de cada agencia, al lado de sus archivos.
+    if (body.action === "indice") {
+      const p = await verificar(secreto, String(body.permiso ?? ""));
+      if (!p || p.op !== "indice") throw new HttpError("Permiso inválido", 403);
+      return responder(await indiceCompleto(createClient(url, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!)));
+    }
+
     const authHeader = req.headers.get("Authorization") ?? "";
     if (!authHeader) throw new HttpError("Sin sesión", 401);
-    const url = Deno.env.get("SUPABASE_URL")!;
     // Como la persona: la RLS decide qué fichas ve. Admin: solo para escribir
     // lo que el navegador no puede (storage_key, tamaño, estado).
     const comoLaPersona = createClient(url, Deno.env.get("SUPABASE_ANON_KEY")!, {
@@ -43,7 +57,6 @@ Deno.serve(async (req) => {
     const yo = auth?.user?.id;
     if (!yo) throw new HttpError("Sesión inválida", 401);
 
-    const body = await req.json().catch(() => ({})) as Record<string, unknown>;
     const accion = String(body.action ?? "");
     const permisoNas = async (datos: Record<string, unknown>, vence: number) =>
       `${nas}/o?t=${await firmar(secreto, { ...datos, e: ahoraMas(vence) } as never)}`;
@@ -167,4 +180,34 @@ async function rolDe(cliente: SupabaseClient, id: string): Promise<string | null
   const { data, error } = await cliente.rpc("drive_mi_rol", { p_item: id });
   if (error) throw new HttpError(error.message, 500);
   return (data as string | null) ?? null;
+}
+
+/** Todo el árbol, de a 1000 filas: PostgREST corta en 1000 sin avisar, y un
+ *  índice al que le faltan filas es peor que no tenerlo. */
+async function indiceCompleto(admin: SupabaseClient) {
+  const items: ItemParaIndice[] = [];
+  for (let desde = 0; ; desde += 1000) {
+    const { data, error } = await admin.from("drive_items")
+      .select("id, tenant_id, owner_id, parent_id, tipo, nombre, size, sha256, storage_key, estado, trashed_at, created_at, updated_at, last_opened_at")
+      .order("id").range(desde, desde + 999);
+    if (error) throw new HttpError(error.message, 500);
+    items.push(...((data ?? []) as ItemParaIndice[]));
+    if (!data || data.length < 1000) break;
+  }
+  const { data: tenants } = await admin.from("tenants").select("id, name");
+  const agencias = new Map(((tenants ?? []) as { id: string; name: string }[]).map((t) => [t.id, t.name]));
+  const duenos = [...new Set(items.map((i) => i.owner_id).filter(Boolean))] as string[];
+  const nombres = new Map<string, string>();
+  const correos = new Map<string, string>();
+  if (duenos.length) {
+    const { data: perfiles } = await admin.from("profiles").select("id, full_name").in("id", duenos);
+    for (const p of (perfiles ?? []) as { id: string; full_name: string | null }[]) nombres.set(p.id, p.full_name ?? "");
+    for (let pagina = 1; pagina < 50; pagina++) {
+      const { data } = await admin.auth.admin.listUsers({ page: pagina, perPage: 1000 });
+      const usuarios = data?.users ?? [];
+      for (const u of usuarios) if (u.email) correos.set(u.id, u.email);
+      if (usuarios.length < 1000) break;
+    }
+  }
+  return { generado: new Date().toISOString(), filas: armarIndice(items, agencias, nombres, correos) };
 }

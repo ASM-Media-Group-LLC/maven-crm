@@ -29,3 +29,36 @@ Deno.test("⚠️ nombres: sin barras (serían carpetas), sin control, con largo
     assert(tira(() => nombreValido(malo)), `dejó pasar ${JSON.stringify(malo)}`);
   }
 });
+
+import { armarIndice, type ItemParaIndice } from "./logica.ts";
+
+const item = (id: string, nombre: string, extra: Partial<ItemParaIndice> = {}): ItemParaIndice => ({
+  id, tenant_id: "ag1", owner_id: "u1", parent_id: null, tipo: "archivo", nombre, size: 10, sha256: "a".repeat(64),
+  storage_key: `ag1/${id}`, estado: "listo", trashed_at: null, created_at: "c", updated_at: "m", last_opened_at: null, ...extra,
+});
+
+Deno.test("el índice arma la ruta legible con las carpetas", () => {
+  const filas = armarIndice([
+    item("c1", "Contabilidad", { tipo: "carpeta", storage_key: null, size: null }),
+    item("c2", "2026", { tipo: "carpeta", parent_id: "c1", storage_key: null, size: null }),
+    item("a1", "Balance.pdf", { parent_id: "c2" }),
+  ], new Map([["ag1", "ASM"]]), new Map([["u1", "Keila Suarez"]]), new Map([["u1", "keila@x.com"]]));
+  const balance = filas.find((f) => f.nombre === "Balance.pdf")!;
+  assert(balance.ruta === "Contabilidad/2026/Balance.pdf", balance.ruta);
+  assert(balance.archivo_en_disco === "ag1/a1", "la llave al disco");
+  assert(balance.agencia === "ASM" && balance.dueno === "Keila Suarez" && balance.correo_dueno === "keila@x.com", "datos del dueño");
+  assert(filas.map((f) => f.ruta).join("|") === "Contabilidad|Contabilidad/2026|Contabilidad/2026/Balance.pdf", "orden por ruta");
+});
+
+Deno.test("una madre que falta no corta la ruta en silencio, y un ciclo no cuelga", () => {
+  const huerfano = armarIndice([item("a1", "x.pdf", { parent_id: "no-existe" })], new Map(), new Map(), new Map());
+  assert(huerfano[0].ruta === "(sin carpeta)/x.pdf", huerfano[0].ruta);
+  const ciclo = armarIndice([item("a", "A", { parent_id: "b" }), item("b", "B", { parent_id: "a" })], new Map(), new Map(), new Map());
+  assert(ciclo.length === 2, "terminó");
+});
+
+Deno.test("lo de la papelera y lo que se está subiendo también entra (marcado)", () => {
+  const f = armarIndice([item("a", "viejo.pdf", { trashed_at: "t" }), item("b", "a medias.zip", { estado: "subiendo" })], new Map(), new Map(), new Map());
+  assert(f.find((x) => x.nombre === "viejo.pdf")!.en_papelera === true, "papelera");
+  assert(f.find((x) => x.nombre === "a medias.zip")!.estado === "subiendo", "subiendo");
+});
