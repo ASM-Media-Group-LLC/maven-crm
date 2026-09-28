@@ -789,7 +789,7 @@ export const useCreateCompany = () => {
   return useMutation({
     mutationFn: async (input: CompanyInput): Promise<ScouterCompany> => {
       const tenantId = tenantQ.data;
-      if (!tenantId) throw new Error(traducir("int.scouter.tenantMissing"));
+      if (!tenantId) throw new Error(traducir("int.scouter.tenantUnresolved"));
       const { data, error } = await sb
         .from("scouter_companies")
         .insert({
@@ -1078,7 +1078,7 @@ export const useCreateLeadManual = () => {
   return useMutation({
     mutationFn: async (input: ManualLeadInput): Promise<ScouterLead> => {
       const tenantId = tenantQ.data;
-      if (!tenantId) throw new Error(traducir("int.scouter.tenantMissingRetry"));
+      if (!tenantId) throw new Error(traducir("int.scouter.tenantUnresolvedRetry"));
       const handle = input.instagram_handle.trim().replace(/^@/, "").toLowerCase();
       if (!handle) throw new Error(traducir("int.scouter.needHandle"));
       if (!input.company_id) throw new Error(traducir("int.scouter.needCompany"));

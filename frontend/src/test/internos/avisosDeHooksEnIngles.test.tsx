@@ -44,10 +44,12 @@ function cadena(tabla: string) {
   return p;
 }
 const invocar = vi.fn();
+/** Lo que devuelve current_tenant_id(): null = la persona todavía no tiene tenant. */
+let tenantDeLaBase: string | null = "t1";
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: (tabla: string) => cadena(tabla),
-    rpc: async (fn: string) => ({ data: fn === "current_tenant_id" ? "t1" : null, error: null }),
+    rpc: async (fn: string) => ({ data: fn === "current_tenant_id" ? tenantDeLaBase : null, error: null }),
     auth: {
       getUser: async () => ({ data: { user: { id: "u1" } }, error: null }),
       getSession: async () => ({ data: { session: null } }),
@@ -60,7 +62,7 @@ import {
   useCreateCompany, useEnqueueDiscoverySeed, useCreateLeadManual, useCancelScouterJob,
 } from "@/hooks/useScouterLeads";
 import { useUpdateSpammerAccount } from "@/hooks/useSpammerAccounts";
-import { useGenerateTasks } from "@/hooks/useSpammerTasks";
+import { useGenerateTasks, useUploadScreenshot } from "@/hooks/useSpammerTasks";
 import { useAskWhatsappAgent, useResolveCommitment, useLinkWhatsappMember } from "@/hooks/useWhatsappAgent";
 
 let qc: QueryClient;
@@ -98,6 +100,7 @@ function montar() {
     cancelarJob: useCancelScouterJob(),
     actualizarCuenta: useUpdateSpammerAccount(),
     generar: useGenerateTasks(),
+    subirScreenshot: useUploadScreenshot(),
     preguntarAlBot: useAskWhatsappAgent(),
     cerrarCompromiso: useResolveCommitment(),
     vincular: useLinkWhatsappMember(),
@@ -109,6 +112,7 @@ beforeEach(() => {
   qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   for (const k of Object.keys(escrito)) delete escrito[k];
   invocar.mockReset();
+  tenantDeLaBase = "t1";
 });
 
 describe("los avisos de los hooks, en inglés", () => {
@@ -184,5 +188,60 @@ describe("los avisos de los hooks, en inglés", () => {
     expect(await screen.findByText(
       "Ya existe @sofia en Lead Gen (cargado el 2026-09-01 por Ana Gomez). No se puede duplicar.",
     )).toBeTruthy();
+  });
+
+  // Sin tenant (la consulta volvió vacía): cada hook tiene SU frase. Crear
+  // compañía, el lead manual, el screenshot y generar tareas nunca dijeron
+  // "todavía"; el discovery sí. En español tienen que leerse como siempre.
+  async function sinTenant() {
+    tenantDeLaBase = null;
+    const { result } = montar();
+    await waitFor(() => expect(qc.getQueryState(["current-tenant-id"])?.status).toBe("success"));
+    act(() => {
+      result.current.crearCompania.mutate({ name: "Acme", slug: "acme" } as never);
+      result.current.discovery.mutate({ seeds: ["sofia"] });
+      result.current.leadManual.mutate({ instagram_handle: "@Sofia", company_id: "c1" });
+      result.current.generar.mutate(0);
+      result.current.subirScreenshot.mutate({
+        file: new File(["x"], "a.png", { type: "image/png" }),
+        taskId: "k1", assignmentId: "a1", leadId: "l1", fromAccountId: "f1", date: "2026-09-28",
+      });
+    });
+  }
+
+  it("sin tenant, en español: el detalle de siempre, letra por letra", async () => {
+    localStorage.setItem("app-language", "es");
+    await sinTenant();
+    for (const titulo of [
+      "Error al crear compañía",
+      "No se pudo encolar el discovery",
+      "No se pudo agregar el lead",
+      "No se pudieron generar tareas",
+      "No se pudo subir el screenshot",
+    ]) {
+      expect(await screen.findByText(titulo), titulo).toBeTruthy();
+    }
+    // Compañía, generar tareas y screenshot.
+    expect(await screen.findAllByText("Tenant no resuelto.")).toHaveLength(3);
+    expect(await screen.findByText("Tenant no resuelto. Reintenta en un segundo.")).toBeTruthy();
+    expect(await screen.findByText("Tenant no resuelto todavía. Reintenta en un segundo.")).toBeTruthy();
+    expect(invocar).not.toHaveBeenCalled();
+  });
+
+  it("sin tenant, en inglés: título y detalle", async () => {
+    await sinTenant();
+    for (const titulo of [
+      "Couldn't create the company",
+      "Couldn't queue the discovery",
+      "Couldn't add the lead",
+      "Couldn't generate tasks",
+      "Couldn't upload the screenshot",
+    ]) {
+      expect(await screen.findByText(titulo), titulo).toBeTruthy();
+    }
+    expect(await screen.findAllByText("Tenant not resolved.")).toHaveLength(3);
+    expect(await screen.findByText("Tenant not resolved. Try again in a second.")).toBeTruthy();
+    expect(await screen.findByText("Tenant not resolved yet. Try again in a second.")).toBeTruthy();
+    expect(textosVisibles().filter((t) => esEspanol(t))).toEqual([]);
   });
 });

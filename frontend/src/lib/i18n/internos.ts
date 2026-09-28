@@ -307,6 +307,14 @@ export const internos = {
     es: "Tenant no resuelto todavía. Reintenta en un segundo.",
     en: "Tenant not resolved yet. Try again in a second.",
   },
+  // Las mismas dos, sin "todavía": así decían crear compañía, el lead manual
+  // (useScouterLeads) y el screenshot y generar tareas (useSpammerTasks). No se
+  // funden con las de arriba: en español el aviso tiene que leerse igual que antes.
+  "int.scouter.tenantUnresolved": { es: "Tenant no resuelto.", en: "Tenant not resolved." },
+  "int.scouter.tenantUnresolvedRetry": {
+    es: "Tenant no resuelto. Reintenta en un segundo.",
+    en: "Tenant not resolved. Try again in a second.",
+  },
   "int.scouter.companyCreated": { es: "Compañía creada", en: "Company created" },
   "int.scouter.companyCreateFailed": { es: "Error al crear compañía", en: "Couldn't create the company" },
   "int.scouter.companyUpdated": { es: "Compañía actualizada", en: "Company updated" },

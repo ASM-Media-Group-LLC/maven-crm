@@ -375,7 +375,7 @@ export const useUploadScreenshot = () => {
         supabase.rpc as unknown as (fn: string) => Promise<{ data: string | null; error: unknown }>
       )("current_tenant_id");
       if (tenantErr) throw tenantErr;
-      if (!tenantId) throw new Error(traducir("int.scouter.tenantMissing"));
+      if (!tenantId) throw new Error(traducir("int.scouter.tenantUnresolved"));
 
       // Compress to WebP before upload
       const webpFile = await compressImageToWebP(input.file);
@@ -461,7 +461,7 @@ export const useGenerateTasks = () => {
         supabase.rpc as unknown as (fn: string) => Promise<{ data: string | null; error: unknown }>
       )("current_tenant_id");
       if (tenantErr) throw tenantErr;
-      if (!tenantId) throw new Error(traducir("int.scouter.tenantMissing"));
+      if (!tenantId) throw new Error(traducir("int.scouter.tenantUnresolved"));
 
       const { data, error } = await supabase.functions.invoke("scouter-generate-tasks", {
         body: {
