@@ -148,6 +148,15 @@ test("⚠️ HTML y SVG nunca se abren como página: siempre descarga y sandbox"
   assert.equal(g.headers.get("x-content-type-options"), "nosniff");
 });
 
+test("un texto sale como UTF-8 (sin charset, «—» se veía «â€”»)", async () => {
+  const k = clave();
+  await fetch(url({ op: "put", k, max: 100 }), { method: "PUT", body: "Hola — acentuación" });
+  const g = await fetch(url({ op: "get", k, ct: "text/plain" }));
+  assert.equal(g.headers.get("content-type"), "text/plain; charset=utf-8");
+  const g2 = await fetch(url({ op: "get", k, ct: "text/csv; charset=latin1" }));
+  assert.equal(g2.headers.get("content-type"), "text/csv; charset=latin1", "si ya dice cuál, se respeta");
+});
+
 test("borrar lo saca de los dos discos", async () => {
   const k = clave();
   await fetch(url({ op: "put", k, max: 10 }), { method: "PUT", body: "x" });

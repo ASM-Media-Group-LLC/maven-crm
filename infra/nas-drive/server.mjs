@@ -130,7 +130,11 @@ async function servirArchivo(conf, req, res, d) {
   const archivo = await buscar(conf, d.k);
   if (!archivo) return json(res, 404, { error: "no existe" });
   const { size } = await fsp.stat(archivo);
-  const tipo = typeof d.ct === "string" && d.ct.length < 200 ? d.ct : "application/octet-stream";
+  const crudo = typeof d.ct === "string" && d.ct.length < 200 ? d.ct : "application/octet-stream";
+  // Un texto sin charset el navegador lo lee como Latin-1: «—» salía «â€”»
+  // (encontrado probando en prod el 28/09). Los archivos de texto de hoy son
+  // UTF-8 casi siempre.
+  const tipo = /^text\//i.test(crudo) && !/charset=/i.test(crudo) ? `${crudo}; charset=utf-8` : crudo;
   const descarga = !!d.dl || PELIGROSOS.test(tipo);
   const nombre = typeof d.n === "string" ? d.n.slice(0, 200) : "archivo";
   res.setHeader("Content-Type", tipo);

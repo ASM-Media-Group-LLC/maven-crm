@@ -441,7 +441,11 @@ function PanelDeSubidas({ subidas, onCerrar }: { subidas: ReturnType<typeof useS
   const { t } = useLanguage();
   const pendientes = subidas.filter((s) => s.estado === "subiendo").length;
   return (
-    <div className="fixed bottom-4 right-4 z-50 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-panel border border-border bg-card shadow-xl">
+    // ⚠️ No abajo a la derecha pegado al borde: ahí viven los botones flotantes
+    // del Messenger y del asistente, y el panel quedaba debajo de ellos
+    // (visto en prod el 28/09). En el teléfono va encima de esos botones; en
+    // pantallas grandes, a su izquierda.
+    <div className="fixed bottom-36 right-4 z-50 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-panel border border-border bg-card shadow-xl sm:bottom-4 sm:right-20">
       <div className="flex items-center justify-between bg-muted/60 px-4 py-2 text-sm font-medium">
         {pendientes ? t("drive.subiendo", { n: pendientes }) : t("drive.subidas.titulo")}
         <button type="button" onClick={onCerrar} disabled={pendientes > 0} aria-label={t("drive.subidas.cerrar")} className="rounded-full p-1 hover:bg-muted disabled:opacity-40">
