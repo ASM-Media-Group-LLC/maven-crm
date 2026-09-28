@@ -35,6 +35,8 @@ import {
   Tag,
   type LucideIcon,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -70,6 +72,7 @@ import {
   useMailMessage,
   useImagenesIncrustadas,
   useMailMessages,
+  CORREOS_POR_PAGINA,
   useMailRealtime,
   useMarkSeen,
   usePrefetchMailMessage,
@@ -251,7 +254,11 @@ export default function CorreoPage() {
   const enBusqueda = queryActiva.trim().length > 0;
 
   const carpetas = useMailFolders(hayBuzon);
-  const lista = useMailMessages(carpeta, hayBuzon);
+  // La página de la carpeta, como Gmail: «1–50 de 186» con ‹ ›. Grace no
+  // podía llegar a sus correos 51 al 126 (28/09).
+  const [pagina, setPagina] = useState(0);
+  const lista = useMailMessages(carpeta, hayBuzon, pagina);
+  const totalCarpeta = lista.data?.total;
   const resultados = useMailSearch(carpeta, queryActiva, hayBuzon);
   // ⚠️ La carpeta del correo ABIERTO, que no siempre es la seleccionada: en la
   // vista por etiqueta conviven correos de Recibidos, Archivados y Enviados.
@@ -294,7 +301,20 @@ export default function CorreoPage() {
     setBusqueda("");
     setQueryActiva("");
     setSeleccion(new Set());
+    setPagina(0);
   }, [carpeta]);
+
+  // La selección es de la página que se ve: al pasar a otra, marcar «todos»
+  // y archivar no puede llevarse correos que ya no están a la vista.
+  useEffect(() => { setSeleccion(new Set()); }, [pagina]);
+
+  // Si la lista se achicó (se archivó la última página entera), volver a la
+  // última que tiene algo en vez de quedarse mirando una página vacía.
+  useEffect(() => {
+    if (totalCarpeta === undefined || pagina === 0) return;
+    const ultima = Math.max(0, Math.ceil(totalCarpeta / CORREOS_POR_PAGINA) - 1);
+    if (pagina > ultima) setPagina(ultima);
+  }, [totalCarpeta, pagina]);
 
   // Selección múltiple, como en Gmail (Jhon, 09/09/2026): casillas en cada
   // fila, "seleccionar todos" y una barra de acciones arriba de la lista.
@@ -1100,6 +1120,17 @@ export default function CorreoPage() {
                       Quitar selección
                     </button>
                   </>
+                ) : !etiquetaVista && !enBusqueda && totalCarpeta !== undefined ? (
+                  // «1–50 de 186» y ‹ ›, como Gmail. Solo en una carpeta: la
+                  // vista de una etiqueta y la búsqueda arman su propia lista.
+                  <Paginador
+                    desde={pagina * CORREOS_POR_PAGINA + 1}
+                    hasta={pagina * CORREOS_POR_PAGINA + mensajes.length}
+                    total={totalCarpeta}
+                    cargando={lista.isPlaceholderData}
+                    onAnterior={pagina > 0 ? () => setPagina((p) => p - 1) : undefined}
+                    onSiguiente={(pagina + 1) * CORREOS_POR_PAGINA < totalCarpeta ? () => setPagina((p) => p + 1) : undefined}
+                  />
                 ) : (
                   <span className="ml-1 text-xs text-muted-foreground">
                     {items.length} {items.length === 1 ? "correo" : "correos"}
@@ -1816,6 +1847,34 @@ function Aviso({ titulo, detalle }: { titulo: string; detalle: string }) {
 /** Botón de la barra de selección. `pronto`: está en la UI para que se vea el
  *  conjunto (como en Gmail) pero todavía no hace nada — falta la acción IMAP
  *  del lado del servidor. Deshabilitado y con aviso en el title. */
+/** «1–50 de 186 ‹ ›» de Gmail, a la derecha de la barra de la lista. */
+function Paginador({
+  desde, hasta, total, cargando, onAnterior, onSiguiente,
+}: {
+  desde: number;
+  hasta: number;
+  total: number;
+  cargando: boolean;
+  /** Undefined = no hay página anterior (la flecha se ve apagada). */
+  onAnterior?: () => void;
+  onSiguiente?: () => void;
+}) {
+  const boton = "inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-30";
+  return (
+    <div className="ml-auto flex items-center gap-0.5">
+      <span className={cn("mr-1 text-xs tabular-nums text-muted-foreground", cargando && "opacity-60")}>
+        {total === 0 ? "0" : `${desde}–${Math.max(desde, hasta)}`} de {total.toLocaleString("es")}
+      </span>
+      <button type="button" className={boton} onClick={onAnterior} disabled={!onAnterior} aria-label="Más recientes" title="Más recientes">
+        <ChevronLeft className="h-4 w-4" />
+      </button>
+      <button type="button" className={boton} onClick={onSiguiente} disabled={!onSiguiente} aria-label="Más antiguos" title="Más antiguos">
+        <ChevronRight className="h-4 w-4" />
+      </button>
+    </div>
+  );
+}
+
 function AccionBarra({
   icono: Icono, etiqueta, onClick, disabled, pronto,
 }: { icono: LucideIcon; etiqueta: string; onClick?: () => void; disabled?: boolean; pronto?: boolean }) {
