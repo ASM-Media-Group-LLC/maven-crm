@@ -56,7 +56,14 @@ export async function escribirIndice({ raices, filas, generado, fecha, conservar
   const resultado = { agencias: porAgencia.size, filas: filas.length, discos: [], errores: [] };
   for (const raiz of raices) {
     try {
-      for (const [agencia, lista] of porAgencia) {
+      // ⚠️ También las agencias que ya tienen carpeta en el disco aunque hoy
+      // no tengan nada: si no, cuando una agencia se queda sin archivos su
+      // «actual» de ayer quedaba ahí, jurando que existen archivos borrados
+      // (visto el 28/09 al limpiar la prueba).
+      const enDisco = (await fsp.readdir(raiz).catch(() => [])).filter((n) => /^[0-9a-f-]{36}$/.test(n));
+      const todas = new Map(porAgencia);
+      for (const a of enDisco) if (!todas.has(a)) todas.set(a, []);
+      for (const [agencia, lista] of todas) {
         if (!/^[0-9a-f-]{36}$/.test(agencia)) continue; // nunca una ruta rara
         const dir = path.join(raiz, agencia, "_indice");
         await fsp.mkdir(dir, { recursive: true });

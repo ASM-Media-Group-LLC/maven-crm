@@ -70,3 +70,12 @@ test("pide el índice con un permiso firmado op=indice que vence en minutos", as
   assert.ok(p.e * 1000 - Date.now() <= 300_000);
   await assert.rejects(pedirIndice({ funciones: "https://x", secreto, fetchFn: async () => new Response('{"error":"no"}', { status: 403 }) }), /403/);
 });
+
+test("⚠️ una agencia que se quedó sin archivos recibe su índice VACÍO (no el de ayer)", async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "indice-"));
+  await escribirIndice({ raices: [dir], filas: [fila(A, "viejo.pdf")], generado: "g", fecha: "2026-09-27" });
+  await escribirIndice({ raices: [dir], filas: [], generado: "g", fecha: "2026-09-28" });
+  const j = JSON.parse(await fs.readFile(path.join(dir, A, "_indice", "actual.json"), "utf8"));
+  assert.deepEqual(j.filas, []);
+  await fs.rm(dir, { recursive: true, force: true });
+});
