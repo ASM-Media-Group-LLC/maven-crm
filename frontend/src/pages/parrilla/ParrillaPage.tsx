@@ -6,11 +6,22 @@
 // clicables. Exporta a PDF vía impresión (lámina apaisada). Los datos viven tipados
 // (ver useParrilla.ts) → de cada guardado se derivan las tareas esperadas que
 // Promolog usará para medir cumplimiento (fase futura).
+//
+// IDIOMA: la LÁMINA (.parrilla-sheet: días, formato, "Idea de material", "Copy
+// sugerido", "Franja", "Acción extra del día", título y "Regla de ejecución") es
+// el documento que se imprime a PDF y se manda al grupo Managers; lo leen las
+// creadoras, en español. Es la misma que arma parrilla-weekly/html.ts para el
+// envío automático. Por eso esos rótulos quedan en español aunque la app esté en
+// inglés. Lo que NO se imprime (botones, placeholders, el badge HOY, toasts y los
+// paneles de feedback y excepciones) sí va por t().
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarClock, CalendarRange, Copy, Loader2, Palette, Plus, Printer, Save, Send, Sparkles, Trash2 } from "lucide-react";
 import { usePermissions } from "@/hooks/usePermissions";
 import { type DateRange } from "react-day-picker";
 import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
+import { traducir, type TranslationKey } from "@/lib/i18n";
+import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
@@ -34,14 +45,23 @@ const hoyBogota = () => new Date().toLocaleDateString("en-CA", { timeZone: "Amer
 // Solo se linkean URLs http(s): texto libre guardado tipo javascript: no debe ser clicable.
 const isHttpUrl = (u: string) => /^https?:\/\//i.test(u.trim());
 
+// Fuera de un componente: el aviso se arma en el momento, con traducir().
 const copiarCopy = (texto: string) => {
   if (!texto.trim()) return;
   navigator.clipboard.writeText(texto).then(
-    () => toast.success("Copy copiado"),
-    () => toast.error("No se pudo copiar"),
+    () => toast.success(traducir("grid.copied")),
+    () => toast.error(traducir("common.couldNotCopy")),
   );
 };
 
+// Estado de la parrilla: la llave es el valor guardado en content_grids.status.
+const ETIQUETA_ESTADO: Record<ContentGrid["status"], TranslationKey> = {
+  borrador: "grid.status.borrador",
+  lista: "grid.status.lista",
+  enviada: "grid.status.enviada",
+};
+
+// El formato del día como se imprime en la lámina (documento: en español).
 const BADGE_LABEL: Record<GridDay["format_badge"], string> = {
   flyer_foto: "FLYER O FOTO",
   video_corto: "VIDEO CORTO",
@@ -53,6 +73,7 @@ function DayColumn({ day, theme, isToday, onChange }: {
   isToday: boolean;
   onChange: (d: GridDay) => void;
 }) {
+  const { t } = useLanguage();
   const meta = EXTRA_TYPE_META[day.extra_type];
   const extraColor = theme[meta.colorKey];
   const topColor = day.format_badge === "video_corto" ? theme.video : theme.foto;
@@ -71,7 +92,7 @@ function DayColumn({ day, theme, isToday, onChange }: {
             {weekdayLabel(day.date)}
             {isToday && (
               <span className="print-hide rounded-full px-1.5 py-px text-[8px] font-bold text-white" style={{ backgroundColor: topColor }}>
-                HOY
+                {t("grid.today")}
               </span>
             )}
           </span>
@@ -104,7 +125,7 @@ function DayColumn({ day, theme, isToday, onChange }: {
         <div>
           <div className="flex items-center justify-between">
             <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Copy sugerido</p>
-            <button type="button" className="print-hide text-muted-foreground hover:text-foreground" title="Copiar" onClick={() => copiarCopy(day.copy_sugerido)}>
+            <button type="button" className="print-hide text-muted-foreground hover:text-foreground" title={t("common.copy")} onClick={() => copiarCopy(day.copy_sugerido)}>
               <Copy className="h-3 w-3" />
             </button>
           </div>
@@ -125,7 +146,7 @@ function DayColumn({ day, theme, isToday, onChange }: {
             onChange={(e) => set({ franja_start: e.target.value || null, franja: e.target.value && day.franja_end ? `${e.target.value} - ${day.franja_end}` : day.franja })}
             className="h-6 w-[82px] border-dashed bg-transparent px-1 text-[11px] print-hide"
           />
-          <span className="text-[10px] text-muted-foreground print-hide">a</span>
+          <span className="text-[10px] text-muted-foreground print-hide">{t("grid.timeTo")}</span>
           <Input
             type="time"
             value={day.franja_end ?? ""}
@@ -146,11 +167,11 @@ function DayColumn({ day, theme, isToday, onChange }: {
             set({ extra_type: t, extra_title: day.extra_title || EXTRA_TYPE_META[t].label });
           }}>
             <SelectTrigger className="h-6 w-auto border-none bg-transparent px-1 text-[10px] print-hide">
-              <SelectValue placeholder="tipo" />
+              <SelectValue placeholder={t("grid.extraTypePh")} />
             </SelectTrigger>
             <SelectContent>
               {Object.entries(EXTRA_TYPE_META).map(([k, m]) => (
-                <SelectItem key={k} value={k}>{m.label}</SelectItem>
+                <SelectItem key={k} value={k}>{t(m.clave)}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -158,7 +179,7 @@ function DayColumn({ day, theme, isToday, onChange }: {
         <Textarea
           value={day.extra_title}
           onChange={(e) => set({ extra_title: e.target.value })}
-          placeholder={meta.label}
+          placeholder={t(meta.clave)}
           rows={1}
           className="mt-1 min-h-0 resize-none border-none bg-transparent px-0 py-0.5 text-sm font-black uppercase leading-tight"
         />
@@ -178,10 +199,10 @@ function DayColumn({ day, theme, isToday, onChange }: {
                   onChange={(e) => {
                     const items = [...day.extra_items]; items[i] = { ...it, label: e.target.value }; set({ extra_items: items });
                   }}
-                  placeholder="etiqueta… (COPY X, MAÑANA, etc.)"
+                  placeholder={t("grid.itemLabelPh")}
                   className="h-5 flex-1 border-none bg-transparent px-0 text-[9px] font-bold uppercase tracking-wide text-muted-foreground"
                 />
-                <button type="button" className="print-hide text-muted-foreground hover:text-foreground" title="Copiar" onClick={() => copiarCopy(it.copy)}>
+                <button type="button" className="print-hide text-muted-foreground hover:text-foreground" title={t("common.copy")} onClick={() => copiarCopy(it.copy)}>
                   <Copy className="h-3 w-3" />
                 </button>
                 <button type="button" className="print-hide text-muted-foreground hover:text-destructive" onClick={() => set({ extra_items: day.extra_items.filter((_, j) => j !== i) })}>
@@ -198,7 +219,7 @@ function DayColumn({ day, theme, isToday, onChange }: {
             </div>
           ))}
           <Button variant="ghost" size="sm" className="print-hide h-6 w-full text-[10px] text-muted-foreground" onClick={() => set({ extra_items: [...day.extra_items, { label: "", copy: "" }] })}>
-            <Plus className="mr-1 h-3 w-3" /> copy
+            <Plus className="mr-1 h-3 w-3" /> {t("grid.addCopy")}
           </Button>
         </div>
 
@@ -216,16 +237,18 @@ function DayColumn({ day, theme, isToday, onChange }: {
                 <Input
                   value={r.nicho ?? ""}
                   onChange={(e) => { const refs = [...day.refs]; refs[i] = { ...r, nicho: e.target.value }; set({ refs }); }}
-                  placeholder="nicho"
+                  placeholder={t("grid.nichePh")}
                   className="h-5 w-14 shrink-0 border-none bg-transparent px-0 text-center text-[9px] font-bold uppercase"
                   style={{ color: extraColor }}
                 />
+                {/* "Ver reel" es rótulo de la lámina (va impreso), aunque la fila
+                    vacía no se imprima: data-lamina lo marca como documento. */}
                 {isHttpUrl(r.url) ? (
-                  <a href={r.url} target="_blank" rel="noreferrer" className="shrink-0 text-[9px] font-bold uppercase" style={{ color: extraColor }}>
+                  <a href={r.url} target="_blank" rel="noreferrer" data-lamina className="shrink-0 text-[9px] font-bold uppercase" style={{ color: extraColor }}>
                     Ver reel →
                   </a>
                 ) : (
-                  <span className="shrink-0 text-[9px] font-bold uppercase opacity-40" style={{ color: extraColor }}>
+                  <span data-lamina className="shrink-0 text-[9px] font-bold uppercase opacity-40" style={{ color: extraColor }}>
                     Ver reel →
                   </span>
                 )}
@@ -235,7 +258,7 @@ function DayColumn({ day, theme, isToday, onChange }: {
               </div>
             ))}
             <Button variant="ghost" size="sm" className="print-hide h-6 w-full text-[10px] text-muted-foreground" onClick={() => set({ refs: [...day.refs, { url: "" }] })}>
-              <Plus className="mr-1 h-3 w-3" /> referencia
+              <Plus className="mr-1 h-3 w-3" /> {t("grid.addRef")}
             </Button>
           </div>
         )}
@@ -246,6 +269,11 @@ function DayColumn({ day, theme, isToday, onChange }: {
 
 export default function ParrillaPage() {
   const f = useFormato();
+  const { t } = useLanguage();
+  // El día de la semana FUERA de la lámina (selector de excepciones): en el idioma
+  // de la pantalla. En español, el mismo de la lámina ("LUNES").
+  const diaSemana = (iso: string) =>
+    f.idioma === "en" ? format(new Date(iso + "T12:00:00Z"), "EEEE", { locale: f.fechas }).toUpperCase() : weekdayLabel(iso);
   const { data: grids = [], isLoading: gridsLoading } = useGridList();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const grid = useMemo(() => grids.find((g) => g.id === selectedId) ?? grids[0] ?? null, [grids, selectedId]);
@@ -324,8 +352,8 @@ export default function ParrillaPage() {
     addEx.mutate(
       { grid_id: grid.id, creator_id: exCreator, day_date: exDay === "__all__" ? null : exDay, motivo: exMotivo.trim() },
       {
-        onSuccess: () => { setExCreator(""); setExDay("__all__"); setExMotivo(""); toast.success("Excepción registrada"); },
-        onError: (e: any) => toast.error(`No se pudo registrar: ${e.message}`),
+        onSuccess: () => { setExCreator(""); setExDay("__all__"); setExMotivo(""); toast.success(t("grid.exAdded")); },
+        onError: (e: any) => toast.error(t("grid.exError", { msg: e.message })),
       },
     );
   };
@@ -338,17 +366,17 @@ export default function ParrillaPage() {
   const enviar = useEnviarParrilla();
   const enviarAlGrupo = () => {
     if (!grid) return;
-    if (dirtyRef.current) { toast.warning("Guarda tus cambios antes de enviar"); return; }
-    toast("Se genera el PDF y se manda al grupo Managers de WhatsApp", {
-      description: "Después la parrilla queda en solo lectura (Volver a borrador para corregirla).",
+    if (dirtyRef.current) { toast.warning(t("grid.saveBeforeSend")); return; }
+    toast(t("grid.sendConfirm"), {
+      description: t("grid.sendConfirmDesc"),
       duration: 10000,
       action: {
-        label: "Enviar",
+        label: t("common.send"),
         onClick: () => enviar.mutate(grid.id, {
-          onSuccess: (d) => toast.success(d.enviado ? "Parrilla enviada al grupo ✅" : "PDF generado (envío desactivado)", {
-            description: d.pdf_url ? "El PDF quedó guardado en la parrilla." : undefined,
+          onSuccess: (d) => toast.success(d.enviado ? t("grid.sent") : t("grid.pdfOnly"), {
+            description: d.pdf_url ? t("grid.pdfSaved") : undefined,
           }),
-          onError: (e: any) => toast.error(`No se pudo enviar: ${e.message}`),
+          onError: (e: any) => toast.error(t("grid.sendError", { msg: e.message })),
         }),
       },
     });
@@ -366,7 +394,7 @@ export default function ParrillaPage() {
 
   const abrirPicker = (open: boolean) => {
     if (open && dirtyRef.current) {
-      toast.warning("Guarda los cambios de esta parrilla antes de crear una nueva");
+      toast.warning(t("grid.saveBeforeNew"));
       return;
     }
     if (open) {
@@ -381,8 +409,8 @@ export default function ParrillaPage() {
     createWeek.mutate(
       { start: isoLocal(range.from), end: isoLocal(range.to), from: grid && days.length ? { grid, days } : null },
       {
-        onSuccess: (id) => { setPickerOpen(false); setSelectedId(id); toast.success("Parrilla nueva creada (borrador)"); },
-        onError: (e: any) => toast.error(e.message?.includes("duplicate") ? "Ya existe una parrilla que empieza ese día" : `No se pudo crear: ${e.message}`),
+        onSuccess: (id) => { setPickerOpen(false); setSelectedId(id); toast.success(t("grid.created")); },
+        onError: (e: any) => toast.error(e.message?.includes("duplicate") ? t("grid.duplicate") : t("grid.createError", { msg: e.message })),
       },
     );
   };
@@ -391,7 +419,7 @@ export default function ParrillaPage() {
   // cantidad de días; el trigger de BD corre las fechas y el contenido se mantiene.
   const abrirStartPicker = (open: boolean) => {
     if (open && dirtyRef.current) {
-      toast.warning("Guarda los cambios antes de cambiar el día de inicio");
+      toast.warning(t("grid.saveBeforeStart"));
       return;
     }
     setStartPickerOpen(open);
@@ -409,11 +437,11 @@ export default function ParrillaPage() {
     setStart.mutate(
       { gridId: grid.id, start, end: isoLocal(endD) },
       {
-        onSuccess: () => { setStartPickerOpen(false); toast.success("Día de inicio actualizado — se corrieron las fechas; el contenido se mantiene"); },
+        onSuccess: () => { setStartPickerOpen(false); toast.success(t("grid.startUpdated")); },
         onError: (e: any) => toast.error(
           (e?.code === "23505" || /duplicate/i.test(e?.message ?? ""))
-            ? "Ya existe una parrilla que empieza ese día"
-            : `No se pudo cambiar: ${e?.message ?? "error"}`,
+            ? t("grid.duplicate")
+            : t("grid.startError", { msg: e?.message ?? "error" }),
         ),
       },
     );
@@ -421,17 +449,17 @@ export default function ParrillaPage() {
 
   const generarConIA = () => {
     if (!grid) return;
-    if (dirtyRef.current) { toast.warning("Guarda tus cambios antes de generar con IA"); return; }
-    toast("La IA va a reescribir los textos de este borrador", {
-      description: "Formato, franjas y referencias se conservan. Tarda ~30-60 segundos.",
+    if (dirtyRef.current) { toast.warning(t("grid.saveBeforeAi")); return; }
+    toast(t("grid.aiConfirm"), {
+      description: t("grid.aiConfirmDesc"),
       duration: 10000,
       action: {
-        label: "Generar",
+        label: t("grid.generate"),
         onClick: () => genIA.mutate(grid.id, {
-          onSuccess: (d) => toast.success(`Parrilla redactada por IA (${d.dias} días) — revísala y dale el toque humano ✍️`, {
-            description: typeof d.usos_restantes === "number" ? `Te quedan ${d.usos_restantes} generaciones con IA hoy.` : undefined,
+          onSuccess: (d) => toast.success(t("grid.aiDone", { days: d.dias }), {
+            description: typeof d.usos_restantes === "number" ? t("grid.aiLeft", { n: d.usos_restantes }) : undefined,
           }),
-          onError: (e: any) => toast.error(`No se pudo generar: ${e.message}`),
+          onError: (e: any) => toast.error(t("grid.aiError", { msg: e.message })),
         }),
       },
     });
@@ -448,16 +476,16 @@ export default function ParrillaPage() {
       {
         onSuccess: () => {
           markDirty(false);
-          toast.success(status === "lista" ? "Parrilla marcada como lista ✅" : status === "borrador" ? "Parrilla devuelta a borrador" : "Parrilla guardada");
+          toast.success(status === "lista" ? t("grid.markedReady") : status === "borrador" ? t("grid.backToDraftDone") : t("grid.saved"));
         },
         onError: (e: any) => {
           if (String(e.message).includes("conflict")) {
-            toast.error("Otra persona guardó esta parrilla mientras la editabas", {
-              description: "Recarga la página para ver su versión antes de volver a guardar.",
+            toast.error(t("grid.conflict"), {
+              description: t("grid.conflictDesc"),
               duration: 10000,
             });
           } else {
-            toast.error(`No se pudo guardar: ${e.message}`);
+            toast.error(t("grid.saveError", { msg: e.message }));
           }
         },
       },
@@ -467,18 +495,18 @@ export default function ParrillaPage() {
   // Cambiar de semana con edición a medias: avisar en vez de descartar en silencio.
   const handleSelectWeek = (id: string) => {
     if (!dirtyRef.current) { setSelectedId(id); return; }
-    toast.warning("Tienes cambios sin guardar en esta parrilla", {
-      description: "Guárdalos, o descártalos para cambiar de semana.",
+    toast.warning(t("grid.unsaved"), {
+      description: t("grid.unsavedDesc"),
       duration: 8000,
-      action: { label: "Descartar y cambiar", onClick: () => { markDirty(false); setSelectedId(id); } },
+      action: { label: t("grid.discardSwitch"), onClick: () => { markDirty(false); setSelectedId(id); } },
     });
   };
 
   const statusBadge = grid?.status === "enviada"
-    ? <Badge className="bg-emerald-600">enviada</Badge>
+    ? <Badge className="bg-emerald-600">{t(ETIQUETA_ESTADO.enviada)}</Badge>
     : grid?.status === "lista"
-      ? <Badge className="bg-blue-600">lista</Badge>
-      : <Badge variant="secondary">borrador</Badge>;
+      ? <Badge className="bg-blue-600">{t(ETIQUETA_ESTADO.lista)}</Badge>
+      : <Badge variant="secondary">{t(ETIQUETA_ESTADO.borrador)}</Badge>;
 
   return (
     <div className="flex flex-1 min-h-0 flex-col">
@@ -526,15 +554,15 @@ export default function ParrillaPage() {
       <PageHeader
         className="shrink-0 border-b px-6 pt-5 pb-4 print-hide"
         icon={<CalendarRange />}
-        title="Parrilla de contenido"
+        title={t("grid.title")}
         subtitle={
           <div className="mt-1.5 flex flex-wrap items-center gap-2">
             <Select value={grid?.id ?? ""} onValueChange={handleSelectWeek}>
-              <SelectTrigger className="h-8 w-[260px]"><SelectValue placeholder="Semana" /></SelectTrigger>
+              <SelectTrigger className="h-8 w-[260px]"><SelectValue placeholder={t("common.week")} /></SelectTrigger>
               <SelectContent>
                 {grids.map((g) => (
                   <SelectItem key={g.id} value={g.id}>
-                    {fmtDia(g.week_start)} → {fmtDia(g.week_end)} · {g.status}
+                    {fmtDia(g.week_start)} → {fmtDia(g.week_end)} · {ETIQUETA_ESTADO[g.status] ? t(ETIQUETA_ESTADO[g.status]) : g.status}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -546,12 +574,12 @@ export default function ParrillaPage() {
           <>
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" size="sm"><Palette className="mr-1 h-4 w-4" /> Tema</Button>
+              <Button variant="outline" size="sm"><Palette className="mr-1 h-4 w-4" /> {t("grid.theme")}</Button>
             </PopoverTrigger>
             <PopoverContent className="w-64 space-y-2">
-              {([["foto", "Foto / flyer"], ["video", "Video / Reel"], ["telegram", "Telegram + audios"], ["urgencia", "Urgencia"], ["base", "Fondo"], ["tinta", "Tinta"]] as Array<[keyof GridTheme, string]>).map(([key, label]) => (
+              {([["foto", "grid.theme.foto"], ["video", "grid.theme.video"], ["telegram", "grid.theme.telegram"], ["urgencia", "grid.theme.urgencia"], ["base", "grid.theme.base"], ["tinta", "grid.theme.tinta"]] as Array<[keyof GridTheme, TranslationKey]>).map(([key, label]) => (
                 <div key={key} className="flex items-center justify-between gap-2">
-                  <span className="text-xs">{label}</span>
+                  <span className="text-xs">{t(label)}</span>
                   <input
                     type="color"
                     value={theme[key]}
@@ -561,7 +589,7 @@ export default function ParrillaPage() {
                 </div>
               ))}
               <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => { setTheme(DEFAULT_THEME); markDirty(true); }}>
-                Restaurar colores
+                {t("grid.resetColors")}
               </Button>
             </PopoverContent>
           </Popover>
@@ -570,20 +598,20 @@ export default function ParrillaPage() {
           </Button>
           {grid?.status === "borrador" && (
             <Button variant="outline" size="sm" disabled={genIA.isPending} onClick={generarConIA}>
-              {genIA.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Sparkles className="mr-1 h-4 w-4" />} Generar con IA
+              {genIA.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Sparkles className="mr-1 h-4 w-4" />} {t("grid.generateAi")}
             </Button>
           )}
           {grid?.status === "borrador" && (
             <Popover open={startPickerOpen} onOpenChange={abrirStartPicker}>
               <PopoverTrigger asChild>
                 <Button variant="outline" size="sm" disabled={setStart.isPending}>
-                  {setStart.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <CalendarClock className="mr-1 h-4 w-4" />} Día de inicio
+                  {setStart.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <CalendarClock className="mr-1 h-4 w-4" />} {t("grid.startDay")}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-3" align="end">
-                <p className="text-xs font-semibold">Cambiar el día de inicio</p>
+                <p className="text-xs font-semibold">{t("grid.changeStart")}</p>
                 <p className="mb-1 text-[11px] text-muted-foreground">
-                  Se corren las fechas ({days.length} días). El contenido de cada columna se mantiene.
+                  {t("grid.changeStartHint", { n: days.length })}
                 </p>
                 <Calendar
                   mode="single"
@@ -599,12 +627,12 @@ export default function ParrillaPage() {
           <Popover open={pickerOpen} onOpenChange={abrirPicker}>
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm" disabled={createWeek.isPending}>
-                <Plus className="mr-1 h-4 w-4" /> Nueva semana
+                <Plus className="mr-1 h-4 w-4" /> {t("grid.newWeek")}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-3" align="end">
-              <p className="text-xs font-semibold">Elige los días de la parrilla</p>
-              <p className="mb-1 text-[11px] text-muted-foreground">El ciclo estándar es jueves → jueves (8 días); puedes elegir otro rango.</p>
+              <p className="text-xs font-semibold">{t("grid.pickDays")}</p>
+              <p className="mb-1 text-[11px] text-muted-foreground">{t("grid.pickDaysHint")}</p>
               <Calendar
                 mode="range"
                 selected={range}
@@ -616,22 +644,22 @@ export default function ParrillaPage() {
               <div className="mt-1 flex items-center justify-between gap-3">
                 <span className="text-[11px] text-muted-foreground">
                   {range?.from && range?.to
-                    ? `${nDias} días · ${fmtDia(isoLocal(range.from))} → ${fmtDia(isoLocal(range.to))}${rangoValido ? "" : " (elige de 2 a 10 días)"}`
-                    : "Elige inicio y fin"}
+                    ? `${t("grid.rangeSummary", { n: nDias, from: fmtDia(isoLocal(range.from)), to: fmtDia(isoLocal(range.to)) })}${rangoValido ? "" : ` ${t("grid.rangeInvalid")}`}`
+                    : t("grid.pickStartEnd")}
                 </span>
                 <Button size="sm" disabled={!rangoValido || createWeek.isPending} onClick={crearSemana}>
-                  {createWeek.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Plus className="mr-1 h-4 w-4" />} Crear
+                  {createWeek.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Plus className="mr-1 h-4 w-4" />} {t("common.create")}
                 </Button>
               </div>
             </PopoverContent>
           </Popover>
           {grid && !soloLectura && puedeEnviar && (
-            <Button variant="outline" size="sm" disabled={enviar.isPending} onClick={enviarAlGrupo} title="PDF + WhatsApp al grupo Managers">
-              {enviar.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Send className="mr-1 h-4 w-4" />} Enviar al grupo
+            <Button variant="outline" size="sm" disabled={enviar.isPending} onClick={enviarAlGrupo} title={t("grid.sendTitle")}>
+              {enviar.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Send className="mr-1 h-4 w-4" />} {t("grid.sendToGroup")}
             </Button>
           )}
-          <Button size="sm" onClick={() => handleSave()} disabled={save.isPending || !grid || soloLectura} title={soloLectura ? "La parrilla ya fue enviada: vuelve a borrador para editarla" : undefined}>
-            {save.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Save className="mr-1 h-4 w-4" />} Guardar
+          <Button size="sm" onClick={() => handleSave()} disabled={save.isPending || !grid || soloLectura} title={soloLectura ? t("grid.sentReadonly") : undefined}>
+            {save.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Save className="mr-1 h-4 w-4" />} {t("common.save")}
           </Button>
           </>
         }
@@ -640,23 +668,23 @@ export default function ParrillaPage() {
       {/* Tablero */}
       <div className="parrilla-print-area flex-1 overflow-auto p-4" style={{ backgroundColor: theme.base }}>
         {gridsLoading || daysLoading ? (
-          <p className="py-16 text-center text-sm text-muted-foreground">Cargando parrilla…</p>
+          <p className="py-16 text-center text-sm text-muted-foreground">{t("grid.loading")}</p>
         ) : !grid ? (
           <div className="py-16 text-center">
-            <p className="text-sm text-muted-foreground">Todavía no hay parrillas.</p>
+            <p className="text-sm text-muted-foreground">{t("grid.empty")}</p>
             <Button className="mt-3" size="sm" disabled={createWeek.isPending} onClick={() => createWeek.mutate({ ...proximoCiclo(null), from: null }, {
               onSuccess: (id) => setSelectedId(id),
-              onError: (e: any) => toast.error(`No se pudo crear: ${e.message}`),
+              onError: (e: any) => toast.error(t("grid.createError", { msg: e.message })),
             })}>
-              <Plus className="mr-1 h-4 w-4" /> Crear la primera semana
+              <Plus className="mr-1 h-4 w-4" /> {t("grid.createFirst")}
             </Button>
           </div>
         ) : (
           <>
             {soloLectura && (
               <div className="print-hide mb-3 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-900">
-                <b>Parrilla enviada al grupo</b>{grid.sent_at ? ` el ${new Date(grid.sent_at).toLocaleString(f.intl("es-CO"), { timeZone: "America/Bogota", dateStyle: "short", timeStyle: "short" })}` : ""} — lo enviado es el contrato: queda en solo lectura. Para corregirla, usa <b>Volver a borrador</b> y vuelve a enviarla.
-                {grid.pdf_url && <> · <a href={grid.pdf_url} target="_blank" rel="noreferrer" className="font-semibold underline">Ver PDF</a></>}
+                <b>{t("grid.sentBanner.title")}</b>{grid.sent_at ? ` ${t("grid.sentBanner.on", { date: new Date(grid.sent_at).toLocaleString(f.intl("es-CO"), { timeZone: "America/Bogota", dateStyle: "short", timeStyle: "short" }) })}` : ""} {t("grid.sentBanner.body")} <b>{t("grid.backToDraft")}</b> {t("grid.sentBanner.end")}
+                {grid.pdf_url && <> · <a href={grid.pdf_url} target="_blank" rel="noreferrer" className="font-semibold underline">{t("grid.viewPdf")}</a></>}
               </div>
             )}
             {/* La lámina completa (título + tablero + regla): es lo que se escala al imprimir.
@@ -689,24 +717,24 @@ export default function ParrillaPage() {
 
             {/* Revisión manual + feedback (alimenta la generación de la próxima semana) */}
             <div className="print-hide mt-4 rounded-xl border bg-card p-3">
-              <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Revisión manual · feedback para la próxima generación</p>
+              <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{t("grid.feedbackTitle")}</p>
               <Textarea
                 value={feedback}
                 onChange={(e) => { setFeedback(e.target.value); markDirty(true); }}
-                placeholder="¿Qué estuvo bien y qué cambiarías de esta parrilla? (esto alimenta la generación automática de la semana siguiente)"
+                placeholder={t("grid.feedbackPh")}
                 className="mt-2 min-h-[64px] text-sm"
               />
               <div className="mt-2 flex items-center justify-between">
                 <p className="text-[11px] text-muted-foreground">
-                  {dirty ? "Cambios sin guardar" : "Sin cambios pendientes"} · el envío al grupo exige feedback (se activa en la fase de automatización)
+                  {dirty ? t("grid.unsavedShort") : t("grid.noPending")} · {t("grid.feedbackRequired")}
                 </p>
                 {grid.status === "borrador" ? (
                   <Button size="sm" variant="secondary" disabled={save.isPending || !feedback.trim()} onClick={() => handleSave("lista")}>
-                    Marcar como lista ✓
+                    {t("grid.markReady")}
                   </Button>
                 ) : (
                   <Button size="sm" variant="ghost" disabled={save.isPending} onClick={() => handleSave("borrador")}>
-                    Volver a borrador
+                    {t("grid.backToDraft")}
                   </Button>
                 )}
               </div>
@@ -714,9 +742,9 @@ export default function ParrillaPage() {
 
             {/* Excepciones por creadora: quién NO se audita esta semana y por qué */}
             <div className="print-hide mt-4 rounded-xl border bg-card p-3">
-              <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Excepciones · creadoras que no se auditan esta semana</p>
+              <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{t("grid.exTitle")}</p>
               <p className="mt-1 text-[11px] text-muted-foreground">
-                Enferma, recién ingresada, sin Telegram, variación pactada… Registrarlas evita que Promolog marque incumplimientos falsos cuando verifique la parrilla.
+                {t("grid.exHint")}
               </p>
               {exemptions.length > 0 && (
                 <ul className="mt-2 divide-y rounded-lg border">
@@ -724,10 +752,10 @@ export default function ParrillaPage() {
                     const cr = activeCreators.find((c) => c.id === ex.creator_id);
                     return (
                       <li key={ex.id} className="flex items-center gap-2 px-3 py-1.5 text-xs">
-                        <span className="font-medium">{cr ? (cr.artistic_name || cr.name) : "(creadora)"}</span>
-                        <span className="text-muted-foreground">· {ex.day_date ? fmtDia(ex.day_date) : "toda la semana"} · {ex.motivo}</span>
+                        <span className="font-medium">{cr ? (cr.artistic_name || cr.name) : t("grid.exUnknownCreator")}</span>
+                        <span className="text-muted-foreground">· {ex.day_date ? fmtDia(ex.day_date) : t("grid.exWholeWeek")} · {ex.motivo}</span>
                         {!soloLectura && (
-                          <button type="button" className="ml-auto text-muted-foreground hover:text-destructive" onClick={() => removeEx.mutate({ id: ex.id, grid_id: ex.grid_id })} title="Quitar excepción">
+                          <button type="button" className="ml-auto text-muted-foreground hover:text-destructive" onClick={() => removeEx.mutate({ id: ex.id, grid_id: ex.grid_id })} title={t("grid.exRemove")}>
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
                         )}
@@ -739,7 +767,7 @@ export default function ParrillaPage() {
               {!soloLectura && (
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <Select value={exCreator || undefined} onValueChange={setExCreator}>
-                    <SelectTrigger className="h-8 w-[220px] text-xs"><SelectValue placeholder="Creadora" /></SelectTrigger>
+                    <SelectTrigger className="h-8 w-[220px] text-xs"><SelectValue placeholder={t("sales.creator")} /></SelectTrigger>
                     <SelectContent>
                       {activeCreators.map((c) => (
                         <SelectItem key={c.id} value={c.id}>{c.artistic_name || c.name}</SelectItem>
@@ -749,15 +777,15 @@ export default function ParrillaPage() {
                   <Select value={exDay} onValueChange={setExDay}>
                     <SelectTrigger className="h-8 w-[170px] text-xs"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="__all__">Toda la semana</SelectItem>
+                      <SelectItem value="__all__">{t("grid.exWholeWeekCap")}</SelectItem>
                       {days.map((d) => (
-                        <SelectItem key={d.day_index} value={d.date}>{weekdayLabel(d.date)} {fmtDia(d.date)}</SelectItem>
+                        <SelectItem key={d.day_index} value={d.date}>{diaSemana(d.date)} {fmtDia(d.date)}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                  <Input value={exMotivo} onChange={(e) => setExMotivo(e.target.value)} placeholder="Motivo (ej. enferma, sin Telegram…)" className="h-8 w-[260px] text-xs" />
+                  <Input value={exMotivo} onChange={(e) => setExMotivo(e.target.value)} placeholder={t("grid.exReasonPh")} className="h-8 w-[260px] text-xs" />
                   <Button size="sm" variant="secondary" className="h-8" disabled={!exCreator || !exMotivo.trim() || addEx.isPending} onClick={agregarExcepcion}>
-                    <Plus className="mr-1 h-3.5 w-3.5" /> Agregar
+                    <Plus className="mr-1 h-3.5 w-3.5" /> {t("common.add")}
                   </Button>
                 </div>
               )}

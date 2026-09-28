@@ -2,6 +2,11 @@
 // chat. Reemplaza el sheet "PERSONALIZADOS PLUS" (una fila por pedido, una
 // pestaña por mes, estado a mano). Ver la migración personalizados_f1 para el
 // porqué de cada campo.
+//
+// Los textos que se ven (estado, tipo, canal, banderas, el reloj del plazo) son
+// CLAVES del diccionario (lib/i18n/ventas.ts); el `id` de cada uno es el valor
+// que se guarda en la base y no se traduce nunca.
+import type { TranslationKey } from "@/lib/i18n";
 
 export type Agency = "plus" | "massive";
 export type Estado =
@@ -65,14 +70,14 @@ export interface PedidoAdjunto {
 
 // El ciclo de vida, en el orden del tablero. Los dos últimos son salidas
 // laterales (no columnas de trabajo): se listan pero no se "avanza" hacia ellos.
-export const ESTADOS: Array<{ id: Estado; label: string; corto: string; tono: string; lateral?: boolean }> = [
-  { id: "solicitado",    label: "Solicitado",     corto: "Solicitado",  tono: "bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/30" },
-  { id: "aprobado",      label: "Aprobado",       corto: "Aprobado",    tono: "bg-violet-500/15 text-violet-600 dark:text-violet-400 border-violet-500/30" },
-  { id: "en_produccion", label: "En producción",  corto: "Producción",  tono: "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30" },
-  { id: "listo",         label: "Listo",          corto: "Listo",       tono: "bg-teal-500/15 text-teal-600 dark:text-teal-400 border-teal-500/30" },
-  { id: "entregado",     label: "Entregado",      corto: "Entregado",   tono: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30" },
-  { id: "denegado",      label: "Denegado",       corto: "Denegado",    tono: "bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/30", lateral: true },
-  { id: "reembolsado",   label: "Reembolsado",    corto: "Reembolso",   tono: "bg-zinc-500/15 text-zinc-600 dark:text-zinc-300 border-zinc-500/30", lateral: true },
+export const ESTADOS: Array<{ id: Estado; label: TranslationKey; corto: TranslationKey; tono: string; lateral?: boolean }> = [
+  { id: "solicitado",    label: "custom.status.solicitado",    corto: "custom.status.solicitado",          tono: "bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/30" },
+  { id: "aprobado",      label: "custom.status.aprobado",      corto: "custom.status.aprobado",            tono: "bg-violet-500/15 text-violet-600 dark:text-violet-400 border-violet-500/30" },
+  { id: "en_produccion", label: "custom.status.en_produccion", corto: "custom.status.en_produccion.short", tono: "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30" },
+  { id: "listo",         label: "custom.status.listo",         corto: "custom.status.listo",               tono: "bg-teal-500/15 text-teal-600 dark:text-teal-400 border-teal-500/30" },
+  { id: "entregado",     label: "custom.status.entregado",     corto: "custom.status.entregado",           tono: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30" },
+  { id: "denegado",      label: "custom.status.denegado",      corto: "custom.status.denegado",            tono: "bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/30", lateral: true },
+  { id: "reembolsado",   label: "custom.status.reembolsado",   corto: "custom.status.reembolsado.short",   tono: "bg-zinc-500/15 text-zinc-600 dark:text-zinc-300 border-zinc-500/30", lateral: true },
 ];
 export const estadoDe = (id: Estado) => ESTADOS.find((e) => e.id === id) ?? ESTADOS[0];
 
@@ -123,7 +128,8 @@ export const estaCerrado = (e: Estado) => CERRADOS.includes(e);
 export interface Alerta {
   nivel: "atencion" | "vencido";
   dias: number;
-  texto: string;
+  /** El rótulo del badge: `t(a.texto, { dias: a.dias })`. */
+  texto: TranslationKey;
   /** Clases del badge. */
   tono: string;
   /** Color plano, para el punto y el borde de la fila/tarjeta. */
@@ -152,7 +158,7 @@ export function alertaDe(
     return {
       nivel: "vencido",
       dias,
-      texto: `Vencido · ${dias} d`,
+      texto: "custom.alert.overdue",
       tono: "bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/30",
       punto: "bg-red-500",
       borde: "border-l-red-500",
@@ -162,7 +168,7 @@ export function alertaDe(
     return {
       nivel: "atencion",
       dias,
-      texto: `${dias} d sin entregar`,
+      texto: "custom.alert.attention",
       tono: "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30",
       punto: "bg-amber-500",
       borde: "border-l-amber-500",
@@ -171,17 +177,17 @@ export function alertaDe(
   return null;
 }
 
-export const TIPOS: Array<{ id: TipoContenido; label: string; emoji: string }> = [
-  { id: "foto", label: "Foto", emoji: "📷" },
-  { id: "video", label: "Video", emoji: "🎬" },
-  { id: "audio", label: "Audio", emoji: "🎧" },
-  { id: "articulo", label: "Artículo", emoji: "📦" },
+export const TIPOS: Array<{ id: TipoContenido; label: TranslationKey; emoji: string }> = [
+  { id: "foto", label: "custom.type.foto", emoji: "📷" },
+  { id: "video", label: "custom.type.video", emoji: "🎬" },
+  { id: "audio", label: "custom.type.audio", emoji: "🎧" },
+  { id: "articulo", label: "custom.type.articulo", emoji: "📦" },
 ];
 export const tipoDe = (id: TipoContenido | null) => TIPOS.find((t) => t.id === id);
 
-export const CANALES: Array<{ id: CanalVenta; label: string; ayuda: string }> = [
-  { id: "normal", label: "Normal", ayuda: "Venta en el chat, sin dinámica especial." },
-  { id: "buster", label: "Hora Buster", ayuda: "Vendido durante una hora Buster (objetivo del equipo)." },
+export const CANALES: Array<{ id: CanalVenta; label: TranslationKey; ayuda: TranslationKey }> = [
+  { id: "normal", label: "custom.channel.normal", ayuda: "custom.channel.normal.help" },
+  { id: "buster", label: "custom.channel.buster", ayuda: "custom.channel.buster.help" },
 ];
 
 export const AGENCIAS: Array<{ id: Agency; label: string; tono: string }> = [
@@ -191,16 +197,18 @@ export const AGENCIAS: Array<{ id: Agency; label: string; tono: string }> = [
 export const agenciaDe = (id: Agency) => AGENCIAS.find((a) => a.id === id) ?? AGENCIAS[0];
 
 // Los "amarillos" del sheet, como banderas tipadas.
-export const FLAGS: Array<{ id: string; label: string }> = [
-  { id: "vendido_antes", label: "Se vendió antes de llegar a la agencia" },
-  { id: "cambio_contenido", label: "Se cambió el contenido" },
-  { id: "fan_conflictivo", label: "Fan conflictivo / inconforme" },
-  { id: "pago_parcial", label: "Pago parcial (debe saldo)" },
-  { id: "entregado_al_user", label: "Entregado directo al fan" },
-  { id: "urgente", label: "Urgente" },
-  { id: "revisar_monto", label: "Monto por revisar (venía imposible del sheet)" },
+export const FLAGS: Array<{ id: string; label: TranslationKey }> = [
+  { id: "vendido_antes", label: "custom.flag.vendido_antes" },
+  { id: "cambio_contenido", label: "custom.flag.cambio_contenido" },
+  { id: "fan_conflictivo", label: "custom.flag.fan_conflictivo" },
+  { id: "pago_parcial", label: "custom.flag.pago_parcial" },
+  { id: "entregado_al_user", label: "custom.flag.entregado_al_user" },
+  { id: "urgente", label: "custom.flag.urgente" },
+  { id: "revisar_monto", label: "custom.flag.revisar_monto" },
 ];
-export const flagDe = (id: string) => FLAGS.find((f) => f.id === id)?.label ?? id;
+/** La clave de una bandera; `null` si es una que no está en el catálogo (se
+ *  muestra su id tal cual). */
+export const flagDe = (id: string): TranslationKey | null => FLAGS.find((f) => f.id === id)?.label ?? null;
 
 // Techos de realidad para la plata. Vienen del histórico: un personalizado sale
 // $150 de mediana y el más caro real fue $3.600, pero en el sheet aparecieron

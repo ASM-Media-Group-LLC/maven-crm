@@ -5,6 +5,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ListRow } from "@/components/ui/list-row";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 import type { CreatorComparison } from "./usePeriodComparison";
 
 interface Props {
@@ -17,38 +19,41 @@ interface Props {
 const fmt = (n: number) =>
   n >= 1000 ? `$${(n / 1000).toFixed(1)}K` : `$${n.toFixed(0)}`;
 
-const TITLES: Record<string, string> = {
-  gross: "Desglose de Ingresos Total",
-  net: "Desglose de Net (estimado 80%)",
-  creators: "Todas las Creadoras",
-  rising: "Creadoras Subiendo",
-  at_risk: "Creadoras en Riesgo",
-  falling: "Creadoras Bajando",
-  high_potential: "Alto Potencial",
-  top10: "Top 10 Creadoras",
-  alerts: "Alertas Activas",
-  todas: "Todas las Creadoras",
-  comparatives: "Comparativas de Rendimiento",
+// La llave es el id de la tarjeta que abrió el detalle (SalesKPICards /
+// SalesOperationalCards).
+const TITLES: Record<string, TranslationKey> = {
+  gross: "sales.ov.title.gross",
+  net: "sales.ov.title.net",
+  creators: "sales.ov.title.creators",
+  rising: "sales.ov.title.rising",
+  at_risk: "sales.ov.title.atRisk",
+  falling: "sales.ov.title.falling",
+  high_potential: "sales.ov.highPotential",
+  top10: "sales.ov.title.top10",
+  alerts: "sales.ov.title.alerts",
+  todas: "sales.ov.title.creators",
+  comparatives: "sales.ov.title.comparatives",
 };
 
 const CardDetailModal = ({ open, onOpenChange, cardType, creators }: Props) => {
+  const { t } = useLanguage();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-auto">
         <DialogHeader className="pr-8">
-          <DialogTitle>{TITLES[cardType] || "Detalle"}</DialogTitle>
+          <DialogTitle>{t(TITLES[cardType] ?? "sales.ov.detail")}</DialogTitle>
         </DialogHeader>
         {creators.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-8 text-center">No hay datos para este periodo.</p>
+          <p className="text-sm text-muted-foreground py-8 text-center">{t("sales.ov.noData")}</p>
         ) : (
           <div className="max-h-[500px] overflow-auto space-y-1.5">
             {/* Header simulando una tabla — labels chiquitos arriba de
                 las columnas, alineados con los valores de cada row. */}
             <div className="flex items-center gap-3 px-3 pt-1 pb-2 text-xs text-muted-foreground">
-              <span className="flex-1">Creadora</span>
-              <span className="w-20 text-right">Actual</span>
-              <span className="w-20 text-right">Anterior</span>
-              <span className="w-16 text-right">Variación</span>
+              <span className="flex-1">{t("sales.creator")}</span>
+              <span className="w-20 text-right">{t("sales.ov.current")}</span>
+              <span className="w-20 text-right">{t("sales.ov.previous")}</span>
+              <span className="w-16 text-right">{t("sales.col.variation")}</span>
             </div>
             {creators.map((c) => (
               <ListRow key={c.creatorKey}>
