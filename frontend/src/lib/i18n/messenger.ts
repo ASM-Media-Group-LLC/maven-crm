@@ -360,6 +360,11 @@ export const messenger = {
 
   // Visor de fotos y videos (ImageLightbox).
   "messenger.lightbox.rotar": { es: "Rotar", en: "Rotate" },
+  "messenger.lightbox.anterior": { es: "Anterior", en: "Previous" },
+  "messenger.lightbox.siguiente": { es: "Siguiente", en: "Next" },
+  "messenger.lightbox.posicion": { es: "{n} de {total}", en: "{n} of {total}" },
+  "messenger.lightbox.ayudaFlechas": { es: "← → para pasar", en: "← → to browse" },
+  "messenger.lightbox.ayudaDeslizar": { es: "Desliza para pasar", en: "Swipe to browse" },
   "messenger.lightbox.ayudaMouse": { es: "Doble clic para zoom · Scroll para ajustar · Arrastra para mover", en: "Double-click to zoom · Scroll to adjust · Drag to move" },
   "messenger.lightbox.ayudaTactil": { es: "Pellizca para zoom · Doble toque para acercar · Arrastra para mover", en: "Pinch to zoom · Double-tap to zoom in · Drag to move" },
 
