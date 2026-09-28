@@ -35,7 +35,7 @@ import { useUserRole } from "@/hooks/useUserRole";
 import StatusPicker, { getStatusColor } from "./components/StatusPicker";
 import DeleteChatDialog from "./components/DeleteChatDialog";
 import { useMentionedConversations } from "@/hooks/useMentionedConversations";
-import { getDraft } from "./drafts";
+import { getDraft, getDraftAttachmentCount } from "./drafts";
 import { useTypingInbox } from "@/hooks/useTypingInbox";
 
 interface ChatSidebarProps {
@@ -574,7 +574,16 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
 
   // Borrador pendiente (estilo WhatsApp): si dejaste un mensaje a medias en este
   // chat, la lista lo recuerda. En el chat activo no hace falta — lo estás viendo.
-  const draft = !isActive ? getDraft(user?.id, conversation.id) : "";
+  // Un borrador que es SOLO una captura pegada también cuenta: si la lista no lo
+  // mostrara, parecería que la imagen se perdió.
+  const draftTexto = !isActive ? getDraft(user?.id, conversation.id) : "";
+  const draftAdjuntos = !isActive ? getDraftAttachmentCount(user?.id, conversation.id) : 0;
+  const draft = draftTexto.replace(/\s*\n\s*/g, " ").trim()
+    || (draftAdjuntos === 1
+      ? t("messenger.sidebar.borradorUnAdjunto")
+      : draftAdjuntos > 1
+        ? t("messenger.sidebar.borradorAdjuntos", { n: draftAdjuntos })
+        : "");
   // Precedencia estilo WhatsApp: escribiendo > borrador > último mensaje. Se
   // sustituye el TEXTO del <p> que ya existe (ya trae truncate), así que no hay
   // renglón nuevo ni salto de alto ni el agujero de min-w-0 de #1602.

@@ -46,6 +46,9 @@ export const messenger = {
   "messenger.sidebar.sinNombre": { es: "Sin nombre", en: "No name" },
   "messenger.sidebar.escribiendo": { es: "escribiendo…", en: "typing…" },
   "messenger.sidebar.borrador": { es: "✏️ Borrador: {draft}", en: "✏️ Draft: {draft}" },
+  // Borrador que es solo adjuntos (una captura pegada y nada escrito).
+  "messenger.sidebar.borradorUnAdjunto": { es: "📎 1 adjunto", en: "📎 1 attachment" },
+  "messenger.sidebar.borradorAdjuntos": { es: "📎 {n} adjuntos", en: "📎 {n} attachments" },
   "messenger.sidebar.anclar": { es: "Anclar", en: "Pin" },
   "messenger.sidebar.desanclar": { es: "Desanclar", en: "Unpin" },
   "messenger.sidebar.archivar": { es: "Archivar", en: "Archive" },
