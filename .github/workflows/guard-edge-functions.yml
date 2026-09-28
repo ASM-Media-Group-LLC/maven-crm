@@ -41,6 +41,12 @@ jobs:
       - name: Guard — salida de los webhooks
         run: deno test --allow-read supabase/functions/_shared/webhook-salida.test.ts
 
+      # Mover un correo tiene que decir ADÓNDE fue a parar (COPYUID), para que
+      # la caché lo traslade en vez de borrarlo, y no dejar pasar un Message-ID
+      # con comillas o saltos de línea a un comando IMAP.
+      - name: Guard — mover correos (IMAP)
+        run: deno test --no-check supabase/functions/_shared/imap-mover.test.ts
+
       # Las acciones de webhooks de manage-api-keys: el guard de arriba las corre sin
       # tipos; acá el tipo de cada mensaje (clave que existe, variables) y de Datos.
       - name: Tipos — manage-api-keys

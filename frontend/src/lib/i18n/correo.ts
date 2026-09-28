@@ -68,8 +68,6 @@ export const correo = {
   "mail.labels.menu.edit": { es: "Modificar", en: "Edit" },
   "mail.labels.menu.remove": { es: "Eliminar etiqueta", en: "Remove label" },
   "mail.labels.menu.addSublabel": { es: "Agregar subetiqueta", en: "Add sublabel" },
-  "mail.labels.more": { es: "Más", en: "More" },
-  "mail.labels.less": { es: "Menos", en: "Less" },
   "mail.labels.new": { es: "Crear etiqueta nueva", en: "Create new label" },
   "mail.labels.manage": { es: "Administrar etiquetas", en: "Manage labels" },
   "mail.labels.expand": { es: "Mostrar subetiquetas de {name}", en: "Show sublabels of {name}" },

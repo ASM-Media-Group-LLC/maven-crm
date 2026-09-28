@@ -60,10 +60,10 @@ describe("la sección en la columna", () => {
     expect(pagina.slice(i, i + 1200)).toMatch(/<EtiquetasColumna/);
   });
 
-  it("tiene su encabezado y el + para crear, y «Administrar etiquetas» en «Más»", () => {
+  it("tiene su encabezado y el + para crear (sin el «Más» al pie)", () => {
     expect(columna).toMatch(/t\("mail\.labels"\)/);
     expect(columna).toMatch(/setDialogo\(\{ tipo: "nueva", madre: null \}\)/);
-    expect(columna).toMatch(/onClick=\{onAdministrar\}/);
+    expect(columna).not.toMatch(/mail\.labels\.more/);
   });
 
   it("volver a tocar la etiqueta activa la apaga", () => {

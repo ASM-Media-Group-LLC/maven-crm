@@ -870,14 +870,13 @@ export default function CorreoPage() {
           {/* ── Etiquetas ─────────────────────────────────────────────────
               Debajo de las carpetas, como en Gmail. Una etiqueta NO es una
               carpeta: cruza todas, así que un correo etiquetado y después
-              archivado sigue apareciendo acá. El árbol, el ⋮ de cada una y
-              «Más» viven en EtiquetasColumna. */}
+              archivado sigue apareciendo acá. El árbol y el ⋮ de cada una
+              viven en EtiquetasColumna. */}
           <EtiquetasColumna
             abierta={carpetasAbiertas}
             etiquetaVista={etiquetaVista}
             onAbrir={(id) => { setEtiquetaVista(id); setSel(null); }}
             noLeidos={noLeidosPorEtiqueta.data}
-            onAdministrar={() => setGestionandoEtiquetas(true)}
           />
         </nav>
 
