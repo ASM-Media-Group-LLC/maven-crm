@@ -47,6 +47,15 @@ jobs:
       - name: Guard — mover correos (IMAP)
         run: deno test --no-check supabase/functions/_shared/imap-mover.test.ts
 
+      # web-push: el título, el cuerpo y a quién le llega el push del Messenger
+      # (_shared/push-notify.ts) y quién aparece como emisor (web-push/nombre-emisor.ts:
+      # ahí va a entrar el nombre visible de la key cuando se escriba por API). Con
+      # tipos. Los tests no importan web-push/index.ts, que arranca el servidor al
+      # importarse; nombre-emisor.test.ts sí lo LEE, para que la función probada sea
+      # la que de verdad arma el push.
+      - name: Guard — web-push
+        run: deno test --allow-read supabase/functions/web-push/ supabase/functions/_shared/push-notify.test.ts
+
       # Las acciones de webhooks de manage-api-keys: el guard de arriba las corre sin
       # tipos; acá el tipo de cada mensaje (clave que existe, variables) y de Datos.
       - name: Tipos — manage-api-keys

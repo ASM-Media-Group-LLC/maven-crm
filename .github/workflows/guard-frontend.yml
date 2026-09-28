@@ -1,0 +1,119 @@
+name: Guard Frontend
+
+# El frontend se despliega solo al mergear a main (Dokploy arma la imagen con
+# `npm run build`) y hasta ahora ningún PR lo revisaba: un test roto, un error de
+# tipos nuevo o un build que no arma llegaban a main sin que nada avisara.
+# Solo lee el código: no despliega nada ni necesita secretos.
+#
+# Tres cosas, en dos trabajos en paralelo:
+#   1. vitest, la suite ENTERA, leyendo el resumen («Test Files»): un archivo de
+#      test que no carga no suma nada a «Tests» y solo se ve ahí (pasó el 16/09).
+#   2. tsc contra main: main arrastra errores viejos, así que se falla solo si el PR
+#      trae uno NUEVO, comparando la lista (sin línea ni columna), no el número.
+#   3. `npm run build`, como lo arma el Dockerfile.
+# La lógica de 1 y 2 está en scripts/ci/ (guardas.mjs, con sus pruebas).
+
+on:
+  pull_request:
+    paths:
+      - "frontend/**"
+      - "vite.config.ts"
+      - "vitest.config.ts"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig*.json"
+      - "tailwind.config.ts"
+      - "postcss.config.js"
+      - "components.json"
+      - "scripts/ci/**"
+      - ".github/workflows/guard-frontend.yml"
+
+permissions:
+  contents: read
+
+# Un push nuevo al PR cancela la corrida anterior: solo importa la última.
+concurrency:
+  group: guard-frontend-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  vitest:
+    name: vitest (suite entera)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Node 20: el mismo que arma la imagen (Dockerfile: node:20-alpine).
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: npm ci
+        run: npm ci --no-audit --no-fund
+
+      # Las pruebas de las propias guardas primero: si el lector del resumen de
+      # vitest se rompe, no tiene sentido confiar en lo que diga abajo.
+      - name: Pruebas de las guardas
+        run: node --test scripts/ci/guardas.test.mjs
+
+      # Por qué el tiempo por test sube a 30 s: con los 5 s de siempre, las pruebas
+      # que montan una página entera (las de «…EnIngles») pasan en una máquina
+      # rápida y se cortan por tiempo en el runner compartido, que tiene 2 núcleos.
+      # Un test colgado de verdad falla igual, a los 30 s.
+      # --maxWorkers=2: con 2 núcleos vitest usa 1 solo worker por defecto (núcleos
+      # menos uno) y la suite corre en fila.
+      - name: vitest — la suite entera, leyendo «Test Files»
+        run: node scripts/ci/vitest-completo.mjs --testTimeout=30000 --hookTimeout=30000 --maxWorkers=2
+
+  tipos-y-build:
+    name: tsc contra main + build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      # fetch-depth 2: en un pull_request, HEAD es el merge que arma GitHub (el PR
+      # encima de main tal como está AHORA) y hace falta su primer padre, que es
+      # ese main. Contra él se compara: es exactamente lo que va a quedar.
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: npm ci
+        id: npmci
+        run: npm ci --no-audit --no-fund
+
+      - name: tsc — ningún error de tipos nuevo respecto de main
+        run: |
+          set -euo pipefail
+          # Si HEAD no fuera el merge (dos padres), HEAD^1 sería el commit anterior
+          # del PR y la comparación no diría nada de main.
+          padres=$(git rev-list --parents -n 1 HEAD | wc -w)
+          if [ "$padres" -ne 3 ]; then
+            echo "::error::HEAD no es el merge del PR con main (tiene $((padres - 1)) padre(s)): no hay contra qué comparar."
+            exit 1
+          fi
+          node scripts/ci/tsc-sin-errores-nuevos.mjs --base=HEAD^1
+
+      # Aunque tsc haya dado rojo: el build es otra señal y conviene verla igual.
+      # Las VITE_ son las mismas marcas que usa el Dockerfile (las reales las pone
+      # docker-entrypoint.sh al arrancar el contenedor).
+      - name: npm run build
+        if: ${{ !cancelled() && steps.npmci.outcome == 'success' }}
+        env:
+          VITE_SUPABASE_URL: __RUNTIME_VITE_SUPABASE_URL__
+          VITE_SUPABASE_PUBLISHABLE_KEY: __RUNTIME_VITE_SUPABASE_PUBLISHABLE_KEY__
+          VITE_SUPABASE_PROJECT_ID: __RUNTIME_VITE_SUPABASE_PROJECT_ID__
+          VITE_PUBLIC_URL: __RUNTIME_VITE_PUBLIC_URL__
+          VITE_GIPHY_API_KEY: __RUNTIME_VITE_GIPHY_API_KEY__
+          VITE_DOCS_SYNC_URL: __RUNTIME_VITE_DOCS_SYNC_URL__
+        run: npm run build
