@@ -226,6 +226,16 @@ export default function CorreoPage() {
   // Qué etiqueta se está mirando. Null = una carpeta normal.
   const [etiquetaVista, setEtiquetaVista] = useState<string | null>(null);
   const correosDeEtiqueta = useCorreosDeEtiqueta(etiquetaVista);
+  // Tocar una carpeta SALE de la etiqueta. Antes el botón solo cambiaba
+  // `carpeta`, y como la lista le da prioridad a la etiqueta, seguías viendo la
+  // etiqueta con Enviados marcado al lado: había que desmarcarla a mano (Jhon,
+  // 28/09). Y si la carpeta ya era la actual, el efecto de `carpeta` no corre:
+  // por eso el mensaje abierto se suelta acá también.
+  const irACarpeta = (f: string) => {
+    setEtiquetaVista(null);
+    setSel(null);
+    setCarpeta(f);
+  };
   const [firmaAbierta, setFirmaAbierta] = useState(false);
   const firma = useMailSignature();
   // La firma que recibe el compositor: solo si está activada y no vacía.
@@ -730,11 +740,12 @@ export default function CorreoPage() {
             ))}
           {(carpetas.data ?? []).map(({ folder: f, unread }) => {
             const Icono = iconoCarpeta(f);
-            const activa = f === carpeta;
+            // Mirando una etiqueta, ninguna carpeta se marca: la vista es UNA sola.
+            const activa = !etiquetaVista && f === carpeta;
             return (
               <button
                 key={f}
-                onClick={() => setCarpeta(f)}
+                onClick={() => irACarpeta(f)}
                 title={carpetasAbiertas ? undefined : `${nombreCarpeta(f)}${unread > 0 ? ` · ${unread} sin leer` : ""}`}
                 aria-label={nombreCarpeta(f)}
                 aria-current={activa ? "page" : undefined}
@@ -849,11 +860,11 @@ export default function CorreoPage() {
           <div className="flex gap-1.5 overflow-x-auto border-b border-border/60 px-3 py-2 pb-1.5 lg:hidden">
             {(carpetas.data ?? [{ folder: carpeta, unread: 0 }]).map(({ folder: f }) => {
               const Icono = iconoCarpeta(f);
-              const activa = f === carpeta;
+              const activa = !etiquetaVista && f === carpeta;
               return (
                 <button
                   key={f}
-                  onClick={() => setCarpeta(f)}
+                  onClick={() => irACarpeta(f)}
                   className={cn(
                     "inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
                     activa
