@@ -12,8 +12,10 @@
 // pantalla siga enterándose, una vez.
 //
 // La línea base TIENE que poder fallar: este mismo archivo, corrido contra
-// origin/main (cfc36187, 28/09), falla en 5 de 7 casos (los dos que pasan son
-// los de comportamiento, que tienen que pasar en los dos lados) e imprime:
+// origin/main (abbec4e0, 29/09), falla en 5 de 8 casos. Los tres que pasan son
+// de comportamiento puro y tienen que pasar en los dos lados; los dos de
+// "mensaje ajeno" y "mi lectura" pasan allá todo lo que hace cada pantalla y
+// fallan recién en el costo. Imprime:
 //   cualquier pantalla: 4 canales; chat_messages:INSERT ×3, chat_participants:UPDATE ×2,
 //     todo sin filtro, también notifications:INSERT (la RLS corría para cada
 //     pestaña de cada persona); cada mensaje ajeno marcaba "entregado" DOS veces.
@@ -21,9 +23,9 @@
 //     chat_participants:UPDATE ×3.
 //   costo por evento: mensaje ajeno 3, mi lectura 2, lectura de otro 2, mensaje
 //     en un directo (updated_at) 1, notificación ajena 1.
-// En prod, ese día (82 pestañas de 40 personas): 257 escuchas del INSERT de
-// chat_messages, 188 del UPDATE de chat_participants y 71 de notifications,
-// ninguna filtrada.
+// En prod el 29/09 (70 pestañas de 36 personas): 218 escuchas sin filtro del
+// INSERT de chat_messages, 161 del UPDATE de chat_participants, 70 del UPDATE de
+// chat_conversations y 61 de notifications; ninguna de esas filtrada.
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, act, cleanup } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -127,7 +129,7 @@ const base = vi.hoisted(() => {
     auth: { getSession: () => Promise.resolve({ data: { session: null } }) },
   };
 
-  return { supabase, canales, llamadas, rpcs };
+  return { supabase, canales, llamadas, rpcs, filas };
 });
 
 vi.mock("@/integrations/supabase/client", () => ({ supabase: base.supabase }));
@@ -161,7 +163,7 @@ import { useMentionedConversations } from "@/hooks/useMentionedConversations";
 import { useMessages } from "@/hooks/useChat";
 
 // ── Las piezas del AppShell ─────────────────────────────────────────────────
-const visto = { noLeidos: -1, ultimoDeLaLista: "" };
+const visto = { noLeidos: -1, ultimoDeLaLista: "", nombres: {} as Record<string, string> };
 
 function Shell({ children }: { children?: ReactNode }) {
   useMessengerNotifications(); // AppShell
@@ -172,6 +174,7 @@ function Topbar() {
   useNotifications(); // NotificationBell
   const { conversations } = useChatShared();
   visto.ultimoDeLaLista = conversations[0]?.lastMessage?.id ?? "";
+  visto.nombres = Object.fromEntries(conversations.map((c) => [c.id, c.displayName]));
   return null;
 }
 function MessengerAbierto() {
@@ -335,15 +338,18 @@ describe("escuchas de Realtime por pestaña", () => {
     });
     await esperar();
 
-    expect(chequeos).toBe(1);
+    // Primero lo que cada pantalla hace con el mensaje: esto pasa IGUAL contra
+    // origin/main (el comportamiento no cambia); lo que falla allá es el costo.
     // La lista (useChat) lo puso arriba…
     expect(visto.ultimoDeLaLista).toBe("m1");
     // …el globito (useUnreadChatCount) volvió a contar…
     expect(base.rpcs).toContain("get_unread_counts");
     // …y el aviso (useMessengerNotifications) miró si la conversación está silenciada.
     expect(base.llamadas.some((l) => l.tabla === "chat_participants" && l.op === "select")).toBe(true);
-    // "Entregado" UNA vez por pestaña (antes: la lista y el aviso, dos upserts iguales).
+    // "Entregado" UNA vez por pestaña (en main: la lista y el aviso, dos upserts iguales).
     expect(base.llamadas.filter((l) => l.tabla === "chat_read_receipts" && l.op === "upsert")).toHaveLength(1);
+    // Y lo que le costó a Realtime (en main: 3).
+    expect(chequeos).toBe(1);
   });
 
   it("mi lectura (UPDATE de mi participación) llega al globito y a las menciones, y no recarga la lista", async () => {
@@ -358,11 +364,36 @@ describe("escuchas de Realtime por pestaña", () => {
     });
     await act(async () => { await new Promise((r) => setTimeout(r, 120)); });
     await esperar();
-    expect(chequeos).toBe(1);
+    // Comportamiento primero (igual que en main), costo al final (en main: 3).
     expect(base.rpcs).toContain("get_unread_counts");
     expect(base.rpcs).toContain("get_mentioned_conversations");
     // Solo cambió last_read_at: la lista no se recarga (como antes).
     expect(base.llamadas.some((l) => l.tabla === "chat_conversations")).toBe(false);
+    expect(chequeos).toBe(1);
+  });
+
+  it("un grupo renombrado se ve en la lista: filtrar a grupos no pierde nada", async () => {
+    // La escucha de chat_conversations va filtrada a grupos: la lista solo copia
+    // nombre, foto y descripción, que un directo no tiene. Esto pasa igual en main.
+    const grupo = { id: "g1", type: "group", name: "Equipo", avatar_url: null, description: null, created_by: "yo-1", created_at: "2026-09-28T12:00:00.000Z", updated_at: "2026-09-28T12:00:00.000Z" };
+    const filasAntes = {
+      participants: base.filas.chat_participants.slice(),
+      conversations: base.filas.chat_conversations.slice(),
+    };
+    base.filas.chat_conversations.push(grupo);
+    base.filas.chat_participants.push({ id: "p3", conversation_id: "g1", user_id: "yo-1", role: "admin", last_read_at: null, is_muted: false, notifications_mode: "all", joined_at: "2026-09-28T12:00:00.000Z", conversation: { type: "group", name: "Equipo" } });
+    try {
+      montar();
+      await esperar();
+      await act(async () => {
+        llega("chat_conversations", "UPDATE", { ...grupo, name: "Equipo Norte", updated_at: "2026-09-28T12:07:00.000Z" }, grupo);
+      });
+      await esperar();
+      expect(visto.nombres.g1).toBe("Equipo Norte");
+    } finally {
+      base.filas.chat_participants.splice(0, Infinity, ...filasAntes.participants);
+      base.filas.chat_conversations.splice(0, Infinity, ...filasAntes.conversations);
+    }
   });
 
   it("si me silencian o me cambian el rol (mi fila, algo más que leer), la lista se recarga", async () => {
