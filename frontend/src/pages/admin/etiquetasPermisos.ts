@@ -145,7 +145,7 @@ export const IGUAL_EN_INGLES = new Set([
   "Offboarding", "Info", "Promos", "Promobot", "Evaluator", "Workspace", "Admin", "Home", "Leads",
   "Funnel", "Settings", "Closers QA", "Calls", "Hubstaff", "New QA", "QA History", "QA Chat",
   "Models", "Notifications", "Chatters QA", "Scorecard", "Managers QA", "LLG QA", "Collections",
-  "Invoices", "Templates", "Roles",
+  "Invoices", "Templates", "Roles", "Drive",
 ]);
 
 /** Lo que se ve de un nombre del catálogo de permisos. La llave no se toca. */
