@@ -18,6 +18,10 @@ export const compartido = {
   },
   "shared.chat.errorCreatingConversation": { es: "Error al crear conversación", en: "Couldn't create the conversation" },
   "shared.chat.errorCreatingGroup": { es: "Error al crear grupo", en: "Couldn't create the group" },
+  "shared.chat.groupDailyLimit": {
+    es: "Ya creaste 30 grupos en las últimas 24 horas. Inténtalo más tarde.",
+    en: "You've created 30 groups in the last 24 hours. Try again later.",
+  },
   "shared.chat.groupCreated": { es: "Grupo \"{name}\" creado", en: "Group \"{name}\" created" },
   "shared.chat.conversationDeleted": { es: "Conversación eliminada", en: "Conversation deleted" },
   "shared.chat.errorDeletingConversation": { es: "Error al eliminar conversación", en: "Couldn't delete the conversation" },
