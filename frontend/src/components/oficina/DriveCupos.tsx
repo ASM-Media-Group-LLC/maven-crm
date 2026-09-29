@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { HardDrive } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -25,9 +26,21 @@ export function BarraDeUso() {
   const pct = cupo > 0 ? Math.min(100, (usado / cupo) * 100) : 100;
   const casiLleno = pct >= 90;
   return (
-    <div className="flex max-w-sm flex-col gap-1" data-testid="barra-uso-drive">
+    <div
+      className="flex w-full flex-col gap-2 rounded-panel border border-border/60 bg-card/60 px-4 py-3 sm:w-80"
+      data-testid="barra-uso-drive"
+    >
+      <div className="flex items-center justify-between gap-3 text-xs">
+        <span className="flex items-center gap-1.5 font-medium text-foreground">
+          <HardDrive className="h-3.5 w-3.5 text-muted-foreground" />
+          {t("drive.uso.titulo")}
+        </span>
+        <span className={cn("tabular-nums", casiLleno ? "font-medium text-warning" : "text-muted-foreground")}>
+          {pct < 1 && usado > 0 ? "<1" : Math.round(pct)}%
+        </span>
+      </div>
       <Progress
-        value={Math.max(pct, usado > 0 ? 1 : 0)}
+        value={Math.max(pct, usado > 0 ? 1.5 : 0)}
         aria-label={t("drive.uso.barra", { usado: tamano(usado), cupo: tamano(cupo) })}
         className="h-2 bg-foreground/10"
         indicatorClassName={cn(

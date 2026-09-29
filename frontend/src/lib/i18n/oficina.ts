@@ -110,6 +110,7 @@ export const oficina = {
   "drive.ruta": { es: "Ubicación", en: "Location" },
   "drive.compartir.conQuien": { es: "Personas con acceso", en: "People with access" },
   // Drive · cupo por persona
+  "drive.uso.titulo": { es: "Almacenamiento", en: "Storage" },
   "drive.uso.barra": { es: "Usas {usado} de {cupo}", en: "{usado} of {cupo} used" },
   "drive.uso.casiLleno": { es: "Te queda poco espacio. Vacía la papelera o pídele a un admin más espacio.", en: "You’re running out of space. Empty the trash or ask an admin for more." },
   "drive.cupos.boton": { es: "Espacio por persona", en: "Storage per person" },
