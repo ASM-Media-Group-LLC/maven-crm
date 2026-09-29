@@ -286,4 +286,71 @@ describe("LiveKitCallView", () => {
     expect(remoto.setVolume).toHaveBeenCalledWith(1);
     expect(remoto.setVolume).not.toHaveBeenCalledWith(0);
   });
+
+  // ── EL RELOJ DE COWORK Y LA CÁMARA CONGELADA ────────────────────────────
+  //
+  // Maria Villegas, 28/09/2026: su cara visible en la grilla de Maven y el
+  // reloj diciendo "cámara apagada" cinco minutos. El reloj de Cowork se mueve
+  // SOLO con el `camOn` de este aviso, así que congelarlo mueve tiempo pago:
+  // pegado en false le roba horas trabajadas, pegado en true le regala horas
+  // con la cámara apagada.
+  //
+  // La trampa: quien comparte pantalla genera DOS recuadros y el PRIMERO es el
+  // de la pantalla, con `isCameraOff: true` escrito a mano
+  // (`tilesDeParticipante`). Como acá se hace `find(p => p.isLocal)`, la
+  // variable `localCamOn` queda clavada en false mientras dure la pantalla —y
+  // era la dependencia que decidía si el aviso se recalculaba—.
+  //
+  // Estas dos pruebas fallan sobre el código anterior.
+  describe("⚠️ el aviso de cámara no se congela al compartir pantalla", () => {
+    /** Los dos recuadros de quien comparte: el de la PANTALLA primero. */
+    const recuadrosCompartiendo = (camaraEncendida: boolean) => [
+      makeParticipant({
+        sid: "local-sid-screen", isScreenSharing: true,
+        isCameraOff: true,                       // clavado, pase lo que pase
+        isCameraOffReal: !camaraEncendida,       // el estado de verdad
+      }),
+      makeParticipant({
+        sid: "local-sid", isScreenSharing: false,
+        isCameraOff: !camaraEncendida, isCameraOffReal: !camaraEncendida,
+      }),
+    ];
+
+    it("apagar la cámara compartiendo pantalla SÍ llega al reloj", () => {
+      const avisos = vi.fn();
+      lkState = { ...defaultLkState, participants: recuadrosCompartiendo(true) };
+      const { rerender } = render(
+        <LiveKitCallView {...defaultProps} onMediaStateChange={avisos} />,
+      );
+      expect(avisos).toHaveBeenLastCalledWith(expect.objectContaining({ camOn: true }));
+
+      // Apaga la cámara: el recuadro de la pantalla NO cambia (su isCameraOff
+      // ya era true). Lo único que se mueve es el estado real.
+      lkState = { ...lkState, participants: recuadrosCompartiendo(false) };
+      rerender(<LiveKitCallView {...defaultProps} onMediaStateChange={avisos} />);
+      expect(avisos).toHaveBeenLastCalledWith(expect.objectContaining({ camOn: false }));
+    });
+
+    it("y el repetidor de 10 s tampoco manda el valor viejo", () => {
+      vi.useFakeTimers();
+      try {
+        const avisos = vi.fn();
+        lkState = { ...defaultLkState, participants: recuadrosCompartiendo(true) };
+        const { rerender } = render(
+          <LiveKitCallView {...defaultProps} onMediaStateChange={avisos} />,
+        );
+        lkState = { ...lkState, participants: recuadrosCompartiendo(false) };
+        rerender(<LiveKitCallView {...defaultProps} onMediaStateChange={avisos} />);
+
+        avisos.mockClear();
+        vi.advanceTimersByTime(10_000);
+        expect(avisos).toHaveBeenCalled();
+        for (const [aviso] of avisos.mock.calls) {
+          expect(aviso).toEqual(expect.objectContaining({ camOn: false }));
+        }
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
 });
