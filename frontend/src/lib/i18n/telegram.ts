@@ -16,7 +16,7 @@ export const telegram = {
   "tg.emptyArchived": { es: "No hay chats archivados.", en: "No archived chats." },
   "tg.emptyUnread": { es: "No hay conversaciones sin leer.", en: "No unread conversations." },
   "tg.emptyFavorites": { es: "No hay favoritos todavía. Click derecho en un chat → Añadir a Favoritos.", en: "No favorites yet. Right-click a chat → Add to Favorites." },
-  "tg.emptyAll": { es: "No hay conversaciones todavía. Aparecen acá cuando alguien te escribe por Telegram.", en: "No conversations yet. They show up here when someone messages you on Telegram." },
+  "tg.emptyAll": { es: "No hay conversaciones todavía. Aparecen aquí cuando alguien te escribe por Telegram.", en: "No conversations yet. They show up here when someone messages you on Telegram." },
   "tg.pickConversation": { es: "Elige una conversación para verla.", en: "Pick a conversation to view it." },
   "tg.assignConversation": { es: "Asignar conversación", en: "Assign conversation" },
   "tg.assign": { es: "Asignar", en: "Assign" },

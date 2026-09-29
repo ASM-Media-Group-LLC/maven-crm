@@ -27,7 +27,7 @@ serve(async (req) => {
 
   const body = await req.json().catch(() => ({})) as { handles?: string[] };
   const handles = Array.isArray(body.handles) ? body.handles.slice(0, 25) : [];
-  if (!handles.length) return json({ ok: false, error: "pasá { handles: [...] }" }, 400);
+  if (!handles.length) return json({ ok: false, error: "pasa { handles: [...] }" }, 400);
 
   const tally = { read_stories: 0, read_empty: 0, user_not_found: 0, insufficient_funds: 0, other: 0 };
   const results: unknown[] = [];

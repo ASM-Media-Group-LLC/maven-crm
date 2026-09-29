@@ -296,7 +296,7 @@ export const equipoTools: AgentTool[] = [
         sin_vincular: sinVincular,
         nota:
           "Esta lista (whatsapp_members del grupo) es LA fuente para 'quiénes están en el grupo'. Hubstaff tiene " +
-          "OTRA gente (chatters) que NO está acá — si mezclas fuentes, aclara de dónde sale cada nombre. Los " +
+          "OTRA gente (chatters) que NO está aquí — si mezclas fuentes, aclara de dónde sale cada nombre. Los " +
           "sin_vincular son participantes reales sin cuenta Maven linkeada (display name crudo, puede ser basura).",
       };
     },

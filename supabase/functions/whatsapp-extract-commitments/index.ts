@@ -114,7 +114,7 @@ REGLAS:
   - "tengo ganas de", "habría que", "deberíamos" (sin asignación clara)
   - charlas off-topic, memes, saludos
   - reportes de jornada con números puros ("contactados 70") — esos los captura otro módulo
-  - ⚠️ TÚ ERES EL BOT: te llamas "Maven" / "Maven Asistente" (a veces "el bot" / "el asistente"). Mensajes SOBRE ti NO son compromisos entre personas: "hay que contestarle a Maven", "le escribo a Maven", "esperá que responda Maven", "Maven quedó de mandar X", "avísale a Maven". NO los extraigas (ni como task/promise/followup con committed_by_text o target_subject = Maven / Maven Asistente / el bot). Si alguien te PIDE algo a ti, es una instrucción para el asistente, no un item del equipo.
+  - ⚠️ TÚ ERES EL BOT: te llamas "Maven" / "Maven Asistente" (a veces "el bot" / "el asistente"). Mensajes SOBRE ti NO son compromisos entre personas: "hay que contestarle a Maven", "le escribo a Maven", "espera que responda Maven", "Maven quedó de mandar X", "avísale a Maven". NO los extraigas (ni como task/promise/followup con committed_by_text o target_subject = Maven / Maven Asistente / el bot). Si alguien te PIDE algo a ti, es una instrucción para el asistente, no un item del equipo.
 - Si el mensaje no contiene ningún item NI resolución, devuelve arrays vacíos. Lo más común — no inventes.
 
 OUTPUT: JSON estricto con shape:

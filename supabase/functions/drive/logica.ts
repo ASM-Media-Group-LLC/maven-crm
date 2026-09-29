@@ -132,8 +132,8 @@ export const legible = (b: number) =>
 export function chequearCupo(usado: number, cupo: number, size: number) {
   if (usado + size > cupo) {
     throw new HttpError(
-      `No te alcanza el espacio: usás ${legible(usado)} de ${legible(cupo)} y este archivo pesa ${legible(size)}. ` +
-        "Vaciá la papelera o pedile a un admin más espacio.",
+      `No te alcanza el espacio: usas ${legible(usado)} de ${legible(cupo)} y este archivo pesa ${legible(size)}. ` +
+        "Vacía la papelera o pídele a un admin más espacio.",
       413,
     );
   }

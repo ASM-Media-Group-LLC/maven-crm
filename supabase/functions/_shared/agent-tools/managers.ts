@@ -689,11 +689,11 @@ export const managersTools: AgentTool[] = [
     description:
       "EL TOTAL de creadoras por manager (el DENOMINADOR) + cuántas promocionaron y contactó ese día, con % " +
       "calculados. LA tool para '¿en % cómo va cada manager?', '¿cuántas creadoras tiene Carolina/Fabiana?'. " +
-      "⚠️ NUNCA pidas al equipo el total ni digas que no lo tienes: SIEMPRE está acá (activas por manager asignada, " +
+      "⚠️ NUNCA pidas al equipo el total ni digas que no lo tienes: SIEMPRE está aquí (activas por manager asignada, " +
       "Plus=Carolina, Massive=Fabiana). Tampoco lo deduzcas del growth feed (ese SOLO trae las EN ALERTA). " +
       "'date' (YYYY-MM-DD) para otro día; default hoy. Campos: total_active (el denominador), promoted_count/" +
       "promoted_pct, contacted_count/contacted_pct y covered_count = a cuántas Promolog logró LEER ese día — si " +
-      "covered_count < total_active, aclaralo al dar el %: las no leídas no son 'no promocionó' (#818). La fila manager_name=null = activas SIN manager: mencionala si es >0.",
+      "covered_count < total_active, acláralo al dar el %: las no leídas no son 'no promocionó' (#818). La fila manager_name=null = activas SIN manager: menciónala si es >0.",
     input_schema: {
       type: "object",
       properties: {

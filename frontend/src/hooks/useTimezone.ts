@@ -9,7 +9,7 @@
 //
 // Bogotá no tiene horario de verano: GMT-5 todo el año, sin excepciones.
 
-/** La zona de Maven. Si algún día cambia, se cambia acá y en ningún otro lado. */
+/** La zona de Maven. Si algún día cambia, se cambia aquí y en ningún otro lado. */
 export const ZONA_MAVEN = "America/Bogota";
 
 export function useTimezone() {

@@ -379,7 +379,7 @@ export async function runFacebook({ account = { sessionFile: FB_SESSION, index: 
   const sesion = sesionUsable(sessionFile, "facebook");
   if (!sesion.ok) {
     log(`⚠️ Facebook: ${sesion.motivo}. NO se escanea (correr sin sesión solo produce falsos "no promocionó").`);
-    log("   Logueá la cuenta en el panel, o importala de Chrome:  node import-session.mjs facebook");
+    log("   Loguea la cuenta en el panel, o impórtala de Chrome:  node import-session.mjs facebook");
     return;
   }
 
@@ -411,7 +411,7 @@ export async function runFacebook({ account = { sessionFile: FB_SESSION, index: 
         await page.goto(t.url, { waitUntil: "domcontentloaded", timeout: PACING.navTimeoutMs });
         // ¿nos mandó a login? → sesión caída: cortamos la corrida entera (seguir
         // sería marcar "sin posts" a todas, que es un "No" falso masivo).
-        if (/\/login|checkpoint/.test(page.url())) { log("⛔ Facebook: sesión caída, re-logueá la cuenta."); break; }
+        if (/\/login|checkpoint/.test(page.url())) { log("⛔ Facebook: sesión caída, re-loguea la cuenta."); break; }
         try { await page.waitForSelector('[role="article"]', { timeout: 15000 }); } catch { /* puede no haber muro legible: se decide abajo */ }
         await sleep(1200 + Math.random() * 1200);
         const { posts, vistos, sinFecha, fueraVentana, muestraFecha } = await extractPosts(page, desdeMs);

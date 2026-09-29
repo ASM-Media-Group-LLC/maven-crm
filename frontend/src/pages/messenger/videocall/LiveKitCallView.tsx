@@ -850,7 +850,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
 
       {/* Navegador de salas (Cowork): flechas estilo Instagram + lista. Al
           moverse, el dueño cuelga la sala anterior y te mete MUTEADO a la
-          nueva (initialMicOn=false del flujo de entrar a sala): no quedás como
+          nueva (initialMicOn=false del flujo de entrar a sala): no quedas como
           presencia fantasma ni hablando donde ya no estás mirando. */}
       {roomSwitcher && roomSwitcher.rooms.length > 1 && (() => {
         const n = roomSwitcher.rooms.length;

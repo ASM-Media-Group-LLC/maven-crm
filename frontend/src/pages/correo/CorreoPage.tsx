@@ -890,7 +890,7 @@ export default function CorreoPage() {
           {/* ── Etiquetas ─────────────────────────────────────────────────
               Debajo de las carpetas, como en Gmail. Una etiqueta NO es una
               carpeta: cruza todas, así que un correo etiquetado y después
-              archivado sigue apareciendo acá. El árbol y el ⋮ de cada una
+              archivado sigue apareciendo aquí. El árbol y el ⋮ de cada una
               viven en EtiquetasColumna. */}
           <EtiquetasColumna
             abierta={carpetasAbiertas}
@@ -974,7 +974,7 @@ export default function CorreoPage() {
 
           {/* [&_[data-radix-scroll-area-viewport]>div]: Radix envuelve el
               contenido en un div display:table; min-width:100% que crece más
-              que el viewport y SE COME EL BORDE DERECHO (acá, las horas de
+              que el viewport y SE COME EL BORDE DERECHO (aquí, las horas de
               la lista — mismo bug que ya mordió a Messenger). Forzarlo a
               block lo clampa y deja funcionar a truncate/min-w-0. */}
           <AlertDialog open={!!confirmarBorrado} onOpenChange={(o) => { if (!o) setConfirmarBorrado(null); }}>
@@ -1255,7 +1255,7 @@ export default function CorreoPage() {
                     Si al sacarlos no queda nada, se deja el original. */}
                 {/* La barra del correo abierto: «Mover a» y «Etiquetar como»,
                     los mismos menús de la selección, aplicados a TODA la
-                    conversación. Keila etiqueta y mueve desde acá, con el
+                    conversación. Keila etiqueta y mueve desde aquí, con el
                     correo abierto — como en Gmail. */}
                 <div className="mb-3 flex items-center gap-1">
                   <DropdownMenu>
@@ -1311,7 +1311,7 @@ export default function CorreoPage() {
                     {sinPrefijos(mensaje.data.subject) || mensaje.data.subject}
                   </h2>
                   {/* Las pastillas con × junto al asunto, como Gmail: TODAS
-                      las etiquetas de la conversación (acá no se esconde
+                      las etiquetas de la conversación (aquí no se esconde
                       ninguna) y «Recibidos» si sigue en la bandeja. */}
                   {abiertoEnRecibidos.length > 0 && (
                     <PastillaEtiqueta

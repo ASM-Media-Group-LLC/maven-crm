@@ -15,7 +15,7 @@ const GB = 1024 * 1024 * 1024;
 /** El cupo general, igual que drive_cupo_por_defecto() en la base. */
 export const CUPO_POR_DEFECTO = 50 * GB;
 
-/** «Usás 3,2 GB de 50 GB», como la de Google Drive. Se pone ámbar al 90%. */
+/** «Usas 3,2 GB de 50 GB», como la de Google Drive. Se pone ámbar al 90%. */
 export function BarraDeUso() {
   const { t } = useLanguage();
   const uso = useUsoDrive();

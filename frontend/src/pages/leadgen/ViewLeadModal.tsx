@@ -231,7 +231,7 @@ const ViewLeadModal = ({ open, onOpenChange, lead, onDelete }: Props) => {
 
             {/* Evidencia que el LG subió al crear el lead — antes se
                 guardaba en leadgen_evidence_files pero nunca se mostraba
-                en ningún componente. Ahora se ve acá. */}
+                en ningún componente. Ahora se ve aquí. */}
             <EvidenceViewer entityType="lead" entityId={lead.id} />
 
             <Separator />
