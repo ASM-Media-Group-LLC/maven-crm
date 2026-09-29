@@ -54,7 +54,6 @@ export const oficina = {
 
   // Drive (sobre el NAS de la oficina)
   "drive.titulo": { es: "Drive", en: "Drive" },
-  "drive.descripcion": { es: "Los archivos del equipo, guardados en el NAS de la oficina.", en: "Your team’s files, stored on the office NAS." },
   "drive.nuevo": { es: "Nuevo", en: "New" },
   "drive.nuevaCarpeta": { es: "Carpeta nueva", en: "New folder" },
   "drive.subirArchivos": { es: "Subir archivos", en: "Upload files" },

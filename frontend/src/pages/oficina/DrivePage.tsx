@@ -136,7 +136,6 @@ export default function DrivePage() {
     <Page>
       <PageHeader
         title={t("drive.titulo")}
-        subtitle={t("drive.descripcion")}
         actions={sePuedeSubir || isAdmin ? (
           <>
           {isAdmin && (
