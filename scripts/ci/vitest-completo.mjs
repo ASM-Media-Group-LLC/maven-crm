@@ -62,7 +62,8 @@ const t = resumen.pruebas;
 console.log("\n── guarda de vitest ──");
 console.log(`archivos de test: ${a ? `${a.passed} ok, ${a.failed} con fallas, ${a.skipped} salteados (de ${a.total})` : "sin resumen"}`);
 if (enDisco != null) console.log(`archivos de test en frontend/src: ${enDisco}`);
-console.log(`pruebas: ${t ? `${t.passed} ok, ${t.failed} con fallas, ${t.skipped} salteadas (de ${t.total})` : "sin resumen"}`);
+const esperadas = t?.expectedFail ? `, ${t.expectedFail} fallas esperadas (test.fails)` : "";
+console.log(`pruebas: ${t ? `${t.passed} ok, ${t.failed} con fallas, ${t.skipped} salteadas${esperadas} (de ${t.total})` : "sin resumen"}`);
 for (const f of resumen.archivosQueFallan) console.log(`::error file=${f},title=vitest::falla o no carga`);
 
 if (process.env.GITHUB_STEP_SUMMARY) {

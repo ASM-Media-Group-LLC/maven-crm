@@ -28,14 +28,16 @@ const raiz = git("rev-parse", "--show-toplevel");
 const cabezaSha = git("rev-parse", "HEAD");
 const baseSha = git("merge-base", "HEAD", baseRef);
 
-function contarFuentes(dir) {
-  let n = 0;
+/** Los .ts/.tsx de frontend/src en disco, como los lista tsc sin la raíz
+ *  («frontend/src/x.tsx»). Tienen que estar todos en su --listFiles. */
+function fuentesDelFrontend(dir, rel = "frontend/src") {
+  const res = [];
   for (const e of readdirSync(dir, { withFileTypes: true })) {
     const ruta = join(dir, e.name);
-    if (e.isDirectory()) n += contarFuentes(ruta);
-    else if (/\.tsx?$/.test(e.name) && !e.name.endsWith(".d.ts")) n++;
+    if (e.isDirectory()) res.push(...fuentesDelFrontend(ruta, `${rel}/${e.name}`));
+    else if (/\.tsx?$/.test(e.name) && !e.name.endsWith(".d.ts")) res.push(`${rel}/${e.name}`);
   }
-  return n;
+  return res;
 }
 
 function correrTsc(dir) {
@@ -43,7 +45,7 @@ function correrTsc(dir) {
     const inicio = Date.now();
     const hijo = spawn(
       process.execPath,
-      [join(dir, "node_modules", "typescript", "bin", "tsc"), "--noEmit", "-p", "tsconfig.app.json", "--pretty", "false", "--diagnostics"],
+      [join(dir, "node_modules", "typescript", "bin", "tsc"), "--noEmit", "-p", "tsconfig.app.json", "--pretty", "false", "--diagnostics", "--listFiles"],
       { cwd: dir, env: { ...process.env, NO_COLOR: "1" }, stdio: ["ignore", "pipe", "pipe"] },
     );
     let salida = "";
@@ -60,7 +62,7 @@ console.log(`base:   ${baseSha} (merge-base con ${baseRef})`);
 let dirBase = null;
 let salidaFinal = 1;
 try {
-  const minimoDeArchivos = contarFuentes(join(raiz, "frontend", "src"));
+  const esperados = fuentesDelFrontend(join(raiz, "frontend", "src"));
   let base;
   let cabeza;
   if (baseSha === cabezaSha) {
@@ -97,15 +99,17 @@ try {
   const lBase = leerSalidaTsc(base.salida, raices);
   const lCabeza = leerSalidaTsc(cabeza.salida, raices);
   const problemas = [
-    ...problemasTsc("base", { codigo: base.codigo, lectura: lBase, minimoDeArchivos: null }),
-    ...problemasTsc("cabeza", { codigo: cabeza.codigo, lectura: lCabeza, minimoDeArchivos }),
+    ...problemasTsc("base", { codigo: base.codigo, lectura: lBase, esperados: null }),
+    ...problemasTsc("cabeza", { codigo: cabeza.codigo, lectura: lCabeza, esperados }),
   ];
   const { nuevos, arreglados } = erroresNuevos(lBase.errores, lCabeza.errores);
 
   console.log(`\n── guarda de tsc ──`);
   const memoria = (l) => (l.diagnosticos["Memory used"] != null ? `${Math.round(l.diagnosticos["Memory used"] / 1024)} MB` : "? MB");
-  console.log(`base:   ${lBase.errores.length} error(es), ${lBase.diagnosticos.Files ?? "?"} archivos, ${base.segundos} s, ${memoria(lBase)}`);
-  console.log(`cabeza: ${lCabeza.errores.length} error(es), ${lCabeza.diagnosticos.Files ?? "?"} archivos, ${cabeza.segundos} s, ${memoria(lCabeza)}`);
+  console.log(`base:   ${lBase.errores.length} error(es), ${lBase.archivos.length} archivos, ${base.segundos} s, ${memoria(lBase)}`);
+  console.log(`cabeza: ${lCabeza.errores.length} error(es), ${lCabeza.archivos.length} archivos, ${cabeza.segundos} s, ${memoria(lCabeza)}`);
+  const revisados = new Set(lCabeza.archivos);
+  console.log(`frontend/src: ${esperados.length} .ts/.tsx en disco; tsc los revisó todos: ${esperados.every((r) => revisados.has(r)) ? "sí" : "NO"}`);
   console.log(`nuevos: ${nuevos.length} · arreglados: ${arreglados}`);
   for (const e of nuevos) {
     console.log(anotacion(e));
@@ -118,8 +122,8 @@ try {
       "",
       `| | errores | archivos |`,
       "|---|---|---|",
-      `| base \`${baseSha.slice(0, 8)}\` | ${lBase.errores.length} | ${lBase.diagnosticos.Files ?? "?"} |`,
-      `| cabeza \`${cabezaSha.slice(0, 8)}\` | ${lCabeza.errores.length} | ${lCabeza.diagnosticos.Files ?? "?"} |`,
+      `| base \`${baseSha.slice(0, 8)}\` | ${lBase.errores.length} | ${lBase.archivos.length} |`,
+      `| cabeza \`${cabezaSha.slice(0, 8)}\` | ${lCabeza.errores.length} | ${lCabeza.archivos.length} |`,
       "",
       `Nuevos: **${nuevos.length}** · arreglados: ${arreglados}`,
       "",

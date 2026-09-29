@@ -12,6 +12,12 @@ name: Guard Frontend
 #      trae uno NUEVO, comparando la lista (sin línea ni columna), no el número.
 #   3. `npm run build`, como lo arma el Dockerfile.
 # La lógica de 1 y 2 está en scripts/ci/ (guardas.mjs, con sus pruebas).
+#
+# `paths`: además del frontend, lo que sus tests LEEN o importan de afuera (edge
+# functions, migraciones, nginx.conf, el servidor del NAS). Si un PR toca solo uno
+# de esos archivos y rompe el test, la guarda tiene que correr igual.
+# scripts/ci/filtro-cubre-lecturas.mjs lo revisa en cada corrida: si un test nuevo
+# lee algo que la lista no cubre, falla y dice qué sumar.
 
 on:
   pull_request:
@@ -24,9 +30,13 @@ on:
       - "tsconfig*.json"
       - "tailwind.config.ts"
       - "postcss.config.js"
-      - "components.json"
       - "scripts/ci/**"
       - ".github/workflows/guard-frontend.yml"
+      # Lo que los tests de frontend/src leen de afuera (con fs o import.meta.glob).
+      - "supabase/functions/**"
+      - "supabase/migrations/**"
+      - "infra/nas-drive/**"
+      - "nginx.conf"
 
 permissions:
   contents: read
@@ -57,6 +67,7 @@ jobs:
           cache: npm
 
       - name: npm ci
+        id: npmci
         run: npm ci --no-audit --no-fund
 
       # Las pruebas de las propias guardas primero: si el lector del resumen de
@@ -72,6 +83,12 @@ jobs:
       # menos uno) y la suite corre en fila.
       - name: vitest — la suite entera, leyendo «Test Files»
         run: node scripts/ci/vitest-completo.mjs --testTimeout=30000 --hookTimeout=30000 --maxWorkers=2
+
+      # Que el filtro `paths` de arriba cubra todo lo que la guarda lee. Corre
+      # aunque vitest haya dado rojo: es otra señal.
+      - name: El filtro paths cubre lo que leen los tests
+        if: ${{ !cancelled() && steps.npmci.outcome == 'success' }}
+        run: node scripts/ci/filtro-cubre-lecturas.mjs
 
   tipos-y-build:
     name: tsc contra main + build

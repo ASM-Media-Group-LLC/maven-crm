@@ -3,12 +3,22 @@
 // es una forma real en que una corrida rota podría pasar por verde.
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import {
   anotacion,
+  archivosDeLaCita,
+  cadenasDelFuente,
+  citasDeRutas,
   corridaParcial,
   erroresNuevos,
+  globARegex,
+  lecturasDeLaGuarda,
+  lecturasSinCubrir,
   leerResumenVitest,
   leerSalidaTsc,
+  patronesDePaths,
+  problemasDelFiltro,
   problemasTsc,
   problemasVitest,
 } from "./guardas.mjs";
@@ -26,7 +36,7 @@ const verde = `
 
 test("vitest: todo verde y la cuenta en disco coincide → sin problemas", () => {
   const r = leerResumenVitest(verde);
-  assert.deepEqual(r.archivos, { failed: 0, passed: 213, skipped: 0, todo: 0, total: 213, ilegible: null });
+  assert.deepEqual(r.archivos, { failed: 0, passed: 213, expectedFail: 0, skipped: 0, todo: 0, total: 213, ilegible: null });
   assert.equal(r.pruebas.passed, 1721);
   assert.deepEqual(problemasVitest({ codigo: 0, resumen: r, enDisco: 213 }), []);
 });
@@ -89,6 +99,22 @@ test("vitest: salteados y todo cierran la cuenta; errores sueltos → rojo", () 
   const p = problemasVitest({ codigo: 1, resumen: r, enDisco: 213 });
   assert.ok(p.some((x) => x.includes("sin atrapar")));
   assert.ok(p.some((x) => x.includes("código 1")));
+});
+
+test("vitest: «expected fail» (un test.fails que falló) se lee y cierra la cuenta", () => {
+  // La salida real de vitest 4.1 con test.fails, skip, todo y describe.skip.
+  const salida = " Test Files  2 passed | 2 skipped (4)\n      Tests  2 passed | 1 expected fail | 4 skipped | 2 todo (9)\n";
+  const r = leerResumenVitest(salida);
+  assert.equal(r.pruebas.ilegible, null);
+  assert.equal(r.pruebas.expectedFail, 1);
+  assert.equal(r.pruebas.passed, 2, "la falla esperada no suma a passed");
+  assert.deepEqual(problemasVitest({ codigo: 0, resumen: r, enDisco: 4 }), []);
+});
+
+test("vitest: una línea «Tests» que no cierra (corrida cortada a la mitad) → rojo", () => {
+  const r = leerResumenVitest(" Test Files  213 passed (213)\n      Tests  1700 passed (1721)\n");
+  const p = problemasVitest({ codigo: 0, resumen: r, enDisco: 213 });
+  assert.ok(p.some((x) => x.includes("«Tests» no cierra") && x.includes("1700 ≠ 1721")), p.join("\n"));
 });
 
 test("vitest: una palabra desconocida en el resumen no se ignora", () => {
@@ -174,24 +200,170 @@ test("tsc: una caída (stack trace, sin memoria) NO se toma por «sin errores nu
   const caida = "/x/node_modules/typescript/lib/tsc.js:120000\n      throw e;\nRangeError: Maximum call stack size exceeded\n";
   const l = leerSalidaTsc(caida);
   assert.equal(l.errores.length, 0);
-  const p = problemasTsc("cabeza", { codigo: 1, lectura: l, minimoDeArchivos: 900 });
+  const p = problemasTsc("cabeza", { codigo: 1, lectura: l, esperados: ["frontend/src/a.tsx"] });
   assert.ok(p.some((x) => x.includes("sin ningún error legible")));
   assert.ok(p.some((x) => x.includes("no son errores")));
-  assert.ok(problemasTsc("cabeza", { codigo: 134, lectura: leerSalidaTsc(tscBase), minimoDeArchivos: null })
+  assert.equal(l.archivos.length, 0, "la primera línea del stack trace no es un archivo listado");
+  assert.ok(problemasTsc("cabeza", { codigo: 134, lectura: leerSalidaTsc(tscBase), esperados: null })
     .some((x) => x.includes("código 134")));
 });
 
-test("tsc: si mira menos archivos que los que tiene frontend/src, no revisó el frontend", () => {
-  // Como `cd frontend && npx tsc --noEmit`: resuelve un tsconfig vacío y da 0 siempre.
+const raizCabeza = "/home/runner/work/maven/maven";
+const listado = (...rutas) => rutas.map((r) => `${raizCabeza}/${r}`).join("\n") + "\n";
+const esperados = ["frontend/src/main.tsx", "frontend/src/App.tsx", "frontend/src/test/a.test.tsx"];
+
+test("tsc: lee --listFiles sin la raíz y sin confundirlo con errores", () => {
+  const l = leerSalidaTsc(listado("node_modules/typescript/lib/lib.es2020.d.ts", ...esperados) + tscBase, [raizCabeza]);
+  assert.deepEqual(l.ilegibles, []);
+  assert.equal(l.errores.length, 3);
+  assert.deepEqual(l.archivos, ["node_modules/typescript/lib/lib.es2020.d.ts", ...esperados]);
+  assert.deepEqual(problemasTsc("cabeza", { codigo: 2, lectura: l, esperados }), []);
+});
+
+test("tsc: si no revisó TODOS los archivos de frontend/src → rojo (include achicado)", () => {
+  // tsconfig.app.json con include ["frontend/src/main.tsx"]: sigue viendo ~1500
+  // archivos (lib y node_modules), pero deja afuera los tests y lo que main no importa.
+  const achicado = leerSalidaTsc(listado("node_modules/typescript/lib/lib.es2020.d.ts", "frontend/src/main.tsx", "frontend/src/App.tsx"), [raizCabeza]);
+  const p = problemasTsc("cabeza", { codigo: 0, lectura: achicado, esperados });
+  assert.ok(p.some((x) => x.includes("no revisó 1 de los 3") && x.includes("frontend/src/test/a.test.tsx")), p.join("\n"));
+});
+
+test("tsc: sin --listFiles (o `cd frontend && npx tsc`, que no revisa nada) → rojo", () => {
   const vacio = leerSalidaTsc("Files:                           0\n");
-  const p = problemasTsc("cabeza", { codigo: 0, lectura: vacio, minimoDeArchivos: 900 });
-  assert.ok(p.some((x) => x.includes("no revisó el frontend")), p.join("\n"));
-  assert.ok(problemasTsc("cabeza", { codigo: 0, lectura: leerSalidaTsc(""), minimoDeArchivos: 900 })
-    .some((x) => x.includes("Files:")));
-  assert.deepEqual(problemasTsc("cabeza", { codigo: 2, lectura: leerSalidaTsc(tscBase), minimoDeArchivos: 900 }), []);
+  const p = problemasTsc("cabeza", { codigo: 0, lectura: vacio, esperados });
+  assert.ok(p.some((x) => x.includes("no listó ningún archivo")), p.join("\n"));
+  assert.deepEqual(problemasTsc("base", { codigo: 0, lectura: vacio, esperados: null }), [], "la base no se compara contra el disco");
 });
 
 test("tsc: la anotación de GitHub apunta al archivo y escapa saltos", () => {
   const [e] = leerSalidaTsc("frontend/src/a.tsx(3,7): error TS1: 100% roto\n").errores;
   assert.equal(anotacion(e), "::error file=frontend/src/a.tsx,line=3,col=7,title=tsc: error nuevo::error TS1: 100%25 roto");
+});
+
+// ─── el filtro `paths` ───────────────────────────────────────────────────────
+
+test("paths: los patrones se leen como el filtro de GitHub", () => {
+  const cubre = (p, ruta) => globARegex(p).test(ruta);
+  assert.ok(cubre("frontend/**", "frontend/src/a/b.tsx"));
+  assert.ok(!cubre("frontend/**", "frontendx/a.ts"));
+  assert.ok(cubre("tsconfig*.json", "tsconfig.app.json"));
+  assert.ok(!cubre("frontend/*", "frontend/src/a.ts"), "«*» no cruza carpetas");
+  assert.ok(cubre("supabase/**/index.ts", "supabase/index.ts"), "«**/» también es ninguna carpeta");
+  assert.ok(cubre("supabase/**/index.ts", "supabase/functions/x/index.ts"));
+  assert.ok(!cubre("nginx.conf", "nginxxconf"), "el punto es un punto");
+  assert.ok(globARegex("a/*.{ts,tsx}", { llaves: true }).test("a/b.tsx"));
+  // Lo que no sabe leer lo rechaza: un patrón mal leído daría por cubierto lo que no lo está.
+  for (const raro of ["a/?.ts", "a/[ab].ts", "!a/**", "a/{b,c}"]) assert.throws(() => globARegex(raro), /no sabe leer/, raro);
+});
+
+test("paths: se leen del workflow real, y un bloque que no se entiende tira", () => {
+  const yml = readFileSync(new URL("../../.github/workflows/guard-frontend.yml", import.meta.url), "utf8");
+  const patrones = patronesDePaths(yml);
+  assert.ok(patrones.includes("frontend/**"));
+  assert.ok(patrones.includes("tsconfig*.json"));
+  const con = (cuerpo) => `on:\n  pull_request:\n${cuerpo}\njobs:\n  x: {}\n`;
+  assert.deepEqual(patronesDePaths(con('    paths:\n      - "a/**"   # comentario\n      - b.json\n      # otro\n      - \'c\'')), ["a/**", "b.json", "c"]);
+  assert.throws(() => patronesDePaths(con("    branches: [main]")), /no tiene «paths:»/);
+  assert.throws(() => patronesDePaths(con("    paths: [a, b]")), /no tiene «paths:»/);
+  assert.throws(() => patronesDePaths(con('    paths:\n      - "a/**"\n      "b"')), /no entiende/);
+  assert.throws(() => patronesDePaths("on: push\n"), /pull_request/);
+});
+
+const ts = createRequire(import.meta.url)("typescript");
+
+test("paths: de un test salen todas sus cadenas (no los comentarios); del resto, solo lo importado", () => {
+  const fuente = `
+    import { x } from "../lib/x";
+    // leer("supabase/functions/comentario.ts") no es leer
+    const a = readFileSync(resolve(process.cwd(), "nginx.conf"), "utf8");
+    const b = import.meta.glob(["/supabase/migrations/1_a.sql", "/infra/y.mjs"], { query: "?raw" });
+    const c = \`supabase/functions/\${nombre}/index.ts\`;
+    const d = await import("./perezoso");
+    const e = "/docs/ruta-de-la-app";
+  `;
+  const todo = cadenasDelFuente(ts, fuente, "frontend/src/test/a.test.ts", { todo: true });
+  for (const c of ["../lib/x", "nginx.conf", "/supabase/migrations/1_a.sql", "/infra/y.mjs", "supabase/functions/*/index.ts", "./perezoso"]) {
+    assert.ok(todo.includes(c), `${c} en ${JSON.stringify(todo)}`);
+  }
+  assert.ok(!todo.some((c) => c.includes("comentario")), "un comentario no es una lectura");
+  const imports = cadenasDelFuente(ts, fuente, "frontend/src/lib/a.ts", { todo: false });
+  assert.deepEqual(imports.sort(), ["../lib/x", "./perezoso", "/infra/y.mjs", "/supabase/migrations/1_a.sql"].sort());
+});
+
+const repo = new Set([
+  "frontend/src/test/a.test.ts",
+  "frontend/src/lib/x.ts",
+  "nginx.conf",
+  "supabase/functions/f/index.ts",
+  "supabase/functions/g/index.ts",
+  "supabase/functions/_shared/cors.ts",
+  "supabase/migrations/1_a.sql",
+  "infra/y.mjs",
+  "docs/guia.md",
+]);
+const carpetasDe = (archivos) => {
+  const c = new Set();
+  for (const a of archivos) for (let d = a.slice(0, a.lastIndexOf("/")); d; d = d.includes("/") ? d.slice(0, d.lastIndexOf("/")) : "") c.add(d);
+  return c;
+};
+const entradas = { carpetasDeLaRaiz: ["frontend", "supabase", "infra", "docs"], archivosDeLaRaiz: ["nginx.conf"] };
+
+test("paths: qué cadena es una ruta del repo", () => {
+  const { relativas, desdeLaRaiz } = citasDeRutas(
+    ["./x", "../../supabase/y", "/supabase/migrations/1_a.sql?raw", "nginx.conf", "supabase", "ver supabase/x", "supabase/x.ts es un ejemplo", "https://a/b", "/dashboard", ""],
+    entradas,
+  );
+  assert.deepEqual(relativas, ["./x", "../../supabase/y"]);
+  assert.deepEqual(desdeLaRaiz, ["supabase/migrations/1_a.sql", "nginx.conf"], "«supabase» sola es una palabra y «ver …» es un texto");
+});
+
+test("paths: una cita son los archivos que existen (glob, carpeta, import sin extensión)", () => {
+  const carpetas = carpetasDe(repo);
+  assert.deepEqual(archivosDeLaCita("supabase/functions/*/index.ts", repo, carpetas), ["supabase/functions/f/index.ts", "supabase/functions/g/index.ts"]);
+  assert.deepEqual(archivosDeLaCita("frontend/src/lib/x", repo, carpetas), ["frontend/src/lib/x.ts"]);
+  assert.deepEqual(archivosDeLaCita("supabase/migrations", repo, carpetas), ["supabase/migrations/1_a.sql"]);
+  assert.deepEqual(archivosDeLaCita("supabase/functions/no-existe.ts", repo, carpetas), []);
+});
+
+test("paths: sigue la cadena (test → edge function → lo que ésta importa) y marca lo que el filtro no cubre", () => {
+  const fuentes = {
+    "frontend/src/test/a.test.ts": 'import { x } from "../lib/x"; const f = readFileSync("supabase/functions/f/index.ts"); const n = "nginx.conf";',
+    "frontend/src/lib/x.ts": 'export const docs = "/docs/guia.md"; import("../../../infra/y.mjs");',
+    "supabase/functions/f/index.ts": 'import { cors } from "../_shared/cors.ts"; const s = "supabase/migrations/1_a.sql";',
+    "infra/y.mjs": "export {};",
+    "supabase/functions/_shared/cors.ts": "export const cors = 1;",
+  };
+  const citadas = lecturasDeLaGuarda({
+    fuentes: ["frontend/src/test/a.test.ts", "frontend/src/lib/x.ts"],
+    archivosDelRepo: [...repo],
+    cadenasDe: (ruta, o) => cadenasDelFuente(ts, fuentes[ruta] ?? "", ruta, o),
+    esTest: (ruta) => ruta.endsWith(".test.ts"),
+  });
+  assert.equal(citadas.get("supabase/functions/f/index.ts"), "frontend/src/test/a.test.ts");
+  assert.equal(citadas.get("supabase/functions/_shared/cors.ts"), "supabase/functions/f/index.ts", "lo que importa la edge function también");
+  assert.equal(citadas.get("infra/y.mjs"), "frontend/src/lib/x.ts", "un import() del código de la app");
+  assert.ok(citadas.has("nginx.conf"));
+  assert.ok(!citadas.has("docs/guia.md"), "en el código de la app una cadena es una ruta de la app, no una lectura");
+  assert.ok(!citadas.has("supabase/migrations/1_a.sql"), "de una edge function (no es un test) solo cuentan sus imports");
+
+  // La línea base tiene que poder fallar: con solo frontend/** queda todo afuera.
+  const sinCubrir = lecturasSinCubrir(citadas, ["frontend/**"]).map((x) => x.ruta);
+  assert.deepEqual(sinCubrir, ["infra/y.mjs", "nginx.conf", "supabase/functions/_shared/cors.ts", "supabase/functions/f/index.ts"]);
+  assert.deepEqual(lecturasSinCubrir(citadas, ["frontend/**", "supabase/functions/**", "infra/**", "nginx.conf"]), []);
+});
+
+test("paths: problemasDelFiltro — falta un requerido, algo sin cubrir, una excepción vieja", () => {
+  const citadas = new Map([["nginx.conf", "frontend/src/test/n.test.ts"], [".gitignore", "frontend/src/test/c.test.ts"]]);
+  const noSonLecturas = new Map([[".gitignore", "un nombre de ejemplo"]]);
+  assert.deepEqual(
+    problemasDelFiltro({ patrones: ["frontend/**", "nginx.conf"], requeridos: ["frontend/**"], citadas, noSonLecturas }),
+    [],
+  );
+  const p = problemasDelFiltro({ patrones: ["nginx.conf"], requeridos: ["frontend/**"], citadas, noSonLecturas });
+  assert.ok(p.some((x) => x.includes("falta «frontend/**»")), p.join("\n"));
+  const q = problemasDelFiltro({ patrones: ["frontend/**"], requeridos: [], citadas, noSonLecturas });
+  assert.ok(q.some((x) => x.startsWith("nginx.conf (lo lee frontend/src/test/n.test.ts)")), q.join("\n"));
+  assert.ok(!q.some((x) => x.startsWith(".gitignore")), "la excepción no se reporta");
+  const r = problemasDelFiltro({ patrones: ["frontend/**", "nginx.conf"], requeridos: [], citadas: new Map([["nginx.conf", "x"]]), noSonLecturas });
+  assert.ok(r.some((x) => x.includes("«.gitignore» ya no la cita nadie")), r.join("\n"));
 });
