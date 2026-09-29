@@ -47,6 +47,11 @@ jobs:
       - name: Guard — mover correos (IMAP)
         run: deno test --no-check supabase/functions/_shared/imap-mover.test.ts
 
+      # Drive: Maven y el NAS tienen que firmar IGUAL (vector compartido con
+      # infra/nas-drive), y las reglas de subida (tope, partes, nombres).
+      - name: Guard — Drive (firma y subidas)
+        run: deno test --no-check supabase/functions/_shared/drive-firma.test.ts supabase/functions/drive/logica.test.ts
+
       # web-push: el título, el cuerpo y a quién le llega el push del Messenger
       # (_shared/push-notify.ts) y quién aparece como emisor (web-push/nombre-emisor.ts:
       # ahí va a entrar el nombre visible de la key cuando se escriba por API). Con

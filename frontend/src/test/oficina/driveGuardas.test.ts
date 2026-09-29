@@ -1,0 +1,71 @@
+import { describe, it, expect } from "vitest";
+
+// Las reglas del Drive que NO se pueden aflojar sin abrir un agujero. La base
+// se probó contra prod el 28/09 (18 casos, en una transacción deshecha); esto
+// cuida que nadie las saque después.
+
+const fuentes = (import.meta as unknown as {
+  glob: (p: string[], o: Record<string, unknown>) => Record<string, string>;
+}).glob([
+  "/supabase/migrations/20260928200000_oficina_drive.sql",
+  "/supabase/functions/drive/index.ts",
+  "/infra/nas-drive/server.mjs",
+], { query: "?raw", import: "default", eager: true });
+const leer = (fin: string) => Object.entries(fuentes).find(([k]) => k.endsWith(fin))?.[1] ?? "";
+const mig = leer("oficina_drive.sql");
+const edge = leer("drive/index.ts");
+const nas = leer("nas-drive/server.mjs");
+
+describe("⚠️ multi-agencia", () => {
+  it("toda política de drive_items exige la agencia", () => {
+    for (const nombre of ["drive_items_ver", "drive_items_crear_carpeta", "drive_items_editar"]) {
+      const i = mig.indexOf(`CREATE POLICY ${nombre}`);
+      expect(i, nombre).toBeGreaterThan(-1);
+      expect(mig.slice(i, mig.indexOf(";", i)), nombre).toMatch(/tenant_id = \(SELECT public\.current_tenant_id\(\)\)/);
+    }
+  });
+  it("drive_mi_rol también mira la agencia, adentro", () => {
+    expect(mig).toMatch(/WHEN NOT EXISTS \(SELECT 1 FROM cadena WHERE nivel = 0 AND tenant_id = public\.current_tenant_id\(\)\) THEN NULL/);
+  });
+  it("compartir solo dentro de la agencia", () => {
+    expect(mig).toMatch(/Solo se puede compartir con alguien de la misma agencia/);
+  });
+  it("la agencia va en la RUTA física del NAS", () => {
+    expect(edge).toMatch(/const storageKey = `\$\{tenant\}\/\$\{id\}`;/);
+  });
+});
+
+describe("⚠️ lo que el navegador no puede hacer", () => {
+  it("crear archivos (solo carpetas): el storage_key lo pone la edge", () => {
+    const i = mig.indexOf("CREATE POLICY drive_items_crear_carpeta");
+    expect(mig.slice(i, mig.indexOf(";", i))).toMatch(/tipo = 'carpeta'/);
+  });
+  it("tocar storage_key, tamaño, huella o estado", () => {
+    expect(mig).toMatch(/NEW\.storage_key IS DISTINCT FROM OLD\.storage_key/);
+    expect(mig).toMatch(/NEW\.estado IS DISTINCT FROM OLD\.estado/);
+  });
+  it("borrar para siempre (no hay política DELETE: lo hace la edge, NAS primero)", () => {
+    expect(mig).not.toMatch(/CREATE POLICY [a-z_]+ ON public\.drive_items\s+FOR DELETE/);
+    expect(edge.indexOf('{ op: "borrar", k }')).toBeLessThan(edge.indexOf('admin.from("drive_items").delete()'));
+  });
+});
+
+describe("⚠️ la subida solo se confirma con el recibo firmado del NAS", () => {
+  it("y el recibo tiene que ser de ESA ruta", () => {
+    expect(edge).toMatch(/rec\.op !== "recibo" \|\| rec\.k !== fila\.storage_key/);
+  });
+  it("abrir pasa por la RLS de la persona, no por el admin", () => {
+    const i = edge.indexOf('if (accion === "abrir")');
+    expect(edge.slice(i, i + 400)).toMatch(/await comoLaPersona\.from\("drive_items"\)/);
+  });
+});
+
+describe("⚠️ el NAS", () => {
+  it("escucha solo en 127.0.0.1 (la puerta es el túnel)", () => {
+    expect(nas).toMatch(/host: env\.HOST \?\? "127\.0\.0\.1"/);
+  });
+  it("HTML/SVG/JS nunca se sirven como página", () => {
+    expect(nas).toMatch(/const PELIGROSOS = \/html\|svg\|xml\|javascript\|ecmascript\/i;/);
+    expect(nas).toMatch(/Content-Security-Policy", "default-src 'none'; sandbox"/);
+  });
+});
