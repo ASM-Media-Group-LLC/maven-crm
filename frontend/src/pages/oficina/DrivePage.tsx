@@ -9,6 +9,7 @@ import {
 import { toast } from "sonner";
 import { Page } from "@/components/ui/page";
 import { PageHeader } from "@/components/ui/page-header";
+import { SubtabNav, SubtabNavItem } from "@/components/ui/subtab-nav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -139,7 +140,7 @@ export default function DrivePage() {
         actions={sePuedeSubir || isAdmin ? (
           <>
           {isAdmin && (
-            <Button variant="outline" className="rounded-full" onClick={() => setViendoCupos(true)}>
+            <Button variant="outline" onClick={() => setViendoCupos(true)}>
               <HardDrive className="mr-1.5 h-4 w-4" />
               {t("drive.cupos.boton")}
             </Button>
@@ -147,7 +148,7 @@ export default function DrivePage() {
           {sePuedeSubir && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button className="rounded-full">
+              <Button>
                 <Plus className="mr-1.5 h-4 w-4" />
                 {t("drive.nuevo")}
               </Button>
@@ -179,26 +180,21 @@ export default function DrivePage() {
         }}
       />
 
-      {/* Las vistas, como la columna de Google Drive; en el teléfono, píldoras. */}
-      <div className="flex gap-1.5 overflow-x-auto pb-1">
-        {VISTAS.map(({ id, clave, icono: Icono }) => {
-          return (
-            <button
-              key={id}
-              type="button"
-              onClick={() => ir(id)}
-              aria-current={vista === id ? "page" : undefined}
-              className={cn(
-                "inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-sm transition-colors",
-                vista === id ? "bg-primary/12 font-medium text-foreground" : "text-muted-foreground hover:bg-muted",
-              )}
-            >
-              <Icono className="h-4 w-4" />
-              {t(clave)}
-            </button>
-          );
-        })}
-      </div>
+      {/* Las vistas, con las mismas pestañas que el resto del CRM. */}
+      <SubtabNav className="self-start">
+        {VISTAS.map(({ id, clave, icono: Icono }) => (
+          <SubtabNavItem
+            key={id}
+            active={vista === id}
+            onClick={() => ir(id)}
+            aria-current={vista === id ? "page" : undefined}
+            className="gap-1.5"
+          >
+            <Icono className="h-4 w-4" />
+            {t(clave)}
+          </SubtabNavItem>
+        ))}
+      </SubtabNav>
 
       <BarraDeUso />
 

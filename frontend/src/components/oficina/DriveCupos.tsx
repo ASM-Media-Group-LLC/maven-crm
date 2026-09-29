@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { Progress } from "@/components/ui/progress";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useGuardarCupo, useUsoDrive, useUsosDeMiAgencia, type UsoDePersona } from "@/hooks/useDrive";
 import { tamano } from "@/lib/drive/formato";
@@ -25,12 +26,15 @@ export function BarraDeUso() {
   const casiLleno = pct >= 90;
   return (
     <div className="flex max-w-sm flex-col gap-1" data-testid="barra-uso-drive">
-      <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-        <div
-          className={cn("h-full rounded-full transition-[width]", casiLleno ? "bg-warning" : "bg-primary")}
-          style={{ width: `${Math.max(pct, usado > 0 ? 1 : 0)}%` }}
-        />
-      </div>
+      <Progress
+        value={Math.max(pct, usado > 0 ? 1 : 0)}
+        aria-label={t("drive.uso.barra", { usado: tamano(usado), cupo: tamano(cupo) })}
+        className="h-2 bg-foreground/10"
+        indicatorClassName={cn(
+          "rounded-full",
+          casiLleno ? "bg-warning" : "bg-gradient-to-r from-accent to-primary",
+        )}
+      />
       <p className="text-xs text-muted-foreground">
         {t("drive.uso.barra", { usado: tamano(usado), cupo: tamano(cupo) })}
       </p>
