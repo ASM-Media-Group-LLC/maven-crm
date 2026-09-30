@@ -443,7 +443,7 @@ export default function CallControls({
                   <DevicePill icon={Volume2} tipo="altavoz" devices={devices.audioOutputs} selectedId={currentAudioOutputId || ""} onSelect={onAudioOutputChange} onPedirPermiso={() => devices.pedirPermiso("audio")} pidiendo={devices.pidiendo} />
                 </div>
                 {/* La cancelación de ruido vivía en el hook pero NINGUNA pantalla la
-                    mostraba: Jhon la buscó en una llamada y no estaba. Va acá, junto
+                    mostraba: Jhon la buscó en una llamada y no estaba. Va aquí, junto
                     al micro, que es donde uno la busca. */}
                 {onToggleNoiseCancellation && (
                   <FilaCancelacionRuido activa={!!isNoiseCancellationOn} onClick={onToggleNoiseCancellation} />

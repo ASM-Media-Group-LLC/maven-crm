@@ -11,7 +11,7 @@ import {
   Mic, MicOff, Video, VideoOff, ArrowLeft, Plus, Pencil, Volume2, VolumeX, ScreenShare, ScreenShareOff,
   PanelRightClose, PanelRightOpen, MoreVertical, MessageCircle,
   Pin, PinOff, PhoneOff, PictureInPicture2, KeyRound, Copy, Check, Coffee, EyeOff, MonitorOff, Settings2, MoreHorizontal,
-  type LucideIcon } from "lucide-react";
+  WifiOff, type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
 import { usePersistentCall, CallOutlet } from "@/components/PersistentCallProvider";
@@ -35,7 +35,8 @@ import { useCoworkMediaPresence, type MediaState } from "@/hooks/useCoworkMediaP
 import { cn } from "@/lib/utils";
 import { leerLimitesPausa } from "@/lib/coworkTablas";
 import { relojDesdePresencia, segundosMostrados, formatoReloj } from "@/lib/coworkReloj";
-import { personasEnSala, relojDeRespaldo, latidoFresco } from "@/lib/coworkOcupacion";
+import { personasEnSala, relojDeRespaldo, latidoFresco, sinConexionConLaSala } from "@/lib/coworkOcupacion";
+import { cuentaComoTrabajo } from "@/lib/coworkTiempoRegla";
 import { useRelojDeSala } from "@/hooks/useRelojDeSala";
 import SalaEnPausa, { type PausaDeSala } from "./SalaEnPausa";
 import { cuentaPausa, clasesPausa, nombreYApellido } from "@/lib/pausaCowork";
@@ -1021,7 +1022,15 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // es lo mismo que ya pasaba con el encuadre antes de arreglarlo: el sistema
   // sabía, pero solo se lo decía a quien tenía el problema. El umbral es el de
   // la sesión; null (regla apagada o sin escalar) = acá no se avisa nunca.
-  const sinPantalla = (ms: MediaState | undefined): boolean => debeAvisarSinPantalla(
+  // Con la sala caída la cámara y la pantalla se ven apagadas aunque no lo
+  // estén: avisar (y DECIRLO en voz alta, por cada persona) mandaría al
+  // supervisor a reclamar lo que no está roto. Lo que se ve es "sin conexión".
+  // Lo que dice el navegador de la persona manda (llega fresco aunque esté fuera
+  // de /cowork); el reloj cubre a los bundles viejos, que no mandan la conexión.
+  const salaCaidaEn = (ms: MediaState | undefined): boolean =>
+    ms?.conexionSala === "desconectada" || ms?.relojEstado === "sin_conexion" || ms?.relojEstado === "sin_conexion_larga";
+
+  const sinPantalla = (ms: MediaState | undefined): boolean => !salaCaidaEn(ms) && debeAvisarSinPantalla(
     ms, now,
     reglas.pantalla.activa && reglas.pantalla.supervisorSeg !== null ? reglas.pantalla.supervisorSeg * 1000 : null,
   );
@@ -1029,6 +1038,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const faceIssue = (ms: MediaState | undefined): ProblemaCara | null => {
     if (!ms || !ms.faceState || !ms.faceSince) return null;
     if (ms.onBreak) return null;                   // ya sabemos que no está
+    if (salaCaidaEn(ms)) return null;              // se cayó la sala, no su cámara
     if (ms.faceState === "ok") return null;
     if (ms.faceState === "unavailable") return null; // el detector no cargó en su equipo
     const regla = reglaDeEstado(reglas, ms.faceState);
@@ -1281,6 +1291,12 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
 
   const minutosTexto = (seg: number) => (seg < 60 ? `${seg} s` : `${Math.floor(seg / 60)} min`);
 
+  // El reloj de una persona: la presencia manda; si no llegó, el que el latido
+  // dejó en la base. (La presencia ya no se queda vieja con la página de la
+  // persona desmontada: lee el reloj al publicar. Comparar las dos por hora no
+  // sirve: una es la hora del navegador y la otra la del servidor.)
+  // Va antes de las etiquetas y de las tarjetas, que lo usan.
+  const relojDe = (uid: string) => relojDesdePresencia(mediaStates[uid]) ?? relojDeRespaldo(relojRespaldo[uid], now);
   type Etiqueta = { key: string; texto: string; tono: "warning" | "destructive" | "muted"; icono: LucideIcon };
   /** Los llamados de atención de una sala: lo que el supervisor tiene que ver
    *  sin leer. Con dos personas en la sala, cada etiqueta dice de quién es. */
@@ -1297,6 +1313,17 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
           out.push({ key: `${a.user_id}-meet`, icono: Video, texto: `${quien}${t("cowork.host.chip.inMeet", { time: minutosTexto(Math.floor((now - enMeet.desde) / 1000)) })}`, tono: "muted" });
         }
         continue;
+      }
+      // Se le cayó la sala: eso es lo que hay que ver, no "cámara apagada".
+      const reloj = relojDe(a.user_id);
+      if (salaCaidaEn(ms) || sinConexionConLaSala(reloj)) {
+        const larga = reloj?.estado === "sin_conexion_larga";
+        out.push({
+          key: `${a.user_id}-conexion`,
+          icono: WifiOff,
+          texto: `${quien}${t(larga ? "cowork.host.chip.noConnectionLong" : "cowork.host.chip.noConnection")}`,
+          tono: larga ? "destructive" : "warning",
+        });
       }
       const problema = faceIssue(ms);
       if (problema && ms?.faceSince) {
@@ -1336,9 +1363,8 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   /** La gente de una sala con su reloj de Cowork (el mismo número que ve la
    *  persona, porque viaja por presencia). */
   const personasDe = (participants: Array<{ user_id: string }>) => participants.map((a) => {
-    // La presencia manda; si no llegó, el reloj que el latido dejó en la base.
-    const reloj = relojDesdePresencia(mediaStates[a.user_id]) ?? relojDeRespaldo(relojRespaldo[a.user_id], now);
-    const corre = reloj?.estado === "activo" || reloj?.estado === "meet";
+    const reloj = relojDe(a.user_id);
+    const corre = !!reloj && cuentaComoTrabajo(reloj.estado);
     return {
       uid: a.user_id,
       nombre: nombreYApellido(cowork.profiles[a.user_id]),
@@ -1423,7 +1449,11 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // o está apagado porque entré a esa sala), los asignados a secas.
   const fichas = cowork.rooms.map((room) => {
     const asignados = getRoomParticipants(room.id);
-    const presentes = new Set(personasEnSala(asignados.map((a) => a.user_id), roomConectados[room.id]));
+    const ids = asignados.map((a) => a.user_id);
+    // Se le cayó la sala y sigue ahí: lo dice su navegador, o su reloj. Con la
+    // conexión de por medio también se queda quien estaba en pausa.
+    const caidas = ids.filter((uid) => mediaStates[uid]?.conexionSala === "desconectada" || sinConexionConLaSala(relojDe(uid)));
+    const presentes = new Set(personasEnSala(ids, roomConectados[room.id], caidas));
     const participants = asignados.filter((a) => presentes.has(a.user_id));
     const pausaSala = pausaDeLaSala(participants.map((p) => p.user_id));
     return { room, asignados, participants, pausaSala };
@@ -1531,7 +1561,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
             </div>
             {/* Acciones de la sesión, todas del mismo tamaño y color: antes cada
                 una tenía el suyo (el enlace en acento, el apagado en rojo) y la
-                fila se veía desparejada. Finalizar la sesión ya no está acá:
+                fila se veía desparejada. Finalizar la sesión ya no está aquí:
                 vive en la lista de sesiones, fuera del tablero. */}
             <div className="flex shrink-0 items-center gap-0.5 rounded-xl bg-muted/40 p-0.5">
               {puedeFinalizar && (
@@ -1584,7 +1614,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               >
                 <Settings2 className="h-4 w-4" />
                 {/* Punto cuando la sesión NO sigue el estándar: de un vistazo se
-                    sabe que acá los avisos son distintos a los de siempre. */}
+                    sabe que aquí los avisos son distintos a los de siempre. */}
                 {!sonEstandar(reglas) && (
                   <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-primary ring-2 ring-card" />
                 )}
@@ -1683,7 +1713,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
 
                           Mientras una solicitud privada siga abierta, al chatter
                           se lo lleva automáticamente a esa sala 1:1 — y si nadie
-                          la cierra, queda parado en una sala VACÍA mientras acá
+                          la cierra, queda parado en una sala VACÍA mientras aquí
                           le hablan a la sala principal. Se ve igual que un
                           problema de audio: "le hablo y no me escucha".
 
@@ -1778,7 +1808,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
           })()}
 
           {/* Supervisores en pausa (break / lunch / ausente desde la tacita del
-              Hub). Acá SÍ con el tiempo: lo ven los supervisores entre sí; los
+              Hub). Aquí SÍ con el tiempo: lo ven los supervisores entre sí; los
               chatters solo ven la pantalla sin contador (Jhon, 10/09). */}
           {(() => {
             const sups = Object.entries(supervisores)
@@ -2136,7 +2166,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                             <span className="text-xs">{t("cowork.host.noParticipants")}</span>
                           </div>
                           {/* El monitor sigue MONTADO aunque no vea a nadie. Antes se
-                              desmontaba acá, y como es él quien avisa quién está, ya no
+                              desmontaba aquí, y como es él quien avisa quién está, ya no
                               podía avisar que alguien llegó (o volvió tras un corte de
                               red): la sala quedaba "Sin participantes" y sin pantalla
                               hasta recargar el tablero (Jhon, 10/09). Solo si hay
@@ -2201,7 +2231,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                                   se corte con puntos y el reloj no se sale de la miniatura. */}
                               <span className="min-w-0 truncate">{p.nombre}</span>
                               {p.reloj && (
-                                <span className={cn("shrink-0 font-mono tabular-nums", p.corre ? "text-success" : "text-white/60")} title={p.motivo ? t("cowork.host.clockStopped", { reason: p.motivo }) : t("cowork.host.clockRunning")}>
+                                <span className={cn("shrink-0 font-mono tabular-nums", p.corre ? "text-success" : "text-white/60")} title={p.corre ? t("cowork.host.clockRunning") : t("cowork.host.clockStopped", { reason: p.motivo ?? "—" })}>
                                   {p.reloj}
                                 </span>
                               )}
@@ -2222,7 +2252,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                             <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", p.online ? "bg-success" : "bg-muted-foreground/40")} />
                             <span className="min-w-0 flex-1 truncate text-foreground/90">{p.nombre}</span>
                             {p.reloj && (
-                              <span className={cn("shrink-0 font-mono tabular-nums", p.corre ? "text-success" : "text-muted-foreground")} title={p.motivo ? t("cowork.host.clockStopped", { reason: p.motivo }) : t("cowork.host.clockRunning")}>
+                              <span className={cn("shrink-0 font-mono tabular-nums", p.corre ? "text-success" : "text-muted-foreground")} title={p.corre ? t("cowork.host.clockRunning") : t("cowork.host.clockStopped", { reason: p.motivo ?? "—" })}>
                                 {p.reloj}
                               </span>
                             )}

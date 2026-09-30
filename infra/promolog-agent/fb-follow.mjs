@@ -110,7 +110,7 @@ export async function runFollowFb(opts = {}, { log = console.log, onResult = () 
   const OPTS = { seguir: false, amistad: false, max: 6, ...opts };
   if (!CRON_TOKEN) { log("⚠️ Falta CRON_INTERNAL_TOKEN en el .env."); return { error: "sin_token" }; }
   const sesion = sesionUsable(FB_SESSION, "facebook");
-  if (!sesion.ok) { log(`⚠️ Facebook: ${sesion.motivo}. Logueá la cuenta en el panel.`); return { error: "sin_sesion" }; }
+  if (!sesion.ok) { log(`⚠️ Facebook: ${sesion.motivo}. Loguea la cuenta en el panel.`); return { error: "sin_sesion" }; }
 
   const targets = await fetchTargets();
   const estado = leerEstado();
@@ -168,7 +168,7 @@ export async function runFollowFb(opts = {}, { log = console.log, onResult = () 
           else { resumen.fallidas++; log(`⚠️ ${etiqueta}: el clic en Seguir no surtió efecto`); resumen.detalle.push({ handle: etiqueta, estado: "fallo_seguir" }); }
         } else if (personal && e.puedeAmistad) {
           if (!OPTS.amistad) {
-            resumen.detalle.push({ handle: etiqueta, estado: "falta_amistad", nota: "requiere solicitud de amistad — activá la opción para mandarla" });
+            resumen.detalle.push({ handle: etiqueta, estado: "falta_amistad", nota: "requiere solicitud de amistad — activa la opción para mandarla" });
             log(`🔒 ${etiqueta}: es perfil personal, necesita SOLICITUD DE AMISTAD (le llega a ella). No la mando sin que lo pidas.`);
           } else {
             await page.click('[data-promolog-amistad="1"]').catch(() => {});

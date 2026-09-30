@@ -153,7 +153,7 @@ export default function MeetGuestPage() {
         </div>
         <p className="text-foreground font-semibold text-center">Saliste de la reunión</p>
         <p className="text-sm text-muted-foreground text-center">
-          Ya podés cerrar esta pestaña. Si querés volver, tenés que pedir
+          Ya puedes cerrar esta pestaña. Si quieres volver, tienes que pedir
           entrada otra vez.
         </p>
         {/* Vuelve al formulario, NO a la llamada: la admisión se terminó al

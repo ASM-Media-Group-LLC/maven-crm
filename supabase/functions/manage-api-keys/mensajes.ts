@@ -24,7 +24,7 @@ const MENSAJES = {
   fechaInvalida: { es: "Fecha de expiración inválida", en: "Invalid expiration date" },
   ipsInvalidas: { es: "IP(s) inválida(s): {lista}", en: "Invalid IP(s): {lista}" },
   confirmarMessenger: {
-    es: "Confirmá que la key va a leer TUS conversaciones del Messenger",
+    es: "Confirma que la key va a leer TUS conversaciones del Messenger",
     en: "Confirm that the key will read YOUR Messenger conversations",
   },
   maximoDeKeys: {
@@ -44,7 +44,7 @@ const MENSAJES = {
     en: "Only the owner of this Messenger key can edit it; any admin can revoke it",
   },
   messengerNoExtender: {
-    es: "A una key con Messenger no se le puede extender el vencimiento: creá otra",
+    es: "A una key con Messenger no se le puede extender el vencimiento: crea otra",
     en: "A Messenger key's expiration can't be extended: create a new one",
   },
   messengerSinIps: { es: "Las keys con Messenger necesitan IPs fijas (whitelist)", en: "Messenger keys need fixed IPs (whitelist)" },
@@ -74,7 +74,7 @@ const MENSAJES = {
     en: "The person this key acts as is no longer active in the agency",
   },
   webhookYaExiste: {
-    es: "Esta key ya tiene un webhook. Borralo para registrar otro.",
+    es: "Esta key ya tiene un webhook. Bórralo para registrar otro.",
     en: "This key already has a webhook. Delete it to register a new one.",
   },
   webhookSinConfigurar: {
@@ -95,32 +95,32 @@ const MENSAJES = {
   },
   webhookErrorBase: { es: "No se pudo guardar el cambio del webhook", en: "Couldn't save the webhook change" },
   webhookErrorLectura: {
-    es: "No se pudo consultar el webhook. Probá de nuevo en un momento.",
+    es: "No se pudo consultar el webhook. Prueba de nuevo en un momento.",
     en: "Couldn't load the webhook. Try again in a moment.",
   },
   webhookErrorInesperado: {
-    es: "No se pudo completar la acción del webhook. Probá de nuevo en un momento.",
+    es: "No se pudo completar la acción del webhook. Prueba de nuevo en un momento.",
     en: "The webhook action couldn't be completed. Try again in a moment.",
   },
   webhookIdRequerido: { es: "Falta el id del webhook", en: "The webhook id is missing" },
   webhookLlaveSinMessenger: {
-    es: "La key ya no tiene el permiso de Messenger. Creá una key nueva y registrá el webhook ahí.",
+    es: "La key ya no tiene el permiso de Messenger. Crea una key nueva y registra el webhook ahí.",
     en: "The key no longer has the Messenger permission. Create a new key and register the webhook there.",
   },
   webhookSecretoIlegible: {
-    es: "El secreto de este webhook no abre con la clave actual del servidor. Avisale a quien administra Maven: si la clave cambió por error, volver a ponerla lo arregla; si cambió a propósito, borralo y registralo de nuevo.",
+    es: "El secreto de este webhook no abre con la clave actual del servidor. Avísale a quien administra Maven: si la clave cambió por error, volver a ponerla lo arregla; si cambió a propósito, bórralo y regístralo de nuevo.",
     en: "This webhook's secret can't be opened with the server's current key. Tell whoever runs Maven: if the key changed by mistake, putting it back fixes it; if it changed on purpose, delete the webhook and register it again.",
   },
   webhookAltaIncierta: {
-    es: "No se sabe si el webhook quedó guardado. Actualizá la página: si aparece, borralo y registralo de nuevo (el secreto no se puede volver a mostrar).",
+    es: "No se sabe si el webhook quedó guardado. Actualiza la página: si aparece, bórralo y regístralo de nuevo (el secreto no se puede volver a mostrar).",
     en: "It's unclear whether the webhook was saved. Refresh the page: if it shows up, delete it and register it again (the secret can't be shown again).",
   },
   webhookPruebaSinAnotar: {
-    es: "La prueba llegó, pero no se pudo anotar, así que el webhook no se activó. Probá de nuevo en unos segundos.",
+    es: "La prueba llegó, pero no se pudo anotar, así que el webhook no se activó. Prueba de nuevo en unos segundos.",
     en: "The test was delivered, but it couldn't be recorded, so the webhook wasn't activated. Try again in a few seconds.",
   },
   webhookActivacionFallo: {
-    es: "La prueba llegó, pero el webhook no se pudo activar. Probá de nuevo en unos segundos.",
+    es: "La prueba llegó, pero el webhook no se pudo activar. Prueba de nuevo en unos segundos.",
     en: "The test was delivered, but the webhook couldn't be activated. Try again in a few seconds.",
   },
   webhookVariasAgencias: {
@@ -128,18 +128,18 @@ const MENSAJES = {
     en: "There's more than one agency in Maven: webhooks stay off until that's resolved",
   },
   webhookReglaBase: {
-    es: "La key, su persona o la agencia cambiaron mientras se registraba el webhook. Actualizá la página y probá de nuevo.",
+    es: "La key, su persona o la agencia cambiaron mientras se registraba el webhook. Actualiza la página y prueba de nuevo.",
     en: "The key, its person or the agency changed while the webhook was being registered. Refresh the page and try again.",
   },
   webhookNoExiste: { es: "El webhook no existe", en: "The webhook doesn't exist" },
   webhookNoEstaActivo: { es: "Solo se puede pausar un webhook activo", en: "Only an active webhook can be paused" },
   webhookNoEstaParado: { es: "El webhook no está pausado ni detenido", en: "The webhook isn't paused or stopped" },
   webhookPruebaMuySeguida: {
-    es: "Esperá {segundos} segundos entre una prueba y la siguiente",
+    es: "Espera {segundos} segundos entre una prueba y la siguiente",
     en: "Wait {segundos} seconds between one test and the next",
   },
   webhookNoSePudoActivar: {
-    es: "La prueba llegó, pero el webhook no se pudo activar: la key o su persona pueden haber cambiado recién. Actualizá la página.",
+    es: "La prueba llegó, pero el webhook no se pudo activar: la key o su persona pueden haber cambiado recién. Actualiza la página.",
     en: "The test was delivered, but the webhook couldn't be activated: the key or its person may have just changed. Refresh the page.",
   },
   webhookYaEstabaActivo: { es: "El webhook ya estaba activo", en: "The webhook was already active" },

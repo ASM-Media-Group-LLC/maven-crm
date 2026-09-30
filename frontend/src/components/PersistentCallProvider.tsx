@@ -298,7 +298,7 @@ export function PersistentCallProvider({ children }: { children: React.ReactNode
               {/* Silencio local del audio entrante (p.ej. el Hub de Cowork).
                   Solo aparece si la llamada OPTÓ por el control (el dueño pasó
                   incomingAudioMuted en la config): en una llamada común no
-                  tiene sentido "no escuchar a nadie" desde acá. */}
+                  tiene sentido "no escuchar a nadie" desde aquí. */}
               {config.incomingAudioMuted !== undefined && (
                 <button
                   type="button"

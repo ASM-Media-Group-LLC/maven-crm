@@ -1,0 +1,57 @@
+# La PUERTA del Drive: un servicio en el Dokploy de microservicios
+# (217.216.95.7) que recibe https://drive.217-216-95-7.nip.io y lo reenvía a
+# la mini (mini5) por Tailscale.
+#
+# Por qué así (28/09/2026): Jhon no quiere pagar ni mover el DNS de
+# maven-ai.me (está en GoDaddy), y Tailscale Funnel no existe en el plan
+# Starter. nip.io resuelve el nombre a la IP sin tocar ningún DNS, Dokploy saca
+# el certificado HTTPS, y la mini sigue sin estar expuesta a internet.
+#
+# En Dokploy: Compose nuevo con este archivo; en Environment la variable
+# TS_AUTHKEY (una auth key de Tailscale: Settings → Keys); en Domains,
+# drive.217-216-95-7.nip.io → servicio `puerta-tailscale`, puerto 8080, HTTPS.
+
+services:
+  puerta-tailscale:
+    image: tailscale/tailscale:stable
+    hostname: maven-drive-puerta
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY}
+      TS_STATE_DIR: /var/lib/tailscale
+      # Modo kernel (no userspace): así el proxy de al lado, que comparte su
+      # red, llega a la mini como si estuviera en la misma red.
+      TS_USERSPACE: "false"
+      TS_ACCEPT_DNS: "true"
+    volumes:
+      - ts-estado:/var/lib/tailscale
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    restart: unless-stopped
+    networks:
+      - dokploy-network
+
+  puerta-proxy:
+    image: caddy:2-alpine
+    # Comparte la red del contenedor de Tailscale: escucha en su :8080 (que es
+    # adonde Traefik manda el dominio) y sale por el túnel de Tailscale.
+    network_mode: service:puerta-tailscale
+    depends_on:
+      - puerta-tailscale
+    # ⚠️ SOLO por nombre (MagicDNS), nunca por IP. La IP de Tailscale de la
+    # mini CAMBIÓ el 28/09 cuando se volvió a iniciar sesión (100.64.206.91 →
+    # 100.127.43.97), y con las dos como destino Caddy alternaba al azar: la
+    # mitad de los pedidos daban 502. El nombre sigue a la máquina.
+    command: >
+      caddy reverse-proxy --from :8080
+      --to unlok-workstation.tail11d450.ts.net:8790
+    restart: unless-stopped
+
+volumes:
+  ts-estado:
+
+networks:
+  dokploy-network:
+    external: true

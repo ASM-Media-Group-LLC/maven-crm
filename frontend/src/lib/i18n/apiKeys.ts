@@ -28,7 +28,7 @@ export const apiKeys = {
   },
   "apiKeys.loadError": { es: "Error al cargar las keys", en: "Couldn't load the keys" },
   "apiKeys.empty": {
-    es: "Todavía no hay API keys. Creá la primera con “{button}”.",
+    es: "Todavía no hay API keys. Crea la primera con “{button}”.",
     en: "There are no API keys yet. Create the first one with “{button}”.",
   },
 
@@ -47,13 +47,13 @@ export const apiKeys = {
   "apiKeys.never": { es: "Nunca", en: "Never" },
   "apiKeys.status.personGone": { es: "Persona dada de baja", en: "Person offboarded" },
   "apiKeys.status.personGoneHint": {
-    es: "La persona como la que actúa esta key fue dada de baja o ya no está en la agencia: el API la rechaza con 401. Revocala y creá otra.",
+    es: "La persona como la que actúa esta key fue dada de baja o ya no está en la agencia: el API la rechaza con 401. Revócala y crea otra.",
     en: "The person this key acts as was offboarded or is no longer in the agency: the API rejects it with 401. Revoke it and create a new one.",
   },
   "apiKeys.status.active": { es: "Activa", en: "Active" },
   "apiKeys.status.unverified": { es: "Activa · sin verificar", en: "Active · unverified" },
   "apiKeys.status.unverifiedHint": {
-    es: "No se pudo verificar si la persona como la que actúa esta key sigue activa. Recargá la página.",
+    es: "No se pudo verificar si la persona como la que actúa esta key sigue activa. Recarga la página.",
     en: "Couldn't verify whether the person this key acts as is still active. Reload the page.",
   },
   "apiKeys.status.revoked": { es: "Revocada", en: "Revoked" },
@@ -63,7 +63,7 @@ export const apiKeys = {
   // Key recién creada
   "apiKeys.fresh.title": { es: "Key creada", en: "Key created" },
   "apiKeys.fresh.copyNow": {
-    es: "Copiala ahora. **No la vas a volver a ver** — Maven solo guarda un hash.",
+    es: "Cópiala ahora. **No la vas a volver a ver** — Maven solo guarda un hash.",
     en: "Copy it now. **You won't see it again** — Maven only stores a hash.",
   },
   "apiKeys.fresh.copyKey": { es: "Copiar la key", en: "Copy the key" },
@@ -75,7 +75,7 @@ export const apiKeys = {
   "apiKeys.form.editTitle": { es: "Editar API key", en: "Edit API key" },
   "apiKeys.form.description": { es: "Nombre, IPs permitidas, expiración y permisos.", en: "Name, allowed IPs, expiration and permissions." },
   "apiKeys.form.actsAsYou": {
-    es: "La key va a actuar como vos, y eso no se puede cambiar después.",
+    es: "La key va a actuar como tú, y eso no se puede cambiar después.",
     en: "The key will act as you, and that can't be changed later.",
   },
   "apiKeys.form.namePlaceholder": { es: "Ej: Integración Álvaro", en: "E.g.: CRM integration" },
@@ -164,8 +164,8 @@ export const apiKeys = {
   },
   "apiKeys.scope.cowork.label": { es: "Tiempo en Cowork (diario y al detalle)", en: "Cowork time (daily and detailed)" },
   "apiKeys.scope.cowork.desc": {
-    es: "Tiempo trabajado en Cowork por empleado y día: segundos con el reloj corriendo (cámara + pantalla, presente), y detenido por pausa, sin cámara, sin pantalla o fuera de cámara. Con /cowork/time/segments, cada tramo con hora de inicio, fin y motivo. Es el dato que va a reemplazar a Hubstaff.",
-    en: "Time worked in Cowork per employee and day: seconds with the clock running (camera + screen, present), and stopped for a break, no camera, no screen or off camera. With /cowork/time/segments, each segment with start time, end time and reason. It's the data that will replace Hubstaff.",
+    es: "Tiempo trabajado en Cowork por empleado y día: segundos con el reloj corriendo (cámara + pantalla, presente), y detenido por pausa, sin cámara, sin pantalla, fuera de cámara o sin conexión a la sala. Con /cowork/time/segments, cada tramo con hora de inicio, fin y motivo. Es el dato que va a reemplazar a Hubstaff.",
+    en: "Time worked in Cowork per employee and day: seconds with the clock running (camera + screen, present), and stopped for a break, no camera, no screen, off camera or disconnected from the room. With /cowork/time/segments, each segment with start time, end time and reason. It's the data that will replace Hubstaff.",
   },
   "apiKeys.scope.sales.label": { es: "Ganancias por creadora (diario)", en: "Earnings per creator (daily)" },
   "apiKeys.scope.sales.desc": {
@@ -229,11 +229,11 @@ export const apiKeys = {
     en: "One conversation: details, group settings, me and participants (user, role, joined_at). If the group hides its member list and the person isn't a group admin, participants = null and participants_hidden = true. If they can't see it, 404.",
   },
   "apiKeys.ep.messages": {
-    es: "La historia, de lo más nuevo a lo más viejo, con cursor: pasá next_cursor en el parámetro before para la página anterior, o usá el parámetro after para pedir lo nuevo en orden. Cada mensaje: sender, kind (text | image | gif | video | voice_note | audio | file | system), text, attachment (url, name, hosted_by, storage_path), reply_to_id, is_thread_reply, is_edited, is_deleted. Un borrado viene sin texto ni adjunto. Filtros: limit (máx 100), before | after, thread_root_id, include=rich (agrega el texto con formato).",
+    es: "La historia, de lo más nuevo a lo más viejo, con cursor: pasa next_cursor en el parámetro before para la página anterior, o usa el parámetro after para pedir lo nuevo en orden. Cada mensaje: sender, kind (text | image | gif | video | voice_note | audio | file | system), text, attachment (url, name, hosted_by, storage_path), reply_to_id, is_thread_reply, is_edited, is_deleted. Un borrado viene sin texto ni adjunto. Filtros: limit (máx 100), before | after, thread_root_id, include=rich (agrega el texto con formato).",
     en: "The history, newest to oldest, with a cursor: pass next_cursor in the before parameter for the previous page, or use the after parameter to get what's new in order. Each message: sender, kind (text | image | gif | video | voice_note | audio | file | system), text, attachment (url, name, hosted_by, storage_path), reply_to_id, is_thread_reply, is_edited, is_deleted. A deleted message comes without text or attachment. Filters: limit (max 100), before | after, thread_root_id, include=rich (adds the formatted text).",
   },
   "apiKeys.ep.feed": {
-    es: "Lo nuevo en TODAS las conversaciones, en orden: así recibe mensajes una integración (con webhook, el aviso le dice cuándo leer y además lee cada 15 min o menos como respaldo; sin webhook, lee cada tanto). Primer pedido con since (ISO, 72 h como máximo) o sin nada (últimos 15 min); después, siempre after=next_cursor. Si caught_up = true, esperá 30 s o más antes del próximo. Mira como mucho una hora por pedido. exclude_own=true saca lo que mandó la propia persona. Solo mensajes nuevos: ediciones y borrados se ven releyendo la conversación.",
+    es: "Lo nuevo en TODAS las conversaciones, en orden: así recibe mensajes una integración (con webhook, el aviso le dice cuándo leer y además lee cada 15 min o menos como respaldo; sin webhook, lee cada tanto). Primer pedido con since (ISO, 72 h como máximo) o sin nada (últimos 15 min); después, siempre after=next_cursor. Si caught_up = true, espera 30 s o más antes del próximo. Mira como mucho una hora por pedido. exclude_own=true saca lo que mandó la propia persona. Solo mensajes nuevos: ediciones y borrados se ven releyendo la conversación.",
     en: "What's new across ALL conversations, in order: this is how an integration receives messages (with a webhook, the notification tells it when to read, and it still reads every 15 minutes or less as a fallback; without one, it reads every so often). First request with since (ISO, 72 h at most) or nothing (last 15 min); after that, always after=next_cursor. If caught_up = true, wait 30 s or more before the next one. It looks at one hour per request at most. exclude_own=true drops what the person sent themselves. New messages only: edits and deletions show up when you re-read the conversation.",
   },
   "apiKeys.ep.creators": {
@@ -252,12 +252,12 @@ export const apiKeys = {
     en: "Daily Hubstaff hours per employee (hours, activity, project). Filters: from, to, profile_id.",
   },
   "apiKeys.ep.coworkTime": {
-    es: "Tiempo en Cowork por empleado y día: active_seconds (lo que exige la sesión, presente; incluye el meet grupal), group_meet_seconds, paused_seconds, bathroom_breaks / bathroom_seconds / bathroom_exceeded (presupuesto del día), breaks / break_seconds / breaks_exceeded / break_excess_seconds (tope por pausa), no_camera_seconds, no_screen_seconds, away_seconds, in_room_seconds, sessions, first_join, last_leave. Filtros: from, to, profile_id.",
-    en: "Cowork time per employee and day: active_seconds (what the session requires, present; includes the group meet), group_meet_seconds, paused_seconds, bathroom_breaks / bathroom_seconds / bathroom_exceeded (daily budget), breaks / break_seconds / breaks_exceeded / break_excess_seconds (per-break cap), no_camera_seconds, no_screen_seconds, away_seconds, in_room_seconds, sessions, first_join, last_leave. Filters: from, to, profile_id.",
+    es: "Tiempo en Cowork por empleado y día: active_seconds (lo que exige la sesión, presente; incluye el meet grupal), group_meet_seconds, paused_seconds, bathroom_breaks / bathroom_seconds / bathroom_exceeded (presupuesto del día), breaks / break_seconds / breaks_exceeded / break_excess_seconds (tope por pausa), no_camera_seconds, no_screen_seconds, away_seconds, disconnected_seconds (la sala se cayó; se pagan hasta 10 min por hora y ya van dentro de active_seconds), disconnected_long_seconds (caídas que no se pagan), in_room_seconds, sessions, first_join, last_leave. Filtros: from, to, profile_id.",
+    en: "Cowork time per employee and day: active_seconds (what the session requires, present; includes the group meet), group_meet_seconds, paused_seconds, bathroom_breaks / bathroom_seconds / bathroom_exceeded (daily budget), breaks / break_seconds / breaks_exceeded / break_excess_seconds (per-break cap), no_camera_seconds, no_screen_seconds, away_seconds, disconnected_seconds (the room dropped; up to 10 min per hour is paid and already inside active_seconds), disconnected_long_seconds (unpaid drops), in_room_seconds, sessions, first_join, last_leave. Filters: from, to, profile_id.",
   },
   "apiKeys.ep.coworkSegments": {
-    es: "Cada tramo del reloj al detalle: state (active | group_meet | paused | no_camera | no_screen | away), detail, started_at, ended_at, seconds, sesión y sala. Filtros: from, to, profile_id.",
-    en: "Each clock segment in detail: state (active | group_meet | paused | no_camera | no_screen | away), detail, started_at, ended_at, seconds, session and room. Filters: from, to, profile_id.",
+    es: "Cada tramo del reloj al detalle: state (active | group_meet | paused | no_camera | no_screen | away | disconnected | disconnected_long; puede sumar valores nuevos: trate cualquier valor desconocido como reloj detenido), detail, started_at, ended_at, seconds, sesión y sala. Filtros: from, to, profile_id.",
+    en: "Each clock segment in detail: state (active | group_meet | paused | no_camera | no_screen | away | disconnected | disconnected_long; new values may be added: treat any unknown value as a stopped clock), detail, started_at, ended_at, seconds, session and room. Filters: from, to, profile_id.",
   },
   "apiKeys.ep.coworkBreaks": {
     es: "Cada pausa al detalle: kind (bathroom | break), started_at, ended_at, seconds, limit_seconds (tope vigente de la sesión), exceeded, auto_closed (la cerró el sistema: cerró la pestaña), sesión y sala. Filtros: from, to, profile_id.",
@@ -283,7 +283,7 @@ export const apiKeys = {
   "apiKeys.webhook.register": { es: "Registrar", en: "Register" },
   "apiKeys.webhook.unknown": { es: "No se pudo consultar", en: "Couldn't check" },
   "apiKeys.webhook.unknownHint": {
-    es: "No se pudo saber si esta key tiene webhook. Recargá la página.",
+    es: "No se pudo saber si esta key tiene webhook. Recarga la página.",
     en: "Couldn't tell whether this key has a webhook. Reload the page.",
   },
   "apiKeys.webhook.state.pending": { es: "Esperando la prueba", en: "Waiting for the test" },
@@ -317,17 +317,17 @@ export const apiKeys = {
   "apiKeys.webhook.url": { es: "URL de tu servidor", en: "Your server's URL" },
   "apiKeys.webhook.urlPlaceholder": { es: "https://tu-servidor.com/maven/webhook", en: "https://your-server.com/maven/webhook" },
   "apiKeys.webhook.urlHint": {
-    es: "Solo `https`, puerto 443, sin usuario ni `#`. No se puede editar: para cambiarla, borrá el webhook y registrá otro. Se trata como un secreto: después solo se muestra el dominio.",
+    es: "Solo `https`, puerto 443, sin usuario ni `#`. No se puede editar: para cambiarla, borra el webhook y registra otro. Se trata como un secreto: después solo se muestra el dominio.",
     en: "Only `https`, port 443, no username or `#`. It can't be edited: to change it, delete the webhook and register another one. It's treated as a secret: afterwards only the domain is shown.",
   },
   "apiKeys.webhook.excludeOwn": { es: "No avisar los mensajes que yo mando", en: "Don't notify the messages I send" },
   "apiKeys.webhook.excludeOwnHint": {
-    es: "Marcado, solo avisa lo que te escriben otras personas. Desmarcado, también lo que mandás vos.",
+    es: "Marcado, solo avisa lo que te escriben otras personas. Desmarcado, también lo que mandas tú.",
     en: "Checked, it only notifies what other people write to you. Unchecked, it also notifies what you send.",
   },
   "apiKeys.webhook.registerButton": { es: "Registrar webhook", en: "Register webhook" },
   "apiKeys.webhook.person.you": {
-    es: "Sos vos, la persona de la key: el webhook avisa lo nuevo de tus conversaciones. Solo vos podés registrarlo, probarlo o reanudarlo.",
+    es: "Eres tú, la persona de la key: el webhook avisa lo nuevo de tus conversaciones. Solo tú puedes registrarlo, probarlo o reanudarlo.",
     en: "That's you, the key's person: the webhook notifies what's new in your conversations. Only you can register, test or resume it.",
   },
   "apiKeys.webhook.person.other": {
@@ -337,12 +337,12 @@ export const apiKeys = {
 
   "apiKeys.webhook.secretTitle": { es: "Webhook registrado", en: "Webhook registered" },
   "apiKeys.webhook.secretCopyNow": {
-    es: "Copiá el **secreto de firma** ahora y pasáselo al integrador: **no se vuelve a mostrar**. Con él verifica que cada aviso viene de Maven.",
+    es: "Copia el **secreto de firma** ahora y pásaselo al integrador: **no se vuelve a mostrar**. Con él verifica que cada aviso viene de Maven.",
     en: "Copy the **signing secret** now and give it to the integrator: **it won't be shown again**. They use it to verify that each notification comes from Maven.",
   },
   "apiKeys.webhook.secretCopy": { es: "Copiar secreto", en: "Copy secret" },
   "apiKeys.webhook.nextTest": {
-    es: "Para activarlo, mandá una prueba: Maven le manda a tu servidor un aviso firmado de tipo `webhook.test`, y tiene que contestar 2xx.",
+    es: "Para activarlo, manda una prueba: Maven le manda a tu servidor un aviso firmado de tipo `webhook.test`, y tiene que contestar 2xx.",
     en: "To activate it, send a test: Maven sends your server a signed `webhook.test` notification, and it has to answer 2xx.",
   },
   "apiKeys.webhook.sendTest": { es: "Enviar prueba", en: "Send test" },
@@ -367,7 +367,7 @@ export const apiKeys = {
   "apiKeys.webhook.detail.disabledOn": { es: "Detenido el {when}", en: "Stopped on {when}" },
 
   "apiKeys.webhook.help.pending": {
-    es: "Todavía no está activo: mandá una prueba y que tu servidor la conteste con 2xx.",
+    es: "Todavía no está activo: manda una prueba y que tu servidor la conteste con 2xx.",
     en: "It isn't active yet: send a test and have your server answer it with 2xx.",
   },
   "apiKeys.webhook.help.active": {
@@ -387,23 +387,23 @@ export const apiKeys = {
     en: "Paused: no notification goes out. On resume, Maven sends a test and starts from that moment; what happened during the pause isn't notified, and the integrator reads it from the feed with its cursor.",
   },
   "apiKeys.webhook.reason.receiver_gone": {
-    es: "Tu servidor contestó 410: dice que esa URL ya no existe. Si la volviste a habilitar, reanudá.",
+    es: "Tu servidor contestó 410: dice que esa URL ya no existe. Si la volviste a habilitar, reanuda.",
     en: "Your server answered 410: it says that URL no longer exists. If you enabled it again, resume.",
   },
   "apiKeys.webhook.reason.receiver_failing": {
-    es: "Falló 3 días seguidos sin contestar 2xx. Cuando el servidor vuelva, reanudá.",
+    es: "Falló 3 días seguidos sin contestar 2xx. Cuando el servidor vuelva, reanuda.",
     en: "It failed for 3 days in a row without answering 2xx. When the server is back, resume.",
   },
   "apiKeys.webhook.reason.key_revoked": {
-    es: "La key fue revocada. Este webhook no vuelve: creá una key nueva y registrá el webhook ahí.",
+    es: "La key fue revocada. Este webhook no vuelve: crea una key nueva y registra el webhook ahí.",
     en: "The key was revoked. This webhook won't come back: create a new key and register the webhook there.",
   },
   "apiKeys.webhook.reason.key_expired": {
-    es: "La key venció. Creá una key nueva y registrá el webhook ahí.",
+    es: "La key venció. Crea una key nueva y registra el webhook ahí.",
     en: "The key expired. Create a new key and register the webhook there.",
   },
   "apiKeys.webhook.reason.scope_removed": {
-    es: "La key ya no tiene el permiso de Messenger. Creá una key nueva y registrá el webhook ahí.",
+    es: "La key ya no tiene el permiso de Messenger. Crea una key nueva y registra el webhook ahí.",
     en: "The key no longer has the Messenger permission. Create a new key and register the webhook there.",
   },
   "apiKeys.webhook.reason.person_inactive": {
@@ -415,7 +415,7 @@ export const apiKeys = {
     en: "There's more than one agency in Maven: webhooks stay off until that's resolved.",
   },
   "apiKeys.webhook.reason.config_error": {
-    es: "La URL ya no se acepta o hay un problema de configuración en Maven. Si reanudar no lo arregla, borralo y registralo de nuevo.",
+    es: "La URL ya no se acepta o hay un problema de configuración en Maven. Si reanudar no lo arregla, bórralo y regístralo de nuevo.",
     en: "The URL is no longer allowed or there's a configuration problem in Maven. If resuming doesn't fix it, delete it and register it again.",
   },
   "apiKeys.webhook.reason.admin": { es: "Lo detuvo un administrador.", en: "An administrator stopped it." },
@@ -431,7 +431,7 @@ export const apiKeys = {
   "apiKeys.webhook.err.respuesta_invalida": { es: "La respuesta no se pudo leer", en: "The response couldn't be read" },
   "apiKeys.webhook.err.host_prohibido": { es: "La URL ya no se acepta", en: "The URL is no longer allowed" },
   "apiKeys.webhook.err.maven_secreto": {
-    es: "El secreto no abre con la clave del servidor: avisale a quien administra Maven",
+    es: "El secreto no abre con la clave del servidor: avísale a quien administra Maven",
     en: "The secret can't be opened with the server's key: tell whoever runs Maven",
   },
   "apiKeys.webhook.err.maven_sesion": {
@@ -501,7 +501,7 @@ export const apiKeys = {
     en: "A Messenger key can have a webhook (the table's **Webhook** column). Maven checks every 15 s and, if there are new messages, sends your URL a **signed notification with no content**: how many, in which conversations and the cursors. The content is read with `GET /messenger/feed`.",
   },
   "apiKeys.docs.webhooks.signature": {
-    es: "Cada aviso lleva `webhook-id`, `webhook-timestamp` y `webhook-signature` (Standard Webhooks: HMAC-SHA256 con el secreto `whsec_…`). Verificá la firma sobre el cuerpo **tal cual llega**, compará en tiempo constante y rechazá timestamps de más de 5 minutos. Las librerías `standardwebhooks` (Node, Python, Go y otras) lo hacen solas.",
+    es: "Cada aviso lleva `webhook-id`, `webhook-timestamp` y `webhook-signature` (Standard Webhooks: HMAC-SHA256 con el secreto `whsec_…`). Verifica la firma sobre el cuerpo **tal cual llega**, compará en tiempo constante y rechaza timestamps de más de 5 minutos. Las librerías `standardwebhooks` (Node, Python, Go y otras) lo hacen solas.",
     en: "Each notification carries `webhook-id`, `webhook-timestamp` and `webhook-signature` (Standard Webhooks: HMAC-SHA256 with the `whsec_…` secret). Verify the signature over the body **exactly as received**, compare in constant time and reject timestamps more than 5 minutes off. The `standardwebhooks` libraries (Node, Python, Go and others) do it for you.",
   },
   "apiKeys.docs.webhooks.receiver": {
@@ -513,7 +513,7 @@ export const apiKeys = {
     en: "Guarantees: **at least once** (a notification may repeat, with the same `webhook-id`), no order between notifications (the feed is ordered) and only one message notification in flight per webhook (a test can arrive at the same time). If it fails, the same one is retried with growing waits (30 s, 2 min, 10 min… up to 8 h); if it fails **3 days in a row** or answers **410**, the webhook stops. A 3xx counts as a failure: redirects aren't followed.",
   },
   "apiKeys.docs.webhooks.fallback": {
-    es: "**Obligatorio:** además del webhook, leé el feed con tu propio cursor **cada 15 minutos o menos**. Así un aviso perdido, una pausa o un webhook detenido solo demoran mensajes, nunca los pierden (son 4 pedidos por hora de los 1000 del límite).",
+    es: "**Obligatorio:** además del webhook, lee el feed con tu propio cursor **cada 15 minutos o menos**. Así un aviso perdido, una pausa o un webhook detenido solo demoran mensajes, nunca los pierden (son 4 pedidos por hora de los 1000 del límite).",
     en: "**Required:** besides the webhook, read the feed with your own cursor **every 15 minutes or less**. That way a lost notification, a pause or a stopped webhook only delays messages, never loses them (it's 4 requests per hour out of the 1000 limit).",
   },
   "apiKeys.docs.webhooks.limits": {

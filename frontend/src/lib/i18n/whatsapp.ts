@@ -101,7 +101,7 @@ export const whatsapp = {
   "wa.nTools": { es: "{n} tools", en: "{n} tools" },
   "wa.nChars": { es: "{n} chars", en: "{n} chars" },
   "wa.defaultEngine": { es: "(motor por defecto)", en: "(default engine)" },
-  "wa.botDialogDesc": { es: "El motor base (no-alucinar, tono, uso de tools) es común. Acá defines lo específico de este bot.", en: "The base engine (no hallucinating, tone, tool use) is shared. Here you define what's specific to this bot." },
+  "wa.botDialogDesc": { es: "El motor base (no-alucinar, tono, uso de tools) es común. Aquí defines lo específico de este bot.", en: "The base engine (no hallucinating, tone, tool use) is shared. Here you define what's specific to this bot." },
   "wa.nameRequired": { es: "Nombre *", en: "Name *" },
   "wa.botNamePlaceholder": { es: "Ej. Managers", en: "e.g. Managers" },
   "wa.manualPrompt": { es: "Manual (prompt del depto)", en: "Manual (department prompt)" },

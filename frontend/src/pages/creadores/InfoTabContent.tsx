@@ -274,7 +274,7 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
         } />
 
         {/* Manager (PERSONA con rol manager — fuente de verdad de quién maneja
-            a esta modelo; el bot de WhatsApp y los reportes agrupan por acá) */}
+            a esta modelo; el bot de WhatsApp y los reportes agrupan por aquí) */}
         {isEditing ? (
           <EditField label="Manager">
             <ManagerSelect

@@ -113,7 +113,7 @@ export async function runAccount(acct, { log = () => {}, onResult = () => {}, sh
     log(`⏸️ slot ${acct.id}: en cooldown ${mins} min más. Se saltea.`);
     return { slot: acct.id, skipped: "cooldown", cooldownUntil: cds[acct.id] };
   }
-  if (!existsSync(acct.sessionFile)) { log(`⚠️ slot ${acct.id}: sin sesión. Logueá la cuenta primero.`); return { slot: acct.id, skipped: "no_session" }; }
+  if (!existsSync(acct.sessionFile)) { log(`⚠️ slot ${acct.id}: sin sesión. Loguea la cuenta primero.`); return { slot: acct.id, skipped: "no_session" }; }
 
   const targets = await fetchTargets(acct.index, acct.count);
   log(`▶️ cuenta ${acct.id} (${acct.index + 1}/${acct.count}): ${targets.length} creadoras.`);
@@ -195,7 +195,7 @@ export async function saveLoginTo(key, sessionFile, network) {
   if (tieneSesion(estado, network) === false) {
     throw new Error(
       `Todavía no hay sesión: falta ${QUE_FALTA[network]}. ` +
-      `Terminá de loguearte en la ventana que quedó abierta (incluido el 2FA) y volvé a apretar “Ya me logueé”.` +
+      `Termina de loguearte en la ventana que quedó abierta (incluido el 2FA) y vuelve a apretar “Ya me logueé”.` +
       (network === "x" ? " Ojo: X bloquea el login automatizado — para X hay que importar la sesión de Chrome: node import-session.mjs x" : ""),
     );
   }
