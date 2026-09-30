@@ -670,6 +670,11 @@ Deno.serve(async (req) => {
       no_camera_seconds: r.seg_sin_camara,
       no_screen_seconds: r.seg_sin_pantalla,
       away_seconds: r.seg_fuera_de_camara,
+      // La sala se cayó. Se pagan hasta 10 min de caídas por hora (ya están
+      // dentro de active_seconds); el resto, no. `?? 0` por si esta
+      // edge sale antes que la migración: la clave no desaparece del JSON.
+      disconnected_seconds: r.seg_sin_conexion ?? 0,
+      disconnected_long_seconds: r.seg_sin_conexion_larga ?? 0,
       in_room_seconds: r.seg_en_sala,
       sessions: r.sesiones,
       first_join: r.primer_ingreso,
