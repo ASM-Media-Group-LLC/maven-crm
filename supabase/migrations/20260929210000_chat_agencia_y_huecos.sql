@@ -49,14 +49,18 @@
 --   A11 get_unread_counts cuenta hasta 101 por conversación, como
 --       messenger_unread_counts: el costo deja de crecer con los no leídos viejos.
 --
--- ⚠️ Lo que el diseño pedía y NO va acá:
+-- ⚠️ Lo que el diseño pedía y NO va aquí:
 --   · A10, la mitad del «esqueleto de un nombre visible»: la columna
 --     api_keys.api_display_name nace en la migración B (PR 2). Esa parte la suma B,
 --     sobre esta misma función.
 --
 -- El nombre: el diseño la llamaba 20260929100000, pero esa versión ya está aplicada
 -- en prod (drive_cupos_nombre_o_correo). Dos migraciones con la misma versión
--- chocan en supabase_migrations.schema_migrations: por eso 20260929150000.
+-- chocan en supabase_migrations.schema_migrations. Y tiene que ir DESPUÉS de la
+-- última aplicada (20260929180000 funciones_sin_voseo, 29/09): una versión
+-- anterior queda «insertada antes de la última» y `supabase db push` la rechaza
+-- sin --include-all. 20260929200000 ya la usa la rama del reloj de Cowork: por
+-- eso 20260929210000.
 --
 -- Diferencias de prod contra el repo que esto respeta (el catálogo de prod manda;
 -- sacado el 28/09 y vuelto a comparar el 29/09, sin cambios):
@@ -410,7 +414,7 @@ create trigger chat_participants_agencia
 -- ─── A10: el nombre lo cambia un admin ───────────────────────────────────────
 -- La app nunca cambia full_name como authenticated; lo hace admin-user-actions con
 -- service_role (sin auth.uid()). Solo UPDATE OF full_name: handle_new_user (INSERT)
--- no pasa por acá.
+-- no pasa por aquí.
 create or replace function public.profiles_nombre_lo_cambia_un_admin()
 returns trigger
 language plpgsql

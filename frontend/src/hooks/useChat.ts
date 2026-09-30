@@ -674,7 +674,7 @@ export function useChat() {
 
         if (createConvError) {
           setConversations(prev => prev.filter(c => c.id !== newConvId));
-          // La base corta en 30 grupos nuevos por persona en 24 horas (20260929150000).
+          // La base corta en 30 grupos nuevos por persona en 24 horas (20260929210000).
           toast.error(traducir(
             createConvError.message?.includes("chat_tope_grupos")
               ? "shared.chat.groupDailyLimit"
@@ -708,7 +708,7 @@ export function useChat() {
             // (la cascada se lleva su participación). Antes se borraba primero la
             // participación: sin ella la política SELECT ya no deja ver la
             // conversación, el DELETE borraba 0 filas sin error y quedaba huérfana.
-            // Desde 20260929150000 la base también rechaza aquí a alguien de otra
+            // Desde 20260929210000 la base también rechaza aquí a alguien de otra
             // agencia (chat_otra_agencia).
             await supabase.from("chat_conversations").delete().eq("id", newConvId);
             setConversations(prev => prev.filter(c => c.id !== newConvId));

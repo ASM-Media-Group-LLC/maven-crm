@@ -1,13 +1,11 @@
 // ABRIR UN DIRECTO: reusar el canónico, crearlo, y la carrera.
 //
-// Desde la migración 20260929150000 la base no deja crear un segundo directo
+// Desde la migración 20260929210000 la base no deja crear un segundo directo
 // entre las mismas dos personas: el tercer paso de la creación da
 // `directo_duplicado`. Pasa solo cuando los dos se abren el chat a la vez (o dos
 // pestañas). El que pierde tiene que borrar lo suyo y abrir el del otro, sin
 // mostrar un error.
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import {
   abrirDirecto,
   esDirectoDuplicado,
@@ -196,12 +194,26 @@ describe("pasosDeSupabase: lo que le pide a la base", () => {
 
 // Los nombres que la app compara tienen que ser los que la base de verdad usa
 // (lección de `refs` vs `references`: un nombre distinto es una función muerta
-// en silencio, con los tests en verde). Se leen con fs, como el resto de las
-// guardas de estructura: un glob que no encuentra nada no falla solo.
-const leer = (rel: string): string => readFileSync(resolve(process.cwd(), rel), "utf8");
-const MIGRACION = "supabase/migrations/20260929150000_chat_agencia_y_huecos.sql";
+// en silencio, con los tests en verde). Se leen con el glob de Vite y no con
+// node:fs: el tsconfig del front compila los tests y no trae los tipos de Node.
+// Un glob que no encuentra nada no falla solo: por eso el primer test mira que
+// los dos fuentes hayan cargado.
+const MIGRACION = "/supabase/migrations/20260929210000_chat_agencia_y_huecos.sql";
+const USE_CHAT = "/frontend/src/hooks/useChat.ts";
+const fuentes = (import.meta as unknown as {
+  glob: (p: string[], o: Record<string, unknown>) => Record<string, string>;
+}).glob(
+  ["/supabase/migrations/20260929210000_chat_agencia_y_huecos.sql", "/frontend/src/hooks/useChat.ts"],
+  { query: "?raw", import: "default", eager: true },
+);
+const leer = (ruta: string): string => fuentes[ruta] ?? "";
 
 describe("el contrato con la migración", () => {
+  it("los fuentes se cargaron", () => {
+    expect(leer(MIGRACION).length).toBeGreaterThan(1000);
+    expect(leer(USE_CHAT).length).toBeGreaterThan(1000);
+  });
+
   it("la base define chat_directo_con(_otro uuid) y los errores que la app reconoce", () => {
     const sql = leer(MIGRACION);
     expect(sql).toMatch(/create or replace function public\.chat_directo_con\(_otro uuid\)/);
@@ -210,7 +222,7 @@ describe("el contrato con la migración", () => {
   });
 
   it("useChat abre los directos con abrirDirecto y ya no busca con limit(1) sin orden", () => {
-    const src = leer("frontend/src/hooks/useChat.ts");
+    const src = leer(USE_CHAT);
     expect(src).toContain("abrirDirecto(");
     expect(src).not.toContain('chat_conversations!inner(type)');
     expect(src).toContain('"chat_tope_grupos"');

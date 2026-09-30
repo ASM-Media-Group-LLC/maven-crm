@@ -1,5 +1,5 @@
 // La agencia en cada conversación y los huecos de la base del Messenger
-// (migración 20260929150000_chat_agencia_y_huecos.sql), probados contra un
+// (migración 20260929210000_chat_agencia_y_huecos.sql), probados contra un
 // Postgres de verdad (PGlite) cargado con el esquema de PROD del 28/09 (vuelto a
 // comparar con prod el 29/09: las huellas no cambiaron).
 //
@@ -10,7 +10,7 @@
 //
 // Cómo está armado:
 //   0. El fixture (fixtures/prod_chat_api_20260928.sql) es el volcado de catálogo de
-//      prod, sin datos. Trae sus huellas md5 en la cabecera; acá se recalculan y,
+//      prod, sin datos. Trae sus huellas md5 en la cabecera; aquí se recalculan y,
 //      si alguna no coincide, el banco falla: el fixture no se toca a mano.
 //   1. Cada hueco (A–H) se prueba DOS veces con el mismo pedido: sobre prod tal
 //      cual (tiene que FUNCIONAR: es la línea base, y si no funciona el test no
@@ -19,13 +19,13 @@
 //      transacción, con el rol y los claims que pone PostgREST), siguen andando.
 //
 // PGlite tiene UNA conexión: las carreras (dos directos a la vez, dos grupos a la
-// vez) se razonan con los candados del trigger, no se prueban acá. Sale con código
+// vez) se razonan con los candados del trigger, no se prueban aquí. Sale con código
 // 1 si algo falla. Corre en el guard de cada PR (guard-edge-functions.yml).
 import { PGlite } from "npm:@electric-sql/pglite@0.3";
 
 const leer = (rel: string) => Deno.readTextFileSync(new URL(rel, import.meta.url));
 const FIXTURE = leer("./fixtures/prod_chat_api_20260928.sql");
-const MIG_A = leer("../migrations/20260929150000_chat_agencia_y_huecos.sql");
+const MIG_A = leer("../migrations/20260929210000_chat_agencia_y_huecos.sql");
 
 const ok: string[] = [], mal: string[] = [];
 const check = (c: boolean, m: string) => (c ? ok : mal).push(m);
