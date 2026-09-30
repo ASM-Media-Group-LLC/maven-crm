@@ -27,7 +27,7 @@ import { escucharLaVuelta } from "@/hooks/useReanudarAlVolver";
  * lee) contra 188 escuchas sin filtro → ~100.000 chequeos de RLS por hora, el
  * 70 % de todo lo que Realtime chequeaba del chat y la campana.
  *
- * ACÁ: un solo canal por pestaña, UNA escucha por (tabla, evento), y cada evento
+ * AQUÍ: un solo canal por pestaña, UNA escucha por (tabla, evento), y cada evento
  * se reparte en memoria a quien se registró. Dos de ellas van filtradas:
  *  - `chat_participants` UPDATE → solo MI fila (`user_id=eq.<yo>`). Es la única
  *    que miran la lista (mute, modo, rol: recargar), el globito y las menciones.
@@ -175,6 +175,13 @@ function armar(c: Centro): void {
     if (estado === "SUBSCRIBED") {
       c.intento = 0;
       c.suscrito = true;
+      // realtime-js reintenta solo tras un CHANNEL_ERROR: si el canal volvió por
+      // su cuenta, el rearmado que quedó programado ya no hace falta (la lista
+      // de useChat lo cancelaba igual con su canal propio).
+      if (c.timer) {
+        clearTimeout(c.timer);
+        c.timer = null;
+      }
       const revivio = c.huboCaida;
       c.huboCaida = false;
       avisar(c, (o) => {

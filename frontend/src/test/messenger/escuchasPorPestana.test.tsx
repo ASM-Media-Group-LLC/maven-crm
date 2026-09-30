@@ -12,7 +12,7 @@
 // pantalla siga enterándose, una vez.
 //
 // La línea base TIENE que poder fallar: este mismo archivo, corrido contra
-// origin/main (abbec4e0, 29/09), falla en 5 de 8 casos. Los tres que pasan son
+// origin/main (be1e1121, 29/09), falla en 5 de 8 casos. Los tres que pasan son
 // de comportamiento puro y tienen que pasar en los dos lados; los dos de
 // "mensaje ajeno" y "mi lectura" pasan allá todo lo que hace cada pantalla y
 // fallan recién en el costo. Imprime:
@@ -25,7 +25,9 @@
 //     en un directo (updated_at) 1, notificación ajena 1.
 // En prod el 29/09 (70 pestañas de 36 personas): 218 escuchas sin filtro del
 // INSERT de chat_messages, 161 del UPDATE de chat_participants, 70 del UPDATE de
-// chat_conversations y 61 de notifications; ninguna de esas filtrada.
+// chat_conversations y 61 de notifications; ninguna de esas filtrada. Más tarde
+// ese día, con 44 pestañas de 23 personas: 142, 103, 44 y 39 (la misma forma:
+// ~3 del INSERT por pestaña, ~2 del UPDATE de participantes, 1 de cada resto).
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, act, cleanup } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";

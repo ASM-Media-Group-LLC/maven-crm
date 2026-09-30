@@ -130,7 +130,7 @@ export default function GroupMembersPanel({
   // de todas mis conversaciones; como esa fila cambia cada vez que alguien lee,
   // Realtime corría la RLS ~534 veces por hora por cada pestaña de Maven para
   // esto solo. Ahora la lista escucha solo mi fila (canalDelChat.ts) y el rol
-  // ajeno, que solo se muestra acá, se escucha acá: filtrado por ESTA
+  // ajeno, que solo se muestra aquí, se escucha aquí: filtrado por ESTA
   // conversación. Un rol distinto del que tenemos → se recarga la lista.
   const onMembersChangedRef = useRef(onMembersChanged);
   onMembersChangedRef.current = onMembersChanged;

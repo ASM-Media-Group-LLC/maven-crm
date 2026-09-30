@@ -213,6 +213,26 @@ describe("canal del chat", () => {
     await microtareas();
   });
 
+  it("si el canal vuelve solo tras un CHANNEL_ERROR, no se rearma y avisa alRevivir", async () => {
+    // realtime-js reintenta por su cuenta un canal con error. Si queda
+    // SUBSCRIBED antes de la espera, el rearmado programado sobra: la lista de
+    // useChat lo cancelaba con su canal propio y el compartido tiene que hacer
+    // lo mismo (si no, cada error suelto era un canal nuevo y otra recarga).
+    const rev = vi.fn();
+    const s = registrarEnElCanalDelChat("u1", ref({ alRevivir: rev }));
+    await microtareas();
+    const [canal] = vivos();
+    canal.alEstado?.("SUBSCRIBED");
+    canal.alEstado?.("CHANNEL_ERROR");
+    canal.alEstado?.("SUBSCRIBED");
+    expect(rev).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(base.canales).toHaveLength(1);
+    expect(vivos()).toEqual([canal]);
+    s();
+    await microtareas();
+  });
+
   it("el CLOSED de nuestro propio removeChannel no programa nada", async () => {
     const s = registrarEnElCanalDelChat("u1", ref({}));
     await microtareas();

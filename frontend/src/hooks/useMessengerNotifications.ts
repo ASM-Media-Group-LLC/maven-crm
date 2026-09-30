@@ -312,7 +312,7 @@ export function useMessengerNotifications() {
       .maybeSingle()
       .then(({ data }) => { myNameRef.current = data?.full_name ?? null; });
 
-    // Qué hacer con cada mensaje se arma acá (cierra sobre userId y los refs);
+    // Qué hacer con cada mensaje se arma aquí (cierra sobre userId y los refs);
     // el evento llega por el canal del chat, que revive solo.
     return registrarEnElCanalDelChat(userId, {
       current: {

@@ -299,7 +299,7 @@ export function useChat() {
           const msg = payload.new as any;
           if (!isKnownConversation(msg?.conversation_id)) return;
           updateConversationWithMessage(msg);
-          // El "entregado" (✓✓ gris) ya NO se marca acá: useMessengerNotifications
+          // El "entregado" (✓✓ gris) ya NO se marca aquí: useMessengerNotifications
           // recibe este mismo evento en esta misma pestaña y lo marca SIEMPRE,
           // también en conversaciones que la lista todavía no cargó. Eran dos
           // upserts idénticos por cada mensaje ajeno y por pestaña.
@@ -413,7 +413,7 @@ export function useChat() {
           }
           scheduleConversationsReload(true);
         },
-        // Llegan SOLO las de grupos (filtro type=eq.group): de acá se copian
+        // Llegan SOLO las de grupos (filtro type=eq.group): de aquí se copian
         // nombre, foto y descripción, que un directo no tiene. Con cada mensaje
         // se toca `updated_at` de su conversación, y el 75 % son de directos.
         "chat_conversations:UPDATE": (payload) => {
@@ -450,7 +450,7 @@ export function useChat() {
     // Volver a la pestaña ya NO recarga por sí solo. Si estuvo oculta poco, el
     // canal siguió vivo y la lista está al día; si estuvo oculta ≥30 s (o se cayó
     // la red), el canal del chat se rearma y ESE recarga al quedar SUBSCRIBED.
-    // Recargar también acá duplicaba cada vuelta, y con Cowork y WhatsApp al lado
+    // Recargar también aquí duplicaba cada vuelta, y con Cowork y WhatsApp al lado
     // la gente alterna pestañas cada pocos segundos.
 
     // Fallback sync por si el websocket se cae. El realtime ya trae los cambios en
