@@ -146,6 +146,8 @@ export const cowork = {
   "cowork.clock.reason.offCamera": { es: "no estás frente a la cámara", en: "you're not in front of the camera" },
   "cowork.clock.reasonOther.noScreen": { es: "sin pantalla", en: "no screen" },
   "cowork.clock.reasonOther.offCamera": { es: "fuera de cámara", en: "off camera" },
+  "cowork.clock.reason.noConnection": { es: "sin conexión a la sala", en: "not connected to the room" },
+  "cowork.clock.reasonOther.noConnection": { es: "sin conexión", en: "disconnected" },
 
   // ── La pausa del supervisor (la tacita del Hub) ────────────────────────────
   // label / phrase / subtitle: el mismo español que lib/pausaSupervisor.
@@ -289,6 +291,7 @@ export const cowork = {
   "cowork.rules.clock.stopNoCamera": { es: "sin cámara", en: "with no camera" },
   "cowork.rules.clock.stopNoScreen": { es: "sin pantalla", en: "with no screen" },
   "cowork.rules.clock.stopNobody": { es: "si no hay nadie {time} seguidos", en: "if nobody's on camera for {time} straight" },
+  "cowork.rules.clock.stopNoConnection": { es: "si se cae la sala más de 10 minutos en una hora", en: "if the room drops for more than 10 minutes in an hour" },
   "cowork.rules.clock.summary": { es: "Corre con {requires} · se detiene {stops}", en: "Runs with {requires} · stops {stops}" },
   "cowork.rules.saved": { es: "Reglas guardadas", en: "Rules saved" },
   "cowork.rules.savedDesc": { es: "Aplican en vivo a quienes ya están en la sesión.", en: "They apply live to everyone already in the session." },
@@ -458,6 +461,8 @@ export const cowork = {
   "cowork.host.roomCloseError": { es: "No se pudo cerrar la sala", en: "Couldn't close the room" },
   "cowork.host.chip.inMeet": { es: "En meet grupal · {time}", en: "In group meet · {time}" },
   "cowork.host.chip.noScreen": { es: "Sin pantalla", en: "No screen" },
+  "cowork.host.chip.noConnection": { es: "Sin conexión con la sala", en: "Not connected to the room" },
+  "cowork.host.chip.noConnectionLong": { es: "Sin conexión · el reloj no cuenta", en: "Disconnected · clock stopped" },
   "cowork.host.room.listening": { es: "Escuchando", en: "Listening" },
   "cowork.host.room.muted": { es: "Silenciada", en: "Muted" },
   "cowork.host.room.listeningHint": {

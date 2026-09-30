@@ -41,17 +41,24 @@ export const ESTAS_SUPERVISOR: Record<EstadoSupervisor, TranslationKey> = {
   ausente: "cowork.supPause.youAre.away",
 };
 
+// Una entrada POR ESTADO (ver lib/coworkReloj): olvidarse uno no compila.
+const CLAVE_MOTIVO: Record<EstadoTiempo, { propio: TranslationKey; deOtro: TranslationKey } | null> = {
+  activo: null,
+  meet: null,
+  sin_conexion: null,
+  pausa: { propio: "cowork.clock.reason.paused", deOtro: "cowork.clock.reason.paused" },
+  sin_camara: { propio: "cowork.clock.reason.cameraOff", deOtro: "cowork.clock.reason.cameraOff" },
+  sin_pantalla: { propio: "cowork.clock.reason.noScreen", deOtro: "cowork.clock.reasonOther.noScreen" },
+  fuera_de_camara: { propio: "cowork.clock.reason.offCamera", deOtro: "cowork.clock.reasonOther.offCamera" },
+  sin_conexion_larga: { propio: "cowork.clock.reason.noConnection", deOtro: "cowork.clock.reasonOther.noConnection" },
+};
+
 /** Por qué está detenido el reloj: a la persona ("no estás frente a la cámara")
  *  o, con `deOtro`, en tercera persona para el tablero ("fuera de cámara").
  *  null cuando corre (activo o en el meet grupal). */
 export function claveMotivoDetenido(estado: EstadoTiempo | null | undefined, deOtro = false): TranslationKey | null {
-  switch (estado) {
-    case "pausa": return "cowork.clock.reason.paused";
-    case "sin_camara": return "cowork.clock.reason.cameraOff";
-    case "sin_pantalla": return deOtro ? "cowork.clock.reasonOther.noScreen" : "cowork.clock.reason.noScreen";
-    case "fuera_de_camara": return deOtro ? "cowork.clock.reasonOther.offCamera" : "cowork.clock.reason.offCamera";
-    default: return null;
-  }
+  const c = estado ? CLAVE_MOTIVO[estado] : null;
+  return c ? (deOtro ? c.deOtro : c.propio) : null;
 }
 
 /** El nombre de cada tipo de pausa. El valor ("bano"/"break") es dato. */

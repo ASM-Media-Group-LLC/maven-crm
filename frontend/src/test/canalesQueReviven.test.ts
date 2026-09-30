@@ -19,7 +19,7 @@ const fuentes = (import.meta as unknown as {
 // Qué cuenta como Messenger: sus hooks y sus dos carpetas de pantallas.
 const esDeMessenger = (ruta: string) =>
   /\/frontend\/src\/(pages|components)\/messenger\//.test(ruta) ||
-  /\/frontend\/src\/hooks\/(useChat|useReactions|useReadReceipts|useMentionedConversations|useMessengerNotifications|useUnreadChatCount|usePinnedChats|useArchivedChats|useTypingInbox|useOnlinePresence|useCanalQueRevive)\./.test(ruta);
+  /\/frontend\/src\/hooks\/(useChat|useReactions|useReadReceipts|useMentionedConversations|useMessengerNotifications|useUnreadChatCount|usePinnedChats|useArchivedChats|useTypingInbox|useOnlinePresence|useCanalQueRevive|canalDelChat)\./.test(ruta);
 
 // Deuda anotada a propósito, no olvido. Cada entrada lleva su porqué.
 const EXCEPCIONES: Record<string, string> = {
@@ -60,9 +60,16 @@ describe("canales de realtime de Messenger", () => {
   });
 
   it("el test se mira a sí mismo: encuentra canales en Messenger", () => {
-    // Los que pasan por el hook ya no dicen `.subscribe(`: cuentan por el hook.
+    // Los que pasan por el hook ya no dicen `.subscribe(`: cuentan por el hook,
+    // igual que los que escuchan por el canal compartido (canalDelChat.ts).
     const n = Object.entries(fuentes).filter(
-      ([ruta, c]) => esDeMessenger(ruta) && !esElHook(ruta) && (/\.subscribe\(/.test(c) || c.includes("useCanalQueRevive(")),
+      ([ruta, c]) =>
+        esDeMessenger(ruta) &&
+        !esElHook(ruta) &&
+        (/\.subscribe\(/.test(c) ||
+          c.includes("useCanalQueRevive(") ||
+          c.includes("useEscuchaDelChat(") ||
+          c.includes("registrarEnElCanalDelChat(")),
     ).length;
     expect(n).toBeGreaterThanOrEqual(12);
   });

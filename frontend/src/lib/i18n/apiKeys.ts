@@ -164,8 +164,8 @@ export const apiKeys = {
   },
   "apiKeys.scope.cowork.label": { es: "Tiempo en Cowork (diario y al detalle)", en: "Cowork time (daily and detailed)" },
   "apiKeys.scope.cowork.desc": {
-    es: "Tiempo trabajado en Cowork por empleado y día: segundos con el reloj corriendo (cámara + pantalla, presente), y detenido por pausa, sin cámara, sin pantalla o fuera de cámara. Con /cowork/time/segments, cada tramo con hora de inicio, fin y motivo. Es el dato que va a reemplazar a Hubstaff.",
-    en: "Time worked in Cowork per employee and day: seconds with the clock running (camera + screen, present), and stopped for a break, no camera, no screen or off camera. With /cowork/time/segments, each segment with start time, end time and reason. It's the data that will replace Hubstaff.",
+    es: "Tiempo trabajado en Cowork por empleado y día: segundos con el reloj corriendo (cámara + pantalla, presente), y detenido por pausa, sin cámara, sin pantalla, fuera de cámara o sin conexión a la sala. Con /cowork/time/segments, cada tramo con hora de inicio, fin y motivo. Es el dato que va a reemplazar a Hubstaff.",
+    en: "Time worked in Cowork per employee and day: seconds with the clock running (camera + screen, present), and stopped for a break, no camera, no screen, off camera or disconnected from the room. With /cowork/time/segments, each segment with start time, end time and reason. It's the data that will replace Hubstaff.",
   },
   "apiKeys.scope.sales.label": { es: "Ganancias por creadora (diario)", en: "Earnings per creator (daily)" },
   "apiKeys.scope.sales.desc": {
@@ -252,12 +252,12 @@ export const apiKeys = {
     en: "Daily Hubstaff hours per employee (hours, activity, project). Filters: from, to, profile_id.",
   },
   "apiKeys.ep.coworkTime": {
-    es: "Tiempo en Cowork por empleado y día: active_seconds (lo que exige la sesión, presente; incluye el meet grupal), group_meet_seconds, paused_seconds, bathroom_breaks / bathroom_seconds / bathroom_exceeded (presupuesto del día), breaks / break_seconds / breaks_exceeded / break_excess_seconds (tope por pausa), no_camera_seconds, no_screen_seconds, away_seconds, in_room_seconds, sessions, first_join, last_leave. Filtros: from, to, profile_id.",
-    en: "Cowork time per employee and day: active_seconds (what the session requires, present; includes the group meet), group_meet_seconds, paused_seconds, bathroom_breaks / bathroom_seconds / bathroom_exceeded (daily budget), breaks / break_seconds / breaks_exceeded / break_excess_seconds (per-break cap), no_camera_seconds, no_screen_seconds, away_seconds, in_room_seconds, sessions, first_join, last_leave. Filters: from, to, profile_id.",
+    es: "Tiempo en Cowork por empleado y día: active_seconds (lo que exige la sesión, presente; incluye el meet grupal), group_meet_seconds, paused_seconds, bathroom_breaks / bathroom_seconds / bathroom_exceeded (presupuesto del día), breaks / break_seconds / breaks_exceeded / break_excess_seconds (tope por pausa), no_camera_seconds, no_screen_seconds, away_seconds, disconnected_seconds (la sala se cayó; se pagan hasta 10 min por hora y ya van dentro de active_seconds), disconnected_long_seconds (caídas que no se pagan), in_room_seconds, sessions, first_join, last_leave. Filtros: from, to, profile_id.",
+    en: "Cowork time per employee and day: active_seconds (what the session requires, present; includes the group meet), group_meet_seconds, paused_seconds, bathroom_breaks / bathroom_seconds / bathroom_exceeded (daily budget), breaks / break_seconds / breaks_exceeded / break_excess_seconds (per-break cap), no_camera_seconds, no_screen_seconds, away_seconds, disconnected_seconds (the room dropped; up to 10 min per hour is paid and already inside active_seconds), disconnected_long_seconds (unpaid drops), in_room_seconds, sessions, first_join, last_leave. Filters: from, to, profile_id.",
   },
   "apiKeys.ep.coworkSegments": {
-    es: "Cada tramo del reloj al detalle: state (active | group_meet | paused | no_camera | no_screen | away), detail, started_at, ended_at, seconds, sesión y sala. Filtros: from, to, profile_id.",
-    en: "Each clock segment in detail: state (active | group_meet | paused | no_camera | no_screen | away), detail, started_at, ended_at, seconds, session and room. Filters: from, to, profile_id.",
+    es: "Cada tramo del reloj al detalle: state (active | group_meet | paused | no_camera | no_screen | away | disconnected | disconnected_long; puede sumar valores nuevos: trate cualquier valor desconocido como reloj detenido), detail, started_at, ended_at, seconds, sesión y sala. Filtros: from, to, profile_id.",
+    en: "Each clock segment in detail: state (active | group_meet | paused | no_camera | no_screen | away | disconnected | disconnected_long; new values may be added: treat any unknown value as a stopped clock), detail, started_at, ended_at, seconds, session and room. Filters: from, to, profile_id.",
   },
   "apiKeys.ep.coworkBreaks": {
     es: "Cada pausa al detalle: kind (bathroom | break), started_at, ended_at, seconds, limit_seconds (tope vigente de la sesión), exceeded, auto_closed (la cerró el sistema: cerró la pestaña), sesión y sala. Filtros: from, to, profile_id.",
