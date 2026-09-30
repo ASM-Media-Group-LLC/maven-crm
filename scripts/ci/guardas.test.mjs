@@ -1,5 +1,5 @@
 // node --test scripts/ci/guardas.test.mjs
-// Las guardas del frontend también tienen que PODER FALLAR: cada caso rojo de acá
+// Las guardas del frontend también tienen que PODER FALLAR: cada caso rojo de aquí
 // es una forma real en que una corrida rota podría pasar por verde.
 import assert from "node:assert/strict";
 import { test } from "node:test";

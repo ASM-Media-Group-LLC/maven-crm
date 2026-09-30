@@ -4,7 +4,7 @@
 //
 // Pura y aparte de index.ts (que arranca el servidor al importarse) para poder
 // probarla. Hoy es el nombre del perfil, o «Alguien» si no hay nombre: lo mismo que
-// hacía index.ts en línea. Cuando la escritura por API llegue, acá se suma el
+// hacía index.ts en línea. Cuando la escritura por API llegue, aquí se suma el
 // nombre visible de la key, para que el celular diga lo mismo que la burbuja y la
 // campana (y no el nombre real de la persona detrás).
 

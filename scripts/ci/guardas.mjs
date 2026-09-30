@@ -114,7 +114,7 @@ const SIN_ARCHIVO = /^(error TS\d+: .*)$/;
 const DIAGNOSTICO = /^([A-Za-z][A-Za-z /]*?):\s+([\d.]+)([KMGs]?)\s*$/;
 // Lo que suma --listFiles: cada archivo del programa, con ruta ABSOLUTA, uno por
 // línea. La primera línea de un stack trace («/x/tsc.js:120000») no termina en una
-// extensión y no entra acá.
+// extensión y no entra aquí.
 const ARCHIVO_LISTADO = /^(?:\/|[A-Za-z]:[\\/]).*\.(?:d\.)?[mc]?[tj]sx?$|^(?:\/|[A-Za-z]:[\\/]).*\.json$/;
 
 /** Saca las raíces absolutas (la cabeza y la copia de la base) de una línea, para
@@ -475,10 +475,10 @@ export function problemasDelFiltro({ patrones, requeridos, citadas, noSonLectura
     if (!patrones.includes(r)) p.push(`falta «${r}» en paths: la guarda no corre cuando eso cambia`);
   }
   for (const { ruta, desde } of lecturasSinCubrir(citadas, patrones)) {
-    if (!noSonLecturas.has(ruta)) p.push(`${ruta} (lo lee ${desde}) no dispara la guarda: sumalo a paths`);
+    if (!noSonLecturas.has(ruta)) p.push(`${ruta} (lo lee ${desde}) no dispara la guarda: súmalo a paths`);
   }
   for (const ruta of noSonLecturas.keys()) {
-    if (!citadas.has(ruta)) p.push(`la excepción «${ruta}» ya no la cita nadie: sacala de la lista`);
+    if (!citadas.has(ruta)) p.push(`la excepción «${ruta}» ya no la cita nadie: sácala de la lista`);
   }
   return p;
 }
