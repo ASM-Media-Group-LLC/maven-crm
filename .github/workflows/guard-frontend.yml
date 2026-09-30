@@ -1,0 +1,154 @@
+name: Guard Frontend
+
+# El frontend se despliega solo al mergear a main (Dokploy arma la imagen con
+# `npm run build`) y hasta ahora ningún PR lo revisaba: un test roto, un error de
+# tipos nuevo o un build que no arma llegaban a main sin que nada avisara.
+# Solo lee el código: no despliega nada ni necesita secretos.
+#
+# Tres cosas, en tres trabajos en paralelo:
+#   1. vitest, la suite ENTERA, leyendo el resumen («Test Files»): un archivo de
+#      test que no carga no suma nada a «Tests» y solo se ve ahí (pasó el 16/09).
+#      Y la LISTA de archivos que corrió tiene que ser la de frontend/src.
+#   2. tsc contra main: main arrastra errores viejos, así que se falla solo si el PR
+#      trae uno NUEVO, comparando la lista (sin línea ni columna), no el número.
+#   3. La imagen de prod, con el Dockerfile tal cual (`docker build`): el mismo
+#      node:20-alpine, el mismo `npm install` y el mismo `npm run build` que arma
+#      Dokploy. Un `npm run build` en el Node 24 de los otros dos trabajos no
+#      alcanza: es otro Node y otro árbol de dependencias (`npm ci` contra
+#      `npm install`), y un PR que arma ahí puede no armar en prod.
+# La lógica de 1 y 2 está en scripts/ci/ (guardas.mjs, con sus pruebas).
+#
+# `paths`: además del frontend, lo que sus tests LEEN o importan de afuera (edge
+# functions, migraciones, nginx.conf, el servidor del NAS). Si un PR toca solo uno
+# de esos archivos y rompe el test, la guarda tiene que correr igual.
+# scripts/ci/filtro-cubre-lecturas.mjs lo revisa en cada corrida: si un test nuevo
+# lee algo que la lista no cubre, falla y dice qué sumar.
+
+on:
+  pull_request:
+    paths:
+      - "frontend/**"
+      - "vite.config.ts"
+      - "vitest.config.ts"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig*.json"
+      - "tailwind.config.ts"
+      - "postcss.config.js"
+      - "scripts/ci/**"
+      - ".github/workflows/guard-frontend.yml"
+      # Lo que lee `docker build` además de lo de arriba.
+      - "Dockerfile"
+      - ".dockerignore"
+      - "docker-entrypoint.sh"
+      # Lo que los tests de frontend/src leen de afuera (con fs o import.meta.glob).
+      - "supabase/functions/**"
+      - "supabase/migrations/**"
+      - "infra/nas-drive/**"
+      - "nginx.conf"
+
+permissions:
+  contents: read
+
+# Un push nuevo al PR cancela la corrida anterior: solo importa la última.
+concurrency:
+  group: guard-frontend-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  vitest:
+    name: vitest (suite entera)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      # Node 24 y no el 20 de la imagen (Dockerfile: node:20-alpine, con
+      # `npm install`): el npm 10 que trae Node 20 rechaza este package-lock en
+      # `npm ci` («Missing: esbuild@0.28.2 from lock file», el peer opcional del
+      # vite 8 que usa vitest). El npm 11 de Node 24 lo acepta, igual que el de
+      # desarrollo. Lo que arma prod lo revisa el trabajo `imagen`, con el
+      # Dockerfile tal cual.
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: npm ci
+        id: npmci
+        run: npm ci --no-audit --no-fund
+
+      # Las pruebas de las propias guardas primero: si el lector del resumen de
+      # vitest se rompe, no tiene sentido confiar en lo que diga abajo. Las de
+      # corredores.test.mjs corren tsc y vitest de verdad sobre un proyecto chico
+      # (usan el node_modules de recién): van después de `npm ci`.
+      - name: Pruebas de las guardas
+        run: node --test scripts/ci/guardas.test.mjs scripts/ci/corredores.test.mjs
+
+      # Por qué el tiempo por test sube a 30 s: con los 5 s de siempre, las pruebas
+      # que montan una página entera (las de «…EnIngles») pasan en una máquina
+      # rápida y se cortan por tiempo en el runner compartido, que tiene 2 núcleos.
+      # Un test colgado de verdad falla igual, a los 30 s.
+      # --maxWorkers=2: con 2 núcleos vitest usa 1 solo worker por defecto (núcleos
+      # menos uno) y la suite corre en fila.
+      - name: vitest — la suite entera, leyendo «Test Files»
+        run: node scripts/ci/vitest-completo.mjs --testTimeout=30000 --hookTimeout=30000 --maxWorkers=2
+
+      # Que el filtro `paths` de arriba cubra todo lo que la guarda lee. Corre
+      # aunque vitest haya dado rojo: es otra señal.
+      - name: El filtro paths cubre lo que leen los tests
+        if: ${{ !cancelled() && steps.npmci.outcome == 'success' }}
+        run: node scripts/ci/filtro-cubre-lecturas.mjs
+
+  tipos:
+    name: tsc contra main
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      # fetch-depth 2: en un pull_request, HEAD es el merge que arma GitHub (el PR
+      # encima de main tal como está AHORA) y hace falta su primer padre, que es
+      # ese main. Contra él se compara: es exactamente lo que va a quedar.
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 2
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: npm ci
+        run: npm ci --no-audit --no-fund
+
+      - name: tsc — ningún error de tipos nuevo respecto de main
+        run: |
+          set -euo pipefail
+          # Si HEAD no fuera el merge (dos padres), HEAD^1 sería el commit anterior
+          # del PR y la comparación no diría nada de main.
+          padres=$(git rev-list --parents -n 1 HEAD | wc -w)
+          if [ "$padres" -ne 3 ]; then
+            echo "::error::HEAD no es el merge del PR con main (tiene $((padres - 1)) padre(s)): no hay contra qué comparar."
+            exit 1
+          fi
+          node scripts/ci/tsc-sin-errores-nuevos.mjs --base=HEAD^1
+
+  imagen:
+    name: build de la imagen de prod (Dockerfile)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      # Exactamente lo que arma Dokploy al mergear: el Dockerfile de la raíz, con
+      # su .dockerignore. La etapa 1 es node:20-alpine + `npm install` +
+      # `npm run build` con las VITE_ de marca (las reales las pone
+      # docker-entrypoint.sh al arrancar); la 2 es nginx, que copia dist/,
+      # nginx.conf y docker-entrypoint.sh. Si algo de eso falla, falla aquí y no
+      # en el deploy. No se publica nada: la imagen queda en el runner y se tira.
+      - name: docker build
+        run: docker build --progress=plain --tag maven-frontend:guarda .

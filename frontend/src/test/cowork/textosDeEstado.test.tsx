@@ -11,7 +11,7 @@ import { LanguageProvider } from "@/hooks/useLanguage";
 import { getTranslation } from "@/lib/i18n";
 import { ESTADOS_SUPERVISOR, fraseDePausaSupervisor, subtituloDePausaSupervisor, fijarPausaSupervisor } from "@/lib/pausaSupervisor";
 import { motivoDetenido, motivoDetenidoDeOtro } from "@/lib/coworkReloj";
-import { ESTADOS_TIEMPO } from "@/lib/coworkTiempoRegla";
+import { ESTADOS_TIEMPO, cuentaComoTrabajo } from "@/lib/coworkTiempoRegla";
 import { FRASES_DE_PAUSA } from "@/lib/frasesDePausa";
 import { ETIQUETA_SUPERVISOR, FRASE_SUPERVISOR, SUBTITULO_SUPERVISOR, claveMotivoDetenido } from "@/pages/cowork/textosCowork";
 import SalaEnPausa from "@/pages/cowork/SalaEnPausa";
@@ -36,6 +36,21 @@ describe("el español del diccionario es el mismo de lib/", () => {
       expect(propio ? es(propio) : null).toBe(motivoDetenido(estado));
       expect(deOtro ? es(deOtro) : null).toBe(motivoDetenidoDeOtro(estado));
     }
+  });
+
+  it("⚠️ todo estado en que el reloj se DETIENE tiene su motivo (null contra null no vale)", () => {
+    // La prueba de arriba compara el diccionario con lib/: si faltaran los dos,
+    // daría null contra null y pasaría en verde. Esta no.
+    let detenidos = 0;
+    for (const estado of ESTADOS_TIEMPO) {
+      if (cuentaComoTrabajo(estado)) continue;
+      detenidos++;
+      expect(claveMotivoDetenido(estado), estado).not.toBeNull();
+      expect(claveMotivoDetenido(estado, true), estado).not.toBeNull();
+      expect(motivoDetenido(estado), estado).not.toBeNull();
+      expect(motivoDetenidoDeOtro(estado), estado).not.toBeNull();
+    }
+    expect(detenidos).toBeGreaterThanOrEqual(5);
   });
 
   it("las frases del break, en el mismo orden", () => {

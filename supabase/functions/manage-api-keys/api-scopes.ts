@@ -62,7 +62,7 @@ export const SCOPE_CATALOG: ScopeDef[] = [
     group: "Empleados",
     label: "Tiempo en Cowork (diario y al detalle)",
     description:
-      "Tiempo trabajado en Cowork por empleado y día: segundos con el reloj corriendo (cámara + pantalla, presente), y detenido por pausa, sin cámara, sin pantalla o fuera de cámara. Con /cowork/time/segments, cada tramo con hora de inicio, fin y motivo. Es el dato que va a reemplazar a Hubstaff.",
+      "Tiempo trabajado en Cowork por empleado y día: segundos con el reloj corriendo (cámara + pantalla, presente), y detenido por pausa, sin cámara, sin pantalla, fuera de cámara o sin conexión a la sala. Con /cowork/time/segments, cada tramo con hora de inicio, fin y motivo. Es el dato que va a reemplazar a Hubstaff.",
   },
   {
     key: "sales:read",

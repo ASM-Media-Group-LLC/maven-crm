@@ -11,9 +11,23 @@
 // la misma matriz de casos: si alguien cambia una y no la otra, falla.
 // La lógica en sí está explicada en el archivo de la edge.
 
-export type EstadoTiempo = "activo" | "pausa" | "sin_camara" | "sin_pantalla" | "fuera_de_camara" | "meet";
+export type EstadoTiempo =
+  | "activo" | "pausa" | "sin_camara" | "sin_pantalla" | "fuera_de_camara" | "meet"
+  | "sin_conexion" | "sin_conexion_larga";
 
-export const ESTADOS_TIEMPO: readonly EstadoTiempo[] = ["activo", "pausa", "sin_camara", "sin_pantalla", "fuera_de_camara", "meet"];
+export const ESTADOS_TIEMPO: readonly EstadoTiempo[] = [
+  "activo", "pausa", "sin_camara", "sin_pantalla", "fuera_de_camara", "meet",
+  "sin_conexion", "sin_conexion_larga",
+];
+
+/** Cómo está la persona respecto de la sala de LiveKit. Ver la edge. */
+export type ConexionSala = "conectada" | "reconectando" | "desconectada" | "reemplazada";
+
+export const CONEXIONES_SALA: readonly ConexionSala[] = ["conectada", "reconectando", "desconectada", "reemplazada"];
+
+export const TOPE_SIN_CONEXION_MS = 10 * 60_000;
+export const VENTANA_SIN_CONEXION_MS = 60 * 60_000;
+export const NO_COBRABA_DESDE_MS = 60_000;
 
 export const UMBRAL_FUERA_DE_CAMARA_MS = 60_000;
 export const INTERVALO_LATIDO_MS = 30_000;
@@ -28,6 +42,8 @@ export interface Latido {
   /** Llevado a un meet grupal por su supervisor: cuenta como trabajo aunque
    *  no comparta pantalla (en el meet no se comparte). La pausa manda igual. */
   enMeet?: boolean;
+  /** Ausente o null = no se sabe: se aplica la regla de siempre. */
+  conexionSala?: ConexionSala | null;
 }
 
 export interface Veredicto {
@@ -47,11 +63,18 @@ export interface Exigencias {
 
 export const EXIGE_TODO: Exigencias = { camara: true, pantalla: true };
 
-/** ¿Corre el reloj en este instante? Prioridad: pausa > sin cámara > sin
- *  pantalla > fuera de cámara > activo — cada una solo si la sesión la exige. */
-export function estadoDeTiempo(l: Latido, ahora: number, umbralFueraMs = UMBRAL_FUERA_DE_CAMARA_MS, exige: Exigencias = EXIGE_TODO): Veredicto {
+/** ¿Corre el reloj en este instante? Prioridad: pausa > meet > sin conexión >
+ *  sin cámara > sin pantalla > fuera de cámara > activo — cada una solo si la
+ *  sesión la exige. `caidaPagada` lo decide el servidor (caidaSePaga). */
+export function estadoDeTiempo(
+  l: Latido, ahora: number, umbralFueraMs = UMBRAL_FUERA_DE_CAMARA_MS, exige: Exigencias = EXIGE_TODO,
+  caidaPagada = true,
+): Veredicto {
   if (l.onBreak) return { estado: "pausa", detalle: null };
   if (l.enMeet) return { estado: "meet", detalle: null };
+  if ((exige.camara || exige.pantalla) && l.conexionSala === "desconectada") {
+    return { estado: caidaPagada ? "sin_conexion" : "sin_conexion_larga", detalle: null };
+  }
   if (exige.camara && !l.camOn) return { estado: "sin_camara", detalle: null };
   if (exige.pantalla && !l.screenShareOn) return { estado: "sin_pantalla", detalle: null };
   // "Fuera de cámara" solo tiene sentido si la cámara se exige y está encendida.
@@ -63,6 +86,8 @@ export function estadoDeTiempo(l: Latido, ahora: number, umbralFueraMs = UMBRAL_
   return { estado: "activo", detalle: l.faceState ?? null };
 }
 
+/** LA regla de qué se paga. El resto del frontend le pregunta a esta función:
+ *  no repetir la lista a mano (llegó a estar copiada en cinco lugares). */
 export function cuentaComoTrabajo(estado: EstadoTiempo): boolean {
-  return estado === "activo" || estado === "meet";
+  return estado === "activo" || estado === "meet" || estado === "sin_conexion";
 }

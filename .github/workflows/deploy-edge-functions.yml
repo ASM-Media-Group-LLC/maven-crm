@@ -96,6 +96,11 @@ jobs:
       - name: Guard — salida de los webhooks
         run: deno test --allow-read supabase/functions/_shared/webhook-salida.test.ts
 
+      # Y el push del Messenger: si deja de armar bien el título, el cuerpo o a quién
+      # le llega, tampoco se despliega nada (la misma guarda que en el PR).
+      - name: Guard — web-push
+        run: deno test --allow-read supabase/functions/web-push/ supabase/functions/_shared/push-notify.test.ts
+
       - name: Determinar qué deployar
         id: changes
         run: |

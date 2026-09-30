@@ -4,7 +4,8 @@ import { agregarPorPersona, totales, horas, porcentaje, type FilaDia } from "@/l
 const fila = (o: Partial<FilaDia>): FilaDia => ({
   dia: "2026-09-07", profile_id: "a", nombre: "Ana", hubstaff_seg: 0, hubstaff_actividad: null,
   cowork_activo_seg: 0, cowork_pausa_seg: 0, cowork_sin_camara_seg: 0, cowork_sin_pantalla_seg: 0,
-  cowork_fuera_seg: 0, cowork_en_sala_seg: 0, cowork_sesiones: 0, ...o,
+  cowork_fuera_seg: 0, cowork_en_sala_seg: 0, cowork_sesiones: 0,
+  cowork_sin_conexion_seg: 0, cowork_sin_conexion_larga_seg: 0, ...o,
 });
 
 describe("agregarPorPersona", () => {

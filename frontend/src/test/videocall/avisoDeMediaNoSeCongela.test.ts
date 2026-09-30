@@ -79,7 +79,7 @@ describe("⚠️ el aviso que mueve tiempo pago no se puede congelar", () => {
       .map((p) => p.split(":")[1]?.trim())
       .filter(Boolean) as string[];
     // Que PUEDA fallar: si la extracción devuelve vacío, esto no probaría nada.
-    expect(reportados.length).toBe(3);
+    expect(reportados.length).toBe(4);
 
     const deps = bloque.slice(bloque.lastIndexOf("}, ["));
     for (const valor of reportados) {
