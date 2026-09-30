@@ -2,7 +2,7 @@ import { corsFor } from "../_shared/cors.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
-  caidaSePaga, estadoDeTiempo, latidoDeCuerpo, noCobrabaAlCaerse, sinConexionPagadaMs,
+  caidaSePaga, equipoDeCuerpo, estadoDeTiempo, latidoDeCuerpo, latidoDeEquipoAfuera, noCobrabaAlCaerse, sinConexionPagadaMs,
   LATIDO_VENCIDO_MS, TOPE_SIN_CONEXION_MS, VENTANA_SIN_CONEXION_MS, type Exigencias, type TramoGuardado,
 } from "../_shared/cowork-tiempo.ts";
 
@@ -601,13 +601,31 @@ serve(async (req) => {
       // paga depende de él (y de las caídas de la última hora). Nunca de un dato
       // del navegador.
       const { data: abierto } = await admin.from("cowork_tiempo_segmentos")
-        .select("id, estado, room_id, session_id, started_at, last_seen_at")
+        .select("id, estado, room_id, session_id, started_at, last_seen_at, equipo")
         .eq("user_id", userId).is("ended_at", null).maybeSingle();
       const vigente = !!abierto
         && abierto.room_id === asignacion.room_id && abierto.session_id === sessionId
         && ahora - new Date(abierto.last_seen_at).getTime() <= LATIDO_VENCIDO_MS;
 
       const latido = latidoDeCuerpo(body, { enPausa: !!pausa, enMeet: !!enMeet });
+      const equipo = equipoDeCuerpo(body);
+
+      // Lo que lleva HOY (día de Bogotá) con el reloj corriendo. Va en cada
+      // respuesta para que la persona vea su cronómetro sin otra consulta, y
+      // lo publique por presencia para el tablero del supervisor.
+      const segundosHoy = async (): Promise<number> => {
+        const hoy = new Date(ahora).toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
+        const { data } = await admin.rpc("cowork_tiempo_diario", { _desde: hoy, _hasta: hoy, _user_id: userId, _limit: 1, _offset: 0 });
+        return Number(data?.[0]?.seg_activo ?? 0);
+      };
+
+      // Otro equipo de la misma persona sigue EN la sala y este quedó afuera: no
+      // se toca el tramo (si no, se lo pisaban cada 30 s y no sumaba nada). Se
+      // contesta con el reloj de verdad para que esta pestaña lo muestre igual.
+      if (abierto && latidoDeEquipoAfuera(abierto, equipo, latido.conexionSala, ahora)) {
+        return json(req, { ok: true, estado: abierto.estado, detalle: null, segmento: abierto.id, otroEquipo: true, segundosHoy: await segundosHoy() });
+      }
+
       // Solo si dice que se cayó la sala: los demás latidos no pagan esta consulta.
       // Trae lo que la persona VIVIÓ en la última ventana (por último latido, así
       // entra también un tramo largo que empezó antes), más el abierto:
@@ -628,20 +646,12 @@ serve(async (req) => {
       }
       const { estado, detalle } = estadoDeTiempo(latido, ahora, umbralMs, exige, caidaPagada);
 
-      // Lo que lleva HOY (día de Bogotá) con el reloj corriendo. Va en cada
-      // respuesta para que la persona vea su cronómetro sin otra consulta, y
-      // lo publique por presencia para el tablero del supervisor.
-      const segundosHoy = async (): Promise<number> => {
-        const hoy = new Date(ahora).toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
-        const { data } = await admin.rpc("cowork_tiempo_diario", { _desde: hoy, _hasta: hoy, _user_id: userId, _limit: 1, _offset: 0 });
-        return Number(data?.[0]?.seg_activo ?? 0);
-      };
-
       const ahoraIso = new Date(ahora).toISOString();
       if (abierto) {
         const mismo = vigente && abierto.estado === estado;
         if (mismo) {
-          await admin.from("cowork_tiempo_segmentos").update({ last_seen_at: ahoraIso }).eq("id", abierto.id);
+          // Se anota QUÉ equipo lo estiró: es con lo que se decide la próxima vez.
+          await admin.from("cowork_tiempo_segmentos").update({ last_seen_at: ahoraIso, equipo }).eq("id", abierto.id);
           return json(req, { ok: true, estado, detalle, segmento: abierto.id, segundosHoy: await segundosHoy() });
         }
         // Cambió el estado (o se perdieron latidos): el anterior termina en el
@@ -649,7 +659,7 @@ serve(async (req) => {
         await admin.from("cowork_tiempo_segmentos").update({ ended_at: abierto.last_seen_at }).eq("id", abierto.id);
       }
       const { data: nuevo, error: insErr } = await admin.from("cowork_tiempo_segmentos")
-        .insert({ session_id: sessionId, room_id: asignacion.room_id, user_id: userId, estado, detalle, started_at: ahoraIso, last_seen_at: ahoraIso })
+        .insert({ session_id: sessionId, room_id: asignacion.room_id, user_id: userId, estado, detalle, started_at: ahoraIso, last_seen_at: ahoraIso, equipo })
         .select("id").single();
       if (insErr) return err(req, insErr.message, 500);
       return json(req, { ok: true, estado, detalle, segmento: nuevo.id, segundosHoy: await segundosHoy() });
