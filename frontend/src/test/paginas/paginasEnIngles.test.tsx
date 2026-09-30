@@ -39,6 +39,7 @@ const estado = vi.hoisted(() => ({
   preferencias: [] as Array<Record<string, unknown>>,
   permisosExplicitos: [] as string[],
   meetStatus: "idle" as string,
+  meetCall: null as null | { room: string },
 }));
 
 // ── Ajustes → Notificaciones ────────────────────────────────────────────────
@@ -107,9 +108,19 @@ vi.mock("@/hooks/useMeetRooms", () => ({
 }));
 vi.mock("@/hooks/useMeetGuest", () => ({
   useMeetGuest: () => ({
-    status: estado.meetStatus, error: null, roomName: "Weekly sync", guestName: "", call: null,
+    status: estado.meetStatus, error: null, roomName: "Weekly sync", guestName: "", call: estado.meetCall,
     knock: vi.fn(), getToken: vi.fn(), leave: vi.fn(),
   }),
+}));
+// La llamada en sí es de otra pantalla: aquí solo hace falta su botón de salir,
+// para llegar a la pantalla «Saliste de la reunión» del invitado.
+vi.mock("@/pages/messenger/videocall/LiveKitCallView", () => ({
+  default: ({ onLeave }: { onLeave: () => void }) => (
+    <button type="button" onClick={onLeave}>leave-call</button>
+  ),
+}));
+vi.mock("@/components/LlamadaEnVentanaFlotante", () => ({
+  LlamadaEnVentanaFlotante: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
 
 // ── Grabaciones ─────────────────────────────────────────────────────────────
@@ -240,6 +251,7 @@ beforeEach(() => {
   estado.preferencias.length = 0;
   estado.permisosExplicitos.length = 0;
   estado.meetStatus = "idle";
+  estado.meetCall = null;
 });
 
 describe("Ajustes → Notificaciones en inglés", () => {
@@ -299,6 +311,19 @@ describe("Meet en inglés", () => {
       expect(enEspanol()).toEqual([]);
     });
   }
+
+  it("el invitado que sale de la llamada ve «You left the meeting» en inglés", async () => {
+    estado.meetStatus = "admitted";
+    estado.meetCall = { room: "meet_r1" };
+    montar(
+      <Routes><Route path="/entrar/:code" element={<MeetGuestPage />} /></Routes>,
+      "/entrar/ABC234",
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "leave-call" }));
+    await screen.findByText(translations["meet.guest.left"].en);
+    expect(screen.getByText(translations["meet.guest.leftHint"].en)).toBeTruthy();
+    expect(enEspanol()).toEqual([]);
+  });
 });
 
 describe("Grabaciones, Teléfonos, Oficina y Telegram en inglés", () => {

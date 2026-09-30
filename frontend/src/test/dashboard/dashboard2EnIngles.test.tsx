@@ -24,9 +24,10 @@ import { esEspanol } from "../i18n/detectarEspanol";
 // Pantallas enteras: con toda la suite corriendo en paralelo, los 5 s por test
 // (y el segundo de findBy/waitFor) a veces no alcanzan sin que haya nada roto.
 // «Más análisis» recorre seis sub-pestañas de un tablero enorme: con la máquina
-// cargada, 30 s no alcanzaban (28/09). Un cuelgue de verdad falla igual.
+// cargada, 30 s no alcanzaban (28/09) y con carga 50 tampoco 90 s (30/09).
+// Un cuelgue de verdad falla igual.
 configure({ asyncUtilTimeout: 5000 });
-vi.setConfig({ testTimeout: 90_000 });
+vi.setConfig({ testTimeout: 180_000 });
 
 if (!("ResizeObserver" in globalThis)) {
   globalThis.ResizeObserver = class {

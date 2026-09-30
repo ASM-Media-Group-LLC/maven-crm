@@ -18,8 +18,9 @@ import { esEspanol } from "../i18n/detectarEspanol";
 
 // Pantallas enteras: con toda la suite corriendo en paralelo, los 5 s por test
 // (y el segundo de findBy/waitFor) a veces no alcanzan sin que haya nada roto.
+// El de etiquetas abre menús y el correo entero: con carga 50 pasó los 30 s (30/09).
 configure({ asyncUtilTimeout: 5000 });
-vi.setConfig({ testTimeout: 30_000 });
+vi.setConfig({ testTimeout: 60_000 });
 
 if (!("ResizeObserver" in globalThis)) {
   globalThis.ResizeObserver = class {
