@@ -161,3 +161,24 @@ describe("coworkLatido — caídas de la sala", () => {
     expect(leerReloj()?.estado).toBe("sin_conexion");
   });
 });
+
+describe("coworkLatido — cada pestaña se identifica", () => {
+  it("⚠️ el latido lleva el equipo, y es el mismo en todos los latidos de la pestaña", async () => {
+    iniciarLatido("s1", { camOn: true, screenShareOn: true, conexionSala: "conectada" });
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(INTERVALO_LATIDO_MS);
+    const [a, b] = cuerpos();
+    expect(typeof a.equipo).toBe("string");
+    expect((a.equipo as string).length).toBeGreaterThan(0);
+    expect(b.equipo).toBe(a.equipo);
+    // El nombre del campo es el que lee la edge (equipoDeCuerpo).
+    const edge = await import("../../../../supabase/functions/_shared/cowork-tiempo");
+    expect(edge.equipoDeCuerpo(a)).toBe(a.equipo);
+  });
+
+  it("sobrevive al F5 de la misma pestaña (sessionStorage)", async () => {
+    const { equipoDeEstaPestana } = await import("@/lib/coworkLatido");
+    const id = equipoDeEstaPestana();
+    expect(sessionStorage.getItem("cowork-equipo")).toBe(id);
+  });
+});

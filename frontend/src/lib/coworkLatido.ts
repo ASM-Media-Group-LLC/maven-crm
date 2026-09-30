@@ -50,6 +50,33 @@ export function relojDeRespuesta(json: unknown, ahora: number): RelojCowork | nu
   return { estado: j.estado as RelojCowork["estado"], segundosHoy: seg, en: ahora };
 }
 
+// ── Quién late: un identificador por PESTAÑA ────────────────────────────────
+// Con Cowork abierto en dos equipos, los dos latían y se pisaban el único tramo
+// abierto de la persona: el tiempo trabajado en uno no sumaba mientras el otro
+// siguiera abierto fuera de la sala. Con esto la edge sabe cuál es cuál e ignora
+// al que quedó afuera (ver latidoDeEquipoAfuera). En sessionStorage: sobrevive
+// al F5 de la misma pestaña y cada pestaña o equipo tiene el suyo.
+const CLAVE_EQUIPO = "cowork-equipo";
+let equipoEnMemoria: string | null = null;
+
+function nuevoId(): string {
+  try { if (typeof crypto?.randomUUID === "function") return crypto.randomUUID(); } catch { /* sin crypto */ }
+  return `e-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+/** Exportado para probarlo. Sin almacenamiento (ventana privada) queda en memoria. */
+export function equipoDeEstaPestana(): string {
+  if (equipoEnMemoria) return equipoEnMemoria;
+  try {
+    const guardado = sessionStorage.getItem(CLAVE_EQUIPO);
+    if (guardado) { equipoEnMemoria = guardado; return guardado; }
+  } catch { /* sin almacenamiento */ }
+  const id = nuevoId();
+  equipoEnMemoria = id;
+  try { sessionStorage.setItem(CLAVE_EQUIPO, id); } catch { /* sin almacenamiento */ }
+  return id;
+}
+
 /** Un cambio de estado se manda enseguida, con un respiro para juntar los
  *  que llegan en ráfaga (apagar cámara dispara dos o tres eventos). */
 export const RESPIRO_CAMBIO_MS = 1_500;
@@ -85,7 +112,7 @@ async function enviar(v: Vivo): Promise<void> {
         apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
         Authorization: `Bearer ${session.access_token}`,
       },
-      body: JSON.stringify({ action: "latido", sessionId: v.sessionId, ...v.estado }),
+      body: JSON.stringify({ action: "latido", sessionId: v.sessionId, equipo: equipoDeEstaPestana(), ...v.estado }),
     });
     if (res.ok && vivo === v) {
       const r = relojDeRespuesta(await res.json().catch(() => null), Date.now());
