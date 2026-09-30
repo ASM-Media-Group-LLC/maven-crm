@@ -573,4 +573,36 @@ describe("LiveKitCallView", () => {
       expect(screen.queryByText(CARTEL)).not.toBeInTheDocument();
     });
   });
+
+  // ── LA PAUSA Y EL MICRÓFONO DE QUIEN SILENCIARON ───────────────────────
+  // Una supervisora silencia a una chatter por ruido de fondo; la chatter marca
+  // Baño. `isMicOn` seguía en "prendido" (no se enteraba del silencio ajeno), la
+  // pausa llamaba a toggleMic para apagarlo, y toggleMic —que mira el estado
+  // real— lo PRENDÍA: la sala escuchaba su casa toda la pausa.
+  describe("⚠️ la pausa y el micrófono de quien silenciaron", () => {
+    const conMicReal = (encendido: boolean) => {
+      (salaFalsa.localParticipant as Record<string, unknown>).isMicrophoneEnabled = encendido;
+    };
+
+    it("silenciada por otro: la pausa NO le prende el micrófono, ni al entrar ni al salir", () => {
+      lkState = { ...defaultLkState, connect: lkState.connect, disconnect: lkState.disconnect, isMicOn: true, isCamOn: false };
+      conMicReal(false); // lo silenció la supervisora; `isMicOn` todavía dice true
+      render(<LiveKitCallView {...defaultProps} />);
+      act(() => { pedirApagarPorPausa(); });
+      expect(lkState.toggleMic).not.toHaveBeenCalled();
+      act(() => { pedirReanudarTrasPausa(); });
+      expect(lkState.toggleMic).not.toHaveBeenCalled();
+    });
+
+    it("con el micrófono prendido de verdad, la pausa lo apaga y al volver lo devuelve", () => {
+      lkState = { ...defaultLkState, connect: lkState.connect, disconnect: lkState.disconnect, isMicOn: true, isCamOn: false };
+      conMicReal(true);
+      render(<LiveKitCallView {...defaultProps} />);
+      act(() => { pedirApagarPorPausa(); });
+      expect(lkState.toggleMic).toHaveBeenCalledTimes(1);
+      conMicReal(false); // la pausa lo apagó
+      act(() => { pedirReanudarTrasPausa(); });
+      expect(lkState.toggleMic).toHaveBeenCalledTimes(2);
+    });
+  });
 });
