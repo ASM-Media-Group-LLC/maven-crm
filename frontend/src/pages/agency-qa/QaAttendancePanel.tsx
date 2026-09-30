@@ -20,7 +20,7 @@ const hhmm = (min: number | null | undefined) => {
 };
 
 // La columna `turno` de v_qa_attendance llega como texto en español. Es dato (no se
-// cambia), pero se muestra en el idioma de la interfaz; uno que no esté acá se ve tal cual.
+// cambia), pero se muestra en el idioma de la interfaz; uno que no esté aquí se ve tal cual.
 const TURNO_KEY: Record<string, TranslationKey> = {
   "Según horario propio": "agencyQa.shift.own",
   "Madrugada · 12am–8am": "agencyQa.shift.night",

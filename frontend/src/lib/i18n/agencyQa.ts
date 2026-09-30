@@ -810,7 +810,7 @@ export const agencyQa = {
   "agencyQa.new.removeModel": { es: "Quitar modelo seleccionada", en: "Remove the selected model" },
   "agencyQa.new.searching": { es: "Buscando…", en: "Searching…" },
   "agencyQa.new.createFirst": {
-    es: "Si la modelo no existe, creala en {scouter} o {leadgen} primero.",
+    es: "Si la modelo no existe, créala en {scouter} o {leadgen} primero.",
     en: "If the model doesn't exist, create it in {scouter} or {leadgen} first.",
   },
   "agencyQa.new.categoryRequired": { es: "Categoría modelo *", en: "Model category *" },
@@ -961,8 +961,9 @@ export const agencyQa = {
   "agencyQa.detail.history": { es: "Historial", en: "History" },
   "agencyQa.detail.viewInstagram": { es: "Ver Instagram", en: "View Instagram" },
   "agencyQa.detail.noModelName": { es: "Sin modelo", en: "No model" },
-  "agencyQa.detail.closerLabel": { es: "Closer: **{name}**", en: "Closer: **{name}**" },
-  "agencyQa.detail.evaluatedBy": { es: "Evaluado por **{name}**", en: "Evaluated by **{name}**" },
+  // El nombre va aparte (en su propio strong, como siempre): en los dos idiomas queda al final.
+  "agencyQa.detail.closerLabel": { es: "Closer:", en: "Closer:" },
+  "agencyQa.detail.evaluatedBy": { es: "Evaluado por", en: "Evaluated by" },
   "agencyQa.detail.aiScore": { es: "Score IA", en: "AI score" },
   "agencyQa.detail.category": { es: "Categoría: {category}", en: "Category: {category}" },
   "agencyQa.detail.analysisAt": { es: "Análisis: {date}", en: "Analysis: {date}" },

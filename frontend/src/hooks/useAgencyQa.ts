@@ -1406,7 +1406,7 @@ const fireQaWebhookInBackground = async ({ callId }: FireInput): Promise<void> =
   if (recipients.length === 0 && !uploaderUserId) return;
 
   // El correo sale en español siempre (qaEmailTemplate.ts): lo lee el closer y los
-  // destinatarios, no quien apretó "Reenviar". Por eso los "(sin nombre)" de acá.
+  // destinatarios, no quien apretó "Reenviar". Por eso los "(sin nombre)" de aquí.
   const a = call.claude_analysis ?? {};
   const outcome = (a.call_outcome as string | null) ?? null;
   const emailPayload: QaEmailPayload = {

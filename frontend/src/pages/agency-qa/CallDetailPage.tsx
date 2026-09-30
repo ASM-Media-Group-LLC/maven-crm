@@ -1561,12 +1561,10 @@ const CallDetailPage = ({
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                   <span className="inline-flex items-center gap-1.5">
                     <User className="h-3.5 w-3.5" />
-                    <span>
-                      <ConFormato
-                        texto={t("agencyQa.detail.closerLabel", { name: call.closer?.name ?? "—" })}
-                        claseNegrita="text-foreground/90"
-                      />
-                    </span>
+                    {t("agencyQa.detail.closerLabel")}{" "}
+                    <strong className="text-foreground/90">
+                      {call.closer?.name ?? "—"}
+                    </strong>
                   </span>
                   <span className="inline-flex items-center gap-1.5">
                     <Calendar className="h-3.5 w-3.5" />
@@ -1574,12 +1572,10 @@ const CallDetailPage = ({
                   </span>
                   <span className="inline-flex items-center gap-1.5">
                     <Sparkles className="h-3.5 w-3.5" />
-                    <span>
-                      <ConFormato
-                        texto={t("agencyQa.detail.evaluatedBy", { name: call.evaluator_name })}
-                        claseNegrita="text-foreground/90"
-                      />
-                    </span>
+                    {t("agencyQa.detail.evaluatedBy")}{" "}
+                    <strong className="text-foreground/90">
+                      {call.evaluator_name}
+                    </strong>
                   </span>
                   {/* Tipo de llamada: las ventas de servicio/plataforma se evalúan
                       con otro framing (no reclutamiento). Distinguimos si la

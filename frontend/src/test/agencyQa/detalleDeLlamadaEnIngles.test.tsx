@@ -203,5 +203,14 @@ describe("Closers QA → detalle de la llamada en inglés", () => {
     expect(screen.getByText("En espera")).toBeTruthy();
     expect(screen.getByText("Venta externa: Unlimited")).toBeTruthy();
     expect(screen.getByText("positivo")).toBeTruthy();
+    // «Closer:» y «Evaluado por» van sueltos y el nombre en su propio strong: tres
+    // piezas del inline-flex (ícono, texto, nombre), con su gap, como siempre.
+    for (const [rotulo, nombre] of [["Closer:", "Bob Closer"], ["Evaluado por", "Claude AI"]]) {
+      const fila = screen.getAllByText(nombre, { selector: "strong" })
+        .map((el) => el.parentElement!)
+        .find((p) => p.textContent === `${rotulo} ${nombre}`)!;
+      expect(fila, rotulo).toBeTruthy();
+      expect(Array.from(fila.children).map((el) => el.tagName.toLowerCase())).toEqual(["svg", "strong"]);
+    }
   });
 });

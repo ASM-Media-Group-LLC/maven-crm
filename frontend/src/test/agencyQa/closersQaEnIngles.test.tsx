@@ -138,7 +138,7 @@ vi.mock("@/pages/agency-qa/useCloserHubstaff", () => ({
 vi.mock("@/pages/agency-qa/chatters-qa/useHubstaffEffort", () => ({
   useHubstaffSyncStatus: () => fijo("sync", () => ({ last_sync_at: HACE_5_MIN })),
 }));
-// Chatters QA tiene su propia prueba (chattersQaEnIngles): acá no se monta.
+// Chatters QA tiene su propia prueba (chattersQaEnIngles): aquí no se monta.
 vi.mock("@/pages/agency-qa/chatters-qa/ChattersQaSection", () => ({ default: () => <div>chatters</div> }));
 
 import AgencyQA from "@/pages/agency-qa/AgencyQA";
