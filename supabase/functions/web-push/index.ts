@@ -32,6 +32,7 @@ import {
   minutosEnBogota,
   previewDeMensaje,
 } from "../_shared/push-notify.ts";
+import { nombreDelEmisor } from "./nombre-emisor.ts";
 
 /** Margen para que el cliente de quien está mirando el chat marque last_read_at
  *  (lo hace al recibir el mensaje con la ventana en foco). */
@@ -210,7 +211,7 @@ async function notificar(req: Request, admin: Admin, b: NotifyBody, vapid: Vapid
     const { title, body } = armarTituloYCuerpo({
       esGrupo: conv.data?.type === "group",
       nombreGrupo: conv.data?.name ?? null,
-      emisor: (emisor.data?.full_name as string | null) || "Alguien",
+      emisor: nombreDelEmisor(emisor.data as { full_name: string | null } | null),
       preview: previewDeMensaje(msg.content ?? null, msg.type ?? "text", msg.file_name ?? null),
       enHilo: msg.is_thread_reply === true,
     });
