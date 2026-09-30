@@ -76,8 +76,9 @@ export function WaChatButton({
     // La clave es el primer tramo de la ruta (dato); la etiqueta, del diccionario.
     const labels: Record<string, TranslationKey> = { contactos: "shared.openChat.fromContacts", creadores: "shared.openChat.fromCreators", closers: "nav.closers" };
     const seg = location.pathname.split("/").filter(Boolean)[0] || "";
+    // Desde otra ruta: en español "atrás" como siempre; en inglés "the previous page".
     navigate(`/inbox?c=${res.conversation_id}`, {
-      state: { backTo: location.pathname + location.search, backLabel: t(labels[seg] ?? "wa.backFallback") },
+      state: { backTo: location.pathname + location.search, backLabel: t(labels[seg] ?? "shared.openChat.fromPrevious") },
     });
   };
 

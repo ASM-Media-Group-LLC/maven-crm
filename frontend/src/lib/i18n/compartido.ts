@@ -378,6 +378,10 @@ export const compartido = {
   // A dónde vuelve la bandeja ("Volver a …"): la sección desde la que se abrió.
   "shared.openChat.fromContacts": { es: "Contactos", en: "Contacts" },
   "shared.openChat.fromCreators": { es: "Creadoras", en: "Creators" },
+  // Desde cualquier otra ruta (la bandeja arma "Volver a {x}" / "Back to {x}").
+  // El español es el de siempre ("Volver a atrás"); en inglés "back" dejaba
+  // «Back to back».
+  "shared.openChat.fromPrevious": { es: "atrás", en: "the previous page" },
 
   // Composer compartido (components/chat/ChatComposer.tsx)
   "shared.composer.remove": { es: "Quitar", en: "Remove" },

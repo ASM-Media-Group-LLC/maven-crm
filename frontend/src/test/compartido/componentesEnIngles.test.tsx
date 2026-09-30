@@ -162,7 +162,7 @@ import { EmployeeSearchCombobox } from "@/components/hr/EmployeeSearchCombobox";
 import { WaChatButton } from "@/components/WaChatButton";
 import { TgChatButton } from "@/components/TgChatButton";
 import AuthLayout from "@/components/auth/AuthLayout";
-import { getTranslation } from "@/lib/i18n";
+import traducciones, { getTranslation } from "@/lib/i18n";
 
 /** Todo el texto visible (sin lo que es código) y los atributos que se leen. */
 function textosVisibles(raiz: HTMLElement): string[] {
@@ -181,7 +181,23 @@ function textosVisibles(raiz: HTMLElement): string[] {
   }
   return out;
 }
-const enEspanol = (raiz: HTMLElement = document.body) => textosVisibles(raiz).filter((t) => esEspanol(t));
+/**
+ * El detector no marca varias palabras sueltas («Renombrar», «Subir», «Borrar»,
+ * «Soporte», «Informativo», «Archivar», «Colgar»): por eso además se busca el
+ * texto EXACTO en español de cualquier clave del diccionario cuyo inglés es
+ * distinto. Se descartan los que también son el inglés de otra clave (no dirían
+ * nada) y los que llevan {variables} (nunca se dibujan tal cual).
+ */
+const valores = Object.values(traducciones as Record<string, { es: string; en: string }>);
+const INGLES = new Set(valores.map((v) => v.en.trim()));
+const ESPANOL_DEL_DICCIONARIO = new Set(
+  valores
+    .filter((v) => v.es !== v.en && !v.es.includes("{"))
+    .map((v) => v.es.trim())
+    .filter((es) => es && !INGLES.has(es)),
+);
+const enEspanol = (raiz: HTMLElement = document.body) =>
+  textosVisibles(raiz).filter((t) => esEspanol(t) || ESPANOL_DEL_DICCIONARIO.has(t));
 
 function montar(ui: ReactNode, ruta = "/dashboard") {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -213,6 +229,7 @@ describe("Clari en inglés", () => {
     const ventana = await screen.findByRole("dialog", { name: "Clari AI chat" });
     expect(within(ventana).getByText("Online")).toBeTruthy();
     expect(within(ventana).getByText("Ask the CRM")).toBeTruthy();
+    expect(within(ventana).getByText("Support")).toBeTruthy();
     expect(await within(ventana).findByText(/I'm Clari/)).toBeTruthy();
     expect(within(ventana).getByTitle("Speak")).toBeTruthy();
     expect(enEspanol()).toEqual([]);
@@ -263,6 +280,7 @@ describe("Clari en inglés", () => {
     expect(screen.getByText("New chat")).toBeTruthy();
     expect(screen.getByText("Today")).toBeTruthy();
     expect(screen.getByText("Older")).toBeTruthy();
+    expect(screen.getByTitle("Rename")).toBeTruthy();
     expect(enEspanol()).toEqual([]);
     fireEvent.click(screen.getByTitle("Delete"));
     const dialogo = await screen.findByRole("alertdialog");
@@ -343,6 +361,7 @@ describe("subir archivos en inglés", () => {
     const dialogo = await screen.findByRole("dialog");
     expect(within(dialogo).getByText("Signed contract & documents")).toBeTruthy();
     expect(within(dialogo).getByText("Up to 10.0 MB per file")).toBeTruthy();
+    expect(within(dialogo).getByRole("button", { name: "Upload" })).toBeTruthy();
     const input = (document.querySelector('input[type="file"]') ?? container.querySelector("input")) as HTMLInputElement;
     const chico = new File(["x"], "contract.pdf", { type: "application/pdf" });
     const grande = new File(["x"], "huge.pdf", { type: "application/pdf" });
@@ -388,6 +407,8 @@ describe("el chat en inglés: composer y frases hechas", () => {
     fireEvent.click(screen.getByTitle("Scripts (saved phrases)"));
     expect(await screen.findByText("sends on click")).toBeTruthy();
     expect(screen.getByText("↳ goes to the message box")).toBeTruthy();
+    expect(screen.getAllByTitle("Delete").length).toBe(2);
+    expect(screen.getAllByTitle("Edit").length).toBe(2);
     expect(enEspanol()).toEqual([]);
   });
 });
@@ -433,16 +454,26 @@ describe("avisos y diálogos sueltos en inglés", () => {
 
   it("la tarjeta de un anuncio: tipo y prioridad", () => {
     montar(
-      <AnnouncementFeedCard
-        announcement={{
-          id: "an1", title: "Team update", message: "New schedule", announcement_type: "recordatorio",
-          priority: "high", starts_at: "2026-09-05T12:00:00Z", image_url: null,
-        } as never}
-        onOpen={() => {}} onVisible={() => {}}
-      />,
+      <>
+        <AnnouncementFeedCard
+          announcement={{
+            id: "an1", title: "Team update", message: "New schedule", announcement_type: "recordatorio",
+            priority: "high", starts_at: "2026-09-05T12:00:00Z", image_url: null,
+          } as never}
+          onOpen={() => {}} onVisible={() => {}}
+        />
+        <AnnouncementFeedCard
+          announcement={{
+            id: "an2", title: "Office hours", message: null, announcement_type: "informativo",
+            priority: "normal", starts_at: "2026-09-06T12:00:00Z", image_url: null,
+          } as never}
+          onOpen={() => {}} onVisible={() => {}}
+        />
+      </>,
     );
     expect(screen.getByText("Reminder")).toBeTruthy();
     expect(screen.getByText("Urgent")).toBeTruthy();
+    expect(screen.getByText("Info")).toBeTruthy();
     expect(screen.getByText("Sep 5, 2026")).toBeTruthy();
     expect(enEspanol()).toEqual([]);
   });
@@ -481,13 +512,13 @@ describe("selectores en inglés", () => {
   });
 });
 
-describe("los botones de WhatsApp y Telegram en inglés", () => {
-  /** La bandeja muestra "Back to …" con lo que le pasó el botón. */
-  function Bandeja() {
-    const { state } = useLocation() as { state: { backLabel?: string } | null };
-    return <p data-testid="volver">{state?.backLabel}</p>;
-  }
+/** La bandeja muestra "Back to …" con lo que le pasó el botón. */
+function Bandeja() {
+  const { state } = useLocation() as { state: { backLabel?: string } | null };
+  return <p data-testid="volver">{state?.backLabel}</p>;
+}
 
+describe("los botones de WhatsApp y Telegram en inglés", () => {
   it("WhatsApp sin canales asignados", () => {
     montar(<WaChatButton phone="+15550001111" />);
     expect(screen.getByTitle("You don't have any WhatsApp channels assigned")).toBeTruthy();
@@ -541,6 +572,30 @@ describe("los botones de WhatsApp y Telegram en inglés", () => {
     expect((await screen.findByTestId("volver")).textContent).toBe("Creators");
   });
 
+  it("desde una ruta sin sección la bandeja vuelve a «the previous page», no a «back»", async () => {
+    canales.wa = [{ id: "w1", label: "Sales", evolution_instance: "x", department: "sales" }];
+    invocar.respuesta = { data: { conversation_id: "c9" }, error: null };
+    const { unmount } = montar(
+      <Routes>
+        <Route path="/otra" element={<WaChatButton phone="+15550001111" />} />
+        <Route path="/inbox" element={<Bandeja />} />
+      </Routes>,
+      "/otra",
+    );
+    fireEvent.click(screen.getByRole("button", { name: /WhatsApp/ }));
+    expect((await screen.findByTestId("volver")).textContent).toBe("the previous page");
+    unmount();
+    montar(
+      <Routes>
+        <Route path="/otra" element={<TgChatButton phone="+15550001111" />} />
+        <Route path="/telegram/bandeja" element={<Bandeja />} />
+      </Routes>,
+      "/otra",
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Telegram/ }));
+    expect((await screen.findByTestId("volver")).textContent).toBe("the previous page");
+  });
+
   it("un aviso de error del botón también sale en inglés", async () => {
     canales.wa = [{ id: "w1", label: "Sales", evolution_instance: "x", department: "sales" }];
     invocar.respuesta = { data: null, error: null };
@@ -558,6 +613,21 @@ describe("en español no cambia nada", () => {
     expect(screen.getByText("Maven cambió de dirección")).toBeTruthy();
     expect(screen.getByText("pedirá tu contraseña otra vez")).toBeTruthy();
     expect(getTranslation("shared.clari.welcomeHelp", "es")).toContain("¡Hola!");
+  });
+
+  it("desde una ruta sin sección la bandeja sigue diciendo «Volver a atrás», como en main", async () => {
+    localStorage.setItem("app-language", "es");
+    canales.wa = [{ id: "w1", label: "Ventas", evolution_instance: "x", department: "sales" }];
+    invocar.respuesta = { data: { conversation_id: "c9" }, error: null };
+    montar(
+      <Routes>
+        <Route path="/otra" element={<WaChatButton phone="+15550001111" />} />
+        <Route path="/inbox" element={<Bandeja />} />
+      </Routes>,
+      "/otra",
+    );
+    fireEvent.click(screen.getByRole("button", { name: /WhatsApp/ }));
+    expect((await screen.findByTestId("volver")).textContent).toBe("atrás");
   });
 
   it("el mes del mejor cerrador sale como lo arma el hook", async () => {
