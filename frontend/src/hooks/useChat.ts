@@ -8,6 +8,7 @@ import {
 } from "@/hooks/useTypingInbox";
 import { useAuth } from "@/hooks/useAuth";
 import { useReanudarAlVolver } from "@/hooks/useReanudarAlVolver";
+import { registrarEnElCanalDelChat } from "@/hooks/canalDelChat";
 import { cerrarNotificacionesDeChat } from "@/lib/insigniaDeLaApp";
 import {
   ChatConversation,
@@ -43,13 +44,6 @@ export function useChat() {
   profilesRef.current = profiles;
   const conversationsRef = useRef(conversations);
   conversationsRef.current = conversations;
-  const [chatRealtimeVersion, setChatRealtimeVersion] = useState(0);
-  // Al volver a primer plano tras >30 s oculto (teléfono bloqueado, otra app), el
-  // socket suele estar muerto y el canal en CLOSED: se recrea (topic con versión
-  // nueva) y SUBSCRIBED vuelve a cargar la lista.
-  useReanudarAlVolver(() => setChatRealtimeVersion((v) => v + 1));
-  const chatRealtimeRetryRef = useRef(0);
-  const chatRealtimeReconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Para quién ya se cargó la lista: distingue la primera carga (que sí muestra
   // "Cargando…") de las recargas de fondo. Guarda el id y no un booleano para
   // que al cambiar de cuenta vuelva a considerarse primera vez.
@@ -291,40 +285,26 @@ export function useChat() {
       });
     };
 
-    const scheduleChannelReconnect = () => {
-      if (chatRealtimeReconnectTimerRef.current) return;
-
-      chatRealtimeRetryRef.current += 1;
-      const delay = Math.min(1000 * Math.pow(2, chatRealtimeRetryRef.current), 15000);
-      chatRealtimeReconnectTimerRef.current = setTimeout(() => {
-        chatRealtimeReconnectTimerRef.current = null;
-        setChatRealtimeVersion((v) => v + 1);
-      }, delay);
-    };
-
-    // El removeChannel del cleanup dispara CLOSED: sin este guard programaría
-    // un reconnect zombi del canal que acabamos de cerrar a propósito.
-    let cancelado = false;
-    const channel = supabase
-      .channel(`chat-realtime-${user.id}-${chatRealtimeVersion}`)
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "chat_messages" },
-        (payload) => {
+    // Las escuchas van por el CANAL DEL CHAT (canalDelChat.ts), UNO por pestaña
+    // para la lista, los avisos, el globito y las menciones. Antes esta lista
+    // abría su propio canal con ocho escuchas y los otros tres hooks
+    // repetían las del INSERT de chat_messages y el UPDATE de chat_participants:
+    // Realtime corre la RLS una vez por escucha por cada fila que cambia, así que
+    // cada mensaje costaba el triple. Ese canal revive solo (espera creciente y
+    // canal nuevo al volver del segundo plano) y avisa `alSuscribir` cada vez que
+    // queda conectado: ahí se recarga la lista, como antes con el canal propio.
+    const dejarDeEscuchar = registrarEnElCanalDelChat(user.id, {
+      current: {
+        "chat_messages:INSERT": (payload) => {
           const msg = payload.new as any;
           if (!isKnownConversation(msg?.conversation_id)) return;
           updateConversationWithMessage(msg);
-          // Ack "entregado": llegó un mensaje de otro por el canal global (aunque el chat no
-          // esté abierto) → marcar entregado para que el remitente vea ✓✓ gris.
-          if (msg?.id && msg.sender_id !== user.id) {
-            void markMessagesDelivered(user.id, [msg.id]);
-          }
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "chat_messages" },
-        (payload) => {
+          // El "entregado" (✓✓ gris) ya NO se marca aquí: useMessengerNotifications
+          // recibe este mismo evento en esta misma pestaña y lo marca SIEMPRE,
+          // también en conversaciones que la lista todavía no cargó. Eran dos
+          // upserts idénticos por cada mensaje ajeno y por pestaña.
+        },
+        "chat_messages:UPDATE": (payload) => {
           const msg = payload.new as any;
           if (!isKnownConversation(msg?.conversation_id)) return;
 
@@ -347,28 +327,8 @@ export function useChat() {
             }
             return prev;
           });
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "DELETE", schema: "public", table: "chat_messages" },
-        (payload) => {
-          const old = payload.old as any;
-          if (!isKnownConversation(old?.conversation_id)) return;
-
-          setConversations((prev) => {
-            const affected = prev.find((c) => c.lastMessage?.id === old.id);
-            if (affected) {
-              scheduleConversationsReload();
-            }
-            return prev;
-          });
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "chat_participants" },
-        (payload) => {
+        },
+        "chat_participants:INSERT": (payload) => {
           const newRow = payload.new as any;
           if (!newRow?.conversation_id) return;
 
@@ -397,76 +357,52 @@ export function useChat() {
               };
             })
           );
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "DELETE", schema: "public", table: "chat_participants" },
-        (payload) => {
-          const old = payload.old as any;
-          if (!old?.conversation_id) return;
-
-          if (old.user_id === user.id) {
-            scheduleConversationsReload(true);
-            return;
+        },
+        // Llega SOLO la baja de MI fila (filtro user_id=eq.<yo>): me sacaron de
+        // un grupo, salí desde otra pestaña o borraron la conversación entera
+        // (delete_conversation_cascade borra las participaciones una por una).
+        // De un borrado Realtime manda solo la llave (`old.id`): con la RLS
+        // prendida recorta el resto. Por eso se busca por el id de la fila y se
+        // recarga igual, que es lo que manda. Esto reemplaza las tres escuchas de
+        // DELETE sin filtro que había (mensajes, participantes, conversaciones):
+        // le traían a cada pestaña los borrados de toda la base y dos de ellas
+        // leían `old.conversation_id`, que en prod nunca llega (canalDelChat.ts).
+        "chat_participants:DELETE": (payload) => {
+          const idFila = (payload.old as { id?: string } | null)?.id;
+          if (idFila) {
+            setConversations((prev) =>
+              prev.filter(
+                (conv) => !conv.participants.some((p) => p.id === idFila && p.user_id === user.id),
+              ),
+            );
           }
-
-          if (!isKnownConversation(old.conversation_id)) return;
-
-          setConversations((prev) =>
-            prev.map((conv) =>
-              conv.id === old.conversation_id
-                ? {
-                    ...conv,
-                    participants: conv.participants.filter((p) => p.user_id !== old.user_id),
-                  }
-                : conv
-            )
-          );
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "chat_participants" },
-        (payload) => {
+          scheduleConversationsReload(true);
+        },
+        // Llega SOLO mi fila: el canal la filtra por user_id en el servidor. La
+        // de los demás cambia cada vez que alguien lee (~534 veces por hora en
+        // prod) y a esta lista solo le servía para el rol que muestra el panel de
+        // miembros, que ahora la escucha él mismo, filtrada por su conversación y
+        // solo mientras está abierto (GroupMembersPanel.tsx).
+        "chat_participants:UPDATE": (payload) => {
           const row = payload.new as any;
-          if (!row?.conversation_id) return;
+          if (!row?.conversation_id || row.user_id !== user.id) return;
 
-          if (row.user_id === user.id) {
-            const old = payload.old as any;
-            if (
-              old &&
-              row.last_read_at !== old.last_read_at &&
-              row.is_muted === old.is_muted &&
-              row.notifications_mode === old.notifications_mode &&
-              row.role === old.role
-            ) {
-              return; // Skip read-receipt-only updates
-            }
-            scheduleConversationsReload(true);
-            return;
+          const old = payload.old as any;
+          if (
+            old &&
+            row.last_read_at !== old.last_read_at &&
+            row.is_muted === old.is_muted &&
+            row.notifications_mode === old.notifications_mode &&
+            row.role === old.role
+          ) {
+            return; // Skip read-receipt-only updates
           }
-
-          if (!isKnownConversation(row.conversation_id)) return;
-
-          setConversations((prev) =>
-            prev.map((conv) => {
-              if (conv.id !== row.conversation_id) return conv;
-
-              return {
-                ...conv,
-                participants: conv.participants.map((p) =>
-                  p.user_id === row.user_id ? { ...p, ...row } : p
-                ),
-              };
-            })
-          );
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "chat_conversations" },
-        (payload) => {
+          scheduleConversationsReload(true);
+        },
+        // Llegan SOLO las de grupos (filtro type=eq.group): de aquí se copian
+        // nombre, foto y descripción, que un directo no tiene. Con cada mensaje
+        // se toca `updated_at` de su conversación, y el 75 % son de directos.
+        "chat_conversations:UPDATE": (payload) => {
           const updated = payload.new as any;
           if (!isKnownConversation(updated?.id)) return;
 
@@ -484,42 +420,20 @@ export function useChat() {
             next[idx] = patched;
             return next;
           });
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "DELETE", schema: "public", table: "chat_conversations" },
-        (payload) => {
-          const old = payload.old as any;
-          setConversations((prev) => prev.filter((c) => c.id !== old.id));
-        }
-      )
-      .subscribe((status) => {
-        if (cancelado) return;
-        if (status === "SUBSCRIBED") {
-          chatRealtimeRetryRef.current = 0;
-          if (chatRealtimeReconnectTimerRef.current) {
-            clearTimeout(chatRealtimeReconnectTimerRef.current);
-            chatRealtimeReconnectTimerRef.current = null;
-          }
-          void loadConversations();
-        }
-
-        // CLOSED también: es terminal (el socket murió en segundo plano y nadie lo
-        // vuelve a levantar); antes solo se atendían ERROR y TIMED_OUT.
-        // Acá NO se recarga: el canal nuevo recarga al quedar SUBSCRIBED (arriba),
-        // que es cuando de verdad sirve. Recargar en los dos daba pares de recargas
-        // con <1 s de diferencia en cada reconexión (medido en prod, 10/09).
-        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
-          scheduleChannelReconnect();
-        }
-      });
+        },
+        // Cada SUBSCRIBED recarga, la primera conexión también. Solo ahí: el canal
+        // del chat no recarga al caerse, recarga al volver, que es cuando sirve
+        // (recargar en los dos daba pares de recargas con <1 s de diferencia en
+        // cada reconexión, medido en prod el 10/09).
+        alSuscribir: () => { void loadConversations(); },
+      },
+    });
 
     // Volver a la pestaña ya NO recarga por sí solo. Si estuvo oculta poco, el
     // canal siguió vivo y la lista está al día; si estuvo oculta ≥30 s (o se cayó
-    // la red), useReanudarAlVolver levanta un canal nuevo y ESE recarga al quedar
-    // SUBSCRIBED. Recargar también acá duplicaba cada vuelta, y con Cowork y
-    // WhatsApp al lado la gente alterna pestañas cada pocos segundos.
+    // la red), el canal del chat se rearma y ESE recarga al quedar SUBSCRIBED.
+    // Recargar también aquí duplicaba cada vuelta, y con Cowork y WhatsApp al lado
+    // la gente alterna pestañas cada pocos segundos.
 
     // Fallback sync por si el websocket se cae. El realtime ya trae los cambios en
     // vivo, así que esto es solo red de seguridad → 20s (antes 5s recargaba toda la
@@ -532,15 +446,10 @@ export function useChat() {
 
     return () => {
       if (pendingReloadRef.timer) clearTimeout(pendingReloadRef.timer);
-      if (chatRealtimeReconnectTimerRef.current) {
-        clearTimeout(chatRealtimeReconnectTimerRef.current);
-        chatRealtimeReconnectTimerRef.current = null;
-      }
       clearInterval(pollInterval);
-      cancelado = true;
-      supabase.removeChannel(channel);
+      dejarDeEscuchar();
     };
-  }, [user, loadConversations, chatRealtimeVersion]);
+  }, [user, loadConversations]);
 
   const createDirectChat = useCallback(
     (otherUserId: string, onResolved?: (realId: string) => void): string | null => {
