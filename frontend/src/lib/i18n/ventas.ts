@@ -6,7 +6,7 @@
 // Las claves de este archivo empiezan con uno de sus prefijos (los fija
 // test/i18n/diccionarioPorModulo.test.ts). Ver lib/i18n.ts.
 //
-// Lo que NO está acá, a propósito:
+// Lo que NO está aquí, a propósito:
 //  - Los valores que se guardan en la base: el estado de un pedido
 //    ("solicitado", "en_produccion"…), las banderas, la etapa de una
 //    oportunidad, el estado de una parrilla. Se traduce solo la ETIQUETA.
@@ -282,7 +282,7 @@ export const ventas = {
   "sales.mgr.dataDaysN": { es: "{n} días con dato", en: "{n} days with data" },
   "sales.mgr.ofTotal": { es: "{pct}% del total", en: "{pct}% of total" },
   "sales.mgr.revenueFooter": {
-    es: "Bruto de OnlyFans del rango elegido, por creadora. Cambiá el rango arriba y este detalle cambia con él.",
+    es: "Bruto de OnlyFans del rango elegido, por creadora. Cambia el rango arriba y este detalle cambia con él.",
     en: "OnlyFans gross for the chosen range, by creator. Change the range above and this breakdown changes with it.",
   },
 
@@ -348,7 +348,7 @@ export const ventas = {
   "custom.board.invalidMove": { es: "De {from} no se pasa a {to}", en: "Can't move from {from} to {to}" },
   "custom.board.onlySupervisor": { es: "Solo un supervisor puede aprobar o denegar", en: "Only a supervisor can approve or deny" },
   "custom.board.moveError": { es: "No se pudo mover el pedido", en: "Couldn't move the order" },
-  "custom.board.empty": { es: "Nada acá", en: "Nothing here" },
+  "custom.board.empty": { es: "Nada aquí", en: "Nothing here" },
   // Ficha del pedido
   "custom.detail.noChatter": { es: "Sin chatter", en: "No chatter" },
   "custom.detail.movedTo": { es: "Pedido → {status}", en: "Order → {status}" },
@@ -432,7 +432,7 @@ export const ventas = {
   "custom.form.priceUsd": { es: "Precio (USD)", en: "Price (USD)" },
   "custom.form.balance": { es: "Saldo pendiente: ${amount}", en: "Balance due: ${amount}" },
   "custom.form.suspicious": {
-    es: "¿{amount}? Parece un error de tipeo ({detail}). Si lo guardás así, el pedido queda marcado como \"monto por revisar\".",
+    es: "¿{amount}? Parece un error de tipeo ({detail}). Si lo guardas así, el pedido queda marcado como \"monto por revisar\".",
     en: "{amount}? That looks like a typo ({detail}). If you save it like this, the order gets flagged as \"amount to review\".",
   },
   "custom.form.priceCeiling": {
@@ -480,7 +480,7 @@ export const ventas = {
   "custom.view.table": { es: "Tabla", en: "Table" },
   "custom.empty.agency": { es: "Todavía no hay pedidos de {agency}", en: "No {agency} orders yet" },
   "custom.empty.none": { es: "Todavía no hay pedidos", en: "No orders yet" },
-  "custom.empty.hint": { es: "Creá el primero con \"{button}\".", en: "Create the first one with \"{button}\"." },
+  "custom.empty.hint": { es: "Crea el primero con \"{button}\".", en: "Create the first one with \"{button}\"." },
 
   // ─── Panel de control · Reclutamiento de chatters ──────────────────────────
   "panel.rec.noRecords": { es: "Sin registros en el rango seleccionado.", en: "No records in the selected range." },
@@ -542,7 +542,7 @@ export const ventas = {
   "panel.wa.commitments": { es: "Compromisos", en: "Commitments" },
   "panel.wa.dailyReports": { es: "Reportes diarios", en: "Daily reports" },
   "panel.wa.events": { es: "Eventos", en: "Events" },
-  "panel.wa.ask": { es: "Preguntale al bot", en: "Ask the bot" },
+  "panel.wa.ask": { es: "Pregúntale al bot", en: "Ask the bot" },
   "panel.wa.askHint": {
     es: "Prueba una pregunta sin escribir en el grupo. La respuesta se manda igual al grupo (si bot_enabled está on).",
     en: "Try a question without writing in the group. The answer still goes to the group (if bot_enabled is on).",
@@ -615,7 +615,7 @@ export const ventas = {
     en: "⚠ The bot is OFF for this group — the answer will be generated but NOT sent.",
   },
   "panel.wa.askPh": {
-    es: "Ej: \"¿Qué pendientes tiene Miguel esta semana?\" o \"Pasame el estado del lead de Camila Pérez\"",
+    es: "Ej: \"¿Qué pendientes tiene Miguel esta semana?\" o \"Pásame el estado del lead de Camila Pérez\"",
     en: "E.g. \"What does Miguel have pending this week?\" or \"Give me the status of Camila Perez's lead\"",
   },
   "panel.wa.botReply": { es: "Respuesta del bot:", en: "Bot's answer:" },
@@ -710,7 +710,7 @@ export const ventas = {
   },
   "grid.saveError": { es: "No se pudo guardar: {msg}", en: "Couldn't save: {msg}" },
   "grid.unsaved": { es: "Tienes cambios sin guardar en esta parrilla", en: "You have unsaved changes in this grid" },
-  "grid.unsavedDesc": { es: "Guardalos, o descartalos para cambiar de semana.", en: "Save them, or discard them to switch weeks." },
+  "grid.unsavedDesc": { es: "Guárdalos, o descártalos para cambiar de semana.", en: "Save them, or discard them to switch weeks." },
   "grid.discardSwitch": { es: "Descartar y cambiar", en: "Discard and switch" },
   "grid.theme": { es: "Tema", en: "Theme" },
   "grid.theme.foto": { es: "Foto / flyer", en: "Photo / flyer" },
@@ -739,7 +739,7 @@ export const ventas = {
   "grid.sendTitle": { es: "PDF + WhatsApp al grupo Managers", en: "PDF + WhatsApp to the Managers group" },
   "grid.sendToGroup": { es: "Enviar al grupo", en: "Send to group" },
   "grid.sentReadonly": {
-    es: "La parrilla ya fue enviada: volvé a borrador para editarla",
+    es: "La parrilla ya fue enviada: vuelve a borrador para editarla",
     en: "The grid was already sent: move it back to draft to edit it",
   },
   "grid.loading": { es: "Cargando parrilla…", en: "Loading grid…" },
