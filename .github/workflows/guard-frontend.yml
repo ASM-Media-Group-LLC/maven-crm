@@ -5,17 +5,23 @@ name: Guard Frontend
 # tipos nuevo o un build que no arma llegaban a main sin que nada avisara.
 # Solo lee el código: no despliega nada ni necesita secretos.
 #
-# Tres cosas, en tres trabajos en paralelo:
+# Tres cosas, en UN solo trabajo (una sola instalación y un solo redondeo de
+# minutos: GitHub cobra cada trabajo redondeado hacia arriba, y en el plan gratis
+# los minutos del mes alcanzan para ~2.000; si se acaban, se frenan TODOS los
+# workflows, también el que despliega las edge functions):
 #   1. vitest, la suite ENTERA, leyendo el resumen («Test Files»): un archivo de
 #      test que no carga no suma nada a «Tests» y solo se ve ahí (pasó el 16/09).
 #      Y la LISTA de archivos que corrió tiene que ser la de frontend/src.
 #   2. tsc contra main: main arrastra errores viejos, así que se falla solo si el PR
 #      trae uno NUEVO, comparando la lista (sin línea ni columna), no el número.
-#   3. La imagen de prod, con el Dockerfile tal cual (`docker build`): el mismo
-#      node:20-alpine, el mismo `npm install` y el mismo `npm run build` que arma
-#      Dokploy. Un `npm run build` en el Node 24 de los otros dos trabajos no
-#      alcanza: es otro Node y otro árbol de dependencias (`npm ci` contra
-#      `npm install`), y un PR que arma ahí puede no armar en prod.
+#      Corre aunque vitest haya dado rojo: es otra señal.
+#   3. Que arme: `npm run build`. Y si el PR cambia lo que hace distinta a la imagen
+#      de prod (Dockerfile, .dockerignore, docker-entrypoint.sh, nginx.conf,
+#      package.json, package-lock.json, vite.config.ts), la imagen entera con el
+#      Dockerfile tal cual (node:20-alpine + `npm install`, como Dokploy), y
+#      además que nginx arranque con esa config y ese entrypoint (`nginx -t`).
+#      El resto de los PR no cambia nada de eso: con el build de aquí alcanza.
+# Los borradores no corren: corre al pasar a «listo para revisar».
 # La lógica de 1 y 2 está en scripts/ci/ (guardas.mjs, con sus pruebas).
 #
 # `paths`: además del frontend, lo que sus tests LEEN o importan de afuera (edge
@@ -26,6 +32,7 @@ name: Guard Frontend
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "frontend/**"
       - "vite.config.ts"
@@ -56,20 +63,26 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  vitest:
-    name: vitest (suite entera)
+  frontend:
+    name: frontend (vitest, tsc contra main, build)
+    if: ${{ !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
+      # fetch-depth 2: en un pull_request, HEAD es el merge que arma GitHub (el PR
+      # encima de main tal como está AHORA) y hace falta su primer padre, que es
+      # ese main. Contra él compara tsc, y de ahí sale qué tocó el PR.
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 2
 
       # Node 24 y no el 20 de la imagen (Dockerfile: node:20-alpine, con
       # `npm install`): el npm 10 que trae Node 20 rechaza este package-lock en
       # `npm ci` («Missing: esbuild@0.28.2 from lock file», el peer opcional del
       # vite 8 que usa vitest). El npm 11 de Node 24 lo acepta, igual que el de
-      # desarrollo. Lo que arma prod lo revisa el trabajo `imagen`, con el
-      # Dockerfile tal cual.
+      # desarrollo. Lo que arma prod lo revisa el paso de la imagen, con el
+      # Dockerfile tal cual, cuando el PR cambia algo que lo hace distinto.
       - name: Setup Node
         uses: actions/setup-node@v5
         with:
@@ -102,29 +115,8 @@ jobs:
         if: ${{ !cancelled() && steps.npmci.outcome == 'success' }}
         run: node scripts/ci/filtro-cubre-lecturas.mjs
 
-  tipos:
-    name: tsc contra main
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    steps:
-      # fetch-depth 2: en un pull_request, HEAD es el merge que arma GitHub (el PR
-      # encima de main tal como está AHORA) y hace falta su primer padre, que es
-      # ese main. Contra él se compara: es exactamente lo que va a quedar.
-      - name: Checkout
-        uses: actions/checkout@v5
-        with:
-          fetch-depth: 2
-
-      - name: Setup Node
-        uses: actions/setup-node@v5
-        with:
-          node-version: 24
-          cache: npm
-
-      - name: npm ci
-        run: npm ci --no-audit --no-fund
-
       - name: tsc — ningún error de tipos nuevo respecto de main
+        if: ${{ !cancelled() && steps.npmci.outcome == 'success' }}
         run: |
           set -euo pipefail
           # Si HEAD no fuera el merge (dos padres), HEAD^1 sería el commit anterior
@@ -136,19 +128,44 @@ jobs:
           fi
           node scripts/ci/tsc-sin-errores-nuevos.mjs --base=HEAD^1
 
-  imagen:
-    name: build de la imagen de prod (Dockerfile)
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
+      # ¿El PR cambia algo que hace a la imagen de prod distinta del build de aquí?
+      # Si el PR cambia esta misma guarda, corren los DOS caminos: así el PR que la
+      # toca prueba también el que no le tocaría.
+      - name: ¿Cambia lo que arma la imagen de prod?
+        id: imagen
+        if: ${{ !cancelled() && steps.npmci.outcome == 'success' }}
+        run: |
+          set -euo pipefail
+          cambiados=$(git diff --name-only HEAD^1 HEAD)
+          insumos='Dockerfile|\.dockerignore|docker-entrypoint\.sh|nginx\.conf|package\.json|package-lock\.json|vite\.config\.ts'
+          guarda='\.github/workflows/guard-frontend\.yml'
+          armar=false; build=true
+          if printf '%s\n' "$cambiados" | grep -qxE "$insumos"; then armar=true; build=false; fi
+          if printf '%s\n' "$cambiados" | grep -qxE "$guarda"; then armar=true; build=true; fi
+          echo "insumos de la imagen tocados: $(printf '%s\n' "$cambiados" | grep -xE "$insumos" | tr '\n' ' ' || true)"
+          echo "armar la imagen: $armar · npm run build: $build"
+          echo "armar=$armar" >> "$GITHUB_OUTPUT"
+          echo "build=$build" >> "$GITHUB_OUTPUT"
+
+      - name: npm run build
+        if: ${{ !cancelled() && steps.imagen.outputs.build == 'true' }}
+        run: npm run build
 
       # Exactamente lo que arma Dokploy al mergear: el Dockerfile de la raíz, con
       # su .dockerignore. La etapa 1 es node:20-alpine + `npm install` +
       # `npm run build` con las VITE_ de marca (las reales las pone
       # docker-entrypoint.sh al arrancar); la 2 es nginx, que copia dist/,
-      # nginx.conf y docker-entrypoint.sh. Si algo de eso falla, falla aquí y no
-      # en el deploy. No se publica nada: la imagen queda en el runner y se tira.
-      - name: docker build
+      # nginx.conf y docker-entrypoint.sh. No se publica nada: la imagen queda en
+      # el runner y se tira.
+      - name: docker build (la imagen de prod)
+        if: ${{ !cancelled() && steps.imagen.outputs.armar == 'true' }}
         run: docker build --progress=plain --tag maven-frontend:guarda .
+
+      # Armar no es arrancar: un nginx.conf con un error o un docker-entrypoint.sh
+      # roto (tiene `set -eu`) arman en verde y recién fallan al levantar el
+      # contenedor, con todo el frontend caído. Con `nginx` como comando, la imagen
+      # oficial corre /docker-entrypoint.d/* (nuestro entrypoint incluido) y después
+      # `nginx -t` revisa la config.
+      - name: nginx arranca con esa config y ese entrypoint
+        if: ${{ !cancelled() && steps.imagen.outputs.armar == 'true' }}
+        run: docker run --rm -e VITE_SUPABASE_URL=https://ci.invalid maven-frontend:guarda nginx -t

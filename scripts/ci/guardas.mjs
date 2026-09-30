@@ -301,21 +301,51 @@ export function problemasTsc(nombre, { codigo, lectura, esperados, canario = fal
   return p;
 }
 
+/** Cuántos caracteres del mensaje (después de «error TSxxxx: ») tienen que coincidir
+ *  para dar un error viejo por el mismo con otro texto. Lo que cambia solo en un
+ *  error viejo es el final: la unión recortada de todas las RPC de types.ts
+ *  («… 230 more …» → «… 231 more …») cuando se regeneran los tipos o se suma una RPC. */
+export const PREFIJO_MISMO_ERROR = 60;
+
+const codigoTs = (mensaje) => mensaje.match(/^error (TS\d+): /)?.[1] ?? "";
+const parecido = (e) =>
+  `${e.archivo ?? ""}\u0000${codigoTs(e.mensaje)}\u0000${e.mensaje.replace(/^error TS\d+: /, "").slice(0, PREFIJO_MISMO_ERROR)}`;
+
 /** Los errores de la cabeza que la base no tiene, contando repeticiones (si un
  *  archivo tenía el mismo error 2 veces y ahora 3, el tercero es nuevo).
- *  `arreglados` = cuántos de la base ya no están (solo para informar). */
+ *  `arreglados` = cuántos de la base ya no están (solo para informar).
+ *  `cambiaronTexto` = errores viejos que siguen ahí con otro final de mensaje (mismo
+ *  archivo, mismo código TS y el mismo comienzo): no son nuevos, se avisan. Sin esto,
+ *  regenerar los tipos de Supabase dejaba en rojo un «error nuevo» que no lo era. */
 export function erroresNuevos(base, cabeza) {
   const cuenta = new Map();
   for (const e of base) cuenta.set(e.clave, (cuenta.get(e.clave) ?? 0) + 1);
-  const nuevos = [];
+  const sinPareja = [];
   for (const e of cabeza) {
     const n = cuenta.get(e.clave) ?? 0;
     if (n > 0) cuenta.set(e.clave, n - 1);
+    else sinPareja.push(e);
+  }
+  // Segunda vuelta: lo que sobra de la cabeza contra lo que sobra de la base.
+  const sobranDeLaBase = new Map();
+  for (const e of base) {
+    const n = cuenta.get(e.clave) ?? 0;
+    if (n > 0) {
+      cuenta.set(e.clave, n - 1);
+      const k = parecido(e);
+      sobranDeLaBase.set(k, [...(sobranDeLaBase.get(k) ?? []), e]);
+    }
+  }
+  const nuevos = [];
+  const cambiaronTexto = [];
+  for (const e of sinPareja) {
+    const lista = sobranDeLaBase.get(parecido(e));
+    if (lista?.length) cambiaronTexto.push({ antes: lista.shift(), ahora: e });
     else nuevos.push(e);
   }
   let arreglados = 0;
-  for (const n of cuenta.values()) arreglados += n;
-  return { nuevos, arreglados };
+  for (const lista of sobranDeLaBase.values()) arreglados += lista.length;
+  return { nuevos, arreglados, cambiaronTexto };
 }
 
 /** Anotación de GitHub (queda marcada en el archivo del PR). */
