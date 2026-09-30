@@ -6,6 +6,7 @@ import {
 // La edge tiene SU copia (el frontend no puede importar de supabase/: el build
 // de Dokploy excluye esa carpeta). Acá se comprueba que digan lo mismo.
 import * as edge from "../../../../supabase/functions/_shared/cowork-tiempo";
+const { OTRO_EQUIPO_VIVO_MS } = edge;
 
 const T = 1_700_000_000_000;
 const base = { camOn: true, screenShareOn: true, faceState: "ok", faceSince: T - 10 * 60_000 };
@@ -352,5 +353,93 @@ describe("latidoDeCuerpo — el nombre del dato no se puede separar entre el nav
     expect(edge.latidoDeCuerpo({ camOn: true, screenShareOn: "sí", faceState: 3, faceSince: "x" }, { enPausa: true, enMeet: true }))
       .toEqual({ camOn: true, screenShareOn: false, faceState: null, faceSince: null, onBreak: true, enMeet: true, conexionSala: null });
     expect(edge.latidoDeCuerpo({ onBreak: true }, { enPausa: false, enMeet: false }).onBreak).toBe(true);
+  });
+});
+
+// ── DOS EQUIPOS DE LA MISMA PERSONA ─────────────────────────────────────────
+// Con la laptop fuera de la sala y el teléfono adentro, los dos latían y se
+// pisaban el único tramo abierto: el tiempo del teléfono no sumaba.
+describe("latidoDeEquipoAfuera — el equipo que quedó afuera no pisa al que está adentro", () => {
+  const T = Date.parse("2026-09-30T15:00:00Z");
+  const iso = (ms: number) => new Date(ms).toISOString();
+  const abiertoDe = (equipo: string | null, estado = "activo", hace = 10_000) => ({ estado, equipo, last_seen_at: iso(T - hace) });
+
+  it("se ignora al de afuera si el otro equipo latió hace poco EN la sala", () => {
+    expect(edge.latidoDeEquipoAfuera(abiertoDe("telefono"), "laptop", "desconectada", T)).toBe(true);
+    expect(edge.latidoDeEquipoAfuera(abiertoDe("telefono"), "laptop", null, T)).toBe(true);
+    expect(edge.latidoDeEquipoAfuera(abiertoDe("telefono", "pausa"), "laptop", "desconectada", T)).toBe(true);
+    expect(edge.latidoDeEquipoAfuera(abiertoDe("telefono", "sin_camara"), "laptop", "desconectada", T)).toBe(true);
+  });
+
+  it("el que está EN la sala nunca se ignora (así un equipo nuevo toma el lugar)", () => {
+    expect(edge.latidoDeEquipoAfuera(abiertoDe("laptop"), "telefono", "conectada", T)).toBe(false);
+    expect(edge.latidoDeEquipoAfuera(abiertoDe("laptop"), "telefono", "reconectando", T)).toBe(false);
+  });
+
+  it("si el otro equipo se fue (no late hace más de 45 s), manda el que queda", () => {
+    expect(edge.latidoDeEquipoAfuera(abiertoDe("telefono", "activo", OTRO_EQUIPO_VIVO_MS + 1), "laptop", "desconectada", T)).toBe(false);
+    expect(edge.latidoDeEquipoAfuera(abiertoDe("telefono", "activo", OTRO_EQUIPO_VIVO_MS), "laptop", "desconectada", T)).toBe(true);
+  });
+
+  it("si el otro también está afuera, no hay a quién darle prioridad", () => {
+    expect(edge.latidoDeEquipoAfuera(abiertoDe("telefono", "sin_conexion"), "laptop", "desconectada", T)).toBe(false);
+    expect(edge.latidoDeEquipoAfuera(abiertoDe("telefono", "sin_conexion_larga"), "laptop", "desconectada", T)).toBe(false);
+  });
+
+  it("⚠️ con la versión anterior (sin equipo) todo queda como antes", () => {
+    expect(edge.latidoDeEquipoAfuera(abiertoDe("telefono"), null, "desconectada", T)).toBe(false);
+    expect(edge.latidoDeEquipoAfuera(abiertoDe(null), "laptop", "desconectada", T)).toBe(false);
+    expect(edge.latidoDeEquipoAfuera(null, "laptop", "desconectada", T)).toBe(false);
+    // Un mismo equipo nunca se ignora a sí mismo: su propia caída se anota.
+    expect(edge.latidoDeEquipoAfuera(abiertoDe("laptop"), "laptop", "desconectada", T)).toBe(false);
+  });
+
+  it("equipoDeCuerpo es estricto", () => {
+    expect(edge.equipoDeCuerpo({ equipo: "abc" })).toBe("abc");
+    expect(edge.equipoDeCuerpo({})).toBeNull();
+    expect(edge.equipoDeCuerpo({ equipo: "" })).toBeNull();
+    expect(edge.equipoDeCuerpo({ equipo: 3 })).toBeNull();
+    expect(edge.equipoDeCuerpo({ equipo: "x".repeat(65) })).toBeNull();
+  });
+
+  // Reproduce lo que hace la edge (index.ts) con los latidos de DOS equipos.
+  type Latir = { equipo: string | null; conexionSala: "conectada" | "desconectada"; camOn: boolean };
+  const simularDos = (latidos: Array<{ en: number } & Latir>, usarRegla: boolean) => {
+    type Fila = { estado: string; started_at: string; ended_at: string | null; last_seen_at: string; equipo: string | null };
+    const tramos: Fila[] = [];
+    let abierto: Fila | null = null;
+    for (const lt of latidos.sort((a, b) => a.en - b.en)) {
+      const ahora = T + lt.en;
+      if (usarRegla && abierto && edge.latidoDeEquipoAfuera(abierto, lt.equipo, lt.conexionSala, ahora)) continue;
+      const vigente = !!abierto && ahora - Date.parse(abierto.last_seen_at) <= LATIDO_VENCIDO_MS;
+      const l = { camOn: lt.camOn, screenShareOn: lt.camOn, faceState: "ok", conexionSala: lt.conexionSala };
+      const { estado } = edge.estadoDeTiempo(l, ahora, undefined, undefined, true);
+      if (abierto && vigente && abierto.estado === estado) { abierto.last_seen_at = iso(ahora); abierto.equipo = lt.equipo; continue; }
+      if (abierto) abierto.ended_at = abierto.last_seen_at;
+      abierto = { estado, started_at: iso(ahora), ended_at: null, last_seen_at: iso(ahora), equipo: lt.equipo };
+      tramos.push(abierto);
+    }
+    if (abierto) abierto.ended_at = abierto.last_seen_at;
+    const activo = tramos.filter((t) => t.estado === "activo").reduce((a, t) => a + (Date.parse(t.ended_at!) - Date.parse(t.started_at)), 0);
+    return { activo, tramos };
+  };
+  const cadaTreinta = (desde: number, hasta: number, desfase: number, lt: Latir) =>
+    Array.from({ length: Math.floor((hasta - desde) / 30_000) + 1 }, (_, i) => ({ en: desde + desfase + i * 30_000, ...lt }));
+
+  it("⚠️ el teléfono trabajando 30 min con la laptop abierta afuera: SUMA los 30 min", () => {
+    const telefono = cadaTreinta(0, 30 * 60_000, 0, { equipo: "telefono", conexionSala: "conectada", camOn: true });
+    const laptop = cadaTreinta(0, 30 * 60_000, 15_000, { equipo: "laptop", conexionSala: "desconectada", camOn: false });
+    // Sin la regla (lo de antes): casi cero.
+    expect(simularDos([...telefono, ...laptop], false).activo).toBeLessThan(60_000);
+    // Con la regla: el turno entero.
+    const { activo } = simularDos([...telefono, ...laptop], true);
+    expect(activo).toBeGreaterThanOrEqual(30 * 60_000 - 30_000);
+  });
+
+  it("si el teléfono se apaga, a los 45 s manda la laptop (su caída se anota)", () => {
+    const telefono = cadaTreinta(0, 10 * 60_000, 0, { equipo: "telefono", conexionSala: "conectada", camOn: true });
+    const laptop = cadaTreinta(0, 15 * 60_000, 15_000, { equipo: "laptop", conexionSala: "desconectada", camOn: false });
+    const { tramos } = simularDos([...telefono, ...laptop], true);
+    expect(tramos.map((t) => t.estado)).toEqual(["activo", "sin_conexion"]);
   });
 });

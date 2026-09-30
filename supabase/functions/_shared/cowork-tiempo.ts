@@ -219,6 +219,52 @@ export function caidaSePaga(noCobraba: boolean, pagadoMs: number): boolean {
   return !noCobraba && pagadoMs < TOPE_SIN_CONEXION_MS;
 }
 
+// ── DOS EQUIPOS DE LA MISMA PERSONA ──────────────────────────────────────────
+// Hay UN solo tramo abierto por persona. Con Cowork abierto en dos equipos (la
+// laptop que perdió el wifi y el teléfono al que se pasó a trabajar), los dos
+// laten: el teléfono dice "trabajando" y la laptop, que quedó fuera de la sala,
+// dice "sin conexión". Cada latido cerraba el tramo del otro y abría el suyo,
+// cada tramo duraba casi cero, y el tiempo trabajado en el teléfono no sumaba
+// mientras la laptop siguiera abierta. Ya pasaba antes de 'sin_conexion' (la
+// laptop decía "sin cámara"). Por eso cada pestaña se identifica (`equipo`).
+
+/** Cuánto hace que latió el OTRO equipo para darlo todavía por adentro: un poco
+ *  más que un latido (30 s). Si se fue, a los 45 s manda el que queda. */
+export const OTRO_EQUIPO_VIVO_MS = 45_000;
+
+/** Estados que solo produce un equipo que está (o estuvo hasta recién) EN la
+ *  sala. Los de caída no: si el otro también está afuera, no hay a quién darle
+ *  prioridad. */
+const ESTADOS_EN_SALA: ReadonlySet<string> = new Set(["activo", "meet", "pausa", "sin_camara", "sin_pantalla", "fuera_de_camara"]);
+
+/** ¿Este latido viene de un equipo que quedó AFUERA de la sala mientras otro
+ *  equipo de la misma persona sigue adentro? Si sí, la edge lo ignora sin tocar
+ *  el tramo. Sin `equipo` (una pestaña con la versión anterior) nunca: queda
+ *  como antes. */
+export function latidoDeEquipoAfuera(
+  abierto: { estado: string; equipo?: string | null; last_seen_at: string } | null,
+  equipo: string | null,
+  conexionSala: ConexionSala | null | undefined,
+  ahora: number,
+): boolean {
+  // No se exige que el tramo sea de esta misma sala o sesión: si la laptop quedó
+  // asignada a otra, igual le robaba el tramo al teléfono que está trabajando.
+  if (!equipo || !abierto || !abierto.equipo || abierto.equipo === equipo) return false;
+  // Este equipo está en la sala: manda él (si el otro también estuviera, LiveKit
+  // echa a uno con "otra pestaña" y ese deja de latir).
+  if (conexionSala === "conectada" || conexionSala === "reconectando") return false;
+  if (!ESTADOS_EN_SALA.has(abierto.estado)) return false;
+  const visto = Date.parse(abierto.last_seen_at);
+  return Number.isFinite(visto) && ahora - visto <= OTRO_EQUIPO_VIVO_MS;
+}
+
+/** El identificador de la pestaña, tal como llegó. Estricto: cualquier otra cosa
+ *  es "no se sabe", que es la regla de siempre. */
+export function equipoDeCuerpo(body: Record<string, unknown>): string | null {
+  const e = body.equipo;
+  return typeof e === "string" && e.length > 0 && e.length <= 64 ? e : null;
+}
+
 /** Arma el latido con lo que mandó el navegador. Estricto: lo que no llega o
  *  llega con otro tipo queda como "no se sabe", nunca como un valor inventado.
  *  La pausa y el meet vienen de la BASE (sobreviven a recargar la pestaña). */

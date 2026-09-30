@@ -41,3 +41,19 @@ describe("elegirPresencia — qué conexión se muestra cuando hay varias", () =
     expect(elegirPresencia<P>([{ tag: "vieja", camOn: true }, { tag: "nueva", camOn: true }])?.tag).toBe("nueva");
   });
 });
+
+describe("elegirPresencia — dos equipos: manda el que está EN la sala", () => {
+  type Q = { tag: string; camOn?: boolean; screenShareOn?: boolean; conexionSala?: string | null };
+  it("⚠️ el teléfono en la sala le gana a la laptop que quedó afuera, aunque tenga la cámara apagada", () => {
+    const laptop: Q = { tag: "laptop", camOn: true, screenShareOn: true, conexionSala: "desconectada" };
+    const telefono: Q = { tag: "telefono", camOn: false, screenShareOn: false, conexionSala: "conectada" };
+    expect(elegirPresencia<Q>([laptop, telefono])?.tag).toBe("telefono");
+    expect(elegirPresencia<Q>([telefono, laptop])?.tag).toBe("telefono");
+  });
+
+  it("sin el dato (versiones anteriores) sigue mandando cámara y pantalla", () => {
+    const a: Q = { tag: "a", camOn: true };
+    const b: Q = { tag: "b", camOn: false };
+    expect(elegirPresencia<Q>([a, b])?.tag).toBe("a");
+  });
+});

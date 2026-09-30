@@ -138,7 +138,7 @@ let ultimoSupervisorPendiente: EstadoSupervisor | null | undefined = undefined;
  *  Regla: si alguna conexión dice "en pausa", esa manda (la pausa es una acción
  *  deliberada registrada en el servidor; la pestaña que la hizo es la que sabe).
  *  Si ninguna, la más NUEVA. Exportada para poder testearla. */
-export function elegirPresencia<T extends { onBreak?: boolean; camOn?: boolean; screenShareOn?: boolean }>(presencias: T[] | undefined): T | undefined {
+export function elegirPresencia<T extends { onBreak?: boolean; camOn?: boolean; screenShareOn?: boolean; conexionSala?: string | null }>(presencias: T[] | undefined): T | undefined {
   if (!presencias?.length) return undefined;
   const enPausa = presencias.find((p) => p.onBreak);
   if (enPausa) return enPausa;
@@ -147,10 +147,15 @@ export function elegirPresencia<T extends { onBreak?: boolean; camOn?: boolean; 
   // pestaña de fondo, sin cámara, era la que hacía sonar "cámara apagada" al
   // supervisor mientras la persona estaba perfectamente en la otra. A igual
   // puntaje, la más nueva (la última), como antes.
+  //
+  // Y antes que eso, la que está EN LA SALA: con la laptop fuera de la sala y el
+  // teléfono adentro, el tablero tiene que mostrar el teléfono aunque tenga la
+  // cámara apagada (la laptop mostraría "sin conexión" de alguien que está).
   let mejor = presencias[presencias.length - 1];
   let puntaje = -1;
   for (const p of presencias) {
-    const pts = (p.camOn ? 2 : 0) + (p.screenShareOn ? 1 : 0);
+    const enSala = p.conexionSala === "conectada" || p.conexionSala === "reconectando";
+    const pts = (enSala ? 4 : 0) + (p.camOn ? 2 : 0) + (p.screenShareOn ? 1 : 0);
     if (pts >= puntaje) { puntaje = pts; mejor = p; }
   }
   return mejor;
