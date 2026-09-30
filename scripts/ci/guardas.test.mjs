@@ -255,6 +255,45 @@ test("tsc: rutas absolutas de cada copia dentro del mensaje se normalizan", () =
   assert.equal(erroresNuevos(b.errores, c.errores).nuevos.length, 0);
 });
 
+test("tsc: un error viejo al que solo le cambia el final (la unión de RPC de types.ts) NO es nuevo, se avisa", () => {
+  const union = (n) =>
+    `frontend/src/hooks/useX.ts(12,40): error TS2345: Argument of type '"mi_rpc_vieja"' is not assignable to parameter of type '"a_rpc" | "b_rpc" | ... ${n} more ... | "z_rpc"'.\n`;
+  const b = leerSalidaTsc(tscBase + union(230)).errores;
+  const c = leerSalidaTsc(tscBase + union(231)).errores;
+  const { nuevos, arreglados, cambiaronTexto } = erroresNuevos(b, c);
+  assert.equal(nuevos.length, 0);
+  assert.equal(arreglados, 0);
+  assert.equal(cambiaronTexto.length, 1);
+  assert.match(cambiaronTexto[0].ahora.mensaje, /231 more/);
+});
+
+test("tsc: mismo archivo y mismo código pero otro error desde el comienzo SÍ es nuevo", () => {
+  const b = leerSalidaTsc(tscBase + "frontend/src/d.tsx(1,1): error TS2345: Argument of type 'number' is not assignable to parameter of type 'string'.\n").errores;
+  const c = leerSalidaTsc(tscBase + "frontend/src/d.tsx(1,1): error TS2345: Argument of type 'Date' is not assignable to parameter of type 'boolean'.\n").errores;
+  const { nuevos, arreglados, cambiaronTexto } = erroresNuevos(b, c);
+  assert.equal(nuevos.length, 1);
+  assert.equal(arreglados, 1);
+  assert.equal(cambiaronTexto.length, 0);
+});
+
+test("tsc: mismo archivo y mismo comienzo pero OTRO código TS SÍ es nuevo", () => {
+  const msg = "Argument of type '\"x\"' is not assignable to parameter of type '\"a\" | \"b\" | \"c\" | \"d\" | \"e\"'.";
+  const b = leerSalidaTsc(tscBase + `frontend/src/f.tsx(1,1): error TS2345: ${msg}\n`).errores;
+  const c = leerSalidaTsc(tscBase + `frontend/src/f.tsx(1,1): error TS2322: ${msg}\n`).errores;
+  const { nuevos, cambiaronTexto } = erroresNuevos(b, c);
+  assert.equal(nuevos.length, 1);
+  assert.equal(cambiaronTexto.length, 0);
+});
+
+test("tsc: el parecido no alcanza para esconder un error MÁS del mismo tipo en el archivo", () => {
+  const e = (n) => `frontend/src/e.tsx(${n},1): error TS2345: Argument of type '"x"' is not assignable to parameter of type '"a" | ... ${n} more ...'.\n`;
+  const b = leerSalidaTsc(tscBase + e(1)).errores;
+  const c = leerSalidaTsc(tscBase + e(2) + e(3)).errores;
+  const { nuevos, cambiaronTexto } = erroresNuevos(b, c);
+  assert.equal(cambiaronTexto.length, 1);
+  assert.equal(nuevos.length, 1);
+});
+
 test("tsc: errores sin archivo (de configuración) también se comparan", () => {
   const c = leerSalidaTsc(`error TS5083: Cannot read file 'tsconfig.base.json'.\n${diag}`);
   assert.equal(c.errores.length, 1);

@@ -149,7 +149,7 @@ try {
     ...problemasTsc("cabeza", { codigo: cabeza.codigo, lectura: lCabeza, esperados, canario: true }),
   ];
   // Los errores del canario no son del código: se cuentan (arriba) y se sacan.
-  const { nuevos, arreglados } = erroresNuevos(sinElCanario(lBase).errores, sinElCanario(lCabeza).errores);
+  const { nuevos, arreglados, cambiaronTexto } = erroresNuevos(sinElCanario(lBase).errores, sinElCanario(lCabeza).errores);
 
   console.log(`\n── guarda de tsc ──`);
   const memoria = (l) => (l.diagnosticos["Memory used"] != null ? `${Math.round(l.diagnosticos["Memory used"] / 1024)} MB` : "? MB");
@@ -164,6 +164,12 @@ try {
     console.log(anotacion(e));
     console.log(`  NUEVO  ${e.archivo ? `${e.archivo}(${e.linea},${e.columna}): ` : ""}${e.mensaje}`);
   }
+  // Errores viejos con otro final de mensaje (p. ej. la unión de RPC de types.ts): aviso, no rojo.
+  for (const { ahora } of cambiaronTexto) {
+    console.log(`::warning file=${ahora.archivo ?? ""},line=${ahora.linea ?? 1},title=tsc: error viejo con otro texto::el mismo error que en la base, con otro final de mensaje`);
+    console.log(`  CAMBIÓ EL TEXTO  ${ahora.archivo ? `${ahora.archivo}(${ahora.linea},${ahora.columna}): ` : ""}${ahora.mensaje.slice(0, 160)}`);
+  }
+  if (cambiaronTexto.length) console.log(`cambiaron de texto (no cuentan como nuevos): ${cambiaronTexto.length}`);
 
   if (process.env.GITHUB_STEP_SUMMARY) {
     const filas = [
@@ -174,7 +180,7 @@ try {
       `| base \`${baseSha.slice(0, 8)}\` | ${errores(lBase)} | ${lBase.archivos.length} |`,
       `| cabeza \`${cabezaSha.slice(0, 8)}\` | ${errores(lCabeza)} | ${lCabeza.archivos.length} |`,
       "",
-      `Nuevos: **${nuevos.length}** · arreglados: ${arreglados}`,
+      `Nuevos: **${nuevos.length}** · arreglados: ${arreglados} · viejos con otro texto: ${cambiaronTexto.length}`,
       "",
       ...nuevos.map((e) => `- \`${e.archivo ?? "(global)"}${e.archivo ? `:${e.linea}` : ""}\` ${e.mensaje.replace(/\|/g, "\\|")}`),
       ...(problemas.length ? ["", `**No se pudo comparar:** ${problemas.join("; ")}`] : []),
