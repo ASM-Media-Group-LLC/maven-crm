@@ -740,5 +740,7 @@ export const admin = {
   "admin.cvh.noScreen": { es: "sin pantalla {h}", en: "no screen {h}" },
   "admin.cvh.offCamera": { es: "fuera de cámara {h}", en: "off camera {h}" },
   "admin.cvh.away": { es: "fuera {h}", en: "away {h}" },
+  "admin.cvh.noConnection": { es: "sin conexión {h}", en: "disconnected {h}" },
+  "admin.cvh.includesDrops": { es: "El reloj incluye {h} de caídas de la sala (se pagan hasta 10 min por hora).", en: "The clock includes {h} of room drops (up to 10 min per hour is paid)." },
   "admin.cvh.stoppedBy": { es: "Detenido por", en: "Stopped by" },
 } as const satisfies Record<string, { es: string; en: string }>;
