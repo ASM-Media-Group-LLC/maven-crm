@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useCanalQueRevive } from "@/hooks/useCanalQueRevive";
+import { useEscuchaDelChat } from "@/hooks/canalDelChat";
 
 /**
  * Returns a Set of conversation IDs where the current user
@@ -63,41 +63,29 @@ export function useMentionedConversations(
     refresh();
   }, [refresh]);
 
-  // Realtime: menciones nuevas y cambios en mi last_read_at. El canal revive
-  // solo si se muere (antes se moría en silencio y el badge se congelaba).
-  useCanalQueRevive({
-    topic: user && currentUserName && stableConvIds.length > 0 ? `mentions-rt-${user.id.slice(0, 8)}` : null,
-    armar: (canal) => canal
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "chat_messages",
-        },
-        (payload) => {
-          const msg = payload.new as any;
-          if (msg.sender_id !== user.id && msg.content?.includes("@")) {
-            refresh();
-          }
-        },
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "chat_participants",
-        },
-        (payload) => {
-          const row = payload.new as any;
-          // When current user's last_read_at changes, re-check mentions
-          if (row.user_id === user.id) {
-            refresh();
-          }
-        },
-      ),
-    alRevivir: () => { void refresh(); },
+  // Realtime: menciones nuevas y cambios en mi last_read_at. Llegan por el CANAL
+  // DEL CHAT (canalDelChat.ts), que ya trae esos dos eventos para la lista: este
+  // hook abría un canal aparte con las mismas dos escuchas, y cada mensaje y cada
+  // lectura le costaban a Realtime un chequeo de RLS más por pestaña en /messenger.
+  // El canal revive solo; al revivir se vuelve a pedir.
+  const refreshRef = useRef(refresh);
+  refreshRef.current = refresh;
+  const userId = user?.id ?? null;
+  const activo = !!userId && !!currentUserName && stableConvIds.length > 0;
+  useEscuchaDelChat(activo ? userId : null, {
+    "chat_messages:INSERT": (payload) => {
+      const msg = payload.new;
+      if (msg.sender_id !== userId && msg.content?.includes("@")) {
+        void refreshRef.current();
+      }
+    },
+    "chat_participants:UPDATE": (payload) => {
+      // When current user's last_read_at changes, re-check mentions
+      if (payload.new.user_id === userId) {
+        void refreshRef.current();
+      }
+    },
+    alRevivir: () => { void refreshRef.current(); },
   });
 
   return { mentionedIds, refreshMentions: refresh };
