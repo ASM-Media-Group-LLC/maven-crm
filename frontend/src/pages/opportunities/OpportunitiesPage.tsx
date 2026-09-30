@@ -184,7 +184,7 @@ const OpportunitiesPage = () => {
       </div>
 
       {/* #4 — Reclutamiento: confirmadas por firmar (del pipeline de Closers),
-          ordenadas por facturación. Acá aparecen los cierres grandes (ej. $24k)
+          ordenadas por facturación. Aquí aparecen los cierres grandes (ej. $24k)
           que antes solo se veían en Closers. */}
       {confirmadas.length > 0 && (
         <div className="rounded-md border bg-muted/20 p-3">

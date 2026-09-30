@@ -47,7 +47,7 @@ const FORMATOS: Record<FormatoDeOficina, {
   docx: {
     titulo: "nav.office.docs", nuevo: "oficina.nuevoDoc", icono: FileText,
     vacio: "Todavía no hay documentos",
-    ayuda: "Empezá por un procedimiento, un guion o un acta de reunión.",
+    ayuda: "Empieza por un procedimiento, un guion o un acta de reunión.",
   },
   xlsx: {
     titulo: "nav.office.sheets", nuevo: "oficina.nuevaHoja", icono: FileSpreadsheet,
@@ -192,9 +192,9 @@ export default function OficinaPage({ formato = "docx" }: { formato?: FormatoDeO
             </p>
             <p className="mx-auto mt-1 max-w-sm text-xs text-muted-foreground">
               {q
-                ? "Se busca por título. Probá con otra palabra."
+                ? "Se busca por título. Prueba con otra palabra."
                 : vista === "papelera"
-                  ? "Lo que mandes a la papelera aparece acá hasta que lo elimines."
+                  ? "Lo que mandes a la papelera aparece aquí hasta que lo elimines."
                   : cfg.ayuda}
             </p>
             {!q && vista !== "papelera" && (

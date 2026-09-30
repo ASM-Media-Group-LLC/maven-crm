@@ -1,5 +1,5 @@
 import {
-  Activity, AlertTriangle, BarChart3, Bell, BookOpen, Bot, Briefcase, Calculator, CalendarDays, CalendarRange, ChevronRight, Clapperboard, ClipboardCheck, Clock, DollarSign, Eye, FileSpreadsheet, FileText, Gauge, Gift, GraduationCap, Headphones, Home, Inbox, LayoutDashboard, Mail, Map, Megaphone, MessageCircle, Moon, Palette, Phone, Presentation, RefreshCw, Rocket, Search, Settings, Shield, Smartphone, Sun, Ticket, UserCheck, UserCog, UserPlus, Users, Users2, Video, Wallet,
+  Activity, AlertTriangle, BarChart3, Bell, BookOpen, Bot, Briefcase, Calculator, CalendarDays, CalendarRange, ChevronRight, Clapperboard, ClipboardCheck, Clock, DollarSign, Eye, FileSpreadsheet, FileText, Gauge, Gift, GraduationCap, HardDrive, Headphones, Home, Inbox, LayoutDashboard, Mail, Map, Megaphone, MessageCircle, Moon, Palette, Phone, Presentation, RefreshCw, Rocket, Search, Settings, Shield, Smartphone, Sun, Ticket, UserCheck, UserCog, UserPlus, Users, Users2, Video, Wallet,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
@@ -356,6 +356,7 @@ const DashboardSidebar = () => {
     { title: t("nav.office.docs"), url: "/oficina", icon: FileText, submodule: "Documentos" },
     { title: t("nav.office.sheets"), url: "/oficina/hojas", icon: FileSpreadsheet, submodule: "Hojas de cálculo" },
     { title: t("nav.office.slides"), url: "/oficina/presentaciones", icon: Presentation, submodule: "Presentaciones" },
+    { title: t("nav.office.drive"), url: "/oficina/drive", icon: HardDrive, submodule: "Drive" },
   ];
   const oficinaItems = oficinaItemsAll.filter((i) => canAccess("Oficina", i.submodule));
   const oficinaCollapsedItems: CI[] = oficinaItems.map((i) => ({ title: i.title, url: i.url }));

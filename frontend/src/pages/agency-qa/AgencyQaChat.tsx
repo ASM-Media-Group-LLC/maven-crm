@@ -354,7 +354,7 @@ const AgencyQaChat = () => {
             <h2 className="text-base font-semibold">Chat with Mike</h2>
             <p className="text-xs text-muted-foreground">
               Mike es tu supervisor IA — conoce a cada closer, todas las QAs, y
-              te ayuda a coachear al equipo. Hacele preguntas sobre tendencias,
+              te ayuda a coachear al equipo. Hazle preguntas sobre tendencias,
               comparativas entre closers o qué le falta a alguien.
             </p>
           </div>

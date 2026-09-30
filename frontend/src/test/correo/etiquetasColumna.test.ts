@@ -9,6 +9,7 @@ import { resolve } from "node:path";
 const leer = (rel: string) => readFileSync(resolve(process.cwd(), rel), "utf8");
 const pagina = leer("frontend/src/pages/correo/CorreoPage.tsx");
 const hook = leer("frontend/src/hooks/useEtiquetasCorreo.ts");
+const columna = leer("frontend/src/components/correo/etiquetas/EtiquetasColumna.tsx");
 
 describe("⚠️ una etiqueta NO es una carpeta: cruza todas", () => {
   it("la consulta no filtra por carpeta", () => {
@@ -53,16 +54,20 @@ describe("⚠️ los UID son POR CARPETA", () => {
 });
 
 describe("la sección en la columna", () => {
-  it("tiene su encabezado y el + para administrarlas", () => {
+  it("vive en EtiquetasColumna, debajo de las carpetas", () => {
     const i = pagina.indexOf("── Etiquetas ─");
     expect(i, "no está la sección").toBeGreaterThan(-1);
-    const bloque = pagina.slice(i, i + 2000);
-    expect(bloque).toMatch(/Etiquetas/);
-    expect(bloque).toMatch(/setGestionandoEtiquetas\(true\)/);
+    expect(pagina.slice(i, i + 1200)).toMatch(/<EtiquetasColumna/);
+  });
+
+  it("tiene su encabezado y el + para crear (sin el «Más» al pie)", () => {
+    expect(columna).toMatch(/t\("mail\.labels"\)/);
+    expect(columna).toMatch(/setDialogo\(\{ tipo: "nueva", madre: null \}\)/);
+    expect(columna).not.toMatch(/mail\.labels\.more/);
   });
 
   it("volver a tocar la etiqueta activa la apaga", () => {
     // Si no, quedarse dentro de una etiqueta sin forma de salir.
-    expect(pagina).toMatch(/setEtiquetaVista\(activa \? null : e\.id\)/);
+    expect(columna).toMatch(/onAbrir\(etiquetaVista === n\.etiqueta\.id \? null : n\.etiqueta\.id\)/);
   });
 });

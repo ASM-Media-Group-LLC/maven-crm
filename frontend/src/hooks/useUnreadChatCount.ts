@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useCanalQueRevive } from "@/hooks/useCanalQueRevive";
+import { useEscuchaDelChat } from "@/hooks/canalDelChat";
 
 /**
  * Cuántas CONVERSACIONES tienen mensajes sin leer — no cuántos mensajes.
@@ -33,37 +33,27 @@ export function useUnreadChatCount() {
 
   useEffect(() => { refresh(); }, [refresh]);
 
-  // Realtime: el callback lee siempre el refresh actual vía ref, así la suscripción se
-  // arma UNA vez por user.id (string estable) y no en cada cambio de identidad del objeto
-  // `user` (refresh de token). IMPORTANTE — nombre de canal ÚNICO: un nombre FIJO se dedupea
-  // por topic en supabase-js; si el efecto se re-ejecutaba (cambio de `user`), la 2ª
-  // suscripción al mismo nombre quedaba muerta y el badge dejaba de actualizarse hasta un
-  // refresh de la página. Mismo fix que useWaInboxNotifications/useTgInboxNotifications.
+  // Realtime: por el CANAL DEL CHAT (canalDelChat.ts), el mismo de la lista y los
+  // avisos. Antes este hook abría su propio canal con otra escucha del INSERT de
+  // chat_messages y otra del UPDATE de chat_participants, y Realtime chequeaba la
+  // RLS una vez más por cada mensaje y por cada vez que alguien leía. Los
+  // callbacks leen siempre el refresh actual vía ref: el registro va por user.id
+  // (string estable), no por la identidad del objeto `user` (refresh de token).
   const refreshRef = useRef(refresh);
   refreshRef.current = refresh;
   const userId = user?.id ?? null;
 
-  useCanalQueRevive({
-    topic: userId ? `chat-unread-${userId}` : null,
-    armar: (canal) => canal
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "chat_messages" },
-        (payload) => {
-          if (payload.new && (payload.new as any).sender_id !== userId) {
-            void refreshRef.current();
-          }
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "chat_participants" },
-        (payload) => {
-          if (payload.new && (payload.new as any).user_id === userId) {
-            void refreshRef.current();
-          }
-        }
-      ),
+  useEscuchaDelChat(userId, {
+    "chat_messages:INSERT": (payload) => {
+      if (payload.new && payload.new.sender_id !== userId) {
+        void refreshRef.current();
+      }
+    },
+    "chat_participants:UPDATE": (payload) => {
+      if (payload.new && payload.new.user_id === userId) {
+        void refreshRef.current();
+      }
+    },
     // Mientras estuvo muerto se perdieron eventos: recontar.
     alRevivir: () => void refreshRef.current(),
   });

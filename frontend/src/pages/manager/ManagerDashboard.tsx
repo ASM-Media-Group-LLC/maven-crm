@@ -477,7 +477,7 @@ export default function ManagerDashboard({ forzado = false }: {
             </ul>
           )}
           <footer className="border-t border-white/5 px-5 py-2.5 text-[11px] text-muted-foreground">
-            Bruto de OnlyFans del rango elegido, por creadora. Cambiá el rango arriba y este detalle cambia con él.
+            Bruto de OnlyFans del rango elegido, por creadora. Cambia el rango arriba y este detalle cambia con él.
           </footer>
         </DialogContent>
       </Dialog>

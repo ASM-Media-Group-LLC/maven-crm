@@ -33,7 +33,7 @@ import {
   Mail, Clapperboard, Gauge, UserCog, UserCheck, Clock, Eye, GraduationCap,
   Wallet, Calculator, DollarSign, Shield, Sparkles, Database, ListChecks,
   CalendarDays, Building2, Briefcase, History, CalendarRange, Gift,
-  FileSpreadsheet, Presentation } from "lucide-react";
+  FileSpreadsheet, Presentation, HardDrive } from "lucide-react";
 import WhatsAppIcon from "@/components/icons/WhatsAppIcon";
 import TelegramIcon from "@/components/icons/TelegramIcon";
 
@@ -78,6 +78,7 @@ export const NAV_CATALOG: NavCatalogEntry[] = [
   { title: "Documentos", i18nKey: "nav.office.docs", url: "/oficina", icon: FileText, module: "Oficina", submodule: "Documentos", section: "Oficina", keywords: ["documentos", "docs", "word", "google docs", "oficina"] },
   { title: "Hojas de cálculo", i18nKey: "nav.office.sheets", url: "/oficina/hojas", icon: FileSpreadsheet, module: "Oficina", submodule: "Hojas de cálculo", section: "Oficina", keywords: ["hojas", "excel", "sheets", "calculo", "planilla", "oficina"] },
   { title: "Presentaciones", i18nKey: "nav.office.slides", url: "/oficina/presentaciones", icon: Presentation, module: "Oficina", submodule: "Presentaciones", section: "Oficina", keywords: ["presentaciones", "powerpoint", "slides", "diapositivas", "oficina"] },
+  { title: "Drive", i18nKey: "nav.office.drive", url: "/oficina/drive", icon: HardDrive, module: "Oficina", submodule: "Drive", section: "Oficina", keywords: ["drive", "archivos", "carpetas", "nas", "google drive", "subir", "oficina"] },
   { title: "Contactos", i18nKey: "nav.contacts", url: "/contactos", icon: UserPlus, module: "Contactos", section: "Menú", keywords: ["directorio"] },
   { title: "Panel de control", i18nKey: "nav.controlPanel", url: "/panel-de-control", icon: Gauge, module: "Panel de control", section: "Menú", keywords: ["control", "kpis"] },
 

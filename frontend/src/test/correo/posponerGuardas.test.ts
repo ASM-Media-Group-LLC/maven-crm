@@ -30,7 +30,7 @@ describe("⚠️ posponer no puede ser esconder para siempre", () => {
     // Al revés, una fecha basura dejaría el correo en Snoozed SIN fila que lo
     // despierte: se habría escondido para siempre.
     const i = edge.indexOf("let volverAt");
-    const j = edge.indexOf("ok = await client.moveUids");
+    const j = edge.indexOf("await client.moveUidsConDestino(lista, dest)");
     expect(i, "no está la validación").toBeGreaterThan(-1);
     expect(j).toBeGreaterThan(i);
   });

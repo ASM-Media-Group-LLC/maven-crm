@@ -2,6 +2,12 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Mock livekit-client
 vi.mock("livekit-client", () => ({
+  // El hook lo usa como VALOR (disconnect() deja la razón CLIENT_INITIATED).
+  DisconnectReason: {
+    UNKNOWN_REASON: 0, CLIENT_INITIATED: 1, DUPLICATE_IDENTITY: 2, SERVER_SHUTDOWN: 3, PARTICIPANT_REMOVED: 4,
+    ROOM_DELETED: 5, STATE_MISMATCH: 6, JOIN_FAILURE: 7, MIGRATION: 8, SIGNAL_CLOSE: 9, ROOM_CLOSED: 10,
+    USER_UNAVAILABLE: 11, USER_REJECTED: 12, SIP_TRUNK_FAILURE: 13, CONNECTION_TIMEOUT: 14, MEDIA_FAILURE: 15,
+  },
   Room: vi.fn().mockImplementation(() => ({
     connect: vi.fn().mockResolvedValue(undefined),
     disconnect: vi.fn(),
@@ -141,6 +147,8 @@ describe("useLiveKit hook", () => {
     expect(result.current.isReconnecting).toBe(false);
     expect(result.current.activeSpeaker).toBeNull();
     expect(result.current.connectionState).toBe("disconnected");
+    // Salir a propósito queda registrado como tal: no se lee como una caída.
+    expect(result.current.razonDeSalida).toBe(1);
   });
 });
 
@@ -183,5 +191,44 @@ describe("LKChatMessage type", () => {
       timestamp: Date.now(),
     };
     expect(msg.content).toBe("Hello");
+  });
+});
+
+describe("⚠️ isMicOn se entera cuando OTRO silencia el micrófono", () => {
+  it("un TrackMuted del micrófono propio baja isMicOn (y el Unmuted lo sube)", async () => {
+    const { Room } = await import("livekit-client");
+    const oyentes: Record<string, Array<(...a: unknown[]) => void>> = {};
+    const lp: Record<string, unknown> = {
+      identity: "user-1", name: "Test User", sid: "sid-local", isSpeaking: false,
+      isMicrophoneEnabled: true, isCameraEnabled: false,
+      audioTrackPublications: new Map(), videoTrackPublications: new Map(), trackPublications: new Map(),
+      connectionQuality: 3, permissions: { canPublish: true, canSubscribe: true }, metadata: "{}",
+      setMicrophoneEnabled: vi.fn().mockResolvedValue(undefined),
+      setCameraEnabled: vi.fn().mockResolvedValue(undefined),
+      setScreenShareEnabled: vi.fn().mockResolvedValue(undefined),
+      publishData: vi.fn(),
+      getTrackPublication: vi.fn().mockReturnValue(undefined),
+    };
+    const sala = {
+      connect: vi.fn().mockResolvedValue(undefined), disconnect: vi.fn(),
+      on: vi.fn((ev: string, cb: (...a: unknown[]) => void) => { (oyentes[ev] ??= []).push(cb); return sala; }),
+      once: vi.fn().mockReturnThis(), off: vi.fn().mockReturnThis(),
+      localParticipant: lp, remoteParticipants: new Map(), startAudio: vi.fn().mockResolvedValue(undefined),
+      canPlaybackAudio: true, name: "sala-1",
+    };
+    // `function` y no flecha: connect() hace `new Room(...)`.
+    (Room as unknown as ReturnType<typeof vi.fn>).mockImplementationOnce(function () { return sala; });
+    const { result } = renderHook(() => useLiveKit());
+    await act(async () => {
+      await result.current.connect("sala-1", "Test User", false, { initialMicOn: true, initialCamOn: false }).catch(() => {});
+    });
+    expect(oyentes["trackMuted"]?.length ?? 0).toBeGreaterThan(0); // que PUEDA fallar
+    // La supervisora lo silencia desde el tablero.
+    lp.isMicrophoneEnabled = false;
+    await act(async () => { for (const cb of oyentes["trackMuted"]) cb({ source: "microphone" }, { isLocal: true }); });
+    expect(result.current.isMicOn).toBe(false);
+    lp.isMicrophoneEnabled = true;
+    await act(async () => { for (const cb of oyentes["trackUnmuted"] ?? []) cb({ source: "microphone" }, { isLocal: true }); });
+    expect(result.current.isMicOn).toBe(true);
   });
 });

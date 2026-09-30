@@ -1,4 +1,4 @@
-import { forwardRef, useState, useMemo, memo, useRef, useEffect } from "react";
+import { forwardRef, useState, useMemo, memo, useRef, useEffect, useContext } from "react";
 import {
   MoreVertical, File, Reply, Copy, Edit2, Trash2, MessageSquareText, Mic, Play, Clock, RotateCw, Check, Download,
 } from "lucide-react";
@@ -17,6 +17,7 @@ import ReactionPicker from "./ReactionPicker";
 import ReactionsDisplay from "./ReactionsDisplay";
 import ReadReceiptIndicator from "./ReadReceiptIndicator";
 import ImageLightbox from "./ImageLightbox";
+import { GaleriaDelChat, clasificarMedia } from "../galeriaDelChat";
 import { renderTextWithMentions } from "./MentionAutocomplete";
 import RichText from "./RichText";
 import { formatTime as formatMsgTime } from "../utils";
@@ -72,6 +73,8 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
   const [accionesTactiles, setAccionesTactiles] = useState(false);
   const [lightboxSrc, setLightboxSrc] = useState("");
   const [lightboxType, setLightboxType] = useState<"image" | "video">("image");
+  // Todas las fotos y videos del chat, para las flechas del visor.
+  const galeria = useContext(GaleriaDelChat);
   const [showAllImages, setShowAllImages] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState("");
@@ -196,21 +199,11 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
     ? cn("rounded-3xl rounded-tr-xl", isLastInGroup ? "rounded-br-md" : "rounded-br-3xl")
     : cn("rounded-3xl rounded-tl-xl", isLastInGroup ? "rounded-bl-md" : "rounded-bl-3xl");
 
-  const isVoiceNote = message.type === "file" && message.file_name?.startsWith("voice-note");
-  const audioExtPattern = /\.(webm|ogg|mp3|m4a|wav)(\?|$)/i;
-  const isAudioFile = message.file_url && audioExtPattern.test(message.file_url);
-  const isImage = message.type === "image" && message.file_url;
-  // GIF: Giphy los manda como .mp4 con file_name "gif.mp4". Se muestran en chico y
-  // reproduciéndose SOLOS (autoplay+loop+muted), como en WhatsApp — no como video con
-  // botón de play (que obligaba a hacer zoom para verlo animado).
-  const isGif = !!message.file_url && (
-    /\.gif(\?|$)/i.test(message.file_url) ||
-    (message.file_name || "").toLowerCase().startsWith("gif") ||
-    /(giphy|tenor)\.com/i.test(message.file_url)
-  );
-  // OJO: los .webm de nota de voz y los gifs .mp4 también matchean este regex →
-  // excluirlos para que NO se dibujen como player de video con botón de play.
-  const isVideo = !isVoiceNote && !isAudioFile && !isGif && message.file_url && (message.file_url.match(/\.(mp4|webm|mov)(\?|$)/i));
+  // Qué es este archivo: la regla vive en galeriaDelChat para que la burbuja y
+  // el visor (que pasa de una foto a otra) digan lo mismo.
+  const {
+    esNotaDeVoz: isVoiceNote, esAudio: isAudioFile, esImagen: isImage, esGif: isGif, esVideo: isVideo,
+  } = clasificarMedia(message);
 
   const openLightbox = (src: string, type: "image" | "video") => {
     setLightboxSrc(src);
@@ -502,7 +495,7 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
                   <Copy className="h-3.5 w-3.5 mr-2" /> {t("common.copy")}
                 </DropdownMenuItem>
                 {/* Todo mensaje con archivo (imagen, video, audio, documento) se
-                    puede descargar desde acá, además del botón del zoom. */}
+                    puede descargar desde aquí, además del botón del zoom. */}
                 {message.file_url && (
                   <DropdownMenuItem onClick={() => void descargarArchivo(message.file_url!, message.file_name)}>
                     <Download className="h-3.5 w-3.5 mr-2" /> {t("common.download")}
@@ -608,6 +601,7 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
         isOpen={lightboxOpen}
         onClose={() => setLightboxOpen(false)}
         type={lightboxType}
+        galeria={galeria}
       />
     </>
   );

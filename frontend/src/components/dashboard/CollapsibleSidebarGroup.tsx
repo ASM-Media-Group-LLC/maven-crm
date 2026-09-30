@@ -137,8 +137,8 @@ export const CollapsibleSidebarGroup = ({
           {/* Fila de primer nivel del menú (rediseño 09/2026): mismo peso que
               cualquier entrada suelta (Panel de control): ícono de 20 px,
               etiqueta a 16 px medium, chevron a la derecha, 48 px de alto. Si la
-              ruta activa cae acá adentro y el grupo está plegado, la fila se
-              realza con una superficie neutra: "estás acá" sin robarle el
+              ruta activa cae aquí adentro y el grupo está plegado, la fila se
+              realza con una superficie neutra: "estás aquí" sin robarle el
               acento al ítem. */}
           <SidebarGroupLabel
             className={`group/label flex h-auto w-full cursor-pointer items-center gap-3 rounded-xl px-2.5 py-3 text-base font-medium !text-foreground/85 transition-colors hover:!text-foreground hover:bg-foreground/5 ${

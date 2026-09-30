@@ -72,7 +72,23 @@ vi.mock("@/components/PersistentCallProvider", () => ({
   CallOutlet: () => null,
 }));
 vi.mock("@/pages/messenger/videocall/LiveKitCallView", () => ({ default: () => null }));
-vi.mock("@/pages/cowork/CoworkRoomMonitor", () => ({ default: () => null }));
+// El monitor de cada sala dice a quién ve LiveKit. Por defecto no dice nada
+// (null = no sabe); el caso de la sala caída le hace decir una lista SIN Mateo.
+const monitor: { ve: string[] | null } = { ve: null };
+vi.mock("@/pages/cowork/CoworkRoomMonitor", async () => {
+  const React = await import("react");
+  return {
+    // Avisa UNA vez al montar, como el de verdad (que guarda el callback en un
+    // ref): el tablero le pasa una función nueva en cada render, y avisar en
+    // cada una armaba un bucle que colgaba la prueba.
+    default: function MonitorFalso({ onParticipantsChange }: { onParticipantsChange?: (ids: string[] | null) => void }) {
+      const cb = React.useRef(onParticipantsChange);
+      cb.current = onParticipantsChange;
+      React.useEffect(() => { if (monitor.ve) cb.current?.(monitor.ve); }, []);
+      return null;
+    },
+  };
+});
 vi.mock("@/hooks/useUserRole", () => ({ useUserRole: () => ({ isAdmin: true }) }));
 vi.mock("@/hooks/use-mobile", () => ({ useIsMobile: () => false }));
 vi.mock("@/hooks/ChatProvider", () => ({ useChatShared: () => ({ createDirectChat: () => null }) }));
@@ -215,6 +231,47 @@ describe("Cowork · tablero del supervisor en inglés", () => {
     // El mensaje guardado en español se lee en el idioma de quien mira.
     expect(screen.getByText("I need help")).toBeTruthy();
     expect(screen.getByText("Private call")).toBeTruthy();
+  });
+
+  it("⚠️ con la sala caída: 'sin conexión', sin alarma de cámara ni de pantalla, y en inglés", async () => {
+    // Así se ve una caída de verdad: el reloj en sin_conexion y el detector
+    // diciendo cam_off (con la sala caída la cámara se ve apagada). Antes el
+    // tablero ponía "cámara apagada" y lo DECÍA en voz alta por cada persona.
+    const antes = mediaStates.u2;
+    mediaStates.u2 = { micOn: false, camOn: false, screenShareOn: false, screenShareSince: hace(10), faceState: "cam_off", faceSince: hace(5),
+      relojEstado: "sin_conexion", relojSegundosHoy: 7200, relojEn: AHORA, conexionSala: "desconectada" };
+    // LiveKit ya no ve a Mateo: antes de este cambio desaparecía de su tarjeta.
+    monitor.ve = ["u1", "u3"];
+    try {
+      montar();
+      await screen.findByText("Requests");
+      await act(async () => { await new Promise((r) => setTimeout(r, 1_200)); });
+      expect(screen.getByText("Mateo Ruiz · Not connected to the room")).toBeTruthy();
+      expect(screen.queryByText(/^Mateo Ruiz · Camera off/)).toBeNull();
+      expect(screen.queryByText(/^Mateo Ruiz · No screen/)).toBeNull();
+      expect(voz.filter((v) => v.startsWith("Mateo Ruiz"))).toEqual([]);
+      expect(enEspanol(document.body)).toEqual([]);
+    } finally {
+      mediaStates.u2 = antes;
+      monitor.ve = null;
+    }
+  });
+
+  it("la caída que ya no se paga se ve en rojo, en inglés", async () => {
+    const antes = mediaStates.u2;
+    mediaStates.u2 = { micOn: false, camOn: false, screenShareOn: false, faceState: "cam_off", faceSince: hace(5),
+      relojEstado: "sin_conexion_larga", relojSegundosHoy: 7200, relojEn: AHORA, conexionSala: "desconectada" };
+    monitor.ve = ["u1", "u3"];
+    try {
+      montar();
+      await screen.findByText("Requests");
+      await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
+      expect(screen.getByText("Mateo Ruiz · Disconnected · clock stopped")).toBeTruthy();
+      expect(enEspanol(document.body)).toEqual([]);
+    } finally {
+      mediaStates.u2 = antes;
+      monitor.ve = null;
+    }
   });
 
   it("los avisos que disparan los primeros tics salen en inglés; la voz sigue en español", async () => {
