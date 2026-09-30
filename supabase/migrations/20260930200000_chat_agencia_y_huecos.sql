@@ -81,10 +81,11 @@
 -- El nombre: el diseño la llamaba 20260929100000, pero esa versión ya está aplicada
 -- en prod (drive_cupos_nombre_o_correo). Dos migraciones con la misma versión
 -- chocan en supabase_migrations.schema_migrations. Y tiene que ir DESPUÉS de la
--- última aplicada (20260929180000 funciones_sin_voseo, 29/09): una versión
--- anterior queda «insertada antes de la última» y `supabase db push` la rechaza
--- sin --include-all. 20260929200000 ya la usa la rama del reloj de Cowork: por
--- eso 20260929210000.
+-- última aplicada: una versión anterior queda «insertada antes de la última» y
+-- `supabase db push` la rechaza sin --include-all. El 30/09 la última aplicada en
+-- prod es 20260930174747 cowork_reloj_sin_conexion (se aplicó con apply_migration,
+-- que anota la hora de aplicación; en el repo es 20260929200000): por eso
+-- 20260930200000. Con apply_migration, prod la va a anotar con su propia hora.
 --
 -- Diferencias de prod contra el repo que esto respeta (el catálogo de prod manda;
 -- sacado el 28/09 y vuelto a comparar el 29/09, sin cambios):

@@ -4,7 +4,7 @@
  * Antes createDirectChat buscaba el directo con dos consultas y un `limit(1)` SIN
  * orden: con dos directos viejos entre las mismas personas cada lado podía abrir
  * uno distinto, y la base no impedía crear un segundo. Desde la migración
- * 20260929210000_chat_agencia_y_huecos:
+ * 20260930200000_chat_agencia_y_huecos:
  *   · `chat_directo_con(_otro)` devuelve EL directo canónico (el del mensaje más
  *     reciente; si empatan, el más viejo). Es el mismo que va a usar la API.
  *   · la base rechaza con `directo_duplicado` el segundo directo entre dos

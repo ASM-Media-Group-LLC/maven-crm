@@ -1,5 +1,5 @@
 // La agencia en cada conversación y los huecos de la base del Messenger
-// (migración 20260929210000_chat_agencia_y_huecos.sql), probados contra un
+// (migración 20260930200000_chat_agencia_y_huecos.sql), probados contra un
 // Postgres de verdad (PGlite) cargado con el esquema de PROD del 28/09 (vuelto a
 // comparar con prod el 29/09 después de 20260929180000: las huellas no cambiaron).
 //
@@ -34,7 +34,7 @@ import { PGlite } from "npm:@electric-sql/pglite@0.3";
 
 const leer = (rel: string) => Deno.readTextFileSync(new URL(rel, import.meta.url));
 const FIXTURE = leer("./fixtures/prod_chat_api_20260928.sql");
-const NOMBRE_A = "20260929210000_chat_agencia_y_huecos.sql";
+const NOMBRE_A = "20260930200000_chat_agencia_y_huecos.sql";
 const MIG_A = leer(`../migrations/${NOMBRE_A}`);
 
 const ok: string[] = [], mal: string[] = [];

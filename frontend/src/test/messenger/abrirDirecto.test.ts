@@ -1,6 +1,6 @@
 // ABRIR UN DIRECTO: reusar el canónico, crearlo, y la carrera.
 //
-// Desde la migración 20260929210000 la base no deja crear un segundo directo
+// Desde la migración 20260930200000 la base no deja crear un segundo directo
 // entre las mismas dos personas: el tercer paso de la creación da
 // `directo_duplicado`. Pasa solo cuando los dos se abren el chat a la vez (o dos
 // pestañas). El que pierde tiene que borrar lo suyo y abrir el del otro, sin
@@ -207,12 +207,12 @@ describe("pasosDeSupabase: lo que le pide a la base", () => {
 // node:fs: el tsconfig del front compila los tests y no trae los tipos de Node.
 // Un glob que no encuentra nada no falla solo: por eso el primer test mira que
 // los dos fuentes hayan cargado.
-const MIGRACION = "/supabase/migrations/20260929210000_chat_agencia_y_huecos.sql";
+const MIGRACION = "/supabase/migrations/20260930200000_chat_agencia_y_huecos.sql";
 const USE_CHAT = "/frontend/src/hooks/useChat.ts";
 const fuentes = (import.meta as unknown as {
   glob: (p: string[], o: Record<string, unknown>) => Record<string, string>;
 }).glob(
-  ["/supabase/migrations/20260929210000_chat_agencia_y_huecos.sql", "/frontend/src/hooks/useChat.ts"],
+  ["/supabase/migrations/20260930200000_chat_agencia_y_huecos.sql", "/frontend/src/hooks/useChat.ts"],
   { query: "?raw", import: "default", eager: true },
 );
 const leer = (ruta: string): string => fuentes[ruta] ?? "";
