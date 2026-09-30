@@ -1,6 +1,6 @@
 // ABRIR UN DIRECTO: reusar el canónico, crearlo, y la carrera.
 //
-// Desde la migración 20260930200000 la base no deja crear un segundo directo
+// Desde la migración 20260930230000 la base no deja crear un segundo directo
 // entre las mismas dos personas: el tercer paso de la creación da
 // `directo_duplicado`. Pasa solo cuando los dos se abren el chat a la vez (o dos
 // pestañas). El que pierde tiene que borrar lo suyo y abrir el del otro, sin
@@ -20,9 +20,10 @@ const OTRO = "22222222-2222-4222-8222-222222222222";
 const NUEVO = "33333333-3333-4333-8333-333333333333";
 const GANADOR = "44444444-4444-4444-8444-444444444444";
 
-// Lo que responde la base cuando el trigger de chat_participants rechaza el duplicado.
+// Lo que responde la base cuando el trigger de chat_participants rechaza el duplicado
+// (SQLSTATE propio para la API del PR 2; la app mira el mensaje, no el código).
 const DUPLICADO = {
-  code: "P0001",
+  code: "MV409",
   message: "directo_duplicado: ya hay un chat directo entre esas dos personas",
 };
 
@@ -135,7 +136,7 @@ describe("abrirDirecto", () => {
   });
 
   it("con el tope de directos del día, el motivo trae el código que useChat reconoce", async () => {
-    const tope = { code: "P0001", message: "chat_tope_directos: ya abriste 100 chats directos en las últimas 24 horas" };
+    const tope = { code: "MV429", message: "chat_tope_directos: ya abriste 100 chats directos en las últimas 24 horas" };
     const { pasos, llamadas } = pasosFalsos({ buscar: [{ data: null, error: null }], crear: { error: tope } });
     const r = await abrirDirecto(pasos, YO, OTRO, NUEVO);
     expect(r.tipo).toBe("error");
@@ -207,12 +208,12 @@ describe("pasosDeSupabase: lo que le pide a la base", () => {
 // node:fs: el tsconfig del front compila los tests y no trae los tipos de Node.
 // Un glob que no encuentra nada no falla solo: por eso el primer test mira que
 // los dos fuentes hayan cargado.
-const MIGRACION = "/supabase/migrations/20260930200000_chat_agencia_y_huecos.sql";
+const MIGRACION = "/supabase/migrations/20260930230000_chat_agencia_y_huecos.sql";
 const USE_CHAT = "/frontend/src/hooks/useChat.ts";
 const fuentes = (import.meta as unknown as {
   glob: (p: string[], o: Record<string, unknown>) => Record<string, string>;
 }).glob(
-  ["/supabase/migrations/20260930200000_chat_agencia_y_huecos.sql", "/frontend/src/hooks/useChat.ts"],
+  ["/supabase/migrations/20260930230000_chat_agencia_y_huecos.sql", "/frontend/src/hooks/useChat.ts"],
   { query: "?raw", import: "default", eager: true },
 );
 const leer = (ruta: string): string => fuentes[ruta] ?? "";
@@ -226,9 +227,10 @@ describe("el contrato con la migración", () => {
   it("la base define chat_directo_con(_otro uuid) y los errores que la app reconoce", () => {
     const sql = leer(MIGRACION);
     expect(sql).toMatch(/create or replace function public\.chat_directo_con\(_otro uuid\)/);
-    expect(sql).toMatch(/raise exception 'directo_duplicado:/);
-    expect(sql).toMatch(/raise exception 'chat_tope_grupos:/);
-    expect(sql).toMatch(/raise exception 'chat_tope_directos:/);
+    // El prefijo del mensaje es lo que compara la app; el SQLSTATE, lo que mapea la API.
+    expect(sql).toMatch(/errcode = 'MV409',\s+message = 'directo_duplicado:/);
+    expect(sql).toMatch(/errcode = 'MV429',\s+message = 'chat_tope_grupos:/);
+    expect(sql).toMatch(/errcode = 'MV429',\s+message = 'chat_tope_directos:/);
   });
 
   it("useChat abre los directos con abrirDirecto y ya no busca con limit(1) sin orden", () => {

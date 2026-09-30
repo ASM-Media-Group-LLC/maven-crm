@@ -80,12 +80,26 @@
 --
 -- El nombre: el diseño la llamaba 20260929100000, pero esa versión ya está aplicada
 -- en prod (drive_cupos_nombre_o_correo). Dos migraciones con la misma versión
--- chocan en supabase_migrations.schema_migrations. Y tiene que ir DESPUÉS de la
--- última aplicada: una versión anterior queda «insertada antes de la última» y
--- `supabase db push` la rechaza sin --include-all. El 30/09 la última aplicada en
--- prod es 20260930174747 cowork_reloj_sin_conexion (se aplicó con apply_migration,
--- que anota la hora de aplicación; en el repo es 20260929200000): por eso
--- 20260930200000. Con apply_migration, prod la va a anotar con su propia hora.
+-- chocan en supabase_migrations.schema_migrations. Va DESPUÉS del último archivo
+-- del repo (20260930190000_cowork_tiempo_equipo) y también de la última versión
+-- anotada en prod, que el 30/09 a las 17:40 (Bogotá) es 20260930215657
+-- cowork_tiempo_equipo. Prod y el repo no coinciden porque apply_migration anota
+-- la hora de aplicación, no el nombre del archivo (cowork_reloj_sin_conexion es
+-- 20260929200000 en el repo y 20260930174747 en prod). Por eso 20260930230000.
+-- Con apply_migration, prod la va a anotar con su propia hora, que también queda
+-- después: lo que de verdad importa es que el archivo vaya después del último del
+-- repo y que su versión no choque con ninguna de prod.
+--
+-- Códigos de error. Los rechazos que la API del PR 2 tiene que traducir llevan su
+-- SQLSTATE propio (la tabla §1.8 del diseño), y conservan el prefijo del mensaje,
+-- que es lo que compara la app. PostgREST responde 400 igual que con P0001:
+--   MV429  chat_tope_grupos / chat_tope_directos, con detail
+--          {"limite": "person_new_groups_day" | "person_new_directs_day",
+--           "reintentar_en": segundos hasta que se libera un lugar} → 429 + Retry-After;
+--   MV422  chat_cita_ajena → 422 invalid_reply; chat_archivo_externo → 422;
+--   MV409  directo_duplicado → el PR 2 no responde error: vuelve a leer con
+--          chat_directo_con y devuelve ese directo.
+-- Los demás rechazos siguen con P0001: el PR 2 valida antes lo que le toca.
 --
 -- Diferencias de prod contra el repo que esto respeta (el catálogo de prod manda;
 -- sacado el 28/09 y vuelto a comparar el 29/09, sin cambios):
@@ -118,11 +132,28 @@
 -- abajo queda solo como red: con todo tomado, ninguna sentencia espera.
 --
 -- ─── VUELTA ATRÁS (el banco la corre tal cual: las líneas «--|») ─────────────
--- Saca todo lo que cambia el comportamiento de la app: los cuatro triggers
--- nuevos, la guarda de mensajes de prod y la política DELETE de antes. Quedan,
--- porque no molestan y el frontend nuevo usa chat_directo_con: tenant_id,
--- chat_directo_con, chat_llave_de_par, delete_chat_message, get_unread_counts y
--- chat_conversaciones_creadas.
+-- Saca todo lo que cambia el comportamiento de la app: los triggers nuevos de
+-- conversaciones, participantes y mensajes, la guarda de mensajes de prod y la
+-- política DELETE de participantes de antes. El trigger de perfiles se APAGA
+-- (disable), no se borra: DROP TRIGGER pide ACCESS EXCLUSIVE sobre profiles, que
+-- traba también las lecturas (y profiles se lee en casi todo pedido); apagarlo
+-- pide SHARE ROW EXCLUSIVE, lo mismo que crearlo, y deja leer. Los candados se
+-- piden al principio, como en la migración, y el banco comprueba con pg_locks que
+-- ninguna sentencia pida después uno más fuerte.
+-- Quedan (el banco compara la vuelta atrás contra prod y exige esta lista exacta):
+--   · chat_conversations.tenant_id, con su FK y otra vez con default;
+--   · chat_conversaciones_creadas (tabla, secuencia e índices);
+--   · chat_message_deletions.content_rich;
+--   · chat_directo_con y chat_llave_de_par (el frontend nuevo usa chat_directo_con);
+--   · delete_chat_message y get_unread_counts como los deja la migración;
+--   · las 4 funciones de trigger sin trigger que las llame, salvo
+--     profiles_nombre_lo_cambia_un_admin, que queda con su trigger APAGADO;
+--   · y NO vuelve la política «Users can delete their own messages»: la vuelta
+--     atrás no devuelve el borrado duro del autor (la app borra con
+--     delete_chat_message; devolverlo es una decisión de Jhon, ver el PR).
+-- ⚠️ Después de una vuelta atrás esta misma migración no vuelve a correr (choca
+-- con content_rich y con lo que queda) y su versión sigue anotada en
+-- schema_migrations: arreglar hacia adelante exige una migración NUEVA.
 -- ⚠️ tenant_id es NOT NULL y sin default, y SOLO lo llena chat_conversations_agencia:
 -- sacar ese trigger sin devolverle antes el default a tenant_id, en la misma
 -- transacción, deja a todos sin poder abrir un directo ni crear un grupo.
@@ -138,9 +169,12 @@
 --|       lock table public.chat_conversations in access exclusive mode;
 --|       lock table public.chat_participants in access exclusive mode;
 --|       lock table public.profiles in share row exclusive mode;
+--|       lock table public.tenants in access share mode;
 --|       exit;
 --|     exception when lock_not_available or deadlock_detected then
---|       if _intento >= 8 then raise; end if;
+--|       if _intento >= 8 then
+--|         raise exception 'chat_candados: no se consiguieron los candados en % intentos; la vuelta atrás no hizo nada, se vuelve a correr más tarde', _intento;
+--|       end if;
 --|       perform pg_sleep(1);
 --|     end;
 --|   end loop;
@@ -156,7 +190,7 @@
 --| drop trigger if exists chat_participants_agencia on public.chat_participants;
 --| alter policy "Admins can remove participants" on public.chat_participants
 --|   using ((is_chat_admin(( SELECT auth.uid() AS uid), conversation_id) OR (( SELECT auth.uid() AS uid) = user_id)));
---| drop trigger if exists profiles_nombre_lo_cambia_un_admin on public.profiles;
+--| alter table public.profiles disable trigger profiles_nombre_lo_cambia_un_admin;
 --| -- Mensajes: el INSERT sin guarda y la guarda del UPDATE como estaba en prod.
 --| drop trigger if exists chat_messages_al_insertar on public.chat_messages;
 --| CREATE OR REPLACE FUNCTION public.guard_chat_message_update()
@@ -294,12 +328,14 @@ begin
   if new.reply_to_id is not null and not exists (
        select 1 from public.chat_messages r
         where r.id = new.reply_to_id and r.conversation_id = new.conversation_id) then
-    raise exception 'chat_cita_ajena: la cita tiene que ser un mensaje de la misma conversación';
+    raise exception using errcode = 'MV422',
+      message = 'chat_cita_ajena: la cita tiene que ser un mensaje de la misma conversación';
   end if;
   if new.file_url is not null
      and new.file_url !~ '^https://lsagslbkliprespbyhts\.supabase\.co/storage/v1/object/public/chat-files/'
      and new.file_url !~ '^https://media[0-9]*\.giphy\.com/' then
-    raise exception 'chat_archivo_externo: el archivo de un mensaje tiene que estar en el almacenamiento de Maven';
+    raise exception using errcode = 'MV422',
+      message = 'chat_archivo_externo: el archivo de un mensaje tiene que estar en el almacenamiento de Maven';
   end if;
   return new;
 end;
@@ -432,6 +468,7 @@ declare
   _agencias int;
   _tope int;
   _hechas int;
+  _libre int;
 begin
   if tg_op = 'UPDATE' then
     if new.tenant_id is distinct from old.tenant_id
@@ -482,10 +519,21 @@ begin
          and a.created_at > now() - interval '24 hours'
        limit _tope) x;
     if _hechas >= _tope then
+      -- Se libera un lugar cuando la más vieja de esas altas cumple 24 horas (el
+      -- PR 2 lo manda como Retry-After). Solo corre al rechazar.
+      select ceil(extract(epoch from min(a.created_at) + interval '24 hours' - now()))::int into _libre
+        from public.chat_conversaciones_creadas a
+       where a.user_id = _uid and a.type = new.type
+         and a.created_at > now() - interval '24 hours';
+      _libre := greatest(coalesce(_libre, 1), 1);
       if new.type = 'group' then
-        raise exception 'chat_tope_grupos: ya creaste 30 grupos en las últimas 24 horas';
+        raise exception using errcode = 'MV429',
+          message = 'chat_tope_grupos: ya creaste 30 grupos en las últimas 24 horas',
+          detail = json_build_object('limite', 'person_new_groups_day', 'reintentar_en', _libre)::text;
       end if;
-      raise exception 'chat_tope_directos: ya abriste 100 chats directos en las últimas 24 horas';
+      raise exception using errcode = 'MV429',
+        message = 'chat_tope_directos: ya abriste 100 chats directos en las últimas 24 horas',
+        detail = json_build_object('limite', 'person_new_directs_day', 'reintentar_en', _libre)::text;
     end if;
     insert into public.chat_conversaciones_creadas (user_id, type, created_at)
     values (_uid, new.type, now());
@@ -590,7 +638,8 @@ begin
                      join public.chat_participants a on a.conversation_id = c.id and a.user_id = _otro
                      join public.chat_participants b on b.conversation_id = c.id and b.user_id = new.user_id
                     where c.type = 'direct' and c.id <> new.conversation_id) then
-          raise exception 'directo_duplicado: ya hay un chat directo entre esas dos personas';
+          raise exception using errcode = 'MV409',
+            message = 'directo_duplicado: ya hay un chat directo entre esas dos personas';
         end if;
       end if;
     end if;

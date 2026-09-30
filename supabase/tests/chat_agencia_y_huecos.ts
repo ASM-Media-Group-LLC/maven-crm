@@ -1,5 +1,5 @@
 // La agencia en cada conversación y los huecos de la base del Messenger
-// (migración 20260930200000_chat_agencia_y_huecos.sql), probados contra un
+// (migración 20260930230000_chat_agencia_y_huecos.sql), probados contra un
 // Postgres de verdad (PGlite) cargado con el esquema de PROD del 28/09 (vuelto a
 // comparar con prod el 29/09 después de 20260929180000: las huellas no cambiaron).
 //
@@ -34,8 +34,10 @@ import { PGlite } from "npm:@electric-sql/pglite@0.3";
 
 const leer = (rel: string) => Deno.readTextFileSync(new URL(rel, import.meta.url));
 const FIXTURE = leer("./fixtures/prod_chat_api_20260928.sql");
-const NOMBRE_A = "20260930200000_chat_agencia_y_huecos.sql";
+const NOMBRE_A = "20260930230000_chat_agencia_y_huecos.sql";
 const MIG_A = leer(`../migrations/${NOMBRE_A}`);
+// La vuelta atrás que documenta la cabecera de la migración (las líneas «--|»).
+const VUELTA = MIG_A.split("\n").filter((l) => l.startsWith("--|")).map((l) => l.replace(/^--\| ?/, "")).join("\n");
 
 const ok: string[] = [], mal: string[] = [];
 const check = (c: boolean, m: string) => (c ? ok : mal).push(m);
@@ -246,11 +248,25 @@ async function falla(db: PGlite, quien: Quien, sql: string, patron: RegExp, m: s
   try { await como(db, quien, sql); mal.push(`${m} (NO falló)`); }
   catch (e) { const t = msg(e); check(patron.test(t), `${m} → ${t.slice(0, 110)}`); }
 }
+// Como `falla`, y además el SQLSTATE: es lo que la API del PR 2 traduce a HTTP
+// (la app compara el prefijo del mensaje). Devuelve el detail, si lo hay.
+// deno-lint-ignore no-explicit-any
+const codigoDe = (e: unknown) => String((e as any)?.code ?? "");
+// deno-lint-ignore no-explicit-any
+const detalleDe = (e: unknown): string => String((e as any)?.detail ?? "");
+async function fallaCon(db: PGlite, quien: Quien, sql: string, patron: RegExp, codigo: string, m: string): Promise<string | null> {
+  try { await como(db, quien, sql); mal.push(`${m} (NO falló)`); return null; }
+  catch (e) {
+    const t = msg(e);
+    check(patron.test(t) && codigoDe(e) === codigo, `${m} → ${codigoDe(e)} ${t.slice(0, 100)}`);
+    return detalleDe(e);
+  }
+}
 // Uno o varios pedidos (cada uno con su persona) y, en la MISMA transacción, la
 // pregunta de si tuvo efecto (como superusuario, sin RLS); después se deshace
 // todo. `si` = el ataque funcionó.
 type Paso = [Quien, string];
-async function probar(db: PGlite, pasos: Paso[], efecto: string): Promise<{ ok: boolean; si?: boolean; error?: string }> {
+async function probar(db: PGlite, pasos: Paso[], efecto: string): Promise<{ ok: boolean; si?: boolean; error?: string; codigo?: string }> {
   await db.exec("begin");
   try {
     for (const [quien, sql] of pasos) { await entrar(db, quien); await db.exec(sql); }
@@ -260,13 +276,13 @@ async function probar(db: PGlite, pasos: Paso[], efecto: string): Promise<{ ok: 
     return { ok: true, si: r[0]?.si === true };
   } catch (e) {
     await db.exec("rollback");
-    return { ok: false, error: msg(e) };
+    return { ok: false, error: msg(e), codigo: codigoDe(e) };
   }
 }
 // Un hueco: sobre prod tiene que funcionar; con las migraciones, fallar con
-// `cierre` o, si es "sin_efecto", pasar sin cambiar nada (la RLS lo filtra, o la
-// base pone el valor que corresponde).
-async function huecoEnPasos(prod: PGlite, conA: PGlite, nombre: string, pasos: Paso[], efecto: string, cierre: RegExp | "sin_efecto") {
+// `cierre` (y, si se pide, con ese SQLSTATE) o, si es "sin_efecto", pasar sin
+// cambiar nada (la RLS lo filtra, o la base pone el valor que corresponde).
+async function huecoEnPasos(prod: PGlite, conA: PGlite, nombre: string, pasos: Paso[], efecto: string, cierre: RegExp | "sin_efecto", codigo?: string) {
   const antes = await probar(prod, pasos, efecto);
   check(antes.ok && antes.si === true,
     `${nombre}: ABIERTO en prod (línea base)${antes.ok ? (antes.si ? "" : " — corrió pero sin efecto: el test no prueba nada") : ` — falló: ${antes.error?.slice(0, 90)}`}`);
@@ -275,12 +291,12 @@ async function huecoEnPasos(prod: PGlite, conA: PGlite, nombre: string, pasos: P
     check(despues.ok ? despues.si === false : false,
       `${nombre}: cerrado con la migración${despues.ok ? " (no tiene efecto)" : ` — falló con error inesperado: ${despues.error?.slice(0, 90)}`}`);
   } else {
-    check(!despues.ok && cierre.test(despues.error ?? ""),
-      `${nombre}: cerrado con la migración → ${despues.ok ? "PASÓ" + (despues.si ? " y tuvo efecto" : " sin error") : despues.error?.slice(0, 100)}`);
+    check(!despues.ok && cierre.test(despues.error ?? "") && (!codigo || despues.codigo === codigo),
+      `${nombre}: cerrado con la migración → ${despues.ok ? "PASÓ" + (despues.si ? " y tuvo efecto" : " sin error") : `${codigo ? despues.codigo + " " : ""}${despues.error?.slice(0, 100)}`}`);
   }
 }
-const hueco = (prod: PGlite, conA: PGlite, nombre: string, quien: Quien, sql: string, efecto: string, cierre: RegExp | "sin_efecto") =>
-  huecoEnPasos(prod, conA, nombre, [[quien, sql]], efecto, cierre);
+const hueco = (prod: PGlite, conA: PGlite, nombre: string, quien: Quien, sql: string, efecto: string, cierre: RegExp | "sin_efecto", codigo?: string) =>
+  huecoEnPasos(prod, conA, nombre, [[quien, sql]], efecto, cierre, codigo);
 
 // La huella de lo que crea A: funciones, triggers y las políticas que toca.
 async function huellaDeA(db: PGlite): Promise<Record<string, string>> {
@@ -302,6 +318,27 @@ async function huellaDeA(db: PGlite): Promise<Record<string, string>> {
 }
 function diferenciasDeHuella(a: Record<string, string>, b: Record<string, string>): string[] {
   return [...new Set([...Object.keys(a), ...Object.keys(b)])].filter((k) => a[k] !== b[k]).sort();
+}
+
+// ─── Los candados ────────────────────────────────────────────────────────────
+const FUERZA = ["accessshare", "rowshare", "rowexclusive", "shareupdateexclusive", "share", "sharerowexclusive", "exclusive", "accessexclusive"];
+const fuerza = (m: string) => FUERZA.indexOf(m.toLowerCase().replace(/lock$/, "").replace(/\s+/g, ""));
+// profiles y tenants se leen en casi todo pedido de la app (profiles: 847.079
+// seq_scan y 2.083.929 idx_scan en prod el 30/09). Ni la migración ni la vuelta
+// atrás los toman más fuerte que SHARE ROW EXCLUSIVE, que deja leer.
+const SE_LEEN_SIEMPRE = ["profiles", "tenants"];
+const DEJA_LEER = fuerza("share row exclusive");
+const pedidosDe = (sql: string) =>
+  [...sql.matchAll(/\block\s+table\s+public\.(\w+)\s+in\s+([a-z ]+?)\s+mode/gi)].map((m) => ({ t: m[1], f: fuerza(m[2]) }));
+const CANDADOS_TENIDOS = `select c.relname t, l.mode m from pg_locks l join pg_class c on c.oid = l.relation join pg_namespace n on n.oid = c.relnamespace
+    where l.locktype = 'relation' and n.nspname = 'public' and c.relkind = 'r' and c.relname in ${TABLAS}`;
+// Los candados tenidos que no se pidieron al principio (o más fuertes que lo
+// pedido), y los que traban las lecturas de profiles o tenants.
+function candadosDeMas(tenidos: Fila[], pedidos: { t: string; f: number }[]): string[] {
+  return tenidos.filter((l) => {
+    const p = pedidos.find((x) => x.t === l.t);
+    return !p || fuerza(l.m) > p.f || (SE_LEEN_SIEMPRE.includes(l.t) && fuerza(l.m) > DEJA_LEER);
+  }).map((l) => `${l.t}:${l.m}`);
 }
 
 // ════ 0. El fixture es prod, y la cadena de migraciones ══════════════════════
@@ -393,10 +430,9 @@ const politicasProd = new Map<string, string>();
     `A no crea políticas, borra solo la del DELETE duro de mensajes y cambia (ALTER, no DROP+CREATE) solo la del DELETE de participantes (${borradas.length} borrada/s, ${alteradas.length} cambiada/s)`);
 
   // Los candados: todos al principio, en el orden del INSERT de un mensaje, y
-  // después ninguna sentencia pide uno más fuerte del que ya se tiene.
-  const FUERZA = ["accessshare", "rowshare", "rowexclusive", "shareupdateexclusive", "share", "sharerowexclusive", "exclusive", "accessexclusive"];
-  const fuerza = (m: string) => FUERZA.indexOf(m.toLowerCase().replace(/lock$/, "").replace(/\s+/g, ""));
-  const pedidos = [...sc.matchAll(/\block\s+table\s+public\.(\w+)\s+in\s+([a-z ]+?)\s+mode/gi)].map((m) => ({ t: m[1], f: fuerza(m[2]) }));
+  // después ninguna sentencia pide uno más fuerte del que ya se tiene. Cómo se
+  // portan cuando un candado está ocupado, en la sección 0b.
+  const pedidos = pedidosDe(sc);
   const tras = sc.slice(sc.indexOf("set lock_timeout = '3s';") + 1, sc.search(/\block\s+table\b/i));
   check(pedidos.length >= 5 && !/\b(create|alter|drop|insert|update|delete)\b/i.test(tras),
     `los ${pedidos.length} candados se piden antes de cualquier otra sentencia`);
@@ -405,19 +441,36 @@ const politicasProd = new Map<string, string>();
     `en el orden en que los toma un INSERT de mensaje: chat_messages → chat_conversations → chat_participants → profiles (${pedidos.map((p) => p.t).join(" → ")})`);
   check(/set_config\('lock_timeout',\s*'200ms',\s*true\)/.test(sc) && /exception\s+when\s+lock_not_available\s+or\s+deadlock_detected/i.test(sc),
     "cada candado espera como mucho 200 ms, y si no llega se sueltan todos y se reintenta");
+  const leidas = pedidos.filter((p) => SE_LEEN_SIEMPRE.includes(p.t));
+  check(leidas.length === 2 && leidas.every((p) => p.f <= DEJA_LEER),
+    `profiles y tenants se piden sin trabar sus lecturas, como mucho SHARE ROW EXCLUSIVE (${leidas.map((p) => `${p.t}:${FUERZA[p.f]}`).join(", ")})`);
   const dbL = new PGlite();
   await dbL.exec(FIXTURE);
   await dbL.exec(SEMILLA);
   await dbL.exec("begin;\n" + MIG_A);
-  const tenidos = await q(dbL, `select c.relname t, l.mode m from pg_locks l join pg_class c on c.oid = l.relation join pg_namespace n on n.oid = c.relnamespace
-    where l.locktype = 'relation' and n.nspname = 'public' and c.relkind = 'r' and c.relname in ${TABLAS}`);
+  const tenidos = await q(dbL, CANDADOS_TENIDOS);
   await dbL.exec("rollback");
-  const sinPedir = tenidos.filter((l) => {
-    const p = pedidos.find((x) => x.t === l.t);
-    return !p || fuerza(l.m) > p.f;
-  }).map((l) => `${l.t}:${l.m}`);
-  check(tenidos.length >= pedidos.length && sinPedir.length === 0,
-    `con la migración entera corrida, ninguna tabla del chat tiene un candado que no se haya pedido al principio (${tenidos.length} candados${sinPedir.length ? `; sin pedir: ${sinPedir.join(", ")}` : ""})`);
+  const deMas = candadosDeMas(tenidos, pedidos);
+  check(tenidos.length >= pedidos.length && deMas.length === 0,
+    `con la migración entera corrida, ninguna tabla del chat tiene un candado que no se haya pedido al principio, ni uno que trabe las lecturas de profiles o tenants (${tenidos.length} candados${deMas.length ? `; de más: ${deMas.join(", ")}` : ""})`);
+
+  // Lo mismo para la vuelta atrás, corrida sobre la migración ya aplicada: un
+  // DROP TRIGGER sobre profiles, por ejemplo, pide ACCESS EXCLUSIVE en medio de la
+  // vuelta atrás, fuera del reintento y con el chat entero tomado.
+  const pedidosV = pedidosDe(VUELTA);
+  const antesV = VUELTA.slice(VUELTA.indexOf("begin;") + "begin;".length, Math.max(0, VUELTA.search(/\block\s+table\b/i)));
+  check(pedidosV.length >= 4 && !/\b(create|alter|drop|insert|update|delete)\b/i.test(antesV),
+    `la vuelta atrás también pide sus ${pedidosV.length} candados antes de cualquier otra sentencia`);
+  const leidasV = pedidosV.filter((p) => SE_LEEN_SIEMPRE.includes(p.t));
+  check(leidasV.length >= 1 && leidasV.every((p) => p.f <= DEJA_LEER),
+    `la vuelta atrás tampoco traba las lecturas de profiles ni de tenants (${leidasV.map((p) => `${p.t}:${FUERZA[p.f]}`).join(", ")})`);
+  await dbL.exec("begin;\n" + MIG_A + "\ncommit;");
+  await dbL.exec(VUELTA.trim().replace(/commit;\s*$/, ""));
+  const tenidosV = await q(dbL, CANDADOS_TENIDOS);
+  await dbL.exec("rollback");
+  const deMasV = candadosDeMas(tenidosV, pedidosV);
+  check(tenidosV.length >= pedidosV.length && deMasV.length === 0,
+    `con la vuelta atrás entera corrida, ninguna tabla tiene un candado que no se haya pedido al principio, ni uno que trabe las lecturas de profiles o tenants (${tenidosV.length} candados${deMasV.length ? `; de más: ${deMasV.join(", ")}` : ""})`);
 
   // La cadena: las migraciones reales posteriores al fixture que tocan el Messenger.
   check(CADENA.length >= 1 && CADENA[0].n === NOMBRE_A,
@@ -443,6 +496,124 @@ const politicasProd = new Map<string, string>();
   await soloA.exec("drop trigger if exists chat_participants_agencia on public.chat_participants");
   const rotos = diferenciasDeHuella(hA, await huellaDeA(soloA));
   check(rotos.includes("trigger chat_participants_agencia"), `si una migración posterior saca un trigger de A, la huella lo marca (${rotos.join(", ")})`);
+}
+
+// ════ 0b. Los candados, con un candado ocupado ═══════════════════════════════
+// Lo que protege a prod al aplicar es el bloque de candados del principio. Con
+// una sola conexión (PGlite) nadie retiene un candado, así que se ensaya el
+// bloque TAL COMO ESTÁ en la migración (y en la vuelta atrás) con el fallo
+// inyectado justo donde lo daría un candado ocupado (lock_not_available antes del
+// `exit`), y un aviso delante de cada `lock table`. Tiene que pasar que:
+//   · cada candado se pide con lock_timeout = 200ms, no con los 3 s de la sesión
+//     (con 3 s, una tabla del chat queda trabada hasta 18 s por intento);
+//   · al fallar, el intento suelta TODO (es una subtransacción): mientras duerme
+//     no tiene ningún candado;
+//   · entre intento e intento pasa 1 s o más (si no, quedan pegados y el chat
+//     queda trabado casi todo el tiempo);
+//   · al 8.º fallo se rinde con chat_candados y no deja nada aplicado;
+//   · cuando lo logra, el resto corre con lock_timeout = 3s, y al terminar la
+//     sesión queda como estaba.
+const MIS_CANDADOS = `(select coalesce(string_agg(c.relname || ':' || replace(l.mode, 'Lock', ''), ',' order by c.relname), '(ninguno)')
+    from pg_locks l join pg_class c on c.oid = l.relation join pg_namespace n on n.oid = c.relnamespace
+   where l.locktype = 'relation' and n.nspname = 'public' and c.relkind = 'r' and c.relname in ${TABLAS})`;
+function conFallosInyectados(sql: string, fallos: number): string {
+  // El primer `lock table` que no está comentado (la cabecera trae la vuelta atrás).
+  const i = sql.search(/^[ \t]*lock\s+table\b/im);
+  const ini = sql.lastIndexOf("do $$", i), fin = sql.indexOf("end $$;", i);
+  if (i < 0 || ini < 0 || fin < 0) throw new Error("no encontré el bloque de candados");
+  const f = fin + "end $$;".length;
+  const b = sql.slice(ini, f)
+    .replace(/(\n\s*)(lock table public\.(\w+) in [a-z ]+ mode;)/gi,
+      (_m, sp, lock, t) => `${sp}raise notice 'candado|${t}|%', current_setting('lock_timeout');${sp}${lock}`)
+    .replace(/(\n\s*)exit;/, (_m, sp) => `${sp}if _intento <= ${fallos} then` +
+      `${sp}  raise notice 'fallo|%|%', _intento, extract(epoch from clock_timestamp());` +
+      `${sp}  raise exception using errcode = 'lock_not_available', message = 'candado ocupado (inyectado)';` +
+      `${sp}end if;${sp}exit;`)
+    .replace(/(exception\s+when\s+lock_not_available\s+or\s+deadlock_detected\s+then)/i,
+      (m) => `${m}\n      raise notice 'handler|%|%', _intento, ${MIS_CANDADOS};`);
+  if (!b.includes("'candado|") || !b.includes("'fallo|") || !b.includes("'handler|")) throw new Error("no pude inyectar el fallo en el bloque de candados");
+  return sql.slice(0, ini) + b + `\ndo $$ begin raise notice 'tras|%', current_setting('lock_timeout'); end $$;` + sql.slice(f);
+}
+async function ensayarCandados(db: PGlite, sql: string): Promise<{ avisos: string[]; error: string | null }> {
+  const avisos: string[] = [];
+  try {
+    // deno-lint-ignore no-explicit-any
+    await db.exec(sql, { onNotice: (n: any) => avisos.push(String(n.message)) } as any);
+    return { avisos, error: null };
+  } catch (e) {
+    await db.exec("rollback").catch(() => {});
+    return { avisos, error: msg(e) };
+  }
+}
+// Lee los avisos: los lock_timeout con que se pidió cada candado, lo que se tenía
+// en el handler, cuánto pasó entre intentos y el lock_timeout de después.
+function leerAvisos(avisos: string[]) {
+  const partes = (p: string) => avisos.filter((a) => a.startsWith(p + "|")).map((a) => a.split("|"));
+  const fallos = partes("fallo").map((x) => Number(x[2]));
+  return {
+    candados: partes("candado").map((x) => x[2]),
+    handler: partes("handler").map((x) => x[2]),
+    fallos: fallos.length,
+    separaciones: fallos.slice(1).map((t, k) => t - fallos[k]),
+    tras: partes("tras").map((x) => x[1]),
+  };
+}
+const seSeparan = (s: number[]) => s.every((x) => x >= 0.95);
+const QUE_QUEDO = `select
+    (select count(*)::int from pg_attribute where attrelid = 'public.chat_conversations'::regclass and attname = 'tenant_id') tenant_id,
+    (select count(*)::int from pg_class where relname = 'chat_conversaciones_creadas') altas,
+    (select count(*)::int from pg_trigger where tgname in ${enSql(TRIGGERS_A)} and tgenabled <> 'D') triggers,
+    current_setting('lock_timeout') lock_timeout`;
+{
+  const base = async () => { const d = new PGlite(); await d.exec(FIXTURE); await d.exec(SEMILLA); return d; };
+  const nCandados = pedidosDe(sinComentarios(MIG_A)).length;
+  // La migración: dos candados ocupados y al tercer intento entra.
+  try {
+    const db = await base();
+    const r = await ensayarCandados(db, "begin;\n" + conFallosInyectados(MIG_A, 2) + "\ncommit;");
+    const a = leerAvisos(r.avisos);
+    const quedo = await uno(db, QUE_QUEDO);
+    check(r.error === null && quedo?.tenant_id === 1 && quedo?.triggers === TRIGGERS_A.length,
+      `migración con 2 candados ocupados: se aplica al tercer intento${r.error ? ` — falló: ${r.error.slice(0, 100)}` : ""}`);
+    check(a.candados.length === 3 * nCandados && a.candados.every((t) => t === "200ms"),
+      `…cada uno de los ${a.candados.length} pedidos de candado espera con lock_timeout = 200ms (${[...new Set(a.candados)].join(", ")})`);
+    check(a.handler.length === 2 && a.handler.every((h) => h === "(ninguno)"),
+      `…el intento que falla suelta todos los candados antes de dormir (${a.handler.join(" / ")})`);
+    check(a.separaciones.length === 1 && seSeparan(a.separaciones),
+      `…entre intentos pasa 1 s o más (${a.separaciones.map((x) => x.toFixed(2)).join(", ")} s)`);
+    check(a.tras.length === 1 && a.tras[0] === "3s", `…con todo tomado, el resto corre con lock_timeout = 3s (${a.tras.join(", ")})`);
+    check(quedo?.lock_timeout === "0", `…y al terminar, el lock_timeout de la sesión queda como estaba (${quedo?.lock_timeout})`);
+  } catch (e) { mal.push(`ensayo de candados de la migración: ${msg(e).slice(0, 160)}`); }
+  // La migración: ocho candados ocupados y se rinde.
+  try {
+    const db = await base();
+    const r = await ensayarCandados(db, "begin;\n" + conFallosInyectados(MIG_A, 8) + "\ncommit;");
+    const a = leerAvisos(r.avisos);
+    const quedo = await uno(db, QUE_QUEDO);
+    check(/chat_candados/.test(r.error ?? "") && a.fallos === 8,
+      `migración con el candado ocupado 8 veces: se rinde con chat_candados → ${(r.error ?? "SE APLICÓ").slice(0, 90)}`);
+    check(a.handler.length === 8 && a.handler.every((h) => h === "(ninguno)") && a.separaciones.length === 7 && seSeparan(a.separaciones),
+      `…cada intento suelta todo, y entre uno y otro pasa 1 s o más (${a.handler.length} fallos sin ningún candado tomado; ${a.separaciones.map((x) => x.toFixed(2)).join(", ")} s)`);
+    check(quedo?.tenant_id === 0 && quedo?.altas === 0 && quedo?.triggers === 0 && quedo?.lock_timeout === "0",
+      `…y no queda nada aplicado (${JSON.stringify(quedo)})`);
+  } catch (e) { mal.push(`ensayo de candados de la migración (8 fallos): ${msg(e).slice(0, 160)}`); }
+  // La vuelta atrás, sobre la migración aplicada: el mismo bloque, las mismas reglas.
+  const nV = pedidosDe(VUELTA).length;
+  try {
+    const db = await base();
+    await db.exec("begin;\n" + MIG_A + "\ncommit;");
+    const r = await ensayarCandados(db, conFallosInyectados(VUELTA, 8));
+    const a = leerAvisos(r.avisos);
+    const quedo = await uno(db, QUE_QUEDO);
+    check(/chat_candados/.test(r.error ?? "") && a.fallos === 8 && a.handler.length === 8 && a.handler.every((h) => h === "(ninguno)")
+        && seSeparan(a.separaciones) && a.candados.length === 8 * nV && a.candados.every((t) => t === "200ms"),
+      `vuelta atrás con el candado ocupado 8 veces: pide cada candado con 200 ms, suelta todo, espera 1 s o más y se rinde con chat_candados (${(r.error ?? "SE CORRIÓ").slice(0, 60)}; ${a.fallos} fallos, ${a.handler.length} esperas sin candados, ${a.candados.length} pedidos con ${[...new Set(a.candados)].join(",")}; ${a.separaciones.map((x) => x.toFixed(1)).join(",")} s)`);
+    check(quedo?.tenant_id === 1 && quedo?.triggers === TRIGGERS_A.length, `…y la migración queda entera, sin nada deshecho a medias (${JSON.stringify(quedo)})`);
+    const r0 = await ensayarCandados(db, conFallosInyectados(VUELTA, 0));
+    const a0 = leerAvisos(r0.avisos);
+    check(r0.error === null && a0.tras.length === 1 && a0.tras[0] === "3s" && a0.candados.every((t) => t === "200ms"),
+      `vuelta atrás con los candados libres: corre, y con todo tomado sigue con lock_timeout = 3s${r0.error ? ` — falló: ${r0.error.slice(0, 90)}` : ` (${a0.tras.join(",")})`}`);
+  } catch (e) { mal.push(`ensayo de candados de la vuelta atrás: ${msg(e).slice(0, 160)}`); }
 }
 
 // ════ 1. A1: la agencia en cada conversación, sin tocar las filas ════════════
@@ -656,15 +827,29 @@ const politicasProd = new Map<string, string>();
   await hueco(prod, conA, "E · INSERT que cita un mensaje de OTRA conversación (donde Ana no está)", ANA,
     `insert into chat_messages(conversation_id, sender_id, content, reply_to_id) values ('${DM1}', '${ANA}', 'cito de G2', '${M_G2}')`,
     `select exists (select 1 from chat_messages where content = 'cito de G2') si`,
-    /chat_cita_ajena/);
+    /chat_cita_ajena/, "MV422");
   await hueco(prod, conA, "E · INSERT con una imagen de afuera (píxel espía)", ANA,
     `insert into chat_messages(conversation_id, sender_id, content, type, file_url, file_name) values ('${G1}', '${ANA}', null, 'image', 'https://rastreo.ejemplo.test/p.png', 'p.png')`,
     `select exists (select 1 from chat_messages where file_url = 'https://rastreo.ejemplo.test/p.png') si`,
-    /chat_archivo_externo/);
+    /chat_archivo_externo/, "MV422");
   await hueco(prod, conA, "E · INSERT con una URL que imita la de Maven (otro proyecto de Supabase)", ANA,
     `insert into chat_messages(conversation_id, sender_id, type, file_url, file_name) values ('${G1}', '${ANA}', 'image', 'https://otroproyecto.supabase.co/storage/v1/object/public/chat-files/p.png', 'p.png')`,
     `select exists (select 1 from chat_messages where file_url like 'https://otroproyecto%') si`,
     /chat_archivo_externo/);
+  // Los anclajes de la lista de orígenes: cada URL imita un origen permitido sin
+  // serlo. Sin el «^» de chat-files pasa la primera; sin el «^» de Giphy, la
+  // segunda; con 'giphy\.com' suelto, la tercera y la cuarta.
+  for (const url of [
+    `https://evil.test/p.png?u=${ARCHIVO_MAVEN}`,
+    "https://evil.test/media1.giphy.com/x.gif",
+    "https://giphy.com.evil.test/x.gif",
+    "https://media1.giphy.com.evil.test/x.gif",
+  ]) {
+    await hueco(prod, conA, `E · INSERT con un archivo que imita un origen permitido (${url.replace(ARCHIVO_MAVEN, "<ARCHIVO_MAVEN>")})`, ANA,
+      `insert into chat_messages(conversation_id, sender_id, type, file_url, file_name) values ('${G1}', '${ANA}', 'image', '${url}', 'x.gif')`,
+      `select exists (select 1 from chat_messages where file_url = '${url}') si`,
+      /chat_archivo_externo/, "MV422");
+  }
   await hueco(prod, conA, "E · INSERT de un mensaje «borrado» con el texto legible", ANA,
     `insert into chat_messages(conversation_id, sender_id, content, is_deleted, is_edited) values ('${G1}', '${ANA}', 'borrado pero se lee', true, true)`,
     `select exists (select 1 from chat_messages where content = 'borrado pero se lee' and (is_deleted or is_edited)) si`,
@@ -855,7 +1040,7 @@ const politicasProd = new Map<string, string>();
   const DM_ROTO = "c1000000-0000-4000-8000-000000000004";
   await anda(db, CARLA, `insert into chat_conversations(id, type, created_by) values ('${DM_ROTO}', 'direct', '${CARLA}')`, "carrera: la conversación");
   await anda(db, CARLA, `insert into chat_participants(conversation_id, user_id, role) values ('${DM_ROTO}', '${CARLA}', 'admin')`, "carrera: el creador");
-  await falla(db, CARLA, `insert into chat_participants(conversation_id, user_id, role) values ('${DM_ROTO}', '${BETO}', 'member')`, /directo_duplicado/, "carrera: el tercer paso falla (Carla y Beto ya tenían directo)");
+  await fallaCon(db, CARLA, `insert into chat_participants(conversation_id, user_id, role) values ('${DM_ROTO}', '${BETO}', 'member')`, /directo_duplicado/, "MV409", "carrera: el tercer paso falla (Carla y Beto ya tenían directo)");
   await anda(db, CARLA, `delete from chat_conversations where id = '${DM_ROTO}'`, "carrera: borra la conversación que creó");
   const roto = await uno(db, `select (select count(*)::int from chat_conversations where id = '${DM_ROTO}') c, (select count(*)::int from chat_participants where conversation_id = '${DM_ROTO}') p`);
   check(roto?.c === 0 && roto?.p === 0, `y no queda nada huérfano (${JSON.stringify(roto)})`);
@@ -968,7 +1153,7 @@ const politicasProd = new Map<string, string>();
   try { await dup(prod, JHON); ok.push("línea base: en prod Jhon abre un SEGUNDO directo con Ana"); }
   catch (e) { mal.push(`línea base: el directo duplicado falló en prod (${msg(e).slice(0, 90)}): el test no prueba nada`); }
   try { await dup(db, JHON); mal.push("un segundo directo Jhon–Ana entró (NO debía)"); }
-  catch (e) { check(/directo_duplicado/.test(msg(e)), `un segundo directo Jhon–Ana → ${msg(e).slice(0, 80)}`); }
+  catch (e) { check(/directo_duplicado/.test(msg(e)) && codigoDe(e) === "MV409", `un segundo directo Jhon–Ana → ${codigoDe(e)} ${msg(e).slice(0, 80)}`); }
   {
     // Con service_role (una edge con el cliente admin) tampoco.
     const DUPS = "c3000000-0000-4000-8000-000000000004";
@@ -978,12 +1163,12 @@ const politicasProd = new Map<string, string>();
     const efecto = `select (select count(*) from chat_participants where conversation_id = '${DUPS}') = 2 si`;
     const a = await probar(prod, pasos, efecto), b = await probar(db, pasos, efecto);
     check(a.ok && a.si === true, `línea base: en prod service_role arma un segundo directo Jhon–Ana${a.ok ? "" : ` — falló: ${a.error?.slice(0, 80)}`}`);
-    check(!b.ok && /directo_duplicado/.test(b.error ?? ""), `con service_role el duplicado también se rechaza → ${b.ok ? "PASÓ" : b.error?.slice(0, 80)}`);
+    check(!b.ok && /directo_duplicado/.test(b.error ?? "") && b.codigo === "MV409", `con service_role el duplicado también se rechaza → ${b.ok ? "PASÓ" : `${b.codigo} ${b.error?.slice(0, 80)}`}`);
   }
   const DUP2 = "c3000000-0000-4000-8000-000000000002";
   await anda(db, ANA, `insert into chat_conversations(id, type, created_by) values ('${DUP2}', 'direct', '${ANA}')`, "Ana abre un directo…");
   await anda(db, ANA, `insert into chat_participants(conversation_id, user_id, role) values ('${DUP2}', '${ANA}', 'admin')`, "…entra…");
-  await falla(db, ANA, `insert into chat_participants(conversation_id, user_id, role) values ('${DUP2}', '${JHON}', 'member')`, /directo_duplicado/, "…y el duplicado al revés (Ana → Jhon) también se rechaza");
+  await fallaCon(db, ANA, `insert into chat_participants(conversation_id, user_id, role) values ('${DUP2}', '${JHON}', 'member')`, /directo_duplicado/, "MV409", "…y el duplicado al revés (Ana → Jhon) también se rechaza");
   await falla(db, "service_role", `insert into chat_participants(conversation_id, user_id, role) values ('${DM1}', '${BETO}', 'member')`, /directo_lleno/, "un tercero en un directo, ni con service_role");
   // Dos de una vez en un directo con una sola persona: la primera fila entra, la
   // segunda ve a la primera (misma sentencia) y queda afuera. Todo vuelve atrás.
@@ -1042,7 +1227,11 @@ const politicasProd = new Map<string, string>();
   let hechos = 0;
   for (let i = 1; i <= 30; i++) { try { await grupo(db, JHON, i); hechos++; } catch { /* abajo */ } }
   check(hechos === 30, `Jhon crea 30 grupos en el día (${hechos})`);
-  await falla(db, JHON, `insert into chat_conversations(type, name, created_by) values ('group', 'g31', '${JHON}')`, /chat_tope_grupos/, "el grupo 31 se rechaza");
+  // MV429 con {limite, reintentar_en}: el PR 2 lo pasa a 429 con Retry-After.
+  const leerDetalle = (d: string | null): Fila => { try { return JSON.parse(d ?? ""); } catch { return {}; } };
+  const d31 = leerDetalle(await fallaCon(db, JHON, `insert into chat_conversations(type, name, created_by) values ('group', 'g31', '${JHON}')`, /chat_tope_grupos/, "MV429", "el grupo 31 se rechaza"));
+  check(d31.limite === "person_new_groups_day" && d31.reintentar_en > 86000 && d31.reintentar_en <= 86400,
+    `…y el detail dice qué tope y cuándo se libera un lugar: cuando la primera de las 30 altas cumpla 24 horas (${JSON.stringify(d31)})`);
   await falla(db, JHON, `insert into chat_conversations(type, name, created_by, created_at) values ('group', 'g31', '${JHON}', '2020-01-01')`, /chat_tope_grupos/, "…también con un created_at atrasado");
   await anda(db, JHON, `insert into chat_conversations(type, created_by) values ('direct', '${JHON}')`, "los grupos no cuentan para el tope de directos");
   await anda(db, ANA, `insert into chat_conversations(type, name, created_by) values ('group', 'de Ana', '${ANA}')`, "el tope es por persona: Ana crea el suyo");
@@ -1053,7 +1242,8 @@ const politicasProd = new Map<string, string>();
   // Las 24 horas son corridas: un alta de hace 23 horas cuenta, una de hace 25 no.
   // Nadie cambia created_at de una conversación (A3): el banco mueve las altas.
   await db.exec(`update chat_conversaciones_creadas set created_at = now() - interval '23 hours' where user_id = '${JHON}' and type = 'group'`);
-  await falla(db, JHON, `insert into chat_conversations(type, name, created_by) values ('group', 'a las 23 horas', '${JHON}')`, /chat_tope_grupos/, "30 grupos de hace 23 horas todavía cuentan");
+  const d23 = leerDetalle(await fallaCon(db, JHON, `insert into chat_conversations(type, name, created_by) values ('group', 'a las 23 horas', '${JHON}')`, /chat_tope_grupos/, "MV429", "30 grupos de hace 23 horas todavía cuentan"));
+  check(d23.reintentar_en > 3500 && d23.reintentar_en <= 3601, `…y se libera un lugar en una hora (reintentar_en ${d23.reintentar_en})`);
   await db.exec(`update chat_conversaciones_creadas set created_at = now() - interval '25 hours' where user_id = '${JHON}' and type = 'group'`);
   await anda(db, JHON, `insert into chat_conversations(type, name, created_by) values ('group', 'al otro día', '${JHON}')`, "pasadas 24 horas, Jhon vuelve a poder");
   // Línea base: en prod no hay tope.
@@ -1099,21 +1289,85 @@ const politicasProd = new Map<string, string>();
   }
   check(directos === 100 && (await uno(db3, `select count(*)::int n from chat_conversations where id::text like 'c6000000%'`))?.n === 0,
     `Jhon abre y borra 100 directos en el día (${directos}), y no queda ninguno`);
-  await falla(db3, JHON, `insert into chat_conversations(type, created_by) values ('direct', '${JHON}')`, /chat_tope_directos/, "el directo 101 se rechaza");
+  const d101 = await fallaCon(db3, JHON, `insert into chat_conversations(type, created_by) values ('direct', '${JHON}')`, /chat_tope_directos/, "MV429", "el directo 101 se rechaza");
+  let d101j: Fila = {};
+  try { d101j = JSON.parse(d101 ?? ""); } catch { /* abajo */ }
+  check(d101j.limite === "person_new_directs_day" && d101j.reintentar_en > 0 && d101j.reintentar_en <= 86400,
+    `…con su propio límite en el detail (${JSON.stringify(d101j)})`);
   const prod3 = await nueva("prod");
   let baseD = 0;
   for (let i = 1; i <= 101; i++) { try { await como(prod3, JHON, `insert into chat_conversations(type, created_by) values ('direct', '${JHON}')`); baseD++; } catch { /* nada */ } }
   check(baseD === 101, `línea base: en prod el directo 101 entra (${baseD})`);
-  // Lo que ya se creó en las últimas 24 horas cuenta desde que se aplica la migración.
-  const HOY = Array.from({ length: 30 }, (_, i) => `('c7000000-0000-4000-8000-${String(i + 1).padStart(12, "0")}', 'group', 'hoy${i}', '${BETO}', now() - interval '2 hours')`).join(",\n");
+  // Lo que ya se creó en las últimas 24 horas cuenta desde que se aplica la migración
+  // (30 grupos de hace 20 horas); lo de hace 25 horas, no.
+  const HOY = Array.from({ length: 30 }, (_, i) => `('c7000000-0000-4000-8000-${String(i + 1).padStart(12, "0")}', 'group', 'hoy${i}', '${BETO}', now() - interval '20 hours')`)
+    .concat([`('c7000000-0000-4000-8000-000000000099', 'group', 'ayer', '${BETO}', now() - interval '25 hours')`]).join(",\n");
   const db4 = await nueva("A", `insert into public.chat_conversations(id, type, name, created_by, created_at) values ${HOY};`);
-  check((await uno(db4, `select count(*)::int n from chat_conversaciones_creadas where user_id = '${BETO}'`))?.n === 30, "la migración siembra las altas de las últimas 24 horas");
+  check((await uno(db4, `select count(*)::int n from chat_conversaciones_creadas where user_id = '${BETO}'`))?.n === 30, "la migración siembra las altas de las últimas 24 horas (30 de hace 20 horas, no la de hace 25)");
   await falla(db4, BETO, `insert into chat_conversations(type, name, created_by) values ('group', 'el 31', '${BETO}')`, /chat_tope_grupos/, "y Beto, con 30 grupos de hoy de antes de la migración, ya no crea el 31");
 }
 
 // ════ 8. La vuelta atrás que documenta la migración ══════════════════════════
+// Lo que la vuelta atrás deja distinto de prod. Es la lista «Quedan» de la
+// cabecera de la migración, objeto por objeto: si la vuelta atrás deja algo más
+// (o devuelve algo de esto), el banco falla y hay que actualizar las dos.
+const QUEDAN_TRAS_LA_VUELTA = [
+  "CAMBIA función public.delete_chat_message(p_message_id uuid)",
+  "CAMBIA función public.get_unread_counts(_user_id uuid)",
+  "FALTA política chat_messages.Users can delete their own messages",
+  "SOBRA columna chat_conversaciones_creadas.created_at",
+  "SOBRA columna chat_conversaciones_creadas.id",
+  "SOBRA columna chat_conversaciones_creadas.type",
+  "SOBRA columna chat_conversaciones_creadas.user_id",
+  "SOBRA columna chat_conversations.tenant_id",
+  "SOBRA columna chat_message_deletions.content_rich",
+  "SOBRA constraint chat_conversaciones_creadas.chat_conversaciones_creadas_pkey",
+  "SOBRA constraint chat_conversations.chat_conversations_tenant_id_fkey",
+  "SOBRA función public.chat_conversations_agencia()",
+  "SOBRA función public.chat_directo_con(_otro uuid)",
+  "SOBRA función public.chat_llave_de_par(_a uuid, _b uuid)",
+  "SOBRA función public.chat_messages_al_insertar()",
+  "SOBRA función public.chat_participants_agencia()",
+  "SOBRA función public.profiles_nombre_lo_cambia_un_admin()",
+  "SOBRA relación chat_conversaciones_creadas",
+  "SOBRA relación chat_conversaciones_creadas_id_seq",
+  "SOBRA trigger profiles.profiles_nombre_lo_cambia_un_admin",
+  "SOBRA índice chat_conversaciones_creadas_persona",
+  "SOBRA índice chat_conversaciones_creadas_pkey",
+];
+// Una foto del catálogo (public y las funciones de auth), objeto por objeto.
+const FOTO_SQL = `
+select 'función ' || n.nspname || '.' || p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')' k,
+       md5(p.prosrc) || ' secdef=' || p.prosecdef::text || ' vol=' || p.provolatile::text || ' cfg=' || coalesce(p.proconfig::text, '-') || ' acl=' || coalesce(p.proacl::text, '-') v
+  from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname in ('public', 'auth')
+union all
+select 'trigger ' || c.relname || '.' || t.tgname, pg_get_triggerdef(t.oid) || ' ' || t.tgenabled::text
+  from pg_trigger t join pg_class c on c.oid = t.tgrelid join pg_namespace n on n.oid = c.relnamespace
+ where not t.tgisinternal and n.nspname in ('public', 'auth')
+union all
+select 'política ' || tablename || '.' || policyname, permissive || '|' || roles::text || '|' || cmd || '|' || coalesce(qual, '') || '|' || coalesce(with_check, '')
+  from pg_policies where schemaname = 'public'
+union all
+select 'columna ' || c.relname || '.' || a.attname, format_type(a.atttypid, a.atttypmod) || case when a.attnotnull then ' nn' else '' end || coalesce(' default ' || pg_get_expr(d.adbin, d.adrelid), '')
+  from pg_attribute a join pg_class c on c.oid = a.attrelid join pg_namespace n on n.oid = c.relnamespace
+  left join pg_attrdef d on d.adrelid = a.attrelid and d.adnum = a.attnum
+ where n.nspname = 'public' and c.relkind in ('r', 'v') and a.attnum > 0 and not a.attisdropped
+union all
+select 'constraint ' || c.relname || '.' || k.conname, pg_get_constraintdef(k.oid)
+  from pg_constraint k join pg_class c on c.oid = k.conrelid join pg_namespace n on n.oid = c.relnamespace where n.nspname = 'public'
+union all
+select 'índice ' || i.relname, pg_get_indexdef(i.oid)
+  from pg_class i join pg_namespace n on n.oid = i.relnamespace where n.nspname = 'public' and i.relkind = 'i'
+union all
+select 'relación ' || c.relname, c.relkind::text || ' rls=' || c.relrowsecurity::text || ' acl=' || coalesce(c.relacl::text, '-')
+  from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname = 'public' and c.relkind in ('r', 'v', 'S')
+union all
+select 'realtime ' || tablename, pubname from pg_publication_tables where schemaname = 'public'`;
+const foto = async (db: PGlite) => new Map((await q(db, FOTO_SQL)).map((r) => [r.k as string, r.v as string]));
+const diferencias = (a: Map<string, string>, b: Map<string, string>) =>
+  [...new Set([...a.keys(), ...b.keys()])].filter((k) => a.get(k) !== b.get(k))
+    .map((k) => `${a.has(k) ? (b.has(k) ? "CAMBIA" : "FALTA") : "SOBRA"} ${k}`).sort();
 {
-  const VUELTA = MIG_A.split("\n").filter((l) => l.startsWith("--|")).map((l) => l.replace(/^--\| ?/, "")).join("\n");
   check(/^begin;/.test(VUELTA.trim()) && /commit;$/.test(VUELTA.trim()), `la vuelta atrás está en la migración, entera y en una transacción (${VUELTA.split("\n").length} líneas)`);
   const conDefault = /alter column tenant_id set default/.test(VUELTA);
   const posDefault = VUELTA.indexOf("alter column tenant_id set default"), posDrop = VUELTA.indexOf("drop trigger if exists chat_conversations_agencia");
@@ -1133,8 +1387,9 @@ const politicasProd = new Map<string, string>();
   const db = await nueva("A");
   try { await db.exec(VUELTA); ok.push("la vuelta atrás corre sobre la base con la migración"); }
   catch (e) { await db.exec("rollback").catch(() => {}); mal.push(`la vuelta atrás falló: ${msg(e).slice(0, 160)}`); }
-  const quedan = await q(db, `select tgname from pg_trigger where not tgisinternal and tgname in ${enSql(TRIGGERS_A)}`);
-  check(quedan.length === 0, `se fueron los ${TRIGGERS_A.length} triggers nuevos (${quedan.map((t) => t.tgname).join(", ")})`);
+  const quedan = await q(db, `select tgname, tgenabled::text e from pg_trigger where not tgisinternal and tgname in ${enSql(TRIGGERS_A)} order by 1`);
+  check(quedan.length === 1 && quedan[0].tgname === "profiles_nombre_lo_cambia_un_admin" && quedan[0].e === "D",
+    `se fueron los ${TRIGGERS_A.length - 1} triggers nuevos del chat y el de perfiles quedó apagado (${quedan.map((t) => `${t.tgname}:${t.e}`).join(", ")})`);
   const guarda = (await q(db, PRODSRC_SQL)).find((f) => f.k === "public.guard_chat_message_update")?.h;
   check(guarda === funcionesProd.get("public.guard_chat_message_update"), "guard_chat_message_update volvió byte a byte a la de prod");
   const polPart = (await q(db, POLITICAS_SQL)).find((f) => f.k === "chat_participants")?.h;
@@ -1155,6 +1410,33 @@ const politicasProd = new Map<string, string>();
   const vb = await anda(db, ANA, `select public.delete_chat_message('${VM}') r`, "vuelta atrás: borrarlo por la RPC");
   check(vb?.[0]?.r?.ok === true, `vuelta atrás: la RPC de borrar sigue andando (${JSON.stringify(vb?.[0]?.r)})`);
   await anda(db, ANA, `update profiles set status = 'busy' where id = '${ANA}'`, "vuelta atrás: el perfil se sigue actualizando");
+  // El trigger de perfiles, apagado, ya no frena nada: como en prod.
+  await anda(db, ANA, `update profiles set full_name = 'Ana R.' where id = '${ANA}'`, "vuelta atrás: el nombre se vuelve a cambiar desde la app, como en prod (el trigger quedó apagado)");
+  // Se puede correr dos veces (por si la primera se cortó después del commit).
+  try { await db.exec(VUELTA); ok.push("la vuelta atrás se puede correr dos veces"); }
+  catch (e) { await db.exec("rollback").catch(() => {}); mal.push(`la vuelta atrás no se puede correr dos veces: ${msg(e).slice(0, 120)}`); }
+}
+{
+  // Lo que queda distinto de prod es EXACTAMENTE lo que dice la cabecera. Sobre
+  // prod + A sola (la cadena podría sumar cambios de otras migraciones).
+  const prod = new PGlite();
+  await prod.exec(FIXTURE);
+  await prod.exec(SEMILLA);
+  const conVuelta = new PGlite();
+  await conVuelta.exec(FIXTURE);
+  await conVuelta.exec(SEMILLA);
+  await aplicar(conVuelta, NOMBRE_A, MIG_A);
+  await conVuelta.exec(VUELTA);
+  const quedan = diferencias(await foto(prod), await foto(conVuelta));
+  const faltan = QUEDAN_TRAS_LA_VUELTA.filter((x) => !quedan.includes(x)), sobran = quedan.filter((x) => !QUEDAN_TRAS_LA_VUELTA.includes(x));
+  check(faltan.length === 0 && sobran.length === 0,
+    `después de la vuelta atrás, lo que queda distinto de prod son los ${QUEDAN_TRAS_LA_VUELTA.length} objetos anotados (${quedan.length}${sobran.length ? `; sin anotar: ${sobran.join(" · ")}` : ""}${faltan.length ? `; anotados que ya no quedan: ${faltan.join(" · ")}` : ""})`);
+  // Por eso, después de una vuelta atrás, se arregla con una migración NUEVA.
+  try { await conVuelta.exec("begin;\n" + MIG_A + "\ncommit;"); mal.push("la migración se volvió a aplicar después de la vuelta atrás (la cabecera dice que no)"); }
+  catch (e) {
+    await conVuelta.exec("rollback").catch(() => {});
+    check(/already exists/.test(msg(e)), `después de la vuelta atrás, la misma migración no vuelve a correr → ${msg(e).slice(0, 90)}`);
+  }
 }
 
 console.log(ok.map((m) => "✓ " + m).join("\n"));
