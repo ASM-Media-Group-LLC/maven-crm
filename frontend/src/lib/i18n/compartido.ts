@@ -240,7 +240,7 @@ export const compartido = {
   },
 
   // ─── Componentes compartidos de components/ (i18n ola 3) ───────────────────
-  // Lo que se guarda en la base NO pasa por acá: los títulos de conversación de
+  // Lo que se guarda en la base NO pasa por aquí: los títulos de conversación de
   // Clari ("Clari · soporte"), el texto de una notificación o de un anuncio, el
   // mensaje de rechazo que manda el servidor al abrir un chat. Eso es dato.
 
@@ -263,11 +263,11 @@ export const compartido = {
   // en la base, pero SÍ le llega al modelo como turno del asistente: viaja
   // siempre en español por el campo `content` (el "en" es solo de pantalla).
   "shared.clari.welcomeHelp": {
-    es: "¡Hola! 👋 Soy Clari. Te ayudo a navegar Maven — preguntame cómo hacer cualquier cosa en la app.",
+    es: "¡Hola! 👋 Soy Clari. Te ayudo a navegar Maven — pregúntame cómo hacer cualquier cosa en la app.",
     en: "Hi! 👋 I'm Clari. I'll help you find your way around Maven — ask me how to do anything in the app.",
   },
   "shared.clari.welcomeSales": {
-    es: "¡Hola! 👋 Soy tu asistente de ventas. Pedime rankings, comparativas o tendencias de tus creadoras. Ej: *¿quién factura más esta semana?*",
+    es: "¡Hola! 👋 Soy tu asistente de ventas. Pídeme rankings, comparativas o tendencias de tus creadoras. Ej: *¿quién factura más esta semana?*",
     en: "Hi! 👋 I'm your sales assistant. Ask me for rankings, comparisons or trends for your creators. E.g.: *who's earning the most this week?*",
   },
   "shared.clari.connectError": { es: "Error al conectar con la IA", en: "Couldn't connect to the AI" },
@@ -284,7 +284,7 @@ export const compartido = {
   "shared.clari.minimize": { es: "Minimizar Clari AI", en: "Minimize Clari AI" },
   "shared.clari.online": { es: "En línea", en: "Online" },
   "shared.clari.modeHelp": { es: "Soporte", en: "Support" },
-  "shared.clari.modeCrm": { es: "Preguntale al CRM", en: "Ask the CRM" },
+  "shared.clari.modeCrm": { es: "Pregúntale al CRM", en: "Ask the CRM" },
 
   // Aviso de mudanza de dominio (components/AvisoMudanzaDominio.tsx). Lo que va
   // entre ** sale resaltado.

@@ -10,7 +10,7 @@
 //
 // Lo que es DATO viene de fixtures en inglés o neutros a propósito: el título y
 // el mensaje de una notificación los escribe un trigger en español y se muestran
-// tal cual; acá se mide la interfaz alrededor, no el contenido.
+// tal cual; aquí se mide la interfaz alrededor, no el contenido.
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within, act } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -141,7 +141,7 @@ vi.mock("@/pages/cowork/usePipWindow", () => ({
 }));
 vi.mock("@/hooks/useCoworkRequestAlerts", () => ({ useCoworkRequestAlerts: () => {} }));
 
-// El aviso de mudanza solo sale en el dominio viejo: acá "estamos" ahí.
+// El aviso de mudanza solo sale en el dominio viejo: aquí "estamos" ahí.
 vi.mock("@/lib/dominioCanonico", () => ({ esDominioHistorico: () => true }));
 
 import ClariAiFab from "@/components/ClariAiFab";
@@ -613,6 +613,19 @@ describe("en español no cambia nada", () => {
     expect(screen.getByText("Maven cambió de dirección")).toBeTruthy();
     expect(screen.getByText("pedirá tu contraseña otra vez")).toBeTruthy();
     expect(getTranslation("shared.clari.welcomeHelp", "es")).toContain("¡Hola!");
+  });
+
+  it("Clari habla en tú neutro (el saludo también le llega al modelo)", async () => {
+    localStorage.setItem("app-language", "es");
+    // «preguntame» y «Preguntale» no están en la lista de test/i18n/sinVoseo.
+    expect(getTranslation("shared.clari.welcomeHelp", "es")).toContain("pregúntame cómo hacer");
+    expect(getTranslation("shared.clari.welcomeSales", "es")).toContain("Pídeme rankings");
+    const { unmount } = montar(<ClariAiChat conversationId="conv-1" endpoint="ai-sales-chat" />);
+    expect(await screen.findByText(/Pídeme rankings/)).toBeTruthy();
+    unmount();
+    montar(<ClariAiFab anclarPanel={() => ({})} />);
+    fireEvent.click(screen.getByRole("button", { name: "Abrir Clari AI" }));
+    expect(await screen.findByText("Pregúntale al CRM")).toBeTruthy();
   });
 
   it("desde una ruta sin sección la bandeja sigue diciendo «Volver a atrás», como en main", async () => {
