@@ -191,12 +191,21 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     const conSala = l.connectionState === ConnectionState.Connected
       || l.connectionState === ConnectionState.Reconnecting
       || l.connectionState === ConnectionState.SignalReconnecting;
+    // ⚠️ Se decide con el estado REAL del micrófono, el mismo que mira toggleMic,
+    // y no con `isMicOn`: si otro la había silenciado, `isMicOn` decía
+    // "prendido", la pausa llamaba a toggleMic para apagarlo y toggleMic —que sí
+    // sabe que está apagado— lo PRENDÍA durante toda la pausa.
+    const micReal = (): boolean => {
+      const lp = l.getRoom()?.localParticipant;
+      return typeof lp?.isMicrophoneEnabled === "boolean" ? lp.isMicrophoneEnabled : l.isMicOn;
+    };
     if (orden === "apagar") {
       if (!conSala) { antesDePausaRef.current = null; setPantallaPendiente(null); return; }
-      antesDePausaRef.current = { mic: l.isMicOn, cam: l.isCamOn, pantalla: l.isScreenSharing };
+      const mic = micReal();
+      antesDePausaRef.current = { mic, cam: l.isCamOn, pantalla: l.isScreenSharing };
       if (l.isScreenSharing) void l.toggleScreenShare();
       if (l.isCamOn) void l.toggleCam();
-      if (l.isMicOn) void l.toggleMic();
+      if (mic) void l.toggleMic();
       setPantallaPendiente(null);
       return;
     }
@@ -204,7 +213,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     antesDePausaRef.current = null;
     if (!antes || !conSala) return;
     if (antes.cam && !l.isCamOn) void l.toggleCam();
-    if (antes.mic && !l.isMicOn) void l.toggleMic();
+    if (antes.mic && !micReal()) void l.toggleMic();
     if (antes.pantalla && !l.isScreenSharing) setPantallaPendiente("pausa");
   }), []);
   useEffect(() => { if (lk.isScreenSharing) setPantallaPendiente(null); }, [lk.isScreenSharing]);

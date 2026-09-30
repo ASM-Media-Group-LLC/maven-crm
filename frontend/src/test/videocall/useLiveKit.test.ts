@@ -193,3 +193,42 @@ describe("LKChatMessage type", () => {
     expect(msg.content).toBe("Hello");
   });
 });
+
+describe("⚠️ isMicOn se entera cuando OTRO silencia el micrófono", () => {
+  it("un TrackMuted del micrófono propio baja isMicOn (y el Unmuted lo sube)", async () => {
+    const { Room } = await import("livekit-client");
+    const oyentes: Record<string, Array<(...a: unknown[]) => void>> = {};
+    const lp: Record<string, unknown> = {
+      identity: "user-1", name: "Test User", sid: "sid-local", isSpeaking: false,
+      isMicrophoneEnabled: true, isCameraEnabled: false,
+      audioTrackPublications: new Map(), videoTrackPublications: new Map(), trackPublications: new Map(),
+      connectionQuality: 3, permissions: { canPublish: true, canSubscribe: true }, metadata: "{}",
+      setMicrophoneEnabled: vi.fn().mockResolvedValue(undefined),
+      setCameraEnabled: vi.fn().mockResolvedValue(undefined),
+      setScreenShareEnabled: vi.fn().mockResolvedValue(undefined),
+      publishData: vi.fn(),
+      getTrackPublication: vi.fn().mockReturnValue(undefined),
+    };
+    const sala = {
+      connect: vi.fn().mockResolvedValue(undefined), disconnect: vi.fn(),
+      on: vi.fn((ev: string, cb: (...a: unknown[]) => void) => { (oyentes[ev] ??= []).push(cb); return sala; }),
+      once: vi.fn().mockReturnThis(), off: vi.fn().mockReturnThis(),
+      localParticipant: lp, remoteParticipants: new Map(), startAudio: vi.fn().mockResolvedValue(undefined),
+      canPlaybackAudio: true, name: "sala-1",
+    };
+    // `function` y no flecha: connect() hace `new Room(...)`.
+    (Room as unknown as ReturnType<typeof vi.fn>).mockImplementationOnce(function () { return sala; });
+    const { result } = renderHook(() => useLiveKit());
+    await act(async () => {
+      await result.current.connect("sala-1", "Test User", false, { initialMicOn: true, initialCamOn: false }).catch(() => {});
+    });
+    expect(oyentes["trackMuted"]?.length ?? 0).toBeGreaterThan(0); // que PUEDA fallar
+    // La supervisora lo silencia desde el tablero.
+    lp.isMicrophoneEnabled = false;
+    await act(async () => { for (const cb of oyentes["trackMuted"]) cb({ source: "microphone" }, { isLocal: true }); });
+    expect(result.current.isMicOn).toBe(false);
+    lp.isMicrophoneEnabled = true;
+    await act(async () => { for (const cb of oyentes["trackUnmuted"] ?? []) cb({ source: "microphone" }, { isLocal: true }); });
+    expect(result.current.isMicOn).toBe(true);
+  });
+});
