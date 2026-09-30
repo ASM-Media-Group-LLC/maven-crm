@@ -25,7 +25,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { TranslationKey } from "@/lib/i18n";
 import { ConFormato } from "@/pages/admin/ConFormato";
-import { etiquetaHrO } from "./etiquetasHr";
+import { etiquetaHrO, valorGuardado } from "./etiquetasHr";
 
 /* ── KPI Cards ── usan StatChip del reskin */
 const kpiCards: { label: TranslationKey; subtitle: TranslationKey; icon: typeof UserCheck; key: "active" | "remote" | "hybrid" | "onsite"; color: string }[] = [
@@ -250,7 +250,7 @@ function ChangeStatusModal({ employee, open, onClose }: { employee: any; open: b
 /* ── Main Page ── */
 export default function EmployeeDirectory() {
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { data: employees = [], isLoading } = useEmployees();
   const { data: departments = [] } = useDepartments();
   const deleteEmployee = useDeleteEmployee();
@@ -423,7 +423,8 @@ export default function EmployeeDirectory() {
           return list.slice(0, 100).map((e: any): KpiRow => ({
             primary: `${e.first_name ?? ""} ${e.last_name ?? ""}`.trim() || e.full_name || t("hrg.noName"),
             secondary: e.position ?? e.department_name ?? undefined,
-            right: etiquetaHrO(t, "modality", e.work_modality),
+            // En español, la modalidad tal cual (así estaba); en inglés, con su etiqueta.
+            right: valorGuardado(t, language, "modality", e.work_modality) ?? "—",
           }));
         })()}
       />

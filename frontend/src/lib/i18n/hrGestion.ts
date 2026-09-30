@@ -10,7 +10,11 @@
 // (estado, tipo de contrato, modalidad…). El valor no se traduce nunca; lo que
 // se traduce es cómo se ve. El español de cada una es EXACTAMENTE el `label` de
 // lib/hrConstants.ts, para que en español no cambie nada. Las lee
-// pages/hr/etiquetasHr.ts.
+// pages/hr/etiquetasHr.ts. Donde una pantalla mostraba el valor crudo ("fijo",
+// "ahorros", "pending"…), en español se sigue viendo crudo y la etiqueta se usa
+// solo en inglés (valorGuardado, en ese mismo archivo). Las que no tienen lista
+// en hrConstants (estado de comisión y de nómina) tienen como español el valor
+// tal cual.
 //
 // En los textos largos, lo que va entre **dobles asteriscos** se dibuja en
 // negrita (ver pages/admin/ConFormato.tsx).
@@ -138,6 +142,16 @@ export const hrGestion = {
   "hrg.opt.commissionStatus.pendiente": { es: "pendiente", en: "pending" },
   "hrg.opt.commissionStatus.pagado": { es: "pagado", en: "paid" },
   "hrg.opt.commissionStatus.aprobado": { es: "aprobado", en: "approved" },
+  // commissions.status: 'proyectado' es el default de la tabla; finanzas lo
+  // pasa además a 'confirmado'. La ficha los muestra tal cual en español.
+  "hrg.opt.commissionStatus.proyectado": { es: "proyectado", en: "projected" },
+  "hrg.opt.commissionStatus.confirmado": { es: "confirmado", en: "confirmed" },
+  // payroll_periods.status (default 'borrador'; finanzas/nomina lo pasa a
+  // 'calculado', 'cerrado' y 'pagado'). La ficha los muestra tal cual en español.
+  "hrg.opt.payrollStatus.borrador": { es: "borrador", en: "draft" },
+  "hrg.opt.payrollStatus.calculado": { es: "calculado", en: "calculated" },
+  "hrg.opt.payrollStatus.cerrado": { es: "cerrado", en: "closed" },
+  "hrg.opt.payrollStatus.pagado": { es: "pagado", en: "paid" },
 
   "hrg.opt.gender.masculino": { es: "Masculino", en: "Male" },
   "hrg.opt.gender.femenino": { es: "Femenino", en: "Female" },
@@ -178,6 +192,11 @@ export const hrGestion = {
   "hrg.starting": { es: "Iniciando...", en: "Starting..." },
   "hrg.noName": { es: "Sin nombre", en: "No name" },
   "hrg.noEmail": { es: "Sin email", en: "No email" },
+  // Mismo significado que common.email / common.fullName / common.startDate,
+  // pero estas pantallas lo escribían así y en español no tiene que cambiar.
+  "hrg.email": { es: "Email", en: "Email" },
+  "hrg.fullName": { es: "Nombre Completo", en: "Full name" },
+  "hrg.startDateOf": { es: "Fecha de Inicio", en: "Start date" },
   "hrg.saveChanges": { es: "Guardar Cambios", en: "Save changes" },
   "hrg.clearFilters": { es: "Limpiar filtros", en: "Clear filters" },
   "hrg.clear": { es: "Limpiar", en: "Clear" },
@@ -257,9 +276,6 @@ export const hrGestion = {
   "hrg.ann.visibility.global": { es: "Global — Visible para todos", en: "Global — Visible to everyone" },
   "hrg.ann.visibility.segmented": { es: "Segmentado — Por rol, departamento o equipo", en: "Segmented — By role, department or team" },
   "hrg.ann.visibility.personal": { es: "Personal — Usuarios específicos", en: "Personal — Specific users" },
-  "hrg.ann.visibility.globalShort": { es: "global", en: "global" },
-  "hrg.ann.visibility.segmentedShort": { es: "segmentado", en: "segmented" },
-  "hrg.ann.visibility.personalShort": { es: "personal", en: "personal" },
   "hrg.ann.recipients": { es: "Destinatarios", en: "Recipients" },
   "hrg.ann.targetType": { es: "Tipo de destino", en: "Recipient type" },
   "hrg.ann.target.all": { es: "Todos", en: "All" },
@@ -270,6 +286,7 @@ export const hrGestion = {
   "hrg.ann.addRecipient": { es: "Agregar destinatario", en: "Add recipient" },
   "hrg.ann.removeRecipient": { es: "Quitar destinatario", en: "Remove recipient" },
   "hrg.ann.searchPlaceholder": { es: "Buscar anuncios...", en: "Search announcements..." },
+  "hrg.ann.startDatePlaceholder": { es: "Fecha inicio", en: "Start date" },
   "hrg.ann.deleteTitle": { es: "¿Eliminar anuncio?", en: "Delete announcement?" },
   "hrg.ann.deleteBody": {
     es: "Esta acción no se puede deshacer. El anuncio será eliminado permanentemente.",
@@ -333,7 +350,7 @@ export const hrGestion = {
   "hrg.pay.kpi.peopleHint": { es: "En el roster", en: "On the roster" },
   "hrg.pay.editorTitle": { es: "Salario base mensual por rol (COP)", en: "Monthly base salary by role (COP)" },
   "hrg.pay.editorHelp": {
-    es: "Define el salario base por rol. **Chatters** usan el costo modelado (base + comisión) de Hubstaff/BLU, así que su base acá es referencial. El costo de los demás roles = base ÷ tasa de cambio.",
+    es: "Define el salario base por rol. **Chatters** usan el costo modelado (base + comisión) de Hubstaff/BLU, así que su base aquí es referencial. El costo de los demás roles = base ÷ tasa de cambio.",
     en: "Set the base salary for each role. **Chatters** use the modeled cost (base + commission) from Hubstaff/BLU, so their base here is only a reference. For every other role, cost = base ÷ exchange rate.",
   },
   "hrg.pay.col.person": { es: "Persona", en: "Person" },
@@ -347,7 +364,9 @@ export const hrGestion = {
   },
 
   // ── Performance operativo (HrPerformanceOperativo.tsx) ──
-  "hrg.op.neverSynced": { es: "sin sincronizar", en: "never" },
+  // Cuando nunca se sincronizó. El español es el de siempre, entero ("Sincronizado"
+  // + "sin sincronizar"); en inglés va solo, sin "Synced" delante.
+  "hrg.op.notSynced": { es: "Sincronizado sin sincronizar", en: "Not synced yet" },
   "hrg.op.justNow": { es: "recién", en: "just now" },
   "hrg.op.minAgo": { es: "hace {n} min", en: "{n} min ago" },
   "hrg.op.hoursAgo": { es: "hace {n}h", en: "{n}h ago" },
@@ -560,6 +579,8 @@ export const hrGestion = {
   "hrg.onb.newSubtitle": { es: "Configura el proceso de integración para un nuevo empleado", en: "Set up the onboarding process for a new employee" },
   "hrg.onb.noEmployees": { es: "No hay empleados disponibles sin onboarding activo.", en: "No employees available without an active onboarding." },
   "hrg.onb.buddy": { es: "Buddy / Mentor", en: "Buddy / mentor" },
+  // El detalle lo escribía sin espacios; el alta, con espacios.
+  "hrg.onb.buddyDetail": { es: "Buddy/Mentor", en: "Buddy / mentor" },
   "hrg.onb.assignBuddy": { es: "Asignar buddy...", en: "Assign buddy..." },
   "hrg.onb.initialNotes": { es: "Notas Iniciales", en: "Initial notes" },
   "hrg.onb.notesPlaceholder": { es: "Observaciones para el proceso de onboarding...", en: "Notes for the onboarding process..." },
@@ -783,6 +804,7 @@ export const hrGestion = {
   "hrg.perf.completedPl": { es: "Completadas", en: "Completed" },
   "hrg.perf.kpi.avg": { es: "Calif. Promedio", en: "Avg. rating" },
   "hrg.perf.kpi.avgFull": { es: "Calificación Promedio", en: "Average rating" },
+  "hrg.perf.kpi.avgHint": { es: "Score general", en: "Overall score" },
   "hrg.perf.kpi.total": { es: "Total Evaluaciones", en: "Total evaluations" },
   "hrg.perf.kpi.totalHint": { es: "Total registradas", en: "Total recorded" },
   "hrg.perf.kpi.withGoals": { es: "Con Objetivos", en: "With goals" },
@@ -834,6 +856,7 @@ export const hrGestion = {
   "hrg.sch.subtitle": { es: "Gestión de turnos, horas extra y banco de horas", en: "Manage shifts, overtime and the hour bank" },
   "hrg.sch.kpi.week": { es: "Turnos Esta Semana", en: "Shifts this week" },
   "hrg.sch.kpi.today": { es: "Turnos Hoy", en: "Shifts today" },
+  "hrg.sch.kpi.overtime": { es: "Horas Extra", en: "Overtime" },
   "hrg.sch.overtimeCard": { es: "Registrar y gestionar horas extras", en: "Record and manage overtime" },
   "hrg.sch.hourBankCard": { es: "Gestionar acumulación y uso de horas", en: "Manage accrued and used hours" },
   "hrg.sch.searchPlaceholder": { es: "Buscar turnos...", en: "Search shifts..." },
@@ -939,6 +962,8 @@ export const hrGestion = {
 
   // ── Detalle del agente de Hubstaff (AgentDetailSheet.tsx) ──
   "hrg.agent.offline": { es: "Desconectado", en: "Offline" },
+  "hrg.agent.paused": { es: "En Pausa", en: "Paused" },
+  "hrg.agent.totalHours": { es: "Horas Totales", en: "Total hours" },
   "hrg.agent.daily": { es: "Diario", en: "Daily" },
   "hrg.agent.noActivity": { es: "Sin datos de actividad", en: "No activity data" },
   "hrg.agent.noActivityHint": {
@@ -956,6 +981,8 @@ export const hrGestion = {
   "hrg.agent.screenshots": { es: "Capturas de Pantalla", en: "Screenshots" },
   "hrg.agent.screenshot": { es: "Captura de pantalla", en: "Screenshot" },
   "hrg.agent.screenshotAt": { es: "Captura de {time}", en: "Screenshot at {time}" },
+  // El `alt` de la miniatura se escribía sin «de».
+  "hrg.agent.screenshotAlt": { es: "Captura {time}", en: "Screenshot at {time}" },
   "hrg.agent.noScreenshots": {
     es: "No hay capturas de pantalla disponibles para hoy. Se mostrarán automáticamente al sincronizar con Hubstaff.",
     en: "No screenshots available for today. They'll show up automatically when Hubstaff syncs.",

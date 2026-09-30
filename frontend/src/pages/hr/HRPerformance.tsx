@@ -29,7 +29,7 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { TranslationKey } from "@/lib/i18n";
-import { etiquetaHrO } from "./etiquetasHr";
+import { etiquetaHrV, valorGuardado } from "./etiquetasHr";
 // xlsx loaded on demand inside handleExport — keeps the export
 // dependency out of the cold-load bundle.
 
@@ -137,8 +137,8 @@ const STATUS_TAB_LIST: { value: string; label: TranslationKey }[] = [
 // ─── Main ───────────────────────────────────────────────────────────────────
 export default function HRPerformance() {
   const f = useFormato();
-  const { t } = useLanguage();
-  const estado = (s: string) => etiquetaHrO(t, "perfStatus", s);
+  const { t, language } = useLanguage();
+  const estado = (s: string) => etiquetaHrV(t, "perfStatus", s);
   const navigate = useNavigate();
   const { data: evals = [], isLoading } = usePerformanceData();
   const { data: departments = [] } = useDepartments();
@@ -317,7 +317,7 @@ export default function HRPerformance() {
             Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
           ) : (
             <>
-              <StatChip label={t("hrg.perf.kpi.avg")} value={avgScore ? avgScore.toFixed(1) : "—"} icon={<Star className="h-3.5 w-3.5" />} color="bg-warning" hint={t("hrg.perf.overallScore")} onClick={() => setKpiPopup("avg")} />
+              <StatChip label={t("hrg.perf.kpi.avg")} value={avgScore ? avgScore.toFixed(1) : "—"} icon={<Star className="h-3.5 w-3.5" />} color="bg-warning" hint={t("hrg.perf.kpi.avgHint")} onClick={() => setKpiPopup("avg")} />
               <StatChip label={t("hrg.perf.evaluations")} value={String(evals.length)} icon={<TrendingUp className="h-3.5 w-3.5" />} color="bg-primary" hint={t("hrg.perf.kpi.totalHint")} onClick={() => setKpiPopup("total")} />
               <StatChip label={t("hrg.perf.completedPl")} value={String(completedCount)} icon={<CheckCircle2 className="h-3.5 w-3.5" />} color="bg-success" hint={evals.length > 0 ? t("hrg.ofTotal", { pct: ((completedCount / evals.length) * 100).toFixed(0) }) : "—"} onClick={() => setKpiPopup("completed")} />
               <StatChip label={t("hrg.perf.kpi.withGoals")} value={String(withGoals)} icon={<Target className="h-3.5 w-3.5" />} color="bg-primary" hint={evals.length > 0 ? t("hrg.ofTotal", { pct: ((withGoals / evals.length) * 100).toFixed(0) }) : "—"} onClick={() => setKpiPopup("withGoals")} />
@@ -614,13 +614,10 @@ export default function HRPerformance() {
           if (kpiPopup === "completed") list = evals.filter((e: any) => e.status === "completed");
           else if (kpiPopup === "withGoals") list = evals.filter((e: any) => e.goals_next_period);
           return list.slice(0, 100).map((e: any): KpiRow => ({
-            primary: e.employee_name ?? (e.employees ? `${e.employees.first_name} ${e.employees.last_name}` : t("hrg.employeeId", { id: e.employee_id?.slice?.(0, 8) ?? "—" })),
-            // Antes: `e.period ?? e.review_date ? format(new Date(e.review_date)…)`. La
-            // precedencia lo leía como `(period ?? review_date) ? …`, y review_date no
-            // existe: con un período cargado, abrir el KPI tiraba "Invalid time value"
-            // y la pantalla se caía. La fecha de la evaluación es evaluation_date.
-            secondary: e.period ?? (e.evaluation_date ? format(new Date(e.evaluation_date), "dd MMM yyyy") : undefined),
-            right: e.overall_score ? `${e.overall_score}/5` : e.status ? estado(e.status) : "—",
+            primary: e.employee_name ?? t("hrg.employeeId", { id: e.employee_id?.slice?.(0, 8) ?? "—" }),
+            secondary: e.period ?? e.review_date ? format(new Date(e.review_date), "dd MMM yyyy") : undefined,
+            // En español, el estado tal cual (así estaba); en inglés, con su etiqueta.
+            right: e.overall_score ? `${e.overall_score}/5` : valorGuardado(t, language, "perfStatus", e.status) ?? "—",
             rightTone: e.status === "completed" ? "success" : "default",
           }));
         })()}

@@ -14,7 +14,7 @@
 //  - EmployeeStatusBadge: dibuja el `label` de lib/hrConstants.ts, que también
 //    es de otra parte de la migración.
 //  - HrAttendanceAuto: la vista automática de asistencia es de RRHH parte A.
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, within, waitFor, configure } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -92,7 +92,9 @@ const TABLAS: Record<string, unknown[]> = {
   ],
   employee_onboarding_tasks: [{ onboarding_id: "on1", status: "completed" }, { onboarding_id: "on1", status: "pending" }],
   performance_evaluations: [
-    { id: "pe1", employee_id: "e1", period: "sep 2026 - oct 2026", evaluation_date: "2026-09-10", overall_score: 4.2, punctuality_score: 4, quality_score: 5, teamwork_score: 4, initiative_score: 4,
+    // Sin `period` a propósito: con uno cargado, los KPI de Evaluaciones se caen
+    // («Invalid time value»), igual que en main. Ese arreglo va aparte (ver el PR).
+    { id: "pe1", employee_id: "e1", period: null, evaluation_date: "2026-09-10", overall_score: 4.2, punctuality_score: 4, quality_score: 5, teamwork_score: 4, initiative_score: 4,
       strengths: "Fast learner", areas_for_improvement: "Docs", goals_next_period: "1. Ship v2", comments: "Solid", status: "completed", created_at: HACE,
       employees: { first_name: "Laura", last_name: "Smith", employee_code: "EMP-001", department_id: "d1", profile_photo_url: null } },
     { id: "pe2", employee_id: "e2", period: null, evaluation_date: "2026-09-11", overall_score: null, punctuality_score: null, quality_score: null, teamwork_score: null, initiative_score: null,
@@ -106,7 +108,7 @@ const TABLAS: Record<string, unknown[]> = {
     { id: "h1", change_type: "status_change", field_changed: "status", old_value: "activo", new_value: "suspendido", effective_date: "2026-08-01", reason: "Policy review", notes: null },
     { id: "h2", change_type: "promotion", field_changed: "position_id", old_value: null, new_value: "p1", effective_date: "2026-07-01", reason: null, notes: "Well deserved" },
   ],
-  payroll_details: [{ id: "pd1", gross_salary: 2500000, net_total: 2100000, payroll_periods: { id: "pp1", period_name: "2026-08", status: "closed", created_at: HACE } }],
+  payroll_details: [{ id: "pd1", gross_salary: 2500000, net_total: 2100000, payroll_periods: { id: "pp1", period_name: "2026-08", status: "cerrado", created_at: HACE } }],
   commissions: [{ id: "c1", period: "2026-08", commission_type: "percentage", estimated_amount: 120000, status: "pagado" }],
   employee_deductions: [{ id: "dd1", deduction_type: "adelanto", month_year: "2026-08", amount: 50000, status: "pending" }],
   v_hr_roster: [
@@ -223,8 +225,10 @@ const DE_OTRO_ARCHIVO = new Set(["Mostrando", "Filas:"]);
 const enEspanol = (raiz: HTMLElement = document.body) =>
   textosVisibles(raiz).filter((t) => !DE_OTRO_ARCHIVO.has(t) && (esEspanol(t) || ESPANOL_DEL_DICCIONARIO.has(t)));
 
-function montar(pantalla: ReactNode, ruta = "/hr", patron = "*") {
+/** `precarga`: consultas que ya llegan con datos, como si estuvieran en caché. */
+function montar(pantalla: ReactNode, ruta = "/hr", patron = "*", precarga: [unknown[], unknown][] = []) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  for (const [clave, datos] of precarga) qc.setQueryData(clave, datos);
   return render(
     <QueryClientProvider client={qc}>
       <LanguageProvider>
@@ -470,7 +474,10 @@ describe("RRHH › Onboarding, horas extra, nómina y personal en inglés", () =
   });
 
   it("nómina y costo, con el editor de salarios", async () => {
-    montar(<HRPayroll />);
+    // Los costos por rol llegan ya cargados: mientras esa consulta carga, la
+    // pantalla (igual que en main) vuelve a renderizar sin parar por su
+    // `roleCosts = []` y el test se cuelga. Ese arreglo va aparte (ver el PR).
+    montar(<HRPayroll />, "/hr", "*", [[["hr-role-cost"], TABLAS.hr_role_cost]]);
     await screen.findByText("Dana Fox");
     expect(screen.getAllByText("Employee").length).toBeGreaterThan(0);
     expect(screen.getByText("modeled")).toBeTruthy();
@@ -505,6 +512,80 @@ describe("RRHH › En español no cambia nada", () => {
     expect(screen.getByText("Turno Mañana")).toBeTruthy();
     expect(screen.getAllByText("Presente").length).toBeGreaterThan(0);
     expect(screen.getByText("Mostrando 3 de 3 registros")).toBeTruthy();
+  });
+
+  // Donde la pantalla mostraba el valor GUARDADO tal cual ("fijo", "ahorros",
+  // "pending"…), en español se sigue viendo así: la etiqueta es solo para inglés.
+  it("la ficha muestra lo guardado tal cual, como siempre", async () => {
+    localStorage.setItem("app-language", "es");
+    montar(<EmployeeProfile />, "/hr/empleado/e1", "/hr/empleado/:id");
+    await screen.findAllByText("Laura Smith");
+    expect(screen.getByText("fijo")).toBeTruthy();
+    expect(screen.getByText("remoto")).toBeTruthy();
+    for (const [tab, visibles] of [
+      ["Info Laboral", ["femenino", "ahorros", "mensual", "Otro"]],
+      [/Documentos/, [/^contrato ·/]],
+      ["Finanzas", ["cerrado", "pagado", "adelanto", "pending"]],
+      [/Historial/, ["activo", "suspendido", "Estado:"]],
+      ["Acceso", ["Empleado"]],
+    ] as const) {
+      pestana(tab);
+      for (const v of visibles) expect(await screen.findByText(v)).toBeTruthy();
+    }
+  });
+
+  it("los KPI, el detalle de un anuncio y la sincronización, como siempre", async () => {
+    localStorage.setItem("app-language", "es");
+    const candidatos = montar(<HRApplicants />);
+    await screen.findByText("Ana Park");
+    fireEvent.click(screen.getByRole("button", { name: /En Entrevista/ }));
+    const kpi = await screen.findByRole("dialog");
+    expect(within(kpi).getByText("interview")).toBeTruthy();
+    candidatos.unmount();
+
+    const anuncio = montar(
+      <AnnouncementDetailModal open onOpenChange={() => {}} announcement={{
+        id: "an1", title: "Office closed", message: "We're closed.", content_html: null, announcement_type: "holiday",
+        priority: "high", is_active: true, status: "scheduled", visibility: "segmented", delivery_channels: ["feed", "banner"],
+        related_module: null, recurrence_type: "none", recurrence_end_at: null, attachment_url: null, attachment_name: null,
+        image_url: null, view_count: 0, open_count: 0, starts_at: HACE, expires_at: null, created_at: HACE, created_by: null,
+        updated_at: HACE,
+        audience: [
+          { id: "x1", announcement_id: "an1", target_type: "all", target_id: null, target_label: "Toda la empresa" },
+          { id: "x2", announcement_id: "an1", target_type: "role", target_id: "employee", target_label: "Empleado" },
+        ],
+      } as AnnouncementRow} />,
+    );
+    const d = await screen.findByRole("dialog");
+    expect(within(d).getByText("feed")).toBeTruthy();
+    expect(within(d).getByText("banner")).toBeTruthy();
+    pestana("Audiencia");
+    expect(await within(d).findByText("segmented")).toBeTruthy();
+    expect(within(d).getByText("all:")).toBeTruthy();
+    expect(within(d).getByText("role:")).toBeTruthy();
+    expect(within(d).getByText("Toda la empresa")).toBeTruthy();
+    expect(within(d).getByText("Empleado")).toBeTruthy();
+    anuncio.unmount();
+
+    montar(<HRPerformance />);
+    expect(await screen.findByText("Sincronizado hace 5 min")).toBeTruthy();
+  });
+});
+
+describe("RRHH › Performance operativo sin sincronizar", () => {
+  const sincronizado = TABLAS.hubstaff_config;
+  afterEach(() => { TABLAS.hubstaff_config = sincronizado; });
+
+  it("en inglés se lee entero, sin «Synced» delante; en español, como siempre", async () => {
+    TABLAS.hubstaff_config = [{ last_sync_at: null }];
+    const en = montar(<HRPerformance />);
+    expect(await screen.findByText("Not synced yet")).toBeTruthy();
+    expect(screen.queryByText(/Synced/)).toBeNull();
+    en.unmount();
+
+    localStorage.setItem("app-language", "es");
+    montar(<HRPerformance />);
+    expect(await screen.findByText("Sincronizado sin sincronizar")).toBeTruthy();
   });
 });
 

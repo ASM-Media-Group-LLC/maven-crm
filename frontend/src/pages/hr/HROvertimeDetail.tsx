@@ -43,10 +43,13 @@ const OVERTIME_TYPES: { value: string; label: TranslationKey }[] = [
   { value: "nocturno_dominical", label: "hrg.ot.type.sundayNight" },
 ];
 
-function tipoHorasExtra(tipo: string, t: Traductor) {
+/** La etiqueta del tipo, o `undefined` si el tipo guardado no está en la lista. */
+function etiquetaTipo(tipo: string, t: Traductor) {
   const o = OVERTIME_TYPES.find((x) => x.value === tipo);
-  return o ? t(o.label) : tipo;
+  return o ? t(o.label) : undefined;
 }
+/** La tabla y las tarjetas caen al valor guardado; el detalle no muestra nada. */
+const tipoHorasExtra = (tipo: string, t: Traductor) => etiquetaTipo(tipo, t) || tipo;
 
 function getStatusBadge(status: string, t: Traductor) {
   if (status === "approved") return <Badge variant="default" className="text-xs bg-success/10 text-success border-success/30">{t("hrg.approved")}</Badge>;
@@ -393,7 +396,7 @@ const HROvertimeDetail = () => {
               <div><span className="text-muted-foreground">{t("hrg.employee")}:</span> <span className="font-medium">{viewData.employees ? `${viewData.employees.first_name} ${viewData.employees.last_name}` : "—"}</span></div>
               <div><span className="text-muted-foreground">{t("common.date")}:</span> {format(parseISO(viewData.date), "dd/MM/yyyy")}</div>
               <div><span className="text-muted-foreground">{t("hrg.hours")}:</span> {viewData.hours}h · {t("hrg.ot.rate")}: x{viewData.rate_multiplier}</div>
-              <div><span className="text-muted-foreground">{t("common.type")}:</span> {tipoHorasExtra(viewData.overtime_type, t)}</div>
+              <div><span className="text-muted-foreground">{t("common.type")}:</span> {etiquetaTipo(viewData.overtime_type, t)}</div>
               <div><span className="text-muted-foreground">{t("common.status")}:</span> {getStatusBadge(viewData.status, t)}</div>
               {viewData.notes && <div><span className="text-muted-foreground">{t("hrg.notes")}:</span> {viewData.notes}</div>}
             </div>

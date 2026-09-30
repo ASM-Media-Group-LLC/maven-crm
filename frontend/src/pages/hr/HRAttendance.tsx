@@ -455,7 +455,7 @@ function EditAttendanceModal({ record, onClose }: { record: AttendanceRecord | n
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function HRAttendance() {
   const formatoUI = useFormato();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { data: records = [], isLoading } = useAttendance();
   const { data: departments = [] } = useDepartments();
   const queryClient = useQueryClient();
@@ -770,9 +770,10 @@ export default function HRAttendance() {
           const tone = (status: string): KpiRow["rightTone"] =>
             status === "presente" ? "success" : status === "ausente" ? "destructive" : status === "tardanza" ? "warning" : "default";
           return list.slice(0, 100).map((r: any): KpiRow => ({
-            primary: r.employee_name ?? (r.employees ? `${r.employees.first_name} ${r.employees.last_name}` : t("hrg.employeeId", { id: r.employee_id?.slice?.(0, 8) ?? "—" })),
+            primary: r.employee_name ?? t("hrg.employeeId", { id: r.employee_id?.slice?.(0, 8) ?? "—" }),
             secondary: r.date ? format(new Date(r.date), "dd MMM yyyy") : undefined,
-            right: r.status ? getStatusLabel(r.status, t) : "—",
+            // En español, el estado tal cual (así estaba); en inglés, con su etiqueta.
+            right: language === "en" && r.status ? getStatusLabel(r.status, t) : r.status ?? "—",
             rightTone: tone(r.status ?? ""),
           }));
         })()}

@@ -65,7 +65,7 @@ const AudienceSelector = ({
   deliveryChannels,
   onDeliveryChannelsChange,
 }: Props) => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { data: departments = [] } = useDepartments();
   const { data: profiles = [] } = useProfiles();
   const [addType, setAddType] = useState<string>("");
@@ -154,8 +154,8 @@ const AudienceSelector = ({
                 return (
                   <Badge key={i} variant="secondary" className="gap-1.5 py-1 px-2.5">
                     <Icon className="h-3 w-3" />
-                    <span className="text-xs">{tipoDestino(t, a.target_type)}:</span>
-                    <span className="text-xs font-medium">{etiquetaDestino(t, a)}</span>
+                    <span className="text-xs capitalize">{tipoDestino(t, language, a.target_type)}:</span>
+                    <span className="text-xs font-medium">{etiquetaDestino(t, language, a)}</span>
                     <button onClick={() => removeTarget(i)} className="ml-1 hover:text-destructive" aria-label={t("hrg.ann.removeRecipient")}>
                       <X className="h-3 w-3" />
                     </button>

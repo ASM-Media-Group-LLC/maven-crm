@@ -35,7 +35,7 @@ const STATUS_LABELS: Record<string, { label: TranslationKey; variant: "default" 
   activo: { label: "common.active", variant: "default" },
   inactivo: { label: "common.inactive", variant: "secondary" },
   desconectado: { label: "hrg.agent.offline", variant: "outline" },
-  en_pausa: { label: "common.paused", variant: "secondary" },
+  en_pausa: { label: "hrg.agent.paused", variant: "secondary" },
 };
 
 function MiniKPI({ label, value, icon: Icon }: { label: string; value: string; icon: typeof Clock }) {
@@ -111,7 +111,7 @@ export default function AgentDetailView({ agent, onBack }: AgentDetailViewProps)
 
                 {/* KPIs */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
-                  <MiniKPI label={t("common.totalHours")} value={kpis.hours} icon={Clock} />
+                  <MiniKPI label={t("hrg.agent.totalHours")} value={kpis.hours} icon={Clock} />
                   <MiniKPI label={t("hrg.agent.productivity")} value={kpis.productivity} icon={TrendingUp} />
                   <MiniKPI label={t("hrg.agent.mouseActivity")} value={kpis.mouse} icon={Mouse} />
                   <MiniKPI label={t("hrg.agent.keyboardActivity")} value={kpis.keyboard} icon={Keyboard} />
@@ -186,7 +186,7 @@ export default function AgentDetailView({ agent, onBack }: AgentDetailViewProps)
                         className="group relative aspect-video rounded-lg border border-border bg-muted/50 flex flex-col items-center justify-center gap-1 hover:border-primary/50 hover:bg-muted transition-colors cursor-pointer overflow-hidden"
                       >
                         {ss.url ? (
-                          <img src={ss.url} alt={t("hrg.agent.screenshotAt", { time: ss.timestamp })} className="absolute inset-0 w-full h-full object-cover" />
+                          <img src={ss.url} alt={t("hrg.agent.screenshotAlt", { time: ss.timestamp })} className="absolute inset-0 w-full h-full object-cover" />
                         ) : (
                           <Monitor className="h-5 w-5 text-muted-foreground/50 group-hover:text-primary/60" />
                         )}

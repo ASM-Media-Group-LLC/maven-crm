@@ -129,7 +129,7 @@ export default function HROnboarding() {
   const { data: departments = [] } = useDepartments();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const estado = (s: string) => {
     const o = ONBOARDING_STATUSES.find((x) => x.value === s);
     return o ? t(o.label) : s;
@@ -436,11 +436,11 @@ export default function HROnboarding() {
               <div className="space-y-3 text-sm">
                 <div className="grid grid-cols-2 gap-3">
                   <div><p className="text-xs text-muted-foreground">{t("hrg.employee")}</p><p className="font-medium">{emp?.first_name} {emp?.last_name}</p></div>
-                  <div><p className="text-xs text-muted-foreground">{t("common.email")}</p><p>{emp?.email ?? "—"}</p></div>
+                  <div><p className="text-xs text-muted-foreground">{t("hrg.email")}</p><p>{emp?.email ?? "—"}</p></div>
                   <div><p className="text-xs text-muted-foreground">{t("hrg.position")}</p><p>{emp?.positions?.name ?? "—"}</p></div>
                   <div><p className="text-xs text-muted-foreground">{t("common.area")}</p><p>{emp?.departments?.name ?? "—"}</p></div>
                   <div><p className="text-xs text-muted-foreground">{t("hrg.startDate")}</p><p>{viewItem.start_date ? format(new Date(viewItem.start_date), "dd/MM/yyyy") : "—"}</p></div>
-                  <div><p className="text-xs text-muted-foreground">{t("hrg.onb.buddy")}</p><p>{viewItem.buddy ? `${viewItem.buddy.first_name} ${viewItem.buddy.last_name}` : "—"}</p></div>
+                  <div><p className="text-xs text-muted-foreground">{t("hrg.onb.buddyDetail")}</p><p>{viewItem.buddy ? `${viewItem.buddy.first_name} ${viewItem.buddy.last_name}` : "—"}</p></div>
                   <div>
                     <p className="text-xs text-muted-foreground">{t("common.status")}</p>
                     <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium", sc.bg, sc.text)}>
@@ -539,7 +539,8 @@ export default function HROnboarding() {
           return list.slice(0, 100).map((o: any): KpiRow => ({
             primary: o.employees ? `${o.employees.first_name ?? ""} ${o.employees.last_name ?? ""}`.trim() : t("hrg.noName"),
             secondary: o.position ?? o.start_date ? format(new Date(o.start_date), "dd MMM yyyy") : undefined,
-            right: o.status ? estado(o.status) : "—",
+            // En español, el estado tal cual (así estaba); en inglés, con su etiqueta.
+            right: language === "en" && o.status ? estado(o.status) : o.status ?? "—",
             rightTone: tone(o.status ?? ""),
           }));
         })()}

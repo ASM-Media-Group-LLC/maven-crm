@@ -28,7 +28,7 @@ interface Props {
 
 const AnnouncementDetailModal = ({ open, onOpenChange, announcement }: Props) => {
   const f = useFormato();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { data: views = [] } = useAnnouncementViews(announcement?.id ?? null);
 
   // Get profiles for view users
@@ -51,11 +51,9 @@ const AnnouncementDetailModal = ({ open, onOpenChange, announcement }: Props) =>
   if (!announcement) return null;
 
   const content = announcement.content_html ?? announcement.message ?? "";
-  const visibilidad = (v: string) =>
-    v === "global" ? t("hrg.ann.visibility.globalShort")
-    : v === "segmented" ? t("hrg.ann.visibility.segmentedShort")
-    : v === "personal" ? t("hrg.ann.visibility.personalShort")
-    : v;
+  // Los canales se veían con el valor guardado ("feed"…) y así se siguen viendo
+  // en español; en inglés, con su nombre.
+  const canal = (ch: string) => (language === "en" ? canalAnuncio(t, ch) : ch);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -128,7 +126,7 @@ const AnnouncementDetailModal = ({ open, onOpenChange, announcement }: Props) =>
             {/* Delivery channels */}
             <div className="flex flex-wrap gap-2">
               {(announcement.delivery_channels ?? []).map((ch) => (
-                <Badge key={ch} variant="secondary" className="text-xs">{canalAnuncio(t, ch)}</Badge>
+                <Badge key={ch} variant="secondary" className="text-xs">{canal(ch)}</Badge>
               ))}
             </div>
           </TabsContent>
@@ -192,14 +190,14 @@ const AnnouncementDetailModal = ({ open, onOpenChange, announcement }: Props) =>
 
           <TabsContent value="audience" className="space-y-4 mt-4">
             <div className="space-y-2">
-              <p className="text-sm font-medium">{t("hrg.ann.visibility")}: <Badge variant="outline">{visibilidad(announcement.visibility)}</Badge></p>
+              <p className="text-sm font-medium">{t("hrg.ann.visibility")}: <Badge variant="outline">{announcement.visibility}</Badge></p>
             </div>
             {(announcement.audience ?? []).length > 0 ? (
               <div className="flex flex-wrap gap-2">
                 {(announcement.audience ?? []).map((a, i) => (
                   <Badge key={i} variant="secondary" className="py-1">
-                    <span className="text-xs mr-1">{tipoDestino(t, a.target_type)}:</span>
-                    {etiquetaDestino(t, a)}
+                    <span className="text-xs capitalize mr-1">{tipoDestino(t, language, a.target_type)}:</span>
+                    {etiquetaDestino(t, language, a)}
                   </Badge>
                 ))}
               </div>

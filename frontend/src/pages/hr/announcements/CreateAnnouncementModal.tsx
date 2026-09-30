@@ -252,7 +252,7 @@ const CreateAnnouncementModal = ({ open, onOpenChange }: Props) => {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>{t("hrg.ann.publishDate")}</Label>
-                    <DateInput value={startsAt} onChange={setStartsAt} placeholder={t("common.startDate")} />
+                    <DateInput value={startsAt} onChange={setStartsAt} placeholder={t("hrg.ann.startDatePlaceholder")} />
                   </div>
                   <div className="space-y-2">
                     <Label>{t("hrg.ann.publishTime")}</Label>

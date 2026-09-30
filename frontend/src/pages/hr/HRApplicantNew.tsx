@@ -94,7 +94,7 @@ export default function HRApplicantNew() {
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label>{t("common.fullName")} <span className="text-destructive">*</span></Label>
+                <Label>{t("hrg.fullName")} <span className="text-destructive">*</span></Label>
                 <Input placeholder={t("hrg.appl.namePlaceholder")} value={form.full_name} onChange={(e) => set("full_name", e.target.value)} />
               </div>
               <div className="space-y-1.5">

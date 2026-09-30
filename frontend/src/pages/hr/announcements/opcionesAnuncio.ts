@@ -1,4 +1,4 @@
-import type { TranslationKey } from "@/lib/i18n";
+import type { Language, TranslationKey } from "@/lib/i18n";
 import type { AudienceTarget } from "./useAnnouncementsAdmin";
 
 // Las opciones de los modales de anuncios. `value` es lo que se guarda en
@@ -82,9 +82,10 @@ type T = (clave: TranslationKey) => string;
 
 export const estadoAnuncio = (t: T, estado: string) => (ESTADOS[estado] ? t(ESTADOS[estado]) : estado);
 export const canalAnuncio = (t: T, canal: string) => (CANALES[canal] ? t(CANALES[canal]) : canal);
+/** La prioridad, o nada si el valor guardado no es uno de los tres (así estaba el detalle). */
 export const prioridadAnuncio = (t: T, prioridad: string) => {
   const o = PRIORIDADES_ANUNCIO.find((p) => p.value === prioridad);
-  return o ? t(o.clave) : prioridad;
+  return o ? t(o.clave) : undefined;
 };
 
 const TIPOS_DESTINO: Record<string, TranslationKey> = {
@@ -95,8 +96,10 @@ const TIPOS_DESTINO: Record<string, TranslationKey> = {
   project: "hrg.ann.target.project",
 };
 
-/** "Departamento", "Rol"… del tipo de destinatario (target_type). */
-export const tipoDestino = (t: T, tipo: string) => (TIPOS_DESTINO[tipo] ? t(TIPOS_DESTINO[tipo]) : tipo);
+/** El tipo de destinatario (target_type). En español se ve el valor guardado
+ *  ("all", "role"…), como siempre se vio; en inglés, su nombre. */
+export const tipoDestino = (t: T, idioma: Language, tipo: string) =>
+  idioma === "en" && TIPOS_DESTINO[tipo] ? t(TIPOS_DESTINO[tipo]) : tipo;
 
 const ROL_VISIBLE: Record<string, TranslationKey> = {
   employee: "hrg.opt.hrRole.employee",
@@ -104,9 +107,11 @@ const ROL_VISIBLE: Record<string, TranslationKey> = {
 };
 
 /** Cómo se DIBUJA un destinatario. El target_label guardado está en español
- *  (ver arriba): "toda la empresa" y los roles se vuelven a armar en el idioma de
- *  quien mira; departamentos y personas son nombres propios y se ven tal cual. */
-export function etiquetaDestino(t: T, a: Pick<AudienceTarget, "target_type" | "target_id" | "target_label">): string {
+ *  (ver arriba) y en español se ve tal cual, como siempre. En inglés, "toda la
+ *  empresa" y los roles se vuelven a armar; departamentos y personas son nombres
+ *  propios y se ven tal cual. */
+export function etiquetaDestino(t: T, idioma: Language, a: Pick<AudienceTarget, "target_type" | "target_id" | "target_label">): string {
+  if (idioma !== "en") return a.target_label;
   if (a.target_type === "all") return t("common.entireCompany");
   if (a.target_type === "role" && a.target_id && ROL_VISIBLE[a.target_id]) return t(ROL_VISIBLE[a.target_id]);
   return a.target_label;

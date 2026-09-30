@@ -26,8 +26,7 @@ const TABS: { key: RoleTab; label: string; icon: any }[] = [
 const usd = (n: number | null | undefined, locale: string) => (n == null ? "—" : `$${Math.round(n).toLocaleString(locale)}`);
 const pct = (n: number | null | undefined) => (n == null ? "—" : `${Math.round(n)}%`);
 
-const relativeTime = (iso: string | null, t: Traductor): string => {
-  if (!iso) return t("hrg.op.neverSynced");
+const relativeTime = (iso: string, t: Traductor): string => {
   const min = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
   if (min < 1) return t("hrg.op.justNow");
   if (min < 60) return t("hrg.op.minAgo", { n: min });
@@ -75,7 +74,10 @@ export default function HrPerformanceOperativo() {
             );
           })}
         </div>
-        <span className="text-xs text-muted-foreground">{t("hrg.op.synced", { when: relativeTime(sync?.last_sync_at ?? null, t) })}</span>
+        <span className="text-xs text-muted-foreground">
+          {/* Sin sincronización todavía va entero, sin "Synced …" delante. */}
+          {sync?.last_sync_at ? t("hrg.op.synced", { when: relativeTime(sync.last_sync_at, t) }) : t("hrg.op.notSynced")}
+        </span>
       </div>
 
       {loading ? (

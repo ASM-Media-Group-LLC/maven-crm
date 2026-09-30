@@ -19,27 +19,38 @@ import { useFormato } from "@/hooks/useFormato";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/ui/page-header";
 import { useLanguage } from "@/hooks/useLanguage";
-import { etiquetaHr, etiquetaHrO, rolHr, type GrupoHr, type Traductor } from "./etiquetasHr";
+import type { Language, TranslationKey } from "@/lib/i18n";
+import { etiquetaHrV, rolHr, valorGuardado, type GrupoHr, type Traductor } from "./etiquetasHr";
 
-// Cómo se pinta el rol vinculado. El nombre sale de rolHr (etiquetasHr.ts).
-const ROLE_VARIANTS: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-  admin: "destructive",
-  manager: "default",
-  employee: "secondary",
-  supervisor: "default",
-  agent: "secondary",
-  closer: "secondary",
+// El rol vinculado, como lo nombraba esta ficha: estos seis con su nombre y
+// cualquier otro con el valor tal cual. En inglés, los que no están acá salen
+// de rolHr (etiquetasHr.ts).
+const ROLE_LABELS: Record<string, { label: TranslationKey | null; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+  // label null: se escribe igual en los dos idiomas.
+  admin: { label: null, variant: "destructive" },
+  manager: { label: null, variant: "default" },
+  employee: { label: "hrg.opt.hrRole.employee", variant: "secondary" },
+  supervisor: { label: null, variant: "default" },
+  agent: { label: "hrg.opt.hrRole.agent", variant: "secondary" },
+  closer: { label: null, variant: "secondary" },
 };
+const NOMBRE_FIJO: Record<string, string> = { admin: "Admin", manager: "Manager", supervisor: "Supervisor", closer: "Closer" };
+function nombreRol(t: Traductor, idioma: Language, rol: string): string {
+  const cfg = ROLE_LABELS[rol];
+  if (cfg) return cfg.label ? t(cfg.label) : NOMBRE_FIJO[rol];
+  return idioma === "en" ? rolHr(t, rol) : rol;
+}
 
-// El historial guarda valores crudos (old_value/new_value). Los campos que son
-// una lista conocida se leen con su etiqueta; el resto (ids, salario) tal cual.
+// El historial guarda valores crudos (old_value/new_value) y así se leen en
+// español. En inglés, los campos que son una lista conocida se leen con su
+// etiqueta; el resto (ids, salario) tal cual.
 const GRUPO_POR_CAMPO: Record<string, GrupoHr> = {
   status: "empStatus",
   contract_type: "contract",
   work_modality: "modality",
 };
-const valorHistorial = (t: Traductor, campo: string, valor: string) =>
-  (GRUPO_POR_CAMPO[campo] ? etiquetaHr(t, GRUPO_POR_CAMPO[campo], valor) : undefined) ?? valor;
+const valorHistorial = (t: Traductor, idioma: Language, campo: string, valor: string) =>
+  GRUPO_POR_CAMPO[campo] ? valorGuardado(t, idioma, GRUPO_POR_CAMPO[campo], valor) : valor;
 
 const MODALITY_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   remoto: Wifi,
@@ -51,7 +62,10 @@ export default function EmployeeProfile() {
   const { id } = useParams();
   const navigate = useNavigate();
   const f = useFormato();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  // Los valores guardados que esta ficha mostraba tal cual ("fijo", "ahorros",
+  // "pending"…): en español se siguen viendo así; en inglés, con su etiqueta.
+  const crudo = <V extends string | null | undefined>(grupo: GrupoHr, valor: V) => valorGuardado(t, language, grupo, valor);
   const { data: employee, isLoading } = useEmployee(id);
   const { data: absences = [] } = useEmployeeAbsences(id);
   const { data: incidents = [] } = useEmployeeIncidents(id);
@@ -163,12 +177,12 @@ export default function EmployeeProfile() {
                     <InfoField label={t("hrg.department")}>
                       <EmployeeAreaBadge departmentName={employee.departments?.name} departmentCode={employee.departments?.code} />
                     </InfoField>
-                    <InfoField label={t("hrg.dir.contract")} value={etiquetaHr(t, "contract", employee.contract_type) ?? employee.contract_type} capitalize />
+                    <InfoField label={t("hrg.dir.contract")} value={crudo("contract", employee.contract_type)} capitalize={language !== "en"} />
                     <InfoField label={t("hrg.dir.hired")} value={employee.hire_date ? format(new Date(employee.hire_date), "dd/MM/yyyy") : undefined} />
                     <InfoField label={t("hrg.dir.modality")}>
                       <div className="flex items-center gap-1.5 mt-1">
                         <ModalityIcon className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span className="text-sm font-medium capitalize">{etiquetaHrO(t, "modality", employee.work_modality)}</span>
+                        <span className={cn("text-sm font-medium", language !== "en" && "capitalize")}>{crudo("modality", employee.work_modality) ?? "—"}</span>
                       </div>
                     </InfoField>
                     {employee.email && (
@@ -198,7 +212,7 @@ export default function EmployeeProfile() {
                   <InfoRow label={t("common.name")} value={fullName} />
                   <InfoRow label={t("hrg.prof.document")} value={employee.national_id ? `${employee.national_id_type ?? "CC"}: ${employee.national_id}` : undefined} />
                   <InfoRow label={t("hrg.prof.birthDate")} value={employee.birth_date ? format(new Date(employee.birth_date), "dd/MM/yyyy") : undefined} />
-                  <InfoRow label={t("hrg.prof.gender")} value={etiquetaHr(t, "gender", employee.gender) ?? employee.gender} />
+                  <InfoRow label={t("hrg.prof.gender")} value={crudo("gender", employee.gender)} />
                   <InfoRow label={t("common.city")} value={employee.city} />
                   <InfoRow label={t("common.address")} value={employee.address} />
                 </CardContent>
@@ -217,9 +231,9 @@ export default function EmployeeProfile() {
                 <CardContent className="space-y-2 text-sm">
                   <InfoRow label={t("hrg.bank")} value={employee.bank_name === "Otro" ? t("hrg.onb.otherBank") : employee.bank_name} />
                   <InfoRow label={t("hrg.prof.accountNo")} value={employee.bank_account_number} />
-                  <InfoRow label={t("common.type")} value={etiquetaHr(t, "bankAccount", employee.bank_account_type) ?? employee.bank_account_type} />
+                  <InfoRow label={t("common.type")} value={crudo("bankAccount", employee.bank_account_type)} />
                   <InfoRow label={t("hrg.opt.histField.base_salary")} value={employee.base_salary ? `$${employee.base_salary.toLocaleString(f.intl("es-CO"))}` : undefined} />
-                  <InfoRow label={t("hrg.prof.frequency")} value={etiquetaHr(t, "salaryFreq", employee.salary_frequency) ?? employee.salary_frequency} />
+                  <InfoRow label={t("hrg.prof.frequency")} value={crudo("salaryFreq", employee.salary_frequency)} />
                 </CardContent>
               </Card>
               <Card>
@@ -332,7 +346,7 @@ export default function EmployeeProfile() {
                           <p className="font-medium">{pd.payroll_periods?.period_name ?? "—"}</p>
                           <p className="text-xs text-muted-foreground">{t("hrg.prof.grossNet", { gross: `$${Number(pd.gross_salary || 0).toLocaleString(f.intl("es-CO"))}`, net: `$${Number(pd.net_total || 0).toLocaleString(f.intl("es-CO"))}` })}</p>
                         </div>
-                        <Badge variant="outline" className="text-xs">{pd.payroll_periods?.status ?? "—"}</Badge>
+                        <Badge variant="outline" className="text-xs">{crudo("payrollStatus", pd.payroll_periods?.status) ?? "—"}</Badge>
                       </div>
                     ))
                   )}
@@ -357,7 +371,7 @@ export default function EmployeeProfile() {
                           <p className="font-medium">{c.period}</p>
                           <p className="text-xs text-muted-foreground">{c.commission_type} · Est: ${Number(c.estimated_amount || 0).toLocaleString(f.intl("es-CO"))}</p>
                         </div>
-                        <Badge variant={c.status === "pagado" ? "default" : "secondary"} className="text-xs">{etiquetaHrO(t, "commissionStatus", c.status)}</Badge>
+                        <Badge variant={c.status === "pagado" ? "default" : "secondary"} className="text-xs">{crudo("commissionStatus", c.status)}</Badge>
                       </div>
                     ))
                   )}
@@ -379,10 +393,10 @@ export default function EmployeeProfile() {
                     empDeductions.slice(0, 5).map((d: any) => (
                       <div key={d.id} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm transition-colors">
                         <div>
-                          <p className="font-medium">{etiquetaHrO(t, "deductionType", d.deduction_type)}</p>
+                          <p className="font-medium">{crudo("deductionType", d.deduction_type)}</p>
                           <p className="text-xs text-muted-foreground">{d.month_year} · ${Number(d.amount || 0).toLocaleString(f.intl("es-CO"))}</p>
                         </div>
-                        <Badge variant={d.status === "applied" ? "default" : "secondary"} className="text-xs">{etiquetaHrO(t, "deductionStatus", d.status)}</Badge>
+                        <Badge variant={d.status === "applied" ? "default" : "secondary"} className="text-xs">{crudo("deductionStatus", d.status)}</Badge>
                       </div>
                     ))
                   )}
@@ -409,7 +423,7 @@ export default function EmployeeProfile() {
                       </div>
                       <div className="text-right">
                         <p className="text-lg font-bold text-primary">{p.overall_score?.toFixed(1) ?? "—"}<span className="text-xs text-muted-foreground font-normal">/5</span></p>
-                        <Badge variant="secondary">{etiquetaHrO(t, "perfStatus", p.status)}</Badge>
+                        <Badge variant="secondary">{etiquetaHrV(t, "perfStatus", p.status)}</Badge>
                       </div>
                     </CardContent>
                   </Card>
@@ -430,7 +444,7 @@ export default function EmployeeProfile() {
                       <FileText className="h-5 w-5 text-muted-foreground shrink-0" />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{doc.file_name}</p>
-                        <p className="text-xs text-muted-foreground">{etiquetaHrO(t, "docType", doc.document_type)} · {format(new Date(doc.uploaded_at), "dd/MM/yyyy")}</p>
+                        <p className="text-xs text-muted-foreground">{crudo("docType", doc.document_type)} · {format(new Date(doc.uploaded_at), "dd/MM/yyyy")}</p>
                       </div>
                       <Button variant="outline" size="sm" asChild>
                         <a href={doc.file_url} target="_blank" rel="noopener noreferrer">{t("common.view")}</a>
@@ -450,8 +464,8 @@ export default function EmployeeProfile() {
               <div className="relative space-y-0">
                 <div className="absolute left-4 top-0 bottom-0 w-px bg-border" />
                 {history.map((h) => {
-                  const typeLabel = etiquetaHrO(t, "histType", h.change_type);
-                  const fieldLabel = etiquetaHrO(t, "histField", h.field_changed);
+                  const typeLabel = etiquetaHrV(t, "histType", h.change_type);
+                  const fieldLabel = etiquetaHrV(t, "histField", h.field_changed);
                   return (
                     <div key={h.id} className="relative pl-10 py-4">
                       <div className="absolute left-2.5 top-5 h-3 w-3 rounded-full bg-primary border-2 border-background" />
@@ -462,9 +476,9 @@ export default function EmployeeProfile() {
                         </div>
                         <p className="text-sm">
                           <span className="text-muted-foreground">{fieldLabel}:</span>{" "}
-                          {h.old_value && <span className="line-through text-muted-foreground/60">{valorHistorial(t, h.field_changed, h.old_value)}</span>}
+                          {h.old_value && <span className="line-through text-muted-foreground/60">{valorHistorial(t, language, h.field_changed, h.old_value)}</span>}
                           {h.old_value && h.new_value && " → "}
-                          {h.new_value && <span className="font-medium">{valorHistorial(t, h.field_changed, h.new_value)}</span>}
+                          {h.new_value && <span className="font-medium">{valorHistorial(t, language, h.field_changed, h.new_value)}</span>}
                         </p>
                         {h.reason && <p className="text-xs text-muted-foreground">{t("hrg.prof.reasonLine", { reason: h.reason })}</p>}
                         {h.notes && <p className="text-xs text-muted-foreground italic">{h.notes}</p>}
@@ -500,8 +514,8 @@ export default function EmployeeProfile() {
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-sm">{linkedProfile.full_name ?? t("hrg.noName")}</p>
                         {linkedProfile.role && (
-                          <Badge variant={ROLE_VARIANTS[linkedProfile.role] ?? "outline"} className="mt-1 text-xs">
-                            {rolHr(t, linkedProfile.role)}
+                          <Badge variant={ROLE_LABELS[linkedProfile.role]?.variant ?? "outline"} className="mt-1 text-xs">
+                            {nombreRol(t, language, linkedProfile.role)}
                           </Badge>
                         )}
                       </div>

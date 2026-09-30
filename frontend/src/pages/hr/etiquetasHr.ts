@@ -1,4 +1,4 @@
-import type { TranslationKey } from "@/lib/i18n";
+import type { Language, TranslationKey } from "@/lib/i18n";
 import { hrGestion } from "@/lib/i18n/hrGestion";
 import { HR_ROLE_LABEL } from "./useHrPeople";
 
@@ -20,7 +20,7 @@ export type GrupoHr =
   | "applStatus" | "applSource"
   | "trainStatus" | "trainModality" | "trainRole" | "trainContent"
   | "perfStatus" | "histType" | "histField" | "infraction" | "hrRole"
-  | "deductionType" | "deductionStatus" | "commissionStatus"
+  | "deductionType" | "deductionStatus" | "commissionStatus" | "payrollStatus"
   | "gender" | "bankAccount" | "salaryFreq" | "docType";
 
 export type Traductor = (clave: TranslationKey, params?: Record<string, string | number>) => string;
@@ -32,14 +32,33 @@ export function etiquetaHr(t: Traductor, grupo: GrupoHr, valor: string | null | 
   return clave in hrGestion ? t(clave as TranslationKey) : undefined;
 }
 
-/** Igual que `etiquetaHr`, pero sin clave devuelve el valor (o "—" si no hay). */
+/** Igual que `etiquetaHr`, pero sin clave devuelve el valor (o "—" si no hay):
+ *  lo que hacía `LISTA.find(...)?.label ?? valor ?? "—"`. */
 export function etiquetaHrO(t: Traductor, grupo: GrupoHr, valor: string | null | undefined): string {
-  return etiquetaHr(t, grupo, valor) ?? (valor || "—");
+  return etiquetaHr(t, grupo, valor) ?? valor ?? "—";
 }
 
-/** El rol de una persona (user_roles.role) como se lee: los que se escriben
- *  distinto en inglés salen del diccionario; el resto, de HR_ROLE_LABEL. */
-export function rolHr(t: Traductor, rol: string | null | undefined): string {
-  if (!rol) return "—";
-  return etiquetaHr(t, "hrRole", rol) ?? HR_ROLE_LABEL[rol] ?? rol;
+/** Igual que `etiquetaHr`, pero sin clave devuelve el valor tal cual, null
+ *  incluido: lo que hacía `LISTA.find(...)?.label ?? valor`. */
+export function etiquetaHrV<V extends string | null | undefined>(t: Traductor, grupo: GrupoHr, valor: V): string | V {
+  return etiquetaHr(t, grupo, valor) ?? valor;
+}
+
+/** Para donde la pantalla mostraba el valor GUARDADO tal cual, sin etiqueta
+ *  ("fijo", "ahorros", "pending"…): en español se sigue viendo exactamente eso,
+ *  para que no cambie nada; en inglés, la etiqueta del diccionario (o el valor,
+ *  si no tiene clave). Mismo criterio que pages/admin/AdminApiKeys.tsx. */
+export function valorGuardado<V extends string | null | undefined>(
+  t: Traductor, idioma: Language, grupo: GrupoHr, valor: V,
+): string | V {
+  return idioma === "en" ? etiquetaHr(t, grupo, valor) ?? valor : valor;
+}
+
+/** El rol de una persona (user_roles.role) como se lee: el de HR_ROLE_LABEL y,
+ *  si no está ahí, el valor tal cual (así se leía antes). Los que en inglés se
+ *  escriben distinto ("Empleado", "Coordinador") salen del diccionario. */
+export function rolHr(t: Traductor, rol: string): string {
+  const nombre = HR_ROLE_LABEL[rol];
+  if (nombre === undefined) return rol;
+  return etiquetaHr(t, "hrRole", rol) ?? nombre;
 }

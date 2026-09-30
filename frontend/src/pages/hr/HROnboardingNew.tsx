@@ -312,7 +312,7 @@ export default function HROnboardingNew() {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <Label>{t("common.startDate")}</Label>
+                    <Label>{t("hrg.startDateOf")}</Label>
                     <DateInput value={startDate} onChange={setStartDate} placeholder={t("hrg.selectDate")} />
                   </div>
                   <div className="space-y-1.5">

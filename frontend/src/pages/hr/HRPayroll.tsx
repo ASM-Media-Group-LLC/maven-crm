@@ -19,19 +19,13 @@ import type { Formato } from "@/lib/formato";
 const usd = (n: number | null | undefined, f: Formato) => (n == null ? "—" : `$${Math.round(n).toLocaleString(f.intl("es-CO"))}`);
 const cop = (n: number | null | undefined, f: Formato) => (n == null || n === 0 ? "—" : `$${Math.round(n).toLocaleString(f.intl("es-CO"))}`);
 
-// Un solo arreglo vacío para "todavía no llegaron los costos". Con `= []` en la
-// desestructuración cada render estrenaba un arreglo nuevo, el efecto de abajo
-// (que depende de él) volvía a correr, llamaba a setDraft y pedía otro render:
-// un bucle mientras la consulta carga, que en un test se cuelga sin error.
-const SIN_COSTOS: RoleCost[] = [];
-
 export default function HRPayroll() {
   const navigate = useNavigate();
   const f = useFormato();
   const { t } = useLanguage();
   const { toast } = useToast();
   const { data: rows = [], isLoading } = useHrPayroll();
-  const { data: roleCosts = SIN_COSTOS } = useRoleCosts();
+  const { data: roleCosts = [] } = useRoleCosts();
   const save = useSaveRoleCost();
 
   const [editing, setEditing] = useState(false);

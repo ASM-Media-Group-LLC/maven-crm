@@ -35,7 +35,7 @@ import { useDepartments } from "@/hooks/useEmployees";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { useLanguage } from "@/hooks/useLanguage";
 import { ConFormato } from "@/pages/admin/ConFormato";
-import { etiquetaHrO } from "./etiquetasHr";
+import { etiquetaHr, etiquetaHrO, etiquetaHrV, valorGuardado } from "./etiquetasHr";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface ApplicantRecord {
@@ -81,9 +81,11 @@ export default function HRApplicants() {
   const { data: departments = [] } = useDepartments();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { t } = useLanguage();
-  const estado = (s: string) => etiquetaHrO(t, "applStatus", s);
+  const { t, language } = useLanguage();
+  const estado = (s: string) => etiquetaHrV(t, "applStatus", s);
+  // La tabla caía al valor guardado; la tarjeta y el detalle, a "—".
   const fuente = (s: string | null) => etiquetaHrO(t, "applSource", s);
+  const fuenteConocida = (s: string | null) => etiquetaHr(t, "applSource", s) ?? "—";
 
   // Filters
   const [search, setSearch] = useState("");
@@ -257,7 +259,7 @@ export default function HRApplicants() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="sticky top-0 z-10 bg-card text-xs font-medium text-muted-foreground">{t("common.name")}</TableHead>
-                    <TableHead className="sticky top-0 z-10 bg-card text-xs font-medium text-muted-foreground">{t("common.email")}</TableHead>
+                    <TableHead className="sticky top-0 z-10 bg-card text-xs font-medium text-muted-foreground">{t("hrg.email")}</TableHead>
                     <TableHead className="sticky top-0 z-10 bg-card text-xs font-medium text-muted-foreground">{t("hrg.position")}</TableHead>
                     <TableHead className="sticky top-0 z-10 bg-card text-xs font-medium text-muted-foreground">{t("common.area")}</TableHead>
                     <TableHead className="sticky top-0 z-10 bg-card text-xs font-medium text-muted-foreground">{t("hrg.source")}</TableHead>
@@ -368,7 +370,7 @@ export default function HRApplicants() {
                       <div className="space-y-1 text-xs text-muted-foreground">
                         <p><span className="font-medium text-foreground">{t("hrg.position")}:</span> {app.position_applied ?? "—"}</p>
                         {app.departments?.name && <p><span className="font-medium text-foreground">{t("common.area")}:</span> {app.departments.name}</p>}
-                        <p><span className="font-medium text-foreground">{t("hrg.source")}:</span> {fuente(app.source)}</p>
+                        <p><span className="font-medium text-foreground">{t("hrg.source")}:</span> {fuenteConocida(app.source)}</p>
                         <p><span className="font-medium text-foreground">{t("common.date")}:</span> {format(new Date(app.created_at), "dd/MM/yyyy")}</p>
                       </div>
                       <div className="flex items-center gap-1 pt-1 border-t border-border">
@@ -393,11 +395,11 @@ export default function HRApplicants() {
             <div className="space-y-3 text-sm">
               <div className="grid grid-cols-2 gap-3">
                 <div><p className="text-xs text-muted-foreground">{t("common.name")}</p><p className="font-medium">{viewItem.full_name}</p></div>
-                <div><p className="text-xs text-muted-foreground">{t("common.email")}</p><p>{viewItem.email ?? "—"}</p></div>
+                <div><p className="text-xs text-muted-foreground">{t("hrg.email")}</p><p>{viewItem.email ?? "—"}</p></div>
                 <div><p className="text-xs text-muted-foreground">{t("common.phone")}</p><p>{viewItem.phone ?? "—"}</p></div>
                 <div><p className="text-xs text-muted-foreground">{t("hrg.position")}</p><p>{viewItem.position_applied ?? "—"}</p></div>
                 <div><p className="text-xs text-muted-foreground">{t("common.area")}</p><p>{viewItem.departments?.name ?? "—"}</p></div>
-                <div><p className="text-xs text-muted-foreground">{t("hrg.source")}</p><p>{fuente(viewItem.source)}</p></div>
+                <div><p className="text-xs text-muted-foreground">{t("hrg.source")}</p><p>{fuenteConocida(viewItem.source)}</p></div>
                 <div><p className="text-xs text-muted-foreground">{t("common.date")}</p><p>{format(new Date(viewItem.created_at), "dd/MM/yyyy")}</p></div>
                 <div>
                   <p className="text-xs text-muted-foreground">{t("common.status")}</p>
@@ -421,12 +423,12 @@ export default function HRApplicants() {
           <DialogHeader><DialogTitle>{t("hrg.appl.editTitle")}</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <Label>{t("common.fullName")} <span className="text-destructive">*</span></Label>
+              <Label>{t("hrg.fullName")} <span className="text-destructive">*</span></Label>
               <Input value={editForm.full_name} onChange={(e) => setEditForm((f) => ({ ...f, full_name: e.target.value }))} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label>{t("common.email")}</Label>
+                <Label>{t("hrg.email")}</Label>
                 <Input type="email" value={editForm.email} onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))} />
               </div>
               <div className="space-y-1.5">
@@ -517,7 +519,8 @@ export default function HRApplicants() {
           return list.slice(0, 100).map((a: any): KpiRow => ({
             primary: a.full_name ?? t("hrg.noName"),
             secondary: a.position_applied ?? a.email ?? undefined,
-            right: a.status ? estado(a.status) : "—",
+            // En español, el estado tal cual (así estaba); en inglés, con su etiqueta.
+            right: valorGuardado(t, language, "applStatus", a.status) ?? "—",
             rightTone: tone(a.status ?? ""),
           }));
         })()}

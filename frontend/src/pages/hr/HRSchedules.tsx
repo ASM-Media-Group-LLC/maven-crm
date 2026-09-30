@@ -388,7 +388,7 @@ const HRSchedules = () => {
               navegando porque tienen su propia ruta detallada. */}
           <StatChip label={t("hrg.sch.kpi.week")} value={String(turnosThisWeek)} icon={<CalendarDays className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("week")} />
           <StatChip label={t("hrg.sch.kpi.today")} value={String(turnosToday)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("today")} />
-          <StatChip label={t("hrg.ot.title")} value={String(overtimeCount)} icon={<Timer className="h-3.5 w-3.5" />} color="bg-warning" hint={t("hrg.viewDetail")} onClick={() => navigate("/hr/horarios/horas-extras")} />
+          <StatChip label={t("hrg.sch.kpi.overtime")} value={String(overtimeCount)} icon={<Timer className="h-3.5 w-3.5" />} color="bg-warning" hint={t("hrg.viewDetail")} onClick={() => navigate("/hr/horarios/horas-extras")} />
           <StatChip label={t("hrg.hourBank")} value={`${hourBankTotal}h`} icon={<Banknote className="h-3.5 w-3.5" />} color="bg-success" hint={t("hrg.viewDetail")} onClick={() => navigate("/hr/horarios/banco-horas")} />
         </div>
 

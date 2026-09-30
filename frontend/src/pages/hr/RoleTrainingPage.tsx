@@ -33,7 +33,7 @@ import { TRAINING_STATUSES, TRAINING_MODALITIES, TRAINING_TARGET_ROLES, TRAINING
 import { PageHeader } from "@/components/ui/page-header";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { TranslationKey } from "@/lib/i18n";
-import { etiquetaHrO, type Traductor } from "./etiquetasHr";
+import { etiquetaHr, etiquetaHrO, etiquetaHrV, type Traductor } from "./etiquetasHr";
 
 // ── Data hooks ──
 function useRoleAssignments(targetRole: string) {
@@ -550,7 +550,7 @@ function AssignmentsTable({ assignments, isLoading, progressMap, moduleCounts, o
                     </TableCell>
                     <TableCell>
                       <Badge variant={getStatusBadgeVariant(a.status)}>
-                        {etiquetaHrO(t, "trainStatus", a.status)}
+                        {etiquetaHrV(t, "trainStatus", a.status)}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
@@ -606,7 +606,7 @@ function AssignmentsGrid({ assignments, isLoading, progressMap, moduleCounts, on
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
                   {expiring && <Badge variant="outline" className="text-xs bg-warning/10 text-warning border-warning/30">{t("hrg.tr.dueSoon")}</Badge>}
-                  <Badge variant={getStatusBadgeVariant(a.status)}>{etiquetaHrO(t, "trainStatus", a.status)}</Badge>
+                  <Badge variant={getStatusBadgeVariant(a.status)}>{etiquetaHrV(t, "trainStatus", a.status)}</Badge>
                 </div>
               </div>
               <p className="text-sm font-medium">{prog?.name || "—"}</p>
@@ -695,7 +695,7 @@ function AssignmentDetailView({ assignment, onBack }: { assignment: any; onBack:
             title={
               <>
                 {emp ? `${emp.first_name} ${emp.last_name}` : "—"}{" "}
-                <Badge variant={getStatusBadgeVariant(assignment.status)}>{etiquetaHrO(t, "trainStatus", assignment.status)}</Badge>
+                <Badge variant={getStatusBadgeVariant(assignment.status)}>{etiquetaHrV(t, "trainStatus", assignment.status)}</Badge>
               </>
             }
             subtitle={prog?.name || "—"}
@@ -708,7 +708,7 @@ function AssignmentDetailView({ assignment, onBack }: { assignment: any; onBack:
             <div className="space-y-1"><p className="text-xs text-muted-foreground">{t("hrg.startDate")}</p><p className="text-sm font-medium">{assignment.start_date ? new Date(assignment.start_date).toLocaleDateString(f.intl("es-CO")) : "—"}</p></div>
             <div className="space-y-1"><p className="text-xs text-muted-foreground">{t("hrg.tr.deadline")}</p><p className="text-sm font-medium">{assignment.completion_date ? new Date(assignment.completion_date).toLocaleDateString(f.intl("es-CO")) : "—"}</p></div>
             <div className="space-y-1"><p className="text-xs text-muted-foreground">{t("hrg.department")}</p><p className="text-sm font-medium">{emp?.departments?.name || "—"}</p></div>
-            <div className="space-y-1"><p className="text-xs text-muted-foreground">{t("hrg.tr.programRole")}</p><p className="text-sm font-medium">{prog?.target_role ? etiquetaHrO(t, "trainRole", prog.target_role) : t("hrg.opt.trainRole.general")}</p></div>
+            <div className="space-y-1"><p className="text-xs text-muted-foreground">{t("hrg.tr.programRole")}</p><p className="text-sm font-medium">{etiquetaHr(t, "trainRole", prog?.target_role) || t("hrg.opt.trainRole.general")}</p></div>
           </div>
 
           {assignment.notes && <div className="space-y-1"><p className="text-xs text-muted-foreground">{t("hrg.notes")}</p><p className="text-sm">{assignment.notes}</p></div>}
@@ -814,7 +814,7 @@ function AssignTrainingView({ targetRole, roleLabel, onBack }: { targetRole: str
             </Select>
           </div>
           <div className="space-y-1.5">
-            <Label>{t("common.startDate")}</Label>
+            <Label>{t("hrg.startDateOf")}</Label>
             <DateInput value={form.start_date} onChange={(v) => setForm((f) => ({ ...f, start_date: v }))} />
           </div>
           <div className="space-y-1.5">
@@ -1028,7 +1028,7 @@ function ProgramConfigView({ targetRole, roleLabel, onBack, onManageModules }: {
                 <TableBody>
                   {filtered.map((p: any) => {
                     const mc = programModuleCounts[p.id];
-                    const modalityLabel = etiquetaHrO(t, "trainModality", p.modality);
+                    const modalityLabel = etiquetaHr(t, "trainModality", p.modality) || p.modality || "—";
                     return (
                       <TableRow key={p.id}>
                         <TableCell className="font-medium">{p.name}</TableCell>
@@ -1238,7 +1238,7 @@ function ModuleManagementView({ program, onBack }: { program: any; onBack: () =>
                         <TableCell>
                           <div className="flex items-center gap-1.5">
                             <ContentIcon className="h-3.5 w-3.5 text-muted-foreground" />
-                            <span className="text-sm">{etiquetaHrO(t, "trainContent", m.content_type)}</span>
+                            <span className="text-sm">{etiquetaHr(t, "trainContent", m.content_type) || m.content_type}</span>
                           </div>
                         </TableCell>
                         <TableCell className="text-sm">{m.duration_minutes ? `${m.duration_minutes} min` : "—"}</TableCell>
