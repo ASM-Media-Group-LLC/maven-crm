@@ -6,6 +6,7 @@ import { Timer, Pause } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { suscribirReloj, leerReloj } from "@/lib/coworkLatido";
 import { segundosMostrados, formatoReloj, type RelojCowork as Reloj } from "@/lib/coworkReloj";
+import { cuentaComoTrabajo } from "@/lib/coworkTiempoRegla";
 import { useLanguage } from "@/hooks/useLanguage";
 import { claveMotivoDetenido } from "./textosCowork";
 
@@ -14,19 +15,21 @@ export function useRelojPropio(): { reloj: Reloj | null; segundos: number } {
   const [reloj, setReloj] = useState<Reloj | null>(() => leerReloj());
   const [ahora, setAhora] = useState(() => Date.now());
   useEffect(() => suscribirReloj(setReloj), []);
+  // Corre en lo que se paga: la regla es UNA (cuentaComoTrabajo), no una copia.
+  const corre = !!reloj && cuentaComoTrabajo(reloj.estado);
   useEffect(() => {
-    if (reloj?.estado !== "activo" && reloj?.estado !== "meet") return;
+    if (!corre) return;
     const id = window.setInterval(() => setAhora(Date.now()), 1000);
     return () => window.clearInterval(id);
-  }, [reloj?.estado]);
-  return { reloj, segundos: segundosMostrados(reloj, reloj?.estado === "activo" || reloj?.estado === "meet" ? ahora : Date.now()) };
+  }, [corre]);
+  return { reloj, segundos: segundosMostrados(reloj, corre ? ahora : Date.now()) };
 }
 
 export default function RelojCowork({ compacto = false, className }: { compacto?: boolean; className?: string }) {
   const { reloj, segundos } = useRelojPropio();
   const { t } = useLanguage();
   if (!reloj) return null; // todavía no llegó el primer latido
-  const corre = reloj.estado === "activo" || reloj.estado === "meet";
+  const corre = cuentaComoTrabajo(reloj.estado);
   const claveMotivo = claveMotivoDetenido(reloj.estado);
   const motivo = claveMotivo ? t(claveMotivo) : null;
   return (

@@ -14,6 +14,7 @@
 //    reloj en la base, así que cuando la presencia falte se lee de ahí.
 
 import type { RelojCowork, EstadoTiempo } from "@/lib/coworkReloj";
+import { ESTADOS_TIEMPO } from "@/lib/coworkTiempoRegla";
 
 /** Un latido más viejo que esto ya no cuenta como "está". */
 export const LATIDO_FRESCO_MS = 90_000;
@@ -24,9 +25,16 @@ export const LATIDO_FRESCO_MS = 90_000;
  * apagado porque el supervisor entró a esa sala): se muestran las asignadas,
  * que es lo mejor que hay. Con la verdad de LiveKit, solo las que están.
  */
-export function personasEnSala(asignadas: string[], conectadas: string[] | null | undefined): string[] {
+export function personasEnSala(
+  asignadas: string[], conectadas: string[] | null | undefined,
+  // Las que LiveKit no ve porque SE LE CAYÓ LA SALA, pero siguen latiendo: sin
+  // esto desaparecían de la tarjeta justo cuando el supervisor tiene que verlas.
+  // Solo entran con latido reciente (ver sinConexionConLaSala): una pestaña
+  // cerrada no vuelve a aparecer.
+  caidas: string[] = [],
+): string[] {
   if (conectadas == null) return asignadas;
-  const set = new Set(conectadas);
+  const set = new Set([...conectadas, ...caidas]);
   return asignadas.filter((id) => set.has(id));
 }
 
@@ -37,7 +45,9 @@ export interface RelojDeRespaldo {
   ultimo_latido: string | null;
 }
 
-const ESTADOS: ReadonlySet<string> = new Set(["activo", "pausa", "sin_camara", "sin_pantalla", "fuera_de_camara", "meet"]);
+// Sale de la regla, no se copia a mano (ver coworkLatido): un estado nuevo que
+// faltara acá dejaba a la persona sin reloj en el tablero.
+const ESTADOS: ReadonlySet<string> = new Set<string>(ESTADOS_TIEMPO);
 
 /**
  * Un reloj para el tablero armado desde la base, con la misma forma que el que
@@ -56,6 +66,13 @@ export function relojDeRespaldo(fila: RelojDeRespaldo | undefined, ahora: number
     segundosHoy: Math.max(0, fila.seg_activo_hoy),
     en: latido,
   };
+}
+
+/** ¿El reloj dice que a esta persona se le cayó la sala? El reloj tiene que
+ *  venir de la presencia o de un latido reciente (relojDeRespaldo ya descarta
+ *  los viejos), así que una pestaña cerrada no cuenta como caída. */
+export function sinConexionConLaSala(reloj: RelojCowork | null | undefined): boolean {
+  return reloj?.estado === "sin_conexion" || reloj?.estado === "sin_conexion_larga";
 }
 
 /** ¿El latido de esta persona es reciente? Para el punto verde cuando la presencia no llega. */

@@ -162,7 +162,11 @@ function FilaPersona({ p, abierta, onToggle }: { p: ResumenPersona; abierta: boo
               {p.cowork_sin_camara_seg > 0 && <Chip>{t("admin.cvh.noCamera", { h: horas(p.cowork_sin_camara_seg) })}</Chip>}
               {p.cowork_sin_pantalla_seg > 0 && <Chip>{t("admin.cvh.noScreen", { h: horas(p.cowork_sin_pantalla_seg) })}</Chip>}
               {p.cowork_fuera_seg > 0 && <Chip>{t("admin.cvh.offCamera", { h: horas(p.cowork_fuera_seg) })}</Chip>}
+              {p.cowork_sin_conexion_larga_seg > 0 && <Chip>{t("admin.cvh.noConnection", { h: horas(p.cowork_sin_conexion_larga_seg) })}</Chip>}
             </div>
+          )}
+          {p.cowork_sin_conexion_seg > 0 && (
+            <p className="text-[11px] text-muted-foreground">{t("admin.cvh.includesDrops", { h: horas(p.cowork_sin_conexion_seg) })}</p>
           )}
 
           <div className="overflow-x-auto">
@@ -186,6 +190,7 @@ function FilaPersona({ p, abierta, onToggle }: { p: ResumenPersona; abierta: boo
                     d.cowork_sin_camara_seg > 0 && t("admin.cvh.noCamera", { h: horas(d.cowork_sin_camara_seg) }),
                     d.cowork_sin_pantalla_seg > 0 && t("admin.cvh.noScreen", { h: horas(d.cowork_sin_pantalla_seg) }),
                     d.cowork_fuera_seg > 0 && t("admin.cvh.away", { h: horas(d.cowork_fuera_seg) }),
+                    (d.cowork_sin_conexion_larga_seg ?? 0) > 0 && t("admin.cvh.noConnection", { h: horas(d.cowork_sin_conexion_larga_seg) }),
                   ].filter(Boolean).join(" · ");
                   return (
                     <tr key={d.dia} className="border-t border-border/30">

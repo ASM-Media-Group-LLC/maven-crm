@@ -2,7 +2,7 @@
 // El servidor manda con cada latido cuánto lleva la persona hoy y en qué
 // estado está; acá se convierte eso en el número que corre en pantalla y en
 // la frase que explica por qué está detenido. Puro, sin React.
-import type { EstadoTiempo } from "@/lib/coworkTiempoRegla";
+import { cuentaComoTrabajo, ESTADOS_TIEMPO, type EstadoTiempo } from "@/lib/coworkTiempoRegla";
 
 export type { EstadoTiempo };
 
@@ -20,8 +20,8 @@ export interface RelojCowork {
 export function segundosMostrados(reloj: RelojCowork | null, ahora: number): number {
   if (!reloj) return 0;
   const base = Math.max(0, reloj.segundosHoy);
-  // Corre en "activo" y en "meet" (el meet grupal cuenta como trabajo).
-  if (reloj.estado !== "activo" && reloj.estado !== "meet") return base;
+  // Corre en lo que se paga: la regla es UNA (cuentaComoTrabajo), no una copia.
+  if (!cuentaComoTrabajo(reloj.estado)) return base;
   return base + Math.max(0, Math.floor((ahora - reloj.en) / 1000));
 }
 
@@ -35,30 +35,46 @@ export function formatoReloj(seg: number): string {
   return h > 0 ? `${h}h ${String(m).padStart(2, "0")}m ${ss}` : `${m}m ${ss}`;
 }
 
+// Una entrada POR ESTADO, y no un switch con `default`: con el switch, un estado
+// nuevo sin frase caía en el default y el reloj se veía detenido sin motivo. Con
+// la tabla, olvidarse uno no compila. null = el reloj corre.
+const MOTIVO_PROPIO: Record<EstadoTiempo, string | null> = {
+  activo: null,
+  meet: null,
+  // Una caída pagada (hasta 10 min por hora): el reloj corre (el cartel de la
+  // llamada es el que le avisa que se cayó la sala).
+  sin_conexion: null,
+  pausa: "en pausa",
+  sin_camara: "cámara apagada",
+  sin_pantalla: "sin compartir pantalla",
+  fuera_de_camara: "no estás frente a la cámara",
+  sin_conexion_larga: "sin conexión a la sala",
+};
+
+const MOTIVO_DE_OTRO: Record<EstadoTiempo, string | null> = {
+  activo: null,
+  meet: null,
+  sin_conexion: null,
+  pausa: "en pausa",
+  sin_camara: "cámara apagada",
+  sin_pantalla: "sin pantalla",
+  fuera_de_camara: "fuera de cámara",
+  sin_conexion_larga: "sin conexión",
+};
+
 /** Por qué está detenido, dicho a la persona. `null` cuando corre. */
 export function motivoDetenido(estado: EstadoTiempo | null | undefined): string | null {
-  switch (estado) {
-    case "pausa": return "en pausa";
-    case "sin_camara": return "cámara apagada";
-    case "sin_pantalla": return "sin compartir pantalla";
-    case "fuera_de_camara": return "no estás frente a la cámara";
-    case "activo": return null;
-    default: return null;
-  }
+  return estado ? MOTIVO_PROPIO[estado] ?? null : null;
 }
 
 /** La misma frase pero en tercera persona, para el tablero del supervisor. */
 export function motivoDetenidoDeOtro(estado: EstadoTiempo | null | undefined): string | null {
-  switch (estado) {
-    case "pausa": return "en pausa";
-    case "sin_camara": return "cámara apagada";
-    case "sin_pantalla": return "sin pantalla";
-    case "fuera_de_camara": return "fuera de cámara";
-    default: return null;
-  }
+  return estado ? MOTIVO_DE_OTRO[estado] ?? null : null;
 }
 
-const ESTADOS = new Set<string>(["activo", "pausa", "sin_camara", "sin_pantalla", "fuera_de_camara", "meet"]);
+// Sale de la regla, no se copia a mano: una lista a mano descartaba en silencio
+// los estados nuevos y el supervisor veía a la persona sin reloj.
+const ESTADOS = new Set<string>(ESTADOS_TIEMPO);
 
 /** Arma el reloj desde lo que llegó por presencia (campos sueltos, cualquiera
  *  puede faltar si el otro lado corre un bundle viejo). */
