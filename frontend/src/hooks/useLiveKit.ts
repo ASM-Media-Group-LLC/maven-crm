@@ -867,12 +867,14 @@ export function useLiveKit() {
         }
 
         if (!preloadedBackgroundsRef.current.has(processorUrl)) {
-          await new Promise<void>((resolve, reject) => {
+          // Con tope: esto corre dentro de connect(), y una foto que no termina
+          // de bajar (ni carga ni error) trababa la entrada entera a la llamada.
+          await withTimeout(new Promise<void>((resolve, reject) => {
             const image = new Image();
             image.src = processorUrl;
             image.onload = () => resolve();
             image.onerror = () => reject(new Error("bg-image-load-failed"));
-          });
+          }), BACKGROUND_SWITCH_TIMEOUT_MS, "bg-precarga");
           preloadedBackgroundsRef.current.add(processorUrl);
         }
 
@@ -1311,6 +1313,19 @@ export function useLiveKit() {
         debouncedRefresh();
       });
       room.on(RoomEvent.TrackMuted, debouncedRefresh);
+      // ⚠️ `isMicOn` / `isCamOn` tienen que decir la VERDAD aunque el silencio lo
+      // haya puesto OTRO (el supervisor desde el tablero). Antes solo se
+      // actualizaban al tocar el botón propio, así que quedaban en "prendido"
+      // con el micrófono silenciado. La pausa decidía con eso y, como toggleMic
+      // mira el estado real, en vez de apagarlo lo PRENDÍA: la sala escuchaba la
+      // casa de la persona durante toda la pausa.
+      const sincronizarPropio = (pub: { source?: Track.Source } | undefined, participant: { isLocal?: boolean } | undefined) => {
+        if (!participant?.isLocal || roomRef.current !== room) return;
+        if (pub?.source === Track.Source.Microphone) setIsMicOn(room.localParticipant.isMicrophoneEnabled);
+        if (pub?.source === Track.Source.Camera) setIsCamOn(hasActiveCameraPublication(room));
+      };
+      room.on(RoomEvent.TrackMuted, sincronizarPropio);
+      room.on(RoomEvent.TrackUnmuted, sincronizarPropio);
       // Alguien mas me silencio: avisarlo. El micro se puede volver a prender
       // cuando uno quiera — el silencio de LiveKit no lo deja bloqueado.
       room.on(RoomEvent.TrackMuted, (pub: any, participant: any) => {

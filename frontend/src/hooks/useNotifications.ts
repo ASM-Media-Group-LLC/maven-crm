@@ -97,16 +97,26 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
   // anterior se llevaba al nuevo. Por eso los ajustes de sonido van por ref.
   const sonidoRef = useRef({ sonar: notifSettings.sound_enabled, noMolestar: notifSettings.dnd_enabled });
   sonidoRef.current = { sonar: notifSettings.sound_enabled, noMolestar: notifSettings.dnd_enabled };
+
+  // FILTRADO POR PERSONA en el servidor (28/09). Sin filtro, Realtime corría la
+  // RLS de `notifications` una vez por cada pestaña de Maven abierta por cada
+  // fila nueva —~289 por hora en prod, casi todas de chat, contra 71 pestañas
+  // con la campana— para descartarla en todas menos en las del destinatario. Con
+  // `user_id=eq.<yo>` el filtro va antes que la RLS y cada fila le cuesta un
+  // chequeo solo a las pestañas de SU persona.
+  // Lo que se deja de oír en vivo: las filas "por rol" (user_id null + role_target).
+  // No existe ninguna (0 en prod; ninguna función de la base ni edge las crea);
+  // si algún día aparecen, las trae el refetch de 60 s de arriba.
   useCanalQueRevive({
     topic: uid ? `notifications-${uid}` : null,
     armar: (canal) =>
       canal.on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "notifications" },
+        { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${uid}` },
         (payload) => {
           const n = payload.new as Notification;
-          // Solo las mías o las dirigidas a mi rol.
-          if (n.user_id === uid || (n.user_id === null && n.role_target)) {
+          // Solo las mías (el filtro ya lo asegura; esto queda de cinturón).
+          if (n.user_id === uid) {
             void qc.invalidateQueries({ queryKey: ["notifications"] });
 
             // Ajustes → Eventos → "En Maven" apagado para este tipo: la fila se
