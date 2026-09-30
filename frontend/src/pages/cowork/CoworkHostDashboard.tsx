@@ -1531,7 +1531,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
             </div>
             {/* Acciones de la sesión, todas del mismo tamaño y color: antes cada
                 una tenía el suyo (el enlace en acento, el apagado en rojo) y la
-                fila se veía desparejada. Finalizar la sesión ya no está acá:
+                fila se veía desparejada. Finalizar la sesión ya no está aquí:
                 vive en la lista de sesiones, fuera del tablero. */}
             <div className="flex shrink-0 items-center gap-0.5 rounded-xl bg-muted/40 p-0.5">
               {puedeFinalizar && (
@@ -1584,7 +1584,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               >
                 <Settings2 className="h-4 w-4" />
                 {/* Punto cuando la sesión NO sigue el estándar: de un vistazo se
-                    sabe que acá los avisos son distintos a los de siempre. */}
+                    sabe que aquí los avisos son distintos a los de siempre. */}
                 {!sonEstandar(reglas) && (
                   <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-primary ring-2 ring-card" />
                 )}
@@ -1683,7 +1683,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
 
                           Mientras una solicitud privada siga abierta, al chatter
                           se lo lleva automáticamente a esa sala 1:1 — y si nadie
-                          la cierra, queda parado en una sala VACÍA mientras acá
+                          la cierra, queda parado en una sala VACÍA mientras aquí
                           le hablan a la sala principal. Se ve igual que un
                           problema de audio: "le hablo y no me escucha".
 
@@ -1778,7 +1778,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
           })()}
 
           {/* Supervisores en pausa (break / lunch / ausente desde la tacita del
-              Hub). Acá SÍ con el tiempo: lo ven los supervisores entre sí; los
+              Hub). Aquí SÍ con el tiempo: lo ven los supervisores entre sí; los
               chatters solo ven la pantalla sin contador (Jhon, 10/09). */}
           {(() => {
             const sups = Object.entries(supervisores)
@@ -2136,7 +2136,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                             <span className="text-xs">{t("cowork.host.noParticipants")}</span>
                           </div>
                           {/* El monitor sigue MONTADO aunque no vea a nadie. Antes se
-                              desmontaba acá, y como es él quien avisa quién está, ya no
+                              desmontaba aquí, y como es él quien avisa quién está, ya no
                               podía avisar que alguien llegó (o volvió tras un corte de
                               red): la sala quedaba "Sin participantes" y sin pantalla
                               hasta recargar el tablero (Jhon, 10/09). Solo si hay

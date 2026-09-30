@@ -67,13 +67,13 @@ export const compartido = {
   "shared.call.repair": { es: "Reparar", en: "Fix it" },
   "shared.call.bgGone": { es: "Tu fondo ya no está disponible", en: "Your background is no longer available" },
   "shared.call.bgGoneDesc": {
-    es: "Se quitó el efecto y tu cámara sale sin fondo. Elegí otro cuando quieras.",
+    es: "Se quitó el efecto y tu cámara sale sin fondo. Elige otro cuando quieras.",
     en: "The effect was removed and your camera is on without a background. Pick another one whenever you want.",
   },
   "shared.call.bgFailed": { es: "No se pudo poner tu fondo", en: "Couldn't set your background" },
   "shared.call.bgApplyFailed": { es: "No se pudo aplicar tu fondo", en: "Couldn't apply your background" },
   "shared.call.bgFailedDesc": {
-    es: "Tu cámara está saliendo sin fondo. Volvé a elegirlo para reintentar.",
+    es: "Tu cámara está saliendo sin fondo. Vuelve a elegirlo para reintentar.",
     en: "Your camera is on without a background. Pick it again to retry.",
   },
   "shared.call.someoneMutedYou": { es: "Alguien silenció tu micrófono", en: "Someone muted your microphone" },
@@ -104,7 +104,7 @@ export const compartido = {
     en: "Try picking a different microphone in the call menu and then switching back to your usual one.",
   },
   "shared.call.screenShareUnavailable": {
-    es: "Compartir pantalla no está disponible acá",
+    es: "Compartir pantalla no está disponible aquí",
     en: "Screen sharing isn't available here",
   },
   "shared.call.screenShareUnavailableDesc": {

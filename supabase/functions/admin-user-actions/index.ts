@@ -327,7 +327,7 @@ Deno.serve(async (req) => {
           // alta. Pasó de verdad: un trigger nuestro en auth.users rechazaba
           // todas las altas y en pantalla se leía "Database error creating
           // new user", en inglés. El detalle técnico viaja en `raw`.
-          friendly = "La base rechazó el alta. No es algo que puedas arreglar desde acá: avisale al equipo técnico con la hora exacta.";
+          friendly = "La base rechazó el alta. No es algo que puedas arreglar desde aquí: avísale al equipo técnico con la hora exacta.";
         } else if (raw && !/[áéíóúñ¿¡]/i.test(raw)) {
           // Cualquier otro mensaje del servidor de auth viene en inglés. Que
           // no llegue crudo a la pantalla: el detalle queda en `raw` para

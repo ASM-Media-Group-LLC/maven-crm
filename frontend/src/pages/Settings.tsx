@@ -208,7 +208,7 @@ const MyAccountTab = () => {
       </Card>
 
       {/* Picker de muñequito: si el usuario no tiene foto, su avatar es un
-          muñequito determinista. Acá puede "mezclar" variantes y guardar la
+          muñequito determinista. Aquí puede "mezclar" variantes y guardar la
           que le guste (profiles.avatar_seed). La foto real siempre gana. */}
       <Card>
         <CardContent className="p-6">
@@ -825,7 +825,7 @@ const AdminTab = ({ canAccess, isAdmin }: { canAccess: ReturnType<typeof usePerm
           />
         )}
         {/* Panel de control vivía como entrada suelta del menú lateral; es una
-            pantalla de administración y acá tiene su lugar (Jhon, 09/09/2026). */}
+            pantalla de administración y aquí tiene su lugar (Jhon, 09/09/2026). */}
         {(canAccess("Panel de control") || isAdmin) && (
           <Row
             to="/panel-de-control"
@@ -982,7 +982,7 @@ const Settings = () => {
       {/* Right side — active tab content, flush-left so it fills the
           available width on desktop instead of floating in the middle
           like a mobile screen. Si hay ?sub=<key>, embedimos la
-          sub-página acá adentro (con header de "Volver al menú" arriba)
+          sub-página aquí adentro (con header de "Volver al menú" arriba)
           en vez de mandar al usuario a otra ruta. */}
       <SettingsRightPane
         active={active}

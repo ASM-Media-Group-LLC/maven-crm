@@ -159,7 +159,7 @@ export default function Messenger() {
                     <Cara seed="camilo" />
                     <span className="glob">
                       <span className="nom">Camilo</span>
-                      Subí las fotos del set de ayer, quedaron nueve.
+                      Sube las fotos del set de ayer, quedaron nueve.
                       <span className="album2"><i /><i /><i>+7</i></span>
                       <span className="hora">14:21</span>
                     </span>
@@ -175,7 +175,7 @@ export default function Messenger() {
                     <Cara seed="martina" />
                     <span className="glob">
                       <span className="nom">Martina</span>
-                      ¿Seguimos con lo del cambio de turno acá o abrimos un hilo?
+                      ¿Seguimos con lo del cambio de turno aquí o abrimos un hilo?
                       <span className="hilo-link">
                         <Link2 width={11} height={11} strokeWidth={2.4} aria-hidden="true" />
                         4 respuestas en el hilo

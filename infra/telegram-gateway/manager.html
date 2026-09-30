@@ -35,7 +35,7 @@
         <div id="step-code" class="hidden space-y-2">
           <p class="text-xs text-slate-500">Te llegó un código a la app de Telegram. Ingresalo:</p>
           <input id="code" inputmode="numeric" placeholder="Código" class="w-full px-3 py-2 rounded border border-slate-300 text-sm" />
-          <input id="pw2fa" type="password" placeholder="Contraseña 2FA (si tenés)" class="w-full px-3 py-2 rounded border border-slate-300 text-sm" />
+          <input id="pw2fa" type="password" placeholder="Contraseña 2FA (si tienes)" class="w-full px-3 py-2 rounded border border-slate-300 text-sm" />
           <button id="btn-verify" class="px-3 py-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold">Verificar y vincular</button>
         </div>
         <div id="add-msg" class="text-xs"></div>
@@ -72,7 +72,7 @@
           const el = document.createElement("div");
           el.className = "flex items-center justify-between border border-slate-200 rounded-lg px-3 py-2";
           const dot = a.loggedIn ? '<span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>' : '<span class="inline-block w-2 h-2 rounded-full bg-rose-500"></span>';
-          const sub = a.loggedIn ? ("@" + (a.account || "?")) : ("caída — " + (a.error || "re-vinculá"));
+          const sub = a.loggedIn ? ("@" + (a.account || "?")) : ("caída — " + (a.error || "re-vincula"));
           el.innerHTML =
             '<div class="min-w-0">' +
               '<div class="font-medium text-slate-800 flex items-center gap-2">' + dot + " " + (a.label || a.id) + (a.isDefault ? ' <span class="text-[10px] px-1.5 rounded bg-slate-200 text-slate-600">Promolog</span>' : "") + "</div>" +
@@ -100,7 +100,7 @@
         if (!r.ok || !j.ok) throw new Error(j.error || "error");
         currentLoginId = j.id;
         $("step-phone").classList.add("hidden"); $("step-code").classList.remove("hidden");
-        msg.textContent = "Código enviado. Revisá tu Telegram."; msg.className = "text-xs text-emerald-600";
+        msg.textContent = "Código enviado. Revisa tu Telegram."; msg.className = "text-xs text-emerald-600";
       } catch (e) { msg.textContent = "Error: " + e.message; msg.className = "text-xs text-rose-600"; }
     });
 
@@ -109,7 +109,7 @@
       try {
         const r = await fetch("/manager/telegram/verify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: currentLoginId, code: $("code").value.trim(), password: $("pw2fa").value }) });
         const j = await r.json();
-        if (r.status === 401 && j.need2fa) { msg.textContent = "Esta cuenta tiene 2FA — ingresá la contraseña y verificá de nuevo."; msg.className = "text-xs text-amber-600"; return; }
+        if (r.status === 401 && j.need2fa) { msg.textContent = "Esta cuenta tiene 2FA — ingresa la contraseña y verifica de nuevo."; msg.className = "text-xs text-amber-600"; return; }
         if (!r.ok || !j.ok) throw new Error(j.error || "error");
         msg.textContent = "✓ Vinculada (@" + (j.account || "") + ")"; msg.className = "text-xs text-emerald-600";
         $("add-form").classList.add("hidden"); $("phone").value = ""; $("label").value = ""; $("code").value = ""; $("pw2fa").value = "";

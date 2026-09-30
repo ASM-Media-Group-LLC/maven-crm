@@ -296,7 +296,7 @@ export default function ChatterQaReportDetail({ id, onBack }: { id: string; onBa
             <Button type="button" variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => patch({ observaciones_por_modelo: [...obs, { model_name: "", observaciones: [""] }] })}><Plus className="h-3.5 w-3.5" /> Agregar modelo</Button>
           </Section>
           <Section icon={Megaphone} title="Venta masiva" accent="bg-fuchsia-500/15 text-fuchsia-500">
-            <p className="mb-2 text-xs text-muted-foreground">Diagnóstico manual de los masivos del chatter (dejalo vacío si no aplica). El detalle —mejores/peores · patrones · recomendaciones— lo completa el borrador IA cuando detecta masivos suyos.</p>
+            <p className="mb-2 text-xs text-muted-foreground">Diagnóstico manual de los masivos del chatter (déjalo vacío si no aplica). El detalle —mejores/peores · patrones · recomendaciones— lo completa el borrador IA cuando detecta masivos suyos.</p>
             <Textarea rows={3} value={report.venta_masiva?.resumen ?? ""} placeholder="Diagnóstico de los masivos…"
               onChange={(e) => patchVm({ resumen: e.target.value })} />
           </Section>

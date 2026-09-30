@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 
 // Jhon, 28/09: cupo por persona (50 GB general), chequeo de lugar antes de
-// subir, y la barrita «usás X de Y».
+// subir, y la barrita «usas X de Y».
 
 vi.mock("@/hooks/useLanguage", (original) =>
   import("@/test/messenger/espanolEnTests").then((m) => m.idiomaEnEspanol(original)));
@@ -23,7 +23,7 @@ describe("la barrita de uso", () => {
   it("dice cuánto se usa de cuánto", () => {
     uso = { usado: 3.2 * 1024 ** 3, cupo: 50 * 1024 ** 3 };
     render(<BarraDeUso />);
-    expect(screen.getByText("Usás 3.2 GB de 50 GB")).toBeInTheDocument();
+    expect(screen.getByText("Usas 3.2 GB de 50 GB")).toBeInTheDocument();
     expect(screen.queryByText(/Te queda poco espacio/)).not.toBeInTheDocument();
   });
   it("al 90% avisa y se pone ámbar", () => {

@@ -254,7 +254,7 @@ const WorkspaceContent = () => {
           {/* Toggle del rail de info personaje (derecha). 3-state:
               hidden por user / shown por user / auto-hide en narrow.
               Click siempre flippea, así el botón funciona aún en
-              narrow. History ya no vive acá — está en la página
+              narrow. History ya no vive aquí — está en la página
               principal del Chatter Evaluator. */}
           <Button
             variant="ghost"

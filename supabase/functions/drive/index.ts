@@ -70,7 +70,7 @@ Deno.serve(async (req) => {
       const parentId = body.parent_id ? String(body.parent_id) : null;
       if (parentId) {
         const rol = await rolDe(comoLaPersona, parentId);
-        if (rol !== "dueno" && rol !== "editor") throw new HttpError("No podés guardar en esa carpeta", 403);
+        if (rol !== "dueno" && rol !== "editor") throw new HttpError("No puedes guardar en esa carpeta", 403);
       }
       const { data: tenant, error: eT } = await comoLaPersona.rpc("current_tenant_id");
       if (eT || !tenant) throw new HttpError("No encontré tu agencia", 403);
@@ -86,9 +86,9 @@ Deno.serve(async (req) => {
       // subida fallaría igual: mejor decirlo ya.
       const salud = await fetch(`${nas}/salud`, { signal: AbortSignal.timeout(8000) })
         .then((r) => r.json()).catch(() => null) as { raices?: { ok: boolean; libre?: number; total?: number }[] } | null;
-      if (!salud?.raices) throw new HttpError("El NAS no responde. Probá en unos minutos.", 503);
+      if (!salud?.raices) throw new HttpError("El NAS no responde. Prueba en unos minutos.", 503);
       if (!hayLugarEnElNas(salud.raices, size, plan.partes > 0)) {
-        throw new HttpError("El NAS no tiene lugar para este archivo. Avisale a un admin.", 507);
+        throw new HttpError("El NAS no tiene lugar para este archivo. Avísale a un admin.", 507);
       }
 
       const id = crypto.randomUUID();
@@ -141,7 +141,7 @@ Deno.serve(async (req) => {
       // Como la persona: si la RLS no se la muestra, no hay permiso.
       const { data: fila } = await comoLaPersona.from("drive_items")
         .select("id, tipo, nombre, mime, storage_key, estado").eq("id", id).maybeSingle();
-      if (!fila || fila.tipo !== "archivo") throw new HttpError("No existe o no tenés acceso", 404);
+      if (!fila || fila.tipo !== "archivo") throw new HttpError("No existe o no tienes acceso", 404);
       if (fila.estado !== "listo") throw new HttpError("El archivo todavía se está subiendo", 409);
       const descargar = !!body.descargar;
       const u = await permisoNas(
@@ -157,7 +157,7 @@ Deno.serve(async (req) => {
     if (accion === "borrar_para_siempre") {
       const id = String(body.id ?? "");
       const rol = await rolDe(comoLaPersona, id);
-      if (rol !== "dueno" && rol !== "editor") throw new HttpError("No podés borrar esto", 403);
+      if (rol !== "dueno" && rol !== "editor") throw new HttpError("No puedes borrar esto", 403);
       const { data: raiz } = await admin.from("drive_items").select("id, trashed_at").eq("id", id).maybeSingle();
       if (!raiz) throw new HttpError("No existe", 404);
       if (!raiz.trashed_at) throw new HttpError("Primero hay que mandarlo a la papelera", 409);
@@ -180,7 +180,7 @@ Deno.serve(async (req) => {
       // siempre. Así, si falla, la ficha sigue en la papelera y se reintenta.
       for (const k of archivos) {
         const r = await fetch(await permisoNas({ op: "borrar", k }, VENCE.borrar), { method: "DELETE" });
-        if (!r.ok && r.status !== 404) throw new HttpError(`El NAS no pudo borrar (${r.status}); probá de nuevo`, 502);
+        if (!r.ok && r.status !== 404) throw new HttpError(`El NAS no pudo borrar (${r.status}); prueba de nuevo`, 502);
       }
       const { error } = await admin.from("drive_items").delete().eq("id", id);
       if (error) throw new HttpError(error.message, 500);

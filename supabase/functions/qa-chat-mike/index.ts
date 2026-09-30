@@ -138,7 +138,7 @@ serve(async (req) => {
     const history = (historyRaw ?? []) as QaChatMessageRow[];
 
     if (history.length === 0) {
-      return jsonError(req, "Sesión sin mensajes — primero insertá el user message.", 400);
+      return jsonError(req, "Sesión sin mensajes — primero inserta el user message.", 400);
     }
     const last = history[history.length - 1];
     if (last.role === "assistant") {

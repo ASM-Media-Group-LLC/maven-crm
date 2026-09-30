@@ -15,7 +15,7 @@ export interface MimePart {
   disposition: string;
   filename: string | null;
   contentId: string | null;
-  /** Contenido ya decodificado. Vacío para adjuntos: no los traemos acá. */
+  /** Contenido ya decodificado. Vacío para adjuntos: no los traemos aquí. */
   text: string;
   /** Body crudo de la parte (aún codificado). Para materializar el binario de
    *  un adjunto puntual bajo demanda con `extraerAdjunto`, sin decodificar
