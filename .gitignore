@@ -39,3 +39,8 @@ scripts/migrate-chatters/node_modules/
 frontend/.env.local
 frontend/.env.*.local
 infra/*/.env
+
+# Los siembra scripts/ci/tsc-sin-errores-nuevos.mjs y los borra al terminar; si una
+# corrida local se corta, que no se suban por error (el canario es un error de tipos a propósito).
+/.guarda-tsc-canario.ts
+/.guarda-tsc.json

@@ -14,6 +14,10 @@ export interface FilaDia {
   cowork_fuera_seg: number;
   cowork_en_sala_seg: number;
   cowork_sesiones: number;
+  /** La sala se cayó: lo que se pagó (hasta 10 min por hora; ya dentro de cowork_activo_seg). */
+  cowork_sin_conexion_seg: number;
+  /** Caídas que no se pagan: pasaron el tope, o ya no estaba cobrando. */
+  cowork_sin_conexion_larga_seg: number;
 }
 
 export interface ResumenPersona {
@@ -26,6 +30,8 @@ export interface ResumenPersona {
   cowork_sin_camara_seg: number;
   cowork_sin_pantalla_seg: number;
   cowork_fuera_seg: number;
+  cowork_sin_conexion_seg: number;
+  cowork_sin_conexion_larga_seg: number;
   /** Cuánto del tiempo de Hubstaff explica el reloj de Cowork (0-1). null si no hay Hubstaff. */
   cobertura: number | null;
   diasHubstaff: number;
@@ -51,6 +57,7 @@ export function agregarPorPersona(filas: FilaDia[]): ResumenPersona[] {
         profile_id: f.profile_id, nombre: f.nombre || "Sin nombre",
         hubstaff_seg: 0, cowork_activo_seg: 0, cowork_en_sala_seg: 0, cowork_pausa_seg: 0,
         cowork_sin_camara_seg: 0, cowork_sin_pantalla_seg: 0, cowork_fuera_seg: 0,
+        cowork_sin_conexion_seg: 0, cowork_sin_conexion_larga_seg: 0,
         cobertura: null, diasHubstaff: 0, diasCowork: 0, dias: [],
       };
       mapa.set(f.profile_id, r);
@@ -62,6 +69,9 @@ export function agregarPorPersona(filas: FilaDia[]): ResumenPersona[] {
     r.cowork_sin_camara_seg += f.cowork_sin_camara_seg;
     r.cowork_sin_pantalla_seg += f.cowork_sin_pantalla_seg;
     r.cowork_fuera_seg += f.cowork_fuera_seg;
+    // `?? 0`: una respuesta sin la columna (la migración todavía no aplicada) no da NaN.
+    r.cowork_sin_conexion_seg += f.cowork_sin_conexion_seg ?? 0;
+    r.cowork_sin_conexion_larga_seg += f.cowork_sin_conexion_larga_seg ?? 0;
     if (f.hubstaff_seg > 0) r.diasHubstaff++;
     if (f.cowork_en_sala_seg > 0) r.diasCowork++;
     r.dias.push(f);

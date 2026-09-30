@@ -43,6 +43,45 @@ const PREJOIN_BG_ATTACH_TIMEOUT_MS = 4000;
 const PREJOIN_BG_SWITCH_TIMEOUT_MS = 5000;
 const PREJOIN_BG_FAILURE_COOLDOWN_MS = 8000;
 
+// ⚠️ LA SALA DE ESPERA SE QUEDABA EN "APLICANDO FONDO…" Y LA PERSONA NO SE VEÍA
+// (Grace, 29/09/2026). Mientras se prepara el fondo el video se esconde a
+// propósito —para no mostrar un cuadro sin fondo— y se ve la foto de la
+// plantilla. Pero dos esperas no tenían tope (pedir la cámara y precargar la
+// foto) y nada sacaba el velo si la cadena se trababa: la persona se quedaba
+// mirando un café, sin verse, para siempre. Encima el cartel mentía: se
+// prendía ANTES de pedir la cámara, así que una cámara trabada también decía
+// "Aplicando fondo…".
+//
+// Ahora cada espera tiene tope, el cartel dice lo que de verdad se espera, y si
+// el fondo no está listo en PREJOIN_BG_TOTAL_TIMEOUT_MS la persona se ve igual,
+// sin fondo (el fondo se vuelve a intentar al entrar a la llamada).
+
+/** Cuánto se espera a que la cámara entregue imagen. `createLocalTracks` no
+ *  tiene tope propio: un permiso sin contestar u otra aplicación usando la
+ *  cámara lo dejan esperando para siempre. */
+const PREJOIN_CAMARA_TIMEOUT_MS = 12_000;
+/** Tope de TODA la preparación del fondo antes de mostrar a la persona. */
+const PREJOIN_BG_TOTAL_TIMEOUT_MS = 10_000;
+
+/** Los errores de la cámara (los del micrófono comparten el mismo cartel). */
+const ERRORES_DE_CAMARA: ReadonlySet<TranslationKey> = new Set<TranslationKey>([
+  "messenger.lobby.permisoCamaraDenegado", "messenger.lobby.noSePudoCamara",
+  "messenger.lobby.camaraNoResponde", "messenger.lobby.permiteLaCamara",
+]);
+
+/** Qué decir cuando la cámara no contesta a tiempo. Si el navegador está
+ *  esperando que la persona dé permiso, eso: el tope también corre mientras el
+ *  aviso de permiso está abierto, y "no responde" la mandaba a revisar lo que no
+ *  está roto. Safari no deja preguntar por "camera": ahí va el mensaje general. */
+async function mensajeDeCamaraQueNoContesta(): Promise<TranslationKey> {
+  try {
+    const estado = await withTimeout(
+      navigator.permissions.query({ name: "camera" as PermissionName }), 1_000, "prejoin-permiso");
+    if (estado.state === "prompt") return "messenger.lobby.permiteLaCamara";
+  } catch { /* no se puede saber */ }
+  return "messenger.lobby.camaraNoResponde";
+}
+
 // isTemplateBackground, isCustomBackground, getCustomBackgroundUrl imported from BackgroundSelector
 
 
@@ -91,12 +130,31 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
   
   const [backgroundPreviewUnsupported, setBackgroundPreviewUnsupported] = useState(false);
   const [isPreparingBackgroundFirstFrame, setIsPreparingBackgroundFirstFrame] = useState(false);
+  // Esperando que la cámara entregue la primera imagen. Es otra espera que la
+  // del fondo y se dice distinto: si se traba la cámara, no es culpa del fondo.
+  const [abriendoCamara, setAbriendoCamara] = useState(false);
+  // El fondo no estuvo listo a tiempo: se muestra a la persona sin fondo.
+  const [fondoTardo, setFondoTardo] = useState(false);
+  // Número de la corrida de "prender la cámara" VIGENTE. Si se pedía otra
+  // mientras la primera esperaba, las dos pisaban la pista y la primera nunca se
+  // apagaba: la cámara quedaba prendida por fuera.
+  const camaraGenRef = useRef(0);
+  // Lo mismo para el micrófono: una apertura vieja que contestaba tarde quedaba
+  // capturando sin ninguna referencia, y nada la apagaba.
+  const microfonoGenRef = useRef(0);
 
   const [audioInputs, setAudioInputs] = useState<DeviceInfo[]>([]);
   const [videoInputs, setVideoInputs] = useState<DeviceInfo[]>([]);
   const [audioOutputs, setAudioOutputs] = useState<DeviceInfo[]>([]);
   const [selectedAudioInput, setSelectedAudioInput] = useState<string>("");
   const [selectedVideoInput, setSelectedVideoInput] = useState<string>("");
+  // Lo que la persona ELIGIÓ ("" = el de siempre). Es lo único que reabre la
+  // cámara o el micrófono. `selected*` es lo que se muestra, y `enumerateDevices`
+  // lo llena con el aparato de verdad apenas hay permiso: cuando esa misma
+  // variable disparaba la reapertura, la primera vez que se prendía la cámara
+  // se abría DOS veces (y el fondo con ella), que es media espera de Grace.
+  const [camaraPedida, setCamaraPedida] = useState<string>("");
+  const [microfonoPedido, setMicrofonoPedido] = useState<string>("");
   const [selectedAudioOutput, setSelectedAudioOutput] = useState<string>("");
 
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
@@ -122,7 +180,9 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
       setSelectedAudioOutput((prev) =>
         ao.some((d) => d.deviceId === prev) ? prev : (ao[0]?.deviceId || "")
       );
-    } catch {}
+    } catch (e) {
+      console.warn("[PreJoin] No se pudieron listar los dispositivos:", e);
+    }
   }, []);
 
 
@@ -220,12 +280,13 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
           return false;
         }
         if (!preloadedRef.current.has(urlImagen)) {
-          await new Promise<void>((resolve, reject) => {
+          // Con tope: una red que se cuelga justo acá dejaba la cola trabada.
+          await withTimeout(new Promise<void>((resolve, reject) => {
             const img = new Image();
             img.src = urlImagen;
             img.onload = () => resolve();
             img.onerror = () => reject(new Error("bg-image-load-failed"));
-          });
+          }), PREJOIN_BG_SWITCH_TIMEOUT_MS, "prejoin-bg-precarga");
           preloadedRef.current.add(urlImagen);
         }
         if (opId !== bgOpRef.current) return false;
@@ -247,7 +308,12 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
       if (videoRef.current && track && mountedRef.current && videoTrackRef.current === track) {
         try { track.detach(); track.attach(videoRef.current); attachedVideoElRef.current = videoRef.current; videoRef.current.play?.().catch(() => {}); } catch {}
       }
-      setBackgroundPreviewUnsupported(effect !== "none");
+      // Un paso que se pasó de su tope (la foto que no termina de bajar, el motor
+      // que no contesta) NO es "tu navegador no soporta": en el caso de Grace ese
+      // aviso culpaba a Chrome. Se dice que el fondo tardó.
+      const fueUnTope = /-timeout$/.test(String((err as Error)?.message ?? ""));
+      setBackgroundPreviewUnsupported(effect !== "none" && !fueUnTope);
+      if (fueUnTope && effect !== "none") setFondoTardo(true);
       return false;
     }
   }, [disposeBackgroundProcessor]);
@@ -271,44 +337,83 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
     return bgApplyQueueRef.current;
   }, [applyBackgroundToTrack, camOn]);
 
+  /** Aplica el fondo con un TOPE TOTAL. Si no llega a tiempo, deja de esperar:
+   *  invalida lo que siga en vuelo, destraba la cola y avisa que se muestra sin
+   *  fondo. Devuelve si quedó aplicado. */
+  const aplicarFondoConTope = useCallback(async (effect: BackgroundEffect): Promise<boolean> => {
+    try {
+      const ok = await withTimeout(queueBackgroundApply(effect), PREJOIN_BG_TOTAL_TIMEOUT_MS, "prejoin-bg-total");
+      if (ok || effect === "none") setFondoTardo(false);
+      return ok;
+    } catch (e) {
+      console.warn("[PreJoin] El fondo no estuvo listo a tiempo; se muestra sin fondo:", e);
+      bgOpRef.current += 1; // lo que siga en vuelo ya no aplica
+      bgApplyQueueRef.current = Promise.resolve(false); // la cola no queda trabada detrás
+      if (mountedRef.current) setFondoTardo(true);
+      return false;
+    }
+  }, [queueBackgroundApply]);
+
   const startVideoTrack = useCallback(async () => {
+    const gen = ++camaraGenRef.current;
+    const vigente = () => gen === camaraGenRef.current && mountedRef.current;
     stopVideoTrack();
     setIsPreparingBackgroundFirstFrame(false);
+    setAbriendoCamara(false);
+    setFondoTardo(false);
 
-    // When restarting with a background active, keep the processor alive
-    // and just clear the track reference so it re-attaches to the new track.
-    // Only dispose if we're turning the camera OFF or have no effect.
-    if (bgProcessorRef.current && bgEffectRef.current === "none") {
-      await disposeBackgroundProcessor();
-    } else {
-      bgAttachedTrackRef.current = null;
-      bgLastAppliedEffectRef.current = "none";
-    }
-
+    // Un motor de fondo POR PISTA. Reutilizarlo entre pistas dejaba colgado el
+    // anterior: cada apagar/prender sumaba otro segmentador y otro contexto de
+    // WebGL sin cerrar, hasta que el navegador empezaba a perder contextos.
+    await disposeBackgroundProcessor();
+    if (!vigente()) return;
+    // Un error viejo de la CÁMARA se va al volver a intentar (los del micrófono no).
+    setPermissionError((e) => (e && ERRORES_DE_CAMARA.has(e) ? null : e));
     if (!camOn) return;
 
-    const requestedEffect = bgEffectRef.current;
-    const shouldPrepareBackgroundFirst = requestedEffect !== "none";
-    if (shouldPrepareBackgroundFirst) {
-      setIsPreparingBackgroundFirstFrame(true);
-    }
+    setAbriendoCamara(true);
 
     try {
-      const tracks = await createLocalTracks({
-        video: selectedVideoInput ? { deviceId: { ideal: selectedVideoInput } } : true,
+      const pedido = createLocalTracks({
+        video: camaraPedida ? { deviceId: { ideal: camaraPedida } } : true,
         audio: false,
       });
-      if (!mountedRef.current) {
+      let tracks: Awaited<typeof pedido>;
+      try {
+        tracks = await withTimeout(pedido, PREJOIN_CAMARA_TIMEOUT_MS, "prejoin-camara");
+      } catch (e) {
+        if ((e as Error)?.message !== "prejoin-camara-timeout") throw e;
+        // ⚠️ El tope AVISA, pero no descarta: se sigue esperando. Si la cámara
+        // contesta tarde (la persona encontró el aviso de permiso a los 15 s) y
+        // esta corrida sigue siendo la vigente, se usa. Descartarla apagaba la
+        // cámara que la persona acababa de permitir.
+        if (vigente()) {
+          setAbriendoCamara(false);
+          setPermissionError(await mensajeDeCamaraQueNoContesta());
+        }
+        tracks = await pedido;
+      }
+      if (!vigente()) {
         tracks.forEach((t) => t.stop());
         return;
       }
 
       const vTrack = tracks.find((t): t is LocalVideoTrack => t.kind === "video") || null;
       videoTrackRef.current = vTrack;
+      setAbriendoCamara(false);
+      setPermissionError((e) => (e && ERRORES_DE_CAMARA.has(e) ? null : e));
+      // El fondo se lee AHORA, con la pista en la mano: si se lee antes de pedir
+      // la cámara, un cambio de fondo hecho mientras abría se perdía.
+      const requestedEffect = bgEffectRef.current;
 
-      // Guarantee processor application happens before exposing the refreshed video frame.
-      if (vTrack && shouldPrepareBackgroundFirst) {
-        await queueBackgroundApply(requestedEffect);
+      // El fondo se prepara ANTES de mostrar el primer cuadro (para no mostrar
+      // la habitación ni un instante), pero con tope: si no llega, se muestra a
+      // la persona sin fondo en vez de dejarla sin verse.
+      if (vTrack && requestedEffect !== "none") {
+        setIsPreparingBackgroundFirstFrame(true);
+        await aplicarFondoConTope(requestedEffect);
+        if (!vigente()) return;
+        setIsPreparingBackgroundFirstFrame(false);
       }
 
       if (videoRef.current && vTrack) {
@@ -320,32 +425,39 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
       setPermissionError(null);
       await enumerateDevices();
     } catch (err: any) {
-      if (err.name === "NotAllowedError") {
+      if (!vigente()) return;
+      if (err?.message === "prejoin-camara-timeout") {
+        setPermissionError("messenger.lobby.camaraNoResponde");
+      } else if (err?.name === "NotAllowedError") {
         setPermissionError("messenger.lobby.permisoCamaraDenegado");
       } else {
         setPermissionError("messenger.lobby.noSePudoCamara");
       }
     } finally {
-      if (mountedRef.current) {
+      if (vigente()) {
         setIsPreparingBackgroundFirstFrame(false);
+        setAbriendoCamara(false);
       }
     }
-  }, [camOn, selectedVideoInput, stopVideoTrack, disposeBackgroundProcessor, queueBackgroundApply, enumerateDevices]);
+  }, [camOn, camaraPedida, stopVideoTrack, disposeBackgroundProcessor, aplicarFondoConTope, enumerateDevices]);
 
   const startAudioTrack = useCallback(async () => {
+    const gen = ++microfonoGenRef.current;
+    const vigente = () => gen === microfonoGenRef.current && mountedRef.current;
     stopAudioTrack();
     if (!micOn) return;
     try {
-      const tracks = await createLocalTracks({ video: false, audio: selectedAudioInput ? { deviceId: { ideal: selectedAudioInput } } : true });
-      if (!mountedRef.current) { tracks.forEach((t) => t.stop()); return; }
+      const tracks = await createLocalTracks({ video: false, audio: microfonoPedido ? { deviceId: { ideal: microfonoPedido } } : true });
+      if (!vigente()) { tracks.forEach((t) => t.stop()); return; }
       const aTrack = tracks.find((t): t is LocalAudioTrack => t.kind === "audio") || null;
       audioTrackRef.current = aTrack;
       setPermissionError(null);
       await enumerateDevices();
     } catch (err: any) {
-      if (err.name === "NotAllowedError") { setPermissionError("messenger.lobby.permisoMicrofonoDenegado"); }
+      if (!vigente()) return;
+      if (err?.name === "NotAllowedError") { setPermissionError("messenger.lobby.permisoMicrofonoDenegado"); }
     }
-  }, [micOn, selectedAudioInput, stopAudioTrack, enumerateDevices]);
+  }, [micOn, microfonoPedido, stopAudioTrack, enumerateDevices]);
 
   useEffect(() => { startVideoTrack(); return () => { stopVideoTrack(); }; }, [startVideoTrack, stopVideoTrack]);
   useEffect(() => { startAudioTrack(); return () => { stopAudioTrack(); }; }, [startAudioTrack, stopAudioTrack]);
@@ -366,12 +478,14 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
       setIsPreparingBackgroundFirstFrame(true);
     }
 
-    void queueBackgroundApply(bgEffect).finally(() => {
+    // Mismo tope que al prender la cámara: el velo esconde el video, y sin tope
+    // un cambio de fondo que se trababa la dejaba sin verse.
+    void aplicarFondoConTope(bgEffect).finally(() => {
       if (mountedRef.current) {
         setIsPreparingBackgroundFirstFrame(false);
       }
     });
-  }, [bgEffect, camOn, queueBackgroundApply]);
+  }, [bgEffect, camOn, aplicarFondoConTope]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -423,6 +537,7 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
 
   const selectedBackgroundTemplate = BACKGROUND_TEMPLATES.find((tpl) => tpl.id === bgEffect) || null;
   const showBackgroundWarmupOverlay = camOn && isPreparingBackgroundFirstFrame && bgEffect !== "none";
+  const mostrarAbriendoCamara = camOn && abriendoCamara;
 
   return (
     <div className="h-screen w-screen bg-background flex items-center justify-center p-4 md:p-8">
@@ -462,11 +577,11 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
               </div>
             )}
 
-            {showBackgroundWarmupOverlay && (
+            {(showBackgroundWarmupOverlay || mostrarAbriendoCamara) && (
               <div className="absolute inset-0 z-20 flex items-center justify-center bg-[hsl(220_3%_14%/0.45)] backdrop-blur-[2px]">
                 <div className="inline-flex items-center gap-2 rounded-full bg-[hsl(220_3%_14%/0.8)] px-3 py-1.5 text-xs text-foreground border border-border">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  {t("messenger.lobby.aplicandoFondo")}
+                  {t(mostrarAbriendoCamara ? "messenger.lobby.abriendoCamara" : "messenger.lobby.aplicandoFondo")}
                 </div>
               </div>
             )}
@@ -477,7 +592,9 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
             </div>
 
             {/* Mic & Cam toggle buttons overlaid on preview */}
-            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-2 z-10">
+            {/* z-30: por ENCIMA de los carteles (z-20). Si no, el aviso de error
+                tapaba el botón de la cámara y no se podía volver a intentar. */}
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-2 z-30">
               <button
                 onClick={handleToggleMic}
                 className={cn(
@@ -518,7 +635,7 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
               label={truncateLabel(audioInputs.find((d) => d.deviceId === selectedAudioInput)?.label || t("messenger.call.microfono"))}
               devices={audioInputs}
               selectedId={selectedAudioInput}
-              onSelect={(id) => setSelectedAudioInput(id)}
+              onSelect={(id) => { setSelectedAudioInput(id); setMicrofonoPedido(id); }}
               isOpen={openDropdown === "mic"}
               onToggle={(e) => { e.stopPropagation(); setOpenDropdown(openDropdown === "mic" ? null : "mic"); }}
             />
@@ -536,7 +653,7 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
               label={truncateLabel(videoInputs.find((d) => d.deviceId === selectedVideoInput)?.label || t("messenger.input.camara"))}
               devices={videoInputs}
               selectedId={selectedVideoInput}
-              onSelect={(id) => setSelectedVideoInput(id)}
+              onSelect={(id) => { setSelectedVideoInput(id); setCamaraPedida(id); }}
               isOpen={openDropdown === "cam"}
               onToggle={(e) => { e.stopPropagation(); setOpenDropdown(openDropdown === "cam" ? null : "cam"); }}
             />
@@ -551,6 +668,11 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
           {backgroundPreviewUnsupported && bgEffect !== "none" && (
             <p className="text-[11px] text-muted-foreground text-center max-w-md">
               {t("messenger.lobby.sinVistaPrevia")}
+            </p>
+          )}
+          {fondoTardo && !backgroundPreviewUnsupported && bgEffect !== "none" && camOn && (
+            <p className="text-[11px] text-muted-foreground text-center max-w-md">
+              {t("messenger.lobby.fondoTardo")}
             </p>
           )}
         </div>
