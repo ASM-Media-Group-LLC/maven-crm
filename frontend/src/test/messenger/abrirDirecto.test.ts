@@ -134,6 +134,15 @@ describe("abrirDirecto", () => {
     expect(llamadas).toEqual([`buscar ${OTRO}`, `crear ${NUEVO}`]);
   });
 
+  it("con el tope de directos del día, el motivo trae el código que useChat reconoce", async () => {
+    const tope = { code: "P0001", message: "chat_tope_directos: ya abriste 100 chats directos en las últimas 24 horas" };
+    const { pasos, llamadas } = pasosFalsos({ buscar: [{ data: null, error: null }], crear: { error: tope } });
+    const r = await abrirDirecto(pasos, YO, OTRO, NUEVO);
+    expect(r.tipo).toBe("error");
+    expect(r.tipo === "error" && r.motivo.includes("chat_tope_directos")).toBe(true);
+    expect(llamadas).toEqual([`buscar ${OTRO}`, `crear ${NUEVO}`]);
+  });
+
   it("esDirectoDuplicado mira el código de la base en el mensaje", () => {
     expect(esDirectoDuplicado(DUPLICADO)).toBe(true);
     expect(esDirectoDuplicado({ message: "directo_lleno: un chat directo es de dos personas" })).toBe(false);
@@ -219,6 +228,7 @@ describe("el contrato con la migración", () => {
     expect(sql).toMatch(/create or replace function public\.chat_directo_con\(_otro uuid\)/);
     expect(sql).toMatch(/raise exception 'directo_duplicado:/);
     expect(sql).toMatch(/raise exception 'chat_tope_grupos:/);
+    expect(sql).toMatch(/raise exception 'chat_tope_directos:/);
   });
 
   it("useChat abre los directos con abrirDirecto y ya no busca con limit(1) sin orden", () => {
@@ -226,5 +236,6 @@ describe("el contrato con la migración", () => {
     expect(src).toContain("abrirDirecto(");
     expect(src).not.toContain('chat_conversations!inner(type)');
     expect(src).toContain('"chat_tope_grupos"');
+    expect(src).toContain('"chat_tope_directos"');
   });
 });

@@ -629,7 +629,12 @@ export function useChat() {
           console.error("[startDirectChat] no pude comprobar si el DM existía:", r.motivo);
           toast.error(traducir("shared.chat.offlineOpen"));
         } else {
-          toast.error(traducir("shared.chat.errorCreatingConversation"));
+          // La base corta en 100 directos nuevos por persona en 24 horas (20260929210000).
+          toast.error(traducir(
+            r.motivo.includes("chat_tope_directos")
+              ? "shared.chat.directDailyLimit"
+              : "shared.chat.errorCreatingConversation",
+          ));
         }
       })();
 

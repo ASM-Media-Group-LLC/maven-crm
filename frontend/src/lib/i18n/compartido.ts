@@ -22,6 +22,10 @@ export const compartido = {
     es: "Ya creaste 30 grupos en las últimas 24 horas. Inténtalo más tarde.",
     en: "You've created 30 groups in the last 24 hours. Try again later.",
   },
+  "shared.chat.directDailyLimit": {
+    es: "Ya abriste 100 chats nuevos en las últimas 24 horas. Inténtalo más tarde.",
+    en: "You've started 100 new chats in the last 24 hours. Try again later.",
+  },
   "shared.chat.groupCreated": { es: "Grupo \"{name}\" creado", en: "Group \"{name}\" created" },
   "shared.chat.conversationDeleted": { es: "Conversación eliminada", en: "Conversation deleted" },
   "shared.chat.errorDeletingConversation": { es: "Error al eliminar conversación", en: "Couldn't delete the conversation" },

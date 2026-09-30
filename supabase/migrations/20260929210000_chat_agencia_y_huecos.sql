@@ -12,15 +12,21 @@
 --   C. cambiar created_by o type de una conversación (con created_by propio se
 --      borra el grupo entero; con type='direct' se saltan los permisos);
 --   D. un tercero en un directo (de una, o sacando al otro y sumando al tercero);
---   E. un mensaje con fecha atrasada, resucitado (is_deleted true→false) o con
---      type/album/hilo/cita/archivo movidos por UPDATE;
---   F. borrar sin dejar archivo (UPDATE is_deleted=true directo, o DELETE duro);
+--   E. un mensaje con fecha inventada, resucitado, con una cita de OTRA conversación
+--      o con un archivo de afuera (píxel espía), por UPDATE y también por INSERT;
+--   F. borrar sin dejar archivo (UPDATE is_deleted=true directo, o DELETE duro), y
+--      reescribir un mensaje sin la marca de editado;
 --   G. re-insertarse o sumar a alguien como admin sin serlo;
 --   H. cambiarse el full_name desde la app.
 --
--- Qué cambia, en el orden en que va (ver «Orden y candados» abajo):
+-- Qué cambia, en el orden en que va:
+--   0   los candados de todas las tablas, al principio y juntos (ver «Candados»).
 --   A8  sin DELETE duro de mensajes (la app borra por delete_chat_message).
---   A6  guard_chat_message_update cierra E y la parte UPDATE de F.
+--   A6  guard_chat_message_update cierra E y la parte UPDATE de F; un cambio de
+--       texto siempre deja la marca de editado, y la marca no se quita.
+--   A6b chat_messages_al_insertar (BEFORE INSERT): con sesión de usuario la fecha
+--       la pone la base, la cita es de la misma conversación y el archivo es del
+--       almacenamiento de Maven (o un GIF de Giphy). Es E por INSERT.
 --   A7  delete_chat_message archiva y vacía también content_rich y file_size, y es
 --       lo único que puede pasar is_deleted a true (GUC maven.borrado_autorizado).
 --   A1  chat_conversations.tenant_id, sin UPDATE de relleno (default constante =
@@ -30,17 +36,23 @@
 --   A2  chat_conversations_agencia (BEFORE INSERT): la agencia sale de quien crea,
 --       nunca del pedido; created_at := now().
 --   A9  el grupo 31 de una persona en 24 horas se rechaza (tope aprobado por Jhon;
---       el máximo que hubo en prod fue 9 en un día).
+--       el máximo que hubo en prod fue 9), y el directo 101 también (tope nuevo:
+--       el máximo en prod fue 14 y la agencia tiene 82 personas). Se cuentan las
+--       ALTAS en chat_conversaciones_creadas, no las conversaciones que siguen
+--       vivas: borrar lo creado no devuelve el cupo.
 --   A3  el mismo trigger en BEFORE UPDATE: tenant_id, type, created_by y created_at
 --       no cambian nunca, lo haga quien lo haga (cierra C).
 --   A4  chat_participants_agencia (BEFORE INSERT OR UPDATE OF user_id, conversation_id):
 --       una participación no se mueve (A, B); quien entra y quien suma son de la
 --       agencia de la conversación; sin ser admin solo se suma a otro como member,
---       y a uno mismo solo el creador en su conversación todavía vacía (G).
+--       y a uno mismo solo el creador en su conversación que nunca se usó: sin
+--       participantes y sin mensajes (G).
 --   A5  en un directo: candado por conversación, rechazo del tercero (D),
 --       'directo_duplicado' si esas dos personas ya tienen otro directo, y nadie
---       entra a un directo con mensajes de alguien que ya no está (D por la
---       puerta de atrás: el creador saca al otro y suma a un tercero).
+--       entra a un directo donde hay mensajes, reacciones o recibos de alguien que
+--       ya no está. Además, en un directo nadie saca al otro: solo se sale uno
+--       mismo (ALTER POLICY "Admins can remove participants"). Las dos cosas
+--       cierran D por la puerta de atrás.
 --   A5b chat_directo_con(_otro): el directo canónico entre yo y el otro, para que
 --       la app y la API elijan el mismo.
 --   A10 profiles.full_name no se cambia con sesión de usuario (H); el admin lo
@@ -53,6 +65,18 @@
 --   · A10, la mitad del «esqueleto de un nombre visible»: la columna
 --     api_keys.api_display_name nace en la migración B (PR 2). Esa parte la suma B,
 --     sobre esta misma función.
+--   · El texto original de un mensaje editado no se archiva: si el autor lo edita
+--     y después lo borra, el archivo de admins guarda la última versión (con la
+--     marca de editado a la vista hasta el borrado). Guardar el original es una
+--     decisión de Jhon (ver el PR).
+--
+-- ⚠️ Límite conocido para cuando haya DOS agencias (hoy hay una, y nadie está en
+-- dos): la agencia de una conversación nueva es la membresía MÁS VIEJA de quien la
+-- crea (current_tenant_id). Alguien de las agencias T1 y T2 no puede abrir un
+-- directo ni armar un grupo con un compañero que es solo de T2 (chat_otra_agencia);
+-- el compañero sí puede abrírselo a él. Antes de sumar la segunda agencia, la
+-- agencia de la conversación tiene que elegirse (o salir de la persona invitada).
+-- El banco deja fijado este comportamiento para que el cambio se note.
 --
 -- El nombre: el diseño la llamaba 20260929100000, pero esa versión ya está aplicada
 -- en prod (drive_cupos_nombre_o_correo). Dos migraciones con la misma versión
@@ -73,15 +97,109 @@
 --     prod precarga safeupdate (no hay UPDATE sin WHERE). Sigue abierto para
 --     service_role, y B sí se abre por PostgREST: por eso A4 cierra el UPDATE de
 --     user_id y conversation_id para todos.
+--   · file_url en prod (30/09): 5.030 del bucket chat-files de este proyecto y 23
+--     GIF de media*.giphy.com; ninguno de otro lado. Si algún día Supabase pasa a
+--     un dominio propio, hay que sumar ese prefijo en chat_messages_al_insertar
+--     (si no, los adjuntos nuevos quedan «no enviado»). push_chat_message ya tiene
+--     el mismo host escrito a mano.
 --
--- Orden y candados. Todo va en una transacción; cada ALTER / CREATE TRIGGER /
--- DROP POLICY toma un candado fuerte sobre su tabla hasta el commit. Van en el mismo
--- orden en que los toma un INSERT de mensaje (chat_messages → chat_conversations →
--- chat_participants → profiles) para no armar un ciclo con él, y con lock_timeout
--- de 3 s: si alguien tiene la tabla tomada, la migración se rinde en vez de dejar
--- una cola detrás suyo. Si pasa, se vuelve a correr.
+-- Candados. Todo va en UNA transacción, y cada ALTER / CREATE TRIGGER / POLICY
+-- toma un candado fuerte que dura hasta el commit. Por eso el primer bloque los
+-- pide TODOS, juntos y antes de tocar nada, en el mismo orden en que los toma un
+-- INSERT de mensaje (chat_messages → chat_conversations → chat_participants →
+-- profiles), con lock_timeout de 200 ms por candado. Si alguno no llega a tiempo,
+-- se sueltan todos (el intento es una subtransacción), se espera 1 s y se
+-- reintenta, hasta 8 veces; si no, la migración falla entera sin dejar nada.
+-- Lo máximo que una tabla del chat queda trabada por un intento es lo que tardan
+-- sus seis esperas: 6 × 200 ms = 1,2 s, más lo que tarda la migración con todo
+-- tomado (milisegundos: nada reescribe filas). El peor caso son 8 intentos de
+-- 1,2 s separados por 1 s, y la migración se rinde. El lock_timeout de 3 s de
+-- abajo queda solo como red: con todo tomado, ninguna sentencia espera.
+--
+-- ─── VUELTA ATRÁS (el banco la corre tal cual: las líneas «--|») ─────────────
+-- Saca todo lo que cambia el comportamiento de la app: los cuatro triggers
+-- nuevos, la guarda de mensajes de prod y la política DELETE de antes. Quedan,
+-- porque no molestan y el frontend nuevo usa chat_directo_con: tenant_id,
+-- chat_directo_con, chat_llave_de_par, delete_chat_message, get_unread_counts y
+-- chat_conversaciones_creadas.
+-- ⚠️ tenant_id es NOT NULL y sin default, y SOLO lo llena chat_conversations_agencia:
+-- sacar ese trigger sin devolverle antes el default a tenant_id, en la misma
+-- transacción, deja a todos sin poder abrir un directo ni crear un grupo.
+--| begin;
+--| do $$
+--| declare _intento int := 0;
+--| begin
+--|   perform set_config('lock_timeout', '200ms', true);
+--|   loop
+--|     _intento := _intento + 1;
+--|     begin
+--|       lock table public.chat_messages in access exclusive mode;
+--|       lock table public.chat_conversations in access exclusive mode;
+--|       lock table public.chat_participants in access exclusive mode;
+--|       lock table public.profiles in share row exclusive mode;
+--|       exit;
+--|     exception when lock_not_available or deadlock_detected then
+--|       if _intento >= 8 then raise; end if;
+--|       perform pg_sleep(1);
+--|     end;
+--|   end loop;
+--|   perform set_config('lock_timeout', '3s', true);
+--| end $$;
+--| -- Conversaciones: primero el default (con dos agencias falla: hay que elegir).
+--| do $$ begin
+--|   execute format('alter table public.chat_conversations alter column tenant_id set default %L',
+--|                  (select id from public.tenants));
+--| end $$;
+--| drop trigger if exists chat_conversations_agencia on public.chat_conversations;
+--| -- Participantes y nombres.
+--| drop trigger if exists chat_participants_agencia on public.chat_participants;
+--| alter policy "Admins can remove participants" on public.chat_participants
+--|   using ((is_chat_admin(( SELECT auth.uid() AS uid), conversation_id) OR (( SELECT auth.uid() AS uid) = user_id)));
+--| drop trigger if exists profiles_nombre_lo_cambia_un_admin on public.profiles;
+--| -- Mensajes: el INSERT sin guarda y la guarda del UPDATE como estaba en prod.
+--| drop trigger if exists chat_messages_al_insertar on public.chat_messages;
+--| CREATE OR REPLACE FUNCTION public.guard_chat_message_update()
+--|  RETURNS trigger
+--|  LANGUAGE plpgsql
+--|  SECURITY DEFINER
+--|  SET search_path TO 'public'
+--| AS $function$
+--| BEGIN
+--|   IF auth.uid() IS NULL THEN RETURN NEW; END IF;
+--|   IF NEW.conversation_id IS DISTINCT FROM OLD.conversation_id OR NEW.sender_id IS DISTINCT FROM OLD.sender_id
+--|   THEN RAISE EXCEPTION 'No autorizado: no se puede mover un mensaje ni cambiar su autor'; END IF;
+--|   RETURN NEW;
+--| END; $function$;
+--| commit;
+-- ─────────────────────────────────────────────────────────────────────────────
 
 set lock_timeout = '3s';
+
+-- ════ 0. Los candados, todos al principio ════════════════════════════════════
+do $$
+declare
+  _intento int := 0;
+begin
+  perform set_config('lock_timeout', '200ms', true);
+  loop
+    _intento := _intento + 1;
+    begin
+      lock table public.chat_messages in access exclusive mode;           -- A8, A6b
+      lock table public.chat_message_deletions in access exclusive mode;  -- A7
+      lock table public.chat_conversations in access exclusive mode;      -- A1, A2
+      lock table public.chat_participants in access exclusive mode;       -- A4, A5 (ALTER POLICY)
+      lock table public.profiles in share row exclusive mode;             -- A10
+      lock table public.tenants in share row exclusive mode;              -- la FK de A1
+      exit;
+    exception when lock_not_available or deadlock_detected then
+      if _intento >= 8 then
+        raise exception 'chat_candados: no se consiguieron los candados en % intentos; no quedó nada aplicado, se vuelve a correr más tarde', _intento;
+      end if;
+      perform pg_sleep(1);
+    end;
+  end loop;
+  perform set_config('lock_timeout', '3s', true);
+end $$;
 
 -- ════ chat_messages ══════════════════════════════════════════════════════════
 
@@ -119,6 +237,11 @@ BEGIN
      OR (NEW.file_size IS DISTINCT FROM OLD.file_size AND NEW.file_size IS NOT NULL)
   THEN RAISE EXCEPTION 'chat_mensaje_inmutable: la cita y el archivo de un mensaje no se cambian por otros'; END IF;
 
+  -- Reescribir un mensaje sin que se note: la marca de editado no se quita.
+  IF OLD.is_edited AND NOT NEW.is_edited THEN
+    RAISE EXCEPTION 'chat_mensaje_inmutable: la marca de editado de un mensaje no se quita';
+  END IF;
+
   IF OLD.is_deleted THEN
     IF NOT NEW.is_deleted THEN
       RAISE EXCEPTION 'chat_mensaje_borrado: un mensaje borrado no vuelve';
@@ -136,15 +259,61 @@ BEGIN
        OR NEW.file_url IS NOT NULL OR NEW.file_name IS NOT NULL OR NEW.file_size IS NOT NULL THEN
       RAISE EXCEPTION 'chat_borrado_sin_archivo: un mensaje borrado queda vacío';
     END IF;
+  ELSIF NEW.content IS DISTINCT FROM OLD.content OR NEW.content_rich IS DISTINCT FROM OLD.content_rich THEN
+    -- Todo cambio de texto queda a la vista, lo mande o no quien edita.
+    NEW.is_edited := true;
   END IF;
   RETURN NEW;
 END; $function$;
+
+-- ─── A6b: qué puede traer un INSERT de mensaje ───────────────────────────────
+-- Lo mismo que A6 le cierra al UPDATE, por la otra puerta. La app nunca manda
+-- created_at, is_edited ni is_deleted (useChat.ts, performSend), cita solo
+-- mensajes de la conversación abierta (0 citas cruzadas en prod el 30/09) y sube
+-- los adjuntos a chat-files; los GIF son mp4 de Giphy. Sin auth.uid() se aparta.
+--   · created_at a elección: uno en el futuro deja un no leído que nadie borra;
+--     uno atrasado se esconde en la historia.
+--   · reply_to_id de otra conversación: la burbuja muestra la cita de un chat
+--     donde quien lee no está.
+--   · file_url de afuera: la imagen se pinta con <img> y le avisa a ese servidor
+--     la IP y la hora de cada persona que abre el chat (píxel espía).
+create or replace function public.chat_messages_al_insertar()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.uid() is null then
+    return new;
+  end if;
+  new.created_at := now();
+  new.is_edited := false;
+  new.is_deleted := false;
+  if new.reply_to_id is not null and not exists (
+       select 1 from public.chat_messages r
+        where r.id = new.reply_to_id and r.conversation_id = new.conversation_id) then
+    raise exception 'chat_cita_ajena: la cita tiene que ser un mensaje de la misma conversación';
+  end if;
+  if new.file_url is not null
+     and new.file_url !~ '^https://lsagslbkliprespbyhts\.supabase\.co/storage/v1/object/public/chat-files/'
+     and new.file_url !~ '^https://media[0-9]*\.giphy\.com/' then
+    raise exception 'chat_archivo_externo: el archivo de un mensaje tiene que estar en el almacenamiento de Maven';
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public.chat_messages_al_insertar() from public, anon, authenticated;
+
+create trigger chat_messages_al_insertar
+  before insert on public.chat_messages
+  for each row execute function public.chat_messages_al_insertar();
 
 -- ════ chat_message_deletions + A7 ════════════════════════════════════════════
 
 -- ─── A7: el borrado archiva y vacía también el texto rico ───────────────────
 -- Antes content_rich quedaba legible para cualquier participante después de
--- borrar (44 filas en prod el 29/09, y suben con cada borrado) y no llegaba al
+-- borrar (46 filas en prod el 29/09, y suben con cada borrado) y no llegaba al
 -- archivo de admins. Esta migración no toca filas: los borrados de antes quedan
 -- como estaban (limpiarlos es una decisión aparte, ver el PR).
 alter table public.chat_message_deletions add column content_rich jsonb;
@@ -220,11 +389,34 @@ begin
     _agencia
   );
   -- Las filas viejas conservan su valor; las nuevas las llena el trigger de abajo.
+  -- ⚠️ Por eso ese trigger no se saca sin devolver antes el default (vuelta atrás).
   alter table public.chat_conversations alter column tenant_id drop default;
 end $$;
 
--- Para el tope de A9 (y para "mis conversaciones de hoy").
-create index chat_conversations_creador_fecha on public.chat_conversations (created_by, created_at);
+-- ─── A9: las altas de conversaciones, para los topes ─────────────────────────
+-- Una fila por conversación creada con sesión de usuario. La llena solo
+-- chat_conversations_agencia (DEFINER); nadie de la app la lee ni la toca, y
+-- borrar la conversación no borra el alta: el tope cuenta lo que se creó, no lo
+-- que sigue vivo (si no, crear y borrar en bucle esquiva el tope y cada vuelta
+-- pega en las 114 escuchas de Realtime de chat_conversations y las 243 de
+-- chat_participants). Crece con las altas (549 conversaciones en toda la historia
+-- de prod al 30/09), así que no se poda.
+create table public.chat_conversaciones_creadas (
+  id bigint generated always as identity primary key,
+  user_id uuid not null,
+  type text not null,
+  created_at timestamptz not null default now()
+);
+create index chat_conversaciones_creadas_persona on public.chat_conversaciones_creadas (user_id, type, created_at);
+alter table public.chat_conversaciones_creadas enable row level security;
+revoke all on table public.chat_conversaciones_creadas from public, anon, authenticated;
+comment on table public.chat_conversaciones_creadas is
+  'Altas de conversaciones con sesión de usuario, para los topes de chat_conversations_agencia. Sin políticas: solo la escribe ese trigger.';
+-- Lo de las últimas 24 horas que ya existe cuenta desde el primer minuto.
+insert into public.chat_conversaciones_creadas (user_id, type, created_at)
+select c.created_by, c.type, c.created_at
+  from public.chat_conversations c
+ where c.created_at > now() - interval '24 hours';
 
 -- ─── A2 + A3 + A9 ────────────────────────────────────────────────────────────
 create or replace function public.chat_conversations_agencia()
@@ -237,6 +429,8 @@ declare
   _uid uuid := auth.uid();
   _agencia uuid;
   _agencias int;
+  _tope int;
+  _hechas int;
 begin
   if tg_op = 'UPDATE' then
     if new.tenant_id is distinct from old.tenant_id
@@ -249,7 +443,8 @@ begin
   end if;
 
   -- INSERT. La agencia es la de quien crea (la membresía más vieja, como
-  -- current_tenant_id); lo que mande el pedido se ignora.
+  -- current_tenant_id: ver «Límite conocido» arriba); lo que mande el pedido se
+  -- ignora.
   if _uid is not null then
     _agencia := public.current_tenant_id();
   else
@@ -270,22 +465,29 @@ begin
   new.tenant_id := _agencia;
 
   if _uid is not null then
-    -- La fecha la pone la base: si no, un created_at atrasado esquiva el tope.
+    -- La fecha la pone la base.
     new.created_at := now();
 
-    -- A9: 30 grupos nuevos por persona en 24 horas. El candado por persona hace
-    -- que dos altas a la vez no pasen las dos con 29; la cuenta de abajo corre con
-    -- una foto nueva (función VOLATILE), así que ve lo que la otra ya confirmó.
-    if new.type = 'group' then
-      perform pg_advisory_xact_lock(hashtextextended('chat_grupos_por_dia:' || _uid::text, 0));
-      if (select count(*) from (
-            select 1 from public.chat_conversations c
-             where c.created_by = _uid and c.type = 'group'
-               and c.created_at > now() - interval '24 hours'
-             limit 30) x) >= 30 then
+    -- A9: 30 grupos y 100 directos nuevos por persona en 24 horas corridas,
+    -- contando ALTAS. El candado por persona hace que dos altas a la vez no pasen
+    -- las dos con 29; la cuenta de abajo corre con una foto nueva (función
+    -- VOLATILE), así que ve lo que la otra ya confirmó. Si el INSERT falla
+    -- después (la RLS), el alta se deshace con él.
+    _tope := case when new.type = 'group' then 30 else 100 end;
+    perform pg_advisory_xact_lock(hashtextextended('chat_altas:' || _uid::text, 0));
+    select count(*) into _hechas from (
+      select 1 from public.chat_conversaciones_creadas a
+       where a.user_id = _uid and a.type = new.type
+         and a.created_at > now() - interval '24 hours'
+       limit _tope) x;
+    if _hechas >= _tope then
+      if new.type = 'group' then
         raise exception 'chat_tope_grupos: ya creaste 30 grupos en las últimas 24 horas';
       end if;
+      raise exception 'chat_tope_directos: ya abriste 100 chats directos en las últimas 24 horas';
     end if;
+    insert into public.chat_conversaciones_creadas (user_id, type, created_at)
+    values (_uid, new.type, now());
   end if;
   return new;
 end;
@@ -352,14 +554,18 @@ begin
     end if;
 
     -- Sin ser admin: a otro, solo como member (la política decide si se puede);
-    -- a uno mismo, solo el creador en su conversación todavía vacía. Así nadie
-    -- vuelve solo a un grupo del que lo sacaron, ni entra como admin.
+    -- a uno mismo, solo el creador en su conversación que nunca se usó (sin
+    -- participantes Y sin mensajes). Así nadie vuelve solo a un grupo del que lo
+    -- sacaron, ni el creador que se fue vuelve como admin a leer lo que se
+    -- escribió después.
     if not public.is_chat_admin(_uid, new.conversation_id)
        and (new.role <> 'member' or new.user_id = _uid)
        and not (new.user_id = _uid
                 and _conv.created_by = _uid
                 and not exists (select 1 from public.chat_participants p
-                                 where p.conversation_id = new.conversation_id)) then
+                                 where p.conversation_id = new.conversation_id)
+                and not exists (select 1 from public.chat_messages m
+                                 where m.conversation_id = new.conversation_id)) then
       raise exception 'chat_rol_no_autorizado: solo un admin suma admins, y a uno mismo solo se suma el creador al crear';
     end if;
   end if;
@@ -387,17 +593,29 @@ begin
         end if;
       end if;
     end if;
-    -- Un directo no cambia de interlocutor: el admin de un directo (su creador)
-    -- puede sacar al otro y, sin esto, sumar a un tercero que lee toda la
-    -- conversación anterior. Entra solo quien no encuentra mensajes de nadie más
-    -- que de él y de quien ya está. La app nunca suma a nadie a un directo viejo:
-    -- sus dos altas van antes del primer mensaje (y si el creador escribe antes
-    -- de que termine el tercer paso, el mensaje es de quien ya está).
+    -- Un directo no cambia de interlocutor. Nadie saca al otro (la política
+    -- DELETE, abajo), pero el otro puede irse solo, y sin esto el que queda suma a
+    -- un tercero que lee la conversación entera, con las reacciones y los recibos
+    -- de quien se fue. Entra solo quien no encuentra rastros de nadie más que de él
+    -- y de quien ya está. La app nunca suma a nadie a un directo viejo: sus dos
+    -- altas van antes del primer mensaje (y si el creador escribe antes de que
+    -- termine el tercer paso, el mensaje es de quien ya está). Solo corre al sumar
+    -- a un directo: en la app, un directo nuevo con 0 o 1 mensajes.
     if exists (select 1 from public.chat_messages m
                 where m.conversation_id = new.conversation_id
                   and m.sender_id is distinct from new.user_id
-                  and m.sender_id is distinct from _otro) then
-      raise exception 'directo_con_historia_ajena: en este directo hay mensajes de alguien que ya no está';
+                  and m.sender_id is distinct from _otro)
+       or exists (select 1 from public.chat_messages m
+                    join public.chat_reactions r on r.message_id = m.id
+                   where m.conversation_id = new.conversation_id
+                     and r.user_id is distinct from new.user_id
+                     and r.user_id is distinct from _otro)
+       or exists (select 1 from public.chat_messages m
+                    join public.chat_read_receipts r on r.message_id = m.id
+                   where m.conversation_id = new.conversation_id
+                     and r.user_id is distinct from new.user_id
+                     and r.user_id is distinct from _otro) then
+      raise exception 'directo_con_historia_ajena: en este directo hay mensajes, reacciones o recibos de alguien que ya no está';
     end if;
   end if;
   return new;
@@ -408,6 +626,21 @@ revoke all on function public.chat_participants_agencia() from public, anon, aut
 create trigger chat_participants_agencia
   before insert or update of user_id, conversation_id on public.chat_participants
   for each row execute function public.chat_participants_agencia();
+
+-- ─── A5: en un directo nadie saca al otro ────────────────────────────────────
+-- El creador de un directo es admin, y la política dejaba a cualquier admin
+-- borrar cualquier participación: sacaba al otro (que se quedaba sin la
+-- conversación) y sumaba a un tercero. En un grupo sigue igual; en un directo
+-- cada uno sale solo. La app nunca saca a nadie de un directo: borra el chat
+-- entero con delete_conversation_cascade (DEFINER, no pasa por esta política) o
+-- sale de su propia participación. Solo cambia la expresión: ALTER, no DROP+CREATE.
+alter policy "Admins can remove participants" on public.chat_participants
+  using (
+    (public.is_chat_admin((select auth.uid()), conversation_id)
+      and not exists (select 1 from public.chat_conversations c
+                       where c.id = chat_participants.conversation_id and c.type = 'direct'))
+    or (select auth.uid()) = user_id
+  );
 
 -- ════ profiles ═══════════════════════════════════════════════════════════════
 
