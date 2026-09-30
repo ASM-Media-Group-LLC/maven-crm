@@ -1,0 +1,49 @@
+name: Guard Imagen
+
+# La imagen de prod entera, con el Dockerfile tal cual: exactamente lo que arma
+# Dokploy al mergear (node:20-alpine + `npm install` + `npm run build`, y nginx con
+# nginx.conf y docker-entrypoint.sh). Corre en una máquina de GitHub (el Mac mini
+# no tiene Docker) y SOLO cuando el PR cambia lo que hace a la imagen distinta del
+# `npm run build` que ya corre guard-frontend.yml en cada PR: así gasta minutos
+# solo cuando hace falta. No publica nada: la imagen queda en el runner y se tira.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "Dockerfile"
+      - ".dockerignore"
+      - "docker-entrypoint.sh"
+      - "nginx.conf"
+      - "package.json"
+      - "package-lock.json"
+      - "vite.config.ts"
+      - ".github/workflows/guard-imagen.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: guard-imagen-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  imagen:
+    name: imagen de prod (Dockerfile + nginx -t)
+    if: ${{ !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: docker build (la imagen de prod)
+        run: docker build --progress=plain --tag maven-frontend:guarda .
+
+      # Armar no es arrancar: un nginx.conf con un error o un docker-entrypoint.sh
+      # roto (tiene `set -eu`) arman en verde y recién fallan al levantar el
+      # contenedor, con todo el frontend caído. Con `nginx` como comando, la imagen
+      # oficial corre /docker-entrypoint.d/* (nuestro entrypoint incluido) y después
+      # `nginx -t` revisa la config.
+      - name: nginx arranca con esa config y ese entrypoint
+        run: docker run --rm -e VITE_SUPABASE_URL=https://ci.invalid maven-frontend:guarda nginx -t
