@@ -166,6 +166,21 @@ function montar(ui: React.ReactElement) {
   );
 }
 
+/** Abre las secciones colapsadas del detalle (el título es el botón). */
+const abrirSecciones = (titulos: string[]) => {
+  for (const titulo of titulos) {
+    const boton = screen.getAllByText(titulo).map((el) => el.closest("button")).find(Boolean)!;
+    fireEvent.click(boton);
+  }
+};
+
+/** Los chips del renglón de estadísticas de la venta masiva, uno por span. */
+const chipsDeMasivos = (primero: string) => {
+  const chip = screen.getByText((_, el) => el?.tagName === "SPAN" && el.textContent === primero);
+  return Array.from(chip.parentElement!.children).map((el) => el.textContent);
+};
+const n = (x: number) => x.toLocaleString();
+
 /** Las pestañas de Radix se activan con mousedown, no con click. */
 const abrirPestana = (nombre: string) =>
   fireEvent.mouseDown(screen.getByRole("tab", { name: nombre }), { button: 0 });
@@ -225,6 +240,10 @@ describe("Chatters QA en inglés", () => {
     expect(screen.getAllByText("Needs improvement").length).toBe(2);
     expect(screen.getByText(/1 model\(s\) · 30 threads · 540 messages/)).toBeTruthy();
     expect(screen.getByText("Most effective")).toBeTruthy();
+    // Cuatro chips sueltos + la plata, como siempre (sin " · " que los pegue).
+    expect(chipsDeMasivos("12 mass messages")).toEqual([
+      "12 mass messages", `${n(3400)} sent`, `${n(1200)} viewed`, `${n(80)} sales (6.7%)`, `$${n(950)}`,
+    ]);
     expect(enEspanol()).toEqual([]);
   });
 
@@ -270,6 +289,21 @@ describe("Chatters QA en inglés", () => {
     expect(screen.getByText("AI draft ready")).toBeTruthy();
     expect(screen.getByPlaceholderText("1 selected — type to filter")).toBeTruthy();
     expect(enEspanol()).toEqual([]);
+  });
+
+  it("en español, el subtítulo de la sección es el de siempre", () => {
+    localStorage.setItem("app-language", "es");
+    montar(<ChattersQaSection />);
+    expect(screen.getByText('Medición y auditoría de chatters — reemplaza el sheet "Medidor de chatters".')).toBeTruthy();
+  });
+
+  it("en español, los chips de la venta masiva siguen separados", () => {
+    localStorage.setItem("app-language", "es");
+    montar(<ChatterQaReportDetail id="r1" onBack={() => {}} />);
+    abrirSecciones(["Venta masiva"]);
+    expect(chipsDeMasivos("12 masivos")).toEqual([
+      "12 masivos", `${n(3400)} enviados`, `${n(1200)} vistos`, `${n(80)} ventas (6.7%)`, `$${n(950)}`,
+    ]);
   });
 
   it("en español, el scorecard sigue diciendo lo de siempre", () => {

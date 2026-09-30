@@ -28,7 +28,7 @@ const { fijo, mutacion, estado } = vi.hoisted(() => {
       return cache.get(clave) as { data: unknown; isLoading: boolean };
     },
     mutacion: () => ({ mutate: () => {}, mutateAsync: () => Promise.resolve({ score: 80 }), isPending: false }),
-    estado: { permisos: [] as string[], admin: true },
+    estado: { permisos: [] as string[], admin: true, conTopClosers: false },
   };
 });
 
@@ -63,9 +63,11 @@ vi.mock("@/hooks/useAgencyQa", async () => {
   const real = await vi.importActual<typeof import("@/hooks/useAgencyQa")>("@/hooks/useAgencyQa");
   return {
     ...real,
-    useQaAnalytics: () => fijo("analytics", () => ({
+    // Con `conTopClosers`, el popup de "Closers activos" trae un closer sin nombre.
+    useQaAnalytics: () => fijo(`analytics-${estado.conTopClosers}`, () => ({
       window: "30d", total_calls: 12, cerro: 5, no_cerro: 4, en_espera: 2, unscored: 1, close_rate: 5 / 12, avg_score: 71,
       active_models: 6, active_closers: 3,
+      top_closers: estado.conTopClosers ? [{ name: null, closer_name: null, calls: 2, score: 60 }] : undefined,
       closer_leaderboard: [{ closer_id: "k1", closer_name: "Bob Closer", calls: 7, avg_score: 75, cerro: 3, close_rate: 0.43 }],
       top_models: [{ model_id: "m1", model_name: "Jane Doe", calls: 4, avg_score: 70 }],
       weekly_volume: [{ week_start: "2026-09-14", count: 5, avg_score: 70 }],
@@ -94,7 +96,9 @@ vi.mock("@/hooks/useAgencyQa", async () => {
       { id: "mm1", session_id: "s1", role: "user", content: "Who closes the most?", tokens_in: null, tokens_out: null, cached_tokens: null, created_at: HACE_5_MIN },
       { id: "mm2", session_id: "s1", role: "assistant", content: "Bob does.", tokens_in: null, tokens_out: null, cached_tokens: null, created_at: HACE_5_MIN },
     ]),
-    useQaClosers: () => fijo("closers", () => [{ id: "k1", name: "Bob Closer", active: true, created_at: "" }, { id: "k2", name: "", active: true, created_at: "" }]),
+    // Como lo devuelve el hook de verdad: ordenado por nombre, y el que no tiene
+    // nombre llega con null (queda PRIMERO). La pantalla lo reordena por lo que muestra.
+    useQaClosers: () => fijo("closers", () => [{ id: "k2", name: null, active: true, created_at: "" }, { id: "k1", name: "Bob Closer", active: true, created_at: "" }]),
     useCreateQaChatSession: mutacion,
     useDeleteQaChatSession: mutacion,
     useSendQaChatMessage: mutacion,
@@ -162,6 +166,7 @@ describe("Company QA → Closers QA en inglés", () => {
     localStorage.setItem("app-language", "en");
     estado.permisos.length = 0;
     estado.admin = true;
+    estado.conTopClosers = false;
   });
 
   it("el marco y el Dashboard", async () => {
@@ -255,6 +260,41 @@ describe("Company QA → Closers QA en inglés", () => {
     expect(screen.getByText("Productivity · effort vs leads")).toBeTruthy();
     expect(screen.getAllByText("Leads/hour").length).toBe(2);
     expect(enEspanol()).toEqual([]);
+  });
+
+  it("un closer sin nombre: «No name» en el popup del KPI y en el alta de conversación, ordenado por lo que se ve", async () => {
+    estado.conTopClosers = true;
+    montar();
+    fireEvent.click(screen.getByText("Active closers").closest("button") ?? screen.getByText("Active closers"));
+    const popup = await screen.findByRole("dialog");
+    expect(within(popup).getByText("No name")).toBeTruthy();
+    expect(enEspanol(popup)).toEqual([]);
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+
+    abrirPestana("QA Chat");
+    fireEvent.click(screen.getByRole("button", { name: /New conversation/ }));
+    const dialogo = await screen.findByRole("dialog");
+    fireEvent.click(within(dialogo).getByRole("combobox"));
+    const opciones = (await screen.findAllByRole("option")).map((o) => o.textContent);
+    expect(opciones).toEqual(["All closers (team-wide)", "Bob Closer", "No name"]);
+  });
+
+  it("en español, el closer sin nombre dice «Sin nombre» (como siempre) y queda en la S", async () => {
+    localStorage.setItem("app-language", "es");
+    estado.conTopClosers = true;
+    montar();
+    fireEvent.click(screen.getByText("Closers activos").closest("button") ?? screen.getByText("Closers activos"));
+    const popup = await screen.findByRole("dialog");
+    expect(within(popup).getByText("Sin nombre")).toBeTruthy();
+    expect(within(popup).queryByText("(sin nombre)")).toBeNull();
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+
+    abrirPestana("QA Chat");
+    fireEvent.click(screen.getByRole("button", { name: /Nueva conversación/ }));
+    const dialogo = await screen.findByRole("dialog");
+    fireEvent.click(within(dialogo).getByRole("combobox"));
+    const opciones = (await screen.findAllByRole("option")).map((o) => o.textContent);
+    expect(opciones).toEqual(["Todos los closers (cross-equipo)", "Bob Closer", "Sin nombre"]);
   });
 
   it("en español sigue diciendo lo de siempre", () => {

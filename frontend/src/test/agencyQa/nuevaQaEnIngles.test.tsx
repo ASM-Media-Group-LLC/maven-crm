@@ -44,7 +44,10 @@ vi.mock("@/hooks/useAgencyQa", async () => {
       },
     }),
     useQaModels: () => consulta([]),
-    useSearchModelsForQa: () => consulta([]),
+    // "nn" trae una modelo sin nombre ni handle; cualquier otra búsqueda, nada.
+    useSearchModelsForQa: (q: string) => consulta(q === "nn"
+      ? [{ id: "x1", instagram_handle: null, display_name: null, avatar_url: null, country: null, city: null, followers_count: null }]
+      : []),
     useTenantProfiles: () => consulta([
       { id: "p1", full_name: "Bob Closer", avatar_url: null },
       { id: "p2", full_name: null, avatar_url: null },
@@ -96,6 +99,25 @@ describe("Closers QA → Nueva QA en inglés", () => {
     fireEvent.change(buscador, { target: { value: "zz" } });
     expect(screen.getByText(/create it in/)).toBeTruthy();
     expect(enEspanol()).toEqual([]);
+  });
+
+  it("una modelo sin nombre ni handle en la búsqueda: «No name»", () => {
+    montar();
+    const buscador = screen.getByPlaceholderText("Search the catalog for a model…");
+    fireEvent.focus(buscador);
+    fireEvent.change(buscador, { target: { value: "nn" } });
+    expect(screen.getByText("No name")).toBeTruthy();
+    expect(enEspanol()).toEqual([]);
+  });
+
+  it("en español, esa modelo sigue diciendo «Sin nombre» (sin paréntesis)", () => {
+    localStorage.setItem("app-language", "es");
+    montar();
+    const buscador = screen.getByPlaceholderText("Buscar modelo en el catálogo…");
+    fireEvent.focus(buscador);
+    fireEvent.change(buscador, { target: { value: "nn" } });
+    expect(screen.getByText("Sin nombre")).toBeTruthy();
+    expect(screen.queryByText("(sin nombre)")).toBeNull();
   });
 
   it("los selectores de closer, soportes y país", async () => {

@@ -603,7 +603,7 @@ const AgencyNewQa = () => {
                               />
                               <div className="min-w-0 flex-1">
                                 <div className="truncate font-medium">
-                                  {m.display_name || m.instagram_handle || t("agencyQa.noName")}
+                                  {m.display_name || m.instagram_handle || t("agencyQa.noNameBare")}
                                 </div>
                                 <div className="truncate text-xs text-muted-foreground">
                                   {m.instagram_handle ? `@${m.instagram_handle}` : "—"}

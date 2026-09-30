@@ -380,17 +380,10 @@ export default function ChatterQaReportDetail({ id, onBack }: { id: string; onBa
                 {vm!.resumen && <p className="mb-3 text-sm leading-relaxed text-foreground/90">{vm!.resumen}</p>}
                 {s && s.count > 0 && (
                   <div className="mb-3 flex flex-wrap gap-x-4 gap-y-1 rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-xs tabular-nums">
-                    <span>
-                      <ConFormato
-                        texto={t("agencyQa.report.massStats", {
-                          count: s.count,
-                          sent: s.sent.toLocaleString(),
-                          viewed: s.viewed.toLocaleString(),
-                          purchased: s.purchased.toLocaleString(),
-                          conv,
-                        })}
-                      />
-                    </span>
+                    <span><ConFormato texto={t("agencyQa.report.massCount", { n: s.count })} /></span>
+                    <span><ConFormato texto={t("agencyQa.report.massSent", { n: s.sent.toLocaleString() })} /></span>
+                    <span><ConFormato texto={t("agencyQa.report.massViewed", { n: s.viewed.toLocaleString() })} /></span>
+                    <span><ConFormato texto={t("agencyQa.report.massPurchased", { n: s.purchased.toLocaleString(), conv })} /></span>
                     <span className="text-success"><b>${s.earnings.toLocaleString()}</b></span>
                   </div>
                 )}

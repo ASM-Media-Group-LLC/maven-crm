@@ -721,7 +721,7 @@ const AgencyQaChat = () => {
 interface NewSessionDialogProps {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  closers: Array<{ id: string; name: string }>;
+  closers: Array<{ id: string; name: string | null }>;
   creating: boolean;
   onCreate: (scopeType: QaChatScope, scopeCloserId: string | null) => void;
 }
@@ -735,6 +735,17 @@ const NewSessionDialog = ({
 }: NewSessionDialogProps) => {
   const { t } = useLanguage();
   const [scope, setScope] = useState<string>("all");
+
+  // El hook deja name en null cuando el perfil no tiene nombre: aquí se pone
+  // «Sin nombre» en el idioma de la pantalla y se ordena por lo que se ve (como
+  // antes, que el hook ordenaba con «Sin nombre» puesto y quedaba en la S).
+  const closersConEtiqueta = useMemo(
+    () =>
+      closers
+        .map((c) => ({ id: c.id, label: c.name ?? t("agencyQa.noNameBare") }))
+        .sort((a, b) => a.label.localeCompare(b.label)),
+    [closers, t],
+  );
 
   useEffect(() => {
     if (open) setScope("all");
@@ -763,11 +774,11 @@ const NewSessionDialog = ({
                   {t("agencyQa.chat.allCrossTeam")}
                 </div>
               </SelectItem>
-              {closers.map((c) => (
+              {closersConEtiqueta.map((c) => (
                 <SelectItem key={c.id} value={c.id}>
                   <div className="flex items-center gap-1.5">
                     <UserIcon className="h-3.5 w-3.5" />
-                    {c.name || t("agencyQa.noName")}
+                    {c.label}
                   </div>
                 </SelectItem>
               ))}

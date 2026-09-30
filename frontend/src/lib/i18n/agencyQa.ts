@@ -20,6 +20,8 @@ export const PREFIJOS_AGENCY_QA = ["agencyQa."] as const;
 export const agencyQa = {
   // ── Compartido por varias pantallas ──
   "agencyQa.noName": { es: "(sin nombre)", en: "(no name)" },
+  // Los lugares que en español decían «Sin nombre» (sin paréntesis) siguen diciéndolo.
+  "agencyQa.noNameBare": { es: "Sin nombre", en: "No name" },
   "agencyQa.noModel": { es: "(sin modelo)", en: "(no model)" },
   "agencyQa.noCloser": { es: "(sin closer)", en: "(no closer)" },
   "agencyQa.model": { es: "Modelo", en: "Model" },
@@ -104,7 +106,7 @@ export const agencyQa = {
     en: "Audits of closers' sales calls with models.",
   },
   "agencyQa.chatters.subtitle": {
-    es: "Medición y auditoría de chatters — reemplaza el sheet de medición de chatters.",
+    es: "Medición y auditoría de chatters — reemplaza el sheet \"Medidor de chatters\".",
     en: "Chatter measurement and audits — replaces the chatter measurement sheet.",
   },
   "agencyQa.chatters.noAccess": {
@@ -540,10 +542,11 @@ export const agencyQa = {
   "agencyQa.report.mainFinding": { es: "Hallazgo principal", en: "Key finding" },
   "agencyQa.report.modelsLabel": { es: "Modelos:", en: "Models:" },
   "agencyQa.report.summary": { es: "Resumen", en: "Summary" },
-  "agencyQa.report.massStats": {
-    es: "**{count}** masivos · **{sent}** enviados · **{viewed}** vistos · **{purchased}** ventas ({conv})",
-    en: "**{count}** mass messages · **{sent}** sent · **{viewed}** viewed · **{purchased}** sales ({conv})",
-  },
+  // Venta masiva: una clave por chip (cada uno va en su propio span del renglón flex-wrap).
+  "agencyQa.report.massCount": { es: "**{n}** masivos", en: "**{n}** mass messages" },
+  "agencyQa.report.massSent": { es: "**{n}** enviados", en: "**{n}** sent" },
+  "agencyQa.report.massViewed": { es: "**{n}** vistos", en: "**{n}** viewed" },
+  "agencyQa.report.massPurchased": { es: "**{n}** ventas ({conv})", en: "**{n}** sales ({conv})" },
   "agencyQa.report.mostEffective": { es: "Más efectivos", en: "Most effective" },
   "agencyQa.report.leastEffective": { es: "Menos efectivos", en: "Least effective" },
   "agencyQa.report.patterns": { es: "Patrones", en: "Patterns" },

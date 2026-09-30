@@ -439,7 +439,7 @@ const AgencyAnalytics = () => {
           if (kpiPopup === "closers") {
             const top = (data as any).top_closers ?? [];
             return top.map((c: any): KpiRow => ({
-              primary: c.name ?? c.closer_name ?? t("agencyQa.noName"),
+              primary: c.name ?? c.closer_name ?? t("agencyQa.noNameBare"),
               secondary: c.calls !== undefined ? t("agencyQa.analytics.nAnalyses", { n: c.calls }) : undefined,
               right: c.score !== undefined ? String(c.score) : undefined,
             }));

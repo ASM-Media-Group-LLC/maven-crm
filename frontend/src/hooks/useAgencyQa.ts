@@ -27,7 +27,8 @@ export interface QaModel {
 
 export interface QaCloser {
   id: string;
-  name: string;
+  /** null = el perfil no tiene nombre: la pantalla pone «Sin nombre» en su idioma. */
+  name: string | null;
   active: boolean;
   created_at: string;
 }
@@ -1092,12 +1093,12 @@ export const useQaClosers = () =>
       return ((data ?? []) as any[])
         .map((r) => ({
           id: r.user_id as string,
-          // Sin nombre → "" y la pantalla pone "(sin nombre)" en su idioma.
-          name: (r.profiles?.full_name as string) ?? "",
+          // Sin nombre → null y la pantalla pone «Sin nombre» en su idioma (y ordena por lo que muestra).
+          name: (r.profiles?.full_name as string | null | undefined) ?? null,
           active: true,
           created_at: (r.profiles?.created_at as string) ?? new Date().toISOString(),
         }))
-        .sort((a, b) => a.name.localeCompare(b.name));
+        .sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
     },
   });
 
