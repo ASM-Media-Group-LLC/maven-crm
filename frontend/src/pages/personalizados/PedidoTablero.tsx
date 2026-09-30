@@ -117,7 +117,7 @@ export default function PedidoTablero({ pedidos, onAbrir }: Props) {
                     ))}
                     {prov.placeholder}
                     {items.length === 0 && !snap.isDraggingOver && (
-                      <p className="text-[11px] text-muted-foreground/60 text-center py-6">Nada acá</p>
+                      <p className="text-[11px] text-muted-foreground/60 text-center py-6">Nada aquí</p>
                     )}
                   </div>
                 </div>

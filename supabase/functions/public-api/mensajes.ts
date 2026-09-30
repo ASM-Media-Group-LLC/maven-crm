@@ -158,11 +158,11 @@ export const MENSAJES = {
     en: "The user this API key acts as is no longer active in this Maven agency",
   },
   no_disponible: {
-    es: "El servicio no está disponible en este momento. Reintentá en unos segundos.",
+    es: "El servicio no está disponible en este momento. Reintenta en unos segundos.",
     en: "The service is temporarily unavailable. Please try again in a few seconds.",
   },
   limite_por_minuto: {
-    es: "Esta API key llegó a su límite de {n} pedidos por minuto. Reintentá en {s} s.",
+    es: "Esta API key llegó a su límite de {n} pedidos por minuto. Reintenta en {s} s.",
     en: "This API key has reached its limit of {n} requests per minute. Please try again in {s} s.",
     vars: ["n", "s"],
   },
@@ -200,7 +200,7 @@ export const MENSAJES = {
     soloEnEs: ["pendiente"],
   },
   aislamiento_no_verificado: {
-    es: "No se pudo verificar el aislamiento entre agencias. Reintentá en unos segundos.",
+    es: "No se pudo verificar el aislamiento entre agencias. Reintenta en unos segundos.",
     en: "Could not verify isolation between agencies. Please try again in a few seconds.",
   },
 
@@ -215,7 +215,7 @@ export const MENSAJES = {
     en: "API keys with Messenger access require an IP allowlist and an expiration date",
   },
   messenger_rutas: {
-    es: "Usá /messenger/conversations, /messenger/conversations/{id}, " +
+    es: "Usa /messenger/conversations, /messenger/conversations/{id}, " +
       "/messenger/conversations/{id}/messages o /messenger/feed",
     en: "Use /messenger/conversations, /messenger/conversations/{id}, " +
       "/messenger/conversations/{id}/messages or /messenger/feed",
@@ -231,14 +231,14 @@ export const MENSAJES = {
     en: "offset must be a number greater than or equal to 0",
   },
   include_invalido: { es: "include solo acepta: rich", en: "include only accepts: rich" },
-  before_y_after: { es: "Usá before O after, no los dos", en: "Use before OR after, not both" },
+  before_y_after: { es: "Usa before O after, no los dos", en: "Use before OR after, not both" },
   cursor_invalido: { es: "El cursor no es válido", en: "Invalid cursor" },
   thread_root_id_invalido: { es: "thread_root_id no es válido", en: "Invalid thread_root_id" },
-  after_y_since: { es: "Usá after O since, no los dos", en: "Use after OR since, not both" },
+  after_y_since: { es: "Usa after O since, no los dos", en: "Use after OR since, not both" },
   exclude_own_invalido: { es: "exclude_own tiene que ser true o false", en: "exclude_own must be true or false" },
   since_invalido: { es: "since tiene que ser una fecha ISO 8601", en: "since must be an ISO 8601 date" },
   since_muy_viejo: {
-    es: "since no puede tener más de 72 horas: para lo anterior, leé cada conversación con /messages",
+    es: "since no puede tener más de 72 horas: para lo anterior, lee cada conversación con /messages",
     en: "since cannot be more than 72 hours ago; for older messages, read each conversation with /messages",
   },
 } as const satisfies Record<string, Entrada>;

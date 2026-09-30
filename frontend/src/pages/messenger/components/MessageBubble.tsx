@@ -495,7 +495,7 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
                   <Copy className="h-3.5 w-3.5 mr-2" /> {t("common.copy")}
                 </DropdownMenuItem>
                 {/* Todo mensaje con archivo (imagen, video, audio, documento) se
-                    puede descargar desde acá, además del botón del zoom. */}
+                    puede descargar desde aquí, además del botón del zoom. */}
                 {message.file_url && (
                   <DropdownMenuItem onClick={() => void descargarArchivo(message.file_url!, message.file_name)}>
                     <Download className="h-3.5 w-3.5 mr-2" /> {t("common.download")}

@@ -318,7 +318,7 @@ export const leadgen = {
   "leadgen.igAccounts.scoutersUseIt": { es: "{count} scouters la usan", en: "{count} scouters use it" },
   "leadgen.igAccounts.deleteTitle": { es: "¿Eliminar @{handle}?", en: "Delete @{handle}?" },
   "leadgen.igAccounts.deleteDesc": {
-    es: "Esta cuenta dejará de aparecer en \"Mis Cuentas IG\" y no se usará más para outreach. Si la quemaron en IG y quieres agregar una nueva, primero eliminala acá.",
+    es: "Esta cuenta dejará de aparecer en \"Mis Cuentas IG\" y no se usará más para outreach. Si la quemaron en IG y quieres agregar una nueva, primero elimínala aquí.",
     en: "This account will no longer show up in \"My IG accounts\" and won't be used for outreach anymore. If it got burned on IG and you want to add a new one, delete it here first.",
   },
   "leadgen.igAccounts.deleteDescShared": {
@@ -406,11 +406,11 @@ export const leadgen = {
     en: "Improve the analysis with screenshots",
   },
   "leadgen.igAccounts.screenshotsRestrictedHint": {
-    es: "Como IG oculta la cuenta a viewers no-loggeados, el bot no puede leer bio/foto/link. Saca screenshots del perfil desde tu browser (logueado) y subilos acá — puedes agregar varios (bio, posts, link, etc) y Claude vision los lee y enriquece el análisis.",
+    es: "Como IG oculta la cuenta a viewers no-loggeados, el bot no puede leer bio/foto/link. Saca screenshots del perfil desde tu browser (logueado) y súbelos aquí — puedes agregar varios (bio, posts, link, etc) y Claude vision los lee y enriquece el análisis.",
     en: "Since IG hides the account from logged-out viewers, the bot can't read the bio/photo/link. Take screenshots of the profile from your browser (logged in) and upload them here — you can add several (bio, posts, link, etc.) and Claude vision reads them and enriches the analysis.",
   },
   "leadgen.igAccounts.screenshotsUnreadHint": {
-    es: "No pudimos leer la cuenta automáticamente (muy nueva o IG bloqueó la lectura). Saca screenshots del perfil desde tu browser (logueado) y subilos acá — puedes agregar varios (bio, posts, link, etc) y Claude vision los lee y arma el análisis con la data real.",
+    es: "No pudimos leer la cuenta automáticamente (muy nueva o IG bloqueó la lectura). Saca screenshots del perfil desde tu browser (logueado) y súbelos aquí — puedes agregar varios (bio, posts, link, etc) y Claude vision los lee y arma el análisis con la data real.",
     en: "We couldn't read the account automatically (too new, or IG blocked the read). Take screenshots of the profile from your browser (logged in) and upload them here — you can add several (bio, posts, link, etc.) and Claude vision reads them and builds the analysis from the real data.",
   },
   "leadgen.igAccounts.uploading": { es: "Subiendo…", en: "Uploading…" },
@@ -653,7 +653,7 @@ export const leadgen = {
   "leadgen.addContact.nameRequired": { es: "Nombre requerido", en: "Name required" },
   "leadgen.addContact.igRequired": { es: "Link de Instagram requerido", en: "Instagram link required" },
   "leadgen.addContact.leadRequired": {
-    es: "Tienes que seleccionar un lead existente. Si no aparece, agregalo primero en LeadGen.",
+    es: "Tienes que seleccionar un lead existente. Si no aparece, agrégalo primero en LeadGen.",
     en: "You have to select an existing lead. If it doesn't show up, add it in LeadGen first.",
   },
   "leadgen.addContact.notEnoughEvidence": { es: "Evidencia insuficiente", en: "Not enough evidence" },
@@ -741,7 +741,7 @@ export const leadgen = {
   "leadgen.autocomplete.unlink": { es: "Quitar asociación al lead", en: "Unlink from the lead" },
   "leadgen.autocomplete.searching": { es: "Buscando…", en: "Searching…" },
   "leadgen.autocomplete.noMatches": {
-    es: "Sin leads que matcheen. Si el lead no existe, agregalo primero en LeadGen.",
+    es: "Sin leads que matcheen. Si el lead no existe, agrégalo primero en LeadGen.",
     en: "No matching leads. If the lead doesn't exist, add it in LeadGen first.",
   },
   "leadgen.autocomplete.hasPhone": { es: "📞 ya tiene tel", en: "📞 has a phone" },

@@ -344,7 +344,7 @@ export default function MessengerPage() {
       </div>
 
       {/* El modal de llamada entrante ahora es GLOBAL (CallProvider), para que
-          suene estés en la sección de Maven que estés, no solo acá. */}
+          suene estés en la sección de Maven que estés, no solo aquí. */}
 
       <NewChatModal
         open={newChatOpen}

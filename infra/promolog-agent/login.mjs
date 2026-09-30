@@ -30,8 +30,8 @@ const context = await browser.newContext({
 const page = await context.newPage();
 await page.goto("https://www.instagram.com/accounts/login/", { waitUntil: "domcontentloaded" });
 
-console.log(`\n➡️  Logueá la cuenta scanner del SLOT "${slot}" en la ventana que se abrió.`);
-console.log("   (resolvé 2FA/challenge si aparece). Cuando estés en el feed logueado, volvé acá y apretá ENTER.\n");
+console.log(`\n➡️  Loguea la cuenta scanner del SLOT "${slot}" en la ventana que se abrió.`);
+console.log("   (resuelve 2FA/challenge si aparece). Cuando estés en el feed logueado, vuelve aquí y aprieta ENTER.\n");
 
 await new Promise((resolve) => {
   const rl = createInterface({ input: process.stdin, output: process.stdout });

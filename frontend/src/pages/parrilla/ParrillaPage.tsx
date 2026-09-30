@@ -468,7 +468,7 @@ export default function ParrillaPage() {
   const handleSelectWeek = (id: string) => {
     if (!dirtyRef.current) { setSelectedId(id); return; }
     toast.warning("Tienes cambios sin guardar en esta parrilla", {
-      description: "Guardalos, o descartalos para cambiar de semana.",
+      description: "Guárdalos, o descártalos para cambiar de semana.",
       duration: 8000,
       action: { label: "Descartar y cambiar", onClick: () => { markDirty(false); setSelectedId(id); } },
     });
@@ -630,7 +630,7 @@ export default function ParrillaPage() {
               {enviar.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Send className="mr-1 h-4 w-4" />} Enviar al grupo
             </Button>
           )}
-          <Button size="sm" onClick={() => handleSave()} disabled={save.isPending || !grid || soloLectura} title={soloLectura ? "La parrilla ya fue enviada: volvé a borrador para editarla" : undefined}>
+          <Button size="sm" onClick={() => handleSave()} disabled={save.isPending || !grid || soloLectura} title={soloLectura ? "La parrilla ya fue enviada: vuelve a borrador para editarla" : undefined}>
             {save.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Save className="mr-1 h-4 w-4" />} Guardar
           </Button>
           </>

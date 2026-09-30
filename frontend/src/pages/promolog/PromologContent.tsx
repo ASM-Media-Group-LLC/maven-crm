@@ -959,7 +959,7 @@ const PromologContent = () => {
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
       {/* Header global — título a la izquierda, presets (Ayer/Hoy/...) +
           DateRangePicker a la derecha. Mismo patrón que PanelDeControl.
-          El date range que vive acá afecta a los 3 subtabs (Dashboard,
+          El date range que vive aquí afecta a los 3 subtabs (Dashboard,
           Promos, Agentes) — es la única fuente de verdad temporal. */}
       <header className="bg-background/30 backdrop-blur-xl px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b border-white/10 shrink-0">
         <PageHeader

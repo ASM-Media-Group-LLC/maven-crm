@@ -432,7 +432,7 @@ async function drainQueue(limit: number): Promise<{ sent: number; failed: number
         await logEvent(sb, {
           tenantId: String(s.tenant_id), groupId: String(s.group_id), kind: "error",
           payload: { stage: "recurrencia", reminder_id: s.id, recurrence: s.recurrence,
-                     detalle: "recurrencia no reconocida — la serie termina acá" },
+                     detalle: "recurrencia no reconocida — la serie termina aquí" },
         });
         continue;
       }

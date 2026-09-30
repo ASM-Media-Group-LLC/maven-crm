@@ -610,7 +610,7 @@ export function crearConectar(red: Red = redDeDeno): Conectar {
 }
 
 export type Resultado =
-  /** El receptor contestó: acá está el código. */
+  /** El receptor contestó: aquí está el código. */
   | { tipo: "respuesta"; estado: number; retryAfterS: number | null; latenciaMs: number }
   /** No salió ni un byte del cuerpo: es un fallo seguro. host_prohibido: la URL
    *  guardada ya no pasa la validación (nunca se va a mandar). */

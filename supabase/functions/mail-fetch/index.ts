@@ -122,7 +122,7 @@ Deno.serve(async (req) => {
       }
       if (!conn) return json(req, { error: "no_connection" }, 409);
       if (!conn.zoho_account_id) {
-        return json(req, { error: "la conexión no tiene casilla asociada — reconectá" }, 409);
+        return json(req, { error: "la conexión no tiene casilla asociada — reconecta" }, 409);
       }
 
       const tok = await refreshUserToken(conn.refresh_token as string);
@@ -843,7 +843,7 @@ Deno.serve(async (req) => {
               };
             } else if (trozo.ok && trozo.truncated) {
               return json(req, {
-                error: "ese archivo pesa más de 20 MB y no se puede descargar desde acá",
+                error: "ese archivo pesa más de 20 MB y no se puede descargar desde aquí",
               }, 413);
             }
           }
@@ -862,7 +862,7 @@ Deno.serve(async (req) => {
           // hizo creer que un CV de 37 KB era "demasiado grande".
           if (raw.truncated) {
             return json(req, {
-              error: "este correo es demasiado grande para abrirlo desde acá",
+              error: "este correo es demasiado grande para abrirlo desde aquí",
             }, 413);
           }
 
@@ -875,7 +875,7 @@ Deno.serve(async (req) => {
         // cortar claro (los adjuntos gigantes son casos raros).
         if (adj.bytes.length > 20 * 1024 * 1024) {
           return json(req, {
-            error: "ese archivo pesa más de 20 MB y no se puede descargar desde acá",
+            error: "ese archivo pesa más de 20 MB y no se puede descargar desde aquí",
           }, 413);
         }
 
@@ -1117,7 +1117,7 @@ Deno.serve(async (req) => {
           // con 13 hojas de vida a tres destinatarias.
           if (sent.incierto) {
             return json(req, {
-              error: "se envió pero el servidor tardó en confirmar: revisá Enviados ANTES de reintentar, puede haber salido",
+              error: "se envió pero el servidor tardó en confirmar: revisa Enviados ANTES de reintentar, puede haber salido",
               code: sent.code,
               incierto: true,
             }, 504);

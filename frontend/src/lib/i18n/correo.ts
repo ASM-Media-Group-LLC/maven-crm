@@ -45,7 +45,7 @@ export const correo = {
     en: "It was removed from the emails that had it. No email was deleted.",
   },
   "mail.labels.duplicate": {
-    es: "Ya tenés una etiqueta con ese nombre.",
+    es: "Ya tienes una etiqueta con ese nombre.",
     en: "You already have a label with that name.",
   },
   "mail.labels.empty": {

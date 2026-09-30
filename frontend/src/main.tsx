@@ -67,7 +67,7 @@ function mostrarAvisoDeRecargaPendiente() {
     "display:flex;align-items:center;gap:12px;font-size:14px;font-family:system-ui,sans-serif;" +
     "box-shadow:0 4px 20px rgba(0,0,0,.4);max-width:calc(100vw - 32px)";
   const texto = document.createElement("span");
-  texto.textContent = "Hay una versión nueva de Maven. Recargá cuando termines la llamada.";
+  texto.textContent = "Hay una versión nueva de Maven. Recarga cuando termines la llamada.";
   const boton = document.createElement("button");
   boton.type = "button";
   boton.textContent = "Recargar ahora";
