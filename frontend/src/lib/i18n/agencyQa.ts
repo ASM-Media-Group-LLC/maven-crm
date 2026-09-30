@@ -462,8 +462,8 @@ export const agencyQa = {
   "agencyQa.qual.newReport": { es: "Nuevo reporte", en: "New report" },
   "agencyQa.qual.chatterFromBlu": { es: "Chatter (de BLU)", en: "Chatter (from BLU)" },
   "agencyQa.qual.suggested": {
-    es: "{name} está asignado a {total} modelos; sugerí {n} (el análisis admite hasta 4). Ajusta si quieres.",
-    en: "{name} is assigned to {total} models; I suggested {n} (the analysis takes up to 4). Adjust if you like.",
+    es: "{name} está asignado a {total} modelos; sugiere {n} (el análisis admite hasta 4). Ajusta si quieres.",
+    en: "{name} is assigned to {total} models; suggesting {n} (the analysis takes up to 4). Adjust if you like.",
   },
   "agencyQa.qual.loadingChatters": { es: "Cargando chatters…", en: "Loading chatters…" },
   "agencyQa.qual.chatterName": { es: "Nombre del chatter…", en: "Chatter name…" },
@@ -533,7 +533,7 @@ export const agencyQa = {
   "agencyQa.report.addModel": { es: "Agregar modelo", en: "Add model" },
   "agencyQa.report.massSales": { es: "Venta masiva", en: "Mass sales" },
   "agencyQa.report.massHint": {
-    es: "Diagnóstico manual de los masivos del chatter (dejalo vacío si no aplica). El detalle —mejores/peores · patrones · recomendaciones— lo completa el borrador IA cuando detecta masivos suyos.",
+    es: "Diagnóstico manual de los masivos del chatter (déjalo vacío si no aplica). El detalle —mejores/peores · patrones · recomendaciones— lo completa el borrador IA cuando detecta masivos suyos.",
     en: "Manual diagnosis of the chatter's mass messages (leave it empty if it doesn't apply). The details — best/worst · patterns · recommendations — are filled in by the AI draft when it finds mass messages of theirs.",
   },
   "agencyQa.report.massPlaceholder": { es: "Diagnóstico de los masivos…", en: "Diagnosis of the mass messages…" },
@@ -683,7 +683,7 @@ export const agencyQa = {
   "agencyQa.chat.couldNotDelete": { es: "No se pudo borrar la conversación", en: "Couldn't delete the conversation" },
   "agencyQa.chat.couldNotCreate": { es: "No se pudo crear la conversación", en: "Couldn't create the conversation" },
   "agencyQa.chat.intro": {
-    es: "Mike es tu supervisor IA — conoce a cada closer, todas las QAs, y te ayuda a coachear al equipo. Hacele preguntas sobre tendencias, comparativas entre closers o qué le falta a alguien.",
+    es: "Mike es tu supervisor IA — conoce a cada closer, todas las QAs, y te ayuda a coachear al equipo. Hazle preguntas sobre tendencias, comparativas entre closers o qué le falta a alguien.",
     en: "Mike is your AI supervisor — he knows every closer and every QA, and helps you coach the team. Ask him about trends, comparisons between closers, or what someone is missing.",
   },
   "agencyQa.chat.new": { es: "Nueva conversación", en: "New conversation" },

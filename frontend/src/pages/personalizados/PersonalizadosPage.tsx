@@ -263,7 +263,7 @@ export default function PersonalizadosPage() {
           <div className="flex flex-col items-center justify-center gap-3 py-20 text-center">
             <div className="h-14 w-14 rounded-3xl bg-primary/10 flex items-center justify-center"><Gift className="h-7 w-7 text-primary" /></div>
             <p className="font-medium">{agenciaActual ? `Todavía no hay pedidos de ${agenciaActual.label}` : "Todavía no hay pedidos"}</p>
-            <p className="text-sm text-muted-foreground max-w-sm">Creá el primero con "Nuevo pedido".</p>
+            <p className="text-sm text-muted-foreground max-w-sm">Crea el primero con "Nuevo pedido".</p>
             <Badge variant="outline" className="rounded-full">Solicitado → Aprobado → En producción → Listo → Entregado</Badge>
           </div>
         ) : vista === "tablero" ? (

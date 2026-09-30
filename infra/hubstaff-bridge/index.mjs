@@ -358,7 +358,7 @@ async function probe() {
   const y = ymd(new Date(Date.now() - DAY));
   const daily = await hsGet(`/organizations/${oid}/activities/daily`, { "date[start]": y, "date[stop]": y, page_limit: 3 });
   console.log(`\n=== /organizations/${oid}/activities/daily (${y}, primeros 3) ===\n` + trunc(daily));
-  console.log("\n[probe] OK. Validá los nombres de campo (user_id, tracked, overall, date, email) contra el parser.");
+  console.log("\n[probe] OK. Valida los nombres de campo (user_id, tracked, overall, date, email) contra el parser.");
 }
 
 async function runOnce() {
@@ -434,7 +434,7 @@ async function refreshCostConfig() {
 
 function warnIfExpired(e) {
   console.error("[hubstaff-bridge] error:", e.message);
-  if (e.expired) console.error("[hubstaff-bridge] ⚠ El refresh token venció/revocó. Generá un PAT nuevo en Hubstaff y actualizá HUBSTAFF_PAT_REFRESH_TOKEN en Dokploy (re-seed).");
+  if (e.expired) console.error("[hubstaff-bridge] ⚠ El refresh token venció/revocó. Genera un PAT nuevo en Hubstaff y actualiza HUBSTAFF_PAT_REFRESH_TOKEN en Dokploy (re-seed).");
 }
 
 // ── Sync ON-DEMAND (cola hubstaff_sync_requests) ─────────────────────────────

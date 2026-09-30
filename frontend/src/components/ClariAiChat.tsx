@@ -87,7 +87,7 @@ const welcomeFor = (endpoint: EndpointKey): Msg => {
   return {
     role: "assistant",
     content:
-      "¡Hola! 👋 Soy tu asistente de ventas. Pedime rankings, comparativas o tendencias de tus creadoras. Ej: *¿quién factura más esta semana?*",
+      "¡Hola! 👋 Soy tu asistente de ventas. Pídeme rankings, comparativas o tendencias de tus creadoras. Ej: *¿quién factura más esta semana?*",
   };
 };
 

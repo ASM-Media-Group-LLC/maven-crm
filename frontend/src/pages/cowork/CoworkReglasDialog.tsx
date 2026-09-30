@@ -99,6 +99,8 @@ function resumenReloj(r: ReglaReloj, camara: boolean, pantalla: boolean, t: Trad
     camara ? t("cowork.rules.clock.stopNoCamera") : null,
     pantalla ? t("cowork.rules.clock.stopNoScreen") : null,
     camara ? t("cowork.rules.clock.stopNobody", { time: textoSegundos(r.fueraDeCamaraSeg) }) : null,
+    // Solo si exige algo: sin cámara ni pantalla, el reloj nunca dependió de la sala.
+    camara || pantalla ? t("cowork.rules.clock.stopNoConnection") : null,
   ].filter(Boolean).join(", ");
   return t("cowork.rules.clock.summary", { requires: exige, stops: paradas });
 }

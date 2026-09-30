@@ -167,7 +167,7 @@ Deno.serve(async (req) => {
           ok: false,
           error: "session_locked",
           message: session.started_at
-            ? "Este examen ya está en curso en otro dispositivo. No se puede continuar desde acá."
+            ? "Este examen ya está en curso en otro dispositivo. No se puede continuar desde aquí."
             : "Otro dispositivo está activo en esta sesión.",
         });
       }

@@ -309,6 +309,9 @@ verify_jwt = false  # auth propia: Bearer del usuario, verificado con getUser (m
 [functions.document-convert]
 verify_jwt = false  # auth propia: Bearer del usuario, verificado con getUser (mismo patrón que creator-video)
 
+[functions.drive]
+verify_jwt = false  # auth propia: Bearer del usuario (auth.getUser) — mismo patrón que oficina-doc
+
 [functions.oficina-doc]
 verify_jwt = false  # auth propia: Bearer del usuario, y el aviso de guardado de ONLYOFFICE llega SIN sesión (se valida con token de un solo uso + firma)
 

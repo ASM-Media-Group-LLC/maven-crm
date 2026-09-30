@@ -69,7 +69,7 @@ async function fetchTargets() {
 export async function runJoin(opts = {}, { log = console.log, shouldStop = () => false } = {}) {
   const OPTS = { join: false, max: 4, all: false, only: "", headless: true, debug: false, aprobacion: false, ...opts };
   if (!CRON_TOKEN) { log("⚠️ Falta CRON_INTERNAL_TOKEN en el .env"); return { error: "sin_token" }; }
-  if (!existsSync(TG_SESSION)) { log(`⚠️ Falta la sesión de Telegram. Logueá la cuenta en el panel.`); return { error: "sin_sesion" }; }
+  if (!existsSync(TG_SESSION)) { log(`⚠️ Falta la sesión de Telegram. Loguea la cuenta en el panel.`); return { error: "sin_sesion" }; }
 
   const targets = await fetchTargets();
   const prev = readState();
@@ -131,7 +131,7 @@ export async function runJoin(opts = {}, { log = console.log, shouldStop = () =>
     }
 
     if (st.state === "falta" && st.needsApproval && OPTS.join && !OPTS.aprobacion) {
-      st = { ...st, detail: "pide aprobación del admin — corré con --pedir-aprobacion si querés que la cuenta se la mande" };
+      st = { ...st, detail: "pide aprobación del admin — corre con --pedir-aprobacion si quieres que la cuenta se la mande" };
     } else if (st.state === "falta" && OPTS.join) {
       let clickErr = null;
       try { await page.click(`[data-tgjoin="${st.joinBtn.idx}"]`, { timeout: 8000 }); }
@@ -176,9 +176,9 @@ export async function runJoin(opts = {}, { log = console.log, shouldStop = () =>
   };
   log(`\n━━━ RESUMEN ━━━`);
   for (const [k, v] of Object.entries(resumen)) if (v) log(`  ${v} ${ROTULO[k] ?? k}`);
-  if (cortado) log(`\n🛑 CORRIDA CORTADA — ${cortado}\n   Dejá descansar la cuenta unas horas antes de la próxima tanda.`);
+  if (cortado) log(`\n🛑 CORRIDA CORTADA — ${cortado}\n   Deja descansar la cuenta unas horas antes de la próxima tanda.`);
   const faltan = Object.values(prev).filter((v) => v.state === "falta").length;
-  if (faltan) log(`\n🔒 Faltan ${faltan} canal(es) — volvé a apretar para la siguiente tanda.`);
+  if (faltan) log(`\n🔒 Faltan ${faltan} canal(es) — vuelve a apretar para la siguiente tanda.`);
   log(`(estado guardado en ${MEMBERSHIP_FILE})`);
   return { resumen, faltan, cortado, raros };
 }

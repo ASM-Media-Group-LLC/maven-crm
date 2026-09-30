@@ -318,8 +318,11 @@ describe("cableado del hook", () => {
   });
 
   it("el efecto que arma el canal NO depende de `version` (ahí estaba el lazo)", () => {
+    // Desde el 28/09 el canal es el compartido (canalDelChat.ts) y este efecto
+    // registra en él qué hacer con cada mensaje. La regla es la misma: si
+    // dependiera de `version`, cada resurrección volvería a pedir el nombre.
     const efectos = fuente.split("useEffect(() => {").slice(1);
-    const delCanal = efectos.filter((e) => e.includes("armarCanalRef.current ="));
+    const delCanal = efectos.filter((e) => e.includes("registrarEnElCanalDelChat("));
     expect(delCanal).toHaveLength(1);
     const deps = delCanal[0].match(/\}, \[([^\]]*)\]\);/)?.[1] ?? "";
     expect(deps.replace(/\s/g, "")).toBe("userId");
@@ -328,7 +331,7 @@ describe("cableado del hook", () => {
   });
 
   it("hay un freno entre barridos: volver del segundo plano dispara dos seguidos", () => {
-    // useReanudarAlVolver de este hook sube `version`, y useCanalQueRevive
+    // useReanudarAlVolver de este hook sube `version`, y el canal del chat
     // vuelve a subirlo desde `alRevivir` al reconectar. Sin freno son dos
     // barridos pegados por cada regreso a primer plano.
     expect(FRENO_BARRIDO_MS).toBeGreaterThanOrEqual(5_000);

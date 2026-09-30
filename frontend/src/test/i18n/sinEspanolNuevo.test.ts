@@ -66,7 +66,7 @@ describe("el botón EN tiene que seguir sirviendo", () => {
     expect(
       nuevos,
       "Estos archivos muestran texto en español que el botón EN no puede traducir.\n" +
-      "Pasalo por t(\"clave\"): const { t } = useLanguage(), y agregá la clave con\n" +
+      "Pásalo por t(\"clave\"): const { t } = useLanguage(), y agrega la clave con\n" +
       "sus dos idiomas en el archivo de su módulo, en frontend/src/lib/i18n/.\n\n" +
       nuevos.join("\n") + "\n",
     ).toEqual([]);
@@ -83,7 +83,7 @@ describe("el botón EN tiene que seguir sirviendo", () => {
 
     expect(
       sobran,
-      "Borrá estas líneas de frontend/src/test/i18n/legadoEnEspanol.ts:\n\n" +
+      "Borra estas líneas de frontend/src/test/i18n/legadoEnEspanol.ts:\n\n" +
       sobran.join("\n") + "\n",
     ).toEqual([]);
   });

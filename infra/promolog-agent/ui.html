@@ -162,7 +162,7 @@ const EMO = { instagram:"📸", telegram:"✈️", x:"𝕏", facebook:"f" };
 const NOTE = {
   instagram:"cada cuenta lee su parte (residencial). Más cuentas = menos volumen c/u = menos ban.",
   telegram:"los canales públicos (@usuario) se leen sin cuenta; los privados (link de invitación) solo si la cuenta logueada es miembro.",
-  x:"cada cuenta logueada navega su parte de los perfiles. ⚠️ X bloquea el login automatizado (mete un control anti-bot que no avanza): logueate en Chrome normal, cerralo, y corré <code>node import-session.mjs x</code>.",
+  x:"cada cuenta logueada navega su parte de los perfiles. ⚠️ X bloquea el login automatizado (mete un control anti-bot que no avanza): loguéate en Chrome normal, ciérralo, y corre <code>node import-session.mjs x</code>.",
   facebook:"lee el muro de cada página con una cuenta logueada. Reemplaza el scan por Apify, que hoy corre 6 veces al día.",
 };
 let LOGIN = {};    // "network:id" → "open"
@@ -260,7 +260,7 @@ function render(st){
       const rm = net.accounts.length>1 ? `<button class="ghost" title="quitar" data-remove="${key}">✕</button>` : "";
       const hint = LOGINERR[key]
         ? `<div class="loginerr">${LOGINERR[key]}</div>`
-        : (LOGIN[key]==="open" ? `<div class="muted" style="margin-top:6px">Logueate en la ventana${net.network==="telegram"?" (escaneá el QR)":""} y apretá “Ya me logueé”.</div>` : "");
+        : (LOGIN[key]==="open" ? `<div class="muted" style="margin-top:6px">Loguéate en la ventana${net.network==="telegram"?" (escanea el QR)":""} y aprieta “Ya me logueé”.</div>` : "");
       return `<div class="acct"><div class="top"><span class="name"><span class="dot ${cls}"></span>${a.id}</span>${rm}</div>
         <div class="muted" style="margin:4px 0 8px">${estado}</div><div class="row">${loginBtn}</div>${hint}</div>`;
     }).join("");
@@ -350,7 +350,7 @@ document.addEventListener("click", async (e) => {
     if (!r.ok){ addLog("⚠️ " + (r.error||"no se pudo actualizar") + (r.detalle ? "\n" + r.detalle : "")); }
     else if (!r.cambio){ addLog("✓ ya estaba al día (" + r.commit + ")"); }
     else if (r.reinicia){ addLog(`✓ actualizado a ${r.commit} (${r.commits} commit/s). Reiniciando…`); esperarReinicio(); return; }
-    else { addLog(`✓ actualizado a ${r.commit} (${r.commits} commit/s). CERRÁ Y VOLVÉ A ABRIR el panel para que tome el código nuevo.`); }
+    else { addLog(`✓ actualizado a ${r.commit} (${r.commits} commit/s). CIERRA Y VUELVE A ABRIR el panel para que tome el código nuevo.`); }
     t.disabled = false; t.textContent = "↻ Actualizar"; await refresh();
   }
 });
@@ -362,7 +362,7 @@ async function esperarReinicio(){
     await new Promise(r=>setTimeout(r,1000));
     try { const r = await fetch("/api/status",{cache:"no-store"}); if (r.ok){ location.reload(); return; } } catch {}
   }
-  addLog("⚠️ El agente no volvió solo. Revisá logs/agente.error.log");
+  addLog("⚠️ El agente no volvió solo. Revisa logs/agente.error.log");
 }
 
 // Programación automática. Va por "change" y no por "click" porque son selects e

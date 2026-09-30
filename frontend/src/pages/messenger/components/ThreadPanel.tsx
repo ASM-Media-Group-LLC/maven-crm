@@ -23,6 +23,7 @@ import ReactionPicker from "./ReactionPicker";
 import ReactionsDisplay from "./ReactionsDisplay";
 import ReadReceiptIndicator from "./ReadReceiptIndicator";
 import ImageLightbox from "./ImageLightbox";
+import { mediaDelChat } from "../galeriaDelChat";
 import VoiceNoteRecorder from "./VoiceNoteRecorder";
 import { formatTime, formatDate, safeFileUrl } from "../utils";
 
@@ -658,6 +659,8 @@ export default function ThreadPanel({
         isOpen={lightboxOpen}
         onClose={() => setLightboxOpen(false)}
         type={lightboxType}
+        // Las del hilo: el mensaje de arriba y sus respuestas, en orden.
+        galeria={mediaDelChat([parentMessage, ...replies])}
       />
     </div>
   );
