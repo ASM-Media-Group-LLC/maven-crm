@@ -7,7 +7,7 @@
 // Las claves de este archivo empiezan con uno de sus prefijos (los fija
 // test/i18n/diccionarioPorModulo.test.ts). Ver lib/i18n.ts.
 //
-// ⚠️ LO QUE NO PASA POR ACÁ, a propósito: el `value` de cada catálogo (es lo que
+// ⚠️ LO QUE NO PASA POR AQUÍ, a propósito: el `value` de cada catálogo (es lo que
 // se guarda en la base y se compara), el `modulo` de catalogoDeEventos (se
 // guarda en notification_preferences.module), las claves de permisos, las notas
 // que se guardan en la base (el last_error de un job de Scouter, la
@@ -390,7 +390,7 @@ export const internos = {
   // ─── main.tsx: el aviso de recarga por deploy (DOM pelado, antes de React) ─
   "int.reload.updating": { es: "Actualizando Maven a la versión nueva…", en: "Updating Maven to the new version…" },
   "int.reload.pending": {
-    es: "Hay una versión nueva de Maven. Recargá cuando termines la llamada.",
+    es: "Hay una versión nueva de Maven. Recarga cuando termines la llamada.",
     en: "A new version of Maven is available. Reload when you finish the call.",
   },
   "int.reload.now": { es: "Recargar ahora", en: "Reload now" },

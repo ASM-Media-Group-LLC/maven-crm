@@ -372,7 +372,7 @@ export function useAskWhatsappAgent() {
     },
     onSuccess: (data) => {
       if (data.ok) {
-        toast.success(traducir("int.waBot.replied", { count: data.iterations ?? 0 }));
+        toast.success(traducir("int.waBot.replied", { count: String(data.iterations) }));
       } else {
         toast.error(`Bot error: ${data.error ?? "unknown"}`);
       }

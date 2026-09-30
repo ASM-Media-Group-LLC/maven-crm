@@ -10,7 +10,7 @@ import { fijarIdioma } from "@/lib/i18n";
 import { marcarLlamadaActiva, olvidarLlamadasActivas } from "@/lib/llamadaActiva";
 import { esEspanol } from "../i18n/detectarEspanol";
 
-// main.tsx monta la app entera al importarse: acá solo interesa su manejador.
+// main.tsx monta la app entera al importarse: aquí solo interesa su manejador.
 vi.mock("@/App", () => ({ default: () => null }));
 vi.mock("@/index.css", () => ({}));
 vi.mock("@/lib/promptDeInstalacion", () => ({}));
@@ -70,7 +70,7 @@ describe("el cartel de versión nueva, en inglés", () => {
     marcarLlamadaActiva("sala-1");
     deploy();
     expect(textosDelCartel("maven-recarga-pendiente")).toEqual([
-      "Hay una versión nueva de Maven. Recargá cuando termines la llamada.", "Recargar ahora", "×", "Cerrar aviso",
+      "Hay una versión nueva de Maven. Recarga cuando termines la llamada.", "Recargar ahora", "×", "Cerrar aviso",
     ]);
   });
 });

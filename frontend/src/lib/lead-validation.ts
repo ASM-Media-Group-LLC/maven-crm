@@ -214,7 +214,7 @@ export async function checkExistingContact(
 }
 
 // ─── Lead Availability check (LLG agregar lead) ───────────────────────
-// Vivía acá (checkLeadAvailability) y devolvía el título y el mensaje del banner
+// Vivía aquí (checkLeadAvailability) y devolvía el título y el mensaje del banner
 // ya escritos en español. Se mudó a pages/leadgen/disponibilidadLead.ts, que
 // devuelve el MOTIVO y arma la frase con el `t` de quien mira; esta copia había
 // quedado sin uso y se borró (sep 2026).

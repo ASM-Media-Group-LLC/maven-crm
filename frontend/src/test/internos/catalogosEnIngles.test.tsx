@@ -3,7 +3,7 @@
 // de rango de fecha, los skins, los fondos de llamada y los eventos de Ajustes →
 // Notificaciones. Más el detalle de Hubstaff de un agente (días y tramos).
 //
-// Los leen pantallas de varios módulos, y casi todas dibujan `opcion.label`. Acá
+// Los leen pantallas de varios módulos, y casi todas dibujan `opcion.label`. Aquí
 // se dibujan igual que en esas pantallas —un componente que usa useLanguage() y
 // pinta `o.label`, más el EmployeeStatusBadge de verdad— y se recorre todo el
 // texto visible: nada en español salvo las marcas (EPS, ARL, fondos de pensión),

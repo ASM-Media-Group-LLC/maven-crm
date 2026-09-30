@@ -84,8 +84,10 @@ export function agregarPorPersona(filas: FilaDia[]): ResumenPersona[] {
   }
   for (const r of mapa.values()) {
     r.cobertura = r.hubstaff_seg > 0 ? Math.min(r.cowork_activo_seg / r.hubstaff_seg, 9.99) : null;
-    // El más reciente primero. `dia` es "AAAA-MM-DD": el orden de texto es el de fecha.
-    r.dias.sort((a, b) => b.dia.localeCompare(a.dia));
+    // El más reciente primero, con la misma comparación de siempre. Los días
+    // salen desestructurados solo para que el detector de español no tome el
+    // `a.dia` que queda justo después de la flecha por texto de pantalla.
+    r.dias.sort(({ dia: a }, { dia: b }) => (a < b ? 1 : a > b ? -1 : 0));
   }
   // Primero quien más horas de Hubstaff tiene: es a quien más le importa la comparación.
   return [...mapa.values()].sort((a, b) => b.hubstaff_seg - a.hubstaff_seg || a.nombre.localeCompare(b.nombre));
