@@ -11,7 +11,15 @@ import { escucharLaVuelta } from "@/hooks/useReanudarAlVolver";
  * fila de `realtime.subscription`, y por cada fila que cambia en la tabla corre
  * la RLS UNA VEZ POR ESCUCHA (`realtime.apply_rls` las recorre de a una). El
  * filtro, si lo hay, se mira ANTES que la RLS: una escucha cuyo filtro no deja
- * pasar la fila no cuesta nada. Los DELETE no pasan por la RLS.
+ * pasar la fila no cuesta nada.
+ *
+ * Los DELETE son otra cosa: NO pasan por la RLS. `apply_rls` le manda el borrado
+ * a toda escucha cuyo filtro lo deje pasar (el filtro se evalúa sobre la fila
+ * vieja completa: las tres tablas tienen REPLICA IDENTITY FULL) y de la fila
+ * solo manda la llave (`old.id`), porque "no puede asegurar" el resto. Una
+ * escucha de DELETE SIN filtro recibe el id y la hora de cada fila que se borra
+ * en esa tabla, de cualquier agencia. Por eso aquí queda UNA sola, filtrada a
+ * mis filas de `chat_participants` (ver abajo).
  *
  * Hasta el 28/09 cada pestaña abría, en cualquier pantalla:
  *  - TRES escuchas sin filtro del INSERT de `chat_messages` (la lista de
@@ -28,7 +36,7 @@ import { escucharLaVuelta } from "@/hooks/useReanudarAlVolver";
  * 70 % de todo lo que Realtime chequeaba del chat y la campana.
  *
  * AQUÍ: un solo canal por pestaña, UNA escucha por (tabla, evento), y cada evento
- * se reparte en memoria a quien se registró. Dos de ellas van filtradas:
+ * se reparte en memoria a quien se registró. Tres de ellas van filtradas:
  *  - `chat_participants` UPDATE → solo MI fila (`user_id=eq.<yo>`). Es la única
  *    que miran la lista (mute, modo, rol: recargar), el globito y las menciones.
  *    La fila de los demás solo importaba para el rol que muestra el panel de
@@ -37,6 +45,14 @@ import { escucharLaVuelta } from "@/hooks/useReanudarAlVolver";
  *  - `chat_conversations` UPDATE → solo GRUPOS (`type=eq.group`). La lista solo
  *    copia nombre, foto y descripción, que en un directo no existen: el 75 % de
  *    los mensajes son de directos y cada uno movía `updated_at` para nada.
+ *  - `chat_participants` DELETE → solo MI fila (`user_id=eq.<yo>`). Es lo único
+ *    de un borrado que la lista puede usar: me sacaron de un grupo, salí desde
+ *    otra pestaña, o borraron la conversación entera (delete_conversation_cascade
+ *    borra una por una las participaciones antes que la conversación). Hasta el
+ *    30/09 había tres DELETE sin filtro: el de `chat_messages` y el de
+ *    `chat_participants` leían `old.conversation_id`, que en prod nunca llega
+ *    (solo llega `old.id`), así que no hacían nada; el de `chat_conversations`
+ *    sí servía, y esta escucha lo reemplaza sin enterarse de lo ajeno.
  *
  * Reglas que heredó de useCanalQueRevive (ver ahí el porqué de cada una):
  *  - topic VERSIONADO y la versión NUNCA se reinicia (#1603: pedir el mismo
@@ -52,12 +68,10 @@ type Evento = "INSERT" | "UPDATE" | "DELETE";
 export type EscuchaDelChat =
   | "chat_messages:INSERT"
   | "chat_messages:UPDATE"
-  | "chat_messages:DELETE"
   | "chat_participants:INSERT"
   | "chat_participants:UPDATE"
   | "chat_participants:DELETE"
-  | "chat_conversations:UPDATE"
-  | "chat_conversations:DELETE";
+  | "chat_conversations:UPDATE";
 
 type Definicion = {
   tabla: Tabla;
@@ -67,17 +81,17 @@ type Definicion = {
 };
 
 /** Qué escucha el canal. FIJO: la lista (useChat, montada en el AppShell) usa
- *  las ocho, así que no hay nada que ganar abriendo menos, y un conjunto fijo
- *  evita rearmar el canal cuando se suma alguien que pide otra. */
+ *  las seis, así que no hay nada que ganar abriendo menos, y un conjunto fijo
+ *  evita rearmar el canal cuando se suma alguien que pide otra.
+ *  ⚠️ Un DELETE nuevo va FILTRADO a algo mío o no va: sin filtro, Realtime le
+ *  manda a cada pestaña los borrados de toda la base (ver arriba). */
 export const ESCUCHAS_DEL_CHAT: Readonly<Record<EscuchaDelChat, Definicion>> = {
   "chat_messages:INSERT": { tabla: "chat_messages", evento: "INSERT" },
   "chat_messages:UPDATE": { tabla: "chat_messages", evento: "UPDATE" },
-  "chat_messages:DELETE": { tabla: "chat_messages", evento: "DELETE" },
   "chat_participants:INSERT": { tabla: "chat_participants", evento: "INSERT" },
   "chat_participants:UPDATE": { tabla: "chat_participants", evento: "UPDATE", filtro: (uid) => `user_id=eq.${uid}` },
-  "chat_participants:DELETE": { tabla: "chat_participants", evento: "DELETE" },
+  "chat_participants:DELETE": { tabla: "chat_participants", evento: "DELETE", filtro: (uid) => `user_id=eq.${uid}` },
   "chat_conversations:UPDATE": { tabla: "chat_conversations", evento: "UPDATE", filtro: () => "type=eq.group" },
-  "chat_conversations:DELETE": { tabla: "chat_conversations", evento: "DELETE" },
 };
 
 // Las filas llegan tal cual de la base; cada consumidor las lee como siempre.

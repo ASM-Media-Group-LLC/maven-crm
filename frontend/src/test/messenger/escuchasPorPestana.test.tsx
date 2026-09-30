@@ -12,10 +12,13 @@
 // pantalla siga enterándose, una vez.
 //
 // La línea base TIENE que poder fallar: este mismo archivo, corrido contra
-// origin/main (be1e1121, 29/09), falla en 5 de 8 casos. Los tres que pasan son
-// de comportamiento puro y tienen que pasar en los dos lados; los dos de
-// "mensaje ajeno" y "mi lectura" pasan allá todo lo que hace cada pantalla y
-// fallan recién en el costo. Imprime:
+// origin/main (be1e1121, 29/09), falla en 6 de 10 casos. Los cuatro que pasan
+// son de comportamiento puro y tienen que pasar en los dos lados (el grupo
+// renombrado, mi fila silenciada, desmontar, y ponerse al día tras una caída);
+// los dos de "mensaje ajeno" y "mi lectura" pasan allá todo lo que hace cada
+// pantalla y fallan recién en el costo; el de "borrados" falla allá porque a
+// cada pestaña le llegaban los borrados de toda la base y "me sacan del grupo"
+// no hacía nada (leía `old.conversation_id`, que Realtime no manda). Imprime:
 //   cualquier pantalla: 4 canales; chat_messages:INSERT ×3, chat_participants:UPDATE ×2,
 //     todo sin filtro, también notifications:INSERT (la RLS corría para cada
 //     pestaña de cada persona); cada mensaje ajeno marcaba "entregado" DOS veces.
@@ -131,7 +134,7 @@ const base = vi.hoisted(() => {
     auth: { getSession: () => Promise.resolve({ data: { session: null } }) },
   };
 
-  return { supabase, canales, llamadas, rpcs, filas };
+  return { supabase, canales, llamadas, rpcs, filas, respuestasRpc };
 });
 
 vi.mock("@/integrations/supabase/client", () => ({ supabase: base.supabase }));
@@ -233,7 +236,24 @@ function llega(table: string, event: string, fila: Record<string, unknown>, ante
   return chequeos;
 }
 
+/** Un borrado como lo manda Realtime en prod: NO pasa por la RLS, el filtro se
+ *  evalúa sobre la fila vieja completa (REPLICA IDENTITY FULL) y de la fila solo
+ *  viaja la llave. Devuelve a cuántas escuchas de esta pestaña le llegó. */
+function borrar(table: string, filaCompleta: Record<string, unknown>): number {
+  let entregas = 0;
+  for (const c of vivos()) {
+    for (const e of c.escuchas) {
+      if (e.type !== "postgres_changes" || e.filtro.table !== table || (e.filtro.event !== "DELETE" && e.filtro.event !== "*")) continue;
+      if (!pasaElFiltro(e.filtro.filter, filaCompleta)) continue;
+      entregas++;
+      e.cb({ new: {}, old: { id: filaCompleta.id }, eventType: "DELETE", table, schema: "public" });
+    }
+  }
+  return entregas;
+}
+
 const esperar = () => act(async () => { for (let i = 0; i < 20; i++) await Promise.resolve(); });
+const dormir = (ms: number) => act(async () => { await new Promise((r) => setTimeout(r, ms)); });
 
 beforeEach(() => {
   base.canales.length = 0;
@@ -278,12 +298,10 @@ describe("escuchas de Realtime por pestaña", () => {
     expect(e).toEqual({
       "chat_messages:INSERT": 1,
       "chat_messages:UPDATE": 1,
-      "chat_messages:DELETE": 1,
       "chat_participants:INSERT": 1,
       "chat_participants:UPDATE [user_id=eq.yo-1]": 1,
-      "chat_participants:DELETE": 1,
+      "chat_participants:DELETE [user_id=eq.yo-1]": 1,
       "chat_conversations:UPDATE [type=eq.group]": 1,
-      "chat_conversations:DELETE": 1,
       "notifications:INSERT [user_id=eq.yo-1]": 1,
     });
     // El canal del chat y el de la campana.
@@ -409,6 +427,100 @@ describe("escuchas de Realtime por pestaña", () => {
     await act(async () => { await new Promise((r) => setTimeout(r, 120)); });
     await esperar();
     expect(base.llamadas.some((l) => l.tabla === "chat_conversations" && l.op === "select")).toBe(true);
+  });
+
+  it("tras una caída del canal, la lista y el globito traen lo que llegó mientras no había canal", async () => {
+    // Mientras el socket está caído los eventos se pierden: lo único que pone al
+    // día es recargar al volver a conectar. La lista lo hace en `alSuscribir`
+    // (useChat) y el globito en `alRevivir` (useUnreadChatCount); si falta
+    // cualquiera de las dos, esto queda viejo hasta el poll de 60 s. Es
+    // comportamiento puro: pasa igual contra origin/main (allí cada hook con su
+    // canal), por eso no mira topics.
+    const antes = { ...base.respuestasRpc };
+    try {
+      montar();
+      await esperar();
+      expect(visto.ultimoDeLaLista).toBe("m0");
+      expect(visto.noLeidos).toBe(0);
+      const caidos = vivos().filter((c) => c.escuchas.some((x) => x.type === "postgres_changes"));
+      expect(caidos.length).toBeGreaterThan(0);
+
+      // Se cae el socket: todos los canales con escuchas dan error.
+      act(() => { for (const c of caidos) c.alEstado?.("CHANNEL_ERROR"); });
+      // Llega un mensaje con el socket caído: no hay evento, solo cambió la base.
+      base.respuestasRpc.get_last_messages = [{ id: "m5", conversation_id: "c1", sender_id: "otro-1", content: "¿sigues?", type: "text", created_at: "2026-09-28T12:09:00.000Z", is_deleted: false }];
+      base.respuestasRpc.get_unread_counts = [{ conversation_id: "c1", unread_count: 1 }];
+
+      // La primera espera es de 1 s (en origin/main la lista esperaba 2 s); los
+      // canales nuevos conectan solos (la base falsa responde SUBSCRIBED al
+      // suscribirse).
+      await dormir(2_100);
+      await esperar();
+      expect(visto.ultimoDeLaLista).toBe("m5");
+      expect(visto.noLeidos).toBe(1);
+    } finally {
+      Object.assign(base.respuestasRpc, antes);
+    }
+  });
+
+  it("borrados: si borran la conversación o me sacan del grupo, se va de la lista; lo ajeno no llega", async () => {
+    // En prod de un borrado solo viaja `old.id`. Hasta el 30/09 la lista tenía
+    // tres DELETE sin filtro: le llegaban los borrados de toda la base (de
+    // cualquier agencia) y dos de ellos leían `old.conversation_id`, que nunca
+    // llega. Ahora hay uno, filtrado a MI fila de chat_participants.
+    const grupo = { id: "g1", type: "group", name: "Equipo", avatar_url: null, description: null, created_by: "otro-1", created_at: "2026-09-28T12:00:00.000Z", updated_at: "2026-09-28T12:00:00.000Z" };
+    const miFilaDelGrupo = { id: "p3", conversation_id: "g1", user_id: "yo-1", role: "member", last_read_at: null, is_muted: false, notifications_mode: "all", joined_at: "2026-09-28T12:00:00.000Z", conversation: { type: "group", name: "Equipo" } };
+    const filasAntes = {
+      participants: base.filas.chat_participants.slice(),
+      conversations: base.filas.chat_conversations.slice(),
+    };
+    base.filas.chat_conversations.push(grupo);
+    base.filas.chat_participants.push(miFilaDelGrupo);
+    try {
+      montar();
+      await esperar();
+      expect(Object.keys(visto.nombres).sort()).toEqual(["c1", "g1"]);
+
+      // Lo que se borra en conversaciones ajenas no le llega a esta pestaña.
+      let ajenas = 0;
+      await act(async () => {
+        ajenas += borrar("chat_messages", { id: "m-x", conversation_id: "c-otra", sender_id: "otro-9" });
+        ajenas += borrar("chat_participants", { id: "p-x", conversation_id: "c-otra", user_id: "otro-9" });
+        ajenas += borrar("chat_conversations", { id: "c-otra", type: "direct" });
+      });
+      expect(ajenas).toBe(0);
+
+      // Borran el directo entero (delete_conversation_cascade: mensajes, las dos
+      // participaciones y la conversación). En la base ya no está.
+      base.filas.chat_conversations.splice(0, Infinity, grupo);
+      base.filas.chat_participants.splice(0, Infinity, miFilaDelGrupo);
+      let entregas = 0;
+      await act(async () => {
+        entregas += borrar("chat_messages", { id: "m0", conversation_id: "c1", sender_id: "otro-1" });
+        entregas += borrar("chat_participants", { id: "p1", conversation_id: "c1", user_id: "yo-1" });
+        entregas += borrar("chat_participants", { id: "p2", conversation_id: "c1", user_id: "otro-1" });
+        entregas += borrar("chat_conversations", { id: "c1", type: "direct" });
+      });
+      expect(entregas).toBe(1); // solo mi participación
+      await esperar();
+      expect(Object.keys(visto.nombres)).toEqual(["g1"]);
+
+      // Me sacan del grupo: solo se borra mi fila.
+      base.llamadas.length = 0;
+      base.filas.chat_participants.splice(0);
+      base.filas.chat_conversations.splice(0);
+      await act(async () => { borrar("chat_participants", { id: "p3", conversation_id: "g1", user_id: "yo-1" }); });
+      await esperar();
+      expect(visto.nombres).toEqual({});
+      // Y además se recarga la lista (lo de la memoria es solo para no esperar).
+      await dormir(120);
+      await esperar();
+      expect(base.llamadas.some((l) => l.tabla === "chat_participants" && l.op === "select")).toBe(true);
+      expect(visto.nombres).toEqual({});
+    } finally {
+      base.filas.chat_participants.splice(0, Infinity, ...filasAntes.participants);
+      base.filas.chat_conversations.splice(0, Infinity, ...filasAntes.conversations);
+    }
   });
 
   it("al desmontar no queda ningún canal", async () => {

@@ -287,7 +287,7 @@ export function useChat() {
 
     // Las escuchas van por el CANAL DEL CHAT (canalDelChat.ts), UNO por pestaña
     // para la lista, los avisos, el globito y las menciones. Antes esta lista
-    // abría su propio canal con estas ocho escuchas y los otros tres hooks
+    // abría su propio canal con ocho escuchas y los otros tres hooks
     // repetían las del INSERT de chat_messages y el UPDATE de chat_participants:
     // Realtime corre la RLS una vez por escucha por cada fila que cambia, así que
     // cada mensaje costaba el triple. Ese canal revive solo (espera creciente y
@@ -328,18 +328,6 @@ export function useChat() {
             return prev;
           });
         },
-        "chat_messages:DELETE": (payload) => {
-          const old = payload.old as any;
-          if (!isKnownConversation(old?.conversation_id)) return;
-
-          setConversations((prev) => {
-            const affected = prev.find((c) => c.lastMessage?.id === old.id);
-            if (affected) {
-              scheduleConversationsReload();
-            }
-            return prev;
-          });
-        },
         "chat_participants:INSERT": (payload) => {
           const newRow = payload.new as any;
           if (!newRow?.conversation_id) return;
@@ -370,27 +358,25 @@ export function useChat() {
             })
           );
         },
+        // Llega SOLO la baja de MI fila (filtro user_id=eq.<yo>): me sacaron de
+        // un grupo, salí desde otra pestaña o borraron la conversación entera
+        // (delete_conversation_cascade borra las participaciones una por una).
+        // De un borrado Realtime manda solo la llave (`old.id`): con la RLS
+        // prendida recorta el resto. Por eso se busca por el id de la fila y se
+        // recarga igual, que es lo que manda. Esto reemplaza las tres escuchas de
+        // DELETE sin filtro que había (mensajes, participantes, conversaciones):
+        // le traían a cada pestaña los borrados de toda la base y dos de ellas
+        // leían `old.conversation_id`, que en prod nunca llega (canalDelChat.ts).
         "chat_participants:DELETE": (payload) => {
-          const old = payload.old as any;
-          if (!old?.conversation_id) return;
-
-          if (old.user_id === user.id) {
-            scheduleConversationsReload(true);
-            return;
+          const idFila = (payload.old as { id?: string } | null)?.id;
+          if (idFila) {
+            setConversations((prev) =>
+              prev.filter(
+                (conv) => !conv.participants.some((p) => p.id === idFila && p.user_id === user.id),
+              ),
+            );
           }
-
-          if (!isKnownConversation(old.conversation_id)) return;
-
-          setConversations((prev) =>
-            prev.map((conv) =>
-              conv.id === old.conversation_id
-                ? {
-                    ...conv,
-                    participants: conv.participants.filter((p) => p.user_id !== old.user_id),
-                  }
-                : conv
-            )
-          );
+          scheduleConversationsReload(true);
         },
         // Llega SOLO mi fila: el canal la filtra por user_id en el servidor. La
         // de los demás cambia cada vez que alguien lee (~534 veces por hora en
@@ -434,10 +420,6 @@ export function useChat() {
             next[idx] = patched;
             return next;
           });
-        },
-        "chat_conversations:DELETE": (payload) => {
-          const old = payload.old as any;
-          setConversations((prev) => prev.filter((c) => c.id !== old.id));
         },
         // Cada SUBSCRIBED recarga, la primera conexión también. Solo ahí: el canal
         // del chat no recarga al caerse, recarga al volver, que es cuando sirve

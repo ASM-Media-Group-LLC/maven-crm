@@ -10,7 +10,10 @@
 //  - el CLOSED de nuestro propio removeChannel no programa nada;
 //  - volver del segundo plano (≥30 s) o recuperar la red → canal nuevo;
 //  - React limpia y vuelve a registrar en la misma vuelta: eso NO cierra el canal;
-//  - el último que se va lo cierra.
+//  - el último que se va lo cierra, y suelta las escuchas de la vuelta;
+//  - tras conectar, la próxima caída vuelve a esperar 1 s (la cuenta se reinicia);
+//  - de los DELETE solo llega la baja de MI fila de chat_participants: Realtime
+//    no pasa los borrados por la RLS y sin filtro traería los de toda la base.
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const base = vi.hoisted(() => {
@@ -82,6 +85,22 @@ function emitir(tabla: string, evento: string, fila: Record<string, unknown>) {
   return entregas;
 }
 
+/** Un borrado como lo manda Realtime en prod: el filtro se evalúa sobre la fila
+ *  vieja COMPLETA (REPLICA IDENTITY FULL) pero de ella solo llega la llave. */
+function borrar(tabla: string, filaCompleta: Record<string, unknown>) {
+  let entregas = 0;
+  for (const c of vivos()) {
+    for (const e of c.escuchas) {
+      if (e.filtro.table !== tabla || e.filtro.event !== "DELETE") continue;
+      const m = e.filtro.filter?.match(/^(\w+)=eq\.(.+)$/);
+      if (m && String(filaCompleta[m[1]]) !== m[2]) continue;
+      entregas++;
+      e.cb({ new: {}, old: { id: filaCompleta.id } });
+    }
+  }
+  return entregas;
+}
+
 function ponerVisibilidad(v: DocumentVisibilityState) {
   Object.defineProperty(document, "visibilityState", { value: v, configurable: true });
   document.dispatchEvent(new Event("visibilitychange"));
@@ -109,15 +128,15 @@ describe("canal del chat", () => {
     expect(vivos()).toHaveLength(1);
     const claves = vivos()[0].escuchas.map((e) => `${e.filtro.table}:${e.filtro.event}${e.filtro.filter ? ` [${e.filtro.filter}]` : ""}`);
     expect(claves.sort()).toEqual([
-      "chat_conversations:DELETE",
       "chat_conversations:UPDATE [type=eq.group]",
-      "chat_messages:DELETE",
       "chat_messages:INSERT",
       "chat_messages:UPDATE",
-      "chat_participants:DELETE",
+      "chat_participants:DELETE [user_id=eq.u1]",
       "chat_participants:INSERT",
       "chat_participants:UPDATE [user_id=eq.u1]",
     ]);
+    // Ningún DELETE sin filtro: Realtime no los pasa por la RLS.
+    expect(vivos()[0].escuchas.filter((e) => e.filtro.event === "DELETE" && !e.filtro.filter)).toEqual([]);
     expect(claves).toHaveLength(Object.keys(ESCUCHAS_DEL_CHAT).length);
     sueltos.forEach((f) => f());
     await microtareas();
@@ -213,6 +232,34 @@ describe("canal del chat", () => {
     await microtareas();
   });
 
+  it("tras conectar, la cuenta de esperas vuelve a cero: la próxima caída espera 1 s otra vez", async () => {
+    // Sin el reinicio, cada corte de la sesión esperaría el doble que el anterior
+    // aunque entre medio el canal haya andado horas (hasta el tope de 30 s).
+    const s = registrarEnElCanalDelChat("u1", ref({}));
+    await microtareas();
+    vivos()[0].alEstado?.("SUBSCRIBED");
+    vivos()[0].alEstado?.("CHANNEL_ERROR");
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(base.canales).toHaveLength(2);
+    vivos()[0].alEstado?.("SUBSCRIBED"); // el canal nuevo conectó
+
+    vivos()[0].alEstado?.("CHANNEL_ERROR"); // y se vuelve a caer
+    await vi.advanceTimersByTimeAsync(999);
+    expect(base.canales).toHaveLength(2);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(base.canales).toHaveLength(3);
+
+    // Lo mismo si el canal había vuelto solo (sin rearmar) antes de caerse otra vez.
+    vivos()[0].alEstado?.("SUBSCRIBED");
+    vivos()[0].alEstado?.("CHANNEL_ERROR");
+    vivos()[0].alEstado?.("SUBSCRIBED");
+    vivos()[0].alEstado?.("CHANNEL_ERROR");
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(base.canales).toHaveLength(4);
+    s();
+    await microtareas();
+  });
+
   it("si el canal vuelve solo tras un CHANNEL_ERROR, no se rearma y avisa alRevivir", async () => {
     // realtime-js reintenta por su cuenta un canal con error. Si queda
     // SUBSCRIBED antes de la espera, el rearmado programado sobra: la lista de
@@ -231,6 +278,27 @@ describe("canal del chat", () => {
     expect(vivos()).toEqual([canal]);
     s();
     await microtareas();
+  });
+
+  it("el último que se va suelta las escuchas de la vuelta (visibilidad, red, bfcache)", async () => {
+    const doc = vi.spyOn(document, "removeEventListener");
+    const win = vi.spyOn(window, "removeEventListener");
+    try {
+      const s1 = registrarEnElCanalDelChat("u1", ref({}));
+      const s2 = registrarEnElCanalDelChat("u1", ref({}));
+      await microtareas();
+      s1();
+      await microtareas();
+      // Queda uno: la vuelta sigue escuchada.
+      expect(doc.mock.calls.filter(([tipo]) => tipo === "visibilitychange")).toHaveLength(0);
+      s2();
+      await microtareas();
+      expect(doc.mock.calls.filter(([tipo]) => tipo === "visibilitychange")).toHaveLength(1);
+      expect(win.mock.calls.map(([tipo]) => tipo).sort()).toEqual(["online", "pageshow"]);
+    } finally {
+      doc.mockRestore();
+      win.mockRestore();
+    }
   });
 
   it("el CLOSED de nuestro propio removeChannel no programa nada", async () => {
@@ -308,6 +376,21 @@ describe("canal del chat", () => {
     expect(emitir("chat_conversations", "UPDATE", { id: "g1", type: "group" })).toBe(1);
     expect(participacion).toHaveBeenCalledTimes(1);
     expect(conversacion).toHaveBeenCalledTimes(1);
+    s();
+    await microtareas();
+  });
+
+  it("de los borrados solo llega la baja de MI fila, y solo con su llave", async () => {
+    const baja = vi.fn();
+    const s = registrarEnElCanalDelChat("u1", ref({ "chat_participants:DELETE": baja }));
+    await microtareas();
+    // Lo ajeno no llega a esta pestaña (en main llegaba el id de cada uno).
+    expect(borrar("chat_participants", { id: "p-otro", conversation_id: "c9", user_id: "otro" })).toBe(0);
+    expect(borrar("chat_messages", { id: "m9", conversation_id: "c9", sender_id: "otro" })).toBe(0);
+    expect(borrar("chat_conversations", { id: "c9", type: "group" })).toBe(0);
+    // Lo mío sí, y de la fila solo viene el id: nadie puede leer conversation_id.
+    expect(borrar("chat_participants", { id: "p-mia", conversation_id: "c1", user_id: "u1" })).toBe(1);
+    expect(baja).toHaveBeenCalledWith({ new: {}, old: { id: "p-mia" } });
     s();
     await microtareas();
   });

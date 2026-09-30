@@ -8,7 +8,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ConversationWithDetails, UserProfile } from "../types";
+import { ChatParticipant, ConversationWithDetails, UserProfile } from "../types";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
@@ -158,6 +158,35 @@ export default function GroupMembersPanel({
     // también revive y la lista ya se recarga ahí (useChat, alSuscribir).
   });
 
+  // Los roles tal como están en la BASE. La lista solo se entera en vivo del rol
+  // ajeno mientras este panel está abierto: con el panel cerrado, lo que traiga
+  // `conversation.participants` puede tener hasta un poll (60 s) de atraso.
+  const leerRoles = async (): Promise<Pick<ChatParticipant, "user_id" | "role" | "joined_at">[] | null> => {
+    const { data, error } = await supabase
+      .from("chat_participants")
+      .select("user_id, role, joined_at")
+      .eq("conversation_id", conversation.id);
+    if (error || !data || data.length === 0) return null;
+    return data as Pick<ChatParticipant, "user_id" | "role" | "joined_at">[];
+  };
+  const leerRolesRef = useRef(leerRoles);
+  leerRolesRef.current = leerRoles;
+
+  // Al abrir: si a alguien le cambiaron el rol con el panel cerrado, recargar la
+  // lista una vez (una consulta chica; la recarga solo si hay diferencia).
+  useEffect(() => {
+    let vigente = true;
+    void leerRolesRef.current().then((filas) => {
+      if (!vigente || !filas) return;
+      const distinto = filas.some((f) => {
+        const antes = rolesRef.current.get(f.user_id);
+        return antes !== undefined && antes !== f.role;
+      });
+      if (distinto) onMembersChangedRef.current();
+    });
+    return () => { vigente = false; };
+  }, [conversation.id]);
+
   const reqName = (uid: string, sinNombre = t("messenger.usuario")) => reqProfiles[uid]?.full_name || profiles[uid]?.full_name || sinNombre;
 
   const approveRequest = async (req: { id: string; user_id: string }) => {
@@ -305,9 +334,15 @@ export default function GroupMembersPanel({
 
     // Si soy el ÚLTIMO admin y quedan otros miembros, promuevo al más antiguo para no dejar
     // el grupo sin admin (mientras sigo siendo admin, que es cuando la RLS me deja).
-    const others = conversation.participants.filter(p => p.user_id !== user!.id);
+    // Los roles se leen de la BASE justo antes de decidir, no de la lista: un
+    // "admin" que ya no lo es (le quitaron el rol con el panel cerrado) hacía
+    // salir al último admin de verdad sin promover a nadie. Si la lectura falla,
+    // se decide con la lista, como antes.
+    const actuales = (await leerRoles()) ?? conversation.participants;
+    const soyAdmin = actuales.find(p => p.user_id === user!.id)?.role === "admin";
+    const others = actuales.filter(p => p.user_id !== user!.id);
     const remainingAdmins = others.filter(p => p.role === "admin");
-    if (isAdmin && remainingAdmins.length === 0 && others.length > 0) {
+    if (soyAdmin && remainingAdmins.length === 0 && others.length > 0) {
       const successor = [...others].sort(
         (a, b) => new Date(a.joined_at).getTime() - new Date(b.joined_at).getTime()
       )[0];
