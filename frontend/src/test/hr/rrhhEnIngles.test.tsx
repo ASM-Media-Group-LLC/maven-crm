@@ -6,7 +6,7 @@
 //
 // Se montan las pantallas de verdad con el LanguageProvider real. Lo único falso
 // es de dónde salen los datos (supabase), y dos piezas que traduce OTRO PR de la
-// ola (el buscador de empleados y los filtros de anuncios): acá se cambian por un
+// ola (el buscador de empleados y los filtros de anuncios): aquí se cambian por un
 // hueco para que este test mida solo lo de estas pantallas.
 //
 // ⚠️ Los tipos y estados de la base ("enfermedad", "pending", "manana"…) llegan tal
@@ -21,7 +21,9 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { esEspanol } from "../i18n/detectarEspanol";
 
 configure({ asyncUtilTimeout: 5000 });
-vi.setConfig({ testTimeout: 30_000 });
+// Cada caso monta pantallas enteras (el alta de empleado, cinco pasos): con la
+// máquina cargada 30 s no alcanzan.
+vi.setConfig({ testTimeout: 90_000 });
 
 beforeAll(() => {
   // Radix (popover, scroll-area, select) lo pide y jsdom no lo trae.
@@ -173,9 +175,9 @@ vi.mock("@/integrations/supabase/client", () => {
 
 vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "u1" }, session: null, loading: false }) }));
 
-// Lo traduce el PR de componentes de esta misma ola: acá no se mide.
+// Lo traduce el PR de componentes de esta misma ola: aquí no se mide.
 vi.mock("@/components/hr/EmployeeSearchCombobox", () => ({ EmployeeSearchCombobox: () => <div data-testid="buscador-empleados" /> }));
-// Lo traduce el PR de RRHH parte B (announcements/): acá no se mide.
+// Lo traduce el PR de RRHH parte B (announcements/): aquí no se mide.
 vi.mock("@/pages/hr/announcements/AnnouncementFilters", () => ({ default: () => <div data-testid="filtros-anuncios" /> }));
 
 // El monitoreo lee Hubstaff con un hook propio que arma "Última actividad" en
@@ -241,7 +243,7 @@ function textosVisibles(raiz: HTMLElement): string[] {
 
 // El detector del freno evita a propósito palabras que no están en su lista (para
 // no dar falsas alarmas en toda la app): "Ausencias", "Permiso", "Capacitación"
-// sin tilde le pasarían. Acá, que solo se mira RRHH, se suman las del módulo.
+// sin tilde le pasarían. Aquí, que solo se mira RRHH, se suman las del módulo.
 const PALABRAS_RRHH = new RegExp(
   "\\b(?:" +
     "falta|faltas|ausencias?|permisos?|vacaciones|capacitaci\\w*|empleados?|solicitud\\w*|turnos?|horarios?|" +
@@ -250,7 +252,9 @@ const PALABRAS_RRHH = new RegExp(
     "programad\\w*|puntualidad|tardanzas?|entrada|salida|rotacion|plantilla|nomina|resumen|acciones|" +
     "configurar|guardar|cancelar|editar|buscar|todos|todas|agente|agentes|actividad|teclado|ahora|" +
     "manana|tarde|noche|semana|mes|dias|horas|activos?|inactivos?|desconectado|pausa|cargo|ubicacion|" +
-    "reporta|empresa|organigrama|directorio|balance alto|devuelto|revocados|pago|terminacion" +
+    "reporta|empresa|organigrama|directorio|balance alto|devuelto|revocados|pago|terminacion|" +
+    // Los roles de los programas de capacitación (target_role "content"/"technology").
+    "contenido|tecnologia" +
   ")\\b",
   "i",
 );
@@ -350,6 +354,10 @@ describe("RRHH en inglés: Capacitación", () => {
 
     fireEvent.click(screen.getAllByRole("button", { name: /Modules/ })[0]);
     await screen.findByText("Role play");
+    // La insignia del rol del programa en el encabezado del gestor de módulos: el
+    // target_role llega como dato ("content") y se ve traducido.
+    expect(within(screen.getByRole("heading", { name: /Sales basics/ })).getByText("Content")).toBeTruthy();
+    expect(screen.getByText("Program modules · 2 modules")).toBeTruthy();
     expect(screen.getByText("Document")).toBeTruthy();
     expect(screen.getByText("Practice")).toBeTruthy();
     sinEspanol();
@@ -402,6 +410,7 @@ describe("RRHH en inglés: Vacaciones", () => {
     await screen.findAllByText("Ana Lopez");
     fireEvent.click(screen.getByRole("button", { name: /Personal days/ }));
     await screen.findByText("Days used");
+    expect(screen.getByText(/^of \d+ per year$/)).toBeTruthy();
     sinEspanol();
 
     fireEvent.click(screen.getByRole("button", { name: /New request/ }));
@@ -455,13 +464,19 @@ describe("RRHH en inglés: el resto de la parte A", () => {
     expect(screen.getAllByText("Late arrival").length).toBeGreaterThan(0);
     sinEspanol();
     fireEvent.click(botonConIcono("eye"));
-    let d = await screen.findByRole("dialog");
-    expect(within(d).getByText("Leave details")).toBeTruthy();
-    expect(enEspanol(d)).toEqual([]);
-    fireEvent.keyDown(d, { key: "Escape" });
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    // La pantalla monta el detalle DOS veces (igual que en main; está en «Propuestas
+    // aparte» del PR). Cada diálogo de Radix marca al otro como aria-hidden, así que
+    // ninguno tiene el rol accesible: se buscan con hidden y se revisan los dos.
+    const detalles = await screen.findAllByRole("dialog", { hidden: true });
+    expect(detalles.length).toBeGreaterThan(0);
+    for (const dd of detalles) {
+      expect(within(dd).getByText("Leave details")).toBeTruthy();
+      expect(enEspanol(dd)).toEqual([]);
+    }
+    fireEvent.keyDown(detalles[detalles.length - 1], { key: "Escape" });
+    await waitFor(() => expect(screen.queryAllByRole("dialog", { hidden: true })).toHaveLength(0));
     fireEvent.click(botonConIcono("pencil"));
-    d = await screen.findByRole("dialog");
+    const d = await screen.findByRole("dialog");
     expect(within(d).getByText("Edit leave")).toBeTruthy();
     expect(enEspanol(d)).toEqual([]);
     fireEvent.keyDown(d, { key: "Escape" });
@@ -474,6 +489,9 @@ describe("RRHH en inglés: el resto de la parte A", () => {
   it("Permisos: la página de nueva solicitud", async () => {
     montar(<HRPermisoNew />);
     await screen.findAllByText("New request");
+    // "Incapacidad" es la licencia por enfermedad con certificado médico: "sick leave",
+    // no "disability" (en inglés de EE. UU. eso es una condición de largo plazo).
+    expect(screen.getByText("Log a leave request, an absence or sick leave")).toBeTruthy();
     sinEspanol();
   });
 
@@ -492,6 +510,8 @@ describe("RRHH en inglés: el resto de la parte A", () => {
     montar(<HRIncidents />);
     await screen.findAllByText("Late login");
     expect(screen.getAllByText("Critical").length).toBeGreaterThan(0);
+    // Un solo incidente abierto: en singular.
+    expect(screen.getByText("1 open incident · 2 total")).toBeTruthy();
     sinEspanol();
     fireEvent.click(botonConIcono("eye"));
     let d = await screen.findByRole("dialog");
@@ -543,6 +563,7 @@ describe("RRHH en inglés: el resto de la parte A", () => {
   it("Banco de horas: balances, movimientos y el alta", async () => {
     montar(<HRHourBank />);
     await screen.findAllByText("Ana Lopez");
+    expect(screen.getByRole("heading", { name: "Hour bank" })).toBeTruthy();
     sinEspanol();
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Entries" }));
     await screen.findByText("Deposit");
@@ -597,6 +618,8 @@ describe("RRHH en inglés: el resto de la parte A", () => {
     const { unmount } = montar(<HRDirectoryLookup />);
     await screen.findAllByText("Ana Lopez");
     expect(screen.getByText("Remote")).toBeTruthy();
+    // Una sola persona activa: en singular.
+    expect(screen.getByText("Quick lookup of team details · 1 active employee")).toBeTruthy();
     sinEspanol();
     unmount();
 
@@ -617,6 +640,7 @@ describe("RRHH en inglés: el resto de la parte A", () => {
   it("Comunicación interna", async () => {
     montar(<HRAnnouncements />);
     await screen.findByText("Holiday notice");
+    expect(screen.getByRole("heading", { name: "Internal communications" })).toBeTruthy();
     expect(screen.getByText("2 audiences")).toBeTruthy();
     sinEspanol();
   });
@@ -647,8 +671,66 @@ describe("RRHH en inglés: el resto de la parte A", () => {
   });
 });
 
+// ─── El detalle de cada tarjeta (KPI) ───────────────────────────────────
+// En español esos detalles muestran el value crudo de la base ("pending",
+// "enfermedad"), como siempre; en inglés muestran su etiqueta. Se abre cada
+// tarjeta clickeable de la pantalla y se revisa el diálogo entero.
+const tarjetas = () => Array.from(document.querySelectorAll("button")).filter((b) => b.querySelector("span.font-display"));
+
+async function revisarTarjetas(ui: ReactNode, listo: string | RegExp, esperados: string[]) {
+  montar(ui);
+  await screen.findAllByText(listo);
+  const n = tarjetas().length;
+  expect(n).toBeGreaterThan(0);
+  const vistos: string[] = [];
+  for (let i = 0; i < n; i++) {
+    fireEvent.click(tarjetas()[i]);
+    // Algunas tarjetas del tablero llevan a otra pantalla en vez de abrir un detalle.
+    const d = await screen.findByRole("dialog", {}, { timeout: 1500 }).catch(() => null);
+    if (!d) continue;
+    expect(enEspanol(d)).toEqual([]);
+    vistos.push(...textosVisibles(d));
+    fireEvent.keyDown(d, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  }
+  const todo = vistos.join(" ");
+  for (const e of esperados) expect(todo).toContain(e);
+}
+
+describe("RRHH en inglés: el detalle de cada tarjeta", () => {
+  it("Ausencias", () => revisarTarjetas(<HRAbsences />, "Ana Lopez", ["Illness", "Pending", "Medical appointment"]));
+  it("Permisos", () => revisarTarjetas(<HRPermisos />, "Ana Lopez", ["Total leave requests", "Pending"]));
+  it("Vacaciones", () => revisarTarjetas(<HRVacations />, "Ana Lopez", ["Approved"]));
+  it("Tablero de RRHH", () => revisarTarjetas(<HRDashboard />, /Illness ·/, ["Active", "Illness", "Pending"]));
+  it("Incidentes", () => revisarTarjetas(<HRIncidents />, "Late login", ["Attendance", "Critical", "Medium"]));
+  it("Deducciones", () => revisarTarjetas(<HRDeductions />, "Social media use", ["No description"]));
+  it("Offboarding", () => revisarTarjetas(<HROffboarding />, "Voluntary", ["In progress"]));
+  it("Banco de horas", () => revisarTarjetas(<HRHourBank />, "Ana Lopez", ["No name"]));
+  it("Horarios de chatters", () => revisarTarjetas(<HRChatterSchedules />, "Morning block", ["No records to show."]));
+  it("Comunicación interna", () => revisarTarjetas(<HRAnnouncements />, "Holiday notice", ["Scheduled", "Draft"]));
+});
+
 // ─── En español no cambia nada ──────────────────────────────────────────
 describe("RRHH en español: se ve lo de siempre", () => {
+  it("deSiempreSalvoEnIngles: en español lo de antes; en inglés la etiqueta", () => {
+    const t = ((k: string) => `«${k}»`) as unknown as Parameters<typeof etiquetas.deSiempreSalvoEnIngles>[1];
+    const claves = { pending: "hr.opt.absStatus.pending" } as Parameters<typeof etiquetas.deSiempreSalvoEnIngles>[2];
+    expect(etiquetas.deSiempreSalvoEnIngles("es", t, claves, "pending", "pending")).toBe("pending");
+    expect(etiquetas.deSiempreSalvoEnIngles("en", t, claves, "pending", "pending")).toBe("«hr.opt.absStatus.pending»");
+    // Un value sin etiqueta sale como en español.
+    expect(etiquetas.deSiempreSalvoEnIngles("en", t, claves, "otro_valor", "—")).toBe("—");
+  });
+
+  it("el detalle de una tarjeta muestra el value tal cual, como en main", async () => {
+    localStorage.setItem("app-language", "es");
+    montar(<HRIncidents />);
+    await screen.findAllByText("Late login");
+    fireEvent.click(tarjetas()[0]);
+    const d = await screen.findByRole("dialog");
+    expect(within(d).getByText("asistencia")).toBeTruthy();
+    expect(within(d).getByText("critical")).toBeTruthy();
+  });
+
   it("las etiquetas de tipos y estados siguen diciendo lo mismo", async () => {
     localStorage.setItem("app-language", "es");
     const { unmount } = montar(<HRPermisos />);

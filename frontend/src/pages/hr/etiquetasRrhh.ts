@@ -20,6 +20,21 @@ export function etiqueta(t: T, claves: Claves, value: string | null | undefined,
   return clave ? t(clave) : (respaldo ?? value ?? "—");
 }
 
+/** Para donde la pantalla mostraba el value CRUDO de la base ("pending",
+ *  "enfermedad", "activo") o una etiqueta que solo cubre parte de los values.
+ *  En español se ve exactamente `deSiempre`, lo de antes: esta traducción no
+ *  cambia la pantalla en español. En inglés se ve la etiqueta, porque un value
+ *  crudo como "permiso_medico" sería texto en español en la pantalla inglesa. */
+export function deSiempreSalvoEnIngles(
+  idioma: "es" | "en",
+  t: T,
+  claves: Claves,
+  value: string | null | undefined,
+  deSiempre: string,
+): string {
+  return idioma === "en" ? etiqueta(t, claves, value, deSiempre) : deSiempre;
+}
+
 export const TIPO_AUSENCIA: Claves = {
   enfermedad: "hr.opt.absType.enfermedad",
   accidente: "hr.opt.absType.accidente",
@@ -66,6 +81,16 @@ export const CUALQUIER_AUSENCIA: Claves = {
   ...TIPO_PERMISO,
   vacaciones: "hr.opt.absType.vacaciones",
   dia_personal: "hr.opt.vacType.dia_personal",
+  licencia: "hr.opt.absType.licencia",
+  permiso: "hr.opt.absType.permiso",
+  otro: "hr.opt.absType.otro",
+};
+
+/** Los cinco tipos que el tablero de RRHH etiquetaba en sus pendientes; los demás
+ *  se veían con el value crudo, y en español se siguen viendo así. */
+export const TIPO_PENDIENTE_DASHBOARD: Claves = {
+  enfermedad: "hr.opt.absType.enfermedad",
+  vacaciones: "hr.opt.absType.vacaciones",
   licencia: "hr.opt.absType.licencia",
   permiso: "hr.opt.absType.permiso",
   otro: "hr.opt.absType.otro",
@@ -193,7 +218,7 @@ export const ESTADO_EMPLEADO: Claves = {
 };
 
 /** El turno lo arma la vista v_qa_attendance como TEXTO en español. Se reconoce
- *  el texto exacto; uno que no esté acá (un cambio en la vista) se ve tal cual. */
+ *  el texto exacto; uno que no esté aquí (un cambio en la vista) se ve tal cual. */
 export const TURNO_ASISTENCIA: Claves = {
   "Según horario propio": "hr.opt.shift.own",
   "Madrugada · 12am–8am": "hr.opt.shift.night",

@@ -286,7 +286,8 @@ const HRAnnouncements = () => {
           return list.slice(0, 100).map((a): KpiRow => ({
             primary: a.title ?? t("hr.noTitle"),
             secondary: audienceLabel(a),
-            right: STATUS_CONFIG[a.status] ? t(STATUS_CONFIG[a.status].label) : (a.status ?? "—"),
+            // En español, el value tal cual, como siempre; en inglés, su etiqueta.
+            right: f.idioma === "en" && STATUS_CONFIG[a.status] ? t(STATUS_CONFIG[a.status].label) : (a.status ?? "—"),
             rightTone: tone(a.status ?? ""),
           }));
         })()}

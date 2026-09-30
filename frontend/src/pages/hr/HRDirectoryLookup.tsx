@@ -48,7 +48,7 @@ export default function HRDirectoryLookup() {
         {/* Header */}
         <PageHeader
           title={t("hr.dir.title")}
-          subtitle={t("hr.dir.subtitle", { count: activeEmployees.length })}
+          subtitle={t(activeEmployees.length === 1 ? "hr.dir.subtitle.one" : "hr.dir.subtitle.other", { count: activeEmployees.length })}
         />
 
         {/* Department tab bar */}

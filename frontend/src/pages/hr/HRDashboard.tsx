@@ -28,7 +28,7 @@ import { useHrProductivity } from "./useHrProductivity";
 import { useHrAttendance } from "./useHrAttendance";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { TranslationKey } from "@/lib/i18n";
-import { etiqueta, CUALQUIER_AUSENCIA, ESTADO_EMPLEADO } from "./etiquetasRrhh";
+import { etiqueta, deSiempreSalvoEnIngles, CUALQUIER_AUSENCIA, ESTADO_AUSENCIA, ESTADO_EMPLEADO, TIPO_PENDIENTE_DASHBOARD } from "./etiquetasRrhh";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface QuickAction {
@@ -84,6 +84,13 @@ function usePendingAbsences() {
     },
   });
 }
+
+// El tipo de una pendiente. En español, lo de siempre: la etiqueta si es uno de los
+// cinco que este tablero etiquetaba, y si no el value tal cual. En inglés, cualquier
+// tipo de la tabla sale con su etiqueta.
+type T = ReturnType<typeof useLanguage>["t"];
+const tipoPendiente = (t: T, idioma: "es" | "en", v: string | null) =>
+  deSiempreSalvoEnIngles(idioma, t, CUALQUIER_AUSENCIA, v, etiqueta(t, TIPO_PENDIENTE_DASHBOARD, v, v ?? ""));
 
 // ─── Financial Summary from Finanzas ─────────────────────────────────────────
 function FinancialSummaryCards() {
@@ -407,7 +414,7 @@ export default function HRDashboard() {
                         {absence.employees?.first_name} {absence.employees?.last_name}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {etiqueta(t, CUALQUIER_AUSENCIA, absence.absence_type)} ·{" "}
+                        {tipoPendiente(t, f.idioma, absence.absence_type)} ·{" "}
                         {format(new Date(absence.start_date), "dd MMM", { locale: f.fechas })} →{" "}
                         {format(new Date(absence.end_date), "dd MMM yyyy", { locale: f.fechas })}
                       </p>
@@ -526,7 +533,7 @@ export default function HRDashboard() {
           <p className="text-xs text-muted-foreground">{t("hr.dash.selectedCount", { count: draftIds.length, max: MAX_SHORTCUTS })}</p>
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfigOpen(false)}>{t("common.cancel")}</Button>
-            <Button onClick={saveConfig}>{t("hr.saveChanges")}</Button>
+            <Button onClick={saveConfig}>{t("hr.saveChangesLower")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -555,16 +562,16 @@ export default function HRDashboard() {
           if (kpiPopup === "total") {
             return employees.slice(0, 100).map((e: any): KpiRow => ({
               primary: `${e.first_name ?? ""} ${e.last_name ?? ""}`.trim() || e.full_name || t("hr.noName"),
-              secondary: e.positions?.name ?? e.departments?.name ?? undefined,
-              right: etiqueta(t, ESTADO_EMPLEADO, e.status),
+              secondary: e.position ?? e.department_name ?? undefined,
+              right: deSiempreSalvoEnIngles(f.idioma, t, ESTADO_EMPLEADO, e.status, e.status ?? "—"),
               rightTone: e.status === "activo" ? "success" : "default",
             }));
           }
           if (kpiPopup === "ausencias") {
             return pendingAbsences.slice(0, 100).map((a: any): KpiRow => ({
-              primary: a.employees ? `${a.employees.first_name ?? ""} ${a.employees.last_name ?? ""}`.trim() : t("hr.employeeWithId", { id: a.employee_id?.slice?.(0, 8) ?? "—" }),
-              secondary: a.absence_type ? `${etiqueta(t, CUALQUIER_AUSENCIA, a.absence_type)} · ${a.start_date ? new Date(a.start_date).toLocaleDateString(f.intl("es-ES")) : "—"}` : a.start_date ? new Date(a.start_date).toLocaleDateString(f.intl("es-ES")) : undefined,
-              right: t("common.pending"),
+              primary: a.employee_name ?? a.full_name ?? t("hr.employeeWithId", { id: a.employee_id?.slice?.(0, 8) ?? "—" }),
+              secondary: a.absence_type ? `${deSiempreSalvoEnIngles(f.idioma, t, CUALQUIER_AUSENCIA, a.absence_type, a.absence_type)} · ${a.start_date ? new Date(a.start_date).toLocaleDateString(f.intl("es-ES")) : "—"}` : a.start_date ? new Date(a.start_date).toLocaleDateString(f.intl("es-ES")) : undefined,
+              right: deSiempreSalvoEnIngles(f.idioma, t, ESTADO_AUSENCIA, a.status, a.status ?? t("common.pending")),
               rightTone: "warning",
             }));
           }
@@ -576,7 +583,7 @@ export default function HRDashboard() {
               .slice(0, 100)
               .map((e: any): KpiRow => ({
                 primary: `${e.first_name ?? ""} ${e.last_name ?? ""}`.trim() || t("hr.noName"),
-                secondary: e.positions?.name ?? undefined,
+                secondary: e.position ?? undefined,
                 right: e.hire_date ? new Date(e.hire_date).toLocaleDateString(f.intl("es-ES")) : "—",
               }));
           }

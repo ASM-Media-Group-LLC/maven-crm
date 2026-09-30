@@ -353,7 +353,7 @@ function TrainingDashboard({ onAssign, onConfig, onViewDetail, onViewProgram }: 
               <HRMetricCard title={t("hr.train.totalAssigned")} value={kpis.total} icon={ClipboardList} color="primary" className={statusFilter === "" ? "ring-2 ring-primary/50" : ""} />
             </div>
             <div className="cursor-pointer" onClick={() => handleKpiClick("in_progress")}>
-              <HRMetricCard title={t("common.inProgress")} value={kpis.inProgress} icon={Clock} color="warning" className={statusFilter === "in_progress" ? "ring-2 ring-warning/50" : ""} />
+              <HRMetricCard title={t("hr.inProgress")} value={kpis.inProgress} icon={Clock} color="warning" className={statusFilter === "in_progress" ? "ring-2 ring-warning/50" : ""} />
             </div>
             <div className="cursor-pointer" onClick={() => handleKpiClick("completed")}>
               <HRMetricCard title={t("hr.train.completedPl")} value={kpis.completed} icon={CheckCircle} color="success" className={statusFilter === "completed" ? "ring-2 ring-success/50" : ""} />
@@ -926,7 +926,7 @@ function AssignTrainingView({ onBack }: { onBack: () => void }) {
             </Select>
           </div>
           <div className="space-y-1.5">
-            <Label>{t("common.startDate")}</Label>
+            <Label>{t("hr.startDateOf")}</Label>
             <DateInput value={form.start_date} onChange={(v) => setForm((prev) => ({ ...prev, start_date: v }))} />
           </div>
           <div className="space-y-1.5">
@@ -1328,7 +1328,7 @@ function GeneralModuleManagementView({ program, onBack }: { program: any; onBack
 
   const isFormDialog = showNew || !!editModule;
   const isEditing = !!editModule;
-  const roleLabel = TRAINING_TARGET_ROLES.find((r) => r.value === program.target_role)?.label || "General";
+  const roleLabel = rolCap(t, program.target_role);
 
   return (
     <div className="flex flex-col h-full">
@@ -1343,7 +1343,7 @@ function GeneralModuleManagementView({ program, onBack }: { program: any; onBack
                   <Badge variant="outline" className={cn("text-xs", getRoleBadgeClass(program.target_role))}>{roleLabel}</Badge>
                 </>
               }
-              subtitle={`${t("hr.train.programModules")} · ${modulos(t, modules.length)}`}
+              subtitle={`${t("hr.train.programModulesLower")} · ${modulos(t, modules.length)}`}
               actions={<Button onClick={() => { resetForm(); setShowNew(true); }}><Plus className="h-4 w-4 mr-1.5" />{t("hr.train.newModule")}</Button>}
             />
           </div>

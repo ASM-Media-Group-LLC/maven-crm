@@ -34,7 +34,7 @@ import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import { PageHeader } from "@/components/ui/page-header";
 import { useLanguage } from "@/hooks/useLanguage";
-import { etiqueta, CUALQUIER_AUSENCIA, ESTADO_AUSENCIA } from "./etiquetasRrhh";
+import { etiqueta, deSiempreSalvoEnIngles, CUALQUIER_AUSENCIA, ESTADO_AUSENCIA } from "./etiquetasRrhh";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 interface AbsenceRecord {
@@ -65,11 +65,13 @@ function getInitials(first: string, last: string) {
 
 // absence_type y status son DATOS de la base; en pantalla se muestra su etiqueta.
 // La tabla `absences` la comparten faltas, permisos y vacaciones, y esta lista las
-// trae todas: por eso la etiqueta sale de CUALQUIER_AUSENCIA y no solo de las faltas.
+// trae todas. En español se ve lo de siempre: la etiqueta del catálogo de faltas o,
+// si no está ahí ("permiso_medico", "vacaciones"), el value tal cual. En inglés
+// cualquier tipo de la tabla sale con su etiqueta (CUALQUIER_AUSENCIA).
 type T = ReturnType<typeof useLanguage>["t"];
 
-function getAbsenceTypeLabel(val: string, t: T) {
-  return etiqueta(t, CUALQUIER_AUSENCIA, val, ABSENCE_TYPES.find((o) => o.value === val)?.label ?? val);
+function getAbsenceTypeLabel(val: string, t: T, idioma: "es" | "en") {
+  return deSiempreSalvoEnIngles(idioma, t, CUALQUIER_AUSENCIA, val, ABSENCE_TYPES.find((o) => o.value === val)?.label ?? val);
 }
 
 function getStatusLabel(val: string, t: T) {
@@ -206,7 +208,7 @@ function RegisterAbsenceModal({ open, onOpenChange }: RegisterModalProps) {
               <SelectTrigger><SelectValue placeholder={t("hr.selectType")} /></SelectTrigger>
               <SelectContent>
                 {ABSENCE_TYPES.map((o) => (
-                  <SelectItem key={o.value} value={o.value}>{getAbsenceTypeLabel(o.value, t)}</SelectItem>
+                  <SelectItem key={o.value} value={o.value}>{getAbsenceTypeLabel(o.value, t, f.idioma)}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -219,7 +221,7 @@ function RegisterAbsenceModal({ open, onOpenChange }: RegisterModalProps) {
                 <PopoverTrigger asChild>
                   <Button variant="outline" className={cn("w-full justify-start font-normal", !startDate && "text-muted-foreground")}>
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {startDate ? format(startDate, DMY) : t("hr.startDate")}
+                    {startDate ? format(startDate, DMY) : t("hr.startDateLower")}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -233,7 +235,7 @@ function RegisterAbsenceModal({ open, onOpenChange }: RegisterModalProps) {
                 <PopoverTrigger asChild>
                   <Button variant="outline" className={cn("w-full justify-start font-normal", !endDate && "text-muted-foreground")}>
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {endDate ? format(endDate, DMY) : t("hr.endDate")}
+                    {endDate ? format(endDate, DMY) : t("hr.endDateLower")}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -313,7 +315,7 @@ function EditAbsenceModal({ absence, onClose }: { absence: AbsenceRecord | null;
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 {ABSENCE_TYPES.map((o) => (
-                  <SelectItem key={o.value} value={o.value}>{getAbsenceTypeLabel(o.value, t)}</SelectItem>
+                  <SelectItem key={o.value} value={o.value}>{getAbsenceTypeLabel(o.value, t, f.idioma)}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -391,7 +393,7 @@ function ViewAbsenceModal({ absence, onClose }: { absence: AbsenceRecord | null;
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div>
               <p className="text-muted-foreground text-xs mb-0.5">{t("hr.abs.type")}</p>
-              <Badge variant="outline">{getAbsenceTypeLabel(absence.absence_type, t)}</Badge>
+              <Badge variant="outline">{getAbsenceTypeLabel(absence.absence_type, t, f.idioma)}</Badge>
             </div>
             <div>
               <p className="text-muted-foreground text-xs mb-0.5">{t("common.status")}</p>
@@ -516,7 +518,7 @@ export default function HRAbsences() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <StatChip label={t("hr.abs.total")} value={String(totalFaltas)} icon={<AlertTriangle className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("total")} />
           <StatChip label={t("common.pendingPl")} value={String(pendientes)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" onClick={() => setKpiPopup("pendientes")} />
-          <StatChip label={t("common.thisMonth")} value={String(esteMes)} icon={<CalendarDays className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("esteMes")} />
+          <StatChip label={t("hr.thisMonth")} value={String(esteMes)} icon={<CalendarDays className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("esteMes")} />
         </div>
 
         {/* Department Tabs */}
@@ -540,7 +542,7 @@ export default function HRAbsences() {
             <SelectContent>
               <SelectItem value="__all__">{t("common.allTypes")}</SelectItem>
               {ABSENCE_TYPES.map((o) => (
-                <SelectItem key={o.value} value={o.value}>{getAbsenceTypeLabel(o.value, t)}</SelectItem>
+                <SelectItem key={o.value} value={o.value}>{getAbsenceTypeLabel(o.value, t, f.idioma)}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -559,7 +561,7 @@ export default function HRAbsences() {
           </div>
         </div>
 
-        <p className="text-xs text-muted-foreground">{t("hr.showingOf", { shown: filtered.length, total: absences.length })}</p>
+        <p className="text-xs text-muted-foreground">{t(absences.length === 1 ? "hr.showingOf.one" : "hr.showingOf.other", { shown: filtered.length, total: absences.length })}</p>
 
         {/* ── List View ─────────────────────────────────────────────────────── */}
         {viewMode === "list" && (
@@ -605,7 +607,7 @@ export default function HRAbsences() {
                               </div>
                             </div>
                           </TableCell>
-                          <TableCell><Badge variant="outline" className="text-xs">{getAbsenceTypeLabel(a.absence_type, t)}</Badge></TableCell>
+                          <TableCell><Badge variant="outline" className="text-xs">{getAbsenceTypeLabel(a.absence_type, t, f.idioma)}</Badge></TableCell>
                           <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{formatDateRange(a.start_date, a.end_date, f)}</TableCell>
                           <TableCell>
                             <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-muted text-xs font-semibold">{a.total_days ?? "—"}</span>
@@ -666,7 +668,7 @@ export default function HRAbsences() {
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-1.5">
-                      <Badge variant="outline" className="text-xs">{getAbsenceTypeLabel(a.absence_type, t)}</Badge>
+                      <Badge variant="outline" className="text-xs">{getAbsenceTypeLabel(a.absence_type, t, f.idioma)}</Badge>
                       <Badge variant={getStatusVariant(a.status)} className={cn("text-xs", a.status === "pending" && "border-warning/50 bg-warning/10 text-warning", a.status === "approved" && "border-primary/50 bg-primary/10 text-primary")}>
                         {getStatusLabel(a.status, t)}
                       </Badge>
@@ -733,18 +735,16 @@ export default function HRAbsences() {
           let list = absences;
           if (kpiPopup === "pendientes") list = absences.filter(a => a.status === "pending");
           else if (kpiPopup === "esteMes") {
-            // Mismo criterio que la tarjeta: registradas este mes.
-            list = absences.filter((a) => {
-              const d = new Date(a.created_at);
-              return d >= monthStart && d <= monthEnd;
-            });
+            const now = new Date();
+            const startMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+            list = absences.filter((a: any) => a.start_date && new Date(a.start_date) >= startMonth);
           }
           const tone = (status: string): KpiRow["rightTone"] =>
             status === "approved" ? "success" : status === "rejected" ? "destructive" : "warning";
-          return list.slice(0, 100).map((a): KpiRow => ({
-            primary: a.employees ? `${a.employees.first_name} ${a.employees.last_name}` : t("hr.employeeWithId", { id: a.employee_id?.slice?.(0, 8) ?? "—" }),
-            secondary: `${getAbsenceTypeLabel(a.absence_type, t)} · ${a.start_date ? new Date(a.start_date).toLocaleDateString(f.idioma === "en" ? "en-US" : "es") : "—"}`,
-            right: getStatusLabel(a.status, t),
+          return list.slice(0, 100).map((a: any): KpiRow => ({
+            primary: a.employee_name ?? t("hr.employeeWithId", { id: a.employee_id?.slice?.(0, 8) ?? "—" }),
+            secondary: `${deSiempreSalvoEnIngles(f.idioma, t, CUALQUIER_AUSENCIA, a.absence_type, a.absence_type ?? "")} · ${a.start_date ? new Date(a.start_date).toLocaleDateString(f.idioma === "en" ? "en-US" : "es") : "—"}`,
+            right: deSiempreSalvoEnIngles(f.idioma, t, ESTADO_AUSENCIA, a.status, a.status ?? "—"),
             rightTone: tone(a.status ?? ""),
           }));
         })()}

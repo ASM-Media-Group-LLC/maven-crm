@@ -33,7 +33,7 @@ import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { TranslationKey } from "@/lib/i18n";
-import { etiqueta, ESTADO_PERMISO, TIPO_PERMISO } from "./etiquetasRrhh";
+import { etiqueta, deSiempreSalvoEnIngles, ESTADO_PERMISO, TIPO_PERMISO } from "./etiquetasRrhh";
 
 type T = (key: TranslationKey, params?: Record<string, string | number>) => string;
 
@@ -456,7 +456,7 @@ export default function HRPermisos() {
               <StatChip label={t("hr.ann.kpiTotal")} value={String(total)} icon={<FileText className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("total")} />
               <StatChip label={t("common.pendingPl")} value={String(pendientes)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" onClick={() => setKpiPopup("pendientes")} />
               <StatChip label={t("hr.perm.kpiApproved")} value={String(aprobados)} icon={<CheckCircle2 className="h-3.5 w-3.5" />} color="bg-success" onClick={() => setKpiPopup("aprobados")} />
-              <StatChip label={t("common.thisMonth")} value={String(esteMes)} icon={<CalendarDays className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("esteMes")} />
+              <StatChip label={t("hr.thisMonth")} value={String(esteMes)} icon={<CalendarDays className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("esteMes")} />
             </>
           )}
         </div>
@@ -532,7 +532,7 @@ export default function HRPermisos() {
 
         {/* Count */}
         <p className="text-xs text-muted-foreground">
-          {t("hr.showingOf", { shown: filtered.length, total: permisos.length })}
+          {t(permisos.length === 1 ? "hr.showingOf.one" : "hr.showingOf.other", { shown: filtered.length, total: permisos.length })}
         </p>
 
         {/* Content */}
@@ -725,6 +725,7 @@ export default function HRPermisos() {
 
       {/* Modals */}
       <ViewPermisoModal permiso={viewPermiso} onClose={() => setViewPermiso(null)} />
+      <ViewPermisoModal permiso={viewPermiso} onClose={() => setViewPermiso(null)} />
 
       {/* Edit Modal */}
       {editData && (
@@ -765,7 +766,7 @@ export default function HRPermisos() {
             case "total": return `${t("hr.perm.kpiTotalTitle")} — ${total}`;
             case "pendientes": return `${t("common.pendingPl")} — ${pendientes}`;
             case "aprobados": return `${t("hr.perm.kpiApproved")} — ${aprobados}`;
-            case "esteMes": return `${t("common.thisMonth")} — ${esteMes}`;
+            case "esteMes": return `${t("hr.thisMonth")} — ${esteMes}`;
             default: return "";
           }
         })()}
@@ -777,15 +778,14 @@ export default function HRPermisos() {
           else if (kpiPopup === "esteMes") {
             const ms = startOfMonth(new Date());
             const me = endOfMonth(new Date());
-            // Mismo criterio que la tarjeta: creados este mes.
-            list = permisos.filter((p) => new Date(p.created_at) >= ms && new Date(p.created_at) <= me);
+            list = permisos.filter((p: any) => p.permission_date && new Date(p.permission_date) >= ms && new Date(p.permission_date) <= me);
           }
           const tone = (status: string): KpiRow["rightTone"] =>
             status === "approved" ? "success" : status === "rejected" ? "destructive" : "warning";
-          return list.slice(0, 100).map((p): KpiRow => ({
-            primary: p.employees ? `${p.employees.first_name} ${p.employees.last_name}` : t("hr.employeeWithId", { id: p.employee_id?.slice?.(0, 8) ?? "—" }),
-            secondary: `${etiqueta(t, TIPO_PERMISO, p.absence_type)} · ${p.start_date ? format(new Date(p.start_date), "dd MMM yyyy", { locale: f.fechas }) : "—"}`,
-            right: etiqueta(t, ESTADO_PERMISO, p.status),
+          return list.slice(0, 100).map((p: any): KpiRow => ({
+            primary: p.employee_name ?? t("hr.employeeWithId", { id: p.employee_id?.slice?.(0, 8) ?? "—" }),
+            secondary: `${deSiempreSalvoEnIngles(f.idioma, t, TIPO_PERMISO, p.permission_type, p.permission_type ?? "")} · ${p.permission_date ? format(new Date(p.permission_date), "dd MMM yyyy") : "—"}`,
+            right: deSiempreSalvoEnIngles(f.idioma, t, ESTADO_PERMISO, p.status, p.status ?? "—"),
             rightTone: tone(p.status ?? ""),
           }));
         })()}

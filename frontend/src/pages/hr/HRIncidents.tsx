@@ -33,7 +33,7 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useFormato } from "@/hooks/useFormato";
-import { etiqueta, ESTADO_INCIDENTE, SEVERIDAD, TIPO_INCIDENTE } from "./etiquetasRrhh";
+import { etiqueta, deSiempreSalvoEnIngles, ESTADO_INCIDENTE, SEVERIDAD, TIPO_INCIDENTE } from "./etiquetasRrhh";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface IncidentRecord {
@@ -188,7 +188,7 @@ export default function HRIncidents() {
       <header className="shrink-0 bg-background/30 backdrop-blur-xl border-b border-white/10 px-6 pt-6 pb-4">
         <PageHeader
           title={t("hr.inc.title")}
-          subtitle={t("hr.inc.subtitle", { open: totalOpen, total: incidents.length })}
+          subtitle={t(totalOpen === 1 ? "hr.inc.subtitle.one" : "hr.inc.subtitle.other", { open: totalOpen, total: incidents.length })}
           actions={
             <Button size="sm" onClick={() => navigate("/hr/incidentes/nuevo")}>
               <Plus className="h-4 w-4 mr-1" />{t("hr.inc.report")}
@@ -432,7 +432,7 @@ export default function HRIncidents() {
         {/* Results counter */}
         {!isLoading && filtered.length > 0 && (
           <p className="text-xs text-muted-foreground">
-            {t("hr.inc.showing", { shown: filtered.length, total: incidents.length })}
+            {t(incidents.length === 1 ? "hr.inc.showing.one" : "hr.inc.showing.other", { shown: filtered.length, total: incidents.length })}
           </p>
         )}
       </div>
@@ -537,8 +537,10 @@ export default function HRIncidents() {
             severity === "critical" ? "destructive" : severity === "high" ? "warning" : "default";
           return list.slice(0, 100).map((i: any): KpiRow => ({
             primary: i.title ?? i.description ?? t("hr.noTitle"),
-            secondary: i.employees ? `${i.employees.first_name} ${i.employees.last_name}` : (i.incident_type ? tipo(i.incident_type) : undefined),
-            right: i.severity ? severidad(i.severity) : i.status ? estado(i.status) : "—",
+            secondary: i.employee_name ?? (i.incident_type != null ? deSiempreSalvoEnIngles(f.idioma, t, TIPO_INCIDENTE, i.incident_type, i.incident_type) : undefined),
+            right: i.severity != null
+              ? deSiempreSalvoEnIngles(f.idioma, t, SEVERIDAD, i.severity, i.severity)
+              : i.status != null ? deSiempreSalvoEnIngles(f.idioma, t, ESTADO_INCIDENTE, i.status, i.status) : "—",
             rightTone: tone(i.severity ?? ""),
           }));
         })()}

@@ -33,7 +33,7 @@ import { useFormato } from "@/hooks/useFormato";
 import type { Formato } from "@/lib/formato";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { TranslationKey } from "@/lib/i18n";
-import { etiqueta, CATEGORIA_INFRACCION, ESTADO_DEDUCCION, TIPO_DEDUCCION } from "./etiquetasRrhh";
+import { etiqueta, deSiempreSalvoEnIngles, CATEGORIA_INFRACCION, ESTADO_DEDUCCION, TIPO_DEDUCCION } from "./etiquetasRrhh";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface DeductionRecord {
@@ -182,7 +182,7 @@ export default function HRDeductions() {
       <header className="shrink-0 bg-background/30 backdrop-blur-xl border-b border-white/10 px-6 pt-6 pb-4">
         <PageHeader
           title={t("hr.ded.title")}
-          subtitle={t("hr.ded.subtitle", { count: deductions.length })}
+          subtitle={t(deductions.length === 1 ? "hr.ded.subtitle.one" : "hr.ded.subtitle.other", { count: deductions.length })}
           actions={
             <Button size="sm" onClick={() => navigate("/hr/deducciones/nuevo")}>
               <Plus className="h-4 w-4 mr-1" />{t("hr.ded.new")}
@@ -411,7 +411,7 @@ export default function HRDeductions() {
         {/* Results counter */}
         {!isLoading && filtered.length > 0 && (
           <p className="text-xs text-muted-foreground">
-            {t("hr.ded.showing", { shown: filtered.length, total: deductions.length })}
+            {t(deductions.length === 1 ? "hr.ded.showing.one" : "hr.ded.showing.other", { shown: filtered.length, total: deductions.length })}
           </p>
         )}
       </div>
@@ -479,8 +479,8 @@ export default function HRDeductions() {
           const tone = (status: string): KpiRow["rightTone"] =>
             status === "applied" ? "success" : status === "pending" ? "warning" : "default";
           return list.slice(0, 100).map((d: any): KpiRow => ({
-            primary: d.employees ? `${d.employees.first_name} ${d.employees.last_name}` : t("hr.ded.noConcept"),
-            secondary: [etiqueta(t, TIPO_DEDUCCION, d.deduction_type), d.month_year].filter(Boolean).join(" · ") || undefined,
+            primary: d.employee_name ?? d.reason ?? t("hr.ded.noConcept"),
+            secondary: d.month_year ?? (d.deduction_type != null ? deSiempreSalvoEnIngles(f.idioma, t, TIPO_DEDUCCION, d.deduction_type, d.deduction_type) : undefined),
             right: formatAmount(f, d.amount || 0),
             rightTone: tone(d.status ?? ""),
           }));

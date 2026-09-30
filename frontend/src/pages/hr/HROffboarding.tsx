@@ -64,7 +64,7 @@ interface OffboardingRecord {
 
 // status, termination_type y final_payment_status son DATOS de la base; lo que se ve es la clave.
 const OFFBOARDING_STATUSES: { value: string; label: TranslationKey }[] = [
-  { value: "in_progress", label: "common.inProgress" },
+  { value: "in_progress", label: "hr.inProgress" },
   { value: "completed", label: "common.completed" },
 ];
 
@@ -256,7 +256,7 @@ export default function HROffboarding() {
           ) : (
             <>
               <StatChip label={t("hr.off.total")} value={String(offboardings.length)} icon={<Users className="h-3.5 w-3.5" />} color="bg-primary" hint={t("hr.off.allProcesses")} onClick={() => setKpiPopup("total")} />
-              <StatChip label={t("common.inProgress")} value={String(totalInProgress)} icon={<Loader2 className="h-3.5 w-3.5" />} color="bg-warning" hint={offboardings.length > 0 ? t("hr.pctOfTotal", { pct: ((totalInProgress / offboardings.length) * 100).toFixed(0) }) : "—"} onClick={() => setKpiPopup("inProgress")} />
+              <StatChip label={t("hr.inProgress")} value={String(totalInProgress)} icon={<Loader2 className="h-3.5 w-3.5" />} color="bg-warning" hint={offboardings.length > 0 ? t("hr.pctOfTotal", { pct: ((totalInProgress / offboardings.length) * 100).toFixed(0) }) : "—"} onClick={() => setKpiPopup("inProgress")} />
               <StatChip label={t("hr.off.completedPl")} value={String(totalCompleted)} icon={<CheckCircle className="h-3.5 w-3.5" />} color="bg-success" hint={offboardings.length > 0 ? t("hr.pctOfTotal", { pct: ((totalCompleted / offboardings.length) * 100).toFixed(0) }) : "—"} onClick={() => setKpiPopup("completed")} />
               <StatChip label={t("hr.off.pendingPayment")} value={String(totalPendingPayment)} icon={<DollarSign className="h-3.5 w-3.5" />} color="bg-destructive" hint={offboardings.length > 0 ? t("hr.pctOfTotal", { pct: ((totalPendingPayment / offboardings.length) * 100).toFixed(0) }) : "—"} onClick={() => setKpiPopup("pendingPayment")} />
             </>
@@ -583,7 +583,7 @@ export default function HROffboarding() {
         title={(() => {
           switch (kpiPopup) {
             case "total": return `${t("hr.off.total")} — ${offboardings.length}`;
-            case "inProgress": return `${t("common.inProgress")} — ${totalInProgress}`;
+            case "inProgress": return `${t("hr.inProgress")} — ${totalInProgress}`;
             case "completed": return `${t("hr.off.completedPl")} — ${totalCompleted}`;
             case "pendingPayment": return `${t("hr.off.pendingPayment")} — ${totalPendingPayment}`;
             default: return "";
@@ -599,8 +599,9 @@ export default function HROffboarding() {
             status === "completed" ? "success" : status === "in_progress" ? "warning" : "default";
           return list.slice(0, 100).map((o: any): KpiRow => ({
             primary: o.employees ? `${o.employees.first_name ?? ""} ${o.employees.last_name ?? ""}`.trim() : t("hr.noName"),
-            secondary: o.termination_date ? format(new Date(o.termination_date), "dd MMM yyyy", { locale: f.fechas }) : undefined,
-            right: o.status ? estado(o.status) : "—",
+            secondary: o.exit_reason ?? o.exit_date ? format(new Date(o.exit_date), "dd MMM yyyy") : undefined,
+            // En español, el value tal cual, como siempre; en inglés, su etiqueta.
+            right: f.idioma === "en" && o.status ? estado(o.status) : (o.status ?? "—"),
             rightTone: tone(o.status ?? ""),
           }));
         })()}

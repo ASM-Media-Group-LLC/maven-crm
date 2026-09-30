@@ -399,8 +399,8 @@ const HRHourBank = () => {
           if (kpiPopup === "high") list = balances.filter((b: any) => b.balance > 30);
           else if (kpiPopup === "low") list = balances.filter((b: any) => b.balance < 10 && b.balance >= 0);
           return list.slice(0, 100).map((b: any): KpiRow => ({
-            primary: `${b.employee?.first_name ?? ""} ${b.employee?.last_name ?? ""}`.trim() || t("hr.noName"),
-            secondary: b.employee?.email ?? undefined,
+            primary: `${b.first_name ?? ""} ${b.last_name ?? ""}`.trim() || t("hr.noName"),
+            secondary: b.position ?? undefined,
             right: `${b.balance.toFixed(1)}h`,
             rightTone: b.balance > 30 ? "success" : b.balance < 10 ? "warning" : "default",
           }));

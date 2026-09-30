@@ -523,14 +523,11 @@ const HRChatterSchedules = () => {
           } else {
             list = schedules.filter((s: any) => s.start_at && isSameDay(new Date(s.start_at), now));
           }
-          return list.slice(0, 100).map((s: any): KpiRow => {
-            const tipo = getTypeConfig(s.schedule_type);
-            return {
-              primary: s.title ?? s.employee_name ?? t("hr.noTitle"),
-              secondary: s.start_at ? format(new Date(s.start_at), "EEEE dd MMM HH:mm", { locale: f.fechas }) : undefined,
-              right: tipo ? t(tipo.label) : (s.shift_type ?? "—"),
-            };
-          });
+          return list.slice(0, 100).map((s: any): KpiRow => ({
+            primary: s.title ?? s.employee_name ?? t("hr.noTitle"),
+            secondary: s.start_at ? format(new Date(s.start_at), "EEEE dd MMM HH:mm", { locale: f.fechas }) : undefined,
+            right: s.shift_type ?? "—",
+          }));
         })()}
         emptyText={t("hr.kpiEmpty")}
       />

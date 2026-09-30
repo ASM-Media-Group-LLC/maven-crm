@@ -3,13 +3,18 @@
 // Las claves de este archivo empiezan con uno de sus prefijos (los fija
 // test/i18n/diccionarioPorModulo.test.ts). Ver lib/i18n.ts.
 //
-// ⚠️ Lo que se GUARDA no pasa por acá. Los tipos de ausencia/permiso
+// ⚠️ Lo que se GUARDA no pasa por aquí. Los tipos de ausencia/permiso
 // ("enfermedad", "permiso_remoto"…), los estados ("pending", "approved"…), los
 // tipos de turno ("manana"…), los de deducción ("adelanto"…) y los valores de los
 // catálogos de lib/hrConstants.ts son DATOS de la base: en pantalla se traduce
 // solo la etiqueta (`hr.opt.*`); el `value` del SelectItem y lo que se compara con
 // la base siguen igual. El texto de los anuncios, sus audiencias y los nombres de
 // departamentos, cargos y programas los escribe la gente: tampoco se traducen.
+//
+// ⚠️ Las claves `.one`/`.other` (singular y plural) existen por el inglés ("1 day",
+// "1 open incident"). En español las dos dicen lo mismo A PROPÓSITO: la pantalla en
+// español siempre mostró "1 días", "1 incidentes abiertos", y esta traducción no la
+// cambia. Corregir el singular en español es cambiar el `es` de la `.one`.
 export const PREFIJOS_HR = ["hr."] as const;
 
 export const hr = {
@@ -39,6 +44,14 @@ export const hr = {
   "hr.selectType": { es: "Seleccionar tipo...", en: "Select a type..." },
   "hr.startDate": { es: "Fecha Inicio", en: "Start date" },
   "hr.endDate": { es: "Fecha Fin", en: "End date" },
+  // Las mismas palabras con otra mayúscula: cada pantalla conserva la que tenía en
+  // español (esta traducción no cambia la pantalla en español).
+  "hr.startDateLower": { es: "Fecha inicio", en: "Start date" },
+  "hr.endDateLower": { es: "Fecha fin", en: "End date" },
+  "hr.startDateOf": { es: "Fecha de Inicio", en: "Start date" },
+  "hr.saveChangesLower": { es: "Guardar cambios", en: "Save changes" },
+  "hr.thisMonth": { es: "Este Mes", en: "This month" },
+  "hr.inProgress": { es: "En Progreso", en: "In progress" },
   "hr.startTime": { es: "Hora Inicio", en: "Start time" },
   "hr.endTime": { es: "Hora Fin", en: "End time" },
   "hr.reasonLabel": { es: "Motivo", en: "Reason" },
@@ -48,7 +61,8 @@ export const hr = {
   "hr.observations": { es: "Observaciones", en: "Remarks" },
   "hr.progress": { es: "Progreso", en: "Progress" },
   "hr.period": { es: "Período", en: "Period" },
-  "hr.showingOf": { es: "Mostrando {shown} de {total} registros", en: "Showing {shown} of {total} records" },
+  "hr.showingOf.one": { es: "Mostrando {shown} de {total} registros", en: "Showing {shown} of {total} record" },
+  "hr.showingOf.other": { es: "Mostrando {shown} de {total} registros", en: "Showing {shown} of {total} records" },
   "hr.yes": { es: "Sí", en: "Yes" },
   "hr.no": { es: "No", en: "No" },
   "hr.deleteRecordTitle": { es: "¿Eliminar este registro?", en: "Delete this record?" },
@@ -58,9 +72,9 @@ export const hr = {
   "hr.createRequest": { es: "Crear Solicitud", en: "Create request" },
   "hr.createRequestPlus": { es: "+ Crear Solicitud", en: "+ Create request" },
   "hr.newRequest": { es: "Nueva Solicitud", en: "New request" },
-  "hr.days.one": { es: "{count} día", en: "{count} day" },
+  "hr.days.one": { es: "{count} días", en: "{count} day" },
   "hr.days.other": { es: "{count} días", en: "{count} days" },
-  "hr.modules.one": { es: "{count} módulo", en: "{count} module" },
+  "hr.modules.one": { es: "{count} módulos", en: "{count} module" },
   "hr.modules.other": { es: "{count} módulos", en: "{count} modules" },
 
   // Días de la semana (cortos y largos). Los calendarios los muestran en mayúscula
@@ -107,7 +121,7 @@ export const hr = {
   "hr.opt.permType.permiso_medico": { es: "Permiso Médico", en: "Medical appointment" },
   "hr.opt.permType.permiso_academico": { es: "Permiso Académico", en: "Academic leave" },
   "hr.opt.permType.permiso_diligencia": { es: "Diligencia Personal", en: "Personal errand" },
-  "hr.opt.permType.incapacidad": { es: "Incapacidad", en: "Medical disability" },
+  "hr.opt.permType.incapacidad": { es: "Incapacidad", en: "Sick leave" },
   // Permisos: estados (masculino)
   "hr.opt.permStatus.pending": { es: "Pendiente", en: "Pending" },
   "hr.opt.permStatus.approved": { es: "Aprobado", en: "Approved" },
@@ -197,7 +211,7 @@ export const hr = {
   // Roles de useHrPeople que no son un nombre en inglés.
   "hr.opt.role.employee": { es: "Empleado", en: "Employee" },
   "hr.opt.role.coordinator": { es: "Coordinador", en: "Coordinator" },
-  // Turno que arma la vista v_qa_attendance (texto de la base, se reconoce acá).
+  // Turno que arma la vista v_qa_attendance (texto de la base, se reconoce aquí).
   "hr.opt.shift.own": { es: "Según horario propio", en: "Own schedule" },
   "hr.opt.shift.night": { es: "Madrugada · 12am–8am", en: "Overnight · 12am–8am" },
   "hr.opt.shift.morning": { es: "Mañana · 8am–4pm", en: "Morning · 8am–4pm" },
@@ -205,7 +219,8 @@ export const hr = {
 
   // ─── Directorio (HRDirectoryLookup)
   "hr.dir.title": { es: "Directorio", en: "Directory" },
-  "hr.dir.subtitle": { es: "Consulta rápida de datos del equipo · {count} empleados activos", en: "Quick lookup of team details · {count} active employees" },
+  "hr.dir.subtitle.one": { es: "Consulta rápida de datos del equipo · {count} empleados activos", en: "Quick lookup of team details · {count} active employee" },
+  "hr.dir.subtitle.other": { es: "Consulta rápida de datos del equipo · {count} empleados activos", en: "Quick lookup of team details · {count} active employees" },
   "hr.dir.searchPlaceholder": { es: "Buscar por nombre, email, teléfono, cargo...", en: "Search by name, email, phone, job title..." },
   "hr.dir.noEmployees": { es: "No se encontraron empleados", en: "No employees found" },
 
@@ -315,8 +330,9 @@ export const hr = {
   "hr.ann.tab.drafts": { es: "Borradores", en: "Drafts" },
   "hr.ann.tab.expired": { es: "Expirados", en: "Expired" },
   "hr.ann.tab.archived": { es: "Archivados", en: "Archived" },
+  // Solo se usa con 2 o más destinos (con uno se muestra su nombre): no necesita singular.
   "hr.ann.targets": { es: "{count} destinos", en: "{count} audiences" },
-  "hr.ann.title": { es: "Comunicación Interna", en: "Internal Communications" },
+  "hr.ann.title": { es: "Comunicación Interna", en: "Internal communications" },
   "hr.ann.subtitle": { es: "Gestión avanzada de anuncios, avisos y comunicados", en: "Manage announcements, notices and memos" },
   "hr.ann.new": { es: "Nuevo Anuncio", en: "New announcement" },
   "hr.ann.kpiTotal": { es: "Total", en: "Total" },
@@ -335,7 +351,7 @@ export const hr = {
   "hr.perm.subtitle": { es: "Gestiona las solicitudes de permisos de horario", en: "Manage schedule leave requests" },
   "hr.perm.request": { es: "Solicitar Permiso", en: "Request leave" },
   "hr.perm.requestDesc": { es: "Registra una solicitud de permiso de horario para un empleado", en: "Log a schedule leave request for an employee" },
-  "hr.perm.newSubtitle": { es: "Registra un permiso, ausencia o incapacidad", en: "Log a leave, absence or medical disability" },
+  "hr.perm.newSubtitle": { es: "Registra un permiso, ausencia o incapacidad", en: "Log a leave request, an absence or sick leave" },
   "hr.perm.requestType": { es: "Tipo de Solicitud", en: "Request type" },
   "hr.perm.permType": { es: "Tipo de Permiso", en: "Leave type" },
   "hr.perm.selectPermType": { es: "Seleccionar tipo de permiso...", en: "Select a leave type..." },
@@ -381,7 +397,7 @@ export const hr = {
   "hr.org.noArea": { es: "Sin área", en: "No area" },
 
   // ─── Banco de horas (HRHourBank)
-  "hr.bank.title": { es: "Banco de Horas", en: "Hours bank" },
+  "hr.bank.title": { es: "Banco de Horas", en: "Hour bank" },
   "hr.bank.subtitle": { es: "Gestión del banco de horas de empleados", en: "Manage employees' banked hours" },
   "hr.bank.saved": { es: "Registro guardado", en: "Entry saved" },
   "hr.bank.errorSaving": { es: "Error al registrar", en: "Couldn't save the entry" },
@@ -411,7 +427,8 @@ export const hr = {
 
   // ─── Deducciones (HRDeductions)
   "hr.ded.title": { es: "Deducciones", en: "Deductions" },
-  "hr.ded.subtitle": { es: "Gestión de adelantos e infracciones · {count} registros", en: "Advances and infractions · {count} records" },
+  "hr.ded.subtitle.one": { es: "Gestión de adelantos e infracciones · {count} registros", en: "Advances and infractions · {count} record" },
+  "hr.ded.subtitle.other": { es: "Gestión de adelantos e infracciones · {count} registros", en: "Advances and infractions · {count} records" },
   "hr.ded.new": { es: "Nueva Deducción", en: "New deduction" },
   "hr.ded.deleted": { es: "Deducción eliminada", en: "Deduction deleted" },
   "hr.ded.total": { es: "Total Deducciones", en: "Total deductions" },
@@ -421,7 +438,8 @@ export const hr = {
   "hr.ded.amount": { es: "Monto", en: "Amount" },
   "hr.ded.empty": { es: "No hay deducciones registradas", en: "No deductions yet" },
   "hr.ded.emptyHint": { es: "Haz clic en \"Nueva Deducción\" para empezar.", en: "Click \"New deduction\" to get started." },
-  "hr.ded.showing": { es: "Mostrando {shown} de {total} deducciones", en: "Showing {shown} of {total} deductions" },
+  "hr.ded.showing.one": { es: "Mostrando {shown} de {total} deducciones", en: "Showing {shown} of {total} deduction" },
+  "hr.ded.showing.other": { es: "Mostrando {shown} de {total} deducciones", en: "Showing {shown} of {total} deductions" },
   "hr.ded.detail": { es: "Detalle de Deducción", en: "Deduction details" },
   "hr.ded.deleteTitle": { es: "¿Eliminar deducción?", en: "Delete deduction?" },
   "hr.ded.deleteDesc": { es: "Esta acción no se puede deshacer. Se eliminará permanentemente esta deducción de {amount}.", en: "This can't be undone. This {amount} deduction will be permanently deleted." },
@@ -604,7 +622,8 @@ export const hr = {
 
   // ─── Incidentes laborales (HRIncidents)
   "hr.inc.title": { es: "Incidentes Laborales", en: "Workplace incidents" },
-  "hr.inc.subtitle": { es: "{open} incidentes abiertos · {total} total", en: "{open} open incidents · {total} total" },
+  "hr.inc.subtitle.one": { es: "{open} incidentes abiertos · {total} total", en: "{open} open incident · {total} total" },
+  "hr.inc.subtitle.other": { es: "{open} incidentes abiertos · {total} total", en: "{open} open incidents · {total} total" },
   "hr.inc.report": { es: "Reportar Incidente", en: "Report incident" },
   "hr.inc.updated": { es: "Incidente actualizado", en: "Incident updated" },
   "hr.inc.deleted": { es: "Incidente eliminado", en: "Incident deleted" },
@@ -614,7 +633,8 @@ export const hr = {
   "hr.inc.severity": { es: "Severidad", en: "Severity" },
   "hr.inc.empty": { es: "No hay incidentes registrados", en: "No incidents yet" },
   "hr.inc.emptyHint": { es: "Haz clic en \"Reportar Incidente\" para empezar.", en: "Click \"Report incident\" to get started." },
-  "hr.inc.showing": { es: "Mostrando {shown} de {total} incidentes", en: "Showing {shown} of {total} incidents" },
+  "hr.inc.showing.one": { es: "Mostrando {shown} de {total} incidentes", en: "Showing {shown} of {total} incident" },
+  "hr.inc.showing.other": { es: "Mostrando {shown} de {total} incidentes", en: "Showing {shown} of {total} incidents" },
   "hr.inc.detail": { es: "Detalle del Incidente", en: "Incident details" },
   "hr.inc.correctiveAction": { es: "Acción Correctiva", en: "Corrective action" },
   "hr.inc.edit": { es: "Editar Incidente", en: "Edit incident" },
@@ -727,13 +747,14 @@ export const hr = {
   "hr.vac.upcoming": { es: "Próximas", en: "Upcoming" },
   "hr.vac.scheduled": { es: "Programadas", en: "Scheduled" },
   "hr.vac.daysUsed": { es: "Días Usados", en: "Days used" },
-  "hr.vac.ofAnnual": { es: "De {max} anuales", en: "Of {max} per year" },
+  "hr.vac.ofAnnual": { es: "De {max} anuales", en: "of {max} per year" },
   "hr.vac.available": { es: "Disponibles", en: "Available" },
   "hr.vac.remaining": { es: "Restantes", en: "Remaining" },
   "hr.vac.tab.requests": { es: "Solicitudes", en: "Requests" },
   "hr.vac.tab.history": { es: "Historial", en: "History" },
   "hr.vac.tab.calendar": { es: "Calendario", en: "Calendar" },
-  "hr.vac.requestsCount": { es: "{count} solicitudes", en: "{count} requests" },
+  "hr.vac.requestsCount.one": { es: "{count} solicitudes", en: "{count} request" },
+  "hr.vac.requestsCount.other": { es: "{count} solicitudes", en: "{count} requests" },
   "hr.vac.empty": { es: "Sin solicitudes registradas", en: "No requests yet" },
   "hr.vac.vacUsed": { es: "Vacaciones Usadas", en: "Vacation used" },
   "hr.vac.vacAvailable": { es: "Vac. Disponibles", en: "Vacation available" },
@@ -782,6 +803,7 @@ export const hr = {
   "hr.train.overallProgress": { es: "Progreso General", en: "Overall progress" },
   "hr.train.modulesProgress": { es: "{done}/{total} módulos · {pct}%", en: "{done}/{total} modules · {pct}%" },
   "hr.train.programModules": { es: "Módulos del Programa", en: "Program modules" },
+  "hr.train.programModulesLower": { es: "Módulos del programa", en: "Program modules" },
   "hr.train.noModulesConfigured": { es: "Este programa no tiene módulos configurados.", en: "This program has no modules set up." },
   "hr.train.requiredShort": { es: "Req.", en: "Req." },
   "hr.train.assigned": { es: "Capacitación asignada", en: "Training assigned" },

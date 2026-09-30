@@ -400,7 +400,7 @@ export default function HRVacations() {
               <StatChip label={t("hr.vac.daysUsed")} value={String(approvedThisYear)} icon={<CalendarDays className="h-3.5 w-3.5" />} color="bg-primary" hint={t("hr.vac.ofAnnual", { max: maxDays })} />
               <StatChip label={t("hr.vac.available")} value={String(availableDays)} icon={<CheckCircle2 className="h-3.5 w-3.5" />} color="bg-success" hint={t("hr.vac.remaining")} />
               <StatChip label={t("common.pendingPl")} value={String(pending)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" hint={t("hr.vac.toApprove")} onClick={() => setKpiPopup("pending")} />
-              <StatChip label={t("common.thisMonth")} value={String(approvedThisMonth)} icon={<CalendarClock className="h-3.5 w-3.5" />} color="bg-primary" hint={format(new Date(), "MMMM yyyy", { locale: f.fechas })} onClick={() => setKpiPopup("thisMonth")} />
+              <StatChip label={t("hr.thisMonth")} value={String(approvedThisMonth)} icon={<CalendarClock className="h-3.5 w-3.5" />} color="bg-primary" hint={format(new Date(), "MMMM yyyy", { locale: f.fechas })} onClick={() => setKpiPopup("thisMonth")} />
               <StatChip label={t("hr.vac.rejectedPl")} value={String(rejected)} icon={<XCircle className="h-3.5 w-3.5" />} color="bg-destructive" hint={t("hr.vac.denied")} onClick={() => setKpiPopup("rejected")} />
             </>
           )}
@@ -457,7 +457,7 @@ export default function HRVacations() {
               </div>
             </div>
 
-            <p className="text-xs text-muted-foreground">{t("hr.vac.requestsCount", { count: filtered.length })}</p>
+            <p className="text-xs text-muted-foreground">{t(filtered.length === 1 ? "hr.vac.requestsCount.one" : "hr.vac.requestsCount.other", { count: filtered.length })}</p>
 
             {/* Table view */}
             {viewMode === "list" ? (
@@ -544,7 +544,7 @@ export default function HRVacations() {
                           <Badge variant="outline" className={cn("text-xs", VACATION_TYPES.find((t) => t.value === a.absence_type)?.color)}>
                             {tipoCorto(a.absence_type, t)}
                           </Badge>
-                          <span className="text-xs text-muted-foreground">{t(a.total_days === 1 ? "hr.days.one" : "hr.days.other", { count: a.total_days ?? 0 })}</span>
+                          <span className="text-xs text-muted-foreground">{t(a.total_days === 1 ? "hr.days.one" : "hr.days.other", { count: a.total_days ?? "" })}</span>
                         </div>
                         <p className="text-sm">
                           {format(new Date(a.start_date), "dd MMM", { locale: f.fechas })} — {format(new Date(a.end_date), "dd MMM yyyy", { locale: f.fechas })}
@@ -694,7 +694,7 @@ export default function HRVacations() {
                             </div>
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium truncate">{getEmpName(a)}</p>
-                              <p className="text-xs text-muted-foreground">{t(a.total_days === 1 ? "hr.days.one" : "hr.days.other", { count: a.total_days ?? 0 })} · {tipoCorto(a.absence_type, t)}</p>
+                              <p className="text-xs text-muted-foreground">{t(a.total_days === 1 ? "hr.days.one" : "hr.days.other", { count: a.total_days ?? "" })} · {tipoCorto(a.absence_type, t)}</p>
                             </div>
                           </div>
                         ))}
@@ -852,7 +852,7 @@ export default function HRVacations() {
             case "approved": return `${t("hr.vac.approvedPl")} — ${approved}`;
             case "rejected": return `${t("hr.vac.rejectedPl")} — ${rejected}`;
             case "upcoming": return `${t("hr.vac.upcoming")} — ${upcoming}`;
-            case "thisMonth": return `${t("common.thisMonth")} — ${approvedThisMonth}`;
+            case "thisMonth": return `${t("hr.thisMonth")} — ${approvedThisMonth}`;
             default: return "";
           }
         })()}
@@ -870,9 +870,10 @@ export default function HRVacations() {
           const tone = (status: string): KpiRow["rightTone"] =>
             status === "approved" ? "success" : status === "rejected" ? "destructive" : "warning";
           return list.slice(0, 100).map((a: any): KpiRow => ({
-            primary: a.employees ? getEmpName(a) : t("hr.employeeWithId", { id: a.employee_id?.slice?.(0, 8) ?? "—" }),
-            secondary: a.start_date && a.end_date ? `${format(new Date(a.start_date), "dd MMM", { locale: f.fechas })} → ${format(new Date(a.end_date), "dd MMM yyyy", { locale: f.fechas })}` : undefined,
-            right: STATUS_CONFIG[a.status] ? t(STATUS_CONFIG[a.status].label) : (a.status ?? "—"),
+            primary: a.employee_name ?? t("hr.employeeWithId", { id: a.employee_id?.slice?.(0, 8) ?? "—" }),
+            secondary: a.start_date && a.end_date ? `${format(new Date(a.start_date), "dd MMM")} → ${format(new Date(a.end_date), "dd MMM yyyy")}` : undefined,
+            // En español, el value tal cual, como siempre; en inglés, su etiqueta.
+            right: f.idioma === "en" && STATUS_CONFIG[a.status] ? t(STATUS_CONFIG[a.status].label) : (a.status ?? "—"),
             rightTone: tone(a.status ?? ""),
           }));
         })()}
