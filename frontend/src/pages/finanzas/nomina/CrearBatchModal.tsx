@@ -9,7 +9,7 @@ import { listRowBase, listRowInteractive } from "@/components/ui/list-row";
 import { cn } from "@/lib/utils";
 import { useFormato } from "@/hooks/useFormato";
 import { useLanguage } from "@/hooks/useLanguage";
-import { estadoNomina } from "../estados";
+import { crudoEnEspanol, estadoNomina } from "../estados";
 
 interface Props {
   open: boolean;
@@ -25,7 +25,7 @@ function fmtUsd(n: number, locale: string) {
 
 export default function CrearBatchModal({ open, onClose, periods, onSubmit, isPending }: Props) {
   const f = useFormato();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const fmt = (n: number) => fmtUsd(n, f.intl("es-CO"));
   const [selected, setSelected] = useState<string[]>([]);
   const [reason, setReason] = useState("");
@@ -61,7 +61,7 @@ export default function CrearBatchModal({ open, onClose, periods, onSubmit, isPe
                   <span className="text-sm font-medium">{p.period_name}</span>
                   <span className="text-xs text-muted-foreground ml-2">{fmt(Number(p.net_total) || 0)}</span>
                 </div>
-                <Badge variant="secondary">{estadoNomina(t, p.status)}</Badge>
+                <Badge variant="secondary">{crudoEnEspanol(language, estadoNomina, t, p.status)}</Badge>
               </label>
             ))}
           </div>

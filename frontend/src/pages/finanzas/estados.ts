@@ -6,7 +6,7 @@
 // se filtra, se compara y se imprime en la factura, y no se toca. Acá solo se
 // elige cómo se MUESTRA en pantalla. Un valor que no está en la lista se muestra
 // tal cual, como antes.
-import type { TranslationKey } from "@/lib/i18n";
+import type { Language, TranslationKey } from "@/lib/i18n";
 
 export type Traductor = (key: TranslationKey, params?: Record<string, string | number>) => string;
 
@@ -74,7 +74,42 @@ export const estadoNotaDePago = (t: Traductor, estado?: string | null) => etique
 export const tipoDePago = (t: Traductor, tipo?: string | null) => etiqueta(TIPO_DE_PAGO, t, tipo);
 export const metodoDePago = (t: Traductor, metodo?: string | null) => etiqueta(METODO_DE_PAGO, t, metodo);
 
-/** "comercial" o "laboral" (commissions.commission_type). Como antes, todo lo que
- *  no es "comercial" se muestra como laboral. */
+/** "comercial" o "laboral" (commissions.commission_type), para los badges que ya
+ *  decían "Comercial"/"Laboral". Como antes, todo lo que no es "comercial" se
+ *  muestra como laboral. */
 export const tipoComision = (t: Traductor, tipo?: string | null) =>
   tipo === "comercial" ? t("finanzas.commType.commercial") : t("finanzas.commType.labor");
+
+const TIPO_COMISION: Record<string, TranslationKey> = {
+  comercial: "finanzas.commType.commercial",
+  laboral: "finanzas.commType.labor",
+};
+
+/** El commission_type tal como está guardado: "comercial" y "laboral" con su
+ *  etiqueta; cualquier otro ("percentage", el que guarda NuevaComisionModal) tal
+ *  cual, sin disfrazarlo de laboral. */
+export const tipoComisionGuardado = (t: Traductor, tipo?: string | null) => etiqueta(TIPO_COMISION, t, tipo);
+
+// El tipo de una deducción de RRHH (employee_deductions.deduction_type), como lo
+// guarda el alta de RRHH (HRDeductionNew). Otro valor se muestra tal cual.
+const TIPO_DE_DEDUCCION: Record<string, TranslationKey> = {
+  adelanto: "finanzas.dedType.advance",
+  infraccion: "finanzas.dedType.infraction",
+};
+
+export const tipoDeDeduccion = (t: Traductor, tipo?: string | null) => etiqueta(TIPO_DE_DEDUCCION, t, tipo);
+
+/**
+ * ⚠️ Donde la pantalla en español mostraba el valor GUARDADO tal cual, en minúscula
+ * ("borrador · Sin CC", "chatters · en_proceso", "Estado: pagado", "Tipo: laboral":
+ * los popups de las tarjetas, el detalle de una comisión, los badges de Recibos y
+ * Batch de Nómina…), en español se sigue mostrando así, letra por letra; en inglés
+ * va la etiqueta. Donde ya había una etiqueta ("Borrador" en los badges de las
+ * tablas) se llama directo a la función de arriba.
+ */
+export const crudoEnEspanol = (
+  language: Language,
+  etiquetar: (t: Traductor, valor?: string | null) => string,
+  t: Traductor,
+  valor: string | null | undefined,
+): string => (language === "es" ? (valor ?? "") : etiquetar(t, valor));

@@ -64,7 +64,7 @@ export default function CalcularNominaModal({ open, onClose, employees, onSubmit
             <Input placeholder={t("finanzas.payroll.calc.periodNamePlaceholder")} value={name} onChange={e => setName(e.target.value)} />
           </div>
           <div>
-            <Label>{t("common.dateRange")}</Label>
+            <Label>{t("finanzas.payroll.calc.dateRange")}</Label>
             <DateRangePicker from={dateFrom} to={dateTo} onApply={(desde, hasta) => { setDateFrom(desde); setDateTo(hasta); }} />
           </div>
           <div>

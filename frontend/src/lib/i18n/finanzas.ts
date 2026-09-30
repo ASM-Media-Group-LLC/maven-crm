@@ -31,6 +31,8 @@ export const finanzas = {
   "finanzas.common.noCC": { es: "Sin CC", en: "No CC" },
   "finanzas.common.noArea": { es: "Sin área", en: "No area" },
   "finanzas.common.noDepartment": { es: "Sin Departamento", en: "No department" },
+  // "..." y no el "…" de common.loading: en español la pantalla decía así.
+  "finanzas.common.loadingDots": { es: "Cargando...", en: "Loading..." },
   "finanzas.common.costCenter": { es: "Centro de Costo", en: "Cost center" },
   "finanzas.common.revenue": { es: "Ingresos", en: "Revenue" },
   "finanzas.common.costs": { es: "Costos", en: "Costs" },
@@ -110,6 +112,9 @@ export const finanzas = {
   "finanzas.status.note.canceled": { es: "Cancelada", en: "Canceled" },
   "finanzas.commType.commercial": { es: "Comercial", en: "Commercial" },
   "finanzas.commType.labor": { es: "Laboral", en: "Labor" },
+  // En español la pantalla muestra el valor guardado ("adelanto"); esto es solo para inglés.
+  "finanzas.dedType.advance": { es: "Adelanto de Nómina", en: "Payroll advance" },
+  "finanzas.dedType.infraction": { es: "Infracción", en: "Infraction" },
   "finanzas.note.type.standard": { es: "Standard", en: "Standard" },
   "finanzas.note.type.advance": { es: "Adelanto", en: "Advance" },
   "finanzas.note.type.bonus": { es: "Bonus", en: "Bonus" },
@@ -197,6 +202,8 @@ export const finanzas = {
   "finanzas.dash.popup.departmentsSub": { es: "Departamentos con empleados activos", en: "Departments with active employees" },
   "finanzas.dash.row.empOne": { es: "{n} emp", en: "{n} emp" },
   "finanzas.dash.row.empOther": { es: "{n} emps", en: "{n} emps" },
+  // En minúscula, como decía el popup (Control y Reportes dicen "Sin Departamento").
+  "finanzas.dash.row.noDepartment": { es: "Sin departamento", en: "No department" },
   "finanzas.dash.popup.alerts": { es: "Alertas Operativas — {n}", en: "Operational alerts — {n}" },
   "finanzas.dash.popup.alertsSub": { es: "Issues activos que requieren atención", en: "Active issues that need attention" },
   "finanzas.dash.popup.payrollToClose": { es: "Nómina por Cerrar — {n}", en: "Payroll to close — {n}" },
@@ -548,7 +555,7 @@ export const finanzas = {
 
   // ─── Horas & Variables (HorasVariablesPage) ───────────────────────────
   "finanzas.common.qbGenerated": { es: "Archivo QuickBooks generado", en: "QuickBooks file generated" },
-  "finanzas.hv.title": { es: "Horas & Variables", en: "Hours & Variables" },
+  "finanzas.hv.title": { es: "Horas & Variables", en: "Hours & variables" },
   "finanzas.hv.subtitle": { es: "Gestión de horas extra, banco de horas y comisiones", en: "Overtime, hour bank and commission management" },
   "finanzas.hv.bank.accrued": { es: "Acumuladas", en: "Accrued" },
   "finanzas.hv.bank.paid": { es: "Pagadas", en: "Paid" },
@@ -663,6 +670,8 @@ export const finanzas = {
   "finanzas.payroll.toast.monthCloseError": { es: "Error al cerrar mes", en: "Couldn't close the month" },
   "finanzas.payroll.toast.noPeriodsToExport": { es: "Sin periodos para exportar", en: "No periods to export" },
   "finanzas.payroll.calc.periodName": { es: "Nombre del Periodo", en: "Period name" },
+  // "Fechas" con mayúscula, como decía el diálogo (common.dateRange dice "Rango de fechas").
+  "finanzas.payroll.calc.dateRange": { es: "Rango de Fechas", en: "Date range" },
   "finanzas.payroll.calc.periodNamePlaceholder": { es: "Ej: Nómina Febrero 2026", en: "E.g. February 2026 payroll" },
   "finanzas.payroll.calc.optional": { es: "Opcional", en: "Optional" },
   "finanzas.payroll.calc.remarks": { es: "Observaciones...", en: "Remarks..." },

@@ -17,7 +17,7 @@ import { startOfMonth, endOfMonth, subMonths, format, isWithinInterval } from "d
 import { useFormato } from "@/hooks/useFormato";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { Formato } from "@/lib/formato";
-import { estadoComision, estadoNomina, metodoDePago } from "./estados";
+import { crudoEnEspanol, estadoComision, estadoNomina, metodoDePago } from "./estados";
 
 function fmtMonto(n: number, f: Formato) {
   return new Intl.NumberFormat(f.intl("es-CO"), { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
@@ -51,7 +51,7 @@ type KpiKey =
 
 export default function FinanzasDashboard() {
   const f = useFormato();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const fmt = useCallback((n: number) => fmtMonto(n, f), [f]);
   const [dateFrom, setDateFrom] = useState<Date | undefined>(startOfMonth(new Date()));
   const [dateTo, setDateTo] = useState<Date | undefined>(endOfMonth(new Date()));
@@ -222,7 +222,7 @@ export default function FinanzasDashboard() {
         rows = [
           ...curPayroll.map(p => ({
             primary: t("finanzas.dash.row.payroll", { name: p.period_name ?? sinNombre }),
-            secondary: `${estadoNomina(t, p.status)} · ${p.cost_center ?? sinCC}`,
+            secondary: `${crudoEnEspanol(language, estadoNomina, t, p.status)} · ${p.cost_center ?? sinCC}`,
             right: fmt(Number(p.net_total) || 0),
             rightTone: "destructive" as const,
           })),
@@ -249,7 +249,7 @@ export default function FinanzasDashboard() {
         subtitle = t("finanzas.dash.popup.projectedPayrollSub", { n: nominaProyectadaList.length });
         rows = nominaProyectadaList.map(p => ({
           primary: p.period_name ?? sinNombre,
-          secondary: `${estadoNomina(t, p.status)} · ${p.cost_center ?? sinCC}`,
+          secondary: `${crudoEnEspanol(language, estadoNomina, t, p.status)} · ${p.cost_center ?? sinCC}`,
           right: fmt(Number(p.net_total) || 0),
           rightTone: "warning",
         }));
@@ -259,7 +259,7 @@ export default function FinanzasDashboard() {
         subtitle = t("finanzas.dash.popup.commissionsSub", { n: curCommissions.length });
         rows = curCommissions.map(c => ({
           primary: c.employee_name ?? sinNombre,
-          secondary: `${c.area ?? sinArea} · ${estadoComision(t, c.status)}`,
+          secondary: `${c.area ?? sinArea} · ${crudoEnEspanol(language, estadoComision, t, c.status)}`,
           right: fmt(Number(c.estimated_amount) || 0),
         }));
         break;
@@ -324,7 +324,7 @@ export default function FinanzasDashboard() {
         title = t("finanzas.dash.popup.departments", { n: hrData?.deptCount ?? 0 });
         subtitle = t("finanzas.dash.popup.departmentsSub");
         rows = (hrData?.departamentos ?? []).map(d => ({
-          primary: d.name || t("finanzas.common.noDepartment"),
+          primary: d.name || t("finanzas.dash.row.noDepartment"),
           right: t(d.count === 1 ? "finanzas.dash.row.empOne" : "finanzas.dash.row.empOther", { n: d.count }),
         }));
         break;
@@ -342,7 +342,7 @@ export default function FinanzasDashboard() {
         subtitle = t("finanzas.dash.popup.payrollToCloseSub");
         rows = nominaSinCerrarList.map(p => ({
           primary: p.period_name ?? sinNombre,
-          secondary: `${estadoNomina(t, p.status)} · ${p.cost_center ?? sinCC}`,
+          secondary: `${crudoEnEspanol(language, estadoNomina, t, p.status)} · ${p.cost_center ?? sinCC}`,
           right: fmt(Number(p.net_total) || 0),
           rightTone: "warning",
         }));
@@ -375,7 +375,7 @@ export default function FinanzasDashboard() {
     }
 
     return { title, subtitle, rows };
-  }, [kpiPopup, curInvoicesPaid, curIngresos, curPayroll, curCommissionsPaid, curNomina, curCostos, curMargen, curMargenPct, nominaProyectadaList, nominaProyectada, curCommissions, curComisiones, facturasPendientesList, facturasPendientes, facturasVencidasList, facturasVencidas, variacion, prevIngresos, hrData, alerts, nominaSinCerrarList, nominaSinCerrar, comisionesPorAprobarList, comisionesPorAprobar, invoicesPorEnviarList, invoicesPorEnviar, now, f, fmt, t]);
+  }, [kpiPopup, curInvoicesPaid, curIngresos, curPayroll, curCommissionsPaid, curNomina, curCostos, curMargen, curMargenPct, nominaProyectadaList, nominaProyectada, curCommissions, curComisiones, facturasPendientesList, facturasPendientes, facturasVencidasList, facturasVencidas, variacion, prevIngresos, hrData, alerts, nominaSinCerrarList, nominaSinCerrar, comisionesPorAprobarList, comisionesPorAprobar, invoicesPorEnviarList, invoicesPorEnviar, now, f, fmt, t, language]);
 
   const vsAnterior = (n: number) => t("finanzas.dash.vsPrevious", { pct: `${n >= 0 ? "+" : ""}${n.toFixed(1)}` });
 

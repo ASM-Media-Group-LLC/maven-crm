@@ -39,7 +39,7 @@ import { useFormato } from "@/hooks/useFormato";
 import type { Formato } from "@/lib/formato";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { TranslationKey } from "@/lib/i18n";
-import { estadoFactura, estadoNotaDePago, metodoDePago, tipoDePago } from "../estados";
+import { crudoEnEspanol, estadoFactura, estadoNotaDePago, metodoDePago, tipoDePago } from "../estados";
 
 // La etiqueta del estado sale de ../estados (en el idioma de la pantalla); acá solo el color.
 const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "outline" | "warning"> = {
@@ -81,7 +81,7 @@ function fmt(n: number, f: Formato) {
 export default function FacturacionPage() {
   const navigate = useNavigate();
   const f = useFormato();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { methods: configuredPaymentMethods } = usePaymentMethods();
@@ -728,7 +728,9 @@ export default function FacturacionPage() {
             status === "pagada" ? "success" : status === "vencida" ? "destructive" : status === "enviada" ? "warning" : "default";
           return list.map((i): KpiRow => ({
             primary: (i as any).recipient_name || `Invoice ${(i as any).invoice_number ?? i.id.slice(0, 8)}`,
-            secondary: `${estadoFactura(t, i.status)} · ${i.created_at ? format(new Date(i.created_at), "dd MMM yyyy", { locale: f.fechas }) : "—"}`,
+            // Sin locale, como siempre: date-fns escribe "02 Sep 2026" (bien en inglés; en
+            // español el mes sale en inglés desde antes y corregirlo cambiaría la pantalla).
+            secondary: `${crudoEnEspanol(language, estadoFactura, t, i.status)} · ${i.created_at ? format(new Date(i.created_at), "dd MMM yyyy") : "—"}`,
             right: kpiPopup === "fee" ? fmt(Number((i as any).fee_amount) || 0, f) : fmt(Number(i.amount) || 0, f),
             rightTone: tone(i.status as string),
           }));

@@ -31,7 +31,7 @@ import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/ui/page-header";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { TranslationKey } from "@/lib/i18n";
-import { estadoFactura, metodoDePago } from "../estados";
+import { crudoEnEspanol, estadoFactura, metodoDePago } from "../estados";
 
 function fmtMonto(n: number, locale: string) {
   return new Intl.NumberFormat(locale, { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
@@ -51,7 +51,7 @@ const STATUS_COLORS: Record<string, string> = {
 
 export default function CollectionsPage() {
   const f = useFormato();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const fmt = (n: number) => fmtMonto(n, f.intl("es-CO"));
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -284,11 +284,12 @@ export default function CollectionsPage() {
   };
 
   // Etiqueta del estado en la tabla de cobros: acá "enviada" se lee como pendiente.
+  // Los otros estados ("cancelada", "borrador"…) en español salían tal cual.
   const estadoCobro = (status: string) =>
     status === "pagada" ? t("finanzas.status.invoice.paid") :
     status === "enviada" ? t("common.pending") :
     status === "vencida" ? t("finanzas.status.invoice.overdue") :
-    estadoFactura(t, status);
+    crudoEnEspanol(language, estadoFactura, t, status);
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -620,7 +621,7 @@ export default function CollectionsPage() {
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div><span className="text-xs text-muted-foreground">{t("common.number")}</span><p className="font-mono">#{viewInvoice.invoice_number}</p></div>
-                <div><span className="text-xs text-muted-foreground">{t("common.status")}</span><p><Badge variant={viewInvoice.status === "pagada" ? "default" : viewInvoice.status === "enviada" ? "secondary" : "destructive"}>{estadoFactura(t, viewInvoice.status)}</Badge></p></div>
+                <div><span className="text-xs text-muted-foreground">{t("common.status")}</span><p><Badge variant={viewInvoice.status === "pagada" ? "default" : viewInvoice.status === "enviada" ? "secondary" : "destructive"}>{crudoEnEspanol(language, estadoFactura, t, viewInvoice.status)}</Badge></p></div>
                 <div><span className="text-xs text-muted-foreground">{t("finanzas.common.creatorF")}</span><p>{viewInvoice.creators?.artistic_name || viewInvoice.creators?.name || "—"}</p></div>
                 <div><span className="text-xs text-muted-foreground">{t("finanzas.common.amount")}</span><p className="font-medium">{fmt(Number(viewInvoice.amount) || 0)}</p></div>
                 <div><span className="text-xs text-muted-foreground">{t("common.method")}</span><p>{metodoDePago(t, viewInvoice.payment_method)}</p></div>
@@ -744,7 +745,7 @@ export default function CollectionsPage() {
             status === "enviada" ? "warning" : "default";
           return list.map((i) => ({
             primary: (i as any).creators?.artistic_name || (i as any).creators?.name || (i as any).recipient_name || `Invoice ${(i as any).invoice_number ?? i.id.slice(0, 8)}`,
-            secondary: `${estadoFactura(t, i.status)} · ${i.created_at ? format(new Date(i.created_at), "dd MMM yyyy", { locale: f.fechas }) : "—"}`,
+            secondary: `${crudoEnEspanol(language, estadoFactura, t, i.status)} · ${i.created_at ? format(new Date(i.created_at), "dd MMM yyyy", { locale: f.fechas }) : "—"}`,
             right: fmt(Number(i.amount) || 0),
             rightTone: tone(i.status as string),
           }));

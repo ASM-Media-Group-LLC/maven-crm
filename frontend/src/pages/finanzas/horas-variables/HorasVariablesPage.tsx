@@ -29,7 +29,7 @@ import { exportTableToExcel } from "@/pages/finanzas/reportes/generateReport";
 import { PageHeader } from "@/components/ui/page-header";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { TranslationKey } from "@/lib/i18n";
-import { estadoComision, tipoComision } from "../estados";
+import { crudoEnEspanol, estadoComision, tipoComision, tipoComisionGuardado } from "../estados";
 
 function fmtMonto(n: number, locale: string) {
   return new Intl.NumberFormat(locale, { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
@@ -61,7 +61,7 @@ const BANCO_LABEL: Record<string, TranslationKey> = {
 
 export default function HorasVariablesPage() {
   const f = useFormato();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const fmt = (n: number) => fmtMonto(n, f.intl("es-CO"));
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -634,13 +634,13 @@ export default function HorasVariablesPage() {
           <DialogHeader><DialogTitle>{t("finanzas.comm.detailOf")}</DialogTitle></DialogHeader>
           {comisionViewItem && (
             <div className="space-y-2 text-sm">
-              <p><span className="text-muted-foreground">{t("common.type")}:</span> {(comisionViewItem as any).commission_type}</p>
+              <p><span className="text-muted-foreground">{t("common.type")}:</span> {crudoEnEspanol(language, tipoComisionGuardado, t, (comisionViewItem as any).commission_type)}</p>
               <p><span className="text-muted-foreground">{t("finanzas.common.period")}:</span> {comisionViewItem.period}</p>
               <p><span className="text-muted-foreground">{t("finanzas.common.base")}:</span> {fmt(Number(comisionViewItem.base_amount) || 0)}</p>
               <p><span className="text-muted-foreground">{t("finanzas.common.percentage")}:</span> {Number(comisionViewItem.percentage) || 0}%</p>
               <p><span className="text-muted-foreground">{t("finanzas.common.estimated")}:</span> {fmt(Number(comisionViewItem.estimated_amount) || 0)}</p>
               <p><span className="text-muted-foreground">{t("finanzas.common.final")}:</span> {fmt(Number(comisionViewItem.final_amount) || 0)}</p>
-              <p><span className="text-muted-foreground">{t("common.status")}:</span> {estadoComision(t, comisionViewItem.status)}</p>
+              <p><span className="text-muted-foreground">{t("common.status")}:</span> {crudoEnEspanol(language, estadoComision, t, comisionViewItem.status)}</p>
               {comisionViewItem.notes && <p><span className="text-muted-foreground">{t("finanzas.common.notes")}:</span> {comisionViewItem.notes}</p>}
             </div>
           )}
@@ -706,7 +706,7 @@ export default function HorasVariablesPage() {
               status === "pagado" ? "success" : status === "confirmado" ? "default" : "warning";
             return commissions.map((c): KpiRow => ({
               primary: (c as any).employees ? `${(c as any).employees.first_name} ${(c as any).employees.last_name}` : t("finanzas.hv.row.employeeId", { id: c.employee_id?.slice(0, 8) ?? "—" }),
-              secondary: `${c.area ?? t("finanzas.common.noArea")} · ${estadoComision(t, c.status)}`,
+              secondary: `${c.area ?? t("finanzas.common.noArea")} · ${crudoEnEspanol(language, estadoComision, t, c.status)}`,
               right: fmt(Number(c.final_amount) || 0),
               rightTone: tone(c.status as string),
             }));

@@ -15,7 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useFormato } from "@/hooks/useFormato";
 import type { Formato } from "@/lib/formato";
 import { useLanguage } from "@/hooks/useLanguage";
-import { estadoComision } from "../estados";
+import { crudoEnEspanol, estadoComision, tipoComisionGuardado } from "../estados";
 
 interface Props {
   open: boolean;
@@ -30,7 +30,7 @@ function fmtMonto(n: number, f: Formato) {
 
 export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }: Props) {
   const f = useFormato();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const fmt = (n: number) => fmtMonto(n, f);
   const [templateId, setTemplateId] = useState("");
   const [creatorId, setCreatorId] = useState("");
@@ -270,7 +270,7 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{c.period_name || c.period}</p>
                         <p className="text-xs text-muted-foreground">
-                          {c.commission_type} · {estadoComision(t, c.status)}
+                          {crudoEnEspanol(language, tipoComisionGuardado, t, c.commission_type)} · {crudoEnEspanol(language, estadoComision, t, c.status)}
                           {c.estimated_amount != null && ` · ${fmt(c.estimated_amount)}`}
                         </p>
                       </div>

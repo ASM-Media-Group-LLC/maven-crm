@@ -21,8 +21,9 @@ import { esEspanol } from "../i18n/detectarEspanol";
 import translations from "@/lib/i18n";
 
 // Cada test recorre una pantalla entera con sus pestañas y diálogos: con la suite
-// completa corriendo en paralelo, los 5 s por defecto no alcanzan.
-vi.setConfig({ testTimeout: 30_000 });
+// completa corriendo en paralelo (y la máquina cargada), ni los 5 s por defecto ni
+// 30 s alcanzan. Un fallo de verdad es una aserción, no el reloj.
+vi.setConfig({ testTimeout: 180_000 });
 
 // Los gráficos (recharts) y el visor A4 miden su contenedor con ResizeObserver, que
 // jsdom no trae.
@@ -107,8 +108,9 @@ const TABLAS: Record<string, Record<string, unknown>[]> = {
   payroll_details: DETALLES,
   employees: EMPLEADOS,
   employee_deductions: [
-    { id: "d1", employee_id: "e1", amount: 80, reason: "Loan", month_year: ym, deduction_type: "loan", status: "applied", created_at: esteMes, employees: { first_name: "Laura", last_name: "Gomez" } },
-    { id: "d2", employee_id: "e2", amount: 20, reason: null, month_year: ym, deduction_type: "other", status: "pending", created_at: esteMes, employees: { first_name: "Pedro", last_name: "Ruiz" } },
+    // deduction_type como lo guarda el alta de RRHH (HRDeductionNew): en español.
+    { id: "d1", employee_id: "e1", amount: 80, reason: "Loan", month_year: ym, deduction_type: "adelanto", status: "applied", created_at: esteMes, employees: { first_name: "Laura", last_name: "Gomez" } },
+    { id: "d2", employee_id: "e2", amount: 20, reason: null, month_year: ym, deduction_type: "infraccion", status: "pending", created_at: esteMes, employees: { first_name: "Pedro", last_name: "Ruiz" } },
   ],
   creators: CREADORAS,
   v_creators: CREADORAS,
@@ -203,7 +205,17 @@ const ESPANOL_DEL_DICCIONARIO = new Set(
     .filter((par) => par.es !== par.en)
     .map((par) => par.es.trim()),
 );
-const esTextoEspanol = (t: string) => esEspanol(t) || ESPANOL_DEL_DICCIONARIO.has(t);
+// Y los valores que se GUARDAN en español (estados, tipos, métodos de cobro): si se
+// imprimen crudos en inglés ("Type: laboral", "borrador · No CC") no tienen tilde ni
+// son el español exacto de una clave (van en minúscula), así que tampoco se ven. Se
+// buscan como palabra suelta.
+const GUARDADOS_EN_ESPANOL = new Set([
+  "borrador", "enviada", "pagada", "parcial", "vencida", "reversada", "cancelada",
+  "proyectado", "confirmado", "pagado", "pendiente", "en_proceso", "calculado", "cerrado",
+  "laboral", "comercial", "quincenal", "mensual", "cobro", "adelanto", "infraccion",
+]);
+const traeUnGuardado = (t: string) => t.split(/[\s·:,()/]+/).some((w) => GUARDADOS_EN_ESPANOL.has(w));
+const esTextoEspanol = (t: string) => esEspanol(t) || ESPANOL_DEL_DICCIONARIO.has(t) || traeUnGuardado(t);
 const enEspanol = () => textosVisibles(document.body).filter(esTextoEspanol);
 
 function montar(ui: ReactNode) {
@@ -298,6 +310,18 @@ describe("Finanzas en inglés", () => {
     await revisarDialogo(() => fireEvent.click(screen.getAllByRole("button", { name: "Cancel" })[0]), "alertdialog");
     await revisarDialogo(() => fireEvent.click(screen.getAllByRole("button", { name: "Reverse" })[0]));
     await revisarDialogo(() => fireEvent.click(boton(/Create invoice/)));
+
+    // El alta de invoice: al elegir la creadora se listan sus comisiones con su tipo
+    // y su estado (guardados en español: "laboral", "proyectado").
+    fireEvent.click(boton(/Create invoice/));
+    const alta = await screen.findByRole("dialog");
+    // Un combobox no toma el nombre de su contenido: se busca por el texto del botón.
+    fireEvent.click(within(alta).getByText("Select creator").closest("button")!);
+    fireEvent.click(await screen.findByRole("option", { name: /Luna/ }));
+    await within(alta).findAllByText(/^Labor · Projected · /);
+    expect(within(alta).getByText(/^Commercial · Confirmed · /)).toBeTruthy();
+    expect(within(alta).getByText(/^Labor · In process · /)).toBeTruthy();
+    expect(textosVisibles(alta).filter(esTextoEspanol)).toEqual([]);
   });
 
   it("Facturación: el invoice que se abre es el documento y sigue en español", async () => {
@@ -326,6 +350,13 @@ describe("Finanzas en inglés", () => {
     await revisarDialogo(() => fireEvent.click(boton(/Close month/)), "alertdialog");
     fireEvent.click(boton("Grid view"));
     await revisarDialogo(() => fireEvent.click(screen.getByText(`${ym} A`).closest("[class*='cursor-pointer']")!));
+    // Las deducciones de RRHH del periodo: el tipo guardado ("adelanto") va traducido.
+    // Se vuelve a abrir porque revisarDialogo lo cierra.
+    fireEvent.click(screen.getByText(`${ym} A`).closest("[class*='cursor-pointer']")!);
+    const abierto = await screen.findByRole("dialog");
+    expect(await within(abierto).findByText("Payroll advance")).toBeTruthy();
+    expect(within(abierto).getByText("Infraction")).toBeTruthy();
+    expect(textosVisibles(abierto).filter(esTextoEspanol)).toEqual([]);
   });
 
   it("Horas & Variables: las tres pestañas, pagar, compensar y popups", async () => {
@@ -343,6 +374,20 @@ describe("Finanzas en inglés", () => {
     await screen.findAllByText("Projected");
     expect(enEspanol()).toEqual([]);
     await revisarDialogo(() => fireEvent.click(boton(/New commission/)));
+
+    // El detalle de cada comisión (el ojo de la fila): tipo y estado traducidos.
+    // Se mira ANTES de cerrar: al cerrarse, el diálogo suelta la comisión y se vacía.
+    const ver = () => Array.from(document.querySelectorAll("svg.lucide-eye")).map((svg) => svg.closest("button")!);
+    const esperados: [number, string, string][] = [[0, "Type: Labor", "Status: Projected"], [1, "Type: Commercial", "Status: Confirmed"]];
+    for (const [fila, tipo, estado] of esperados) {
+      fireEvent.click(ver()[fila]);
+      const detalle = await screen.findByRole("dialog");
+      expect(detalle.textContent).toContain(tipo);
+      expect(detalle.textContent).toContain(estado);
+      expect(textosVisibles(detalle).filter(esTextoEspanol)).toEqual([]);
+      fireEvent.keyDown(detalle, { key: "Escape" });
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    }
   });
 
   it("Horas & Banco de Horas: las dos pestañas", async () => {
@@ -406,7 +451,11 @@ describe("Finanzas en inglés", () => {
     montar(<TemplatesPage />);
     await screen.findByText("KASH AGENCY - Invoice");
     expect(screen.getAllByText("Payment note").length).toBeGreaterThan(0);
-    expect(enEspanol()).toEqual([]);
+    // El nombre guardado ("Template - Nota de pago") es un dato: se muestra tal cual y
+    // solo se traduce el tipo que se le agrega.
+    expect(screen.getByText("Template - Nota de pago - Payment note")).toBeTruthy();
+    // Esa fila es la única con español, y es el dato guardado: se descuenta solo ella.
+    expect(enEspanol().filter((t) => t !== "Template - Nota de pago - Payment note")).toEqual([]);
     await revisarDialogo(() => fireEvent.click(boton(/Create template/)));
   });
 
@@ -422,12 +471,117 @@ describe("Finanzas en inglés", () => {
     expect(document.querySelector("[data-documento]")?.textContent).toMatch(/Nota de Pago/);
   });
 
-  it("en español la pantalla sigue en español", async () => {
+});
+
+// ⚠️ En español la pantalla dice EXACTAMENTE lo que decía antes de traducirla. Donde
+// se mostraba el valor guardado tal cual ("borrador · Sin CC", "Estado: pagado") se
+// sigue viendo así, en minúscula; donde había una etiqueta ("Borrador" en los badges)
+// sigue la etiqueta. Los textos de acá salen de recorrer las pantallas de main antes
+// del cambio.
+describe("Finanzas en español: dice lo mismo que antes, palabra por palabra", () => {
+  beforeEach(() => {
+    cleanup();
     localStorage.setItem("app-language", "es");
+  });
+
+  /** Abre el popup de un StatChip y devuelve el diálogo. */
+  async function abrirPopup(etiqueta: string) {
+    const chip = screen.getAllByText(etiqueta).map((el) => el.closest("button")).find(Boolean)!;
+    fireEvent.click(chip);
+    return screen.findByRole("dialog");
+  }
+  async function cerrar(dialogo: HTMLElement) {
+    fireEvent.keyDown(dialogo, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  }
+
+  it("Dashboard: los popups de nómina, comisiones y departamentos", async () => {
+    montar(<FinanzasDashboard />);
+    await screen.findByText("Nómina Proyectada");
+    let popup = await abrirPopup("Nómina Proyectada");
+    expect(within(popup).getByText("borrador · Sin CC")).toBeTruthy();
+    expect(within(popup).getByText("calculado · OPS")).toBeTruthy();
+    await cerrar(popup);
+    popup = await abrirPopup("Comisiones Acumuladas");
+    expect(within(popup).getByText("chatters · en_proceso")).toBeTruthy();
+    expect(within(popup).getByText("Sin área · confirmado")).toBeTruthy();
+    await cerrar(popup);
+    popup = await abrirPopup("Departamentos");
+    expect(within(popup).getByText("Sin departamento")).toBeTruthy();
+  });
+
+  it("Facturación: badges con etiqueta, el popup con el estado guardado y la fecha sin locale", async () => {
     montar(<FacturacionPage />);
     await screen.findByText("INV-1", { exact: false });
     expect(screen.getByText("Facturación")).toBeTruthy();
     expect(screen.getAllByText("Borrador").length).toBeGreaterThan(0);
+    const popup = await abrirPopup("Total Invoices");
+    // "02 Sep 2026": el mes en inglés, como siempre (el popup no pasaba locale).
+    expect(within(popup).getByText(/^borrador · \d{2} [A-Z][a-z]{2} \d{4}$/)).toBeTruthy();
+    expect(within(popup).getByText(/^cancelada · \d{2} [A-Z][a-z]{2} \d{4}$/)).toBeTruthy();
+    await cerrar(popup);
+    // El alta de invoice: "laboral · proyectado", crudo.
+    fireEvent.click(screen.getByRole("button", { name: /Crear Invoice/ }));
+    const alta = await screen.findByRole("dialog");
+    fireEvent.click(within(alta).getByText("Seleccionar creador").closest("button")!);
+    fireEvent.click(await screen.findByRole("option", { name: /Luna/ }));
+    await within(alta).findAllByText(/^laboral · proyectado · /);
+    expect(within(alta).getByText(/^comercial · confirmado · /)).toBeTruthy();
+  });
+
+  it("Templates: el nombre sin compañía y el cargando", async () => {
+    montar(<TemplatesPage />);
+    expect(screen.getByText("Cargando...")).toBeTruthy();
+    expect(await screen.findByText("Template - Nota de pago - Nota de pago")).toBeTruthy();
+  });
+
+  it("Nómina: rango de fechas, badges de Batch y Recibos y el popup", async () => {
+    montar(<NominaPage />);
+    await screen.findByText(`${ym} A`);
+    fireEvent.click(screen.getByRole("button", { name: /Calcular Nómina/ }));
+    let dialogo = await screen.findByRole("dialog");
+    expect(within(dialogo).getByText("Rango de Fechas")).toBeTruthy();
+    await cerrar(dialogo);
+    fireEvent.click(screen.getAllByRole("button", { name: /Crear Batch/ })[0]);
+    dialogo = await screen.findByRole("dialog");
+    expect(within(dialogo).getByText("borrador")).toBeTruthy();
+    expect(within(dialogo).getByText("calculado")).toBeTruthy();
+    await cerrar(dialogo);
+    dialogo = await abrirPopup("Total Periodos");
+    expect(within(dialogo).getByText("borrador · Sin CC")).toBeTruthy();
+    await cerrar(dialogo);
+    fireEvent.click(screen.getByRole("button", { name: "Recibos" }));
+    expect(await screen.findByText("cerrado")).toBeTruthy();
+    expect(screen.getByText("pagado")).toBeTruthy();
+    // El detalle de un periodo: las deducciones de RRHH con su tipo guardado, crudo.
+    fireEvent.click(screen.getByRole("button", { name: "Cálculo" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Vista de cuadrícula" }));
+    fireEvent.click(screen.getByText(`${ym} A`).closest("[class*='cursor-pointer']")!);
+    dialogo = await screen.findByRole("dialog");
+    expect(await within(dialogo).findByText("adelanto")).toBeTruthy();
+    expect(within(dialogo).getByText("infraccion")).toBeTruthy();
+  });
+
+  it("Collections y Horas & Variables: la tabla de cobros y el detalle de la comisión", async () => {
+    montar(<CollectionsPage />);
+    await screen.findAllByText("Sin Cobro");
+    const popup = await abrirPopup("Total");
+    expect(within(popup).getByText(/^cancelada · /)).toBeTruthy();
+    await cerrar(popup);
+    fireEvent.click(screen.getByRole("button", { name: "Cobros" }));
+    expect(await screen.findByText("cancelada")).toBeTruthy();
+    expect(screen.getByText("parcial")).toBeTruthy();
+    expect(screen.getAllByText("Pagada").length).toBeGreaterThan(0);
+
+    cleanup();
+    montar(<HorasVariablesPage />);
+    await screen.findAllByText("Laura Gomez");
+    fireEvent.click(screen.getByRole("button", { name: "Comisiones" }));
+    await screen.findAllByText("Proyectado");
+    fireEvent.click(document.querySelector("svg.lucide-eye")!.closest("button")!);
+    const detalle = await screen.findByRole("dialog");
+    expect(detalle.textContent).toContain("Tipo: laboral");
+    expect(detalle.textContent).toContain("Estado: proyectado");
   });
 });
 

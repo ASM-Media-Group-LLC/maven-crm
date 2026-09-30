@@ -27,7 +27,7 @@ import NuevaComisionModal from "./NuevaComisionModal";
 import { exportTableToExcel } from "@/pages/finanzas/reportes/generateReport";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { TranslationKey } from "@/lib/i18n";
-import { estadoComision, tipoComision } from "../estados";
+import { crudoEnEspanol, estadoComision, tipoComision } from "../estados";
 
 // La etiqueta del estado sale de ../estados (en el idioma de la pantalla); acá solo el color.
 const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
@@ -50,7 +50,7 @@ function fmtMonto(n: number, locale: string) {
 
 export default function ComisionesPage() {
   const f = useFormato();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const fmt = (n: number) => fmtMonto(n, f.intl("es-CO"));
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -246,7 +246,7 @@ export default function ComisionesPage() {
               <p><strong>{t("finanzas.common.percentage")}:</strong> {Number(viewItem.percentage) || 0}%</p>
               <p><strong>{t("finanzas.common.estimated")}:</strong> {fmt(Number(viewItem.estimated_amount) || 0)}</p>
               <p><strong>{t("finanzas.common.final")}:</strong> {fmt(Number(viewItem.final_amount) || 0)}</p>
-              <p><strong>{t("common.status")}:</strong> {estadoComision(t, viewItem.status)}</p>
+              <p><strong>{t("common.status")}:</strong> {crudoEnEspanol(language, estadoComision, t, viewItem.status)}</p>
               {viewItem.notes && <p><strong>{t("finanzas.common.notes")}:</strong> {viewItem.notes}</p>}
             </div>
           )}

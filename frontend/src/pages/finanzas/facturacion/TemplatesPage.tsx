@@ -35,13 +35,6 @@ interface Template {
   creator_name?: string;
 }
 
-// El nombre se guarda como "<compañía> - Invoice" o "<compañía> - Nota de pago" (ver
-// CreateTemplateModal), en español. Acá el tipo se agrega traducido, así que se le
-// quita el que trae guardado: si no, un template de nota de pago se leía
-// "Template - Nota de pago - Nota de pago" (y en inglés, mitad en cada idioma).
-const nombreDeTemplate = (tpl: { company_name: string | null; name: string }) =>
-  tpl.company_name || tpl.name.replace(/ - (Invoice|Nota de pago)$/, "");
-
 export default function TemplatesPage() {
   const f = useFormato();
   const { t } = useLanguage();
@@ -119,7 +112,7 @@ export default function TemplatesPage() {
 
       <div className="flex-1 min-h-0 flex flex-col px-6 py-4">
         {isLoading ? (
-          <p className="text-muted-foreground text-sm">{t("common.loading")}</p>
+          <p className="text-muted-foreground text-sm">{t("finanzas.common.loadingDots")}</p>
         ) : templates.length === 0 ? (
           <EmptyState seed="invoice-templates" title={t("finanzas.tpl.empty")} description={t("finanzas.tpl.emptyDesc")} />
         ) : (
@@ -138,7 +131,7 @@ export default function TemplatesPage() {
                 <TableBody>
                   {templates.map((tpl) => (
                     <TableRow key={tpl.id} className="group hover:bg-muted/30 transition-colors">
-                      <TableCell className="text-sm font-medium">{`${nombreDeTemplate(tpl)} - ${tpl.type === "invoice" ? "Invoice" : t("finanzas.tpl.paymentNote")}`}</TableCell>
+                      <TableCell className="text-sm font-medium">{`${tpl.company_name || tpl.name} - ${tpl.type === "invoice" ? "Invoice" : t("finanzas.tpl.paymentNote")}`}</TableCell>
                       <TableCell>
                         <Badge variant={tpl.type === "invoice" ? "default" : "secondary"}>
                           {tpl.type === "invoice" ? "Invoice" : t("finanzas.tpl.paymentNote")}

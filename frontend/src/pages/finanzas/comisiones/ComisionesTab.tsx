@@ -19,7 +19,7 @@ import { format } from "date-fns";
 import NuevaComisionModal from "./NuevaComisionModal";
 import { useFormato } from "@/hooks/useFormato";
 import { useLanguage } from "@/hooks/useLanguage";
-import { estadoComision, metodoDePago } from "../estados";
+import { crudoEnEspanol, estadoComision, metodoDePago } from "../estados";
 
 function fmtUsd(n: number, locale: string) {
   return new Intl.NumberFormat(locale, { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
@@ -40,7 +40,7 @@ interface Props {
 
 export default function ComisionesTab({ renderFilterBar, currentFilters }: Props) {
   const f = useFormato();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const fmt = (n: number) => fmtUsd(n, f.intl("es-CO"));
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -300,7 +300,7 @@ export default function ComisionesTab({ renderFilterBar, currentFilters }: Props
                 <div className="flex justify-between"><span className="text-muted-foreground">Blue</span><span className="font-medium">{fmt(config.blue_amount)}</span></div>
               )}
               <div className="flex justify-between"><span className="text-muted-foreground">{t("finanzas.common.totalToPay")}</span><span className="text-primary font-medium">{fmt(Number(viewItem.final_amount) || 0)}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">{t("common.status")}</span><Badge variant={STATUS_VARIANT[viewItem.status] || "outline"}>{estadoComision(t, viewItem.status)}</Badge></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">{t("common.status")}</span><Badge variant={STATUS_VARIANT[viewItem.status] || "outline"}>{STATUS_VARIANT[viewItem.status] ? estadoComision(t, viewItem.status) : crudoEnEspanol(language, estadoComision, t, viewItem.status)}</Badge></div>
               {viewItem.payment_method && <div className="flex justify-between"><span className="text-muted-foreground">{t("finanzas.common.paymentMethod")}</span><span>{metodoDePago(t, viewItem.payment_method)}</span></div>}
               {viewItem.payment_date && <div className="flex justify-between"><span className="text-muted-foreground">{t("finanzas.comm.paymentDate")}</span><span>{format(new Date(viewItem.payment_date + "T12:00:00"), "dd/MM/yyyy")}</span></div>}
               {viewItem.notes && <div><span className="text-muted-foreground">{t("finanzas.common.notes")}:</span><p className="mt-1 text-foreground">{viewItem.notes}</p></div>}

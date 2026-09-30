@@ -32,7 +32,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { useFormato } from "@/hooks/useFormato";
 import { useLanguage } from "@/hooks/useLanguage";
 import { traducir, type TranslationKey } from "@/lib/i18n";
-import { estadoNomina } from "../estados";
+import { crudoEnEspanol, estadoNomina, tipoDeDeduccion } from "../estados";
 
 // La etiqueta del estado sale de ../estados (en el idioma de la pantalla); acá solo el color.
 const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
@@ -48,7 +48,7 @@ function fmtUsd(n: number, locale: string) {
 
 function PeriodDetailContent({ item }: { item: any }) {
   const f = useFormato();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const fmt = (n: number) => fmtUsd(n, f.intl("es-CO"));
   const { data: deductions = [], isLoading } = useQuery({
     queryKey: ["nomina-deductions", item.period_name],
@@ -81,7 +81,7 @@ function PeriodDetailContent({ item }: { item: any }) {
       <div className="border-t pt-3">
         <p className="text-sm font-medium mb-2">{t("finanzas.payroll.detail.deductions")}</p>
         {isLoading ? (
-          <p className="text-xs text-muted-foreground">{t("common.loading")}</p>
+          <p className="text-xs text-muted-foreground">{t("finanzas.common.loadingDots")}</p>
         ) : deductions.length === 0 ? (
           <p className="text-xs text-muted-foreground">{t("finanzas.payroll.detail.noDeductions")}</p>
         ) : (
@@ -90,7 +90,7 @@ function PeriodDetailContent({ item }: { item: any }) {
               <div key={d.id} className="flex items-center justify-between rounded border border-border px-2 py-1.5">
                 <div>
                   <span className="text-xs font-medium">{d.employees?.first_name} {d.employees?.last_name}</span>
-                  <span className="text-xs text-muted-foreground ml-2">{d.deduction_type}</span>
+                  <span className="text-xs text-muted-foreground ml-2">{crudoEnEspanol(language, tipoDeDeduccion, t, d.deduction_type)}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-medium">${Number(d.amount).toLocaleString(f.intl("es-CO"))}</span>
@@ -117,7 +117,7 @@ const TAB_LABEL: Record<NominaTab, TranslationKey> = {
 
 export default function NominaPage() {
   const { toast } = useToast();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const formatoUi = useFormato();
   const fmt = (n: number) => fmtUsd(n, formatoUi.intl("es-CO"));
   const queryClient = useQueryClient();
@@ -215,7 +215,7 @@ export default function NominaPage() {
                   ) : pagados.map(p => (
                     <TableRow key={p.id} className="hover:bg-muted/30">
                       <TableCell className="text-sm font-medium">{p.period_name}</TableCell>
-                      <TableCell><Badge variant="default">{estadoNomina(t, p.status)}</Badge></TableCell>
+                      <TableCell><Badge variant="default">{crudoEnEspanol(language, estadoNomina, t, p.status)}</Badge></TableCell>
                       <TableCell className="text-sm font-medium">{fmt(Number(p.net_total) || 0)}</TableCell>
                       <TableCell>
                         <Button variant="ghost" size="sm" onClick={async () => {
@@ -275,7 +275,7 @@ export default function NominaPage() {
                   ) : batchPeriods.map(p => (
                     <TableRow key={p.id} className="hover:bg-muted/30">
                       <TableCell className="text-sm font-medium">{p.period_name}</TableCell>
-                      <TableCell><Badge variant="secondary">{estadoNomina(t, p.status)}</Badge></TableCell>
+                      <TableCell><Badge variant="secondary">{crudoEnEspanol(language, estadoNomina, t, p.status)}</Badge></TableCell>
                       <TableCell className="text-sm font-medium">{fmt(Number(p.net_total) || 0)}</TableCell>
                       <TableCell>
                         <Button variant="ghost" size="sm" onClick={async () => {
@@ -518,7 +518,7 @@ export default function NominaPage() {
           const rightField = kpiPopup === "neto" ? "net_total" : "gross_total";
           return list.map((p) => ({
             primary: p.period_name ?? t("finanzas.common.noName"),
-            secondary: `${estadoNomina(t, p.status)} · ${p.cost_center ?? t("finanzas.common.noCC")}`,
+            secondary: `${crudoEnEspanol(language, estadoNomina, t, p.status)} · ${p.cost_center ?? t("finanzas.common.noCC")}`,
             right: fmt(Number((p as any)[rightField]) || 0),
             rightTone: tone(p.status as string),
           }));

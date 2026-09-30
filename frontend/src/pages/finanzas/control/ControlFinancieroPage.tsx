@@ -14,7 +14,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { useFormato } from "@/hooks/useFormato";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { TranslationKey } from "@/lib/i18n";
-import { estadoNomina } from "../estados";
+import { crudoEnEspanol, estadoNomina } from "../estados";
 
 const TABS = ["Ingresos vs Costos", "Costos por CC", "Costos por Departamento", "Productividad por Empleado", "Márgenes Operativos"] as const;
 type Tab = typeof TABS[number];
@@ -33,7 +33,7 @@ function fmtUsd(n: number, locale: string) {
 
 export default function ControlFinancieroPage() {
   const f = useFormato();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const fmt = (n: number) => fmtUsd(n, f.intl("es-CO"));
   const [activeTab, setActiveTab] = useState<Tab>("Ingresos vs Costos");
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
@@ -393,7 +393,7 @@ export default function ControlFinancieroPage() {
           if (kpiPopup === "egresos") {
             const payRows: KpiRow[] = payroll.map(p => ({
               primary: t("finanzas.dash.row.payroll", { name: (p as any).period_name ?? t("finanzas.common.noName") }),
-              secondary: `${estadoNomina(t, p.status)} · ${(p as any).cost_center ?? t("finanzas.common.noCC")}`,
+              secondary: `${crudoEnEspanol(language, estadoNomina, t, p.status)} · ${(p as any).cost_center ?? t("finanzas.common.noCC")}`,
               right: fmt(Number(p.net_total) || 0),
               rightTone: "destructive",
             }));
