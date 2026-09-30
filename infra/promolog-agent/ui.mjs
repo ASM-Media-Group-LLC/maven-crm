@@ -183,7 +183,7 @@ function correr(cmd, args, timeout = 180_000) {
 
 async function actualizarAgente() {
   const g = (...a) => correr("git", a);
-  if (!(await g("rev-parse", "--git-dir")).ok) return { ok: false, error: "Esta copia del agente no es un clon de git: actualizala a mano." };
+  if (!(await g("rev-parse", "--git-dir")).ok) return { ok: false, error: "Esta copia del agente no es un clon de git: actualízala a mano." };
 
   const sucio = await g("status", "--porcelain");
   if (sucio.ok && sucio.out) {
@@ -246,7 +246,7 @@ const server = createServer(async (req, res) => {
 
   // actualizar el agente:  POST /api/actualizar
   if (req.method === "POST" && parts[1] === "actualizar") {
-    if (running) return json(res, 409, { ok: false, error: "Hay un escaneo corriendo. Esperá a que termine." });
+    if (running) return json(res, 409, { ok: false, error: "Hay un escaneo corriendo. Espera a que termine." });
     try { return json(res, 200, await actualizarAgente()); }
     catch (e) { return json(res, 500, { ok: false, error: e.message }); }
   }
@@ -329,7 +329,7 @@ const server = createServer(async (req, res) => {
 // en la ventana de Terminal — que para quien hizo doble clic es "se abrió en negro".
 server.on("error", (e) => {
   if (e.code === "EADDRINUSE") {
-    console.error(`\n⚠️  Ya hay un panel abierto en el puerto ${PORT}.\n   Cerrá esa ventana de Terminal (o su pestaña) y volvé a hacer doble clic.\n   Si querés abrir OTRO en paralelo:  UI_PORT=4600 node --env-file=.env ui.mjs\n`);
+    console.error(`\n⚠️  Ya hay un panel abierto en el puerto ${PORT}.\n   Cierra esa ventana de Terminal (o su pestaña) y vuelve a hacer doble clic.\n   Si quieres abrir OTRO en paralelo:  UI_PORT=4600 node --env-file=.env ui.mjs\n`);
     process.exit(1);
   }
   console.error(`\n⚠️  No se pudo levantar el panel: ${e.message}\n`);
@@ -354,7 +354,7 @@ setInterval(latir, 5 * 60_000);
 
 await leerVersion();
 server.listen(PORT, HOST, () => {
-  console.log(`\n🖥️  Panel de Promolog: abrí  http://localhost:${PORT}`);
+  console.log(`\n🖥️  Panel de Promolog: abre  http://localhost:${PORT}`);
   console.log(`   agente: ${AGENT_ID}  ·  versión ${VERSION.commit}  ·  escuchando en ${HOST}:${PORT}`);
   if (HOST === "127.0.0.1") console.log(`   (solo esta máquina. Para entrar por Tailscale: UI_HOST=<tu IP 100.x.y.z>)`);
   console.log("");

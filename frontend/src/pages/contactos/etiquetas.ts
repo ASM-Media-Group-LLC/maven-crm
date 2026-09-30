@@ -35,7 +35,7 @@ export const ETIQUETA_PRIORIDAD: Record<string, TranslationKey> = Object.fromEnt
 /** El valor guardado de la plataforma "otra". */
 export const PLATAFORMA_OTRA = "Otra";
 
-/** Estado del contacto → etiqueta. Un valor que no está acá se muestra tal cual. */
+/** Estado del contacto → etiqueta. Un valor que no está aquí se muestra tal cual. */
 const ETIQUETA_ESTADO: Record<string, TranslationKey> = {
   "Sin cambio": "contactos.statusNoChange",
   Nuevo: "common.new",

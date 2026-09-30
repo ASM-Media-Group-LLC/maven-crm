@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { HardDrive } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -7,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { Progress } from "@/components/ui/progress";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useGuardarCupo, useUsoDrive, useUsosDeMiAgencia, type UsoDePersona } from "@/hooks/useDrive";
 import { tamano } from "@/lib/drive/formato";
@@ -15,7 +17,7 @@ const GB = 1024 * 1024 * 1024;
 /** El cupo general, igual que drive_cupo_por_defecto() en la base. */
 export const CUPO_POR_DEFECTO = 50 * GB;
 
-/** «Usás 3,2 GB de 50 GB», como la de Google Drive. Se pone ámbar al 90%. */
+/** «Usas 3,2 GB de 50 GB», como la de Google Drive. Se pone ámbar al 90%. */
 export function BarraDeUso() {
   const { t } = useLanguage();
   const uso = useUsoDrive();
@@ -24,13 +26,28 @@ export function BarraDeUso() {
   const pct = cupo > 0 ? Math.min(100, (usado / cupo) * 100) : 100;
   const casiLleno = pct >= 90;
   return (
-    <div className="flex max-w-sm flex-col gap-1" data-testid="barra-uso-drive">
-      <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-        <div
-          className={cn("h-full rounded-full transition-[width]", casiLleno ? "bg-warning" : "bg-primary")}
-          style={{ width: `${Math.max(pct, usado > 0 ? 1 : 0)}%` }}
-        />
+    <div
+      className="flex w-full flex-col gap-2 rounded-panel border border-border/60 bg-card/60 px-4 py-3 sm:w-80"
+      data-testid="barra-uso-drive"
+    >
+      <div className="flex items-center justify-between gap-3 text-xs">
+        <span className="flex items-center gap-1.5 font-medium text-foreground">
+          <HardDrive className="h-3.5 w-3.5 text-muted-foreground" />
+          {t("drive.uso.titulo")}
+        </span>
+        <span className={cn("tabular-nums", casiLleno ? "font-medium text-warning" : "text-muted-foreground")}>
+          {pct < 1 && usado > 0 ? "<1" : Math.round(pct)}%
+        </span>
       </div>
+      <Progress
+        value={Math.max(pct, usado > 0 ? 1.5 : 0)}
+        aria-label={t("drive.uso.barra", { usado: tamano(usado), cupo: tamano(cupo) })}
+        className="h-2 bg-foreground/10"
+        indicatorClassName={cn(
+          "rounded-full",
+          casiLleno ? "bg-warning" : "bg-gradient-to-r from-accent to-primary",
+        )}
+      />
       <p className="text-xs text-muted-foreground">
         {t("drive.uso.barra", { usado: tamano(usado), cupo: tamano(cupo) })}
       </p>

@@ -499,7 +499,7 @@ export const messenger = {
 
   // Llamada: la sala de espera antes de entrar (PreJoinLobby).
   "messenger.lobby.fondoNoDisponible": { es: "Tu fondo ya no está disponible", en: "Your background is no longer available" },
-  "messenger.lobby.eligeOtro": { es: "Elegí otro cuando quieras.", en: "Pick another one whenever you want." },
+  "messenger.lobby.eligeOtro": { es: "Elige otro cuando quieras.", en: "Pick another one whenever you want." },
   "messenger.lobby.permisoCamaraDenegado": { es: "Permiso de cámara denegado. Habilítalo en la configuración del navegador.", en: "Camera permission denied. Turn it on in your browser settings." },
   "messenger.lobby.noSePudoCamara": { es: "No se pudo acceder a la cámara.", en: "Couldn't access the camera." },
   "messenger.lobby.permisoMicrofonoDenegado": { es: "Permiso de micrófono denegado. Habilítalo en la configuración del navegador.", en: "Microphone permission denied. Turn it on in your browser settings." },

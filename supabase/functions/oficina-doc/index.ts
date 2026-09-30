@@ -455,7 +455,7 @@ Deno.serve(async (req) => {
       // ── Restaurar ───────────────────────────────────────────────────────
       // NO se pisa nada: la versión vieja se copia como una versión NUEVA, que
       // es lo que hace Google. Restaurar borrando sería perder lo que había.
-      if (!puedeEditar) throw new HttpError("No podés editar este documento", 403);
+      if (!puedeEditar) throw new HttpError("No puedes editar este documento", 403);
       if (version === doc.version) throw new HttpError("Esa ya es la versión vigente", 400);
 
       const origen = archivoDeLaVersion(paraHistorial, filas, version);

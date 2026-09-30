@@ -22,7 +22,7 @@ export const monetizacionTools: AgentTool[] = [
       "cualquier toque, incluido el housekeeping (cerrar un duplicado viejo del import, o cerrar una fila porque " +
       "un closer avisó que la creadora YA tenía el servicio). Contar por ellos convierte una limpieza — o la " +
       "corrección de un humano — en una venta nueva del día. " +
-      "Nota: Maven solo tiene lo que registró el bot o lo cargado acá — si un closer dice que las puso en un Google " +
+      "Nota: Maven solo tiene lo que registró el bot o lo cargado aquí — si un closer dice que las puso en un Google " +
       "Sheet u otro lado, no van a aparecer.",
     input_schema: {
       type: "object",

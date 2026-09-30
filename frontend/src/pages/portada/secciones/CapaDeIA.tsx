@@ -118,7 +118,7 @@ export default function CapaDeIA() {
           <span className="eyebrow">la capa de ia</span>
           <h2>No es un chat pegado al costado. Es quien hace la supervisión.</h2>
           <p>
-            La mayoría de las plataformas agregaron un asistente que responde preguntas. Acá la
+            La mayoría de las plataformas agregaron un asistente que responde preguntas. Aquí la
             IA hace el trabajo que antes ocupaba a una persona entera: leer, verificar,
             calificar y avisar.
           </p>

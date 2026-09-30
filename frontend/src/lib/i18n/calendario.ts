@@ -27,11 +27,11 @@ export const calendario = {
   "cal.creado": { es: "Evento creado", en: "Event created" },
   "cal.guardado": { es: "Evento guardado", en: "Event saved" },
   "cal.borrado": { es: "Evento eliminado", en: "Event deleted" },
-  "cal.faltaTitulo": { es: "Ponele un título al evento", en: "Give the event a title" },
+  "cal.faltaTitulo": { es: "Ponle un título al evento", en: "Give the event a title" },
   "cal.finAntes": { es: "Termina antes de empezar", en: "It ends before it starts" },
   "cal.sinEventos": { es: "Nada agendado este mes", en: "Nothing scheduled this month" },
   "cal.sinEventosAyuda": {
-    es: "Hacé clic en un día para agendar algo.",
+    es: "Haz clic en un día para agendar algo.",
     en: "Click a day to schedule something.",
   },
   "cal.masEventos": { es: "+{n} más", en: "+{n} more" },
@@ -49,7 +49,7 @@ export const calendario = {
   "cal.resp.quizas": { es: "quizás", en: "maybe" },
   "cal.respondiste": { es: "Respuesta guardada", en: "Reply saved" },
   "cal.invitaAlGuardar": {
-    es: "Guardá el evento y después invitá a quien quieras",
+    es: "Guarda el evento y después invita a quien quieras",
     en: "Save the event first, then invite whoever you want",
   },
   "cal.organiza": { es: "Organiza", en: "Organizer" },

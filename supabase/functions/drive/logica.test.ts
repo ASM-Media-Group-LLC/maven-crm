@@ -70,7 +70,7 @@ Deno.test("cupo: entra justo; un byte más, no — y el mensaje dice cuánto", (
   chequearCupo(49 * G, 50 * G, G);
   let msg = "";
   try { chequearCupo(49 * G, 50 * G, G + 1); } catch (e) { msg = (e as Error).message; }
-  assert(/No te alcanza el espacio: usás 49 GB de 50 GB/.test(msg), msg);
+  assert(/No te alcanza el espacio: usas 49 GB de 50 GB/.test(msg), msg);
 });
 
 Deno.test("lugar en el NAS: 5% libre después de guardar, y el doble si va por partes", () => {

@@ -86,7 +86,7 @@ export function totales(personas: ResumenPersona[]): Totales {
   };
 }
 
-/** "7h 32m" — y "0m" para el cero, nunca "—": el cero acá es un dato. */
+/** "7h 32m" — y "0m" para el cero, nunca "—": el cero aquí es un dato. */
 export function horas(seg: number): string {
   const h = Math.floor(seg / 3600), m = Math.round((seg % 3600) / 60);
   if (h === 0) return `${m}m`;

@@ -13,8 +13,8 @@ import {
 
 /** Qué se le dice a la persona cuando su imagen no se pudo guardar. */
 const MOTIVO_DE_FALLO: Record<FalloAlGuardar, string> = {
-  limite: `Se guardan hasta ${MAX_FONDOS_PROPIOS}. Borrá uno y volvé a intentar.`,
-  ilegible: "Este navegador no puede abrir esa imagen. Probá con un JPG o un PNG.",
+  limite: `Se guardan hasta ${MAX_FONDOS_PROPIOS}. Borra uno y vuelve a intentar.`,
+  ilegible: "Este navegador no puede abrir esa imagen. Prueba con un JPG o un PNG.",
   "sin-almacen": "Este navegador no está guardando datos del sitio, así que el fondo no se puede recordar.",
 };
 
