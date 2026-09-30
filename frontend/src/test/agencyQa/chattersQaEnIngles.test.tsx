@@ -311,5 +311,12 @@ describe("Chatters QA en inglés", () => {
     montar(<ChattersQaScorecard />);
     expect(screen.getByText("Febrero 2026 · medición mensual · 8 criterios /40")).toBeTruthy();
     expect(screen.getAllByText("Puntualidad").length).toBeGreaterThan(0);
+    // La ayuda de arriba: el texto y el «azul» son hijos directos del flex (como en
+    // main), sin un span que los envuelva y cambie cómo se reparte el renglón.
+    const azul = screen.getByText("azul", { selector: "span" });
+    const ayuda = azul.parentElement!;
+    expect(ayuda.tagName).toBe("P");
+    expect(ayuda.textContent).toMatch(/^Edita una celda .* Los criterios en azul se auto-completarán/);
+    expect(Array.from(ayuda.children).map((el) => el.tagName.toLowerCase())).toEqual(["svg", "span"]);
   });
 });

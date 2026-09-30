@@ -311,12 +311,11 @@ export default function ChattersQaScorecard() {
 
       <p className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
         <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-        <span>
-          <ConFormato
-            texto={t("agencyQa.score.hint")}
-            piezas={{ blue: <span className="text-primary">{t("agencyQa.score.blue")}</span> }}
-          />
-        </span>
+        {/* Sin envoltorio: los pedazos quedan como hijos directos del flex, igual que antes. */}
+        <ConFormato
+          texto={t("agencyQa.score.hint")}
+          piezas={{ blue: <span className="text-primary">{t("agencyQa.score.blue")}</span> }}
+        />
       </p>
 
       {isLoading && <p className="text-sm text-muted-foreground">{t("common.loading")}</p>}
