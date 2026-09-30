@@ -309,7 +309,7 @@ export default function AdjuntoVisor({
             <Mensaje
               icono={<FileQuestion className="h-8 w-8 text-muted-foreground" />}
               titulo="Este archivo no se puede ver aquí"
-              detalle="Se pueden ver acá los PDF, las imágenes, el texto y los documentos de Office. Este hay que descargarlo y abrirlo con el programa que le corresponde."
+              detalle="Se pueden ver aquí los PDF, las imágenes, el texto y los documentos de Office. Este hay que descargarlo y abrirlo con el programa que le corresponde."
               accion={
                 <Button
                   size="sm"
@@ -428,7 +428,7 @@ export default function AdjuntoVisor({
               <Mensaje
                 icono={<Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />}
                 titulo="Preparando la vista…"
-                detalle="Los documentos de Office se convierten para poder leerlos acá. Se hace una sola vez por archivo."
+                detalle="Los documentos de Office se convierten para poder leerlos aquí. Se hace una sola vez por archivo."
               />
             )
           ) : bytesPdf ? (

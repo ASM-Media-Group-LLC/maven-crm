@@ -76,6 +76,7 @@ export const navegacion = {
   "nav.office.sheets": { es: "Hojas de cálculo", en: "Spreadsheets" },
   "nav.office.slides": { es: "Presentaciones", en: "Presentations" },
   "nav.office.calendar": { es: "Calendario", en: "Calendar" },
+  "nav.office.drive": { es: "Drive", en: "Drive" },
   "nav.messenger": { es: "Messenger", en: "Messenger" },
   "nav.cowork": { es: "Cowork", en: "Cowork" },
   "nav.meet": { es: "Meet", en: "Meet" },

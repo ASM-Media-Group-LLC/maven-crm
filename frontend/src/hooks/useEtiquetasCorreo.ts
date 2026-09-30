@@ -1,18 +1,22 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import type { ParDeColores } from "@/lib/correo/coloresEtiqueta";
 
-/** Los colores son TOKENS del tema, no hex sueltos: así una etiqueta se ve
- *  bien en claro y en oscuro sin que nadie elija algo ilegible. */
-export const COLORES_ETIQUETA = [
-  "primary", "accent", "success", "warning", "destructive", "muted",
-] as const;
-export type ColorEtiqueta = (typeof COLORES_ETIQUETA)[number];
+/** «En la lista de etiquetas» de Gmail: Mostrar / Mostrar si no están leídas /
+ *  Ocultar. */
+export type EnListaEtiquetas = "mostrar" | "si_no_leidas" | "ocultar";
 
 export interface EtiquetaDeCorreo {
   id: string;
+  /** Solo el tramo propio: la ruta «Padre/Hija» la arma `arbolDeEtiquetas`. */
   nombre: string;
-  color: ColorEtiqueta;
+  parentId: string | null;
+  /** Fondo y texto, de la paleta de Gmail. Null = sin color. */
+  color: ParDeColores | null;
+  enListaEtiquetas: EnListaEtiquetas;
+  /** «En la lista de mensajes»: si la pastilla aparece junto al asunto. */
+  enListaMensajes: boolean;
 }
 
 /** `types.ts` es generado y todavía no conoce estas tablas. Mismo patrón que
@@ -20,6 +24,25 @@ export interface EtiquetaDeCorreo {
 function tabla(nombre: string) {
   return supabase.from(nombre as never);
 }
+
+interface FilaEtiqueta {
+  id: string;
+  nombre: string;
+  parent_id: string | null;
+  bg_color: string | null;
+  text_color: string | null;
+  en_lista_etiquetas: EnListaEtiquetas | null;
+  en_lista_mensajes: boolean | null;
+}
+
+const deFila = (f: FilaEtiqueta): EtiquetaDeCorreo => ({
+  id: f.id,
+  nombre: f.nombre,
+  parentId: f.parent_id ?? null,
+  color: f.bg_color && f.text_color ? { fondo: f.bg_color, texto: f.text_color } : null,
+  enListaEtiquetas: f.en_lista_etiquetas ?? "mostrar",
+  enListaMensajes: f.en_lista_mensajes ?? true,
+});
 
 export function useEtiquetas() {
   const { user } = useAuth();
@@ -29,19 +52,126 @@ export function useEtiquetas() {
     staleTime: 5 * 60_000,
     queryFn: async (): Promise<EtiquetaDeCorreo[]> => {
       const { data, error } = await tabla("mail_labels")
-        .select("id, nombre, color").order("nombre", { ascending: true });
+        .select("id, nombre, parent_id, bg_color, text_color, en_lista_etiquetas, en_lista_mensajes")
+        .order("nombre", { ascending: true });
       if (error) throw error;
-      return (data ?? []) as unknown as EtiquetaDeCorreo[];
+      return ((data ?? []) as unknown as FilaEtiqueta[]).map(deFila);
     },
   });
 }
 
-/** Qué etiquetas tiene cada correo, indexado por `message_id`.
+export interface NodoEtiqueta {
+  etiqueta: EtiquetaDeCorreo;
+  /** 0 = primer nivel. */
+  nivel: number;
+  /** «Hubstaff/Reportes»: como la muestra Gmail en la pastilla y en los menús. */
+  ruta: string;
+  tieneHijas: boolean;
+  /** Los ids de sus madres, de la más cercana a la raíz. */
+  ancestros: string[];
+}
+
+/** Las etiquetas en el orden de la columna: cada madre seguida de sus hijas,
+ *  alfabético en cada nivel.
  *
- *  Se traen TODAS de una y se cruzan en memoria, en vez de preguntar por
- *  correo: son decenas de filas por persona y la bandeja pinta 50 renglones —
- *  cincuenta consultas para pintar una lista es justo lo que cuelga la
- *  pantalla. */
+ *  Una hija cuya madre no llegó (no debería pasar: borrar la madre borra las
+ *  hijas) se muestra en el primer nivel en vez de desaparecer. */
+export function arbolDeEtiquetas(etiquetas: EtiquetaDeCorreo[]): NodoEtiqueta[] {
+  const ids = new Set(etiquetas.map((e) => e.id));
+  const hijas = new Map<string | null, EtiquetaDeCorreo[]>();
+  for (const e of etiquetas) {
+    const madre = e.parentId && ids.has(e.parentId) ? e.parentId : null;
+    const lista = hijas.get(madre);
+    if (lista) lista.push(e);
+    else hijas.set(madre, [e]);
+  }
+  const orden = (a: EtiquetaDeCorreo, b: EtiquetaDeCorreo) =>
+    a.nombre.localeCompare(b.nombre, "es", { sensitivity: "base" });
+
+  const salida: NodoEtiqueta[] = [];
+  const vistos = new Set<string>();
+  const bajar = (madre: string | null, nivel: number, ruta: string, ancestros: string[]) => {
+    for (const e of [...(hijas.get(madre) ?? [])].sort(orden)) {
+      // Un ciclo no puede entrar (lo frena un trigger en la base), pero si
+      // entrara, la columna no se tiene que colgar.
+      if (vistos.has(e.id)) continue;
+      vistos.add(e.id);
+      const miRuta = ruta ? `${ruta}/${e.nombre}` : e.nombre;
+      salida.push({
+        etiqueta: e, nivel, ruta: miRuta, ancestros,
+        tieneHijas: (hijas.get(e.id) ?? []).length > 0,
+      });
+      bajar(e.id, nivel + 1, miRuta, [...ancestros, e.id]);
+    }
+  };
+  bajar(null, 0, "", []);
+  return salida;
+}
+
+/** Qué etiquetas se ven en la columna y cuáles quedan en «Más».
+ *
+ *  - «Mostrar»: siempre.
+ *  - «Mostrar si no están leídas»: solo con algo sin leer en ella o en sus
+ *    subetiquetas (si no, una hija con correo nuevo quedaría colgando de una
+ *    madre invisible).
+ *  - «Ocultar»: nunca, y se lleva a sus subetiquetas.
+ *
+ *  La etiqueta ABIERTA se ve siempre: ocultarla mientras la mirás te dejaría
+ *  sin nada marcado en la columna. Una madre PLEGADA esconde a sus hijas, pero
+ *  eso no las manda a «Más» (siguen ahí, detrás de la flecha). */
+export function repartirEnColumna(
+  nodos: NodoEtiqueta[],
+  { noLeidos, etiquetaVista, plegadas }: {
+    noLeidos: Map<string, number> | undefined;
+    etiquetaVista: string | null;
+    plegadas: Set<string>;
+  },
+): { arriba: NodoEtiqueta[]; enMas: NodoEtiqueta[] } {
+  const porId = new Map(nodos.map((n) => [n.etiqueta.id, n.etiqueta]));
+  const sinLeerRama = new Map<string, number>();
+  for (const n of nodos) {
+    const propio = noLeidos?.get(n.etiqueta.id) ?? 0;
+    if (!propio) continue;
+    for (const id of [n.etiqueta.id, ...n.ancestros]) {
+      sinLeerRama.set(id, (sinLeerRama.get(id) ?? 0) + propio);
+    }
+  }
+  const pasa = (e: EtiquetaDeCorreo) =>
+    e.enListaEtiquetas === "mostrar" ||
+    (e.enListaEtiquetas === "si_no_leidas" && (sinLeerRama.get(e.id) ?? 0) > 0);
+
+  const arriba: NodoEtiqueta[] = [];
+  const enMas: NodoEtiqueta[] = [];
+  for (const n of nodos) {
+    const abierta = n.etiqueta.id === etiquetaVista;
+    const madres = n.ancestros.map((id) => porId.get(id)).filter(Boolean) as EtiquetaDeCorreo[];
+    if (!abierta && !(pasa(n.etiqueta) && madres.every(pasa))) {
+      enMas.push(n);
+      continue;
+    }
+    if (!abierta && n.ancestros.some((id) => plegadas.has(id))) continue;
+    arriba.push(n);
+  }
+  return { arriba, enMas };
+}
+
+/** Ella y todas sus subetiquetas, a cualquier profundidad. Sirve para no
+ *  ofrecer «anidar en» una de sus propias hijas (sería un ciclo). */
+export function ramaDe(id: string, etiquetas: EtiquetaDeCorreo[]): Set<string> {
+  const rama = new Set([id]);
+  let crecio = true;
+  while (crecio) {
+    crecio = false;
+    for (const e of etiquetas) {
+      if (e.parentId && rama.has(e.parentId) && !rama.has(e.id)) {
+        rama.add(e.id);
+        crecio = true;
+      }
+    }
+  }
+  return rama;
+}
+
 export function useEtiquetasPorCorreo() {
   const { user } = useAuth();
   return useQuery({
@@ -67,12 +197,67 @@ export function useCrearEtiqueta() {
   const qc = useQueryClient();
   const { user } = useAuth();
   return useMutation({
-    mutationFn: async ({ nombre, color }: { nombre: string; color: ColorEtiqueta }) => {
-      const { error } = await tabla("mail_labels")
-        .insert({ nombre: nombre.trim(), color, user_id: user?.id } as never);
+    mutationFn: async (
+      { nombre, parentId = null }: { nombre: string; parentId?: string | null },
+    ) => {
+      // Sin color, como una etiqueta nueva de Gmail: el color se elige después
+      // desde el ⋮.
+      const { data, error } = await tabla("mail_labels")
+        .insert({ nombre: nombre.trim(), parent_id: parentId, user_id: user?.id } as never)
+        .select("id")
+        .single();
       if (error) throw error;
+      return (data as unknown as { id: string }).id;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["mail-labels"] }),
+  });
+}
+
+export interface CambiosDeEtiqueta {
+  nombre?: string;
+  parentId?: string | null;
+  /** Null = «Eliminar color». */
+  color?: ParDeColores | null;
+  enListaEtiquetas?: EnListaEtiquetas;
+  enListaMensajes?: boolean;
+}
+
+/** Todo lo del menú ⋮ que no es borrar: color, mostrar/ocultar, renombrar y
+ *  cambiar de madre.
+ *
+ *  Se aplica en la caché ANTES de que conteste la base: elegir un color o
+ *  «Ocultar» tiene que verse al instante, como en Gmail. Si la base lo
+ *  rechaza, se vuelve a lo de antes. */
+export function useActualizarEtiqueta() {
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  const clave = ["mail-labels", user?.id];
+  return useMutation({
+    mutationFn: async ({ id, cambios }: { id: string; cambios: CambiosDeEtiqueta }) => {
+      const fila: Record<string, unknown> = {};
+      if (cambios.nombre !== undefined) fila.nombre = cambios.nombre.trim();
+      if (cambios.parentId !== undefined) fila.parent_id = cambios.parentId;
+      if (cambios.color !== undefined) {
+        fila.bg_color = cambios.color?.fondo ?? null;
+        fila.text_color = cambios.color?.texto ?? null;
+      }
+      if (cambios.enListaEtiquetas !== undefined) fila.en_lista_etiquetas = cambios.enListaEtiquetas;
+      if (cambios.enListaMensajes !== undefined) fila.en_lista_mensajes = cambios.enListaMensajes;
+      const { error } = await tabla("mail_labels").update(fila as never).eq("id", id);
+      if (error) throw error;
+    },
+    onMutate: async ({ id, cambios }) => {
+      await qc.cancelQueries({ queryKey: clave });
+      const antes = qc.getQueryData<EtiquetaDeCorreo[]>(clave);
+      qc.setQueryData<EtiquetaDeCorreo[]>(clave, (viejas) =>
+        viejas?.map((e) => (e.id === id ? { ...e, ...cambios, nombre: cambios.nombre?.trim() ?? e.nombre } : e)),
+      );
+      return { antes };
+    },
+    onError: (_e, _v, ctx) => {
+      if (ctx?.antes) qc.setQueryData(clave, ctx.antes);
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["mail-labels"] }),
   });
 }
 
@@ -85,8 +270,10 @@ export function useBorrarEtiqueta() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["mail-labels"] });
-      // Las asignaciones se van con ON DELETE CASCADE; el mapa en memoria no.
+      // Las asignaciones (y las subetiquetas) se van con ON DELETE CASCADE; el
+      // mapa en memoria no.
       qc.invalidateQueries({ queryKey: ["mail-message-labels"] });
+      qc.invalidateQueries({ queryKey: ["mail-labels-unread"] });
     },
   });
 }

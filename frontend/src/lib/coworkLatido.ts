@@ -10,7 +10,7 @@
 // tiene que seguir aunque la pantalla de Cowork se desmonte. Se detiene solo
 // cuando la persona SALE de la sala.
 import { supabase } from "@/integrations/supabase/client";
-import { INTERVALO_LATIDO_MS, type Latido } from "@/lib/coworkTiempoRegla";
+import { ESTADOS_TIEMPO, INTERVALO_LATIDO_MS, type Latido } from "@/lib/coworkTiempoRegla";
 import type { RelojCowork } from "@/lib/coworkReloj";
 
 export { INTERVALO_LATIDO_MS };
@@ -36,7 +36,10 @@ function fijarReloj(r: RelojCowork | null): void {
   }
 }
 
-const ESTADOS = new Set(["activo", "pausa", "sin_camara", "sin_pantalla", "fuera_de_camara", "meet"]);
+// Sale de la regla, NO se copia a mano: una lista escrita a mano descartaba en
+// silencio cualquier estado nuevo, y el cronómetro seguía corriendo en verde en
+// la pantalla de la persona mientras el servidor lo tenía detenido.
+const ESTADOS = new Set<string>(ESTADOS_TIEMPO);
 
 /** Interpreta la respuesta del servidor. Exportado para probarlo. */
 export function relojDeRespuesta(json: unknown, ahora: number): RelojCowork | null {
@@ -57,12 +60,19 @@ interface Vivo {
   cada: ReturnType<typeof setInterval>;
   pendiente: ReturnType<typeof setTimeout> | null;
   enviando: boolean;
+  /** Llegó un cambio mientras había un latido en vuelo: se manda apenas vuelve.
+   *  Antes se descartaba y podía tardar hasta el próximo latido (30 s). */
+  otraVez: boolean;
 }
 
 let vivo: Vivo | null = null;
 
 async function enviar(v: Vivo): Promise<void> {
-  if (v.enviando) return;
+  // Otra pestaña u otro equipo tomó su lugar en la sala: late ESE, que es el que
+  // de verdad está adentro. Si latieran los dos se pisarían el único tramo
+  // abierto de la persona.
+  if (v.estado.conexionSala === "reemplazada") return;
+  if (v.enviando) { v.otraVez = true; return; }
   v.enviando = true;
   try {
     const { data: { session } } = await supabase.auth.getSession();
@@ -85,6 +95,10 @@ async function enviar(v: Vivo): Promise<void> {
     /* el próximo latido lo vuelve a intentar; un latido perdido no rompe nada */
   } finally {
     v.enviando = false;
+    if (v.otraVez && vivo === v) {
+      v.otraVez = false;
+      void enviar(v);
+    }
   }
 }
 
@@ -93,7 +107,9 @@ function afectaAlReloj(a: Latido, b: Latido): boolean {
   return a.camOn !== b.camOn
     || a.screenShareOn !== b.screenShareOn
     || !!a.onBreak !== !!b.onBreak
-    || (a.faceState === "no_face") !== (b.faceState === "no_face");
+    || (a.faceState === "no_face") !== (b.faceState === "no_face")
+    // Perder la sala y recuperarla: tiene que llegar enseguida, no en 30 s.
+    || (a.conexionSala === "desconectada") !== (b.conexionSala === "desconectada");
 }
 
 /** Empieza a latir para esta sesión. Idempotente: si ya late para la misma
@@ -107,6 +123,7 @@ export function iniciarLatido(sessionId: string, estadoInicial: Latido): void {
     cada: setInterval(() => { void enviar(v); }, INTERVALO_LATIDO_MS),
     pendiente: null,
     enviando: false,
+    otraVez: false,
   };
   vivo = v;
   void enviar(v);

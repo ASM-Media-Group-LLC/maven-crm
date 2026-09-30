@@ -56,7 +56,7 @@ Submódulos:
   → IA (Groq llama-3.3-70b ~10-30s) arma reporte (score,
   tono, upsell, manejo objeciones, monetización, recomendaciones,
   quotes literales). Queda en historial del perfil.
-- Workspace: asistencia en vivo. Pegás último mensaje del fan
+- Workspace: asistencia en vivo. Pegas último mensaje del fan
   → IA sugiere 3 respuestas (frío/neutro/agresivo upsell) con
   explicación. Permiso "Workspace".
 - Admin: rúbrica/prompts/perfiles. Permiso "Admin".
@@ -133,7 +133,7 @@ Ruta: /finanzas · Permiso: "Finanzas"
 Submódulos: Dashboard, Collections (cuentas por cobrar), Nómina,
 Horas Variables, Invoices, Templates, Control Financiero,
 Reportes, Configuración.
-(IA de ventas vive en Creator Sales → IA Ventas, no acá.)
+(IA de ventas vive en Creator Sales → IA Ventas, no aquí.)
 
 == RRHH ==
 Ruta: /hr · Permiso: "HR"
@@ -191,7 +191,7 @@ Data scopes: all (todo), team (equipo), own (sus propios), self
 (spammer ve solo sus tareas).
 
 Si te preguntan cómo hacer X y su rol no tiene el permiso:
-decile qué permiso falta y "pedile a un admin que te lo habilite
+dile qué permiso falta y "pídele a un admin que te lo habilite
 en Settings → Roles". Si ya es admin, que lo edite él mismo.
 
 == GOTCHAS / FAQ ==

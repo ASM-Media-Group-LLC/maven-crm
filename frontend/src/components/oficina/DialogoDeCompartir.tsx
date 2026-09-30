@@ -152,7 +152,7 @@ export default function DialogoDeCompartir(
                 email={dueno?.email_address}
                 avatarUrl={dueno?.avatar_url}
                 avatarSeed={dueno?.avatar_seed}
-                sufijo={soyDueno ? t("doc.vos") : undefined}
+                sufijo={soyDueno ? t("doc.tu") : undefined}
               >
                 <span className="shrink-0 pr-3 text-xs text-muted-foreground">
                   {t("doc.dueno")}
@@ -238,7 +238,7 @@ export default function DialogoDeCompartir(
           {/* ── Acceso general ───────────────────────────────────────────────
               Antes esto era un botón suelto arriba del editor, y quedaban dos
               lugares distintos para contestar la misma pregunta: quién lo ve.
-              Google los junta acá y tiene razón. */}
+              Google los junta aquí y tiene razón. */}
           <section className="flex flex-col gap-2">
             <h3 className="text-sm font-medium">{t("doc.accesoGeneral")}</h3>
             <div className="flex items-start gap-3">

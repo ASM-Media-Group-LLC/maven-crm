@@ -21,13 +21,24 @@ import { ScriptsButton } from "@/components/chat/ScriptsButton";
 import { MAX_FILES, MAX_FILE_SIZE_MB, MAX_FILE_SIZE_BYTES, formatFileSize, uploadFileWithTUS } from "../uploadUtils";
 import { claveSeguraParaArchivo } from "@/lib/claveDeArchivo";
 import { contenidoDeAdjunto } from "@/lib/mensajeConAdjunto";
-import { getDraft, setDraft } from "../drafts";
+import { getDraft, getDraftDoc, setDraft, clearDraft } from "../drafts";
+import { adjuntosEnMemoria, cargarAdjuntos, guardarAdjuntos, olvidarAdjuntos } from "../adjuntosDelBorrador";
+import type { JSONContent } from "@tiptap/react";
 import { useLanguage } from "@/hooks/useLanguage";
 
 interface PendingFile {
   file: File;
   preview?: string;
   type: "image" | "file";
+}
+
+function aPendiente(file: File): PendingFile {
+  const isImg = file.type.startsWith("image/");
+  return {
+    file,
+    preview: isImg ? URL.createObjectURL(file) : undefined,
+    type: isImg ? "image" : "file",
+  };
 }
 
 // Cuánto sigue diciendo "está escribiendo" después de la última tecla.
@@ -77,16 +88,58 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
   // El texto arranca desde el borrador guardado: si te fuiste a otro chat (o
   // recargaste) sin terminar el mensaje, al volver sigue acá.
   const [text, setText] = useState(() => getDraft(user?.id, conversationId));
-
-  // Persistir el borrador en CADA cambio de texto, venga de donde venga
-  // (tecleo, emoji, script pegado). Vaciarlo (p.ej. al enviar) lo borra.
-  useEffect(() => {
-    setDraft(user?.id, conversationId, text);
-  }, [text, user?.id, conversationId]);
+  // El borrador se guarda desde handleComposerUpdate, que trae el DOCUMENTO del
+  // editor (renglones, viñetas, formato). Ya no desde un efecto sobre `text`:
+  // `text` es plano, y guardar eso era justamente lo que aplastaba los renglones.
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState("");
   const [uploadPercent, setUploadPercent] = useState(0);
-  const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
+  // Los adjuntos sin mandar también son borrador: arrancan desde lo que quedó
+  // anotado (memoria de la pestaña, al instante) y, tras una recarga, desde el
+  // disco (abajo). Ver adjuntosDelBorrador.ts.
+  const [pendingFiles, setPendingFiles] = useState<PendingFile[]>(() =>
+    (adjuntosEnMemoria(user?.id, conversationId) ?? []).map(aPendiente)
+  );
+  // ⚠️ No se escribe NADA hasta haber leído lo guardado: el primer render trae
+  // la lista vacía y, sin esta guarda, el efecto de abajo borraba del disco la
+  // captura que se estaba por recuperar.
+  const [adjuntosLeidos, setAdjuntosLeidos] = useState(false);
+  // Mientras se suben, los adjuntos YA NO son borrador (ver handleSend).
+  const subiendoRef = useRef(false);
+  const montadoRef = useRef(true);
+  useEffect(() => {
+    montadoRef.current = true;
+    return () => { montadoRef.current = false; };
+  }, []);
+  useEffect(() => {
+    let vivo = true;
+    void cargarAdjuntos(user?.id, conversationId).then((guardados) => {
+      if (!vivo) return;
+      // Marcarlo SIEMPRE, haya o no algo guardado: si se pegó una captura mientras
+      // se leía el disco, el efecto de abajo tiene que guardarla ahora.
+      setAdjuntosLeidos(true);
+      if (guardados.length === 0) return;
+      setPendingFiles((prev) => {
+        // Lo que ya está en pantalla (memoria, o algo pegado mientras se leía el
+        // disco) no se duplica.
+        const yaEsta = new Set(prev.map((pf) => pf.file));
+        const nuevos = guardados.filter((f) => !yaEsta.has(f)).map(aPendiente);
+        return nuevos.length ? [...prev, ...nuevos] : prev;
+      });
+    });
+    return () => { vivo = false; };
+  }, [user?.id, conversationId]);
+  useEffect(() => {
+    if (!adjuntosLeidos || subiendoRef.current) return;
+    void guardarAdjuntos(user?.id, conversationId, pendingFiles.map((pf) => pf.file));
+  }, [pendingFiles, adjuntosLeidos, user?.id, conversationId]);
+  // Las miniaturas son URLs de objeto: se sueltan al salir (el File sigue vivo
+  // en la memoria del borrador; al volver se crean de nuevo).
+  const pendingFilesRef = useRef(pendingFiles);
+  pendingFilesRef.current = pendingFiles;
+  useEffect(() => () => {
+    pendingFilesRef.current.forEach((pf) => { if (pf.preview) URL.revokeObjectURL(pf.preview); });
+  }, []);
   const [isRecording, setIsRecording] = useState(false);
   const composerRef = useRef<RichComposerHandle>(null);
   // Barra de formato plegada por defecto (como el botón "Opciones de formato" de Google).
@@ -143,14 +196,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
       toast.error(t("messenger.input.archivosGrandes", { mb: MAX_FILE_SIZE_MB, nombres: names }));
       return;
     }
-    const newPending: PendingFile[] = files.map(file => {
-      const isImg = file.type.startsWith("image/");
-      return {
-        file,
-        preview: isImg ? URL.createObjectURL(file) : undefined,
-        type: isImg ? "image" as const : "file" as const,
-      };
-    });
+    const newPending: PendingFile[] = files.map(aPendiente);
     setPendingFiles(prev => [...prev, ...newPending]);
   }, [pendingFiles.length, t]);
 
@@ -180,6 +226,14 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
     if (uploading) return;
     if (pendingFiles.length > 0) {
       setUploading(true);
+      // Desde que arranca la subida, esto ya no es borrador: se va a mandar. Si
+      // no se olvida ACÁ (y se esperaba al final), irse del chat a mitad de la
+      // subida dejaba el borrador guardado y al volver aparecía de nuevo, listo
+      // para mandarse dos veces. Si se cancela, se vuelve a anotar.
+      subiendoRef.current = true;
+      const docAntes = composerRef.current?.getDoc() ?? null;
+      void olvidarAdjuntos(user?.id, conversationId);
+      clearDraft(user?.id, conversationId);
       // Álbum estilo WhatsApp: si van VARIAS imágenes, comparten un album_id y el
       // cliente las dibuja como UNA cuadrícula. Las imágenes se mandan primero y
       // juntas (sort estable) para que el álbum quede contiguo en el timeline;
@@ -216,6 +270,9 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
 
         if (uploadError === "cancelled") {
           toast(t("messenger.input.subidaCancelada"));
+          subiendoRef.current = false;
+          void guardarAdjuntos(user?.id, conversationId, pendingFiles.map((f) => f.file));
+          if (docAntes) setDraft(user?.id, conversationId, text, docAntes);
           setUploading(false);
           setUploadProgress("");
           setUploadPercent(0);
@@ -249,6 +306,10 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
         const msgContent = contenidoDeAdjunto(baseContent, pf.file.name);
         onSendMessage(msgContent, pf.type as ChatMessage["type"], urlData.publicUrl, pf.file.name, replyTo?.id, isImg ? albumId : undefined);
       }
+      subiendoRef.current = false;
+      // Si la persona ya se fue del chat, no se toca nada: lo guardado se olvidó
+      // al arrancar, y lo que haya ahora es un borrador NUEVO de otro cajón.
+      if (!montadoRef.current) return;
       setPendingFiles([]);
       setText("");
       composerRef.current?.clear();
@@ -269,6 +330,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
     // el formato va aparte en content_rich, y es null si el mensaje no tiene formato.
     const rich = composerRef.current?.getRich() ?? null;
     onSendMessage(text.trim(), "text", undefined, undefined, replyTo?.id, undefined, undefined, rich);
+    clearDraft(user?.id, conversationId);
     setText("");
     composerRef.current?.clear();
     onCancelReply();
@@ -277,20 +339,23 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
     clearTimeout(typingTimeout.current);
     onSendTyping(false);
     composerRef.current?.focus();
-  }, [text, replyTo, onSendMessage, onCancelReply, onSendTyping, pendingFiles, user, uploadFileWithProgress, uploading, t]);
+  }, [text, replyTo, onSendMessage, onCancelReply, onSendTyping, pendingFiles, user, uploadFileWithProgress, uploading, t, conversationId]);
 
   // El editor rico avisa el texto PLANO y dónde está el cursor dentro de ese texto;
   // con eso siguen andando el borrador, el indicador de "escribiendo" y las @menciones.
-  const handleComposerUpdate = useCallback((plain: string, cursorPlain: number, cambioDeTexto = true) => {
+  const handleComposerUpdate = useCallback((plain: string, cursorPlain: number, cambioDeTexto: boolean, doc: JSONContent) => {
     setText(plain);
     setCursorPosition(cursorPlain);
     // Mover el cursor NO es escribir: sin esta guarda, hacer clic en el cajón ya
     // le anunciaba "está escribiendo" a la otra persona.
     if (!cambioDeTexto) return;
+    // El borrador se guarda en CADA cambio de texto, venga de donde venga
+    // (tecleo, emoji, script, mención): todo pasa por el editor. Vacío lo borra.
+    setDraft(user?.id, conversationId, plain, doc);
     onSendTyping(true);
     clearTimeout(typingTimeout.current);
     typingTimeout.current = setTimeout(() => onSendTyping(false), APAGAR_ESCRIBIENDO_MS);
-  }, [onSendTyping]);
+  }, [onSendTyping, user?.id, conversationId]);
 
   // Con editor rico no se puede reemplazar TODO el texto (borraría el formato):
   // se borra solo el token "@algo" que está antes del cursor y se inserta la mención.
@@ -508,7 +573,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
               )}>
                 <RichComposer
                   ref={composerRef}
-                  initialContent={getDraft(user?.id, conversationId)}
+                  initialContent={getDraftDoc(user?.id, conversationId)}
                   placeholder={chatType === "group" ? t("messenger.input.placeholderGrupo") : t("messenger.input.placeholder")}
                   showToolbar={showToolbar}
                   disabled={uploading}
@@ -600,7 +665,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
               <div className="msg-composer-wrap w-full min-w-0 overflow-hidden bg-primary/5 rounded-2xl px-4 py-2.5 pr-12 focus-within:ring-1 focus-within:ring-primary/30">
                 <RichComposer
                   ref={composerRef}
-                  initialContent={getDraft(user?.id, conversationId)}
+                  initialContent={getDraftDoc(user?.id, conversationId)}
                   placeholder={chatType === "group" ? t("messenger.input.placeholderGrupo") : t("messenger.input.placeholder")}
                   showToolbar={showToolbar}
                   disabled={uploading}

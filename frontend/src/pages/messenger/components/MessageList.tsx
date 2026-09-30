@@ -3,6 +3,7 @@ import { ChatMessage, UserProfile } from "../types";
 import type { DeletedMessageArchive } from "../useDeletedMessages";
 import { ReactionGroup } from "@/hooks/useReactions";
 import MessageBubble from "./MessageBubble";
+import { GaleriaDelChat, mediaDelChat } from "../galeriaDelChat";
 import { cn } from "@/lib/utils";
 import { Loader2, ChevronDown } from "lucide-react";
 import { agruparEnAlbumes } from "@/lib/albumDeImagenes";
@@ -205,6 +206,11 @@ export default function MessageList({
     return m;
   }, [messages]);
 
+  // Las fotos y videos del chat, en orden, para las flechas del visor. Memo:
+  // es el valor de un contexto, y uno nuevo por render repintaría TODAS las
+  // burbujas (que son memo) cada vez.
+  const galeria = useMemo(() => mediaDelChat(messages), [messages]);
+
   if (messages.length === 0) {
     return (
       // El mismo fondo (y el mismo className del que llama) que con mensajes:
@@ -221,7 +227,8 @@ export default function MessageList({
   }
 
   return (
-    // `fondo-de-chat`: resplandor + papel tapiz detrás del scroller (index.css).
+    <GaleriaDelChat.Provider value={galeria}>
+    {/* `fondo-de-chat`: resplandor + papel tapiz detrás del scroller (index.css). */}
     <div className={cn("fondo-de-chat flex-1 relative overflow-hidden", className)}>
     <div ref={scrollRef} className="absolute inset-0 overflow-y-auto overflow-x-hidden">
       <div ref={contentRef} className="w-full py-4 px-3 md:px-6 space-y-1">
@@ -327,5 +334,6 @@ export default function MessageList({
         </button>
       )}
     </div>
+    </GaleriaDelChat.Provider>
   );
 }

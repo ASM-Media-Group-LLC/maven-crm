@@ -10,7 +10,8 @@ import { usePersistentCall, CallOutlet } from "@/components/PersistentCallProvid
 import type { useCoworkSession } from "@/hooks/useCoworkSession";
 import { supabase } from "@/integrations/supabase/client";
 import { useCoworkMediaPresence, salirDePresencia } from "@/hooks/useCoworkMediaPresence";
-import { iniciarLatido, actualizarLatido, detenerLatido, suscribirReloj } from "@/lib/coworkLatido";
+import { iniciarLatido, actualizarLatido, detenerLatido, suscribirReloj, leerReloj } from "@/lib/coworkLatido";
+import type { ConexionSala } from "@/lib/coworkTiempoRegla";
 import RelojCowork from "./RelojCowork";
 import { usePestanaPrincipal } from "@/hooks/usePestanaPrincipal";
 import { esEstadoSupervisor, type EstadoSupervisor } from "@/lib/pausaSupervisor";
@@ -57,6 +58,13 @@ export function formatBreak(totalSeconds: number): string {
   return h > 0
     ? `${h}:${dosDigitos(m)}:${dosDigitos(sec)}`
     : `${dosDigitos(m)}:${dosDigitos(sec)}`;
+}
+
+/** El reloj para la presencia, leído del latido (que vive a nivel de módulo y
+ *  sigue aunque esta página se desmonte). */
+function relojParaPresencia(): { relojEstado: string | null; relojSegundosHoy: number | null; relojEn: number | null } {
+  const r = leerReloj();
+  return r ? { relojEstado: r.estado, relojSegundosHoy: r.segundosHoy, relojEn: r.en } : { relojEstado: null, relojSegundosHoy: null, relojEn: null };
 }
 
 export default function CoworkParticipantView({ cowork, userId }: Props) {
@@ -128,8 +136,10 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   // por presence, así el coordinador lo ve en vivo aunque recargue su dashboard.
   const [breakStartedAt, setBreakStartedAt] = useState<number | null>(null);
   const [breakElapsed, setBreakElapsed] = useState(0);
-  const lastMediaRef = useRef<{ micOn: boolean; camOn: boolean; screenShareOn: boolean }>({
-    micOn: false, camOn: false, screenShareOn: false,
+  // `conexionSala` es obligatoria en el tipo (y null hasta el primer aviso de la
+  // sala): así el latido no puede salir sin decidir qué dice sobre la conexión.
+  const lastMediaRef = useRef<{ micOn: boolean; camOn: boolean; screenShareOn: boolean; conexionSala: ConexionSala | null }>({
+    micOn: false, camOn: false, screenShareOn: false, conexionSala: null,
   });
   const faceRef = useRef<{ faceState: string | null; faceSince: number | null }>({
     faceState: null, faceSince: null,
@@ -233,21 +243,18 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   const [banoConsumido, setBanoConsumido] = useState(0);
 
   // El reloj que contesta el servidor viaja por presencia para que el
-  // supervisor vea el MISMO número que la persona. Va en un ref porque
-  // presence reemplaza el payload entero en cada track(): todos los
-  // trackMediaState de abajo lo incluyen.
-  const relojRef = useRef<{ relojEstado: string | null; relojSegundosHoy: number | null; relojEn: number | null }>({
-    relojEstado: null, relojSegundosHoy: null, relojEn: null,
-  });
-  useEffect(() => suscribirReloj((r) => {
-    relojRef.current = r
-      ? { relojEstado: r.estado, relojSegundosHoy: r.segundosHoy, relojEn: r.en }
-      : { relojEstado: null, relojSegundosHoy: null, relojEn: null };
+  // supervisor vea el MISMO número que la persona. Presence reemplaza el payload
+  // entero en cada track(), así que todos los trackMediaState de abajo lo
+  // incluyen, leído en el MOMENTO de publicar (relojParaPresencia): cuando esta
+  // página se desmonta la llamada sigue en la ventanita y re-publica cada 10 s,
+  // y un reloj guardado acá se quedaba congelado — el tablero no veía la caída,
+  // o la veía para siempre.
+  useEffect(() => suscribirReloj(() => {
     trackMediaState({
       ...lastMediaRef.current,
       onBreak: !!breakStartedAt, breakStartedAt, breakKind, banoConsumidoSeg: banoConsumido,
       ...faceRef.current,
-      ...relojRef.current,
+      ...relojParaPresencia(),
     });
   }), [trackMediaState, breakStartedAt, breakKind, banoConsumido]);
   const recargarConsumido = useCallback(async () => {
@@ -325,7 +332,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
         ...lastMediaRef.current,
         onBreak: !cerrando, breakStartedAt: inicio, breakKind: cerrando ? null : kind,
         ...faceRef.current,
-        ...relojRef.current,
+        ...relojParaPresencia(),
       });
       actualizarLatido({ onBreak: !cerrando });
     } catch (e) {
@@ -394,7 +401,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
         breakKind,
         banoConsumidoSeg: banoConsumido,
         ...faceRef.current,
-        ...relojRef.current,
+        ...relojParaPresencia(),
       });
     },
     [breakStartedAt, breakKind, banoConsumido, trackMediaState]
@@ -402,16 +409,19 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   // Compartir pantalla ya es DIRECTO (el token de sala lo permite para todos) —
   // acá solo reportamos el estado de media para que el dashboard lo muestre.
   const handleMediaStateChange = useCallback(
-    (state: { micOn: boolean; camOn: boolean; screenShareOn: boolean }) => {
+    (state: { micOn: boolean; camOn: boolean; screenShareOn: boolean; conexionSala: ConexionSala | null }) => {
       // Guardamos el último estado de media para poder re-publicarlo junto con la
       // pausa: presence reemplaza el payload entero en cada track().
       lastMediaRef.current = state;
-      actualizarLatido({ camOn: state.camOn, screenShareOn: state.screenShareOn });
+      // La conexión va en el MISMO latido que la cámara: con la sala caída los
+      // dos cambian juntos, y el servidor tiene que ver los dos para no anotar
+      // "sin cámara" de paso.
+      actualizarLatido({ camOn: state.camOn, screenShareOn: state.screenShareOn, conexionSala: state.conexionSala });
       trackMediaState({
         ...state,
         onBreak: !!breakStartedAt, breakStartedAt, breakKind, banoConsumidoSeg: banoConsumido,
         ...faceRef.current,
-        ...relojRef.current,
+        ...relojParaPresencia(),
       });
     },
     [trackMediaState, breakStartedAt, breakKind, banoConsumido]

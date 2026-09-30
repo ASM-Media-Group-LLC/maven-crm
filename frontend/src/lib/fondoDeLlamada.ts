@@ -333,7 +333,7 @@ export async function achicarImagen(file: Blob, anchoMax = ANCHO_MAX_FONDO): Pro
   }
 }
 
-/** Por qué no se pudo guardar una imagen. El aviso al usuario sale de acá. */
+/** Por qué no se pudo guardar una imagen. El aviso al usuario sale de aquí. */
 export type FalloAlGuardar = "limite" | "ilegible" | "sin-almacen";
 
 /**

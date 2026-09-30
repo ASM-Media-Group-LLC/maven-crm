@@ -1379,7 +1379,7 @@ const ChatterPublicView = () => {
       </aside>
 
       {/* CENTER — chat. `relative` para que el TipPopup (absolute inset-0)
-          se contenga acá adentro en vez de cubrir toda la viewport. */}
+          se contenga aquí adentro en vez de cubrir toda la viewport. */}
       <section className="relative flex min-w-0 flex-1 flex-col">
         {/* Chat header */}
         <header className="flex items-center justify-between gap-3 border-b bg-card px-5 py-3">

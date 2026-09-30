@@ -781,13 +781,13 @@ const CAPABILITIES_BLOCK =
   "📊 *Reportes* — guardo métricas de cada jornada\n" +
   "🤖 *Análisis IG* — followers, AI score, monetización estimada\n" +
   "🔍 *Leads* — historial: ¿ya rechazada? ¿quién la trabajó?\n" +
-  "🏖️ *Ausencias* — registro días libres anunciados acá\n" +
+  "🏖️ *Ausencias* — registro días libres anunciados aquí\n" +
   "🕐 *Horarios* — sé quién trabaja ahora mismo";
 
 async function firePresentationFlow(sb: SupabaseClient, groupId: string): Promise<void> {
   // 1) Hook inicial (mientras paralelamente queryamos stats)
   const statsPromise = getGroupStats(sb, groupId);
-  await sendToGroup(groupId, "👀 *Acá estoy.*");
+  await sendToGroup(groupId, "👀 *Aquí estoy.*");
 
   // 2) Pausa dramática + stats
   await sleep(1500);

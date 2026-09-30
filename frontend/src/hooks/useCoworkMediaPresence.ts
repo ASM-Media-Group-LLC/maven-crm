@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { esEstadoSupervisor, type EstadoSupervisor, leerDesdePausaSupervisor } from "@/lib/pausaSupervisor";
+import type { ConexionSala } from "@/lib/coworkTiempoRegla";
 
 export interface MediaState {
   micOn: boolean;
@@ -37,6 +38,10 @@ export interface MediaState {
   relojEstado?: string | null;
   relojSegundosHoy?: number | null;
   relojEn?: number | null;
+  /** Cómo está respecto de la sala de LiveKit, según SU navegador. Llega fresco
+   *  aunque la página de Cowork esté desmontada (la llamada sigue en la
+   *  ventanita), a diferencia del reloj. null en los bundles viejos. */
+  conexionSala?: ConexionSala | null;
 }
 
 interface UseCoworkMediaPresenceResult {
@@ -205,6 +210,7 @@ function leerEstados(canal: CanalRealtime) {
       relojEstado: ultima.relojEstado ?? null,
       relojSegundosHoy: ultima.relojSegundosHoy ?? null,
       relojEn: ultima.relojEn ?? null,
+      conexionSala: ultima.conexionSala ?? null,
     };
   });
   return resultado;
@@ -218,6 +224,13 @@ function leerEstados(canal: CanalRealtime) {
 // Justo la persona a la que hay que avisarle sería la que nunca dispara el
 // aviso.
 let selloPantalla: { compartiendo: boolean; desde: number } | null = null;
+// Al volver de una caída de la sala, "sin compartir pantalla" cuenta de nuevo
+// SI la pantalla se cortó por la caída. Sin esto, apenas reconectaba el tablero
+// decía "lleva 7 minutos sin compartir pantalla" contando la caída, y afirmaba
+// avisos que nunca le habían llegado. Si ya no compartía desde ANTES de la caída,
+// el contador sigue: si no, cada caída corta la volvía invisible al supervisor.
+let conexionAnterior: ConexionSala | null = null;
+let caidaDesde: number | null = null;
 
 function selloDePantalla(compartiendo: boolean): number {
   if (!selloPantalla || selloPantalla.compartiendo !== compartiendo) {
@@ -262,6 +275,16 @@ let pendienteDePublicar: { entrada: CanalVivo; state: MediaState } | null = null
 let temporizadorPendiente: number | null = null;
 
 function publicar(entrada: CanalVivo, state: MediaState) {
+  if (state.conexionSala === "desconectada" && conexionAnterior !== "desconectada") caidaDesde = Date.now();
+  if (conexionAnterior === "desconectada" && state.conexionSala != null && state.conexionSala !== "desconectada") {
+    // Margen de 5 s: la pantalla se corta un instante antes de que llegue el
+    // aviso de la caída.
+    if (selloPantalla && !selloPantalla.compartiendo && caidaDesde !== null && selloPantalla.desde >= caidaDesde - 5_000) {
+      selloPantalla = null;
+    }
+    caidaDesde = null;
+  }
+  if (state.conexionSala != null) conexionAnterior = state.conexionSala;
   // El estado se re-publica cada diez segundos aunque no cambie nada, así que
   // el sello se ARRASTRA: solo se renueva cuando de verdad cambió el compartir.
   const screenShareSince = selloDePantalla(state.screenShareOn);
@@ -322,6 +345,7 @@ function enviar(entrada: CanalVivo, state: MediaState, screenShareSince: number)
     relojEstado: state.relojEstado ?? null,
     relojSegundosHoy: state.relojSegundosHoy ?? null,
     relojEn: state.relojEn ?? null,
+    conexionSala: state.conexionSala ?? null,
   });
   // `track()` devuelve una promesa y hasta ahora nadie la miraba. Cuando el
   // servidor rechaza la publicación —justamente el caso del corte por límite—

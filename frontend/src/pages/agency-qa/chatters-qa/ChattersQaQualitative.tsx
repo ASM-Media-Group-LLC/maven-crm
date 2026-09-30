@@ -109,7 +109,7 @@ export default function ChattersQaQualitative() {
                   if (suggested.length) {
                     setNewModels(suggested);
                     if (matched.length > suggested.length)
-                      toast.info(`${c.name} está asignado a ${matched.length} modelos; sugerí ${suggested.length} (el análisis admite hasta 4). Ajusta si quieres.`);
+                      toast.info(`${c.name} está asignado a ${matched.length} modelos; sugiere ${suggested.length} (el análisis admite hasta 4). Ajusta si quieres.`);
                   } else {
                     setNewModels([]);
                   }

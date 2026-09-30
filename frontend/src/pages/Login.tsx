@@ -126,7 +126,7 @@ const Login = () => {
           </Link>
           {/* Sin "crear cuenta": las cuentas de Maven las crea un admin desde
               el panel de control, y el registro público está cerrado en la
-              base (guard `bloquear_alta_publica`). Ofrecerlo acá mandaba a la
+              base (guard `bloquear_alta_publica`). Ofrecerlo aquí mandaba a la
               gente a una puerta que no abre. Quien no tiene cuenta y quiere
               probar Maven pide una demo desde la portada. */}
           <Link to="/#demo" className="text-white/40 hover:text-white hover:underline">
