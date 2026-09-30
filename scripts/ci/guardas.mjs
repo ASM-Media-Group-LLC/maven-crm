@@ -6,8 +6,10 @@
 //  - vitest: un archivo de test que NO CARGA (error de compilación, import roto)
 //    no suma nada a la línea «Tests»; solo aparece en «Test Files N failed». El
 //    16/09 una guarda nueva no cargaba y «Tests 140 passed» salía igual que antes.
-//    Por eso se lee «Test Files», y además se cuenta cuántos archivos de test hay
-//    en disco: si vitest ve menos, alguno quedó afuera sin avisar.
+//    Por eso se lee «Test Files», y además se compara la LISTA de archivos que
+//    corrió vitest con la de los que hay en disco: si falta uno, quedó afuera sin
+//    avisar. Contar no alcanza: un exclude que saca uno y un include que suma otro
+//    dejan la cuenta igual.
 //  - tsc: main arrastra ~220 errores viejos, así que «tsc sin errores» haría fallar
 //    todos los PR. Y el número solo no sirve: la base se mueve, y un error nuevo se
 //    esconde detrás de uno viejo que otro PR arregló. Se compara la LISTA contra la
@@ -62,10 +64,16 @@ export function leerResumenVitest(salida) {
   };
 }
 
+/** Hasta 5 rutas de una lista, para un mensaje. */
+const algunas = (lista) => `${lista.slice(0, 5).join(", ")}${lista.length > 5 ? ", …" : ""}`;
+
 /** Qué impide dar la corrida por buena. Vacío = verde.
- *  `enDisco` = cuántos archivos de test hay en frontend/src (null = no comparar,
- *  p. ej. si se corrió un subconjunto). */
-export function problemasVitest({ codigo, resumen, enDisco }) {
+ *  - `enDisco`: los archivos de test que hay en frontend/src, desde la raíz (null =
+ *    no comparar: solo con `--parcial`, ver argumentosDelCorredor).
+ *  - `ejecutados`: los que corrió vitest según su informe JSON (null = no se pudo
+ *    leer). Tienen que ser EXACTAMENTE los de disco: ni uno menos (un include o un
+ *    exclude que deja afuera) ni uno de otro lado. */
+export function problemasVitest({ codigo, resumen, enDisco, ejecutados = null }) {
   const problemas = [];
   const a = resumen.archivos;
   if (!a) {
@@ -75,11 +83,30 @@ export function problemasVitest({ codigo, resumen, enDisco }) {
     if (a.failed > 0) problemas.push(`${a.failed} archivo(s) de test fallaron o NO CARGARON («Test Files ${a.failed} failed»)`);
     if (a.passed === 0) problemas.push("ningún archivo de test pasó: la corrida no probó nada");
     if (!a.ilegible && sumaDe(a) !== a.total) problemas.push(`la línea «Test Files» no cierra: ${sumaDe(a)} ≠ ${a.total}`);
-    if (enDisco != null && a.total !== enDisco) {
-      problemas.push(
-        `vitest vio ${a.total} archivo(s) de test y en frontend/src hay ${enDisco}: alguno quedó afuera ` +
-          "(¿cambió el include de vitest.config.ts?)",
-      );
+  }
+  if (enDisco != null) {
+    if (ejecutados == null) {
+      problemas.push("no se pudo leer el informe JSON de vitest: no se sabe qué archivos corrió, y así no se puede comparar contra frontend/src");
+    } else {
+      const corridos = new Set(ejecutados);
+      const deDisco = new Set(enDisco);
+      const faltan = enDisco.filter((r) => !corridos.has(r));
+      const sobran = ejecutados.filter((r) => !deDisco.has(r));
+      if (faltan.length) {
+        problemas.push(
+          `vitest no corrió ${faltan.length} de los ${enDisco.length} archivo(s) de test de frontend/src ` +
+            `(¿cambió el include o el exclude de vitest.config.ts?): ${algunas(faltan)}`,
+        );
+      }
+      if (sobran.length) {
+        problemas.push(
+          `vitest corrió ${sobran.length} archivo(s) que no son tests de frontend/src ` +
+            `(¿cambió el include de vitest.config.ts?): ${algunas(sobran)}`,
+        );
+      }
+      if (a && a.total !== ejecutados.length) {
+        problemas.push(`el resumen dice ${a.total} archivo(s) de test y el informe JSON trae ${ejecutados.length}: no describen la misma corrida`);
+      }
     }
   }
   const t = resumen.pruebas;
@@ -94,17 +121,47 @@ export function problemasVitest({ codigo, resumen, enDisco }) {
   return problemas;
 }
 
-/** ¿Los argumentos extra achican la corrida? (filtros de archivo, --shard, -t…).
- *  Entonces no se compara contra la cuenta en disco. Las opciones con valor van
- *  con «=» (--testTimeout=30000): un valor suelto se lee como filtro. */
-export function corridaParcial(extra) {
-  return extra.some(
-    (a) => !a.startsWith("-") || /^--(shard|project|testNamePattern|changed|related)\b/.test(a) || /^-t\b/.test(a),
-  );
+/** Separa `--parcial` (una opción del corredor, no de vitest) de lo que va a vitest.
+ *  Sin `--parcial`, la comparación contra el disco corre SIEMPRE: si algún argumento
+ *  achica la corrida (un filtro de archivo, --shard, -t…), la lista de archivos no
+ *  coincide y da rojo. No se adivina qué argumento es un filtro: antes se hacía, y
+ *  un valor suelto (`--maxWorkers 2`, `--reporter default`) se tomaba por filtro y
+ *  apagaba la comparación sin avisar. */
+export function argumentosDelCorredor(extra) {
+  return { parcial: extra.includes("--parcial"), paraVitest: extra.filter((a) => a !== "--parcial") };
 }
 
 /** Los archivos que vitest.config.ts incluye: frontend/src/**\/*.{test,spec}.{ts,tsx}. */
 export const ES_ARCHIVO_DE_TEST = /\.(test|spec)\.tsx?$/;
+
+/** Una ruta absoluta desde la raíz del repo («frontend/src/x.test.ts»), probando
+ *  cada raíz (la del checkout y su realpath). Si no cae en ninguna, queda como
+ *  está: absoluta, y así no coincide con nada de lo que hay en disco. */
+function desdeLaRaiz(ruta, raices) {
+  const r = ruta.replace(/\\/g, "/");
+  for (const raiz of [...raices].filter(Boolean).sort((x, y) => y.length - x.length)) {
+    const conBarra = raiz.replace(/\\/g, "/").replace(/\/?$/, "/");
+    if (r.startsWith(conBarra)) return r.slice(conBarra.length);
+  }
+  return r;
+}
+
+/** Los archivos que corrió vitest, del informe de `--reporter=json`
+ *  (`testResults[].name`, con ruta absoluta), desde la raíz y ordenados. Un archivo
+ *  que no carga también está (con status «failed»). Null si el informe no está o
+ *  no tiene la forma de siempre: sin él no se sabe qué corrió. */
+export function archivosDelInformeVitest(texto, raices) {
+  let informe;
+  try {
+    informe = JSON.parse(texto);
+  } catch {
+    return null;
+  }
+  if (!informe || !Array.isArray(informe.testResults)) return null;
+  const nombres = informe.testResults.map((r) => r?.name);
+  if (nombres.some((n) => typeof n !== "string" || !n)) return null;
+  return nombres.map((n) => desdeLaRaiz(n, raices)).sort();
+}
 
 // ─── tsc ─────────────────────────────────────────────────────────────────────
 
@@ -170,6 +227,39 @@ export function leerSalidaTsc(salida, raices = []) {
   return { errores, diagnosticos, archivos, ilegibles };
 }
 
+/** El error de control que tsc-sin-errores-nuevos.mjs siembra en cada árbol antes de
+ *  correr tsc: un archivo con un error de tipos seguro, sumado al programa por una
+ *  config que extiende tsconfig.app.json. Si tsc no lo marca, la corrida no revisa
+ *  tipos y cualquier error nuevo pasaría callado. Es la prueba de que la corrida
+ *  PUEDE fallar, y cubre lo que no se conoce: `"noCheck": true` ya lo apaga el
+ *  `--noCheck false` de la línea de comandos, pero una opción que venga después no.
+ *  Los dos archivos van en la raíz, junto a tsconfig.app.json: desde ahí resuelve
+ *  tsc los `types` y los `paths`, igual que con `-p tsconfig.app.json`. */
+export const CANARIO_TSC = {
+  archivo: ".guarda-tsc-canario.ts",
+  config: ".guarda-tsc.json",
+  fuente: 'export const __canarioDeLaGuarda: number = "no es un número";\n',
+  codigo: "TS2322",
+};
+
+/** La config del canario. `extends` hereda todo de tsconfig.app.json menos
+ *  «files», que se PISA: si tsconfig.app.json llega a usar «files», esos archivos
+ *  quedarían afuera sin avisar, así que eso tira (y el corredor da rojo). */
+export function configDelCanario(tsconfigApp) {
+  if (/"files"\s*:/.test(String(tsconfigApp))) {
+    throw new Error(
+      "tsconfig.app.json usa «files»: la config del canario lo pisaría (extends no suma «files», lo reemplaza) " +
+        "y esos archivos quedarían sin revisar. Súmalos en configDelCanario (scripts/ci/guardas.mjs).",
+    );
+  }
+  return `${JSON.stringify({ extends: "./tsconfig.app.json", files: [`./${CANARIO_TSC.archivo}`] }, null, 2)}\n`;
+}
+
+/** La lectura sin los errores del canario (no son del código: no se comparan). */
+export function sinElCanario(lectura) {
+  return { ...lectura, errores: lectura.errores.filter((e) => e.archivo !== CANARIO_TSC.archivo) };
+}
+
 /** Por qué una corrida de tsc no sirve para comparar. Vacío = sirve.
  *  tsc sale con 0 sin errores y con 1 o 2 con errores (2 con --noEmit); cualquier
  *  otra cosa, o un código de error sin ningún error leído, es que se cayó.
@@ -179,14 +269,23 @@ export function leerSalidaTsc(salida, raices = []) {
  *  `cd frontend && npx tsc` (un tsconfig vacío, siempre 0) y con un include achicado
  *  (p. ej. a frontend/src/main.tsx, que deja afuera todos los tests). Contar no
  *  alcanza: «Files» suma ~1500 .d.ts de lib y de node_modules, y un include
- *  achicado sigue por encima de cualquier umbral. */
-export function problemasTsc(nombre, { codigo, lectura, esperados }) {
+ *  achicado sigue por encima de cualquier umbral.
+ *  `canario: true`: la corrida tiene que traer el error de CANARIO_TSC. Listar
+ *  todos los archivos no prueba que se revisaron: con `"noCheck": true` tsc los
+ *  lista todos y no marca ningún error. */
+export function problemasTsc(nombre, { codigo, lectura, esperados, canario = false }) {
   const p = [];
   if (![0, 1, 2].includes(codigo)) p.push(`${nombre}: tsc salió con código ${codigo} (¿se quedó sin memoria?)`);
   if (codigo !== 0 && lectura.errores.length === 0) p.push(`${nombre}: tsc salió con código ${codigo} sin ningún error legible`);
   if (codigo === 0 && lectura.errores.length > 0) p.push(`${nombre}: tsc salió con 0 pero imprimió ${lectura.errores.length} error(es)`);
   if (lectura.ilegibles.length) {
     p.push(`${nombre}: tsc imprimió ${lectura.ilegibles.length} línea(s) que no son errores:\n    ${lectura.ilegibles.slice(0, 5).join("\n    ")}`);
+  }
+  if (canario && !lectura.errores.some((e) => e.archivo === CANARIO_TSC.archivo && e.mensaje.startsWith(`error ${CANARIO_TSC.codigo}:`))) {
+    p.push(
+      `${nombre}: tsc no marcó el error de control sembrado en ${CANARIO_TSC.archivo}: la corrida no revisa tipos ` +
+        "(¿«noCheck» u otra opción que apaga la revisión?) y un error nuevo pasaría callado",
+    );
   }
   if (esperados != null) {
     const revisados = new Set(lectura.archivos);
@@ -195,7 +294,7 @@ export function problemasTsc(nombre, { codigo, lectura, esperados }) {
     else if (faltan.length) {
       p.push(
         `${nombre}: tsc no revisó ${faltan.length} de los ${esperados.length} archivo(s) de frontend/src ` +
-          `(¿se achicó el include de tsconfig.app.json?): ${faltan.slice(0, 5).join(", ")}${faltan.length > 5 ? ", …" : ""}`,
+          `(¿se achicó el include de tsconfig.app.json?): ${algunas(faltan)}`,
       );
     }
   }
@@ -376,7 +475,12 @@ export function citasDeRutas(cadenas, { carpetasDeLaRaiz, archivosDeLaRaiz }) {
   const carpetas = new Set(carpetasDeLaRaiz);
   const archivos = new Set(archivosDeLaRaiz);
   for (const cruda of cadenas) {
-    const c = cruda.replace(/\?[\w=&-]*$/, "");
+    // Un template que empieza con una expresión (`${RAIZ}/Dockerfile`,
+    // `${process.cwd()}/supabase/x`) llega como «*/Dockerfile»: esa expresión suele
+    // ser la raíz del repo, así que se lee lo que sigue. Si era la carpeta del test
+    // (`${__dirname}/../x`), lo que sigue empieza con «../» y se toma como relativo,
+    // que es lo correcto.
+    const c = cruda.replace(/\?[\w=&-]*$/, "").replace(/^\*+\//, "");
     if (!c || /[\s"'`<>|\\]/.test(c)) continue;
     if (/^\.\.?\//.test(c)) {
       relativas.push(c);

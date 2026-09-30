@@ -5,12 +5,17 @@ name: Guard Frontend
 # tipos nuevo o un build que no arma llegaban a main sin que nada avisara.
 # Solo lee el código: no despliega nada ni necesita secretos.
 #
-# Tres cosas, en dos trabajos en paralelo:
+# Tres cosas, en tres trabajos en paralelo:
 #   1. vitest, la suite ENTERA, leyendo el resumen («Test Files»): un archivo de
 #      test que no carga no suma nada a «Tests» y solo se ve ahí (pasó el 16/09).
+#      Y la LISTA de archivos que corrió tiene que ser la de frontend/src.
 #   2. tsc contra main: main arrastra errores viejos, así que se falla solo si el PR
 #      trae uno NUEVO, comparando la lista (sin línea ni columna), no el número.
-#   3. `npm run build`, como lo arma el Dockerfile.
+#   3. La imagen de prod, con el Dockerfile tal cual (`docker build`): el mismo
+#      node:20-alpine, el mismo `npm install` y el mismo `npm run build` que arma
+#      Dokploy. Un `npm run build` en el Node 24 de los otros dos trabajos no
+#      alcanza: es otro Node y otro árbol de dependencias (`npm ci` contra
+#      `npm install`), y un PR que arma ahí puede no armar en prod.
 # La lógica de 1 y 2 está en scripts/ci/ (guardas.mjs, con sus pruebas).
 #
 # `paths`: además del frontend, lo que sus tests LEEN o importan de afuera (edge
@@ -32,6 +37,10 @@ on:
       - "postcss.config.js"
       - "scripts/ci/**"
       - ".github/workflows/guard-frontend.yml"
+      # Lo que lee `docker build` además de lo de arriba.
+      - "Dockerfile"
+      - ".dockerignore"
+      - "docker-entrypoint.sh"
       # Lo que los tests de frontend/src leen de afuera (con fs o import.meta.glob).
       - "supabase/functions/**"
       - "supabase/migrations/**"
@@ -59,7 +68,8 @@ jobs:
       # `npm install`): el npm 10 que trae Node 20 rechaza este package-lock en
       # `npm ci` («Missing: esbuild@0.28.2 from lock file», el peer opcional del
       # vite 8 que usa vitest). El npm 11 de Node 24 lo acepta, igual que el de
-      # desarrollo.
+      # desarrollo. Lo que arma prod lo revisa el trabajo `imagen`, con el
+      # Dockerfile tal cual.
       - name: Setup Node
         uses: actions/setup-node@v5
         with:
@@ -71,9 +81,11 @@ jobs:
         run: npm ci --no-audit --no-fund
 
       # Las pruebas de las propias guardas primero: si el lector del resumen de
-      # vitest se rompe, no tiene sentido confiar en lo que diga abajo.
+      # vitest se rompe, no tiene sentido confiar en lo que diga abajo. Las de
+      # corredores.test.mjs corren tsc y vitest de verdad sobre un proyecto chico
+      # (usan el node_modules de recién): van después de `npm ci`.
       - name: Pruebas de las guardas
-        run: node --test scripts/ci/guardas.test.mjs
+        run: node --test scripts/ci/guardas.test.mjs scripts/ci/corredores.test.mjs
 
       # Por qué el tiempo por test sube a 30 s: con los 5 s de siempre, las pruebas
       # que montan una página entera (las de «…EnIngles») pasan en una máquina
@@ -90,8 +102,8 @@ jobs:
         if: ${{ !cancelled() && steps.npmci.outcome == 'success' }}
         run: node scripts/ci/filtro-cubre-lecturas.mjs
 
-  tipos-y-build:
-    name: tsc contra main + build
+  tipos:
+    name: tsc contra main
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -110,7 +122,6 @@ jobs:
           cache: npm
 
       - name: npm ci
-        id: npmci
         run: npm ci --no-audit --no-fund
 
       - name: tsc — ningún error de tipos nuevo respecto de main
@@ -125,16 +136,19 @@ jobs:
           fi
           node scripts/ci/tsc-sin-errores-nuevos.mjs --base=HEAD^1
 
-      # Aunque tsc haya dado rojo: el build es otra señal y conviene verla igual.
-      # Las VITE_ son las mismas marcas que usa el Dockerfile (las reales las pone
-      # docker-entrypoint.sh al arrancar el contenedor).
-      - name: npm run build
-        if: ${{ !cancelled() && steps.npmci.outcome == 'success' }}
-        env:
-          VITE_SUPABASE_URL: __RUNTIME_VITE_SUPABASE_URL__
-          VITE_SUPABASE_PUBLISHABLE_KEY: __RUNTIME_VITE_SUPABASE_PUBLISHABLE_KEY__
-          VITE_SUPABASE_PROJECT_ID: __RUNTIME_VITE_SUPABASE_PROJECT_ID__
-          VITE_PUBLIC_URL: __RUNTIME_VITE_PUBLIC_URL__
-          VITE_GIPHY_API_KEY: __RUNTIME_VITE_GIPHY_API_KEY__
-          VITE_DOCS_SYNC_URL: __RUNTIME_VITE_DOCS_SYNC_URL__
-        run: npm run build
+  imagen:
+    name: build de la imagen de prod (Dockerfile)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      # Exactamente lo que arma Dokploy al mergear: el Dockerfile de la raíz, con
+      # su .dockerignore. La etapa 1 es node:20-alpine + `npm install` +
+      # `npm run build` con las VITE_ de marca (las reales las pone
+      # docker-entrypoint.sh al arrancar); la 2 es nginx, que copia dist/,
+      # nginx.conf y docker-entrypoint.sh. Si algo de eso falla, falla aquí y no
+      # en el deploy. No se publica nada: la imagen queda en el runner y se tira.
+      - name: docker build
+        run: docker build --progress=plain --tag maven-frontend:guarda .

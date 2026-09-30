@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-// Corre `tsc --noEmit -p tsconfig.app.json` sobre la cabeza y sobre la base, y
-// falla solo si la cabeza trae un error que la base no tenía.
+// Corre tsc con tsconfig.app.json sobre la cabeza y sobre la base, y falla solo si
+// la cabeza trae un error que la base no tenía. (Con `-p .guarda-tsc.json`, una
+// config que extiende tsconfig.app.json y le suma el canario: ver abajo.)
 //
 //   node scripts/ci/tsc-sin-errores-nuevos.mjs [--base=<ref>] [--secuencial]
 //
@@ -12,11 +13,22 @@
 //   para que un tipo que cambió con una dependencia se vea como nuevo.
 // - Se compara la LISTA (archivo + código + mensaje, sin línea ni columna), no el
 //   número. Ver guardas.mjs.
+// - tsc corre SIEMPRE revisando tipos, diga lo que diga tsconfig.app.json: la línea
+//   de comandos lleva `--noCheck false` (con `"noCheck": true` tsc lista todos los
+//   archivos, no marca ningún error y todo lo viejo se vería «arreglado»). Y, por si
+//   aparece otra forma de apagar la revisión, cada árbol lleva un error de control
+//   (CANARIO_TSC en guardas.mjs): si tsc no lo marca, la corrida no vale.
 import { spawn, execFileSync } from "node:child_process";
-import { appendFileSync, mkdtempSync, readdirSync, realpathSync, rmSync, symlinkSync } from "node:fs";
+import { appendFileSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { anotacion, erroresNuevos, leerSalidaTsc, problemasTsc } from "./guardas.mjs";
+import { CANARIO_TSC, anotacion, configDelCanario, erroresNuevos, leerSalidaTsc, problemasTsc, sinElCanario } from "./guardas.mjs";
+
+// El límite del heap de cada tsc. El de V8 por defecto depende de la memoria de la
+// máquina: en el runner privado de GitHub (7 GB) queda cerca de 1,75 GB y tsc ya usa
+// ~1,56 GB en este repo, así que al crecer el frontend se caería (código 134) en
+// todos los PR. Dos tsc a 3 GB entran en 7 GB; lo que usan de verdad es ~1,9 GB cada uno.
+const MEMORIA_TSC_MB = 3072;
 
 const args = process.argv.slice(2);
 const opcion = (n) => args.find((a) => a.startsWith(`--${n}=`))?.slice(n.length + 3);
@@ -40,12 +52,43 @@ function fuentesDelFrontend(dir, rel = "frontend/src") {
   return res;
 }
 
+/** Siembra el canario en la raíz de un árbol: el archivo con el error de control y
+ *  la config que lo suma al programa de tsconfig.app.json. Devuelve lo que escribió,
+ *  para borrarlo después. */
+function sembrarCanario(dir) {
+  let tsconfigApp = "";
+  try {
+    tsconfigApp = readFileSync(join(dir, "tsconfig.app.json"), "utf8");
+  } catch {
+    // Sin tsconfig.app.json el extends falla, tsc no marca el canario y da rojo.
+  }
+  const config = configDelCanario(tsconfigApp);
+  const escritos = [join(dir, CANARIO_TSC.archivo), join(dir, CANARIO_TSC.config)];
+  writeFileSync(escritos[0], CANARIO_TSC.fuente);
+  writeFileSync(escritos[1], config);
+  return escritos;
+}
+
 function correrTsc(dir) {
   return new Promise((ok) => {
     const inicio = Date.now();
     const hijo = spawn(
       process.execPath,
-      [join(dir, "node_modules", "typescript", "bin", "tsc"), "--noEmit", "-p", "tsconfig.app.json", "--pretty", "false", "--diagnostics", "--listFiles"],
+      [
+        `--max-old-space-size=${MEMORIA_TSC_MB}`,
+        join(dir, "node_modules", "typescript", "bin", "tsc"),
+        "--noEmit",
+        "-p",
+        CANARIO_TSC.config,
+        // Pisa un `"noCheck": true` del tsconfig (TS >= 5.6; uno más viejo no conoce
+        // la opción, no revisa nada, no marca el canario y da rojo).
+        "--noCheck",
+        "false",
+        "--pretty",
+        "false",
+        "--diagnostics",
+        "--listFiles",
+      ],
       { cwd: dir, env: { ...process.env, NO_COLOR: "1" }, stdio: ["ignore", "pipe", "pipe"] },
     );
     let salida = "";
@@ -60,9 +103,11 @@ console.log(`cabeza: ${cabezaSha}`);
 console.log(`base:   ${baseSha} (merge-base con ${baseRef})`);
 
 let dirBase = null;
+let sembrados = [];
 let salidaFinal = 1;
 try {
   const esperados = fuentesDelFrontend(join(raiz, "frontend", "src"));
+  sembrados = sembrarCanario(raiz);
   let base;
   let cabeza;
   if (baseSha === cabezaSha) {
@@ -86,6 +131,7 @@ try {
     } else {
       symlinkSync(join(raiz, "node_modules"), join(dirBase, "node_modules"), "dir");
     }
+    sembrarCanario(dirBase);
     console.log(secuencial ? "tsc: base y cabeza, una después de la otra…" : "tsc: base y cabeza a la vez…");
     if (secuencial) {
       base = await correrTsc(dirBase);
@@ -99,15 +145,18 @@ try {
   const lBase = leerSalidaTsc(base.salida, raices);
   const lCabeza = leerSalidaTsc(cabeza.salida, raices);
   const problemas = [
-    ...problemasTsc("base", { codigo: base.codigo, lectura: lBase, esperados: null }),
-    ...problemasTsc("cabeza", { codigo: cabeza.codigo, lectura: lCabeza, esperados }),
+    ...problemasTsc("base", { codigo: base.codigo, lectura: lBase, esperados: null, canario: true }),
+    ...problemasTsc("cabeza", { codigo: cabeza.codigo, lectura: lCabeza, esperados, canario: true }),
   ];
-  const { nuevos, arreglados } = erroresNuevos(lBase.errores, lCabeza.errores);
+  // Los errores del canario no son del código: se cuentan (arriba) y se sacan.
+  const { nuevos, arreglados } = erroresNuevos(sinElCanario(lBase).errores, sinElCanario(lCabeza).errores);
 
   console.log(`\n── guarda de tsc ──`);
   const memoria = (l) => (l.diagnosticos["Memory used"] != null ? `${Math.round(l.diagnosticos["Memory used"] / 1024)} MB` : "? MB");
-  console.log(`base:   ${lBase.errores.length} error(es), ${lBase.archivos.length} archivos, ${base.segundos} s, ${memoria(lBase)}`);
-  console.log(`cabeza: ${lCabeza.errores.length} error(es), ${lCabeza.archivos.length} archivos, ${cabeza.segundos} s, ${memoria(lCabeza)}`);
+  const errores = (l) => sinElCanario(l).errores.length;
+  const canario = (l) => (errores(l) < l.errores.length ? "canario visto" : "SIN canario");
+  console.log(`base:   ${errores(lBase)} error(es), ${lBase.archivos.length} archivos, ${base.segundos} s, ${memoria(lBase)}, ${canario(lBase)}`);
+  console.log(`cabeza: ${errores(lCabeza)} error(es), ${lCabeza.archivos.length} archivos, ${cabeza.segundos} s, ${memoria(lCabeza)}, ${canario(lCabeza)}`);
   const revisados = new Set(lCabeza.archivos);
   console.log(`frontend/src: ${esperados.length} .ts/.tsx en disco; tsc los revisó todos: ${esperados.every((r) => revisados.has(r)) ? "sí" : "NO"}`);
   console.log(`nuevos: ${nuevos.length} · arreglados: ${arreglados}`);
@@ -122,8 +171,8 @@ try {
       "",
       `| | errores | archivos |`,
       "|---|---|---|",
-      `| base \`${baseSha.slice(0, 8)}\` | ${lBase.errores.length} | ${lBase.archivos.length} |`,
-      `| cabeza \`${cabezaSha.slice(0, 8)}\` | ${lCabeza.errores.length} | ${lCabeza.archivos.length} |`,
+      `| base \`${baseSha.slice(0, 8)}\` | ${errores(lBase)} | ${lBase.archivos.length} |`,
+      `| cabeza \`${cabezaSha.slice(0, 8)}\` | ${errores(lCabeza)} | ${lCabeza.archivos.length} |`,
       "",
       `Nuevos: **${nuevos.length}** · arreglados: ${arreglados}`,
       "",
@@ -151,7 +200,11 @@ try {
     console.log("\nVERDE: ningún error de tipos nuevo.");
     salidaFinal = 0;
   }
+} catch (e) {
+  // Lo que no es de tsc (la config del canario, git): rojo con el motivo, no un stack trace.
+  console.log(`\nROJO: la guarda de tsc no pudo correr: ${e?.message ?? e}`);
 } finally {
+  for (const f of sembrados) rmSync(f, { force: true });
   if (dirBase) {
     try {
       git("worktree", "remove", "--force", dirBase);

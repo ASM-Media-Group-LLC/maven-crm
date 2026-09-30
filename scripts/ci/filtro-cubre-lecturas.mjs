@@ -10,6 +10,7 @@
 //
 // Lo que NO ve: una ruta armada con pedazos sueltos (join("supabase", "functions",
 // x)). Los tests de hoy no lo hacen; si alguno lo hace, que la escriba entera.
+// Un template que empieza con la raíz (`${RAIZ}/Dockerfile`) sí lo ve.
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -22,8 +23,19 @@ const WORKFLOW = ".github/workflows/guard-frontend.yml";
 // el build y las pruebas de scripts/ci).
 const RAICES = ["frontend/**", "scripts/ci/**", "vite.config.ts", "vitest.config.ts", "tailwind.config.ts", "postcss.config.js"];
 // Lo que tiene que estar en paths tal cual, además de las raíces: no se cita con
-// una cadena desde el código, pero npm, tsc y vite lo leen.
-const REQUERIDOS = [...RAICES, "package.json", "package-lock.json", "tsconfig*.json", WORKFLOW];
+// una cadena desde el código, pero npm, tsc, vite y `docker build` (el trabajo
+// `imagen`) lo leen.
+const REQUERIDOS = [
+  ...RAICES,
+  "package.json",
+  "package-lock.json",
+  "tsconfig*.json",
+  WORKFLOW,
+  "Dockerfile",
+  ".dockerignore",
+  "docker-entrypoint.sh",
+  "nginx.conf",
+];
 // Los tests de vitest (el include de vitest.config.ts): se leen enteros, porque
 // toda cadena puede ser una ruta. El resto, solo sus imports. guardas.test.mjs
 // tampoco se lee entero: sus cadenas son ejemplos inventados, y lo único que lee
