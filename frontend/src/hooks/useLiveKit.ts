@@ -867,12 +867,14 @@ export function useLiveKit() {
         }
 
         if (!preloadedBackgroundsRef.current.has(processorUrl)) {
-          await new Promise<void>((resolve, reject) => {
+          // Con tope: esto corre dentro de connect(), y una foto que no termina
+          // de bajar (ni carga ni error) trababa la entrada entera a la llamada.
+          await withTimeout(new Promise<void>((resolve, reject) => {
             const image = new Image();
             image.src = processorUrl;
             image.onload = () => resolve();
             image.onerror = () => reject(new Error("bg-image-load-failed"));
-          });
+          }), BACKGROUND_SWITCH_TIMEOUT_MS, "bg-precarga");
           preloadedBackgroundsRef.current.add(processorUrl);
         }
 
