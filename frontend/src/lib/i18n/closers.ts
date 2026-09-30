@@ -197,7 +197,7 @@ export const closers = {
   "closers.shots.couldNotAttach": { es: "No se pudo adjuntar", en: "Couldn't attach" },
   "closers.shots.couldNotDelete": { es: "No se pudo borrar", en: "Couldn't delete" },
   "closers.shots.attachHint": { es: "Adjuntar captura — click, arrastrar o Ctrl+V", en: "Attach screenshot — click, drag or Ctrl+V" },
-  "closers.shots.emptyHint": { es: "Adjuntá capturas: click, arrastrá o pegá con ⌘/Ctrl+V", en: "Attach screenshots: click, drag or paste with ⌘/Ctrl+V" },
+  "closers.shots.emptyHint": { es: "Adjunta capturas: click, arrastra o pega con ⌘/Ctrl+V", en: "Attach screenshots: click, drag or paste with ⌘/Ctrl+V" },
   "closers.shots.countOne": { es: "{n} captura · solo tú y quien tenga este lead pueden verlas", en: "{n} screenshot · only you and whoever has this lead can see them" },
   "closers.shots.countMany": { es: "{n} capturas · solo tú y quien tenga este lead pueden verlas", en: "{n} screenshots · only you and whoever has this lead can see them" },
   "closers.shots.delete": { es: "Borrar", en: "Delete" },

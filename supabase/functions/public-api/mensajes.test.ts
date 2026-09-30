@@ -205,8 +205,8 @@ const ANTES: Record<Clave, [Record<string, string | number> | undefined, string]
   ip_desconocida: [undefined, "desconocida"],
   llave_sin_agencia: [undefined, "Esta API key no pertenece a ninguna agencia"],
   persona_no_vigente: [undefined, "La persona como la que actúa esta API key ya no está activa en esta agencia de Maven"],
-  no_disponible: [undefined, "El servicio no está disponible en este momento. Reintentá en unos segundos."],
-  limite_por_minuto: [{ n: 60, s: 17 }, "Esta API key llegó a su límite de 60 pedidos por minuto. Reintentá en 17 s."],
+  no_disponible: [undefined, "El servicio no está disponible en este momento. Reintenta en unos segundos."],
+  limite_por_minuto: [{ n: 60, s: 17 }, "Esta API key llegó a su límite de 60 pedidos por minuto. Reintenta en 17 s."],
   limite_por_hora: [
     { n: 1000, hora: "2026-09-25T19:00:00+00:00" },
     "Esta API key llegó a su límite de 1000 pedidos por hora. Se reinicia a las 2026-09-25T19:00:00+00:00.",
@@ -223,25 +223,25 @@ const ANTES: Record<Clave, [Record<string, string | number> | undefined, string]
     "Este recurso todavía no separa datos por agencia, así que se desactiva mientras Maven tenga más de una, " +
     "para no exponer datos de otras. Pendiente: creators no tiene tenant_id.",
   ],
-  aislamiento_no_verificado: [undefined, "No se pudo verificar el aislamiento entre agencias. Reintentá en unos segundos."],
+  aislamiento_no_verificado: [undefined, "No se pudo verificar el aislamiento entre agencias. Reintenta en unos segundos."],
   me_sub_recurso_desconocido: [{ sub: "x" }, "Sub-recurso de me desconocido: x"],
   messenger_llave_sin_reglas: [undefined, "Las llaves con Messenger necesitan IPs fijas y fecha de vencimiento"],
   messenger_rutas: [
     undefined,
-    "Usá /messenger/conversations, /messenger/conversations/{id}, /messenger/conversations/{id}/messages o /messenger/feed",
+    "Usa /messenger/conversations, /messenger/conversations/{id}, /messenger/conversations/{id}/messages o /messenger/feed",
   ],
   conversacion_no_encontrada: [undefined, "Conversación no encontrada"],
   id_de_conversacion_invalido: [undefined, "El id de la conversación no es válido"],
   limit_invalido: [undefined, "limit tiene que ser un número entre 1 y 100"],
   offset_invalido: [undefined, "offset tiene que ser un número de 0 en adelante"],
   include_invalido: [undefined, "include solo acepta: rich"],
-  before_y_after: [undefined, "Usá before O after, no los dos"],
+  before_y_after: [undefined, "Usa before O after, no los dos"],
   cursor_invalido: [undefined, "El cursor no es válido"],
   thread_root_id_invalido: [undefined, "thread_root_id no es válido"],
-  after_y_since: [undefined, "Usá after O since, no los dos"],
+  after_y_since: [undefined, "Usa after O since, no los dos"],
   exclude_own_invalido: [undefined, "exclude_own tiene que ser true o false"],
   since_invalido: [undefined, "since tiene que ser una fecha ISO 8601"],
-  since_muy_viejo: [undefined, "since no puede tener más de 72 horas: para lo anterior, leé cada conversación con /messages"],
+  since_muy_viejo: [undefined, "since no puede tener más de 72 horas: para lo anterior, lee cada conversación con /messages"],
 };
 
 Deno.test("en español, cada texto es byte a byte el de antes", () => {
@@ -342,7 +342,7 @@ Deno.test("Messenger: cada rechazo sale en el idioma del Contexto (y en español
   // Los mismos textos, contra lo que respondía ANTES de este cambio.
   const antes = await servirMessenger(explota, { ...CTX, ruta: ["conversations", CONV, "messages"], consulta: { before: "a", after: "b" } });
   assert(!antes.ok && antes.estado === 400);
-  assertEquals(antes.mensaje, "Usá before O after, no los dos");
+  assertEquals(antes.mensaje, "Usa before O after, no los dos");
 });
 
 Deno.test("Messenger: la llave sin reglas (403) y la conversación que no ve (404), en los dos idiomas", async () => {

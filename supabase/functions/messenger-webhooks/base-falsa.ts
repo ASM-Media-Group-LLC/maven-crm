@@ -104,7 +104,7 @@ export function crearBaseFalsa(inicioMs: number, o: Opciones = {}) {
     !!e && e.tenant_id === g.tenantId && e.lease_until !== null && e.lease_until === aMicros(g.reclamo, reloj.us) &&
     e.status === "active" && e.cursor_at !== null && e.cursor_at === aMicros(g.cursorAt, reloj.us) && e.cursor_id === g.cursorId;
 
-  /** Lo que hace el trigger api_webhook_endpoints_cambio (lo que importa acá), y los CHECKs. */
+  /** Lo que hace el trigger api_webhook_endpoints_cambio (lo que importa aquí), y los CHECKs. */
   const aplicarEp = (e: FilaEp, cambios: Record<string, unknown>): boolean => {
     const nuevo: FilaEp = { ...e };
     for (const [k, v] of Object.entries(cambios)) {

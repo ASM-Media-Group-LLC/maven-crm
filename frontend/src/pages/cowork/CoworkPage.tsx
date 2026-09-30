@@ -338,7 +338,7 @@ export default function CoworkPage() {
 
         {/* UNA sola lista (pedido de Jhon, 08/09): antes había "Tus sesiones" y
             aparte "Todas las sesiones" solo para admins, y daba la impresión de
-            que faltaban sesiones. Ahora los admins ven TODAS acá, con su rol en
+            que faltaban sesiones. Ahora los admins ven TODAS aquí, con su rol en
             cada una; el resto ve las suyas. Las finalizadas van al final. */}
         {!loadingSessions && filasActivas.length > 0 && (
           <div className="w-full flex flex-col gap-2">

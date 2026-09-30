@@ -5,6 +5,7 @@ import {
   Track,
   LocalAudioTrack,
   ConnectionState,
+  DisconnectReason,
   Participant,
   VideoPresets,
   ScreenSharePresets,
@@ -465,6 +466,15 @@ export function useLiveKit() {
   // Va aparte de `error` a propósito: no se rompió nada, y sobre todo NO se
   // reintenta — reintentar es lo que arma la pelea infinita entre las dos.
   const [otraPestanaTomoLaSesion, setOtraPestanaTomoLaSesion] = useState(false);
+  // POR QUÉ nos soltó la sala la última vez. Sin esto no se distingue una caída
+  // (red, servidor: hay que volver solos) de una salida a propósito (salió,
+  // cambió de sala, la sacó el supervisor: NO se vuelve). Ver lib/conexionSala.
+  const [razonDeSalida, setRazonDeSalida] = useState<DisconnectReason | null>(null);
+  // Número del intento de conexión VIGENTE. `disconnect()` lo invalida. Sin esto,
+  // un intento que todavía esperaba el token cuando se pidió otro creaba igual su
+  // sala: quedaban DOS conexiones, y la huérfana publicaba el micrófono sin que
+  // nadie pudiera silenciarla (el botón actuaba sobre la otra).
+  const intentoRef = useRef(0);
   const handRaisedMap = useRef<Record<string, boolean>>({});
   const preferredDevicesRef = useRef<{
     audioDeviceId?: string;
@@ -857,12 +867,14 @@ export function useLiveKit() {
         }
 
         if (!preloadedBackgroundsRef.current.has(processorUrl)) {
-          await new Promise<void>((resolve, reject) => {
+          // Con tope: esto corre dentro de connect(), y una foto que no termina
+          // de bajar (ni carga ni error) trababa la entrada entera a la llamada.
+          await withTimeout(new Promise<void>((resolve, reject) => {
             const image = new Image();
             image.src = processorUrl;
             image.onload = () => resolve();
             image.onerror = () => reject(new Error("bg-image-load-failed"));
-          });
+          }), BACKGROUND_SWITCH_TIMEOUT_MS, "bg-precarga");
           preloadedBackgroundsRef.current.add(processorUrl);
         }
 
@@ -1112,12 +1124,15 @@ export function useLiveKit() {
   ) => {
     // Empieza un intento nuevo: la marca de "me la tomaron" ya no aplica.
     setOtraPestanaTomoLaSesion(false);
+    setRazonDeSalida(null);
     // Guard against concurrent connect calls
     if (connectingRef.current) {
       console.warn("[LiveKit] Connect already in progress, ignoring duplicate call");
       return;
     }
     connectingRef.current = true;
+    const intento = ++intentoRef.current;
+    const vigente = () => intento === intentoRef.current;
 
     let livekitUrlForError: string | undefined;
 
@@ -1196,11 +1211,17 @@ export function useLiveKit() {
         throw new Error(`Invalid LiveKit URL: "${livekitUrl}". Ensure LIVEKIT_URL is configured.`);
       }
 
+      // Mientras se esperaba el token se pidió otro intento (o salir): este ya no
+      // es el vigente y NO crea sala.
+      if (!vigente()) return;
       const room = new Room(ROOM_OPTIONS);
       roomRef.current = room;
 
       // ── Wire events ──────────────────────────────────────────
       room.on(RoomEvent.ConnectionStateChanged, (state) => {
+        // Una sala que ya no es la vigente (se reemplazó por un reintento) no
+        // escribe el estado de la nueva.
+        if (roomRef.current !== room) return;
         setConnectionState(state);
       });
 
@@ -1444,7 +1465,12 @@ export function useLiveKit() {
       });
 
       room.on(RoomEvent.Disconnected, (razon) => {
+        // ⚠️ Solo la sala VIGENTE. El Disconnected de una sala vieja llega tarde
+        // (después de que el reintento ya empezó) y pisaba el estado de la nueva:
+        // dejaba la razón CLIENT_INITIATED y el reloj volvía a "sin cámara".
+        if (roomRef.current !== room) return;
         setOtraPestanaTomoLaSesion(esOtraPestana(razon));
+        setRazonDeSalida(razon ?? null);
         clearSyncInterval();
         clearBackgroundReapplyTimer();
         cleanupAudioResumeListeners();
@@ -1460,6 +1486,7 @@ export function useLiveKit() {
 
       // ── Connect & publish tracks ────────────────────────────
       await room.connect(livekitUrl, tokenData.token);
+      if (!vigente()) { void room.disconnect(true); return; }
       // Que la página NO se recargue sola por un deploy mientras esto dure.
       marcarLlamadaActiva(roomName);
       room.once(RoomEvent.Disconnected, () => quitarLlamadaActiva(roomName));
@@ -1552,13 +1579,17 @@ export function useLiveKit() {
         vigilarSalidaDelMicroRef.current();
       }, PARTICIPANT_SYNC_INTERVAL_MS);
     } catch (err: any) {
+      // Un intento que ya no es el vigente no escribe el estado del nuevo: su
+      // error tapaba una llamada que ya estaba conectada.
+      if (!vigente()) throw err;
       clearSyncInterval();
       setError(formatLiveKitConnectionError(err, livekitUrlForError));
       setConnectionState(ConnectionState.Disconnected);
       console.error("LiveKit connect error:", err);
       throw err;
     } finally {
-      connectingRef.current = false;
+      // Tampoco libera el cerrojo del intento que lo reemplazó.
+      if (vigente()) connectingRef.current = false;
     }
   }, [refreshParticipants, debouncedRefresh, clearSyncInterval, clearBackgroundReapplyTimer, cleanupAudioResumeListeners, hasActiveCameraPublication, enableCameraWithRecovery, disposeBackgroundProcessor, applyConfiguredBackgroundIfNeeded, applyBackgroundBeforeLocalVideoVisible, scheduleBackgroundApply, scheduleDeferredBackgroundReapply, kickAudioPlayback, vigilarMicro]);
 
@@ -1574,8 +1605,13 @@ export function useLiveKit() {
     ncProcessorRef.current = null;
     ncEnabledRef.current = false;
     setIsNoiseCancellationOn(false);
+    intentoRef.current++;
     roomRef.current?.disconnect(true);
     roomRef.current = null;
+    // Salir a propósito: el Disconnected de la sala llega después y ya no es la
+    // vigente, así que la razón se deja acá. Sin esto, salir o cambiar de sala
+    // se leía como una caída.
+    setRazonDeSalida(DisconnectReason.CLIENT_INITIATED);
     connectingRef.current = false;
     holdLocalVideoUntilBackgroundRef.current = false;
     setParticipants([]);
@@ -2332,6 +2368,7 @@ export function useLiveKit() {
     error,
     isReconnecting,
     otraPestanaTomoLaSesion,
+    razonDeSalida,
     connect,
     disconnect,
     toggleMic,

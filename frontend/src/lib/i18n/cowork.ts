@@ -124,7 +124,7 @@ export const cowork = {
     en: "Couldn't load the session (is it still active? are you an admin?).",
   },
   "cowork.incognito.banner": {
-    es: "Modo incógnito — nadie te ve ni te escucha (solo otro admin sabe que estás acá)",
+    es: "Modo incógnito — nadie te ve ni te escucha (solo otro admin sabe que estás aquí)",
     en: "Incognito mode — nobody sees or hears you (only another admin knows you're here)",
   },
   "cowork.incognito.alsoHere": { es: "También de incógnito: {names}", en: "Also incognito: {names}" },
@@ -146,6 +146,8 @@ export const cowork = {
   "cowork.clock.reason.offCamera": { es: "no estás frente a la cámara", en: "you're not in front of the camera" },
   "cowork.clock.reasonOther.noScreen": { es: "sin pantalla", en: "no screen" },
   "cowork.clock.reasonOther.offCamera": { es: "fuera de cámara", en: "off camera" },
+  "cowork.clock.reason.noConnection": { es: "sin conexión a la sala", en: "not connected to the room" },
+  "cowork.clock.reasonOther.noConnection": { es: "sin conexión", en: "disconnected" },
 
   // ── La pausa del supervisor (la tacita del Hub) ────────────────────────────
   // label / phrase / subtitle: el mismo español que lib/pausaSupervisor.
@@ -279,16 +281,17 @@ export const cowork = {
     en: "Bathroom {bathroom} min/day · Break {break} min · {supervisor}",
   },
   "cowork.rules.clock.requiresBoth": { es: "cámara y pantalla", en: "camera and screen" },
-  "cowork.rules.clock.requiresCamera": { es: "cámara (la pantalla no se exige acá)", en: "camera (screen isn't required here)" },
-  "cowork.rules.clock.requiresScreen": { es: "pantalla (la cámara no se exige acá)", en: "screen (camera isn't required here)" },
+  "cowork.rules.clock.requiresCamera": { es: "cámara (la pantalla no se exige aquí)", en: "camera (screen isn't required here)" },
+  "cowork.rules.clock.requiresScreen": { es: "pantalla (la cámara no se exige aquí)", en: "screen (camera isn't required here)" },
   "cowork.rules.clock.requiresNone": {
-    es: "estar en la sala (ni cámara ni pantalla se exigen acá)",
+    es: "estar en la sala (ni cámara ni pantalla se exigen aquí)",
     en: "being in the room (neither camera nor screen is required here)",
   },
   "cowork.rules.clock.stopPaused": { es: "en pausa", en: "when paused" },
   "cowork.rules.clock.stopNoCamera": { es: "sin cámara", en: "with no camera" },
   "cowork.rules.clock.stopNoScreen": { es: "sin pantalla", en: "with no screen" },
   "cowork.rules.clock.stopNobody": { es: "si no hay nadie {time} seguidos", en: "if nobody's on camera for {time} straight" },
+  "cowork.rules.clock.stopNoConnection": { es: "si se cae la sala más de 10 minutos en una hora", en: "if the room drops for more than 10 minutes in an hour" },
   "cowork.rules.clock.summary": { es: "Corre con {requires} · se detiene {stops}", en: "Runs with {requires} · stops {stops}" },
   "cowork.rules.saved": { es: "Reglas guardadas", en: "Rules saved" },
   "cowork.rules.savedDesc": { es: "Aplican en vivo a quienes ya están en la sesión.", en: "They apply live to everyone already in the session." },
@@ -312,7 +315,7 @@ export const cowork = {
     en: "The clock requires the same as the alerts above: if you turn off the screen alert, it won't stop over the screen; if you turn off the camera alert, it won't stop over the camera either. Ducking out of frame for a moment doesn't count against anyone: it only stops when the absence lasts longer than this. Being too far away or in low light doesn't stop it; that's handled by the framing alerts.",
   },
   "cowork.rules.logHint": {
-    es: "Los llamados de atención se registran con estas mismas reglas: si una alerta no existe acá, no queda anotada en nadie.",
+    es: "Los llamados de atención se registran con estas mismas reglas: si una alerta no existe aquí, no queda anotada en nadie.",
     en: "Warnings are logged with these same rules: if an alert doesn't exist here, it isn't logged for anyone.",
   },
   "cowork.rules.reset": { es: "Restablecer estándar", en: "Reset to standard" },
@@ -381,7 +384,7 @@ export const cowork = {
   "cowork.participant.inPrivateCall": { es: "En llamada privada...", en: "In private call..." },
   "cowork.participant.privateCallShort": { es: "Llamada privada supervisor", en: "Private call with supervisor" },
   "cowork.participant.imBack": { es: "Avisar que volviste", en: "Let them know you're back" },
-  "cowork.participant.stepAway": { es: "Avisar que te ausentás un momento", en: "Let them know you're stepping away" },
+  "cowork.participant.stepAway": { es: "Avisar que te ausentas un momento", en: "Let them know you're stepping away" },
   "cowork.participant.over": { es: "pasado", en: "over" },
   "cowork.participant.pause": { es: "Pausa", en: "Pause" },
   "cowork.participant.inMeet": { es: "Estás en un meet grupal.", en: "You're in a group meet." },
@@ -458,6 +461,8 @@ export const cowork = {
   "cowork.host.roomCloseError": { es: "No se pudo cerrar la sala", en: "Couldn't close the room" },
   "cowork.host.chip.inMeet": { es: "En meet grupal · {time}", en: "In group meet · {time}" },
   "cowork.host.chip.noScreen": { es: "Sin pantalla", en: "No screen" },
+  "cowork.host.chip.noConnection": { es: "Sin conexión con la sala", en: "Not connected to the room" },
+  "cowork.host.chip.noConnectionLong": { es: "Sin conexión · el reloj no cuenta", en: "Disconnected · clock stopped" },
   "cowork.host.room.listening": { es: "Escuchando", en: "Listening" },
   "cowork.host.room.muted": { es: "Silenciada", en: "Muted" },
   "cowork.host.room.listeningHint": {
@@ -479,13 +484,13 @@ export const cowork = {
   "cowork.host.room.talkHint": { es: "Toca para hablarle solo a esta sala.", en: "Tap to talk to this room only." },
   "cowork.host.camera": { es: "Cámara", en: "Camera" },
   "cowork.host.room.cameraOnHint": {
-    es: "Tu cámara se ve en esta sala. Toca para apagarla acá.",
+    es: "Tu cámara se ve en esta sala. Toca para apagarla aquí.",
     en: "Your camera is showing in this room. Tap to turn it off here.",
   },
   "cowork.host.room.cameraHint": { es: "Comparte tu cámara solo con esta sala.", en: "Share your camera with this room only." },
   "cowork.host.screen": { es: "Pantalla", en: "Screen" },
   "cowork.host.room.screenOnHint": {
-    es: "Tu pantalla se ve en esta sala. Toca para dejar de compartirla acá.",
+    es: "Tu pantalla se ve en esta sala. Toca para dejar de compartirla aquí.",
     en: "Your screen is showing in this room. Tap to stop sharing it here.",
   },
   "cowork.host.room.screenHint": { es: "Comparte tu pantalla solo con esta sala.", en: "Share your screen with this room only." },

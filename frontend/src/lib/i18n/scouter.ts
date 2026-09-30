@@ -173,7 +173,7 @@ export const scouter = {
   "scouter.leads.col.discovered": { es: "Descubierto", en: "Discovered" },
   "scouter.leads.manualTitle": { es: "Agregar lead manualmente", en: "Add lead manually" },
   "scouter.leads.manualDescription": {
-    es: "Inserta un @handle directo a la tabla de leads. Si tienes más datos, completalos — sino, el worker los enriquecerá después.",
+    es: "Inserta un @handle directo a la tabla de leads. Si tienes más datos, complétalos — sino, el worker los enriquecerá después.",
     en: "Insert an @handle straight into the leads table. If you have more data, fill it in — otherwise the worker will enrich it later.",
   },
   "scouter.leads.companyRequired": { es: "Compañía *", en: "Company *" },
@@ -400,7 +400,7 @@ export const scouter = {
   "scouter.onboarding.setupAccounts": { es: "Configurar cuentas", en: "Set up accounts" },
   "scouter.onboarding.labelTitle": { es: "Etiqueta y nicho", en: "Label and niche" },
   "scouter.onboarding.labelHint": {
-    es: "Ponele un nombre descriptivo a cada cuenta y elige su nicho. Esto le permite a la IA asignar leads afines a cada perfil.",
+    es: "Ponle un nombre descriptivo a cada cuenta y elige su nicho. Esto le permite a la IA asignar leads afines a cada perfil.",
     en: "Give each account a descriptive name and pick its niche. This lets the AI assign matching leads to each profile.",
   },
   "scouter.onboarding.displayName": { es: "Nombre descriptivo *", en: "Descriptive name *" },

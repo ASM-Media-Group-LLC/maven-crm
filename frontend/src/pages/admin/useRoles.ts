@@ -170,8 +170,8 @@ export const MODULES_CONFIG: ModuleConfig[] = [
   def("Menú", "Grabaciones"),
   // Oficina: la suite de la casa. Dejó de ser un módulo plano — cada formato es
   // su propia sección, y un admin puede quitarle a un rol solo las hojas sin
-  // tocar los documentos. Calendario y Drive se suman acá cuando existan.
-  def("Menú", "Oficina", ["Calendario", "Documentos", "Hojas de cálculo", "Presentaciones"]),
+  // tocar los documentos.
+  def("Menú", "Oficina", ["Calendario", "Documentos", "Hojas de cálculo", "Presentaciones", "Drive"]),
   // Contactos: subtabs de navegación + acciones de edición/borrado.
   def("Menú", "Contactos", ["Dashboard", "Contactos"], ["Crear Contacto", "Editar Contacto", "Eliminar Contacto", "Ver Teléfonos"]),
   // Creadores: subtabs del listado + tabs ANIDADOS del perfil (parent "Perfil") + acciones críticas.

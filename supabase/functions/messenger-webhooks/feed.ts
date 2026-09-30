@@ -33,7 +33,7 @@ export type PaginaDelFeed =
     cantidad: number;
     /** Las conversaciones de esos mensajes, sin repetir. */
     conversaciones: string[];
-    /** El next_cursor del feed: desde acá se lee la próxima. Texto opaco. */
+    /** El next_cursor del feed: desde aquí se lee la próxima. Texto opaco. */
     siguiente: string;
     /** Queda más por leer (página llena o todavía no se llegó al presente). */
     hayMas: boolean;

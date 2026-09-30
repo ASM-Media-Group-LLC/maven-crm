@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { describeFunctionError } from "@/hooks/useMailConnection";
@@ -202,26 +202,47 @@ export function useMailFolders(enabled: boolean) {
   });
 }
 
-export function useMailMessages(folder: string, enabled: boolean) {
+/** Correos por página, como Gmail («1–50 de 186»). */
+export const CORREOS_POR_PAGINA = 50;
+
+/** Una PÁGINA de la carpeta, de las más nuevas a las más viejas.
+ *
+ *  Grace (28/09): «¿cómo hago para ver el resto de los correos? Solo me salen
+ *  los 50 primeros y son 126 que tengo pendientes por leer». La caché tenía
+ *  los 186 de su bandeja, pero la lista pedía siempre los primeros 50 y no
+ *  había cómo pasar a los siguientes.
+ *
+ *  ⚠️ La página va en la CLAVE (["mail-messages", folder, pagina]): quien
+ *  toque la lista de una carpeta a mano tiene que usar setQueriesData con el
+ *  prefijo ["mail-messages", folder], o solo cambiaría la página 0. */
+export function useMailMessages(folder: string, enabled: boolean, pagina = 0) {
   const qc = useQueryClient();
   return useQuery({
-    queryKey: ["mail-messages", folder],
+    queryKey: ["mail-messages", folder, pagina],
     enabled: enabled && !!folder,
     ...SESION_IMAP,
     staleTime: 60 * 1000,
-    queryFn: async (): Promise<{ messages: MailSummary[] }> => {
+    // Al pasar de página se sigue viendo la anterior hasta que llega la nueva:
+    // sin esto la lista se vacía y parpadea con cada ‹ ›.
+    placeholderData: keepPreviousData,
+    queryFn: async (): Promise<{ messages: MailSummary[]; total?: number }> => {
       // Caché primero.
       // ⚠️ `as never` en la tabla: `types.ts` es generado y todavía no conoce
       // `in_reply_to` ni `refs`, así que el cliente tipado rechaza el select
       // entero. Mismo patrón que calendar_events y document_shares.
       const COLUMNAS_BASE =
         "id, uid, from_addr, to_addr, cc_addr, subject, date, snippet, unread, message_id";
+      const desde = pagina * CORREOS_POR_PAGINA;
       const traer = (cols: string) =>
         supabase.from("mail_messages" as never)
-          .select(cols)
+          // El total viene en la MISMA consulta: es el «de 186» de Gmail.
+          .select(cols, { count: "exact" })
           .eq("folder", folder)
           .order("date", { ascending: false })
-          .limit(50);
+          // Desempate estable: con dos correos a la misma hora, sin esto uno
+          // podía salir en la página 1 Y en la 2 (o en ninguna).
+          .order("uid", { ascending: false })
+          .range(desde, desde + CORREOS_POR_PAGINA - 1);
 
       // ⚠️ SE DEGRADA EN VEZ DE CAERSE.
       //
@@ -234,14 +255,18 @@ export function useMailMessages(folder: string, enabled: boolean) {
       //
       // Si faltan, se reintenta sin ellas: los hilos se agrupan por asunto,
       // que es el camino de respaldo que ya existe, y la bandeja se ve.
-      let { data, error } = await traer(`${COLUMNAS_BASE}, in_reply_to, refs`);
+      let { data, error, count } = await traer(`${COLUMNAS_BASE}, in_reply_to, refs`);
       if (error && /in_reply_to|refs/.test(error.message ?? "")) {
-        ({ data, error } = await traer(COLUMNAS_BASE));
+        ({ data, error, count } = await traer(COLUMNAS_BASE));
       }
       if (error) throw error;
-      if (data && data.length > 0) {
+      // ⚠️ De la página 2 en adelante NUNCA se cae al camino en vivo: una
+      // página vacía (se borraron correos y la lista se achicó) es un vacío de
+      // verdad, no una caché sin sincronizar.
+      if ((data && data.length > 0) || pagina > 0) {
         return {
-          messages: (data as unknown as Record<string, unknown>[]).map((m) => ({
+          total: count ?? undefined,
+          messages: ((data ?? []) as unknown as Record<string, unknown>[]).map((m) => ({
             id: m.id as string,
             uid: m.uid as number,
             from: (m.from_addr as string) ?? "",
@@ -379,8 +404,8 @@ export function useMarkSeen() {
       if (m.seq) await callMail({ action: "mark_seen", folder, seq: m.seq });
     },
     onMutate: ({ folder, m }) => {
-      qc.setQueryData(
-        ["mail-messages", folder],
+      qc.setQueriesData(
+        { queryKey: ["mail-messages", folder] },
         (prev: { messages?: MailSummary[] } | undefined) =>
           prev?.messages
             ? {
@@ -440,8 +465,8 @@ export function useMailBulk() {
     },
     onMutate: ({ folder, op, items }) => {
       const claves = new Set(items.map(claveDe));
-      qc.setQueryData(
-        ["mail-messages", folder],
+      qc.setQueriesData(
+        { queryKey: ["mail-messages", folder] },
         (prev: { messages?: MailSummary[] } | undefined) => {
           if (!prev?.messages) return prev;
           const messages = op === "seen" || op === "unseen"
@@ -456,6 +481,12 @@ export function useMailBulk() {
       qc.invalidateQueries({ queryKey: ["mail-folders"] });
       qc.invalidateQueries({ queryKey: ["mail-search"] });
       qc.invalidateQueries({ queryKey: ["sidebar-badges"] });
+      // Y lo que se arma desde la caché CRUZANDO carpetas: la vista de una
+      // etiqueta y su contador. Un correo movido cambia de carpeta en la caché
+      // (el servidor traslada la fila); sin esto la etiqueta seguía mostrando
+      // la foto vieja durante su staleTime.
+      qc.invalidateQueries({ queryKey: ["mail-por-etiqueta"] });
+      qc.invalidateQueries({ queryKey: ["mail-labels-unread"] });
     },
   });
 }

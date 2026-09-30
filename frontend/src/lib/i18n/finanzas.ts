@@ -714,7 +714,7 @@ export const finanzas = {
 
   // ─── Fondos propios de la videollamada (hooks/useFondosPropios.ts) ────
   "callBg.saveFailed": { es: "No se pudo guardar el fondo", en: "Couldn't save the background" },
-  "callBg.limit": { es: "Se guardan hasta {max}. Borrá uno y volvé a intentar.", en: "You can save up to {max}. Delete one and try again." },
-  "callBg.unreadable": { es: "Este navegador no puede abrir esa imagen. Probá con un JPG o un PNG.", en: "This browser can't open that image. Try a JPG or a PNG." },
+  "callBg.limit": { es: "Se guardan hasta {max}. Borra uno y vuelve a intentar.", en: "You can save up to {max}. Delete one and try again." },
+  "callBg.unreadable": { es: "Este navegador no puede abrir esa imagen. Prueba con un JPG o un PNG.", en: "This browser can't open that image. Try a JPG or a PNG." },
   "callBg.noStorage": { es: "Este navegador no está guardando datos del sitio, así que el fondo no se puede recordar.", en: "This browser isn't saving site data, so the background can't be remembered." },
 } as const satisfies Record<string, { es: string; en: string }>;

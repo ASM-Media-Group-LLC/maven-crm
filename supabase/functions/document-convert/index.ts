@@ -291,7 +291,7 @@ Deno.serve(async (req) => {
       // 429 y no un error: el navegador reintenta solo. Es una fila de espera,
       // no una falla.
       return responder(
-        { error: "Hay otras conversiones en curso. Reintentá en unos segundos.", reintentar: true },
+        { error: "Hay otras conversiones en curso. Reintenta en unos segundos.", reintentar: true },
         429,
       );
     }

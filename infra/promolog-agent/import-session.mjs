@@ -52,7 +52,7 @@ if (!SITES[site]) { console.error("Uso: node import-session.mjs <x|instagram|fac
 // cookies inservibles — el mismo falso éxito que el botón "ya me logueé".
 if (site === "telegram") {
   console.error("Telegram no se importa desde el navegador: su sesión vive en el localStorage, no en las cookies.");
-  console.error("Usá el panel → Telegram → Loguear, y escaneá el QR desde el celular.");
+  console.error("Usa el panel → Telegram → Loguear, y escanea el QR desde el celular.");
   process.exit(1);
 }
 
@@ -101,7 +101,7 @@ const candidatos = (flagPedido ? [flagPedido] : NAVEGADORES).flatMap(perfilesDe)
 if (!candidatos.length) {
   if (flagPedido) {
     console.error(`Pediste ${flagPedido.nombre}, pero no tiene ningún perfil en esta máquina (${flagPedido.dir.replace(homedir(), "~")}).`);
-    console.error(`Con perfil acá: ${NAVEGADORES.flatMap(perfilesDe).map((p) => `${p.nav.nombre} ${p.nav.flag}`).filter((v, i, a) => a.indexOf(v) === i).join(", ") || "ninguno"}`);
+    console.error(`Con perfil aquí: ${NAVEGADORES.flatMap(perfilesDe).map((p) => `${p.nav.nombre} ${p.nav.flag}`).filter((v, i, a) => a.indexOf(v) === i).join(", ") || "ninguno"}`);
   } else {
     console.error("No encontré ningún navegador con perfil en esta máquina.");
     console.error("Buscado en: " + NAVEGADORES.map((n) => n.dir.replace(homedir(), "~")).join(", "));
@@ -205,8 +205,8 @@ for (const r of revisados) {
 
 if (!elegido) {
   console.error(`\n❌ Ninguno de los ${revisados.length} perfiles revisados tiene sesión de ${site} (falta ${QUE_FALTA[site]}).`);
-  console.error(`   Abrí ${SITES[site].origin}, logueate, CERRÁ el navegador entero y repetí.`);
-  console.error("   Si te logueaste recién, puede que el navegador todavía no haya escrito las cookies al disco: cerralo del todo (Cmd+Q).");
+  console.error(`   Abre ${SITES[site].origin}, loguéate, CIERRA el navegador entero y repite.`);
+  console.error("   Si te logueaste recién, puede que el navegador todavía no haya escrito las cookies al disco: ciérralo del todo (Cmd+Q).");
   console.error("   (No escribí nada: la sesión anterior queda como estaba.)");
   process.exit(1);
 }

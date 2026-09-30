@@ -50,6 +50,7 @@ const GrabacionesPage = lazy(() => import("./pages/grabaciones/GrabacionesPage")
 const OficinaPage = lazy(() => import("./pages/oficina/OficinaPage"));
 const CalendarioPage = lazy(() => import("./pages/calendario/CalendarioPage"));
 const DocumentoPage = lazy(() => import("./pages/oficina/DocumentoPage"));
+const DrivePage = lazy(() => import("./pages/oficina/DrivePage"));
 // Correo (Zoho detrás). Ya está en UNIVERSAL_MODULES (usePermissions), o sea que
 // se ve por default como Messenger/Cowork/Meet; un admin puede apagárselo a un rol
 // desde Administración → Roles, donde ahora figura (MODULES_CONFIG en useRoles.ts).
@@ -356,6 +357,7 @@ const App = () => (
                 <Route path="/oficina/calendario" element={<PermissionRoute module="Oficina" submodule="Calendario"><CalendarioPage /></PermissionRoute>} />
                 <Route path="/oficina/hojas" element={<PermissionRoute module="Oficina" submodule="Hojas de cálculo"><OficinaPage formato="xlsx" /></PermissionRoute>} />
                 <Route path="/oficina/presentaciones" element={<PermissionRoute module="Oficina" submodule="Presentaciones"><OficinaPage formato="pptx" /></PermissionRoute>} />
+                <Route path="/oficina/drive" element={<PermissionRoute module="Oficina" submodule="Drive"><DrivePage /></PermissionRoute>} />
                 <Route path="/oficina/:id" element={<PermissionRoute module="Oficina"><DocumentoPage /></PermissionRoute>} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/notificaciones" element={<Notificaciones />} />

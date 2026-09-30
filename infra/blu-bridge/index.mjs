@@ -807,7 +807,7 @@ async function runOnce(acct, firstRun = false, quickDays = null) {
 
 function warnIfExpired(acct, e) {
   console.error(`[blu-bridge:${acct?.account ?? "?"}] error:`, e.message);
-  if (e.expired) console.error(`[blu-bridge:${acct?.account ?? "?"}] ⚠ Renová el JWT (${acct?.account === "massive" ? "BLU_JWT_MASSIVE" : "BLU_JWT"}) desde BLU y re-seedeá el secreto en Dokploy.`);
+  if (e.expired) console.error(`[blu-bridge:${acct?.account ?? "?"}] ⚠ Renueva el JWT (${acct?.account === "massive" ? "BLU_JWT_MASSIVE" : "BLU_JWT"}) desde BLU y re-seedea el secreto en Dokploy.`);
 }
 
 // Deja la salud del puente en un lugar CONSULTABLE (blu_bridge_state), no solo en
