@@ -4,12 +4,18 @@
 // Se monta la pantalla real; lo que se reemplaza es lo que trae datos y el
 // selector del título (SelectorDeTablero, de otra pantalla).
 import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { configure, render, screen, fireEvent, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { LanguageProvider } from "@/hooks/useLanguage";
 import type { NotaDelBot } from "@/pages/manager/useManagerDashboard";
 import { enEspanol, prepararJsdom } from "./visibles";
+
+// Pantallas enteras con diálogos: con la suite corriendo en paralelo (o la
+// máquina cargada) el segundo de findBy y los 5 s por test no alcanzan y el
+// test falla sin que haya nada roto. Mismo arreglo que admin/adminEnIngles.
+configure({ asyncUtilTimeout: 5000 });
+vi.setConfig({ testTimeout: 30_000 });
 
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const HOY = iso(new Date());

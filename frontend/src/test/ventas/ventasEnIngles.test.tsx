@@ -4,12 +4,18 @@
 // Las tarjetas de Ventas reciben todo por props: se montan tal cual. Oportunidades
 // y las dos pestañas del Panel leen de Supabase: se reemplaza solo el cliente.
 import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { configure, render, screen, fireEvent, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { LanguageProvider } from "@/hooks/useLanguage";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import type { PeriodComparisonResult, CreatorComparison } from "@/pages/sales-overview/usePeriodComparison";
 import { enEspanol, prepararJsdom } from "./visibles";
+
+// Pantallas enteras con diálogos: con la suite corriendo en paralelo (o la
+// máquina cargada) el segundo de findBy y los 5 s por test no alcanzan y el
+// test falla sin que haya nada roto. Mismo arreglo que admin/adminEnIngles.
+configure({ asyncUtilTimeout: 5000 });
+vi.setConfig({ testTimeout: 30_000 });
 
 // ── Supabase: cada tabla devuelve lo suyo ────────────────────────────────
 const OPORTUNIDADES = [

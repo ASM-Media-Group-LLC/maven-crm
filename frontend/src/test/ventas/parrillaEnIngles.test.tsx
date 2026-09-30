@@ -8,11 +8,17 @@
 // (.print-hide), que son controles del editor y sí se revisan. Los atributos
 // (placeholder, title) se revisan en todas partes.
 import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { configure, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { LanguageProvider } from "@/hooks/useLanguage";
 import type { ContentGrid, GridDay } from "@/pages/parrilla/useParrilla";
 import { enEspanol, prepararJsdom } from "./visibles";
+
+// Pantallas enteras con diálogos: con la suite corriendo en paralelo (o la
+// máquina cargada) el segundo de findBy y los 5 s por test no alcanzan y el
+// test falla sin que haya nada roto. Mismo arreglo que admin/adminEnIngles.
+configure({ asyncUtilTimeout: 5000 });
+vi.setConfig({ testTimeout: 30_000 });
 
 const hoyBogota = new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
 const masDias = (iso: string, n: number) => {

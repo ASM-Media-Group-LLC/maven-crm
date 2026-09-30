@@ -5,11 +5,17 @@
 // reemplaza es solo lo que trae datos (usePersonalizados) y la ficha del
 // Messenger (ProfileCard), que no es de este módulo.
 import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { configure, render, screen, fireEvent, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { LanguageProvider } from "@/hooks/useLanguage";
 import type { Pedido, PedidoAdjunto, PedidoEvento } from "@/pages/personalizados/types";
 import { enEspanol, prepararJsdom } from "./visibles";
+
+// Pantallas enteras con diálogos: con la suite corriendo en paralelo (o la
+// máquina cargada) el segundo de findBy y los 5 s por test no alcanzan y el
+// test falla sin que haya nada roto. Mismo arreglo que admin/adminEnIngles.
+configure({ asyncUtilTimeout: 5000 });
+vi.setConfig({ testTimeout: 30_000 });
 
 const diaHace = (n: number) => {
   const d = new Date();
@@ -51,6 +57,10 @@ const NOMBRES: Record<string, string> = { u1: "Laura Gomez" };
 // Lo que el test cambia: los pedidos que "hay" y los permisos de quien mira.
 let pedidos: Pedido[] = PEDIDOS;
 let puedeAprobar = true;
+// Quién está usando la pantalla. "u1" es chatter (está en PERFILES): el alta
+// arranca con él como vendedor. Otro id = un supervisor que carga un pedido
+// ajeno, y el selector queda vacío mostrando su placeholder.
+let yo = "u1";
 
 vi.mock("@/pages/personalizados/usePersonalizados", async () => {
   const real = await vi.importActual<typeof import("@/pages/personalizados/usePersonalizados")>("@/pages/personalizados/usePersonalizados");
@@ -70,7 +80,7 @@ vi.mock("@/pages/personalizados/usePersonalizados", async () => {
 });
 vi.mock("@/pages/messenger/components/ProfileCard", () => ({ default: () => null }));
 vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ canAccess: () => true, explicitPermission: () => null, isLoading: false }) }));
-vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "u1" } }) }));
+vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: yo } }) }));
 vi.mock("react-router-dom", () => ({
   Link: ({ children }: { children: React.ReactNode }) => children,
   useNavigate: () => () => {},
@@ -97,6 +107,7 @@ describe("Personalizados en inglés", () => {
     localStorage.removeItem("maven.personalizados.agencia");
     pedidos = PEDIDOS;
     puedeAprobar = true;
+    yo = "u1";
   });
 
   it("la lista, el resumen y los filtros no tienen nada en español", async () => {
@@ -158,6 +169,15 @@ describe("Personalizados en inglés", () => {
     // El aviso de monto imposible, con su detalle.
     fireEvent.change(within(dialogo).getAllByPlaceholderText("200")[0], { target: { value: "5500000" } });
     expect(await within(dialogo).findByText(/That looks like a typo/)).toBeTruthy();
+    expect(enEspanol(dialogo)).toEqual([]);
+  });
+
+  it("el alta la carga alguien que no es chatter: el selector de vendedor, vacío, también en inglés", async () => {
+    yo = "sup1";
+    montar();
+    fireEvent.click(await screen.findByRole("button", { name: /New order/ }));
+    const dialogo = await screen.findByRole("dialog");
+    expect(within(dialogo).getByText("Who sold the order")).toBeTruthy();
     expect(enEspanol(dialogo)).toEqual([]);
   });
 

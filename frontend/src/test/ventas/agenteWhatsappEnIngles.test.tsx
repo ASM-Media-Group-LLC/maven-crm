@@ -6,13 +6,19 @@
 // (hooks/useWhatsappAgent). Los datos de prueba vienen en inglés o son nombres:
 // lo que se busca es el español de la PANTALLA, no el de los mensajes del grupo.
 import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { configure, render, screen, fireEvent, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { LanguageProvider } from "@/hooks/useLanguage";
 import type {
   WhatsappCommitment, WhatsappCostRow, WhatsappDailyReport, WhatsappGroup, WhatsappMember, WhatsappMessage,
 } from "@/hooks/useWhatsappAgent";
 import { enEspanol, prepararJsdom } from "./visibles";
+
+// Pantallas enteras con diálogos: con la suite corriendo en paralelo (o la
+// máquina cargada) el segundo de findBy y los 5 s por test no alcanzan y el
+// test falla sin que haya nada roto. Mismo arreglo que admin/adminEnIngles.
+configure({ asyncUtilTimeout: 5000 });
+vi.setConfig({ testTimeout: 30_000 });
 
 const ahora = "2026-09-20T15:00:00Z";
 const GRUPO: WhatsappGroup = {
