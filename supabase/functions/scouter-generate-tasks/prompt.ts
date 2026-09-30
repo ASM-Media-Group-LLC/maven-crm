@@ -41,7 +41,7 @@ REGLAS DE PLANIFICACIÓN
    - score >= 8 (high_fit) sin interacciones previas → 4 tareas: story_view → like → like → comment. Multi-cuenta si hay 2+ afines.
    - score 6-7 (medium_fit) sin interacciones → 3 tareas: story_view → like → comment ligero (solo si hay recent_posts útiles).
    - score < 6 (cold) → 2 tareas: follow + 1 like. NO comment en cold.
-   - re_engage (interaction_count > 0 y days_since_assigned > 7) → 2 tareas: like reciente + comment "vuelvo a estar acá". Misma cuenta que la última vez.
+   - re_engage (interaction_count > 0 y days_since_assigned > 7) → 2 tareas: like reciente + comment "vuelvo a estar aquí". Misma cuenta que la última vez.
    - convert (interaction_count >= 3, outcome positivo previo) → 1-2 tareas: comment provocativo + story_react que invite a DM.
 
 2. CRITERIO DE CUENTA DEL SPAMMER

@@ -95,7 +95,7 @@ const ClariAiFab = ({ anclarPanel }: { anclarPanel: (ancho: number, alto: number
   return (
     <>
       {/* Botón de Clari. El arrastre lo maneja el muelle que lo contiene, así
-          que acá alcanza con un onClick normal. */}
+          que aquí alcanza con un onClick normal. */}
       <button
         type="button"
         onClick={() => setOpen((o) => { if (!o) setHasActivity(true); return !o; })}

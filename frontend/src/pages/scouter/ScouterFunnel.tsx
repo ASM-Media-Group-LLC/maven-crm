@@ -237,7 +237,7 @@ const ScouterFunnel = () => {
 
       {/* ─── Sección: Progreso del equipo ─────────────────────────────
           Vivía en ScouterHome arriba de los filtros, pero ocupaba mucho
-          espacio vertical en una vista enfocada a Listado. Acá tiene su
+          espacio vertical en una vista enfocada a Listado. Aquí tiene su
           lugar natural junto al Funnel. */}
       <div className="pt-2 border-t border-border/60">
         <div className="pt-4">

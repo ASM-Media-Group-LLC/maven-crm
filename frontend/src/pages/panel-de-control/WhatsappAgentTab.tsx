@@ -969,7 +969,7 @@ function AskAgentDialog({
         <Textarea
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
-          placeholder='Ej: "¿Qué pendientes tiene Miguel esta semana?" o "Pasame el estado del lead de Camila Pérez"'
+          placeholder='Ej: "¿Qué pendientes tiene Miguel esta semana?" o "Pásame el estado del lead de Camila Pérez"'
           rows={4}
         />
         {askMut.data?.final_reply && (

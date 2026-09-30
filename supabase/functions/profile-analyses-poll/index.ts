@@ -239,7 +239,7 @@ async function sweepHandleCheckJobs(
       }
       const handles: string[] = Array.isArray(job.handles) ? job.handles : [];
       const quien = job.requested_by ? ` ${job.requested_by},` : "";
-      const body = `⚠️${quien} no pude completar el chequeo de ${handles.map((h) => `@${h}`).join(", ")} — el scraper no respondió a tiempo. Reintentá pidiéndomelo de nuevo en unos minutos.`;
+      const body = `⚠️${quien} no pude completar el chequeo de ${handles.map((h) => `@${h}`).join(", ")} — el scraper no respondió a tiempo. Reintenta pidiéndomelo de nuevo en unos minutos.`;
       try {
         await fetch(`${env.SUPABASE_URL}/functions/v1/whatsapp-send`, {
           method: "POST",

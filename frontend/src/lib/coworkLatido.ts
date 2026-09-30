@@ -10,7 +10,7 @@
 // tiene que seguir aunque la pantalla de Cowork se desmonte. Se detiene solo
 // cuando la persona SALE de la sala.
 import { supabase } from "@/integrations/supabase/client";
-import { INTERVALO_LATIDO_MS, type Latido } from "@/lib/coworkTiempoRegla";
+import { ESTADOS_TIEMPO, INTERVALO_LATIDO_MS, type Latido } from "@/lib/coworkTiempoRegla";
 import type { RelojCowork } from "@/lib/coworkReloj";
 
 export { INTERVALO_LATIDO_MS };
@@ -36,7 +36,10 @@ function fijarReloj(r: RelojCowork | null): void {
   }
 }
 
-const ESTADOS = new Set(["activo", "pausa", "sin_camara", "sin_pantalla", "fuera_de_camara", "meet"]);
+// Sale de la regla, NO se copia a mano: una lista escrita a mano descartaba en
+// silencio cualquier estado nuevo, y el cronómetro seguía corriendo en verde en
+// la pantalla de la persona mientras el servidor lo tenía detenido.
+const ESTADOS = new Set<string>(ESTADOS_TIEMPO);
 
 /** Interpreta la respuesta del servidor. Exportado para probarlo. */
 export function relojDeRespuesta(json: unknown, ahora: number): RelojCowork | null {
@@ -45,6 +48,33 @@ export function relojDeRespuesta(json: unknown, ahora: number): RelojCowork | nu
   if (typeof j.estado !== "string" || !ESTADOS.has(j.estado)) return null;
   const seg = typeof j.segundosHoy === "number" ? j.segundosHoy : 0;
   return { estado: j.estado as RelojCowork["estado"], segundosHoy: seg, en: ahora };
+}
+
+// ── Quién late: un identificador por PESTAÑA ────────────────────────────────
+// Con Cowork abierto en dos equipos, los dos latían y se pisaban el único tramo
+// abierto de la persona: el tiempo trabajado en uno no sumaba mientras el otro
+// siguiera abierto fuera de la sala. Con esto la edge sabe cuál es cuál e ignora
+// al que quedó afuera (ver latidoDeEquipoAfuera). En sessionStorage: sobrevive
+// al F5 de la misma pestaña y cada pestaña o equipo tiene el suyo.
+const CLAVE_EQUIPO = "cowork-equipo";
+let equipoEnMemoria: string | null = null;
+
+function nuevoId(): string {
+  try { if (typeof crypto?.randomUUID === "function") return crypto.randomUUID(); } catch { /* sin crypto */ }
+  return `e-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+/** Exportado para probarlo. Sin almacenamiento (ventana privada) queda en memoria. */
+export function equipoDeEstaPestana(): string {
+  if (equipoEnMemoria) return equipoEnMemoria;
+  try {
+    const guardado = sessionStorage.getItem(CLAVE_EQUIPO);
+    if (guardado) { equipoEnMemoria = guardado; return guardado; }
+  } catch { /* sin almacenamiento */ }
+  const id = nuevoId();
+  equipoEnMemoria = id;
+  try { sessionStorage.setItem(CLAVE_EQUIPO, id); } catch { /* sin almacenamiento */ }
+  return id;
 }
 
 /** Un cambio de estado se manda enseguida, con un respiro para juntar los
@@ -60,12 +90,19 @@ interface Vivo {
   cada: Intervalo;
   pendiente: Espera | null;
   enviando: boolean;
+  /** Llegó un cambio mientras había un latido en vuelo: se manda apenas vuelve.
+   *  Antes se descartaba y podía tardar hasta el próximo latido (30 s). */
+  otraVez: boolean;
 }
 
 let vivo: Vivo | null = null;
 
 async function enviar(v: Vivo): Promise<void> {
-  if (v.enviando) return;
+  // Otra pestaña u otro equipo tomó su lugar en la sala: late ESE, que es el que
+  // de verdad está adentro. Si latieran los dos se pisarían el único tramo
+  // abierto de la persona.
+  if (v.estado.conexionSala === "reemplazada") return;
+  if (v.enviando) { v.otraVez = true; return; }
   v.enviando = true;
   try {
     const { data: { session } } = await supabase.auth.getSession();
@@ -78,7 +115,7 @@ async function enviar(v: Vivo): Promise<void> {
         apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
         Authorization: `Bearer ${session.access_token}`,
       },
-      body: JSON.stringify({ action: "latido", sessionId: v.sessionId, ...v.estado }),
+      body: JSON.stringify({ action: "latido", sessionId: v.sessionId, equipo: equipoDeEstaPestana(), ...v.estado }),
     });
     if (res.ok && vivo === v) {
       const r = relojDeRespuesta(await res.json().catch(() => null), Date.now());
@@ -88,6 +125,10 @@ async function enviar(v: Vivo): Promise<void> {
     /* el próximo latido lo vuelve a intentar; un latido perdido no rompe nada */
   } finally {
     v.enviando = false;
+    if (v.otraVez && vivo === v) {
+      v.otraVez = false;
+      void enviar(v);
+    }
   }
 }
 
@@ -96,7 +137,9 @@ function afectaAlReloj(a: Latido, b: Latido): boolean {
   return a.camOn !== b.camOn
     || a.screenShareOn !== b.screenShareOn
     || !!a.onBreak !== !!b.onBreak
-    || (a.faceState === "no_face") !== (b.faceState === "no_face");
+    || (a.faceState === "no_face") !== (b.faceState === "no_face")
+    // Perder la sala y recuperarla: tiene que llegar enseguida, no en 30 s.
+    || (a.conexionSala === "desconectada") !== (b.conexionSala === "desconectada");
 }
 
 /** Empieza a latir para esta sesión. Idempotente: si ya late para la misma
@@ -110,6 +153,7 @@ export function iniciarLatido(sessionId: string, estadoInicial: Latido): void {
     cada: setInterval(() => { void enviar(v); }, INTERVALO_LATIDO_MS),
     pendiente: null,
     enviando: false,
+    otraVez: false,
   };
   vivo = v;
   void enviar(v);

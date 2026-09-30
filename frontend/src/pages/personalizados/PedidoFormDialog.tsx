@@ -235,12 +235,12 @@ export default function PedidoFormDialog({ open, onOpenChange, pedido, agenciaPo
               <p className="col-span-3 text-[11px] text-warning">Saldo pendiente: ${saldo.toFixed(0)}</p>
             )}
             {/* Del sheet llegaron precios de "$5.500.000": si el monto es imposible
-                se avisa acá y el pedido queda marcado para revisar. */}
+                se avisa aquí y el pedido queda marcado para revisar. */}
             {(precioRaro || gastoRaro) && (
               <p className="col-span-3 text-[11px] text-warning">
                 ¿{precioRaro ? usd(num(precio)) : usd(num(gastoFan))}? Parece un error de tipeo
                 ({precioRaro ? `un personalizado ronda los $150; el techo son ${usd(TECHO_PRECIO)}` : `el techo del gasto del fan son ${usd(TECHO_GASTO_FAN)}`}).
-                Si lo guardás así, el pedido queda marcado como "monto por revisar".
+                Si lo guardas así, el pedido queda marcado como "monto por revisar".
               </p>
             )}
           </div>

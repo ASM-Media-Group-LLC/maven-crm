@@ -147,7 +147,7 @@ const TelegramChannelsPage = () => {
         </div>
         <p className="text-[11px] text-muted-foreground">
           Cada conversación NUEVA de una línea se asigna automáticamente a quien marques (puedes elegir
-          varias personas) — igual que en WhatsApp. Las líneas aparecen acá solas al recibir su primer mensaje.
+          varias personas) — igual que en WhatsApp. Las líneas aparecen aquí solas al recibir su primer mensaje.
         </p>
         {isLoading ? (
           <div className="flex justify-center py-6 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" /></div>

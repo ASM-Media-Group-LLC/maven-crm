@@ -64,7 +64,7 @@ export const ajustes = {
   "settings.waSaved": { es: "Número de WhatsApp guardado", en: "WhatsApp number saved" },
   "settings.waSavedDesc": { es: "Ahora toca \"Verificar por WhatsApp\" y envíale el código al bot.", en: "Now tap \"Verify via WhatsApp\" and send the code to the bot." },
   "settings.waDuplicate": { es: "Ese número ya está en uso por otro usuario", en: "That number is already in use by another user" },
-  "settings.waDuplicateDesc": { es: "Si te lo apropiaste recientemente, pediles que se lo saquen primero.", en: "If you recently took it over, ask them to remove it first." },
+  "settings.waDuplicateDesc": { es: "Si te lo apropiaste recientemente, pídeles que se lo saquen primero.", en: "If you recently took it over, ask them to remove it first." },
   "settings.waBadFormat": { es: "Formato inválido", en: "Invalid format" },
   "settings.waBadFormatDesc": { es: "Tiene que ser E.164 (ej. +573001234567 o +5491112345678).", en: "It must be E.164 (e.g. +573001234567 or +5491112345678)." },
   "settings.waCodeGenerated": { es: "Código generado", en: "Code generated" },

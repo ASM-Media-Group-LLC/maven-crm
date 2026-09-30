@@ -127,7 +127,7 @@ export async function runX({ account = { sessionFile: X_SESSION, index: 0, count
   const sesion = sesionUsable(sessionFile, "x");
   if (!sesion.ok) {
     log(`⚠️ X: ${sesion.motivo}. NO se escanea (correr sin sesión solo produce falsos "no promocionó").`);
-    log("   X bloquea el login automatizado: logueate en Chrome, cerralo, y corré  node import-session.mjs x");
+    log("   X bloquea el login automatizado: loguéate en Chrome, ciérralo, y corre  node import-session.mjs x");
     return;
   }
   let targets = await fetchTargets();
@@ -148,7 +148,7 @@ export async function runX({ account = { sessionFile: X_SESSION, index: 0, count
     try {
       await page.goto(`https://x.com/${handle}`, { waitUntil: "domcontentloaded", timeout: PACING.navTimeoutMs });
       // ¿nos mandó a login? → sesión caída.
-      if (/\/i\/flow\/login|\/login/.test(page.url())) { log("⛔ X: sesión caída, re-logueá la cuenta."); break; }
+      if (/\/i\/flow\/login|\/login/.test(page.url())) { log("⛔ X: sesión caída, re-loguea la cuenta."); break; }
       // INTERSTICIAL DE CONTENIDO SENSIBLE: X esconde el timeline de las creadoras
       // adultas tras un "Sí, ver perfil". Sin este clic el perfil daba 0 tweets
       // SIEMPRE (verificado: elonmusk 5 tweets vs eliloaiza/bysaritac 0).

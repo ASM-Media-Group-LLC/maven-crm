@@ -9,6 +9,9 @@ vi.mock("react-router-dom", () => ({
   useSearchParams: () => [new URLSearchParams(), vi.fn()],
 }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+// La sección de Etiquetas usa el diccionario (t()).
+vi.mock("@/hooks/useLanguage", (original) =>
+  import("@/test/messenger/espanolEnTests").then((m) => m.idiomaEnEspanol(original)));
 
 vi.mock("@/hooks/useMailbox", async (original) => ({
   ...(await original<typeof import("@/hooks/useMailbox")>()),

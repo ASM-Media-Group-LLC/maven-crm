@@ -67,9 +67,9 @@ export const UI_HOST = process.env.UI_HOST || "127.0.0.1";
 export function assertConfig() {
   const errs = [];
   if (!EXT_TOKEN) errs.push("Falta PROMOLOG_EXT_TOKEN (el mismo token de la extensión / secret de Supabase).");
-  if (!existsSync(SESSIONS_DIR)) errs.push(`Falta la carpeta de sesiones: ${SESSIONS_DIR}. Corré primero: npm run login.`);
+  if (!existsSync(SESSIONS_DIR)) errs.push(`Falta la carpeta de sesiones: ${SESSIONS_DIR}. Corre primero: npm run login.`);
   for (const a of ACCOUNTS) {
-    if (!existsSync(a.sessionFile)) errs.push(`Falta la sesión del slot "${a.slot}": ${a.sessionFile}. Corré: node login.mjs ${a.slot}`);
+    if (!existsSync(a.sessionFile)) errs.push(`Falta la sesión del slot "${a.slot}": ${a.sessionFile}. Corre: node login.mjs ${a.slot}`);
   }
   if (errs.length) { console.error("Config incompleta:\n- " + errs.join("\n- ")); process.exit(1); }
 }

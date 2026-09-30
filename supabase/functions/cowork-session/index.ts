@@ -1,7 +1,10 @@
 import { corsFor } from "../_shared/cors.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { estadoDeTiempo, LATIDO_VENCIDO_MS, type Exigencias } from "../_shared/cowork-tiempo.ts";
+import {
+  caidaSePaga, equipoDeCuerpo, estadoDeTiempo, latidoDeCuerpo, latidoDeEquipoAfuera, noCobrabaAlCaerse, sinConexionPagadaMs,
+  LATIDO_VENCIDO_MS, TOPE_SIN_CONEXION_MS, VENTANA_SIN_CONEXION_MS, type Exigencias, type TramoGuardado,
+} from "../_shared/cowork-tiempo.ts";
 
 const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
 
@@ -594,18 +597,18 @@ serve(async (req) => {
       // (managers), el reloj no se detiene por pantalla. Jhon, 07/09.
       const exige = exigenciasDelReloj(sesionReloj?.alert_rules);
 
-      const { estado, detalle } = estadoDeTiempo({
-        camOn: body.camOn === true,
-        screenShareOn: body.screenShareOn === true,
-        faceState: typeof body.faceState === "string" ? body.faceState : null,
-        faceSince: typeof body.faceSince === "number" ? body.faceSince : null,
-        onBreak: !!pausa || body.onBreak === true,
-        enMeet: !!enMeet,
-      }, ahora, umbralMs, exige);
-
+      // El tramo abierto se lee ANTES de decidir: si la sala está caída, qué se
+      // paga depende de él (y de las caídas de la última hora). Nunca de un dato
+      // del navegador.
       const { data: abierto } = await admin.from("cowork_tiempo_segmentos")
-        .select("id, estado, room_id, session_id, last_seen_at")
+        .select("id, estado, room_id, session_id, started_at, last_seen_at, equipo")
         .eq("user_id", userId).is("ended_at", null).maybeSingle();
+      const vigente = !!abierto
+        && abierto.room_id === asignacion.room_id && abierto.session_id === sessionId
+        && ahora - new Date(abierto.last_seen_at).getTime() <= LATIDO_VENCIDO_MS;
+
+      const latido = latidoDeCuerpo(body, { enPausa: !!pausa, enMeet: !!enMeet });
+      const equipo = equipoDeCuerpo(body);
 
       // Lo que lleva HOY (día de Bogotá) con el reloj corriendo. Va en cada
       // respuesta para que la persona vea su cronómetro sin otra consulta, y
@@ -616,12 +619,39 @@ serve(async (req) => {
         return Number(data?.[0]?.seg_activo ?? 0);
       };
 
+      // Otro equipo de la misma persona sigue EN la sala y este quedó afuera: no
+      // se toca el tramo (si no, se lo pisaban cada 30 s y no sumaba nada). Se
+      // contesta con el reloj de verdad para que esta pestaña lo muestre igual.
+      if (abierto && latidoDeEquipoAfuera(abierto, equipo, latido.conexionSala, ahora)) {
+        return json(req, { ok: true, estado: abierto.estado, detalle: null, segmento: abierto.id, otroEquipo: true, segundosHoy: await segundosHoy() });
+      }
+
+      // Solo si dice que se cayó la sala: los demás latidos no pagan esta consulta.
+      // Trae lo que la persona VIVIÓ en la última ventana (por último latido, así
+      // entra también un tramo largo que empezó antes), más el abierto:
+      //  · el presupuesto de caídas pagadas se cuenta en TODAS las sesiones;
+      //  · la racha de "venía sin cobrar" se mira en ESTA sesión.
+      let caidaPagada = true;
+      if (latido.conexionSala === "desconectada") {
+        const { data: recientes } = await admin.from("cowork_tiempo_segmentos")
+          .select("id, session_id, estado, started_at, ended_at, last_seen_at")
+          .eq("user_id", userId)
+          .gte("last_seen_at", new Date(ahora - VENTANA_SIN_CONEXION_MS - TOPE_SIN_CONEXION_MS).toISOString());
+        const tramos = (recientes ?? []) as Array<TramoGuardado & { id: string; session_id: string }>;
+        if (abierto && !tramos.some((t) => t.id === abierto.id)) tramos.push({ ...abierto, ended_at: null });
+        caidaPagada = caidaSePaga(
+          noCobrabaAlCaerse(tramos.filter((t) => t.session_id === sessionId), ahora),
+          sinConexionPagadaMs(tramos, ahora, vigente && abierto?.estado === "sin_conexion"),
+        );
+      }
+      const { estado, detalle } = estadoDeTiempo(latido, ahora, umbralMs, exige, caidaPagada);
+
       const ahoraIso = new Date(ahora).toISOString();
       if (abierto) {
-        const vencido = ahora - new Date(abierto.last_seen_at).getTime() > LATIDO_VENCIDO_MS;
-        const mismo = abierto.estado === estado && abierto.room_id === asignacion.room_id && abierto.session_id === sessionId;
-        if (mismo && !vencido) {
-          await admin.from("cowork_tiempo_segmentos").update({ last_seen_at: ahoraIso }).eq("id", abierto.id);
+        const mismo = vigente && abierto.estado === estado;
+        if (mismo) {
+          // Se anota QUÉ equipo lo estiró: es con lo que se decide la próxima vez.
+          await admin.from("cowork_tiempo_segmentos").update({ last_seen_at: ahoraIso, equipo }).eq("id", abierto.id);
           return json(req, { ok: true, estado, detalle, segmento: abierto.id, segundosHoy: await segundosHoy() });
         }
         // Cambió el estado (o se perdieron latidos): el anterior termina en el
@@ -629,7 +659,7 @@ serve(async (req) => {
         await admin.from("cowork_tiempo_segmentos").update({ ended_at: abierto.last_seen_at }).eq("id", abierto.id);
       }
       const { data: nuevo, error: insErr } = await admin.from("cowork_tiempo_segmentos")
-        .insert({ session_id: sessionId, room_id: asignacion.room_id, user_id: userId, estado, detalle, started_at: ahoraIso, last_seen_at: ahoraIso })
+        .insert({ session_id: sessionId, room_id: asignacion.room_id, user_id: userId, estado, detalle, started_at: ahoraIso, last_seen_at: ahoraIso, equipo })
         .select("id").single();
       if (insErr) return err(req, insErr.message, 500);
       return json(req, { ok: true, estado, detalle, segmento: nuevo.id, segundosHoy: await segundosHoy() });

@@ -1,5 +1,5 @@
 import { forwardRef, useImperativeHandle, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
-import { useEditor, EditorContent } from "@tiptap/react";
+import { useEditor, EditorContent, type JSONContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
 import Link from "@tiptap/extension-link";
@@ -28,16 +28,20 @@ export interface RichComposerHandle {
   getPlain: () => string;
   /** Documento con formato, o null si el mensaje es texto plano (no ensuciamos la fila). */
   getRich: () => RichNode | null;
+  /** Documento completo tal cual (con o sin formato), para guardar el borrador. */
+  getDoc: () => JSONContent | null;
 }
 
 interface Props {
-  initialContent?: string;
+  /** Borrador a restaurar. Es un DOCUMENTO, no texto: TipTap lee un string como
+   *  HTML y los "\n" se vuelven espacios (el borrador volvía en un solo párrafo). */
+  initialContent?: JSONContent | null;
   placeholder?: string;
   showToolbar: boolean;
   disabled?: boolean;
   /** plain = texto completo; cursorPlain = offset del cursor EN texto plano (para @menciones). */
   /** `cambioDeTexto` distingue escribir de solo mover el cursor. */
-  onUpdate: (plain: string, cursorPlain: number, cambioDeTexto: boolean) => void;
+  onUpdate: (plain: string, cursorPlain: number, cambioDeTexto: boolean, doc: JSONContent) => void;
   onEnter: () => void;
   onPasteFiles: (files: File[]) => void;
 }
@@ -78,7 +82,7 @@ const RichComposer = forwardRef<RichComposerHandle, Props>(({
       Link.configure({ openOnClick: false, autolink: true }),
       Placeholder.configure({ placeholder: placeholder || t("messenger.input.placeholder") }),
     ],
-    content: initialContent || "",
+    content: initialContent ?? "",
     editorProps: {
       attributes: {
         class: "msg-composer focus:outline-none min-h-[24px] max-h-[160px] overflow-y-auto text-sm",
@@ -144,12 +148,12 @@ const RichComposer = forwardRef<RichComposerHandle, Props>(({
     onUpdate: ({ editor: ed }) => {
       const plain = ed.getText({ blockSeparator: "\n" });
       const antes = ed.state.doc.textBetween(0, ed.state.selection.from, "\n", "\n");
-      onUpdateRef.current(plain, antes.length, true);
+      onUpdateRef.current(plain, antes.length, true, ed.getJSON());
     },
     onSelectionUpdate: ({ editor: ed }) => {
       const plain = ed.getText({ blockSeparator: "\n" });
       const antes = ed.state.doc.textBetween(0, ed.state.selection.from, "\n", "\n");
-      onUpdateRef.current(plain, antes.length, false);
+      onUpdateRef.current(plain, antes.length, false, ed.getJSON());
     },
   }, [placeholder]);
 
@@ -171,6 +175,7 @@ const RichComposer = forwardRef<RichComposerHandle, Props>(({
       const doc = editor.getJSON() as RichNode;
       return richTieneFormato(doc) ? doc : null;
     },
+    getDoc: () => editor?.getJSON() ?? null,
   }), [editor]);
 
   const btn = (active: boolean) =>

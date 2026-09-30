@@ -177,7 +177,7 @@ export const tickets = {
     en: "No published templates yet",
   },
   "tickets.launcher.noPublishedHint": {
-    es: "Crea una desde la pestaña Plantillas y publícala para que aparezca acá.",
+    es: "Crea una desde la pestaña Plantillas y publícala para que aparezca aquí.",
     en: "Create one from the Templates tab and publish it to see it here.",
   },
   "tickets.launcher.editTemplate": { es: "Editar plantilla {name}", en: "Edit template {name}" },

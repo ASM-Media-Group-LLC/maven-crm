@@ -46,6 +46,9 @@ export const messenger = {
   "messenger.sidebar.sinNombre": { es: "Sin nombre", en: "No name" },
   "messenger.sidebar.escribiendo": { es: "escribiendo…", en: "typing…" },
   "messenger.sidebar.borrador": { es: "✏️ Borrador: {draft}", en: "✏️ Draft: {draft}" },
+  // Borrador que es solo adjuntos (una captura pegada y nada escrito).
+  "messenger.sidebar.borradorUnAdjunto": { es: "📎 1 adjunto", en: "📎 1 attachment" },
+  "messenger.sidebar.borradorAdjuntos": { es: "📎 {n} adjuntos", en: "📎 {n} attachments" },
   "messenger.sidebar.anclar": { es: "Anclar", en: "Pin" },
   "messenger.sidebar.desanclar": { es: "Desanclar", en: "Unpin" },
   "messenger.sidebar.archivar": { es: "Archivar", en: "Archive" },
@@ -357,6 +360,11 @@ export const messenger = {
 
   // Visor de fotos y videos (ImageLightbox).
   "messenger.lightbox.rotar": { es: "Rotar", en: "Rotate" },
+  "messenger.lightbox.anterior": { es: "Anterior", en: "Previous" },
+  "messenger.lightbox.siguiente": { es: "Siguiente", en: "Next" },
+  "messenger.lightbox.posicion": { es: "{n} de {total}", en: "{n} of {total}" },
+  "messenger.lightbox.ayudaFlechas": { es: "← → para pasar", en: "← → to browse" },
+  "messenger.lightbox.ayudaDeslizar": { es: "Desliza para pasar", en: "Swipe to browse" },
   "messenger.lightbox.ayudaMouse": { es: "Doble clic para zoom · Scroll para ajustar · Arrastra para mover", en: "Double-click to zoom · Scroll to adjust · Drag to move" },
   "messenger.lightbox.ayudaTactil": { es: "Pellizca para zoom · Doble toque para acercar · Arrastra para mover", en: "Pinch to zoom · Double-tap to zoom in · Drag to move" },
 
@@ -459,6 +467,14 @@ export const messenger = {
   "messenger.callView.reconectando": { es: "Reconectando...", en: "Reconnecting..." },
   "messenger.callView.volvisteDeLaPausa": { es: "Volviste de la pausa. Tu cámara y tu micrófono ya están encendidos; la pantalla hay que retomarla.", en: "You're back from your break. Your camera and microphone are on again; you need to share your screen again." },
   "messenger.callView.volverACompartir": { es: "Volver a compartir pantalla", en: "Share screen again" },
+  "messenger.callView.salaCaida": { es: "Se perdió la conexión con la sala.", en: "Lost connection to the room." },
+  "messenger.callView.reconectarAhora": { es: "Reconectar", en: "Reconnect" },
+  "messenger.callView.volviendoALaSala": { es: "Volviendo a la sala…", en: "Rejoining the room…" },
+  "messenger.callView.volvisteALaSala": { es: "Volviste a la sala. Tu cámara y tu micrófono quedaron apagados: préndelos y vuelve a compartir tu pantalla.", en: "You're back in the room. Your camera and microphone are off: turn them on and share your screen again." },
+  "messenger.callView.volvisteALaLlamada": { es: "Volviste a la llamada. Tu cámara y tu micrófono quedaron apagados.", en: "You're back in the call. Your camera and microphone are off." },
+  "messenger.callView.esperaALaSala": { es: "Estamos volviendo a la sala: en un momento puedes prenderlo.", en: "Rejoining the room: you can turn it on in a moment." },
+  "messenger.callView.entendido": { es: "Entendido", en: "Got it" },
+  "messenger.callView.primeroReconecta": { es: "Se perdió la conexión con la sala: primero toca «Reconectar».", en: "You lost connection to the room: tap “Reconnect” first." },
   "messenger.callView.ahoraNo": { es: "Ahora no", en: "Not now" },
   "messenger.callView.esperando": { es: "Esperando a que otros participantes se unan...", en: "Waiting for others to join..." },
   "messenger.callView.silenciado": { es: "Silenciado", en: "Muted" },
@@ -491,7 +507,7 @@ export const messenger = {
 
   // Llamada: la sala de espera antes de entrar (PreJoinLobby).
   "messenger.lobby.fondoNoDisponible": { es: "Tu fondo ya no está disponible", en: "Your background is no longer available" },
-  "messenger.lobby.eligeOtro": { es: "Elegí otro cuando quieras.", en: "Pick another one whenever you want." },
+  "messenger.lobby.eligeOtro": { es: "Elige otro cuando quieras.", en: "Pick another one whenever you want." },
   "messenger.lobby.permisoCamaraDenegado": { es: "Permiso de cámara denegado. Habilítalo en la configuración del navegador.", en: "Camera permission denied. Turn it on in your browser settings." },
   "messenger.lobby.noSePudoCamara": { es: "No se pudo acceder a la cámara.", en: "Couldn't access the camera." },
   "messenger.lobby.permisoMicrofonoDenegado": { es: "Permiso de micrófono denegado. Habilítalo en la configuración del navegador.", en: "Microphone permission denied. Turn it on in your browser settings." },
@@ -501,6 +517,10 @@ export const messenger = {
   "messenger.bg.fondoVirtual": { es: "Fondo virtual", en: "Virtual background" },
   "messenger.lobby.vistaPreviaFondo": { es: "Vista previa del fondo {fondo}", en: "Preview of the {fondo} background" },
   "messenger.lobby.aplicandoFondo": { es: "Aplicando fondo…", en: "Applying background…" },
+  "messenger.lobby.abriendoCamara": { es: "Abriendo la cámara…", en: "Opening the camera…" },
+  "messenger.lobby.permiteLaCamara": { es: "Tu navegador está esperando que permitas la cámara: busca el aviso arriba, junto a la dirección de la página.", en: "Your browser is waiting for you to allow the camera: look for the prompt at the top, next to the page address." },
+  "messenger.lobby.camaraNoResponde": { es: "La cámara no responde. Revisa que el navegador tenga permiso y que otra aplicación no la esté usando, y vuelve a prenderla.", en: "The camera isn't responding. Check that the browser has permission and that no other app is using it, then turn it on again." },
+  "messenger.lobby.fondoTardo": { es: "El fondo tardó demasiado en la vista previa, así que te mostramos sin fondo. Se vuelve a aplicar al entrar a la llamada.", en: "The background took too long in the preview, so we're showing you without it. It's applied again when you join the call." },
   "messenger.lobby.desactivarMicrofono": { es: "Desactivar micrófono", en: "Turn off microphone" },
   "messenger.lobby.activarMicrofono": { es: "Activar micrófono", en: "Turn on microphone" },
   "messenger.lobby.desactivarCamara": { es: "Desactivar cámara", en: "Turn off camera" },

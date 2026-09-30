@@ -111,7 +111,7 @@ export const admin = {
   // ─── Alta de usuario ────────────────────────────────────────────────
   "admin.addUser.created": { es: "Usuario creado", en: "User created" },
   "admin.addUser.handOver": {
-    es: "Entregale estos datos a la persona. La contraseña **no se muestra de nuevo**: si se pierde, se le hace un reset desde acá mismo.",
+    es: "Entrégale estos datos a la persona. La contraseña **no se muestra de nuevo**: si se pierde, se le hace un reset desde aquí mismo.",
     en: "Hand these details to the person. The password **won't be shown again**: if it gets lost, reset it from right here.",
   },
   "admin.addUser.loginEmail": { es: "Correo de acceso", en: "Sign-in email" },
@@ -129,7 +129,7 @@ export const admin = {
     en: "The temporary password was already emailed to **{email}**. There's nothing to hand over.",
   },
   "admin.addUser.emailNotSent": {
-    es: "La cuenta quedó creada pero **el correo con la contraseña no salió**{detail}. Entregale estos datos en mano:",
+    es: "La cuenta quedó creada pero **el correo con la contraseña no salió**{detail}. Entrégale estos datos en mano:",
     en: "The account was created but **the email with the password didn't go out**{detail}. Hand these details over in person:",
   },
   "admin.addUser.done": { es: "Listo", en: "Done" },
@@ -176,7 +176,7 @@ export const admin = {
   },
   "admin.resetPw.emailNotSent": { es: "No se envió el email.", en: "The email wasn't sent." },
   "admin.resetPw.noResendKey": {
-    es: "Falta configurar RESEND_API_KEY en los secrets de Supabase. Mientras tanto, comparte la contraseña con el usuario manualmente desde acá.",
+    es: "Falta configurar RESEND_API_KEY en los secrets de Supabase. Mientras tanto, comparte la contraseña con el usuario manualmente desde aquí.",
     en: "RESEND_API_KEY isn't set in the Supabase secrets. In the meantime, share the password with the user manually from here.",
   },
   "admin.resetPw.shareManually": {
@@ -719,7 +719,7 @@ export const admin = {
   "admin.cvh.loadError": { es: "No se pudo cargar la comparación: {error}", en: "Couldn't load the comparison: {error}" },
   "admin.cvh.emptyTitle": { es: "Todavía no hay nada que comparar", en: "Nothing to compare yet" },
   "admin.cvh.emptyBody": {
-    es: "El reloj de Cowork empieza a contar desde que alguien entra a una sala con esta versión. En cuanto haya latidos, acá aparecen las personas con sus horas de Hubstaff al lado.",
+    es: "El reloj de Cowork empieza a contar desde que alguien entra a una sala con esta versión. En cuanto haya latidos, aquí aparecen las personas con sus horas de Hubstaff al lado.",
     en: "The Cowork clock starts counting once someone joins a room with this version. As soon as there are heartbeats, people show up here with their Hubstaff hours next to them.",
   },
   "admin.cvh.people": { es: "Personas", en: "People" },
@@ -740,5 +740,7 @@ export const admin = {
   "admin.cvh.noScreen": { es: "sin pantalla {h}", en: "no screen {h}" },
   "admin.cvh.offCamera": { es: "fuera de cámara {h}", en: "off camera {h}" },
   "admin.cvh.away": { es: "fuera {h}", en: "away {h}" },
+  "admin.cvh.noConnection": { es: "sin conexión {h}", en: "disconnected {h}" },
+  "admin.cvh.includesDrops": { es: "El reloj incluye {h} de caídas de la sala (se pagan hasta 10 min por hora).", en: "The clock includes {h} of room drops (up to 10 min per hour is paid)." },
   "admin.cvh.stoppedBy": { es: "Detenido por", en: "Stopped by" },
 } as const satisfies Record<string, { es: string; en: string }>;
