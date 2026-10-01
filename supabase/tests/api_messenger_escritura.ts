@@ -8,8 +8,9 @@
 //   deno run -A --node-modules-dir=none --no-lock supabase/tests/api_messenger_escritura.ts
 //
 // Cómo está armado:
-//   0. Las huellas: los fixtures son prod, y el fixture del 28/09 más la migración A
-//      da lo mismo que prod el 01/10 para todo lo que B reemplaza o compone.
+//   0. Las huellas: los fixtures son prod, y el fixture del 28/09 más las migraciones
+//      que prod ya tiene (la A y el 1b) da lo mismo que prod el 01/10 para todo lo
+//      que B reemplaza o compone.
 //   1. Sobre los fixtures se aplican, en orden, TODAS las migraciones reales
 //      posteriores al fixture que tocan el Messenger o las keys (la A incluida) y la
 //      B. Las que no tocan nada de eso se saltan y se listan.
@@ -49,7 +50,7 @@ const json = (s: string): Fila => { try { return JSON.parse(s); } catch { return
 
 // ─── La cadena de migraciones ────────────────────────────────────────────────
 const FIXTURE_HASTA = "20260929180000"; // la última que tenía prod el 28/09
-const PROD_HASTA = "20260930230000";    // la última del repo que prod tiene aplicada el 01/10 (la A)
+const PROD_HASTA = "20261001100000";    // la última del repo que prod tiene aplicada el 01/10 (la A y el 1b)
 const TABLAS_DE_INTERES = ["app_flags", "chat_archived", "chat_conversations", "chat_join_requests", "chat_message_deletions",
   "chat_messages", "chat_participants", "chat_pinned", "chat_reactions", "chat_read_receipts", "chat_space_conversations",
   "chat_spaces", "notification_preferences", "notification_settings", "notifications", "profiles", "push_subscriptions",
@@ -225,7 +226,7 @@ async function nueva(migB = MIG_B, extra = ""): Promise<PGlite> {
   await db.exec(SEMILLA_B + extra);
   return db;
 }
-// prod el 01/10: los fixtures + las migraciones que prod ya tiene (hasta la A).
+// prod el 01/10: los fixtures + las migraciones que prod ya tiene (la A y el 1b).
 async function prodHoy(): Promise<PGlite> {
   const db = new PGlite();
   await db.exec(FIXTURE);
@@ -310,8 +311,8 @@ async function sembrarSinTriggers(db: PGlite, sql: string) {
   const delFixture = huellas(FIXTURE, /^--\s+((?:auth|public)\.\w+)=([0-9a-f]{32})$/gm);
   const delComplemento = huellas(COMPLEMENTO, /^--\s+(public\.\w+)=([0-9a-f]{32})$/gm);
   const prodTrasA = huellas(COMPLEMENTO, /^--\s+prod\.((?:public|politicas)\.\w+)=([0-9a-f]{32})$/gm);
-  check(delFixture.size === 27 && delComplemento.size === 9 && prodTrasA.size === 13,
-    `huellas en las cabeceras: ${delFixture.size} del fixture del 28/09, ${delComplemento.size} del complementario y ${prodTrasA.size} de prod tras la A`);
+  check(delFixture.size === 27 && delComplemento.size === 9 && prodTrasA.size === 15,
+    `huellas en las cabeceras: ${delFixture.size} del fixture del 28/09, ${delComplemento.size} del complementario y ${prodTrasA.size} de prod tras la A y el 1b`);
   const PRODSRC = `select n.nspname||'.'||p.proname k, md5(p.prosrc) h from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname in ('public','auth')`;
   const POLITICAS = `select tablename k, md5(string_agg(policyname||'|'||permissive||'|'||roles::text||'|'||cmd||'|'||coalesce(qual,'')||'|'||coalesce(with_check,''), E'\n' order by policyname)) h from pg_policies where schemaname='public' group by 1`;
   const db = new PGlite();
@@ -339,7 +340,7 @@ async function sembrarSinTriggers(db: PGlite, sql: string) {
   const fh = new Map((await q(hoy, PRODSRC)).map((f) => [f.k, f.h]));
   const ph = new Map((await q(hoy, POLITICAS)).map((f) => [f.k, f.h]));
   const distintas = [...prodTrasA].filter(([k, h]) => (k.startsWith("politicas.") ? ph.get(k.slice(10)) : fh.get(k)) !== h).map(([k]) => k);
-  check(distintas.length === 0, `con la A aplicada, las ${prodTrasA.size} piezas que toca la B son iguales a prod del 01/10${distintas.length ? ` — distintas: ${distintas.join(", ")}` : ""}`);
+  check(distintas.length === 0, `con la A y el 1b aplicados, las ${prodTrasA.size} piezas que toca o compone la B son iguales a prod del 01/10${distintas.length ? ` — distintas: ${distintas.join(", ")}` : ""}`);
   const politicas28 = new Map([...FIXTURE.split("\n").filter((l) => l.startsWith("--") && !l.includes(".")).flatMap((l) => [...l.matchAll(/(\w+)=([0-9a-f]{32})/g)])].map((m) => [m[1], m[2]]));
   const cercadas = ["chat_conversations", "chat_reactions", "chat_read_receipts", "chat_pinned", "chat_archived", "chat_join_requests", "chat_spaces", "chat_space_conversations", "notifications", "chat_message_deletions"];
   const polMal = cercadas.filter((t) => ph.get(t) !== politicas28.get(t));

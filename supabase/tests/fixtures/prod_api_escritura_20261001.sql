@@ -47,6 +47,10 @@
 --     prod.politicas.chat_messages=6c538aeeb778aa6c553a5d597d345d7e
 --     prod.politicas.chat_participants=44c880a65f689155cc420e0674deaf13
 --   (las políticas de las otras 10 tablas que cerca la B son las del 28/09: mismas huellas.)
+--   Y lo del PR 1b (20261001100000_chat_mensajes_de_sistema del repo; en prod, aplicado
+--   el 01/10 como 20261001064806 + 20261001065025), que no cambia nada de lo de arriba:
+--     prod.public.chat_evento_sistema=2fee1016fc7dbb5fa79d26a3394294ac
+--     prod.public.chat_mensajes_de_sistema=a80c8facfca4c273c36c292de58f5c55
 --
 -- Lo que NO trae, a propósito (no es del Messenger y dispara fuera de él):
 --   · api_keys: el trigger api_webhooks_por_llave (AFTER UPDATE OF revoked_at,

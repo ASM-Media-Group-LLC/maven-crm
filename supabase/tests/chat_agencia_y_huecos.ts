@@ -1025,7 +1025,12 @@ const QUE_QUEDO = `select
   await anda(db, JHON, `update chat_conversations set name = 'Equipo 2' where id = '${G1}'`, "el admin renombra el grupo (ChatHeader)");
   await anda(db, JHON, `update chat_conversations set avatar_url = 'https://ejemplo.test/a.png' where id = '${G1}'`, "el admin le cambia la foto");
   await anda(db, JHON, `update chat_conversations set msg_permission = 'admins', require_approval = true where id = '${G1}'`, "el admin cambia los permisos (GroupMembersPanel)");
-  await anda(db, JHON, `insert into chat_messages(conversation_id, sender_id, type, content) values ('${G1}', '${JHON}', 'system', 'Jhon agregó a Carla al grupo')`, "mensaje de sistema (sigue igual: lo cierra el PR 1b)");
+  // Los avisos de sistema: desde el PR 1b (20261001100000, en la cadena) los arma
+  // la base. El aviso libre ya no entra; el de la RPC sí (su banco es
+  // chat_mensajes_de_sistema.ts).
+  await falla(db, JHON, `insert into chat_messages(conversation_id, sender_id, type, content) values ('${G1}', '${JHON}', 'system', 'Jhon agregó a Carla al grupo')`,
+    /chat_sistema_sin_evento/, "un aviso de sistema con texto libre ya no entra (PR 1b)");
+  await anda(db, JHON, `select public.chat_evento_sistema('${G1}', 'agrego', '${CARLA}', null)`, "el aviso de sistema por la RPC (PR 1b)");
 
   // delete_conversation_cascade con citas adentro y una cita desde OTRA conversación.
   // (Hoy la app no cita entre conversaciones; la cita cruzada vieja la siembra el banco.)

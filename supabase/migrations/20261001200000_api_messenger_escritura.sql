@@ -53,16 +53,18 @@
 -- reescriben (columnas nuevas sin default: solo catálogo); ninguna key tiene
 -- messenger:write (el alta la cierra el PR 4) y el interruptor está apagado.
 --
--- Cómo se compone con la migración A (20260930230000, ya en prod). Los triggers BEFORE
--- de una tabla corren en orden alfabético:
---   · chat_messages:     chat_messages_al_insertar (A) → chat_messages_api (B). A
---     pone la fecha, limpia is_edited/is_deleted y rechaza la cita de otra
---     conversación y el archivo de afuera (MV422); B no lo repite: suma la cita
---     borrada, el hilo que no apunta a una raíz y todo lo de la API.
+-- Cómo se compone con la migración A (20260930230000) y el PR 1b (20261001100000),
+-- los dos ya en prod. Los triggers BEFORE de una tabla corren en orden alfabético:
+--   · chat_messages:     chat_messages_al_insertar (A) → chat_messages_api (B) →
+--     trg_mensajes_de_sistema (1b). A pone la fecha, limpia is_edited/is_deleted y
+--     rechaza la cita de otra conversación y el archivo de afuera (MV422); B no lo
+--     repite: suma la cita borrada, el hilo que no apunta a una raíz y todo lo de la
+--     API (por API nunca hay un aviso de sistema, tampoco por chat_evento_sistema).
 --   · UPDATE de mensajes: chat_messages_api_editar (B) → trg_guard_chat_message_update
---     (A) → update_chat_messages_updated_at. B copia las marcas de OLD para todos y
---     decide lo de la API; la guarda de A sigue cerrando fecha, tipo, cita, archivo y
---     borrado sin archivo (el GUC maven.borrado_autorizado).
+--     (A) → trg_mensajes_de_sistema (1b) → update_chat_messages_updated_at. B copia
+--     las marcas de OLD para todos y decide lo de la API; la guarda de A sigue
+--     cerrando fecha, tipo, cita, archivo y borrado sin archivo (el GUC
+--     maven.borrado_autorizado).
 --   · chat_conversations: chat_conversations_agencia (A: agencia, fecha y los topes
 --     de 30 grupos y 100 directos por persona en 24 h, MV429) → chat_conversations_api.
 --   · chat_participants: chat_participants_agencia (A: agencia, roles, tercero en un
@@ -105,9 +107,9 @@
 --     sin fila = apagado para siempre);
 --   · net.http_request_queue existe y postgres la lee (2 filas en ese momento).
 --
--- El nombre: el último archivo del repo es 20260930230000_chat_agencia_y_huecos y la
--- última versión anotada en prod es 20261001053309 (la A, con la hora en que se
--- aplicó). El PR 1b usa 20261001100000. apply_migration anota su propia hora.
+-- El nombre: el último archivo del repo es 20261001100000_chat_mensajes_de_sistema
+-- (PR 1b) y la última versión anotada en prod es 20261001065025 (el 1b, con la hora
+-- en que se aplicó). apply_migration anota su propia hora.
 --
 -- Candados. Todo va en UNA transacción, y cada ALTER / CREATE INDEX / CREATE TRIGGER
 -- / CREATE POLICY toma un candado fuerte que dura hasta el commit (CREATE POLICY pide
