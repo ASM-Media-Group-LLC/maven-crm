@@ -8,7 +8,7 @@
 // (.print-hide), que son controles del editor y sí se revisan. Los atributos
 // (placeholder, title) se revisan en todas partes.
 import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
-import { configure, render, screen } from "@testing-library/react";
+import { configure, fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { LanguageProvider } from "@/hooks/useLanguage";
 import type { ContentGrid, GridDay } from "@/pages/parrilla/useParrilla";
@@ -115,6 +115,31 @@ describe("Parrilla en inglés", () => {
     expect(await screen.findByText("Regla de ejecución")).toBeTruthy();
     expect(screen.getAllByText("Idea de material").length).toBe(DIAS.length);
     expect(screen.getByText("VIDEO CORTO")).toBeTruthy();
+  });
+
+  // El menú para elegir el formato del día se abre en un portal, fuera de la
+  // lámina, y no se imprime: va en inglés. El botón que lo abre muestra lo que
+  // imprime la lámina ("FLYER O FOTO"), que queda en español.
+  const abrirMenuDelFormato = async () => {
+    const boton = (await screen.findByText("FLYER O FOTO")).closest('[role="combobox"]');
+    expect(boton).toBeTruthy();
+    fireEvent.keyDown(boton as Element, { key: "Enter" });
+    return screen.findAllByRole("option");
+  };
+
+  it("el menú del formato del día, en inglés", async () => {
+    montar();
+    const opciones = await abrirMenuDelFormato();
+    expect(opciones.map((o) => o.textContent)).toEqual(["Flyer or photo", "Short video"]);
+    expect(screen.getByText("FLYER O FOTO")).toBeTruthy();
+    expect(enEspanol(document.body, esDocumento)).toEqual([]);
+  });
+
+  it("en español, el menú del formato dice lo mismo que en main", async () => {
+    localStorage.setItem("app-language", "es");
+    montar();
+    const opciones = await abrirMenuDelFormato();
+    expect(opciones.map((o) => o.textContent)).toEqual(["FLYER O FOTO", "VIDEO CORTO"]);
   });
 
   it("una parrilla ya enviada: el aviso de solo lectura", async () => {

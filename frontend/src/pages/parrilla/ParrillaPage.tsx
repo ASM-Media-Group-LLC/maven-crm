@@ -61,7 +61,8 @@ const ETIQUETA_ESTADO: Record<ContentGrid["status"], TranslationKey> = {
   enviada: "grid.status.enviada",
 };
 
-// El formato del día como se imprime en la lámina (documento: en español).
+// El formato del día como se imprime en la lámina (documento: en español). El
+// menú para elegirlo no se imprime: sus opciones van por t() (grid.format.*).
 const BADGE_LABEL: Record<GridDay["format_badge"], string> = {
   flyer_foto: "FLYER O FOTO",
   video_corto: "VIDEO CORTO",
@@ -105,8 +106,8 @@ function DayColumn({ day, theme, isToday, onChange }: {
               <SelectValue>{BADGE_LABEL[day.format_badge]}</SelectValue>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="flyer_foto">FLYER O FOTO</SelectItem>
-              <SelectItem value="video_corto">VIDEO CORTO</SelectItem>
+              <SelectItem value="flyer_foto">{t("grid.format.flyer_foto")}</SelectItem>
+              <SelectItem value="video_corto">{t("grid.format.video_corto")}</SelectItem>
             </SelectContent>
           </Select>
         </div>

@@ -317,7 +317,7 @@ export const ventas = {
   "custom.alert.overdue": { es: "Vencido · {dias} d", en: "Overdue · {dias} d" },
   "custom.alert.attention": { es: "{dias} d sin entregar", en: "{dias} d undelivered" },
   "custom.alert.tipOverdue": { es: "Pasó el plazo de {max} días: abierto hace {dias}.", en: "Past the {max}-day deadline: open for {dias} days." },
-  "custom.alert.tipAttention": { es: "Abierto hace {dias} días. El plazo es de {max}.", en: "Open for {dias} days. The deadline is {max}." },
+  "custom.alert.tipAttention": { es: "Abierto hace {dias} días. El plazo es de {max}.", en: "Open for {dias} days. The deadline is {max} days." },
   "custom.alert.tipDeadline": { es: "El plazo de un personalizado es de {max} días.", en: "A custom order has a {max}-day deadline." },
   // Orden de la tabla (orden.ts)
   "custom.sort.numDesc": { es: "Mayor a menor", en: "Highest to lowest" },
@@ -648,6 +648,9 @@ export const ventas = {
   "grid.extra.tg_audio": { es: "Audios de buenos días", en: "Good-morning voice notes" },
   "grid.extra.dinamica_cierre": { es: "Dinámica de urgencia · Cierre", en: "Urgency promo · Close" },
   "grid.extra.custom": { es: "Acción extra", en: "Extra action" },
+  // Opciones del menú del formato del día. La lámina imprime BADGE_LABEL (en español).
+  "grid.format.flyer_foto": { es: "FLYER O FOTO", en: "Flyer or photo" },
+  "grid.format.video_corto": { es: "VIDEO CORTO", en: "Short video" },
   "grid.status.borrador": { es: "borrador", en: "draft" },
   "grid.status.lista": { es: "lista", en: "ready" },
   "grid.status.enviada": { es: "enviada", en: "sent" },

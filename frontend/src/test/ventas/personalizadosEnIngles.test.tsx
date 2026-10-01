@@ -118,6 +118,9 @@ describe("Personalizados en inglés", () => {
     expect(screen.getByText("🎬 Video")).toBeTruthy();
     expect(screen.getByText("📦 Item")).toBeTruthy();
     expect(screen.getByText("Due soon")).toBeTruthy();
+    // El title del reloj del plazo, con la unidad en los dos números.
+    expect(screen.getAllByTitle("Open for 8 days. The deadline is 12 days.").length).toBeGreaterThan(0);
+    expect(screen.getAllByTitle("Past the 12-day deadline: open for 15 days.").length).toBeGreaterThan(0);
     expect(enEspanol(document.body)).toEqual([]);
   });
 
@@ -127,6 +130,7 @@ describe("Personalizados en inglés", () => {
     expect((await screen.findAllByText("Nothing here")).length).toBeGreaterThan(0);
     expect(screen.getByText("Overdue · 15 d")).toBeTruthy();
     expect(screen.getByText("8 d undelivered")).toBeTruthy();
+    expect(screen.getAllByTitle("Open for 8 days. The deadline is 12 days.").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Owes $80").length).toBeGreaterThan(0);
     expect(enEspanol(document.body)).toEqual([]);
   });
