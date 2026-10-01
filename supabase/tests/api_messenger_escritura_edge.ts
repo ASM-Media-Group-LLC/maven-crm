@@ -427,6 +427,8 @@ let primero = "";
   espera(await enviar(G, { text: "al revés ‮" }), 422, "invalid_text", "U+202E: 422");
   espera(await enviar(G, { text: "x".repeat(4001) }), 422, "invalid_text", "4.001 caracteres: 422");
   espera(await enviar(G, { text: "   " }), 422, "invalid_text", "solo espacios: 422");
+  espera(await enviar(G, { text: "hola\u200Bmundo" }), 422, "invalid_text", "un espacio de ancho cero (U+200B): 422");
+  espera(await enviar(G, { text: "\u200D\u00A0" }), 422, "invalid_text", "nada visible (ZWJ y espacio duro): 422");
   espera(await enviar(G, { text: "ho\u0000la" }), 422, "invalid_text", "un NUL: 422 (el edge, antes de la base)");
   espera(await enviar(G, { text: "cito", reply_to_id: M_SIN }), 422, "invalid_reply", "cita de otra conversación: 422 (chat_cita_ajena de la A)");
   espera(await enviar(G, { text: "hilo", reply_to_id: M_G_HILO, thread: true }), 422, "invalid_reply", "hilo sobre una respuesta en hilo: 422");
