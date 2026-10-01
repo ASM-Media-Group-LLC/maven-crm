@@ -2,6 +2,7 @@ import { Crown, HeadphonesIcon, Megaphone, Minus, TrendingUp, Info } from "lucid
 import { Skeleton } from "@/components/ui/skeleton";
 import { UserAvatar } from "@/components/UserAvatar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useLanguage } from "@/hooks/useLanguage";
 import { useVentasTops } from "./useVentasTops";
 
 /**
@@ -34,6 +35,7 @@ interface Fila {
 
 // Barra de proporción: hace el ranking legible de un vistazo, sin leer números.
 function Podio({ filas, tono, vacio }: { filas: Fila[]; tono: string; vacio: string }) {
+  const { t } = useLanguage();
   if (filas.length === 0) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-2 px-4 py-10 text-center">
@@ -64,7 +66,7 @@ function Podio({ filas, tono, vacio }: { filas: Fila[]; tono: string; vacio: str
             <div className="shrink-0 text-right">
               <p className="text-sm font-semibold tabular-nums leading-tight">{f.valor}</p>
               {f.nota != null && (
-                <p className="text-[10px] text-muted-foreground">nota {f.nota.toFixed(1)}</p>
+                <p className="text-[10px] text-muted-foreground">{t("sales.tops.score", { n: f.nota.toFixed(1) })}</p>
               )}
             </div>
           </div>
@@ -132,12 +134,13 @@ function Tarjeta({
 }
 
 export default function VentasTops({ desde, hasta }: { desde: string | undefined; hasta: string | undefined }) {
+  const { t } = useLanguage();
   const { tops, cargando, error } = useVentasTops(desde, hasta);
 
   if (error) {
     return (
       <div className="rounded-2xl border border-border bg-card px-4 py-6 text-center text-sm">
-        <p className="font-medium text-destructive">No se pudieron cargar los rankings</p>
+        <p className="font-medium text-destructive">{t("sales.tops.loadError")}</p>
         <p className="mt-1 text-xs text-muted-foreground">{error.message}</p>
       </div>
     );
@@ -152,21 +155,21 @@ export default function VentasTops({ desde, hasta }: { desde: string | undefined
     // un hueco negro al lado de la larga.
     <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
       <Tarjeta
-        titulo="Top chatters"
-        ayuda="Ventas por modelo (chatter_model_daily), las DOS agencias. Los días son los que tienen dato importado; la serie arranca el 13/08/2026."
+        titulo={t("sales.tops.chatters")}
+        ayuda={t("sales.tops.chattersHelp")}
         icono={HeadphonesIcon}
         acento="from-sky-500/20 via-sky-500/5 to-transparent"
         tono="bg-sky-500"
         cargando={cargando}
-        vacio="Sin ventas de chatters en el rango."
-        pie={tops.chatters.length > 0 ? `Suma de estos ${tops.chatters.length}: ${money(tops.chatters.reduce((s, c) => s + c.ventas, 0))}` : undefined}
+        vacio={t("sales.tops.chattersEmpty")}
+        pie={tops.chatters.length > 0 ? t("sales.tops.sum", { n: tops.chatters.length, total: money(tops.chatters.reduce((s, c) => s + c.ventas, 0)) }) : undefined}
         filas={tops.chatters.map((c) => ({
           nombre: c.nombre,
           valor: money(c.ventas),
           // El reparto por agencia va A LA VISTA: el ranking anterior salía de
           // una tabla que dejó de traer Plus y no había forma de notarlo.
           detalle: [
-            `${c.dias} día${c.dias === 1 ? "" : "s"}`,
+            t(c.dias === 1 ? "sales.tops.day1" : "sales.tops.dayN", { n: c.dias }),
             c.plus > 0 ? `Plus ${money(c.plus)}` : null,
             c.massive > 0 ? `Massive ${money(c.massive)}` : null,
           ].filter(Boolean).join(" · "),
@@ -175,36 +178,36 @@ export default function VentasTops({ desde, hasta }: { desde: string | undefined
       />
 
       <Tarjeta
-        titulo="Top closers"
-        ayuda="Plataformas vendidas (oportunidades ganadas) en el rango. El monto es el valor MENSUAL recurrente, no un pago único."
+        titulo={t("sales.tops.closers")}
+        ayuda={t("sales.tops.closersHelp")}
         icono={TrendingUp}
         acento="from-violet-500/20 via-violet-500/5 to-transparent"
         tono="bg-violet-500"
         cargando={cargando}
-        vacio="Sin cierres en el rango."
-        pie={tops.closers.length > 0 ? `Suma de estos ${tops.closers.length}: ${money(tops.closers.reduce((s, c) => s + c.usd_mensual, 0))}/mes` : undefined}
+        vacio={t("sales.tops.closersEmpty")}
+        pie={tops.closers.length > 0 ? t("sales.tops.sumMonthly", { n: tops.closers.length, total: money(tops.closers.reduce((s, c) => s + c.usd_mensual, 0)) }) : undefined}
         filas={tops.closers.map((c) => ({
           nombre: c.nombre,
-          valor: `${money(c.usd_mensual)}/mes`,
-          detalle: `${c.ganadas} vendida${c.ganadas === 1 ? "" : "s"}`,
+          valor: t("sales.tops.perMonth", { amount: money(c.usd_mensual) }),
+          detalle: t(c.ganadas === 1 ? "sales.tops.sold1" : "sales.tops.soldN", { n: c.ganadas }),
           proporcion: c.usd_mensual / maxCloser,
           nota: c.nota_corte,
         }))}
       />
 
       <Tarjeta
-        titulo="Top managers"
-        ayuda="Su objetivo es que su roster promocione: días con promo sobre los días medidos por promolog, en sus creadoras activas."
+        titulo={t("sales.tops.managers")}
+        ayuda={t("sales.tops.managersHelp")}
         icono={Megaphone}
         acento="from-amber-500/20 via-amber-500/5 to-transparent"
         tono="bg-amber-500"
         cargando={cargando}
-        vacio="Sin datos de promoción en el rango."
-        pie={tops.managers.length > 0 ? `${tops.managers.reduce((s, m) => s + m.promocionaron, 0)} de ${tops.managers.reduce((s, m) => s + m.creadoras, 0)} creadoras promocionaron` : undefined}
+        vacio={t("sales.tops.managersEmpty")}
+        pie={tops.managers.length > 0 ? t("sales.tops.managersSum", { a: tops.managers.reduce((s, m) => s + m.promocionaron, 0), b: tops.managers.reduce((s, m) => s + m.creadoras, 0) }) : undefined}
         filas={tops.managers.map((m) => ({
           nombre: m.nombre,
           valor: `${m.pct_dias.toFixed(0)}%`,
-          detalle: `${m.promocionaron}/${m.creadoras} creadoras · ${m.dias_con_promo} de ${m.dias_medidos} días`,
+          detalle: t("sales.tops.managerDetail", { promoted: m.promocionaron, creators: m.creadoras, days: m.dias_con_promo, measured: m.dias_medidos }),
           proporcion: m.pct_dias / 100,
           nota: m.nota_corte,
         }))}

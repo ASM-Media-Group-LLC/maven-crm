@@ -1,3 +1,5 @@
+import type { TranslationKey } from "@/lib/i18n";
+
 export interface EarningsRow {
   id: string;
   date: string;
@@ -37,38 +39,39 @@ export type SortDirection = "asc" | "desc";
 
 export interface ColumnDef {
   key: SortField;
-  label: string;
+  /** Clave del diccionario: se muestra con `t(col.label)`. */
+  label: TranslationKey;
   defaultVisible: boolean;
   align?: "left" | "right";
   format?: "currency" | "number" | "percent" | "text" | "date" | "document" | "time" | "signed_percent" | "trend";
 }
 
 export const ALL_COLUMNS: ColumnDef[] = [
-  { key: "artistic_name", label: "Artistic Name", defaultVisible: true, format: "text" },
-  { key: "pending_creator", label: "Creator OF", defaultVisible: true, format: "text" },
-  { key: "effective_date", label: "Fecha", defaultVisible: true, align: "right", format: "date" },
-  { key: "report_time", label: "Hora", defaultVisible: true, align: "right", format: "time" },
-  { key: "total_earnings_gross", label: "Gross Earnings", defaultVisible: true, align: "right", format: "currency" },
-  { key: "net_earnings", label: "Net Earnings", defaultVisible: true, align: "right", format: "currency" },
-  { key: "total_earnings" as SortField, label: "Total Earnings", defaultVisible: true, align: "right", format: "currency" },
-  { key: "subscription_gross", label: "Subscriptions", defaultVisible: true, align: "right", format: "currency" },
-  { key: "message_gross", label: "Message", defaultVisible: true, align: "right", format: "currency" },
-  { key: "tips_gross", label: "Tips", defaultVisible: true, align: "right", format: "currency" },
-  { key: "new_subscriptions_sub_gross", label: "New Subscriptions", defaultVisible: false, align: "right", format: "currency" },
-  { key: "recurring_sub_gross", label: "Recurring Subscriptions", defaultVisible: false, align: "right", format: "currency" },
-  { key: "contribution", label: "Contribution %", defaultVisible: false, align: "right", format: "percent" },
-  { key: "of_ranking", label: "OF Ranking", defaultVisible: false, align: "right", format: "number" },
-  { key: "following", label: "Following", defaultVisible: false, align: "right", format: "number" },
-  { key: "fans_renew_on", label: "Fans Renew On", defaultVisible: false, align: "right", format: "number" },
-  { key: "renew_on_percentage", label: "Renew On %", defaultVisible: false, align: "right", format: "percent" },
-  { key: "new_fans", label: "New Fans", defaultVisible: false, align: "right", format: "number" },
-  { key: "active_fans", label: "Active Fans", defaultVisible: false, align: "right", format: "number" },
-  { key: "change_expired_fan_count", label: "Expired Fan Change", defaultVisible: false, align: "right", format: "number" },
-  { key: "avg_spend_per_spender_gross", label: "Avg Spend/Spender", defaultVisible: false, align: "right", format: "currency" },
-  { key: "avg_spend_per_transaction_gross", label: "Avg Spend/Transaction", defaultVisible: false, align: "right", format: "currency" },
-  { key: "avg_earnings_per_fan_gross", label: "Avg Earnings/Fan", defaultVisible: false, align: "right", format: "currency" },
-  { key: "variation_percent", label: "Variación", defaultVisible: true, align: "right", format: "signed_percent" },
-  { key: "trend", label: "Tendencia", defaultVisible: true, format: "trend" },
-  { key: "participation_percent", label: "Participación", defaultVisible: true, align: "right", format: "percent" },
-  { key: "document_id", label: "Document ID", defaultVisible: true, format: "document" },
+  { key: "artistic_name", label: "sales.col.artisticName", defaultVisible: true, format: "text" },
+  { key: "pending_creator", label: "sales.col.creatorOf", defaultVisible: true, format: "text" },
+  { key: "effective_date", label: "common.date", defaultVisible: true, align: "right", format: "date" },
+  { key: "report_time", label: "sales.col.time", defaultVisible: true, align: "right", format: "time" },
+  { key: "total_earnings_gross", label: "sales.col.gross", defaultVisible: true, align: "right", format: "currency" },
+  { key: "net_earnings", label: "sales.col.net", defaultVisible: true, align: "right", format: "currency" },
+  { key: "total_earnings" as SortField, label: "sales.col.total", defaultVisible: true, align: "right", format: "currency" },
+  { key: "subscription_gross", label: "sales.col.subscriptions", defaultVisible: true, align: "right", format: "currency" },
+  { key: "message_gross", label: "sales.col.message", defaultVisible: true, align: "right", format: "currency" },
+  { key: "tips_gross", label: "sales.col.tips", defaultVisible: true, align: "right", format: "currency" },
+  { key: "new_subscriptions_sub_gross", label: "sales.col.newSubs", defaultVisible: false, align: "right", format: "currency" },
+  { key: "recurring_sub_gross", label: "sales.col.recurringSubs", defaultVisible: false, align: "right", format: "currency" },
+  { key: "contribution", label: "sales.col.contribution", defaultVisible: false, align: "right", format: "percent" },
+  { key: "of_ranking", label: "sales.col.ofRanking", defaultVisible: false, align: "right", format: "number" },
+  { key: "following", label: "sales.col.following", defaultVisible: false, align: "right", format: "number" },
+  { key: "fans_renew_on", label: "sales.col.fansRenewOn", defaultVisible: false, align: "right", format: "number" },
+  { key: "renew_on_percentage", label: "sales.col.renewOnPct", defaultVisible: false, align: "right", format: "percent" },
+  { key: "new_fans", label: "sales.col.newFans", defaultVisible: false, align: "right", format: "number" },
+  { key: "active_fans", label: "sales.col.activeFans", defaultVisible: false, align: "right", format: "number" },
+  { key: "change_expired_fan_count", label: "sales.col.expiredChange", defaultVisible: false, align: "right", format: "number" },
+  { key: "avg_spend_per_spender_gross", label: "sales.col.avgPerSpender", defaultVisible: false, align: "right", format: "currency" },
+  { key: "avg_spend_per_transaction_gross", label: "sales.col.avgPerTransaction", defaultVisible: false, align: "right", format: "currency" },
+  { key: "avg_earnings_per_fan_gross", label: "sales.col.avgPerFan", defaultVisible: false, align: "right", format: "currency" },
+  { key: "variation_percent", label: "sales.col.variation", defaultVisible: true, align: "right", format: "signed_percent" },
+  { key: "trend", label: "sales.col.trend", defaultVisible: true, format: "trend" },
+  { key: "participation_percent", label: "sales.col.share", defaultVisible: true, align: "right", format: "percent" },
+  { key: "document_id", label: "sales.col.documentId", defaultVisible: true, format: "document" },
 ];

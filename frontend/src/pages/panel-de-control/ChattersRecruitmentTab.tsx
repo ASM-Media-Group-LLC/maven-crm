@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { format } from "date-fns";
 import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
 import {
   Users,
   UserCheck,
@@ -101,6 +102,7 @@ const DetailDialog = ({
   range: ChattersRange;
 }) => {
   const f = useFormato();
+  const { t } = useLanguage();
   const { data, isLoading } = useChattersRecruitmentDetails(
     metric ?? "total",
     range,
@@ -123,7 +125,7 @@ const DetailDialog = ({
             </>
           ) : !data || data.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-12">
-              Sin registros en el rango seleccionado.
+              {t("panel.rec.noRecords")}
             </p>
           ) : (
             data.map((row) => (
@@ -158,7 +160,7 @@ const DetailDialog = ({
 
         {data && data.length === 100 && (
           <p className="text-[10px] text-muted-foreground text-center pt-2 border-t border-border/40">
-            Mostrando los primeros 100.
+            {t("panel.rec.first100")}
           </p>
         )}
       </DialogContent>
@@ -173,6 +175,7 @@ interface Props {
 
 const ChattersRecruitmentTab = ({ range }: Props) => {
   const f = useFormato();
+  const { t } = useLanguage();
   const { data, isLoading } = useChattersRecruitment(range);
   const [openMetric, setOpenMetric] = useState<ChattersMetricKey | null>(null);
 
@@ -202,39 +205,39 @@ const ChattersRecruitmentTab = ({ range }: Props) => {
   }> = [
     {
       key: "total",
-      label: "Sesiones creadas",
+      label: t("panel.rec.sessions"),
       value: k.total,
       icon: <Users className="h-3.5 w-3.5" />,
       gradient: "bg-indigo-500",
-      hint: "Invitaciones generadas por examiners",
+      hint: t("panel.rec.sessionsHint"),
     },
     {
       key: "claimed",
-      label: "Reclamadas",
+      label: t("panel.rec.claimed"),
       value: k.claimed,
       icon: <UserCheck className="h-3.5 w-3.5" />,
       gradient: "bg-primary",
-      hint: "Candidato abrió el link y comenzó la sesión",
+      hint: t("panel.rec.claimedHint"),
     },
     {
       key: "ended",
-      label: "Completadas",
+      label: t("panel.rec.completed"),
       value: k.ended,
       icon: <MessageSquare className="h-3.5 w-3.5" />,
       gradient: "bg-cyan-500",
-      hint: "Sesiones terminadas (status='ended')",
+      hint: t("panel.rec.completedHint"),
     },
     {
       key: "evaluated",
-      label: "Evaluadas",
+      label: t("panel.rec.evaluated"),
       value: k.evaluated,
       icon: <ClipboardCheck className="h-3.5 w-3.5" />,
       gradient: "bg-primary",
-      hint: "El examiner cerró el veredicto",
+      hint: t("panel.rec.evaluatedHint"),
     },
     {
       key: "apto",
-      label: "Aprobados",
+      label: t("panel.rec.approvedM"),
       value: k.apto,
       icon: <CheckCircle2 className="h-3.5 w-3.5" />,
       gradient: "bg-success",
@@ -242,7 +245,7 @@ const ChattersRecruitmentTab = ({ range }: Props) => {
     },
     {
       key: "noApto",
-      label: "Rechazados",
+      label: t("panel.rec.rejected"),
       value: k.noApto,
       icon: <XCircle className="h-3.5 w-3.5" />,
       gradient: "bg-destructive",
@@ -254,11 +257,11 @@ const ChattersRecruitmentTab = ({ range }: Props) => {
     cards.find((c) => c.key === openMetric)?.label ?? "";
 
   const funnelChartData = [
-    { stage: "Creadas",     value: k.total,      fill: "#6366f1" },
-    { stage: "Reclamadas",  value: k.claimed,    fill: "#3b82f6" },
-    { stage: "Completadas", value: k.ended,      fill: "#06b6d4" },
-    { stage: "Evaluadas",   value: k.evaluated,  fill: "#8b5cf6" },
-    { stage: "Aprobadas",   value: k.apto,       fill: "#10b981" },
+    { stage: t("panel.rec.created"),    value: k.total,      fill: "#6366f1" },
+    { stage: t("panel.rec.claimed"),    value: k.claimed,    fill: "#3b82f6" },
+    { stage: t("panel.rec.completed"),  value: k.ended,      fill: "#06b6d4" },
+    { stage: t("panel.rec.evaluated"),  value: k.evaluated,  fill: "#8b5cf6" },
+    { stage: t("panel.rec.approvedF"),  value: k.apto,       fill: "#10b981" },
   ];
 
   return (
@@ -272,14 +275,14 @@ const ChattersRecruitmentTab = ({ range }: Props) => {
         >
           <div className="relative">
             <p className="text-xs text-foreground/80 font-semibold">
-              Total sesiones de evaluación
+              {t("panel.rec.totalSessions")}
             </p>
             <div className="flex items-end gap-3 mt-2">
               <p className="text-4xl font-bold tabular-nums leading-none">
                 {k.total.toLocaleString(f.intl("es-ES"))}
               </p>
               <p className="text-xs text-muted-foreground pb-1">
-                {k.claimed.toLocaleString(f.intl("es-ES"))} reclamadas ({claimRate}%)
+                {t("panel.rec.claimedOf", { n: k.claimed.toLocaleString(f.intl("es-ES")), pct: claimRate })}
               </p>
             </div>
           </div>
@@ -288,7 +291,7 @@ const ChattersRecruitmentTab = ({ range }: Props) => {
         <Card className="p-5 border-2 border-success/30 relative overflow-hidden">
           <div className="relative">
             <p className="text-xs text-foreground/80 font-semibold">
-              Tasa de aprobación
+              {t("panel.rec.approvalRate")}
             </p>
             <div className="flex items-end gap-3 mt-2">
               <p className="text-4xl font-bold tabular-nums leading-none">
@@ -296,7 +299,7 @@ const ChattersRecruitmentTab = ({ range }: Props) => {
                 <span className="text-xl text-muted-foreground">%</span>
               </p>
               <p className="text-xs text-muted-foreground pb-1">
-                {k.apto.toLocaleString(f.intl("es-ES"))} aptos de {k.evaluated.toLocaleString(f.intl("es-ES"))} evaluados
+                {t("panel.rec.aptOf", { apt: k.apto.toLocaleString(f.intl("es-ES")), total: k.evaluated.toLocaleString(f.intl("es-ES")) })}
               </p>
             </div>
           </div>
@@ -327,14 +330,14 @@ const ChattersRecruitmentTab = ({ range }: Props) => {
             </div>
             <div>
               <p className="text-xs text-foreground/80 font-semibold">
-                Tasa de aprobación
+                {t("panel.rec.approvalRate")}
               </p>
               <p className="text-3xl font-bold tabular-nums leading-tight">
                 {approvalRate}
                 <span className="text-lg text-muted-foreground">%</span>
               </p>
               <p className="text-[10px] text-muted-foreground mt-1">
-                Aprobados / Evaluados ({k.apto}/{k.evaluated})
+                {t("panel.rec.approvalFormula", { apt: k.apto, total: k.evaluated })}
               </p>
             </div>
           </div>
@@ -348,14 +351,14 @@ const ChattersRecruitmentTab = ({ range }: Props) => {
             </div>
             <div>
               <p className="text-xs text-foreground/80 font-semibold">
-                Tasa de claim
+                {t("panel.rec.claimRate")}
               </p>
               <p className="text-3xl font-bold tabular-nums leading-tight">
                 {claimRate}
                 <span className="text-lg text-muted-foreground">%</span>
               </p>
               <p className="text-[10px] text-muted-foreground mt-1">
-                Reclamadas / Creadas ({k.claimed}/{k.total})
+                {t("panel.rec.claimFormula", { claimed: k.claimed, total: k.total })}
               </p>
             </div>
           </div>
@@ -364,23 +367,23 @@ const ChattersRecruitmentTab = ({ range }: Props) => {
 
       {/* Funnel visual flow */}
       <Card className="p-4">
-        <h2 className="text-sm font-semibold mb-3">Flujo del funnel</h2>
+        <h2 className="text-sm font-semibold mb-3">{t("panel.rec.funnelFlow")}</h2>
         <div className="flex items-center gap-2 flex-wrap text-xs">
-          <FunnelStep label="Creadas"     value={k.total}     color="text-indigo-400" />
+          <FunnelStep label={t("panel.rec.created")}   value={k.total}     color="text-indigo-400" />
           <ArrowRight className="h-3 w-3 text-muted-foreground" />
-          <FunnelStep label="Reclamadas"  value={k.claimed}   color="text-blue-400" />
+          <FunnelStep label={t("panel.rec.claimed")}   value={k.claimed}   color="text-blue-400" />
           <ArrowRight className="h-3 w-3 text-muted-foreground" />
-          <FunnelStep label="Completadas" value={k.ended}     color="text-cyan-400" />
+          <FunnelStep label={t("panel.rec.completed")} value={k.ended}     color="text-cyan-400" />
           <ArrowRight className="h-3 w-3 text-muted-foreground" />
-          <FunnelStep label="Evaluadas"   value={k.evaluated} color="text-violet-400" />
+          <FunnelStep label={t("panel.rec.evaluated")} value={k.evaluated} color="text-violet-400" />
           <ArrowRight className="h-3 w-3 text-muted-foreground" />
-          <FunnelStep label="Aprobadas"   value={k.apto}      color="text-success" />
+          <FunnelStep label={t("panel.rec.approvedF")} value={k.apto}      color="text-success" />
         </div>
       </Card>
 
       {/* Bar chart del funnel */}
       <Card className="p-4">
-        <h2 className="text-sm font-semibold mb-3">Funnel de reclutamiento</h2>
+        <h2 className="text-sm font-semibold mb-3">{t("panel.rec.funnel")}</h2>
         <div className="h-56">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={funnelChartData}>

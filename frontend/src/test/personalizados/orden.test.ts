@@ -1,6 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { ordenarPedidos, valoresDe, etiquetaValor, CLASE, TEXTOS } from "@/pages/personalizados/orden";
 import type { Pedido } from "@/pages/personalizados/types";
+import { getTranslation, type TranslationKey } from "@/lib/i18n";
+
+// Los textos del menú son claves del diccionario: se leen en los dos idiomas.
+const es = (k: TranslationKey) => getTranslation(k, "es");
+const en = (k: TranslationKey) => getTranslation(k, "en");
 
 // Pedido de Jhon (03/09/2026): "doy click en precio y me habilita mayor precio o
 // menor precio… tipo, y me va acomodando por tipos".
@@ -79,9 +84,11 @@ describe("ordenar por columna", () => {
 describe("menú del encabezado", () => {
   it("los textos dependen de la clase de la columna", () => {
     expect(CLASE.price_usd).toBe("numero");
-    expect(TEXTOS[CLASE.price_usd].desc).toBe("Mayor a menor");
-    expect(TEXTOS[CLASE.content_type].asc).toContain("Agrupar");
-    expect(TEXTOS[CLASE.requested_on].desc).toContain("reciente");
+    expect(es(TEXTOS[CLASE.price_usd].desc)).toBe("Mayor a menor");
+    expect(es(TEXTOS[CLASE.content_type].asc)).toContain("Agrupar");
+    expect(es(TEXTOS[CLASE.requested_on].desc)).toContain("reciente");
+    expect(en(TEXTOS[CLASE.price_usd].desc)).toBe("Highest to lowest");
+    expect(en(TEXTOS[CLASE.requested_on].desc)).toBe("Newest first");
   });
 
   it("'ver solo' ofrece únicamente los valores que existen en la tabla", () => {
@@ -91,9 +98,13 @@ describe("menú del encabezado", () => {
   });
 
   it("los valores se muestran con su etiqueta, no con el id de la base", () => {
-    expect(etiquetaValor("content_type", "video")).toContain("Video");
-    expect(etiquetaValor("status", "en_produccion")).toBe("En producción");
-    expect(etiquetaValor("sale_channel", "buster")).toMatch(/Buster/);
-    expect(etiquetaValor("agency", "massive")).toBe("Massive");
+    expect(etiquetaValor("content_type", "video", es)).toContain("Video");
+    expect(etiquetaValor("status", "en_produccion", es)).toBe("En producción");
+    expect(etiquetaValor("sale_channel", "buster", es)).toMatch(/Buster/);
+    expect(etiquetaValor("agency", "massive", es)).toBe("Massive");
+    // En inglés, la etiqueta; el id de la base nunca.
+    expect(etiquetaValor("status", "en_produccion", en)).toBe("In production");
+    expect(etiquetaValor("content_type", "foto", en)).toBe("📷 Photo");
+    expect(etiquetaValor("status", "desconocido", en)).toBe("desconocido");
   });
 });

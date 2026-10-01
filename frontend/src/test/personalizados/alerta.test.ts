@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DIAS_ATENCION, DIAS_VENCIDO, alertaDe, diasDesde, type Estado } from "@/pages/personalizados/types";
+import { getTranslation } from "@/lib/i18n";
 
 // Regla del negocio: un personalizado se entrega en 12 días como máximo. A los
 // 7 avisa (ámbar), a los 12 vence (rojo) — y un pedido CERRADO no alerta nunca,
@@ -27,7 +28,10 @@ describe("alertaDe · plazo de los 12 días", () => {
   it("vence (rojo) a partir de los 12 días", () => {
     expect(alertaDe(p(DIAS_VENCIDO), HOY)?.nivel).toBe("vencido");
     expect(alertaDe(p(40), HOY)?.nivel).toBe("vencido");
-    expect(alertaDe(p(40), HOY)?.texto).toBe("Vencido · 40 d");
+    // El rótulo es una clave del diccionario, con los días como parámetro.
+    const a = alertaDe(p(40), HOY)!;
+    expect(getTranslation(a.texto, "es", { dias: a.dias })).toBe("Vencido · 40 d");
+    expect(getTranslation(a.texto, "en", { dias: a.dias })).toBe("Overdue · 40 d");
   });
 
   it("los pedidos cerrados NO alertan, por viejos que sean", () => {

@@ -7,6 +7,10 @@ vi.mock("@/pages/personalizados/usePersonalizados", () => ({
   usePermisosPersonalizados: () => ({ puedeAprobar: true, puedeGestionar: true, puedeCrear: true, cargando: false }),
 }));
 
+// El tablero habla por t(): se dibuja con el diccionario real en español.
+vi.mock("@/hooks/useLanguage", (original) =>
+  import("@/test/messenger/espanolEnTests").then((m) => m.idiomaEnEspanol(original)));
+
 import PedidoTablero from "@/pages/personalizados/PedidoTablero";
 
 describe("PedidoTablero", () => {

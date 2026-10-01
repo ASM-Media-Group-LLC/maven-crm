@@ -1,6 +1,7 @@
 import { DollarSign, Wallet, Users, TrendingUp, AlertTriangle, Info } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { NET_FACTOR } from "@/lib/earnings";
+import { useLanguage } from "@/hooks/useLanguage";
 import type { PeriodComparisonResult } from "./usePeriodComparison";
 
 interface Props {
@@ -15,6 +16,7 @@ const fmt = (n: number) =>
 // + icono cuadrado coloreado + hover lift. Todos los clicks abren el
 // modal CardDetailModal, ya no navegan a otras rutas.
 const SalesKPICards = ({ data, onCardClick }: Props) => {
+  const { t } = useLanguage();
   const cards: Array<{
     id: string;
     title: string;
@@ -28,7 +30,7 @@ const SalesKPICards = ({ data, onCardClick }: Props) => {
   }> = [
     {
       id: "gross",
-      title: "Ingresos Total",
+      title: t("sales.ov.gross"),
       value: fmt(data.totalCurrent),
       change: data.totalChangePercent,
       previousValue: fmt(data.totalPrevious),
@@ -38,43 +40,43 @@ const SalesKPICards = ({ data, onCardClick }: Props) => {
     },
     {
       id: "net",
-      title: "Net (estimado 80%)",
+      title: t("sales.ov.net"),
       // NET_FACTOR centralizado en @/lib/earnings — estimación, no descuenta contracargos.
       value: fmt(data.totalCurrent * NET_FACTOR),
       change: data.totalChangePercent,
       previousValue: fmt(data.totalPrevious * NET_FACTOR),
       subtitle: null,
-      tooltip: "Estimación: bruto × 0.80 (payout de OF). No descuenta contracargos ni otros ajustes.",
+      tooltip: t("sales.ov.netTip"),
       icon: Wallet,
       bg: "bg-emerald-500",
     },
     {
       id: "creators",
-      title: "Creadoras",
+      title: t("sales.ov.creators"),
       value: data.creators.length.toString(),
       change: 0,
       previousValue: null,
-      subtitle: `${data.activeCreators} activas`,
+      subtitle: t("sales.ov.activeN", { n: data.activeCreators }),
       icon: Users,
       bg: "bg-violet-500",
     },
     {
       id: "rising",
-      title: "Subiendo",
+      title: t("sales.ov.rising"),
       value: data.rising.length.toString(),
       change: 0,
       previousValue: null,
-      subtitle: "crecimiento positivo",
+      subtitle: t("sales.ov.risingSub"),
       icon: TrendingUp,
       bg: "bg-success",
     },
     {
       id: "at_risk",
-      title: "En Riesgo",
+      title: t("sales.ov.atRisk"),
       value: data.atRisk.length.toString(),
       change: 0,
       previousValue: null,
-      subtitle: "necesitan atención",
+      subtitle: t("sales.ov.atRiskSub"),
       icon: AlertTriangle,
       bg: "bg-destructive",
     },
@@ -110,11 +112,11 @@ const SalesKPICards = ({ data, onCardClick }: Props) => {
               <p className="text-3xl font-bold tabular-nums leading-tight">{card.value}</p>
               {card.change !== 0 && (
                 <p className={`text-[10px] mt-1 ${card.change >= 0 ? "text-success" : "text-destructive"}`}>
-                  {card.change >= 0 ? "+" : ""}{card.change.toFixed(1)}% vs anterior
+                  {t("sales.ov.vsPrev", { change: `${card.change >= 0 ? "+" : ""}${card.change.toFixed(1)}` })}
                 </p>
               )}
               {card.previousValue && card.change === 0 && (
-                <p className="text-[10px] text-muted-foreground mt-1">Anterior: {card.previousValue}</p>
+                <p className="text-[10px] text-muted-foreground mt-1">{t("sales.ov.previousValue", { value: card.previousValue })}</p>
               )}
               {card.subtitle && (
                 <p className="text-[10px] text-muted-foreground mt-1">{card.subtitle}</p>

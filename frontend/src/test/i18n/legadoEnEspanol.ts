@@ -56,29 +56,10 @@ export const LEGADO_EN_ESPANOL: string[] = [
   "pages/hr/HROffboardingNew.tsx",
   // Traducido; queda la checklist por defecto (categoría/título/descripción): se guarda en employee_onboarding_tasks y la lee quien lleve el onboarding. Se ve traducida.
   "pages/hr/HROnboardingNew.tsx",
-  "pages/manager/ManagerDashboard.tsx",
-  "pages/opportunities/OpportunitiesPage.tsx",
-  "pages/panel-de-control/ChattersRecruitmentTab.tsx",
-  "pages/panel-de-control/ControlGastoTab.tsx",
-  "pages/panel-de-control/WhatsappAgentTab.tsx",
+  // Traducido; queda la lámina (días, formato, rótulos, título y regla de ejecución): es el documento que se imprime y se manda al grupo, lo leen las creadoras.
   "pages/parrilla/ParrillaPage.tsx",
+  // Traducido; quedan los días de la lámina y el título por defecto de cada acción extra y de la parrilla, que se guardan e imprimen en el documento.
   "pages/parrilla/useParrilla.ts",
-  "pages/personalizados/PedidoFicha.tsx",
-  "pages/personalizados/PedidoFormDialog.tsx",
-  "pages/personalizados/PedidoTabla.tsx",
-  "pages/personalizados/PedidoTablero.tsx",
-  "pages/personalizados/PersonalizadosPage.tsx",
-  "pages/personalizados/types.ts",
-  "pages/sales-overview/CardDetailModal.tsx",
-  "pages/sales-overview/SalesKPICards.tsx",
-  "pages/sales-overview/SalesOperationalCards.tsx",
-  "pages/sales-performance/CohortRetentionTab.tsx",
-  "pages/sales-performance/EarningsFilters.tsx",
-  "pages/sales-performance/EarningsTable.tsx",
-  "pages/sales-performance/LinkCreatorModal.tsx",
-  "pages/sales-performance/LtvTab.tsx",
-  "pages/sales-performance/VentasTops.tsx",
-  "pages/sales-performance/types.ts",
   // Traducido; queda «Link de Instagram», la pregunta que se guarda en ticket_form_fields y la leen todos: no se traduce.
   "pages/tickets/TicketFormEditor.tsx",
   // Traducido; queda un nombre propio con ñ en TEAM_MEMBERS («Castaño»), que no es texto de pantalla.
