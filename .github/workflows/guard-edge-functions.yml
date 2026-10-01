@@ -59,6 +59,13 @@ jobs:
       - name: Guard — IA por OpenRouter
         run: deno test --no-check -A supabase/functions/ai-orchestrator/openrouter.test.ts supabase/functions/qa-analyze/openrouter.test.ts supabase/functions/parrilla-generate/ia.test.ts
 
+      # Cowork por agencia: todo id que nombra un pedido a cowork-session (sesión, salas,
+      # meet, pedidos) tiene que ser de la agencia de quien llama y de ESA sesión; antes y
+      # después de la migración 20261001213000. También lee index.ts: la guarda corre una
+      # vez antes de toda acción y toda acción con requestId está clasificada. Con tipos.
+      - name: Guard — Cowork por agencia (cowork-session)
+        run: deno test --allow-read supabase/functions/cowork-session/agencia.test.ts
+
       # web-push: el título, el cuerpo y a quién le llega el push del Messenger
       # (_shared/push-notify.ts) y quién aparece como emisor (web-push/nombre-emisor.ts:
       # ahí va a entrar el nombre visible de la key cuando se escriba por API). Con
