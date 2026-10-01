@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   KeyRound, Plus, Check, Loader2, ShieldAlert, Trash2, Pencil, BookOpen, ExternalLink, X, MessageSquareX,
@@ -27,7 +27,7 @@ import { useCaras } from "./carasDePersonas";
 import { CeldaWebhook, DialogoWebhook, DocsWebhooks, type WebhookResumen } from "./ApiKeyWebhook";
 import { AvisoVersionesViejas, DialogoRetirada } from "./ApiKeyEscritura";
 import {
-  SCOPE_MESSENGER_ESCRITURA, alternarScope, esScopeDeEscritura, esScopeMessenger, escribe,
+  SCOPE_MESSENGER_ESCRITURA, alternarScope, esScopeDeEscritura, esScopeMessenger, escribe, escribioAlgunaVez,
   normalizarNombreVisible, problemaDelNombreVisible, type ProblemaDelNombre,
 } from "./apiKeysEscritura";
 
@@ -187,6 +187,13 @@ const AdminApiKeys = () => {
   const [errorAlGuardar, setErrorAlGuardar] = useState<string | null>(null);
   // De qué key se retira lo que mandó. `vez` remonta el diálogo en cada apertura.
   const [retirarDe, setRetirarDe] = useState<{ llave: ApiKey; vez: number } | null>(null);
+  // El nombre que trajo la rotación (no lo escribió la persona): al cambiar de key o
+  // volver a «Ninguna» se cambia o se quita. Si lo tocó, queda el suyo.
+  const nombreTraido = useRef<string | null>(null);
+  // Cualquier cambio en el formulario deja atrás el error: era del intento anterior
+  // (no solo el nombre: también las IPs, el vencimiento o los scopes).
+  useEffect(() => { setErrorAlGuardar(null); },
+    [name, scopes, ipMode, ipText, expiryDays, confirmaMessenger, nombreVisible, reemplazaA, confirmaEscritura]);
   const createMutPendiente = useRef(false);
 
   const { data, isLoading, isError, error, refetch } = useQuery({
@@ -212,10 +219,10 @@ const AdminApiKeys = () => {
   const nombreVisibleOriginal = editing?.api_display_name ?? null;
   const nombreVisibleCambio = modalMode === "create" || normalizarNombreVisible(nombreVisible) !== (nombreVisibleOriginal ?? "");
   const problemaDelNombre = conEscritura && nombreVisibleCambio ? problemaDelNombreVisible(nombreVisible) : null;
-  // La rotación: otra key de la MISMA persona que escribía (también revocada o vencida:
-  // es justo cuando se la reemplaza). El servidor vuelve a exigir persona y agencia.
+  // La rotación: otra key de la MISMA persona que escribía (también revocada, vencida o
+  // ya sin write: es justo cuando se la reemplaza, y su nombre no lo puede usar otra). El servidor vuelve a exigir persona y agencia.
   const reemplazables = useMemo(
-    () => keys.filter((k) => escribe(k.scopes) && !!data?.you?.id && k.acts_as?.id === data.you.id),
+    () => keys.filter((k) => escribioAlgunaVez(k) && !!data?.you?.id && k.acts_as?.id === data.you.id),
     [keys, data?.you?.id],
   );
   // Sin nombre (perfil sin full_name) no se arma "ALL of you's": hay una frase propia.
@@ -233,6 +240,7 @@ const AdminApiKeys = () => {
     setName(""); setScopes(["creators:read"]); setIpMode("none"); setIpText(""); setExpiryDays(30); setFreshKey(null);
     setConfirmaMessenger(false);
     setNombreVisible(""); setReemplazaA(""); setConfirmaEscritura(false); setErrorAlGuardar(null);
+    nombreTraido.current = null;
   };
   const openCreate = () => { resetForm(); setEditing(null); setModalMode("create"); };
   const openEdit = (k: ApiKey) => {
@@ -240,6 +248,7 @@ const AdminApiKeys = () => {
     setIpMode(k.ip_whitelist?.length ? "restrict" : "none");
     setIpText((k.ip_whitelist ?? []).join("\n"));
     setNombreVisible(k.api_display_name ?? ""); setReemplazaA(""); setConfirmaEscritura(false); setErrorAlGuardar(null);
+    nombreTraido.current = null;
     setExpiryDays(-1); setFreshKey(null); setModalMode("edit");
   };
   // Con el alta en vuelo no se cierra: la key llega UNA vez y, con el modal cerrado,
@@ -322,15 +331,19 @@ const AdminApiKeys = () => {
       if (modalMode === "edit") setExpiryDays(-1);
     }
     if (!hay) setConfirmaMessenger(false);
-    if (!escribe(nuevos)) { setConfirmaEscritura(false); setReemplazaA(""); }
+    if (!escribe(nuevos)) { setConfirmaEscritura(false); setReemplazaA(""); nombreTraido.current = null; }
   };
 
   // La rotación trae el nombre visible de la key reemplazada (el servidor hace lo mismo
   // si no viene otro); se puede cambiar.
   const elegirReemplazo = (id: string) => {
     setReemplazaA(id);
-    const vieja = reemplazables.find((k) => k.id === id);
-    if (vieja?.api_display_name) setNombreVisible(vieja.api_display_name);
+    const traido = reemplazables.find((k) => k.id === id)?.api_display_name ?? null;
+    if (traido) { setNombreVisible(traido); nombreTraido.current = traido; return; }
+    // Volver a «Ninguna»: el nombre que trajo la key anterior se quita (el servidor lo
+    // rechaza, ya es de otra integración); el que escribió la persona queda.
+    if (nombreTraido.current !== null && nombreVisible === nombreTraido.current) setNombreVisible("");
+    nombreTraido.current = null;
   };
 
   const submitting = createMut.isPending || updateMut.isPending;
@@ -475,9 +488,9 @@ const AdminApiKeys = () => {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
-                        {/* En toda key que escribe, también revocada o vencida: es justo
-                            cuando hace falta limpiar lo que mandó. */}
-                        {escribe(k.scopes) && (
+                        {/* En toda key que escribe o escribió, también revocada, vencida o
+                            sin write: es justo cuando hace falta limpiar lo que mandó. */}
+                        {escribioAlgunaVez(k) && (
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive"
                             onClick={() => setRetirarDe((antes) => ({ llave: k, vez: (antes?.vez ?? 0) + 1 }))}
                             title={t("apiKeys.withdraw.button")} aria-label={t("apiKeys.withdraw.button")}>
@@ -650,8 +663,9 @@ const AdminApiKeys = () => {
                         maxLength={64} aria-invalid={problemaDelNombre !== null && nombreVisible !== ""}
                         aria-describedby="key-display-name-hint"
                         onChange={(e) => { setNombreVisible(e.target.value); setErrorAlGuardar(null); }} />
-                      {/* Vacío todavía no es un error que se marque: el botón sigue apagado. */}
-                      {problemaDelNombre && nombreVisible !== "" && (
+                      {/* En el alta, vacío todavía no es un error que se marque (no escribió
+                          nada). Al editar sí: lo borró y «Guardar» se apaga, hay que decir por qué. */}
+                      {problemaDelNombre && (nombreVisible !== "" || modalMode === "edit") && (
                         <p className="text-xs text-destructive" data-error-nombre-visible>{t(TEXTO_DEL_NOMBRE[problemaDelNombre])}</p>
                       )}
                       <p id="key-display-name-hint" className="text-xs text-muted-foreground">{t("apiKeys.form.displayNameHint")}</p>

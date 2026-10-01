@@ -16,8 +16,8 @@ import { LanguageProvider } from "@/hooks/useLanguage";
 import { esEspanol } from "../i18n/detectarEspanol";
 import { SCOPE_CATALOG, SCOPE_GROUPS } from "../../../../supabase/functions/manage-api-keys/api-scopes";
 import {
-  alternarScope, desdeCuando, errorDeRetirada, esqueleto, leerTanda, problemaDelNombreVisible, retirarEnTandas,
-  RAICES_RESERVADAS, MAX_TANDAS,
+  alternarScope, desdeCuando, errorDeRetirada, escribioAlgunaVez, esqueleto, leerTanda, problemaDelNombreVisible,
+  retirarEnTandas, RAICES_RESERVADAS, MAX_TANDAS,
 } from "@/pages/admin/apiKeysEscritura";
 
 const YO = "3f1c2b7a-9d4e-4a51-8c0f-2e6b7d9a1c35";
@@ -40,8 +40,9 @@ function llave(id: string, extra: W = {}): W {
 }
 const ESCRIBE = ["messenger:read", "messenger:write"];
 const LLAVES = [
-  // Una key a la que le sacaron write: conserva su nombre visible en la base, pero ya no
-  // manda nada (ni «como «…»» ni retirada ni rotación).
+  // Una key a la que le sacaron write: conserva su nombre visible en la base. Ya no
+  // manda nada (no dice «como «…»»), pero lo que mandó se puede retirar y se la puede
+  // reemplazar (su nombre no lo puede usar otra integración).
   llave("lee", {
     name: "Solo lectura", scopes: ["messenger:read"], ip_whitelist: ["1.2.3.4"], expires_at: "2026-11-30T00:00:00Z",
     api_display_name: "Retired Bot",
@@ -83,15 +84,26 @@ vi.mock("@/pages/admin/carasDePersonas", () => ({ useCaras: () => new Map() }));
 // La base: la RPC de la retirada y los nombres de profiles (para el aviso de versiones).
 const base = vi.hoisted(() => ({
   rpc: [] as { fn: string; args: Record<string, unknown> }[],
+  senales: [] as AbortSignal[],
   contestar: (async () => ({ data: { retirados: 0, quedan: 0 }, error: null })) as (args: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>,
   perfiles: [] as { id: string; full_name: string | null }[],
   pedidosDePerfiles: [] as string[][],
 }));
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
+    // Como supabase-js: rpc() da una cadena con .abortSignal(); al cortarse, la
+    // respuesta vuelve con un error SIN código de la base.
     rpc: (fn: string, args: Record<string, unknown>) => {
       base.rpc.push({ fn, args });
-      return base.contestar(args);
+      return {
+        abortSignal: (s: AbortSignal) => {
+          base.senales.push(s);
+          return new Promise((resolver, fallar) => {
+            base.contestar(args).then(resolver, fallar);
+            s.addEventListener("abort", () => resolver({ data: null, error: { message: "AbortError: aborted", code: "20" } }));
+          });
+        },
+      };
     },
     from: (tabla: string) => ({
       select: () => ({
@@ -176,6 +188,7 @@ beforeEach(() => {
   localStorage.setItem("app-language", "en");
   llamadas.length = 0;
   base.rpc.length = 0;
+  base.senales.length = 0;
   base.perfiles = [];
   base.pedidosDePerfiles.length = 0;
   base.contestar = async () => ({ data: { retirados: 0, quedan: 0 }, error: null });
@@ -288,7 +301,20 @@ describe("la retirada en tandas", () => {
     expect(errorDeRetirada({ code: "MV401" })).toBe("sin_sesion");
     expect(errorDeRetirada({ code: "MV403", details: '{"error": "forbidden"}' })).toBe("sin_permiso");
     expect(errorDeRetirada({ code: "MV404" })).toBe("sin_llave");
-    expect(errorDeRetirada(new TypeError("Failed to fetch"))).toBe("otro");
+    // Con código de la base, la tanda se deshizo entera: es un fallo.
+    expect(errorDeRetirada({ code: "57014", message: "canceling statement due to statement timeout" })).toBe("otro");
+    expect(errorDeRetirada({ code: "PGRST301" })).toBe("otro");
+    // Sin código (red cortada, plazo vencido, 5xx de la puerta de enlace): no se sabe.
+    expect(errorDeRetirada({ code: "", message: "TypeError: Failed to fetch" })).toBe("sin_saber");
+    expect(errorDeRetirada({ code: "20", message: "AbortError: aborted" })).toBe("sin_saber");
+    expect(errorDeRetirada(new TypeError("Failed to fetch"))).toBe("sin_saber");
+  });
+
+  it("escribió alguna vez: write hoy, o el nombre visible que le quedó; la integración sola no cuenta", () => {
+    expect(escribioAlgunaVez({ scopes: ["messenger:read", "messenger:write"] })).toBe(true);
+    expect(escribioAlgunaVez({ scopes: ["messenger:read"], api_display_name: "BLU" })).toBe(true);
+    // En prod toda key tiene integracion_id (también las 3 que solo leen).
+    expect(escribioAlgunaVez({ scopes: ["creators:read"], api_display_name: null })).toBe(false);
   });
 
   it("desde cuándo: atajos, todo (null) y una fecha que no puede estar en el futuro", () => {
@@ -374,8 +400,9 @@ describe("el alta de una key que escribe", () => {
     const d = await altaConEscritura("");
     const select = within(d).getByLabelText("Replaces…") as HTMLSelectElement;
     const opciones = Array.from(select.options).map((o) => o.value);
-    expect(opciones).toEqual(["", "blu", "vieja"]); // ni la ajena ni la de solo lectura
-    expect(select.options[2].textContent).toBe("BLU old · “BLU” · Revoked");
+    // Ni la ajena; sí la que ya no escribe (su nombre queda reservado a su integración).
+    expect(opciones).toEqual(["", "lee", "blu", "vieja"]);
+    expect(select.options[3].textContent).toBe("BLU old · “BLU” · Revoked");
     fireEvent.change(select, { target: { value: "vieja" } });
     expect((within(d).getByLabelText("Display name") as HTMLInputElement).value).toBe("BLU");
     confirmarEscritura(d);
@@ -396,6 +423,27 @@ describe("el alta de una key que escribe", () => {
     expect(llamadas.find((l) => l.action === "create")).not.toHaveProperty("replaces_key_id");
   });
 
+  it("volver a «None» quita el nombre que trajo la rotación, no el que escribió la persona", async () => {
+    let d = await altaConEscritura("");
+    const campo = () => within(d).getByLabelText("Display name") as HTMLInputElement;
+    const select = () => within(d).getByLabelText("Replaces…") as HTMLSelectElement;
+    fireEvent.change(select(), { target: { value: "vieja" } });
+    expect(campo().value).toBe("BLU");
+    fireEvent.change(select(), { target: { value: "" } });
+    expect(campo().value).toBe("");
+    fireEvent.click(within(d).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    fireEvent.click(screen.getByRole("button", { name: /Create API key/ }));
+    d = await screen.findByRole("dialog");
+    fireEvent.click(casillaDe(d, "messenger:write"));
+    fireEvent.change(campo(), { target: { value: "BLU" } });
+    fireEvent.change(campo(), { target: { value: "Mi Bot" } });
+    fireEvent.change(select(), { target: { value: "vieja" } });
+    fireEvent.change(campo(), { target: { value: "Mi Bot" } });
+    fireEvent.change(select(), { target: { value: "" } });
+    expect(campo().value).toBe("Mi Bot");
+  });
+
   it("el error del servidor (ya traducido) queda a la vista en el formulario", async () => {
     servidor = async (body) => {
       if (body.action === "list") return lista();
@@ -409,6 +457,11 @@ describe("el alta de una key que escribe", () => {
     );
     // Al corregir el nombre, el error viejo se va.
     fireEvent.change(within(d).getByLabelText("Display name"), { target: { value: "BLU Bot" } });
+    expect(within(d).queryByRole("alert")).toBeNull();
+    // Y también al corregir otra cosa: el error era del intento anterior.
+    fireEvent.click(botonCrear(d));
+    expect(await within(d).findByRole("alert")).toBeTruthy();
+    fireEvent.change(within(d).getByPlaceholderText(/exact IPs/), { target: { value: "45.225.224.130" } });
     expect(within(d).queryByRole("alert")).toBeNull();
   });
 
@@ -484,6 +537,17 @@ describe("la tabla", () => {
     expect(llamadas.find((l) => l.action === "update")).not.toHaveProperty("display_name");
   });
 
+  it("al editar, borrar el nombre visible apaga «Save» y dice por qué", async () => {
+    montar();
+    await screen.findByText("BLU prod");
+    fireEvent.click(within(fila("BLU prod")).getByTitle("Edit"));
+    const d = await screen.findByRole("dialog");
+    expect(d.querySelector("[data-error-nombre-visible]")).toBeNull();
+    fireEvent.change(within(d).getByLabelText("Display name"), { target: { value: "" } });
+    expect((within(d).getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(d.querySelector("[data-error-nombre-visible]")?.textContent).toBeTruthy();
+  });
+
   it("al editar, cambiar el nombre visible lo manda; a una key que solo lee no se le suma write", async () => {
     montar();
     await screen.findByText("BLU prod");
@@ -506,13 +570,19 @@ describe("la tabla", () => {
 describe("«Withdraw what it sent since…»", () => {
   const botonRetirar = (nombre: string) => within(fila(nombre)).queryByRole("button", { name: "Withdraw what it sent since…" });
 
-  it("está en toda key que escribe, también la revocada; no en las que solo leen", async () => {
+  it("está en toda key que escribe o escribió (revocada, o a la que le sacaron write); no en las que nunca", async () => {
+    const nunca = llave("nunca", {
+      name: "Inbox feed", scopes: ["messenger:read"], ip_whitelist: ["1.2.3.4"], expires_at: "2026-11-30T00:00:00Z",
+    });
+    servidor = async (body) => (body.action === "list" ? lista([...LLAVES, nunca]) : {});
     montar();
     await screen.findByText("BLU prod");
     expect(botonRetirar("BLU prod")).toBeTruthy();
     expect(botonRetirar("BLU old")).toBeTruthy();
     expect(botonRetirar("Kash Web")).toBeTruthy();
-    expect(botonRetirar("Solo lectura")).toBeNull();
+    expect(botonRetirar("Solo lectura")).toBeTruthy();
+    // Tiene integración (como toda key en prod) pero nunca escribió.
+    expect(botonRetirar("Inbox feed")).toBeNull();
   });
 
   it("pide confirmar y retira en tandas de 200, con el progreso, hasta que no queda nada", async () => {
@@ -584,6 +654,27 @@ describe("«Withdraw what it sent since…»", () => {
     await act(async () => { pendientes[1]({ data: { retirados: 40, quedan: 0 }, error: null }); });
     expect(await within(d).findByText("Done: 240 messages were withdrawn.")).toBeTruthy();
     expect(base.rpc[1].args._desde).toBe(base.rpc[0].args._desde);
+  });
+
+  it("si se corta la red, no lo da por fallido: «al menos», que no se sabe, y deja seguir", async () => {
+    const respuestas = [
+      { data: { retirados: 200, quedan: 300 }, error: null },
+      { data: null, error: { code: "", message: "TypeError: Failed to fetch", details: "", hint: "" } },
+    ];
+    base.contestar = async () => respuestas.shift() ?? { data: { retirados: 0, quedan: 0 }, error: null };
+    montar();
+    await screen.findByText("BLU prod");
+    fireEvent.click(botonRetirar("BLU old")!);
+    const d = await screen.findByRole("alertdialog");
+    fireEvent.click(within(d).getByText(/I understand the messages are emptied/).closest("label")!.querySelector("input")!);
+    fireEvent.click(within(d).getByRole("button", { name: "Withdraw" }));
+    expect(await within(d).findByText(/it's not known whether the last batch went through/)).toBeTruthy();
+    expect(within(d).getByText("At least 200 were withdrawn: those stay withdrawn.")).toBeTruthy();
+    expect(within(d).queryByText(/Couldn't withdraw/)).toBeNull();
+    expect(within(d).getByRole("button", { name: "Keep withdrawing" })).toBeTruthy();
+    // Cada tanda lleva su plazo (sin él, una red colgada trababa el diálogo).
+    expect(base.senales).toHaveLength(2);
+    expect(base.senales.every((s) => s instanceof AbortSignal)).toBe(true);
   });
 
   it("si la base dice que no puede, lo dice en palabras y no ofrece reintentar", async () => {

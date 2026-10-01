@@ -12,7 +12,7 @@ import { useFormato } from "@/hooks/useFormato";
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
 import type { TranslationKey } from "@/lib/i18n";
 import {
-  BUILD_CON_ETIQUETA_API, QUEDAN_TOPE, TANDA_DE_RETIRADA, desdeCuando, errorDeRetirada, retirarEnTandas,
+  BUILD_CON_ETIQUETA_API, PLAZO_DE_TANDA_MS, QUEDAN_TOPE, TANDA_DE_RETIRADA, desdeCuando, errorDeRetirada, retirarEnTandas,
   type Desde, type FinDeLaRetirada, type Progreso,
 } from "./apiKeysEscritura";
 
@@ -87,12 +87,21 @@ function fechaLocal(ms: number): string {
 /** Una tanda: hasta 200 mensajes de la integración desde `desde`. La base decide quién
  *  puede (un admin de la agencia de la key o su persona) y anda con la key revocada. */
 async function retirarUnaTanda(llave: string, desde: string | null): Promise<unknown> {
-  const { data, error } = await supabase.rpc(
-    "api_retirar_mensajes_de_integracion" as never,
-    { _llave: llave, _desde: desde, _limite: TANDA_DE_RETIRADA } as never,
-  );
-  if (error) throw error;
-  return data;
+  // Con plazo: sin él, una red colgada dejaba el diálogo trabado (no se cierra mientras
+  // retira y Detener espera a que termine la tanda). Cortarla no deshace nada en la
+  // base: vuelve sin código y se muestra como «no se sabe».
+  const plazo = new AbortController();
+  const reloj = setTimeout(() => plazo.abort(), PLAZO_DE_TANDA_MS);
+  try {
+    const { data, error } = await supabase.rpc(
+      "api_retirar_mensajes_de_integracion" as never,
+      { _llave: llave, _desde: desde, _limite: TANDA_DE_RETIRADA } as never,
+    ).abortSignal(plazo.signal);
+    if (error) throw error;
+    return data;
+  } finally {
+    clearTimeout(reloj);
+  }
 }
 
 type Fase =
@@ -213,7 +222,13 @@ export function DialogoRetirada({ llave, onCerrar }: { llave: LlaveQueEscribe; o
             {fin.estado === "error" && codigo && (
               <>
                 <p className="text-destructive">{t(`apiKeys.withdraw.err.${codigo}` as TranslationKey)}</p>
-                {fin.retirados > 0 && <p className="text-xs text-muted-foreground">{t("apiKeys.withdraw.doneBefore", { n: numero(fin.retirados) })}</p>}
+                {/* Sin saber si la última tanda se aplicó, lo retirado es «al menos»: la cuenta
+                    puede quedar corta en hasta una tanda. */}
+                {fin.retirados > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    {t(codigo === "sin_saber" ? "apiKeys.withdraw.atLeast" : "apiKeys.withdraw.doneBefore", { n: numero(fin.retirados) })}
+                  </p>
+                )}
               </>
             )}
           </div>
@@ -237,7 +252,7 @@ export function DialogoRetirada({ llave, onCerrar }: { llave: LlaveQueEscribe; o
             <>
               {puedeSeguir && (
                 <Button variant="outline" onClick={() => void correr()}>
-                  {fin.estado === "error" ? t("common.retry") : t("apiKeys.withdraw.again")}
+                  {fin.estado === "error" && codigo !== "sin_saber" ? t("common.retry") : t("apiKeys.withdraw.again")}
                 </Button>
               )}
               <Button onClick={onCerrar}>{t("common.close")}</Button>

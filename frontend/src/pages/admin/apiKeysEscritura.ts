@@ -18,6 +18,12 @@ export const esScopeMessenger = (s: string): boolean => SCOPES_MESSENGER.include
 /** El único scope que escribe. Los demás son de lectura («Solo lectura»). */
 export const esScopeDeEscritura = (s: string): boolean => s === SCOPE_MESSENGER_ESCRITURA;
 export const escribe = (scopes: readonly string[]): boolean => scopes.includes(SCOPE_MESSENGER_ESCRITURA);
+/** Una key que escribe HOY o que escribió alguna vez: le quitaron write pero conserva
+ *  su nombre visible (reservado para siempre a su integración). A esa se le puede
+ *  retirar lo que mandó y se la puede reemplazar. Por el nombre y NO por
+ *  integracion_id: toda key tiene integración, también las que nunca escribieron. */
+export const escribioAlgunaVez = (k: { scopes: readonly string[]; api_display_name?: string | null }): boolean =>
+  escribe(k.scopes) || !!k.api_display_name;
 
 /** Tildar o destildar un scope. write va siempre con read: tildar write tilda read, y
  *  destildar read destilda write (una key que escribe sin leer no existe; el servidor
@@ -99,6 +105,9 @@ export function problemaDelNombreVisible(crudo: string): ProblemaDelNombre | nul
 // hasta 1.001: más de 1.000 se dice así.
 
 export const TANDA_DE_RETIRADA = 200;
+/** Lo que se espera cada tanda: más que el statement_timeout de la base (8 s), para
+ *  no cortar una que todavía puede terminar bien. */
+export const PLAZO_DE_TANDA_MS = 15_000;
 export const QUEDAN_TOPE = 1000;
 /** 100 tandas = 20.000 mensajes: el doble de lo que una key puede mandar en un día.
  *  Si después de eso sigue habiendo, se para y se dice (la integración sigue mandando:
@@ -155,7 +164,13 @@ export async function retirarEnTandas(
   }
 }
 
-export type ErrorDeRetirada = "sin_sesion" | "sin_permiso" | "sin_llave" | "otro";
+export type ErrorDeRetirada = "sin_sesion" | "sin_permiso" | "sin_llave" | "sin_saber" | "otro";
+
+/** Un código que puso la base (SQLSTATE de 5, propios MV… o de PostgREST): la tanda
+ *  se deshizo entera. Sin él (se cortó la red, se venció el plazo, la puerta de enlace
+ *  contestó 5xx) no se sabe si la base alcanzó a aplicarla. */
+const esCodigoDeLaBase = (code: unknown): boolean =>
+  typeof code === "string" && (/^[0-9A-Z]{5}$/.test(code) || code.startsWith("PGRST"));
 
 /** El error de la base (PostgrestError: code MV401/MV403/MV404 y detail
  *  {"error": …}) como uno de los casos que la pantalla explica. */
@@ -172,6 +187,9 @@ export function errorDeRetirada(e: unknown): ErrorDeRetirada {
   if (err.code === "MV401" || dicho === "unauthorized") return "sin_sesion";
   if (err.code === "MV403" || err.code === "42501" || dicho === "forbidden") return "sin_permiso";
   if (err.code === "MV404" || dicho === "not_found") return "sin_llave";
+  // No es un fallo: es no saber. La pantalla lo dice así y deja seguir (seguir no
+  // retira nada dos veces).
+  if (!esCodigoDeLaBase(err.code)) return "sin_saber";
   return "otro";
 }
 

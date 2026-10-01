@@ -239,6 +239,14 @@ export const apiKeys = {
     en: "Only an admin of the key's agency or the key's person can withdraw what it sent.",
   },
   "apiKeys.withdraw.err.sin_llave": { es: "Esa key ya no existe.", en: "That key no longer exists." },
+  "apiKeys.withdraw.atLeast": {
+    es: "Se retiraron al menos {n}: esos ya quedaron retirados.",
+    en: "At least {n} were withdrawn: those stay withdrawn.",
+  },
+  "apiKeys.withdraw.err.sin_saber": {
+    es: "Se cortó la conexión y no se sabe si la última tanda alcanzó a retirarse. Seguir retirando es seguro: nada se retira dos veces.",
+    en: "The connection dropped, so it's not known whether the last batch went through. It's safe to keep withdrawing: nothing is withdrawn twice.",
+  },
   "apiKeys.withdraw.err.otro": {
     es: "No se pudo retirar. Prueba de nuevo en un momento.",
     en: "Couldn't withdraw. Try again in a moment.",
