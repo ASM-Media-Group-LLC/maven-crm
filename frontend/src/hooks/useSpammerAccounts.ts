@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+// Avisos y errores de pantalla por traducir() (salen de mutaciones y consultas).
+import { traducir } from "@/lib/i18n";
 
 // Types mirror the scouter_spammer_accounts table. Kept inline here so
 // the rest of the app can import them without a regen step.
@@ -116,7 +118,7 @@ export const useInsertSpammerAccount = () => {
   return useMutation({
     mutationFn: async (input: InsertSpammerAccountInput): Promise<SpammerAccount> => {
       const { data: userRes, error: userErr } = await supabase.auth.getUser();
-      if (userErr || !userRes.user) throw userErr ?? new Error("No hay sesión activa.");
+      if (userErr || !userRes.user) throw userErr ?? new Error(traducir("int.noSession"));
 
       // Dedup cross-spammer: si el handle ya tiene una fila escaneada,
       // reusamos el snapshot + análisis al insertar (no quema otra
@@ -182,10 +184,10 @@ export const useInsertSpammerAccount = () => {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["spammer-accounts"] });
-      toast.success("Cuenta spammer registrada");
+      toast.success(traducir("int.spammer.accountRegistered"));
     },
     onError: (e) => {
-      toast.error("No se pudo registrar la cuenta", { description: (e as Error).message });
+      toast.error(traducir("int.spammer.registerFailed"), { description: (e as Error).message });
     },
   });
 };
@@ -244,10 +246,10 @@ export const useUploadSpammerScreenshots = () => {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["spammer-accounts"] });
-      toast.success("Screenshots subidos — re-escaneando con la data del perfil");
+      toast.success(traducir("int.spammer.screenshotsUploaded"));
     },
     onError: (e) => {
-      toast.error("No se pudieron subir los screenshots", {
+      toast.error(traducir("int.spammer.screenshotsUploadFailed"), {
         description: (e as Error).message,
       });
     },
@@ -299,10 +301,10 @@ export const useRemoveSpammerScreenshot = () => {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["spammer-accounts"] });
-      toast.success("Screenshot eliminado");
+      toast.success(traducir("int.spammer.screenshotDeleted"));
     },
     onError: (e) => {
-      toast.error("No se pudo eliminar", { description: (e as Error).message });
+      toast.error(traducir("common.couldNotDelete"), { description: (e as Error).message });
     },
   });
 };
@@ -360,10 +362,10 @@ export const useDeleteSpammerAccount = () => {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["spammer-accounts"] });
-      toast.success("Cuenta eliminada");
+      toast.success(traducir("int.spammer.accountDeleted"));
     },
     onError: (e) => {
-      toast.error("No se pudo eliminar", { description: (e as Error).message });
+      toast.error(traducir("common.couldNotDelete"), { description: (e as Error).message });
     },
   });
 };
@@ -384,10 +386,10 @@ export const useUpdateSpammerAccount = () => {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["spammer-accounts"] });
-      toast.success("Cuenta actualizada");
+      toast.success(traducir("int.spammer.accountUpdated"));
     },
     onError: (e) => {
-      toast.error("No se pudo actualizar la cuenta", { description: (e as Error).message });
+      toast.error(traducir("int.spammer.accountUpdateFailed"), { description: (e as Error).message });
     },
   });
 };

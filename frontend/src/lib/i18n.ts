@@ -29,6 +29,7 @@ import { scouter } from "./i18n/scouter";
 import { apiKeys } from "./i18n/apiKeys";
 import { compartido } from "./i18n/compartido";
 import { hrGestion } from "./i18n/hrGestion";
+import { internos } from "./i18n/internos";
 
 export type Language = "es" | "en";
 
@@ -82,6 +83,7 @@ const translations = {
   ...apiKeys,
   ...compartido,
   ...hrGestion,
+  ...internos,
 } as const;
 
 export type TranslationKey = keyof typeof translations;

@@ -1,14 +1,17 @@
 import { startOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays, endOfDay } from "date-fns";
+import { conEtiqueta, type ConEtiqueta } from "@/lib/etiquetaTraducida";
 
 // Presets de rango de fecha compartidos (mismos que Panel de Control / Dashboard 2).
 // Centralizados acá para que el tab Ventas use exactamente la misma UX.
+// `key` es el dato (rangeForPreset lo lee); la etiqueta es `t(p.labelKey)`, y
+// `p.label` se traduce al leerlo (ver lib/etiquetaTraducida.ts).
 export type RangePreset = "yesterday" | "today" | "this_week" | "this_month";
 
-export const PRESET_CONFIG: Array<{ key: RangePreset; label: string }> = [
-  { key: "yesterday", label: "Ayer" },
-  { key: "today", label: "Hoy" },
-  { key: "this_week", label: "Esta semana" },
-  { key: "this_month", label: "Este mes" },
+export const PRESET_CONFIG: Array<ConEtiqueta<{ key: RangePreset }>> = [
+  conEtiqueta({ key: "yesterday" as const }, "int.range.yesterday"),
+  conEtiqueta({ key: "today" as const }, "common.today"),
+  conEtiqueta({ key: "this_week" as const }, "common.thisWeek"),
+  conEtiqueta({ key: "this_month" as const }, "common.thisMonth"),
 ];
 
 export function rangeForPreset(preset: RangePreset, ref: Date): { from: Date; to: Date } {

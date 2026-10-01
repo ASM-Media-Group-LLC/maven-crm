@@ -11,21 +11,24 @@ import {
   useBrowserNotifications,
   useNotificationPermission,
 } from "@/hooks/useBrowserNotifications";
+// La notificación del navegador es para quien la recibe: en su idioma, armada
+// con traducir() en el momento del aviso.
+import { traducir, type TranslationKey } from "@/lib/i18n";
 
 // Etiqueta legible cuando el mensaje no trae texto (mismo criterio que la bandeja).
-const MEDIA_LABEL: Record<string, string> = {
-  image: "📷 Foto",
-  video: "🎥 Video",
-  audio: "🎵 Audio",
-  document: "📄 Documento",
-  sticker: "Sticker",
-  system: "Mensaje",
+const MEDIA_LABEL: Record<string, TranslationKey> = {
+  image: "int.inbox.photo",
+  video: "int.inbox.video",
+  audio: "int.inbox.audio",
+  document: "int.inbox.document",
+  sticker: "int.inbox.sticker",
+  system: "int.inbox.message",
 };
 
 function previewOf(body: string | null, msgType: string): string {
   const t = (body ?? "").trim();
   if (t) return t.length > 120 ? t.slice(0, 120) + "…" : t;
-  return MEDIA_LABEL[msgType] ?? "Nuevo mensaje";
+  return traducir(MEDIA_LABEL[msgType] ?? "int.inbox.newMessage");
 }
 
 /**
@@ -118,7 +121,7 @@ export function useWaInboxNotifications() {
 
           // Nombre del contacto (best-effort). La RLS garantiza que solo resuelve
           // conversaciones visibles para el usuario; si falla, título genérico.
-          let title = "Nuevo mensaje de WhatsApp";
+          let title = traducir("int.inbox.newWhatsapp");
           try {
             const { data } = await (supabase as any)
               .from("wa_conversations")

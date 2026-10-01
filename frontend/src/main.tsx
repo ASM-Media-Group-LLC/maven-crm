@@ -11,6 +11,7 @@ import "./lib/altoDeLaApp";
 import "./lib/sinZoomAlEnfocar";
 import { applyStoredSkin, applyStoredAppearance } from "./hooks/useSkin";
 import { irAlDominioCanonico } from "./lib/dominioCanonico";
+import { traducir } from "./lib/i18n";
 
 // Una sola URL: quien entre por maven-ai.me o www.maven-ai.me termina en
 // app.maven-ai.me con la misma ruta. Va PRIMERO, antes de aplicar tema o montar
@@ -36,6 +37,10 @@ applyStoredAppearance();
 // El candado en sessionStorage es lo que impide un bucle: si al recargar vuelve
 // a fallar, no es un deploy a mitad de camino sino un problema de verdad, y hay
 // que dejar que se vea en vez de recargar para siempre.
+//
+// Los textos van por traducir(): esto salta al navegar, con la app ya montada,
+// y para entonces el LanguageProvider ya fijó el idioma de la persona. (El texto
+// sale del diccionario, no de nadie de afuera: por eso se puede meter en innerHTML.)
 function mostrarAvisoDeRecarga() {
   if (document.getElementById("maven-recarga-aviso")) return;
   const aviso = document.createElement("div");
@@ -49,7 +54,7 @@ function mostrarAvisoDeRecarga() {
   aviso.innerHTML =
     '<span style="display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.35);' +
     'border-top-color:#fff;border-radius:50%;animation:maven-giro .8s linear infinite"></span>' +
-    "<span>Actualizando Maven a la versión nueva…</span>" +
+    `<span>${traducir("int.reload.updating")}</span>` +
     "<style>@keyframes maven-giro{to{transform:rotate(360deg)}}</style>";
   document.body.appendChild(aviso);
 }
@@ -67,17 +72,17 @@ function mostrarAvisoDeRecargaPendiente() {
     "display:flex;align-items:center;gap:12px;font-size:14px;font-family:system-ui,sans-serif;" +
     "box-shadow:0 4px 20px rgba(0,0,0,.4);max-width:calc(100vw - 32px)";
   const texto = document.createElement("span");
-  texto.textContent = "Hay una versión nueva de Maven. Recarga cuando termines la llamada.";
+  texto.textContent = traducir("int.reload.pending");
   const boton = document.createElement("button");
   boton.type = "button";
-  boton.textContent = "Recargar ahora";
+  boton.textContent = traducir("int.reload.now");
   boton.style.cssText =
     "background:#fff;color:#1a1a2e;border:0;border-radius:999px;padding:6px 12px;" +
     "font-weight:600;font-size:13px;cursor:pointer;white-space:nowrap";
   boton.addEventListener("click", () => window.location.reload());
   const cerrar = document.createElement("button");
   cerrar.type = "button";
-  cerrar.setAttribute("aria-label", "Cerrar aviso");
+  cerrar.setAttribute("aria-label", traducir("int.reload.dismiss"));
   cerrar.textContent = "×";
   cerrar.style.cssText = "background:transparent;color:rgba(255,255,255,.7);border:0;font-size:18px;cursor:pointer;line-height:1";
   cerrar.addEventListener("click", () => aviso.remove());
