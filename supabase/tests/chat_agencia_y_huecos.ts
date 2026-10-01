@@ -104,7 +104,12 @@ const FIXTURE_HASTA = "20260929180000";
 // falso positivo de `objetivos`) y no carga sobre el fixture: se anota aquí, con
 // el motivo. Si SÍ cambia el Messenger, lo que hay que hacer es sumar al fixture
 // lo que le falta.
-const NO_TOCAN_EL_MESSENGER: Record<string, string> = {};
+const NO_TOCAN_EL_MESSENGER: Record<string, string> = {
+  "20261001211000_roles_por_agencia.sql":
+    "reescribe is_in_role_group y le suma tenant_id a user_roles, pero necesita las tablas de roles (roles_config, " +
+    "role_permissions, role_base_grants y sus triggers) que este fixture no trae. Con una sola agencia da lo mismo que " +
+    "prod persona por persona, y con dos se prueba en su propio banco sobre el catálogo de prod: roles_por_agencia.ts.",
+};
 // Si una migración posterior cambia a propósito algo que creó A (el PR 2 suma el
 // esqueleto del nombre visible a profiles_nombre_lo_cambia_un_admin), se anota
 // aquí «objeto → migración», después de revisar que los huecos sigan cerrados.
