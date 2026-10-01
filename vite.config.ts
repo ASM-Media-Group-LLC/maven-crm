@@ -2,6 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { VitePWA } from "vite-plugin-pwa";
+import { pluginMarcaDeBuild } from "./frontend/src/lib/marcaDeBuild";
 
 // https://vitejs.dev/config/
 //
@@ -30,6 +31,10 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [
     react(),
+    // La hora del build va como <meta> en index.html, NO en el JavaScript: así dos
+    // builds del mismo código dan los mismos chunks y el mismo sw.js (ver
+    // lib/marcaDeBuild.ts). En `npm run dev` es la hora en que arrancó el servidor.
+    pluginMarcaDeBuild(),
     mode === "production" && VitePWA({
       registerType: "prompt",
       injectRegister: false,

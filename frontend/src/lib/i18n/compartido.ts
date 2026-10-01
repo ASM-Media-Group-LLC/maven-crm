@@ -44,6 +44,9 @@ export const compartido = {
   "shared.msgNotif.message": { es: "Mensaje", en: "Message" },
   "shared.msgNotif.newMessage": { es: "Nuevo mensaje", en: "New message" },
   "shared.msgNotif.someone": { es: "Alguien", en: "Someone" },
+  // Un mensaje por API se anuncia con el nombre de la key y la etiqueta, como la
+  // campana y el push («BLU (API)»). El nombre es dato y no se traduce.
+  "shared.msgNotif.viaApi": { es: "{name} (API)", en: "{name} (API)" },
   "shared.msgNotif.group": { es: "Grupo", en: "Group" },
   "shared.msgNotif.wroteIn": { es: "💬 {name} escribió en {title}", en: "💬 {name} wrote in {title}" },
   "shared.msgNotif.wroteYou": { es: "💬 {name} te escribió", en: "💬 {name} messaged you" },

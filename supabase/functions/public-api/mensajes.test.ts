@@ -120,8 +120,9 @@ Deno.test("cada clave tiene texto en español y en inglés, y el inglés no tien
 });
 
 Deno.test("las variables declaradas están en los textos, y las marcas sueltas son rutas", () => {
-  // {id} en "/messenger/conversations/{id}" es parte de la ruta, no una variable.
-  const LITERALES = new Set(["id"]);
+  // {id} y {message_id} en "/messenger/conversations/{id}/messages/{message_id}" son
+  // parte de la ruta, no variables.
+  const LITERALES = new Set(["id", "message_id"]);
   for (const k of CLAVES) {
     const e = entrada(k);
     const vars = e.vars ?? [];
@@ -192,6 +193,28 @@ Deno.test("msg: NUNCA tira, ni con una clave mal escrita (arma el cuerpo de un e
   assertEquals(suelto("en", "falta_scope", 7), "Missing scope {scope}");
 });
 
+// ─── Español neutro ──────────────────────────────────────────────────────────
+// La misma lista de formas concretas que frontend/src/test/i18n/sinVoseo.test.ts (la
+// guarda del frontend no mira las edge functions). Si falla, se corrige el texto.
+const VOSEO = [
+  "vos", "sos", "acá", "podés", "tenés", "querés", "sabés", "hacés", "ponés", "decís", "venís", "seguís",
+  "usás", "necesitás", "mandás", "guardás", "llevás", "quedás", "pensás", "entrás", "pertenecés",
+  "creá", "usá", "probá", "volvé", "recargá", "registrá", "borrá", "arrastrá", "soltá", "vaciá", "elegí", "hacé",
+  "poné", "tené", "mandá", "pegá", "agregá", "adjuntá", "guardá", "cambiá", "copiá", "confirmá", "revisá",
+  "intentá", "reintentá", "esperá", "actualizá", "completá", "ingresá", "invitá", "tocá", "apretá", "abrí",
+  "cerrá", "subí", "leé", "dejá", "buscá", "activá", "asigná", "reanudá", "verificá", "rechazá", "usalo",
+  "pedile", "avisale", "decile", "fijate", "acordate", "asegurate", "hacelo", "dejalo", "borralo", "revocala",
+];
+const PATRON_VOSEO = new RegExp(`(?<![\\p{L}])(${VOSEO.join("|")})(?![\\p{L}])`, "iu");
+
+Deno.test("el español del diccionario es neutro (sin voseo)", () => {
+  const malas = CLAVES.filter((k) => PATRON_VOSEO.test(entrada(k).es)).map((k) => `${k}: ${entrada(k).es}`);
+  assertEquals(malas, [], "textos con voseo: pasarlos a tú neutro (reintenta, puedes, aquí…)");
+  // La guarda puede fallar: con un texto que vosea, salta.
+  assert(PATRON_VOSEO.test("Reintentá en unos segundos") && PATRON_VOSEO.test("no pertenecés a ninguna agencia"));
+  assert(!PATRON_VOSEO.test("Reintenta en unos segundos") && !PATRON_VOSEO.test("te escribí"));
+});
+
 // ─── Por defecto, EXACTAMENTE lo de antes ────────────────────────────────────
 // Cada texto en español, copiado del código ANTES de este cambio. Si hay que
 // cambiar uno, es a conciencia: las integraciones vivas lo ven.
@@ -226,9 +249,12 @@ const ANTES: Record<Clave, [Record<string, string | number> | undefined, string]
   aislamiento_no_verificado: [undefined, "No se pudo verificar el aislamiento entre agencias. Reintenta en unos segundos."],
   me_sub_recurso_desconocido: [{ sub: "x" }, "Sub-recurso de me desconocido: x"],
   messenger_llave_sin_reglas: [undefined, "Las llaves con Messenger necesitan IPs fijas y fecha de vencimiento"],
+  // Cambió a conciencia el 01/10 (PR 4: las rutas de la escritura). Ninguna key de prod
+  // tenía Messenger: nadie leía el texto de antes.
   messenger_rutas: [
     undefined,
-    "Usa /messenger/conversations, /messenger/conversations/{id}, /messenger/conversations/{id}/messages o /messenger/feed",
+    "Usa /messenger/conversations, /messenger/conversations/{id}, /messenger/conversations/{id}/messages, " +
+    "/messenger/conversations/{id}/messages/{message_id}, /messenger/feed o /messenger/people",
   ],
   conversacion_no_encontrada: [undefined, "Conversación no encontrada"],
   id_de_conversacion_invalido: [undefined, "El id de la conversación no es válido"],
@@ -242,6 +268,41 @@ const ANTES: Record<Clave, [Record<string, string | number> | undefined, string]
   exclude_own_invalido: [undefined, "exclude_own tiene que ser true o false"],
   since_invalido: [undefined, "since tiene que ser una fecha ISO 8601"],
   since_muy_viejo: [undefined, "since no puede tener más de 72 horas: para lo anterior, lee cada conversación con /messages"],
+  // La escritura (PR 4, 01/10): el texto con el que nacen.
+  metodo_no_permitido: [{ permitidos: "PATCH, DELETE" }, "Método no permitido en esta ruta. Se aceptan: PATCH, DELETE"],
+  cuerpo_muy_grande: [undefined, "El cuerpo del pedido pasa de 64 KB"],
+  tipo_de_contenido: [undefined, "El cuerpo tiene que ser JSON en UTF-8 (Content-Type: application/json)"],
+  cuerpo_mal_codificado: [undefined, "El cuerpo no es UTF-8 válido"],
+  cuerpo_json_invalido: [undefined, "El cuerpo no es JSON válido"],
+  cuerpo_no_es_objeto: [undefined, "El cuerpo tiene que ser un objeto JSON"],
+  campo_desconocido: [{ campos: "reply_to" }, "Campos que este pedido no acepta: reply_to"],
+  campo_invalido: [{ campo: "text" }, "text falta o no tiene el tipo correcto"],
+  tipo_de_conversacion: [undefined, "type tiene que ser \"direct\": por API solo se abren chats directos"],
+  falta_idempotencia: [undefined, "Falta la cabecera Idempotency-Key: de 8 a 100 caracteres ASCII visibles, distinta en cada mensaje"],
+  idempotencia_invalida: [undefined, "La Idempotency-Key tiene que tener de 8 a 100 caracteres ASCII visibles, sin espacios"],
+  id_de_mensaje_invalido: [undefined, "El id del mensaje no es válido"],
+  q_invalido: [undefined, "q tiene que ser un texto de hasta 100 caracteres, sin caracteres nulos"],
+  texto_invalido: [undefined, "El texto tiene que tener de 1 a 4.000 caracteres, al menos uno visible, y sin caracteres de control, invisibles ni de dirección del texto (solo texto plano)"],
+  cita_invalida: [undefined, "reply_to_id tiene que ser un mensaje no borrado de esta conversación; con thread: true, uno que no sea a su vez una respuesta en hilo"],
+  conversacion_muy_grande: [undefined, "Por API solo se escribe en conversaciones de hasta 50 personas"],
+  consigo_mismo: [undefined, "No se puede abrir un chat con la misma persona de la API key"],
+  demasiadas_conversaciones: [undefined, "La persona de esta API key ya está en demasiadas conversaciones para abrir otra por API"],
+  persona_no_encontrada: [undefined, "A esa persona no se le puede escribir por API: no existe, no está en esta agencia o no está activa"],
+  mensaje_no_encontrado: [undefined, "Ese mensaje no existe en esta conversación"],
+  mensaje_de_otra_persona: [undefined, "Ese mensaje es de otra persona"],
+  mensaje_escrito_a_mano: [undefined, "Ese mensaje no lo mandó una integración: se escribió en Maven"],
+  mensaje_de_otra_integracion: [undefined, "Ese mensaje lo mandó otra integración"],
+  mensaje_ya_borrado: [undefined, "Ese mensaje está borrado"],
+  idempotencia_reusada: [undefined, "Esa Idempotency-Key ya se usó con otro pedido en las últimas 72 horas"],
+  escritura_llave_no_valida: [undefined, "La API key ya no es válida para escribir: está revocada o venció"],
+  escritura_prohibida: [undefined, "Esta API key no puede hacer esta escritura"],
+  no_puede_escribir_aqui: [undefined, "En esta conversación solo escriben sus administradores"],
+  tope_de_escritura: [{ limite: "key_messages_minute", s: 42 }, "Se alcanzó el tope key_messages_minute. Reintenta en 42 s."],
+  escritura_en_curso: [undefined, "Esta API key ya tiene otro pedido en curso: las escrituras van una a la vez. Reintenta en 1 s."],
+  ronda_de_integraciones: [undefined, "Los últimos 20 mensajes de esta conversación son de integraciones: hace falta que escriba una persona antes de seguir"],
+  escritura_apagada: [undefined, "La escritura del Messenger por API está apagada en este momento"],
+  escritura_en_pausa: [undefined, "La escritura del Messenger por API está en pausa porque la base está bajo carga. Reintenta más tarde."],
+  resultado_incierto: [undefined, "No se sabe si la escritura se hizo: puede haberse hecho. Reintenta el mismo pedido (en los POST, con la misma Idempotency-Key)."],
 };
 
 Deno.test("en español, cada texto es byte a byte el de antes", () => {
@@ -301,6 +362,9 @@ const CTX: Contexto = {
   baseDeArchivos: "https://proyecto.supabase.co",
   cupo: { limite: 1000, restantes: 999, reinicio: "2026-09-25T19:00:00+00:00" },
   idioma: "es",
+  metodo: "GET",
+  cuerpo: null,
+  idempotencia: null,
 };
 const explota = new Proxy({}, { get: () => { throw new Error("tocó la base"); } }) as SupabaseClient;
 

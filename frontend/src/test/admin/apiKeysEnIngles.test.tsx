@@ -169,7 +169,7 @@ describe("Ajustes → API keys: los casos que encontró la revisión", () => {
     const clave: Record<string, string> = {
       "creators:read": "creators", "contacts:read": "contacts", "contacts:phone": "phone", "employees:read": "employees",
       "hubstaff:read": "hubstaff", "cowork:read": "cowork", "sales:read": "sales", "sales:chatters": "salesChatters",
-      "promolog:read": "promolog", "messenger:read": "messenger",
+      "promolog:read": "promolog", "messenger:read": "messenger", "messenger:write": "messengerWrite",
     };
     for (const s of SCOPE_CATALOG) {
       const base = clave[s.key];

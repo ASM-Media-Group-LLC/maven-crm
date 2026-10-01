@@ -34,6 +34,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
 import StatusPicker, { getStatusColor } from "./components/StatusPicker";
 import DeleteChatDialog from "./components/DeleteChatDialog";
+import EtiquetaApi from "./components/EtiquetaApi";
 import { useMentionedConversations } from "@/hooks/useMentionedConversations";
 import { getDraft, getDraftAttachmentCount } from "./drafts";
 import { useTypingInbox } from "@/hooks/useTypingInbox";
@@ -435,6 +436,7 @@ export default function ChatSidebar({
                         <div className="flex items-center gap-1.5 mb-0.5">
                           <User className="h-3 w-3 text-muted-foreground shrink-0" />
                           <span className="text-[11px] font-medium text-foreground">{r.senderName}</span>
+                    {r.esApi && <EtiquetaApi nombre={r.senderName} persona={r.personaReal} esMio={false} />}
                           <span className="text-[10px] text-muted-foreground ml-auto shrink-0">
                             {formatDistanceToNow(new Date(r.createdAt), { addSuffix: true, locale: f.fechas })}
                           </span>

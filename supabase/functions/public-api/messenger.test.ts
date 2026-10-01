@@ -5,7 +5,7 @@
 //  * el feed mira como mucho una hora por pedido y nunca adelanta el cursor por
 //    encima de lo que todavía se puede estar guardando;
 //  * lo que la app esconde (lista de miembros, conversación directa vacía) también
-//    se esconde acá;
+//    se esconde aquí;
 //  * toda consulta a chat_messages va acotada por conversación.
 
 import { assert, assertEquals } from "jsr:@std/assert";
@@ -39,6 +39,9 @@ const CTX: Contexto = {
   baseDeArchivos: BASE,
   cupo: { limite: 1000, restantes: 999, reinicio: "2026-09-25T19:00:00+00:00" },
   idioma: "es",
+  metodo: "GET",
+  cuerpo: null,
+  idempotencia: null,
 };
 const con = (ruta: string[], consulta: Record<string, string> = {}): Contexto => ({ ...CTX, ruta, consulta });
 
@@ -82,7 +85,7 @@ function fila(parcial: Partial<FilaDeMensaje> & { id: string; created_at: string
   return {
     conversation_id: CONV, sender_id: OTRA, content: "hola", type: "text", file_url: null, file_name: null,
     reply_to_id: null, album_id: null, is_thread_reply: false, is_edited: false, is_deleted: false,
-    updated_at: parcial.created_at, ...parcial,
+    updated_at: parcial.created_at, api_key_id: null, api_display_name: null, ...parcial,
   };
 }
 
@@ -98,12 +101,18 @@ Deno.test("sin IPs fijas o sin vencimiento: 403 y ni una consulta", async () => 
 });
 
 Deno.test("rutas desconocidas: 404 sin tocar la base", async () => {
-  for (const ruta of [[], ["chats"], ["conversations", CONV, "reactions"], ["feed", "x"], ["conversations", CONV, "messages", "x"]]) {
+  for (const ruta of [[], ["chats"], ["conversations", CONV, "reactions"], ["feed", "x"], ["conversations", CONV, "messages", "x", "y"], ["people", "x"]]) {
     const { cliente, llamadas } = clienteFalso(() => { throw new Error("tocó la base"); });
     const r = await servirMessenger(cliente, con(ruta));
     assert(!r.ok && r.estado === 404, `${ruta.join("/")} no dio 404`);
     assertEquals(llamadas.length, 0);
   }
+  // /conversations/{id}/messages/{messageId} existe desde la escritura (PATCH y
+  // DELETE): con GET es 405, no 404, y tampoco toca la base.
+  const { cliente, llamadas } = clienteFalso(() => { throw new Error("tocó la base"); });
+  const r = await servirMessenger(cliente, con(["conversations", CONV, "messages", "x"]));
+  assert(!r.ok && r.estado === 405, JSON.stringify(r));
+  assertEquals(llamadas.length, 0);
 });
 
 // ─── /conversations/{id}/messages ────────────────────────────────────────────
@@ -482,4 +491,30 @@ Deno.test("vista previa y mensaje: nada del contenido si está borrado", () => {
   const api = mensajeParaApi(m, undefined, { conRico: true, baseMaven: BASE });
   assert(!JSON.stringify(api).includes("secreto"));
   assertEquals(api.rich, null);
+});
+
+Deno.test("via_api: el nombre visible si lo mandó una integración, null si no; sender sigue siendo la persona; también en la vista previa", () => {
+  const app = fila({ id: "a0000000-0000-4000-8000-000000000101", created_at: "2026-10-01T10:00:00+00:00" });
+  const api = fila({
+    id: "a0000000-0000-4000-8000-000000000102", created_at: "2026-10-01T10:00:00+00:00",
+    api_key_id: "7b2e4c1d-8a9f-4b3c-9d2e-1f0a3b4c5d6e", api_display_name: "BLU",
+  });
+  const persona = { id: OTRA, name: "Alvaro Diaz", avatar_url: null };
+  assertEquals(mensajeParaApi(app, persona, { conRico: false, baseMaven: BASE }).via_api, null);
+  const m = mensajeParaApi(api, persona, { conRico: false, baseMaven: BASE });
+  assertEquals(m.via_api, { display_name: "BLU" });
+  assertEquals(m.sender, { id: OTRA, name: "Alvaro Diaz", avatar_url: null }, "sender es la persona real, no la integración");
+  assert(!JSON.stringify(m).includes("7b2e4c1d"), "el id de la key no sale");
+  assertEquals(vistaPrevia(app).via_api, null);
+  assertEquals(vistaPrevia(api).via_api, { display_name: "BLU" });
+  // Borrado: la marca se ve igual (lo mandó la integración), sin el texto.
+  const borrado = mensajeParaApi({ ...api, is_deleted: true, content: null }, persona, { conRico: false, baseMaven: BASE });
+  assertEquals([borrado.text, borrado.via_api], [null, { display_name: "BLU" }]);
+});
+
+Deno.test("las lecturas de mensajes piden las dos columnas de la marca (sin ellas no hay via_api)", async () => {
+  const { cliente, llamadas } = clienteFalso((ll) => ll.tabla === "chat_conversations" ? ok({ id: CONV }) : ok([]));
+  await servirMessenger(cliente, con(["conversations", CONV, "messages"]));
+  const sel = op(llamadas.find((l) => l.tabla === "chat_messages")!, "select")[0][0] as string;
+  assert(/\bapi_key_id\b/.test(sel) && /\bapi_display_name\b/.test(sel), sel);
 });

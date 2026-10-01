@@ -53,6 +53,13 @@ export function getMessagePreview(
     else body = `📎 ${fn || t("common.file")}`;
   } else if (lastMsg.type === "image") body = t("messenger.preview.foto");
   else body = lastMsg.content || "";
+  // Por API: «BLU (API): …» siempre, también en los directos y en los míos. Si no,
+  // la lista diría «Jhon» (o nada, o «Tú») y adentro del chat «BLU». El nombre es
+  // dato de la fila; la etiqueta, la misma del aviso y la campana.
+  if (lastMsg.api_key_id != null) {
+    const nombre = lastMsg.api_display_name?.trim() || t("messenger.api.etiqueta");
+    return `${t("shared.msgNotif.viaApi", { name: nombre })}: ${body}`;
+  }
   if (conversation.type === "group" && lastMsg.sender_id) {
     const senderName = lastMsg.sender_id === userId
       ? t("messenger.preview.tu")

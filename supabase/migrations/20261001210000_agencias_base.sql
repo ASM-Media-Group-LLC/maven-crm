@@ -85,7 +85,7 @@ begin
   on conflict do nothing;
 
   -- 3. La agencia NO se pone aquí: la pone admin-user-actions (la de quien crea
-  --    la cuenta). Ver la cabecera de 20261001150000_agencias_base.
+  --    la cuenta). Ver la cabecera de 20261001210000_agencias_base.
   return new;
 end;
 $function$;

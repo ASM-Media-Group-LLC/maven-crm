@@ -12,9 +12,19 @@
 // de cualquiera, editar mensajes ajenos y hacerse admin de grupos.
 //
 // CÓMO. Se fabrica un JWT de sesión para ese usuario — {sub, role: "authenticated"}
-// con 60 segundos de vida — y se consulta con él. Es el camino documentado por
-// Supabase para esto ("JWT Signing Keys": `sub` es "a user you want to impersonate").
-// Hoy Maven firma las sesiones con el esquema clásico HS256 (su JWKS público está
+// con 60 segundos de vida — y se consulta con él. Lleva además dos claims de primer
+// nivel que lee la base (migración 20261001200000, diseño §3):
+//  · `mvf: true` SIEMPRE: es una sesión fabricada. Sin `mvk`, la base no la deja
+//    escribir nada en chat_* ni en notifications (el despachador de webhooks lee así);
+//  · `mvk: "<api_keys.id>"` cuando el pedido viene de una key (clienteDeLlave): la
+//    base valida esa key en cada escritura (que exista, no esté revocada ni vencida,
+//    sea de esta persona, tenga messenger:write…) y pone la marca «vino por API» con
+//    el nombre visible que lee de api_keys, nunca de aquí.
+// Nunca user_metadata ni app_metadata: esos los escribe el usuario (o un admin), y
+// la base no confía en ellos.
+//
+// Es el camino documentado por Supabase para esto ("JWT Signing Keys": `sub` es
+// "a user you want to impersonate"). Hoy Maven firma las sesiones con el esquema clásico HS256 (su JWKS público está
 // vacío), así que se firma con ese secreto.
 //
 // ⚠️ EL SECRETO ES UNA LLAVE MAESTRA: quien lo tenga fabrica la sesión de cualquier
@@ -24,7 +34,7 @@
 //
 // ⚠️ SI MAVEN MIGRA A "JWT SIGNING KEYS", el secreto legacy deja de valer. Esta es
 // la ÚNICA función que firma: el cambio es importar una clave ES256 propia (`supabase
-// gen signing-key --algorithm ES256`) y firmar acá con ella.
+// gen signing-key --algorithm ES256`) y firmar aquí con ella.
 
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -40,17 +50,23 @@ function base64url(bytes: Uint8Array): string {
 
 const texto = (o: unknown) => base64url(new TextEncoder().encode(JSON.stringify(o)));
 
-/** Fabrica el JWT de sesión de `userId`, firmado HS256 con `secreto`. Pura: el
- *  reloj entra por parámetro para poder testearla. */
+/** Fabrica el JWT de sesión de `userId`, firmado HS256 con `secreto`. `llave` es el
+ *  id de la API key del pedido (va como `mvk`), o null si la sesión no viene de una
+ *  key (el despachador de webhooks). Pura: el reloj entra por parámetro para poder
+ *  testearla. */
 export async function fabricarToken(
   userId: string,
   secreto: string,
+  llave: string | null,
   ahoraSeg: number = Math.floor(Date.now() / 1000),
 ): Promise<string> {
   if (!secreto) throw new Error("falta el secreto de firma");
   // Defensa: el `sub` tiene que ser un id de usuario. Un sub raro produce una
-  // sesión que auth.uid() no reconoce como nadie, y eso es peor que fallar acá.
+  // sesión que auth.uid() no reconoce como nadie, y eso es peor que fallar aquí.
   if (!UUID.test(userId)) throw new Error("el usuario no es un id válido");
+  // Y `mvk`, el id de una key: la base rechaza un mvk que no es un UUID (MV401), pero
+  // un token así no tiene por qué salir de aquí.
+  if (llave !== null && !UUID.test(llave)) throw new Error("la llave no es un id válido");
 
   const header = texto({ alg: "HS256", typ: "JWT" });
   const payload = texto({
@@ -59,6 +75,8 @@ export async function fabricarToken(
     aud: "authenticated",
     iat: ahoraSeg,
     exp: ahoraSeg + SEGUNDOS_DE_VIDA,
+    mvf: true,
+    ...(llave !== null ? { mvk: llave.toLowerCase() } : {}),
   });
   const clave = await crypto.subtle.importKey(
     "raw",
@@ -77,20 +95,38 @@ export function comoUsuarioConfigurado(): boolean {
   return !!Deno.env.get("MAVEN_JWT_SECRET");
 }
 
-/** Cliente de Supabase que consulta COMO `userId`: con la RLS y los triggers de la
- *  app. `null` si falta el secreto — el llamador responde 503, nunca cae a service_role.
- *
- *  `fetch` es opcional: el despachador de webhooks (messenger-webhooks) le pasa uno
- *  con plazo por pedido, para que una base lenta no le estire la corrida. */
+/** Cliente de Supabase que consulta COMO `userId` con la sesión fabricada (`token`):
+ *  con la RLS y los triggers de la app. */
+function clienteCon(token: string, opciones: { fetch?: typeof fetch }): SupabaseClient {
+  return createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
+    global: { headers: { Authorization: `Bearer ${token}` }, ...(opciones.fetch ? { fetch: opciones.fetch } : {}) },
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+  });
+}
+
+/** Cliente que consulta COMO `userId`, SIN key (`mvf` sin `mvk`): solo lee. Lo usa el
+ *  despachador de webhooks (messenger-webhooks/feed.ts), que le pasa un fetch con
+ *  plazo por pedido para que una base lenta no le estire la corrida. `null` si falta
+ *  el secreto: el llamador responde 503, nunca cae a service_role. */
 export async function clienteComoUsuario(
   userId: string,
   opciones: { fetch?: typeof fetch } = {},
 ): Promise<SupabaseClient | null> {
   const secreto = Deno.env.get("MAVEN_JWT_SECRET");
   if (!secreto) return null;
-  const token = await fabricarToken(userId, secreto);
-  return createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
-    global: { headers: { Authorization: `Bearer ${token}` }, ...(opciones.fetch ? { fetch: opciones.fetch } : {}) },
-    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-  });
+  return clienteCon(await fabricarToken(userId, secreto, null), opciones);
+}
+
+/** Cliente que consulta COMO `userId` y en nombre de la key `llaveId` (`mvf` + `mvk`):
+ *  el de todos los recursos como_usuario de public-api. `llaveId` sale de la fila de
+ *  api_keys que se encontró por el hash de la key del pedido, nunca del pedido. `null`
+ *  si falta el secreto. */
+export async function clienteDeLlave(
+  userId: string,
+  llaveId: string,
+  opciones: { fetch?: typeof fetch } = {},
+): Promise<SupabaseClient | null> {
+  const secreto = Deno.env.get("MAVEN_JWT_SECRET");
+  if (!secreto) return null;
+  return clienteCon(await fabricarToken(userId, secreto, llaveId), opciones);
 }
