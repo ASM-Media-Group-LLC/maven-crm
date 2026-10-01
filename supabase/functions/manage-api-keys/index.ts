@@ -26,10 +26,12 @@ import {
 } from "./escritura.ts";
 import { conWebhooks, crearDatos, servirWebhook, webhooksDeLlaves } from "./webhooks.ts";
 
-// Igual que Infloww: hasta 3 keys válidas a la vez, POR AGENCIA. Antes se contaba
-// para toda la plataforma: con las 3 de la primera agencia, la segunda no habría
-// podido crear ni una.
-const MAX_ACTIVE_KEYS = 3;
+// Hasta 5 keys válidas a la vez, POR AGENCIA (eran 3, como Infloww; el 01/10 Jhon lo
+// subió a 5 para que entre «BLU» sin revocar las de Álvaro). Antes se contaba para
+// toda la plataforma: con las de la primera agencia, la segunda no habría podido
+// crear ni una. Más keys no suben lo que se puede escribir: los topes de la agencia y
+// de la plataforma (api_escritura_cupos) valen para todas sus keys juntas.
+const MAX_ACTIVE_KEYS = 5;
 
 const corsHeaders = (req: Request) =>
   corsFor(req, {
