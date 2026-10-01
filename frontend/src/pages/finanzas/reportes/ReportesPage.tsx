@@ -25,19 +25,31 @@ import { generateReport, exportTableToExcel } from "./generateReport";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { useFormato } from "@/hooks/useFormato";
 import type { Formato } from "@/lib/formato";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
+import { metodoDePago } from "../estados";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RTooltip, Legend } from "recharts";
 
 const REPORT_TABS = ["Estado de Cuenta CC", "Ventas por Creador", "Por Método de Pago", "Comparativos Mensuales", "Reportes Generales"] as const;
 type ReportTab = typeof REPORT_TABS[number];
+// El valor de la pestaña es interno; esto es lo que se lee.
+const TAB_LABEL: Record<ReportTab, TranslationKey> = {
+  "Estado de Cuenta CC": "finanzas.reports.tab.ccStatement",
+  "Ventas por Creador": "finanzas.reports.type.salesByCreator",
+  "Por Método de Pago": "finanzas.reports.type.byPaymentMethod",
+  "Comparativos Mensuales": "finanzas.reports.type.monthly",
+  "Reportes Generales": "finanzas.reports.tab.general",
+};
 
-const REPORT_TYPES: Record<string, string> = {
-  nomina: "Nómina",
-  facturacion: "Facturación",
-  comisiones: "Comisiones",
-  consolidado: "Consolidado",
-  ventas_creador: "Ventas por Creador",
-  comparativos: "Comparativos Mensuales",
-  metodo_pago: "Por Método de Pago",
+// La llave (financial_reports.report_type) es el dato que se guarda; esto es lo que se lee.
+const REPORT_TYPES: Record<string, TranslationKey> = {
+  nomina: "finanzas.common.payroll",
+  facturacion: "finanzas.common.billing",
+  comisiones: "finanzas.common.commissions",
+  consolidado: "finanzas.reports.type.consolidated",
+  ventas_creador: "finanzas.reports.type.salesByCreator",
+  comparativos: "finanzas.reports.type.monthly",
+  metodo_pago: "finanzas.reports.type.byPaymentMethod",
 };
 
 function fmtMonto(n: number, f: Formato) {
@@ -46,6 +58,7 @@ function fmtMonto(n: number, f: Formato) {
 
 function DepartmentCostSection() {
   const f = useFormato();
+  const { t } = useLanguage();
   const fmt = (n: number) => fmtMonto(n, f);
   const { data: employees = [] } = useQuery({
     queryKey: ["reportes-dept-employees"],
@@ -57,7 +70,7 @@ function DepartmentCostSection() {
   });
 
   const deptGroups = employees.reduce((acc, e: any) => {
-    const dept = e.departments?.name || "Sin Departamento";
+    const dept = e.departments?.name || t("finanzas.common.noDepartment");
     if (!acc[dept]) acc[dept] = { count: 0, total: 0 };
     acc[dept].count++;
     acc[dept].total += Number(e.base_salary) || 0;
@@ -73,15 +86,15 @@ function DepartmentCostSection() {
     <div className="space-y-3">
       <div className="flex items-center gap-2">
         <Building2 className="h-4 w-4 text-muted-foreground" />
-        <h3 className="text-sm font-medium">Costo Salarial por Departamento</h3>
+        <h3 className="text-sm font-medium">{t("finanzas.reports.deptCost")}</h3>
       </div>
       <div className="rounded-lg border border-border overflow-hidden">
         <Table>
           <TableHeader><TableRow className="bg-card">
-            <TableHead className="text-xs font-medium text-muted-foreground">Departamento</TableHead>
-            <TableHead className="text-xs font-medium text-muted-foreground"># Empleados</TableHead>
-            <TableHead className="text-xs font-medium text-muted-foreground">Costo Salarial</TableHead>
-            <TableHead className="text-xs font-medium text-muted-foreground">% del Total</TableHead>
+            <TableHead className="text-xs font-medium text-muted-foreground">{t("finanzas.common.department")}</TableHead>
+            <TableHead className="text-xs font-medium text-muted-foreground">{t("finanzas.common.employeesHash")}</TableHead>
+            <TableHead className="text-xs font-medium text-muted-foreground">{t("finanzas.common.salaryCost")}</TableHead>
+            <TableHead className="text-xs font-medium text-muted-foreground">{t("finanzas.common.pctOfTotal")}</TableHead>
           </TableRow></TableHeader>
           <TableBody>
             {entries.map(([dept, data]) => (
@@ -107,6 +120,8 @@ function DepartmentCostSection() {
 
 export default function ReportesPage() {
   const f = useFormato();
+  const { t } = useLanguage();
+  const tipoReporte = (tipo: string) => (REPORT_TYPES[tipo] ? t(REPORT_TYPES[tipo]) : tipo);
   const fmt = (n: number) => fmtMonto(n, f);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -162,10 +177,10 @@ export default function ReportesPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["financial-reports"] });
-      toast({ title: "Reporte eliminado" });
+      toast({ title: t("finanzas.reports.toast.deleted") });
       setDeleteItem(null);
     },
-    onError: () => toast({ title: "Error al eliminar", variant: "destructive" }),
+    onError: () => toast({ title: t("common.errorDeleting"), variant: "destructive" }),
   });
 
   const generateMutation = useMutation({
@@ -183,6 +198,7 @@ export default function ReportesPage() {
       } else {
         const { data: inv } = await supabase.from("invoices").select("invoice_number, amount, status");
         const { data: pay } = await supabase.from("payroll_periods").select("period_name, net_total, status");
+        // Columna del archivo que se descarga: va en español, como el resto de las columnas.
         reportData = [...(inv || []).map(i => ({ ...i, tipo: "Invoice" })), ...(pay || []).map(p => ({ ...p, tipo: "Nómina" }))];
       }
       generateReport(reportData, genType, genFormat);
@@ -196,10 +212,10 @@ export default function ReportesPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["financial-reports"] });
-      toast({ title: "Reporte generado y descargado" });
+      toast({ title: t("finanzas.reports.toast.generated") });
       setShowGenModal(false);
     },
-    onError: () => toast({ title: "Error al generar reporte", variant: "destructive" }),
+    onError: () => toast({ title: t("finanzas.reports.toast.generateError"), variant: "destructive" }),
   });
 
   const hasFilters = search || typeFilter || dateFrom || dateTo;
@@ -207,7 +223,7 @@ export default function ReportesPage() {
   // Ventas por Creador
   const creatorSales = Object.values(invoices.reduce((acc, inv) => {
     const cid = inv.creator_id || "sin_asignar";
-    const name = (inv as any).creators?.artistic_name || (inv as any).creators?.name || "Sin asignar";
+    const name = (inv as any).creators?.artistic_name || (inv as any).creators?.name || t("common.unassigned");
     if (!acc[cid]) acc[cid] = { name, totalFacturado: 0, totalCobrado: 0, pendiente: 0 };
     acc[cid].totalFacturado += Number(inv.amount) || 0;
     if (inv.status === "pagada") acc[cid].totalCobrado += Number(inv.amount) || 0;
@@ -220,7 +236,7 @@ export default function ReportesPage() {
 
   // Por Método de Pago
   const methodGroups = invoices.reduce((acc, inv) => {
-    const m = inv.payment_method || "Sin método";
+    const m = inv.payment_method ? metodoDePago(t, inv.payment_method) : t("finanzas.reports.noMethod");
     if (!acc[m]) acc[m] = { count: 0, total: 0 };
     acc[m].count++;
     acc[m].total += Number(inv.amount) || 0;
@@ -258,15 +274,15 @@ export default function ReportesPage() {
             <div className="overflow-auto max-h-[calc(100vh-24rem)]">
               <Table>
                 <TableHeader><TableRow className="sticky top-0 z-10 bg-card">
-                  <TableHead className="text-xs font-medium text-muted-foreground">Creador</TableHead>
-                  <TableHead className="text-xs font-medium text-muted-foreground">Total Facturado</TableHead>
-                  <TableHead className="text-xs font-medium text-muted-foreground">Total Cobrado</TableHead>
-                  <TableHead className="text-xs font-medium text-muted-foreground">Pendiente</TableHead>
-                  <TableHead className="text-xs font-medium text-muted-foreground">% del Total</TableHead>
+                  <TableHead className="text-xs font-medium text-muted-foreground">{t("finanzas.common.creator")}</TableHead>
+                  <TableHead className="text-xs font-medium text-muted-foreground">{t("finanzas.reports.totalBilled")}</TableHead>
+                  <TableHead className="text-xs font-medium text-muted-foreground">{t("finanzas.reports.totalCollected")}</TableHead>
+                  <TableHead className="text-xs font-medium text-muted-foreground">{t("common.pending")}</TableHead>
+                  <TableHead className="text-xs font-medium text-muted-foreground">{t("finanzas.common.pctOfTotal")}</TableHead>
                 </TableRow></TableHeader>
                 <TableBody>
                   {creatorSales.length === 0 ? (
-                    <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-12">Sin datos.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-12">{t("finanzas.common.noDataDot")}</TableCell></TableRow>
                   ) : creatorSales.map((r, i) => (
                     <TableRow key={i} className="hover:bg-muted/30">
                       <TableCell className="text-sm font-medium">{r.name}</TableCell>
@@ -283,13 +299,13 @@ export default function ReportesPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {creatorSales.length === 0 ? (
-              <div className="col-span-full text-center text-muted-foreground py-12">Sin datos.</div>
+              <div className="col-span-full text-center text-muted-foreground py-12">{t("finanzas.common.noDataDot")}</div>
             ) : creatorSales.map((r, i) => (
               <div key={i} className="rounded-xl border border-white/10 bg-white/5 p-4 hover:bg-white/10 hover:border-primary/40 transition-colors">
                 <p className="text-sm font-medium truncate">{r.name}</p>
                 <p className="text-xl font-bold text-foreground mt-2">{fmt(r.totalFacturado)}</p>
                 <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
-                  <span className="text-accent">Cobrado: {fmt(r.totalCobrado)}</span>
+                  <span className="text-accent">{t("finanzas.reports.collectedLabel", { amount: fmt(r.totalCobrado) })}</span>
                   <span>{grandTotal > 0 ? ((r.totalFacturado / grandTotal) * 100).toFixed(1) : 0}%</span>
                 </div>
               </div>
@@ -302,17 +318,17 @@ export default function ReportesPage() {
           <div className="space-y-4">
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
               {methodEntries.map(([method, data]) => (
-                <StatChip key={method} label={method} value={fmt(data.total)} icon={<FileText className="h-3.5 w-3.5" />} color="bg-primary" hint={`${data.count} invoices`} />
+                <StatChip key={method} label={method} value={fmt(data.total)} icon={<FileText className="h-3.5 w-3.5" />} color="bg-primary" hint={t("finanzas.reports.invoicesCount", { n: data.count })} />
               ))}
             </div>
             {viewMode === "list" ? (
               <div className="rounded-lg border border-border overflow-hidden">
                 <Table>
                   <TableHeader><TableRow className="sticky top-0 z-10 bg-card">
-                    <TableHead className="text-xs font-medium text-muted-foreground">Método</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">{t("common.method")}</TableHead>
                     <TableHead className="text-xs font-medium text-muted-foreground">Invoices</TableHead>
                     <TableHead className="text-xs font-medium text-muted-foreground">Total</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">% del Total</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">{t("finanzas.common.pctOfTotal")}</TableHead>
                   </TableRow></TableHeader>
                   <TableBody>
                     {methodEntries.map(([method, data]) => (
@@ -332,7 +348,7 @@ export default function ReportesPage() {
                   <div key={method} className="rounded-xl border border-white/10 bg-white/5 p-4 hover:bg-white/10 hover:border-primary/40 transition-colors">
                     <p className="text-sm font-medium">{method}</p>
                     <p className="text-xl font-bold text-foreground mt-2">{fmt(data.total)}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{data.count} invoices · {grandTotal > 0 ? ((data.total / grandTotal) * 100).toFixed(1) : 0}%</p>
+                    <p className="text-xs text-muted-foreground mt-1">{t("finanzas.reports.invoicesCount", { n: data.count })} · {grandTotal > 0 ? ((data.total / grandTotal) * 100).toFixed(1) : 0}%</p>
                   </div>
                 ))}
               </div>
@@ -344,15 +360,15 @@ export default function ReportesPage() {
         return (
           <div className="space-y-4">
             <div className="rounded-lg border border-border p-4 bg-card">
-              <h3 className="text-sm font-medium text-foreground mb-4">Comparativo Mensual (6 meses)</h3>
+              <h3 className="text-sm font-medium text-foreground mb-4">{t("finanzas.reports.monthlyChart")}</h3>
               <ResponsiveContainer width="100%" height={280}>
                 <BarChart data={monthlyWithChange}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis dataKey="mes" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
                   <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} />
                   <RTooltip formatter={(v: number) => fmt(v)} contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 13 }} />
-                  <Bar dataKey="ingresos" fill="hsl(var(--accent))" name="Ingresos" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="egresos" fill="hsl(var(--destructive))" name="Egresos" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="ingresos" fill="hsl(var(--accent))" name={t("finanzas.common.revenue")} radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="egresos" fill="hsl(var(--destructive))" name={t("finanzas.common.expenses")} radius={[4, 4, 0, 0]} />
                   <Legend />
                 </BarChart>
               </ResponsiveContainer>
@@ -360,11 +376,11 @@ export default function ReportesPage() {
             <div className="rounded-lg border border-border overflow-hidden">
               <Table>
                 <TableHeader><TableRow className="sticky top-0 z-10 bg-card">
-                  <TableHead className="text-xs font-medium text-muted-foreground">Mes</TableHead>
-                  <TableHead className="text-xs font-medium text-muted-foreground">Ingresos</TableHead>
-                  <TableHead className="text-xs font-medium text-muted-foreground">Egresos</TableHead>
-                  <TableHead className="text-xs font-medium text-muted-foreground">Margen</TableHead>
-                  <TableHead className="text-xs font-medium text-muted-foreground">% Cambio</TableHead>
+                  <TableHead className="text-xs font-medium text-muted-foreground">{t("common.month")}</TableHead>
+                  <TableHead className="text-xs font-medium text-muted-foreground">{t("finanzas.common.revenue")}</TableHead>
+                  <TableHead className="text-xs font-medium text-muted-foreground">{t("finanzas.common.expenses")}</TableHead>
+                  <TableHead className="text-xs font-medium text-muted-foreground">{t("finanzas.common.margin")}</TableHead>
+                  <TableHead className="text-xs font-medium text-muted-foreground">{t("finanzas.reports.changePct")}</TableHead>
                 </TableRow></TableHeader>
                 <TableBody>
                   {monthlyWithChange.map((m, i) => (
@@ -390,7 +406,7 @@ export default function ReportesPage() {
 
       case "Estado de Cuenta CC": {
         const filtered = reports.filter(r => {
-          const matchSearch = !search || (REPORT_TYPES[r.report_type] || r.report_type).toLowerCase().includes(search.toLowerCase());
+          const matchSearch = !search || tipoReporte(r.report_type).toLowerCase().includes(search.toLowerCase());
           const d = new Date(r.created_at);
           const matchFrom = !dateFrom || d >= dateFrom;
           const matchTo = !dateTo || d <= dateTo;
@@ -406,7 +422,7 @@ export default function ReportesPage() {
 
       default: {
         const filtered = reports.filter(r => {
-          const matchSearch = !search || (REPORT_TYPES[r.report_type] || r.report_type).toLowerCase().includes(search.toLowerCase());
+          const matchSearch = !search || tipoReporte(r.report_type).toLowerCase().includes(search.toLowerCase());
           const matchType = !typeFilter || r.report_type === typeFilter;
           const d = new Date(r.created_at);
           const matchFrom = !dateFrom || d >= dateFrom;
@@ -424,30 +440,30 @@ export default function ReportesPage() {
         <Table>
           <TableHeader>
             <TableRow className="sticky top-0 z-10 bg-card border-b">
-              <TableHead className="text-xs font-medium text-muted-foreground">Tipo</TableHead>
-              <TableHead className="text-xs font-medium text-muted-foreground">Periodo</TableHead>
-              <TableHead className="text-xs font-medium text-muted-foreground">Área / CC</TableHead>
-              <TableHead className="text-xs font-medium text-muted-foreground">Formato</TableHead>
-              <TableHead className="text-xs font-medium text-muted-foreground">Fecha</TableHead>
-              <TableHead className="text-xs font-medium text-muted-foreground sticky right-0 bg-card">Acciones</TableHead>
+              <TableHead className="text-xs font-medium text-muted-foreground">{t("common.type")}</TableHead>
+              <TableHead className="text-xs font-medium text-muted-foreground">{t("finanzas.common.period")}</TableHead>
+              <TableHead className="text-xs font-medium text-muted-foreground">{t("finanzas.reports.areaCC")}</TableHead>
+              <TableHead className="text-xs font-medium text-muted-foreground">{t("finanzas.reports.format")}</TableHead>
+              <TableHead className="text-xs font-medium text-muted-foreground">{t("common.date")}</TableHead>
+              <TableHead className="text-xs font-medium text-muted-foreground sticky right-0 bg-card">{t("common.actions")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? Array.from({ length: 5 }).map((_, i) => (
               <TableRow key={i}>{Array.from({ length: 6 }).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}</TableRow>
             )) : filtered.length === 0 ? (
-              <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-12">{reports.length === 0 ? "No hay reportes. Genera el primero." : "Sin resultados."}</TableCell></TableRow>
+              <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-12">{reports.length === 0 ? t("finanzas.reports.empty") : t("finanzas.common.noResults")}</TableCell></TableRow>
             ) : filtered.map(r => (
               <TableRow key={r.id} className="group hover:bg-muted/30 transition-colors">
-                <TableCell><div className="flex items-center gap-2"><FileText className="h-4 w-4 text-muted-foreground" /><span className="text-sm">{REPORT_TYPES[r.report_type] || r.report_type}</span></div></TableCell>
+                <TableCell><div className="flex items-center gap-2"><FileText className="h-4 w-4 text-muted-foreground" /><span className="text-sm">{tipoReporte(r.report_type)}</span></div></TableCell>
                 <TableCell className="text-sm">{r.period_from && r.period_to ? `${r.period_from} — ${r.period_to}` : "—"}</TableCell>
                 <TableCell className="text-sm">{r.area || "—"}</TableCell>
                 <TableCell><Badge variant="outline">{(r.format || "csv").toUpperCase()}</Badge></TableCell>
                 <TableCell className="text-sm whitespace-nowrap">{format(new Date(r.created_at), "dd/MM/yyyy HH:mm")}</TableCell>
                 <TableCell className="sticky right-0 bg-card group-hover:bg-muted/30">
                   <div className="flex items-center gap-1">
-                    <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0"><Download className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">Descargar</TooltipContent></Tooltip>
-                    <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => setDeleteItem(r)}><Trash2 className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">Eliminar</TooltipContent></Tooltip>
+                    <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0"><Download className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">{t("common.download")}</TooltipContent></Tooltip>
+                    <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => setDeleteItem(r)}><Trash2 className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">{t("common.delete")}</TooltipContent></Tooltip>
                   </div>
                 </TableCell>
               </TableRow>
@@ -459,15 +475,15 @@ export default function ReportesPage() {
   ) : (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
       {filtered.length === 0 ? (
-        <div className="col-span-full text-center text-muted-foreground py-12">Sin reportes.</div>
+        <div className="col-span-full text-center text-muted-foreground py-12">{t("finanzas.reports.none")}</div>
       ) : filtered.map(r => (
         <div key={r.id} className="rounded-xl border border-white/10 bg-white/5 p-4 hover:bg-white/10 hover:border-primary/40 transition-colors">
           <div className="flex items-center justify-between mb-2">
             <Badge variant="outline" className="text-[10px]">{(r.format || "csv").toUpperCase()}</Badge>
             <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-destructive" onClick={() => setDeleteItem(r)}><Trash2 className="h-3 w-3" /></Button>
           </div>
-          <p className="text-sm font-medium">{REPORT_TYPES[r.report_type] || r.report_type}</p>
-          <p className="text-xs text-muted-foreground mt-1">{r.area || "Sin área"}</p>
+          <p className="text-sm font-medium">{tipoReporte(r.report_type)}</p>
+          <p className="text-xs text-muted-foreground mt-1">{r.area || t("finanzas.common.noArea")}</p>
           <p className="text-xs text-muted-foreground mt-1">{format(new Date(r.created_at), "dd/MM/yyyy HH:mm")}</p>
         </div>
       ))}
@@ -478,41 +494,41 @@ export default function ReportesPage() {
     <div className="flex flex-col h-full overflow-hidden">
       <header className="shrink-0 bg-background/30 backdrop-blur-xl border-b border-white/10 px-6 pt-6 pb-4">
         <PageHeader
-          title="Reportes"
-          subtitle={`Generación y descarga de reportes financieros · ${reports.length} generados`}
-          actions={<Button size="sm" onClick={() => setShowGenModal(true)}><Plus className="h-4 w-4 mr-1" />Generar Reporte</Button>}
+          title={t("finanzas.reports.title")}
+          subtitle={t("finanzas.reports.subtitle", { n: reports.length })}
+          actions={<Button size="sm" onClick={() => setShowGenModal(true)}><Plus className="h-4 w-4 mr-1" />{t("finanzas.reports.generate")}</Button>}
         />
       </header>
 
       <div className="flex-1 overflow-auto p-6 space-y-5">
         <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1 flex-wrap">
-          {REPORT_TABS.map(t => (
-            <Button key={t} variant={reportTab === t ? "secondary" : "ghost"} size="sm" onClick={() => { setReportTab(t); setSearch(""); }}>{t}</Button>
+          {REPORT_TABS.map(pestana => (
+            <Button key={pestana} variant={reportTab === pestana ? "secondary" : "ghost"} size="sm" onClick={() => { setReportTab(pestana); setSearch(""); }}>{t(TAB_LABEL[pestana])}</Button>
           ))}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Buscar..." className="pl-8" value={search} onChange={e => setSearch(e.target.value)} />
+            <Input placeholder={t("finanzas.common.searchEllipsis")} className="pl-8" value={search} onChange={e => setSearch(e.target.value)} />
           </div>
           {reportTab === "Reportes Generales" && (
             <Select value={typeFilter || undefined} onValueChange={v => setTypeFilter(v === "__all__" ? "" : v)}>
-              <SelectTrigger className="w-40"><SelectValue placeholder="Tipo" /></SelectTrigger>
+              <SelectTrigger className="w-40"><SelectValue placeholder={t("common.type")} /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="__all__">Todos</SelectItem>
-                {Object.entries(REPORT_TYPES).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+                <SelectItem value="__all__">{t("common.all")}</SelectItem>
+                {Object.entries(REPORT_TYPES).map(([k, v]) => <SelectItem key={k} value={k}>{t(v)}</SelectItem>)}
               </SelectContent>
             </Select>
           )}
-          <DateRangePicker from={dateFrom} to={dateTo} onApply={(f, t) => { setDateFrom(f); setDateTo(t); }} />
+          <DateRangePicker from={dateFrom} to={dateTo} onApply={(desde, hasta) => { setDateFrom(desde); setDateTo(hasta); }} />
           <div className="inline-flex items-center rounded-md border border-border">
-            <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="sm" className="h-8 w-8 p-0 rounded-r-none" onClick={() => setViewMode("list")}><List className="h-4 w-4" /></Button>
-            <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="sm" className="h-8 w-8 p-0 rounded-l-none" onClick={() => setViewMode("grid")}><LayoutGrid className="h-4 w-4" /></Button>
+            <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="sm" className="h-8 w-8 p-0 rounded-r-none" onClick={() => setViewMode("list")} aria-label={t("finanzas.common.viewList")}><List className="h-4 w-4" /></Button>
+            <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="sm" className="h-8 w-8 p-0 rounded-l-none" onClick={() => setViewMode("grid")} aria-label={t("finanzas.common.viewGrid")}><LayoutGrid className="h-4 w-4" /></Button>
           </div>
           {hasFilters && (
             <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={() => { setSearch(""); setTypeFilter(""); setDateFrom(undefined); setDateTo(undefined); }}>
-              <X className="h-3.5 w-3.5 mr-1" />Limpiar
+              <X className="h-3.5 w-3.5 mr-1" />{t("finanzas.common.clear")}
             </Button>
           )}
         </div>
@@ -523,27 +539,27 @@ export default function ReportesPage() {
       {/* Generate Report Modal */}
       <Dialog open={showGenModal} onOpenChange={setShowGenModal}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>Generar Reporte</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t("finanzas.reports.generate")}</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label>Tipo de Reporte</Label>
+              <Label>{t("finanzas.reports.reportType")}</Label>
               <Select value={genType} onValueChange={setGenType}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {Object.entries(REPORT_TYPES).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+                  {Object.entries(REPORT_TYPES).map(([k, v]) => <SelectItem key={k} value={k}>{t(v)}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <Label>Periodo</Label>
-              <DateRangePicker from={genDateFrom} to={genDateTo} onApply={(f, t) => { setGenDateFrom(f); setGenDateTo(t); }} />
+              <Label>{t("finanzas.common.period")}</Label>
+              <DateRangePicker from={genDateFrom} to={genDateTo} onApply={(desde, hasta) => { setGenDateFrom(desde); setGenDateTo(hasta); }} />
             </div>
             <div>
-              <Label>Área / CC</Label>
+              <Label>{t("finanzas.reports.areaCC")}</Label>
               <Select value={genArea || undefined} onValueChange={v => setGenArea(v === "__all__" ? "" : v)}>
-                <SelectTrigger><SelectValue placeholder="Todas" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={t("common.allF")} /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__all__">Todas</SelectItem>
+                  <SelectItem value="__all__">{t("common.allF")}</SelectItem>
                   <SelectItem value="chatters">Chatters</SelectItem>
                   <SelectItem value="closers">Closers</SelectItem>
                   <SelectItem value="tech">Tech</SelectItem>
@@ -551,7 +567,7 @@ export default function ReportesPage() {
               </Select>
             </div>
             <div>
-              <Label>Formato</Label>
+              <Label>{t("finanzas.reports.format")}</Label>
               <Select value={genFormat} onValueChange={v => setGenFormat(v as "csv" | "excel")}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -562,9 +578,9 @@ export default function ReportesPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowGenModal(false)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => setShowGenModal(false)}>{t("common.cancel")}</Button>
             <Button onClick={() => generateMutation.mutate()} disabled={generateMutation.isPending}>
-              <Download className="h-4 w-4 mr-1" />Generar
+              <Download className="h-4 w-4 mr-1" />{t("finanzas.common.generate")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -573,12 +589,12 @@ export default function ReportesPage() {
       <AlertDialog open={!!deleteItem} onOpenChange={() => setDeleteItem(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar reporte?</AlertDialogTitle>
-            <AlertDialogDescription>Esta acción no se puede deshacer.</AlertDialogDescription>
+            <AlertDialogTitle>{t("finanzas.reports.delete.title")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("common.cannotBeUndone")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel />
-            <AlertDialogAction onClick={() => deleteItem && deleteMutation.mutate(deleteItem.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Eliminar</AlertDialogAction>
+            <AlertDialogAction onClick={() => deleteItem && deleteMutation.mutate(deleteItem.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">{t("common.delete")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

@@ -62,8 +62,10 @@ export default function InvoiceA4Preview({ invoice, template, zoom = DEFAULT_ZOO
 
   const addressLines = companyAddress.split("\n");
 
+  // data-documento: esto es el documento (va en español siempre, lo recibe la creadora),
+  // no la pantalla. El test de Finanzas en inglés lo saltea por esta marca.
   return (
-    <div style={{ width: A4_W * zoom, height: A4_H * zoom, flexShrink: 0 }}>
+    <div data-documento style={{ width: A4_W * zoom, height: A4_H * zoom, flexShrink: 0 }}>
       <div
         style={{ width: A4_W, height: A4_H, transform: `scale(${zoom})`, transformOrigin: "top left" }}
         className="bg-white rounded shadow-2xl p-10 font-serif text-black text-[11px] leading-relaxed flex flex-col"

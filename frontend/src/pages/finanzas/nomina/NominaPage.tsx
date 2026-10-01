@@ -30,12 +30,16 @@ import { useNomina } from "./useNomina";
 import { exportTableToExcel } from "@/pages/finanzas/reportes/generateReport";
 import { PageHeader } from "@/components/ui/page-header";
 import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
+import { traducir, type TranslationKey } from "@/lib/i18n";
+import { crudoEnEspanol, estadoNomina, tipoDeDeduccion } from "../estados";
 
-const STATUS_BADGE: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
-  borrador: { variant: "secondary", label: "Borrador" },
-  calculado: { variant: "outline", label: "Calculado" },
-  cerrado: { variant: "default", label: "Cerrado" },
-  pagado: { variant: "default", label: "Pagado" },
+// La etiqueta del estado sale de ../estados (en el idioma de la pantalla); acá solo el color.
+const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+  borrador: "secondary",
+  calculado: "outline",
+  cerrado: "default",
+  pagado: "default",
 };
 
 function fmtUsd(n: number, locale: string) {
@@ -44,6 +48,7 @@ function fmtUsd(n: number, locale: string) {
 
 function PeriodDetailContent({ item }: { item: any }) {
   const f = useFormato();
+  const { t, language } = useLanguage();
   const fmt = (n: number) => fmtUsd(n, f.intl("es-CO"));
   const { data: deductions = [], isLoading } = useQuery({
     queryKey: ["nomina-deductions", item.period_name],
@@ -63,29 +68,29 @@ function PeriodDetailContent({ item }: { item: any }) {
   return (
     <div className="space-y-4 text-sm">
       <div className="space-y-2">
-        <p><span className="text-muted-foreground">Periodo:</span> {item.period_name}</p>
-        <p><span className="text-muted-foreground">Estado:</span> <Badge variant={STATUS_BADGE[item.status]?.variant || "outline"}>{STATUS_BADGE[item.status]?.label || item.status}</Badge></p>
-        <p><span className="text-muted-foreground">Empleados:</span> {item.total_employees}</p>
-        <p><span className="text-muted-foreground">Total Bruto:</span> {fmt(Number(item.gross_total) || 0)}</p>
-        <p><span className="text-muted-foreground">Total Neto:</span> {fmt(Number(item.net_total) || 0)}</p>
-        <p><span className="text-muted-foreground">Centro de Costo:</span> {item.cost_center || "—"}</p>
-        {item.notes && <p><span className="text-muted-foreground">Notas:</span> {item.notes}</p>}
+        <p><span className="text-muted-foreground">{t("finanzas.common.period")}:</span> {item.period_name}</p>
+        <p><span className="text-muted-foreground">{t("common.status")}:</span> <Badge variant={STATUS_VARIANT[item.status] || "outline"}>{estadoNomina(t, item.status)}</Badge></p>
+        <p><span className="text-muted-foreground">{t("finanzas.common.employees")}:</span> {item.total_employees}</p>
+        <p><span className="text-muted-foreground">{t("finanzas.common.totalGross")}:</span> {fmt(Number(item.gross_total) || 0)}</p>
+        <p><span className="text-muted-foreground">{t("finanzas.common.totalNet")}:</span> {fmt(Number(item.net_total) || 0)}</p>
+        <p><span className="text-muted-foreground">{t("finanzas.common.costCenter")}:</span> {item.cost_center || "—"}</p>
+        {item.notes && <p><span className="text-muted-foreground">{t("finanzas.common.notes")}:</span> {item.notes}</p>}
       </div>
 
       {/* Deducciones de HR */}
       <div className="border-t pt-3">
-        <p className="text-sm font-medium mb-2">Deducciones Aplicadas (HR)</p>
+        <p className="text-sm font-medium mb-2">{t("finanzas.payroll.detail.deductions")}</p>
         {isLoading ? (
-          <p className="text-xs text-muted-foreground">Cargando...</p>
+          <p className="text-xs text-muted-foreground">{t("finanzas.common.loadingDots")}</p>
         ) : deductions.length === 0 ? (
-          <p className="text-xs text-muted-foreground">Sin deducciones asociadas a este periodo.</p>
+          <p className="text-xs text-muted-foreground">{t("finanzas.payroll.detail.noDeductions")}</p>
         ) : (
           <div className="space-y-1.5 max-h-40 overflow-auto">
             {deductions.map((d: any) => (
               <div key={d.id} className="flex items-center justify-between rounded border border-border px-2 py-1.5">
                 <div>
                   <span className="text-xs font-medium">{d.employees?.first_name} {d.employees?.last_name}</span>
-                  <span className="text-xs text-muted-foreground ml-2">{d.deduction_type}</span>
+                  <span className="text-xs text-muted-foreground ml-2">{crudoEnEspanol(language, tipoDeDeduccion, t, d.deduction_type)}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-medium">${Number(d.amount).toLocaleString(f.intl("es-CO"))}</span>
@@ -102,9 +107,17 @@ function PeriodDetailContent({ item }: { item: any }) {
 
 const NOMINA_TABS = ["Cálculo", "Recibos", "Mail", "Batch"] as const;
 type NominaTab = typeof NOMINA_TABS[number];
+// El valor de la pestaña es interno; esto es lo que se lee.
+const TAB_LABEL: Record<NominaTab, TranslationKey> = {
+  "Cálculo": "finanzas.payroll.tab.calculation",
+  "Recibos": "finanzas.payroll.tab.receipts",
+  "Mail": "finanzas.billing.tab.mail",
+  "Batch": "finanzas.payroll.tab.batch",
+};
 
 export default function NominaPage() {
   const { toast } = useToast();
+  const { t, language } = useLanguage();
   const formatoUi = useFormato();
   const fmt = (n: number) => fmtUsd(n, formatoUi.intl("es-CO"));
   const queryClient = useQueryClient();
@@ -146,7 +159,7 @@ export default function NominaPage() {
   const closeMonthMutation = useMutation({
     mutationFn: async () => {
       const openPeriods = periods.filter(p => p.status === "borrador" || p.status === "calculado");
-      if (openPeriods.length === 0) throw new Error("No hay periodos abiertos");
+      if (openPeriods.length === 0) throw new Error(traducir("finanzas.payroll.noOpenPeriods"));
       const ids = openPeriods.map(p => p.id);
       const { error } = await supabase.from("payroll_periods").update({ status: "cerrado" }).in("id", ids);
       if (error) throw error;
@@ -159,14 +172,15 @@ export default function NominaPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["payroll-periods"] });
-      toast({ title: "Mes cerrado. Archivo bancario generado. Recibos disponibles para envío." });
+      toast({ title: t("finanzas.payroll.toast.monthClosed") });
       setShowCloseMonthDialog(false);
     },
-    onError: (e: any) => toast({ title: e.message || "Error al cerrar mes", variant: "destructive" }),
+    onError: (e: any) => toast({ title: e.message || t("finanzas.payroll.toast.monthCloseError"), variant: "destructive" }),
   });
 
   // QuickBooks export
   const exportQuickBooks = () => {
+    // Archivo para QuickBooks: el Memo y la cuenta van en español, sea cual sea el idioma de la pantalla.
     const rows = batchPeriods.map(p => ({
       Date: new Date(p.created_at).toLocaleDateString("en-US"),
       Name: p.period_name,
@@ -174,9 +188,9 @@ export default function NominaPage() {
       Amount: Number(p.net_total) || 0,
       Account: p.cost_center || "Nómina",
     }));
-    if (rows.length === 0) { toast({ title: "Sin periodos para exportar", variant: "destructive" }); return; }
+    if (rows.length === 0) { toast({ title: t("finanzas.payroll.toast.noPeriodsToExport"), variant: "destructive" }); return; }
     exportTableToExcel(rows, "quickbooks-nomina");
-    toast({ title: "Archivo QuickBooks generado" });
+    toast({ title: t("finanzas.common.qbGenerated") });
   };
 
   const renderTabContent = () => {
@@ -184,24 +198,24 @@ export default function NominaPage() {
       case "Recibos":
         return (
           <div className="space-y-5">
-            <p className="text-sm text-muted-foreground">{pagados.length} periodos con recibo disponible</p>
+            <p className="text-sm text-muted-foreground">{t("finanzas.payroll.receiptsCount", { n: pagados.length })}</p>
             <div className="rounded-lg border border-border overflow-hidden">
               <Table>
                 <TableHeader>
                   <TableRow className="bg-card">
-                    <TableHead className="text-xs font-medium text-muted-foreground">Periodo</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">Estado</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">Total Neto</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">Acciones</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">{t("finanzas.common.period")}</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">{t("common.status")}</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">{t("finanzas.common.totalNet")}</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">{t("common.actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {pagados.length === 0 ? (
-                    <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">Sin recibos disponibles.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">{t("finanzas.payroll.receiptsEmpty")}</TableCell></TableRow>
                   ) : pagados.map(p => (
                     <TableRow key={p.id} className="hover:bg-muted/30">
                       <TableCell className="text-sm font-medium">{p.period_name}</TableCell>
-                      <TableCell><Badge variant="default">{p.status}</Badge></TableCell>
+                      <TableCell><Badge variant="default">{crudoEnEspanol(language, estadoNomina, t, p.status)}</Badge></TableCell>
                       <TableCell className="text-sm font-medium">{fmt(Number(p.net_total) || 0)}</TableCell>
                       <TableCell>
                         <Button variant="ghost" size="sm" onClick={async () => {
@@ -224,12 +238,12 @@ export default function NominaPage() {
           <div className="space-y-5">
             <div className="rounded-lg border border-dashed border-border p-12 text-center">
               <Mail className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
-              <h3 className="text-sm font-medium text-foreground mb-1">Envío de Recibos por Correo</h3>
+              <h3 className="text-sm font-medium text-foreground mb-1">{t("finanzas.payroll.mail.title")}</h3>
               <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                Envía recibos de nómina a los empleados automáticamente por correo electrónico. Selecciona un periodo cerrado o pagado para generar y enviar los recibos.
+                {t("finanzas.payroll.mail.desc")}
               </p>
               <Button size="sm" variant="outline" className="mt-4" disabled>
-                <Mail className="h-4 w-4 mr-1" />Próximamente
+                <Mail className="h-4 w-4 mr-1" />{t("common.comingSoon")}
               </Button>
             </div>
           </div>
@@ -239,29 +253,29 @@ export default function NominaPage() {
         return (
           <div className="space-y-5">
             <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">{batchPeriods.length} periodos elegibles para cierre</p>
+              <p className="text-sm text-muted-foreground">{t("finanzas.payroll.eligibleCount", { n: batchPeriods.length })}</p>
               <div className="flex items-center gap-2">
-                <Button size="sm" variant="outline" onClick={exportQuickBooks}><Download className="h-4 w-4 mr-1" />Exportar a QuickBooks</Button>
-                <Button size="sm" onClick={() => setShowBatchModal(true)}><Plus className="h-4 w-4 mr-1" />Crear Batch</Button>
+                <Button size="sm" variant="outline" onClick={exportQuickBooks}><Download className="h-4 w-4 mr-1" />{t("finanzas.payroll.exportQb")}</Button>
+                <Button size="sm" onClick={() => setShowBatchModal(true)}><Plus className="h-4 w-4 mr-1" />{t("finanzas.payroll.createBatch")}</Button>
               </div>
             </div>
             <div className="rounded-lg border border-border overflow-hidden">
               <Table>
                 <TableHeader>
                   <TableRow className="bg-card">
-                    <TableHead className="text-xs font-medium text-muted-foreground">Periodo</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">Estado</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">Total Neto</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">Acciones</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">{t("finanzas.common.period")}</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">{t("common.status")}</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">{t("finanzas.common.totalNet")}</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">{t("common.actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {batchPeriods.length === 0 ? (
-                    <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">Sin periodos abiertos para cerrar.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">{t("finanzas.payroll.openEmpty")}</TableCell></TableRow>
                   ) : batchPeriods.map(p => (
                     <TableRow key={p.id} className="hover:bg-muted/30">
                       <TableCell className="text-sm font-medium">{p.period_name}</TableCell>
-                      <TableCell><Badge variant="secondary">{p.status}</Badge></TableCell>
+                      <TableCell><Badge variant="secondary">{crudoEnEspanol(language, estadoNomina, t, p.status)}</Badge></TableCell>
                       <TableCell className="text-sm font-medium">{fmt(Number(p.net_total) || 0)}</TableCell>
                       <TableCell>
                         <Button variant="ghost" size="sm" onClick={async () => {
@@ -285,26 +299,25 @@ export default function NominaPage() {
             <div className="flex flex-wrap items-center gap-2">
               <div className="relative flex-1 min-w-[200px]">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Buscar periodo..." className="pl-8" value={search} onChange={e => setSearch(e.target.value)} />
+                <Input placeholder={t("finanzas.payroll.searchPeriod")} className="pl-8" value={search} onChange={e => setSearch(e.target.value)} />
               </div>
               <Select value={statusFilter || undefined} onValueChange={v => setStatusFilter(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="w-36"><SelectValue placeholder="Estado" /></SelectTrigger>
+                <SelectTrigger className="w-36"><SelectValue placeholder={t("common.status")} /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__all__">Todos</SelectItem>
-                  <SelectItem value="borrador">Borrador</SelectItem>
-                  <SelectItem value="calculado">Calculado</SelectItem>
-                  <SelectItem value="cerrado">Cerrado</SelectItem>
-                  <SelectItem value="pagado">Pagado</SelectItem>
+                  <SelectItem value="__all__">{t("common.all")}</SelectItem>
+                  {["borrador", "calculado", "cerrado", "pagado"].map(estado => (
+                    <SelectItem key={estado} value={estado}>{estadoNomina(t, estado)}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
-              <DateRangePicker from={dateFrom} to={dateTo} onApply={(f, t) => { setDateFrom(f); setDateTo(t); }} />
+              <DateRangePicker from={dateFrom} to={dateTo} onApply={(desde, hasta) => { setDateFrom(desde); setDateTo(hasta); }} />
               <div className="inline-flex items-center rounded-md border border-border">
-                <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8 rounded-r-none" onClick={() => setViewMode("list")}><ListIcon className="h-4 w-4" /></Button>
-                <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8 rounded-l-none" onClick={() => setViewMode("grid")}><LayoutGrid className="h-4 w-4" /></Button>
+                <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8 rounded-r-none" onClick={() => setViewMode("list")} aria-label={t("finanzas.common.viewList")}><ListIcon className="h-4 w-4" /></Button>
+                <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8 rounded-l-none" onClick={() => setViewMode("grid")} aria-label={t("finanzas.common.viewGrid")}><LayoutGrid className="h-4 w-4" /></Button>
               </div>
               {hasFilters && (
                 <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={() => { setSearch(""); setStatusFilter(""); setDateFrom(undefined); setDateTo(undefined); }}>
-                  <X className="h-3.5 w-3.5 mr-1" />Limpiar
+                  <X className="h-3.5 w-3.5 mr-1" />{t("finanzas.common.clear")}
                 </Button>
               )}
             </div>
@@ -315,21 +328,21 @@ export default function NominaPage() {
                   <Table>
                     <TableHeader>
                       <TableRow className="sticky top-0 z-10 bg-card border-b">
-                        <TableHead className="text-xs font-medium text-muted-foreground">Periodo</TableHead>
-                        <TableHead className="text-xs font-medium text-muted-foreground">Empleados</TableHead>
-                        <TableHead className="text-xs font-medium text-muted-foreground">Total Bruto</TableHead>
-                        <TableHead className="text-xs font-medium text-muted-foreground">Total Neto</TableHead>
-                        <TableHead className="text-xs font-medium text-muted-foreground">Estado</TableHead>
-                        <TableHead className="text-xs font-medium text-muted-foreground sticky right-0 bg-card">Acciones</TableHead>
+                        <TableHead className="text-xs font-medium text-muted-foreground">{t("finanzas.common.period")}</TableHead>
+                        <TableHead className="text-xs font-medium text-muted-foreground">{t("finanzas.common.employees")}</TableHead>
+                        <TableHead className="text-xs font-medium text-muted-foreground">{t("finanzas.common.totalGross")}</TableHead>
+                        <TableHead className="text-xs font-medium text-muted-foreground">{t("finanzas.common.totalNet")}</TableHead>
+                        <TableHead className="text-xs font-medium text-muted-foreground">{t("common.status")}</TableHead>
+                        <TableHead className="text-xs font-medium text-muted-foreground sticky right-0 bg-card">{t("common.actions")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {loadingPeriods ? Array.from({ length: 5 }).map((_, i) => (
                         <TableRow key={i}>{Array.from({ length: 6 }).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}</TableRow>
                       )) : filtered.length === 0 ? (
-                        <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-12">{periods.length === 0 ? "No hay periodos de nómina." : "Sin resultados."}</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-12">{periods.length === 0 ? t("finanzas.payroll.empty") : t("finanzas.common.noResults")}</TableCell></TableRow>
                       ) : filtered.map(p => {
-                        const badge = STATUS_BADGE[p.status] ?? STATUS_BADGE.borrador;
+                        const estado = STATUS_VARIANT[p.status] ? p.status : "borrador";
                         const locked = isLocked(p.status);
                         return (
                           <TableRow key={p.id} className="group hover:bg-muted/30 transition-colors">
@@ -339,15 +352,15 @@ export default function NominaPage() {
                             <TableCell className="text-sm font-medium">{fmt(Number(p.net_total) || 0)}</TableCell>
                             <TableCell>
                               <div className="flex items-center gap-1">
-                                <Badge variant={badge.variant}>{badge.label}</Badge>
+                                <Badge variant={STATUS_VARIANT[estado]}>{estadoNomina(t, estado)}</Badge>
                                 {locked && <Lock className="h-3 w-3 text-muted-foreground" />}
                               </div>
                             </TableCell>
                             <TableCell className="sticky right-0 bg-card group-hover:bg-muted/30">
                               <div className="flex items-center gap-1">
-                                <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setViewItem(p)}><Eye className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">Ver</TooltipContent></Tooltip>
+                                <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setViewItem(p)}><Eye className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">{t("common.view")}</TooltipContent></Tooltip>
                                 {!locked && (
-                                  <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => setDeleteItem(p)}><Trash2 className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">Eliminar</TooltipContent></Tooltip>
+                                  <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => setDeleteItem(p)}><Trash2 className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">{t("common.delete")}</TooltipContent></Tooltip>
                                 )}
                               </div>
                             </TableCell>
@@ -361,7 +374,7 @@ export default function NominaPage() {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filtered.map(p => {
-                  const badge = STATUS_BADGE[p.status] ?? STATUS_BADGE.borrador;
+                  const estado = STATUS_VARIANT[p.status] ? p.status : "borrador";
                   const locked = isLocked(p.status);
                   return (
                     <Card key={p.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => setViewItem(p)}>
@@ -369,14 +382,14 @@ export default function NominaPage() {
                         <div className="flex items-center justify-between">
                           <span className="font-medium text-sm">{p.period_name}</span>
                           <div className="flex items-center gap-1">
-                            <Badge variant={badge.variant}>{badge.label}</Badge>
+                            <Badge variant={STATUS_VARIANT[estado]}>{estadoNomina(t, estado)}</Badge>
                             {locked && <Lock className="h-3 w-3 text-muted-foreground" />}
                           </div>
                         </div>
-                        <div className="text-xs text-muted-foreground">{p.total_employees} empleados</div>
+                        <div className="text-xs text-muted-foreground">{t("finanzas.common.employeesCount", { n: p.total_employees })}</div>
                         <div className="flex justify-between text-sm">
-                          <span>Bruto: {fmt(Number(p.gross_total) || 0)}</span>
-                          <span className="font-medium">Neto: {fmt(Number(p.net_total) || 0)}</span>
+                          <span>{t("finanzas.payroll.grossLabel", { amount: fmt(Number(p.gross_total) || 0) })}</span>
+                          <span className="font-medium">{t("finanzas.payroll.netLabel", { amount: fmt(Number(p.net_total) || 0) })}</span>
                         </div>
                       </CardContent>
                     </Card>
@@ -393,14 +406,14 @@ export default function NominaPage() {
     <div className="flex flex-col h-full overflow-hidden">
       <header className="shrink-0 bg-background/30 backdrop-blur-xl border-b border-white/10 px-6 pt-6 pb-4">
         <PageHeader
-          title="Nómina"
-          subtitle={`Gestión de periodos de nómina · ${periods.length} registros`}
+          title={t("finanzas.common.payroll")}
+          subtitle={t("finanzas.payroll.subtitle", { n: periods.length })}
           actions={
             <>
-              <Button size="sm" onClick={() => setShowCalcModal(true)}><Calculator className="h-4 w-4 mr-1" />Calcular Nómina</Button>
-              <Button size="sm" variant="outline" onClick={() => setShowBatchModal(true)}><Plus className="h-4 w-4 mr-1" />Crear Batch</Button>
+              <Button size="sm" onClick={() => setShowCalcModal(true)}><Calculator className="h-4 w-4 mr-1" />{t("finanzas.payroll.calculate")}</Button>
+              <Button size="sm" variant="outline" onClick={() => setShowBatchModal(true)}><Plus className="h-4 w-4 mr-1" />{t("finanzas.payroll.createBatch")}</Button>
               <Button size="sm" variant="outline" onClick={() => setShowCloseMonthDialog(true)} disabled={batchPeriods.length === 0}>
-                <Lock className="h-4 w-4 mr-1" />Cerrar Mes
+                <Lock className="h-4 w-4 mr-1" />{t("finanzas.payroll.closeMonth")}
               </Button>
             </>
           }
@@ -411,16 +424,16 @@ export default function NominaPage() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {loadingPeriods ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-lg" />) : (
             <>
-              <StatChip label="Total Periodos" value={String(periods.length)} icon={<DollarSign className="h-3.5 w-3.5" />} color="bg-primary" hint="Todos los registros" onClick={() => setKpiPopup("total")} />
-              <StatChip label="Borradores" value={String(totalBorradores)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" hint={periods.length > 0 ? `${((totalBorradores / periods.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("borradores")} />
-              <StatChip label="Monto Bruto Total" value={fmt(totalBruto)} icon={<DollarSign className="h-3.5 w-3.5" />} color="bg-success" hint="Suma bruta" onClick={() => setKpiPopup("bruto")} />
-              <StatChip label="Monto Neto Total" value={fmt(totalNeto)} icon={<CheckCircle className="h-3.5 w-3.5" />} color="bg-accent" hint="Suma neta" onClick={() => setKpiPopup("neto")} />
+              <StatChip label={t("finanzas.payroll.kpi.total")} value={String(periods.length)} icon={<DollarSign className="h-3.5 w-3.5" />} color="bg-primary" hint={t("finanzas.payroll.kpi.totalHint")} onClick={() => setKpiPopup("total")} />
+              <StatChip label={t("finanzas.payroll.kpi.drafts")} value={String(totalBorradores)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" hint={periods.length > 0 ? t("finanzas.control.pctOfTotal", { pct: ((totalBorradores / periods.length) * 100).toFixed(0) }) : "—"} onClick={() => setKpiPopup("borradores")} />
+              <StatChip label={t("finanzas.payroll.kpi.gross")} value={fmt(totalBruto)} icon={<DollarSign className="h-3.5 w-3.5" />} color="bg-success" hint={t("finanzas.payroll.kpi.grossHint")} onClick={() => setKpiPopup("bruto")} />
+              <StatChip label={t("finanzas.payroll.kpi.net")} value={fmt(totalNeto)} icon={<CheckCircle className="h-3.5 w-3.5" />} color="bg-accent" hint={t("finanzas.payroll.kpi.netHint")} onClick={() => setKpiPopup("neto")} />
             </>
           )}
         </div>
         <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1 flex-wrap">
-          {NOMINA_TABS.map(t => (
-            <Button key={t} variant={nominaTab === t ? "secondary" : "ghost"} size="sm" onClick={() => setNominaTab(t)}>{t}</Button>
+          {NOMINA_TABS.map(pestana => (
+            <Button key={pestana} variant={nominaTab === pestana ? "secondary" : "ghost"} size="sm" onClick={() => setNominaTab(pestana)}>{t(TAB_LABEL[pestana])}</Button>
           ))}
         </div>
         {renderTabContent()}
@@ -433,20 +446,20 @@ export default function NominaPage() {
       <AlertDialog open={showCloseMonthDialog} onOpenChange={setShowCloseMonthDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Cerrar el Mes?</AlertDialogTitle>
+            <AlertDialogTitle>{t("finanzas.payroll.closeDialog.title")}</AlertDialogTitle>
             <AlertDialogDescription className="space-y-2">
-              <p>Esta acción cerrará {batchPeriods.length} periodo(s) abierto(s) y generará los archivos bancarios correspondientes.</p>
+              <p>{t("finanzas.payroll.closeDialog.desc", { n: batchPeriods.length })}</p>
               <div className="rounded-xl border border-white/10 bg-white/5 p-3 bg-muted/50 space-y-1 text-sm">
-                <p>Periodos a cerrar: <span className="font-medium">{batchPeriods.length}</span></p>
-                <p>Monto total neto: <span className="font-medium">{fmt(batchPeriods.reduce((s, p) => s + (Number(p.net_total) || 0), 0))}</span></p>
+                <p>{t("finanzas.payroll.closeDialog.toClose")}: <span className="font-medium">{batchPeriods.length}</span></p>
+                <p>{t("finanzas.payroll.closeDialog.netTotal")}: <span className="font-medium">{fmt(batchPeriods.reduce((s, p) => s + (Number(p.net_total) || 0), 0))}</span></p>
               </div>
-              <p className="text-xs text-muted-foreground">Una vez cerrado, no se podrán editar los periodos.</p>
+              <p className="text-xs text-muted-foreground">{t("finanzas.payroll.closeDialog.warning")}</p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel />
             <AlertDialogAction onClick={() => closeMonthMutation.mutate()} disabled={closeMonthMutation.isPending}>
-              <Lock className="h-4 w-4 mr-1" />Confirmar Cierre
+              <Lock className="h-4 w-4 mr-1" />{t("finanzas.payroll.closeDialog.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -455,7 +468,7 @@ export default function NominaPage() {
       {/* Periodo detail dialog */}
       <Dialog open={!!viewItem} onOpenChange={() => setViewItem(null)}>
         <DialogContent className="max-w-lg">
-          <DialogHeader><DialogTitle>Detalle de Periodo</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t("finanzas.payroll.detail.title")}</DialogTitle></DialogHeader>
           {viewItem && <PeriodDetailContent item={viewItem} />}
         </DialogContent>
       </Dialog>
@@ -464,12 +477,12 @@ export default function NominaPage() {
       <AlertDialog open={!!deleteItem} onOpenChange={() => setDeleteItem(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar periodo?</AlertDialogTitle>
-            <AlertDialogDescription>Se eliminará "{deleteItem?.period_name}". Esta acción no se puede deshacer.</AlertDialogDescription>
+            <AlertDialogTitle>{t("finanzas.payroll.delete.title")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("finanzas.payroll.delete.desc", { name: deleteItem?.period_name ?? "" })}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel />
-            <AlertDialogAction onClick={() => deleteItem && deletePeriod.mutate(deleteItem.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Eliminar</AlertDialogAction>
+            <AlertDialogAction onClick={() => deleteItem && deletePeriod.mutate(deleteItem.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">{t("common.delete")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -477,21 +490,22 @@ export default function NominaPage() {
       <KpiDetailDialog
         open={kpiPopup !== null}
         onOpenChange={(o) => !o && setKpiPopup(null)}
+        emptyText={t("finanzas.kpi.empty")}
         title={(() => {
           switch (kpiPopup) {
-            case "total": return `Todos los Periodos — ${periods.length}`;
-            case "borradores": return `Periodos en Borrador — ${totalBorradores}`;
-            case "bruto": return `Monto Bruto Total — ${fmt(totalBruto)}`;
-            case "neto": return `Monto Neto Total — ${fmt(totalNeto)}`;
+            case "total": return t("finanzas.payroll.popup.total", { n: periods.length });
+            case "borradores": return t("finanzas.payroll.popup.drafts", { n: totalBorradores });
+            case "bruto": return t("finanzas.payroll.popup.gross", { amount: fmt(totalBruto) });
+            case "neto": return t("finanzas.payroll.popup.net", { amount: fmt(totalNeto) });
             default: return "";
           }
         })()}
         subtitle={(() => {
           switch (kpiPopup) {
-            case "total": return "Listado completo de periodos de nómina";
-            case "borradores": return "Pendientes de cerrar";
-            case "bruto": return "Sumatoria de gross_total por periodo";
-            case "neto": return "Sumatoria de net_total por periodo";
+            case "total": return t("finanzas.payroll.popup.totalSub");
+            case "borradores": return t("finanzas.payroll.popup.draftsSub");
+            case "bruto": return t("finanzas.payroll.popup.grossSub");
+            case "neto": return t("finanzas.payroll.popup.netSub");
             default: return undefined;
           }
         })()}
@@ -503,8 +517,8 @@ export default function NominaPage() {
             status === "borrador" ? "warning" : "default";
           const rightField = kpiPopup === "neto" ? "net_total" : "gross_total";
           return list.map((p) => ({
-            primary: p.period_name ?? "Sin nombre",
-            secondary: `${p.status} · ${p.cost_center ?? "Sin CC"}`,
+            primary: p.period_name ?? t("finanzas.common.noName"),
+            secondary: `${crudoEnEspanol(language, estadoNomina, t, p.status)} · ${p.cost_center ?? t("finanzas.common.noCC")}`,
             right: fmt(Number((p as any)[rightField]) || 0),
             rightTone: tone(p.status as string),
           }));

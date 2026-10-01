@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Calendar } from "@/components/ui/calendar";
 import { useFormato } from "@/hooks/useFormato";
 import type { Formato } from "@/lib/formato";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface Props {
   open: boolean;
@@ -27,6 +28,7 @@ function fmt(n: number, f: Formato) {
 
 export default function NuevaComisionModal({ open, onClose, onSubmit, isPending }: Props) {
   const f = useFormato();
+  const { t } = useLanguage();
   const [creatorId, setCreatorId] = useState("");
   const [creatorOpen, setCreatorOpen] = useState(false);
   const [periodStart, setPeriodStart] = useState<Date>();
@@ -122,21 +124,21 @@ export default function NuevaComisionModal({ open, onClose, onSubmit, isPending 
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>Crear Comisión</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{t("finanzas.comm.create")}</DialogTitle></DialogHeader>
         <div className="space-y-4">
           {/* Creator selector */}
           <div>
-            <Label>Creador</Label>
+            <Label>{t("finanzas.common.creator")}</Label>
             <Popover open={creatorOpen} onOpenChange={setCreatorOpen}>
               <PopoverTrigger asChild>
                 <Button variant="outline" role="combobox" className={cn("w-full justify-between", !creatorId && "text-muted-foreground")}>
-                  {creatorLabel || "Seleccionar creador..."}
+                  {creatorLabel || t("finanzas.comm.new.selectCreator")}
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
                 <Command>
-                  <CommandInput placeholder="Buscar creador..." />
+                  <CommandInput placeholder={t("finanzas.common.searchCreator")} />
                   <CommandList onWheel={(e) => e.stopPropagation()}>
                     <CommandEmpty />
                     <CommandGroup>
@@ -156,12 +158,12 @@ export default function NuevaComisionModal({ open, onClose, onSubmit, isPending 
           {/* Period */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label>Fecha Inicio</Label>
+              <Label>{t("finanzas.comm.new.startDate")}</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !periodStart && "text-muted-foreground")}>
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {periodStart ? format(periodStart, "d MMM yyyy", { locale: f.fechas }) : "Seleccionar"}
+                    {periodStart ? format(periodStart, "d MMM yyyy", { locale: f.fechas }) : t("common.select")}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -170,12 +172,12 @@ export default function NuevaComisionModal({ open, onClose, onSubmit, isPending 
               </Popover>
             </div>
             <div>
-              <Label>Fecha Fin</Label>
+              <Label>{t("finanzas.comm.new.endDate")}</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !periodEnd && "text-muted-foreground")}>
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {periodEnd ? format(periodEnd, "d MMM yyyy", { locale: f.fechas }) : "Seleccionar"}
+                    {periodEnd ? format(periodEnd, "d MMM yyyy", { locale: f.fechas }) : t("common.select")}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -187,24 +189,24 @@ export default function NuevaComisionModal({ open, onClose, onSubmit, isPending 
 
           {/* Earnings */}
           <div>
-            <Label>Ganancia Total (USD)</Label>
+            <Label>{t("finanzas.comm.new.totalEarnings")}</Label>
             <Input type="number" placeholder="0.00" value={baseAmount} onChange={e => setBaseAmount(e.target.value)} />
           </div>
 
           {/* Auto-calc preview */}
           <div className="rounded-lg border border-border p-4 bg-muted/30 space-y-1">
-            <p className="text-sm font-medium">Cálculo Automático</p>
+            <p className="text-sm font-medium">{t("finanzas.comm.new.autoCalc")}</p>
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Ganancia de la Creadora</span>
+              <span className="text-muted-foreground">{t("finanzas.comm.new.creatorEarnings")}</span>
               <span>{fmt(base, f)}</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Comisión</span>
+              <span className="text-muted-foreground">{t("finanzas.common.commission")}</span>
               {creatorId && agencyPct > 0 ? (
                 <span className="font-medium">{agencyPct}%</span>
               ) : creatorId && agencyPct === 0 && commType === "fixed" ? (
                 <span className="text-destructive text-xs flex items-center gap-1">
-                  <AlertCircle className="h-3 w-3" /> Sin porcentaje configurado
+                  <AlertCircle className="h-3 w-3" /> {t("finanzas.comm.new.noPercentage")}
                 </span>
               ) : (
                 <span className="text-muted-foreground">—</span>
@@ -217,15 +219,15 @@ export default function NuevaComisionModal({ open, onClose, onSubmit, isPending 
               </div>
             )}
             <div className="border-t border-border pt-1 flex justify-between text-sm font-semibold">
-              <span>Total a pagar</span>
+              <span>{t("finanzas.common.totalToPay")}</span>
               <span className="text-primary">{fmt(companyValue, f)}</span>
             </div>
           </div>
 
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancelar</Button>
-          <Button onClick={handleSubmit} disabled={!canSubmit || isPending}>Guardar Comisión</Button>
+          <Button variant="outline" onClick={onClose}>{t("common.cancel")}</Button>
+          <Button onClick={handleSubmit} disabled={!canSubmit || isPending}>{t("finanzas.comm.new.save")}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

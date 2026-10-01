@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { traducir } from "@/lib/i18n";
 
 export function useNomina() {
   const { toast } = useToast();
@@ -65,9 +66,9 @@ export function useNomina() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["payroll-periods"] });
-      toast({ title: "Periodo de nómina creado" });
+      toast({ title: traducir("finanzas.payroll.toast.created") });
     },
-    onError: () => toast({ title: "Error al crear periodo", variant: "destructive" }),
+    onError: () => toast({ title: traducir("finanzas.payroll.toast.createError"), variant: "destructive" }),
   });
 
   const batchClose = useMutation({
@@ -81,9 +82,9 @@ export function useNomina() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["payroll-periods"] });
-      toast({ title: "Batch cerrado exitosamente" });
+      toast({ title: traducir("finanzas.payroll.toast.batchClosed") });
     },
-    onError: () => toast({ title: "Error al cerrar batch", variant: "destructive" }),
+    onError: () => toast({ title: traducir("finanzas.payroll.toast.batchCloseError"), variant: "destructive" }),
   });
 
   const deletePeriod = useMutation({
@@ -93,9 +94,9 @@ export function useNomina() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["payroll-periods"] });
-      toast({ title: "Periodo eliminado" });
+      toast({ title: traducir("finanzas.payroll.toast.deleted") });
     },
-    onError: () => toast({ title: "Error al eliminar", variant: "destructive" }),
+    onError: () => toast({ title: traducir("common.errorDeleting"), variant: "destructive" }),
   });
 
   return {

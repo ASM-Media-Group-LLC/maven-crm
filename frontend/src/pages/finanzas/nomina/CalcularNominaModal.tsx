@@ -10,6 +10,7 @@ import { format } from "date-fns";
 import { useCostCenters, usePayrollParams } from "@/hooks/useFinancialConfig";
 import { useFormato } from "@/hooks/useFormato";
 import type { Formato } from "@/lib/formato";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface Props {
   open: boolean;
@@ -25,6 +26,7 @@ function fmt(n: number, f: Formato) {
 
 export default function CalcularNominaModal({ open, onClose, employees, onSubmit, isPending }: Props) {
   const f = useFormato();
+  const { t } = useLanguage();
   const [name, setName] = useState("");
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
   const [dateTo, setDateTo] = useState<Date | undefined>();
@@ -55,22 +57,22 @@ export default function CalcularNominaModal({ open, onClose, employees, onSubmit
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-lg">
-        <DialogHeader><DialogTitle>Calcular Nómina</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{t("finanzas.payroll.calculate")}</DialogTitle></DialogHeader>
         <div className="space-y-4">
           <div>
-            <Label>Nombre del Periodo</Label>
-            <Input placeholder="Ej: Nómina Febrero 2026" value={name} onChange={e => setName(e.target.value)} />
+            <Label>{t("finanzas.payroll.calc.periodName")}</Label>
+            <Input placeholder={t("finanzas.payroll.calc.periodNamePlaceholder")} value={name} onChange={e => setName(e.target.value)} />
           </div>
           <div>
-            <Label>Rango de Fechas</Label>
-            <DateRangePicker from={dateFrom} to={dateTo} onApply={(f, t) => { setDateFrom(f); setDateTo(t); }} />
+            <Label>{t("finanzas.payroll.calc.dateRange")}</Label>
+            <DateRangePicker from={dateFrom} to={dateTo} onApply={(desde, hasta) => { setDateFrom(desde); setDateTo(hasta); }} />
           </div>
           <div>
-            <Label>Centro de Costo</Label>
+            <Label>{t("finanzas.common.costCenter")}</Label>
             <Select value={costCenter || undefined} onValueChange={v => setCostCenter(v === "__none__" ? "" : v)}>
-              <SelectTrigger><SelectValue placeholder="Opcional" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder={t("finanzas.payroll.calc.optional")} /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="__none__">Ninguno</SelectItem>
+                <SelectItem value="__none__">{t("common.none")}</SelectItem>
                 {centers.map(c => (
                   <SelectItem key={c.code} value={c.code}>{c.name} ({c.code})</SelectItem>
                 ))}
@@ -78,25 +80,25 @@ export default function CalcularNominaModal({ open, onClose, employees, onSubmit
             </Select>
           </div>
           <div>
-            <Label>Notas</Label>
-            <Textarea placeholder="Observaciones..." value={notes} onChange={e => setNotes(e.target.value)} />
+            <Label>{t("finanzas.common.notes")}</Label>
+            <Textarea placeholder={t("finanzas.payroll.calc.remarks")} value={notes} onChange={e => setNotes(e.target.value)} />
           </div>
           <div className="rounded-lg border border-border p-4 bg-muted/30 space-y-1">
-            <p className="text-sm font-medium">Preview del Cálculo</p>
-            <p className="text-sm text-muted-foreground">Empleados activos: <strong>{employees.length}</strong></p>
-            <p className="text-sm text-muted-foreground">Total salarios base: <strong>{fmt(totalBase, f)}</strong></p>
+            <p className="text-sm font-medium">{t("finanzas.payroll.calc.preview")}</p>
+            <p className="text-sm text-muted-foreground">{t("finanzas.payroll.calc.activeEmployees")}: <strong>{employees.length}</strong></p>
+            <p className="text-sm text-muted-foreground">{t("finanzas.payroll.calc.baseTotal")}: <strong>{fmt(totalBase, f)}</strong></p>
             {payrollParams && (
               <div className="text-xs text-muted-foreground space-y-0.5 mt-2 pt-2 border-t border-border">
-                <p>Salud: {payrollParams.deductions.health_pct}% · Pensión: {payrollParams.deductions.pension_pct}%{payrollParams.deductions.tax_pct > 0 ? ` · Impuestos: ${payrollParams.deductions.tax_pct}%` : ""}</p>
-                <p>HE Diurno: {payrollParams.overtime_multipliers.daytime}x · Nocturno: {payrollParams.overtime_multipliers.nighttime}x · Festivo: {payrollParams.overtime_multipliers.holiday}x</p>
+                <p>{t("finanzas.payroll.calc.deductionsLine", { health: payrollParams.deductions.health_pct, pension: payrollParams.deductions.pension_pct })}{payrollParams.deductions.tax_pct > 0 ? ` · ${t("finanzas.payroll.calc.taxes", { pct: payrollParams.deductions.tax_pct })}` : ""}</p>
+                <p>{t("finanzas.payroll.calc.otLine", { day: payrollParams.overtime_multipliers.daytime, night: payrollParams.overtime_multipliers.nighttime, holiday: payrollParams.overtime_multipliers.holiday })}</p>
               </div>
             )}
-            <p className="text-xs text-muted-foreground">El monto final incluirá horas extra, comisiones y deducciones aplicadas.</p>
+            <p className="text-xs text-muted-foreground">{t("finanzas.payroll.calc.finalNote")}</p>
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancelar</Button>
-          <Button onClick={handleSubmit} disabled={!name || !dateFrom || !dateTo || isPending}>Calcular y Guardar</Button>
+          <Button variant="outline" onClick={onClose}>{t("common.cancel")}</Button>
+          <Button onClick={handleSubmit} disabled={!name || !dateFrom || !dateTo || isPending}>{t("finanzas.payroll.calc.submit")}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -15,7 +15,9 @@ import { PageHeader } from "@/components/ui/page-header";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip, ResponsiveContainer, Legend } from "recharts";
 import { startOfMonth, endOfMonth, subMonths, format, isWithinInterval } from "date-fns";
 import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
 import type { Formato } from "@/lib/formato";
+import { crudoEnEspanol, estadoComision, estadoNomina, metodoDePago } from "./estados";
 
 function fmtMonto(n: number, f: Formato) {
   return new Intl.NumberFormat(f.intl("es-CO"), { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
@@ -49,6 +51,7 @@ type KpiKey =
 
 export default function FinanzasDashboard() {
   const f = useFormato();
+  const { t, language } = useLanguage();
   const fmt = useCallback((n: number) => fmtMonto(n, f), [f]);
   const [dateFrom, setDateFrom] = useState<Date | undefined>(startOfMonth(new Date()));
   const [dateTo, setDateTo] = useState<Date | undefined>(endOfMonth(new Date()));
@@ -93,7 +96,8 @@ export default function FinanzasDashboard() {
       const activos = (emps ?? []).filter(e => e.status === "activo");
       const depts = new Map<string, number>();
       activos.forEach(e => {
-        const d = e.department_id ?? "Sin departamento";
+        // "" = sin departamento; la etiqueta se pone al dibujar, en el idioma de la pantalla.
+        const d = e.department_id ?? "";
         depts.set(d, (depts.get(d) ?? 0) + 1);
       });
 
@@ -167,12 +171,12 @@ export default function FinanzasDashboard() {
 
   const alerts = useMemo(() => {
     const list: { label: string; count: number; severity: "destructive" | "warning" | "default" }[] = [];
-    if (facturasVencidas > 0) list.push({ label: "Facturas vencidas", count: facturasVencidas, severity: "destructive" });
-    if (nominaSinCerrar > 0) list.push({ label: "Batch de nómina sin cerrar", count: nominaSinCerrar, severity: "warning" });
-    if (comisionFueraRango > 0) list.push({ label: "Comisión fuera de rango", count: comisionFueraRango, severity: "warning" });
-    if (facturasPendientes > 0) list.push({ label: "Pagos pendientes de ejecutar", count: facturasPendientes, severity: "default" });
+    if (facturasVencidas > 0) list.push({ label: t("finanzas.dash.alert.overdue"), count: facturasVencidas, severity: "destructive" });
+    if (nominaSinCerrar > 0) list.push({ label: t("finanzas.dash.alert.payrollOpen"), count: nominaSinCerrar, severity: "warning" });
+    if (comisionFueraRango > 0) list.push({ label: t("finanzas.dash.alert.commissionRange"), count: comisionFueraRango, severity: "warning" });
+    if (facturasPendientes > 0) list.push({ label: t("finanzas.dash.alert.paymentsPending"), count: facturasPendientes, severity: "default" });
     return list;
-  }, [facturasVencidas, nominaSinCerrar, comisionFueraRango, facturasPendientes]);
+  }, [facturasVencidas, nominaSinCerrar, comisionFueraRango, facturasPendientes, t]);
 
   // Chart data
   const chartMonths = chartRange === "3M" ? 3 : chartRange === "6M" ? 6 : 12;
@@ -184,7 +188,7 @@ export default function FinanzasDashboard() {
       const ing = invoices.filter(inv => inv.status === "pagada" && inRange(inv.created_at, ms, me)).reduce((s, inv) => s + (Number(inv.amount) || 0), 0);
       const cos = payroll.filter(p => inRange(p.created_at, ms, me)).reduce((s, p) => s + (Number(p.net_total) || 0), 0) +
         commissions.filter(c => c.status === "pagado" && inRange(c.created_at, ms, me)).reduce((s, c) => s + (Number(c.final_amount) || 0), 0);
-      return { name: format(m, "MMM yy", { locale: f.fechas }), Ingresos: ing, Costos: cos };
+      return { name: format(m, "MMM yy", { locale: f.fechas }), ingresos: ing, costos: cos };
     });
   }, [invoices, payroll, commissions, chartMonths, f]);
 
@@ -196,133 +200,137 @@ export default function FinanzasDashboard() {
     let title = "";
     let subtitle = "";
     let rows: KpiRow[] = [];
+    const sinNombre = t("finanzas.common.noName");
+    const sinCC = t("finanzas.common.noCC");
+    const sinArea = t("finanzas.common.noArea");
+    const pct = (n: number) => `${n >= 0 ? "+" : ""}${n.toFixed(1)}`;
 
     switch (kpiPopup) {
       case "ingresos":
-        title = `Ingresos del Mes — ${fmt(curIngresos)}`;
-        subtitle = `${curInvoicesPaid.length} facturas pagadas en ${format(now, "MMMM yyyy", { locale: f.fechas })}`;
+        title = t("finanzas.dash.popup.revenue", { amount: fmt(curIngresos) });
+        subtitle = t("finanzas.dash.popup.revenueSub", { n: curInvoicesPaid.length, month: format(now, "MMMM yyyy", { locale: f.fechas }) });
         rows = curInvoicesPaid.map(i => ({
           primary: i.recipient_name || `Invoice ${i.invoice_number ?? i.id.slice(0, 8)}`,
-          secondary: i.payment_method ? `${i.payment_method} · ${format(new Date(i.created_at), "dd MMM", { locale: f.fechas })}` : format(new Date(i.created_at), "dd MMM", { locale: f.fechas }),
+          secondary: i.payment_method ? `${metodoDePago(t, i.payment_method)} · ${format(new Date(i.created_at), "dd MMM", { locale: f.fechas })}` : format(new Date(i.created_at), "dd MMM", { locale: f.fechas }),
           right: fmt(Number(i.amount) || 0),
           rightTone: "success",
         }));
         break;
       case "costos":
-        title = `Costos del Mes — ${fmt(curCostos)}`;
-        subtitle = `Nómina (${fmt(curNomina)}) + Comisiones pagadas (${fmt(curCostos - curNomina)})`;
+        title = t("finanzas.dash.popup.costs", { amount: fmt(curCostos) });
+        subtitle = t("finanzas.dash.popup.costsSub", { payroll: fmt(curNomina), commissions: fmt(curCostos - curNomina) });
         rows = [
           ...curPayroll.map(p => ({
-            primary: `Nómina · ${p.period_name ?? "Sin nombre"}`,
-            secondary: `${p.status} · ${p.cost_center ?? "Sin CC"}`,
+            primary: t("finanzas.dash.row.payroll", { name: p.period_name ?? sinNombre }),
+            secondary: `${crudoEnEspanol(language, estadoNomina, t, p.status)} · ${p.cost_center ?? sinCC}`,
             right: fmt(Number(p.net_total) || 0),
             rightTone: "destructive" as const,
           })),
           ...curCommissionsPaid.map(c => ({
-            primary: `Comisión · ${c.employee_name ?? "Sin nombre"}`,
-            secondary: `${c.area ?? "Sin área"} · ${c.cost_center ?? "Sin CC"}`,
+            primary: t("finanzas.dash.row.commission", { name: c.employee_name ?? sinNombre }),
+            secondary: `${c.area ?? sinArea} · ${c.cost_center ?? sinCC}`,
             right: fmt(Number(c.final_amount) || 0),
             rightTone: "destructive" as const,
           })),
         ];
         break;
       case "margen":
-        title = `Margen Operativo — ${fmt(curMargen)} (${curMargenPct.toFixed(1)}%)`;
-        subtitle = `Ingresos ${fmt(curIngresos)} − Costos ${fmt(curCostos)}`;
+        title = t("finanzas.dash.popup.margin", { amount: fmt(curMargen), pct: curMargenPct.toFixed(1) });
+        subtitle = t("finanzas.dash.popup.marginSub", { revenue: fmt(curIngresos), costs: fmt(curCostos) });
         rows = [
-          { primary: "Ingresos", right: fmt(curIngresos), rightTone: "success" },
-          { primary: "Costos", right: fmt(curCostos), rightTone: "destructive" },
-          { primary: "Margen", right: fmt(curMargen), rightTone: curMargen >= 0 ? "success" : "destructive" },
-          { primary: "Margen %", right: `${curMargenPct.toFixed(1)}%`, rightTone: curMargenPct >= 0 ? "success" : "destructive" },
+          { primary: t("finanzas.common.revenue"), right: fmt(curIngresos), rightTone: "success" },
+          { primary: t("finanzas.common.costs"), right: fmt(curCostos), rightTone: "destructive" },
+          { primary: t("finanzas.common.margin"), right: fmt(curMargen), rightTone: curMargen >= 0 ? "success" : "destructive" },
+          { primary: t("finanzas.common.marginPct"), right: `${curMargenPct.toFixed(1)}%`, rightTone: curMargenPct >= 0 ? "success" : "destructive" },
         ];
         break;
       case "nominaProy":
-        title = `Nómina Proyectada — ${fmt(nominaProyectada)}`;
-        subtitle = `${nominaProyectadaList.length} batches en borrador o calculado`;
+        title = t("finanzas.dash.popup.projectedPayroll", { amount: fmt(nominaProyectada) });
+        subtitle = t("finanzas.dash.popup.projectedPayrollSub", { n: nominaProyectadaList.length });
         rows = nominaProyectadaList.map(p => ({
-          primary: p.period_name ?? "Sin nombre",
-          secondary: `${p.status} · ${p.cost_center ?? "Sin CC"}`,
+          primary: p.period_name ?? sinNombre,
+          secondary: `${crudoEnEspanol(language, estadoNomina, t, p.status)} · ${p.cost_center ?? sinCC}`,
           right: fmt(Number(p.net_total) || 0),
           rightTone: "warning",
         }));
         break;
       case "comisiones":
-        title = `Comisiones Acumuladas — ${fmt(curComisiones)}`;
-        subtitle = `${curCommissions.length} registros este mes`;
+        title = t("finanzas.dash.popup.commissions", { amount: fmt(curComisiones) });
+        subtitle = t("finanzas.dash.popup.commissionsSub", { n: curCommissions.length });
         rows = curCommissions.map(c => ({
-          primary: c.employee_name ?? "Sin nombre",
-          secondary: `${c.area ?? "Sin área"} · ${c.status}`,
+          primary: c.employee_name ?? sinNombre,
+          secondary: `${c.area ?? sinArea} · ${crudoEnEspanol(language, estadoComision, t, c.status)}`,
           right: fmt(Number(c.estimated_amount) || 0),
         }));
         break;
       case "facturasPend":
-        title = `Facturas Pendientes — ${facturasPendientes}`;
-        subtitle = "Estatus 'enviada', esperando pago";
+        title = t("finanzas.dash.popup.pendingInvoices", { n: facturasPendientes });
+        subtitle = t("finanzas.dash.popup.pendingInvoicesSub");
         rows = facturasPendientesList.map(i => ({
           primary: i.recipient_name || `Invoice ${i.invoice_number ?? i.id.slice(0, 8)}`,
-          secondary: i.due_date ? `Vence ${format(new Date(i.due_date), "dd MMM yyyy", { locale: f.fechas })}` : format(new Date(i.created_at), "dd MMM", { locale: f.fechas }),
+          secondary: i.due_date ? t("finanzas.dash.row.due", { date: format(new Date(i.due_date), "dd MMM yyyy", { locale: f.fechas }) }) : format(new Date(i.created_at), "dd MMM", { locale: f.fechas }),
           right: fmt(Number(i.amount) || 0),
           rightTone: "warning",
         }));
         break;
       case "facturasVenc":
-        title = `Facturas Vencidas — ${facturasVencidas}`;
-        subtitle = "Requieren atención inmediata";
+        title = t("finanzas.dash.popup.overdueInvoices", { n: facturasVencidas });
+        subtitle = t("finanzas.dash.popup.overdueInvoicesSub");
         rows = facturasVencidasList.map(i => ({
           primary: i.recipient_name || `Invoice ${i.invoice_number ?? i.id.slice(0, 8)}`,
-          secondary: i.due_date ? `Vencida ${format(new Date(i.due_date), "dd MMM yyyy", { locale: f.fechas })}` : format(new Date(i.created_at), "dd MMM", { locale: f.fechas }),
+          secondary: i.due_date ? t("finanzas.dash.row.overdueSince", { date: format(new Date(i.due_date), "dd MMM yyyy", { locale: f.fechas }) }) : format(new Date(i.created_at), "dd MMM", { locale: f.fechas }),
           right: fmt(Number(i.amount) || 0),
           rightTone: "destructive",
         }));
         break;
       case "variacion":
-        title = `Variación vs Mes Anterior — ${variacion >= 0 ? "+" : ""}${variacion.toFixed(1)}%`;
-        subtitle = `Mes actual ${fmt(curIngresos)} vs Mes anterior ${fmt(prevIngresos)}`;
+        title = t("finanzas.dash.popup.change", { pct: pct(variacion) });
+        subtitle = t("finanzas.dash.popup.changeSub", { current: fmt(curIngresos), previous: fmt(prevIngresos) });
         rows = [
           { primary: format(now, "MMMM yyyy", { locale: f.fechas }), right: fmt(curIngresos), rightTone: "success" },
           { primary: format(subMonths(now, 1), "MMMM yyyy", { locale: f.fechas }), right: fmt(prevIngresos) },
-          { primary: "Diferencia", right: fmt(curIngresos - prevIngresos), rightTone: curIngresos - prevIngresos >= 0 ? "success" : "destructive" },
+          { primary: t("finanzas.dash.row.difference"), right: fmt(curIngresos - prevIngresos), rightTone: curIngresos - prevIngresos >= 0 ? "success" : "destructive" },
         ];
         break;
       case "headcount":
-        title = `Empleados Activos — ${hrData?.headcount ?? 0}`;
-        subtitle = "Headcount con status 'activo'";
+        title = t("finanzas.dash.popup.activeEmployees", { n: hrData?.headcount ?? 0 });
+        subtitle = t("finanzas.dash.popup.activeEmployeesSub");
         rows = (hrData?.empleados ?? []).map(e => ({
-          primary: e.full_name ?? "Sin nombre",
-          secondary: e.position ?? "Sin posición",
+          primary: e.full_name ?? sinNombre,
+          secondary: e.position ?? t("finanzas.dash.row.noPosition"),
           right: e.base_salary ? fmt(Number(e.base_salary)) : "—",
         }));
         break;
       case "costoEmp":
-        title = `Costo Promedio por Empleado — ${fmt(hrData?.costPerEmp ?? 0)}`;
-        subtitle = `Nómina mensual / ${hrData?.headcount ?? 0} empleados activos`;
+        title = t("finanzas.dash.popup.avgCost", { amount: fmt(hrData?.costPerEmp ?? 0) });
+        subtitle = t("finanzas.dash.popup.avgCostSub", { n: hrData?.headcount ?? 0 });
         rows = [
           { primary: "Headcount", right: String(hrData?.headcount ?? 0) },
-          { primary: "Costo promedio mensual", right: fmt(hrData?.costPerEmp ?? 0), rightTone: "default" },
-          { primary: "Costo anualizado estimado", right: fmt((hrData?.costPerEmp ?? 0) * 12) },
+          { primary: t("finanzas.dash.row.avgMonthlyCost"), right: fmt(hrData?.costPerEmp ?? 0), rightTone: "default" },
+          { primary: t("finanzas.dash.row.annualizedCost"), right: fmt((hrData?.costPerEmp ?? 0) * 12) },
         ];
         break;
       case "deducciones":
-        title = `Deducciones del Mes — ${fmt(hrData?.dedTotal ?? 0)}`;
-        subtitle = `${hrData?.deducciones.length ?? 0} deducciones registradas`;
+        title = t("finanzas.dash.popup.deductions", { amount: fmt(hrData?.dedTotal ?? 0) });
+        subtitle = t("finanzas.dash.popup.deductionsSub", { n: hrData?.deducciones.length ?? 0 });
         rows = (hrData?.deducciones ?? []).map(d => ({
-          primary: d.reason ?? "Sin concepto",
+          primary: d.reason ?? t("finanzas.dash.row.noConcept"),
           secondary: d.month_year ?? "—",
           right: fmt(Number(d.amount) || 0),
           rightTone: "destructive",
         }));
         break;
       case "departamentos":
-        title = `Departamentos — ${hrData?.deptCount ?? 0}`;
-        subtitle = "Departamentos con empleados activos";
+        title = t("finanzas.dash.popup.departments", { n: hrData?.deptCount ?? 0 });
+        subtitle = t("finanzas.dash.popup.departmentsSub");
         rows = (hrData?.departamentos ?? []).map(d => ({
-          primary: d.name,
-          right: `${d.count} emp${d.count === 1 ? "" : "s"}`,
+          primary: d.name || t("finanzas.dash.row.noDepartment"),
+          right: t(d.count === 1 ? "finanzas.dash.row.empOne" : "finanzas.dash.row.empOther", { n: d.count }),
         }));
         break;
       case "alertas":
-        title = `Alertas Operativas — ${alerts.length}`;
-        subtitle = "Issues activos que requieren atención";
+        title = t("finanzas.dash.popup.alerts", { n: alerts.length });
+        subtitle = t("finanzas.dash.popup.alertsSub");
         rows = alerts.map(a => ({
           primary: a.label,
           right: String(a.count),
@@ -330,28 +338,28 @@ export default function FinanzasDashboard() {
         }));
         break;
       case "accion-nomina":
-        title = `Nómina por Cerrar — ${nominaSinCerrar}`;
-        subtitle = "Batches en borrador o calculado";
+        title = t("finanzas.dash.popup.payrollToClose", { n: nominaSinCerrar });
+        subtitle = t("finanzas.dash.popup.payrollToCloseSub");
         rows = nominaSinCerrarList.map(p => ({
-          primary: p.period_name ?? "Sin nombre",
-          secondary: `${p.status} · ${p.cost_center ?? "Sin CC"}`,
+          primary: p.period_name ?? sinNombre,
+          secondary: `${crudoEnEspanol(language, estadoNomina, t, p.status)} · ${p.cost_center ?? sinCC}`,
           right: fmt(Number(p.net_total) || 0),
           rightTone: "warning",
         }));
         break;
       case "accion-comisiones":
-        title = `Comisiones por Aprobar — ${comisionesPorAprobar}`;
-        subtitle = "Status 'proyectado'";
+        title = t("finanzas.dash.popup.commissionsToApprove", { n: comisionesPorAprobar });
+        subtitle = t("finanzas.dash.popup.commissionsToApproveSub");
         rows = comisionesPorAprobarList.map(c => ({
-          primary: c.employee_name ?? "Sin nombre",
-          secondary: `${c.area ?? "Sin área"}`,
+          primary: c.employee_name ?? sinNombre,
+          secondary: `${c.area ?? sinArea}`,
           right: fmt(Number(c.estimated_amount) || 0),
           rightTone: "warning",
         }));
         break;
       case "accion-invoices":
-        title = `Invoices por Enviar — ${invoicesPorEnviar}`;
-        subtitle = "Status 'borrador'";
+        title = t("finanzas.dash.popup.invoicesToSend", { n: invoicesPorEnviar });
+        subtitle = t("finanzas.dash.popup.invoicesToSendSub");
         rows = invoicesPorEnviarList.map(i => ({
           primary: i.recipient_name || `Invoice ${i.invoice_number ?? i.id.slice(0, 8)}`,
           secondary: format(new Date(i.created_at), "dd MMM yyyy", { locale: f.fechas }),
@@ -360,38 +368,40 @@ export default function FinanzasDashboard() {
         }));
         break;
       case "accion-archivos":
-        title = "Archivos Bancarios por Generar";
-        subtitle = "No hay archivos pendientes";
+        title = t("finanzas.dash.popup.bankFiles");
+        subtitle = t("finanzas.dash.popup.bankFilesSub");
         rows = [];
         break;
     }
 
     return { title, subtitle, rows };
-  }, [kpiPopup, curInvoicesPaid, curIngresos, curPayroll, curCommissionsPaid, curNomina, curCostos, curMargen, curMargenPct, nominaProyectadaList, nominaProyectada, curCommissions, curComisiones, facturasPendientesList, facturasPendientes, facturasVencidasList, facturasVencidas, variacion, prevIngresos, hrData, alerts, nominaSinCerrarList, nominaSinCerrar, comisionesPorAprobarList, comisionesPorAprobar, invoicesPorEnviarList, invoicesPorEnviar, now, f, fmt]);
+  }, [kpiPopup, curInvoicesPaid, curIngresos, curPayroll, curCommissionsPaid, curNomina, curCostos, curMargen, curMargenPct, nominaProyectadaList, nominaProyectada, curCommissions, curComisiones, facturasPendientesList, facturasPendientes, facturasVencidasList, facturasVencidas, variacion, prevIngresos, hrData, alerts, nominaSinCerrarList, nominaSinCerrar, comisionesPorAprobarList, comisionesPorAprobar, invoicesPorEnviarList, invoicesPorEnviar, now, f, fmt, t, language]);
+
+  const vsAnterior = (n: number) => t("finanzas.dash.vsPrevious", { pct: `${n >= 0 ? "+" : ""}${n.toFixed(1)}` });
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <header className="shrink-0 bg-background/30 backdrop-blur-xl border-b border-white/10 px-6 pt-6 pb-4">
-        <PageHeader title="Dashboard Financiero" subtitle="Vista ejecutiva y operativa consolidada" />
+        <PageHeader title={t("finanzas.dash.title")} subtitle={t("finanzas.dash.subtitle")} />
       </header>
 
       <div className="flex-1 overflow-auto p-6 space-y-6">
         {/* Filtros globales */}
         <div className="flex flex-wrap items-center gap-2">
-          <DateRangePicker from={dateFrom} to={dateTo} onApply={(f, t) => { setDateFrom(f); setDateTo(t); }} />
+          <DateRangePicker from={dateFrom} to={dateTo} onApply={(desde, hasta) => { setDateFrom(desde); setDateTo(hasta); }} />
           <Select value={costCenter || undefined} onValueChange={v => setCostCenter(v === "__all__" ? "" : v)}>
-            <SelectTrigger className="w-full sm:w-40"><SelectValue placeholder="Centro de Costo" /></SelectTrigger>
+            <SelectTrigger className="w-full sm:w-40"><SelectValue placeholder={t("finanzas.common.costCenter")} /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="__all__">Todos</SelectItem>
-              <SelectItem value="operaciones">Operaciones</SelectItem>
-              <SelectItem value="ventas">Ventas</SelectItem>
+              <SelectItem value="__all__">{t("common.all")}</SelectItem>
+              <SelectItem value="operaciones">{t("finanzas.cc.operations")}</SelectItem>
+              <SelectItem value="ventas">{t("finanzas.cc.sales")}</SelectItem>
               <SelectItem value="admin">Admin</SelectItem>
             </SelectContent>
           </Select>
           <Select value={area || undefined} onValueChange={v => setArea(v === "__all__" ? "" : v)}>
-            <SelectTrigger className="w-full sm:w-32"><SelectValue placeholder="Área" /></SelectTrigger>
+            <SelectTrigger className="w-full sm:w-32"><SelectValue placeholder={t("common.area")} /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="__all__">Todas</SelectItem>
+              <SelectItem value="__all__">{t("common.allF")}</SelectItem>
               <SelectItem value="chatters">Chatters</SelectItem>
               <SelectItem value="closers">Closers</SelectItem>
               <SelectItem value="tech">Tech</SelectItem>
@@ -400,14 +410,14 @@ export default function FinanzasDashboard() {
           <Select value={tipo} onValueChange={setTipo}>
             <SelectTrigger className="w-full sm:w-32"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="ambos">Ambos</SelectItem>
-              <SelectItem value="ingresos">Ingresos</SelectItem>
-              <SelectItem value="egresos">Egresos</SelectItem>
+              <SelectItem value="ambos">{t("finanzas.dash.filter.both")}</SelectItem>
+              <SelectItem value="ingresos">{t("finanzas.common.revenue")}</SelectItem>
+              <SelectItem value="egresos">{t("finanzas.common.expenses")}</SelectItem>
             </SelectContent>
           </Select>
           {hasFilters && (
             <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={() => { setCostCenter(""); setArea(""); setTipo("ambos"); }}>
-              <X className="h-3.5 w-3.5 mr-1" />Limpiar
+              <X className="h-3.5 w-3.5 mr-1" />{t("finanzas.common.clear")}
             </Button>
           )}
         </div>
@@ -416,14 +426,14 @@ export default function FinanzasDashboard() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {isLoading ? Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-lg" />) : (
             <>
-              <StatChip label="Ingresos del Mes" value={fmt(curIngresos)} icon={<TrendingUp className="h-3.5 w-3.5" />} color="bg-success" hint={`${variacion >= 0 ? "+" : ""}${variacion.toFixed(1)}% vs anterior`} onClick={() => setKpiPopup("ingresos")} />
-              <StatChip label="Costos del Mes" value={fmt(curCostos)} icon={<TrendingDown className="h-3.5 w-3.5" />} color="bg-destructive" hint={`${pctChange(curCostos, prevCostos) >= 0 ? "+" : ""}${pctChange(curCostos, prevCostos).toFixed(1)}% vs anterior`} onClick={() => setKpiPopup("costos")} />
-              <StatChip label="Margen Operativo" value={fmt(curMargen)} icon={<BarChart3 className="h-3.5 w-3.5" />} color={curMargen >= 0 ? "bg-success" : "bg-destructive"} hint={`${curMargenPct.toFixed(1)}% margen`} onClick={() => setKpiPopup("margen")} />
-              <StatChip label="Nómina Proyectada" value={fmt(nominaProyectada)} icon={<Users className="h-3.5 w-3.5" />} color="bg-warning" hint="Borrador + calculado" onClick={() => setKpiPopup("nominaProy")} />
-              <StatChip label="Comisiones Acumuladas" value={fmt(curComisiones)} icon={<DollarSign className="h-3.5 w-3.5" />} color="bg-primary" hint={`${curCommissions.length} registros`} onClick={() => setKpiPopup("comisiones")} />
-              <StatChip label="Facturas Pendientes" value={String(facturasPendientes)} icon={<FileText className="h-3.5 w-3.5" />} color="bg-warning" hint="Enviadas" onClick={() => setKpiPopup("facturasPend")} />
-              <StatChip label="Facturas Vencidas" value={String(facturasVencidas)} icon={<AlertTriangle className="h-3.5 w-3.5" />} color="bg-destructive" hint="Requieren atención" onClick={() => setKpiPopup("facturasVenc")} />
-              <StatChip label="Variación vs Anterior" value={`${variacion >= 0 ? "+" : ""}${variacion.toFixed(1)}%`} icon={<TrendingUp className="h-3.5 w-3.5" />} color={variacion >= 0 ? "bg-success" : "bg-destructive"} hint="Ingresos mes a mes" onClick={() => setKpiPopup("variacion")} />
+              <StatChip label={t("finanzas.dash.kpi.revenue")} value={fmt(curIngresos)} icon={<TrendingUp className="h-3.5 w-3.5" />} color="bg-success" hint={vsAnterior(variacion)} onClick={() => setKpiPopup("ingresos")} />
+              <StatChip label={t("finanzas.dash.kpi.costs")} value={fmt(curCostos)} icon={<TrendingDown className="h-3.5 w-3.5" />} color="bg-destructive" hint={vsAnterior(pctChange(curCostos, prevCostos))} onClick={() => setKpiPopup("costos")} />
+              <StatChip label={t("finanzas.dash.kpi.margin")} value={fmt(curMargen)} icon={<BarChart3 className="h-3.5 w-3.5" />} color={curMargen >= 0 ? "bg-success" : "bg-destructive"} hint={t("finanzas.dash.kpi.marginHint", { pct: curMargenPct.toFixed(1) })} onClick={() => setKpiPopup("margen")} />
+              <StatChip label={t("finanzas.dash.kpi.projectedPayroll")} value={fmt(nominaProyectada)} icon={<Users className="h-3.5 w-3.5" />} color="bg-warning" hint={t("finanzas.dash.kpi.projectedPayrollHint")} onClick={() => setKpiPopup("nominaProy")} />
+              <StatChip label={t("finanzas.dash.kpi.commissions")} value={fmt(curComisiones)} icon={<DollarSign className="h-3.5 w-3.5" />} color="bg-primary" hint={t("finanzas.common.records", { n: curCommissions.length })} onClick={() => setKpiPopup("comisiones")} />
+              <StatChip label={t("finanzas.dash.kpi.pendingInvoices")} value={String(facturasPendientes)} icon={<FileText className="h-3.5 w-3.5" />} color="bg-warning" hint={t("finanzas.dash.kpi.pendingInvoicesHint")} onClick={() => setKpiPopup("facturasPend")} />
+              <StatChip label={t("finanzas.dash.kpi.overdueInvoices")} value={String(facturasVencidas)} icon={<AlertTriangle className="h-3.5 w-3.5" />} color="bg-destructive" hint={t("finanzas.dash.kpi.overdueInvoicesHint")} onClick={() => setKpiPopup("facturasVenc")} />
+              <StatChip label={t("finanzas.dash.kpi.change")} value={`${variacion >= 0 ? "+" : ""}${variacion.toFixed(1)}%`} icon={<TrendingUp className="h-3.5 w-3.5" />} color={variacion >= 0 ? "bg-success" : "bg-destructive"} hint={t("finanzas.dash.kpi.changeHint")} onClick={() => setKpiPopup("variacion")} />
             </>
           )}
         </div>
@@ -432,13 +442,13 @@ export default function FinanzasDashboard() {
         <div className="space-y-3">
           <h2 className="text-sm font-semibold flex items-center gap-2 text-foreground">
             <Users className="h-4 w-4 text-muted-foreground" />
-            Headcount y Costos de Personal
+            {t("finanzas.dash.headcountTitle")}
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <StatChip label="Empleados Activos" value={String(hrData?.headcount ?? 0)} icon={<Users className="h-3.5 w-3.5" />} color="bg-primary" hint="Headcount" onClick={() => setKpiPopup("headcount")} />
-            <StatChip label="Costo Prom/Emp" value={fmt(hrData?.costPerEmp ?? 0)} icon={<Briefcase className="h-3.5 w-3.5" />} color="bg-accent" hint="Nómina / headcount" onClick={() => setKpiPopup("costoEmp")} />
-            <StatChip label="Deducciones Mes" value={fmt(hrData?.dedTotal ?? 0)} icon={<ArrowDown className="h-3.5 w-3.5" />} color="bg-destructive" hint="Acumuladas" onClick={() => setKpiPopup("deducciones")} />
-            <StatChip label="Departamentos" value={String(hrData?.deptCount ?? 0)} icon={<Building2 className="h-3.5 w-3.5" />} color="bg-success" hint="Con empleados activos" onClick={() => setKpiPopup("departamentos")} />
+            <StatChip label={t("finanzas.dash.kpi.activeEmployees")} value={String(hrData?.headcount ?? 0)} icon={<Users className="h-3.5 w-3.5" />} color="bg-primary" hint="Headcount" onClick={() => setKpiPopup("headcount")} />
+            <StatChip label={t("finanzas.dash.kpi.avgCost")} value={fmt(hrData?.costPerEmp ?? 0)} icon={<Briefcase className="h-3.5 w-3.5" />} color="bg-accent" hint={t("finanzas.dash.kpi.avgCostHint")} onClick={() => setKpiPopup("costoEmp")} />
+            <StatChip label={t("finanzas.dash.kpi.deductions")} value={fmt(hrData?.dedTotal ?? 0)} icon={<ArrowDown className="h-3.5 w-3.5" />} color="bg-destructive" hint={t("finanzas.dash.kpi.deductionsHint")} onClick={() => setKpiPopup("deducciones")} />
+            <StatChip label={t("finanzas.dash.kpi.departments")} value={String(hrData?.deptCount ?? 0)} icon={<Building2 className="h-3.5 w-3.5" />} color="bg-success" hint={t("finanzas.dash.kpi.departmentsHint")} onClick={() => setKpiPopup("departamentos")} />
           </div>
         </div>
 
@@ -446,7 +456,7 @@ export default function FinanzasDashboard() {
         <div className="rounded-xl border border-border bg-card p-4">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-semibold flex items-center gap-2 text-foreground">
-              <Wallet className="h-4 w-4 text-muted-foreground" />Flujo de Dinero
+              <Wallet className="h-4 w-4 text-muted-foreground" />{t("finanzas.dash.cashFlow")}
             </h2>
             <div className="inline-flex items-center gap-1 rounded-md border border-border p-0.5">
               {(["3M", "6M", "12M"] as const).map(r => (
@@ -462,8 +472,8 @@ export default function FinanzasDashboard() {
                 <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} />
                 <RTooltip formatter={(v: number) => fmt(v)} contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 13 }} />
                 <Legend />
-                <Bar dataKey="Ingresos" fill="hsl(var(--accent))" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="Costos" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="ingresos" name={t("finanzas.common.revenue")} fill="hsl(var(--accent))" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="costos" name={t("finanzas.common.costs")} fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           )}
@@ -472,11 +482,11 @@ export default function FinanzasDashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Alertas Operativas — card resumen clickeable */}
           <StatChip
-            label="Alertas Operativas"
+            label={t("finanzas.dash.kpi.alerts")}
             value={String(alerts.length)}
             icon={<AlertTriangle className="h-3.5 w-3.5" />}
             color={alerts.length > 0 ? "bg-warning" : "bg-muted-foreground"}
-            hint={alerts.length === 0 ? "Sin alertas activas" : "Click para ver detalle"}
+            hint={alerts.length === 0 ? t("finanzas.dash.kpi.alertsNone") : t("finanzas.dash.kpi.alertsClick")}
             onClick={() => setKpiPopup("alertas")}
             className="lg:col-span-1"
           />
@@ -485,13 +495,13 @@ export default function FinanzasDashboard() {
           <div className="space-y-3">
             <h2 className="text-sm font-semibold flex items-center gap-2 text-foreground">
               <ListChecks className="h-4 w-4 text-primary" />
-              Próximas Acciones
+              {t("finanzas.dash.nextActions")}
             </h2>
             <div className="grid grid-cols-2 gap-3">
-              <StatChip label="Nómina por cerrar" value={String(nominaSinCerrar)} icon={<Users className="h-3.5 w-3.5" />} color="bg-warning" onClick={() => setKpiPopup("accion-nomina")} />
-              <StatChip label="Comisiones por aprobar" value={String(comisionesPorAprobar)} icon={<DollarSign className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("accion-comisiones")} />
-              <StatChip label="Invoices por enviar" value={String(invoicesPorEnviar)} icon={<FileText className="h-3.5 w-3.5" />} color="bg-accent" onClick={() => setKpiPopup("accion-invoices")} />
-              <StatChip label="Archivos bancarios" value="0" icon={<FileText className="h-3.5 w-3.5" />} color="bg-muted-foreground" hint="Por generar" onClick={() => setKpiPopup("accion-archivos")} />
+              <StatChip label={t("finanzas.dash.action.payroll")} value={String(nominaSinCerrar)} icon={<Users className="h-3.5 w-3.5" />} color="bg-warning" onClick={() => setKpiPopup("accion-nomina")} />
+              <StatChip label={t("finanzas.dash.action.commissions")} value={String(comisionesPorAprobar)} icon={<DollarSign className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("accion-comisiones")} />
+              <StatChip label={t("finanzas.dash.action.invoices")} value={String(invoicesPorEnviar)} icon={<FileText className="h-3.5 w-3.5" />} color="bg-accent" onClick={() => setKpiPopup("accion-invoices")} />
+              <StatChip label={t("finanzas.dash.action.bankFiles")} value="0" icon={<FileText className="h-3.5 w-3.5" />} color="bg-muted-foreground" hint={t("finanzas.dash.action.bankFilesHint")} onClick={() => setKpiPopup("accion-archivos")} />
             </div>
           </div>
         </div>
@@ -503,6 +513,7 @@ export default function FinanzasDashboard() {
         title={popup?.title ?? ""}
         subtitle={popup?.subtitle}
         rows={popup?.rows ?? []}
+        emptyText={t("finanzas.kpi.empty")}
       />
     </div>
   );
