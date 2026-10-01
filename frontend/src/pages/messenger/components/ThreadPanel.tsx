@@ -25,7 +25,8 @@ import ReadReceiptIndicator from "./ReadReceiptIndicator";
 import ImageLightbox from "./ImageLightbox";
 import { mediaDelChat } from "../galeriaDelChat";
 import VoiceNoteRecorder from "./VoiceNoteRecorder";
-import { formatTime, formatDate, safeFileUrl } from "../utils";
+import { formatTime, formatDate, safeFileUrl, remitenteVisible } from "../utils";
+import EtiquetaApi from "./EtiquetaApi";
 
 import { EMOJIS, MAX_FILE_SIZE_BYTES, formatFileSize, uploadFileWithTUS } from "../uploadUtils";
 import { claveSeguraParaArchivo } from "@/lib/claveDeArchivo";
@@ -387,7 +388,10 @@ export default function ThreadPanel({
   // --- Render a single message row (parent or reply) ---
   const renderMessage = (msg: ChatMessage, isParent: boolean = false) => {
     const isMe = msg.sender_id === currentUserId;
-    const sender = profiles[msg.sender_id]?.full_name || t("messenger.usuario");
+    // «BLU» + pastilla si vino por API, también si es mío (no «Tú»): la key es mía,
+    // pero no lo escribí yo.
+    const remitente = remitenteVisible(msg, profiles, t);
+    const sender = remitente.nombre;
     const reactions = getReactionsForMessage(msg.id);
     const readBy = getReadByUsers(msg.id);
     const deliveredBy = getDeliveredByUsers(msg.id);
@@ -405,14 +409,18 @@ export default function ThreadPanel({
         <div className="flex items-start gap-2">
           <UserAvatar
             name={sender}
-            src={profiles[msg.sender_id]?.avatar_url}
-            seed={profiles[msg.sender_id]?.avatar_seed}
+            // Una integración no tiene cara: iniciales, nunca la foto de la persona.
+            src={remitente.esApi ? null : profiles[msg.sender_id]?.avatar_url}
+            seed={remitente.esApi ? null : profiles[msg.sender_id]?.avatar_seed}
             size="xs"
             className={cn("shrink-0 mt-0.5", isParent ? "h-7 w-7" : "h-6 w-6")}
           />
           <div className="min-w-0 flex-1">
             <div className="flex items-baseline gap-2">
-              <span className="text-xs font-semibold text-foreground">{isMe ? t("messenger.preview.tu") : sender}</span>
+              <span className="text-xs font-semibold text-foreground">{isMe && !remitente.esApi ? t("messenger.preview.tu") : sender}</span>
+              {remitente.esApi && (
+                <EtiquetaApi nombre={sender} persona={remitente.personaReal} esMio={isMe} className="self-center" />
+              )}
               <span className="text-[10px] text-muted-foreground">
                 {isParent ? `${formatDate(msg.created_at, t, language)} ${formatTime(msg.created_at, language)}` : formatTime(msg.created_at, language)}
               </span>
@@ -437,7 +445,8 @@ export default function ThreadPanel({
                       </DropdownMenuItem>
                       {isMe && (
                         <>
-                          {msg.type === "text" && (
+                          {/* Lo de una integración no se edita desde la app. */}
+                          {msg.type === "text" && !remitente.esApi && (
                             <DropdownMenuItem onClick={() => startEdit(msg)}>
                               <Edit2 className="h-3.5 w-3.5 mr-2" /> {t("common.edit")}
                             </DropdownMenuItem>

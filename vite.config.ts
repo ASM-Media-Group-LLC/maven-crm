@@ -18,6 +18,13 @@ import { VitePWA } from "vite-plugin-pwa";
 export default defineConfig(({ mode }) => ({
   root: "frontend",
   publicDir: "public",
+  // La hora del build (ms). Viaja en la presencia como `b` y se compara con
+  // app_flags 'ui_build_minimo' para obligar a actualizar a las pestañas con un
+  // bundle viejo (lib/versionDelBundle.ts). En `npm run dev` es la hora en que
+  // arrancó el servidor.
+  define: {
+    __MAVEN_BUILD__: JSON.stringify(Date.now()),
+  },
   server: {
     host: "::",
     // Honour the PORT env var when present (Claude Code preview /

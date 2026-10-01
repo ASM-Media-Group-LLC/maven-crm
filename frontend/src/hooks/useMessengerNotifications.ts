@@ -325,6 +325,8 @@ export function useMessengerNotifications() {
             type?: string;
             file_name?: string | null;
             is_deleted?: boolean;
+            api_key_id?: string | null;
+            api_display_name?: string | null;
           } | null;
           if (!m?.id || !m.conversation_id || !m.sender_id) return;
           if (m.sender_id === userId || m.is_deleted) return;
@@ -359,17 +361,27 @@ export function useMessengerNotifications() {
           let senderName = tRef.current("shared.msgNotif.someone");
           let senderFoto: string | null = null;
           let senderSeed: string | null = null;
-          try {
-            const { data: prof } = await supabase
-              .from("profiles")
-              .select("full_name, avatar_url, avatar_seed")
-              .eq("id", m.sender_id)
-              .maybeSingle();
-            if (prof?.full_name) senderName = prof.full_name;
-            senderFoto = (prof as { avatar_url?: string | null } | null)?.avatar_url ?? null;
-            senderSeed = (prof as { avatar_seed?: string | null } | null)?.avatar_seed ?? null;
-          } catch {
-            /* nombre genérico */
+          if (m.api_key_id != null) {
+            // Lo mandó una integración: el nombre de la key viene en la fila
+            // («BLU (API)», igual que la campana y el push) y NO se pregunta a
+            // profiles, que diría el nombre y la foto de la persona dueña de la
+            // key. Sin foto: iniciales.
+            senderName = tRef.current("shared.msgNotif.viaApi", {
+              name: m.api_display_name?.trim() || tRef.current("messenger.api.etiqueta"),
+            });
+          } else {
+            try {
+              const { data: prof } = await supabase
+                .from("profiles")
+                .select("full_name, avatar_url, avatar_seed")
+                .eq("id", m.sender_id)
+                .maybeSingle();
+              if (prof?.full_name) senderName = prof.full_name;
+              senderFoto = (prof as { avatar_url?: string | null } | null)?.avatar_url ?? null;
+              senderSeed = (prof as { avatar_seed?: string | null } | null)?.avatar_seed ?? null;
+            } catch {
+              /* nombre genérico */
+            }
           }
 
           const preview = previewOf(m.content ?? null, m.type ?? "text", m.file_name ?? null, tRef.current);

@@ -36,6 +36,10 @@ import { traducir } from "@/lib/i18n";
 // persona llegaba a 5 recargas/min (~1.200 peticiones/hora solo en esto).
 export const POLL_LISTA_MS = 60_000;
 
+// Un mensaje de una conversación que la lista no conoce recarga la lista, pero a
+// lo sumo una vez por conversación en este lapso (ver recargarPorDesconocida).
+export const RECARGA_DESCONOCIDA_MS = 60_000;
+
 export function useChat() {
   const { user } = useAuth();
   const [conversations, setConversations] = useState<ConversationWithDetails[]>([]);
@@ -262,6 +266,22 @@ export function useChat() {
       return conversationsRef.current.some((c) => c.id === conversationId);
     };
 
+    // Un mensaje de una conversación que la lista no tiene: un directo que alguien
+    // (o una integración, que lo abre con el primer mensaje en la misma
+    // transacción) acaba de abrir conmigo, o uno que la lista escondía por no
+    // tener mensajes. Realtime solo manda los de conversaciones donde estoy, así
+    // que vale recargar. Una vez por conversación cada RECARGA_DESCONOCIDA_MS: si
+    // la recarga no la trae (no debería), los mensajes siguientes no disparan una
+    // recarga cada uno; el poll de la lista sigue de red.
+    const recargasPorDesconocida = new Map<string, number>();
+    const recargarPorDesconocida = (conversationId: string) => {
+      const ahora = Date.now();
+      const ultima = recargasPorDesconocida.get(conversationId);
+      if (ultima !== undefined && ahora - ultima < RECARGA_DESCONOCIDA_MS) return;
+      recargasPorDesconocida.set(conversationId, ahora);
+      scheduleConversationsReload();
+    };
+
     // Inline update: when a new message arrives, update the sidebar without full reload
     const updateConversationWithMessage = (msg: any) => {
       if (!msg?.conversation_id || msg.is_deleted) return;
@@ -298,7 +318,10 @@ export function useChat() {
       current: {
         "chat_messages:INSERT": (payload) => {
           const msg = payload.new as any;
-          if (!isKnownConversation(msg?.conversation_id)) return;
+          if (!isKnownConversation(msg?.conversation_id)) {
+            if (msg?.conversation_id && !msg.is_deleted) recargarPorDesconocida(msg.conversation_id);
+            return;
+          }
           updateConversationWithMessage(msg);
           // El "entregado" (✓✓ gris) ya NO se marca aquí: useMessengerNotifications
           // recibe este mismo evento en esta misma pestaña y lo marca SIEMPRE,
@@ -884,6 +907,8 @@ export function useMessages(
           file_name: p.fileName || null, file_size: null, reply_to_id: p.replyToId || null,
           album_id: p.albumId || null, is_thread_reply: !!p.isThreadReply,
           content_rich: (p.contentRich as ChatMessage["content_rich"]) ?? null,
+          // Lo escribí yo desde la app: sin marca de API.
+          api_key_id: null, api_display_name: null,
           is_edited: false, is_deleted: false, created_at: p.createdAt, updated_at: p.createdAt,
           _localStatus: "failed",
         }));
@@ -1027,7 +1052,11 @@ export function useMessages(
           setMessages((prev) => {
             if (prev.find((m) => m.id === newMsg.id)) return prev;
 
-            const optimisticMatch = prev.find(
+            // El optimista solo lo puede reemplazar la fila que escribí desde la
+            // app: un mensaje que mandó MI integración en el mismo instante y con
+            // el mismo texto también trae mi sender_id, y si lo tomara, el mío
+            // quedaría pintado como «BLU» y el de la integración desaparecería.
+            const optimisticMatch = newMsg.api_key_id != null ? undefined : prev.find(
               (m) =>
                 optimisticIdsRef.current.has(m.id) &&
                 m.sender_id === newMsg.sender_id &&
@@ -1309,6 +1338,8 @@ export function useMessages(
         content, type, file_url: fileUrl || null, file_name: fileName || null, file_size: null,
         reply_to_id: replyToId || null, album_id: albumId || null, is_thread_reply: !!isThreadReply,
         content_rich: (contentRich as ChatMessage["content_rich"]) ?? null,
+        // Lo escribo yo desde la app: sin marca de API.
+        api_key_id: null, api_display_name: null,
         is_edited: false, is_deleted: false,
         created_at: now, updated_at: now, _localStatus: "sending",
       };

@@ -13,6 +13,18 @@ export const messenger = {
   "messenger.sinMensajesQueMarcar": { es: "Este chat no tiene mensajes de otros que marcar", en: "This chat has no messages from others to mark" },
   "messenger.noPudeMarcarNoLeido": { es: "No pude marcar el chat como no leído", en: "Couldn't mark the chat as unread" },
 
+  // La pastilla «API» de los mensajes que manda una integración (EtiquetaApi). El
+  // nombre de la key («BLU») es dato: llega tal cual y no se traduce.
+  "messenger.api.etiqueta": { es: "API", en: "API" },
+  "messenger.api.enviadoPor": {
+    es: "Enviado por la integración «{nombre}» a nombre de {persona}",
+    en: "Sent by the “{nombre}” integration on behalf of {persona}",
+  },
+  "messenger.api.enviadoPorTuIntegracion": {
+    es: "Lo mandó tu integración «{nombre}»",
+    en: "Sent by your “{nombre}” integration",
+  },
+
   // Lista de chats (ChatSidebar) y la vista previa del último mensaje (preview.ts).
   "messenger.preview.ayer": { es: "Ayer", en: "Yesterday" },
   "messenger.preview.sinMensajes": { es: "Sin mensajes", en: "No messages" },
