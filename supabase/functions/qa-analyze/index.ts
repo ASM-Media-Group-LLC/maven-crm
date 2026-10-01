@@ -9,10 +9,11 @@ import {
   SYSTEM_PROMPT,
   UNSPECIFIED_SERVICE_NOTE,
 } from "./prompt.ts";
-import { logAnthropicUsage } from "../_shared/usage.ts";
+import { costoDeUso, MODELO_ECONOMICO, pedirAnalisis } from "./openrouter.ts";
 import { buildQaEmailHtml, buildQaEmailSubject, labelForOutcome, type QaEmailPayload } from "./qaEmail.ts";
 
-// qa-analyze — corre el análisis con Claude (Anthropic API) de un
+// qa-analyze — corre el análisis con IA (desde el 01/10/2026, un Gemini económico
+// por OpenRouter: Maven ya no tiene llave de Anthropic; ver openrouter.ts) de un
 // qa_calls.id existente. Migrado de Gemini/Groq → Anthropic para igualar
 // la calidad del análisis que teníamos en Kash (Claude Opus/Sonnet).
 //
@@ -39,7 +40,7 @@ const MAX_TRANSCRIPT_CHARS = 200_000;
 // Red de seguridad: si igual se pasa, la fila queda con claude_analysis='{}' y
 // el cron retry_stuck_qa_analyses (job 18, cada 10 min) la reintenta — eso recién
 // funciona desde que se creó el secret project_url en Vault el 2026-07-30.
-const CLAUDE_TIMEOUT_MS = 135_000;
+const IA_TIMEOUT_MS = 135_000;
 
 interface AnalyzeRequest {
   call_id?: string;
@@ -136,30 +137,21 @@ serve(async (req) => {
   }
 
   try {
-    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-    if (!ANTHROPIC_API_KEY) {
-      return jsonError(req, 
-        "ANTHROPIC_API_KEY no configurada en los secrets de Supabase.",
+    const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
+    if (!OPENROUTER_API_KEY) {
+      return jsonError(req,
+        "OPENROUTER_API_KEY no configurada en los secrets de Supabase.",
         500,
       );
     }
-    // Modelo configurable por TIER de la modelo:
-    //   A++ y A+ → premium (Opus 4.7) — modelos top que justifican el
-    //   costo extra del análisis más fino.
-    //   A / B+ / B / C+ / C / null → standard (Sonnet 4.6) — buen
-    //   balance calidad/costo, suficiente para el grueso del catálogo.
-    //
-    // Override por env si quieres ajustar:
-    //   CLAUDE_MODEL_PREMIUM   — modelo para A++/A+ (default: claude-opus-4-7)
-    //   CLAUDE_MODEL_STANDARD  — modelo para el resto (default: claude-sonnet-4-6)
-    //   CLAUDE_MODEL           — legacy/fuerza para TODAS las calls (override total)
-    //
-    // El pick efectivo se hace abajo cuando ya tenemos category de la modelo.
-    const CLAUDE_MODEL_PREMIUM =
-      Deno.env.get("CLAUDE_MODEL_PREMIUM") || "claude-opus-4-7";
-    const CLAUDE_MODEL_STANDARD =
-      Deno.env.get("CLAUDE_MODEL_STANDARD") || "claude-sonnet-4-6";
-    const CLAUDE_MODEL_FORCE = Deno.env.get("CLAUDE_MODEL");
+    // El modelo, por TIER de la modelo. Desde el 01/10/2026 va por OpenRouter con
+    // un Gemini económico (Maven ya no tiene llave de Anthropic):
+    //   IA_MODELO_OPENROUTER — para todas (default: google/gemini-2.5-flash-lite)
+    //   QA_MODELO_PREMIUM    — solo para A++ / A+ (default: el mismo)
+    // ⚠️ Ya NO lee CLAUDE_MODEL*: si siguen cargados con nombres de Claude, OpenRouter
+    // no los reconocería.
+    const MODELO_ESTANDAR = Deno.env.get("IA_MODELO_OPENROUTER") || MODELO_ECONOMICO;
+    const MODELO_PREMIUM = Deno.env.get("QA_MODELO_PREMIUM") || MODELO_ESTANDAR;
 
     let body: AnalyzeRequest;
     try {
@@ -427,35 +419,29 @@ serve(async (req) => {
       systemPromptWithPortfolio += UNSPECIFIED_SERVICE_NOTE;
     }
 
-    // Pick del modelo según category. Premium tier = A++ / A+ (modelos
-    // top que justifican el costo extra). Resto va a standard. Si está
-    // seteado el override CLAUDE_MODEL, ese gana sobre todo (escape
-    // hatch para casos como debug o forzar todas a Opus en una corrida).
+    // Pick del modelo según category: A++ / A+ pueden ir a un modelo mejor.
     const cat = (c.model?.category ?? "").trim();
     const isPremiumTier = cat === "A++" || cat === "A+";
-    const CLAUDE_MODEL = CLAUDE_MODEL_FORCE
-      ? CLAUDE_MODEL_FORCE
-      : isPremiumTier
-        ? CLAUDE_MODEL_PREMIUM
-        : CLAUDE_MODEL_STANDARD;
+    const MODELO = isPremiumTier ? MODELO_PREMIUM : MODELO_ESTANDAR;
 
-    // Call Claude via Anthropic Messages API
     let raw: string;
-    let usage: unknown;
+    let usage: Awaited<ReturnType<typeof pedirAnalisis>>["usage"];
     try {
-      const result = await callClaude(
-        ANTHROPIC_API_KEY,
-        CLAUDE_MODEL,
+      const result = await pedirAnalisis(
+        fetch,
+        OPENROUTER_API_KEY,
+        MODELO,
         systemPromptWithPortfolio,
         userMessage,
+        IA_TIMEOUT_MS,
       );
       raw = result.raw;
       usage = result.usage;
     } catch (providerErr) {
-      const msg = (providerErr as Error).message ?? "Error de Claude";
+      const msg = (providerErr as Error).message ?? "Error de la IA";
       const status = /rate limit|429/i.test(msg)
         ? 429
-        : /key|401|402|cuota|quota|credit/i.test(msg)
+        : /key|401|402|cuota|quota|credit|crédito/i.test(msg)
           ? 402
           : 502;
       return jsonError(req, msg, status);
@@ -466,11 +452,11 @@ serve(async (req) => {
       analysis = JSON.parse(raw);
     } catch (parseErr) {
       console.error(
-        "Claude devolvió JSON inválido:",
+        "La IA devolvió JSON inválido:",
         String(parseErr),
         raw.slice(0, 500),
       );
-      return jsonError(req, "Claude devolvió JSON malformado. Reintenta.", 502);
+      return jsonError(req, "La IA devolvió JSON malformado. Reintenta.", 502);
     }
 
     if (!isValidAnalysis(analysis)) {
@@ -568,12 +554,14 @@ serve(async (req) => {
     // Loggea uso para el dashboard "Control de Gasto". No await crítico
     // — si falla el insert, no rompe la response al cliente.
     if (usage) {
-      void logAnthropicUsage({
+      void supabase.from("api_usage_log").insert({
+        provider: "openrouter",
         operation: "qa-analyze",
-        model: CLAUDE_MODEL,
-        usage: usage as any,
+        model: MODELO,
+        units: { input_tokens: usage.prompt_tokens ?? 0, output_tokens: usage.completion_tokens ?? 0 },
+        cost_usd: costoDeUso(MODELO, usage),
         context: { qa_call_id: callId, score },
-      });
+      }).then(({ error }) => { if (error) console.warn("api_usage_log:", error.message); });
     }
 
     return new Response(
@@ -582,8 +570,8 @@ serve(async (req) => {
         call_id: callId,
         score,
         analysis,
-        provider: "anthropic",
-        model: CLAUDE_MODEL,
+        provider: "openrouter",
+        model: MODELO,
         usage: usage ?? null,
         updated,
       }),
@@ -705,108 +693,4 @@ function jsonError(req: Request, error: string, status: number): Response {
     status,
     headers: { ...corsHeaders(req), "Content-Type": "application/json" },
   });
-}
-
-// ─── Claude (Anthropic Messages API) ────────────────────────────────
-
-interface LlmCallResult {
-  raw: string;
-  usage: unknown;
-}
-
-async function callClaude(
-  apiKey: string,
-  model: string,
-  systemPrompt: string,
-  userMessage: string,
-): Promise<LlmCallResult> {
-  const ac = new AbortController();
-  const timeoutId = setTimeout(() => ac.abort(), CLAUDE_TIMEOUT_MS);
-
-  let res: Response;
-  try {
-    res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "Content-Type": "application/json",
-      },
-      signal: ac.signal,
-      body: JSON.stringify({
-        model,
-        max_tokens: 16000,
-        // System prompt con cache control para reducir costos en
-        // re-análisis consecutivos (misma rubric, distinto transcript).
-        system: [
-          {
-            type: "text",
-            text: systemPrompt,
-            cache_control: { type: "ephemeral" },
-          },
-        ],
-        messages: [
-          {
-            role: "user",
-            content: userMessage,
-          },
-        ],
-      }),
-    });
-  } catch (fetchErr) {
-    clearTimeout(timeoutId);
-    const aborted = (fetchErr as Error).name === "AbortError";
-    throw new Error(
-      aborted
-        ? `Claude tardó más de ${CLAUDE_TIMEOUT_MS / 1000}s. Prueba de nuevo.`
-        : `Error al contactar Anthropic: ${(fetchErr as Error).message}`,
-    );
-  }
-  clearTimeout(timeoutId);
-
-  if (!res.ok) {
-    const status = res.status;
-    const errText = await res.text().catch(() => "");
-    console.error("Claude API error", status, errText.slice(0, 500));
-    if (status === 429) throw new Error("Claude: rate limit. Prueba en unos segundos.");
-    if (status === 401) throw new Error("Claude: API key inválida.");
-    if (status === 402 || status === 403) {
-      throw new Error("Claude: crédito agotado o sin permisos.");
-    }
-    if (status === 529) throw new Error("Claude: API sobrecargada. Prueba en unos segundos.");
-    throw new Error(`Claude API error ${status}`);
-  }
-
-  const data = (await res.json()) as {
-    content?: Array<{ type: string; text?: string }>;
-    usage?: {
-      input_tokens?: number;
-      output_tokens?: number;
-      cache_creation_input_tokens?: number;
-      cache_read_input_tokens?: number;
-    };
-    stop_reason?: string;
-  };
-
-  // Extract text from content blocks
-  const textBlocks = (data.content ?? [])
-    .filter((c) => c.type === "text" && c.text)
-    .map((c) => c.text!)
-    .join("");
-
-  if (!textBlocks) {
-    throw new Error("Claude devolvió respuesta vacía.");
-  }
-
-  // Clean potential markdown wrapping (```json ... ```)
-  let raw = textBlocks.trim();
-  if (raw.startsWith("```json")) raw = raw.slice(7);
-  if (raw.startsWith("```")) raw = raw.slice(3);
-  if (raw.endsWith("```")) raw = raw.slice(0, -3);
-  raw = raw.trim();
-
-  return {
-    raw,
-    usage: data.usage ?? null,
-  };
 }

@@ -65,9 +65,17 @@ function tocaAlgo(sql: string): boolean {
   ].map((p) => new RegExp(p, "gi"));
   return patrones.some((p) => [...s.matchAll(p)].some((m) => DE_INTERES.has(m[1].toLowerCase())));
 }
+// Migraciones que tocan objetos de este banco pero necesitan tablas que sus fixtures no traen.
+// Se prueban en su propio banco, con el motivo al lado.
+const NO_CARGAN_AQUI: Record<string, string> = {
+  "20261001211000_roles_por_agencia.sql":
+    "reescribe is_in_role_group y le suma tenant_id a user_roles, pero necesita roles_config, role_permissions, " +
+    "role_base_grants y sus triggers. Con una agencia da lo mismo que prod persona por persona; se prueba en " +
+    "roles_por_agencia.ts sobre el catálogo de prod.",
+};
 const DIR = new URL("../migrations/", import.meta.url);
 const CADENA = [...Deno.readDirSync(DIR)].map((e) => e.name)
-  .filter((x) => /^\d{14}_\w+\.sql$/.test(x) && x.slice(0, 14) > FIXTURE_HASTA).sort()
+  .filter((x) => /^\d{14}_\w+\.sql$/.test(x) && x.slice(0, 14) > FIXTURE_HASTA && !NO_CARGAN_AQUI[x]).sort()
   .map((n) => ({ n, sql: Deno.readTextFileSync(new URL(n, DIR)) }))
   .filter((m) => m.n === NOMBRE_B || tocaAlgo(m.sql));
 

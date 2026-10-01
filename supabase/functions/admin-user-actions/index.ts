@@ -186,6 +186,21 @@ Deno.serve(async (req) => {
         });
       }
 
+      // La cuenta nueva va a la agencia de quien la crea (una persona es de una
+      // sola agencia: tenant_members_una_agencia). Sin agencia no se crea nada.
+      const { data: membresiaDeQuienCrea } = await adminClient
+        .from("tenant_members")
+        .select("tenant_id")
+        .eq("user_id", callerId)
+        .maybeSingle();
+      const agenciaDeQuienCrea = (membresiaDeQuienCrea as { tenant_id?: string } | null)?.tenant_id;
+      if (!agenciaDeQuienCrea) {
+        return new Response(JSON.stringify({
+          error: "Tu cuenta no pertenece a ninguna agencia, así que no puede crear usuarios.",
+          reason: "sin_agencia",
+        }), { status: 403, headers: { ...corsHeaders(req), "Content-Type": "application/json" } });
+      }
+
       // === Guarda de cupos de correo (Zoho) ===
       // Si este alta va a CREAR una casilla nueva y ya no quedan puestos en
       // Zoho, frenamos ACÁ con un mensaje claro — en vez de crear un usuario a
@@ -340,45 +355,51 @@ Deno.serve(async (req) => {
         });
       }
 
+      // === La agencia de la cuenta nueva ===
+      // La de quien la crea, y va ANTES que todo lo demás: si no se puede poner,
+      // el alta se deshace sin haber tocado rol, correo ni casilla. Desde
+      // 20261001210000_agencias_base la base ya no mete a nadie en asm-tech: este
+      // es el único lugar que pone la agencia (la base no puede, porque GoTrue no
+      // escribe app_metadata en el mismo INSERT; ver esa migración).
+      //
+      // ON CONFLICT DO NOTHING + releer: así anda igual con el handle_new_user
+      // viejo, que ya puso asm-tech (= la agencia de quien crea, mientras haya una
+      // sola), y con el nuevo, que no pone nada. Si la fila que quedó es de OTRA
+      // agencia, o no quedó ninguna, se deshace.
+      if (newUser?.user?.id) {
+        const nuevoId = newUser.user.id;
+        const { error: tmErr } = await adminClient
+          .from("tenant_members")
+          .upsert(
+            { user_id: nuevoId, tenant_id: agenciaDeQuienCrea },
+            { onConflict: "user_id,tenant_id", ignoreDuplicates: true },
+          );
+        const { data: quedo } = await adminClient
+          .from("tenant_members")
+          .select("tenant_id")
+          .eq("user_id", nuevoId)
+          .maybeSingle();
+        const agenciaQueQuedo = (quedo as { tenant_id?: string } | null)?.tenant_id;
+        if (tmErr || agenciaQueQuedo !== agenciaDeQuienCrea) {
+          console.error(
+            "[admin-user-actions] la cuenta nueva no quedó en la agencia de quien la crea; se deshace el alta:",
+            tmErr?.message ?? `quedó en ${agenciaQueQuedo ?? "ninguna"}`,
+          );
+          const { error: delErr } = await adminClient.auth.admin.deleteUser(nuevoId);
+          if (delErr) console.error("[admin-user-actions] no se pudo deshacer el alta:", delErr.message);
+          return new Response(JSON.stringify({
+            error: "No se pudo asignar la agencia a la cuenta nueva, así que el alta se deshizo. Avísale al equipo técnico con la hora exacta.",
+            reason: "alta_sin_agencia",
+            raw: tmErr?.message ?? null,
+          }), { status: 500, headers: { ...corsHeaders(req), "Content-Type": "application/json" } });
+        }
+      }
+
       if (role && role !== "employee" && newUser?.user?.id) {
         await adminClient
           .from("user_roles")
           .update({ role })
           .eq("user_id", newUser.user.id);
-      }
-
-      // Tenant membership: el usuario nuevo hereda el tenant del admin
-      // que lo creó. Sin esta fila, current_tenant_id() devuelve NULL
-      // y RLS le filtra TODA la data tenant-scoped a 0 (ese era el bug
-      // que vimos cuando un admin recién creado entraba a Scouter Assist
-      // y veía 0 leads). ON CONFLICT DO NOTHING por si una migration o
-      // trigger ya creó la fila.
-      if (newUser?.user?.id) {
-        const { data: callerMembership } = await adminClient
-          .from("tenant_members")
-          .select("tenant_id")
-          .eq("user_id", callerId)
-          .maybeSingle();
-
-        const callerTenantId = (callerMembership as { tenant_id?: string } | null)?.tenant_id;
-        if (callerTenantId) {
-          const { error: tmErr } = await adminClient
-            .from("tenant_members")
-            .upsert(
-              { user_id: newUser.user.id, tenant_id: callerTenantId },
-              { onConflict: "user_id,tenant_id", ignoreDuplicates: true },
-            );
-          if (tmErr) {
-            console.error(
-              "[admin-user-actions] tenant_members insert failed:",
-              tmErr.message,
-            );
-          }
-        } else {
-          console.warn(
-            "[admin-user-actions] caller has no tenant_members row — new user created without tenant",
-          );
-        }
       }
 
       // === Correo personal de recuperación ===
@@ -1207,12 +1228,17 @@ Deno.serve(async (req) => {
         // Este camino escribía el rol SIN validarlo contra roles_config (el otro
         // endpoint sí lo hace). Se valida igual acá: si no existe o está inactivo,
         // no se escribe. La jerarquía ya la chequeó gUpdate arriba.
-        const { data: validRoleUp } = await adminClient
+        // En la agencia de la persona (ver manage-user-roles: cada agencia tiene
+        // sus roles desde 20261001211000; select("*") para andar antes y después).
+        const { data: agenciaDe } = await adminClient
+          .from("tenant_members").select("tenant_id").eq("user_id", user_id).maybeSingle();
+        const { data: rolesConEseNombre } = await adminClient
           .from("roles_config")
-          .select("id")
+          .select("*")
           .eq("name", role)
-          .eq("is_active", true)
-          .maybeSingle();
+          .eq("is_active", true);
+        const validRoleUp = (rolesConEseNombre ?? []).find((r: Record<string, unknown>) =>
+          !("tenant_id" in r) || r.tenant_id === (agenciaDe as { tenant_id?: string } | null)?.tenant_id);
 
         if (!validRoleUp) {
           return new Response(JSON.stringify({ error: `Rol inválido o inactivo: ${role}` }), {

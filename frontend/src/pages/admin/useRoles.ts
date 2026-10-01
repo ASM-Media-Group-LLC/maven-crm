@@ -24,6 +24,26 @@ export const ROLE_TIER_FLAGS: Record<RoleTier, {
   admin:      { is_admin: true,  is_manager_or_above: true,  is_supervisor_or_above: true,  is_member: true },
 };
 
+// Guarda el tipo de acceso de un rol en role_groups: UPDATE y, si no había fila,
+// INSERT. No es un upsert porque la clave cambió: desde 20261001211000_roles_por_agencia
+// es (tenant_id, role_name), así que «onConflict: role_name» ya no encaja. Esto anda
+// igual antes y después de la migración: la RLS deja ver y tocar solo la fila de la
+// propia agencia, y en un INSERT la agencia la pone la base.
+async function guardarTipoDeRol(nombre: string, campos: (typeof ROLE_TIER_FLAGS)[RoleTier] & { description?: string }) {
+  const ahora = new Date().toISOString();
+  const { data, error } = await supabase
+    .from("role_groups")
+    .update({ ...campos, updated_at: ahora })
+    .eq("role_name", nombre)
+    .select("role_name");
+  if (error) throw error;
+  if (data && data.length > 0) return;
+  const { error: insError } = await supabase
+    .from("role_groups")
+    .insert({ role_name: nombre, ...campos, updated_at: ahora });
+  if (insError) throw insError;
+}
+
 // Claves del diccionario: el texto se elige al dibujar, en el idioma de la interfaz.
 export const ROLE_TIER_LABELS: Record<RoleTier, TranslationKey> = {
   member: "admin.tier.member",
@@ -329,12 +349,8 @@ export const useRoles = () => {
       // Cablear role_groups (capacidades RLS) con el nivel elegido. SIN esto el
       // rol nacía sin acceso a nivel DB (bug histórico). El admin puede escribir
       // role_groups (policy "Only admins can modify role_groups"). El trigger ya
-      // garantiza una fila default; este upsert fija el nivel real.
-      const { error: rgError } = await supabase
-        .from("role_groups")
-        .upsert({ role_name: name, ...ROLE_TIER_FLAGS[tier], description, updated_at: new Date().toISOString() },
-          { onConflict: "role_name" });
-      if (rgError) throw rgError;
+      // garantiza una fila default; esto fija el nivel real.
+      await guardarTipoDeRol(name, { ...ROLE_TIER_FLAGS[tier], description });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["roles-config"] });
@@ -354,13 +370,7 @@ export const useRoles = () => {
       if (error) throw error;
       // Si cambió el nombre, el trigger ya renombró role_groups + user_roles.
       // Acá fijamos el NIVEL (capacidades RLS) por el nombre actual.
-      if (tier) {
-        const { error: rgError } = await supabase
-          .from("role_groups")
-          .upsert({ role_name: name, ...ROLE_TIER_FLAGS[tier], updated_at: new Date().toISOString() },
-            { onConflict: "role_name" });
-        if (rgError) throw rgError;
-      }
+      if (tier) await guardarTipoDeRol(name, ROLE_TIER_FLAGS[tier]);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["roles-config"] });
