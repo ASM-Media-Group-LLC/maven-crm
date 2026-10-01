@@ -22,6 +22,7 @@ import { markMessagesDelivered } from "@/hooks/useReadReceipts";
 import { addPending, removePending, pendingForConversation } from "@/pages/messenger/pendingQueue";
 import { perfilesGarantizados } from "@/hooks/perfilesGarantizados";
 import { queHacerConLaCarga, esperaDeReintento } from "@/hooks/queHacerConLaCarga";
+import { abrirDirecto, pasosDeSupabase, type ClienteParaDirecto } from "@/hooks/abrirDirecto";
 import { toast } from "sonner";
 // Los avisos van por traducir(): salen de callbacks y promesas, no del JSX.
 // Los mensajes de sistema que se INSERTAN en chat_messages no pasan por acá: son
@@ -508,90 +509,41 @@ export function useChat() {
       setConversations((prev) => [optimisticConv, ...prev]);
 
       (async () => {
-        // Check server-side for existing direct chat with this user.
-        // ⚠️ Si la comprobación FALLA, NO se crea nada. Antes un fallo de red se
-        // leía como "no existe" y se creaba un segundo DM con la misma persona
-        // — y la base no tiene candado para eso (solo la clave primaria).
-        const abortarApertura = (motivo: string) => {
-          console.error("[startDirectChat] no pude comprobar si el DM existía:", motivo);
-          setConversations((prev) => prev.filter((c) => c.id !== newConvId));
+        // La búsqueda, la creación y la carrera (directo_duplicado) viven en
+        // hooks/abrirDirecto.ts. Si no se pudo averiguar si el DM existía, NO se
+        // crea nada: un fallo de red leído como "no existe" creaba un segundo DM.
+        const r = await abrirDirecto(
+          pasosDeSupabase(supabase as unknown as ClienteParaDirecto, user.id),
+          user.id,
+          otherUserId,
+          newConvId,
+        );
+        if (r.tipo === "creado") return;
+        if (r.tipo === "existente") {
+          // El DM ya existía en el server (a veces oculto: un directo sin mensajes creado
+          // por el otro no aparece en mi lista), o lo acaba de crear el otro. Reapuntamos
+          // al id real y reseleccionamos: si ya está en la lista quitamos la optimista;
+          // si no, reusamos la optimista con el id real (queda visible: created_by = yo).
+          const existingConvId = r.id;
+          setConversations((prev) =>
+            prev.some((c) => c.id === existingConvId)
+              ? prev.filter((c) => c.id !== newConvId)
+              : prev.map((c) => (c.id === newConvId ? { ...c, id: existingConvId } : c))
+          );
+          onResolved?.(existingConvId);
+          return;
+        }
+        setConversations((prev) => prev.filter((c) => c.id !== newConvId));
+        if (r.tipo === "sin_saber") {
+          console.error("[startDirectChat] no pude comprobar si el DM existía:", r.motivo);
           toast.error(traducir("shared.chat.offlineOpen"));
-        };
-        const participacionesMias = await supabase
-          .from("chat_participants")
-          .select("conversation_id")
-          .eq("user_id", user.id);
-        if (queHacerConLaCarga(participacionesMias) === "abortar") {
-          abortarApertura(participacionesMias.error?.message ?? "sin datos");
-          return;
-        }
-        const myParticipations = participacionesMias.data;
-
-        if (myParticipations && myParticipations.length > 0) {
-          const myConvIds = myParticipations.map((p: any) => p.conversation_id);
-          
-          // Find if otherUserId is in any of my direct conversations
-          const otros = await supabase
-            .from("chat_participants")
-            .select("conversation_id, chat_conversations!inner(type)")
-            .eq("user_id", otherUserId)
-            .eq("chat_conversations.type", "direct")
-            .in("conversation_id", myConvIds)
-            .limit(1);
-          if (queHacerConLaCarga(otros) === "abortar") {
-            abortarApertura(otros.error?.message ?? "sin datos");
-            return;
-          }
-          const otherP = otros.data;
-
-          if (otherP && otherP.length > 0) {
-            // El DM ya existía en el server (a veces oculto: un directo sin mensajes creado
-            // por el otro no aparece en mi lista). Antes solo borrábamos la conv optimista
-            // → el chat abierto se cerraba solo y NUNCA se podía reabrir. Ahora reapuntamos
-            // al id real y reseleccionamos: si ya está en la lista quitamos la optimista;
-            // si no, reusamos la optimista con el id real (queda visible: created_by = yo).
-            const existingConvId = otherP[0].conversation_id;
-            setConversations((prev) =>
-              prev.some((c) => c.id === existingConvId)
-                ? prev.filter((c) => c.id !== newConvId)
-                : prev.map((c) => (c.id === newConvId ? { ...c, id: existingConvId } : c))
-            );
-            onResolved?.(existingConvId);
-            return;
-          }
-        }
-
-        const { error: createConvError } = await supabase
-          .from("chat_conversations")
-          .insert({ id: newConvId, type: "direct", created_by: user.id });
-
-        if (createConvError) {
-          setConversations((prev) => prev.filter((c) => c.id !== newConvId));
-          toast.error(traducir("shared.chat.errorCreatingConversation"));
-          return;
-        }
-
-        const { error: addCreatorError } = await supabase
-          .from("chat_participants")
-          .insert({ conversation_id: newConvId, user_id: user.id, role: "admin" });
-
-        if (addCreatorError) {
-          await supabase.from("chat_conversations").delete().eq("id", newConvId);
-          setConversations((prev) => prev.filter((c) => c.id !== newConvId));
-          toast.error(traducir("shared.chat.errorCreatingConversation"));
-          return;
-        }
-
-        const { error: addOtherError } = await supabase
-          .from("chat_participants")
-          .insert({ conversation_id: newConvId, user_id: otherUserId, role: "member" });
-
-        if (addOtherError) {
-          await supabase.from("chat_participants").delete().eq("conversation_id", newConvId);
-          await supabase.from("chat_conversations").delete().eq("id", newConvId);
-          setConversations((prev) => prev.filter((c) => c.id !== newConvId));
-          toast.error(traducir("shared.chat.errorCreatingConversation"));
-          return;
+        } else {
+          // La base corta en 100 directos nuevos por persona en 24 horas (20260930230000).
+          toast.error(traducir(
+            r.motivo.includes("chat_tope_directos")
+              ? "shared.chat.directDailyLimit"
+              : "shared.chat.errorCreatingConversation",
+          ));
         }
       })();
 
@@ -636,7 +588,12 @@ export function useChat() {
 
         if (createConvError) {
           setConversations(prev => prev.filter(c => c.id !== newConvId));
-          toast.error(traducir("shared.chat.errorCreatingGroup"));
+          // La base corta en 30 grupos nuevos por persona en 24 horas (20260930230000).
+          toast.error(traducir(
+            createConvError.message?.includes("chat_tope_grupos")
+              ? "shared.chat.groupDailyLimit"
+              : "shared.chat.errorCreatingGroup",
+          ));
           return;
         }
 
@@ -661,7 +618,12 @@ export function useChat() {
           );
 
           if (addMembersError) {
-            await supabase.from("chat_participants").delete().eq("conversation_id", newConvId);
+            // Se borra la CONVERSACIÓN mientras quien la creó todavía es participante
+            // (la cascada se lleva su participación). Antes se borraba primero la
+            // participación: sin ella la política SELECT ya no deja ver la
+            // conversación, el DELETE borraba 0 filas sin error y quedaba huérfana.
+            // Desde 20260930230000 la base también rechaza aquí a alguien de otra
+            // agencia (chat_otra_agencia).
             await supabase.from("chat_conversations").delete().eq("id", newConvId);
             setConversations(prev => prev.filter(c => c.id !== newConvId));
             toast.error(traducir("shared.chat.errorCreatingGroup"));
