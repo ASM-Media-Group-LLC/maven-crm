@@ -292,6 +292,7 @@ export const dashboard = {
   "dashboard.d2.wh.loading": { es: "Cargando ballenas…", en: "Loading whales…" },
   "dashboard.d2.wh.empty": { es: "Sin ballenas todavía — espera la próxima sincronización de BLU.", en: "No whales yet — wait for the next BLU sync." },
   "dashboard.d2.wh.spend": { es: "Gasto", en: "Spend" },
+  "dashboard.d2.wh.messages": { es: "Mensajes", en: "Messages" },
   "dashboard.d2.wh.expires": { es: "Expira", en: "Expires" },
   "dashboard.d2.ret.title": { es: "Retención de fans por cohorte", en: "Fan retention by cohort" },
   "dashboard.d2.ret.desc": { es: "De cada grupo de fans nuevos, qué % sigue suscripto a los días 0–11 (cohortes últimos 60d: {snap}). Caída fuerte = problema de retención.", en: "For each group of new fans, what % is still subscribed on days 0–11 (cohorts from the last 60d: {snap}). A sharp drop = a retention problem." },

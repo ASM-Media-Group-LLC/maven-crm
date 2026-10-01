@@ -364,7 +364,7 @@ export default function TelefonosPage() {
     });
     const res = data as { ok?: boolean; error?: string } | null;
     if (error || !res?.ok) {
-      toast({ title: t("common.errorAssigning"), description: error?.message || res?.error, variant: "destructive" });
+      toast({ title: t("phones.assignError"), description: error?.message || res?.error, variant: "destructive" });
       return;
     }
     setPhones((prev) => prev.map((x) => (x.id === p.id ? { ...x, assigned_to: userIds } : x)));

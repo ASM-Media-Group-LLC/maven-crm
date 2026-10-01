@@ -46,7 +46,6 @@ const NotificacionesSettings = () => {
               size="icon"
               className="h-7 w-7"
               onClick={() => navigate("/notificaciones")}
-              aria-label={t("common.back")}
             >
               <ArrowLeft className="h-4 w-4" />
             </Button>

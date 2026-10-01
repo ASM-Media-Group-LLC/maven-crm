@@ -1,10 +1,12 @@
 // La vista pública del chatter (/chatter/:sesión) en INGLÉS.
 //
 // La abre un candidato sin sesión: no tiene la barra de Maven ni su botón ES/EN.
-// Lo único que tiene es el selector de idioma del personaje. Por eso el texto de
-// la pantalla sale en inglés si CUALQUIERA de los dos está en inglés (ver
-// useTextoPublico en ChatterPublicView). Este test prueba los dos caminos y el
-// tercero: con los dos en español, la pantalla dice lo de siempre.
+// Lo único que tiene es el selector de idioma del personaje, que en main ya
+// cambiaba el encabezado, el temporizador y la barra del personaje. Esos textos
+// salen en inglés si CUALQUIERA de los dos está en inglés (useTextoBilingue en
+// ChatterPublicView); el resto de la pantalla sigue solo el idioma de la app.
+// Con la app en español, la pantalla dice exactamente lo de main, aunque el
+// candidato elija EN en el selector.
 //
 // Se monta la pantalla REAL con el LanguageProvider de verdad; solo se
 // reemplaza el cliente anónimo de Supabase. Los componentes de OTRO dueño (el
@@ -187,12 +189,45 @@ describe("La vista pública del chatter en inglés", () => {
     expect(enEspanol()).toEqual([]);
   });
 
-  it("con la app en español pero el personaje en inglés, la pantalla sale en inglés", async () => {
+  it("con la app en español y el personaje en inglés, solo cambia lo que ya cambiaba en main", async () => {
     localStorage.setItem("app-language", "es");
     localStorage.setItem("maven.chatter.lang", "en");
     montar();
+    // Lo que en main ya seguía al selector del personaje: en inglés.
     await screen.findByText("Conversations");
     expect(screen.getByText("Time remaining")).toBeTruthy();
+    expect(screen.getByText("Chat with JavixBuster")).toBeTruthy();
+    expect(await screen.findByText(/JavixBuster typing…/)).toBeTruthy();
+    // Lo que en main era solo español: sigue en español (sigue a la app).
+    expect(await screen.findByPlaceholderText("Responder como Luna…")).toBeTruthy();
+    await screen.findByText("hi babe");
+    fireEvent.keyDown(screen.getByRole("button", { name: "Opciones del mensaje" }), { key: "Enter" });
+    fireEvent.click(await screen.findByText("Editar mensaje"));
+    const edicion = await screen.findByRole("dialog");
+    expect(within(edicion).getByText("El examiner va a poder ver el historial de cambios.")).toBeTruthy();
+    fireEvent.click(within(edicion).getByRole("button", { name: "Cancelar" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    fireEvent.click(screen.getByRole("button", { name: "Vault del personaje" }));
+    const vault = await screen.findByRole("dialog");
+    expect(within(vault).getByText("Vault de Luna")).toBeTruthy();
+    fireEvent.click(await within(vault).findByRole("img", { name: "beach.jpg" }));
+    expect(within(vault).getByText("Gratis")).toBeTruthy();
+  });
+
+  it("con la app en español y el personaje en inglés, las pantallas de sesión siguen en español", async () => {
+    localStorage.setItem("app-language", "es");
+    localStorage.setItem("maven.chatter.lang", "en");
+    estado.sesion = null;
+    const { unmount } = montar();
+    await screen.findByText("Sesión no disponible");
+    unmount();
+
+    estado.sesion = SESION;
+    localStorage.setItem("maven.chatter.tab.s1", JSON.stringify({ tabId: "otra", ts: Date.now() }));
+    montar();
+    await screen.findByText("¿Usar esta sesión aquí?");
+    expect(screen.getByRole("button", { name: "Usar aquí" })).toBeTruthy();
   });
 
   it("con los dos en español dice lo de siempre", async () => {

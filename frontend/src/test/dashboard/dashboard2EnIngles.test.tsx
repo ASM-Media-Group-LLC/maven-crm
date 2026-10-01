@@ -280,4 +280,14 @@ describe("Dashboard Ventas en inglés", () => {
     await screen.findByText("Revenue Bruto");
     expect(screen.getByText("Distribución de la Monetización")).toBeTruthy();
   });
+
+  it("en español la tabla de Ballenas dice «Mensajes», como siempre (no «Mensajería»)", async () => {
+    localStorage.setItem("app-language", "es");
+    montar();
+    await screen.findByText("Revenue Bruto");
+    abrirPestana(/Más análisis/);
+    fireEvent.click(await screen.findByRole("button", { name: "Ballenas" }));
+    expect(await screen.findByRole("columnheader", { name: "Mensajes" })).toBeTruthy();
+    expect(screen.queryByRole("columnheader", { name: "Mensajería" })).toBeNull();
+  });
 });

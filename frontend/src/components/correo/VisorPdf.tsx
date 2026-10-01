@@ -47,6 +47,10 @@ const PASOS_ZOOM = [0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4] as const;
  *  devuelve en blanco, sin error. */
 const LADO_MAXIMO = 6000;
 
+/** Marca de «falló sin un Error con mensaje»: en pantalla se ve el texto
+ *  traducido de «no se pudo leer el PDF», igual que antes se veía el literal. */
+const PDF_ILEGIBLE = "pdf-ilegible";
+
 /** Dibuja un PDF en un canvas propio.
  *
  *  ⚠️ NO se usa un <iframe> con el visor de Chrome, aunque sea una línea de
@@ -100,8 +104,7 @@ export default function VisorPdf({ bytes, nombre }: { bytes: Uint8Array; nombre:
         setCargando(false);
       } catch (e) {
         if (vivo) {
-          // Sin mensaje queda "" (y no null): el título del error ya lo dice.
-          setError(e instanceof Error ? e.message : "");
+          setError(e instanceof Error ? e.message : PDF_ILEGIBLE);
           setCargando(false);
         }
       }
@@ -128,7 +131,7 @@ export default function VisorPdf({ bytes, nombre }: { bytes: Uint8Array; nombre:
   useEffect(() => {
     const doc = docRef.current;
     const canvas = canvasRef.current;
-    if (!doc || !canvas || cargando || error !== null || ancho === 0) return;
+    if (!doc || !canvas || cargando || error || ancho === 0) return;
     let tarea: { cancel: () => void } | null = null;
     let vivo = true;
     (async () => {
@@ -236,12 +239,14 @@ export default function VisorPdf({ bytes, nombre }: { bytes: Uint8Array; nombre:
     [paginas],
   );
 
-  if (error !== null) {
+  if (error) {
     return (
       <div className="flex h-full items-center justify-center px-8 text-center">
         <div>
           <p className="text-sm font-medium">{t("mail.pdf.readError")}</p>
-          {error && <p className="mt-1 text-xs text-muted-foreground">{error}</p>}
+          <p className="mt-1 text-xs text-muted-foreground">
+            {error === PDF_ILEGIBLE ? t("mail.pdf.readError") : error}
+          </p>
         </div>
       </div>
     );
@@ -330,7 +335,6 @@ export default function VisorPdf({ bytes, nombre }: { bytes: Uint8Array; nombre:
                 disabled={pagina >= paginas}
                 onClick={() => irA(pagina + 1)}
                 aria-label={t("mail.pdf.nextPage")}
-
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>

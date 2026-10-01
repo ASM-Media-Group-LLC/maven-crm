@@ -80,7 +80,11 @@ import { useLanguage } from "@/hooks/useLanguage";
 // ─── Types ───────────────────────────────────────────────────────
 interface CreatorSummary {
   creatorId: string;
+  /** En pantalla: el nombre o «sin nombre» en el idioma de la interfaz. */
   name: string;
+  /** No tiene nombre artístico ni de BLU: el PDF (en español fijo) dice «Sin
+   *  nombre» sin importar el idioma de quien lo exporta. */
+  sinNombre: boolean;
   instagramHandle: string | null;
   profilePhotoUrl: string | null;
   platform: string;
@@ -477,6 +481,7 @@ const Dashboard2 = () => {
       out.push({
         creatorId: r.group_key,
         name: r.artistic_name || r.blu_creator_name || t("dashboard.noName"),
+        sinNombre: !(r.artistic_name || r.blu_creator_name),
         instagramHandle: info?.ig || null,
         profilePhotoUrl: info?.photo || null,
         platform: plat || "OnlyFans",
@@ -723,6 +728,7 @@ const Dashboard2 = () => {
 
   // ⚠️ El PDF que se exporta queda en español a propósito (se comparte fuera de la
   // pantalla): sus títulos y columnas NO pasan por el diccionario.
+  const nombreEnPdf = (c: CreatorSummary) => (c.sinNombre ? "Sin nombre" : c.name);
   const exportPdf = async () => {
     if (!selectedPeriod) return;
     const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
@@ -739,7 +745,7 @@ const Dashboard2 = () => {
     doc.text(`Total Bruto: ${fmt(grandTotal)}  |  Neto (80%): ${fmt(grandTotal * 0.8)}  |  Creadoras: ${activeCount}  |  Retencion: ${hlKpis.renewalRate.toFixed(1)}%`, 14, 28);
     const tHead = [["#", "Creadora", "Instagram", "Bruto", "Neto 80%", "Subs", "Nuevas", "Recur.", "Tips", "Msgs", "Fans", "New", "$/Dia", "$/Fan", "Dias", "Ultima"]];
     const tBody = creators.map((c, i) => [
-      String(i + 1), c.name, c.instagramHandle ? "@" + c.instagramHandle.replace(/^@/, "") : "-",
+      String(i + 1), nombreEnPdf(c), c.instagramHandle ? "@" + c.instagramHandle.replace(/^@/, "") : "-",
       fmt(c.total), fmt(c.net), fmtShort(c.subs), fmtShort(c.newSubs), fmtShort(c.recurringSubs),
       fmtShort(c.tips), fmtShort(c.messages), String(c.activeFans), String(c.newFans),
       fmtShort(c.avgPerDay), fmtShort(c.avgPerFan), String(c.daysWithData),
@@ -755,7 +761,7 @@ const Dashboard2 = () => {
     doc.text(`Top ${paretoAnalysis.topCount} = ${fmt(paretoAnalysis.topRevenue)} (${topPct}%)  |  Resto ${paretoAnalysis.rest.length} = ${fmt(paretoAnalysis.totalRevenue - paretoAnalysis.topRevenue)}`, 14, 22);
     const pH = [["#", "Creadora", "Instagram", "Bruto", "% Top", "% Total"]];
     const pB = paretoAnalysis.top.map((c, i) => [
-      String(i + 1), c.name, c.instagramHandle ? "@" + c.instagramHandle.replace(/^@/, "") : "-",
+      String(i + 1), nombreEnPdf(c), c.instagramHandle ? "@" + c.instagramHandle.replace(/^@/, "") : "-",
       fmt(c.total),
       (paretoAnalysis.topRevenue > 0 ? (c.total / paretoAnalysis.topRevenue * 100).toFixed(1) : "0") + "%",
       (paretoAnalysis.totalRevenue > 0 ? (c.total / paretoAnalysis.totalRevenue * 100).toFixed(1) : "0") + "%",
@@ -2637,7 +2643,7 @@ const Dashboard2 = () => {
                                   <TableHead>Fan</TableHead>
                                   <TableHead>{t("dashboard.d2.creator")}</TableHead>
                                   <TableHead className="text-right">{t("dashboard.d2.wh.spend")}</TableHead>
-                                  <TableHead className="text-right">{t("dashboard.d2.messaging")}</TableHead>
+                                  <TableHead className="text-right">{t("dashboard.d2.wh.messages")}</TableHead>
                                   <TableHead>{t("common.status")}</TableHead>
                                   <TableHead>{t("dashboard.d2.wh.expires")}</TableHead>
                                 </TableRow>

@@ -542,7 +542,7 @@ const renderRow = (
 // creators (para los Ingresos al CRM).
 
 // La llave es la COLUMNA de la base (dato); el valor, cómo se dice en pantalla.
-// Una columna que no está acá se muestra con su nombre crudo.
+// Una columna que no está aquí se muestra con su nombre crudo.
 const FIELD_LABELS: Record<string, TranslationKey> = {
   model_handle: "page.panel.field.modelHandle",
   instagram_handle: "page.panel.field.instagram",

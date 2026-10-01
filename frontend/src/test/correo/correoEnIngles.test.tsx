@@ -291,4 +291,37 @@ describe("Correo en inglés", () => {
     expect(screen.getAllByRole("button", { name: "Recibidos" }).length).toBeGreaterThan(0);
     expect(screen.getByText("(sin asunto)")).toBeTruthy();
   });
+
+  it("en español el compositor dice «Cc» y «Cco», como siempre (no «Copia», que es del detalle del abierto)", async () => {
+    localStorage.setItem("app-language", "es");
+    montar();
+    await screen.findByText("Carpetas");
+    fireEvent.click(screen.getByRole("button", { name: /Redactar/ }));
+    const comp = await screen.findByRole("dialog");
+    expect(within(comp).getByRole("button", { name: "Cco" })).toBeTruthy();
+    fireEvent.click(within(comp).getByRole("button", { name: "Cc" }));
+    expect(within(comp).getByText("Cc", { selector: "label" })).toBeTruthy();
+    expect(within(comp).queryByText("Copia")).toBeNull();
+  });
+
+  it("el título del correo abierto: el marcador del servidor se traduce, un asunto vacío queda vacío", async () => {
+    abierto = { ...ABIERTO, subject: "(sin asunto)" };
+    const { unmount } = montar();
+    await screen.findByText("Folders");
+    fireEvent.click(screen.getAllByText("Quarterly report")[0]);
+    await screen.findByText("Show images");
+    let titulos = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
+    expect(titulos).toContain("(no subject)");
+    unmount();
+
+    localStorage.setItem("app-language", "es");
+    abierto = { ...ABIERTO, subject: "" };
+    montar();
+    await screen.findByText("Carpetas");
+    fireEvent.click(screen.getAllByText("Quarterly report")[0]);
+    await screen.findByText("Mostrar imágenes");
+    titulos = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
+    expect(titulos).toContain("");
+    expect(titulos).not.toContain("(sin asunto)");
+  });
 });

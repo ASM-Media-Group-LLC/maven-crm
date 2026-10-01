@@ -8,7 +8,7 @@
 // reemplazan los hooks que leen la base. Lo que es de OTRO dueño de la ola (el
 // catálogo de eventos de lib/, los rótulos de los filtros de
 // lib/notificationHelpers, el bloque de push de este dispositivo) se cambia por
-// un doble en inglés: acá se mira el texto de ESTAS páginas.
+// un doble en inglés: aquí se mira el texto de ESTAS páginas.
 //
 // Lo que NO se traduce también se prueba: el módulo de un aviso se guarda con su
 // nombre en español ("Correo"), la pestaña viaja en la URL con su id

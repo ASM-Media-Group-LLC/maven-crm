@@ -126,7 +126,7 @@ const SE_VACIAN_AL_MOVER = new Set(["INBOX", "Notification", "Newsletter", "Corr
 
 /** Nombre e ícono por carpeta. Los nombres crudos vienen del servidor (son la
  *  LLAVE: "Papelera", "Correo no deseado"… se comparan y viajan a la edge tal
- *  cual); acá solo se elige cómo se muestran. Una carpeta que no está en el mapa
+ *  cual); aquí solo se elige cómo se muestran. Una carpeta que no está en el mapa
  *  (una que alguien creó a mano) se muestra con su nombre. */
 const CARPETAS: Record<string, { nombre: TranslationKey; icono: LucideIcon }> = {
   INBOX: { nombre: "mail.folder.inbox", icono: Inbox },
@@ -1319,7 +1319,7 @@ export default function CorreoPage() {
 
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
                   <h2 className="text-xl font-semibold leading-snug tracking-tight sm:text-2xl">
-                    {asuntoVisible(sinPrefijos(mensaje.data.subject) || mensaje.data.subject, t)}
+                    {marcadorSinAsunto(sinPrefijos(mensaje.data.subject) || mensaje.data.subject, t)}
                   </h2>
                   {/* Las pastillas con × junto al asunto, como Gmail: TODAS
                       las etiquetas de la conversación (aquí no se esconde
@@ -1835,6 +1835,12 @@ function FilaMensaje({
  *  servidor) se dice en el idioma de quien mira. */
 function asuntoVisible(asunto: string | undefined, t: ReturnType<typeof useLanguage>["t"]): string {
   return !asunto || asunto === SIN_ASUNTO ? t("mail.noSubject") : asunto;
+}
+
+/** Solo traduce el marcador del servidor: un asunto vacío se queda vacío
+ *  (el título del correo abierto nunca dijo «sin asunto» por un ''). */
+function marcadorSinAsunto(asunto: string, t: ReturnType<typeof useLanguage>["t"]): string {
+  return asunto === SIN_ASUNTO ? t("mail.noSubject") : asunto;
 }
 
 function VacioSuave({ icono: Icono, texto }: { icono: LucideIcon; texto: string }) {

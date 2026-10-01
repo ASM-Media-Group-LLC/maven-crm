@@ -818,7 +818,7 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
   const malos = (lista: string[]) => lista.filter((d) => !ES_CORREO.test(d));
   const avisos = [
     tocado.to && malos(destinatarios).length ? `${t("mail.to")}: ${malos(destinatarios).join(", ")}` : null,
-    tocado.cc && malos(copias).length ? `${t("mail.cc")}: ${malos(copias).join(", ")}` : null,
+    tocado.cc && malos(copias).length ? `${t("mail.comp.cc")}: ${malos(copias).join(", ")}` : null,
     tocado.bcc && malos(ocultas).length ? `${t("mail.bcc")}: ${malos(ocultas).join(", ")}` : null,
   ].filter(Boolean) as string[];
   // `puedeEnviar` SÍ mira todo en vivo: el botón no se habilita con basura
@@ -1072,7 +1072,7 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
             <div className="flex shrink-0 gap-2 pt-2.5 text-sm text-muted-foreground">
               {!verCc && (
                 <button type="button" className="hover:text-foreground hover:underline" onClick={() => setVerCc(true)}>
-                  {t("mail.cc")}
+                  {t("mail.comp.cc")}
                 </button>
               )}
               {!verBcc && (
@@ -1086,7 +1086,7 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
           {verCc && (
             <div className="mail-composer-row flex items-start gap-2 border-b border-border/40 px-5 focus-within:bg-muted/30">
               <label htmlFor="mail-cc" className="w-12 shrink-0 pt-2.5 text-sm text-muted-foreground">
-                {t("mail.cc")}
+                {t("mail.comp.cc")}
               </label>
               <RecipientsField
                 id="mail-cc"

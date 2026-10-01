@@ -41,6 +41,8 @@ export const paginas = {
   // ── Notificaciones (/notificaciones) ────────────────────────────────────────
   "page.notif.markAllRead": { es: "Marcar todas leídas", en: "Mark all as read" },
   "page.notif.archiveAll": { es: "Archivar todas", en: "Archive all" },
+  "page.notif.settings": { es: "Configuración de notificaciones", en: "Notification settings" },
+  "page.notif.loading": { es: "Cargando...", en: "Loading..." },
   "page.notif.module": { es: "Módulo", en: "Module" },
   "page.notif.clearFilters": { es: "Limpiar filtros", en: "Clear filters" },
   "page.notif.empty": { es: "No hay notificaciones.", en: "No notifications." },
@@ -119,6 +121,7 @@ export const paginas = {
   "phones.inUseDesc": { es: "Lo está usando {name}. Espera a que lo cierre para abrirlo.", en: "{name} is using it. Wait until they close it to open it." },
   "phones.someoneElse": { es: "otra persona", en: "someone else" },
   "phones.openError": { es: "No se pudo abrir el teléfono", en: "Couldn't open the phone" },
+  "phones.assignError": { es: "No se pudo asignar", en: "Couldn't assign" },
   "phones.noUrl": { es: "No llegó la URL", en: "No URL came back" },
   "phones.twoMinLeft": { es: "Te quedan 2 minutos", en: "2 minutes left" },
   "phones.twoMinLeftDesc": { es: "Se cierra solo. Toca Extender si sigues.", en: "It closes on its own. Tap Extend if you're still using it." },

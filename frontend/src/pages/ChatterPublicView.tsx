@@ -49,7 +49,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useLanguage } from "@/hooks/useLanguage";
-import { getTranslation, type Language, type TranslationKey } from "@/lib/i18n";
+import { getTranslation, type Language } from "@/lib/i18n";
 import type {
   ChatterSession,
   ChatterMessage,
@@ -69,22 +69,30 @@ const sb = supabaseAnon as unknown as { from: (t: string) => any };
 
 const DEVICE_KEY = "maven.chatter.deviceId";
 
-type TextoPublico = (k: TranslationKey, p?: Record<string, string | number>) => string;
+/** Los textos que en main ya eran bilingües por el selector del personaje
+ *  (`lang === "en" ? … : …`): el encabezado, el temporizador y la barra del
+ *  personaje. Solo estos siguen la regla «app en inglés O selector en
+ *  inglés». Todo lo demás de la pantalla sigue solo el idioma de la app
+ *  (t() normal): con la app en español se ve como siempre, aunque el
+ *  candidato elija EN en el selector. */
+type ClaveBilingue =
+  | "page.chatter.conversations"
+  | "page.chatter.online"
+  | "page.chatter.spent"
+  | "page.chatter.waiting"
+  | "page.chatter.timerStarts"
+  | "page.chatter.timeUp"
+  | "page.chatter.timeRemaining"
+  | "page.chatter.chatWith"
+  | "page.chatter.youArePlaying"
+  | "page.chatter.typing";
+type TextoBilingue = (k: ClaveBilingue, p?: Record<string, string | number>) => string;
 
-/** El idioma del texto de ESTA pantalla.
- *
- *  La vista pública la abre un candidato sin sesión: no tiene la barra de Maven
- *  ni su botón ES/EN. Lo único que tiene es el selector de idioma del personaje
- *  (LangSelect), que ya cambiaba el encabezado, el temporizador y la ficha. Por
- *  eso el texto sale en inglés si CUALQUIERA de los dos está en inglés: con la
- *  app en inglés, la pantalla está en inglés; y el candidato que elige EN no
- *  pierde lo que ya veía en inglés. El contenido del personaje sigue solo el
- *  selector (pVal), como siempre. */
-function useTextoPublico(): TextoPublico {
+function useTextoBilingue(): TextoBilingue {
   const { language } = useLanguage();
   const [lang] = useChatterLang();
   const idioma: Language = language === "en" || lang === "en" ? "en" : "es";
-  return useCallback<TextoPublico>((k, p) => getTranslation(k, idioma, p), [idioma]);
+  return useCallback<TextoBilingue>((k, p) => getTranslation(k, idioma, p), [idioma]);
 }
 
 const getDeviceId = (): string => {
@@ -313,7 +321,7 @@ const ReactionPickerChatter = ({
   align: "left" | "right";
   onPick: (emoji: string) => void;
 }) => {
-  const tp = useTextoPublico();
+  const { t } = useLanguage();
   const [open, setOpen] = useState(false);
   return (
     <div
@@ -325,8 +333,8 @@ const ReactionPickerChatter = ({
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="flex h-6 w-6 items-center justify-center rounded-full bg-background text-muted-foreground opacity-0 shadow-sm ring-1 ring-border transition-opacity hover:bg-muted hover:text-foreground hover:opacity-100 group-hover/bubble:opacity-100 data-[state=open]:opacity-100"
-        title={tp("common.react")}
-        aria-label={tp("common.react")}
+        title={t("common.react")}
+        aria-label={t("common.react")}
         data-state={open ? "open" : "closed"}
       >
         <Smile className="h-3.5 w-3.5" />
@@ -384,13 +392,13 @@ interface BubbleProps {
 
 const Bubble = ({ msg, fanName, fanAvatar, profile, side, readByOther, onOpenMedia, onDelete, onEdit, myReactionId, onReact, repliedTo, onReply }: BubbleProps) => {
   // El hook va ANTES del return temprano (regla de hooks).
-  const tp = useTextoPublico();
+  const { t } = useLanguage();
   if (msg.deleted === "full") return null;
 
   const quoteAuthor = (m: ChatterMessage): string =>
     m.role === "fan" ? fanName : profile?.name ?? "chatter";
   const quotePreview = (m: ChatterMessage): string =>
-    (m.content?.trim() || (m.images && m.images.length > 0 ? `📷 ${tp("page.chatter.photo")}` : tp("page.chatter.message")));
+    (m.content?.trim() || (m.images && m.images.length > 0 ? `📷 ${t("page.chatter.photo")}` : t("page.chatter.message")));
 
   if (msg.role === "system") {
     const isTip = msg.msg_type === "tip";
@@ -486,8 +494,8 @@ const Bubble = ({ msg, fanName, fanAvatar, profile, side, readByOther, onOpenMed
                   <button
                     type="button"
                     className="absolute -right-2 -top-2 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-background text-muted-foreground opacity-0 shadow-sm ring-1 ring-border transition-opacity hover:bg-muted hover:text-foreground group-hover/bubble:opacity-100 data-[state=open]:opacity-100"
-                    title={tp("page.chatter.msgOptions")}
-                    aria-label={tp("page.chatter.msgOptions")}
+                    title={t("page.chatter.msgOptions")}
+                    aria-label={t("page.chatter.msgOptions")}
                   >
                     <MoreVertical className="h-3 w-3" />
                   </button>
@@ -495,14 +503,14 @@ const Bubble = ({ msg, fanName, fanAvatar, profile, side, readByOther, onOpenMed
                 <DropdownMenuContent align="end" className="w-44">
                   <DropdownMenuItem onClick={() => onEdit(msg)}>
                     <Pencil className="mr-2 h-3.5 w-3.5" />
-                    {tp("page.chatter.editMsg")}
+                    {t("page.chatter.editMsg")}
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={() => onDelete(msg)}
                     className="text-destructive focus:text-destructive"
                   >
                     <Trash2 className="mr-2 h-3.5 w-3.5" />
-                    {tp("page.chatter.deleteMsg")}
+                    {t("page.chatter.deleteMsg")}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -519,8 +527,8 @@ const Bubble = ({ msg, fanName, fanAvatar, profile, side, readByOther, onOpenMed
               type="button"
               onClick={() => onReply(msg)}
               className={`absolute -top-2 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-background text-muted-foreground opacity-0 shadow-sm ring-1 ring-border transition-opacity hover:bg-muted hover:text-foreground group-hover/bubble:opacity-100 ${isMine ? "-left-2" : "-right-2"}`}
-              title={tp("page.chatter.replyQuote")}
-              aria-label={tp("common.reply")}
+              title={t("page.chatter.replyQuote")}
+              aria-label={t("common.reply")}
             >
               <Reply className="h-3 w-3" />
             </button>
@@ -584,47 +592,47 @@ const Bubble = ({ msg, fanName, fanAvatar, profile, side, readByOther, onOpenMed
 };
 
 const LockedScreen = ({ onRetry, busy }: { onRetry: () => void; busy: boolean }) => {
-  const tp = useTextoPublico();
+  const { t } = useLanguage();
   return (
     <div className="flex h-screen flex-col items-center justify-center gap-4 bg-background p-6 text-center">
       <Lock className="h-12 w-12 text-warning" />
-      <h1 className="text-xl font-bold">{tp("page.chatter.lockedTitle")}</h1>
+      <h1 className="text-xl font-bold">{t("page.chatter.lockedTitle")}</h1>
       <p className="max-w-sm text-sm text-muted-foreground">
-        {tp("page.chatter.lockedDesc")}
+        {t("page.chatter.lockedDesc")}
       </p>
       <button
         onClick={onRetry}
         disabled={busy}
         className="mt-1 inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
       >
-        {busy ? tp("page.chatter.retrying") : tp("common.retry")}
+        {busy ? t("page.chatter.retrying") : t("common.retry")}
       </button>
       <p className="max-w-sm text-[11px] text-muted-foreground/70">
-        {tp("page.chatter.lockedHint")}
+        {t("page.chatter.lockedHint")}
       </p>
     </div>
   );
 };
 
 const NotFoundScreen = ({ reason }: { reason: string }) => {
-  const tp = useTextoPublico();
+  const { t } = useLanguage();
   return (
     <div className="flex h-screen flex-col items-center justify-center gap-4 bg-background p-6 text-center">
       <AlertTriangle className="h-12 w-12 text-destructive" />
-      <h1 className="text-xl font-bold">{tp("page.chatter.unavailable")}</h1>
+      <h1 className="text-xl font-bold">{t("page.chatter.unavailable")}</h1>
       <p className="max-w-sm text-sm text-muted-foreground">{reason}</p>
     </div>
   );
 };
 
 const TabLockedScreen = () => {
-  const tp = useTextoPublico();
+  const { t } = useLanguage();
   return (
     <div className="flex h-screen flex-col items-center justify-center gap-4 bg-background p-6 text-center">
       <Lock className="h-12 w-12 text-warning" />
-      <h1 className="text-xl font-bold">{tp("page.chatter.otherTabTitle")}</h1>
+      <h1 className="text-xl font-bold">{t("page.chatter.otherTabTitle")}</h1>
       <p className="max-w-sm text-sm text-muted-foreground">
-        {tp("page.chatter.otherTabDesc")}
+        {t("page.chatter.otherTabDesc")}
       </p>
     </div>
   );
@@ -637,17 +645,17 @@ const TabTakeoverScreen = ({
   onUseHere: () => void;
   onCancel: () => void;
 }) => {
-  const tp = useTextoPublico();
+  const { t } = useLanguage();
   return (
     <div className="flex h-screen flex-col items-center justify-center gap-4 bg-background p-6 text-center">
       <div className="text-5xl">👥</div>
-      <h1 className="text-xl font-bold">{tp("page.chatter.takeoverTitle")}</h1>
+      <h1 className="text-xl font-bold">{t("page.chatter.takeoverTitle")}</h1>
       <p className="max-w-sm text-sm text-muted-foreground">
-        {tp("page.chatter.takeoverDesc")}
+        {t("page.chatter.takeoverDesc")}
       </p>
       <div className="mt-2 flex gap-3">
-        <Button variant="outline" onClick={onCancel}>{tp("common.cancel")}</Button>
-        <Button onClick={onUseHere}>{tp("page.chatter.useHere")}</Button>
+        <Button variant="outline" onClick={onCancel}>{t("common.cancel")}</Button>
+        <Button onClick={onUseHere}>{t("page.chatter.useHere")}</Button>
       </div>
     </div>
   );
@@ -678,10 +686,11 @@ const formatRemaining = (ms: number): string => {
 };
 
 const ChatterPublicView = () => {
-  const tp = useTextoPublico();
+  const { t } = useLanguage();
+  const tl = useTextoBilingue();
   // Para los efectos: leen el texto del render MÁS NUEVO sin volver a correr.
-  const tpRef = useRef(tp);
-  tpRef.current = tp;
+  const tRef = useRef(t);
+  tRef.current = t;
   const { sessionId } = useParams<{ sessionId: string }>();
   const qc = useQueryClient();
   const [input, setInput] = useState("");
@@ -702,7 +711,7 @@ const ChatterPublicView = () => {
     } catch (e) {
       const msg = (e as Error).message;
       if (!(msg.includes("session_locked") || msg.includes("Otro dispositivo") || msg.includes("en curso"))) {
-        toast.error(tp("page.chatter.joinError"), { description: msg });
+        toast.error(t("page.chatter.joinError"), { description: msg });
       }
       // sigue bloqueado: el candado todavía está vigente
     } finally {
@@ -900,7 +909,7 @@ const ChatterPublicView = () => {
           // join" error on top of it.
           return;
         } else {
-          if (!cancelled) toast.error(tpRef.current("page.chatter.joinSessionError"), { description: msg });
+          if (!cancelled) toast.error(tRef.current("page.chatter.joinSessionError"), { description: msg });
         }
       }
     };
@@ -1024,10 +1033,10 @@ const ChatterPublicView = () => {
         const isPurchase = newestEvent.msg_type === "purchase";
         const who = configQ.data?.fan_name ?? "JavixBuster";
         toast(
-          isPurchase ? `🎉 ${tpRef.current("page.chatter.congrats")}` : `💸 ${tpRef.current("page.chatter.gotTip")}`,
+          isPurchase ? `🎉 ${tRef.current("page.chatter.congrats")}` : `💸 ${tRef.current("page.chatter.gotTip")}`,
           {
             description: isPurchase
-              ? tpRef.current("page.chatter.boughtContent", { name: who, price: newestEvent.price })
+              ? tRef.current("page.chatter.boughtContent", { name: who, price: newestEvent.price })
               : `$${newestEvent.price} USD`,
             duration: 7000,
             className: isPurchase
@@ -1116,7 +1125,7 @@ const ChatterPublicView = () => {
       callChatterApi("set-typing", { sessionId, typing: false }).catch(() => {});
     } catch (e) {
       if (!isSessionEndedError(e)) {
-        toast.error(tp("common.couldNotSend"), { description: (e as Error).message });
+        toast.error(t("common.couldNotSend"), { description: (e as Error).message });
         setInput(text);
       }
     }
@@ -1125,8 +1134,8 @@ const ChatterPublicView = () => {
   const handleFileUpload = async (file: File) => {
     if (!sessionId) return;
     if (file.size > 8 * 1024 * 1024) {
-      toast.error(tp("page.chatter.fileTooBig"), {
-        description: tp("page.chatter.fileTooBigDesc"),
+      toast.error(t("page.chatter.fileTooBig"), {
+        description: t("page.chatter.fileTooBigDesc"),
       });
       return;
     }
@@ -1148,10 +1157,10 @@ const ChatterPublicView = () => {
         images: [upload.url],
       });
       qc.invalidateQueries({ queryKey: ["chatter-public-messages", sessionId] });
-      toast.success(tp("page.chatter.imageSent"));
+      toast.success(t("page.chatter.imageSent"));
     } catch (e) {
       if (!isSessionEndedError(e)) {
-        toast.error(tp("common.couldNotUpload"), { description: (e as Error).message });
+        toast.error(t("common.couldNotUpload"), { description: (e as Error).message });
       }
     } finally {
       setUploading(false);
@@ -1170,7 +1179,7 @@ const ChatterPublicView = () => {
       if (files.length > 0) {
         setUploading(true);
         for (const file of files) {
-          if (file.size > 8 * 1024 * 1024) throw new Error(tp("page.chatter.fileMax8", { name: file.name || tp("page.chatter.file") }));
+          if (file.size > 8 * 1024 * 1024) throw new Error(t("page.chatter.fileMax8", { name: file.name || t("page.chatter.file") }));
           const base64 = await fileToBase64(file);
           const up = await callChatterApi("upload-image", { sessionId, fileName: file.name, contentType: file.type, base64 });
           images.push(up.url);
@@ -1182,7 +1191,7 @@ const ChatterPublicView = () => {
       callChatterApi("set-typing", { sessionId, typing: false }).catch(() => {});
       qc.invalidateQueries({ queryKey: ["chatter-public-messages", sessionId] });
     } catch (e) {
-      if (!isSessionEndedError(e)) toast.error(tp("common.couldNotSend"), { description: (e as Error).message });
+      if (!isSessionEndedError(e)) toast.error(t("common.couldNotSend"), { description: (e as Error).message });
       throw e;
     } finally {
       setUploading(false);
@@ -1198,7 +1207,7 @@ const ChatterPublicView = () => {
       await callChatterApi("send", { sessionId, images: [mp4Url], replyToId: replyId });
       qc.invalidateQueries({ queryKey: ["chatter-public-messages", sessionId] });
     } catch (e) {
-      if (!isSessionEndedError(e)) toast.error(tp("page.chatter.gifError"), { description: (e as Error).message });
+      if (!isSessionEndedError(e)) toast.error(t("page.chatter.gifError"), { description: (e as Error).message });
     }
   };
 
@@ -1210,7 +1219,7 @@ const ChatterPublicView = () => {
     setUploading(true);
     try {
       const resp = await fetch(signedUrl);
-      if (!resp.ok) throw new Error(tp("page.chatter.stickerReadError"));
+      if (!resp.ok) throw new Error(t("page.chatter.stickerReadError"));
       const blob = await resp.blob();
       const ext = blob.type.includes("gif") ? "gif" : "webp";
       const ctype = blob.type || "image/webp";
@@ -1220,7 +1229,7 @@ const ChatterPublicView = () => {
       await callChatterApi("send", { sessionId, images: [up.url], replyToId: replyId });
       qc.invalidateQueries({ queryKey: ["chatter-public-messages", sessionId] });
     } catch (e) {
-      if (!isSessionEndedError(e)) toast.error(tp("page.chatter.stickerError"), { description: (e as Error).message });
+      if (!isSessionEndedError(e)) toast.error(t("page.chatter.stickerError"), { description: (e as Error).message });
     } finally {
       setUploading(false);
     }
@@ -1303,7 +1312,7 @@ const ChatterPublicView = () => {
 
   // Locale-aware character/persona name (used in placeholders, persona bar).
   const personaName =
-    pVal(profile as unknown as Record<string, unknown>, "name", lang) || profile?.name || tp("page.chatter.theCharacter");
+    pVal(profile as unknown as Record<string, unknown>, "name", lang) || profile?.name || t("page.chatter.theCharacter");
 
   // Loading
   if (sessionQ.isLoading) {
@@ -1314,8 +1323,8 @@ const ChatterPublicView = () => {
     );
   }
 
-  if (!session) return <NotFoundScreen reason={tp("page.chatter.notFound")} />;
-  if (session.status === "ended") return <NotFoundScreen reason={tp("page.chatter.ended")} />;
+  if (!session) return <NotFoundScreen reason={t("page.chatter.notFound")} />;
+  if (session.status === "ended") return <NotFoundScreen reason={t("page.chatter.ended")} />;
   if (locked) return <LockedScreen onRetry={retryClaim} busy={takingOver} />;
   if (tabState === "blocked") return <TabLockedScreen />;
   if (tabState === "prompt") {
@@ -1360,7 +1369,7 @@ const ChatterPublicView = () => {
       <aside className="hidden w-[260px] shrink-0 flex-col border-r bg-card md:flex">
         <div className="border-b p-5">
           <div className="mb-4 text-xs font-bold text-muted-foreground">
-            {tp("page.chatter.conversations")}
+            {tl("page.chatter.conversations")}
           </div>
           <div className="flex items-center gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3">
             <div className="aspect-square h-10 w-10 shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-purple-600 to-amber-500">
@@ -1372,11 +1381,11 @@ const ChatterPublicView = () => {
               <div className="truncate text-sm font-bold">{fanName}</div>
               <div className="flex items-center gap-1.5 text-[11px] text-success">
                 <span className="inline-block h-1.5 w-1.5 rounded-full bg-success" />
-                {tp("page.chatter.online")}
+                {tl("page.chatter.online")}
               </div>
               {/* Total spent — mirrors chatterTotalSpent in the original. */}
               <div className="mt-1 font-mono text-[13px] font-bold text-amber-500">
-                {tp("page.chatter.spent", { amount: totalSpent })}
+                {tl("page.chatter.spent", { amount: totalSpent })}
               </div>
             </div>
           </div>
@@ -1389,10 +1398,10 @@ const ChatterPublicView = () => {
             // 'active' and stamps started_at on first send).
             <>
               <div className="rounded-xl bg-muted p-4 text-center font-mono text-3xl font-bold text-muted-foreground">
-                {tp("page.chatter.waiting")}
+                {tl("page.chatter.waiting")}
               </div>
               <div className="mt-3 text-center text-xs text-muted-foreground">
-                {tp("page.chatter.timerStarts")}
+                {tl("page.chatter.timerStarts")}
               </div>
             </>
           ) : (
@@ -1406,8 +1415,8 @@ const ChatterPublicView = () => {
               </div>
               <div className="mt-3 text-center text-xs text-muted-foreground">
                 {timerExpired
-                  ? tp("page.chatter.timeUp")
-                  : tp("page.chatter.timeRemaining")}
+                  ? tl("page.chatter.timeUp")
+                  : tl("page.chatter.timeRemaining")}
               </div>
             </>
           )}
@@ -1428,7 +1437,7 @@ const ChatterPublicView = () => {
             <div className="truncate text-sm font-semibold">{fanName}</div>
           </div>
           <span className="hidden text-sm font-bold md:inline">
-            {tp("page.chatter.chatWith", { name: fanName })}
+            {tl("page.chatter.chatWith", { name: fanName })}
           </span>
           <div className="flex items-center gap-2">
             {/* Mobile timer chip — mientras la sesión está waiting muestra
@@ -1448,12 +1457,12 @@ const ChatterPublicView = () => {
         {profile && (
           <div className="border-b bg-amber-500/5 px-5 py-2 text-xs">
             <span className="text-muted-foreground">
-              {tp("page.chatter.youArePlaying")}{" "}
+              {tl("page.chatter.youArePlaying")}{" "}
             </span>
             <strong className="text-foreground">{personaName}</strong>
             {examinerTyping && (
               <span className="ml-2 text-muted-foreground">
-                · {tp("page.chatter.typing", { name: fanName })}
+                · {tl("page.chatter.typing", { name: fanName })}
               </span>
             )}
           </div>
@@ -1463,11 +1472,11 @@ const ChatterPublicView = () => {
         <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto p-4" style={{ fontSize: `${fontSize}px` }}>
           <div className="space-y-3">
             {messagesQ.isLoading && (
-              <p className="text-xs text-muted-foreground">{tp("common.loading")}</p>
+              <p className="text-xs text-muted-foreground">{t("common.loading")}</p>
             )}
             {!messagesQ.isLoading && messages.length === 0 && (
               <p className="rounded-md bg-muted/50 p-4 text-center text-xs text-muted-foreground">
-                {tp("page.chatter.noMessagesYet", { fan: fanName, persona: personaName })}
+                {t("page.chatter.noMessagesYet", { fan: fanName, persona: personaName })}
               </p>
             )}
             {messages
@@ -1500,7 +1509,7 @@ const ChatterPublicView = () => {
                     emoji,
                   }).catch((e) => {
                     if (!isSessionEndedError(e)) {
-                      toast.error(tp("page.chatter.reactError"), {
+                      toast.error(t("page.chatter.reactError"), {
                         description: (e as Error).message,
                       });
                     }
@@ -1518,7 +1527,7 @@ const ChatterPublicView = () => {
           value={input}
           onChange={handleInputChange}
           onSend={composerSend}
-          placeholder={tp("page.chatter.replyAs", { name: personaName })}
+          placeholder={t("page.chatter.replyAs", { name: personaName })}
           busy={uploading}
           emojis={chatterEmojis}
           onAddEmoji={(e) => setChatterEmojis((curr) => (curr.includes(e) ? curr : [...curr, e]))}
@@ -1530,18 +1539,18 @@ const ChatterPublicView = () => {
                 <Reply className="h-4 w-4 shrink-0 text-primary" />
                 <div className="min-w-0 flex-1">
                   <div className="text-[11px] font-semibold text-primary">
-                    {tp("page.chatter.replyingTo", { name: replyTo.role === "fan" ? fanName : personaName })}
+                    {t("page.chatter.replyingTo", { name: replyTo.role === "fan" ? fanName : personaName })}
                   </div>
                   <div className="truncate text-xs text-muted-foreground">
-                    {replyTo.content?.trim() || (replyTo.images && replyTo.images.length > 0 ? `📷 ${tp("page.chatter.photo")}` : tp("page.chatter.message"))}
+                    {replyTo.content?.trim() || (replyTo.images && replyTo.images.length > 0 ? `📷 ${t("page.chatter.photo")}` : t("page.chatter.message"))}
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setReplyTo(null)}
                   className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-                  title={tp("page.chatter.cancelReply")}
-                  aria-label={tp("page.chatter.cancelReply")}
+                  title={t("page.chatter.cancelReply")}
+                  aria-label={t("page.chatter.cancelReply")}
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -1557,8 +1566,8 @@ const ChatterPublicView = () => {
                 size="icon"
                 variant="ghost"
                 className="h-9 w-9 text-muted-foreground"
-                title={tp("page.chatter.characterVault")}
-                aria-label={tp("page.chatter.characterVault")}
+                title={t("page.chatter.characterVault")}
+                aria-label={t("page.chatter.characterVault")}
                 disabled={!profile}
               >
                 <FolderOpen className="h-4 w-4" />
@@ -1588,9 +1597,9 @@ const ChatterPublicView = () => {
           try {
             await sendVaultItemMut.mutateAsync({ item, price, caption });
             setVaultOpen(false);
-            toast.success(price ? tp("page.chatter.sentAsPurchase", { price }) : tp("page.chatter.itemSent"));
+            toast.success(price ? t("page.chatter.sentAsPurchase", { price }) : t("page.chatter.itemSent"));
           } catch (e) {
-            toast.error(tp("common.couldNotSend"), { description: (e as Error).message });
+            toast.error(t("common.couldNotSend"), { description: (e as Error).message });
           }
         }}
         sending={sendVaultItemMut.isPending}
@@ -1610,16 +1619,16 @@ const ChatterPublicView = () => {
       >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{tp("page.chatter.editMsg")}</DialogTitle>
+            <DialogTitle>{t("page.chatter.editMsg")}</DialogTitle>
             <DialogDescription>
-              {tp("page.chatter.editDesc")}
+              {t("page.chatter.editDesc")}
             </DialogDescription>
           </DialogHeader>
           <Textarea
             value={editDraft}
             onChange={(e) => setEditDraft(e.target.value)}
             rows={4}
-            placeholder={tp("page.chatter.msgText")}
+            placeholder={t("page.chatter.msgText")}
             className="resize-none"
           />
           <DialogFooter>
@@ -1632,7 +1641,7 @@ const ChatterPublicView = () => {
               }}
               disabled={editSaving}
             >
-              {tp("common.cancel")}
+              {t("common.cancel")}
             </button>
             <button
               type="button"
@@ -1656,7 +1665,7 @@ const ChatterPublicView = () => {
                   setEditDraft("");
                 } catch (e) {
                   if (!isSessionEndedError(e)) {
-                    toast.error(tp("page.chatter.editError"), {
+                    toast.error(t("page.chatter.editError"), {
                       description: (e as Error).message,
                     });
                   }
@@ -1666,7 +1675,7 @@ const ChatterPublicView = () => {
               }}
               disabled={editSaving || !editDraft.trim()}
             >
-              {editSaving ? tp("page.chatter.saving") : tp("common.save")}
+              {editSaving ? t("page.chatter.saving") : t("common.save")}
             </button>
           </DialogFooter>
         </DialogContent>
@@ -1676,9 +1685,9 @@ const ChatterPublicView = () => {
       <AlertDialog open={!!confirmDelMsg} onOpenChange={(o) => !o && setConfirmDelMsg(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{tp("page.chatter.deleteMsg")}</AlertDialogTitle>
+            <AlertDialogTitle>{t("page.chatter.deleteMsg")}</AlertDialogTitle>
             <AlertDialogDescription>
-              {tp("page.chatter.deleteConfirm")}
+              {t("page.chatter.deleteConfirm")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1696,7 +1705,7 @@ const ChatterPublicView = () => {
                   });
                   setConfirmDelMsg(null);
                 } catch (err) {
-                  toast.error(tp("common.couldNotDelete"), {
+                  toast.error(t("common.couldNotDelete"), {
                     description: (err as Error).message,
                   });
                 } finally {
@@ -1706,7 +1715,7 @@ const ChatterPublicView = () => {
               disabled={deletingMsg}
             >
               {deletingMsg && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {tp("common.delete")}
+              {t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1742,7 +1751,7 @@ const VaultPickerDialog = ({
   onSend,
   sending,
 }: VaultPickerProps) => {
-  const tp = useTextoPublico();
+  const { t } = useLanguage();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [priceChoice, setPriceChoice] = useState<PriceChoice>(null);
   const [customPriceStr, setCustomPriceStr] = useState("");
@@ -1790,9 +1799,9 @@ const VaultPickerDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl">
         <DialogHeader>
-          <DialogTitle>{tp("page.chatter.vaultOf", { name: profileName })}</DialogTitle>
+          <DialogTitle>{t("page.chatter.vaultOf", { name: profileName })}</DialogTitle>
           <DialogDescription>
-            {tp("page.chatter.vaultDesc")}
+            {t("page.chatter.vaultDesc")}
           </DialogDescription>
         </DialogHeader>
 
@@ -1804,7 +1813,7 @@ const VaultPickerDialog = ({
           ) : items.length === 0 ? (
             <div className="flex flex-col items-center gap-2 p-8 text-center text-muted-foreground">
               <ImageIcon className="h-8 w-8" />
-              <p className="text-sm">{tp("page.chatter.vaultEmpty")}</p>
+              <p className="text-sm">{t("page.chatter.vaultEmpty")}</p>
             </div>
           ) : (
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
@@ -1867,7 +1876,7 @@ const VaultPickerDialog = ({
                 onClick={() => setSelectedId(null)}
                 size="icon"
                 variant="ghost"
-                aria-label={tp("page.chatter.clearSelection")}
+                aria-label={t("page.chatter.clearSelection")}
               >
                 <X className="h-4 w-4" />
               </Button>
@@ -1875,14 +1884,14 @@ const VaultPickerDialog = ({
             <Input
               value={caption}
               onChange={(e) => setCaption(e.target.value)}
-              placeholder={tp("page.chatter.captionPlaceholder")}
+              placeholder={t("page.chatter.captionPlaceholder")}
             />
 
             {/* Required price tier picker — mirrors the examiner's quick-tip
                 popover but with $0 (free) as a valid choice. */}
             <div>
               <div className="mb-1.5 text-xs font-medium text-muted-foreground">
-                {tp("page.chatter.price")} <span className="text-destructive">*</span>
+                {t("page.chatter.price")} <span className="text-destructive">*</span>
               </div>
               <div className="grid grid-cols-4 gap-1.5">
                 {VAULT_PRICE_PRESETS.map((amt) => {
@@ -1901,7 +1910,7 @@ const VaultPickerDialog = ({
                         setCustomPriceStr("");
                       }}
                     >
-                      {amt === 0 ? tp("page.chatter.free") : `$${amt}`}
+                      {amt === 0 ? t("page.chatter.free") : `$${amt}`}
                     </Button>
                   );
                 })}
@@ -1914,7 +1923,7 @@ const VaultPickerDialog = ({
                   }`}
                   onClick={() => setPriceChoice("custom")}
                 >
-                  {tp("page.chatter.other")}
+                  {t("page.chatter.other")}
                 </Button>
               </div>
               {priceChoice === "custom" && (
@@ -1927,7 +1936,7 @@ const VaultPickerDialog = ({
                     autoFocus
                     value={customPriceStr}
                     onChange={(e) => setCustomPriceStr(e.target.value)}
-                    placeholder={tp("page.chatter.amount")}
+                    placeholder={t("page.chatter.amount")}
                     className="max-w-[140px]"
                   />
                 </div>
@@ -1938,24 +1947,24 @@ const VaultPickerDialog = ({
 
         <DialogFooter className="gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={sending}>
-            {tp("common.cancel")}
+            {t("common.cancel")}
           </Button>
           <Button
             onClick={handleSend}
             disabled={!canSend}
             title={
               !selected
-                ? tp("page.chatter.pickItem")
+                ? t("page.chatter.pickItem")
                 : priceChoice === null
-                ? tp("page.chatter.pickPrice")
+                ? t("page.chatter.pickPrice")
                 : priceChoice === "custom" && resolvedPrice === null
-                ? tp("page.chatter.validAmount")
+                ? t("page.chatter.validAmount")
                 : undefined
             }
             className="gap-2"
           >
             {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            {tp("common.send")}
+            {t("common.send")}
 
             {resolvedPrice !== null && resolvedPrice > 0 && ` · $${resolvedPrice}`}
           </Button>

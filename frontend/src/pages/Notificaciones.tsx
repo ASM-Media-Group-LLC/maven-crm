@@ -79,7 +79,7 @@ const Notificaciones = () => {
                 <Button variant="outline" size="sm" className="gap-1 text-xs" title={t("page.notif.archiveAll")} aria-label={t("page.notif.archiveAll")} onClick={() => archiveAll.mutate()}>
                   <Archive className="h-3 w-3" /> <span className="hidden sm:inline">{t("page.notif.archiveAll")}</span>
                 </Button>
-                <Button variant="outline" size="sm" className="gap-1" title={t("settings.notif.title")} aria-label={t("settings.notif.title")} onClick={() => navigate("/ajustes/notificaciones")}>
+                <Button variant="outline" size="sm" className="gap-1" title={t("page.notif.settings")} aria-label={t("page.notif.settings")} onClick={() => navigate("/ajustes/notificaciones")}>
                   <Settings className="h-3.5 w-3.5" />
                 </Button>
               </>
@@ -129,12 +129,11 @@ const Notificaciones = () => {
         <div className="flex-1 overflow-auto">
           <div className="border-b-0 bg-card divide-y">
             {isLoading ? (
-              <div className="p-8 text-center text-sm text-muted-foreground">{t("common.loading")}</div>
+              <div className="p-8 text-center text-sm text-muted-foreground">{t("page.notif.loading")}</div>
             ) : notifications.length === 0 ? (
               <EmptyState
                 seed="notificaciones"
                 title={hasFilters ? t("page.notif.emptyFiltered") : t("page.notif.empty")}
-
               />
             ) : (
               notifications.map((n) => (

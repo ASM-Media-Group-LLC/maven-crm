@@ -24,7 +24,7 @@ const CANALES: { canal: CanalDeAviso; label: TranslationKey; icon: typeof Bell; 
 ];
 
 // El nombre del módulo se GUARDA en notification_preferences.module (es dato y
-// no cambia); acá solo se elige cómo se muestra. Uno que no esté en el mapa se
+// no cambia); aquí solo se elige cómo se muestra. Uno que no esté en el mapa se
 // muestra tal cual (los nombres propios: Messenger, Cowork, Closers).
 const NOMBRE_DEL_MODULO: Record<string, TranslationKey> = {
   Correo: "settings.notif.ev.mod.mail",
