@@ -5,6 +5,7 @@ import {
   caidaSePaga, equipoDeCuerpo, estadoDeTiempo, latidoDeCuerpo, latidoDeEquipoAfuera, noCobrabaAlCaerse, sinConexionPagadaMs,
   LATIDO_VENCIDO_MS, TOPE_SIN_CONEXION_MS, VENTANA_SIN_CONEXION_MS, type Exigencias, type TramoGuardado,
 } from "../_shared/cowork-tiempo.ts";
+import { agenciaDePersona, agenciaDeSesion, revisarPedido, topeDeLaTabla } from "./agencia.ts";
 
 const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
 
@@ -215,6 +216,8 @@ serve(async (req) => {
       }
     };
 
+    // Admin de SU agencia: la guarda de agencia (más abajo) ya dejó afuera todo
+    // lo que no es de la agencia de quien llama.
     const esAdmin = async (uid: string): Promise<boolean> => {
       const { data } = await admin.from("user_roles").select("user_id").eq("user_id", uid).eq("role", "admin").maybeSingle();
       return !!data;
@@ -227,6 +230,14 @@ serve(async (req) => {
     const body = await req.json();
     const { action } = body;
 
+    // ── Cowork por agencia ────────────────────────────────────────────────
+    // Todo lo que nombra el pedido (sesión, salas, meet, pedidos) tiene que ser
+    // de la agencia de quien llama y, si el pedido nombra una sesión, de ESA
+    // sesión. Corre antes de cualquier acción (ver agencia.ts).
+    const miAgencia = await agenciaDePersona(admin, userId);
+    const veredicto = await revisarPedido(admin, miAgencia, String(action ?? ""), body ?? {});
+    if (!veredicto.ok) return err(req, veredicto.error, veredicto.status);
+
     const lkUrl = Deno.env.get("LIVEKIT_URL")!;
     const lkKey = Deno.env.get("LIVEKIT_API_KEY")!;
     const lkSecret = Deno.env.get("LIVEKIT_API_SECRET")!;
@@ -235,6 +246,8 @@ serve(async (req) => {
     // CREATE COWORK SESSION
     // ═══════════════════════════════════════════════════════════════
     if (action === "createSession") {
+      // La sesión queda en la agencia de quien la crea (la pone la base).
+      if (!miAgencia) return err(req, "Tu cuenta no está en ninguna agencia. Pídele a un admin que te agregue.", 403);
       // Crear una sesión es una acción de COORDINACIÓN. La regla vive en la DB
       // (can_use_module_function) para que el front y esta función no se
       // desincronicen: si el rol tiene fila explícita para Cowork → "Crear
@@ -515,6 +528,11 @@ serve(async (req) => {
       const { data: room } = await admin.from("cowork_rooms")
         .select("id, session_id, name").eq("join_code", code).maybeSingle();
       if (!room) return err(req, "Código inválido. Pídele el código a tu coordinador.", 404);
+      // El código de una sala de otra agencia es un código inválido: no se
+      // confirma que existe.
+      if (!miAgencia || (await agenciaDeSesion(admin, room.session_id)) !== miAgencia) {
+        return err(req, "Código inválido. Pídele el código a tu coordinador.", 404);
+      }
 
       const { data: session } = await admin.from("cowork_sessions")
         .select("id, name, status").eq("id", room.session_id).maybeSingle();
@@ -904,7 +922,7 @@ serve(async (req) => {
 
         if (!targetRoomId) return err(req, "roomId required for hosts joining a room");
 
-        const { data: room } = await admin.from("cowork_rooms").select("livekit_room_name").eq("id", targetRoomId).single();
+        const { data: room } = await admin.from("cowork_rooms").select("livekit_room_name").eq("id", targetRoomId).eq("session_id", sessionId).maybeSingle();
         if (!room) return err(req, "Room not found");
 
         // TODOS los miembros de la sala pueden compartir pantalla directo (pedido del
@@ -927,7 +945,7 @@ serve(async (req) => {
       if (purpose === "preview_room") {
         if (!isHost) return err(req, "Only hosts can preview rooms", 403);
         if (!roomId) return err(req, "roomId required");
-        const { data: room } = await admin.from("cowork_rooms").select("livekit_room_name").eq("id", roomId).single();
+        const { data: room } = await admin.from("cowork_rooms").select("livekit_room_name").eq("id", roomId).eq("session_id", sessionId).maybeSingle();
         if (!room) return err(req, "Room not found");
         const token = await createLKToken(lkKey, lkSecret, `${userId}__preview`, userName, {
           roomJoin: true, room: room.livekit_room_name, canPublish: false, canSubscribe: true, canPublishData: false, hidden: true,
@@ -943,7 +961,7 @@ serve(async (req) => {
       if (purpose === "monitor_room") {
         if (!isHost) return err(req, "Only hosts can monitor rooms", 403);
         if (!roomId) return err(req, "roomId required");
-        const { data: room } = await admin.from("cowork_rooms").select("livekit_room_name").eq("id", roomId).single();
+        const { data: room } = await admin.from("cowork_rooms").select("livekit_room_name").eq("id", roomId).eq("session_id", sessionId).maybeSingle();
         if (!room) return err(req, "Room not found");
         // La identidad lleva el id de la PESTAÑA, no solo el del usuario.
         //
@@ -978,6 +996,14 @@ serve(async (req) => {
     if (action === "requestHost") {
       const { sessionId, roomId, message, requestOneOnOne } = body;
       if (!sessionId || !roomId) return err(req, "sessionId and roomId required");
+      // Solo quien está en la sesión, y desde una sala de ESA sesión: antes
+      // cualquiera con sesión iniciada le metía pedidos al tablero de otro.
+      const { data: miembro } = await admin.from("cowork_memberships")
+        .select("role").eq("session_id", sessionId).eq("user_id", userId).maybeSingle();
+      if (!miembro) return err(req, "Not a member of this session", 403);
+      const { data: salaDelPedido } = await admin.from("cowork_rooms")
+        .select("id").eq("id", roomId).eq("session_id", sessionId).maybeSingle();
+      if (!salaDelPedido) return err(req, "Room not found");
 
       // Check for existing open/acknowledged request from this user
       const { data: existingReq } = await admin.from("cowork_host_requests")
@@ -1073,6 +1099,15 @@ serve(async (req) => {
     if (action === "requestScreenShare") {
       const { sessionId, roomId } = body;
       if (!sessionId || !roomId) return err(req, "sessionId and roomId required");
+      // Igual que requestHost: miembro de la sesión y sala de ESA sesión. Antes
+      // un pedido apuntaba a una sala ajena y quien lo aprobaba (el mismo, si
+      // era host de su propia sesión) recibía un token para publicar en ella.
+      const { data: miembro } = await admin.from("cowork_memberships")
+        .select("role").eq("session_id", sessionId).eq("user_id", userId).maybeSingle();
+      if (!miembro) return err(req, "Not a member of this session", 403);
+      const { data: salaDelPedido } = await admin.from("cowork_rooms")
+        .select("id").eq("id", roomId).eq("session_id", sessionId).maybeSingle();
+      if (!salaDelPedido) return err(req, "Room not found");
 
       // Check not already pending
       const { data: existing } = await admin.from("cowork_screenshare_requests").select("id").eq("session_id", sessionId).eq("user_id", userId).eq("status", "pending");
@@ -1108,7 +1143,7 @@ serve(async (req) => {
 
       // If approved, issue a new token with screen share permission
       if (approve) {
-        const { data: room } = await admin.from("cowork_rooms").select("livekit_room_name").eq("id", ssReq.room_id).single();
+        const { data: room } = await admin.from("cowork_rooms").select("livekit_room_name").eq("id", ssReq.room_id).eq("session_id", ssReq.session_id).maybeSingle();
         const { data: requesterProfile } = await admin.from("profiles").select("full_name").eq("id", ssReq.user_id).single();
         if (room) {
           const identity = ssReq.user_id;
@@ -1142,7 +1177,7 @@ serve(async (req) => {
       if (claimErr) console.error("claimScreenShareToken status update:", claimErr.message);
 
       // Issue token with full publish permissions (including screen share)
-      const { data: room } = await admin.from("cowork_rooms").select("livekit_room_name").eq("id", ssReq.room_id).single();
+      const { data: room } = await admin.from("cowork_rooms").select("livekit_room_name").eq("id", ssReq.room_id).eq("session_id", ssReq.session_id).maybeSingle();
       if (!room) return err(req, "Room not found");
 
       const identity = userId;
@@ -1303,12 +1338,12 @@ serve(async (req) => {
       // Tope de la pausa. La sesión puede tener sus propios topes
       // (alert_rules.pausas, los pone el supervisor desde el tablero) y esos
       // mandan; sin reglas propias rige la tabla cowork_break_limits, como
-      // hasta ahora. La etiqueta sale siempre de la tabla.
+      // hasta ahora (la de la agencia de la sesión). La etiqueta sale siempre de
+      // la tabla.
       const { data: sesion } = await admin.from("cowork_sessions")
         .select("alert_rules").eq("id", asignacion.session_id).maybeSingle();
       const topeSesion = minutosDePausaDeSesion(sesion?.alert_rules, kind);
-      const { data: limite } = await admin.from("cowork_break_limits")
-        .select("minutos, label").eq("kind", kind).maybeSingle();
+      const limite = await topeDeLaTabla(admin, kind, await agenciaDeSesion(admin, asignacion.session_id));
       return json(req, { break: pausa, limiteMinutos: topeSesion ?? limite?.minutos ?? null, label: limite?.label ?? kind });
     }
 
@@ -1339,8 +1374,7 @@ serve(async (req) => {
       const { data: sesion } = await admin.from("cowork_sessions")
         .select("alert_rules").eq("id", pausa.session_id).maybeSingle();
       const topeSesion = minutosDePausaDeSesion(sesion?.alert_rules, pausa.kind);
-      const { data: limite } = await admin.from("cowork_break_limits")
-        .select("minutos, label").eq("kind", pausa.kind).maybeSingle();
+      const limite = await topeDeLaTabla(admin, pausa.kind, await agenciaDeSesion(admin, pausa.session_id));
       return json(req, { pausa, limiteMinutos: topeSesion ?? limite?.minutos ?? null, label: limite?.label ?? pausa.kind });
     }
 
