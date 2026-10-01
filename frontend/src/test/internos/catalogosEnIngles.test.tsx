@@ -56,7 +56,9 @@ import { EmployeeStatusBadge } from "@/components/hr/EmployeeStatusBadge";
 import { useHubstaffAgentDetail } from "@/hooks/useHubstaffAgentDetail";
 
 /** Las marcas: se escriben igual en los dos idiomas y el detector las lee como español. */
-const MARCAS = new Set(["Nueva EPS", "Seguros Bolívar", "Protección"]);
+// «Compensar» (caja de compensación) choca con el botón «Compensar» de Finanzas
+// (finanzas.hv.compensate), que sí se traduce.
+const MARCAS = new Set(["Nueva EPS", "Seguros Bolívar", "Protección", "Compensar"]);
 
 type Opcion = { value: string | number; label: string };
 const CATALOGOS_HR = Object.entries(HR).filter(([, v]) => Array.isArray(v)) as [string, Opcion[]][];

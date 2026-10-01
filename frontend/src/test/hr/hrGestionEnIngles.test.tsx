@@ -222,8 +222,14 @@ const ESPANOL_DEL_DICCIONARIO = new Set(
 // fuera de la migración por decisión y no es de este PR: se ignora acá y queda
 // anotado en el PR. Nada más se ignora.
 const DE_OTRO_ARCHIVO = new Set(["Mostrando", "Filas:"]);
+// Datos de la ficha que son nombres propios y se escriben igual en los dos idiomas:
+// «Compensar» es una caja de compensación. Choca con el botón «Compensar» de
+// Finanzas (finanzas.hv.compensate), que sí se traduce.
+const MARCAS = new Set(["Compensar"]);
 const enEspanol = (raiz: HTMLElement = document.body) =>
-  textosVisibles(raiz).filter((t) => !DE_OTRO_ARCHIVO.has(t) && (esEspanol(t) || ESPANOL_DEL_DICCIONARIO.has(t)));
+  textosVisibles(raiz).filter(
+    (t) => !DE_OTRO_ARCHIVO.has(t) && !MARCAS.has(t) && (esEspanol(t) || ESPANOL_DEL_DICCIONARIO.has(t)),
+  );
 
 /** `precarga`: consultas que ya llegan con datos, como si estuvieran en caché. */
 function montar(pantalla: ReactNode, ruta = "/hr", patron = "*", precarga: [unknown[], unknown][] = []) {
