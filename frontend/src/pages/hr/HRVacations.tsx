@@ -32,11 +32,15 @@ import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths, isSameDay, isSameMonth, isToday, differenceInCalendarDays } from "date-fns";
 import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
+import { traducir, type TranslationKey } from "@/lib/i18n";
+import { DIAS_CORTOS } from "./etiquetasRrhh";
 
 // ─── Constants ─────────────────────────────────────────────────────
+// `value` es el absence_type que se guarda (DATO); `label`/`short` son las claves de lo que se ve.
 const VACATION_TYPES = [
-  { value: "vacaciones", label: "Vacaciones Anuales", icon: Sun, color: "bg-blue-500/10 text-blue-500 border-blue-500/30" },
-  { value: "dia_personal", label: "Días Personales", icon: CalendarDays, color: "bg-violet-500/10 text-violet-500 border-violet-500/30" },
+  { value: "vacaciones", label: "hr.opt.vacType.vacaciones", short: "hr.opt.vacShort.vacaciones", icon: Sun, color: "bg-blue-500/10 text-blue-500 border-blue-500/30" },
+  { value: "dia_personal", label: "hr.opt.vacType.dia_personal", short: "hr.opt.vacShort.dia_personal", icon: CalendarDays, color: "bg-violet-500/10 text-violet-500 border-violet-500/30" },
 ] as const;
 
 type VacationType = "vacaciones" | "dia_personal";
@@ -44,11 +48,15 @@ type VacationType = "vacaciones" | "dia_personal";
 const ANNUAL_VACATION_DAYS = 15;
 const ANNUAL_PERSONAL_DAYS = 12;
 
-const STATUS_CONFIG: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; color: string }> = {
-  pending: { label: "Pendiente", variant: "secondary", color: "text-warning border-warning/40" },
-  approved: { label: "Aprobada", variant: "default", color: "text-success border-success/40" },
-  rejected: { label: "Rechazada", variant: "destructive", color: "text-destructive border-destructive/40" },
+const STATUS_CONFIG: Record<string, { label: TranslationKey; variant: "default" | "secondary" | "destructive" | "outline"; color: string }> = {
+  pending: { label: "hr.opt.absStatus.pending", variant: "secondary", color: "text-warning border-warning/40" },
+  approved: { label: "hr.opt.absStatus.approved", variant: "default", color: "text-success border-success/40" },
+  rejected: { label: "hr.opt.absStatus.rejected", variant: "destructive", color: "text-destructive border-destructive/40" },
 };
+
+/** "Vacaciones" / "Personal": la etiqueta corta del tipo, en el idioma de la interfaz. */
+const tipoCorto = (tipo: string, t: (k: TranslationKey) => string) =>
+  t(tipo === "vacaciones" ? "hr.opt.vacShort.vacaciones" : "hr.opt.vacShort.dia_personal");
 
 // ─── Data hook ─────────────────────────────────────────────────────
 function useVacationAbsences() {
@@ -68,10 +76,12 @@ function useVacationAbsences() {
 
 // ─── Edit Form ─────────────────────────────────────────────────────
 function EditVacationForm({ data, onSave, onCancel, isPending }: { data: any; onSave: (d: any) => void; onCancel: () => void; isPending: boolean }) {
+  const { t } = useLanguage();
   const [startDate, setStartDate] = useState<Date | undefined>(new Date(data.start_date));
   const [endDate, setEndDate] = useState<Date | undefined>(new Date(data.end_date));
   const [reason, setReason] = useState(data.reason ?? "");
   const f = useFormato();
+  const DMY = f.idioma === "en" ? "MM/dd/yyyy" : "dd/MM/yyyy";
 
   const handleSave = () => {
     const days = startDate && endDate ? Math.max(1, differenceInCalendarDays(endDate, startDate) + 1) : data.total_days;
@@ -88,12 +98,12 @@ function EditVacationForm({ data, onSave, onCancel, isPending }: { data: any; on
       <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <Label>Fecha Inicio</Label>
+            <Label>{t("hr.startDate")}</Label>
             <Popover>
               <PopoverTrigger asChild>
                 <Button variant="outline" className={cn("w-full justify-start font-normal")}>
                   <CalendarDays className="mr-2 h-4 w-4" />
-                  {startDate ? format(startDate, "dd/MM/yyyy") : "—"}
+                  {startDate ? format(startDate, DMY) : "—"}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
@@ -102,12 +112,12 @@ function EditVacationForm({ data, onSave, onCancel, isPending }: { data: any; on
             </Popover>
           </div>
           <div className="space-y-1.5">
-            <Label>Fecha Fin</Label>
+            <Label>{t("hr.endDate")}</Label>
             <Popover>
               <PopoverTrigger asChild>
                 <Button variant="outline" className={cn("w-full justify-start font-normal")}>
                   <CalendarDays className="mr-2 h-4 w-4" />
-                  {endDate ? format(endDate, "dd/MM/yyyy") : "—"}
+                  {endDate ? format(endDate, DMY) : "—"}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
@@ -117,13 +127,13 @@ function EditVacationForm({ data, onSave, onCancel, isPending }: { data: any; on
           </div>
         </div>
         <div className="space-y-1.5">
-          <Label>Motivo</Label>
+          <Label>{t("hr.reasonLabel")}</Label>
           <Textarea rows={3} value={reason} onChange={(e) => setReason(e.target.value)} />
         </div>
       </div>
       <DialogFooter className="shrink-0 px-6 py-4 border-t flex gap-2">
-        <Button variant="outline" onClick={onCancel} className="flex-1">Cancelar</Button>
-        <Button onClick={handleSave} disabled={isPending} className="flex-1">{isPending ? "Guardando..." : "Guardar Cambios"}</Button>
+        <Button variant="outline" onClick={onCancel} className="flex-1">{t("common.cancel")}</Button>
+        <Button onClick={handleSave} disabled={isPending} className="flex-1">{isPending ? t("hr.saving") : t("hr.saveChanges")}</Button>
       </DialogFooter>
     </>
   );
@@ -131,11 +141,13 @@ function EditVacationForm({ data, onSave, onCancel, isPending }: { data: any; on
 
 // ─── Component ─────────────────────────────────────────────────────
 export default function HRVacations() {
+  const { t } = useLanguage();
   const { data: absences = [], isLoading } = useVacationAbsences();
   const { data: employees = [] } = useEmployees();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const f = useFormato();
+  const DMY = f.idioma === "en" ? "MM/dd/yyyy" : "dd/MM/yyyy";
 
   // State
   const [activeType, setActiveType] = useState<VacationType>("vacaciones");
@@ -197,7 +209,7 @@ export default function HRVacations() {
   const createMutation = useMutation({
     mutationFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!form.start_date || !form.end_date) throw new Error("Fechas requeridas");
+      if (!form.start_date || !form.end_date) throw new Error(traducir("hr.vac.datesRequired"));
       const days = Math.max(1, differenceInCalendarDays(form.end_date, form.start_date) + 1);
       const { error } = await supabase.from("absences").insert({
         employee_id: form.employee_id,
@@ -212,11 +224,11 @@ export default function HRVacations() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vacation-absences"] });
-      toast({ title: "Solicitud creada exitosamente" });
+      toast({ title: t("hr.vac.created") });
       setModalOpen(false);
       setForm({ employee_id: "", start_date: undefined, end_date: undefined, reason: "" });
     },
-    onError: () => toast({ title: "Error al crear la solicitud", variant: "destructive" }),
+    onError: () => toast({ title: t("hr.errorCreatingRequest"), variant: "destructive" }),
   });
 
   const updateStatus = useMutation({
@@ -229,7 +241,7 @@ export default function HRVacations() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vacation-absences"] });
-      toast({ title: "Estado actualizado" });
+      toast({ title: t("hr.statusUpdated") });
     },
   });
 
@@ -240,10 +252,10 @@ export default function HRVacations() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vacation-absences"] });
-      toast({ title: "Solicitud eliminada" });
+      toast({ title: t("hr.vac.deleted") });
       setDeleteId(null);
     },
-    onError: () => toast({ title: "Error al eliminar", variant: "destructive" }),
+    onError: () => toast({ title: t("common.errorDeleting"), variant: "destructive" }),
   });
 
   const editMutation = useMutation({
@@ -253,18 +265,19 @@ export default function HRVacations() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vacation-absences"] });
-      toast({ title: "Solicitud actualizada" });
+      toast({ title: t("hr.vac.updated") });
       setEditData(null);
     },
-    onError: () => toast({ title: "Error al actualizar", variant: "destructive" }),
+    onError: () => toast({ title: t("common.errorUpdating"), variant: "destructive" }),
   });
 
   // ─── Helper renders ────────────────────────────────────────────
   const typeConfig = VACATION_TYPES.find((t) => t.value === activeType)!;
 
   const renderStatusBadge = (status: string) => {
-    const cfg = STATUS_CONFIG[status] ?? { label: status, variant: "outline" as const, color: "" };
-    return <Badge variant={cfg.variant} className={cn("text-xs", cfg.color)}>{cfg.label}</Badge>;
+    const cfg = STATUS_CONFIG[status];
+    if (!cfg) return <Badge variant="outline" className="text-xs">{status}</Badge>;
+    return <Badge variant={cfg.variant} className={cn("text-xs", cfg.color)}>{t(cfg.label)}</Badge>;
   };
 
   const renderActions = (item: any) => (
@@ -339,12 +352,12 @@ export default function HRVacations() {
       {/* Header */}
       <header className="bg-background/30 backdrop-blur-xl px-6 pt-6 pb-4 border-b border-white/10 shrink-0">
         <PageHeader
-          title="Vacaciones & Tiempo Libre"
-          subtitle="Gestión de solicitudes, balances y calendario"
+          title={t("hr.vac.title")}
+          subtitle={t("hr.vac.subtitle")}
           actions={
             <Button onClick={() => setModalOpen(true)}>
               <Plus className="h-4 w-4 mr-1" />
-              Nueva Solicitud
+              {t("hr.newRequest")}
             </Button>
           }
         />
@@ -363,7 +376,7 @@ export default function HRVacations() {
               onClick={() => setActiveType(vt.value as VacationType)}
             >
               <vt.icon className="h-4 w-4" />
-              {vt.label}
+              {t(vt.label)}
             </Button>
           ))}
         </div>
@@ -374,21 +387,21 @@ export default function HRVacations() {
             Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
           ) : activeType === "vacaciones" ? (
             <>
-              <StatChip label="Total Solicitudes" value={String(totalRequests)} icon={<CalendarDays className="h-3.5 w-3.5" />} color="bg-primary" hint={`${currentYear}`} onClick={() => setKpiPopup("total")} />
-              <StatChip label="Pendientes" value={String(pending)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" hint="Por aprobar" onClick={() => setKpiPopup("pending")} />
-              <StatChip label="Aprobadas" value={String(approved)} icon={<CheckCircle2 className="h-3.5 w-3.5" />} color="bg-success" hint="Confirmadas" onClick={() => setKpiPopup("approved")} />
-              <StatChip label="Rechazadas" value={String(rejected)} icon={<XCircle className="h-3.5 w-3.5" />} color="bg-destructive" hint="Denegadas" onClick={() => setKpiPopup("rejected")} />
-              <StatChip label="Próximas" value={String(upcoming)} icon={<CalendarClock className="h-3.5 w-3.5" />} color="bg-primary" hint="Programadas" onClick={() => setKpiPopup("upcoming")} />
+              <StatChip label={t("hr.vac.totalRequests")} value={String(totalRequests)} icon={<CalendarDays className="h-3.5 w-3.5" />} color="bg-primary" hint={`${currentYear}`} onClick={() => setKpiPopup("total")} />
+              <StatChip label={t("common.pendingPl")} value={String(pending)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" hint={t("hr.vac.toApprove")} onClick={() => setKpiPopup("pending")} />
+              <StatChip label={t("hr.vac.approvedPl")} value={String(approved)} icon={<CheckCircle2 className="h-3.5 w-3.5" />} color="bg-success" hint={t("hr.vac.confirmed")} onClick={() => setKpiPopup("approved")} />
+              <StatChip label={t("hr.vac.rejectedPl")} value={String(rejected)} icon={<XCircle className="h-3.5 w-3.5" />} color="bg-destructive" hint={t("hr.vac.denied")} onClick={() => setKpiPopup("rejected")} />
+              <StatChip label={t("hr.vac.upcoming")} value={String(upcoming)} icon={<CalendarClock className="h-3.5 w-3.5" />} color="bg-primary" hint={t("hr.vac.scheduled")} onClick={() => setKpiPopup("upcoming")} />
             </>
           ) : (
             <>
               {/* "Días Usados / Disponibles" son métricas agregadas sin
                   lista propia: las dejamos estáticas (sin onClick). */}
-              <StatChip label="Días Usados" value={String(approvedThisYear)} icon={<CalendarDays className="h-3.5 w-3.5" />} color="bg-primary" hint={`De ${maxDays} anuales`} />
-              <StatChip label="Disponibles" value={String(availableDays)} icon={<CheckCircle2 className="h-3.5 w-3.5" />} color="bg-success" hint="Restantes" />
-              <StatChip label="Pendientes" value={String(pending)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" hint="Por aprobar" onClick={() => setKpiPopup("pending")} />
-              <StatChip label="Este Mes" value={String(approvedThisMonth)} icon={<CalendarClock className="h-3.5 w-3.5" />} color="bg-primary" hint={format(new Date(), "MMMM yyyy", { locale: f.fechas })} onClick={() => setKpiPopup("thisMonth")} />
-              <StatChip label="Rechazadas" value={String(rejected)} icon={<XCircle className="h-3.5 w-3.5" />} color="bg-destructive" hint="Denegadas" onClick={() => setKpiPopup("rejected")} />
+              <StatChip label={t("hr.vac.daysUsed")} value={String(approvedThisYear)} icon={<CalendarDays className="h-3.5 w-3.5" />} color="bg-primary" hint={t("hr.vac.ofAnnual", { max: maxDays })} />
+              <StatChip label={t("hr.vac.available")} value={String(availableDays)} icon={<CheckCircle2 className="h-3.5 w-3.5" />} color="bg-success" hint={t("hr.vac.remaining")} />
+              <StatChip label={t("common.pendingPl")} value={String(pending)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" hint={t("hr.vac.toApprove")} onClick={() => setKpiPopup("pending")} />
+              <StatChip label={t("hr.thisMonth")} value={String(approvedThisMonth)} icon={<CalendarClock className="h-3.5 w-3.5" />} color="bg-primary" hint={format(new Date(), "MMMM yyyy", { locale: f.fechas })} onClick={() => setKpiPopup("thisMonth")} />
+              <StatChip label={t("hr.vac.rejectedPl")} value={String(rejected)} icon={<XCircle className="h-3.5 w-3.5" />} color="bg-destructive" hint={t("hr.vac.denied")} onClick={() => setKpiPopup("rejected")} />
             </>
           )}
         </div>
@@ -396,10 +409,10 @@ export default function HRVacations() {
         {/* View tabs */}
         <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1">
           {([
-            { key: "solicitudes", label: "Solicitudes" },
-            { key: "balances", label: "Balances" },
-            { key: "historial", label: "Historial" },
-            { key: "calendario", label: "Calendario", icon: CalendarDays },
+            { key: "solicitudes", label: "hr.vac.tab.requests" },
+            { key: "balances", label: "hr.bank.balances" },
+            { key: "historial", label: "hr.vac.tab.history" },
+            { key: "calendario", label: "hr.vac.tab.calendar", icon: CalendarDays },
           ] as const).map((tab) => (
             <Button
               key={tab.key}
@@ -409,7 +422,7 @@ export default function HRVacations() {
               onClick={() => setActiveView(tab.key as any)}
             >
               {"icon" in tab && tab.icon && <tab.icon className="h-3.5 w-3.5" />}
-              {tab.label}
+              {t(tab.label)}
             </Button>
           ))}
         </div>
@@ -421,16 +434,16 @@ export default function HRVacations() {
             <div className="flex flex-wrap items-center gap-3">
               <div className="relative flex-1 min-w-[200px] max-w-sm">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Buscar por nombre o motivo..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
+                <Input placeholder={t("hr.searchByNameOrReason")} className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
               </div>
               {activeView === "solicitudes" && (
               <Select value={statusFilter || undefined} onValueChange={(v) => setStatusFilter(v === "__all__" ? "" : v)}>
-                  <SelectTrigger className="w-40"><SelectValue placeholder="Estado" /></SelectTrigger>
+                  <SelectTrigger className="w-40"><SelectValue placeholder={t("common.status")} /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__all__">Todos</SelectItem>
-                    <SelectItem value="pending">Pendientes</SelectItem>
-                    <SelectItem value="approved">Aprobadas</SelectItem>
-                    <SelectItem value="rejected">Rechazadas</SelectItem>
+                    <SelectItem value="__all__">{t("common.all")}</SelectItem>
+                    <SelectItem value="pending">{t("common.pendingPl")}</SelectItem>
+                    <SelectItem value="approved">{t("hr.vac.approvedPl")}</SelectItem>
+                    <SelectItem value="rejected">{t("hr.vac.rejectedPl")}</SelectItem>
                   </SelectContent>
                 </Select>
               )}
@@ -444,7 +457,7 @@ export default function HRVacations() {
               </div>
             </div>
 
-            <p className="text-xs text-muted-foreground">{filtered.length} solicitudes</p>
+            <p className="text-xs text-muted-foreground">{t(filtered.length === 1 ? "hr.vac.requestsCount.one" : "hr.vac.requestsCount.other", { count: filtered.length })}</p>
 
             {/* Table view */}
             {viewMode === "list" ? (
@@ -453,13 +466,13 @@ export default function HRVacations() {
                   <Table>
                     <TableHeader className="sticky top-0 z-10 bg-card">
                       <TableRow>
-                        <TableHead className="text-xs">Empleado</TableHead>
-                        <TableHead className="text-xs">Tipo</TableHead>
-                        <TableHead className="text-xs">Período</TableHead>
-                        <TableHead className="text-xs">Días</TableHead>
-                        <TableHead className="text-xs">Razón</TableHead>
-                        <TableHead className="text-xs">Estado</TableHead>
-                        <TableHead className="text-xs w-28 sticky right-0 bg-card">Acciones</TableHead>
+                        <TableHead className="text-xs">{t("hr.employee")}</TableHead>
+                        <TableHead className="text-xs">{t("common.type")}</TableHead>
+                        <TableHead className="text-xs">{t("hr.period")}</TableHead>
+                        <TableHead className="text-xs">{t("common.days")}</TableHead>
+                        <TableHead className="text-xs">{t("common.reason")}</TableHead>
+                        <TableHead className="text-xs">{t("common.status")}</TableHead>
+                        <TableHead className="text-xs w-28 sticky right-0 bg-card">{t("common.actions")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -468,7 +481,7 @@ export default function HRVacations() {
                           <TableRow key={i}>{Array.from({ length: 7 }).map((_, j) => <TableCell key={j}><Skeleton className="h-5" /></TableCell>)}</TableRow>
                         ))
                       ) : filtered.length === 0 ? (
-                        <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-10">Sin solicitudes registradas</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-10">{t("hr.vac.empty")}</TableCell></TableRow>
                       ) : (
                         filtered.map((a) => (
                           <TableRow key={a.id}>
@@ -485,7 +498,7 @@ export default function HRVacations() {
                             </TableCell>
                             <TableCell>
                               <Badge variant="outline" className={cn("text-xs", VACATION_TYPES.find((t) => t.value === a.absence_type)?.color)}>
-                                {a.absence_type === "vacaciones" ? "Vacaciones" : "Personal"}
+                                {tipoCorto(a.absence_type, t)}
                               </Badge>
                             </TableCell>
                             <TableCell className="text-sm">
@@ -510,7 +523,7 @@ export default function HRVacations() {
               /* Grid view */
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filtered.length === 0 ? (
-                  <p className="col-span-full text-center text-muted-foreground py-10">Sin solicitudes registradas</p>
+                  <p className="col-span-full text-center text-muted-foreground py-10">{t("hr.vac.empty")}</p>
                 ) : (
                   filtered.map((a) => (
                     <Card key={a.id} className="hover:border-primary/30 transition-colors">
@@ -529,9 +542,9 @@ export default function HRVacations() {
                         </div>
                         <div className="flex items-center gap-2">
                           <Badge variant="outline" className={cn("text-xs", VACATION_TYPES.find((t) => t.value === a.absence_type)?.color)}>
-                            {a.absence_type === "vacaciones" ? "Vacaciones" : "Personal"}
+                            {tipoCorto(a.absence_type, t)}
                           </Badge>
-                          <span className="text-xs text-muted-foreground">{a.total_days} días</span>
+                          <span className="text-xs text-muted-foreground">{t(a.total_days === 1 ? "hr.days.one" : "hr.days.other", { count: a.total_days ?? "" })}</span>
                         </div>
                         <p className="text-sm">
                           {format(new Date(a.start_date), "dd MMM", { locale: f.fechas })} — {format(new Date(a.end_date), "dd MMM yyyy", { locale: f.fechas })}
@@ -554,16 +567,16 @@ export default function HRVacations() {
               <Table>
                 <TableHeader className="sticky top-0 z-10 bg-card">
                   <TableRow>
-                    <TableHead className="text-xs">Empleado</TableHead>
-                    <TableHead className="text-xs">Vacaciones Usadas</TableHead>
-                    <TableHead className="text-xs">Vac. Disponibles</TableHead>
-                    <TableHead className="text-xs">Personales Usados</TableHead>
-                    <TableHead className="text-xs">Pers. Disponibles</TableHead>
+                    <TableHead className="text-xs">{t("hr.employee")}</TableHead>
+                    <TableHead className="text-xs">{t("hr.vac.vacUsed")}</TableHead>
+                    <TableHead className="text-xs">{t("hr.vac.vacAvailable")}</TableHead>
+                    <TableHead className="text-xs">{t("hr.vac.persUsed")}</TableHead>
+                    <TableHead className="text-xs">{t("hr.vac.persAvailable")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {balancesData.length === 0 ? (
-                    <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-10">Sin empleados</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-10">{t("hr.vac.noEmployees")}</TableCell></TableRow>
                   ) : (
                     balancesData.map(({ emp, vacUsed, vacAvail, persUsed, persAvail }) => (
                       <TableRow key={emp.id}>
@@ -613,7 +626,7 @@ export default function HRVacations() {
                   </Button>
                   <div className="flex items-center gap-2">
                     <h3 className="text-sm font-semibold capitalize">{format(calendarMonth, "MMMM yyyy", { locale: f.fechas })}</h3>
-                    <Button variant="outline" size="sm" className="text-xs h-7" onClick={() => setCalendarMonth(new Date())}>Hoy</Button>
+                    <Button variant="outline" size="sm" className="text-xs h-7" onClick={() => setCalendarMonth(new Date())}>{t("common.today")}</Button>
                   </div>
                   <Button variant="ghost" size="icon" onClick={() => setCalendarMonth(addMonths(calendarMonth, 1))}>
                     <ChevronRight className="h-4 w-4" />
@@ -622,14 +635,14 @@ export default function HRVacations() {
 
                 {/* Legend */}
                 <div className="flex gap-4 mb-3 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-blue-500" /> Vacaciones</span>
-                  <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-violet-500" /> Días Personales</span>
+                  <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-blue-500" /> {t("hr.opt.vacShort.vacaciones")}</span>
+                  <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-violet-500" /> {t("hr.opt.vacType.dia_personal")}</span>
                 </div>
 
                 {/* Calendar grid */}
                 <div className="grid grid-cols-7 gap-px bg-border rounded-lg overflow-hidden">
-                  {["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map((d) => (
-                    <div key={d} className="bg-muted/50 text-center text-xs font-medium text-muted-foreground py-2">{d}</div>
+                  {DIAS_CORTOS.map((d) => (
+                    <div key={d} className="bg-muted/50 text-center text-xs font-medium text-muted-foreground py-2">{t(d)}</div>
                   ))}
                   {/* Empty cells for offset */}
                   {Array.from({ length: (getDay(startOfMonth(calendarMonth)) + 6) % 7 }).map((_, i) => (
@@ -671,7 +684,7 @@ export default function HRVacations() {
                   <>
                     <h4 className="text-sm font-semibold mb-3 capitalize">{format(selectedDay, "EEEE dd MMMM", { locale: f.fechas })}</h4>
                     {getAbsencesForDay(selectedDay).length === 0 ? (
-                      <p className="text-xs text-muted-foreground">Sin ausencias este día</p>
+                      <p className="text-xs text-muted-foreground">{t("hr.vac.noAbsencesDay")}</p>
                     ) : (
                       <div className="space-y-2">
                         {getAbsencesForDay(selectedDay).map((a) => (
@@ -681,7 +694,7 @@ export default function HRVacations() {
                             </div>
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium truncate">{getEmpName(a)}</p>
-                              <p className="text-xs text-muted-foreground">{a.total_days} días · {a.absence_type === "vacaciones" ? "Vacaciones" : "Personal"}</p>
+                              <p className="text-xs text-muted-foreground">{t(a.total_days === 1 ? "hr.days.one" : "hr.days.other", { count: a.total_days ?? "" })} · {tipoCorto(a.absence_type, t)}</p>
                             </div>
                           </div>
                         ))}
@@ -691,8 +704,8 @@ export default function HRVacations() {
                 ) : (
                   <div className="flex flex-col items-center justify-center text-center py-8 text-muted-foreground">
                     <CalendarDays className="h-8 w-8 mb-2 opacity-40" />
-                    <p className="text-sm">Selecciona un día</p>
-                    <p className="text-xs">para ver las ausencias programadas</p>
+                    <p className="text-sm">{t("hr.vac.pickDay")}</p>
+                    <p className="text-xs">{t("hr.vac.pickDayHint")}</p>
                   </div>
                 )}
               </CardContent>
@@ -705,59 +718,59 @@ export default function HRVacations() {
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
         <DialogContent className="!flex !flex-col gap-0 max-w-md">
           <DialogHeader className="shrink-0 p-6 pb-4">
-            <DialogTitle>Nueva Solicitud — {typeConfig.label}</DialogTitle>
+            <DialogTitle>{t("hr.newRequest")} — {t(typeConfig.label)}</DialogTitle>
           </DialogHeader>
           <div className="flex-1 min-h-0 overflow-y-auto px-6 space-y-4">
             <div className="space-y-1.5">
-              <Label>Empleado</Label>
-              <EmployeeSearchCombobox value={form.employee_id || null} onChange={(v) => setForm((f) => ({ ...f, employee_id: v ?? "" }))} />
+              <Label>{t("hr.employee")}</Label>
+              <EmployeeSearchCombobox value={form.employee_id || null} onChange={(v) => setForm((prev) => ({ ...prev, employee_id: v ?? "" }))} />
             </div>
             <div className="space-y-1.5">
-              <Label>Tipo</Label>
+              <Label>{t("common.type")}</Label>
               <div className={cn("flex items-center gap-2 rounded-md border px-3 py-2 text-sm", typeConfig.color)}>
                 <typeConfig.icon className="h-4 w-4" />
-                {typeConfig.label}
+                {t(typeConfig.label)}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label>Fecha Inicio</Label>
+                <Label>{t("hr.startDate")}</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !form.start_date && "text-muted-foreground")}>
                       <CalendarDays className="mr-2 h-4 w-4" />
-                      {form.start_date ? format(form.start_date, "dd/MM/yyyy") : "Seleccionar"}
+                      {form.start_date ? format(form.start_date, DMY) : t("common.select")}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar mode="single" selected={form.start_date} onSelect={(d) => setForm((f) => ({ ...f, start_date: d }))} locale={f.fechas} className="p-3 pointer-events-auto" />
+                    <Calendar mode="single" selected={form.start_date} onSelect={(d) => setForm((prev) => ({ ...prev, start_date: d }))} locale={f.fechas} className="p-3 pointer-events-auto" />
                   </PopoverContent>
                 </Popover>
               </div>
               <div className="space-y-1.5">
-                <Label>Fecha Fin</Label>
+                <Label>{t("hr.endDate")}</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !form.end_date && "text-muted-foreground")}>
                       <CalendarDays className="mr-2 h-4 w-4" />
-                      {form.end_date ? format(form.end_date, "dd/MM/yyyy") : "Seleccionar"}
+                      {form.end_date ? format(form.end_date, DMY) : t("common.select")}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar mode="single" selected={form.end_date} onSelect={(d) => setForm((f) => ({ ...f, end_date: d }))} locale={f.fechas} disabled={(d) => form.start_date ? d < form.start_date : false} className="p-3 pointer-events-auto" />
+                    <Calendar mode="single" selected={form.end_date} onSelect={(d) => setForm((prev) => ({ ...prev, end_date: d }))} locale={f.fechas} disabled={(d) => form.start_date ? d < form.start_date : false} className="p-3 pointer-events-auto" />
                   </PopoverContent>
                 </Popover>
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label>Motivo</Label>
-              <Textarea placeholder="Descripción del motivo..." rows={3} value={form.reason} onChange={(e) => setForm((f) => ({ ...f, reason: e.target.value }))} />
+              <Label>{t("hr.reasonLabel")}</Label>
+              <Textarea placeholder={t("hr.vac.reasonPlaceholder")} rows={3} value={form.reason} onChange={(e) => setForm((prev) => ({ ...prev, reason: e.target.value }))} />
             </div>
           </div>
           <DialogFooter className="shrink-0 p-6 pt-4">
-            <Button variant="outline" onClick={() => setModalOpen(false)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => setModalOpen(false)}>{t("common.cancel")}</Button>
             <Button onClick={() => createMutation.mutate()} disabled={!form.employee_id || !form.start_date || !form.end_date || createMutation.isPending}>
-              {createMutation.isPending ? "Creando..." : "+ Crear Solicitud"}
+              {createMutation.isPending ? t("hr.creating") : t("hr.createRequestPlus")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -767,7 +780,7 @@ export default function HRVacations() {
       <Dialog open={!!viewModalData} onOpenChange={(o) => !o && setViewModalData(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Detalle de Solicitud</DialogTitle>
+            <DialogTitle>{t("hr.vac.detail")}</DialogTitle>
           </DialogHeader>
           {viewModalData && (
             <div className="space-y-3">
@@ -781,21 +794,21 @@ export default function HRVacations() {
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3 text-sm">
-                <div><p className="text-xs text-muted-foreground">Tipo</p><Badge variant="outline" className={cn("mt-1", VACATION_TYPES.find((t) => t.value === viewModalData.absence_type)?.color)}>{viewModalData.absence_type === "vacaciones" ? "Vacaciones" : "Personal"}</Badge></div>
-                <div><p className="text-xs text-muted-foreground">Estado</p><div className="mt-1">{renderStatusBadge(viewModalData.status)}</div></div>
-                <div><p className="text-xs text-muted-foreground">Inicio</p><p className="font-medium">{format(new Date(viewModalData.start_date), "dd/MM/yyyy")}</p></div>
-                <div><p className="text-xs text-muted-foreground">Fin</p><p className="font-medium">{format(new Date(viewModalData.end_date), "dd/MM/yyyy")}</p></div>
-                <div><p className="text-xs text-muted-foreground">Total Días</p><p className="font-medium">{viewModalData.total_days}</p></div>
-                <div><p className="text-xs text-muted-foreground">Creado</p><p className="font-medium">{format(new Date(viewModalData.created_at), "dd/MM/yyyy HH:mm")}</p></div>
+                <div><p className="text-xs text-muted-foreground">{t("common.type")}</p><Badge variant="outline" className={cn("mt-1", VACATION_TYPES.find((vt) => vt.value === viewModalData.absence_type)?.color)}>{tipoCorto(viewModalData.absence_type, t)}</Badge></div>
+                <div><p className="text-xs text-muted-foreground">{t("common.status")}</p><div className="mt-1">{renderStatusBadge(viewModalData.status)}</div></div>
+                <div><p className="text-xs text-muted-foreground">{t("hr.vac.start")}</p><p className="font-medium">{format(new Date(viewModalData.start_date), DMY)}</p></div>
+                <div><p className="text-xs text-muted-foreground">{t("hr.vac.end")}</p><p className="font-medium">{format(new Date(viewModalData.end_date), DMY)}</p></div>
+                <div><p className="text-xs text-muted-foreground">{t("hr.vac.totalDays")}</p><p className="font-medium">{viewModalData.total_days}</p></div>
+                <div><p className="text-xs text-muted-foreground">{t("hr.vac.createdAt")}</p><p className="font-medium">{format(new Date(viewModalData.created_at), `${DMY} HH:mm`)}</p></div>
               </div>
-              {viewModalData.reason && <div><p className="text-xs text-muted-foreground">Motivo</p><p className="text-sm mt-1">{viewModalData.reason}</p></div>}
+              {viewModalData.reason && <div><p className="text-xs text-muted-foreground">{t("hr.reasonLabel")}</p><p className="text-sm mt-1">{viewModalData.reason}</p></div>}
               {viewModalData.status === "pending" && (
                 <div className="flex gap-2 pt-2">
                   <Button className="flex-1 gap-1" variant="default" onClick={() => { updateStatus.mutate({ id: viewModalData.id, status: "approved" }); setViewModalData(null); }}>
-                    <Check className="h-4 w-4" /> Aprobar
+                    <Check className="h-4 w-4" /> {t("hr.approve")}
                   </Button>
                   <Button className="flex-1 gap-1" variant="destructive" onClick={() => { updateStatus.mutate({ id: viewModalData.id, status: "rejected" }); setViewModalData(null); }}>
-                    <X className="h-4 w-4" /> Rechazar
+                    <X className="h-4 w-4" /> {t("hr.reject")}
                   </Button>
                 </div>
               )}
@@ -808,7 +821,7 @@ export default function HRVacations() {
       <Dialog open={!!editData} onOpenChange={(o) => !o && setEditData(null)}>
         <DialogContent className="!flex !flex-col gap-0 max-w-md p-0 overflow-hidden">
           <DialogHeader className="shrink-0 px-6 py-5 border-b">
-            <DialogTitle>Editar Solicitud</DialogTitle>
+            <DialogTitle>{t("hr.vac.edit")}</DialogTitle>
             <DialogDescription>{editData ? getEmpName(editData) : ""}</DialogDescription>
           </DialogHeader>
           {editData && <EditVacationForm data={editData} onSave={(d) => editMutation.mutate({ id: editData.id, data: d })} onCancel={() => setEditData(null)} isPending={editMutation.isPending} />}
@@ -819,12 +832,12 @@ export default function HRVacations() {
       <AlertDialog open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar solicitud?</AlertDialogTitle>
-            <AlertDialogDescription>Esta acción no se puede deshacer.</AlertDialogDescription>
+            <AlertDialogTitle>{t("hr.vac.deleteTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("common.cannotBeUndone")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel />
-            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => deleteId && deleteMutation.mutate(deleteId)}>Eliminar</AlertDialogAction>
+            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => deleteId && deleteMutation.mutate(deleteId)}>{t("common.delete")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -834,12 +847,12 @@ export default function HRVacations() {
         onOpenChange={(o) => !o && setKpiPopup(null)}
         title={(() => {
           switch (kpiPopup) {
-            case "total": return `Total Solicitudes — ${totalRequests}`;
-            case "pending": return `Pendientes — ${pending}`;
-            case "approved": return `Aprobadas — ${approved}`;
-            case "rejected": return `Rechazadas — ${rejected}`;
-            case "upcoming": return `Próximas — ${upcoming}`;
-            case "thisMonth": return `Este Mes — ${approvedThisMonth}`;
+            case "total": return `${t("hr.vac.totalRequests")} — ${totalRequests}`;
+            case "pending": return `${t("common.pendingPl")} — ${pending}`;
+            case "approved": return `${t("hr.vac.approvedPl")} — ${approved}`;
+            case "rejected": return `${t("hr.vac.rejectedPl")} — ${rejected}`;
+            case "upcoming": return `${t("hr.vac.upcoming")} — ${upcoming}`;
+            case "thisMonth": return `${t("hr.thisMonth")} — ${approvedThisMonth}`;
             default: return "";
           }
         })()}
@@ -857,12 +870,14 @@ export default function HRVacations() {
           const tone = (status: string): KpiRow["rightTone"] =>
             status === "approved" ? "success" : status === "rejected" ? "destructive" : "warning";
           return list.slice(0, 100).map((a: any): KpiRow => ({
-            primary: a.employee_name ?? `Empleado ${a.employee_id?.slice?.(0, 8) ?? "—"}`,
+            primary: a.employee_name ?? t("hr.employeeWithId", { id: a.employee_id?.slice?.(0, 8) ?? "—" }),
             secondary: a.start_date && a.end_date ? `${format(new Date(a.start_date), "dd MMM")} → ${format(new Date(a.end_date), "dd MMM yyyy")}` : undefined,
-            right: a.status ?? "—",
+            // En español, el value tal cual, como siempre; en inglés, su etiqueta.
+            right: f.idioma === "en" && STATUS_CONFIG[a.status] ? t(STATUS_CONFIG[a.status].label) : (a.status ?? "—"),
             rightTone: tone(a.status ?? ""),
           }));
         })()}
+        emptyText={t("hr.kpiEmpty")}
       />
     </div>
   );

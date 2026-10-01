@@ -28,12 +28,15 @@ import { cn } from "@/lib/utils";
 import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import { PageHeader } from "@/components/ui/page-header";
+import { useLanguage } from "@/hooks/useLanguage";
+import { DIAS_CORTOS } from "./etiquetasRrhh";
 
+// `value` es el schedule_type que se guarda (DATO); `label` es la clave de lo que se ve.
 const SCHEDULE_TYPES = [
-  { value: "manana", label: "Mañana", icon: Sun, color: "bg-amber-500/10 text-amber-600 border-amber-500/30" },
-  { value: "tarde", label: "Tarde", icon: Sunset, color: "bg-orange-500/10 text-orange-600 border-orange-500/30" },
-  { value: "noche", label: "Noche", icon: Moon, color: "bg-indigo-500/10 text-indigo-600 border-indigo-500/30" },
-  { value: "flexible", label: "Flexible", icon: Zap, color: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30" },
+  { value: "manana", label: "hr.chat.type.manana", icon: Sun, color: "bg-amber-500/10 text-amber-600 border-amber-500/30" },
+  { value: "tarde", label: "hr.chat.type.tarde", icon: Sunset, color: "bg-orange-500/10 text-orange-600 border-orange-500/30" },
+  { value: "noche", label: "hr.chat.type.noche", icon: Moon, color: "bg-indigo-500/10 text-indigo-600 border-indigo-500/30" },
+  { value: "flexible", label: "hr.chat.type.flexible", icon: Zap, color: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30" },
 ] as const;
 
 function getTypeConfig(val: string) {
@@ -41,20 +44,23 @@ function getTypeConfig(val: string) {
 }
 
 function TypeBadge({ type }: { type: string }) {
+  const { t } = useLanguage();
   const cfg = getTypeConfig(type);
   if (!cfg) return <Badge variant="secondary">{type}</Badge>;
   const Icon = cfg.icon;
   return (
     <Badge variant="outline" className={cn("text-xs gap-1", cfg.color)}>
       <Icon className="h-3 w-3" />
-      {cfg.label}
+      {t(cfg.label)}
     </Badge>
   );
 }
 
 const HRChatterSchedules = () => {
+  const { t } = useLanguage();
   const { toast } = useToast();
   const f = useFormato();
+  const DMY = f.idioma === "en" ? "MM/dd/yyyy" : "dd/MM/yyyy";
   const queryClient = useQueryClient();
 
   const [search, setSearch] = useState("");
@@ -95,11 +101,11 @@ const HRChatterSchedules = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["work_schedules_chatters"] });
-      toast({ title: "Turno creado exitosamente" });
+      toast({ title: t("hr.chat.created") });
       setCreateOpen(false);
       resetForm();
     },
-    onError: () => toast({ title: "Error al crear turno", variant: "destructive" }),
+    onError: () => toast({ title: t("hr.chat.errorCreating"), variant: "destructive" }),
   });
 
   const editMutation = useMutation({
@@ -110,11 +116,11 @@ const HRChatterSchedules = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["work_schedules_chatters"] });
-      toast({ title: "Turno actualizado exitosamente" });
+      toast({ title: t("hr.chat.updated") });
       setEditData(null);
       resetForm();
     },
-    onError: () => toast({ title: "Error al actualizar turno", variant: "destructive" }),
+    onError: () => toast({ title: t("hr.chat.errorUpdating"), variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
@@ -124,10 +130,10 @@ const HRChatterSchedules = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["work_schedules_chatters"] });
-      toast({ title: "Turno eliminado" });
+      toast({ title: t("hr.chat.deleted") });
       setDeleteId(null);
     },
-    onError: () => toast({ title: "Error al eliminar turno", variant: "destructive" }),
+    onError: () => toast({ title: t("hr.chat.errorDeleting"), variant: "destructive" }),
   });
 
   function resetForm() {
@@ -149,7 +155,7 @@ const HRChatterSchedules = () => {
 
   function handleSubmit() {
     if (!formTitle || !formStartDate || !formEndDate) {
-      toast({ title: "Completa los campos requeridos", variant: "destructive" });
+      toast({ title: t("common.requiredFields"), variant: "destructive" });
       return;
     }
     const vals: any = {
@@ -216,7 +222,7 @@ const HRChatterSchedules = () => {
   }
 
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
-  const dayLabels = ["LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB", "DOM"];
+  const dayLabels = DIAS_CORTOS.map((k) => t(k).toUpperCase());
 
   if (isLoading) return <div className="p-6 space-y-4">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-20 w-full" />)}</div>;
 
@@ -224,31 +230,31 @@ const HRChatterSchedules = () => {
     <Dialog open={createOpen || !!editData} onOpenChange={(o) => { if (!o) { setCreateOpen(false); setEditData(null); resetForm(); } }}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{editData ? "Editar Turno" : "Crear Turno"}</DialogTitle>
-          <DialogDescription>{editData ? "Modifica los datos del turno" : "Completa la información del nuevo turno"}</DialogDescription>
+          <DialogTitle>{editData ? t("hr.chat.edit") : t("hr.chat.create")}</DialogTitle>
+          <DialogDescription>{editData ? t("hr.chat.editDesc") : t("hr.chat.createDesc")}</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div>
-            <Label>Título *</Label>
-            <Input value={formTitle} onChange={(e) => setFormTitle(e.target.value)} placeholder="Ej: Turno Mañana Enero" />
+            <Label>{t("common.title")} *</Label>
+            <Input value={formTitle} onChange={(e) => setFormTitle(e.target.value)} placeholder={t("hr.chat.titlePlaceholder")} />
           </div>
           <div>
-            <Label>Tipo de turno *</Label>
+            <Label>{t("hr.chat.shiftType")} *</Label>
             <Select value={formType} onValueChange={setFormType}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {SCHEDULE_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                {SCHEDULE_TYPES.map((st) => <SelectItem key={st.value} value={st.value}>{t(st.label)}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label>Fecha Inicio *</Label>
+              <Label>{t("hr.startDate")} *</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !formStartDate && "text-muted-foreground")}>
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {formStartDate ? format(formStartDate, "dd/MM/yyyy") : "Seleccionar"}
+                    {formStartDate ? format(formStartDate, DMY) : t("common.select")}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -257,12 +263,12 @@ const HRChatterSchedules = () => {
               </Popover>
             </div>
             <div>
-              <Label>Fecha Fin *</Label>
+              <Label>{t("hr.endDate")} *</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !formEndDate && "text-muted-foreground")}>
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {formEndDate ? format(formEndDate, "dd/MM/yyyy") : "Seleccionar"}
+                    {formEndDate ? format(formEndDate, DMY) : t("common.select")}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -273,23 +279,23 @@ const HRChatterSchedules = () => {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label>Hora Inicio</Label>
+              <Label>{t("hr.startTime")}</Label>
               <Input type="time" value={formStartTime} onChange={(e) => setFormStartTime(e.target.value)} />
             </div>
             <div>
-              <Label>Hora Fin</Label>
+              <Label>{t("hr.endTime")}</Label>
               <Input type="time" value={formEndTime} onChange={(e) => setFormEndTime(e.target.value)} />
             </div>
           </div>
           <div>
-            <Label>Descripción</Label>
-            <Textarea value={formDescription} onChange={(e) => setFormDescription(e.target.value)} placeholder="Detalles adicionales" />
+            <Label>{t("common.description")}</Label>
+            <Textarea value={formDescription} onChange={(e) => setFormDescription(e.target.value)} placeholder={t("hr.chat.descPlaceholder")} />
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => { setCreateOpen(false); setEditData(null); resetForm(); }}>Cancelar</Button>
+          <Button variant="outline" onClick={() => { setCreateOpen(false); setEditData(null); resetForm(); }}>{t("common.cancel")}</Button>
           <Button onClick={handleSubmit} disabled={createMutation.isPending || editMutation.isPending}>
-            {editData ? "Guardar Cambios" : "Crear Turno"}
+            {editData ? t("hr.saveChanges") : t("hr.chat.create")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -300,11 +306,11 @@ const HRChatterSchedules = () => {
     <div className="h-full flex flex-col">
       <div className="shrink-0 bg-background border-b px-6 py-4">
         <PageHeader
-          title="Horarios Chatters"
-          subtitle="Gestión de turnos para el equipo de chatters"
+          title={t("hr.chat.title")}
+          subtitle={t("hr.chat.subtitle")}
           actions={
             <Button onClick={() => { resetForm(); setCreateOpen(true); }}>
-              <Plus className="h-4 w-4 mr-2" /> Crear Turno
+              <Plus className="h-4 w-4 mr-2" /> {t("hr.chat.create")}
             </Button>
           }
         />
@@ -312,25 +318,25 @@ const HRChatterSchedules = () => {
 
       <div className="flex-1 overflow-auto p-6 space-y-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <StatChip label="Turnos Esta Semana" value={String(turnosThisWeek)} icon={<CalendarDays className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("week")} />
-          <StatChip label="Turnos Hoy" value={String(turnosToday)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("today")} />
+          <StatChip label={t("hr.chat.thisWeek")} value={String(turnosThisWeek)} icon={<CalendarDays className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("week")} />
+          <StatChip label={t("hr.chat.today")} value={String(turnosToday)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("today")} />
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative flex-1 min-w-[200px] max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Buscar turnos..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+            <Input placeholder={t("hr.chat.search")} value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
           </div>
           <Select value={typeFilter || undefined} onValueChange={(v) => setTypeFilter(v === "__all__" ? "" : v)}>
-            <SelectTrigger className="w-[160px]"><SelectValue placeholder="Turnos" /></SelectTrigger>
+            <SelectTrigger className="w-[160px]"><SelectValue placeholder={t("hr.chat.shifts")} /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="__all__">Todos</SelectItem>
-              {SCHEDULE_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+              <SelectItem value="__all__">{t("common.all")}</SelectItem>
+              {SCHEDULE_TYPES.map((st) => <SelectItem key={st.value} value={st.value}>{t(st.label)}</SelectItem>)}
             </SelectContent>
           </Select>
           {(search || typeFilter) && (
             <Button variant="ghost" size="sm" onClick={() => { setSearch(""); setTypeFilter(""); }}>
-              <span className="mr-1.5">✕</span> Limpiar filtros
+              <span className="mr-1.5">✕</span> {t("hr.clearFilters")}
             </Button>
           )}
           <div className="ml-auto flex items-center border rounded-lg">
@@ -346,23 +352,23 @@ const HRChatterSchedules = () => {
               <Table>
                 <TableHeader className="sticky top-0 z-10 bg-card">
                   <TableRow>
-                    <TableHead className="text-xs">Título</TableHead>
-                    <TableHead className="text-xs">Tipo</TableHead>
-                    <TableHead className="text-xs">Fecha Inicio</TableHead>
-                    <TableHead className="text-xs">Fecha Fin</TableHead>
-                    <TableHead className="text-xs">Horario</TableHead>
-                    <TableHead className="text-xs sticky right-0 bg-card">Acciones</TableHead>
+                    <TableHead className="text-xs">{t("common.title")}</TableHead>
+                    <TableHead className="text-xs">{t("common.type")}</TableHead>
+                    <TableHead className="text-xs">{t("hr.startDate")}</TableHead>
+                    <TableHead className="text-xs">{t("hr.endDate")}</TableHead>
+                    <TableHead className="text-xs">{t("hr.schedule")}</TableHead>
+                    <TableHead className="text-xs sticky right-0 bg-card">{t("common.actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filtered.length === 0 ? (
-                    <TableRow><TableCell colSpan={6} className="text-center py-10 text-muted-foreground">No hay turnos registrados</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={6} className="text-center py-10 text-muted-foreground">{t("hr.chat.empty")}</TableCell></TableRow>
                   ) : filtered.map((s: any) => (
                     <TableRow key={s.id}>
                       <TableCell className="font-medium">{s.title}</TableCell>
                       <TableCell><TypeBadge type={s.schedule_type} /></TableCell>
-                      <TableCell className="text-sm">{format(parseISO(s.start_date), "dd/MM/yyyy")}</TableCell>
-                      <TableCell className="text-sm">{format(parseISO(s.end_date), "dd/MM/yyyy")}</TableCell>
+                      <TableCell className="text-sm">{format(parseISO(s.start_date), DMY)}</TableCell>
+                      <TableCell className="text-sm">{format(parseISO(s.end_date), DMY)}</TableCell>
                       <TableCell className="text-sm">{s.start_time && s.end_time ? `${s.start_time.slice(0,5)} - ${s.end_time.slice(0,5)}` : "—"}</TableCell>
                       <TableCell className="sticky right-0 bg-card">
                         <div className="flex items-center gap-1">
@@ -382,7 +388,7 @@ const HRChatterSchedules = () => {
         {viewMode === "grid" && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filtered.length === 0 ? (
-              <div className="col-span-full text-center py-10 text-muted-foreground">No hay turnos registrados</div>
+              <div className="col-span-full text-center py-10 text-muted-foreground">{t("hr.chat.empty")}</div>
             ) : filtered.map((s: any) => (
               <Card key={s.id} className="hover:border-primary/30 transition-colors">
                 <CardContent className="p-4 space-y-3">
@@ -393,7 +399,7 @@ const HRChatterSchedules = () => {
                     <TypeBadge type={s.schedule_type} />
                   </div>
                   <div className="text-sm text-muted-foreground space-y-1">
-                    <p>📅 {format(parseISO(s.start_date), "dd/MM/yyyy")} → {format(parseISO(s.end_date), "dd/MM/yyyy")}</p>
+                    <p>📅 {format(parseISO(s.start_date), DMY)} → {format(parseISO(s.end_date), DMY)}</p>
                     {s.start_time && s.end_time && <p>🕐 {s.start_time.slice(0,5)} - {s.end_time.slice(0,5)}</p>}
                   </div>
                   <div className="flex items-center gap-1 pt-2 border-t">
@@ -410,10 +416,10 @@ const HRChatterSchedules = () => {
         {viewMode === "calendar" && (
           <div className="space-y-6">
             <div className="flex flex-wrap gap-3">
-              {SCHEDULE_TYPES.map((t) => (
-                <div key={t.value} className="flex items-center gap-1.5 text-xs">
-                  <div className={cn("w-3 h-3 rounded-full", t.value === "manana" ? "bg-amber-500" : t.value === "tarde" ? "bg-orange-500" : t.value === "noche" ? "bg-indigo-500" : "bg-emerald-500")} />
-                  {t.label}
+              {SCHEDULE_TYPES.map((st) => (
+                <div key={st.value} className="flex items-center gap-1.5 text-xs">
+                  <div className={cn("w-3 h-3 rounded-full", st.value === "manana" ? "bg-amber-500" : st.value === "tarde" ? "bg-orange-500" : st.value === "noche" ? "bg-indigo-500" : "bg-emerald-500")} />
+                  {t(st.label)}
                 </div>
               ))}
             </div>
@@ -449,14 +455,14 @@ const HRChatterSchedules = () => {
 
             <Card>
               <CardContent className="p-4">
-                <h3 className="font-medium mb-3">Semana Actual</h3>
+                <h3 className="font-medium mb-3">{t("hr.chat.currentWeek")}</h3>
                 <div className="grid grid-cols-7 gap-2">
                   {weekDays.map((day, i) => {
                     const daySchedules = getSchedulesForDay(day);
                     return (
                       <div key={i} className={cn("p-2 rounded-lg border min-h-[80px]", isSameDay(day, today) ? "border-primary bg-primary/5" : "")}>
                         <p className="text-xs font-medium">{dayLabels[i]}</p>
-                        <p className="text-[10px] text-muted-foreground mb-1">{format(day, "dd/MM")}</p>
+                        <p className="text-[10px] text-muted-foreground mb-1">{format(day, f.idioma === "en" ? "MM/dd" : "dd/MM")}</p>
                         {daySchedules.map((s: any) => (
                           <div key={s.id} className="text-[10px] p-1 rounded bg-muted/50 mb-0.5 truncate" title={s.title}>
                             {s.start_time?.slice(0,5)} {s.title}
@@ -476,14 +482,14 @@ const HRChatterSchedules = () => {
 
       <Dialog open={!!viewData} onOpenChange={(o) => !o && setViewData(null)}>
         <DialogContent className="sm:max-w-md">
-          <DialogHeader><DialogTitle>Detalle del Turno</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t("hr.chat.detail")}</DialogTitle></DialogHeader>
           {viewData && (
             <div className="space-y-3 text-sm">
-              <div><span className="text-muted-foreground">Título:</span> <span className="font-medium">{viewData.title}</span></div>
-              <div><span className="text-muted-foreground">Tipo:</span> <TypeBadge type={viewData.schedule_type} /></div>
-              <div><span className="text-muted-foreground">Período:</span> {format(parseISO(viewData.start_date), "dd/MM/yyyy")} → {format(parseISO(viewData.end_date), "dd/MM/yyyy")}</div>
-              {viewData.start_time && <div><span className="text-muted-foreground">Horario:</span> {viewData.start_time.slice(0,5)} - {viewData.end_time?.slice(0,5)}</div>}
-              {viewData.description && <div><span className="text-muted-foreground">Descripción:</span> {viewData.description}</div>}
+              <div><span className="text-muted-foreground">{t("common.title")}:</span> <span className="font-medium">{viewData.title}</span></div>
+              <div><span className="text-muted-foreground">{t("common.type")}:</span> <TypeBadge type={viewData.schedule_type} /></div>
+              <div><span className="text-muted-foreground">{t("hr.period")}:</span> {format(parseISO(viewData.start_date), DMY)} → {format(parseISO(viewData.end_date), DMY)}</div>
+              {viewData.start_time && <div><span className="text-muted-foreground">{t("hr.schedule")}:</span> {viewData.start_time.slice(0,5)} - {viewData.end_time?.slice(0,5)}</div>}
+              {viewData.description && <div><span className="text-muted-foreground">{t("common.description")}:</span> {viewData.description}</div>}
             </div>
           )}
         </DialogContent>
@@ -492,12 +498,12 @@ const HRChatterSchedules = () => {
       <AlertDialog open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar este turno?</AlertDialogTitle>
-            <AlertDialogDescription>Esta acción no se puede deshacer.</AlertDialogDescription>
+            <AlertDialogTitle>{t("hr.chat.deleteTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("common.cannotBeUndone")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel />
-            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => deleteId && deleteMutation.mutate(deleteId)}>Eliminar</AlertDialogAction>
+            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => deleteId && deleteMutation.mutate(deleteId)}>{t("common.delete")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -505,7 +511,7 @@ const HRChatterSchedules = () => {
       <KpiDetailDialog
         open={kpiPopup !== null}
         onOpenChange={(o) => !o && setKpiPopup(null)}
-        title={kpiPopup === "week" ? `Turnos Esta Semana — ${turnosThisWeek}` : `Turnos Hoy — ${turnosToday}`}
+        title={kpiPopup === "week" ? `${t("hr.chat.thisWeek")} — ${turnosThisWeek}` : `${t("hr.chat.today")} — ${turnosToday}`}
         rows={(() => {
           if (!kpiPopup) return [];
           const now = new Date();
@@ -518,11 +524,12 @@ const HRChatterSchedules = () => {
             list = schedules.filter((s: any) => s.start_at && isSameDay(new Date(s.start_at), now));
           }
           return list.slice(0, 100).map((s: any): KpiRow => ({
-            primary: s.title ?? s.employee_name ?? "Sin título",
+            primary: s.title ?? s.employee_name ?? t("hr.noTitle"),
             secondary: s.start_at ? format(new Date(s.start_at), "EEEE dd MMM HH:mm", { locale: f.fechas }) : undefined,
             right: s.shift_type ?? "—",
           }));
         })()}
+        emptyText={t("hr.kpiEmpty")}
       />
     </div>
   );

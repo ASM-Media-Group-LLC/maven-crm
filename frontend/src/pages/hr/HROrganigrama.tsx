@@ -16,6 +16,8 @@ import { useEmployees, useDepartments } from "@/hooks/useEmployees";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { EmployeeWithRelations } from "@/hooks/useEmployees";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 
 type ViewTab = "tabla" | "arbol" | "grid" | "departamento";
 
@@ -48,6 +50,7 @@ function buildTree(employees: EmployeeWithRelations[]): TreeNode[] {
 }
 
 function TreeNodeComponent({ node, level = 0 }: { node: TreeNode; level?: number }) {
+  const { t } = useLanguage();
   const [open, setOpen] = useState(level < 2);
   const navigate = useNavigate();
   const hasChildren = node.children.length > 0;
@@ -79,7 +82,7 @@ function TreeNodeComponent({ node, level = 0 }: { node: TreeNode; level?: number
         />
         <div className="min-w-0">
           <p className="text-sm font-medium truncate">{node.first_name} {node.last_name}</p>
-          <p className="text-xs text-muted-foreground truncate">{node.positions?.name ?? "Sin cargo"}</p>
+          <p className="text-xs text-muted-foreground truncate">{node.positions?.name ?? t("hr.org.noJobTitle")}</p>
         </div>
         {hasChildren && (
           <span className="ml-auto text-xs text-muted-foreground">{node.children.length}</span>
@@ -98,6 +101,7 @@ function TreeNodeComponent({ node, level = 0 }: { node: TreeNode; level?: number
 
 // ---------- Main Page ----------
 export default function HROrganigrama() {
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const { data: employees, isLoading } = useEmployees();
   const { data: departments } = useDepartments();
@@ -143,11 +147,11 @@ export default function HROrganigrama() {
     return Object.values(groups).sort((a, b) => (a.dept?.name ?? "ZZZ").localeCompare(b.dept?.name ?? "ZZZ"));
   }, [activeEmployees]);
 
-  const views: { key: ViewTab; label: string }[] = [
-    { key: "tabla", label: "Tabla" },
-    { key: "arbol", label: "Árbol" },
-    { key: "grid", label: "Grid" },
-    { key: "departamento", label: "Por Departamento" },
+  const views: { key: ViewTab; label: TranslationKey }[] = [
+    { key: "tabla", label: "hr.org.viewTable" },
+    { key: "arbol", label: "hr.org.viewTree" },
+    { key: "grid", label: "hr.org.viewGrid" },
+    { key: "departamento", label: "hr.org.viewByDept" },
   ];
 
   if (isLoading) {
@@ -166,16 +170,16 @@ export default function HROrganigrama() {
     <div className="h-full flex flex-col">
       <div className="shrink-0 bg-background border-b px-6 pt-6 pb-4 space-y-4">
         <PageHeader
-          title="Organigrama"
-          subtitle="Estructura organizacional y jerarquías"
+          title={t("hr.org.title")}
+          subtitle={t("hr.org.subtitle")}
         />
 
         {/* KPIs */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <HRMetricCard title="Total Empleados" value={activeEmployees.length} icon={Users} />
-          <HRMetricCard title="Empresas" value={companies?.length ?? 1} icon={Building2} />
-          <HRMetricCard title="Departamentos" value={departments?.length ?? 0} icon={Network} />
-          <HRMetricCard title="Ubicaciones" value={uniqueCities} icon={MapPin} />
+          <HRMetricCard title={t("hr.org.totalEmployees")} value={activeEmployees.length} icon={Users} />
+          <HRMetricCard title={t("hr.org.companies")} value={companies?.length ?? 1} icon={Building2} />
+          <HRMetricCard title={t("hr.org.departments")} value={departments?.length ?? 0} icon={Network} />
+          <HRMetricCard title={t("hr.org.locations")} value={uniqueCities} icon={MapPin} />
         </div>
 
         {/* View tabs */}
@@ -187,7 +191,7 @@ export default function HROrganigrama() {
               size="sm"
               onClick={() => setView(v.key)}
             >
-              {v.label}
+              {t(v.label)}
             </Button>
           ))}
         </div>
@@ -196,10 +200,10 @@ export default function HROrganigrama() {
         <div className="flex items-center gap-3">
           <Select value={companyFilter} onValueChange={setCompanyFilter}>
             <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Empresa" />
+              <SelectValue placeholder={t("hr.org.company")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todas las Empresas</SelectItem>
+              <SelectItem value="all">{t("hr.org.allCompanies")}</SelectItem>
               {companies?.map((c) => (
                 <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
               ))}
@@ -214,12 +218,12 @@ export default function HROrganigrama() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Empleado</TableHead>
-                <TableHead>Posición</TableHead>
-                <TableHead>Departamento</TableHead>
-                <TableHead>Reporta a</TableHead>
-                <TableHead>Ubicación</TableHead>
-                <TableHead className="text-right">Reportes</TableHead>
+                <TableHead>{t("hr.employee")}</TableHead>
+                <TableHead>{t("common.position")}</TableHead>
+                <TableHead>{t("hr.department")}</TableHead>
+                <TableHead>{t("hr.org.reportsTo")}</TableHead>
+                <TableHead>{t("common.location")}</TableHead>
+                <TableHead className="text-right">{t("hr.org.directReports")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -263,7 +267,7 @@ export default function HROrganigrama() {
         {view === "arbol" && (
           <div className="space-y-1">
             {tree.length === 0 ? (
-              <p className="text-muted-foreground text-center py-12">No hay datos de jerarquía configurados</p>
+              <p className="text-muted-foreground text-center py-12">{t("hr.org.noHierarchy")}</p>
             ) : (
               tree.map((root) => <TreeNodeComponent key={root.id} node={root} />)
             )}
@@ -289,7 +293,7 @@ export default function HROrganigrama() {
                   />
                   <div className="min-w-0">
                     <p className="text-sm font-medium truncate">{emp.first_name} {emp.last_name}</p>
-                    <p className="text-xs text-muted-foreground truncate">{emp.positions?.name ?? "Sin cargo"}</p>
+                    <p className="text-xs text-muted-foreground truncate">{emp.positions?.name ?? t("hr.org.noJobTitle")}</p>
                     <EmployeeAreaBadge departmentName={emp.departments?.name} departmentCode={emp.departments?.code} className="mt-1" />
                   </div>
                 </CardContent>
@@ -304,7 +308,7 @@ export default function HROrganigrama() {
             {groupedByDept.map((group, idx) => (
               <div key={idx}>
                 <div className="flex items-center gap-2 mb-3">
-                  <EmployeeAreaBadge departmentName={group.dept?.name ?? "Sin área"} departmentCode={group.dept?.code ?? null} />
+                  <EmployeeAreaBadge departmentName={group.dept?.name ?? t("hr.org.noArea")} departmentCode={group.dept?.code ?? null} />
                   <span className="text-xs text-muted-foreground">({group.employees.length})</span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
@@ -323,7 +327,7 @@ export default function HROrganigrama() {
                       />
                       <div className="min-w-0">
                         <p className="text-sm font-medium truncate">{emp.first_name} {emp.last_name}</p>
-                        <p className="text-xs text-muted-foreground truncate">{emp.positions?.name ?? "Sin cargo"}</p>
+                        <p className="text-xs text-muted-foreground truncate">{emp.positions?.name ?? t("hr.org.noJobTitle")}</p>
                       </div>
                     </div>
                   ))}
