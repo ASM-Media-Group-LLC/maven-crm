@@ -9,6 +9,7 @@ import { formatDistanceToNow } from "date-fns";
 import { useFormato } from "@/hooks/useFormato";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/hooks/useLanguage";
+import EtiquetaApi from "./EtiquetaApi";
 
 interface GlobalSearchPanelProps {
   open: boolean;
@@ -127,6 +128,7 @@ export default function GlobalSearchPanel({ open, onClose, onSelectResult }: Glo
                   <div className="flex items-center gap-1.5 mb-0.5">
                     <User className="h-3 w-3 text-muted-foreground shrink-0" />
                     <span className="text-[11px] font-medium text-foreground">{r.senderName}</span>
+                    {r.esApi && <EtiquetaApi nombre={r.senderName} persona={r.personaReal} esMio={false} />}
                     <span className="text-[10px] text-muted-foreground ml-auto shrink-0">
                       {formatDistanceToNow(new Date(r.createdAt), { addSuffix: true, locale: f.fechas })}
                     </span>

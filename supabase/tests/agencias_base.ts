@@ -1,4 +1,4 @@
-// La base de las agencias (migración 20261001150000_agencias_base.sql), probada
+// La base de las agencias (migración 20261001210000_agencias_base.sql), probada
 // contra un Postgres de verdad (PGlite) cargado con el esquema de PROD: el mismo
 // fixture del banco del Messenger (fixtures/prod_chat_api_20260928.sql) más
 // 20260930230000_chat_agencia_y_huecos, que prod ya tiene aplicada desde el 01/10.
@@ -21,7 +21,7 @@ import { PGlite } from "npm:@electric-sql/pglite@0.3";
 const leer = (rel: string) => Deno.readTextFileSync(new URL(rel, import.meta.url));
 const FIXTURE = leer("./fixtures/prod_chat_api_20260928.sql");
 const CHAT = leer("../migrations/20260930230000_chat_agencia_y_huecos.sql");
-const NOMBRE = "20261001150000_agencias_base.sql";
+const NOMBRE = "20261001210000_agencias_base.sql";
 const MIG = leer(`../migrations/${NOMBRE}`);
 const VUELTA = MIG.split("\n").filter((l) => l.startsWith("--|")).map((l) => l.replace(/^--\| ?/, "")).join("\n");
 

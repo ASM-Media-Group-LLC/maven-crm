@@ -358,7 +358,7 @@ Deno.serve(async (req) => {
       // === La agencia de la cuenta nueva ===
       // La de quien la crea, y va ANTES que todo lo demás: si no se puede poner,
       // el alta se deshace sin haber tocado rol, correo ni casilla. Desde
-      // 20261001150000_agencias_base la base ya no mete a nadie en asm-tech: este
+      // 20261001210000_agencias_base la base ya no mete a nadie en asm-tech: este
       // es el único lugar que pone la agencia (la base no puede, porque GoTrue no
       // escribe app_metadata en el mismo INSERT; ver esa migración).
       //

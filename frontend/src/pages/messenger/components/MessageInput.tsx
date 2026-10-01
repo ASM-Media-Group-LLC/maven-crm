@@ -7,6 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Progress } from "@/components/ui/progress";
 import { ChatMessage, UserProfile } from "../types";
 import { cn } from "@/lib/utils";
+import { remitenteVisible } from "../utils";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -428,7 +429,9 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
           <div className="h-8 w-1 rounded-full bg-primary shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-[11px] font-semibold text-primary">
-              {replyTo.sender_id === user?.id ? t("messenger.preview.tu") : profiles[replyTo.sender_id]?.full_name || t("messenger.usuario")}
+              {replyTo.sender_id === user?.id && replyTo.api_key_id == null
+                ? t("messenger.preview.tu")
+                : remitenteVisible(replyTo, profiles, t).nombre}
             </p>
             <p className="text-[11px] text-muted-foreground truncate">{replyTo.content}</p>
           </div>

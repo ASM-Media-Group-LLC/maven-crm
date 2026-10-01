@@ -2,6 +2,11 @@ import { createContext, useContext, useEffect, useState, useCallback, useRef, Re
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import React from "react";
+import { BUILD_PROPIO, versionesDesdePresencia, type PersonaConVersionVieja } from "@/lib/versionDelBundle";
+
+/** El build de esta pestaña en la presencia (`b`). Sin build conocido no va: del
+ *  otro lado, «sin b» se cuenta como versión vieja, que es lo prudente. */
+const BUILD_EN_LA_PRESENCIA: { b?: number } = BUILD_PROPIO > 0 ? { b: BUILD_PROPIO } : {};
 
 /** "No molestar" se quitó: pintaba el mismo rojo que "Ocupado" y no tenía
  *  ningún efecto funcional. "offline" es aparecer como desconectado (solo
@@ -30,6 +35,10 @@ interface OnlinePresenceContextType {
   /** Color del puntito elegido a mano, o null si usa el del estado. */
   getStatusColorPersonal: (userId: string) => string | null;
   myStatusColor: string | null;
+  /** Las personas conectadas ahora con un Maven anterior a `minimo` (hora del
+   *  build en ms) o que no dicen su versión: las que todavía no verían la etiqueta
+   *  API. Lee la presencia en el momento; no consulta la base. */
+  versionesConectadas: (minimo: number) => PersonaConVersionVieja[];
 }
 
 const OnlinePresenceContext = createContext<OnlinePresenceContextType>({
@@ -44,6 +53,7 @@ const OnlinePresenceContext = createContext<OnlinePresenceContextType>({
   setMyStatusText: async () => {},
   getStatusColorPersonal: () => null,
   myStatusColor: null,
+  versionesConectadas: () => [],
 });
 
 export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
@@ -78,6 +88,7 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
       status: status ?? myStatusRef.current,
       status_text: myStatusTextRef.current || null,
       status_color: myStatusColorRef.current || null,
+      ...BUILD_EN_LA_PRESENCIA,
     });
   }, []);
 
@@ -124,6 +135,7 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
             // Si Maven se abre ya en segundo plano, no anunciar "Disponible".
             status: document.hidden ? "away" : myStatusRef.current,
             status_text: myStatusTextRef.current || null,
+            ...BUILD_EN_LA_PRESENCIA,
           });
         }
       });
@@ -295,6 +307,14 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
     [statusColors]
   );
 
+  // Del estado de la presencia tal como está AHORA (todas las pestañas de cada
+  // uno). No guarda nada en el estado de React: quien lo muestra se vuelve a
+  // dibujar con cada sync de la presencia (cambia onlineUsers) y lo vuelve a pedir.
+  const versionesConectadas = useCallback((minimo: number) => {
+    const canal = channelRef.current as { presenceState?: () => Record<string, unknown[]> } | null;
+    return versionesDesdePresencia(canal?.presenceState?.() ?? {}, minimo);
+  }, []);
+
   return React.createElement(
     OnlinePresenceContext.Provider,
     {
@@ -302,6 +322,7 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
         onlineUsers, isOnline, userStatuses, getStatus, myStatus, setMyStatus,
         getStatusText, myStatusText, setMyStatusText,
         getStatusColorPersonal, myStatusColor,
+        versionesConectadas,
       },
     },
     children

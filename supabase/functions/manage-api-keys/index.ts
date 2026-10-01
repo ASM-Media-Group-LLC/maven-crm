@@ -3,7 +3,7 @@
 // (webhook_create | webhook_test | webhook_resume | webhook_pause | webhook_delete |
 // webhook_deliveries, en ./webhooks.ts). El secreto completo se devuelve UNA sola
 // vez al crear; después solo queda el hash + últimos 4 chars para mostrar.
-// verify_jwt=false: validamos el JWT y el rol admin acá adentro (mismo gate que
+// verify_jwt=false: validamos el JWT y el rol admin aquí adentro (mismo gate que
 // el frontend: user_roles.role='admin').
 import { corsFor } from "../_shared/cors.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -15,6 +15,15 @@ import {
   SCOPE_GROUPS,
 } from "./api-scopes.ts";
 import { type ClaveDeMensaje, type Idioma, idiomaDe, msg } from "./mensajes.ts";
+import {
+  escribe,
+  leerNombreVisible,
+  leerReemplazo,
+  problemaAlCrear,
+  problemaAlEditar,
+  scopesNoDisponibles,
+  traducirErrorDeLlave,
+} from "./escritura.ts";
 import { conWebhooks, crearDatos, servirWebhook, webhooksDeLlaves } from "./webhooks.ts";
 
 // Igual que Infloww: hasta 3 keys válidas a la vez, POR AGENCIA. Antes se contaba
@@ -103,7 +112,7 @@ Deno.serve(async (req) => {
     const callerId = user.id;
 
     // El cuerpo se lee recién con la sesión validada (a un anónimo no se le lee
-    // nada) y trae el idioma de la página: todo mensaje traducido viene de acá para
+    // nada) y trae el idioma de la página: todo mensaje traducido viene de aquí para
     // abajo. Los dos 401 de arriba dicen "Unauthorized" a propósito: adminInvoke
     // lo mira para saber que la sesión se cayó. Sin `lang`, español como siempre.
     const body = await req.json().catch(() => ({}));
@@ -133,7 +142,7 @@ Deno.serve(async (req) => {
       return json(req, { error: m("sinAgencia") }, 403);
     }
     if (agenciasDelAdmin.length > 1) {
-      // Adivinar la agencia acá es justo cómo se termina administrando la ajena.
+      // Adivinar la agencia aquí es justo cómo se termina administrando la ajena.
       return json(req, { error: m("variasAgencias") }, 409);
     }
     const tenantId = (agenciasDelAdmin[0] as { tenant_id: string }).tenant_id;
@@ -141,11 +150,21 @@ Deno.serve(async (req) => {
     const action = body?.action as string | undefined;
 
     const SELECT_COLS =
-      "id, name, key_prefix, last_four, scopes, ip_whitelist, created_at, created_by_email, last_used_at, request_count, expires_at, revoked_at, acts_as_user_id, limite_por_hora";
+      "id, name, key_prefix, last_four, scopes, ip_whitelist, created_at, created_by_email, last_used_at, request_count, expires_at, revoked_at, acts_as_user_id, limite_por_hora, api_display_name, integracion_id";
+
+    // Un error de la base al guardar una key: si es una regla de messenger:write o del
+    // nombre visible (MV422 de api_keys_nombre_visible, o un CHECK), su mensaje; si no,
+    // uno genérico y el detalle al log. Nunca el error crudo de la base con un 500.
+    const errorAlGuardar = (donde: string, e: { message?: string } | null) => {
+      const clave = traducirErrorDeLlave(e);
+      if (clave) return json(req, { error: m(clave) }, 400);
+      console.error(`[manage-api-keys] ${donde}:`, e?.message ?? e);
+      return json(req, { error: m("errorAlGuardar") }, 500);
+    };
 
     // Como quién actúa cada llave, con nombre y si sigue vigente: es lo primero que
     // tiene que ver quien la administra. Si a esa persona la dieron de baja, el API
-    // rechaza la llave con 401 aunque acá diga "Activa"; sin esto no hay cómo saberlo.
+    // rechaza la llave con 401 aunque aquí diga "Activa"; sin esto no hay cómo saberlo.
     // `active` sale de api_key_vigente, la MISMA regla que usa el API (sin baja, sin
     // bloqueo, en la agencia): si la página y el API no coinciden, alguien revoca la
     // llave equivocada. Solo para las llaves activas (a lo sumo MAX_ACTIVE_KEYS).
@@ -189,6 +208,8 @@ Deno.serve(async (req) => {
       const { keys, webhooks_unknown } = conWebhooks((await conPersona(data ?? [])).map((k) => ({ ...k, status: statusOf(k) })), webhooks);
       return json(req, {
         keys, webhooks_unknown,
+        // El de la PANTALLA: sin SCOPES_OCULTOS_EN_PANTALLA (hoy vacía: messenger:write ya
+        // se ofrece). La validación usa el completo (isValidScope).
         scope_catalog: SCOPE_CATALOG, scope_groups: SCOPE_GROUPS, max_active_keys: MAX_ACTIVE_KEYS,
         // Quién está mirando: una key nueva actúa como esta persona. La página lo
         // usa para decir de quién son las conversaciones que leería con Messenger.
@@ -218,6 +239,9 @@ Deno.serve(async (req) => {
       if (scopes.length === 0) return json(req, { error: m("alMenosUnScope") }, 400);
       const bad = scopes.filter((s) => !isValidScope(s));
       if (bad.length) return json(req, { error: m("scopesInvalidos", { lista: bad.join(", ") }) }, 400);
+      // Lo que la pantalla todavía no ofrece, el servidor tampoco lo da (hasta el PR 5).
+      const ocultos = scopesNoDisponibles(scopes);
+      if (ocultos.length) return json(req, { error: m("scopeNoDisponible", { lista: ocultos.join(", ") }) }, 400);
       if (expiresAt && Number.isNaN(expiresAt.getTime())) {
         return json(req, { error: m("fechaInvalida") }, 400);
       }
@@ -233,6 +257,31 @@ Deno.serve(async (req) => {
           return json(req, { error: m("confirmarMessenger") }, 400);
         }
       }
+
+      // messenger:write: el nombre visible y la rotación (replaces_key_id). La key que
+      // se reemplaza tiene que ser de quien crea esta y de esta agencia; la nueva hereda
+      // su integración (editar y borrar lo que mandó siguen andando) y, si no se dice
+      // otro, su nombre visible.
+      const nombrePedido = leerNombreVisible(body?.display_name);
+      if (!nombrePedido.ok) return json(req, { error: m("nombreVisibleForma") }, 400);
+      const reemplazo = leerReemplazo(body?.replaces_key_id);
+      if (!reemplazo.ok) return json(req, { error: m("reemplazoInvalido") }, 400);
+      let nombreVisible: string | null = nombrePedido.valor ?? null;
+      let integracionId: string | null = null;
+      if (reemplazo.valor) {
+        const { data: vieja, error: vErr } = await admin
+          .from("api_keys").select("id, integracion_id, api_display_name, acts_as_user_id")
+          .eq("id", reemplazo.valor).eq("tenant_id", tenantId).maybeSingle();
+        if (vErr) return errorAlGuardar("key que se reemplaza", vErr);
+        const v = vieja as { integracion_id: string; api_display_name: string | null; acts_as_user_id: string | null } | null;
+        if (!v || v.acts_as_user_id !== callerId) return json(req, { error: m("reemplazoInvalido") }, 400);
+        integracionId = v.integracion_id;
+        if (nombrePedido.valor === undefined && escribe(scopes)) nombreVisible = v.api_display_name;
+      }
+      const problemaDeEscritura = problemaAlCrear({
+        scopes, nombreVisible, confirmaEscrituraComo: body?.acknowledge_messenger_writes_as, quienCrea: callerId,
+      });
+      if (problemaDeEscritura) return json(req, { error: m(problemaDeEscritura.clave) }, problemaDeEscritura.estado);
 
       // Límite de keys activas (no revocadas ni vencidas).
       const nowIso = new Date().toISOString();
@@ -261,10 +310,14 @@ Deno.serve(async (req) => {
           // quien la crea: el cliente no puede elegir una ajena.
           tenant_id: tenantId,
           expires_at: expiresAt ? expiresAt.toISOString() : null,
+          // La base lo normaliza y lo valida (api_keys_nombre_visible): forma, raíces
+          // reservadas, nombres de personas y reservado para siempre por integración.
+          api_display_name: nombreVisible,
+          ...(integracionId ? { integracion_id: integracionId } : {}),
         })
-        .select("id, name, key_prefix, last_four, scopes, ip_whitelist, created_at, expires_at, revoked_at, acts_as_user_id, limite_por_hora")
+        .select("id, name, key_prefix, last_four, scopes, ip_whitelist, created_at, expires_at, revoked_at, acts_as_user_id, limite_por_hora, api_display_name, integracion_id")
         .single();
-      if (error) return json(req, { error: error.message }, 500);
+      if (error) return errorAlGuardar("alta de la key", error);
 
       // El secreto completo viaja UNA sola vez. No se vuelve a poder recuperar.
       const [conNombre] = await conPersona([inserted]);
@@ -287,6 +340,8 @@ Deno.serve(async (req) => {
         if (scopes.length === 0) return json(req, { error: m("alMenosUnScope") }, 400);
         const bad = scopes.filter((s) => !isValidScope(s));
         if (bad.length) return json(req, { error: m("scopesInvalidos", { lista: bad.join(", ") }) }, 400);
+        const ocultos = scopesNoDisponibles(scopes);
+        if (ocultos.length) return json(req, { error: m("scopeNoDisponible", { lista: ocultos.join(", ") }) }, 400);
         patch.scopes = scopes;
       }
       if (body?.ip_whitelist !== undefined) {
@@ -295,6 +350,9 @@ Deno.serve(async (req) => {
         if (badIps.length) return json(req, { error: m("ipsInvalidas", { lista: badIps.join(", ") }) }, 400);
         patch.ip_whitelist = ips;
       }
+      const nombreNuevo = leerNombreVisible(body?.display_name);
+      if (!nombreNuevo.ok) return json(req, { error: m("nombreVisibleForma") }, 400);
+      if (nombreNuevo.valor !== undefined) patch.api_display_name = nombreNuevo.valor;
       if (body?.expires_at !== undefined) {
         if (body.expires_at === null) patch.expires_at = null;
         else {
@@ -308,11 +366,13 @@ Deno.serve(async (req) => {
       // Reglas del Messenger contra lo que la key tiene HOY, no contra lo que dice
       // el pedido.
       const { data: actual, error: aErr } = await admin
-        .from("api_keys").select("scopes, ip_whitelist, expires_at, acts_as_user_id")
+        .from("api_keys").select("scopes, ip_whitelist, expires_at, acts_as_user_id, api_display_name")
         .eq("id", id).eq("tenant_id", tenantId).is("revoked_at", null).maybeSingle();
-      if (aErr) return json(req, { error: aErr.message }, 500);
+      if (aErr) return errorAlGuardar("lectura de la key a editar", aErr);
       if (!actual) return json(req, { error: m("noExisteORevocada") }, 404);
-      const hoy = actual as { scopes: string[]; ip_whitelist: string[]; expires_at: string | null; acts_as_user_id: string };
+      const hoy = actual as {
+        scopes: string[]; ip_whitelist: string[]; expires_at: string | null; acts_as_user_id: string; api_display_name: string | null;
+      };
       const teniaMessenger = (hoy.scopes ?? []).some(esScopeMessenger);
       const scopesNuevos = (patch.scopes as string[] | undefined) ?? hoy.scopes ?? [];
       const tendraMessenger = scopesNuevos.some(esScopeMessenger);
@@ -321,6 +381,14 @@ Deno.serve(async (req) => {
         // Messenger les daría sus chats sin que nadie lo note.
         return json(req, { error: m("messengerSoloNuevas") }, 400);
       }
+      // messenger:write, contra lo de HOY: no se suma a una key que ya existe (aunque ya
+      // lea el Messenger: teniaMessenger la dejaría pasar), va con read, y el nombre
+      // visible lo cambia solo su persona. Quitarlo se permite.
+      const problemaDeEscritura = problemaAlEditar({
+        scopesHoy: hoy.scopes ?? [], scopesNuevos, nombreVisibleHoy: hoy.api_display_name ?? null,
+        nombreVisibleNuevo: nombreNuevo.valor, actuaComo: hoy.acts_as_user_id, quienEdita: callerId,
+      });
+      if (problemaDeEscritura) return json(req, { error: m(problemaDeEscritura.clave) }, problemaDeEscritura.estado);
       if (tendraMessenger) {
         // Solo la persona como la que actúa puede editarla (cualquier admin la revoca).
         if (hoy.acts_as_user_id !== callerId) {
@@ -340,7 +408,7 @@ Deno.serve(async (req) => {
       const { data, error } = await admin
         .from("api_keys").update(patch).eq("id", id).eq("tenant_id", tenantId).is("revoked_at", null)
         .select(SELECT_COLS);
-      if (error) return json(req, { error: error.message }, 500);
+      if (error) return errorAlGuardar("edición de la key", error);
       if (!data?.length) return json(req, { error: m("noExisteORevocada") }, 404);
       const [conNombre] = await conPersona(data);
       return json(req, { ...conNombre, status: statusOf(data[0]) });

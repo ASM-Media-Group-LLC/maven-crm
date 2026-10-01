@@ -47,6 +47,21 @@ const TTL_LLAMADA_S = 30;
 type Admin = ReturnType<typeof createClient<any>>;
 type Vapid = { subject: string; publicKey: string; privateKey: string };
 type Sub = { id: string; user_id: string; endpoint: string; p256dh: string; auth: string };
+/** Lo que el push de chat lee de chat_messages (sin la marca de API, que se suma aparte). */
+const COLUMNAS_DEL_MENSAJE = "id, conversation_id, sender_id, content, type, file_name, is_deleted, is_thread_reply, created_at";
+type MensajeDelPush = {
+  id: string;
+  conversation_id: string;
+  sender_id: string;
+  content: string | null;
+  type: string | null;
+  file_name: string | null;
+  is_deleted: boolean;
+  is_thread_reply: boolean | null;
+  created_at: string;
+  api_key_id?: string | null;
+  api_display_name?: string | null;
+};
 type NotifyBody = {
   kind?: unknown;
   recipient_ids?: unknown;
@@ -168,11 +183,15 @@ async function notificar(req: Request, admin: Admin, b: NotifyBody, vapid: Vapid
 
     await new Promise((r) => setTimeout(r, ESPERA_LECTURA_MS));
 
-    const { data: msg } = await admin
-      .from("chat_messages")
-      .select("id, conversation_id, sender_id, content, type, file_name, is_deleted, is_thread_reply, created_at")
-      .eq("id", messageId)
-      .maybeSingle();
+    // api_key_id/api_display_name: la marca «vino por API» (migración 20261001200000).
+    // Si esta función llega a prod antes que esa migración, el select con las dos
+    // columnas da 42703 (columna inexistente) y, sin el respaldo, NINGÚN mensaje
+    // tendría push. Con el respaldo se lee como antes y el emisor sale del perfil.
+    const leerMensaje = (columnas: string) =>
+      admin.from("chat_messages").select(columnas).eq("id", messageId).maybeSingle();
+    let leido = await leerMensaje(`${COLUMNAS_DEL_MENSAJE}, api_key_id, api_display_name`);
+    if (leido.error?.code === "42703") leido = await leerMensaje(COLUMNAS_DEL_MENSAJE);
+    const msg = leido.data as MensajeDelPush | null;
     if (!msg) return json(req, { ok: true, kind, sent: 0, reason: "message_not_found" });
     if (msg.is_deleted) return json(req, { ok: true, kind, sent: 0, reason: "deleted" });
     if (msg.type === "system") return json(req, { ok: true, kind, sent: 0, reason: "system" });
@@ -211,7 +230,8 @@ async function notificar(req: Request, admin: Admin, b: NotifyBody, vapid: Vapid
     const { title, body } = armarTituloYCuerpo({
       esGrupo: conv.data?.type === "group",
       nombreGrupo: conv.data?.name ?? null,
-      emisor: nombreDelEmisor(emisor.data as { full_name: string | null } | null),
+      // Por API: «BLU (API)», con el nombre de la FILA (nunca el del perfil).
+      emisor: nombreDelEmisor(msg, emisor.data as { full_name: string | null } | null),
       preview: previewDeMensaje(msg.content ?? null, msg.type ?? "text", msg.file_name ?? null),
       enHilo: msg.is_thread_reply === true,
     });

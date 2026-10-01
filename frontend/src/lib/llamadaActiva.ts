@@ -22,6 +22,21 @@ export function quitarLlamadaActiva(sala: string): void {
   salasConectadas.delete(sala);
 }
 
+/**
+ * Una llamada que está ENTRANDO (pidiendo el token, conectando, publicando)
+ * también cuenta: recargar en ese momento la corta igual, y `marcarLlamadaActiva`
+ * recién llega cuando `room.connect` termina. Lo marca `useLiveKit` al empezar
+ * `connect()`; devuelve cómo soltarlo, y se suelta siempre al terminar el intento
+ * (bien, mal o reemplazado). Si conectó, para entonces ya quedó la sala marcada.
+ * Cada intento tiene su propia marca: dos a la vez no se pisan.
+ */
+let conexiones = 0;
+export function marcarConexionEnCurso(sala: string): () => void {
+  const marca = `conectando:${sala}:${++conexiones}`;
+  salasConectadas.add(marca);
+  return () => { salasConectadas.delete(marca); };
+}
+
 export function hayLlamadaActiva(): boolean {
   return salasConectadas.size > 0;
 }

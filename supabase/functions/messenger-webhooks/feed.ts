@@ -7,7 +7,7 @@
 // timbre nunca apunta a algo que el feed no le devolvería al integrador. Un test lo
 // verifica leyendo este archivo.
 //
-// ⚠️ Del feed sale el CONTENIDO de los mensajes (texto, adjuntos, remitentes). Acá
+// ⚠️ Del feed sale el CONTENIDO de los mensajes (texto, adjuntos, remitentes). Aquí
 // se queda SOLO con lo que va en el timbre —cuántos, en qué conversaciones y los
 // cursores— y el resto se descarta en esta misma función: no sale ni al log, ni a la
 // base, ni al cuerpo del timbre. El detalle de un 503 (que puede traer el mensaje de
@@ -72,17 +72,24 @@ export async function leerFeedCon(yo: SupabaseClient, p: PedidoDelFeed): Promise
       ruta: ["feed"],
       consulta: { after: p.despues, exclude_own: p.sinPropios ? "true" : "false", limit: "100" },
       llave: { conWhitelist: p.conWhitelist, venceEl: p.venceEl },
-      // Solo arma las URLs de los adjuntos, que acá se descartan.
+      // Solo arma las URLs de los adjuntos, que aquí se descartan.
       baseDeArchivos: "",
       cupo: { limite: 0, restantes: 0, reinicio: new Date(0).toISOString() },
       idioma: "es",
+      // Solo lee: el feed es un GET, sin cuerpo ni Idempotency-Key.
+      metodo: "GET",
+      cuerpo: null,
+      idempotencia: null,
     });
   } catch {
     return NO_PERMANENTE("base");
   }
   if (!r.ok) {
-    if (r.estado !== 503) return PERMANENTE(`feed_${r.estado}`);
-    return clasificar503(r.detalle);
+    if ("detalle" in r) return clasificar503(r.detalle);
+    if (r.estado === 400 || r.estado === 403 || r.estado === 404) return PERMANENTE(`feed_${r.estado}`);
+    // Lo demás (un 405, un tope, una pausa) no lo devuelve un GET del feed: si llegara,
+    // se vuelve a intentar más tarde, sin detener el endpoint.
+    return NO_PERMANENTE("base");
   }
   return extraerDelFeed(r.cuerpo);
 }
@@ -135,7 +142,7 @@ export function fetchConPlazo(restanteMs: () => number): typeof fetch {
     // red —incluido este corte, que llega como TimeoutError y no como AbortError— y todo
     // 503/520 (respetando Retry-After sin tope): hasta 3 veces, con 1+2+4 s de espera
     // que ningún plazo corta. Un pedido de 0,5 s se volvía 4 pedidos y 9 s justo con la
-    // base caída. Acá no se reintenta nada: el reintento lo decide el despachador (la
+    // base caída. Aquí no se reintenta nada: el reintento lo decide el despachador (la
     // espera de 5 min, el freno). Un pedido que ya viene marcado como reintento se corta,
     // cualquier falla sale como AbortError (que no se reintenta) y un 503/520 como 502.
     if (new Headers(init?.headers).has("X-Retry-Count")) throw new DOMException("sin reintentos", "AbortError");
