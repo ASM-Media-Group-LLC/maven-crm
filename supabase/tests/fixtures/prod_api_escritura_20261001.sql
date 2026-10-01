@@ -7,8 +7,10 @@
 -- Sale de consultas de catálogo de solo lectura (MCP execute_sql), las mismas del
 -- fixture del 28/09. Las funciones salen de la última migración del repo que las
 -- define (con el cambio de 20260929180000_funciones_sin_voseo) y su md5(prosrc) se
--- comparó con el de prod: iguales, salvo get_karma_profile, que en prod NO es la del
--- repo (20260903020000_karma_profile_correo.sql da c7bcc7ae…): va el cuerpo de prod.
+-- comparó con el de prod: iguales, salvo get_karma_profile y send_karma, que en prod
+-- NO son las del repo (20260903020000_karma_profile_correo.sql da c7bcc7ae… y
+-- 20260828160000_messenger_karma_points.sql e2691c8b…): van los cuerpos de prod.
+-- send_karma está porque 20261001150000_karma_sin_anon le cambia los permisos.
 --
 -- Huellas de prod del 01/10 (md5). El banco api_messenger_escritura.ts las recalcula
 -- y FALLA si alguna no coincide: este archivo no se toca a mano.
@@ -22,6 +24,11 @@
 --     public.api_keys_reglas_messenger=5201625d15227803a5514ce235bde6ce
 --     public.api_keys_validar_actua_como=4ae306899ead0410e4bd7a4393751f36
 --     public.get_karma_profile=1aa22eb9f32d548fa57475c3032a980e
+--     public.send_karma=b084b3561f41bb7c013e67de4f897f7d
+--   proacl de las dos del karma, como quedaron después de
+--   20261001150000_karma_sin_anon (en prod, 20261001073247): sin PUBLIC ni anon.
+--     acl.public.get_karma_profile={postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}
+--     acl.public.send_karma={postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}
 --   estructura (md5 de columnas, de constraints y de índices, como en el del 28/09):
 --     api_keys ee5f5ffb9571c368fa7079da6b9cc3b7 8b85a988a5192cf38d3079af172a163f 22861dc019a8762063b1511ed830cbc1
 --     role_groups bbcd61486bff17f4c2b733b580b172d9 bcce753ec0d2ed883c40aa2c75571e10 c257873fe7eb7ed7b2200da8e7e7f427
@@ -59,8 +66,9 @@
 --
 -- Stubs (NO son de prod): las tablas y la función que lee get_karma_profile fuera del
 -- Messenger, con solo las columnas que usa y los tipos de prod (mail_credentials,
--- hubstaff_daily_data, hubstaff_members, qa_calls, qa_closers, karma_sends y
--- has_permission, que aquí da false), y pg_cron (cron.job y schedule/unschedule).
+-- hubstaff_daily_data, hubstaff_members, qa_calls, qa_closers, karma_sends con la
+-- UNIQUE que pide send_karma, y has_permission, que aquí da false), y pg_cron
+-- (cron.job y schedule/unschedule).
 -- ════════════════════════════════════════════════════════════════════════════
 
 set check_function_bodies = off;
@@ -75,7 +83,7 @@ create table public.hubstaff_daily_data (hubstaff_user_id text, date date, track
 create table public.hubstaff_members (profile_id uuid, hubstaff_user_id text);
 create table public.qa_calls (closer_id uuid, call_date date, claude_score integer);
 create table public.qa_closers (id uuid, profile_id uuid);
-create table public.karma_sends (giver_id uuid, recipient_id uuid);
+create table public.karma_sends (giver_id uuid, recipient_id uuid, unique (giver_id, recipient_id));
 create function public.has_permission(_user_id uuid, _module text, _submodule text default null) returns boolean
   language sql stable as $f$ select false $f$;
 
@@ -458,6 +466,30 @@ begin
 end;
 $function$;
 
+CREATE OR REPLACE FUNCTION public.send_karma(target uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare v_caller uuid := auth.uid();
+begin
+  if v_caller is null then
+    return jsonb_build_object('ok', false, 'error', 'not_authenticated');
+  end if;
+  if v_caller = target then
+    return jsonb_build_object('ok', false, 'error', 'cannot_karma_self');
+  end if;
+  if not exists (select 1 from user_roles where user_id = v_caller) then
+    return jsonb_build_object('ok', false, 'error', 'not_eligible');
+  end if;
+  insert into karma_sends (giver_id, recipient_id)
+  values (v_caller, target)
+  on conflict (giver_id, recipient_id) do nothing;
+  return public.get_karma_profile(target);
+end;
+$function$;
+
 -- ─── Grants de funciones distintos del de por defecto (proacl de prod) ──────
 revoke all on function public.api_key_consumir(uuid) from public, anon, authenticated;
 revoke all on function public.api_key_persona_vigente(uuid, uuid) from public, anon, authenticated;
@@ -467,6 +499,8 @@ revoke all on function public.api_keys_agencia_inmutable() from public, anon, au
 revoke all on function public.api_keys_asignar_agencia() from public, anon, authenticated;
 revoke all on function public.api_keys_reglas_messenger() from public, anon, authenticated;
 revoke all on function public.api_keys_validar_actua_como() from public, anon, authenticated;
+revoke all on function public.get_karma_profile(uuid) from public, anon;
+revoke all on function public.send_karma(uuid) from public, anon;
 
 -- ─── Triggers ────────────────────────────────────────────────────────────────
 CREATE TRIGGER api_keys_actua_como_inmutable BEFORE UPDATE OF acts_as_user_id ON public.api_keys FOR EACH ROW EXECUTE FUNCTION api_keys_actua_como_inmutable();

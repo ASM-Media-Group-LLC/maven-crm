@@ -50,7 +50,7 @@ const json = (s: string): Fila => { try { return JSON.parse(s); } catch { return
 
 // ─── La cadena de migraciones ────────────────────────────────────────────────
 const FIXTURE_HASTA = "20260929180000"; // la última que tenía prod el 28/09
-const PROD_HASTA = "20261001100000";    // la última del repo que prod tiene aplicada el 01/10 (la A y el 1b)
+const PROD_HASTA = "20261001150000";    // la última del repo que prod tiene aplicada el 01/10 (la A, el 1b y karma_sin_anon)
 const TABLAS_DE_INTERES = ["app_flags", "chat_archived", "chat_conversations", "chat_join_requests", "chat_message_deletions",
   "chat_messages", "chat_participants", "chat_pinned", "chat_reactions", "chat_read_receipts", "chat_space_conversations",
   "chat_spaces", "notification_preferences", "notification_settings", "notifications", "profiles", "push_subscriptions",
@@ -62,7 +62,7 @@ const FUNCIONES_DE_INTERES = new Set(["current_tenant_id", "delete_chat_message"
   "get_unread_counts", "guard_chat_message_update", "handle_new_user", "is_chat_admin", "is_chat_participant", "notify_chat_message",
   "push_chat_message", "chat_conversations_agencia", "chat_participants_agencia", "chat_messages_al_insertar", "chat_directo_con",
   "chat_llave_de_par", "profiles_nombre_lo_cambia_un_admin", "api_key_persona_vigente", "api_key_vigente", "api_key_consumir",
-  "api_keys_reglas_messenger", "api_keys_validar_actua_como", "api_keys_asignar_agencia", ...FUNCIONES_DE_B]);
+  "api_keys_reglas_messenger", "api_keys_validar_actua_como", "api_keys_asignar_agencia", "send_karma", ...FUNCIONES_DE_B]);
 const DE_INTERES = new Set([...TABLAS_DE_INTERES, ...FUNCIONES_DE_INTERES]);
 function objetivos(sql: string): string[] {
   const s = sinComentarios(sql);
@@ -226,7 +226,7 @@ async function nueva(migB = MIG_B, extra = ""): Promise<PGlite> {
   await db.exec(SEMILLA_B + extra);
   return db;
 }
-// prod el 01/10: los fixtures + las migraciones que prod ya tiene (la A y el 1b).
+// prod el 01/10: los fixtures + las migraciones que prod ya tiene (la A, el 1b y karma_sin_anon).
 async function prodHoy(): Promise<PGlite> {
   const db = new PGlite();
   await db.exec(FIXTURE);
@@ -243,6 +243,16 @@ type Sesion = { claims: Fila | null; rol: string | null; nombre: string };
 const app = (uid: string, extra: Fila = {}): Sesion => ({ claims: { sub: uid, role: "authenticated", aud: "authenticated", ...extra }, rol: "authenticated", nombre: `app:${uid.slice(-2)}` });
 const api = (uid: string, k: string): Sesion => ({ claims: { sub: uid, role: "authenticated", aud: "authenticated", mvf: true, mvk: k }, rol: "authenticated", nombre: `api:${k.slice(-2)}` });
 const fabricada = (uid: string): Sesion => ({ claims: { sub: uid, role: "authenticated", aud: "authenticated", mvf: true }, rol: "authenticated", nombre: `mvf:${uid.slice(-2)}` });
+// Tokens con los claims «editados»: lo que no fabrica el edge, pero que la base tiene
+// que tratar igual de fabricado (un solo predicado: trae `mvf` o `mvk`, aunque sea null).
+const soloMvk = (uid: string, k = K_BLU): Sesion => ({ claims: { sub: uid, role: "authenticated", aud: "authenticated", mvk: k }, rol: "authenticated", nombre: `solo-mvk:${uid.slice(-2)}` });
+const mvfNull = (uid: string): Sesion => ({ claims: { sub: uid, role: "authenticated", aud: "authenticated", mvf: null }, rol: "authenticated", nombre: `mvf-null:${uid.slice(-2)}` });
+const mvkNull = (uid: string): Sesion => ({ claims: { sub: uid, role: "authenticated", aud: "authenticated", mvk: null }, rol: "authenticated", nombre: `mvk-null:${uid.slice(-2)}` });
+const mvfNullConMvk = (uid: string, k = K_BLU): Sesion => ({ claims: { sub: uid, role: "authenticated", aud: "authenticated", mvf: null, mvk: k }, rol: "authenticated", nombre: `mvf-null+mvk:${uid.slice(-2)}` });
+// Un JWT de GoTrue de verdad: user_metadata (que la persona sí controla) con mvf y mvk adentro.
+const gotrue = (uid: string): Sesion => ({ claims: { iss: "https://lsagslbkliprespbyhts.supabase.co/auth/v1", sub: uid, aud: "authenticated", exp: 9999999999,
+  email: "x@ejemplo.test", app_metadata: { provider: "email", alta: "admin" }, user_metadata: { full_name: "x", mvf: true, mvk: K_BLU },
+  role: "authenticated", aal: "aal1", session_id: "5f0c0e2a-1111-4222-8333-944444444444", is_anonymous: false }, rol: "authenticated", nombre: `gotrue:${uid.slice(-2)}` });
 const SR: Sesion = { claims: { role: "service_role" }, rol: "service_role", nombre: "service_role" };
 const SR_CON_MVK = (k: string): Sesion => ({ claims: { role: "service_role", mvf: true, mvk: k }, rol: "service_role", nombre: "service_role+mvk" });
 const ANON: Sesion = { claims: { role: "anon" }, rol: "anon", nombre: "anon" };
@@ -311,7 +321,7 @@ async function sembrarSinTriggers(db: PGlite, sql: string) {
   const delFixture = huellas(FIXTURE, /^--\s+((?:auth|public)\.\w+)=([0-9a-f]{32})$/gm);
   const delComplemento = huellas(COMPLEMENTO, /^--\s+(public\.\w+)=([0-9a-f]{32})$/gm);
   const prodTrasA = huellas(COMPLEMENTO, /^--\s+prod\.((?:public|politicas)\.\w+)=([0-9a-f]{32})$/gm);
-  check(delFixture.size === 27 && delComplemento.size === 9 && prodTrasA.size === 15,
+  check(delFixture.size === 27 && delComplemento.size === 10 && prodTrasA.size === 15,
     `huellas en las cabeceras: ${delFixture.size} del fixture del 28/09, ${delComplemento.size} del complementario y ${prodTrasA.size} de prod tras la A y el 1b`);
   const PRODSRC = `select n.nspname||'.'||p.proname k, md5(p.prosrc) h from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname in ('public','auth')`;
   const POLITICAS = `select tablename k, md5(string_agg(policyname||'|'||permissive||'|'||roles::text||'|'||cmd||'|'||coalesce(qual,'')||'|'||coalesce(with_check,''), E'\n' order by policyname)) h from pg_policies where schemaname='public' group by 1`;
@@ -333,10 +343,19 @@ async function sembrarSinTriggers(db: PGlite, sql: string) {
   check(est[0]?.h === cab(/^--\s+api_keys ([0-9a-f]{32}) ([0-9a-f]{32}) ([0-9a-f]{32})$/m) && est[1]?.h === cab(/^--\s+role_groups ([0-9a-f]{32}) ([0-9a-f]{32}) ([0-9a-f]{32})$/m)
       && est[0]?.trg === cab(/^--\s+triggers\.api_keys=([0-9a-f]{32})$/m),
     `columnas, constraints, índices y triggers de api_keys y role_groups son los de prod (${est.map((e) => e.k).join(", ")})`);
+  // Los permisos del karma, como quedaron en prod después de karma_sin_anon (sin
+  // PUBLIC ni anon), en el fixture y después de la cadena (que la vuelve a correr).
+  const acls = new Map([...COMPLEMENTO.matchAll(/^--\s+acl\.public\.(\w+)=(\{[^}]*\})$/gm)].map((m) => [m[1], m[2]]));
+  const aclDe = async (d: PGlite) => new Map((await q(d, `select p.proname k, p.proacl::text v from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = any($1)`, [[...acls.keys()]])).map((f) => [f.k, f.v]));
+  const aclFx = await aclDe(db);
+  check(acls.size === 2 && [...acls].every(([k, v]) => aclFx.get(k) === v && !v.includes("anon") && !v.startsWith("{=")),
+    `get_karma_profile y send_karma tienen los permisos de prod (sin PUBLIC ni anon): ${[...aclFx].map(([k, v]) => `${k} ${v}`).join("; ")}`);
   const pol = new Map((await q(db, POLITICAS)).map((f) => [f.k, f.h]));
   check(pol.get("role_groups") === cab(/^--\s+politicas\.role_groups=([0-9a-f]{32})$/m) && !pol.has("api_keys"), "las políticas de role_groups son las de prod y api_keys no tiene ninguna (como en prod)");
   // Fixture del 28/09 + A = prod del 01/10 en todo lo que B reemplaza o compone.
   const hoy = await prodHoy();
+  const aclHoy = await aclDe(hoy);
+  check([...acls].every(([k, v]) => aclHoy.get(k) === v), "…y siguen así con la cadena (karma_sin_anon no cambia nada sobre el fixture)");
   const fh = new Map((await q(hoy, PRODSRC)).map((f) => [f.k, f.h]));
   const ph = new Map((await q(hoy, POLITICAS)).map((f) => [f.k, f.h]));
   const distintas = [...prodTrasA].filter(([k, h]) => (k.startsWith("politicas.") ? ph.get(k.slice(10)) : fh.get(k)) !== h).map(([k]) => k);
@@ -347,6 +366,23 @@ async function sembrarSinTriggers(db: PGlite, sql: string) {
   check(polMal.length === 0, `las políticas de las otras ${cercadas.length} tablas que cerca la B siguen siendo las del 28/09, como en prod${polMal.length ? ` — distintas: ${polMal.join(", ")}` : ""}`);
   check(CADENA.at(-1)?.n === NOMBRE_B || DESPUES_DE_B.length > 0,
     `la cadena: ${CADENA.map((m) => m.n.slice(0, 14)).join(" → ")}; se saltan ${SALTADAS.length} (${SALTADAS.join(", ")})`);
+}
+
+// ════ 0b. Ningún carácter invisible literal en los fuentes ═══════════════════
+// Un carácter de formato (dirección del texto, ancho cero) o de control literal en un
+// fuente no se ve en la revisión y cambia lo que hace. Tampoco van escapes \uXXXX en
+// la migración: un transporte que decodifica JSON (el MCP) los convierte en el
+// carácter por el camino. Las clases se arman con chr().
+{
+  const raros = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\p{Co}\p{Cs}]/u;
+  const espacios = /\p{Zs}/u;
+  for (const [nombre, texto] of [[NOMBRE_B, MIG_B], ["api_messenger_escritura.ts", Deno.readTextFileSync(new URL(import.meta.url))],
+    ["fixtures/prod_api_escritura_20261001.sql", COMPLEMENTO]] as [string, string][]) {
+    const malos = [...texto].map((c, i) => [c, i] as [string, number]).filter(([c]) => (raros.test(c) && c !== "\n" && c !== "\t") || (espacios.test(c) && c !== " "));
+    check(malos.length === 0, `${nombre}: ningún carácter invisible ni de control literal${malos.length ? ` — hay ${malos.length}: ${malos.slice(0, 5).map(([c, i]) => `U+${c.codePointAt(0)!.toString(16).toUpperCase().padStart(4, "0")} en ${i}`).join(", ")}` : ""}`);
+  }
+  const escapes = sinComentarios(MIG_B).match(/\\u[0-9a-fA-F]{4}/g) ?? [];
+  check(escapes.length === 0, `la migración no lleva escapes \\uXXXX en el SQL (${escapes.length})`);
 }
 
 // ════ 1. La forma de la migración ════════════════════════════════════════════
@@ -531,9 +567,12 @@ const QUE_QUEDO = `select (select count(*)::int from pg_attribute where attrelid
     const RPC = ["api_escritura_habilitada", "api_llave_del_pedido", "api_mi_llave", "messenger_directorio", "messenger_persona_alcanzable",
       "api_misma_integracion", "api_idem_clave", "api_idem_buscar", "api_idem_guardar", "api_mensaje_json", "api_texto_normalizado",
       "api_messenger_enviar", "api_messenger_abrir_directo", "api_messenger_editar", "api_messenger_borrar", "api_retirar_mensajes_de_integracion",
-      "api_nombre_de_integracion"];
+      ];
     const malAuth = g.filter((f) => RPC.includes(f.f) !== f.auth).map((f) => `${f.f}:${f.auth}`);
     check(malAuth.length === 0, `authenticated ejecuta solo las ${RPC.length} que llama una sesión; las internas y las de trigger, no (${malAuth.join(", ") || "ok"})`);
+    const oraculo = await uno(d, `select has_function_privilege('authenticated', 'public.api_nombre_de_integracion(uuid, text)', 'execute') a,
+      has_function_privilege('service_role', 'public.api_nombre_de_integracion(uuid, text)', 'execute') s`);
+    check(oraculo?.a === false && oraculo?.s === true, `api_nombre_de_integracion: la ejecuta service_role (el admin que renombra) y no authenticated, que con ella sabría los nombres visibles de otra agencia (${JSON.stringify(oraculo)})`);
     const invoker = g.filter((f) => !f.def).map((f) => f.f).sort();
     check(JSON.stringify(invoker) === JSON.stringify(["api_esqueleto", "api_idem_clave", "api_messenger_abrir_directo", "api_messenger_borrar", "api_messenger_editar", "api_messenger_enviar", "api_mensaje_json", "api_mvk", "api_sin_acentos", "api_texto_es_valido", "api_texto_normalizado"].sort()),
       `las 4 de escritura son INVOKER (la RLS y los triggers se aplican como en la app), y solo las puras y api_mensaje_json lo son además (${invoker.join(", ")})`);
@@ -655,9 +694,10 @@ const QUE_QUEDO = `select (select count(*)::int from pg_attribute where attrelid
   const POR_TRIGGER = new Set(["chat_messages:INSERT", "chat_messages:UPDATE", "chat_conversations:INSERT", "chat_participants:INSERT"]);
   const pol = await q(db, `select tablename t, policyname n, permissive p, cmd c, coalesce(qual, '') u, coalesce(with_check, '') w, roles::text r
     from pg_policies where schemaname = 'public' and (tablename like 'chat\\_%' or tablename = 'notifications')`);
+  const PREDICADO = "( SELECT (auth.jwt() ?| ARRAY['mvf'::text, 'mvk'::text])) IS NOT TRUE";
   const cerco = (t: string, c: string) => pol.find((x) => x.t === t && x.p === "RESTRICTIVE" && x.c === c && x.r === "{public}"
-    && (c === "INSERT" ? x.w : x.u).replace(/\s+/g, " ").includes("( SELECT (auth.jwt() ->> 'mvf'::text)) IS NULL")
-    && (c !== "UPDATE" || x.w.includes("'mvf'::text")));
+    && (c === "INSERT" ? x.w : x.u).replace(/\s+/g, " ").includes(PREDICADO)
+    && (c !== "UPDATE" || x.w.replace(/\s+/g, " ").includes(PREDICADO)));
   const huecos: string[] = [];
   let permisivas = 0;
   for (const x of pol.filter((p) => p.p === "PERMISSIVE" && p.c !== "SELECT")) {
@@ -700,15 +740,28 @@ const QUE_QUEDO = `select (select count(*)::int from pg_attribute where attrelid
     try { await entrar(db, s); await db.exec(sql); await db.exec("reset role"); const r = await uno(db, efecto); await db.exec("rollback"); return { ok: true, si: r?.si === true }; }
     catch (e) { await db.exec("rollback"); return { ok: false, si: false, error: msg(e) }; }
   };
-  let cercadas = 0;
+  let cercadas = 0, editadas = 0, deGotrue = 0;
   for (const [nombre, s, sql, efecto] of casos) {
-    const comoApp = await probar(app(s.claims!.sub), sql, efecto);
+    const uid = s.claims!.sub as string;
+    const comoApp = await probar(app(uid), sql, efecto);
     const comoFab = await probar(s, sql, efecto);
     const bien = comoApp.ok && comoApp.si && !comoFab.si;
     if (bien) cercadas++;
     else check(false, `cerco · ${nombre}: con la app ${comoApp.ok ? (comoApp.si ? "anda" : "NO tiene efecto (la línea base no prueba nada)") : `falla: ${comoApp.error?.slice(0, 80)}`}; fabricada ${comoFab.si ? "TUVO EFECTO" : "sin efecto"}`);
+    // El mismo pedido con los claims editados: mvk sin mvf, mvf: null, mvk: null y los dos.
+    const variantes = [soloMvk(uid), mvfNull(uid), mvkNull(uid), mvfNullConMvk(uid)];
+    const conEfecto: string[] = [];
+    for (const v of variantes) if ((await probar(v, sql, efecto)).si) conEfecto.push(v.nombre);
+    if (conEfecto.length === 0) editadas++;
+    else check(false, `cerco · ${nombre}: con claims editados TUVO EFECTO (${conEfecto.join(", ")})`);
+    // Y un JWT de GoTrue con mvf/mvk en user_metadata es la app.
+    const g = await probar(gotrue(uid), sql, efecto);
+    if (g.ok && g.si) deGotrue++;
+    else check(false, `cerco · ${nombre}: un JWT de GoTrue con mvf/mvk en user_metadata NO anda (${g.error?.slice(0, 80) ?? "sin efecto"})`);
   }
   check(cercadas === casos.length, `cerco: las ${casos.length} escrituras andan con la sesión de la app y no tienen efecto con una sesión fabricada sin key (${cercadas}/${casos.length})`);
+  check(editadas === casos.length, `cerco: tampoco con un token con mvk y sin mvf, con mvf: null, con mvk: null ni con los dos (${editadas}/${casos.length}, 4 variantes cada una)`);
+  check(deGotrue === casos.length, `cerco: un JWT de GoTrue con mvf y mvk dentro de user_metadata sigue siendo la app (${deGotrue}/${casos.length})`);
   // Las funciones DEFINER no pasan por las políticas: cada una que una sesión puede
   // llamar y que escribe en chat_* o notifications tiene su guarda `mvf`, o su
   // escritura cae en un trigger de la pared (y entonces se prueba que con una sesión
@@ -722,7 +775,7 @@ const QUE_QUEDO = `select (select count(*)::int from pg_attribute where attrelid
     where n.nspname = 'public' and p.prosecdef and pg_get_function_result(p.oid) <> 'trigger'
       and has_function_privilege('authenticated', p.oid, 'execute')
       and p.prosrc ~* '(insert\\s+into|update|delete\\s+from)\\s+(public\\.)?(chat_\\w+|notifications)\\M'`);
-  const sinGuarda = definer.filter((f) => !/'mvf'/.test(f.s) && !POR_UN_TRIGGER[f.f]).map((f) => f.f);
+  const sinGuarda = definer.filter((f) => !/\(auth\.jwt\(\) \?\| array\['mvf', 'mvk'\]\) is true/i.test(f.s) && !POR_UN_TRIGGER[f.f]).map((f) => f.f);
   check(definer.length >= 3 && sinGuarda.length === 0,
     `las ${definer.length} funciones DEFINER que una sesión puede llamar y escriben en el chat tienen guarda «mvf» o caen en un trigger de la pared (${definer.map((f) => f.f).sort().join(", ")})${sinGuarda.length ? ` — sin guarda: ${sinGuarda.join(", ")}` : ""}`);
   const mLlave = mensajeDe(await enviar(db, BLU, G50, "para delete_chat_message"));
@@ -731,6 +784,15 @@ const QUE_QUEDO = `select (select count(*)::int from pg_attribute where attrelid
     const sigue = await uno(db, `select is_deleted from chat_messages where id = $1`, [mLlave.id]);
     check(!r.ok && sigue?.is_deleted === false && r.codigo === "MV403", `delete_chat_message con ${s.nombre}: el trigger lo frena y no queda nada (${desc(r)})`);
   }
+  for (const s of [soloMvk(ALVARO), mvfNull(ALVARO)]) {
+    const c = await intentar(db, s, `select public.delete_conversation_cascade('${G50}')`);
+    const r = await intentar(db, s, `select public.api_retirar_mensajes_de_integracion('${K_BLU}', null, 200) r`);
+    const sigue = await uno(db, `select count(*)::int n from chat_conversations where id = '${G50}'`);
+    check(!c.ok && c.codigo === "MV403" && !r.ok && r.codigo === "MV403" && sigue?.n === 1,
+      `con ${s.nombre}, delete_conversation_cascade y la retirada dan MV403 (${desc(c).slice(0, 60)} / ${desc(r).slice(0, 60)})`);
+  }
+  const mk = await intentar(db, mvkNull(ALVARO), `insert into chat_messages(conversation_id, sender_id, content) values ('${G}', '${ALVARO}', 'con mvk null')`);
+  check(!mk.ok && mk.codigo === "MV403", `un mensaje con mvk: null (sin key) no entra como si fuera de la app (${desc(mk).slice(0, 90)})`);
   if (definer.some((f) => f.f === "chat_evento_sistema")) {
     for (const s of [fabricada(ALVARO), BLU]) {
       const r = await intentar(db, s, `select public.chat_evento_sistema('${G}', 'salio') r`);
@@ -777,9 +839,18 @@ const QUE_QUEDO = `select (select count(*)::int from pg_attribute where attrelid
   const emojis = "👍".repeat(4000);
   const e = await enviar(db, BLU, otra(), emojis);
   check(e.ok && (mensajeDe(e).content as string)?.length === 8000, `4.000 emojis (4.000 puntos de código) entran${e.ok ? "" : ` → ${desc(e)}`}`);
-  anda(await enviar(db, BLU, otra(), "familia 👨‍👩‍👧 con ZWJ"), "emojis con ZWJ entran");
-  rechazo(await enviar(db, BLU, otra(), "pagar a ‮anuncio"), "MV422", "error", "invalid_text", "U+202E (invierte la dirección del texto) no");
-  for (const [c, n] of [["‎", "U+200E"], ["⁦", "U+2066"], ["\u0007", "BEL"], ["\u001B", "ESC"], ["\u0085", "C1 U+0085"], ["\r", "\\r suelto"], ["\u007F", "DEL"]]) {
+  anda(await enviar(db, BLU, otra(), "familia 👨\u200D👩\u200D👧 con ZWJ"), "emojis con ZWJ entran");
+  rechazo(await enviar(db, BLU, otra(), "pagar a \u202Eanuncio"), "MV422", "error", "invalid_text", "U+202E (invierte la dirección del texto) no");
+  // La misma clase que limpia chat_evento_sistema (PR 1b), y al menos un carácter visible.
+  const cp = (...n: number[]) => String.fromCodePoint(...n);
+  for (const [n, t] of [
+    ["U+200B (ancho cero) en el medio", `ho${cp(0x200B)}la`], ["U+FEFF", `${cp(0xFEFF)}hola`], ["U+2060", `ho${cp(0x2060)}la`],
+    ["U+061C (marca de letra árabe)", `hola ${cp(0x061C)} 123`], ["U+2028", `hola${cp(0x2028)}mundo`], ["U+2029", `hola${cp(0x2029)}mundo`],
+    ["U+206A", `ho${cp(0x206A)}la`], ["U+00AD (guion blando)", `ho${cp(0x00AD)}la`], ["U+180E", `ho${cp(0x180E)}la`], ["U+200C", `ho${cp(0x200C)}la`],
+    ["solo U+200B", cp(0x200B)], ["solo U+061C", cp(0x061C)], ["solo U+200D (ZWJ)", cp(0x200D)], ["solo espacios de Unicode", cp(0x00A0, 0x3000, 0x2003)],
+  ] as [string, string][]) rechazo(await enviar(db, BLU, otra(), t), "MV422", "error", "invalid_text", `${n}: no`);
+  anda(await enviar(db, BLU, otra(), `hola${cp(0x00A0)}mundo`), "un espacio duro (U+00A0) entre palabras sí");
+  for (const [c, n] of [["\u200E", "U+200E"], ["\u2066", "U+2066"], ["\u0007", "BEL"], ["\u001B", "ESC"], ["\u0085", "C1 U+0085"], ["\r", "\\r suelto"], ["\u007F", "DEL"]]) {
     rechazo(await enviar(db, BLU, otra(), `con ${c} adentro`), "MV422", "error", "invalid_text", `${n} no`);
   }
   for (const [t, n] of [["", "vacío"], ["   \n\t ", "solo espacios"]]) rechazo(await enviar(db, BLU, otra(), t), "MV422", "error", "invalid_text", `texto ${n} no`);
@@ -1028,7 +1099,7 @@ const QUE_QUEDO = `select (select count(*)::int from pg_attribute where attrelid
   rechazo(await abrir(db, BLU, CARLA, "hola"), "MV404", "error", "person_not_found", "con alguien que no es de la agencia de la key no");
   const n1 = (await uno(db, `select count(*)::int n from chat_conversations`))?.n;
   rechazo(await abrir(db, BLU, DANI, "  "), "MV422", "error", "invalid_text", "con un texto inválido falla…");
-  rechazo(await abrir(db, BLU, relleno(1), "con ‮"), "MV422", "error", "invalid_text", "…también si el directo era nuevo…");
+  rechazo(await abrir(db, BLU, relleno(1), "con \u202E"), "MV422", "error", "invalid_text", "…también si el directo era nuevo…");
   check((await uno(db, `select count(*)::int n from chat_conversations`))?.n === n1, "…y no queda un directo vacío");
   // La pared, sin la RPC: por INSERT directo con la sesión de la key.
   const D = "c9300000-0000-4000-8000-000000000001";
@@ -1117,7 +1188,7 @@ const QUE_QUEDO = `select (select count(*)::int from pg_attribute where attrelid
   };
   for (const [nombre, error, por] of [
     ["ВLU", "display_name_format", "«ВLU» con la В cirílica"],
-    ["B​LU", "display_name_format", "con un espacio de ancho cero"],
+    ["B\u200BLU", "display_name_format", "con un espacio de ancho cero"],
     ["B", "display_name_format", "de 1 carácter"],
     ["x".repeat(33), "display_name_format", "de 33"],
     ["...", "display_name_format", "sin letras"],
@@ -1266,6 +1337,42 @@ const QUE_QUEDO = `select (select count(*)::int from pg_attribute where attrelid
   check(w?.is_deleted === false, "lo de otra integración de la misma persona queda");
   const r3 = await ret(app(ALVARO));
   check(r3.ok && r3.r?.retirados === 0, `la persona de la key también la puede correr (${r3.ok ? JSON.stringify(r3.r) : desc(r3)})`);
+  // Quien ya salió de la conversación también pierde la notificación (el texto del
+  // mensaje viaja en ella).
+  await db.exec(`update app_flags set enabled = true where key = 'api_messenger_escritura'`);
+  const sale = mensajeDe(await enviar(db, api(ALVARO, K_BLU2), G, "lo ve alguien que después se va"));
+  const deBeto = async () => (await uno(db, `select count(*)::int n from notifications where user_id = '${BETO}' and deep_link_url like '%' || $1`, [sale.id]))?.n;
+  const antesBeto = await deBeto();
+  anda(await intentar(db, app(BETO), `delete from chat_participants where conversation_id = '${G}' and user_id = '${BETO}'`), "Beto sale del grupo");
+  anda(await ret(app(JHON), K_BLU2), "se retira lo de la integración");
+  check(antesBeto === 1 && await deBeto() === 0, `…y la notificación de Beto, que ya se fue, también se va (${antesBeto} → ${await deBeto()})`);
+  // Un solo DELETE de notificaciones, después del recorrido (deep_link_url no tiene índice).
+  const cuerpo = MIG_B.slice(MIG_B.indexOf("create or replace function public.api_retirar_mensajes_de_integracion"));
+  const fn = cuerpo.slice(0, cuerpo.indexOf("\n$$;"));
+  const deletes = fn.match(/delete from public\.notifications/g) ?? [];
+  check(deletes.length === 1 && fn.indexOf("delete from public.notifications") > fn.indexOf("end loop;"), `la retirada borra las notificaciones con UN solo DELETE, después del recorrido (${deletes.length})`);
+}
+{
+  // El tamaño de prod: un grupo de 41 personas y 175 mil notificaciones. Con un DELETE
+  // por mensaje, 200 mensajes tardaban 29 s en PGlite (en prod, 278 ms cada uno: más que
+  // los 8 s de statement_timeout, y no se retiraba nada).
+  const db = await nueva();
+  await sembrarSinTriggers(db, `
+    insert into notifications(user_id, type, title, message, reference_id, reference_type, deep_link_url)
+      select '${JHON}', 'chat_message', 'x', 'y', gen_random_uuid(), 'conversation', '/messenger?c=' || gen_random_uuid() || '&m=' || gen_random_uuid() from generate_series(1, 175000) g;
+    insert into chat_messages(id, conversation_id, sender_id, content, api_key_id, api_display_name, created_at)
+      select ('e9000000-0000-4000-8000-' || lpad(g::text, 12, '0'))::uuid, '${G50}', '${ALVARO}', 'm' || g, '${K_BLU}', 'BLU', now() - g * interval '1 second' from generate_series(1, 200) g;
+    insert into notifications(user_id, type, title, message, reference_id, reference_type, deep_link_url)
+      select p.user_id, 'chat_message', 'BLU (API) en Cincuenta', 'm', '${G50}', 'conversation', '/messenger?c=${G50}&m=' || m.id
+        from chat_messages m join chat_participants p on p.conversation_id = m.conversation_id and p.user_id <> m.sender_id
+       where m.id::text like 'e9000000%'`);
+  const n0 = (await uno(db, `select count(*)::int n from notifications`))?.n as number;
+  const t0 = performance.now();
+  const r = await rpc(db, app(JHON), "api_retirar_mensajes_de_integracion", { _llave: K_BLU, _desde: null, _limite: 200 });
+  const ms = performance.now() - t0;
+  const n1 = (await uno(db, `select count(*)::int n from notifications`))?.n as number;
+  check(r.ok && r.r?.retirados === 200 && n0 - n1 === 200 * 49 && ms < 3000,
+    `con ${n0} notificaciones, retirar 200 mensajes de un grupo de 50 tarda ${Math.round(ms)} ms y se lleva sus ${n0 - n1} notificaciones${r.ok ? "" : ` (${desc(r)})`}`);
 }
 
 // ════ 18. El freno por presión ═══════════════════════════════════════════════
@@ -1411,7 +1518,7 @@ const MUTANTES: Mutante[] = [
     de: "  if _c ->> 'role' = 'service_role' then\n    raise exception using errcode = 'MV403',\n      message = 'api_service_role_no_escribe_chat: con service_role no se insertan mensajes',", a: "  if false then\n    raise exception using errcode = 'MV403',\n      message = 'x',",
     nota: (db) => falla_(intentar(db, SR, `insert into chat_messages(conversation_id, sender_id, content) values ('${G}', '${ALVARO}', 'sr')`), "MV403") },
   { nombre: "la sesión fabricada sin key inserta mensajes",
-    de: "    -- La app (y postgres sin claims). Las marcas no las pone el pedido.\n    if _c ? 'mvf' then", a: "    -- La app (y postgres sin claims). Las marcas no las pone el pedido.\n    if false then",
+    de: "    -- La app (y postgres sin claims). Las marcas no las pone el pedido.\n    if _c ?| array['mvf', 'mvk'] then", a: "    -- La app (y postgres sin claims). Las marcas no las pone el pedido.\n    if false then",
     nota: async (db) => { await intentar(db, fabricada(ANA), `insert into chat_messages(conversation_id, sender_id, content) values ('${G}', '${ANA}', 'fab')`); return (await uno(db, `select count(*)::int n from chat_messages where content = 'fab'`))?.n === 0; } },
   { nombre: "las marcas se pueden cambiar con UPDATE",
     de: "  new.api_key_id := old.api_key_id;\n  new.api_display_name := old.api_display_name;\n", a: "",
@@ -1435,8 +1542,26 @@ const MUTANTES: Mutante[] = [
   { nombre: "sin la raíz reservada «ceo»", de: "|staff|moderad|ceo|gerenc|", a: "|staff|moderad|gerenc|",
     nota: (db) => falla_(intentar(db, PG, `insert into public.api_keys(name, key_prefix, key_hash, created_by, acts_as_user_id, tenant_id, scopes, ip_whitelist, expires_at, api_display_name) values ('k', 'p', 'hceo', '${BETO}', '${BETO}', '${T1}', '{messenger:read,messenger:write}', '{1.2.3.4}', now() + interval '30 days', 'Ventas_CEO')`), "MV422", "error", "display_name_reserved") },
   { nombre: "la retirada deja las notificaciones",
-    de: "    delete from public.notifications n\n     where n.user_id in (select p.user_id from public.chat_participants p where p.conversation_id = _m.conversation_id)\n       and n.deep_link_url = '/messenger?c=' || _m.conversation_id || '&m=' || _m.id;\n", a: "",
+    de: "    delete from public.notifications n\n     using unnest(_enlaces) l(enlace)\n     where n.deep_link_url = l.enlace and n.reference_type = 'conversation';\n", a: "    perform 1;\n",
     nota: async (db) => { const m = mensajeDe(await enviar(db, BLU, G, "r")); await rpc(db, app(JHON), "api_retirar_mensajes_de_integracion", { _llave: K_BLU, _desde: null, _limite: 200 }); return (await uno(db, `select count(*)::int n from notifications where deep_link_url like '%' || $1`, [m.id]))?.n === 0; } },
+  { nombre: "la retirada, como antes: solo las notificaciones de quienes siguen en la conversación",
+    de: "     where n.deep_link_url = l.enlace and n.reference_type = 'conversation';", a: "     where n.deep_link_url = l.enlace and n.reference_type = 'conversation'\n       and n.user_id in (select p.user_id from public.chat_participants p where p.conversation_id = n.reference_id);",
+    nota: async (db) => { const m = mensajeDe(await enviar(db, BLU, G, "r")); await intentar(db, app(BETO), `delete from chat_participants where conversation_id = '${G}' and user_id = '${BETO}'`); await rpc(db, app(JHON), "api_retirar_mensajes_de_integracion", { _llave: K_BLU, _desde: null, _limite: 200 }); return (await uno(db, `select count(*)::int n from notifications where deep_link_url like '%' || $1`, [m.id]))?.n === 0; } },
+  { nombre: "el cerco solo mira mvf (un token con mvk y sin mvf pasa)",
+    de: "  _pred text := $p$(select auth.jwt() ?| array['mvf', 'mvk']) is not true$p$;", a: "  _pred text := $p$(select auth.jwt() ->> 'mvf') is null$p$;",
+    nota: async (db) => { await intentar(db, soloMvk(ANA), `insert into notifications(user_id, type, title) values ('${JHON}', 'chat_message', 'falsa')`); return (await uno(db, `select count(*)::int n from notifications where title = 'falsa'`))?.n === 0; } },
+  { nombre: "delete_conversation_cascade solo mira mvf", de: "  IF (auth.jwt() ?| array['mvf', 'mvk']) IS TRUE THEN", a: "  IF (auth.jwt() ->> 'mvf') IS NOT NULL THEN",
+    nota: async (db) => { await intentar(db, soloMvk(ALVARO), `select public.delete_conversation_cascade('${G50}')`); return (await uno(db, `select count(*)::int n from chat_conversations where id = '${G50}'`))?.n === 1; } },
+  { nombre: "la retirada solo mira mvf", de: "  if (auth.jwt() ?| array['mvf', 'mvk']) is true then", a: "  if (auth.jwt() ->> 'mvf') is not null then",
+    nota: (db) => falla_(rpc(db, soloMvk(ALVARO), "api_retirar_mensajes_de_integracion", { _llave: K_BLU, _desde: null, _limite: 200 }), "MV403") },
+  { nombre: "el trigger de mensajes trata mvk: null como la app", de: "    -- La app (y postgres sin claims). Las marcas no las pone el pedido.\n    if _c ?| array['mvf', 'mvk'] then", a: "    -- La app (y postgres sin claims). Las marcas no las pone el pedido.\n    if _c ? 'mvf' then",
+    nota: (db) => falla_(intentar(db, mvkNull(ALVARO), `insert into chat_messages(conversation_id, sender_id, content) values ('${G}', '${ALVARO}', 'x')`), "MV403") },
+  { nombre: "el texto deja pasar U+200B", de: " || chr(8203) || chr(8204)", a: " || chr(8204)",
+    nota: (db) => falla_(enviar(db, BLU, G, `ho${String.fromCodePoint(0x200B)}la`), "MV422", "error", "invalid_text") },
+  { nombre: "el texto no pide un carácter visible", de: "     and _t ~ ('[^[:space:]'", a: "     and _t !~ ('^$[^[:space:]'",
+    nota: (db) => falla_(enviar(db, BLU, G, String.fromCodePoint(0x200D)), "MV422", "error", "invalid_text") },
+  { nombre: "api_nombre_de_integracion abierta a authenticated", de: "  grant execute on function public.api_nombre_de_integracion(uuid, text) to service_role;", a: "  grant execute on function public.api_nombre_de_integracion(uuid, text) to service_role, authenticated;",
+    nota: (db) => falla_(intentar(db, app(ANA), `select public.api_nombre_de_integracion('${ANA}', 'BLU') r`), "42501") },
   { nombre: "la app edita un mensaje de su integración", de: "    if old.api_key_id is not null and auth.uid() is not null and not _borrado", a: "    if false and old.api_key_id is not null",
     nota: async (db) => { const m = mensajeDe(await enviar(db, BLU, G, "e")); return falla_(intentar(db, app(ALVARO), `update chat_messages set content = 'x', is_edited = true where id = '${m.id}'`), "MV403"); } },
   { nombre: "el directorio no pide messenger:write",
@@ -1449,7 +1574,7 @@ const MUTANTES: Mutante[] = [
       insert into chat_participants(conversation_id, user_id, role) values ('c9500000-0000-4000-8000-000000000001', '${NUEVA}', 'member')`), "MV404") },
   { nombre: "el tope de la hora deja pasar uno de más", de: "(case when c.hora_inicio >= _hora then c.hora_msj  else 0 end) + _msj   <= c.lim_msj_hora)", a: "(case when c.hora_inicio >= _hora then c.hora_msj  else 0 end) + _msj   <= c.lim_msj_hora + 1)",
     nota: async (db) => { await db.exec(`update api_escritura_cupos set hora_msj = 1000, hora_inicio = date_trunc('hour', now()) where clave = 'llave:${K_BLU}'`); return falla_(enviar(db, BLU, G, "x"), "MV429", "limite", "key_messages_hour"); } },
-  { nombre: "delete_conversation_cascade sin la guarda de la sesión fabricada", de: "  IF (auth.jwt() ->> 'mvf') IS NOT NULL THEN", a: "  IF false THEN",
+  { nombre: "delete_conversation_cascade sin la guarda de la sesión fabricada", de: "  IF (auth.jwt() ?| array['mvf', 'mvk']) IS TRUE THEN", a: "  IF false THEN",
     nota: async (db) => { await intentar(db, fabricada(ALVARO), `select public.delete_conversation_cascade('${G50}')`); return (await uno(db, `select count(*)::int n from chat_conversations where id = '${G50}'`))?.n === 1; } },
 ];
 {
