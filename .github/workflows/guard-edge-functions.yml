@@ -52,6 +52,13 @@ jobs:
       - name: Guard — Drive (firma y subidas)
         run: deno test --no-check supabase/functions/_shared/drive-firma.test.ts supabase/functions/drive/logica.test.ts
 
+      # La IA por OpenRouter (desde el 01/10/2026 no hay llave de Anthropic): el bucle de
+      # herramientas de Clari, el catálogo sin additionalProperties (Gemini lo rechaza),
+      # el JSON del análisis de QA y la herramienta forzada de la Parrilla. Sin red:
+      # fetch es un doble que responde como OpenRouter (el catálogo sí baja sus imports).
+      - name: Guard — IA por OpenRouter
+        run: deno test --no-check -A supabase/functions/ai-orchestrator/openrouter.test.ts supabase/functions/qa-analyze/openrouter.test.ts supabase/functions/parrilla-generate/ia.test.ts
+
       # web-push: el título, el cuerpo y a quién le llega el push del Messenger
       # (_shared/push-notify.ts) y quién aparece como emisor (web-push/nombre-emisor.ts:
       # ahí va a entrar el nombre visible de la key cuando se escriba por API). Con

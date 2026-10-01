@@ -5,9 +5,22 @@
 // con service role). Por eso recibe el cliente de Supabase ya construido y no
 // sabe nada de auth: quien llama decide con qué permisos se lee y se escribe.
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { logAnthropicUsage } from "../_shared/usage.ts";
+// Desde el 01/10/2026 va por OpenRouter con un Gemini económico: Maven ya no tiene
+// llave de Anthropic. El modelo se cambia sin desplegar con IA_MODELO_OPENROUTER.
+const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+export const MODELO_ECONOMICO = "google/gemini-2.5-flash-lite";
+const PRECIO_LISTA: Record<string, { in: number; out: number }> = {
+  "google/gemini-2.5-flash-lite": { in: 0.10, out: 0.40 },
+};
+const IA_TIMEOUT_MS = 110_000;
 
-const CLAUDE_TIMEOUT_MS = 110_000;
+/** El costo en US$: el que informa OpenRouter (usage.cost) o, si no vino, el de lista. */
+export function costoDeUso(modelo: string, u: { prompt_tokens?: number; completion_tokens?: number; cost?: number } | undefined): number {
+  if (typeof u?.cost === "number") return u.cost;
+  const p = PRECIO_LISTA[modelo];
+  if (!p) return 0;
+  return ((u?.prompt_tokens ?? 0) * p.in + (u?.completion_tokens ?? 0) * p.out) / 1_000_000;
+}
 
 export interface DiaGenerado {
   day_index: number;
@@ -38,8 +51,9 @@ Entrega el resultado LLAMANDO a la tool entregar_parrilla:
 - Mantén "extra_title" muy parecido al actual (es el nombre de la sección).
 - Un elemento por CADA día del esqueleto, en orden.`;
 
-// Salida estructurada por tool_use: la API garantiza el JSON contra este schema
-// (la primera versión pedía "responde solo JSON" y parseaba texto: se rompía).
+// Salida estructurada forzando la herramienta: la respuesta viene como los
+// argumentos de esta función, con este schema (la primera versión pedía "responde
+// solo JSON" y parseaba texto: se rompía).
 const TOOL_ENTREGAR = {
   name: "entregar_parrilla",
   description: "Entrega los días redactados de la parrilla",
@@ -81,7 +95,7 @@ export class IaError extends Error {
   constructor(message: string, public status: number) { super(message); }
 }
 
-// Llama a Claude con el esqueleto + la historia y devuelve los días redactados.
+// Llama a la IA con el esqueleto + la historia y devuelve los días redactados.
 // No escribe nada: eso lo hace aplicarRedaccion.
 export async function redactarParrilla(
   sb: SupabaseClient,
@@ -137,57 +151,80 @@ export async function redactarParrilla(
     parrillas_anteriores: historia,
   });
 
-  const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
-  if (!apiKey) throw new IaError("Falta ANTHROPIC_API_KEY", 500);
-  const model = Deno.env.get("CLAUDE_MODEL_STANDARD") || "claude-sonnet-5";
+  const apiKey = Deno.env.get("OPENROUTER_API_KEY");
+  if (!apiKey) throw new IaError("Falta OPENROUTER_API_KEY", 500);
+  const model = Deno.env.get("IA_MODELO_OPENROUTER") || MODELO_ECONOMICO;
+  const { generados, uso } = await pedirParrilla(fetch, apiKey, model, userMessage);
+  void sb.from("api_usage_log").insert({
+    provider: "openrouter",
+    operation: "parrilla_generate",
+    model,
+    units: { input_tokens: uso?.prompt_tokens ?? 0, output_tokens: uso?.completion_tokens ?? 0 },
+    cost_usd: costoDeUso(model, uso),
+    context: { grid_id: grid.id, week_start: grid.week_start, ...contexto },
+  }).then(({ error }) => { if (error) console.warn("api_usage_log:", error.message); });
+  return { generados, model };
+}
 
+// La llamada: fuerza la herramienta entregar_parrilla y devuelve sus «dias».
+export async function pedirParrilla(
+  f: typeof fetch,
+  apiKey: string,
+  model: string,
+  userMessage: string,
+): Promise<{ generados: DiaGenerado[]; uso?: { prompt_tokens?: number; completion_tokens?: number; cost?: number } }> {
   const ac = new AbortController();
-  const timeoutId = setTimeout(() => ac.abort(), CLAUDE_TIMEOUT_MS);
+  const timeoutId = setTimeout(() => ac.abort(), IA_TIMEOUT_MS);
   let res: Response;
   try {
-    res = await fetch("https://api.anthropic.com/v1/messages", {
+    res = await f(OPENROUTER_URL, {
       method: "POST",
       headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
+        "Authorization": `Bearer ${apiKey}`,
         "Content-Type": "application/json",
+        "HTTP-Referer": "https://app.maven-ai.me",
+        "X-Title": "Maven",
       },
       signal: ac.signal,
       body: JSON.stringify({
         model,
         max_tokens: 8000,
-        system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
-        tools: [TOOL_ENTREGAR],
-        tool_choice: { type: "tool", name: "entregar_parrilla" },
-        messages: [{ role: "user", content: userMessage }],
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "user", content: userMessage },
+        ],
+        tools: [{
+          type: "function",
+          function: { name: TOOL_ENTREGAR.name, description: TOOL_ENTREGAR.description, parameters: TOOL_ENTREGAR.input_schema },
+        }],
+        tool_choice: { type: "function", function: { name: TOOL_ENTREGAR.name } },
+        usage: { include: true },
       }),
     });
   } catch (e) {
-    if ((e as Error)?.name === "AbortError") throw new IaError("Claude tardó demasiado, reintenta", 504);
+    if ((e as Error)?.name === "AbortError") throw new IaError("La IA tardó demasiado, reintenta", 504);
     throw e;
   } finally {
     clearTimeout(timeoutId);
   }
   if (!res.ok) {
     const body = await res.text();
-    console.error("anthropic error", res.status, body.slice(0, 500));
-    throw new IaError(`Claude respondió ${res.status}`, 502);
+    console.error("openrouter error", res.status, body.slice(0, 500));
+    throw new IaError(`La IA respondió ${res.status}`, 502);
   }
   const payload = await res.json();
-  void logAnthropicUsage({
-    operation: "parrilla_generate",
-    model,
-    usage: payload?.usage ?? {},
-    context: { grid_id: grid.id, week_start: grid.week_start, ...contexto },
-  });
-
-  const toolUse = (payload?.content ?? []).find((c: any) => c.type === "tool_use");
-  const generados: DiaGenerado[] = toolUse?.input?.dias ?? [];
+  const llamada = (payload?.choices?.[0]?.message?.tool_calls ?? [])
+    .find((c: any) => c?.function?.name === TOOL_ENTREGAR.name);
+  let generados: DiaGenerado[] = [];
+  try {
+    generados = JSON.parse(llamada?.function?.arguments ?? "{}")?.dias ?? [];
+  } catch { generados = []; }
   if (!Array.isArray(generados) || !generados.length) {
-    console.error("sin tool_use utilizable; stop_reason:", payload?.stop_reason, "content:", JSON.stringify(payload?.content).slice(0, 400));
+    console.error("sin entregar_parrilla utilizable; finish_reason:", payload?.choices?.[0]?.finish_reason,
+      "message:", JSON.stringify(payload?.choices?.[0]?.message).slice(0, 400));
     throw new IaError("La IA no devolvió días, reintenta", 502);
   }
-  return { generados, model };
+  return { generados, uso: payload?.usage };
 }
 
 // Aplica SOLO los textos, día por día, guarda el snapshot de lo generado (contra
