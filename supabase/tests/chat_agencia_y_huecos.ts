@@ -34,6 +34,12 @@ import { PGlite } from "npm:@electric-sql/pglite@0.3";
 
 const leer = (rel: string) => Deno.readTextFileSync(new URL(rel, import.meta.url));
 const FIXTURE = leer("./fixtures/prod_chat_api_20260928.sql");
+// El complementario del 01/10 (api_keys, role_groups, get_karma_profile): lo necesita
+// la migración B (20261001200000_api_messenger_escritura), que entra en la cadena.
+// Las huellas de este banco son las del fixture del 28/09 y no lo miran; las del
+// complementario las revisa api_messenger_escritura.ts.
+const COMPLEMENTO = leer("./fixtures/prod_api_escritura_20261001.sql");
+const ESQUEMA = FIXTURE + "\n" + COMPLEMENTO;
 const NOMBRE_A = "20260930230000_chat_agencia_y_huecos.sql";
 const MIG_A = leer(`../migrations/${NOMBRE_A}`);
 // La vuelta atrás que documenta la cabecera de la migración (las líneas «--|»).
@@ -102,7 +108,20 @@ const NO_TOCAN_EL_MESSENGER: Record<string, string> = {};
 // Si una migración posterior cambia a propósito algo que creó A (el PR 2 suma el
 // esqueleto del nombre visible a profiles_nombre_lo_cambia_un_admin), se anota
 // aquí «objeto → migración», después de revisar que los huecos sigan cerrados.
-const CAMBIAN_LO_DE_A: Record<string, string> = {};
+// La B: delete_chat_message archiva también las marcas de la API; profiles_nombre…
+// rechaza además el nombre visible de una integración; las políticas suman el cerco
+// RESTRICTIVE «mvf» (UPDATE/DELETE de participantes, DELETE de mensajes); y las
+// columnas nuevas (creada_por_api_key, y las marcas en el archivo). Los huecos A–H
+// siguen cerrados: este mismo banco los corre con la B en la cadena.
+const B_ESCRITURA = "20261001200000_api_messenger_escritura.sql";
+const CAMBIAN_LO_DE_A: Record<string, string> = {
+  "función delete_chat_message": B_ESCRITURA,
+  "función profiles_nombre_lo_cambia_un_admin": B_ESCRITURA,
+  "políticas de chat_messages": B_ESCRITURA,
+  "políticas de chat_participants": B_ESCRITURA,
+  "columnas de chat_conversations": B_ESCRITURA,
+  "columnas de chat_message_deletions": B_ESCRITURA,
+};
 
 const DIR_MIG = new URL("../migrations/", import.meta.url);
 const posteriores = [...Deno.readDirSync(DIR_MIG)].map((e) => e.name)
@@ -205,7 +224,7 @@ async function aplicarCadena(db: PGlite) {
 type Modo = "prod" | "A";
 async function nueva(modo: Modo, extra = ""): Promise<PGlite> {
   const db = new PGlite();
-  await db.exec(FIXTURE);
+  await db.exec(ESQUEMA);
   await db.exec(SEMILLA + extra);
   if (modo === "A") await aplicarCadena(db);
   return db;
@@ -362,7 +381,7 @@ const funcionesProd = new Map<string, string>();
 const politicasProd = new Map<string, string>();
 {
   const db = new PGlite();
-  await db.exec(FIXTURE);
+  await db.exec(ESQUEMA);
   const cab = FIXTURE.split("\n").filter((l) => l.startsWith("--"));
   const estructura = new Map<string, string[]>();
   const catalogo = new Map<string, string>();
@@ -445,7 +464,7 @@ const politicasProd = new Map<string, string>();
   check(leidas.length === 2 && leidas.every((p) => p.f <= DEJA_LEER),
     `profiles y tenants se piden sin trabar sus lecturas, como mucho SHARE ROW EXCLUSIVE (${leidas.map((p) => `${p.t}:${FUERZA[p.f]}`).join(", ")})`);
   const dbL = new PGlite();
-  await dbL.exec(FIXTURE);
+  await dbL.exec(ESQUEMA);
   await dbL.exec(SEMILLA);
   await dbL.exec("begin;\n" + MIG_A);
   const tenidos = await q(dbL, CANDADOS_TENIDOS);
@@ -484,7 +503,7 @@ const politicasProd = new Map<string, string>();
 // La huella de A tiene que quedar igual después de la cadena, salvo lo anotado.
 {
   const soloA = new PGlite();
-  await soloA.exec(FIXTURE);
+  await soloA.exec(ESQUEMA);
   await soloA.exec(SEMILLA);
   await aplicar(soloA, NOMBRE_A, MIG_A);
   const conCadena = await nueva("A");
@@ -565,7 +584,7 @@ const QUE_QUEDO = `select
     (select count(*)::int from pg_trigger where tgname in ${enSql(TRIGGERS_A)} and tgenabled <> 'D') triggers,
     current_setting('lock_timeout') lock_timeout`;
 {
-  const base = async () => { const d = new PGlite(); await d.exec(FIXTURE); await d.exec(SEMILLA); return d; };
+  const base = async () => { const d = new PGlite(); await d.exec(ESQUEMA); await d.exec(SEMILLA); return d; };
   const nCandados = pedidosDe(sinComentarios(MIG_A)).length;
   // La migración: dos candados ocupados y al tercer intento entra.
   try {
@@ -1094,9 +1113,11 @@ const QUE_QUEDO = `select
   await anda(db, OLGA, `insert into chat_participants(conversation_id, user_id, role) values ('${GO}', '${OLGA}', 'admin')`, "Olga entra a su grupo");
   await falla(db, OLGA, `insert into chat_participants(conversation_id, user_id, role) values ('${GO}', '${JHON}', 'member')`, /chat_otra_agencia/, "Olga no suma a Jhon");
   await falla(db, JHON, `update chat_participants set conversation_id = '${GO}' where conversation_id = '${G1}' and user_id = '${JHON}'`, /chat_participacion_inmutable/, "Jhon no se muda al grupo de Olga");
-  // Sin sesión de usuario (service_role) la agencia sale de created_by, no de la primera que haya.
+  // Sin sesión de usuario (sin claims: cron, el editor de SQL; desde la B,
+  // service_role ya no inserta conversaciones) la agencia sale de created_by, no de
+  // la primera que haya.
   const GS = "c2000000-0000-4000-8000-000000000003";
-  await anda(db, "service_role", `insert into chat_conversations(id, type, name, created_by, tenant_id) values ('${GS}', 'group', 'Del sistema', '${OLGA}', '${T1}')`, "service_role crea un grupo a nombre de Olga (mandando la otra agencia)");
+  await anda(db, "postgres", `insert into chat_conversations(id, type, name, created_by, tenant_id) values ('${GS}', 'group', 'Del sistema', '${OLGA}', '${T1}')`, "sin sesión de usuario se crea un grupo a nombre de Olga (mandando la otra agencia)");
   check((await uno(db, `select tenant_id::text t from chat_conversations where id = '${GS}'`))?.t === T2, "queda en la agencia de Olga");
   // Con dos agencias, alguien sin ninguna no puede crear conversaciones (la base no adivina).
   const SIN = "a0000000-0000-4000-8000-000000000007";
@@ -1155,15 +1176,18 @@ const QUE_QUEDO = `select
   try { await dup(db, JHON); mal.push("un segundo directo Jhon–Ana entró (NO debía)"); }
   catch (e) { check(/directo_duplicado/.test(msg(e)) && codigoDe(e) === "MV409", `un segundo directo Jhon–Ana → ${codigoDe(e)} ${msg(e).slice(0, 80)}`); }
   {
-    // Con service_role (una edge con el cliente admin) tampoco.
+    // Sin sesión de usuario tampoco. Era service_role (una edge con el cliente admin);
+    // desde la B, service_role ni siquiera inserta en chat_conversations,
+    // chat_participants ni chat_messages (lo prueba api_messenger_escritura.ts), así
+    // que la rama sin auth.uid() de A se prueba sin claims (cron, el editor de SQL).
     const DUPS = "c3000000-0000-4000-8000-000000000004";
-    const pasos: Paso[] = [["service_role", `insert into chat_conversations(id, type, created_by) values ('${DUPS}', 'direct', '${JHON}');
+    const pasos: Paso[] = [["postgres", `insert into chat_conversations(id, type, created_by) values ('${DUPS}', 'direct', '${JHON}');
       insert into chat_participants(conversation_id, user_id, role) values ('${DUPS}', '${JHON}', 'admin');
       insert into chat_participants(conversation_id, user_id, role) values ('${DUPS}', '${ANA}', 'member')`]];
     const efecto = `select (select count(*) from chat_participants where conversation_id = '${DUPS}') = 2 si`;
     const a = await probar(prod, pasos, efecto), b = await probar(db, pasos, efecto);
-    check(a.ok && a.si === true, `línea base: en prod service_role arma un segundo directo Jhon–Ana${a.ok ? "" : ` — falló: ${a.error?.slice(0, 80)}`}`);
-    check(!b.ok && /directo_duplicado/.test(b.error ?? "") && b.codigo === "MV409", `con service_role el duplicado también se rechaza → ${b.ok ? "PASÓ" : `${b.codigo} ${b.error?.slice(0, 80)}`}`);
+    check(a.ok && a.si === true, `línea base: en prod, sin sesión de usuario, se arma un segundo directo Jhon–Ana${a.ok ? "" : ` — falló: ${a.error?.slice(0, 80)}`}`);
+    check(!b.ok && /directo_duplicado/.test(b.error ?? "") && b.codigo === "MV409", `sin sesión de usuario el duplicado también se rechaza → ${b.ok ? "PASÓ" : `${b.codigo} ${b.error?.slice(0, 80)}`}`);
   }
   const DUP2 = "c3000000-0000-4000-8000-000000000002";
   await anda(db, ANA, `insert into chat_conversations(id, type, created_by) values ('${DUP2}', 'direct', '${ANA}')`, "Ana abre un directo…");
@@ -1235,7 +1259,7 @@ const QUE_QUEDO = `select
   await falla(db, JHON, `insert into chat_conversations(type, name, created_by, created_at) values ('group', 'g31', '${JHON}', '2020-01-01')`, /chat_tope_grupos/, "…también con un created_at atrasado");
   await anda(db, JHON, `insert into chat_conversations(type, created_by) values ('direct', '${JHON}')`, "los grupos no cuentan para el tope de directos");
   await anda(db, ANA, `insert into chat_conversations(type, name, created_by) values ('group', 'de Ana', '${ANA}')`, "el tope es por persona: Ana crea el suyo");
-  await anda(db, "service_role", `insert into chat_conversations(type, name, created_by) values ('group', 'del sistema', '${JHON}')`, "sin sesión de usuario (service_role) no hay tope");
+  await anda(db, "postgres", `insert into chat_conversations(type, name, created_by) values ('group', 'del sistema', '${JHON}')`, "sin sesión de usuario (sin claims) no hay tope");
   check((await uno(db, `select tenant_id::text t from chat_conversations where name = 'del sistema'`))?.t === T1, "y la conversación queda en la agencia de created_by");
   await falla(db, JHON, `select count(*) from chat_conversaciones_creadas`, /permission denied/, "la tabla de altas no se lee desde la app");
   await falla(db, JHON, `delete from chat_conversaciones_creadas where user_id = '${JHON}'`, /permission denied/, "ni se borra para recuperar el cupo");
@@ -1392,8 +1416,9 @@ const diferencias = (a: Map<string, string>, b: Map<string, string>) =>
     `se fueron los ${TRIGGERS_A.length - 1} triggers nuevos del chat y el de perfiles quedó apagado (${quedan.map((t) => `${t.tgname}:${t.e}`).join(", ")})`);
   const guarda = (await q(db, PRODSRC_SQL)).find((f) => f.k === "public.guard_chat_message_update")?.h;
   check(guarda === funcionesProd.get("public.guard_chat_message_update"), "guard_chat_message_update volvió byte a byte a la de prod");
-  const polPart = (await q(db, POLITICAS_SQL)).find((f) => f.k === "chat_participants")?.h;
-  check(polPart === politicasProd.get("chat_participants"), "las políticas de chat_participants volvieron a ser las de prod");
+  // Sin las del cerco de la B (api_fabricada_*), que la vuelta atrás de A no toca.
+  const polPart = (await q(db, POLITICAS_SQL.replace("where schemaname='public'", "where schemaname='public' and policyname not like 'api\\_fabricada\\_%'"))).find((f) => f.k === "chat_participants")?.h;
+  check(polPart === politicasProd.get("chat_participants"), "las políticas de chat_participants volvieron a ser las de prod (sin contar el cerco de la B)");
   // La app sigue andando.
   const VDM = "c8000000-0000-4000-8000-000000000001", VG = "c8000000-0000-4000-8000-000000000002";
   await anda(db, JHON, `insert into chat_conversations(id, type, created_by) values ('${VDM}', 'direct', '${JHON}')`, "vuelta atrás: directo, paso 1");
@@ -1420,10 +1445,10 @@ const diferencias = (a: Map<string, string>, b: Map<string, string>) =>
   // Lo que queda distinto de prod es EXACTAMENTE lo que dice la cabecera. Sobre
   // prod + A sola (la cadena podría sumar cambios de otras migraciones).
   const prod = new PGlite();
-  await prod.exec(FIXTURE);
+  await prod.exec(ESQUEMA);
   await prod.exec(SEMILLA);
   const conVuelta = new PGlite();
-  await conVuelta.exec(FIXTURE);
+  await conVuelta.exec(ESQUEMA);
   await conVuelta.exec(SEMILLA);
   await aplicar(conVuelta, NOMBRE_A, MIG_A);
   await conVuelta.exec(VUELTA);
