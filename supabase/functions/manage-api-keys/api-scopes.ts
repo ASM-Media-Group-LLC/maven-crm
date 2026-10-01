@@ -1,6 +1,10 @@
 // Catálogo de scopes de la API pública de Maven. Agrupado por entidad para el
-// modal estilo Infloww. Extensible: agregar una entrada acá habilita el scope
+// modal estilo Infloww. Extensible: agregar una entrada aquí habilita el scope
 // tanto en el gestor (manage-api-keys) como en la validación (public-api).
+//
+// Dos catálogos: el COMPLETO (con el que se valida, aquí y en public-api) y el que se
+// manda a la pantalla de Ajustes → API keys, que todavía no ofrece lo que está en
+// SCOPES_OCULTOS_EN_PANTALLA.
 //
 // Vive en manage-api-keys/ y no en _shared/ (desde el 25/09): es su único
 // importador, y un cambio en _shared/ redespliega TODAS las edge functions.
@@ -11,17 +15,26 @@ export type ScopeDef = { key: string; group: string; label: string; description:
 
 export const SCOPE_GROUPS = ["Creadoras", "Contactos", "Empleados", "Ventas", "Promolog", "Messenger"] as const;
 
-/** Scopes que leen conversaciones privadas: exigen IPs fijas y vencimiento de
- *  90 días como máximo, y solo van en llaves NUEVAS (decisión de Jhon, 25/09). La
- *  base lo vuelve a exigir (api_keys_reglas_messenger). */
-export const SCOPES_MESSENGER = ["messenger:read"] as const;
+/** Scopes del Messenger (leen conversaciones privadas, y messenger:write además
+ *  escribe en ellas): exigen IPs fijas y vencimiento de 90 días como máximo, y solo
+ *  van en llaves NUEVAS (decisión de Jhon, 25/09). La base lo vuelve a exigir
+ *  (api_keys_reglas_messenger detecta `messenger:%`). */
+export const SCOPES_MESSENGER = ["messenger:read", "messenger:write"] as const;
+export const SCOPE_MESSENGER_LECTURA = "messenger:read";
+export const SCOPE_MESSENGER_ESCRITURA = "messenger:write";
+
+/** Lo que la pantalla de Ajustes todavía no ofrece. messenger:write se esconde hasta
+ *  el PR 5 (la pantalla con el nombre visible, la rotación y la retirada): sin eso, una
+ *  key que escribe no se puede crear bien desde Maven. La validación usa el catálogo
+ *  COMPLETO. El PR 5 vacía esta lista. */
+export const SCOPES_OCULTOS_EN_PANTALLA: readonly string[] = ["messenger:write"];
 export const MESSENGER_MAX_DIAS = 90;
 
 export function esScopeMessenger(s: string): boolean {
   return (SCOPES_MESSENGER as readonly string[]).includes(s);
 }
 
-export const SCOPE_CATALOG: ScopeDef[] = [
+export const SCOPE_CATALOG_COMPLETO: ScopeDef[] = [
   {
     key: "creators:read",
     group: "Creadoras",
@@ -86,6 +99,13 @@ export const SCOPE_CATALOG: ScopeDef[] = [
       "Lee TODAS las conversaciones del Messenger de la persona que crea la key — directas y grupos, también las futuras — exactamente como las ve ella en /messenger, con los mensajes que le mandan otras personas. No marca nada como leído. Exige IPs fijas y vencimiento de 90 días como máximo, y solo se puede poner al crear una key nueva.",
   },
   {
+    key: "messenger:write",
+    group: "Messenger",
+    label: "⚠️ Mandar mensajes en el Messenger a nombre de quien crea la key",
+    description:
+      "Manda mensajes de texto en las conversaciones de la persona que crea la key, abre chats directos con gente de su agencia y edita o borra lo que mandó la misma integración. Cada mensaje sale con el nombre visible de la key y la etiqueta API, y lo frenan los topes por minuto, hora y día. Va siempre con messenger:read, pide un nombre visible y que quien la crea confirme que escribirá a su nombre, y solo se puede poner al crear una key nueva.",
+  },
+  {
     key: "promolog:read",
     group: "Promolog",
     label: "Promoción diaria",
@@ -94,8 +114,12 @@ export const SCOPE_CATALOG: ScopeDef[] = [
   },
 ];
 
-const SCOPE_SET: Set<string> = new Set(SCOPE_CATALOG.map((s) => s.key));
+/** El catálogo que ve la pantalla (sin los ocultos). */
+export const SCOPE_CATALOG: ScopeDef[] = SCOPE_CATALOG_COMPLETO.filter((s) => !SCOPES_OCULTOS_EN_PANTALLA.includes(s.key));
 
+const SCOPE_SET: Set<string> = new Set(SCOPE_CATALOG_COMPLETO.map((s) => s.key));
+
+/** ¿Existe el scope? Contra el catálogo COMPLETO (también lo oculto en pantalla). */
 export function isValidScope(s: string): boolean {
   return SCOPE_SET.has(s);
 }

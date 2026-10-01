@@ -27,7 +27,7 @@ import {
 } from "./aislamiento.ts";
 import { RECURSOS_COMO_USUARIO, SCOPE_REQUERIDO } from "./recursos-como-usuario.ts";
 import { MENSAJES } from "./mensajes.ts";
-import { isValidScope } from "../manage-api-keys/api-scopes.ts";
+import { isValidScope, SCOPE_CATALOG, SCOPE_CATALOG_COMPLETO } from "../manage-api-keys/api-scopes.ts";
 
 /** El código sin comentarios: de bloque, líneas que son solo comentario, y el
  *  comentario al final de una línea de código (`x, // nota`). Este último solo si
@@ -45,6 +45,7 @@ const leer = (ruta: string) => sinComentarios(Deno.readTextFileSync(new URL(ruta
 const PUBLIC_API = leer("./index.ts");
 const RECURSOS_USUARIO = leer("./recursos-como-usuario.ts");
 const FORMATO_MESSENGER = leer("./messenger-formato.ts");
+const FORMATO_ESCRITURA = leer("./escritura-formato.ts");
 const COMO_USUARIO = leer("./como-usuario.ts");
 const PETICION = leer("./peticion.ts");
 const MENSAJES_TS = leer("./mensajes.ts");
@@ -122,7 +123,7 @@ Deno.test("los nombres heredados de Object.prototype no pasan la puerta", () => 
 Deno.test("hoy ningún recurso de DATOS dice estar aislado (y con 2 agencias se apagan todos)", () => {
   // Tener una columna tenant_id no alcanza: tiene que decir la verdad. Promover un
   // recurso a 'columna', 'miembros' o 'como_usuario' es una decisión de seguridad:
-  // exige arreglar su `pendiente` Y actualizar esta lista a conciencia. Si tocás
+  // exige arreglar su `pendiente` Y actualizar esta lista a conciencia. Si tocas
   // esta lista sin haber arreglado el dato, estás abriendo una fuga.
   //
   //  * me — 24/09/2026. Devuelve a la persona como la que actúa la llave y su
@@ -145,7 +146,7 @@ Deno.test("hoy ningún recurso de DATOS dice estar aislado (y con 2 agencias se 
   assertEquals(
     promovidos,
     PROMOVIDOS_CON_VERIFICACION,
-    "un recurso pasó a 'columna' o 'miembros' sin registrarse acá",
+    "un recurso pasó a 'columna' o 'miembros' sin registrarse aquí",
   );
 
   const sueltos = Object.entries(AISLAMIENTO_POR_RECURSO).filter(([, m]) => m.tipo === "sin_agencia");
@@ -177,7 +178,7 @@ Deno.test("public-api: cada tabla o función que toca está declarada", () => {
     sinDeclarar,
     [],
     `public-api usa ${sinDeclarar.join(", ")} sin declarar cómo aísla agencias. ` +
-      "Agregala a FUENTES_POR_RECURSO en ./aislamiento.ts, bajo el recurso que la usa.",
+      "Agrégala a FUENTES_POR_RECURSO en ./aislamiento.ts, bajo el recurso que la usa.",
   );
 });
 
@@ -296,15 +297,26 @@ Deno.test("como_usuario: cada recurso declarado tiene su handler, y ninguno sobr
   for (const r of ["constructor", "toString", "__proto__"]) assert(!esComoUsuario(r));
 });
 
-Deno.test("como_usuario: cada recurso declara su scope, y es un scope que existe", () => {
+Deno.test("como_usuario: cada recurso declara su scope de lectura y de escritura, y existen en el catálogo COMPLETO", () => {
   assertEquals(Object.keys(SCOPE_REQUERIDO).sort(), Object.keys(RECURSOS_COMO_USUARIO).sort(),
     "un recurso como_usuario no declara qué scope necesita (o sobra uno)");
-  for (const [recurso, scope] of Object.entries(SCOPE_REQUERIDO)) {
-    assert(scope === null || isValidScope(scope), `${recurso} pide un scope que no existe: ${scope}`);
+  for (const [recurso, { lectura, escritura }] of Object.entries(SCOPE_REQUERIDO)) {
+    assert(lectura === null || isValidScope(lectura), `${recurso} pide un scope de lectura que no existe: ${lectura}`);
+    assert(escritura === null || isValidScope(escritura), `${recurso} pide un scope de escritura que no existe: ${escritura}`);
+    // Escribir sin leer no existe (la base y manage-api-keys exigen write ⇒ read).
+    assert(escritura === null || lectura !== null, `${recurso} se escribe sin scope de lectura`);
   }
-  // Solo /me puede ir sin scope: saber como quién actúa la llave es lo mínimo.
-  const sinScope = Object.entries(SCOPE_REQUERIDO).filter(([, s]) => s === null).map(([r]) => r);
+  // Solo /me puede ir sin scope: saber como quién actúa la llave es lo mínimo. Y no se
+  // escribe: todo lo que no es GET da 405.
+  const sinScope = Object.entries(SCOPE_REQUERIDO).filter(([, s]) => s.lectura === null).map(([r]) => r);
   assertEquals(sinScope, ["me"], "un recurso como_usuario quedó sin scope");
+  assertEquals(SCOPE_REQUERIDO.me.escritura, null, "/me no se escribe");
+  assertEquals(SCOPE_REQUERIDO.messenger, { lectura: "messenger:read", escritura: "messenger:write" });
+  // La validación usa el catálogo completo; la pantalla, uno sin messenger:write hasta
+  // el PR 5 (SCOPES_OCULTOS_EN_PANTALLA). Si la validación usara el de la pantalla,
+  // ninguna key podría tener write; si la pantalla usara el completo, se ofrecería antes.
+  assert(SCOPE_CATALOG_COMPLETO.some((s) => s.key === "messenger:write"), "el catálogo completo no tiene messenger:write");
+  assert(!SCOPE_CATALOG.some((s) => s.key === "messenger:write"), "messenger:write se ve en la pantalla antes del PR 5");
 });
 
 Deno.test("IP: la whitelist usa la IP de peticion.ts (probada por comportamiento en peticion.test.ts)", () => {
@@ -341,7 +353,7 @@ Deno.test("como_usuario: los handlers nunca ven service_role", () => {
   // Las únicas excepciones: las piezas PURAS del Messenger y los textos, que los tests
   // de abajo obligan a no importar nada ni tocar la base.
   const importsDeValores = (RECURSOS_USUARIO.match(/^\s*import\s+(?!type\b)[^;]*/gm) ?? [])
-    .filter((i) => !/from\s+"\.\/(messenger-formato|mensajes)\.ts"\s*$/.test(i.trim()));
+    .filter((i) => !/from\s+"\.\/(messenger-formato|escritura-formato|mensajes)\.ts"\s*$/.test(i.trim()));
   assertEquals(importsDeValores, [], "recursos-como-usuario.ts importa valores, no solo tipos");
   const reexports = RECURSOS_USUARIO.match(/^\s*export\s*(\*|\{)[^;]*\bfrom\b/gm) ?? [];
   assertEquals(reexports, [], "recursos-como-usuario.ts reexporta de otro archivo");
@@ -357,6 +369,17 @@ Deno.test("como_usuario: los handlers nunca ven service_role", () => {
   }
   assert(!/SERVICE_ROLE/.test(COMO_USUARIO), "como-usuario.ts arma su cliente con service_role");
   assert(/SUPABASE_ANON_KEY/.test(COMO_USUARIO), "como-usuario.ts no arma su cliente con la clave anónima");
+  // La sesión es la de la key del pedido (mvf + mvk), con el id de la fila encontrada
+  // por el hash, y sin reintentos escondidos. clienteComoUsuario (mvf sin mvk) es del
+  // despachador de webhooks: aquí no aparece.
+  assert(/clienteDeLlave\(\s*consumo\.actua_como\s*,\s*keyRow\.id\s+as\s+string\s*,\s*\{\s*fetch:\s*fetchSinReintentos\(/.test(PUBLIC_API),
+    "la rama como_usuario no arma la sesión con clienteDeLlave(actua_como, keyRow.id, { fetch: fetchSinReintentos(…) })");
+  assert(!/\bclienteComoUsuario\b/.test(PUBLIC_API), "index.ts usa clienteComoUsuario (sin mvk): la base no dejaría escribir");
+  // El plazo de la sesión de la persona, más largo que el statement_timeout de
+  // authenticated (8 s): la base corta primero, con un 57014 que se reintenta seguro.
+  const plazo = Number(PUBLIC_API.match(/const PLAZO_YO_MS = ([\d_]+);/)?.[1].replace(/_/g, ""));
+  assert(plazo > 8_000 && plazo <= 15_000, `PLAZO_YO_MS = ${plazo}: tiene que pasar de los 8 s del statement_timeout`);
+  assert(/clienteDeLlave\([^)]*fetchSinReintentos\(PLAZO_YO_MS\)/.test(PUBLIC_API), "la sesión no usa PLAZO_YO_MS");
   // El router entra por servirComoUsuario (que verifica la sesión) con el cliente de
   // la persona, y solo ese. Nada de despachar handlers sueltos.
   assert(/await\s+servirComoUsuario\(\s*recursoClave\s*,\s*yo\s*,/.test(PUBLIC_API), "el router no entra por servirComoUsuario con `yo`");
@@ -366,9 +389,12 @@ Deno.test("como_usuario: los handlers nunca ven service_role", () => {
   const rama = PUBLIC_API.slice(inicioRama, finRama);
   assert(!/\badmin\b/.test(rama), "la rama como_usuario del router usa `admin`");
   // En la rama solo se llaman estas funciones: ninguna otra puede servir datos (un
-  // handler armado afuera con `admin` y llamado acá saltearía el scope y la agencia).
+  // handler armado afuera con `admin` y llamado aquí saltearía el scope y la agencia).
   const llamadas = [...rama.matchAll(/(?<![.\w$])([A-Za-z_$][\w$]*)\s*\(/g)].map((m) => m[1]);
-  const PERMITIDAS = new Set(["if", "catch", "esComoUsuario", "noDisponible", "comoUsuarioConfigurado", "clienteComoUsuario", "servirComoUsuario", "json"]);
+  const PERMITIDAS = new Set([
+    "if", "catch", "esComoUsuario", "noDisponible", "comoUsuarioConfigurado", "clienteDeLlave", "fetchSinReintentos",
+    "servirComoUsuario", "json", "msg", "String",
+  ]);
   assertEquals([...new Set(llamadas.filter((f) => !PERMITIDAS.has(f)))], [], "la rama como_usuario llama a algo que no es la entrada");
   assert(!/RECURSOS_COMO_USUARIO|SCOPE_REQUERIDO|crearServidorComoUsuario/.test(PUBLIC_API),
     "el router despacha handlers o arma su propia entrada sin pasar por servirComoUsuario");
@@ -423,6 +449,15 @@ Deno.test("messenger: con DOS agencias se apaga (hasta que la base impida mezcla
   assert(decidir("me", 2).ok, "/me dejó de servirse con 2 agencias");
 });
 
+Deno.test("escritura-formato.ts es PURO: no importa nada ni toca la base", () => {
+  for (const prohibido of [
+    /^\s*import\b/m, /\bimport\s*\(/, /SupabaseClient/, /createClient/, /Deno\.env/, /\bfetch\s*\(/,
+    /service_?role/i, /\.from\(\s*["'`]/, /\.rpc\(/, /\byo\b/, /\badmin\b/, /\bglobalThis\b/, /\beval\s*\(/,
+  ]) {
+    assert(!prohibido.test(FORMATO_ESCRITURA), `escritura-formato.ts usa ${prohibido}`);
+  }
+});
+
 Deno.test("messenger-formato.ts es PURO: no importa nada ni toca la base", () => {
   for (const prohibido of [
     /^\s*import\b/m, /\bimport\s*\(/, /SupabaseClient/, /createClient/, /Deno\.env/, /\bfetch\s*\(/,
@@ -436,15 +471,99 @@ Deno.test("messenger-formato.ts es PURO: no importa nada ni toca la base", () =>
   assert(/export const ROL_ADMIN_DE_GRUPO = "admin";/.test(FORMATO_MESSENGER), "el único 'admin' no es ROL_ADMIN_DE_GRUPO");
 });
 
-Deno.test("lo como_usuario no escribe: fase de solo lectura", () => {
-  // Leer NO marca como leído ni entregado. Escribir es otra fase, con su revisión.
+/** El cuerpo de `async function nombre(…) { … }` en un código (sin comentarios). */
+function cuerpoDeFuncion(src: string, nombre: string): string {
+  const i = src.search(new RegExp(`\\basync\\s+function\\s+${nombre}\\s*\\(`));
+  if (i < 0) return "";
+  // Los handlers no llevan llaves en los parámetros ni en el tipo de retorno
+  // (Promise<Resultado>): el cuerpo es la primera llave después de los parámetros.
+  const j = src.indexOf("{", src.indexOf(")", i));
+  let nivel = 0;
+  for (let k = j; k < src.length; k++) {
+    const c = src[k];
+    if (c === '"' || c === "'" || c === "`") { k = finDeString(src, k); continue; }
+    if (c === "{") nivel++;
+    else if (c === "}" && --nivel === 0) return src.slice(j, k + 1);
+  }
+  return src.slice(j);
+}
+
+Deno.test("lo como_usuario escribe SOLO por estas RPC, una en cada handler, por POST", () => {
+  // Leer NO marca como leído ni entregado. Escribir va por las 4 RPC de la base
+  // (INVOKER: la RLS y los triggers como en la app, la key validada en cada una).
+  // Nunca un .insert/.update/.upsert/.delete: con la sesión fabricada, una tabla fuera
+  // del chat (perfil, Cowork…) SÍ se dejaría escribir (diseño §3 ⚠️).
   for (const prohibido of [/\.insert\(/, /\.update\(/, /\.upsert\(/, /\.delete\(/]) {
     assert(!prohibido.test(RECURSOS_USUARIO), `recursos-como-usuario.ts escribe (${prohibido})`);
   }
   const rpcs = [...RECURSOS_USUARIO.matchAll(/\.rpc\(\s*"([a-z_]+)"/g)].map((m) => m[1]).sort();
-  const PERMITIDAS = ["current_tenant_id", "get_last_messages", "messenger_unread_counts"];
+  const PERMITIDAS = [
+    "current_tenant_id", "get_last_messages", "messenger_unread_counts", "api_mi_llave", "messenger_directorio", "api_escritura_habilitada",
+    "api_messenger_enviar", "api_messenger_abrir_directo", "api_messenger_editar", "api_messenger_borrar",
+  ];
   assertEquals([...new Set(rpcs)].filter((r) => !PERMITIDAS.includes(r)), [], "una función de base no autorizada");
   assert(!/\.(from|rpc)\(\s*[^"\s]/.test(RECURSOS_USUARIO), "from()/rpc() con un nombre que no es literal");
+  // Ni por GET ni HEAD: postgrest-js reintenta un GET que falla, y una escritura no se
+  // repite a ciegas. Toda .rpc( lleva a lo sumo dos argumentos (nombre y parámetros).
+  const llamadasRpc = [...RECURSOS_USUARIO.matchAll(/\.rpc\(/g)];
+  assert(llamadasRpc.length >= 9, `se esperaban al menos 9 .rpc(, hay ${llamadasRpc.length}: se rompió la búsqueda`);
+  for (const m of llamadasRpc) {
+    const args = elementosDesde(RECURSOS_USUARIO, m.index! + m[0].length).elementos;
+    assert(args.length <= 2, `.rpc(${args.join(", ")}) con opciones`);
+  }
+  assert(!/\bget\s*:\s*true|\bhead\s*:/.test(RECURSOS_USUARIO), "recursos-como-usuario.ts pide un get/head");
+  // Cada RPC de escritura aparece UNA vez en todo el archivo, dentro de su handler.
+  const DUENO: Record<string, string> = {
+    api_messenger_enviar: "enviar", api_messenger_abrir_directo: "abrirChat",
+    api_messenger_editar: "editar", api_messenger_borrar: "borrar", messenger_directorio: "personasDelDirectorio",
+    api_escritura_habilitada: "personasDelDirectorio",
+  };
+  for (const [rpc, handler] of Object.entries(DUENO)) {
+    const llamadas = RECURSOS_USUARIO.match(new RegExp(`\\.rpc\\(\\s*"${rpc}"`, "g")) ?? [];
+    assertEquals(llamadas.length, 1, `${rpc} se llama ${llamadas.length} veces`);
+    const cuerpo = cuerpoDeFuncion(RECURSOS_USUARIO, handler);
+    assert(cuerpo.length > 100, `no se encontró el handler ${handler}`);
+    assert(cuerpo.includes(`.rpc("${rpc}"`), `${rpc} no se llama dentro de ${handler}`);
+    // Y el nombre de la RPC no aparece fuera de su handler (ni en un texto suelto).
+    assertEquals((RECURSOS_USUARIO.match(new RegExp(`"${rpc}"`, "g")) ?? []).length, 1, `${rpc} aparece fuera de ${handler}`);
+  }
+  // Las de escritura no aparecen en ningún otro archivo de public-api.
+  for (const [archivo, src] of [["index.ts", PUBLIC_API], ["escritura-formato.ts", FORMATO_ESCRITURA], ["messenger-formato.ts", FORMATO_MESSENGER]]) {
+    assert(!/"api_messenger_|"api_idem_/.test(src), `${archivo} nombra una RPC de escritura`);
+  }
+});
+
+Deno.test("index.ts no nombra el chat ni las RPC de escritura, y el cuerpo se lee después de la puerta y del 405", () => {
+  // Todo lo que toca el chat va por servirComoUsuario, con la sesión de la persona.
+  for (const prohibido of [/"chat_/, /"api_messenger_/, /"api_idem_/, /"messenger_directorio"/, /"api_mi_llave"/, /"api_escritura_habilitada"/]) {
+    assert(!prohibido.test(PUBLIC_API), `index.ts nombra ${prohibido}`);
+  }
+  const puerta = PUBLIC_API.indexOf("decidir(recursoClave");
+  const noEsComoUsuario = PUBLIC_API.search(/if\s*\(\s*metodo\s*!==\s*"GET"\s*&&\s*!esComoUsuario\(recursoClave\)\s*\)/);
+  const lectura = PUBLIC_API.indexOf("leerCuerpo(");
+  assert(puerta > 0 && noEsComoUsuario > puerta, "el 405 de lo que no es como_usuario no va después de la puerta");
+  assert(lectura > noEsComoUsuario, "leerCuerpo( va antes del 405 (se leería el cuerpo de un recurso que no se escribe)");
+  assertEquals((PUBLIC_API.match(/\bleerCuerpo\(/g) ?? []).length, 1, "leerCuerpo( se llama más de una vez");
+  // La raíz con otro método: 405 antes de armar la lista.
+  const raiz = PUBLIC_API.indexOf("if (!resource) {");
+  assert(raiz > 0 && /if \(!resource\) \{\s*if \(metodo !== "GET"\)[\s\S]{0,250}405/.test(PUBLIC_API), "la raíz no da 405 a lo que no es GET");
+  // Y los dos clientes van sin reintentos escondidos: el de service_role en toda
+  // escritura, el de la persona siempre.
+  const clientes = [...PUBLIC_API.matchAll(/createClient\(/g)];
+  assertEquals(clientes.length, 1, "index.ts arma más de un cliente");
+  const argumentos = elementosDesde(PUBLIC_API, clientes[0].index! + "createClient(".length).elementos;
+  assert((argumentos[1] ?? "").includes("SUPABASE_SERVICE_ROLE_KEY"), "el cliente de index.ts no es el de service_role");
+  const opciones = argumentos[2] ?? "";
+  assert(/metodo\s*===\s*"GET"\s*\?\s*\{\s*\}\s*:\s*\{\s*global:\s*\{\s*fetch:\s*fetchSinReintentos\(\s*PLAZO_ADMIN_MS\s*\)\s*\}\s*\}/.test(opciones),
+    `el cliente de service_role no va con fetchSinReintentos en las escrituras: ${opciones}`);
+  // El contador caído corta una escritura antes de api_key_vigente y del conteo.
+  const caido = PUBLIC_API.search(/if\s*\(\s*consumoErr\s*&&\s*metodo\s*!==\s*"GET"\s*\)\s*return\s+noDisponible/);
+  assert(caido > 0 && caido < PUBLIC_API.indexOf('rpc("api_key_vigente"') && caido < PUBLIC_API.indexOf('from("tenants")'),
+    "sin contador, una escritura no se corta antes de api_key_vigente y del conteo de agencias");
+  // La demora de la base se mide ANTES de leer el cuerpo (lo lento del cliente no cuenta).
+  const demora = PUBLIC_API.indexOf("const demoraDeLaBase = Date.now() - t0;");
+  assert(demora > PUBLIC_API.indexOf('from("tenants")') && demora < lectura, "la demora de la base no se mide entre el conteo y el cuerpo");
+  assert(PUBLIC_API.indexOf("const t0 = Date.now();") < PUBLIC_API.indexOf('from("api_keys")'), "t0 no se toma al entrar el pedido");
 });
 
 Deno.test("lo como_usuario no toca las tablas caras ni las de admins", () => {
@@ -491,7 +610,7 @@ Deno.test("paginas del Messenger topan en 100", () => {
 
 // ─── 8. Idioma: todo texto para el cliente sale de mensajes.ts ───────────────
 // El comportamiento (negociación, textos, byte a byte el español de antes) se prueba
-// en mensajes.test.ts. Acá, que el código no se saltee el diccionario.
+// en mensajes.test.ts. Aquí, que el código no se saltee el diccionario.
 
 /** Hasta dónde llega un string que empieza en `i` (índice de la comilla de cierre). */
 function finDeString(src: string, i: number): number {
@@ -667,7 +786,7 @@ Deno.test("idioma: cada msg() usa el idioma del pedido, nunca uno fijo", () => {
 Deno.test("idioma: cada msg() nombra una clave que EXISTE y le pasa exactamente sus variables", () => {
   // El tipo de msg() ya lo exige, pero CI corre `deno test --no-check`: con
   // `msg(idioma, "creadora_no_encontradx")` o `msg(idioma, "falta_scope")` sin su
-  // variable pasaban todos los tests. Acá se mira en el código, llamada por llamada,
+  // variable pasaban todos los tests. Aquí se mira en el código, llamada por llamada,
   // en los tres archivos que responden.
   type ConVars = { vars?: readonly string[] };
   const entrada = (k: string) => Object.hasOwn(MENSAJES, k) ? (MENSAJES as Record<string, ConVars>)[k] : null;
@@ -784,7 +903,7 @@ Deno.test("idioma: las respuestas JSON llevan Vary: Accept-Language sin pisar el
 });
 
 Deno.test("mensajes.ts es PURO: no importa nada ni toca la base", () => {
-  // recursos-como-usuario.ts importa valores de acá: si esto importara algo, por acá
+  // recursos-como-usuario.ts importa valores de aquí: si esto importara algo, por aquí
   // entraría un cliente con service_role.
   for (const prohibido of [
     /^\s*import\b/m, /\bimport\s*\(/, /^\s*export\s*(\*|\{)[^;]*\bfrom\b/m, /\brequire\s*\(/,

@@ -94,7 +94,7 @@ function responderFeed(ll: Llamada): Resp {
   return { data: null, error: { message: `tabla inesperada ${CANARIO}` } };
 }
 
-Deno.test("canario: el feed de verdad trae el contenido, y de acá sale SOLO cuántos, dónde y los cursores", async () => {
+Deno.test("canario: el feed de verdad trae el contenido, y de aquí sale SOLO cuántos, dónde y los cursores", async () => {
   // Primero: que el handler real efectivamente devuelva el canario (si no, el test no prueba nada).
   const { servirComoUsuario } = await import("../public-api/recursos-como-usuario.ts");
   const crudo = await servirComoUsuario("messenger", clienteFalso(responderFeed).cliente, {
@@ -102,6 +102,7 @@ Deno.test("canario: el feed de verdad trae el contenido, y de acá sale SOLO cu�
     consulta: { after: DESDE, exclude_own: "true", limit: "100" },
     llave: { conWhitelist: true, venceEl: new Date(Date.now() + 86_400_000).toISOString() },
     baseDeArchivos: "https://proyecto.supabase.co", cupo: { limite: 0, restantes: 0, reinicio: "x" }, idioma: "es",
+    metodo: "GET", cuerpo: null, idempotencia: null,
   });
   assert(crudo.ok && JSON.stringify(crudo.cuerpo).includes(CANARIO), `el feed real trae el contenido: ${JSON.stringify(crudo).slice(0, 300)}`);
 
