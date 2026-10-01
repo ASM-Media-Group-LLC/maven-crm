@@ -11,6 +11,7 @@ import NotificationItem from "@/components/notifications/NotificationItem";
 import type { Notification } from "@/hooks/useNotifications";
 import { CheckCheck, Archive, Bell, Settings } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
+import { useLanguage } from "@/hooks/useLanguage";
 
 const Notificaciones = () => {
   const [moduleFilter, setModuleFilter] = useState<string | null>(null);
@@ -23,6 +24,7 @@ const Notificaciones = () => {
   const { canAccess } = usePermissions();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t } = useLanguage();
 
   // Filter module options by role permissions
   const filteredModuleOptions = useMemo(
@@ -42,7 +44,7 @@ const Notificaciones = () => {
       markAsRead.mutate(n.id);
     }
     if (n.required_permission_module && !canAccess(n.required_permission_module, n.required_permission_submodule ?? undefined)) {
-      toast({ title: "Sin acceso", description: "No tienes permiso para ver este recurso.", variant: "destructive" });
+      toast({ title: t("common.noAccess"), description: t("common.noPermission"), variant: "destructive" });
       return;
     }
     const url = resolveDeepLink(n.reference_type, n.reference_id, n.deep_link_url);
@@ -67,17 +69,17 @@ const Notificaciones = () => {
               la fila puede partirse: a 390 px el engranaje —que es la única puerta a
               la configuración— quedaba fuera de la pantalla. */}
           <PageHeader
-            title="Notificaciones"
+            title={t("nav.notifications")}
             icon={<Bell />}
             actions={
               <>
-                <Button variant="outline" size="sm" className="gap-1 text-xs" title="Marcar todas leídas" aria-label="Marcar todas leídas" onClick={() => markAllAsRead.mutate()}>
-                  <CheckCheck className="h-3 w-3" /> <span className="hidden sm:inline">Marcar todas leídas</span>
+                <Button variant="outline" size="sm" className="gap-1 text-xs" title={t("page.notif.markAllRead")} aria-label={t("page.notif.markAllRead")} onClick={() => markAllAsRead.mutate()}>
+                  <CheckCheck className="h-3 w-3" /> <span className="hidden sm:inline">{t("page.notif.markAllRead")}</span>
                 </Button>
-                <Button variant="outline" size="sm" className="gap-1 text-xs" title="Archivar todas" aria-label="Archivar todas" onClick={() => archiveAll.mutate()}>
-                  <Archive className="h-3 w-3" /> <span className="hidden sm:inline">Archivar todas</span>
+                <Button variant="outline" size="sm" className="gap-1 text-xs" title={t("page.notif.archiveAll")} aria-label={t("page.notif.archiveAll")} onClick={() => archiveAll.mutate()}>
+                  <Archive className="h-3 w-3" /> <span className="hidden sm:inline">{t("page.notif.archiveAll")}</span>
                 </Button>
-                <Button variant="outline" size="sm" className="gap-1" title="Configuración de notificaciones" aria-label="Configuración de notificaciones" onClick={() => navigate("/ajustes/notificaciones")}>
+                <Button variant="outline" size="sm" className="gap-1" title={t("page.notif.settings")} aria-label={t("page.notif.settings")} onClick={() => navigate("/ajustes/notificaciones")}>
                   <Settings className="h-3.5 w-3.5" />
                 </Button>
               </>
@@ -87,7 +89,7 @@ const Notificaciones = () => {
           <div className="flex flex-wrap items-center gap-3">
             <Select value={moduleFilter ?? ""} onValueChange={(v) => setModuleFilter(v || null)}>
               <SelectTrigger className="w-36 h-8 text-xs">
-                <SelectValue placeholder="Módulo" />
+                <SelectValue placeholder={t("page.notif.module")} />
               </SelectTrigger>
               <SelectContent>
                 {filteredModuleOptions.map((o) => (
@@ -97,7 +99,7 @@ const Notificaciones = () => {
             </Select>
             <Select value={priorityFilter ?? ""} onValueChange={(v) => setPriorityFilter(v || null)}>
               <SelectTrigger className="w-32 h-8 text-xs">
-                <SelectValue placeholder="Prioridad" />
+                <SelectValue placeholder={t("settings.notif.tab.priority")} />
               </SelectTrigger>
               <SelectContent>
                 {PRIORITY_OPTIONS.map((o) => (
@@ -107,7 +109,7 @@ const Notificaciones = () => {
             </Select>
             <Select value={statusFilter ?? ""} onValueChange={(v) => setStatusFilter(v || null)}>
               <SelectTrigger className="w-32 h-8 text-xs">
-                <SelectValue placeholder="Estado" />
+                <SelectValue placeholder={t("common.status")} />
               </SelectTrigger>
               <SelectContent>
                 {STATUS_OPTIONS.map((o) => (
@@ -117,7 +119,7 @@ const Notificaciones = () => {
             </Select>
             {hasFilters && (
               <Button variant="ghost" size="sm" className="text-xs" onClick={clearFilters}>
-                Limpiar filtros
+                {t("page.notif.clearFilters")}
               </Button>
             )}
           </div>
@@ -127,11 +129,11 @@ const Notificaciones = () => {
         <div className="flex-1 overflow-auto">
           <div className="border-b-0 bg-card divide-y">
             {isLoading ? (
-              <div className="p-8 text-center text-sm text-muted-foreground">Cargando...</div>
+              <div className="p-8 text-center text-sm text-muted-foreground">{t("page.notif.loading")}</div>
             ) : notifications.length === 0 ? (
               <EmptyState
                 seed="notificaciones"
-                title={`No hay notificaciones${hasFilters ? " con estos filtros" : ""}.`}
+                title={hasFilters ? t("page.notif.emptyFiltered") : t("page.notif.empty")}
               />
             ) : (
               notifications.map((n) => (

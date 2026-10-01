@@ -30,6 +30,7 @@ import { apiKeys } from "./i18n/apiKeys";
 import { compartido } from "./i18n/compartido";
 import { hrGestion } from "./i18n/hrGestion";
 import { internos } from "./i18n/internos";
+import { paginas } from "./i18n/paginas";
 
 export type Language = "es" | "en";
 
@@ -84,6 +85,7 @@ const translations = {
   ...compartido,
   ...hrGestion,
   ...internos,
+  ...paginas,
 } as const;
 
 export type TranslationKey = keyof typeof translations;

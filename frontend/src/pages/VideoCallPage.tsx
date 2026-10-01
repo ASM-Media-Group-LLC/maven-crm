@@ -12,12 +12,15 @@ import { useQuienesEstanEnLaSala } from "@/hooks/useQuienesEstanEnLaSala";
 import MeetGuestGate from "./meet/MeetGuestGate";
 import type { BackgroundEffect } from "./messenger/videocall/BackgroundSelector";
 import { Loader2 } from "lucide-react";
+import { useLanguage } from "@/hooks/useLanguage";
 
 export default function VideoCallPage() {
+  const { t } = useLanguage();
   const { roomName } = useParams<{ roomName: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const isAdmin = searchParams.get("admin") === "1";
+  // Viaja como título de la grabación (se guarda): no se traduce.
   const callDisplayName = searchParams.get("name") || roomName || "Videollamada";
   const { user } = useAuth();
   const [joined, setJoined] = useState(false);
@@ -134,7 +137,7 @@ export default function VideoCallPage() {
   if (!roomName) {
     return (
       <div className="h-screen flex items-center justify-center bg-background text-foreground">
-        <p>Sala no especificada</p>
+        <p>{t("page.call.noRoom")}</p>
       </div>
     );
   }
@@ -142,7 +145,7 @@ export default function VideoCallPage() {
   if (!user) {
     return (
       <div className="h-screen flex items-center justify-center bg-background text-foreground">
-        <p>Debes iniciar sesión para unirte a una llamada</p>
+        <p>{t("page.call.signInToJoin")}</p>
       </div>
     );
   }
@@ -164,6 +167,7 @@ export default function VideoCallPage() {
     );
   }
 
+  // Es el nombre con el que te ven los demás en la llamada: no depende de tu idioma.
   const userName = profile.full_name || "Usuario";
 
   if (!joined) {

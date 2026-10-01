@@ -21,25 +21,10 @@
 // para traducirse igual. Lo que la lista garantiza es que el problema no se
 // EXTIENDA a archivos nuevos.
 export const LEGADO_EN_ESPANOL: string[] = [
-  "components/correo/AdjuntoVisor.tsx",
-  "components/correo/MailBody.tsx",
-  "components/correo/MailComposer.tsx",
-  "components/correo/MailSignatureDialog.tsx",
-  "components/correo/VisorPdf.tsx",
-  "components/correo/mailHtml.ts",
   // Traducido en pantalla: ReportScheduleModal dibuja admin.metric.<key> (etiquetasMetricas.ts); el `label` queda en español como respaldo y lo ata adminEnIngles.test.tsx al `es` del diccionario.
   "hooks/reportMetricsCatalog.ts",
   // Traducido; quedan los criterios originales del scorecard (ORIGINAL_CRITERIA), que se guardan en la base con su label_en al lado: son dato.
   "hooks/useChatterEvaluator.ts",
-  "pages/ChatterPublicView.tsx",
-  "pages/Credentials.tsx",
-  "pages/Dashboard2.tsx",
-  "pages/DiagnosticoPantalla.tsx",
-  "pages/Index.tsx",
-  "pages/Notificaciones.tsx",
-  "pages/PanelDeControl.tsx",
-  "pages/Settings.tsx",
-  "pages/VideoCallPage.tsx",
   // Código muerto: nadie lo importa (lo reemplazaron el Dashboard y QA History de AgencyQA.tsx). Se traduce o se borra aparte.
   "pages/agency-qa/AgencyCalls.tsx",
   // Código muerto: nadie lo importa (el detalle vive en CallDetailPage.tsx, ya traducido). Se traduce o se borra aparte.
@@ -50,19 +35,9 @@ export const LEGADO_EN_ESPANOL: string[] = [
   "pages/agency-qa/chatters-qa/useChatterQaReports.ts",
   // El correo del QA de closers: sale en español a los destinatarios y al closer. No se traduce.
   "pages/agency-qa/qaEmailTemplate.ts",
-  "pages/ajustes/NotificacionesSettings.tsx",
-  "pages/ajustes/notificaciones/CanalesTab.tsx",
-  "pages/ajustes/notificaciones/EventosTab.tsx",
-  "pages/ajustes/notificaciones/GeneralTab.tsx",
-  "pages/ajustes/notificaciones/NoMolestarTab.tsx",
-  "pages/ajustes/notificaciones/PrioridadTab.tsx",
-  "pages/ajustes/notificaciones/ResumenesTab.tsx",
-  "pages/ajustes/notificaciones/tabs.ts",
   // El correo del reporte (va a los emails de notificación de Admin): se arma
   // acá y Apps Script lo manda tal cual. Es DATO que lee otra persona, no pantalla.
   "pages/chatter-evaluator/emailTemplate.ts",
-  "pages/correo/CorreoConectarPage.tsx",
-  "pages/correo/CorreoPage.tsx",
   // Traducido; queda un nombre propio con ñ en la lista de asignables («Castaño»), que no es texto de pantalla.
   "pages/creadores/CreateTicketModal.tsx",
   // Traducido; quedan el título de la notificación y la acción del historial, que se guardan y los leen otras personas.
@@ -73,23 +48,15 @@ export const LEGADO_EN_ESPANOL: string[] = [
   "pages/creadores/onboarding/OnboardingWizard.tsx",
   // Traducido; queda la notificación de inactividad, que se guarda y la lee el manager asignado.
   "pages/creadores/onboarding/useOnboarding.ts",
-  "pages/dashboard/SelectorDeTablero.tsx",
   // Es la factura en sí (se exporta a PDF y la recibe la creadora): un documento, no pantalla. Va en español a propósito.
   "pages/finanzas/facturacion/InvoiceA4Preview.tsx",
   // Es la nota de pago en sí (el documento que recibe la creadora; también la vista previa al crearla). Va en español a propósito.
   "pages/finanzas/facturacion/PaymentNoteA4Preview.tsx",
-  "pages/grabaciones/CompartirGrabacionDialog.tsx",
-  "pages/grabaciones/GrabacionesPage.tsx",
   // Traducido; queda la checklist por defecto (categoría/título/descripción) y los motivos de salida: se guardan en employee_offboarding_tasks / termination_reason y los lee quien lleve el offboarding. Se ven traducidos.
   "pages/hr/HROffboardingNew.tsx",
   // Traducido; queda la checklist por defecto (categoría/título/descripción): se guarda en employee_onboarding_tasks y la lee quien lleve el onboarding. Se ve traducida.
   "pages/hr/HROnboardingNew.tsx",
   "pages/manager/ManagerDashboard.tsx",
-  "pages/meet/MeetGuestGate.tsx",
-  "pages/meet/MeetGuestPage.tsx",
-  "pages/meet/MeetPage.tsx",
-  "pages/oficina/DocumentoPage.tsx",
-  "pages/oficina/OficinaPage.tsx",
   "pages/opportunities/OpportunitiesPage.tsx",
   "pages/panel-de-control/ChattersRecruitmentTab.tsx",
   "pages/panel-de-control/ControlGastoTab.tsx",
@@ -112,9 +79,6 @@ export const LEGADO_EN_ESPANOL: string[] = [
   "pages/sales-performance/LtvTab.tsx",
   "pages/sales-performance/VentasTops.tsx",
   "pages/sales-performance/types.ts",
-  "pages/telefonos/TelefonosPage.tsx",
-  "pages/telegram/TelegramChannelsPage.tsx",
-  "pages/telegram/TelegramInboxPage.tsx",
   // Traducido; queda «Link de Instagram», la pregunta que se guarda en ticket_form_fields y la leen todos: no se traduce.
   "pages/tickets/TicketFormEditor.tsx",
   // Traducido; queda un nombre propio con ñ en TEAM_MEMBERS («Castaño»), que no es texto de pantalla.

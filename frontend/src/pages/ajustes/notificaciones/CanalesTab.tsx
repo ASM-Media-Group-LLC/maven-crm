@@ -2,21 +2,23 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Bell, Mail, Smartphone, FileText, CheckCircle2 } from "lucide-react";
 import NotificacionesEnEsteDispositivo from "./NotificacionesEnEsteDispositivo";
+import { useLanguage } from "@/hooks/useLanguage";
 
 const CHANNELS = [
-  { key: "in_app", label: "In-app", desc: "Notificaciones dentro de la plataforma", icon: Bell, active: true },
-  { key: "email", label: "Email", desc: "Al correo de tu cuenta. Viene apagado: se prende evento por evento en la pestaña Eventos.", icon: Mail, active: true },
-  { key: "push", label: "Push", desc: "Notificaciones push para app móvil", icon: Smartphone, active: false },
-  { key: "digest", label: "Resumen periódico", desc: "Recibir un digest con el resumen de actividad", icon: FileText, active: false, linkTab: "resumenes" },
+  { key: "in_app", label: "settings.notif.ch.inApp", desc: "settings.notif.ch.inAppDesc", icon: Bell, active: true },
+  { key: "email", label: "settings.notif.ch.email", desc: "settings.notif.ch.emailDesc", icon: Mail, active: true },
+  { key: "push", label: "settings.notif.ch.push", desc: "settings.notif.ch.pushDesc", icon: Smartphone, active: false },
+  { key: "digest", label: "settings.notif.ch.digest", desc: "settings.notif.ch.digestDesc", icon: FileText, active: false, linkTab: "resumenes" },
 ] as const;
 
 const CanalesTab = () => {
+  const { t } = useLanguage();
   return (
     <Card className="border-border">
       <CardHeader className="pb-3">
-        <CardTitle className="text-base">Canales de Notificación</CardTitle>
+        <CardTitle className="text-base">{t("settings.notif.ch.title")}</CardTitle>
         <CardDescription className="text-xs">
-          Elige cómo quieres recibir tus notificaciones. Cada evento podrá activarse o desactivarse por canal.
+          {t("settings.notif.ch.desc")}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-1">
@@ -31,18 +33,18 @@ const CanalesTab = () => {
             <div className="flex items-start gap-3">
               <Icon className="h-4 w-4 mt-0.5 text-muted-foreground" />
               <div>
-                <span className="text-sm font-medium">{label}</span>
-                <p className="text-xs text-muted-foreground mt-0.5">{desc}</p>
+                <span className="text-sm font-medium">{t(label)}</span>
+                <p className="text-xs text-muted-foreground mt-0.5">{t(desc)}</p>
               </div>
             </div>
             {active ? (
               <Badge variant="default" className="text-[10px] gap-1">
                 <CheckCircle2 className="h-3 w-3" />
-                Activo
+                {t("common.active")}
               </Badge>
             ) : (
               <Badge variant="outline" className="text-[10px] text-muted-foreground">
-                Próximamente
+                {t("common.comingSoon")}
               </Badge>
             )}
           </div>

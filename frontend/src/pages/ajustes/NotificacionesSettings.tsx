@@ -3,6 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { TABS, TAB_POR_DEFECTO, tabDesdeUrl, type TabId } from "./notificaciones/tabs";
 import { Button } from "@/components/ui/button";
+import { useLanguage } from "@/hooks/useLanguage";
 import GeneralTab from "./notificaciones/GeneralTab";
 import CanalesTab from "./notificaciones/CanalesTab";
 import EventosTab from "./notificaciones/EventosTab";
@@ -30,6 +31,7 @@ const NotificacionesSettings = () => {
     setSearchParams(siguiente, { replace: true });
   };
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const ActiveComponent = TAB_CONTENT[activeTab];
 
   return (
@@ -48,9 +50,9 @@ const NotificacionesSettings = () => {
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <div>
-              <h1 className="text-xl font-bold text-foreground">Configuración de Notificaciones</h1>
+              <h1 className="text-xl font-bold text-foreground">{t("settings.notif.title")}</h1>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Controla qué notificaciones recibes, por qué canal y con qué prioridad.
+                {t("settings.notif.subtitle")}
               </p>
             </div>
           </div>
@@ -63,7 +65,7 @@ const NotificacionesSettings = () => {
         <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
           {/* Vertical Tabs - Desktop */}
           <nav className="hidden md:flex shrink-0 w-48 border-r border-border bg-muted/30 flex-col py-2">
-            {TABS.map(({ id, label, icon: Icon }) => (
+            {TABS.map(({ id, labelKey, icon: Icon }) => (
               <button
                 key={id}
                 onClick={() => setActiveTab(id)}
@@ -75,7 +77,7 @@ const NotificacionesSettings = () => {
                 )}
               >
                 <Icon className="h-4 w-4 shrink-0" />
-                {label}
+                {t(labelKey)}
               </button>
             ))}
           </nav>
@@ -83,7 +85,7 @@ const NotificacionesSettings = () => {
           {/* Horizontal Tabs - Mobile */}
           <div className="md:hidden shrink-0 border-b border-border bg-background overflow-x-auto">
             <div className="flex px-2 py-1.5 gap-1 min-w-max">
-              {TABS.map(({ id, label, icon: Icon }) => (
+              {TABS.map(({ id, labelKey, icon: Icon }) => (
                 <button
                   key={id}
                   onClick={() => setActiveTab(id)}
@@ -95,7 +97,8 @@ const NotificacionesSettings = () => {
                   )}
                 >
                   <Icon className="h-3.5 w-3.5" />
-                  {label}
+                  {t(labelKey)}
+
                 </button>
               ))}
             </div>

@@ -69,6 +69,8 @@ import TextStyle from "@tiptap/extension-text-style";
 import { Color } from "@tiptap/extension-color";
 import Placeholder from "@tiptap/extension-placeholder";
 import { Extension } from "@tiptap/core";
+import { useLanguage } from "@/hooks/useLanguage";
+import { traducir, type TranslationKey } from "@/lib/i18n";
 
 /**
  * Redactar y responder, con editor rico (negrita, listas, links, color,
@@ -195,7 +197,8 @@ export const TOPE_ADJUNTOS = 20 * 1024 * 1024;
  *  rota en Outlook y en varios filtros. */
 const TIPOS_PEGABLES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
 
-/** Lo que queda en el borrador donde estaba una imagen pegada. */
+/** Lo que queda en el borrador donde estaba una imagen pegada. Va DENTRO del
+ *  cuerpo del correo (si no se borra, sale con él): no se traduce. */
 const MARCA_IMAGEN_PERDIDA = "[imagen pegada — se perdió al recuperar el borrador]";
 
 /** Lee un archivo a `data:<tipo>;base64,…`, que es lo que come el editor. */
@@ -203,7 +206,7 @@ function leerDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const fr = new FileReader();
     fr.onload = () => resolve(String(fr.result));
-    fr.onerror = () => reject(new Error("no se pudo leer el archivo"));
+    fr.onerror = () => reject(new Error(traducir("mail.comp.readFileError")));
     fr.readAsDataURL(file);
   });
 }
@@ -217,7 +220,7 @@ function leerBase64(file: File): Promise<string> {
       const coma = res.indexOf(",");
       resolve(coma >= 0 ? res.slice(coma + 1) : res);
     };
-    fr.onerror = () => reject(new Error("no se pudo leer el archivo"));
+    fr.onerror = () => reject(new Error(traducir("mail.comp.readFileError")));
     fr.readAsDataURL(file);
   });
 }
@@ -235,34 +238,34 @@ const COLORES = [
   ["#7c3aed", "#c026d3", "#db2777", "#9ca3af", "#f87171", "#fbbf24", "#4ade80", "#60a5fa"],
 ];
 
-const EMOJIS: Array<{ grupo: string; lista: string[] }> = [
+const EMOJIS: Array<{ grupo: TranslationKey; lista: string[] }> = [
   {
-    grupo: "Caritas",
+    grupo: "mail.emoji.faces",
     lista: ["😀", "😁", "😂", "🤣", "😊", "😍", "🥰", "😘", "😎", "🤩", "🥳", "😅", "😉", "🙃", "🤔", "🤯", "😳", "🥺", "😢", "😭", "😤", "😡", "😴", "🤒", "🥴", "😇", "🤗", "🤫", "🙄", "😬", "🫠", "💀"],
   },
   {
-    grupo: "Gestos",
+    grupo: "mail.emoji.gestures",
     lista: ["👍", "👎", "👌", "🤌", "✌️", "🤞", "🤟", "🤙", "👏", "🙌", "🤝", "🙏", "💪", "👀", "🫡", "👋", "☝️", "👉", "👈", "🫶", "✍️", "🤲", "🖖", "🤘"],
   },
   {
-    grupo: "Corazones",
+    grupo: "mail.emoji.hearts",
     lista: ["❤️", "🧡", "💛", "💚", "💙", "💜", "🖤", "🤍", "💖", "💘", "💝", "💕", "💞", "💗", "💔", "❣️"],
   },
   {
-    grupo: "Trabajo",
+    grupo: "mail.emoji.work",
     lista: ["✅", "❌", "⚠️", "📌", "📎", "📈", "📉", "📊", "💼", "🗂️", "📁", "📄", "📝", "💰", "💵", "🧾", "📅", "⏰", "🚀", "🎯", "🏆", "🔥", "⭐", "✨", "💡", "🔔", "📣", "🔒", "🔑", "⚙️", "🛠️", "💻"],
   },
   {
-    grupo: "Festejo y varios",
+    grupo: "mail.emoji.party",
     lista: ["🎉", "🎁", "🥂", "🍾", "🎂", "☕", "🍕", "🌮", "🍔", "💯", "❓", "❗", "➕", "➖", "🔁", "🆗", "🆕", "🌎"],
   },
 ];
 
-const TAMANOS: Array<{ etiqueta: string; valor: string | null }> = [
-  { etiqueta: "Pequeño", valor: "12px" },
-  { etiqueta: "Normal", valor: null },
-  { etiqueta: "Grande", valor: "18px" },
-  { etiqueta: "Enorme", valor: "24px" },
+const TAMANOS: Array<{ etiqueta: TranslationKey; valor: string | null }> = [
+  { etiqueta: "mail.size.small", valor: "12px" },
+  { etiqueta: "mail.size.normal", valor: null },
+  { etiqueta: "mail.size.large", valor: "18px" },
+  { etiqueta: "mail.size.huge", valor: "24px" },
 ];
 
 /* ── Piezas de la barra ─────────────────────────────────────────────────── */
@@ -309,6 +312,7 @@ function Separador() {
 }
 
 function BarraFormato({ editor }: { editor: Editor }) {
+  const { t } = useLanguage();
   const [url, setUrl] = useState("");
   const [linkAbierto, setLinkAbierto] = useState(false);
 
@@ -343,14 +347,14 @@ function BarraFormato({ editor }: { editor: Editor }) {
   return (
     <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto">
       <BotonBarra
-        titulo="Deshacer"
+        titulo={t("mail.ed.undo")}
         onClick={() => editor.chain().focus().undo().run()}
         disabled={!editor.can().undo()}
       >
         <Undo2 className="h-4 w-4" />
       </BotonBarra>
       <BotonBarra
-        titulo="Rehacer"
+        titulo={t("mail.ed.redo")}
         onClick={() => editor.chain().focus().redo().run()}
         disabled={!editor.can().redo()}
       >
@@ -364,7 +368,8 @@ function BarraFormato({ editor }: { editor: Editor }) {
         <PopoverTrigger asChild>
           <button
             type="button"
-            title="Tamaño de letra"
+            title={t("mail.ed.fontSize")}
+            aria-label={t("mail.ed.fontSize")}
             onMouseDown={(e) => e.preventDefault()}
             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
@@ -372,19 +377,19 @@ function BarraFormato({ editor }: { editor: Editor }) {
           </button>
         </PopoverTrigger>
         <PopoverContent className="w-36 p-1" align="start">
-          {TAMANOS.map((t) => (
+          {TAMANOS.map((tam) => (
             <button
-              key={t.etiqueta}
+              key={tam.etiqueta}
               type="button"
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => {
-                if (t.valor) editor.chain().focus().setFontSize(t.valor).run();
+                if (tam.valor) editor.chain().focus().setFontSize(tam.valor).run();
                 else editor.chain().focus().unsetFontSize().run();
               }}
               className="block w-full rounded-md px-3 py-1.5 text-left hover:bg-muted"
-              style={{ fontSize: t.valor ?? "14px" }}
+              style={{ fontSize: tam.valor ?? "14px" }}
             >
-              {t.etiqueta}
+              {t(tam.etiqueta)}
             </button>
           ))}
         </PopoverContent>
@@ -393,28 +398,28 @@ function BarraFormato({ editor }: { editor: Editor }) {
       <Separador />
 
       <BotonBarra
-        titulo="Negrita"
+        titulo={t("mail.ed.bold")}
         activo={editor.isActive("bold")}
         onClick={() => editor.chain().focus().toggleBold().run()}
       >
         <Bold className="h-4 w-4" />
       </BotonBarra>
       <BotonBarra
-        titulo="Cursiva"
+        titulo={t("mail.ed.italic")}
         activo={editor.isActive("italic")}
         onClick={() => editor.chain().focus().toggleItalic().run()}
       >
         <Italic className="h-4 w-4" />
       </BotonBarra>
       <BotonBarra
-        titulo="Subrayado"
+        titulo={t("mail.ed.underline")}
         activo={editor.isActive("underline")}
         onClick={() => editor.chain().focus().toggleUnderline().run()}
       >
         <UnderlineIcon className="h-4 w-4" />
       </BotonBarra>
       <BotonBarra
-        titulo="Tachado"
+        titulo={t("mail.ed.strike")}
         activo={editor.isActive("strike")}
         onClick={() => editor.chain().focus().toggleStrike().run()}
       >
@@ -426,7 +431,8 @@ function BarraFormato({ editor }: { editor: Editor }) {
         <PopoverTrigger asChild>
           <button
             type="button"
-            title="Color de texto"
+            title={t("mail.ed.textColor")}
+            aria-label={t("mail.ed.textColor")}
             onMouseDown={(e) => e.preventDefault()}
             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
@@ -456,7 +462,7 @@ function BarraFormato({ editor }: { editor: Editor }) {
               onClick={() => editor.chain().focus().unsetColor().run()}
               className="mt-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted"
             >
-              Color automático
+              {t("mail.ed.autoColor")}
             </button>
           </div>
         </PopoverContent>
@@ -465,21 +471,21 @@ function BarraFormato({ editor }: { editor: Editor }) {
       <Separador />
 
       <BotonBarra
-        titulo="Lista con viñetas"
+        titulo={t("mail.ed.bulletList")}
         activo={editor.isActive("bulletList")}
         onClick={() => editor.chain().focus().toggleBulletList().run()}
       >
         <List className="h-4 w-4" />
       </BotonBarra>
       <BotonBarra
-        titulo="Lista numerada"
+        titulo={t("mail.ed.numberedList")}
         activo={editor.isActive("orderedList")}
         onClick={() => editor.chain().focus().toggleOrderedList().run()}
       >
         <ListOrdered className="h-4 w-4" />
       </BotonBarra>
       <BotonBarra
-        titulo="Cita"
+        titulo={t("mail.ed.quote")}
         activo={editor.isActive("blockquote")}
         onClick={() => editor.chain().focus().toggleBlockquote().run()}
       >
@@ -493,7 +499,8 @@ function BarraFormato({ editor }: { editor: Editor }) {
         <PopoverTrigger asChild>
           <button
             type="button"
-            title="Insertar link"
+            title={t("mail.ed.insertLink")}
+            aria-label={t("mail.ed.insertLink")}
             onMouseDown={(e) => e.preventDefault()}
             className={cn(
               "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
@@ -514,7 +521,7 @@ function BarraFormato({ editor }: { editor: Editor }) {
               autoFocus
             />
             <Button size="sm" className="h-8" onClick={aplicarLink}>
-              Aplicar
+              {t("mail.ed.apply")}
             </Button>
           </div>
           {editor.isActive("link") && (
@@ -526,7 +533,7 @@ function BarraFormato({ editor }: { editor: Editor }) {
               }}
               className="mt-2 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted"
             >
-              Quitar link de la selección
+              {t("mail.ed.removeLink")}
             </button>
           )}
         </PopoverContent>
@@ -537,7 +544,8 @@ function BarraFormato({ editor }: { editor: Editor }) {
         <PopoverTrigger asChild>
           <button
             type="button"
-            title="Emoji"
+            title={t("mail.ed.emoji")}
+            aria-label={t("mail.ed.emoji")}
             onMouseDown={(e) => e.preventDefault()}
             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
@@ -557,7 +565,7 @@ function BarraFormato({ editor }: { editor: Editor }) {
             {EMOJIS.map((seccion) => (
               <div key={seccion.grupo}>
                 <p className="px-1 pb-1 pt-2 text-xs font-semibold text-muted-foreground first:pt-0">
-                  {seccion.grupo}
+                  {t(seccion.grupo)}
                 </p>
                 <div className="grid grid-cols-8">
                   {seccion.lista.map((e) => (
@@ -581,7 +589,7 @@ function BarraFormato({ editor }: { editor: Editor }) {
       <Separador />
 
       <BotonBarra
-        titulo="Limpiar formato"
+        titulo={t("mail.ed.clearFormat")}
         onClick={() => editor.chain().focus().clearNodes().unsetAllMarks().run()}
       >
         <RemoveFormatting className="h-4 w-4" />
@@ -593,6 +601,7 @@ function BarraFormato({ editor }: { editor: Editor }) {
 /* ── El compositor ──────────────────────────────────────────────────────── */
 
 export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: firmaHtml }: Props) {
+  const { t } = useLanguage();
   // Firma del contexto (nuevo vs. responder a tal hilo) y borrador guardado
   // para ese contexto. Se lee UNA vez al montar: el compositor se monta de
   // cero en cada apertura, así que no hace falta re-leer.
@@ -638,7 +647,7 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
     const yaHay = adjuntos.reduce((n, a) => n + a.sizeBytes, 0);
     const total = yaHay + elegidos.reduce((n, f) => n + f.size, 0);
     if (total > TOPE_ADJUNTOS) {
-      toast.error("Los adjuntos superan el límite de 20 MB.");
+      toast.error(t("mail.comp.tooBig"));
       return;
     }
     try {
@@ -652,7 +661,7 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
       );
       setAdjuntos((prev) => [...prev, ...nuevos]);
     } catch {
-      toast.error("No se pudo leer alguno de los archivos.");
+      toast.error(t("mail.comp.readSomeError"));
     }
   };
 
@@ -689,7 +698,7 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
         // correo lo mismo que una adjuntada, y dejarla fuera del conteo sería
         // una puerta para pasarse del límite sin darse cuenta.
         if (acumulado + f.size > TOPE_ADJUNTOS) {
-          toast.error("Con esa imagen el correo pasa los 20 MB.");
+          toast.error(t("mail.comp.imageTooBig"));
           break;
         }
         acumulado += f.size;
@@ -697,7 +706,7 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
           const dataUrl = await leerDataUrl(f);
           editorRef.current?.chain().focus().setImage({ src: dataUrl }).run();
         } catch {
-          toast.error(`No se pudo leer ${f.name || "la imagen"}.`);
+          toast.error(t("mail.comp.readImageError", { name: f.name || t("mail.comp.theImage") }));
         }
       }
     })();
@@ -706,6 +715,8 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
 
   // La cita del correo original entra AL editor como blockquote editable:
   // igual que Gmail, se puede recortar o borrar antes de mandar.
+  // ⚠️ Su encabezado («El … escribió:», «Mensaje reenviado», De/Fecha/Asunto)
+  // queda en español a propósito: viaja DENTRO del correo que lee otra persona.
   const contenidoInicial = useMemo(() => {
     const f = firmaHtml ?? "";
     if (!inicial?.citar) {
@@ -746,7 +757,7 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
       TextStyle,
       Color,
       FontSize,
-      Placeholder.configure({ placeholder: "Escribe tu mensaje…" }),
+      Placeholder.configure({ placeholder: t("mail.comp.bodyPlaceholder") }),
       // `allowBase64`: al pegar, la imagen entra como `data:` y recién al
       // ENVIAR se convierte en una parte MIME con `cid:`. Sin esto el editor
       // descarta el src y la imagen pegada desaparece sin decir nada.
@@ -806,9 +817,9 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
   const ocultas = partirDirecciones(bcc);
   const malos = (lista: string[]) => lista.filter((d) => !ES_CORREO.test(d));
   const avisos = [
-    tocado.to && malos(destinatarios).length ? `Para: ${malos(destinatarios).join(", ")}` : null,
-    tocado.cc && malos(copias).length ? `Cc: ${malos(copias).join(", ")}` : null,
-    tocado.bcc && malos(ocultas).length ? `Cco: ${malos(ocultas).join(", ")}` : null,
+    tocado.to && malos(destinatarios).length ? `${t("mail.to")}: ${malos(destinatarios).join(", ")}` : null,
+    tocado.cc && malos(copias).length ? `${t("mail.comp.cc")}: ${malos(copias).join(", ")}` : null,
+    tocado.bcc && malos(ocultas).length ? `${t("mail.bcc")}: ${malos(ocultas).join(", ")}` : null,
   ].filter(Boolean) as string[];
   // `puedeEnviar` SÍ mira todo en vivo: el botón no se habilita con basura
   // aunque el aviso todavía no se muestre.
@@ -939,7 +950,7 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
       borrarBorrador(remitente, firma);
       // Si venía de un borrador del servidor, se saca también de la carpeta.
       if (serverUid) borrarServidor.mutate({ uid: serverUid });
-      toast.success("Correo enviado");
+      toast.success(t("mail.comp.sent"));
       onCerrar();
     } catch (e) {
       toast.error((e as Error).message);
@@ -984,13 +995,13 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
           uid: serverUid,
         },
         {
-          onSuccess: () => toast.success("Borrador guardado"),
+          onSuccess: () => toast.success(t("mail.comp.draftSaved")),
           onError: (e) =>
-            toast.error(`Guardado en este equipo (no en el servidor): ${(e as Error).message}`),
+            toast.error(t("mail.comp.draftLocalOnly", { error: (e as Error).message })),
         },
       );
     } else {
-      toast.success("Borrador guardado");
+      toast.success(t("mail.comp.draftSaved"));
     }
     onCerrar();
   };
@@ -1021,22 +1032,22 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
       <DialogContent className="flex max-h-[92dvh] w-[min(96vw,52rem)] max-w-3xl flex-col gap-0 overflow-hidden p-0">
         <DialogHeader className="border-b border-border/60 px-5 py-3">
           <DialogTitle className="text-base">
-            {inicial?.inReplyTo ? "Responder" : "Nuevo correo"}
+            {inicial?.inReplyTo ? t("common.reply") : t("mail.comp.newEmail")}
           </DialogTitle>
-          <p className="text-xs text-muted-foreground">Desde {remitente}</p>
+          <p className="text-xs text-muted-foreground">{t("mail.comp.fromAddress", { email: remitente })}</p>
         </DialogHeader>
 
         {avisoRecuperado && (
           <div className="flex items-center justify-between gap-2 border-b border-border/40 bg-primary/5 px-5 py-2 text-xs">
             <span className="text-muted-foreground">
-              Retomaste un borrador que habías empezado.
+              {t("mail.comp.resumedDraft")}
             </span>
             <button
               type="button"
               onClick={empezarDeCero}
               className="shrink-0 font-medium text-primary hover:underline"
             >
-              Empezar de cero
+              {t("mail.comp.startOver")}
             </button>
           </div>
         )}
@@ -1048,25 +1059,25 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
               una línea de Gmail, así que el foco tiene que verse en la fila. */}
           <div className="mail-composer-row flex items-start gap-2 border-b border-border/40 px-5 focus-within:bg-muted/30">
             <label htmlFor="mail-to" className="w-12 shrink-0 pt-2.5 text-sm text-muted-foreground">
-              Para
+              {t("mail.to")}
             </label>
             <RecipientsField
               id="mail-to"
               value={to}
               onChange={setTo}
-              onBlur={() => setTocado((t) => ({ ...t, to: true }))}
-              placeholder="nombre@empresa.com"
+              onBlur={() => setTocado((prev) => ({ ...prev, to: true }))}
+              placeholder={t("mail.comp.toPlaceholder")}
               sugerencias={sugerencias}
             />
             <div className="flex shrink-0 gap-2 pt-2.5 text-sm text-muted-foreground">
               {!verCc && (
                 <button type="button" className="hover:text-foreground hover:underline" onClick={() => setVerCc(true)}>
-                  Cc
+                  {t("mail.comp.cc")}
                 </button>
               )}
               {!verBcc && (
                 <button type="button" className="hover:text-foreground hover:underline" onClick={() => setVerBcc(true)}>
-                  Cco
+                  {t("mail.bcc")}
                 </button>
               )}
             </div>
@@ -1075,19 +1086,19 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
           {verCc && (
             <div className="mail-composer-row flex items-start gap-2 border-b border-border/40 px-5 focus-within:bg-muted/30">
               <label htmlFor="mail-cc" className="w-12 shrink-0 pt-2.5 text-sm text-muted-foreground">
-                Cc
+                {t("mail.comp.cc")}
               </label>
               <RecipientsField
                 id="mail-cc"
                 value={cc}
                 onChange={setCc}
-                onBlur={() => setTocado((t) => ({ ...t, cc: true }))}
+                onBlur={() => setTocado((prev) => ({ ...prev, cc: true }))}
                 sugerencias={sugerencias}
               />
               <button
                 type="button"
-                title="Quitar Cc"
-                aria-label="Quitar Cc"
+                title={t("mail.comp.removeCc")}
+                aria-label={t("mail.comp.removeCc")}
                 onClick={() => { setCc(""); setVerCc(false); }}
                 className="shrink-0 pt-2.5 text-muted-foreground hover:text-foreground"
               >
@@ -1099,21 +1110,21 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
           {verBcc && (
             <div className="mail-composer-row flex items-start gap-2 border-b border-border/40 px-5 focus-within:bg-muted/30">
               <label htmlFor="mail-bcc" className="w-12 shrink-0 pt-2.5 text-sm text-muted-foreground">
-                Cco
+                {t("mail.bcc")}
               </label>
               <RecipientsField
                 id="mail-bcc"
                 value={bcc}
                 onChange={setBcc}
-                onBlur={() => setTocado((t) => ({ ...t, bcc: true }))}
+                onBlur={() => setTocado((prev) => ({ ...prev, bcc: true }))}
                 sugerencias={sugerencias}
               />
               {/* Plegar limpia el valor: una copia oculta olvidada en una fila
                   que ya no se ve es justo el accidente a evitar. */}
               <button
                 type="button"
-                title="Quitar Cco"
-                aria-label="Quitar Cco"
+                title={t("mail.comp.removeBcc")}
+                aria-label={t("mail.comp.removeBcc")}
                 onClick={() => { setBcc(""); setVerBcc(false); }}
                 className="shrink-0 text-muted-foreground hover:text-foreground"
               >
@@ -1124,13 +1135,13 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
 
           <div className="mail-composer-row flex items-center gap-2 border-b border-border/40 px-5 focus-within:bg-muted/30">
             <label htmlFor="mail-subject" className="sr-only">
-              Asunto
+              {t("mail.comp.subject")}
             </label>
             <input
               id="mail-subject"
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
-              placeholder="Asunto"
+              placeholder={t("mail.comp.subject")}
               className="h-10 min-w-0 flex-1 bg-transparent text-sm font-medium outline-none placeholder:font-normal placeholder:text-muted-foreground/60"
             />
           </div>
@@ -1140,7 +1151,7 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
               role="alert"
               className="border-b border-border/40 bg-destructive/5 px-5 py-1.5 text-xs text-destructive"
             >
-              No parecen direcciones válidas — {avisos.join(" · ")}
+              {t("mail.comp.invalidAddresses", { list: avisos.join(" · ") })}
             </p>
           )}
 
@@ -1186,8 +1197,8 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
                 llega", que es justo el error que uno no ve al escribirlo. */}
             <span>
               {mencionados.length === 1
-                ? `Se sumó ${mencionados[0].nombre} a este correo: lo recibe y le llega un aviso en Maven.`
-                : `Se sumaron ${mencionados.length} personas a este correo: lo reciben y les llega un aviso en Maven.`}
+                ? t("mail.comp.mentionOne", { name: mencionados[0].nombre })
+                : t("mail.comp.mentionMany", { n: mencionados.length })}
             </span>
           </div>
         )}
@@ -1206,8 +1217,8 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
                 </span>
                 <button
                   type="button"
-                  title="Quitar adjunto"
-                  aria-label={`Quitar ${a.filename}`}
+                  title={t("mail.comp.removeAttachment")}
+                  aria-label={t("mail.comp.removeNamed", { name: a.filename })}
                   onClick={() => setAdjuntos((prev) => prev.filter((_, j) => j !== i))}
                   className="shrink-0 text-muted-foreground hover:text-destructive"
                 >
@@ -1229,10 +1240,10 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
               disabled={!puedeEnviar}
               title={
                 destinatarios.length === 0
-                  ? "Falta el destinatario"
+                  ? t("mail.comp.missingRecipient")
                   : invalidos.length > 0
-                    ? "Hay direcciones inválidas"
-                    : "Enviar"
+                    ? t("mail.comp.hasInvalid")
+                    : t("common.send")
               }
               className="shrink-0 rounded-full bg-gradient-to-r from-accent to-primary px-5 text-white transition-opacity hover:opacity-90"
             >
@@ -1241,7 +1252,7 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
               ) : (
                 <Send className="mr-2 h-4 w-4" />
               )}
-              Enviar
+              {t("common.send")}
             </Button>
 
             <input
@@ -1257,8 +1268,8 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
             />
             <button
               type="button"
-              title="Adjuntar archivo"
-              aria-label="Adjuntar archivo"
+              title={t("mail.comp.attach")}
+              aria-label={t("mail.comp.attach")}
               onClick={() => inputArchivo.current?.click()}
               disabled={enviar.isPending}
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
@@ -1268,7 +1279,8 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
 
             <button
               type="button"
-              title="Descartar"
+              title={t("mail.comp.discard")}
+              aria-label={t("mail.comp.discard")}
               onClick={cerrarConCuidado}
               disabled={enviar.isPending}
               className="ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-destructive sm:order-last"
@@ -1284,14 +1296,13 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
       <AlertDialog open={confirmarDescarte} onOpenChange={setConfirmarDescarte}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Guardar este borrador?</AlertDialogTitle>
+            <AlertDialogTitle>{t("mail.comp.saveDraftTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Puedes guardarlo y seguir después, o descartarlo. El borrador
-              queda guardado en este navegador.
+              {t("mail.comp.saveDraftDesc")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Seguir editando</AlertDialogCancel>
+            <AlertDialogCancel>{t("mail.comp.keepEditing")}</AlertDialogCancel>
             {/* No es AlertDialogAction/Cancel: `descartar` ya cierra el
                 diálogo y desmonta el compositor. */}
             <Button
@@ -1299,10 +1310,11 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
               onClick={descartar}
               className="text-destructive hover:bg-destructive/10 hover:text-destructive"
             >
-              Descartar
+              {t("mail.comp.discard")}
             </Button>
             <AlertDialogAction onClick={guardarYCerrar}>
-              Guardar borrador
+              {t("mail.comp.saveDraft")}
+
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -11,6 +11,7 @@ import { useMeetRooms, MeetRoom } from "@/hooks/useMeetRooms";
 import { usePermissions } from "@/hooks/usePermissions";
 import { isCompleteRoomCode } from "@/lib/coworkRoomCode";
 import { parseJoinInput } from "@/lib/meetJoinInput";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // El link que se COMPARTE es /entrar/<código>, no /call/<sala>: esa página manda
 // a la llamada a quien tiene cuenta en Maven y le pide entrada a quien no la
@@ -37,6 +38,7 @@ export default function MeetPage() {
     myRooms, setMyRooms, loading,
     createRoom, joinByCode, resolveByLivekitRoom, renameRoom, setPinned, reorder, endRoom,
   } = useMeetRooms();
+  const { t } = useLanguage();
   const [renameTarget, setRenameTarget] = useState<MeetRoom | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [renaming, setRenaming] = useState(false);
@@ -58,11 +60,11 @@ export default function MeetPage() {
       await navigator.clipboard
         .writeText(shareLink(room))
         .catch(() => { /* sin permiso de portapapeles: el link igual está en la lista */ });
-      toast.success(`Reunión creada · código ${room.code}`, {
-        description: "Link copiado. Compártelo con quien quieras que entre.",
+      toast.success(t("meet.created", { code: room.code }), {
+        description: t("meet.createdDesc"),
       });
     } catch (e: any) {
-      toast.error(e.message || "No se pudo crear la reunión");
+      toast.error(e.message || t("meet.createError"));
     } finally {
       setCreating(false);
     }
@@ -79,7 +81,7 @@ export default function MeetPage() {
       setJoinInput("");
       openCall(room);
     } catch (e: any) {
-      toast.error(e.message || "No se pudo entrar a la reunión");
+      toast.error(e.message || t("meet.joinError"));
     } finally {
       setJoining(false);
     }
@@ -87,12 +89,12 @@ export default function MeetPage() {
 
   const copyLink = (room: MeetRoom) => {
     navigator.clipboard.writeText(shareLink(room));
-    toast.success("Link copiado — sirve con o sin cuenta en Maven");
+    toast.success(t("meet.linkCopied"));
   };
 
   const copyCode = (room: MeetRoom) => {
     navigator.clipboard.writeText(room.code);
-    toast.success(`Código copiado: ${room.code}`);
+    toast.success(t("meet.codeCopied", { code: room.code }));
   };
 
   const doRename = async () => {
@@ -101,9 +103,9 @@ export default function MeetPage() {
     try {
       await renameRoom(renameTarget.id, renameValue.trim());
       setRenameTarget(null);
-      toast.success("Nombre actualizado");
+      toast.success(t("meet.renamed"));
     } catch (e: any) {
-      toast.error(e.message || "No se pudo cambiar el nombre");
+      toast.error(e.message || t("meet.renameError"));
     } finally {
       setRenaming(false);
     }
@@ -113,7 +115,7 @@ export default function MeetPage() {
     try {
       await setPinned(room.id, !room.pinned);
     } catch (e: any) {
-      toast.error(e.message || "No se pudo fijar la reunión");
+      toast.error(e.message || t("meet.pinError"));
     }
   };
 
@@ -128,17 +130,17 @@ export default function MeetPage() {
     try {
       await reorder(next.map((r) => r.id));
     } catch {
-      toast.error("No se pudo guardar el orden");
+      toast.error(t("meet.orderError"));
     }
   };
 
   const handleEnd = async (room: MeetRoom) => {
-    if (!window.confirm(`¿Terminar "${room.name}"? El link y el código dejan de funcionar.`)) return;
+    if (!window.confirm(t("meet.endConfirm", { name: room.name }))) return;
     try {
       await endRoom(room.id);
-      toast.success("Reunión terminada");
+      toast.success(t("meet.ended"));
     } catch (e: any) {
-      toast.error(e.message || "No se pudo terminar la reunión");
+      toast.error(e.message || t("meet.endError"));
     }
   };
 
@@ -164,8 +166,8 @@ export default function MeetPage() {
             <h1 className="text-xl font-bold tracking-tight text-foreground md:text-2xl">Meet</h1>
             <p className="mt-0.5 text-sm text-muted-foreground">
               {myRooms.length > 0
-                ? "Vuelve a una de tus reuniones abiertas o crea una nueva."
-                : "Crea una reunión, comparte el link o el código, y quien lo tenga entra."}
+                ? t("meet.subtitleBack")
+                : t("meet.subtitleNew")}
             </p>
           </div>
           {canCreate && (
@@ -176,24 +178,24 @@ export default function MeetPage() {
               className="w-full gap-2 rounded-full px-7 shadow-md md:w-auto"
             >
               {creating ? <Loader2 className="h-5 w-5 animate-spin" /> : <Plus className="h-5 w-5" />}
-              Nueva reunión
+              {t("meet.new")}
             </Button>
           )}
         </div>
 
         <div className="mt-5 flex flex-col items-center gap-2 border-t border-border/40 pt-4 md:flex-row md:justify-between">
-          <span className="text-xs text-muted-foreground">Entrar con un link o un código</span>
+          <span className="text-xs text-muted-foreground">{t("meet.joinWith")}</span>
           <div className="flex w-full gap-2 md:w-auto">
             <Input
               value={joinInput}
               onChange={(e) => setJoinInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && !joinDisabled && handleJoin()}
-              placeholder="ABC234 o pega el link"
+              placeholder={t("meet.joinPlaceholder")}
               className="rounded-full md:w-64"
             />
             <Button onClick={handleJoin} disabled={joinDisabled} className="shrink-0 gap-1 rounded-full">
               {joining ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
-              Entrar
+              {t("meet.join")}
             </Button>
           </div>
         </div>
@@ -202,7 +204,7 @@ export default function MeetPage() {
       {!loading && myRooms.length > 0 && (
         <div className="w-full flex flex-col gap-2">
           <h2 className="text-xs font-semibold text-muted-foreground px-1">
-            Tus reuniones abiertas · {myRooms.length}
+            {t("meet.openRooms", { n: myRooms.length })}
           </h2>
           {/* Con muchas reuniones la lista scrollea sola en vez de estirar la
               página. Las fijadas van arriba (el orden lo pone el hook). */}
@@ -227,8 +229,8 @@ export default function MeetPage() {
                           <span
                             {...dragProvided.dragHandleProps}
                             className="text-muted-foreground/40 hover:text-muted-foreground cursor-grab active:cursor-grabbing shrink-0"
-                            title="Arrastrar para reordenar"
-                            aria-label="Reordenar"
+                            title={t("meet.dragToReorder")}
+                            aria-label={t("meet.reorder")}
                           >
                             <GripVertical className="h-4 w-4" />
                           </span>
@@ -246,8 +248,8 @@ export default function MeetPage() {
                                 <button
                                   type="button"
                                   className="text-muted-foreground/40 hover:text-primary transition-colors shrink-0"
-                                  title="Cambiar el nombre de la reunión"
-                                  aria-label="Cambiar el nombre"
+                                  title={t("meet.renameTitle")}
+                                  aria-label={t("meet.renameAria")}
                                   onClick={() => { setRenameTarget(room); setRenameValue(room.name); }}
                                 >
                                   <Pencil className="h-3 w-3" />
@@ -258,7 +260,7 @@ export default function MeetPage() {
                               type="button"
                               onClick={() => copyCode(room)}
                               className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors"
-                              title="Copiar código"
+                              title={t("meet.copyCode")}
                             >
                               <KeyRound className="h-3 w-3" />
                               <span className="font-mono tracking-[0.2em]">{room.code}</span>
@@ -271,7 +273,8 @@ export default function MeetPage() {
                             variant="ghost"
                             size="icon"
                             className={`h-8 w-8 tactil:h-10 tactil:w-10 rounded-full ${room.pinned ? "text-primary" : "text-muted-foreground hover:text-primary"}`}
-                            title={room.pinned ? "Dejar de fijar" : "Fijar arriba"}
+                            title={room.pinned ? t("meet.unpin") : t("meet.pin")}
+                            aria-label={room.pinned ? t("meet.unpin") : t("meet.pin")}
                             onClick={() => togglePin(room)}
                           >
                             {room.pinned ? <Pin className="h-4 w-4" /> : <PinOff className="h-4 w-4" />}
@@ -280,7 +283,8 @@ export default function MeetPage() {
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8 tactil:h-10 tactil:w-10 rounded-full text-muted-foreground hover:text-primary"
-                            title="Copiar link de invitación"
+                            title={t("meet.copyLink")}
+                            aria-label={t("meet.copyLink")}
                             onClick={() => copyLink(room)}
                           >
                             <Link2 className="h-4 w-4" />
@@ -292,14 +296,15 @@ export default function MeetPage() {
                               variant="ghost"
                               size="icon"
                               className="h-8 w-8 tactil:h-10 tactil:w-10 rounded-full text-destructive hover:text-destructive"
-                              title="Terminar reunión"
+                              title={t("meet.end")}
+                              aria-label={t("meet.end")}
                               onClick={() => handleEnd(room)}
                             >
                               <PhoneOff className="h-4 w-4" />
                             </Button>
                           )}
                           <Button size="sm" className="rounded-full gap-1 shrink-0" onClick={() => openCall(room)}>
-                            Entrar <ArrowRight className="h-4 w-4" />
+                            {t("meet.join")} <ArrowRight className="h-4 w-4" />
                           </Button>
                           </div>
                         </div>
@@ -316,25 +321,26 @@ export default function MeetPage() {
 
       <Dialog open={!!renameTarget} onOpenChange={(v) => { if (!v) setRenameTarget(null); }}>
         <DialogContent className="sm:max-w-sm">
-          <DialogHeader><DialogTitle>Nombre de la reunión</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t("meet.nameTitle")}</DialogTitle></DialogHeader>
           <div className="space-y-2 py-1">
-            <Label htmlFor="meet-room-name">Cómo se llama esta reunión</Label>
+            <Label htmlFor="meet-room-name">{t("meet.nameLabel")}</Label>
             <Input
               id="meet-room-name"
               value={renameValue}
               onChange={(e) => setRenameValue(e.target.value.slice(0, 80))}
               onKeyDown={(e) => { if (e.key === "Enter" && renameValue.trim()) void doRename(); }}
-              placeholder="Ej: Oficina"
+              placeholder={t("meet.namePlaceholder")}
               autoFocus
             />
             <p className="text-[11px] text-muted-foreground">
-              Lo ven todos los que tengan la reunión en su lista.
+              {t("meet.nameHint")}
             </p>
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setRenameTarget(null)}>Cancelar</Button>
+            <Button variant="ghost" onClick={() => setRenameTarget(null)}>{t("common.cancel")}</Button>
             <Button onClick={() => void doRename()} disabled={!renameValue.trim() || renaming}>
-              {renaming ? "Guardando..." : "Guardar"}
+              {renaming ? t("meet.saving") : t("common.save")}
+
             </Button>
           </DialogFooter>
         </DialogContent>
