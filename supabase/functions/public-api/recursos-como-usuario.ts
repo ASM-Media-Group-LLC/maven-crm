@@ -58,6 +58,7 @@ import {
   type ObjetoJson,
   type ProblemaDeCuerpo,
   scopesDeLaRuta,
+  textoGuardable,
 } from "./escritura-formato.ts";
 import { type ClaveSinVars, type Idioma, msg } from "./mensajes.ts";
 
@@ -713,14 +714,21 @@ function leerEnvio(v: unknown): Envio | null {
   return { repetido: o.repetido, conversacion: o.conversation_id, creada: o.created === true, fila };
 }
 
-/** GET /messenger/people — a quién se le puede escribir (pide messenger:write). */
+/** GET /messenger/people — a quién se le puede escribir (pide messenger:write). Sirve
+ *  solo para escribir, así que también lo apaga el interruptor: «apagado» es todo. */
 async function personasDelDirectorio(yo: SupabaseClient, ctx: Contexto): Promise<Resultado> {
   const limit = limiteDePagina(ctx.consulta.limit, 50);
   if (limit === null) return malPedido(ctx.idioma, "limit_invalido");
   const offset = offsetDePagina(ctx.consulta.offset);
   if (offset === null) return malPedido(ctx.idioma, "offset_invalido");
+  // Un NUL (%00) Postgres no lo puede ni leer (22021): saldría como un 503 que un
+  // cliente obediente reintentaría para siempre. Es culpa del pedido: 400.
   const q = ctx.consulta.q;
-  if (q !== undefined && q.length > 100) return malPedido(ctx.idioma, "q_invalido");
+  if (q !== undefined && (q.length > 100 || !textoGuardable(q))) return malPedido(ctx.idioma, "q_invalido");
+  // El interruptor y el freno, con la sesión de la persona: con la escritura apagada
+  // (o la base bajo presión), tampoco se reparte la lista de a quién escribirle.
+  const habilitada = await llamar(yo.rpc("api_escritura_habilitada", {}));
+  if (habilitada.error) return resultadoDeError(ctx.idioma, clasificarErrorDeEscritura(habilitada.error));
   const r = await llamar(yo.rpc("messenger_directorio", { _q: q ?? null, _limite: limit, _desde: offset }));
   if (r.error) return resultadoDeError(ctx.idioma, clasificarErrorDeEscritura(r.error));
   if (!Array.isArray(r.data)) return falla("messenger_directorio devolvió otra forma");

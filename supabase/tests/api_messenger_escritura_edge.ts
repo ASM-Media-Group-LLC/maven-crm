@@ -192,7 +192,7 @@ const ANON = await firmar({ role: "anon", iss: "banco" });
 const pedidosALaBase: { que: string; claims: Fila; metodo: string; args?: Fila }[] = [];
 /** Para simular fallos: antes (demora o error) o después de correr (la red se corta
  *  con la escritura YA hecha). */
-type Truco = { que: string; demoraMs?: number; error500?: boolean; cortarDespues?: boolean; antesSql?: string; veces: number };
+type Truco = { que: string; demoraMs?: number; error500?: boolean; errorPg?: string; cortarDespues?: boolean; antesSql?: string; veces: number };
 const trucos: Truco[] = [];
 const truco = (que: string) => {
   const t = trucos.find((x) => x.que === que && x.veces > 0);
@@ -250,24 +250,61 @@ async function rpc(claims: Fila, fn: string, args: Fila): Promise<Response> {
   return new Response(texto, { status: 200, headers: { "content-type": "application/json" } });
 }
 
-async function tabla(claims: Fila, metodo: string, url: URL, prefer: string): Promise<Response> {
-  const rel = url.pathname.split("/").pop()!;
-  if (!IDENT.test(rel)) return responder(400, { code: "PGRST100", message: "relación inválida" });
-  const sel = (url.searchParams.get("select") ?? "*").split(",").filter(Boolean);
-  if (!sel.every((c) => c === "*" || IDENT.test(c))) throw new Error(`el banco no sabe hacer este select: ${sel.join(",")}`);
-  const where: string[] = [];
-  const params: unknown[] = [];
-  for (const [col, v] of url.searchParams) {
-    if (["select", "order", "limit", "offset"].includes(col)) continue;
+/** Los filtros de PostgREST que usan public-api y manage-api-keys: eq, neq, gt, gte,
+ *  lt, lte, in, is.null y or=(…) de esos mismos. */
+function filtros(url: URL, params: unknown[], prefijo = ""): string[] {
+  const ops: Record<string, string> = { eq: "=", neq: "<>", gt: ">", gte: ">=", lt: "<", lte: "<=" };
+  const uno = (col: string, v: string): string => {
     if (!IDENT.test(col)) throw new Error(`el banco no sabe filtrar por ${col}`);
     const [op, ...resto] = v.split(".");
     const val = resto.join(".");
-    const ops: Record<string, string> = { eq: "=", neq: "<>", gt: ">", gte: ">=", lt: "<", lte: "<=" };
-    if (ops[op]) { params.push(val); where.push(`${col} ${ops[op]} $${params.length}`); }
-    else if (op === "in") { params.push(val.replace(/^\(|\)$/g, "").split(",").map((x) => x.replace(/^"|"$/g, ""))); where.push(`${col}::text = any($${params.length}::text[])`); }
-    else if (op === "is" && val === "null") where.push(`${col} is null`);
-    else throw new Error(`el banco no sabe el filtro ${col}=${v}`);
+    if (ops[op]) { params.push(val); return `${prefijo}${col} ${ops[op]} $${params.length}`; }
+    if (op === "in") { params.push(val.replace(/^\(|\)$/g, "").split(",").map((x) => x.replace(/^"|"$/g, ""))); return `${prefijo}${col}::text = any($${params.length}::text[])`; }
+    if (op === "is" && val === "null") return `${prefijo}${col} is null`;
+    throw new Error(`el banco no sabe el filtro ${col}=${v}`);
+  };
+  const where: string[] = [];
+  for (const [col, v] of url.searchParams) {
+    if (["select", "order", "limit", "offset", "columns"].includes(col)) continue;
+    if (col === "or") {
+      where.push("(" + v.replace(/^\(|\)$/g, "").split(",").map((p) => { const [c, ...r] = p.split("."); return uno(c, r.join(".")); }).join(" or ") + ")");
+      continue;
+    }
+    where.push(uno(col, v));
   }
+  return where;
+}
+
+async function tabla(claims: Fila, metodo: string, url: URL, accept: string, cuerpo: string | null): Promise<Response> {
+  const rel = url.pathname.split("/").pop()!;
+  if (!IDENT.test(rel)) return responder(400, { code: "PGRST100", message: "relación inválida" });
+  const sel = (url.searchParams.get("select") ?? "*").split(",").map((c) => c.trim()).filter(Boolean);
+  if (!sel.every((c) => c === "*" || IDENT.test(c))) throw new Error(`el banco no sabe hacer este select: ${sel.join(",")}`);
+  const params: unknown[] = [];
+  const unObjeto = accept.includes("vnd.pgrst.object");
+  const estado = metodo === "POST" ? 201 : 200;
+  // Las filas como las arma PostgREST (json_agg) y, con .single(), un objeto o 406.
+  const salida = async (filasSql: string, antes = "") => {
+    const texto = await ejecutar(claims, `${antes} select coalesce(json_agg(t), '[]')::text as j from (${filasSql}) t`, params);
+    if (!unObjeto) return new Response(texto, { status: estado, headers: { "content-type": "application/json" } });
+    const filas = JSON.parse(texto);
+    if (filas.length !== 1) return responder(406, { code: "PGRST116", message: "JSON object requested, multiple (or no) rows returned" });
+    return new Response(JSON.stringify(filas[0]), { status: estado, headers: { "content-type": "application/json" } });
+  };
+  if (metodo === "POST" || metodo === "PATCH") {
+    const fila = JSON.parse(cuerpo ?? "{}");
+    const cols = Object.keys(fila);
+    if (!cols.every((c) => IDENT.test(c))) throw new Error("columnas raras");
+    params.push(JSON.stringify(fila));
+    if (metodo === "POST") {
+      return await salida(`select ${sel.join(", ")} from ins`,
+        `with ins as (insert into public.${rel} (${cols.join(", ")}) select ${cols.join(", ")} from json_populate_record(null::public.${rel}, $1::json) returning *)`);
+    }
+    const where = filtros(url, params, "t.");
+    return await salida(`select ${sel.join(", ")} from upd`,
+      `with upd as (update public.${rel} t set ${cols.map((c) => `${c} = r.${c}`).join(", ")} from json_populate_record(null::public.${rel}, $1::json) r ${where.length ? "where " + where.join(" and ") : ""} returning t.*)`);
+  }
+  const where = filtros(url, params);
   const orden = (url.searchParams.get("order") ?? "").split(",").filter(Boolean).map((o) => {
     const [c, dir = "asc", nulos] = o.split(".");
     if (!IDENT.test(c)) throw new Error(`orden ${o}`);
@@ -279,18 +316,23 @@ async function tabla(claims: Fila, metodo: string, url: URL, prefer: string): Pr
     const n = JSON.parse(await ejecutar(claims, `select count(*)::text as j ${base}`, params));
     return new Response(null, { status: 200, headers: { "content-range": `*/${n}` } });
   }
-  void prefer;
-  const sql = `select coalesce(json_agg(t), '[]')::text as j from (select ${sel.join(", ")} ${base}${orden.length ? " order by " + orden.join(", ") : ""}${lim ? ` limit ${Number(lim)}` : ""}${off ? ` offset ${Number(off)}` : ""}) t`;
-  return new Response(await ejecutar(claims, sql, params), { status: 200, headers: { "content-type": "application/json" } });
+  return await salida(`select ${sel.join(", ")} ${base}${orden.length ? " order by " + orden.join(", ") : ""}${lim ? ` limit ${Number(lim)}` : ""}${off ? ` offset ${Number(off)}` : ""}`);
 }
 
 const fetchOriginal = globalThis.fetch;
 globalThis.fetch = (async (entrada: RequestInfo | URL, init?: RequestInit) => {
   const url = new URL(typeof entrada === "string" ? entrada : entrada instanceof URL ? entrada.href : entrada.url);
-  if (!url.href.startsWith(`${BASE}/rest/v1/`)) return fetchOriginal(entrada, init);
   const h = new Headers(init?.headers);
   const metodo = (init?.method ?? "GET").toUpperCase();
   const token = (h.get("authorization") ?? "").replace(/^Bearer /, "");
+  // Un GoTrue mínimo para manage-api-keys (auth.getUser): el usuario del JWT firmado.
+  if (url.href === `${BASE}/auth/v1/user`) {
+    const c = await verificar(token);
+    if (!c?.sub) return responder(401, { code: 401, msg: "invalid JWT" });
+    const u = (await q(`select id::text id, email from auth.users where id = $1`, [c.sub]))[0];
+    return responder(200, { id: u.id, aud: "authenticated", role: "authenticated", email: u.email, app_metadata: {}, user_metadata: {}, created_at: "2026-09-01T10:00:00Z" });
+  }
+  if (!url.href.startsWith(`${BASE}/rest/v1/`)) return fetchOriginal(entrada, init);
   return await enOrden(async () => {
     const claims = await verificar(token);
     if (!claims) return responder(401, { code: "PGRST301", message: "JWSError JWSInvalidSignature" });
@@ -299,11 +341,22 @@ globalThis.fetch = (async (entrada: RequestInfo | URL, init?: RequestInit) => {
     const args = esRpc ? JSON.parse(String(init?.body ?? "{}")) : undefined;
     pedidosALaBase.push({ que, claims, metodo, args });
     const t = truco(que);
-    if (t?.demoraMs) await new Promise((r) => setTimeout(r, t.demoraMs));
+    // La demora respeta la señal del que llama, como un fetch de verdad: si el edge
+    // corta por plazo (fetchSinReintentos), aquí también se corta.
+    if (t?.demoraMs) {
+      const senal = init?.signal;
+      await new Promise<void>((listo, cortado) => {
+        const reloj = setTimeout(listo, t.demoraMs);
+        senal?.addEventListener("abort", () => { clearTimeout(reloj); cortado(senal.reason ?? new DOMException("abortado", "AbortError")); }, { once: true });
+      });
+    }
     if (t?.error500) return responder(500, { code: "XX000", message: "la base no responde (simulado)" });
+    if (t?.errorPg) return responder(estadoDe(t.errorPg), { code: t.errorPg, message: "canceling statement due to statement timeout (simulado)", details: null, hint: null });
     if (t?.antesSql) await db.exec(t.antesSql);
     try {
-      const r = esRpc ? await rpc(claims, url.pathname.slice("/rest/v1/rpc/".length), args) : await tabla(claims, metodo, url, h.get("prefer") ?? "");
+      const r = esRpc
+        ? await rpc(claims, url.pathname.slice("/rest/v1/rpc/".length), args)
+        : await tabla(claims, metodo, url, h.get("accept") ?? "", init?.body ? String(init.body) : null);
       if (t?.cortarDespues) throw new TypeError("la red se cortó después de mandar (simulado)");
       return r;
     } catch (e) {
@@ -326,6 +379,11 @@ let servir: ((r: Request) => Promise<Response>) | null = null;
 await import("../functions/public-api/index.ts");
 if (!servir) throw new Error("public-api no llamó a Deno.serve");
 const handler: (r: Request) => Promise<Response> = servir;
+// Y manage-api-keys de verdad (las reglas de la key, con la sesión de un admin).
+servir = null;
+await import("../functions/manage-api-keys/index.ts");
+if (!servir) throw new Error("manage-api-keys no llamó a Deno.serve");
+const manage: (r: Request) => Promise<Response> = servir;
 
 type Pedido = { llave?: NombreDeLlave; cuerpo?: unknown; crudo?: BodyInit; idem?: string; tipo?: string; cabeceras?: Record<string, string>; idioma?: string };
 type Resp = { estado: number; json: Fila; cabeceras: Headers };
@@ -611,6 +669,100 @@ let primero = "";
   // En inglés, el mismo código y otro texto.
   const en = await pedir("POST", `/messenger/conversations/${G}/messages`, { cuerpo: { text: "x" }, idioma: "en" });
   check(en.estado === 400 && en.json.error === "idempotency_key_required" && /^Missing Idempotency-Key/.test(en.json.message), `en inglés → ${d(en)}`);
+}
+
+// ════ 9. El directorio: un q que la base no puede leer, y el interruptor ══════
+{
+  for (const q of ["%00", "ana%00x"]) {
+    const r = await pedir("GET", `/messenger/people?q=${q}`);
+    check(r.estado === 400 && r.json.error === "bad_request" && !r.cabeceras.get("Retry-After"),
+      `GET /people?q=${q}: 400 (no un 503 que se reintenta para siempre) → ${d(r)}`);
+  }
+  const p = pedidosALaBase.length;
+  await db.exec(`update public.app_flags set enabled = false where key = 'api_messenger_escritura'`);
+  const off = await pedir("GET", "/messenger/people");
+  check(off.estado === 503 && off.json.error === "writes_paused" && off.cabeceras.get("Retry-After") === "300",
+    `GET /people con el interruptor apagado: 503 writes_paused, Retry-After 300 → ${d(off)}`);
+  check(pedidosALaBase.slice(p).some((x) => x.que === "rpc:api_escritura_habilitada" && x.claims.role === "authenticated" && x.claims.mvk === LLAVES.BLU.id)
+      && !pedidosALaBase.slice(p).some((x) => x.que === "rpc:messenger_directorio"),
+    "lo decidió api_escritura_habilitada con la sesión de la persona, y la lista ni se pidió");
+  await db.exec(`update public.app_flags set enabled = true where key = 'api_messenger_escritura'`);
+  await db.exec(`update banco.presion set valor = 500 where senal = 'cola'`);
+  const presion = await pedir("GET", "/messenger/people");
+  check(presion.estado === 503 && presion.json.error === "writes_paused" && presion.cabeceras.get("Retry-After") === "60", `GET /people con el freno: 503, Retry-After 60 → ${d(presion)}`);
+  await db.exec(`update banco.presion set valor = 0 where senal = 'cola'`);
+  check((await pedir("GET", "/messenger/people")).estado === 200, "prendido y sin presión, GET /people vuelve a andar");
+}
+
+// ════ 10. La base lenta corta ANTES que el edge: 57014, que se reintenta seguro ══
+{
+  await envejecer();
+  // La base tarda 8,5 s (más que nada que el edge espere con 8 s) y responde lo que da
+  // el statement_timeout de authenticated: 57014. Con el plazo de 10 s de la sesión, el
+  // edge recibe esa respuesta (volvió atrás entera) y no un corte sin respuesta.
+  const k = idem();
+  trucos.push({ que: "rpc:api_messenger_enviar", demoraMs: 8_500, errorPg: "57014", veces: 1 });
+  const antes = await mensajesApi();
+  const lenta = await pedir("POST", `/messenger/conversations/${DM_AJ}/messages`, { cuerpo: { text: "base lenta" }, idem: k });
+  check(lenta.estado === 503 && lenta.json.error === "temporarily_unavailable" && lenta.cabeceras.get("Retry-After") === "2",
+    `la base cortó a los 8 s: 503 temporarily_unavailable, Retry-After 2 (no outcome_unknown) → ${d(lenta)}`);
+  check(await mensajesApi() === antes, "no se escribió nada");
+  const otra = await pedir("POST", `/messenger/conversations/${DM_AJ}/messages`, { cuerpo: { text: "base lenta" }, idem: k });
+  check(otra.estado === 201 && otra.json.idempotent_replay === false && await mensajesApi() === antes + 1,
+    `reintentar con la misma Idempotency-Key manda el mensaje una vez → ${d(otra)}`);
+}
+
+// ════ 11. manage-api-keys de verdad: lo oculto no se da y el nombre es de su dueño ══
+{
+  // Jhon y Alvaro, admins de Maven (manage-api-keys es solo para admins).
+  await db.exec(`delete from public.user_roles where user_id in ('${JHON}', '${ALVARO}');
+    insert into public.user_roles(user_id, role) values ('${JHON}', 'admin'), ('${ALVARO}', 'admin');`);
+  // Hasta 3 keys activas por agencia: quedan «BLU» y lugar para las de esta sección.
+  await db.exec(`update public.api_keys set revoked_at = now() where id in ('${LLAVES.BLU2.id}', '${LLAVES.WEB.id}', '${LLAVES.LEE.id}', '${LLAVES.CREA.id}')`);
+  const jwt = async (sub: string) => await firmar({ sub, role: "authenticated", aud: "authenticated", exp: Math.floor(Date.now() / 1000) + 3600 });
+  const JWT = { JHON: await jwt(JHON), ALVARO: await jwt(ALVARO) };
+  const gestionar = async (quien: keyof typeof JWT, cuerpo: Fila) => {
+    const r = await manage(new Request(`${BASE}/functions/v1/manage-api-keys`, {
+      method: "POST", headers: { Authorization: `Bearer ${JWT[quien]}`, "Content-Type": "application/json", Origin: "https://app.maven-ai.me" },
+      body: JSON.stringify({ lang: "es", ...cuerpo }),
+    }));
+    const t = await r.text();
+    let json: Fila = {};
+    try { json = t ? JSON.parse(t) : {}; } catch { json = { _t: t }; }
+    return { estado: r.status, json, cabeceras: r.headers } as Resp;
+  };
+  const llaves = async () => Number((await q(`select count(*)::int c from public.api_keys`))[0].c);
+
+  const lista = await gestionar("JHON", { action: "list" });
+  check(lista.estado === 200 && !(lista.json.scope_catalog ?? []).some((x: Fila) => x.key === "messenger:write")
+      && (lista.json.scope_catalog ?? []).some((x: Fila) => x.key === "messenger:read"),
+    `list: 200 y la pantalla sin messenger:write → ${lista.estado}`);
+  // Hoy (SCOPES_OCULTOS_EN_PANTALLA = messenger:write): el pedido armado a mano, en regla
+  // en todo lo demás, no crea nada.
+  const antes = await llaves();
+  const aMano = await gestionar("JHON", {
+    action: "create", name: "Escribe", scopes: ["messenger:read", "messenger:write"], ip_whitelist: ["5.6.7.8"], expires_in_days: 30,
+    acknowledge_messenger_reads_as: JHON, acknowledge_messenger_writes_as: JHON, display_name: "Kappa Bot",
+  });
+  check(aMano.estado === 400 && /todavía no se puede dar: messenger:write/.test(aMano.json.error ?? ""), `crear con messenger:write a mano: 400 → ${d(aMano)}`);
+  check(await llaves() === antes, "y no se creó ninguna key");
+  // La línea base: lo mismo sin write sí crea (el handler y el banco andan).
+  const lee = await gestionar("JHON", {
+    action: "create", name: "Lector", scopes: ["messenger:read"], ip_whitelist: ["5.6.7.8"], expires_in_days: 30, acknowledge_messenger_reads_as: JHON,
+  });
+  check(lee.estado === 201 && lee.json.scopes?.join(",") === "messenger:read", `crear con messenger:read: 201 → ${d(lee)}`);
+  const sumarWrite = await gestionar("JHON", { action: "update", id: lee.json.id, scopes: ["messenger:read", "messenger:write"] });
+  check(sumarWrite.estado === 400 && /todavía no se puede dar/.test(sumarWrite.json.error ?? ""), `editar sumando messenger:write: 400 → ${d(sumarWrite)}`);
+  // El nombre visible de «BLU» lo cambia solo Alvaro: un admin que no es su dueño, no.
+  const ajeno = await gestionar("JHON", { action: "update", id: LLAVES.BLU.id, display_name: "Kappa Bot" });
+  check(ajeno.estado === 403 && ajeno.json.error === "Solo la persona dueña de la key puede cambiar su nombre visible",
+    `Jhon (admin) renombra «BLU» de Alvaro: 403 → ${d(ajeno)}`);
+  const nombre = async () => (await q(`select api_display_name n from public.api_keys where id = $1`, [LLAVES.BLU.id]))[0]?.n;
+  check(await nombre() === "BLU", "y «BLU» sigue llamándose «BLU»");
+  const propio = await gestionar("ALVARO", { action: "update", id: LLAVES.BLU.id, display_name: "BLU Bot" });
+  check(propio.estado === 200 && propio.json.api_display_name === "BLU Bot" && await nombre() === "BLU Bot", `Alvaro renombra su «BLU»: 200 → ${d(propio)}`);
+  const reservado = await gestionar("ALVARO", { action: "update", id: LLAVES.BLU.id, display_name: "Soporte Maven" });
+  check(reservado.estado === 400 && /se parece al de Maven o al de un área/.test(reservado.json.error ?? ""), `un nombre reservado: el MV422 de la base, traducido → ${d(reservado)}`);
 }
 
 console.log(`\n${ok.length} ok, ${mal.length} mal`);

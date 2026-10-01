@@ -161,6 +161,7 @@ export const FUENTES_POR_RECURSO: Record<string, string[]> = {
     // La escritura (migración 20261001200000): RPC INVOKER que corren con la sesión de
     // la persona, más el directorio, que pide messenger:write.
     "messenger_directorio",
+    "api_escritura_habilitada",
     "api_messenger_enviar",
     "api_messenger_abrir_directo",
     "api_messenger_editar",

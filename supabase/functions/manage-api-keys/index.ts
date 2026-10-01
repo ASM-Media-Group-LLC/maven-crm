@@ -15,7 +15,15 @@ import {
   SCOPE_GROUPS,
 } from "./api-scopes.ts";
 import { type ClaveDeMensaje, type Idioma, idiomaDe, msg } from "./mensajes.ts";
-import { escribe, leerNombreVisible, leerReemplazo, problemaAlCrear, problemaAlEditar, traducirErrorDeLlave } from "./escritura.ts";
+import {
+  escribe,
+  leerNombreVisible,
+  leerReemplazo,
+  problemaAlCrear,
+  problemaAlEditar,
+  scopesNoDisponibles,
+  traducirErrorDeLlave,
+} from "./escritura.ts";
 import { conWebhooks, crearDatos, servirWebhook, webhooksDeLlaves } from "./webhooks.ts";
 
 // Igual que Infloww: hasta 3 keys válidas a la vez, POR AGENCIA. Antes se contaba
@@ -231,6 +239,9 @@ Deno.serve(async (req) => {
       if (scopes.length === 0) return json(req, { error: m("alMenosUnScope") }, 400);
       const bad = scopes.filter((s) => !isValidScope(s));
       if (bad.length) return json(req, { error: m("scopesInvalidos", { lista: bad.join(", ") }) }, 400);
+      // Lo que la pantalla todavía no ofrece, el servidor tampoco lo da (hasta el PR 5).
+      const ocultos = scopesNoDisponibles(scopes);
+      if (ocultos.length) return json(req, { error: m("scopeNoDisponible", { lista: ocultos.join(", ") }) }, 400);
       if (expiresAt && Number.isNaN(expiresAt.getTime())) {
         return json(req, { error: m("fechaInvalida") }, 400);
       }
@@ -329,6 +340,8 @@ Deno.serve(async (req) => {
         if (scopes.length === 0) return json(req, { error: m("alMenosUnScope") }, 400);
         const bad = scopes.filter((s) => !isValidScope(s));
         if (bad.length) return json(req, { error: m("scopesInvalidos", { lista: bad.join(", ") }) }, 400);
+        const ocultos = scopesNoDisponibles(scopes);
+        if (ocultos.length) return json(req, { error: m("scopeNoDisponible", { lista: ocultos.join(", ") }) }, 400);
         patch.scopes = scopes;
       }
       if (body?.ip_whitelist !== undefined) {

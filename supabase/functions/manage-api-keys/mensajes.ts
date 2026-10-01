@@ -103,6 +103,10 @@ const MENSAJES = {
     en: "The key being replaced must be yours and belong to this agency",
   },
   integracionInmutable: { es: "La integración de una key no cambia", en: "A key's integration can't change" },
+  scopeNoDisponible: {
+    es: "Ese permiso todavía no se puede dar: {lista}",
+    en: "That permission can't be granted yet: {lista}",
+  },
   errorAlGuardar: {
     es: "No se pudo guardar la key. Prueba de nuevo en un momento.",
     en: "Couldn't save the key. Try again in a moment.",
