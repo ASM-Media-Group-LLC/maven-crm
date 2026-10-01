@@ -375,6 +375,11 @@ Deno.test("como_usuario: los handlers nunca ven service_role", () => {
   assert(/clienteDeLlave\(\s*consumo\.actua_como\s*,\s*keyRow\.id\s+as\s+string\s*,\s*\{\s*fetch:\s*fetchSinReintentos\(/.test(PUBLIC_API),
     "la rama como_usuario no arma la sesión con clienteDeLlave(actua_como, keyRow.id, { fetch: fetchSinReintentos(…) })");
   assert(!/\bclienteComoUsuario\b/.test(PUBLIC_API), "index.ts usa clienteComoUsuario (sin mvk): la base no dejaría escribir");
+  // El plazo de la sesión de la persona, más largo que el statement_timeout de
+  // authenticated (8 s): la base corta primero, con un 57014 que se reintenta seguro.
+  const plazo = Number(PUBLIC_API.match(/const PLAZO_YO_MS = ([\d_]+);/)?.[1].replace(/_/g, ""));
+  assert(plazo > 8_000 && plazo <= 15_000, `PLAZO_YO_MS = ${plazo}: tiene que pasar de los 8 s del statement_timeout`);
+  assert(/clienteDeLlave\([^)]*fetchSinReintentos\(PLAZO_YO_MS\)/.test(PUBLIC_API), "la sesión no usa PLAZO_YO_MS");
   // El router entra por servirComoUsuario (que verifica la sesión) con el cliente de
   // la persona, y solo ese. Nada de despachar handlers sueltos.
   assert(/await\s+servirComoUsuario\(\s*recursoClave\s*,\s*yo\s*,/.test(PUBLIC_API), "el router no entra por servirComoUsuario con `yo`");
@@ -493,7 +498,7 @@ Deno.test("lo como_usuario escribe SOLO por estas RPC, una en cada handler, por 
   }
   const rpcs = [...RECURSOS_USUARIO.matchAll(/\.rpc\(\s*"([a-z_]+)"/g)].map((m) => m[1]).sort();
   const PERMITIDAS = [
-    "current_tenant_id", "get_last_messages", "messenger_unread_counts", "api_mi_llave", "messenger_directorio",
+    "current_tenant_id", "get_last_messages", "messenger_unread_counts", "api_mi_llave", "messenger_directorio", "api_escritura_habilitada",
     "api_messenger_enviar", "api_messenger_abrir_directo", "api_messenger_editar", "api_messenger_borrar",
   ];
   assertEquals([...new Set(rpcs)].filter((r) => !PERMITIDAS.includes(r)), [], "una función de base no autorizada");
@@ -511,6 +516,7 @@ Deno.test("lo como_usuario escribe SOLO por estas RPC, una en cada handler, por 
   const DUENO: Record<string, string> = {
     api_messenger_enviar: "enviar", api_messenger_abrir_directo: "abrirChat",
     api_messenger_editar: "editar", api_messenger_borrar: "borrar", messenger_directorio: "personasDelDirectorio",
+    api_escritura_habilitada: "personasDelDirectorio",
   };
   for (const [rpc, handler] of Object.entries(DUENO)) {
     const llamadas = RECURSOS_USUARIO.match(new RegExp(`\\.rpc\\(\\s*"${rpc}"`, "g")) ?? [];
@@ -529,7 +535,7 @@ Deno.test("lo como_usuario escribe SOLO por estas RPC, una en cada handler, por 
 
 Deno.test("index.ts no nombra el chat ni las RPC de escritura, y el cuerpo se lee después de la puerta y del 405", () => {
   // Todo lo que toca el chat va por servirComoUsuario, con la sesión de la persona.
-  for (const prohibido of [/"chat_/, /"api_messenger_/, /"api_idem_/, /"messenger_directorio"/, /"api_mi_llave"/]) {
+  for (const prohibido of [/"chat_/, /"api_messenger_/, /"api_idem_/, /"messenger_directorio"/, /"api_mi_llave"/, /"api_escritura_habilitada"/]) {
     assert(!prohibido.test(PUBLIC_API), `index.ts nombra ${prohibido}`);
   }
   const puerta = PUBLIC_API.indexOf("decidir(recursoClave");

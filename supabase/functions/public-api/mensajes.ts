@@ -283,7 +283,10 @@ export const MENSAJES = {
     en: "The Idempotency-Key must be 8 to 100 visible ASCII characters, with no spaces",
   },
   id_de_mensaje_invalido: { es: "El id del mensaje no es válido", en: "Invalid message id" },
-  q_invalido: { es: "q puede tener como mucho 100 caracteres", en: "q can be at most 100 characters long" },
+  q_invalido: {
+    es: "q tiene que ser un texto de hasta 100 caracteres, sin caracteres nulos",
+    en: "q must be text of at most 100 characters, with no null characters",
+  },
   texto_invalido: {
     es: "El texto tiene que tener de 1 a 4.000 caracteres, al menos uno visible, y sin caracteres de control, invisibles ni de dirección del texto (solo texto plano)",
     en: "The text must be 1 to 4,000 characters of plain text, with at least one visible character and no control, invisible or text-direction characters",

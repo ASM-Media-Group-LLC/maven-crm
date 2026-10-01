@@ -510,11 +510,32 @@ Deno.test("GET /people: limit+1 → has_more, cada persona como objeto, y los pa
   assertEquals([c.object, c.resource, c.limit, c.offset, c.has_more], ["list", "/messenger/people", 2, 4, true]);
   assertEquals(c.data, filas.slice(0, 2).map((f) => ({ object: "person", ...f })));
   assertEquals(llamadas.find((l) => l.rpc === "messenger_directorio")?.args, { _q: "ana", _limite: 2, _desde: 4 });
-  for (const consulta of [{ limit: "0" }, { offset: "-1" }, { q: "x".repeat(101) }] as Record<string, string>[]) {
+  // Primero el interruptor y el freno (con la sesión de la persona), después la lista.
+  assertEquals(llamadas.filter((l) => l.rpc).map((l) => l.rpc), ["current_tenant_id", "api_escritura_habilitada", "messenger_directorio"]);
+  // Un NUL (o un texto que Postgres no puede leer) en q es un 400, no un 503 que el
+  // cliente reintentaría para siempre; y un q de más de 100, también.
+  for (const consulta of [{ limit: "0" }, { offset: "-1" }, { q: "x".repeat(101) }, { q: "\u0000" }, { q: "ana\u0000x" }, { q: "a\ud800" }] as Record<string, string>[]) {
     const a = anotador();
     const x = await servirComoUsuario("messenger", a.cliente, escribir("GET", ["people"], null, { consulta }));
-    assert(!x.ok && x.estado === 400, JSON.stringify(consulta));
-    assert(!a.llamadas.some((l) => l.rpc === "messenger_directorio"));
+    assert(!x.ok && x.estado === 400 && "error" in x && x.error === "bad_request", JSON.stringify(consulta));
+    assert(!a.llamadas.some((l) => l.rpc === "messenger_directorio" || l.rpc === "api_escritura_habilitada"), JSON.stringify(consulta));
+  }
+  const conTilde = anotador((ll) => ll.rpc === "messenger_directorio" ? ok([]) : ok(null));
+  const t = await servirComoUsuario("messenger", conTilde.cliente, escribir("GET", ["people"], null, { consulta: { q: "Ñandú" } }));
+  assert(t.ok, "un q con tildes es un q válido");
+});
+
+Deno.test("GET /people respeta el interruptor y el freno: 503 writes_paused y la lista ni se pide", async () => {
+  for (const [motivo, espera] of [["interruptor", 300], ["varias_agencias", 300], ["presion", 60]] as const) {
+    const { cliente, llamadas } = anotador((ll) =>
+      ll.rpc === "api_escritura_habilitada"
+        ? { data: null, error: { code: "MV503", message: "api_escritura_apagada", details: JSON.stringify({ motivo }) } }
+        : ok([{ id: PERSONA, name: "x", avatar_url: null }])
+    );
+    const r = await servirComoUsuario("messenger", cliente, escribir("GET", ["people"]));
+    assert(!r.ok && r.estado === 503 && "error" in r && r.error === "writes_paused", `${motivo} → ${JSON.stringify(r)}`);
+    assertEquals((r as { reintentarEnSeg: number }).reintentarEnSeg, espera);
+    assert(!llamadas.some((l) => l.rpc === "messenger_directorio"), `${motivo}: pidió la lista igual`);
   }
 });
 

@@ -10,6 +10,7 @@ import {
   leerReemplazo,
   problemaAlCrear,
   problemaAlEditar,
+  scopesNoDisponibles,
   traducirErrorDeLlave,
 } from "./escritura.ts";
 import { isValidScope, SCOPE_CATALOG, SCOPE_CATALOG_COMPLETO, SCOPES_MESSENGER, SCOPES_OCULTOS_EN_PANTALLA } from "./api-scopes.ts";
@@ -28,6 +29,21 @@ Deno.test("catálogo: write existe para validar, pero la pantalla todavía no lo
   assertEquals(SCOPE_CATALOG.length, SCOPE_CATALOG_COMPLETO.length - 1);
   // Las dos son de Messenger: IPs exactas, vencimiento y solo en keys nuevas.
   assertEquals([...SCOPES_MESSENGER], ["messenger:read", "messenger:write"]);
+});
+
+Deno.test("lo oculto en pantalla tampoco se da por el servidor; con la lista vacía (PR 5), sí", () => {
+  // Hoy: messenger:write está oculto, así que se rechaza al crear y al editar, venga
+  // como venga el pedido (armado a mano, una página vieja…).
+  assertEquals(scopesNoDisponibles(ESCRIBE), ["messenger:write"]);
+  assertEquals(scopesNoDisponibles(["creators:read", "messenger:write", "messenger:read"]), ["messenger:write"]);
+  assertEquals(scopesNoDisponibles(LEE), []);
+  assertEquals(scopesNoDisponibles(["creators:read", "contacts:phone"]), []);
+  // El PR 5 vacía SCOPES_OCULTOS_EN_PANTALLA: entonces no se rechaza nada y valen las
+  // reglas de write (que pasan con un pedido en regla).
+  assertEquals(scopesNoDisponibles(ESCRIBE, []), []);
+  assertEquals(problemaAlCrear({ scopes: ESCRIBE, nombreVisible: "BLU", confirmaEscrituraComo: YO, quienCrea: YO }), null);
+  // Y con otra lista, lo que esa diga (la regla no está atada a messenger:write).
+  assertEquals(scopesNoDisponibles(["contacts:phone", "creators:read"], ["contacts:phone"]), ["contacts:phone"]);
 });
 
 Deno.test("alta: write exige read, nombre visible y la confirmación PROPIA", () => {
@@ -129,12 +145,28 @@ Deno.test("index.ts: alta y edición aplican las reglas, y un error de la base a
   assert(/problemaAlCrear\(\{[\s\S]*confirmaEscrituraComo:\s*body\?\.acknowledge_messenger_writes_as,\s*quienCrea:\s*callerId/.test(alta),
     "el alta no aplica problemaAlCrear con la confirmación de quien la crea");
   assert(/problemaAlEditar\(\{[\s\S]*quienEdita:\s*callerId/.test(edicion), "la edición no aplica problemaAlEditar");
+  // El dueño se compara con la persona de la key de HOY (de la base), nunca con quien
+  // pide: es la única pared para el nombre visible (la base no la puede poner, porque
+  // escribe service_role). El banco de punta a punta lo prueba con el handler de verdad.
+  assert(/problemaAlEditar\(\{[\s\S]{0,300}actuaComo:\s*hoy\.acts_as_user_id,/.test(edicion), "la edición no compara con la persona de la key (hoy.acts_as_user_id)");
   for (const [nombre, t] of [["alta", alta], ["edición", edicion]]) {
     assert(!/error:\s*\w+\.message\s*\}\s*,\s*500/.test(t), `${nombre}: devuelve el error crudo de la base con 500`);
     assert(/errorAlGuardar\(/.test(t), `${nombre}: no traduce el error de la base`);
   }
   assert(/api_display_name:\s*nombreVisible/.test(alta), "el alta no guarda el nombre visible");
   assert(/integracion_id:\s*integracionId/.test(alta), "el alta no hereda la integración de la key que reemplaza");
+});
+
+Deno.test("index.ts: lo oculto en pantalla se rechaza al crear y al editar, antes de escribir", () => {
+  const alta = tramo('if (action === "create")', 'if (action === "update")');
+  const edicion = tramo('if (action === "update")', 'if (action === "revoke")');
+  for (const [nombre, t] of [["alta", alta], ["edición", edicion]]) {
+    const i = t.search(/scopesNoDisponibles\(scopes\)/);
+    assert(i > 0, `${nombre}: no aplica scopesNoDisponibles a los scopes del pedido`);
+    assert(/if \(ocultos\.length\) return json\(req, \{ error: m\("scopeNoDisponible"/.test(t), `${nombre}: no rechaza lo oculto`);
+    const escritura = t.search(/\.(insert|update)\(/);
+    assert(escritura > i, `${nombre}: escribe antes de rechazar lo oculto`);
+  }
 });
 
 Deno.test("index.ts: la key que se reemplaza se busca en ESTA agencia, y tiene que ser de quien crea la nueva", () => {

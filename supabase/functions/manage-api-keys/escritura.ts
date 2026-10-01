@@ -16,12 +16,20 @@
 // personas de la agencia, reservado para siempre por integración) la decide la base:
 // aquí solo se mira que sea un texto.
 
-import { SCOPE_MESSENGER_ESCRITURA, SCOPE_MESSENGER_LECTURA } from "./api-scopes.ts";
+import { SCOPE_MESSENGER_ESCRITURA, SCOPE_MESSENGER_LECTURA, SCOPES_OCULTOS_EN_PANTALLA } from "./api-scopes.ts";
 import type { ClaveDeMensaje } from "./mensajes.ts";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export const escribe = (scopes: readonly string[]) => scopes.includes(SCOPE_MESSENGER_ESCRITURA);
+
+/** Los scopes del pedido que la pantalla todavía no ofrece (SCOPES_OCULTOS_EN_PANTALLA:
+ *  hoy, messenger:write). Mientras estén ocultos, el servidor tampoco los da, ni al
+ *  crear ni al editar: si no, cualquiera que arme el pedido a mano crearía una key que
+ *  escribe antes del PR 5. El PR 5 vacía la lista y esto deja de rechazar. */
+export function scopesNoDisponibles(scopes: readonly string[], ocultos: readonly string[] = SCOPES_OCULTOS_EN_PANTALLA): string[] {
+  return scopes.filter((s) => ocultos.includes(s));
+}
 const lee = (scopes: readonly string[]) => scopes.includes(SCOPE_MESSENGER_LECTURA);
 
 /** El nombre visible que manda la página: `undefined` si no vino, null si viene vacío

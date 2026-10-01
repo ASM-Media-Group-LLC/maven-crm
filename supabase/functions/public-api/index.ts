@@ -68,10 +68,12 @@ import { esMetodo, leerCuerpoDeEscritura, leerIdempotencia, METODOS, type Objeto
 
 // Los plazos de los clientes en una escritura (sin reintentos escondidos: ver
 // fetchSinReintentos). El de service_role cubre buscar la key, el cupo y el conteo de
-// agencias; el de la persona, la RPC de escritura entera (sus candados esperan como
-// mucho 500 ms cada uno).
+// agencias. El de la persona es MÁS largo que el statement_timeout de authenticated
+// (8 s): con la base lenta, la base corta primero y responde 57014 (volvió atrás
+// entera: 503 temporarily_unavailable, se reintenta seguro), en vez de cortar el edge
+// sin respuesta (503 outcome_unknown: no se sabe si se hizo).
 const PLAZO_ADMIN_MS = 3_000;
-const PLAZO_YO_MS = 8_000;
+const PLAZO_YO_MS = 10_000;
 // Si la base tardó más que esto en buscar la key y contar el cupo, una escritura no
 // se intenta (503 writes_paused): con la base lenta, mejor no sumarle carga.
 const BASE_LENTA_MS = 1_500;

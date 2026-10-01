@@ -281,7 +281,7 @@ const ANTES: Record<Clave, [Record<string, string | number> | undefined, string]
   falta_idempotencia: [undefined, "Falta la cabecera Idempotency-Key: de 8 a 100 caracteres ASCII visibles, distinta en cada mensaje"],
   idempotencia_invalida: [undefined, "La Idempotency-Key tiene que tener de 8 a 100 caracteres ASCII visibles, sin espacios"],
   id_de_mensaje_invalido: [undefined, "El id del mensaje no es válido"],
-  q_invalido: [undefined, "q puede tener como mucho 100 caracteres"],
+  q_invalido: [undefined, "q tiene que ser un texto de hasta 100 caracteres, sin caracteres nulos"],
   texto_invalido: [undefined, "El texto tiene que tener de 1 a 4.000 caracteres, al menos uno visible, y sin caracteres de control, invisibles ni de dirección del texto (solo texto plano)"],
   cita_invalida: [undefined, "reply_to_id tiene que ser un mensaje no borrado de esta conversación; con thread: true, uno que no sea a su vez una respuesta en hilo"],
   conversacion_muy_grande: [undefined, "Por API solo se escribe en conversaciones de hasta 50 personas"],
