@@ -27,6 +27,9 @@ import { PERFORMANCE_EVALUATION_STATUSES } from "@/lib/hrConstants";
 import HrPerformanceOperativo from "./HrPerformanceOperativo";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
+import { etiquetaHrV, valorGuardado } from "./etiquetasHr";
 // xlsx loaded on demand inside handleExport — keeps the export
 // dependency out of the cold-load bundle.
 
@@ -113,26 +116,29 @@ function getStatusBadgeClasses(status: string) {
 
 // ─── Score tooltip content ──────────────────────────────────────────────────
 function ScoreBreakdownTooltip({ ev }: { ev: EvalRecord }) {
+  const { t } = useLanguage();
   return (
     <div className="space-y-1 text-xs">
-      <div className="flex justify-between gap-4"><span className="text-muted-foreground">Puntualidad</span><span className="font-medium">{ev.punctuality_score?.toFixed(1) ?? "—"}</span></div>
-      <div className="flex justify-between gap-4"><span className="text-muted-foreground">Calidad</span><span className="font-medium">{ev.quality_score?.toFixed(1) ?? "—"}</span></div>
-      <div className="flex justify-between gap-4"><span className="text-muted-foreground">Equipo</span><span className="font-medium">{ev.teamwork_score?.toFixed(1) ?? "—"}</span></div>
-      <div className="flex justify-between gap-4"><span className="text-muted-foreground">Iniciativa</span><span className="font-medium">{ev.initiative_score?.toFixed(1) ?? "—"}</span></div>
+      <div className="flex justify-between gap-4"><span className="text-muted-foreground">{t("hrg.perf.punctuality")}</span><span className="font-medium">{ev.punctuality_score?.toFixed(1) ?? "—"}</span></div>
+      <div className="flex justify-between gap-4"><span className="text-muted-foreground">{t("hrg.perf.quality")}</span><span className="font-medium">{ev.quality_score?.toFixed(1) ?? "—"}</span></div>
+      <div className="flex justify-between gap-4"><span className="text-muted-foreground">{t("hrg.perf.team")}</span><span className="font-medium">{ev.teamwork_score?.toFixed(1) ?? "—"}</span></div>
+      <div className="flex justify-between gap-4"><span className="text-muted-foreground">{t("hrg.perf.initiative")}</span><span className="font-medium">{ev.initiative_score?.toFixed(1) ?? "—"}</span></div>
     </div>
   );
 }
 
-const STATUS_TAB_LIST = [
-  { value: "", label: "Todos" },
-  { value: "completed", label: "Completadas" },
-  { value: "pending", label: "Pendientes" },
-  { value: "draft", label: "Borrador" },
+const STATUS_TAB_LIST: { value: string; label: TranslationKey }[] = [
+  { value: "", label: "common.all" },
+  { value: "completed", label: "hrg.perf.completedPl" },
+  { value: "pending", label: "common.pendingPl" },
+  { value: "draft", label: "hrg.opt.perfStatus.draft" },
 ];
 
 // ─── Main ───────────────────────────────────────────────────────────────────
 export default function HRPerformance() {
   const f = useFormato();
+  const { t, language } = useLanguage();
+  const estado = (s: string) => etiquetaHrV(t, "perfStatus", s);
   const navigate = useNavigate();
   const { data: evals = [], isLoading } = usePerformanceData();
   const { data: departments = [] } = useDepartments();
@@ -166,9 +172,9 @@ export default function HRPerformance() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["performance-all"] });
-      toast({ title: "Estado actualizado" });
+      toast({ title: t("hrg.statusUpdated") });
     },
-    onError: () => toast({ title: "Error al actualizar", variant: "destructive" }),
+    onError: () => toast({ title: t("common.errorUpdating"), variant: "destructive" }),
   });
 
   // ─── Delete mutation ──────────────────────────────────────────────────
@@ -179,17 +185,19 @@ export default function HRPerformance() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["performance-all"] });
-      toast({ title: "Evaluación eliminada" });
+      toast({ title: t("hrg.perf.deleted") });
       setDeleteId(null);
     },
     onError: () => {
-      toast({ title: "Error al eliminar", variant: "destructive" });
+      toast({ title: t("common.errorDeleting"), variant: "destructive" });
       setDeleteId(null);
     },
   });
 
   // ─── Export ───────────────────────────────────────────────────────────
   async function handleExport() {
+    // El Excel sale siempre en español (columnas y estado): es un archivo que
+    // se comparte y se procesa afuera, no pantalla (ver lib/formato.ts).
     const XLSX = await import("xlsx");
     const rows = filtered.map((ev) => {
       const emp = ev.employees;
@@ -256,29 +264,29 @@ export default function HRPerformance() {
       {/* ── Header ───────────────────────────────────────────────────────── */}
       <header className="shrink-0 bg-background/30 backdrop-blur-xl border-b border-white/10 px-6 pt-6 pb-4">
         <PageHeader
-          title="Evaluaciones & Performance"
+          title={t("hrg.perf.title")}
           subtitle={
             view === "operativo"
-              ? "Resultado operativo por rol desde Hubstaff y BLU"
-              : `${evals.length} evaluaciones registradas · ${completedCount} completadas`
+              ? t("hrg.perf.subtitleOperational")
+              : t("hrg.perf.subtitleEvals", { total: evals.length, completed: completedCount })
           }
           actions={
             <div className="flex items-center gap-2">
               <div className="inline-flex items-center gap-0.5 rounded-lg border border-white/10 bg-white/5 p-0.5">
                 <Button variant={view === "operativo" ? "secondary" : "ghost"} size="sm" onClick={() => setView("operativo")}>
-                  Operativo (Hubstaff)
+                  {t("hrg.perf.operational")}
                 </Button>
                 <Button variant={view === "evaluaciones" ? "secondary" : "ghost"} size="sm" onClick={() => setView("evaluaciones")}>
-                  Evaluaciones
+                  {t("hrg.perf.evaluations")}
                 </Button>
               </div>
               {view === "evaluaciones" && (
                 <>
                   <Button variant="outline" size="sm" onClick={handleExport} disabled={filtered.length === 0}>
-                    <Download className="h-4 w-4 mr-1" />Exportar
+                    <Download className="h-4 w-4 mr-1" />{t("hrg.perf.export")}
                   </Button>
                   <Button size="sm" onClick={() => navigate("/hr/desempeno/nuevo")}>
-                    <Plus className="h-4 w-4 mr-1" />Nueva Evaluación
+                    <Plus className="h-4 w-4 mr-1" />{t("hrg.perf.new")}
                   </Button>
                 </>
               )}
@@ -288,7 +296,7 @@ export default function HRPerformance() {
         {/* Department Tabs — solo en evaluaciones manuales */}
         {view === "evaluaciones" && (
           <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1 flex-wrap mt-4">
-            <Button variant={!deptTab ? "secondary" : "ghost"} size="sm" onClick={() => setDeptTab("")}>Todos</Button>
+            <Button variant={!deptTab ? "secondary" : "ghost"} size="sm" onClick={() => setDeptTab("")}>{t("common.all")}</Button>
             {departments.map((d) => (
               <Button key={d.id} variant={deptTab === d.id ? "secondary" : "ghost"} size="sm" onClick={() => setDeptTab(d.id)}>{d.name}</Button>
             ))}
@@ -309,10 +317,10 @@ export default function HRPerformance() {
             Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
           ) : (
             <>
-              <StatChip label="Calif. Promedio" value={avgScore ? avgScore.toFixed(1) : "—"} icon={<Star className="h-3.5 w-3.5" />} color="bg-warning" hint="Score general" onClick={() => setKpiPopup("avg")} />
-              <StatChip label="Evaluaciones" value={String(evals.length)} icon={<TrendingUp className="h-3.5 w-3.5" />} color="bg-primary" hint="Total registradas" onClick={() => setKpiPopup("total")} />
-              <StatChip label="Completadas" value={String(completedCount)} icon={<CheckCircle2 className="h-3.5 w-3.5" />} color="bg-success" hint={evals.length > 0 ? `${((completedCount / evals.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("completed")} />
-              <StatChip label="Con Objetivos" value={String(withGoals)} icon={<Target className="h-3.5 w-3.5" />} color="bg-primary" hint={evals.length > 0 ? `${((withGoals / evals.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("withGoals")} />
+              <StatChip label={t("hrg.perf.kpi.avg")} value={avgScore ? avgScore.toFixed(1) : "—"} icon={<Star className="h-3.5 w-3.5" />} color="bg-warning" hint={t("hrg.perf.kpi.avgHint")} onClick={() => setKpiPopup("avg")} />
+              <StatChip label={t("hrg.perf.evaluations")} value={String(evals.length)} icon={<TrendingUp className="h-3.5 w-3.5" />} color="bg-primary" hint={t("hrg.perf.kpi.totalHint")} onClick={() => setKpiPopup("total")} />
+              <StatChip label={t("hrg.perf.completedPl")} value={String(completedCount)} icon={<CheckCircle2 className="h-3.5 w-3.5" />} color="bg-success" hint={evals.length > 0 ? t("hrg.ofTotal", { pct: ((completedCount / evals.length) * 100).toFixed(0) }) : "—"} onClick={() => setKpiPopup("completed")} />
+              <StatChip label={t("hrg.perf.kpi.withGoals")} value={String(withGoals)} icon={<Target className="h-3.5 w-3.5" />} color="bg-primary" hint={evals.length > 0 ? t("hrg.ofTotal", { pct: ((withGoals / evals.length) * 100).toFixed(0) }) : "—"} onClick={() => setKpiPopup("withGoals")} />
             </>
           )}
         </div>
@@ -320,7 +328,7 @@ export default function HRPerformance() {
         {/* Status Tabs */}
         <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1">
           {STATUS_TAB_LIST.map((s) => (
-            <Button key={s.value} variant={statusTab === s.value ? "secondary" : "ghost"} size="sm" onClick={() => setStatusTab(s.value)}>{s.label}</Button>
+            <Button key={s.value} variant={statusTab === s.value ? "secondary" : "ghost"} size="sm" onClick={() => setStatusTab(s.value)}>{t(s.label)}</Button>
           ))}
         </div>
 
@@ -328,14 +336,14 @@ export default function HRPerformance() {
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Buscar empleado..." className="pl-8" value={search} onChange={(e) => setSearch(e.target.value)} />
+            <Input placeholder={t("hrg.searchEmployee")} className="pl-8" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
 
           <Select value={statusFilter || undefined} onValueChange={(v) => setStatusFilter(v === "__all__" ? "" : v)}>
-            <SelectTrigger className="w-36"><SelectValue placeholder="Estado" /></SelectTrigger>
+            <SelectTrigger className="w-36"><SelectValue placeholder={t("common.status")} /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="__all__">Todos</SelectItem>
-              {PERFORMANCE_EVALUATION_STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+              <SelectItem value="__all__">{t("common.all")}</SelectItem>
+              {PERFORMANCE_EVALUATION_STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{estado(s.value)}</SelectItem>)}
             </SelectContent>
           </Select>
 
@@ -347,17 +355,17 @@ export default function HRPerformance() {
 
           {/* View toggle */}
           <div className="inline-flex items-center rounded-md border border-border">
-            <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8 rounded-r-none" onClick={() => setViewMode("list")}>
+            <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8 rounded-r-none" onClick={() => setViewMode("list")} aria-label={t("hrg.dir.viewTable")}>
               <ListIcon className="h-4 w-4" />
             </Button>
-            <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8 rounded-l-none" onClick={() => setViewMode("grid")}>
+            <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8 rounded-l-none" onClick={() => setViewMode("grid")} aria-label={t("hrg.dir.viewGrid")}>
               <LayoutGrid className="h-4 w-4" />
             </Button>
           </div>
 
           {hasFilters && (
             <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={clearFilters}>
-              <XIcon className="h-3.5 w-3.5 mr-1" />Limpiar filtros
+              <XIcon className="h-3.5 w-3.5 mr-1" />{t("hrg.clearFilters")}
             </Button>
           )}
         </div>
@@ -369,13 +377,13 @@ export default function HRPerformance() {
               <Table>
                 <TableHeader>
                   <TableRow className="sticky top-0 z-10 bg-card border-b">
-                    <TableHead className="text-xs font-medium text-muted-foreground">Empleado</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">Período</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">Evaluado</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">{t("hrg.employee")}</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">{t("common.period")}</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">{t("hrg.perf.evaluated")}</TableHead>
                     <TableHead className="text-xs font-medium text-muted-foreground">Rating</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">Objetivos</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">Estado</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground sticky right-0 bg-card">Acciones</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">{t("hrg.perfNew.step.goals")}</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">{t("common.status")}</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground sticky right-0 bg-card">{t("common.actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -386,7 +394,7 @@ export default function HRPerformance() {
                   ) : filtered.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={7} className="text-center text-muted-foreground py-12">
-                        {evals.length === 0 ? 'No hay evaluaciones registradas. Haz clic en "Nueva Evaluación" para empezar.' : "Sin resultados para los filtros aplicados."}
+                        {evals.length === 0 ? t("hrg.perf.emptyHint") : t("hrg.noResultsFilters")}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -419,14 +427,14 @@ export default function HRPerformance() {
                           </TableCell>
                           <TableCell>
                             {ev.goals_next_period ? (
-                              <Badge variant="outline" className="text-xs">Definidos</Badge>
+                              <Badge variant="outline" className="text-xs">{t("hrg.perf.defined")}</Badge>
                             ) : (
                               <span className="text-xs text-muted-foreground">—</span>
                             )}
                           </TableCell>
                           <TableCell>
                             <Badge variant="outline" className={cn("text-xs", getStatusBadgeClasses(ev.status))}>
-                              {PERFORMANCE_EVALUATION_STATUSES.find((s) => s.value === ev.status)?.label ?? ev.status}
+                              {estado(ev.status)}
                             </Badge>
                           </TableCell>
                           <TableCell className="sticky right-0 bg-card group-hover:bg-muted/30">
@@ -435,27 +443,27 @@ export default function HRPerformance() {
                                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-success" onClick={() => statusMutation.mutate({ id: ev.id, status: "completed" })} disabled={ev.status === "completed"}>
                                   <Check className="h-3.5 w-3.5" />
                                 </Button>
-                              </TooltipTrigger><TooltipContent side="left">Aprobar</TooltipContent></Tooltip>
+                              </TooltipTrigger><TooltipContent side="left">{t("hrg.perf.approve")}</TooltipContent></Tooltip>
                               <Tooltip><TooltipTrigger asChild>
                                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => statusMutation.mutate({ id: ev.id, status: "draft" })} disabled={ev.status === "draft"}>
                                   <XIcon className="h-3.5 w-3.5" />
                                 </Button>
-                              </TooltipTrigger><TooltipContent side="left">Rechazar</TooltipContent></Tooltip>
+                              </TooltipTrigger><TooltipContent side="left">{t("hrg.perf.reject")}</TooltipContent></Tooltip>
                               <Tooltip><TooltipTrigger asChild>
                                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setViewItem(ev)}>
                                   <Eye className="h-3.5 w-3.5" />
                                 </Button>
-                              </TooltipTrigger><TooltipContent side="left">Ver</TooltipContent></Tooltip>
+                              </TooltipTrigger><TooltipContent side="left">{t("common.view")}</TooltipContent></Tooltip>
                               <Tooltip><TooltipTrigger asChild>
                                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => navigate(`/hr/desempeno/nuevo?edit=${ev.id}`)}>
                                   <Pencil className="h-3.5 w-3.5" />
                                 </Button>
-                              </TooltipTrigger><TooltipContent side="left">Editar</TooltipContent></Tooltip>
+                              </TooltipTrigger><TooltipContent side="left">{t("common.edit")}</TooltipContent></Tooltip>
                               <Tooltip><TooltipTrigger asChild>
                                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => setDeleteId(ev.id)}>
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </Button>
-                              </TooltipTrigger><TooltipContent side="left">Eliminar</TooltipContent></Tooltip>
+                              </TooltipTrigger><TooltipContent side="left">{t("common.delete")}</TooltipContent></Tooltip>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -473,7 +481,7 @@ export default function HRPerformance() {
               Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-48 rounded-lg" />)
             ) : filtered.length === 0 ? (
               <div className="col-span-full text-center text-muted-foreground py-12">
-                {evals.length === 0 ? 'No hay evaluaciones registradas.' : "Sin resultados para los filtros aplicados."}
+                {evals.length === 0 ? t("hrg.perf.empty") : t("hrg.noResultsFilters")}
               </div>
             ) : (
               filtered.map((ev) => {
@@ -488,11 +496,11 @@ export default function HRPerformance() {
                           <UserAvatar name={fullName} src={emp?.profile_photo_url ?? undefined} size="sm" className="h-9 w-9" />
                           <div>
                             <p className="text-sm font-medium">{fullName}</p>
-                            <p className="text-xs text-muted-foreground">{ev.period ?? "Sin período"}</p>
+                            <p className="text-xs text-muted-foreground">{ev.period ?? t("hrg.perf.noPeriod")}</p>
                           </div>
                         </div>
                         <Badge variant="outline" className={cn("text-xs", getStatusBadgeClasses(ev.status))}>
-                          {PERFORMANCE_EVALUATION_STATUSES.find((s) => s.value === ev.status)?.label ?? ev.status}
+                          {estado(ev.status)}
                         </Badge>
                       </div>
                       <div className="flex items-center justify-between">
@@ -532,7 +540,7 @@ export default function HRPerformance() {
       {/* ── View Modal ────────────────────────────────────────────────────── */}
       <Dialog open={!!viewItem} onOpenChange={() => setViewItem(null)}>
         <DialogContent className="max-w-lg">
-          <DialogHeader><DialogTitle>Detalle de Evaluación</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t("hrg.perf.detailTitle")}</DialogTitle></DialogHeader>
           {viewItem && (() => {
             const emp = viewItem.employees;
             const fullName = emp ? `${emp.first_name} ${emp.last_name}` : "—";
@@ -546,22 +554,22 @@ export default function HRPerformance() {
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1"><p className="text-xs text-muted-foreground">Puntualidad</p><ScoreStars score={viewItem.punctuality_score} /></div>
-                  <div className="space-y-1"><p className="text-xs text-muted-foreground">Calidad</p><ScoreStars score={viewItem.quality_score} /></div>
-                  <div className="space-y-1"><p className="text-xs text-muted-foreground">Trabajo en Equipo</p><ScoreStars score={viewItem.teamwork_score} /></div>
-                  <div className="space-y-1"><p className="text-xs text-muted-foreground">Iniciativa</p><ScoreStars score={viewItem.initiative_score} /></div>
+                  <div className="space-y-1"><p className="text-xs text-muted-foreground">{t("hrg.perf.punctuality")}</p><ScoreStars score={viewItem.punctuality_score} /></div>
+                  <div className="space-y-1"><p className="text-xs text-muted-foreground">{t("hrg.perf.quality")}</p><ScoreStars score={viewItem.quality_score} /></div>
+                  <div className="space-y-1"><p className="text-xs text-muted-foreground">{t("hrg.perf.teamwork")}</p><ScoreStars score={viewItem.teamwork_score} /></div>
+                  <div className="space-y-1"><p className="text-xs text-muted-foreground">{t("hrg.perf.initiative")}</p><ScoreStars score={viewItem.initiative_score} /></div>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">Score General</p>
+                  <p className="text-xs text-muted-foreground">{t("hrg.perf.overallScore")}</p>
                   <div className="flex items-center gap-2">
                     <span className="text-lg font-bold">{viewItem.overall_score?.toFixed(1) ?? "—"}</span>
                     <Star className="h-5 w-5 text-amber-500 fill-amber-500" />
                   </div>
                 </div>
-                {viewItem.strengths && <div className="space-y-1"><p className="text-xs font-medium text-muted-foreground">Fortalezas</p><p className="text-sm">{viewItem.strengths}</p></div>}
-                {viewItem.areas_for_improvement && <div className="space-y-1"><p className="text-xs font-medium text-muted-foreground">Áreas de Mejora</p><p className="text-sm">{viewItem.areas_for_improvement}</p></div>}
-                {viewItem.goals_next_period && <div className="space-y-1"><p className="text-xs font-medium text-muted-foreground">Objetivos Próximo Período</p><p className="text-sm">{viewItem.goals_next_period}</p></div>}
-                {viewItem.comments && <div className="space-y-1"><p className="text-xs font-medium text-muted-foreground">Comentarios</p><p className="text-sm">{viewItem.comments}</p></div>}
+                {viewItem.strengths && <div className="space-y-1"><p className="text-xs font-medium text-muted-foreground">{t("hrg.perf.strengths")}</p><p className="text-sm">{viewItem.strengths}</p></div>}
+                {viewItem.areas_for_improvement && <div className="space-y-1"><p className="text-xs font-medium text-muted-foreground">{t("hrg.perf.improvements")}</p><p className="text-sm">{viewItem.areas_for_improvement}</p></div>}
+                {viewItem.goals_next_period && <div className="space-y-1"><p className="text-xs font-medium text-muted-foreground">{t("hrg.perf.nextGoals")}</p><p className="text-sm">{viewItem.goals_next_period}</p></div>}
+                {viewItem.comments && <div className="space-y-1"><p className="text-xs font-medium text-muted-foreground">{t("hrg.perf.comments")}</p><p className="text-sm">{viewItem.comments}</p></div>}
               </div>
             );
           })()}
@@ -572,8 +580,8 @@ export default function HRPerformance() {
       <AlertDialog open={!!deleteId} onOpenChange={(open) => { if (!open) setDeleteId(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar evaluación?</AlertDialogTitle>
-            <AlertDialogDescription>Esta acción no se puede deshacer. La evaluación será eliminada permanentemente.</AlertDialogDescription>
+            <AlertDialogTitle>{t("hrg.perf.deleteTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("hrg.perf.deleteBody")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel />
@@ -581,7 +589,7 @@ export default function HRPerformance() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => { if (deleteId) deleteMutation.mutate(deleteId); }}
             >
-              Eliminar
+              {t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -590,12 +598,13 @@ export default function HRPerformance() {
       <KpiDetailDialog
         open={kpiPopup !== null}
         onOpenChange={(o) => !o && setKpiPopup(null)}
+        emptyText={t("hrg.noRecordsToShow")}
         title={(() => {
           switch (kpiPopup) {
-            case "avg": return `Calificación Promedio — ${avgScore ? avgScore.toFixed(1) : "—"}`;
-            case "total": return `Total Evaluaciones — ${evals.length}`;
-            case "completed": return `Completadas — ${completedCount}`;
-            case "withGoals": return `Con Objetivos — ${withGoals}`;
+            case "avg": return t("hrg.kpiTitle", { label: t("hrg.perf.kpi.avgFull"), value: avgScore ? avgScore.toFixed(1) : "—" });
+            case "total": return t("hrg.kpiTitle", { label: t("hrg.perf.kpi.total"), value: evals.length });
+            case "completed": return t("hrg.kpiTitle", { label: t("hrg.perf.completedPl"), value: completedCount });
+            case "withGoals": return t("hrg.kpiTitle", { label: t("hrg.perf.kpi.withGoals"), value: withGoals });
             default: return "";
           }
         })()}
@@ -605,9 +614,10 @@ export default function HRPerformance() {
           if (kpiPopup === "completed") list = evals.filter((e: any) => e.status === "completed");
           else if (kpiPopup === "withGoals") list = evals.filter((e: any) => e.goals_next_period);
           return list.slice(0, 100).map((e: any): KpiRow => ({
-            primary: e.employee_name ?? `Empleado ${e.employee_id?.slice?.(0, 8) ?? "—"}`,
+            primary: e.employee_name ?? t("hrg.employeeId", { id: e.employee_id?.slice?.(0, 8) ?? "—" }),
             secondary: e.period ?? e.review_date ? format(new Date(e.review_date), "dd MMM yyyy") : undefined,
-            right: e.overall_score ? `${e.overall_score}/5` : e.status ?? "—",
+            // En español, el estado tal cual (así estaba); en inglés, con su etiqueta.
+            right: e.overall_score ? `${e.overall_score}/5` : valorGuardado(t, language, "perfStatus", e.status) ?? "—",
             rightTone: e.status === "completed" ? "success" : "default",
           }));
         })()}

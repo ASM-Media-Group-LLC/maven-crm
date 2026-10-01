@@ -10,7 +10,9 @@ import { useToast } from "@/hooks/use-toast";
 import { HRPageHeader } from "@/components/hr/HRPageHeader";
 import { cn } from "@/lib/utils";
 import { useHrPayroll, useRoleCosts, useSaveRoleCost, type RoleCost } from "./useHrPayroll";
-import { HR_ROLE_LABEL } from "./useHrPeople";
+import { useLanguage } from "@/hooks/useLanguage";
+import { ConFormato } from "@/pages/admin/ConFormato";
+import { rolHr } from "./etiquetasHr";
 import { useFormato } from "@/hooks/useFormato";
 import type { Formato } from "@/lib/formato";
 
@@ -20,6 +22,7 @@ const cop = (n: number | null | undefined, f: Formato) => (n == null || n === 0 
 export default function HRPayroll() {
   const navigate = useNavigate();
   const f = useFormato();
+  const { t } = useLanguage();
   const { toast } = useToast();
   const { data: rows = [], isLoading } = useHrPayroll();
   const { data: roleCosts = [] } = useRoleCosts();
@@ -39,10 +42,10 @@ export default function HRPayroll() {
   const onSave = async () => {
     try {
       await save.mutateAsync(draft);
-      toast({ title: "Salarios base actualizados" });
+      toast({ title: t("hrg.pay.saved") });
       setEditing(false);
     } catch (e: any) {
-      toast({ title: "No se pudo guardar", description: e.message, variant: "destructive" });
+      toast({ title: t("common.couldNotSave"), description: e.message, variant: "destructive" });
     }
   };
 
@@ -50,12 +53,12 @@ export default function HRPayroll() {
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <div className="shrink-0 px-6 pt-6">
         <HRPageHeader
-          title="Nómina y costo"
-          subtitle="Costo por persona vs ingreso atribuido (Hubstaff + BLU). Chatters usan el costo modelado (base + comisión)."
+          title={t("hrg.pay.title")}
+          subtitle={t("hrg.pay.subtitle")}
           icon={Wallet}
           actions={
             <Button variant="outline" size="sm" onClick={() => setEditing((v) => !v)} className="gap-1.5">
-              <Settings2 className="h-4 w-4" /> Salarios base por rol
+              <Settings2 className="h-4 w-4" /> {t("hrg.pay.baseByRole")}
             </Button>
           }
         />
@@ -68,10 +71,10 @@ export default function HRPayroll() {
             Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
           ) : (
             <>
-              <Kpi label="Costo mensual" value={usd(totals.cost, f)} icon={DollarSign} color="bg-blue-500" hint="Suma de costos del equipo" />
-              <Kpi label="Ingreso atribuido" value={usd(totals.rev, f)} icon={TrendingUp} color="bg-violet-500" hint="Tajada agencia (chatters/BLU)" />
-              <Kpi label="Margen" value={usd(totals.margin, f)} icon={Wallet} color={totals.margin >= 0 ? "bg-success" : "bg-destructive"} hint="Ingreso − costo (chatters)" tone={totals.margin >= 0 ? "ok" : "bad"} />
-              <Kpi label="Personas" value={String(totals.people)} icon={Users} color="bg-slate-500" hint="En el roster" />
+              <Kpi label={t("hrg.pay.kpi.cost")} value={usd(totals.cost, f)} icon={DollarSign} color="bg-blue-500" hint={t("hrg.pay.kpi.costHint")} />
+              <Kpi label={t("hrg.pay.kpi.revenue")} value={usd(totals.rev, f)} icon={TrendingUp} color="bg-violet-500" hint={t("hrg.pay.kpi.revenueHint")} />
+              <Kpi label={t("hrg.pay.kpi.margin")} value={usd(totals.margin, f)} icon={Wallet} color={totals.margin >= 0 ? "bg-success" : "bg-destructive"} hint={t("hrg.pay.kpi.marginHint")} tone={totals.margin >= 0 ? "ok" : "bad"} />
+              <Kpi label={t("hrg.pay.kpi.people")} value={String(totals.people)} icon={Users} color="bg-slate-500" hint={t("hrg.pay.kpi.peopleHint")} />
             </>
           )}
         </div>
@@ -81,18 +84,17 @@ export default function HRPayroll() {
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-sm font-medium">
-                <Settings2 className="h-4 w-4 text-muted-foreground" /> Salario base mensual por rol (COP)
+                <Settings2 className="h-4 w-4 text-muted-foreground" /> {t("hrg.pay.editorTitle")}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <p className="text-xs text-muted-foreground">
-                Define el salario base por rol. <strong>Chatters</strong> usan el costo modelado (base + comisión) de Hubstaff/BLU,
-                así que su base aquí es referencial. El costo de los demás roles = base ÷ tasa de cambio.
+                <ConFormato texto={t("hrg.pay.editorHelp")} />
               </p>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {draft.map((rc, i) => (
                   <div key={rc.role} className="flex items-center gap-2 rounded-lg border border-border bg-card/40 p-2">
-                    <span className="w-28 shrink-0 text-sm">{HR_ROLE_LABEL[rc.role] ?? rc.role}</span>
+                    <span className="w-28 shrink-0 text-sm">{rolHr(t, rc.role)}</span>
                     <Input
                       type="number"
                       value={rc.base_salary_cop || ""}
@@ -104,9 +106,9 @@ export default function HRPayroll() {
                 ))}
               </div>
               <div className="flex justify-end gap-2">
-                <Button variant="ghost" size="sm" onClick={() => { setDraft(roleCosts.map((r) => ({ ...r }))); setEditing(false); }}>Cancelar</Button>
+                <Button variant="ghost" size="sm" onClick={() => { setDraft(roleCosts.map((r) => ({ ...r }))); setEditing(false); }}>{t("common.cancel")}</Button>
                 <Button size="sm" onClick={onSave} disabled={save.isPending}>
-                  {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Guardar"}
+                  {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : t("common.save")}
                 </Button>
               </div>
             </CardContent>
@@ -120,28 +122,28 @@ export default function HRPayroll() {
               <table className="tabla-movil w-full min-w-[720px] text-sm">
                 <thead>
                   <tr className="border-b border-border text-xs text-muted-foreground">
-                    <th className="px-4 py-3 text-left font-semibold">Persona</th>
-                    <th className="px-3 py-3 text-left font-semibold">Rol</th>
-                    <th className="px-3 py-3 text-right font-semibold">Base (COP)</th>
-                    <th className="px-3 py-3 text-right font-semibold">Costo (USD)</th>
-                    <th className="px-3 py-3 text-right font-semibold">Ingreso ag.</th>
-                    <th className="px-3 py-3 text-right font-semibold">Margen</th>
+                    <th className="px-4 py-3 text-left font-semibold">{t("hrg.pay.col.person")}</th>
+                    <th className="px-3 py-3 text-left font-semibold">{t("common.role")}</th>
+                    <th className="px-3 py-3 text-right font-semibold">{t("hrg.pay.col.base")}</th>
+                    <th className="px-3 py-3 text-right font-semibold">{t("hrg.pay.col.cost")}</th>
+                    <th className="px-3 py-3 text-right font-semibold">{t("hrg.pay.col.revenue")}</th>
+                    <th className="px-3 py-3 text-right font-semibold">{t("hrg.pay.kpi.margin")}</th>
                     <th className="px-4 py-3 text-left font-semibold"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {isLoading ? (
-                    <tr><td colSpan={7} className="py-10 text-center text-muted-foreground">Cargando…</td></tr>
+                    <tr><td colSpan={7} className="py-10 text-center text-muted-foreground">{t("common.loading")}</td></tr>
                   ) : rows.map((r) => (
                     <tr key={r.profile_id} onClick={() => navigate(`/hr/persona/${r.profile_id}`)}
                       className="cursor-pointer border-b border-border/60 hover:bg-muted/40">
                       <td className="px-4 py-2.5 font-medium">{r.name}</td>
-                      <td className="px-3 py-2.5 text-muted-foreground">{HR_ROLE_LABEL[r.role] ?? r.role}</td>
+                      <td className="px-3 py-2.5 text-muted-foreground">{rolHr(t, r.role)}</td>
                       <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">{cop(r.base_salary_cop, f)}</td>
                       <td className="px-3 py-2.5 text-right tabular-nums">
                         <span className="inline-flex items-center gap-1">
                           {usd(r.cost_usd, f)}
-                          {r.cost_modelado && <Badge variant="secondary-soft" className="text-[9px]">modelado</Badge>}
+                          {r.cost_modelado && <Badge variant="secondary-soft" className="text-[9px]">{t("hrg.pay.modeled")}</Badge>}
                         </span>
                       </td>
                       <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">{r.revenue_usd != null ? usd(r.revenue_usd, f) : "—"}</td>
@@ -158,8 +160,7 @@ export default function HRPayroll() {
           </CardContent>
         </Card>
         <p className="px-1 text-[11px] text-muted-foreground">
-          El costo de <strong>chatters</strong> es modelado (base + comisión, incluye la tajada de OF y el % de agencia) y trae ingreso atribuido desde BLU → margen y ROI reales.
-          Para los demás roles, carga el salario base por rol (botón arriba) y el costo se calcula automáticamente; el ingreso atribuido directo aplica solo a chatters. Click en una fila abre la ficha.
+          <ConFormato texto={t("hrg.pay.footnote")} />
         </p>
       </div>
     </div>

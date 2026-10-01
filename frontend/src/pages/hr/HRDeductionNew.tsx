@@ -15,6 +15,9 @@ import { EmployeeSearchCombobox } from "@/components/hr/EmployeeSearchCombobox";
 import { INFRACTION_CATEGORIES } from "@/lib/hrConstants";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/ui/page-header";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
+import { etiquetaHrO } from "./etiquetasHr";
 
 interface FormState {
   employee_id: string;
@@ -34,15 +37,16 @@ const initialForm: FormState = {
   description: "",
 };
 
-const TYPE_OPTIONS = [
-  { value: "adelanto", label: "Adelanto de Nómina", icon: Wallet, desc: "Anticipo solicitado por el empleado" },
-  { value: "infraccion", label: "Infracción", icon: AlertTriangle, desc: "Descuento por violación de políticas" },
+const TYPE_OPTIONS: { value: string; icon: typeof Wallet; desc: TranslationKey }[] = [
+  { value: "adelanto", icon: Wallet, desc: "hrg.ded.advanceDesc" },
+  { value: "infraccion", icon: AlertTriangle, desc: "hrg.ded.infractionDesc" },
 ];
 
 export default function HRDeductionNew() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [form, setForm] = useState<FormState>(initialForm);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -74,10 +78,10 @@ export default function HRDeductionNew() {
       });
       if (error) throw error;
       queryClient.invalidateQueries({ queryKey: ["employee-deductions-all"] });
-      toast({ title: "Deducción registrada correctamente" });
+      toast({ title: t("hrg.ded.created") });
       navigate("/hr/deducciones");
     } catch {
-      toast({ title: "Error al registrar la deducción", variant: "destructive" });
+      toast({ title: t("hrg.ded.createError"), variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
@@ -88,28 +92,28 @@ export default function HRDeductionNew() {
       {/* Header */}
       <div className="shrink-0 border-b border-white/10 bg-background/30 backdrop-blur-xl px-6 py-4">
         <Button variant="ghost" size="sm" className="mb-2 -ml-2 text-muted-foreground hover:text-foreground" onClick={() => navigate("/hr/deducciones")}>
-          <ArrowLeft className="h-4 w-4 mr-1" />Volver a Deducciones
+          <ArrowLeft className="h-4 w-4 mr-1" />{t("hrg.ded.back")}
         </Button>
         <PageHeader
-          title="Registrar Deducción"
-          subtitle="Adelanto de nómina o infracción"
+          title={t("hrg.ded.title")}
+          subtitle={t("hrg.ded.subtitle")}
         />
       </div>
 
       {/* Scrollable Content */}
       <div className="flex-1 overflow-auto px-6 py-6">
         <Card>
-          <CardHeader><CardTitle className="text-base">Datos de la Deducción</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base">{t("hrg.ded.details")}</CardTitle></CardHeader>
           <CardContent className="space-y-5">
             {/* Employee */}
             <div className="space-y-1.5">
-              <Label>Empleado <span className="text-destructive">*</span></Label>
+              <Label>{t("hrg.employee")} <span className="text-destructive">*</span></Label>
               <EmployeeSearchCombobox value={form.employee_id || null} onChange={(v) => set("employee_id", v ?? "")} />
             </div>
 
             {/* Type - Radio Cards */}
             <div className="space-y-1.5">
-              <Label>Tipo de Deducción <span className="text-destructive">*</span></Label>
+              <Label>{t("hrg.ded.type")} <span className="text-destructive">*</span></Label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {TYPE_OPTIONS.map((opt) => {
                   const Icon = opt.icon;
@@ -133,8 +137,8 @@ export default function HRDeductionNew() {
                         <Icon className="h-4.5 w-4.5" />
                       </div>
                       <div>
-                        <p className={cn("text-sm font-medium", isSelected && "text-primary")}>{opt.label}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">{opt.desc}</p>
+                        <p className={cn("text-sm font-medium", isSelected && "text-primary")}>{etiquetaHrO(t, "deductionType", opt.value)}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{t(opt.desc)}</p>
                       </div>
                     </button>
                   );
@@ -145,11 +149,11 @@ export default function HRDeductionNew() {
             {/* Infraction Category */}
             {form.deduction_type === "infraccion" && (
               <div className="space-y-1.5">
-                <Label>Categoría de Infracción <span className="text-destructive">*</span></Label>
+                <Label>{t("hrg.ded.infractionCategory")} <span className="text-destructive">*</span></Label>
                 <Select value={form.category || undefined} onValueChange={(v) => set("category", v)}>
-                  <SelectTrigger><SelectValue placeholder="Seleccionar categoría..." /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder={t("hrg.selectCategory")} /></SelectTrigger>
                   <SelectContent>
-                    {INFRACTION_CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                    {INFRACTION_CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{etiquetaHrO(t, "infraction", c.value)}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -157,7 +161,7 @@ export default function HRDeductionNew() {
 
             {/* Amount */}
             <div className="space-y-1.5">
-              <Label>Monto <span className="text-destructive">*</span></Label>
+              <Label>{t("hrg.ded.amount")} <span className="text-destructive">*</span></Label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
                 <Input
@@ -174,16 +178,16 @@ export default function HRDeductionNew() {
 
             {/* Date */}
             <div className="space-y-1.5">
-              <Label>Fecha de Deducción</Label>
+              <Label>{t("hrg.ded.date")}</Label>
               <DateInput value={form.date} onChange={(v) => set("date", v)} />
             </div>
 
             {/* Description */}
             <div className="space-y-1.5">
-              <Label>Descripción / Motivo</Label>
+              <Label>{t("hrg.ded.description")}</Label>
               <Textarea
                 rows={3}
-                placeholder={form.deduction_type === "infraccion" ? "Detalle de la infracción cometida..." : "Motivo del adelanto solicitado..."}
+                placeholder={form.deduction_type === "infraccion" ? t("hrg.ded.infractionPlaceholder") : t("hrg.ded.advancePlaceholder")}
                 value={form.description}
                 onChange={(e) => set("description", e.target.value)}
               />
@@ -194,9 +198,9 @@ export default function HRDeductionNew() {
 
       {/* Footer */}
       <div className="shrink-0 border-t bg-background px-6 py-3 flex items-center justify-end gap-2">
-        <Button variant="outline" onClick={() => navigate("/hr/deducciones")}>Cancelar</Button>
+        <Button variant="outline" onClick={() => navigate("/hr/deducciones")}>{t("common.cancel")}</Button>
         <Button onClick={handleSubmit} disabled={!canSubmit || isSubmitting}>
-          {isSubmitting ? "Guardando..." : "Guardar Deducción"}
+          {isSubmitting ? t("hrg.saving") : t("hrg.ded.save")}
         </Button>
       </div>
     </div>

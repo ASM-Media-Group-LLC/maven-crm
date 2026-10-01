@@ -3,6 +3,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useDeleteAnnouncement } from "./useAnnouncementsAdmin";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface Props {
   open: boolean;
@@ -11,15 +12,16 @@ interface Props {
 }
 
 const DeleteAnnouncementDialog = ({ open, onOpenChange, announcementId }: Props) => {
+  const { t } = useLanguage();
   const del = useDeleteAnnouncement();
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>¿Eliminar anuncio?</AlertDialogTitle>
+          <AlertDialogTitle>{t("hrg.ann.deleteTitle")}</AlertDialogTitle>
           <AlertDialogDescription>
-            Esta acción no se puede deshacer. El anuncio será eliminado permanentemente.
+            {t("hrg.ann.deleteBody")}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -30,7 +32,7 @@ const DeleteAnnouncementDialog = ({ open, onOpenChange, announcementId }: Props)
               if (announcementId) del.mutate(announcementId, { onSuccess: () => onOpenChange(false) });
             }}
           >
-            Eliminar
+            {t("common.delete")}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
