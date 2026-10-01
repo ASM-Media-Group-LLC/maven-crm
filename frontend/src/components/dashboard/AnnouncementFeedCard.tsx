@@ -2,6 +2,8 @@ import { useEffect, useRef } from "react";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 import { Megaphone, AlertTriangle, Info, RefreshCw } from "lucide-react";
 import type { Announcement } from "@/hooks/useAnnouncements";
 
@@ -11,11 +13,13 @@ const PRIORITY_STYLES: Record<string, string> = {
   low: "border-l-muted-foreground",
 };
 
-const TYPE_CONFIG: Record<string, { label: string; icon: typeof Info }> = {
-  informativo: { label: "Informativo", icon: Info },
-  urgente: { label: "Urgente", icon: AlertTriangle },
-  recordatorio: { label: "Recordatorio", icon: RefreshCw },
-  actualizacion: { label: "Actualización", icon: Megaphone },
+// La clave es el announcement_type guardado en la base (dato: no se traduce);
+// `label` es la clave del diccionario de su etiqueta.
+const TYPE_CONFIG: Record<string, { label: TranslationKey; icon: typeof Info }> = {
+  informativo: { label: "shared.announcement.informativo", icon: Info },
+  urgente: { label: "shared.announcement.urgente", icon: AlertTriangle },
+  recordatorio: { label: "shared.announcement.recordatorio", icon: RefreshCw },
+  actualizacion: { label: "shared.announcement.actualizacion", icon: Megaphone },
 };
 
 interface Props {
@@ -26,6 +30,7 @@ interface Props {
 
 export default function AnnouncementFeedCard({ announcement, onOpen, onVisible }: Props) {
   const f = useFormato();
+  const { t } = useLanguage();
   const ref = useRef<HTMLDivElement>(null);
 
   // IntersectionObserver - register view after 1 second visible
@@ -72,17 +77,17 @@ export default function AnnouncementFeedCard({ announcement, onOpen, onVisible }
         <div className="flex items-center gap-2 flex-wrap">
           <p className="text-sm font-medium truncate">{announcement.title}</p>
           <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0">
-            {typeConfig.label}
+            {t(typeConfig.label)}
           </Badge>
           {announcement.priority === "high" && (
-            <Badge variant="destructive" className="text-[10px] px-1.5 py-0">Urgente</Badge>
+            <Badge variant="destructive" className="text-[10px] px-1.5 py-0">{t("shared.announcement.urgente")}</Badge>
           )}
         </div>
         {announcement.message && (
           <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{announcement.message}</p>
         )}
         <p className="text-[10px] text-muted-foreground mt-1">
-          {format(new Date(announcement.starts_at), "d MMM yyyy", { locale: f.fechas })}
+          {format(new Date(announcement.starts_at), f.idioma === "en" ? "MMM d, yyyy" : "d MMM yyyy", { locale: f.fechas })}
         </p>
       </div>
       {announcement.image_url && (

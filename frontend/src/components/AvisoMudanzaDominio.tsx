@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight, KeyRound, Bell, Bookmark } from "lucide-react";
 import { esDominioHistorico } from "@/lib/dominioCanonico";
 import { getPublicBaseUrl } from "@/lib/getPublicUrl";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // Aviso de mudanza de dominio.
 //
@@ -42,7 +43,16 @@ function leerCerradoEn(): number | null {
   } catch { return null; }
 }
 
+/** El texto del diccionario con lo que va entre ** resaltado. Así la frase se
+ *  traduce entera, con el resaltado donde caiga en cada idioma. */
+function conResaltado(texto: string) {
+  return texto.split("**").map((parte, i) =>
+    i % 2 === 1 ? <span key={i} className="text-foreground font-medium">{parte}</span> : parte,
+  );
+}
+
 export default function AvisoMudanzaDominio() {
+  const { t } = useLanguage();
   const [abierto, setAbierto] = useState(false);
 
   useEffect(() => {
@@ -77,18 +87,18 @@ export default function AvisoMudanzaDominio() {
             <ArrowRight className="h-7 w-7 text-primary" />
           </div>
 
-          <DialogTitle className="text-xl leading-tight">Maven cambió de dirección</DialogTitle>
+          <DialogTitle className="text-xl leading-tight">{t("shared.domainMove.title")}</DialogTitle>
 
           <p className="mt-2 text-sm text-muted-foreground">
-            A partir de ahora el acceso es
+            {t("shared.domainMove.accessNow")}
           </p>
           <p className="mt-1 font-mono text-base font-semibold text-foreground">{dominioNuevo}</p>
 
           <div className="mt-5 w-full space-y-2.5 text-left">
             {[
-              { icono: KeyRound, texto: <>La primera vez te <span className="text-foreground font-medium">pedirá tu contraseña otra vez</span>. Es normal: es una dirección nueva.</> },
-              { icono: Bell, texto: <>El navegador volverá a preguntar por las <span className="text-foreground font-medium">notificaciones</span>. Acéptalas para no perder los avisos de mensajes.</> },
-              { icono: Bookmark, texto: <>Actualiza el marcador o el acceso directo que tengas guardado.</> },
+              { icono: KeyRound, texto: conResaltado(t("shared.domainMove.password")) },
+              { icono: Bell, texto: conResaltado(t("shared.domainMove.notifications")) },
+              { icono: Bookmark, texto: conResaltado(t("shared.domainMove.bookmark")) },
             ].map(({ icono: Icono, texto }, i) => (
               <div key={i} className="flex items-start gap-2.5 rounded-2xl bg-muted/40 px-3 py-2.5">
                 <Icono className="h-4 w-4 shrink-0 text-primary mt-0.5" />
@@ -101,7 +111,7 @@ export default function AvisoMudanzaDominio() {
             onClick={irAlNuevo}
             className="mt-5 w-full rounded-full bg-gradient-to-r from-accent to-primary text-white shadow-md transition-opacity hover:opacity-90"
           >
-            Ir a {dominioNuevo} <ArrowRight className="ml-1 h-4 w-4" />
+            {t("shared.domainMove.goTo", { domain: dominioNuevo })} <ArrowRight className="ml-1 h-4 w-4" />
           </Button>
 
           <button
@@ -109,7 +119,7 @@ export default function AvisoMudanzaDominio() {
             onClick={cerrar}
             className="mt-3 text-xs text-muted-foreground hover:text-foreground transition-colors"
           >
-            Seguir aquí por ahora
+            {t("shared.domainMove.stayHere")}
           </button>
         </div>
       </DialogContent>

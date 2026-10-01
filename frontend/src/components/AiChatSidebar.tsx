@@ -13,8 +13,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Plus, Pencil, Trash2, MessageSquare } from "lucide-react";
 import { AiConversation } from "@/hooks/useAiConversations";
-import { format, isToday, isYesterday, isThisWeek } from "date-fns";
+import { isToday, isYesterday, isThisWeek } from "date-fns";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 
 interface AiChatSidebarProps {
   conversations: AiConversation[];
@@ -25,12 +27,14 @@ interface AiChatSidebarProps {
   onRename: (id: string, title: string) => void;
 }
 
+// `label` es la clave del diccionario: el grupo se nombra al dibujarlo, en el
+// idioma de la pantalla.
 function groupConversations(conversations: AiConversation[]) {
-  const groups: { label: string; items: AiConversation[] }[] = [
-    { label: "Hoy", items: [] },
-    { label: "Ayer", items: [] },
-    { label: "Esta semana", items: [] },
-    { label: "Anteriores", items: [] },
+  const groups: { label: TranslationKey; items: AiConversation[] }[] = [
+    { label: "common.today", items: [] },
+    { label: "shared.ui.range.yesterday", items: [] },
+    { label: "common.thisWeek", items: [] },
+    { label: "shared.aiChat.older", items: [] },
   ];
 
   for (const conv of conversations) {
@@ -52,6 +56,7 @@ export default function AiChatSidebar({
   onDelete,
   onRename,
 }: AiChatSidebarProps) {
+  const { t } = useLanguage();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -91,7 +96,7 @@ export default function AiChatSidebar({
         <div className="p-3 border-b border-border">
           <Button onClick={onCreate} className="w-full gap-2" size="sm">
             <Plus className="h-4 w-4" />
-            Nuevo chat
+            {t("shared.aiChat.newChat")}
           </Button>
         </div>
 
@@ -101,14 +106,14 @@ export default function AiChatSidebar({
             {conversations.length === 0 && (
               <div className="flex flex-col items-center gap-2 py-8 text-center text-muted-foreground">
                 <MessageSquare className="h-8 w-8 opacity-40" />
-                <p className="text-xs">Aún no hay conversaciones</p>
+                <p className="text-xs">{t("shared.aiChat.empty")}</p>
               </div>
             )}
 
             {groups.map((group) => (
               <div key={group.label}>
                 <p className="mb-1 px-2 text-xs font-semibold text-muted-foreground">
-                  {group.label}
+                  {t(group.label)}
                 </p>
                 <div className="space-y-1">
                   {group.items.map((conv) => (
@@ -150,7 +155,7 @@ export default function AiChatSidebar({
                               e.stopPropagation();
                               startEditing(conv);
                             }}
-                            title="Renombrar"
+                            title={t("shared.aiChat.rename")}
                           >
                             <Pencil className="h-3.5 w-3.5" />
                           </button>
@@ -160,7 +165,7 @@ export default function AiChatSidebar({
                               e.stopPropagation();
                               setDeleteId(conv.id);
                             }}
-                            title="Eliminar"
+                            title={t("common.delete")}
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
@@ -179,9 +184,9 @@ export default function AiChatSidebar({
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar conversación?</AlertDialogTitle>
+            <AlertDialogTitle>{t("shared.aiChat.deleteTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción no se puede deshacer. Se eliminarán todos los mensajes de esta conversación.
+              {t("shared.aiChat.deleteDesc")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -193,7 +198,7 @@ export default function AiChatSidebar({
                 setDeleteId(null);
               }}
             >
-              Eliminar
+              {t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

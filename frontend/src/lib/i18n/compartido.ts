@@ -238,4 +238,217 @@ export const compartido = {
     es: "No se pudo conectar con el servidor. Revisa tu conexión a internet.",
     en: "Couldn't reach the server. Check your internet connection.",
   },
+
+  // ─── Componentes compartidos de components/ (i18n ola 3) ───────────────────
+  // Lo que se guarda en la base NO pasa por aquí: los títulos de conversación de
+  // Clari ("Clari · soporte"), el texto de una notificación o de un anuncio, el
+  // mensaje de rechazo que manda el servidor al abrir un chat. Eso es dato.
+
+  // Ventanitas: minimizar / agrandar (Clari y la llamada flotante).
+  "shared.window.minimize": { es: "Minimizar", en: "Minimize" },
+  "shared.window.expand": { es: "Agrandar", en: "Expand" },
+
+  // Historial de chats con Clari (components/AiChatSidebar.tsx)
+  "shared.aiChat.newChat": { es: "Nuevo chat", en: "New chat" },
+  "shared.aiChat.empty": { es: "Aún no hay conversaciones", en: "No conversations yet" },
+  "shared.aiChat.older": { es: "Anteriores", en: "Older" },
+  "shared.aiChat.rename": { es: "Renombrar", en: "Rename" },
+  "shared.aiChat.deleteTitle": { es: "¿Eliminar conversación?", en: "Delete this conversation?" },
+  "shared.aiChat.deleteDesc": {
+    es: "Esta acción no se puede deshacer. Se eliminarán todos los mensajes de esta conversación.",
+    en: "This can't be undone. All the messages in this conversation will be deleted.",
+  },
+
+  // Clari (components/ClariAiChat.tsx + ClariAiFab.tsx). El saludo no se guarda
+  // en la base, pero SÍ le llega al modelo como turno del asistente: viaja
+  // siempre en español por el campo `content` (el "en" es solo de pantalla).
+  "shared.clari.welcomeHelp": {
+    es: "¡Hola! 👋 Soy Clari. Te ayudo a navegar Maven — pregúntame cómo hacer cualquier cosa en la app.",
+    en: "Hi! 👋 I'm Clari. I'll help you find your way around Maven — ask me how to do anything in the app.",
+  },
+  "shared.clari.welcomeSales": {
+    es: "¡Hola! 👋 Soy tu asistente de ventas. Pídeme rankings, comparativas o tendencias de tus creadoras. Ej: *¿quién factura más esta semana?*",
+    en: "Hi! 👋 I'm your sales assistant. Ask me for rankings, comparisons or trends for your creators. E.g.: *who's earning the most this week?*",
+  },
+  "shared.clari.connectError": { es: "Error al conectar con la IA", en: "Couldn't connect to the AI" },
+  "shared.clari.noResponse": { es: "Sin respuesta", en: "No response" },
+  "shared.clari.connectionError": { es: "Error de conexión", en: "Connection error" },
+  "shared.clari.micError": { es: "Error de micrófono: {error}", en: "Microphone error: {error}" },
+  "shared.clari.typing": { es: "Clari escribiendo…", en: "Clari is typing…" },
+  "shared.clari.pickChat": { es: "Crea o selecciona un chat para comenzar…", en: "Create or pick a chat to get started…" },
+  "shared.clari.listening": { es: "🎙️ Escuchando…", en: "🎙️ Listening…" },
+  "shared.clari.askPlaceholder": { es: "Escribe tu pregunta…", en: "Type your question…" },
+  "shared.clari.stopRecording": { es: "Detener grabación", en: "Stop recording" },
+  "shared.clari.speak": { es: "Hablar", en: "Speak" },
+  "shared.clari.open": { es: "Abrir Clari AI", en: "Open Clari AI" },
+  "shared.clari.minimize": { es: "Minimizar Clari AI", en: "Minimize Clari AI" },
+  "shared.clari.online": { es: "En línea", en: "Online" },
+  "shared.clari.modeHelp": { es: "Soporte", en: "Support" },
+  "shared.clari.modeCrm": { es: "Pregúntale al CRM", en: "Ask the CRM" },
+
+  // Aviso de mudanza de dominio (components/AvisoMudanzaDominio.tsx). Lo que va
+  // entre ** sale resaltado.
+  "shared.domainMove.title": { es: "Maven cambió de dirección", en: "Maven has a new address" },
+  "shared.domainMove.accessNow": { es: "A partir de ahora el acceso es", en: "From now on, you'll find it at" },
+  "shared.domainMove.password": {
+    es: "La primera vez te **pedirá tu contraseña otra vez**. Es normal: es una dirección nueva.",
+    en: "The first time, it'll **ask for your password again**. That's normal: it's a new address.",
+  },
+  "shared.domainMove.notifications": {
+    es: "El navegador volverá a preguntar por las **notificaciones**. Acéptalas para no perder los avisos de mensajes.",
+    en: "Your browser will ask about **notifications** again. Allow them so you don't miss message alerts.",
+  },
+  "shared.domainMove.bookmark": {
+    es: "Actualiza el marcador o el acceso directo que tengas guardado.",
+    en: "Update any bookmark or shortcut you have saved.",
+  },
+  "shared.domainMove.goTo": { es: "Ir a {domain}", en: "Go to {domain}" },
+  "shared.domainMove.stayHere": { es: "Seguir aquí por ahora", en: "Stay here for now" },
+
+  // Pantallas de entrar / recuperar contraseña (components/auth/AuthLayout.tsx)
+  "shared.authLayout.backHome": { es: "Volver al inicio", en: "Back to home" },
+  "shared.authLayout.tagline": {
+    es: "La plataforma integral para gestionar, escalar y optimizar tus operaciones.",
+    en: "The all-in-one platform to manage, scale and optimize your operations.",
+  },
+
+  // Subir archivos de una creadora o un contacto (components/FileUploadModal.tsx)
+  "shared.upload.contracts": { es: "Contrato Firmado & Documentos", en: "Signed contract & documents" },
+  "shared.upload.piclink": { es: "Fotos de PickLink (Comprobante)", en: "PickLink photos (proof)" },
+  "shared.upload.extras": { es: "Fotos y Videos Extras", en: "Extra photos & videos" },
+  "shared.upload.formatsContracts": {
+    es: "PDF, Word (.doc, .docx) e Imágenes (JPG, PNG, GIF)",
+    en: "PDF, Word (.doc, .docx) and images (JPG, PNG, GIF)",
+  },
+  "shared.upload.formatsPiclink": { es: "Imágenes (JPG, PNG, GIF, WebP)", en: "Images (JPG, PNG, GIF, WebP)" },
+  "shared.upload.formatsExtras": {
+    es: "Imágenes (JPG, PNG, GIF) y Videos (MP4, MOV)",
+    en: "Images (JPG, PNG, GIF) and videos (MP4, MOV)",
+  },
+  "shared.upload.tooLarge": { es: "Archivo muy grande", en: "File too large" },
+  "shared.upload.tooLargeDesc": { es: "{name} excede {max}", en: "{name} is over {max}" },
+  "shared.upload.failed": { es: "Error al subir", en: "Upload failed" },
+  "shared.upload.done": { es: "{n} archivo(s) subido(s) exitosamente", en: "{n} file(s) uploaded successfully" },
+  "shared.upload.pickOrDrag": { es: "Selecciona o arrastra archivos para subir", en: "Select or drag files to upload" },
+  "shared.upload.dragHere": { es: "Arrastra archivos aquí o", en: "Drag files here or" },
+  "shared.upload.selectFiles": { es: "Seleccionar archivos", en: "Select files" },
+  "shared.upload.formats": { es: "Formatos: {formats}", en: "Formats: {formats}" },
+  "shared.upload.maxPerFile": { es: "Máximo {max} por archivo", en: "Up to {max} per file" },
+  "shared.upload.selected": { es: "Archivos seleccionados ({n})", en: "Selected files ({n})" },
+  "shared.upload.remove": { es: "Quitar {name}", en: "Remove {name}" },
+  "shared.upload.progress": { es: "Subiendo... {p}%", en: "Uploading... {p}%" },
+  "shared.upload.uploading": { es: "Subiendo…", en: "Uploading…" },
+  "shared.upload.upload": { es: "Subir", en: "Upload" },
+
+  // La ventanita de la llamada que sigue viva al cambiar de página
+  // (components/PersistentCallProvider.tsx)
+  "shared.floatCall.inCall": { es: "En llamada", en: "In a call" },
+  "shared.floatCall.mutedForYou": {
+    es: "Silenciado solo para ti (ellos siguen hablando). Toca para volver a escuchar.",
+    en: "Muted just for you (they're still talking). Tap to hear them again.",
+  },
+  "shared.floatCall.muteForYou": {
+    es: "Silenciar solo para ti: no los escuchas, tu micro no cambia.",
+    en: "Mute just for you: you won't hear them, and your mic doesn't change.",
+  },
+  "shared.floatCall.listenAgain": { es: "Volver a escuchar", en: "Hear them again" },
+  "shared.floatCall.muteForMe": { es: "Silenciar para mí", en: "Mute for me" },
+  "shared.floatCall.popOut": { es: "Sacar del navegador", en: "Pop out of the browser" },
+  "shared.floatCall.hangUp": { es: "Colgar", en: "Hang up" },
+
+  // Elegir varias personas del equipo (components/SelectorDePersonas.tsx)
+  "shared.people.searchTeam": { es: "Buscar en el equipo…", en: "Search the team…" },
+  "shared.people.remove": { es: "Quitar a {name}", en: "Remove {name}" },
+  "shared.people.thisPerson": { es: "esta persona", en: "this person" },
+  "shared.people.noName": { es: "Sin nombre", en: "No name" },
+
+  // Botones de WhatsApp y Telegram que abren el chat en la bandeja de Maven
+  // (components/WaChatButton.tsx + TgChatButton.tsx). El rechazo que manda el
+  // servidor (res.error) llega escrito por el servidor y se muestra tal cual.
+  "shared.openChat.failed": { es: "No se pudo abrir el chat", en: "Couldn't open the chat" },
+  "shared.openChat.tgFailed": { es: "No se pudo abrir el chat de Telegram.", en: "Couldn't open the Telegram chat." },
+  "shared.openChat.waNotAvailable": { es: "Este lead no está disponible para ti.", en: "This lead isn't available to you." },
+  "shared.openChat.waNotYours": { es: "Este lead no es tuyo", en: "This lead isn't yours" },
+  "shared.openChat.waNoChannels": {
+    es: "No tienes canales de WhatsApp asignados",
+    en: "You don't have any WhatsApp channels assigned",
+  },
+  "shared.openChat.whichLine": { es: "¿Desde qué línea?", en: "From which line?" },
+  "shared.openChat.whichChannel": { es: "¿Desde qué canal?", en: "From which channel?" },
+  // A dónde vuelve la bandeja ("Volver a …"): la sección desde la que se abrió.
+  "shared.openChat.fromContacts": { es: "Contactos", en: "Contacts" },
+  "shared.openChat.fromCreators": { es: "Creadoras", en: "Creators" },
+  // Desde cualquier otra ruta (la bandeja arma "Volver a {x}" / "Back to {x}").
+  // El español es el de siempre ("Volver a atrás"); en inglés "back" dejaba
+  // «Back to back».
+  "shared.openChat.fromPrevious": { es: "atrás", en: "the previous page" },
+
+  // Composer compartido (components/chat/ChatComposer.tsx)
+  "shared.composer.remove": { es: "Quitar", en: "Remove" },
+
+  // Frases hechas del chat (components/chat/ScriptsButton.tsx)
+  "shared.scripts.title": { es: "Scripts (frases hechas)", en: "Scripts (saved phrases)" },
+  "shared.scripts.editTitle": { es: "Editar frase", en: "Edit phrase" },
+  "shared.scripts.newTitle": { es: "Nueva frase", en: "New phrase" },
+  "shared.scripts.namePlaceholder": { es: "Nombre (opcional, para buscar)", en: "Name (optional, for searching)" },
+  "shared.scripts.textPlaceholder": { es: "La frase…", en: "The phrase…" },
+  "shared.scripts.sendOnClick": { es: "Enviar al instante al hacer click", en: "Send right away on click" },
+  "shared.scripts.sendOnClickHint": {
+    es: "(si no, queda en el cajón para editar)",
+    en: "(otherwise it goes into the message box to edit)",
+  },
+  "shared.scripts.search": { es: "Buscar frase…", en: "Search phrases…" },
+  "shared.scripts.empty": { es: "Sin frases todavía. Crea una con “Nueva”.", en: "No phrases yet. Create one with “New”." },
+  "shared.scripts.noMatch": { es: "Nada coincide.", en: "Nothing matches." },
+  "shared.scripts.clickSends": { es: "Click = enviar", en: "Click = send" },
+  "shared.scripts.clickInserts": { es: "Click = poner en el cajón", en: "Click = put it in the message box" },
+  "shared.scripts.sendsOnClick": { es: "envía al click", en: "sends on click" },
+  "shared.scripts.goesToBox": { es: "↳ va al cajón", en: "↳ goes to the message box" },
+  "shared.scripts.delete": { es: "Borrar", en: "Delete" },
+  "shared.scripts.deleteFailed": { es: "No se pudo borrar", en: "Couldn't delete" },
+
+  // Tarjeta de un anuncio en el tablero (components/dashboard/AnnouncementFeedCard.tsx).
+  // La clave es el announcement_type guardado en la base; solo cambia la etiqueta.
+  "shared.announcement.informativo": { es: "Informativo", en: "Info" },
+  "shared.announcement.urgente": { es: "Urgente", en: "Urgent" },
+  "shared.announcement.recordatorio": { es: "Recordatorio", en: "Reminder" },
+  "shared.announcement.actualizacion": { es: "Actualización", en: "Update" },
+
+  // Mejor cerrador de cada mes (components/dashboard/BestCloserMonthlyDialog.tsx)
+  "shared.bestCloser.title": { es: "Mejor cerrador por mes", en: "Best closer by month" },
+  "shared.bestCloser.empty": {
+    es: "Sin data todavía. El ranking arrancó este mes y va a empezar a llenarse a medida que entren calls.",
+    en: "No data yet. The ranking started this month and will fill up as calls come in.",
+  },
+  "shared.bestCloser.stats": { es: "{closes} cierres · calif promedio {score}/100", en: "{closes} closes · avg score {score}/100" },
+  "shared.bestCloser.noWinner": { es: "Sin ganador", en: "No winner" },
+
+  // Cambiar la contraseña desde la barra de arriba (components/dashboard/ChangePasswordModal.tsx)
+  "shared.password.notMet": { es: "La contraseña no cumple los requisitos.", en: "The password doesn't meet the requirements." },
+  "shared.password.changedDesc": { es: "Tu contraseña ha sido cambiada exitosamente.", en: "Your password has been changed successfully." },
+  "shared.password.repeat": { es: "Repite la contraseña", en: "Repeat the password" },
+  "shared.password.updating": { es: "Actualizando…", en: "Updating…" },
+  "shared.password.show": { es: "Mostrar contraseña", en: "Show password" },
+  "shared.password.hide": { es: "Ocultar contraseña", en: "Hide password" },
+
+  // Buscador de empleados de RRHH (components/hr/EmployeeSearchCombobox.tsx)
+  "shared.employeePicker.placeholder": { es: "Seleccionar empleado...", en: "Select an employee..." },
+  "shared.employeePicker.search": { es: "Buscar empleado...", en: "Search employees..." },
+  "shared.employeePicker.empty": { es: "No se encontró ningún empleado.", en: "No employee found." },
+
+  // La campana de notificaciones (components/notifications/). El título y el
+  // mensaje de cada notificación los escribe un trigger en la base: son dato.
+  "shared.notif.markAll": { es: "Marcar todas", en: "Mark all as read" },
+  "shared.notif.seeAll": { es: "Ver todas las notificaciones", en: "See all notifications" },
+  "shared.notif.archive": { es: "Archivar", en: "Archive" },
+  // El chip del módulo de origen. En español se sigue mostrando el valor
+  // guardado tal cual (module_origin); en inglés, estos nombres.
+  "shared.notif.module.creadores": { es: "Creadoras", en: "Creators" },
+  "shared.notif.module.chatterEvaluator": { es: "Evaluador de chatters", en: "Chatter evaluator" },
+  "shared.notif.module.finanzas": { es: "Finanzas", en: "Finance" },
+  "shared.notif.module.tareas": { es: "Tareas", en: "Tasks" },
+  "shared.notif.module.eventos": { es: "Eventos", en: "Events" },
+  "shared.notif.module.correo": { es: "Correo", en: "Email" },
+  "shared.notif.module.comunicacion": { es: "Comunicación", en: "Communication" },
+  "shared.notif.module.hr": { es: "RRHH", en: "HR" },
 } as const satisfies Record<string, { es: string; en: string }>;

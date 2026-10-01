@@ -9,6 +9,8 @@ import {
   endOfMonth,
   subDays,
 } from "date-fns";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 
 // DateRangePresets — chips de rango rápido (Ayer / Hoy / Esta semana /
 // Este mes) + DateRangePicker custom alineado en una fila. Es el mismo
@@ -36,11 +38,12 @@ export interface DateRange {
 }
 
 // shortLabel: en celular "Esta semana"/"Este mes" se partían en dos líneas.
-export const PRESET_CONFIG: Array<{ key: RangePreset; label: string; shortLabel: string }> = [
-  { key: "yesterday", label: "Ayer", shortLabel: "Ayer" },
-  { key: "today", label: "Hoy", shortLabel: "Hoy" },
-  { key: "this_week", label: "Esta semana", shortLabel: "Semana" },
-  { key: "this_month", label: "Este mes", shortLabel: "Mes" },
+// label y shortLabel son claves del diccionario; `key` es el preset (dato).
+export const PRESET_CONFIG: Array<{ key: RangePreset; label: TranslationKey; shortLabel: TranslationKey }> = [
+  { key: "yesterday", label: "shared.ui.range.yesterday", shortLabel: "shared.ui.range.yesterday" },
+  { key: "today", label: "common.today", shortLabel: "common.today" },
+  { key: "this_week", label: "common.thisWeek", shortLabel: "common.week" },
+  { key: "this_month", label: "common.thisMonth", shortLabel: "common.month" },
 ];
 
 export function rangeForPreset(preset: RangePreset, ref: Date = new Date()): DateRange {
@@ -72,38 +75,41 @@ interface Props {
   placeholder?: string;
 }
 
-const DateRangePresets = ({ range, activePreset, onChange, className, placeholder }: Props) => (
-  <div className={cn("flex items-center gap-2 flex-wrap", className)}>
-    {/* Pill segmentado — click setea range y preset; el DateRangePicker
-        de al lado lo desactiva si el user elige fechas custom. */}
-    <div className="inline-flex items-center rounded-lg border border-border bg-card/40 p-0.5">
-      {PRESET_CONFIG.map((p) => {
-        const isActive = activePreset === p.key;
-        return (
-          <button
-            key={p.key}
-            type="button"
-            onClick={() => onChange(rangeForPreset(p.key), p.key)}
-            className={cn(
-              "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
-              isActive
-                ? "bg-primary/15 text-primary ring-1 ring-primary/30"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
-            )}
-          >
-            <span className="sm:hidden">{p.shortLabel}</span>
-            <span className="hidden sm:inline">{p.label}</span>
-          </button>
-        );
-      })}
+const DateRangePresets = ({ range, activePreset, onChange, className, placeholder }: Props) => {
+  const { t } = useLanguage();
+  return (
+    <div className={cn("flex items-center gap-2 flex-wrap", className)}>
+      {/* Pill segmentado — click setea range y preset; el DateRangePicker
+          de al lado lo desactiva si el user elige fechas custom. */}
+      <div className="inline-flex items-center rounded-lg border border-border bg-card/40 p-0.5">
+        {PRESET_CONFIG.map((p) => {
+          const isActive = activePreset === p.key;
+          return (
+            <button
+              key={p.key}
+              type="button"
+              onClick={() => onChange(rangeForPreset(p.key), p.key)}
+              className={cn(
+                "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
+                isActive
+                  ? "bg-primary/15 text-primary ring-1 ring-primary/30"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
+              )}
+            >
+              <span className="sm:hidden">{t(p.shortLabel)}</span>
+              <span className="hidden sm:inline">{t(p.label)}</span>
+            </button>
+          );
+        })}
+      </div>
+      <DateRangePicker
+        from={range.from}
+        to={range.to}
+        onApply={(from, to) => onChange({ from, to }, null)}
+        placeholder={placeholder ?? t("shared.ui.selectDates")}
+      />
     </div>
-    <DateRangePicker
-      from={range.from}
-      to={range.to}
-      onApply={(from, to) => onChange({ from, to }, null)}
-      placeholder={placeholder ?? "Seleccionar fechas"}
-    />
-  </div>
-);
+  );
+};
 
 export default DateRangePresets;

@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { MessageSquareText, Plus, Pencil, Trash2, Zap, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // Frases hechas INDIVIDUALES por usuario y por SECCIÓN (surface) de Maven. Cada usuario ve/edita
 // solo las suyas (RLS user_id=auth.uid()) y cada superficie las propias ('chatter'|'inbox'|'messenger'):
@@ -89,6 +90,7 @@ interface ScriptsButtonProps {
 type EditState = { id: string | null; text: string; label: string; sendOnClick: boolean } | null;
 
 export function ScriptsButton({ surface, onUse, disabled }: ScriptsButtonProps) {
+  const { t } = useLanguage();
   const { scripts, isLoading, add, update, remove } = useChatterScripts(surface);
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -109,41 +111,41 @@ export function ScriptsButton({ surface, onUse, disabled }: ScriptsButtonProps) 
     if (!edit || !edit.text.trim()) return;
     const payload = { text: edit.text, label: edit.label, send_on_click: edit.sendOnClick };
     const m = edit.id
-      ? update.mutate({ id: edit.id, ...payload }, { onSuccess: () => setEdit(null), onError: (e) => toast.error("No se pudo guardar", { description: (e as Error).message }) })
-      : add.mutate(payload, { onSuccess: () => setEdit(null), onError: (e) => toast.error("No se pudo guardar", { description: (e as Error).message }) });
+      ? update.mutate({ id: edit.id, ...payload }, { onSuccess: () => setEdit(null), onError: (e) => toast.error(t("common.couldNotSave"), { description: (e as Error).message }) })
+      : add.mutate(payload, { onSuccess: () => setEdit(null), onError: (e) => toast.error(t("common.couldNotSave"), { description: (e as Error).message }) });
     return m;
   };
 
   return (
     <Popover open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setEdit(null); setQ(""); } }}>
       <PopoverTrigger asChild>
-        <Button type="button" variant="ghost" size="sm" className="h-9 gap-1 px-2 text-xs text-muted-foreground" disabled={disabled} title="Scripts (frases hechas)">
+        <Button type="button" variant="ghost" size="sm" className="h-9 gap-1 px-2 text-xs text-muted-foreground" disabled={disabled} title={t("shared.scripts.title")}>
           <MessageSquareText className="h-4 w-4" /> <span className="hidden sm:inline">Scripts</span>
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" side="top" className="w-80 p-2">
         {edit ? (
           <div className="space-y-2">
-            <div className="text-xs font-semibold">{edit.id ? "Editar frase" : "Nueva frase"}</div>
-            <Input value={edit.label} onChange={(e) => setEdit({ ...edit, label: e.target.value })} placeholder="Nombre (opcional, para buscar)" className="h-8 text-sm" />
-            <Textarea value={edit.text} onChange={(e) => setEdit({ ...edit, text: e.target.value })} placeholder="La frase…" rows={3} className="resize-none text-sm" autoFocus />
+            <div className="text-xs font-semibold">{edit.id ? t("shared.scripts.editTitle") : t("shared.scripts.newTitle")}</div>
+            <Input value={edit.label} onChange={(e) => setEdit({ ...edit, label: e.target.value })} placeholder={t("shared.scripts.namePlaceholder")} className="h-8 text-sm" />
+            <Textarea value={edit.text} onChange={(e) => setEdit({ ...edit, text: e.target.value })} placeholder={t("shared.scripts.textPlaceholder")} rows={3} className="resize-none text-sm" autoFocus />
             <label className="flex cursor-pointer items-center gap-2 text-xs">
               <input type="checkbox" checked={edit.sendOnClick} onChange={(e) => setEdit({ ...edit, sendOnClick: e.target.checked })} className="accent-primary" />
-              Enviar al instante al hacer click <span className="text-muted-foreground">(si no, queda en el cajón para editar)</span>
+              {t("shared.scripts.sendOnClick")} <span className="text-muted-foreground">{t("shared.scripts.sendOnClickHint")}</span>
             </label>
             <div className="flex justify-end gap-1 pt-1">
-              <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setEdit(null)}>Cancelar</Button>
+              <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setEdit(null)}>{t("common.cancel")}</Button>
               <Button size="sm" className="h-8 text-xs" disabled={!edit.text.trim() || add.isPending || update.isPending} onClick={saveEdit}>
-                {(add.isPending || update.isPending) ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Guardar"}
+                {(add.isPending || update.isPending) ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : t("common.save")}
               </Button>
             </div>
           </div>
         ) : (
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar frase…" className="h-8 text-sm" />
+              <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("shared.scripts.search")} className="h-8 text-sm" />
               <Button size="sm" variant="outline" className="h-8 shrink-0 gap-1 px-2 text-xs" onClick={startNew}>
-                <Plus className="h-3.5 w-3.5" /> Nueva
+                <Plus className="h-3.5 w-3.5" /> {t("common.newF")}
               </Button>
             </div>
             <div className="max-h-72 space-y-1 overflow-y-auto">
@@ -151,7 +153,7 @@ export function ScriptsButton({ surface, onUse, disabled }: ScriptsButtonProps) 
                 <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
               ) : filtered.length === 0 ? (
                 <p className="py-6 text-center text-xs text-muted-foreground">
-                  {scripts.length === 0 ? "Sin frases todavía. Crea una con “Nueva”." : "Nada coincide."}
+                  {scripts.length === 0 ? t("shared.scripts.empty") : t("shared.scripts.noMatch")}
                 </p>
               ) : (
                 filtered.map((s) => (
@@ -160,17 +162,17 @@ export function ScriptsButton({ surface, onUse, disabled }: ScriptsButtonProps) 
                       type="button"
                       onClick={() => { onUse(s); setOpen(false); }}
                       className="min-w-0 flex-1 text-left"
-                      title={s.send_on_click ? "Click = enviar" : "Click = poner en el cajón"}
+                      title={s.send_on_click ? t("shared.scripts.clickSends") : t("shared.scripts.clickInserts")}
                     >
                       {s.label && <div className="truncate text-[11px] font-semibold text-foreground">{s.label}</div>}
                       <div className="line-clamp-2 text-xs text-muted-foreground">{s.text}</div>
                       <span className={`mt-0.5 inline-flex items-center gap-0.5 text-[9px] ${s.send_on_click ? "text-warning" : "text-muted-foreground/70"}`}>
-                        {s.send_on_click ? <><Zap className="h-2.5 w-2.5" /> envía al click</> : <>↳ va al cajón</>}
+                        {s.send_on_click ? <><Zap className="h-2.5 w-2.5" /> {t("shared.scripts.sendsOnClick")}</> : <>{t("shared.scripts.goesToBox")}</>}
                       </span>
                     </button>
                     <div className="flex shrink-0 flex-col gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-                      <button type="button" onClick={() => startEdit(s)} className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground" title="Editar"><Pencil className="h-3 w-3" /></button>
-                      <button type="button" onClick={() => remove.mutate(s.id, { onError: (e) => toast.error("No se pudo borrar", { description: (e as Error).message }) })} className="rounded p-1 text-muted-foreground hover:bg-destructive/15 hover:text-destructive" title="Borrar"><Trash2 className="h-3 w-3" /></button>
+                      <button type="button" onClick={() => startEdit(s)} className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground" title={t("common.edit")}><Pencil className="h-3 w-3" /></button>
+                      <button type="button" onClick={() => remove.mutate(s.id, { onError: (e) => toast.error(t("shared.scripts.deleteFailed"), { description: (e as Error).message }) })} className="rounded p-1 text-muted-foreground hover:bg-destructive/15 hover:text-destructive" title={t("shared.scripts.delete")}><Trash2 className="h-3 w-3" /></button>
                     </div>
                   </div>
                 ))
