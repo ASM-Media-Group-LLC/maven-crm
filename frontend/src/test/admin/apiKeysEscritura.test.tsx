@@ -187,6 +187,17 @@ afterEach(() => { vi.useRealTimers(); });
 
 // ─── Lo puro ─────────────────────────────────────────────────────────────────
 
+/** La migración B (la de la escritura). Con import.meta.glob (patrón literal desde la
+ *  raíz del repo), como las guardas de i18n: el tsconfig de la app no trae Node. */
+function migracionB(): string {
+  const archivos = (import.meta as unknown as {
+    glob: (p: string, o: Record<string, unknown>) => Record<string, string>;
+  }).glob("/supabase/migrations/20261001200000_api_messenger_escritura.sql", { query: "?raw", import: "default", eager: true });
+  const sql = Object.values(archivos)[0] ?? "";
+  expect(sql.length, "no se pudo leer la migración").toBeGreaterThan(1000);
+  return sql;
+}
+
 describe("alternarScope: write va con read", () => {
   it("tildar write tilda read; destildar read destilda write; destildar write deja read", () => {
     expect(alternarScope(["creators:read"], "messenger:write").sort()).toEqual(["creators:read", "messenger:read", "messenger:write"]);
@@ -223,13 +234,7 @@ describe("el nombre visible, como lo valida la base", () => {
   });
 
   it("las raíces son EXACTAMENTE las de la migración", () => {
-    // Con import.meta.glob (patrón literal desde la raíz del repo), como las guardas de
-    // i18n: el tsconfig de la app no trae los tipos de Node.
-    const archivos = (import.meta as unknown as {
-      glob: (p: string, o: Record<string, unknown>) => Record<string, string>;
-    }).glob("/supabase/migrations/20261001200000_api_messenger_escritura.sql", { query: "?raw", import: "default", eager: true });
-    const sql = Object.values(archivos)[0] ?? "";
-    expect(sql.length, "no se pudo leer la migración").toBeGreaterThan(1000);
+    const sql = migracionB();
     const m = sql.match(/if _sin ~ '\(([a-z|]+)\)' then/);
     expect(m, "no encontré las raíces en api_keys_nombre_visible").toBeTruthy();
     expect([...RAICES_RESERVADAS]).toEqual(m![1].split("|"));
@@ -237,6 +242,17 @@ describe("el nombre visible, como lo valida la base", () => {
 });
 
 describe("la retirada en tandas", () => {
+  it("la RPC se llama como en la migración: parámetros, tope de 200, lo que devuelve y quién la puede llamar", () => {
+    // Un parámetro con otro nombre haría fallar CADA retirada (PostgREST no encuentra la
+    // función) sin que ningún test con la base falsa se entere.
+    const sql = migracionB();
+    expect(sql).toMatch(/create or replace function public\.api_retirar_mensajes_de_integracion\(_llave uuid, _desde timestamptz, _limite integer default 200\)/);
+    expect(sql).toMatch(/_lim integer := least\(greatest\(coalesce\(_limite, 200\), 1\), 200\);/);
+    expect(sql).toMatch(/jsonb_build_object\('retirados', _hechos, 'quedan', _quedan\)/);
+    expect(sql).toMatch(/limit 1001\) x;/); // «quedan» se cuenta hasta 1.001: más de 1.000
+    expect(sql).toMatch(/'api_retirar_mensajes_de_integracion\(uuid, timestamptz, integer\)'\] loop\s+execute format\('revoke all on function public\.%s from public, anon', _f\);\s+execute format\('grant execute on function public\.%s to authenticated', _f\);/);
+  });
+
   it("sigue hasta que no queda nada y suma lo retirado", async () => {
     const respuestas = [{ retirados: 200, quedan: 250 }, { retirados: 200, quedan: 50 }, { retirados: 50, quedan: 0 }];
     const vistos: number[] = [];

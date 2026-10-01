@@ -34,18 +34,17 @@ Deno.test("catálogo: write existe para validar y, desde el PR 5, la pantalla lo
   assertEquals([...SCOPES_MESSENGER], ["messenger:read", "messenger:write"]);
 });
 
-Deno.test("lo oculto en pantalla tampoco se da por el servidor; con la lista vacía (PR 5), sí", () => {
-  // Hoy: messenger:write está oculto, así que se rechaza al crear y al editar, venga
-  // como venga el pedido (armado a mano, una página vieja…).
-  assertEquals(scopesNoDisponibles(ESCRIBE), ["messenger:write"]);
-  assertEquals(scopesNoDisponibles(["creators:read", "messenger:write", "messenger:read"]), ["messenger:write"]);
+Deno.test("lo oculto en pantalla tampoco se da por el servidor; con la lista vacía (PR 5), write se da", () => {
+  // Desde el PR 5 la lista está vacía: ni el alta ni la edición rechazan nada por estar
+  // oculto, y una key que escribe se crea si el pedido está en regla.
+  assertEquals(scopesNoDisponibles(ESCRIBE), []);
+  assertEquals(scopesNoDisponibles(["creators:read", "messenger:write", "messenger:read"]), []);
   assertEquals(scopesNoDisponibles(LEE), []);
-  assertEquals(scopesNoDisponibles(["creators:read", "contacts:phone"]), []);
-  // El PR 5 vacía SCOPES_OCULTOS_EN_PANTALLA: entonces no se rechaza nada y valen las
-  // reglas de write (que pasan con un pedido en regla).
-  assertEquals(scopesNoDisponibles(ESCRIBE, []), []);
   assertEquals(problemaAlCrear({ scopes: ESCRIBE, nombreVisible: "BLU", confirmaEscrituraComo: YO, quienCrea: YO }), null);
-  // Y con otra lista, lo que esa diga (la regla no está atada a messenger:write).
+  // La regla sigue en pie para el próximo scope que se esconda: con messenger:write
+  // oculto (como antes del PR 5) se rechaza, venga como venga el pedido.
+  assertEquals(scopesNoDisponibles(ESCRIBE, ["messenger:write"]), ["messenger:write"]);
+  assertEquals(scopesNoDisponibles(LEE, ["messenger:write"]), []);
   assertEquals(scopesNoDisponibles(["contacts:phone", "creators:read"], ["contacts:phone"]), ["contacts:phone"]);
 });
 

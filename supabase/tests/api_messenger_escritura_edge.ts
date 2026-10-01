@@ -712,7 +712,7 @@ let primero = "";
     `reintentar con la misma Idempotency-Key manda el mensaje una vez → ${d(otra)}`);
 }
 
-// ════ 11. manage-api-keys de verdad: lo oculto no se da y el nombre es de su dueño ══
+// ════ 11. manage-api-keys de verdad: write se da (PR 5) con sus reglas, y el nombre es de su dueño ══
 {
   // Jhon y Alvaro, admins de Maven (manage-api-keys es solo para admins).
   await db.exec(`delete from public.user_roles where user_id in ('${JHON}', '${ALVARO}');
@@ -733,26 +733,62 @@ let primero = "";
   };
   const llaves = async () => Number((await q(`select count(*)::int c from public.api_keys`))[0].c);
 
+  // Desde el PR 5 (SCOPES_OCULTOS_EN_PANTALLA vacía) la pantalla ofrece messenger:write.
   const lista = await gestionar("JHON", { action: "list" });
-  check(lista.estado === 200 && !(lista.json.scope_catalog ?? []).some((x: Fila) => x.key === "messenger:write")
+  check(lista.estado === 200 && (lista.json.scope_catalog ?? []).some((x: Fila) => x.key === "messenger:write")
       && (lista.json.scope_catalog ?? []).some((x: Fila) => x.key === "messenger:read"),
-    `list: 200 y la pantalla sin messenger:write → ${lista.estado}`);
-  // Hoy (SCOPES_OCULTOS_EN_PANTALLA = messenger:write): el pedido armado a mano, en regla
-  // en todo lo demás, no crea nada.
-  const antes = await llaves();
-  const aMano = await gestionar("JHON", {
+    `list: 200 y la pantalla ofrece messenger:write → ${lista.estado}`);
+
+  // Lo que manda la pantalla al crear una key que escribe. Sin cada pieza, 400 y nada.
+  const escribe = {
     action: "create", name: "Escribe", scopes: ["messenger:read", "messenger:write"], ip_whitelist: ["5.6.7.8"], expires_in_days: 30,
     acknowledge_messenger_reads_as: JHON, acknowledge_messenger_writes_as: JHON, display_name: "Kappa Bot",
-  });
-  check(aMano.estado === 400 && /todavía no se puede dar: messenger:write/.test(aMano.json.error ?? ""), `crear con messenger:write a mano: 400 → ${d(aMano)}`);
-  check(await llaves() === antes, "y no se creó ninguna key");
-  // La línea base: lo mismo sin write sí crea (el handler y el banco andan).
+  };
+  const antes = await llaves();
+  const sinConfirmar = await gestionar("JHON", { ...escribe, acknowledge_messenger_writes_as: undefined });
+  check(sinConfirmar.estado === 400 && /mandar mensajes en el Messenger a TU nombre/.test(sinConfirmar.json.error ?? ""),
+    `crear con write sin la confirmación: 400 → ${d(sinConfirmar)}`);
+  const confirmaOtro = await gestionar("JHON", { ...escribe, acknowledge_messenger_writes_as: ALVARO });
+  check(confirmaOtro.estado === 400 && /a TU nombre/.test(confirmaOtro.json.error ?? ""), `la confirmación de otro admin no vale: 400 → ${d(confirmaOtro)}`);
+  const sinNombre = await gestionar("JHON", { ...escribe, display_name: undefined });
+  check(sinNombre.estado === 400 && /necesita un nombre visible/.test(sinNombre.json.error ?? ""), `crear con write sin nombre visible: 400 → ${d(sinNombre)}`);
+  const sinLeer = await gestionar("JHON", { ...escribe, scopes: ["messenger:write"] });
+  check(sinLeer.estado === 400 && /va con el de leerlo/.test(sinLeer.json.error ?? ""), `crear con write sin read: 400 → ${d(sinLeer)}`);
+  check(await llaves() === antes, "y ninguno de esos creó una key");
+
+  // En regla: se crea, con el nombre visible y una integración nueva (no la de «BLU»).
+  const creada = await gestionar("JHON", escribe);
+  const integraciones = (await q(`select integracion_id::text i from public.api_keys where id <> $1`, [creada.json.id ?? null])).map((f) => f.i);
+  check(creada.estado === 201 && creada.json.scopes?.join(",") === "messenger:read,messenger:write"
+      && creada.json.api_display_name === "Kappa Bot" && typeof creada.json.key === "string"
+      && typeof creada.json.integracion_id === "string" && !integraciones.includes(creada.json.integracion_id),
+    `crear con messenger:write en regla: 201 con el nombre visible y una integración nueva → ${d(creada)}`);
+  check(await llaves() === antes + 1, "y quedó UNA key");
+  // Su fila de cupo la crea la base (sin ella, la escritura falla cerrada).
+  check(Number((await q(`select count(*)::int c from public.api_escritura_cupos where clave = $1`, [`llave:${creada.json.id}`]))[0].c) === 1,
+    "la base creó la fila de cupo de la key nueva");
+
+  // A una key que ya existe no se le suma write (aunque ya lea el Messenger).
   const lee = await gestionar("JHON", {
     action: "create", name: "Lector", scopes: ["messenger:read"], ip_whitelist: ["5.6.7.8"], expires_in_days: 30, acknowledge_messenger_reads_as: JHON,
   });
   check(lee.estado === 201 && lee.json.scopes?.join(",") === "messenger:read", `crear con messenger:read: 201 → ${d(lee)}`);
   const sumarWrite = await gestionar("JHON", { action: "update", id: lee.json.id, scopes: ["messenger:read", "messenger:write"] });
-  check(sumarWrite.estado === 400 && /todavía no se puede dar/.test(sumarWrite.json.error ?? ""), `editar sumando messenger:write: 400 → ${d(sumarWrite)}`);
+  check(sumarWrite.estado === 400 && /solo se puede poner al crear una key nueva/.test(sumarWrite.json.error ?? ""), `editar sumando messenger:write: 400 → ${d(sumarWrite)}`);
+
+  // La rotación: «Escribe» se revoca y la nueva la reemplaza. Hereda la integración y el
+  // nombre (no hace falta mandarlo). Un nombre de OTRA integración («BLU», de Alvaro)
+  // no se puede usar, y reemplazar una key ajena tampoco.
+  const revocada = await gestionar("JHON", { action: "revoke", id: creada.json.id });
+  check(revocada.estado === 200, `revocar «Escribe»: 200 → ${d(revocada)}`);
+  const ocupado = await gestionar("JHON", { ...escribe, name: "Otra", display_name: "BLU" });
+  check(ocupado.estado === 400 && /ya usó ese nombre visible/.test(ocupado.json.error ?? ""), `el nombre de otra integración: 400 → ${d(ocupado)}`);
+  const ajena = await gestionar("JHON", { ...escribe, name: "Ajena", display_name: undefined, replaces_key_id: LLAVES.BLU.id });
+  check(ajena.estado === 400 && /tiene que ser tuya/.test(ajena.json.error ?? ""), `reemplazar la key de Alvaro: 400 → ${d(ajena)}`);
+  const rotada = await gestionar("JHON", { ...escribe, name: "Escribe 2", display_name: undefined, replaces_key_id: creada.json.id });
+  check(rotada.estado === 201 && rotada.json.integracion_id === creada.json.integracion_id && rotada.json.api_display_name === "Kappa Bot",
+    `la rotación desde una key revocada: 201, misma integración y mismo nombre → ${d(rotada)}`);
+
   // El nombre visible de «BLU» lo cambia solo Alvaro: un admin que no es su dueño, no.
   const ajeno = await gestionar("JHON", { action: "update", id: LLAVES.BLU.id, display_name: "Kappa Bot" });
   check(ajeno.estado === 403 && ajeno.json.error === "Solo la persona dueña de la key puede cambiar su nombre visible",
