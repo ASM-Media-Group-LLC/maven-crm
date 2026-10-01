@@ -14,6 +14,8 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useFormato } from "@/hooks/useFormato";
 import type { Formato } from "@/lib/formato";
+import { useLanguage } from "@/hooks/useLanguage";
+import { crudoEnEspanol, estadoComision, tipoComisionGuardado } from "../estados";
 
 interface Props {
   open: boolean;
@@ -28,6 +30,7 @@ function fmtMonto(n: number, f: Formato) {
 
 export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }: Props) {
   const f = useFormato();
+  const { t, language } = useLanguage();
   const fmt = (n: number) => fmtMonto(n, f);
   const [templateId, setTemplateId] = useState("");
   const [creatorId, setCreatorId] = useState("");
@@ -189,7 +192,7 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Crear Invoice</DialogTitle>
+          <DialogTitle>{t("finanzas.common.createInvoice")}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -197,7 +200,7 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
           <div>
             <Label>Template</Label>
             <Select value={templateId} onValueChange={setTemplateId}>
-              <SelectTrigger><SelectValue placeholder="Seleccionar template" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder={t("finanzas.billing.selectTemplate")} /></SelectTrigger>
               <SelectContent>
                 {templates.map(t => (
                   <SelectItem key={t.id} value={t.id}>
@@ -210,19 +213,19 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
 
           {/* Creator */}
           <div>
-            <Label>Creador</Label>
+            <Label>{t("finanzas.common.creator")}</Label>
             <Popover open={creatorOpen} onOpenChange={setCreatorOpen}>
               <PopoverTrigger asChild>
                 <Button variant="outline" role="combobox" aria-expanded={creatorOpen} className="w-full justify-between font-normal">
-                  {selectedCreator ? (selectedCreator.artistic_name || selectedCreator.name) : "Seleccionar creador"}
+                  {selectedCreator ? (selectedCreator.artistic_name || selectedCreator.name) : t("finanzas.common.selectCreator")}
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="p-0 w-[var(--radix-popover-trigger-width)]" align="start">
                 <Command>
-                  <CommandInput placeholder="Buscar creador..." />
+                  <CommandInput placeholder={t("finanzas.common.searchCreator")} />
                   <CommandList onWheel={(e) => e.stopPropagation()}>
-                    <CommandEmpty>No se encontró creador.</CommandEmpty>
+                    <CommandEmpty>{t("finanzas.common.creatorNotFound")}</CommandEmpty>
                     <CommandGroup>
                       {creators.map(c => (
                         <CommandItem
@@ -248,11 +251,11 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
           {/* Commissions */}
           {creatorId && (
             <div>
-              <Label>Comisiones</Label>
+              <Label>{t("finanzas.common.commissions")}</Label>
               {loadingCommissions ? (
-                <p className="text-sm text-muted-foreground py-2">Cargando comisiones...</p>
+                <p className="text-sm text-muted-foreground py-2">{t("finanzas.billing.new.loadingCommissions")}</p>
               ) : commissions.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-2">No hay comisiones disponibles para este creador.</p>
+                <p className="text-sm text-muted-foreground py-2">{t("finanzas.billing.new.noCommissions")}</p>
               ) : (
                 <div className="max-h-48 overflow-y-auto border border-border rounded-md divide-y divide-border">
                   {commissions.map(c => (
@@ -267,7 +270,7 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{c.period_name || c.period}</p>
                         <p className="text-xs text-muted-foreground">
-                          {c.commission_type} · {c.status}
+                          {crudoEnEspanol(language, tipoComisionGuardado, t, c.commission_type)} · {crudoEnEspanol(language, estadoComision, t, c.status)}
                           {c.estimated_amount != null && ` · ${fmt(c.estimated_amount)}`}
                         </p>
                       </div>
@@ -281,27 +284,27 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
           {/* Summary */}
           {totals.count > 0 && (
             <div className="rounded-md border border-border bg-muted/30 p-3 space-y-1 text-sm">
-              <p className="font-medium text-foreground">{totals.count} comisión{totals.count > 1 ? "es" : ""} seleccionada{totals.count > 1 ? "s" : ""}</p>
+              <p className="font-medium text-foreground">{t(totals.count > 1 ? "finanzas.billing.new.selectedOther" : "finanzas.billing.new.selectedOne", { n: totals.count })}</p>
               {totals.agency > 0 && <p className="text-muted-foreground">Agency: {fmt(totals.agency)}</p>}
               {totals.blue > 0 && <p className="text-muted-foreground">Blue: {fmt(totals.blue)}</p>}
               {totals.paypal > 0 && <p className="text-muted-foreground">PayPal: {fmt(totals.paypal)}</p>}
               <p className="font-semibold text-foreground pt-1 border-t border-border">Total: {fmt(totals.grand)}</p>
-              {totals.dueDate && <p className="text-muted-foreground text-xs">Vencimiento: {new Date(totals.dueDate + "T12:00:00").toLocaleDateString(f.intl("es-ES"), { day: "2-digit", month: "long", year: "numeric" })}</p>}
+              {totals.dueDate && <p className="text-muted-foreground text-xs">{t("finanzas.common.dueDate")}: {new Date(totals.dueDate + "T12:00:00").toLocaleDateString(f.intl("es-ES"), { day: "2-digit", month: "long", year: "numeric" })}</p>}
             </div>
           )}
 
           {/* Notes */}
           <div>
-            <Label>Notas</Label>
-            <Textarea placeholder="Notas opcionales..." value={notes} onChange={e => setNotes(e.target.value)} rows={2} />
+            <Label>{t("finanzas.common.notes")}</Label>
+            <Textarea placeholder={t("finanzas.common.optionalNotes")} value={notes} onChange={e => setNotes(e.target.value)} rows={2} />
           </div>
         </div>
 
         {/* Footer */}
         <div className="flex justify-end gap-2 pt-2">
-          <Button variant="outline" onClick={handleClose}>Cancelar</Button>
+          <Button variant="outline" onClick={handleClose}>{t("common.cancel")}</Button>
           <Button onClick={handleSubmit} disabled={!canSubmit || isPending}>
-            Crear Invoice
+            {t("finanzas.common.createInvoice")}
           </Button>
         </div>
       </DialogContent>

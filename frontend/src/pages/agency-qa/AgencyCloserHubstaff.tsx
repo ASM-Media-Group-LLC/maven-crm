@@ -4,23 +4,17 @@ import { Activity, DollarSign, Users, AlertTriangle, TrendingUp, Phone, Clock } 
 import { useCloserHubstaff } from "./useCloserHubstaff";
 import { useHubstaffSyncStatus } from "./chatters-qa/useHubstaffEffort";
 import { periodLabel } from "./chatters-qa/useChatterScorecards";
+import { useLanguage } from "@/hooks/useLanguage";
+import { ConFormato } from "@/pages/admin/ConFormato";
+import { haceCuanto } from "./haceCuanto";
 
 // Subtab "Hubstaff" de Closers QA. Esfuerzo (horas de Hubstaff) × Cierre (pipeline + QA de llamadas).
 // La actividad% de un closer es baja por naturaleza (está en llamadas) → contexto, no veredicto.
 
-const relativeTime = (iso: string | null): string => {
-  if (!iso) return "sin sincronizar";
-  const min = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
-  if (min < 1) return "recién";
-  if (min < 60) return `hace ${min} min`;
-  const h = Math.floor(min / 60);
-  if (h < 24) return `hace ${h}h`;
-  return `hace ${Math.floor(h / 24)}d`;
-};
-
 const money = (n: number | null | undefined) => "$" + Math.round(n ?? 0).toLocaleString("en-US");
 
 export default function AgencyCloserHubstaff() {
+  const { t, language } = useLanguage();
   const { data: rows = [], isLoading } = useCloserHubstaff();
   const { data: sync } = useHubstaffSyncStatus();
 
@@ -36,7 +30,7 @@ export default function AgencyCloserHubstaff() {
   }, [rows]);
 
   if (isLoading) {
-    return <Card><CardContent className="p-6 text-sm text-muted-foreground">Cargando datos de Hubstaff…</CardContent></Card>;
+    return <Card><CardContent className="p-6 text-sm text-muted-foreground">{t("agencyQa.hubstaff.loading")}</CardContent></Card>;
   }
 
   if (!rows.length) {
@@ -44,7 +38,7 @@ export default function AgencyCloserHubstaff() {
       <Card>
         <CardContent className="space-y-2 p-6 text-sm text-muted-foreground">
           <div className="flex items-center gap-2 font-medium text-foreground"><Clock className="h-4 w-4" /> Hubstaff</div>
-          Todavía no hay actividad de closers cruzada con el pipeline. El micro <code>hubstaff-bridge</code> sincroniza cada 6h.
+          <ConFormato texto={t("agencyQa.closerHs.empty")} piezas={{ code: <code>hubstaff-bridge</code> }} />
         </CardContent>
       </Card>
     );
@@ -55,21 +49,21 @@ export default function AgencyCloserHubstaff() {
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <h3 className="flex items-center gap-2 text-lg font-semibold">
-            <Activity className="h-4 w-4 text-success" /> Esfuerzo vs Cierre
+            <Activity className="h-4 w-4 text-success" /> {t("agencyQa.closerHs.title")}
           </h3>
           <p className="text-sm text-muted-foreground">
-            Horas de Hubstaff cruzadas con el pipeline y la QA de llamadas — {stats && periodLabel(stats.period)}.
+            {t("agencyQa.closerHs.subtitle", { period: stats ? periodLabel(stats.period, language) : "" })}
           </p>
         </div>
-        <span className="text-xs text-muted-foreground">Sincronizado {relativeTime(sync?.last_sync_at ?? null)}</span>
+        <span className="text-xs text-muted-foreground">{t("agencyQa.sync.synced", { when: haceCuanto(sync?.last_sync_at ?? null, t) })}</span>
       </div>
 
       {stats && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatCard icon={Users} label="Closers" value={String(stats.closers)} />
-          <StatCard icon={Clock} label="Horas totales" value={`${stats.totalHours}h`} />
-          <StatCard icon={DollarSign} label="Monetización" value={money(stats.totalMonet)} />
-          <StatCard icon={AlertTriangle} label="Sin cierres" value={String(stats.sinCierres)}
+          <StatCard icon={Clock} label={t("common.totalHours")} value={`${stats.totalHours}h`} />
+          <StatCard icon={DollarSign} label={t("agencyQa.closerHs.monetization")} value={money(stats.totalMonet)} />
+          <StatCard icon={AlertTriangle} label={t("agencyQa.closerHs.noCloses")} value={String(stats.sinCierres)}
             tone={stats.sinCierres ? "warn" : "ok"} />
         </div>
       )}
@@ -81,14 +75,14 @@ export default function AgencyCloserHubstaff() {
               <thead>
                 <tr className="border-b border-border text-xs text-muted-foreground">
                   <th className="px-4 py-3 text-left font-semibold">Closer</th>
-                  <th className="px-3 py-3 text-right font-semibold">Horas</th>
-                  <th className="px-3 py-3 text-right font-semibold">Activ.</th>
+                  <th className="px-3 py-3 text-right font-semibold">{t("common.hours")}</th>
+                  <th className="px-3 py-3 text-right font-semibold">{t("agencyQa.activityShort")}</th>
                   <th className="px-3 py-3 text-right font-semibold">Leads</th>
-                  <th className="px-3 py-3 text-right font-semibold">Cerradas</th>
-                  <th className="px-3 py-3 text-right font-semibold">Monetización</th>
-                  <th className="px-3 py-3 text-right font-semibold"><DollarSign className="inline h-3 w-3" />/hora</th>
+                  <th className="px-3 py-3 text-right font-semibold">{t("agencyQa.closerHs.closed")}</th>
+                  <th className="px-3 py-3 text-right font-semibold">{t("agencyQa.closerHs.monetization")}</th>
+                  <th className="px-3 py-3 text-right font-semibold"><DollarSign className="inline h-3 w-3" />{t("agencyQa.col.perHour")}</th>
                   <th className="px-3 py-3 text-right font-semibold"><Phone className="inline h-3 w-3" /> QA</th>
-                  <th className="px-4 py-3 text-left font-semibold">Estado</th>
+                  <th className="px-4 py-3 text-left font-semibold">{t("common.status")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -110,11 +104,11 @@ export default function AgencyCloserHubstaff() {
                       <td className="px-4 py-2.5">
                         {r.sin_cierres ? (
                           <span className="inline-flex items-center gap-1 rounded-full bg-warning/15 px-2 py-0.5 text-[11px] font-medium text-warning">
-                            <AlertTriangle className="h-3 w-3" /> trabaja, no cierra
+                            <AlertTriangle className="h-3 w-3" /> {t("agencyQa.closerHs.worksNoClose")}
                           </span>
                         ) : r.cerradas > 0 && uph >= 50 ? (
                           <span className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-medium text-success">
-                            <TrendingUp className="h-3 w-3" /> rinde
+                            <TrendingUp className="h-3 w-3" /> {t("agencyQa.performs")}
                           </span>
                         ) : (
                           <span className="text-[11px] text-muted-foreground">—</span>
@@ -130,9 +124,7 @@ export default function AgencyCloserHubstaff() {
       </Card>
 
       <p className="px-1 text-[11px] leading-relaxed text-muted-foreground">
-        <strong>Actividad%</strong> en closers suele ser baja porque están en llamadas (hablan, no teclean) — es contexto, no se castiga.
-        <strong> Monetización</strong> y <strong>cerradas</strong> salen del pipeline actual (Confirmada/Completada); <strong>QA</strong> = nº de llamadas analizadas · score promedio.
-        "Trabaja, no cierra" = ≥20h sin cierres en el pipeline → revisar.
+        <ConFormato texto={t("agencyQa.closerHs.footnote")} />
       </p>
     </div>
   );

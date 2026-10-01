@@ -25,12 +25,15 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Card, CardContent } from "@/components/ui/card";
 import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
-import { DEDUCTION_DISPLAY_TYPES, DEDUCTION_STATUSES, INFRACTION_CATEGORIES } from "@/lib/hrConstants";
+import { DEDUCTION_DISPLAY_TYPES, DEDUCTION_STATUSES } from "@/lib/hrConstants";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { PageHeader } from "@/components/ui/page-header";
 import { useFormato } from "@/hooks/useFormato";
 import type { Formato } from "@/lib/formato";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
+import { etiqueta, deSiempreSalvoEnIngles, CATEGORIA_INFRACCION, ESTADO_DEDUCCION, TIPO_DEDUCCION } from "./etiquetasRrhh";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface DeductionRecord {
@@ -99,15 +102,17 @@ function formatAmount(f: Formato, amount: number): string {
   return new Intl.NumberFormat(f.intl("es-CO"), { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(amount);
 }
 
-const STATUS_BADGE: Record<string, { variant: "default" | "secondary" | "destructive"; label: string }> = {
-  pending: { variant: "secondary", label: "Pendiente" },
-  applied: { variant: "default", label: "Aplicada" },
-  rejected: { variant: "destructive", label: "Rechazada" },
+const STATUS_BADGE: Record<string, { variant: "default" | "secondary" | "destructive"; label: TranslationKey }> = {
+  pending: { variant: "secondary", label: "hr.opt.dedStatus.pending" },
+  applied: { variant: "default", label: "hr.opt.dedStatus.applied" },
+  rejected: { variant: "destructive", label: "hr.opt.dedStatus.rejected" },
 };
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function HRDeductions() {
+  const { t } = useLanguage();
   const f = useFormato();
+  const DMY = f.idioma === "en" ? "MM/dd/yyyy" : "dd/MM/yyyy";
   const navigate = useNavigate();
   const { data: deductions = [], isLoading } = useDeductions();
   const { data: departments = [] } = useDepartments();
@@ -137,10 +142,10 @@ export default function HRDeductions() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employee-deductions-all"] });
-      toast({ title: "Deducción eliminada" });
+      toast({ title: t("hr.ded.deleted") });
       setDeleteItem(null);
     },
-    onError: () => toast({ title: "Error al eliminar", variant: "destructive" }),
+    onError: () => toast({ title: t("common.errorDeleting"), variant: "destructive" }),
   });
 
   // ─── KPIs ─────────────────────────────────────────────────────────────────
@@ -176,11 +181,11 @@ export default function HRDeductions() {
       {/* ── Fixed Header ──────────────────────────────────────────────────── */}
       <header className="shrink-0 bg-background/30 backdrop-blur-xl border-b border-white/10 px-6 pt-6 pb-4">
         <PageHeader
-          title="Deducciones"
-          subtitle={`Gestión de adelantos e infracciones · ${deductions.length} registros`}
+          title={t("hr.ded.title")}
+          subtitle={t(deductions.length === 1 ? "hr.ded.subtitle.one" : "hr.ded.subtitle.other", { count: deductions.length })}
           actions={
             <Button size="sm" onClick={() => navigate("/hr/deducciones/nuevo")}>
-              <Plus className="h-4 w-4 mr-1" />Nueva Deducción
+              <Plus className="h-4 w-4 mr-1" />{t("hr.ded.new")}
             </Button>
           }
         />
@@ -195,17 +200,17 @@ export default function HRDeductions() {
             Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
           ) : (
             <>
-              <StatChip label="Total Deducciones" value={String(deductions.length)} icon={<DollarSign className="h-3.5 w-3.5" />} color="bg-primary" hint="Todos los registros" onClick={() => setKpiPopup("total")} />
-              <StatChip label="Pendientes" value={String(totalPending)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" hint={deductions.length > 0 ? `${((totalPending / deductions.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("pending")} />
-              <StatChip label="Aplicadas" value={String(totalApplied)} icon={<CheckCircle className="h-3.5 w-3.5" />} color="bg-success" hint={deductions.length > 0 ? `${((totalApplied / deductions.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("applied")} />
-              <StatChip label="Monto Total" value={formatAmount(f, totalAmount)} icon={<Wallet className="h-3.5 w-3.5" />} color="bg-destructive" hint="Suma de todas las deducciones" onClick={() => setKpiPopup("amount")} />
+              <StatChip label={t("hr.ded.total")} value={String(deductions.length)} icon={<DollarSign className="h-3.5 w-3.5" />} color="bg-primary" hint={t("hr.allRecords")} onClick={() => setKpiPopup("total")} />
+              <StatChip label={t("common.pendingPl")} value={String(totalPending)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" hint={deductions.length > 0 ? t("hr.pctOfTotal", { pct: ((totalPending / deductions.length) * 100).toFixed(0) }) : "—"} onClick={() => setKpiPopup("pending")} />
+              <StatChip label={t("hr.ded.applied")} value={String(totalApplied)} icon={<CheckCircle className="h-3.5 w-3.5" />} color="bg-success" hint={deductions.length > 0 ? t("hr.pctOfTotal", { pct: ((totalApplied / deductions.length) * 100).toFixed(0) }) : "—"} onClick={() => setKpiPopup("applied")} />
+              <StatChip label={t("hr.ded.totalAmount")} value={formatAmount(f, totalAmount)} icon={<Wallet className="h-3.5 w-3.5" />} color="bg-destructive" hint={t("hr.ded.totalAmountHint")} onClick={() => setKpiPopup("amount")} />
             </>
           )}
         </div>
 
         {/* Department Tabs */}
         <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1">
-          <Button variant={!deptTab ? "secondary" : "ghost"} size="sm" onClick={() => setDeptTab("")}>Todos</Button>
+          <Button variant={!deptTab ? "secondary" : "ghost"} size="sm" onClick={() => setDeptTab("")}>{t("common.all")}</Button>
           {departments.map((d) => (
             <Button key={d.id} variant={deptTab === d.id ? "secondary" : "ghost"} size="sm" onClick={() => setDeptTab(d.id)}>{d.name}</Button>
           ))}
@@ -213,9 +218,9 @@ export default function HRDeductions() {
 
         {/* Type Sub-tabs */}
         <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1">
-          <Button variant={!typeTab ? "secondary" : "ghost"} size="sm" onClick={() => setTypeTab("")}>Todos</Button>
-          {DEDUCTION_DISPLAY_TYPES.map((t) => (
-            <Button key={t.value} variant={typeTab === t.value ? "secondary" : "ghost"} size="sm" onClick={() => setTypeTab(t.value)}>{t.label}</Button>
+          <Button variant={!typeTab ? "secondary" : "ghost"} size="sm" onClick={() => setTypeTab("")}>{t("common.all")}</Button>
+          {DEDUCTION_DISPLAY_TYPES.map((dt) => (
+            <Button key={dt.value} variant={typeTab === dt.value ? "secondary" : "ghost"} size="sm" onClick={() => setTypeTab(dt.value)}>{etiqueta(t, TIPO_DEDUCCION, dt.value, dt.label)}</Button>
           ))}
         </div>
 
@@ -223,21 +228,21 @@ export default function HRDeductions() {
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Buscar empleado..." className="pl-8" value={search} onChange={(e) => setSearch(e.target.value)} />
+            <Input placeholder={t("hr.searchEmployee")} className="pl-8" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
 
           <Select value={statusFilter || undefined} onValueChange={(v) => setStatusFilter(v === "__all__" ? "" : v)}>
-            <SelectTrigger className="w-36"><SelectValue placeholder="Estado" /></SelectTrigger>
+            <SelectTrigger className="w-36"><SelectValue placeholder={t("common.status")} /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="__all__">Todos</SelectItem>
-              {DEDUCTION_STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+              <SelectItem value="__all__">{t("common.all")}</SelectItem>
+              {DEDUCTION_STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{etiqueta(t, ESTADO_DEDUCCION, s.value, s.label)}</SelectItem>)}
             </SelectContent>
           </Select>
 
           <DateRangePicker
             from={dateFrom}
             to={dateTo}
-            onApply={(f, t) => { setDateFrom(f); setDateTo(t); }}
+            onApply={(desde, hasta) => { setDateFrom(desde); setDateTo(hasta); }}
           />
 
           {/* View toggle */}
@@ -252,7 +257,7 @@ export default function HRDeductions() {
 
           {hasFilters && (
             <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={clearFilters}>
-              <X className="h-3.5 w-3.5 mr-1" />Limpiar filtros
+              <X className="h-3.5 w-3.5 mr-1" />{t("hr.clearFilters")}
             </Button>
           )}
         </div>
@@ -264,13 +269,13 @@ export default function HRDeductions() {
               <Table>
                 <TableHeader>
                   <TableRow className="sticky top-0 z-10 bg-card border-b">
-                    <TableHead className="text-xs font-medium text-muted-foreground">Empleado</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">Tipo</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">Categoría</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">Monto</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">Fecha</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">Estado</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground sticky right-0 bg-card">Acciones</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">{t("hr.employee")}</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">{t("common.type")}</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">{t("common.category")}</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">{t("hr.ded.amount")}</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">{t("common.date")}</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">{t("common.status")}</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground sticky right-0 bg-card">{t("common.actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -282,9 +287,9 @@ export default function HRDeductions() {
                     <TableRow>
                       <TableCell colSpan={7}>
                         {deductions.length === 0 ? (
-                          <EmptyState seed="hr-deducciones" title="No hay deducciones registradas" description={'Haz clic en "Nueva Deducción" para empezar.'} />
+                          <EmptyState seed="hr-deducciones" title={t("hr.ded.empty")} description={t("hr.ded.emptyHint")} />
                         ) : (
-                          <EmptyState seed="hr-deducciones" title="Sin resultados" description="No hay coincidencias con los filtros aplicados." />
+                          <EmptyState seed="hr-deducciones" title={t("common.noResultsShort")} description={t("common.noMatches")} />
                         )}
                       </TableCell>
                     </TableRow>
@@ -293,9 +298,9 @@ export default function HRDeductions() {
                       const emp = ded.employees;
                       const fullName = emp ? `${emp.first_name} ${emp.last_name}` : "—";
                       const initials = emp ? getInitials(emp.first_name, emp.last_name) : "?";
-                      const typeLabel = DEDUCTION_DISPLAY_TYPES.find((t) => t.value === ded.deduction_type)?.label ?? ded.deduction_type;
+                      const typeLabel = etiqueta(t, TIPO_DEDUCCION, ded.deduction_type);
                       const category = ded.deduction_type === "infraccion" ? parseCategory(ded.description) : null;
-                      const catLabel = category ? (INFRACTION_CATEGORIES.find((c) => c.value === category)?.label ?? category) : "—";
+                      const catLabel = category ? etiqueta(t, CATEGORIA_INFRACCION, category) : "—";
                       const badge = STATUS_BADGE[ded.status] ?? STATUS_BADGE.pending;
                       return (
                         <TableRow key={ded.id} className="group hover:bg-muted/30 transition-colors">
@@ -318,20 +323,20 @@ export default function HRDeductions() {
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">{catLabel}</TableCell>
                           <TableCell className="text-sm font-medium">{formatAmount(f, ded.amount)}</TableCell>
-                          <TableCell className="text-sm whitespace-nowrap">{format(new Date(ded.created_at), "dd/MM/yyyy")}</TableCell>
+                          <TableCell className="text-sm whitespace-nowrap">{format(new Date(ded.created_at), DMY)}</TableCell>
                           <TableCell>
-                            <Badge variant={badge.variant}>{badge.label}</Badge>
+                            <Badge variant={badge.variant}>{t(badge.label)}</Badge>
                           </TableCell>
                           <TableCell className="sticky right-0 bg-card group-hover:bg-muted/30">
                             <div className="flex items-center gap-1">
                               <Tooltip><TooltipTrigger asChild>
                                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setViewItem(ded)}><Eye className="h-3.5 w-3.5" /></Button>
-                              </TooltipTrigger><TooltipContent side="left">Ver</TooltipContent></Tooltip>
+                              </TooltipTrigger><TooltipContent side="left">{t("common.view")}</TooltipContent></Tooltip>
                               <Tooltip><TooltipTrigger asChild>
                                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => setDeleteItem(ded)}>
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </Button>
-                              </TooltipTrigger><TooltipContent side="left">Eliminar</TooltipContent></Tooltip>
+                              </TooltipTrigger><TooltipContent side="left">{t("common.delete")}</TooltipContent></Tooltip>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -351,9 +356,9 @@ export default function HRDeductions() {
               </div>
             ) : filtered.length === 0 ? (
               deductions.length === 0 ? (
-                <EmptyState seed="hr-deducciones" title="No hay deducciones registradas" description={'Haz clic en "Nueva Deducción" para empezar.'} />
+                <EmptyState seed="hr-deducciones" title={t("hr.ded.empty")} description={t("hr.ded.emptyHint")} />
               ) : (
-                <EmptyState seed="hr-deducciones" title="Sin resultados" description="No hay coincidencias con los filtros aplicados." />
+                <EmptyState seed="hr-deducciones" title={t("common.noResultsShort")} description={t("common.noMatches")} />
               )
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -361,7 +366,7 @@ export default function HRDeductions() {
                   const emp = ded.employees;
                   const fullName = emp ? `${emp.first_name} ${emp.last_name}` : "—";
                   const initials = emp ? getInitials(emp.first_name, emp.last_name) : "?";
-                  const typeLabel = DEDUCTION_DISPLAY_TYPES.find((t) => t.value === ded.deduction_type)?.label ?? ded.deduction_type;
+                  const typeLabel = etiqueta(t, TIPO_DEDUCCION, ded.deduction_type);
                   const badge = STATUS_BADGE[ded.status] ?? STATUS_BADGE.pending;
                   return (
                     <Card key={ded.id} className="group hover:shadow-md transition-all">
@@ -383,10 +388,10 @@ export default function HRDeductions() {
                             {ded.deduction_type === "adelanto" ? <Wallet className="h-3.5 w-3.5 text-muted-foreground" /> : <AlertTriangle className="h-3.5 w-3.5 text-destructive" />}
                             {typeLabel}
                           </div>
-                          <p className="text-xs text-muted-foreground">{format(new Date(ded.created_at), "dd/MM/yyyy")}</p>
+                          <p className="text-xs text-muted-foreground">{format(new Date(ded.created_at), DMY)}</p>
                         </div>
                         <div className="flex items-center justify-between pt-1">
-                          <Badge variant={badge.variant} className="text-xs">{badge.label}</Badge>
+                          <Badge variant={badge.variant} className="text-xs">{t(badge.label)}</Badge>
                           <div className="flex items-center gap-1">
                             <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setViewItem(ded)}><Eye className="h-3.5 w-3.5" /></Button>
                             <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => setDeleteItem(ded)}>
@@ -406,7 +411,7 @@ export default function HRDeductions() {
         {/* Results counter */}
         {!isLoading && filtered.length > 0 && (
           <p className="text-xs text-muted-foreground">
-            Mostrando {filtered.length} de {deductions.length} deducciones
+            {t(deductions.length === 1 ? "hr.ded.showing.one" : "hr.ded.showing.other", { shown: filtered.length, total: deductions.length })}
           </p>
         )}
       </div>
@@ -414,24 +419,24 @@ export default function HRDeductions() {
       {/* ── View Modal ─────────────────────────────────────────────────────── */}
       <Dialog open={!!viewItem} onOpenChange={() => setViewItem(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Detalle de Deducción</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t("hr.ded.detail")}</DialogTitle></DialogHeader>
           {viewItem && (() => {
-            const typeLabel = DEDUCTION_DISPLAY_TYPES.find((t) => t.value === viewItem.deduction_type)?.label ?? viewItem.deduction_type;
+            const typeLabel = etiqueta(t, TIPO_DEDUCCION, viewItem.deduction_type);
             const category = viewItem.deduction_type === "infraccion" ? parseCategory(viewItem.description) : null;
-            const catLabel = category ? (INFRACTION_CATEGORIES.find((c) => c.value === category)?.label ?? category) : null;
+            const catLabel = category ? etiqueta(t, CATEGORIA_INFRACCION, category) : null;
             const descText = parseDescription(viewItem.description);
             const badge = STATUS_BADGE[viewItem.status] ?? STATUS_BADGE.pending;
             return (
               <div className="space-y-3 text-sm">
                 <div className="grid grid-cols-2 gap-3">
-                  <div><Label className="text-muted-foreground">Empleado</Label><p className="font-medium">{viewItem.employees ? `${viewItem.employees.first_name} ${viewItem.employees.last_name}` : "—"}</p></div>
-                  <div><Label className="text-muted-foreground">Tipo</Label><p className="font-medium">{typeLabel}</p></div>
-                  {catLabel && <div><Label className="text-muted-foreground">Categoría</Label><p className="font-medium">{catLabel}</p></div>}
-                  <div><Label className="text-muted-foreground">Monto</Label><p className="font-medium">{formatAmount(f, viewItem.amount)}</p></div>
-                  <div><Label className="text-muted-foreground">Fecha</Label><p className="font-medium">{format(new Date(viewItem.created_at), "dd/MM/yyyy")}</p></div>
-                  <div><Label className="text-muted-foreground">Estado</Label><Badge variant={badge.variant}>{badge.label}</Badge></div>
+                  <div><Label className="text-muted-foreground">{t("hr.employee")}</Label><p className="font-medium">{viewItem.employees ? `${viewItem.employees.first_name} ${viewItem.employees.last_name}` : "—"}</p></div>
+                  <div><Label className="text-muted-foreground">{t("common.type")}</Label><p className="font-medium">{typeLabel}</p></div>
+                  {catLabel && <div><Label className="text-muted-foreground">{t("common.category")}</Label><p className="font-medium">{catLabel}</p></div>}
+                  <div><Label className="text-muted-foreground">{t("hr.ded.amount")}</Label><p className="font-medium">{formatAmount(f, viewItem.amount)}</p></div>
+                  <div><Label className="text-muted-foreground">{t("common.date")}</Label><p className="font-medium">{format(new Date(viewItem.created_at), DMY)}</p></div>
+                  <div><Label className="text-muted-foreground">{t("common.status")}</Label><Badge variant={badge.variant}>{t(badge.label)}</Badge></div>
                 </div>
-                {descText && <div><Label className="text-muted-foreground">Descripción</Label><p>{descText}</p></div>}
+                {descText && <div><Label className="text-muted-foreground">{t("common.description")}</Label><p>{descText}</p></div>}
               </div>
             );
           })()}
@@ -442,13 +447,13 @@ export default function HRDeductions() {
       <AlertDialog open={!!deleteItem} onOpenChange={() => setDeleteItem(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar deducción?</AlertDialogTitle>
-            <AlertDialogDescription>Esta acción no se puede deshacer. Se eliminará permanentemente esta deducción de {formatAmount(f, deleteItem?.amount ?? 0)}.</AlertDialogDescription>
+            <AlertDialogTitle>{t("hr.ded.deleteTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("hr.ded.deleteDesc", { amount: formatAmount(f, deleteItem?.amount ?? 0) })}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel />
             <AlertDialogAction onClick={() => deleteItem && deleteMutation.mutate(deleteItem.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              {deleteMutation.isPending ? "Eliminando..." : "Eliminar"}
+              {deleteMutation.isPending ? t("hr.deleting") : t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -459,10 +464,10 @@ export default function HRDeductions() {
         onOpenChange={(o) => !o && setKpiPopup(null)}
         title={(() => {
           switch (kpiPopup) {
-            case "total": return `Total Deducciones — ${deductions.length}`;
-            case "pending": return `Pendientes — ${totalPending}`;
-            case "applied": return `Aplicadas — ${totalApplied}`;
-            case "amount": return `Monto Total — ${formatAmount(f, totalAmount)}`;
+            case "total": return `${t("hr.ded.total")} — ${deductions.length}`;
+            case "pending": return `${t("common.pendingPl")} — ${totalPending}`;
+            case "applied": return `${t("hr.ded.applied")} — ${totalApplied}`;
+            case "amount": return `${t("hr.ded.totalAmount")} — ${formatAmount(f, totalAmount)}`;
             default: return "";
           }
         })()}
@@ -474,12 +479,13 @@ export default function HRDeductions() {
           const tone = (status: string): KpiRow["rightTone"] =>
             status === "applied" ? "success" : status === "pending" ? "warning" : "default";
           return list.slice(0, 100).map((d: any): KpiRow => ({
-            primary: d.employee_name ?? d.reason ?? "Sin concepto",
-            secondary: d.month_year ?? d.deduction_type ?? undefined,
+            primary: d.employee_name ?? d.reason ?? t("hr.ded.noConcept"),
+            secondary: d.month_year ?? (d.deduction_type != null ? deSiempreSalvoEnIngles(f.idioma, t, TIPO_DEDUCCION, d.deduction_type, d.deduction_type) : undefined),
             right: formatAmount(f, d.amount || 0),
             rightTone: tone(d.status ?? ""),
           }));
         })()}
+        emptyText={t("hr.kpiEmpty")}
       />
     </div>
   );

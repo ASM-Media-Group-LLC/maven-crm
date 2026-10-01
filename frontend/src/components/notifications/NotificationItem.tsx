@@ -4,7 +4,26 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import type { Notification } from "@/hooks/useNotifications";
 import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 import { getModuleIcon, getTypeIcon, getPriorityDotClass } from "@/lib/notificationHelpers";
+
+// El chip del módulo de origen muestra `module_origin`, que es el valor guardado
+// en la base. En español se deja tal cual (como siempre); en inglés, los que
+// tienen nombre en español se dicen con el diccionario. Los que ya son un
+// nombre propio (messenger, closers, leadgen, tickets, admin) quedan igual.
+const MODULO_EN_INGLES: Record<string, TranslationKey> = {
+  creadores: "shared.notif.module.creadores",
+  "chatter-evaluator": "shared.notif.module.chatterEvaluator",
+  finanzas: "shared.notif.module.finanzas",
+  tareas: "shared.notif.module.tareas",
+  eventos: "shared.notif.module.eventos",
+  correo: "shared.notif.module.correo",
+  "comunicación": "shared.notif.module.comunicacion",
+  comunicacion: "shared.notif.module.comunicacion",
+  hr: "shared.notif.module.hr",
+  rrhh: "shared.notif.module.hr",
+};
 
 interface Props {
   notification: Notification;
@@ -16,9 +35,16 @@ interface Props {
 
 export default function NotificationItem({ notification: n, onClickNotification, onArchive, onDelete, showArchive }: Props) {
   const f = useFormato();
+  const { t, language } = useLanguage();
   const ModuleIcon = n.module_origin ? getModuleIcon(n.module_origin) : getTypeIcon(n.type);
   const isUnread = n.status === "new" || (!n.status && !n.is_read);
   const dotClass = getPriorityDotClass(n.priority);
+  const claveModulo = n.module_origin ? MODULO_EN_INGLES[n.module_origin.toLowerCase()] : undefined;
+  // Con etiqueta del diccionario ya viene en sentence case («Chatter evaluator»):
+  // `capitalize` la pasaría a «Chatter Evaluator». Solo el valor crudo de la base
+  // (español, o uno sin traducción como «messenger») se sigue capitalizando.
+  const usaDiccionario = language === "en" && !!claveModulo;
+  const nombreModulo = usaDiccionario && claveModulo ? t(claveModulo) : n.module_origin;
 
   return (
     <div
@@ -44,8 +70,8 @@ export default function NotificationItem({ notification: n, onClickNotification,
             {formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: f.fechas })}
           </p>
           {n.module_origin && (
-            <span className="text-[10px] px-1.5 py-0 rounded bg-muted text-muted-foreground capitalize">
-              {n.module_origin}
+            <span className={`text-[10px] px-1.5 py-0 rounded bg-muted text-muted-foreground${usaDiccionario ? "" : " capitalize"}`}>
+              {nombreModulo}
             </span>
           )}
         </div>
@@ -60,6 +86,7 @@ export default function NotificationItem({ notification: n, onClickNotification,
                 variant="ghost"
                 size="icon"
                 className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                aria-label={t("shared.notif.archive")}
                 onClick={(e) => {
                   e.stopPropagation();
                   onArchive(n.id);
@@ -68,7 +95,7 @@ export default function NotificationItem({ notification: n, onClickNotification,
                 <Archive className="h-3 w-3" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Archivar</TooltipContent>
+            <TooltipContent>{t("shared.notif.archive")}</TooltipContent>
           </Tooltip>
         )}
         {onDelete && (
@@ -78,6 +105,7 @@ export default function NotificationItem({ notification: n, onClickNotification,
                 variant="ghost"
                 size="icon"
                 className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
+                aria-label={t("common.delete")}
                 onClick={(e) => {
                   e.stopPropagation();
                   onDelete(n.id);
@@ -86,7 +114,7 @@ export default function NotificationItem({ notification: n, onClickNotification,
                 <Trash2 className="h-3 w-3" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Eliminar</TooltipContent>
+            <TooltipContent>{t("common.delete")}</TooltipContent>
           </Tooltip>
         )}
       </div>

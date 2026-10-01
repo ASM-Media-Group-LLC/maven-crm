@@ -37,6 +37,8 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useFormato } from "@/hooks/useFormato";
 import type { Formato } from "@/lib/formato";
+import { useLanguage } from "@/hooks/useLanguage";
+import { ConFormato } from "@/pages/admin/ConFormato";
 import {
   useQaCalls,
   useFireQaWebhook,
@@ -78,6 +80,7 @@ const StatusBadge = ({
 }: {
   status: ReturnType<typeof computeStatus>;
 }) => {
+  const { t } = useLanguage();
   if (status === "ready") {
     return (
       <Badge
@@ -85,7 +88,7 @@ const StatusBadge = ({
         className="gap-1 border-success/40 text-success"
       >
         <CheckCircle2 className="h-3 w-3" />
-        Listo
+        {t("agencyQa.history.ready")}
       </Badge>
     );
   }
@@ -96,7 +99,7 @@ const StatusBadge = ({
         className="gap-1 border-warning/40 text-warning"
       >
         <Clock className="h-3 w-3" />
-        Sin análisis
+        {t("agencyQa.history.noAnalysis")}
       </Badge>
     );
   }
@@ -104,7 +107,7 @@ const StatusBadge = ({
     return (
       <Badge variant="outline" className="gap-1 border-primary/40 text-primary">
         <Loader2 className="h-3 w-3 animate-spin" />
-        Procesando…
+        {t("agencyQa.processing")}
       </Badge>
     );
   }
@@ -112,14 +115,14 @@ const StatusBadge = ({
     return (
       <Badge variant="outline" className="gap-1 border-destructive/40 text-destructive">
         <AlertTriangle className="h-3 w-3" />
-        Falló
+        {t("agencyQa.history.failed")}
       </Badge>
     );
   }
   return (
     <Badge variant="outline" className="gap-1 border-destructive/40 text-destructive">
       <AlertCircle className="h-3 w-3" />
-      Sin transcript
+      {t("agencyQa.history.noTranscript")}
     </Badge>
   );
 };
@@ -172,6 +175,7 @@ interface AgencyQaHistoryProps {
 }
 
 const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
+  const { t } = useLanguage();
   const f = useFormato();
   const { user } = useAuth();
   const profileQ = useMyProfile();
@@ -185,12 +189,12 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
   const handleRetry = (e: React.MouseEvent, callId: string) => {
     e.stopPropagation();
     if (reprocess.isPending) return;
-    toast.loading("Reprocesando…", { id: `retry-${callId}` });
+    toast.loading(t("agencyQa.history.reprocessing"), { id: `retry-${callId}` });
     reprocess
       .mutateAsync(callId)
-      .then((r) => toast.success(`Listo · score ${r.score}/100`, { id: `retry-${callId}` }))
+      .then((r) => toast.success(t("agencyQa.history.retryDone", { score: r.score }), { id: `retry-${callId}` }))
       .catch((err) =>
-        toast.error("Falló de nuevo", { id: `retry-${callId}`, description: (err as Error).message }),
+        toast.error(t("agencyQa.history.retryFailed"), { id: `retry-${callId}`, description: (err as Error).message }),
       );
   };
   const { canAccess } = usePermissions();
@@ -254,10 +258,10 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
     const target = pendingResend;
     try {
       await fireWebhook.mutateAsync({ callId: target.id });
-      toast.success("Email reenviado");
+      toast.success(t("agencyQa.emailResent"));
       setPendingResend(null);
     } catch (err) {
-      toast.error("No se pudo reenviar el email", {
+      toast.error(t("agencyQa.couldNotResend"), {
         description: (err as Error).message,
       });
     }
@@ -276,10 +280,10 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
     if (!pendingDelete) return;
     try {
       await deleteCall.mutateAsync(pendingDelete.id);
-      toast.success("QA borrada");
+      toast.success(t("agencyQa.history.deleted"));
       setPendingDelete(null);
     } catch (err) {
-      toast.error("No se pudo borrar la QA", {
+      toast.error(t("agencyQa.history.couldNotDelete"), {
         description: (err as Error).message,
       });
     }
@@ -289,12 +293,10 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
     <div className="space-y-4">
       <div>
         <h2 className="text-base font-semibold">
-          {isAdmin ? "Historial de QAs" : "Mis QAs recientes"}
+          {isAdmin ? t("agencyQa.history.titleAll") : t("agencyQa.history.titleMine")}
         </h2>
         <p className="text-xs text-muted-foreground">
-          {isAdmin
-            ? "Listado completo de todas las QAs del equipo. Click en una fila para ver el detalle."
-            : "Las llamadas que tú subiste. Click en una fila para ver el detalle completo."}
+          {isAdmin ? t("agencyQa.history.subtitleAll") : t("agencyQa.history.subtitleMine")}
         </p>
       </div>
 
@@ -303,18 +305,15 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
           {callsQ.isLoading ? (
             <div className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Cargando…
+              {t("common.loading")}
             </div>
           ) : visibleCalls.length === 0 ? (
             <div className="space-y-2 p-6 text-center text-sm">
               <p className="text-muted-foreground">
-                {isAdmin
-                  ? "Todavía no hay QAs cargadas."
-                  : "Todavía no subiste ninguna QA."}
+                {isAdmin ? t("agencyQa.history.emptyAll") : t("agencyQa.history.emptyMine")}
               </p>
               <p className="text-xs text-muted-foreground">
-                Ve al tab Nueva QA, sube el audio de una llamada y al volver
-                aquí verás el estado del análisis.
+                {t("agencyQa.history.emptyHint", { tab: t("agencyQa.tab.newQa") })}
               </p>
             </div>
           ) : (
@@ -325,19 +324,19 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
                     Score
                   </TableHead>
                   <TableHead className="text-xs font-bold">
-                    Fecha
+                    {t("common.date")}
                   </TableHead>
                   <TableHead className="text-xs font-bold">
-                    Modelo
+                    {t("agencyQa.model")}
                   </TableHead>
                   <TableHead className="text-xs font-bold">
-                    Cerrador
+                    {t("agencyQa.history.closer")}
                   </TableHead>
                   <TableHead className="text-xs font-bold">
-                    Estado
+                    {t("common.status")}
                   </TableHead>
                   <TableHead className="w-[120px] text-right text-xs font-bold">
-                    Acciones
+                    {t("common.actions")}
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -345,8 +344,8 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
                 {visibleCalls.map((call) => {
                   const status = computeStatus(call);
                   const label =
-                    `${call.model?.name ?? "(sin modelo)"} · ${
-                      call.closer?.name ?? "(sin closer)"
+                    `${call.model?.name ?? t("agencyQa.noModel")} · ${
+                      call.closer?.name ?? t("agencyQa.noCloser")
                     }`;
                   return (
                     <TableRow
@@ -382,18 +381,18 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
                             {/* Ventas (≠ reclutamiento): a creadora propia vs modelo externa */}
                             {call.call_type === "venta_servicio" && (
                               <span className="rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary whitespace-nowrap">
-                                Venta: {call.service_sold || "servicio"}
+                                {t("agencyQa.saleBadge", { service: call.service_sold || t("agencyQa.serviceFallback") })}
                               </span>
                             )}
                             {call.call_type === "venta_externa" && (
                               <span className="rounded-full border border-warning/40 bg-warning/10 px-2 py-0.5 text-[10px] font-semibold text-warning whitespace-nowrap">
-                                Externa: {call.service_sold || "plataforma"}
+                                {t("agencyQa.externalBadge", { service: call.service_sold || t("agencyQa.platformFallback") })}
                               </span>
                             )}
                           </div>
                         ) : (
                           <span className="text-sm text-muted-foreground">
-                            (sin modelo)
+                            {t("agencyQa.noModel")}
                           </span>
                         )}
                       </TableCell>
@@ -401,7 +400,7 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
                       <TableCell className="text-sm">
                         {call.closer?.name ?? (
                           <span className="text-muted-foreground">
-                            (sin closer)
+                            {t("agencyQa.noCloser")}
                           </span>
                         )}
                       </TableCell>
@@ -412,10 +411,10 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
                           {status === "ready" && (
                             <span
                               className="hidden items-center gap-0.5 text-[11px] text-success lg:flex"
-                              title="Análisis IA generado"
+                              title={t("agencyQa.history.aiGenerated")}
                             >
                               <Sparkles className="h-3 w-3" />
-                              IA
+                              {t("agencyQa.qual.ai")}
                             </span>
                           )}
                         </div>
@@ -429,7 +428,7 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
                               onClick={(e) => handleRetry(e, call.id)}
                               disabled={reprocess.isPending}
                               className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary disabled:opacity-50"
-                              title="Reintentar transcripción + análisis"
+                              title={t("agencyQa.history.retry")}
                             >
                               <RotateCw className={reprocess.isPending ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
                             </button>
@@ -439,7 +438,7 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
                             onClick={(e) => askResend(e, call.id, label)}
                             disabled={fireWebhook.isPending}
                             className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary disabled:opacity-50"
-                            title="Reenviar email"
+                            title={t("agencyQa.resendEmail")}
                           >
                             <Mail className="h-4 w-4" />
                           </button>
@@ -449,7 +448,7 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
                               onClick={(e) => askDelete(e, call.id, label)}
                               disabled={deleteCall.isPending}
                               className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
-                              title="Borrar QA"
+                              title={t("agencyQa.history.deleteQa")}
                             >
                               <Trash2 className="h-4 w-4" />
                             </button>
@@ -474,14 +473,12 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-destructive" />
-              Borrar QA
+              {t("agencyQa.history.deleteQa")}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              ¿Seguro que quieres borrar la QA de{" "}
-              <strong>{pendingDelete?.label}</strong>?
+              <ConFormato texto={t("agencyQa.history.deleteBody", { label: pendingDelete?.label ?? "" })} />
               <br />
-              Se eliminan también sus feedbacks y comentarios. Esta acción no
-              se puede deshacer.
+              {t("agencyQa.history.deleteWarn")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -494,10 +491,10 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
               {deleteCall.isPending ? (
                 <>
                   <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                  Borrando…
+                  {t("agencyQa.deleting")}
                 </>
               ) : (
-                "Borrar"
+                t("agencyQa.delete")
               )}
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -516,14 +513,12 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <Mail className="h-5 w-5 text-primary" />
-              Reenviar email del QA
+              {t("agencyQa.resendQaEmailTitle")}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Vas a reenviar el reporte de <strong>{pendingResend?.label}</strong>{" "}
-              a todos los destinatarios configurados.
+              <ConFormato texto={t("agencyQa.resendQaEmailBody", { label: pendingResend?.label ?? "" })} />
               <br />
-              El correo automático ya se mandó al terminar el análisis. Solo
-              reenvíalo si necesitas una segunda copia.
+              {t("agencyQa.resendQaEmailWarn")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -536,10 +531,10 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
               {fireWebhook.isPending ? (
                 <>
                   <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                  Reenviando…
+                  {t("agencyQa.resending")}
                 </>
               ) : (
-                "Reenviar"
+                t("agencyQa.resend")
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

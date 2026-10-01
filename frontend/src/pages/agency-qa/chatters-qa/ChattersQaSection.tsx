@@ -12,6 +12,7 @@ import QaAttendancePanel from "../QaAttendancePanel";
 import QaAnomaliesPanel from "../QaAnomaliesPanel";
 import { useQaProcessingWatcher } from "./useChatterQaReports";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // Chatters QA — antes era un placeholder "soon" en el rail de Agency QA.
 // Ahora alberga el sistema de medición de chatters que reemplaza el sheet
@@ -26,17 +27,20 @@ import { usePermissions } from "@/hooks/usePermissions";
 // Subtabs gateados por rol: cada uno declara su `submodule` en role_permissions ("Agency QA").
 // Sin fila → se ve (hereda del permiso de "Chatters QA"); para TAPAR uno, el admin lo destilda
 // en Roles (can_access=false). Espejo del patrón de Closers QA (AgencyQA.tsx).
+// ⚠️ `submodule` es la LLAVE en role_permissions: no se traduce. Solo `label`.
+// (`label: null` = el nombre es igual en los dos idiomas: "Scorecard".)
 const CHATTER_QA_SUBS = [
-  { key: "scorecard",      label: "Scorecard",      icon: ClipboardCheck, submodule: "Chatters: Scorecard" },
-  { key: "qa",             label: "QA cualitativo", icon: FileText,       submodule: "Chatters: QA Cualitativo" },
-  { key: "masivos",        label: "Masivos",        icon: Megaphone,      submodule: "Chatters: Masivos" },
-  { key: "hubstaff",       label: "Productividad",  icon: Clock,          submodule: "Chatters: Hubstaff" },
-  { key: "asistencia",     label: "Asistencia",     icon: CalendarClock,  submodule: "Chatters: Asistencia" },
-  { key: "anomalias",      label: "Anomalías",      icon: ShieldAlert,    submodule: "Chatters: Anomalías" },
-  { key: "notificaciones", label: "Notificaciones", icon: Bell,           submodule: "Chatters: Notificaciones" },
+  { key: "scorecard",      label: null,                             icon: ClipboardCheck, submodule: "Chatters: Scorecard" },
+  { key: "qa",             label: "agencyQa.tab.qualitative",       icon: FileText,       submodule: "Chatters: QA Cualitativo" },
+  { key: "masivos",        label: "agencyQa.tab.massMessages",      icon: Megaphone,      submodule: "Chatters: Masivos" },
+  { key: "hubstaff",       label: "agencyQa.tab.productivity",      icon: Clock,          submodule: "Chatters: Hubstaff" },
+  { key: "asistencia",     label: "agencyQa.tab.attendance",        icon: CalendarClock,  submodule: "Chatters: Asistencia" },
+  { key: "anomalias",      label: "agencyQa.tab.anomalies",         icon: ShieldAlert,    submodule: "Chatters: Anomalías" },
+  { key: "notificaciones", label: "agencyQa.tab.notifications",     icon: Bell,           submodule: "Chatters: Notificaciones" },
 ] as const;
 
 export default function ChattersQaSection() {
+  const { t } = useLanguage();
   useQaProcessingWatcher(); // avisa (toast verde/rojo) cuando un borrador IA termina, aunque cambies de subtab
   const { canAccess } = usePermissions();
   const [sp] = useSearchParams();
@@ -44,9 +48,9 @@ export default function ChattersQaSection() {
   const visibleSubs = CHATTER_QA_SUBS.filter((s) => canAccess("Agency QA", s.submodule));
 
   const [tab, setTab] = useState(() => {
-    const t = sp.get("tab") ?? "";
+    const pedido = sp.get("tab") ?? "";
     // el ?tab= del URL solo vale si ese subtab está habilitado para el rol; si no, el primero visible.
-    if (visibleSubs.some((s) => s.key === t)) return t;
+    if (visibleSubs.some((s) => s.key === pedido)) return pedido;
     return visibleSubs[0]?.key ?? "scorecard";
   });
 
@@ -54,7 +58,7 @@ export default function ChattersQaSection() {
     return (
       <Card>
         <CardContent className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
-          <Lock className="h-4 w-4" /> No tienes acceso a ningún subtab de Chatters QA. Pídele a un admin que te habilite alguno en Roles.
+          <Lock className="h-4 w-4" /> {t("agencyQa.chatters.noAccess")}
         </CardContent>
       </Card>
     );
@@ -67,9 +71,7 @@ export default function ChattersQaSection() {
     <div className="space-y-4">
       <div>
         <h2 className="text-xl font-bold tracking-tight">Chatters QA</h2>
-        <p className="text-sm text-muted-foreground">
-          Medición y auditoría de chatters — reemplaza el sheet "Medidor de chatters".
-        </p>
+        <p className="text-sm text-muted-foreground">{t("agencyQa.chatters.subtitle")}</p>
       </div>
       <Tabs value={activeTab} onValueChange={setTab}>
         <TabsList>
@@ -77,7 +79,7 @@ export default function ChattersQaSection() {
             const Icon = s.icon;
             return (
               <TabsTrigger key={s.key} value={s.key} className="gap-1.5">
-                <Icon className="h-3.5 w-3.5" />{s.label}
+                <Icon className="h-3.5 w-3.5" />{s.label ? t(s.label) : "Scorecard"}
               </TabsTrigger>
             );
           })}

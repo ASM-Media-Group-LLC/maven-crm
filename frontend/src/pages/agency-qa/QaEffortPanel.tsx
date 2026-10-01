@@ -4,22 +4,16 @@ import { Activity, Clock, Users } from "lucide-react";
 import { useQaEffort, type QaRole } from "./useQaHubstaff";
 import { useHubstaffSyncStatus } from "./chatters-qa/useHubstaffEffort";
 import { periodLabel } from "./chatters-qa/useChatterScorecards";
+import { useLanguage } from "@/hooks/useLanguage";
+import { ConFormato } from "@/pages/admin/ConFormato";
+import { haceCuanto } from "./haceCuanto";
 
 // Panel de Productividad "solo esfuerzo" (horas/actividad/días) — para roles SIN fuente de
 // resultado poblada (managers). La actividad% es contexto (gran parte del trabajo de un manager
 // es en reuniones/llamadas, no tecleando), no un veredicto.
 
-const relativeTime = (iso: string | null): string => {
-  if (!iso) return "sin sincronizar";
-  const min = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
-  if (min < 1) return "recién";
-  if (min < 60) return `hace ${min} min`;
-  const h = Math.floor(min / 60);
-  if (h < 24) return `hace ${h}h`;
-  return `hace ${Math.floor(h / 24)}d`;
-};
-
 export default function QaEffortPanel({ role }: { role: QaRole }) {
+  const { t, language } = useLanguage();
   const { data: rows = [], isLoading } = useQaEffort(role);
   const { data: sync } = useHubstaffSyncStatus();
 
@@ -34,15 +28,15 @@ export default function QaEffortPanel({ role }: { role: QaRole }) {
   }, [rows]);
 
   if (isLoading) {
-    return <Card><CardContent className="p-6 text-sm text-muted-foreground">Cargando datos de Hubstaff…</CardContent></Card>;
+    return <Card><CardContent className="p-6 text-sm text-muted-foreground">{t("agencyQa.hubstaff.loading")}</CardContent></Card>;
   }
 
   if (!rows.length) {
     return (
       <Card>
         <CardContent className="space-y-2 p-6 text-sm text-muted-foreground">
-          <div className="flex items-center gap-2 font-medium text-foreground"><Clock className="h-4 w-4" /> Productividad</div>
-          Todavía no hay actividad de Hubstaff para este rol. El micro <code>hubstaff-bridge</code> sincroniza cada 6h.
+          <div className="flex items-center gap-2 font-medium text-foreground"><Clock className="h-4 w-4" /> {t("agencyQa.tab.productivity")}</div>
+          <ConFormato texto={t("agencyQa.effort.empty")} piezas={{ code: <code>hubstaff-bridge</code> }} />
         </CardContent>
       </Card>
     );
@@ -53,20 +47,20 @@ export default function QaEffortPanel({ role }: { role: QaRole }) {
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <h3 className="flex items-center gap-2 text-lg font-semibold">
-            <Activity className="h-4 w-4 text-emerald-500" /> Productividad · esfuerzo
+            <Activity className="h-4 w-4 text-emerald-500" /> {t("agencyQa.effort.title")}
           </h3>
           <p className="text-sm text-muted-foreground">
-            Horas trabajadas y actividad de Hubstaff — {stats && periodLabel(stats.period)}.
+            {t("agencyQa.effort.subtitle", { period: stats ? periodLabel(stats.period, language) : "" })}
           </p>
         </div>
-        <span className="text-xs text-muted-foreground">Sincronizado {relativeTime(sync?.last_sync_at ?? null)}</span>
+        <span className="text-xs text-muted-foreground">{t("agencyQa.sync.synced", { when: haceCuanto(sync?.last_sync_at ?? null, t) })}</span>
       </div>
 
       {stats && (
         <div className="grid grid-cols-3 gap-3">
-          <StatCard icon={Users} label="Personas" value={String(stats.count)} />
-          <StatCard icon={Clock} label="Horas totales" value={`${stats.totalHours}h`} />
-          <StatCard icon={Activity} label="Actividad prom." value={`${stats.avgAct}%`} />
+          <StatCard icon={Users} label={t("agencyQa.people")} value={String(stats.count)} />
+          <StatCard icon={Clock} label={t("common.totalHours")} value={`${stats.totalHours}h`} />
+          <StatCard icon={Activity} label={t("agencyQa.effort.avgActivity")} value={`${stats.avgAct}%`} />
         </div>
       )}
 
@@ -76,10 +70,10 @@ export default function QaEffortPanel({ role }: { role: QaRole }) {
             <table className="tabla-movil w-full min-w-[420px] text-sm">
               <thead>
                 <tr className="border-b border-border text-xs text-muted-foreground">
-                  <th className="px-4 py-3 text-left font-semibold">Persona</th>
-                  <th className="px-3 py-3 text-right font-semibold">Días</th>
-                  <th className="px-3 py-3 text-right font-semibold">Horas</th>
-                  <th className="px-4 py-3 text-right font-semibold">Actividad</th>
+                  <th className="px-4 py-3 text-left font-semibold">{t("agencyQa.person")}</th>
+                  <th className="px-3 py-3 text-right font-semibold">{t("common.days")}</th>
+                  <th className="px-3 py-3 text-right font-semibold">{t("common.hours")}</th>
+                  <th className="px-4 py-3 text-right font-semibold">{t("agencyQa.activity")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -98,8 +92,7 @@ export default function QaEffortPanel({ role }: { role: QaRole }) {
       </Card>
 
       <p className="px-1 text-[11px] leading-relaxed text-muted-foreground">
-        Solo esfuerzo (horas + actividad): para este rol todavía no hay una fuente de resultado en Maven para cruzar.
-        La actividad% es contexto (mucho trabajo es en reuniones/llamadas), no un veredicto.
+        {t("agencyQa.effort.footnote")}
       </p>
     </div>
   );

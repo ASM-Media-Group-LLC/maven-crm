@@ -7,6 +7,7 @@ import { useLanguage, useIdiomaDelPerfil, reescribirUiPrefs, type UiPrefsGuardad
 import { useSaveSkin } from "@/hooks/useUserProfile";
 import { aaLightnessForHue, CUSTOM_SKIN_SATURATION } from "@/lib/wcag";
 import type { TranslationKey } from "@/lib/i18n";
+import { conEtiqueta } from "@/lib/etiquetaTraducida";
 
 // Skins de Maven — presets de ACENTO por usuario (Settings → Mi cuenta →
 // Apariencia). Un skin solo cambia primary/accent/ring/sidebar-primary/
@@ -25,12 +26,16 @@ export type SkinId =
   | "medianoche"
   | "dorado"
   | "kash"
+  | "diva"
   | "unlimited"
   | "unlok";
 
 export interface SkinDef {
   id: SkinId;
-  label: string;
+  /** Clave del nombre del skin: la pantalla hace t(s.labelKey). */
+  labelKey: TranslationKey;
+  /** El nombre, traducido al leerlo (ver lib/etiquetaTraducida.ts). */
+  readonly label: string;
   /** Colores LITERALES del preset para pintar su swatch en el picker (no
       pueden ser var(--primary): esas vars reflejan el skin ACTIVO). Deben
       quedar sincronizados con los bloques [data-skin] de index.css. */
@@ -41,19 +46,22 @@ export interface SkinDef {
   group?: "linea";
 }
 
+const definirSkin = (def: Omit<SkinDef, "labelKey" | "label">, labelKey: TranslationKey): SkinDef =>
+  conEtiqueta(def, labelKey);
+
 export const SKINS: SkinDef[] = [
-  { id: "maven", label: "Maven", primary: "hsl(211 100% 50%)", accent: "hsl(271 91% 50%)" },
-  { id: "atardecer", label: "Atardecer", primary: "hsl(25 95% 39%)", accent: "hsl(340 82% 59%)" },
-  { id: "esmeralda", label: "Esmeralda", primary: "hsl(160 84% 28%)", accent: "hsl(190 90% 45%)" },
-  { id: "orquidea", label: "Orquídea", primary: "hsl(290 84% 49%)", accent: "hsl(320 85% 55%)" },
-  { id: "medianoche", label: "Medianoche", primary: "hsl(217 91% 53%)", accent: "hsl(217 91% 53%)" },
-  { id: "dorado", label: "Dorado", primary: "hsl(43 80% 30%)", accent: "hsl(30 85% 45%)" },
-  { id: "kash", label: "Rojo Kash", primary: "hsl(350 80% 42%)", accent: "hsl(15 90% 50%)" },
-  { id: "diva", label: "Diva", primary: "hsl(330 85% 48%)", accent: "hsl(350 90% 60%)" },
+  definirSkin({ id: "maven", primary: "hsl(211 100% 50%)", accent: "hsl(271 91% 50%)" }, "int.skin.maven"),
+  definirSkin({ id: "atardecer", primary: "hsl(25 95% 39%)", accent: "hsl(340 82% 59%)" }, "int.skin.atardecer"),
+  definirSkin({ id: "esmeralda", primary: "hsl(160 84% 28%)", accent: "hsl(190 90% 45%)" }, "int.skin.esmeralda"),
+  definirSkin({ id: "orquidea", primary: "hsl(290 84% 49%)", accent: "hsl(320 85% 55%)" }, "int.skin.orquidea"),
+  definirSkin({ id: "medianoche", primary: "hsl(217 91% 53%)", accent: "hsl(217 91% 53%)" }, "int.skin.medianoche"),
+  definirSkin({ id: "dorado", primary: "hsl(43 80% 30%)", accent: "hsl(30 85% 45%)" }, "int.skin.dorado"),
+  definirSkin({ id: "kash", primary: "hsl(350 80% 42%)", accent: "hsl(15 90% 50%)" }, "int.skin.kash"),
+  definirSkin({ id: "diva", primary: "hsl(330 85% 48%)", accent: "hsl(350 90% 60%)" }, "int.skin.diva"),
   // Líneas de negocio — van después del separador "Líneas" del picker
   // (Kash ya tiene su preset propio arriba, "Rojo Kash").
-  { id: "unlimited", label: "Unlimited", primary: "hsl(150 56% 33%)", accent: "hsl(190 90% 45%)", group: "linea" },
-  { id: "unlok", label: "Unlok", primary: "hsl(211 100% 45%)", accent: "hsl(199 90% 48%)", group: "linea" },
+  definirSkin({ id: "unlimited", primary: "hsl(150 56% 33%)", accent: "hsl(190 90% 45%)", group: "linea" }, "int.skin.unlimited"),
+  definirSkin({ id: "unlok", primary: "hsl(211 100% 45%)", accent: "hsl(199 90% 48%)", group: "linea" }, "int.skin.unlok"),
 ];
 
 const STORAGE_KEY = "maven-skin";

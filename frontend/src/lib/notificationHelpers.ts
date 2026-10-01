@@ -1,3 +1,4 @@
+import { conEtiqueta } from "@/lib/etiquetaTraducida";
 import { Bell, CheckSquare, Users, Calendar, Briefcase, DollarSign, FileText, UserCheck, ShieldAlert, MessageSquare, ClipboardList, AlertTriangle, Clock, HelpCircle, type LucideIcon, AtSign } from "lucide-react";
 
 // ─── Deep link resolver ────────────────────────────────────────────
@@ -94,16 +95,19 @@ export function getPriorityDotClass(priority: string | null): string {
 }
 
 // ─── Module label for filters ─────────────────────────────────────
+// `value` es notifications.module_origin (dato: "Comunicación" va con tilde
+// porque así lo escribe la base). Se traduce solo la etiqueta; ver
+// lib/etiquetaTraducida.ts.
 export const MODULE_OPTIONS = [
-  { value: "creadores", label: "Creadores" },
-  { value: "hr", label: "RRHH" },
-  { value: "finanzas", label: "Finanzas" },
-  { value: "tickets", label: "Tickets" },
-  { value: "leadgen", label: "LeadGen" },
-  { value: "closers", label: "Closers" },
-  { value: "Comunicación", label: "Comunicación" },
-  { value: "messenger", label: "Messenger" },
-  { value: "admin", label: "Admin" },
+  conEtiqueta({ value: "creadores" }, "int.notif.module.creadores"),
+  conEtiqueta({ value: "hr" }, "int.notif.module.hr"),
+  conEtiqueta({ value: "finanzas" }, "int.notif.module.finanzas"),
+  conEtiqueta({ value: "tickets" }, "int.notif.module.tickets"),
+  conEtiqueta({ value: "leadgen" }, "int.notif.module.leadgen"),
+  conEtiqueta({ value: "closers" }, "int.notif.module.closers"),
+  conEtiqueta({ value: "Comunicación" }, "int.notif.module.comunicacion"),
+  conEtiqueta({ value: "messenger" }, "int.notif.module.messenger"),
+  conEtiqueta({ value: "admin" }, "int.notif.module.admin"),
 ] as const;
 
 // Maps module option values to RBAC permission module names (capitalized)
@@ -121,13 +125,13 @@ export const MODULE_PERMISSION_MAP: Record<string, string | null> = {
 };
 
 export const PRIORITY_OPTIONS = [
-  { value: "high", label: "Alta" },
-  { value: "medium", label: "Media" },
-  { value: "low", label: "Baja" },
+  conEtiqueta({ value: "high" }, "int.level.high"),
+  conEtiqueta({ value: "medium" }, "int.level.medium"),
+  conEtiqueta({ value: "low" }, "int.level.low"),
 ] as const;
 
 export const STATUS_OPTIONS = [
-  { value: "new", label: "Nueva" },
-  { value: "read", label: "Leída" },
-  { value: "archived", label: "Archivada" },
+  conEtiqueta({ value: "new" }, "common.newF"),
+  conEtiqueta({ value: "read" }, "int.notif.status.read"),
+  conEtiqueta({ value: "archived" }, "int.notif.status.archived"),
 ] as const;

@@ -31,19 +31,31 @@ import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import { CalendarIcon } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
+import type { Traductor } from "./etiquetasHr";
 
-const OVERTIME_TYPES = [
-  { value: "diurno", label: "Diurno" },
-  { value: "nocturno", label: "Nocturno" },
-  { value: "dominical", label: "Dominical/Festivo" },
-  { value: "nocturno_dominical", label: "Nocturno Dominical" },
+// `value` es lo que se guarda en overtime.overtime_type: DATO, no se traduce.
+const OVERTIME_TYPES: { value: string; label: TranslationKey }[] = [
+  { value: "diurno", label: "hrg.ot.type.day" },
+  { value: "nocturno", label: "hrg.ot.type.night" },
+  { value: "dominical", label: "hrg.ot.type.sunday" },
+  { value: "nocturno_dominical", label: "hrg.ot.type.sundayNight" },
 ];
 
-function getStatusBadge(status: string) {
-  if (status === "approved") return <Badge variant="default" className="text-xs bg-success/10 text-success border-success/30">Aprobado</Badge>;
-  if (status === "rejected") return <Badge variant="destructive" className="text-xs">Rechazado</Badge>;
-  if (status === "paid") return <Badge variant="default" className="text-xs bg-blue-500/10 text-blue-600 border-blue-500/30">Pagado</Badge>;
-  return <Badge variant="secondary" className="text-xs text-warning border-warning/30">Pendiente</Badge>;
+/** La etiqueta del tipo, o `undefined` si el tipo guardado no está en la lista. */
+function etiquetaTipo(tipo: string, t: Traductor) {
+  const o = OVERTIME_TYPES.find((x) => x.value === tipo);
+  return o ? t(o.label) : undefined;
+}
+/** La tabla y las tarjetas caen al valor guardado; el detalle no muestra nada. */
+const tipoHorasExtra = (tipo: string, t: Traductor) => etiquetaTipo(tipo, t) || tipo;
+
+function getStatusBadge(status: string, t: Traductor) {
+  if (status === "approved") return <Badge variant="default" className="text-xs bg-success/10 text-success border-success/30">{t("hrg.approved")}</Badge>;
+  if (status === "rejected") return <Badge variant="destructive" className="text-xs">{t("hrg.rejected")}</Badge>;
+  if (status === "paid") return <Badge variant="default" className="text-xs bg-blue-500/10 text-blue-600 border-blue-500/30">{t("hrg.paid")}</Badge>;
+  return <Badge variant="secondary" className="text-xs text-warning border-warning/30">{t("common.pending")}</Badge>;
 }
 
 function getInitials(first: string, last: string) {
@@ -53,6 +65,7 @@ function getInitials(first: string, last: string) {
 const HROvertimeDetail = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
 
   const [search, setSearch] = useState("");
@@ -90,8 +103,8 @@ const HROvertimeDetail = () => {
       const { error } = await supabase.from("overtime").insert(vals);
       if (error) throw error;
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["overtime"] }); toast({ title: "Horas extra registradas" }); setCreateOpen(false); resetForm(); },
-    onError: () => toast({ title: "Error al registrar", variant: "destructive" }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["overtime"] }); toast({ title: t("hrg.ot.created") }); setCreateOpen(false); resetForm(); },
+    onError: () => toast({ title: t("hrg.ot.createError"), variant: "destructive" }),
   });
 
   const editMutation = useMutation({
@@ -100,8 +113,8 @@ const HROvertimeDetail = () => {
       const { error } = await supabase.from("overtime").update(rest).eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["overtime"] }); toast({ title: "Registro actualizado" }); setEditData(null); resetForm(); },
-    onError: () => toast({ title: "Error al actualizar", variant: "destructive" }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["overtime"] }); toast({ title: t("hrg.recordUpdated") }); setEditData(null); resetForm(); },
+    onError: () => toast({ title: t("common.errorUpdating"), variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
@@ -109,8 +122,8 @@ const HROvertimeDetail = () => {
       const { error } = await supabase.from("overtime").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["overtime"] }); toast({ title: "Registro eliminado" }); setDeleteId(null); },
-    onError: () => toast({ title: "Error al eliminar", variant: "destructive" }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["overtime"] }); toast({ title: t("hrg.recordDeleted") }); setDeleteId(null); },
+    onError: () => toast({ title: t("common.errorDeleting"), variant: "destructive" }),
   });
 
   const updateStatus = useMutation({
@@ -118,7 +131,7 @@ const HROvertimeDetail = () => {
       const { error } = await supabase.from("overtime").update({ status, approved_at: status === "approved" ? new Date().toISOString() : null }).eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["overtime"] }); toast({ title: "Estado actualizado" }); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["overtime"] }); toast({ title: t("hrg.statusUpdated") }); },
   });
 
   function resetForm() {
@@ -138,7 +151,7 @@ const HROvertimeDetail = () => {
 
   function handleSubmit() {
     if (!formEmployeeId || !formDate || !formHours) {
-      toast({ title: "Completa los campos requeridos", variant: "destructive" }); return;
+      toast({ title: t("common.requiredFields"), variant: "destructive" }); return;
     }
     const vals: any = {
       employee_id: formEmployeeId,
@@ -180,39 +193,39 @@ const HROvertimeDetail = () => {
           <Button variant="ghost" size="icon" onClick={() => navigate("/hr/horarios")}><ArrowLeft className="h-4 w-4" /></Button>
           <PageHeader
             className="flex-1"
-            title="Horas Extras"
-            subtitle="Registro y aprobación de horas extra"
-            actions={<Button onClick={() => { resetForm(); setCreateOpen(true); }}><Plus className="h-4 w-4 mr-2" /> Registrar Horas Extra</Button>}
+            title={t("hrg.ot.title")}
+            subtitle={t("hrg.ot.subtitle")}
+            actions={<Button onClick={() => { resetForm(); setCreateOpen(true); }}><Plus className="h-4 w-4 mr-2" /> {t("hrg.ot.register")}</Button>}
           />
         </div>
       </div>
 
       <div className="flex-1 overflow-auto p-6 space-y-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatChip label="Total Horas" value={`${totalHours}h`} icon={<Timer className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("total")} />
-          <StatChip label="Pendientes" value={String(pendingCount)} icon={<AlertCircle className="h-3.5 w-3.5" />} color="bg-warning" onClick={() => setKpiPopup("pending")} />
-          <StatChip label="Aprobadas" value={String(approvedCount)} icon={<CheckCircle2 className="h-3.5 w-3.5" />} color="bg-success" onClick={() => setKpiPopup("approved")} />
-          <StatChip label="Pagadas" value={String(paidCount)} icon={<Banknote className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("paid")} />
+          <StatChip label={t("hrg.ot.kpi.totalHours")} value={`${totalHours}h`} icon={<Timer className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("total")} />
+          <StatChip label={t("common.pendingPl")} value={String(pendingCount)} icon={<AlertCircle className="h-3.5 w-3.5" />} color="bg-warning" onClick={() => setKpiPopup("pending")} />
+          <StatChip label={t("hrg.ot.kpi.approved")} value={String(approvedCount)} icon={<CheckCircle2 className="h-3.5 w-3.5" />} color="bg-success" onClick={() => setKpiPopup("approved")} />
+          <StatChip label={t("hrg.ot.kpi.paid")} value={String(paidCount)} icon={<Banknote className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("paid")} />
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative flex-1 min-w-[200px] max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Buscar empleado..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+            <Input placeholder={t("hrg.searchEmployee")} value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
           </div>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="pending">Pendiente</SelectItem>
-              <SelectItem value="approved">Aprobado</SelectItem>
-              <SelectItem value="rejected">Rechazado</SelectItem>
-              <SelectItem value="paid">Pagado</SelectItem>
+              <SelectItem value="all">{t("common.all")}</SelectItem>
+              <SelectItem value="pending">{t("common.pending")}</SelectItem>
+              <SelectItem value="approved">{t("hrg.approved")}</SelectItem>
+              <SelectItem value="rejected">{t("hrg.rejected")}</SelectItem>
+              <SelectItem value="paid">{t("hrg.paid")}</SelectItem>
             </SelectContent>
           </Select>
           <div className="ml-auto flex items-center border rounded-lg">
-            <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="sm" onClick={() => setViewMode("list")}><ListIcon className="h-4 w-4" /></Button>
-            <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="sm" onClick={() => setViewMode("grid")}><LayoutGrid className="h-4 w-4" /></Button>
+            <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="sm" onClick={() => setViewMode("list")} aria-label={t("hrg.dir.viewTable")}><ListIcon className="h-4 w-4" /></Button>
+            <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="sm" onClick={() => setViewMode("grid")} aria-label={t("hrg.dir.viewGrid")}><LayoutGrid className="h-4 w-4" /></Button>
           </div>
         </div>
 
@@ -222,18 +235,18 @@ const HROvertimeDetail = () => {
               <Table>
                 <TableHeader className="sticky top-0 z-10 bg-card">
                   <TableRow>
-                    <TableHead className="text-xs">Empleado</TableHead>
-                    <TableHead className="text-xs">Fecha</TableHead>
-                    <TableHead className="text-xs">Horas</TableHead>
-                    <TableHead className="text-xs">Tasa</TableHead>
-                    <TableHead className="text-xs">Tipo</TableHead>
-                    <TableHead className="text-xs">Estado</TableHead>
-                    <TableHead className="text-xs sticky right-0 bg-card">Acciones</TableHead>
+                    <TableHead className="text-xs">{t("hrg.employee")}</TableHead>
+                    <TableHead className="text-xs">{t("common.date")}</TableHead>
+                    <TableHead className="text-xs">{t("hrg.hours")}</TableHead>
+                    <TableHead className="text-xs">{t("hrg.ot.rate")}</TableHead>
+                    <TableHead className="text-xs">{t("common.type")}</TableHead>
+                    <TableHead className="text-xs">{t("common.status")}</TableHead>
+                    <TableHead className="text-xs sticky right-0 bg-card">{t("common.actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filtered.length === 0 ? (
-                    <TableRow><TableCell colSpan={7} className="text-center py-10 text-muted-foreground">No hay registros de horas extra</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={7} className="text-center py-10 text-muted-foreground">{t("hrg.ot.empty")}</TableCell></TableRow>
                   ) : filtered.map((r: any) => {
                     const emp = r.employees;
                     return (
@@ -250,8 +263,8 @@ const HROvertimeDetail = () => {
                         <TableCell className="text-sm">{format(parseISO(r.date), "dd/MM/yyyy")}</TableCell>
                         <TableCell className="text-sm font-medium">{r.hours}h</TableCell>
                         <TableCell className="text-sm">x{r.rate_multiplier}</TableCell>
-                        <TableCell className="text-sm">{OVERTIME_TYPES.find(t => t.value === r.overtime_type)?.label || r.overtime_type}</TableCell>
-                        <TableCell>{getStatusBadge(r.status)}</TableCell>
+                        <TableCell className="text-sm">{tipoHorasExtra(r.overtime_type, t)}</TableCell>
+                        <TableCell>{getStatusBadge(r.status, t)}</TableCell>
                         <TableCell className="sticky right-0 bg-card">
                           <div className="flex items-center gap-1">
                             {r.status === "pending" && (
@@ -275,7 +288,7 @@ const HROvertimeDetail = () => {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filtered.length === 0 ? (
-              <div className="col-span-full text-center py-10 text-muted-foreground">No hay registros</div>
+              <div className="col-span-full text-center py-10 text-muted-foreground">{t("hrg.ot.emptyShort")}</div>
             ) : filtered.map((r: any) => {
               const emp = r.employees;
               return (
@@ -289,11 +302,11 @@ const HROvertimeDetail = () => {
                           <p className="text-xs text-muted-foreground">{emp?.email}</p>
                         </div>
                       </div>
-                      {getStatusBadge(r.status)}
+                      {getStatusBadge(r.status, t)}
                     </div>
                     <div className="text-sm text-muted-foreground space-y-1">
                       <p>📅 {format(parseISO(r.date), "dd/MM/yyyy")} · {r.hours}h · x{r.rate_multiplier}</p>
-                      <p>Tipo: {OVERTIME_TYPES.find(t => t.value === r.overtime_type)?.label || r.overtime_type}</p>
+                      <p>{t("common.type")}: {tipoHorasExtra(r.overtime_type, t)}</p>
                       {r.notes && <p className="truncate">{r.notes}</p>}
                     </div>
                     <div className="flex items-center gap-1 pt-2 border-t">
@@ -319,30 +332,30 @@ const HROvertimeDetail = () => {
       <Dialog open={createOpen || !!editData} onOpenChange={(o) => { if (!o) { setCreateOpen(false); setEditData(null); resetForm(); } }}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>{editData ? "Editar Horas Extra" : "Registrar Horas Extra"}</DialogTitle>
-            <DialogDescription>{editData ? "Modifica los datos del registro" : "Registra las horas extra de un empleado"}</DialogDescription>
+            <DialogTitle>{editData ? t("hrg.ot.editTitle") : t("hrg.ot.register")}</DialogTitle>
+            <DialogDescription>{editData ? t("hrg.ot.editHint") : t("hrg.ot.registerHint")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label>Empleado *</Label>
+              <Label>{t("hrg.employeeRequired")}</Label>
               <EmployeeSearchCombobox value={formEmployeeId} onChange={setFormEmployeeId} />
             </div>
             <div>
-              <Label>Tipo *</Label>
+              <Label>{t("common.type")} *</Label>
               <Select value={formType} onValueChange={setFormType}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {OVERTIME_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                  {OVERTIME_TYPES.map((o) => <SelectItem key={o.value} value={o.value}>{t(o.label)}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <Label>Fecha *</Label>
+              <Label>{t("common.date")} *</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !formDate && "text-muted-foreground")}>
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {formDate ? format(formDate, "dd/MM/yyyy") : "Seleccionar"}
+                    {formDate ? format(formDate, "dd/MM/yyyy") : t("common.select")}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -352,23 +365,23 @@ const HROvertimeDetail = () => {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Horas *</Label>
-                <Input type="number" min="0" step="0.5" value={formHours} onChange={(e) => setFormHours(e.target.value)} placeholder="Ej: 2" />
+                <Label>{t("hrg.hours")} *</Label>
+                <Input type="number" min="0" step="0.5" value={formHours} onChange={(e) => setFormHours(e.target.value)} placeholder={t("hrg.ot.hoursPlaceholder")} />
               </div>
               <div>
-                <Label>Tasa multiplicadora</Label>
+                <Label>{t("hrg.ot.multiplier")}</Label>
                 <Input type="number" min="1" step="0.25" value={formRate} onChange={(e) => setFormRate(e.target.value)} />
               </div>
             </div>
             <div>
-              <Label>Razón</Label>
-              <Textarea value={formNotes} onChange={(e) => setFormNotes(e.target.value)} placeholder="Motivo de las horas extra" />
+              <Label>{t("common.reason")}</Label>
+              <Textarea value={formNotes} onChange={(e) => setFormNotes(e.target.value)} placeholder={t("hrg.ot.reasonPlaceholder")} />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setCreateOpen(false); setEditData(null); resetForm(); }}>Cancelar</Button>
+            <Button variant="outline" onClick={() => { setCreateOpen(false); setEditData(null); resetForm(); }}>{t("common.cancel")}</Button>
             <Button onClick={handleSubmit} disabled={createMutation.isPending || editMutation.isPending}>
-              {editData ? "Guardar Cambios" : "Registrar"}
+              {editData ? t("hrg.saveChanges") : t("hrg.att.registerShort")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -377,15 +390,15 @@ const HROvertimeDetail = () => {
       {/* View Modal */}
       <Dialog open={!!viewData} onOpenChange={(o) => !o && setViewData(null)}>
         <DialogContent className="sm:max-w-md">
-          <DialogHeader><DialogTitle>Detalle de Horas Extra</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t("hrg.ot.detailTitle")}</DialogTitle></DialogHeader>
           {viewData && (
             <div className="space-y-3 text-sm">
-              <div><span className="text-muted-foreground">Empleado:</span> <span className="font-medium">{viewData.employees ? `${viewData.employees.first_name} ${viewData.employees.last_name}` : "—"}</span></div>
-              <div><span className="text-muted-foreground">Fecha:</span> {format(parseISO(viewData.date), "dd/MM/yyyy")}</div>
-              <div><span className="text-muted-foreground">Horas:</span> {viewData.hours}h · Tasa: x{viewData.rate_multiplier}</div>
-              <div><span className="text-muted-foreground">Tipo:</span> {OVERTIME_TYPES.find(t => t.value === viewData.overtime_type)?.label}</div>
-              <div><span className="text-muted-foreground">Estado:</span> {getStatusBadge(viewData.status)}</div>
-              {viewData.notes && <div><span className="text-muted-foreground">Notas:</span> {viewData.notes}</div>}
+              <div><span className="text-muted-foreground">{t("hrg.employee")}:</span> <span className="font-medium">{viewData.employees ? `${viewData.employees.first_name} ${viewData.employees.last_name}` : "—"}</span></div>
+              <div><span className="text-muted-foreground">{t("common.date")}:</span> {format(parseISO(viewData.date), "dd/MM/yyyy")}</div>
+              <div><span className="text-muted-foreground">{t("hrg.hours")}:</span> {viewData.hours}h · {t("hrg.ot.rate")}: x{viewData.rate_multiplier}</div>
+              <div><span className="text-muted-foreground">{t("common.type")}:</span> {etiquetaTipo(viewData.overtime_type, t)}</div>
+              <div><span className="text-muted-foreground">{t("common.status")}:</span> {getStatusBadge(viewData.status, t)}</div>
+              {viewData.notes && <div><span className="text-muted-foreground">{t("hrg.notes")}:</span> {viewData.notes}</div>}
             </div>
           )}
         </DialogContent>
@@ -395,12 +408,12 @@ const HROvertimeDetail = () => {
       <AlertDialog open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar este registro?</AlertDialogTitle>
-            <AlertDialogDescription>Esta acción no se puede deshacer.</AlertDialogDescription>
+            <AlertDialogTitle>{t("hrg.deleteRecordTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("common.cannotBeUndone")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel />
-            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => deleteId && deleteMutation.mutate(deleteId)}>Eliminar</AlertDialogAction>
+            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => deleteId && deleteMutation.mutate(deleteId)}>{t("common.delete")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -408,12 +421,13 @@ const HROvertimeDetail = () => {
       <KpiDetailDialog
         open={kpiPopup !== null}
         onOpenChange={(o) => !o && setKpiPopup(null)}
+        emptyText={t("hrg.noRecordsToShow")}
         title={(() => {
           switch (kpiPopup) {
-            case "total": return `Total Horas Extra — ${totalHours}h`;
-            case "pending": return `Pendientes — ${pendingCount}`;
-            case "approved": return `Aprobadas — ${approvedCount}`;
-            case "paid": return `Pagadas — ${paidCount}`;
+            case "total": return t("hrg.kpiTitle", { label: t("hrg.ot.kpi.totalOvertime"), value: `${totalHours}h` });
+            case "pending": return t("hrg.kpiTitle", { label: t("common.pendingPl"), value: pendingCount });
+            case "approved": return t("hrg.kpiTitle", { label: t("hrg.ot.kpi.approved"), value: approvedCount });
+            case "paid": return t("hrg.kpiTitle", { label: t("hrg.ot.kpi.paid"), value: paidCount });
             default: return "";
           }
         })()}
@@ -426,7 +440,7 @@ const HROvertimeDetail = () => {
           const tone = (status: string): KpiRow["rightTone"] =>
             status === "paid" ? "success" : status === "approved" ? "default" : status === "pending" ? "warning" : "default";
           return list.slice(0, 100).map((r: any): KpiRow => ({
-            primary: r.employees ? `${r.employees.first_name ?? ""} ${r.employees.last_name ?? ""}`.trim() : "Sin nombre",
+            primary: r.employees ? `${r.employees.first_name ?? ""} ${r.employees.last_name ?? ""}`.trim() : t("hrg.noName"),
             secondary: r.date ? format(new Date(r.date), "dd MMM yyyy") : undefined,
             right: `${r.hours}h`,
             rightTone: tone(r.status ?? ""),

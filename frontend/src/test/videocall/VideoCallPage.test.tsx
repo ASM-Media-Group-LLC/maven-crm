@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 
+// La página ahora dibuja sus textos con useLanguage: se monta en español, como
+// esperan las aserciones de abajo.
+vi.mock("@/hooks/useLanguage", (original) =>
+  import("@/test/messenger/espanolEnTests").then((m) => m.idiomaEnEspanol(original)));
+
 // Mock react-router-dom.
 //
 // Partimos del módulo REAL (`original`) y solo pisamos los tres hooks que la

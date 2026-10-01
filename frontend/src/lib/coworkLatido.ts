@@ -81,11 +81,14 @@ export function equipoDeEstaPestana(): string {
  *  que llegan en ráfaga (apagar cámara dispara dos o tres eventos). */
 export const RESPIRO_CAMBIO_MS = 1_500;
 
+type Intervalo = ReturnType<typeof setInterval>;
+type Espera = ReturnType<typeof setTimeout>;
+
 interface Vivo {
   sessionId: string;
   estado: Latido;
-  cada: ReturnType<typeof setInterval>;
-  pendiente: ReturnType<typeof setTimeout> | null;
+  cada: Intervalo;
+  pendiente: Espera | null;
   enviando: boolean;
   /** Llegó un cambio mientras había un latido en vuelo: se manda apenas vuelve.
    *  Antes se descartaba y podía tardar hasta el próximo latido (30 s). */

@@ -1,6 +1,8 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
+import { useLanguage } from "@/hooks/useLanguage";
+import { TIPOS_ANUNCIO, PRIORIDADES_ANUNCIO } from "./opcionesAnuncio";
 
 interface Props {
   search: string;
@@ -11,24 +13,6 @@ interface Props {
   onFilterPriorityChange: (v: string) => void;
 }
 
-const TYPE_OPTIONS = [
-  { value: "all", label: "Todos los tipos" },
-  { value: "general", label: "General" },
-  { value: "policy", label: "Política" },
-  { value: "celebration", label: "Celebración" },
-  { value: "holiday", label: "Feriado" },
-  { value: "urgent", label: "Urgente" },
-  { value: "reminder", label: "Recordatorio" },
-  { value: "update", label: "Actualización" },
-];
-
-const PRIORITY_OPTIONS = [
-  { value: "all", label: "Todas las prioridades" },
-  { value: "high", label: "Alta" },
-  { value: "normal", label: "Normal" },
-  { value: "low", label: "Baja" },
-];
-
 const AnnouncementFilters = ({
   search,
   onSearchChange,
@@ -36,12 +20,21 @@ const AnnouncementFilters = ({
   onFilterTypeChange,
   filterPriority,
   onFilterPriorityChange,
-}: Props) => (
+}: Props) => {
+  const { t } = useLanguage();
+  // En el filtro, "update" se lee corto ("Actualización"); en el alta, entero.
+  const tipos = TIPOS_ANUNCIO.map((o) => ({
+    value: o.value,
+    label: t(o.value === "update" ? "hrg.ann.type.updateShort" : o.clave),
+  }));
+  // La prioridad, de mayor a menor: así estaba el filtro.
+  const prioridades = [...PRIORIDADES_ANUNCIO].reverse();
+  return (
   <div className="flex flex-wrap items-center gap-3">
     <div className="relative flex-1 min-w-[200px] max-w-xs">
       <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
       <Input
-        placeholder="Buscar anuncios..."
+        placeholder={t("hrg.ann.searchPlaceholder")}
         value={search}
         onChange={(e) => onSearchChange(e.target.value)}
         className="pl-9 h-9"
@@ -50,7 +43,8 @@ const AnnouncementFilters = ({
     <Select value={filterType} onValueChange={onFilterTypeChange}>
       <SelectTrigger className="w-44 h-9"><SelectValue /></SelectTrigger>
       <SelectContent>
-        {TYPE_OPTIONS.map((o) => (
+        <SelectItem value="all">{t("common.allTypes")}</SelectItem>
+        {tipos.map((o) => (
           <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
         ))}
       </SelectContent>
@@ -58,12 +52,14 @@ const AnnouncementFilters = ({
     <Select value={filterPriority} onValueChange={onFilterPriorityChange}>
       <SelectTrigger className="w-44 h-9"><SelectValue /></SelectTrigger>
       <SelectContent>
-        {PRIORITY_OPTIONS.map((o) => (
-          <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+        <SelectItem value="all">{t("hrg.ann.allPriorities")}</SelectItem>
+        {prioridades.map((o) => (
+          <SelectItem key={o.value} value={o.value}>{t(o.clave)}</SelectItem>
         ))}
       </SelectContent>
     </Select>
   </div>
-);
+  );
+};
 
 export default AnnouncementFilters;

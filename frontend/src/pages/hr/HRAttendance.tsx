@@ -29,6 +29,9 @@ import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import HrAttendanceAuto from "./HrAttendanceAuto";
 import { PageHeader } from "@/components/ui/page-header";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
+import type { Traductor } from "./etiquetasHr";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface AttendanceRecord {
@@ -53,28 +56,31 @@ interface AttendanceRecord {
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const SHIFTS = [
-  { value: "turno_manana",  label: "Turno Mañana",  start: "08:00", end: "16:00" },
-  { value: "turno_tarde",   label: "Turno Tarde",   start: "14:00", end: "22:00" },
-  { value: "turno_noche",   label: "Turno Noche",   start: "22:00", end: "06:00" },
+// `value` es lo que se guarda en attendance (shift / status): DATO, no se traduce.
+const SHIFTS: { value: string; label: TranslationKey; start: string; end: string }[] = [
+  { value: "turno_manana",  label: "hrg.att.shift.morning",  start: "08:00", end: "16:00" },
+  { value: "turno_tarde",   label: "hrg.att.shift.afternoon",   start: "14:00", end: "22:00" },
+  { value: "turno_noche",   label: "hrg.att.shift.night",   start: "22:00", end: "06:00" },
 ];
 
-const STATUSES = [
-  { value: "presente",  label: "Presente",  variant: "success" as const },
-  { value: "tardanza",  label: "Tardanza",  variant: "warning" as const },
-  { value: "ausente",   label: "Ausente",   variant: "destructive" as const },
+const STATUSES: { value: string; label: TranslationKey; variant: "success" | "warning" | "destructive" }[] = [
+  { value: "presente",  label: "hrg.att.status.present",  variant: "success" },
+  { value: "tardanza",  label: "hrg.att.status.late",  variant: "warning" },
+  { value: "ausente",   label: "hrg.att.status.absent",   variant: "destructive" },
 ];
 
 function getStatusVariant(status: string) {
   return STATUSES.find((s) => s.value === status)?.variant ?? "secondary";
 }
 
-function getStatusLabel(status: string) {
-  return STATUSES.find((s) => s.value === status)?.label ?? status;
+function getStatusLabel(status: string, t: Traductor) {
+  const s = STATUSES.find((x) => x.value === status);
+  return s ? t(s.label) : status;
 }
 
-function getShiftLabel(shift: string) {
-  return SHIFTS.find((s) => s.value === shift)?.label ?? shift;
+function getShiftLabel(shift: string, t: Traductor) {
+  const s = SHIFTS.find((x) => x.value === shift);
+  return s ? t(s.label) : shift;
 }
 
 function formatDuration(checkIn: string | null, checkOut: string | null): string {
@@ -139,6 +145,7 @@ interface RegisterModalProps {
 
 function RegisterAttendanceModal({ open, onOpenChange }: RegisterModalProps) {
   const formatoUI = useFormato();
+  const { t } = useLanguage();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -196,7 +203,7 @@ function RegisterAttendanceModal({ open, onOpenChange }: RegisterModalProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["attendance"] });
-      toast({ title: "Asistencia registrada correctamente" });
+      toast({ title: t("hrg.att.created") });
       onOpenChange(false);
       setEmployeeId(null);
       setShift("turno_manana");
@@ -208,7 +215,7 @@ function RegisterAttendanceModal({ open, onOpenChange }: RegisterModalProps) {
       setNotes("");
       setDate(new Date());
     },
-    onError: () => toast({ title: "Error al registrar asistencia", variant: "destructive" }),
+    onError: () => toast({ title: t("hrg.att.createError"), variant: "destructive" }),
   });
 
   const canSubmit = !!employeeId && !mutation.isPending;
@@ -217,18 +224,18 @@ function RegisterAttendanceModal({ open, onOpenChange }: RegisterModalProps) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="!flex !flex-col gap-0 max-w-lg p-0 overflow-hidden">
         <DialogHeader className="shrink-0 px-6 pt-6 pb-4 border-b border-border">
-          <DialogTitle className="text-lg font-semibold">Registrar Asistencia</DialogTitle>
-          <p className="text-sm text-muted-foreground">Complete los datos del registro de asistencia</p>
+          <DialogTitle className="text-lg font-semibold">{t("hrg.att.register")}</DialogTitle>
+          <p className="text-sm text-muted-foreground">{t("hrg.att.registerHint")}</p>
         </DialogHeader>
 
         <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-4">
           <div className="space-y-1.5">
-            <Label>Empleado <span className="text-destructive">*</span></Label>
+            <Label>{t("hrg.employee")} <span className="text-destructive">*</span></Label>
             <EmployeeSearchCombobox value={employeeId} onChange={setEmployeeId} />
           </div>
 
           <div className="space-y-1.5">
-            <Label>Fecha</Label>
+            <Label>{t("common.date")}</Label>
             <Popover open={dateOpen} onOpenChange={setDateOpen}>
               <PopoverTrigger asChild>
                 <Button
@@ -236,7 +243,7 @@ function RegisterAttendanceModal({ open, onOpenChange }: RegisterModalProps) {
                   className={cn("w-full justify-start text-left font-normal", !date && "text-muted-foreground")}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
-                  {date ? format(date, "dd/MM/yyyy") : "Seleccionar fecha"}
+                  {date ? format(date, "dd/MM/yyyy") : t("hrg.att.selectDate")}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
@@ -253,12 +260,12 @@ function RegisterAttendanceModal({ open, onOpenChange }: RegisterModalProps) {
           </div>
 
           <div className="space-y-1.5">
-            <Label>Turno</Label>
+            <Label>{t("hrg.att.shift")}</Label>
             <Select value={shift} onValueChange={handleShiftChange}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 {SHIFTS.map((s) => (
-                  <SelectItem key={s.value} value={s.value}>{s.label} ({s.start}–{s.end})</SelectItem>
+                  <SelectItem key={s.value} value={s.value}>{t(s.label)} ({s.start}–{s.end})</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -266,48 +273,48 @@ function RegisterAttendanceModal({ open, onOpenChange }: RegisterModalProps) {
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label>Inicio Turno</Label>
+              <Label>{t("hrg.att.shiftStart")}</Label>
               <Input type="time" value={shiftStart} onChange={(e) => setShiftStart(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <Label>Fin Turno</Label>
+              <Label>{t("hrg.att.shiftEnd")}</Label>
               <Input type="time" value={shiftEnd} onChange={(e) => setShiftEnd(e.target.value)} />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label>Hora de Entrada</Label>
+              <Label>{t("hrg.att.checkIn")}</Label>
               <Input type="datetime-local" value={checkIn} onChange={(e) => handleCheckInChange(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <Label>Hora de Salida</Label>
+              <Label>{t("hrg.att.checkOut")}</Label>
               <Input type="datetime-local" value={checkOut} onChange={(e) => setCheckOut(e.target.value)} />
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <Label>Estado</Label>
+            <Label>{t("common.status")}</Label>
             <Select value={status} onValueChange={setStatus}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 {STATUSES.map((s) => (
-                  <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                  <SelectItem key={s.value} value={s.value}>{t(s.label)}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
           <div className="space-y-1.5">
-            <Label>Notas</Label>
-            <Textarea placeholder="Observaciones adicionales..." rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
+            <Label>{t("hrg.notes")}</Label>
+            <Textarea placeholder={t("hrg.att.notesPlaceholder")} rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
           </div>
         </div>
 
         <DialogFooter className="shrink-0 px-6 py-4 border-t border-border bg-muted/30">
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={mutation.isPending}>Cancelar</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={mutation.isPending}>{t("common.cancel")}</Button>
           <Button onClick={() => mutation.mutate()} disabled={!canSubmit}>
-            {mutation.isPending ? "Registrando..." : "+ Registrar Asistencia"}
+            {mutation.isPending ? t("hrg.registering") : `+ ${t("hrg.att.register")}`}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -318,6 +325,7 @@ function RegisterAttendanceModal({ open, onOpenChange }: RegisterModalProps) {
 // ─── Edit Modal ──────────────────────────────────────────────────────────────
 function EditAttendanceModal({ record, onClose }: { record: AttendanceRecord | null; onClose: () => void }) {
   const formatoUI = useFormato();
+  const { t } = useLanguage();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -347,10 +355,10 @@ function EditAttendanceModal({ record, onClose }: { record: AttendanceRecord | n
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["attendance"] });
-      toast({ title: "Registro actualizado" });
+      toast({ title: t("hrg.recordUpdated") });
       onClose();
     },
-    onError: () => toast({ title: "Error al actualizar", variant: "destructive" }),
+    onError: () => toast({ title: t("common.errorUpdating"), variant: "destructive" }),
   });
 
   if (!record) return null;
@@ -361,13 +369,13 @@ function EditAttendanceModal({ record, onClose }: { record: AttendanceRecord | n
     <Dialog open={!!record} onOpenChange={onClose}>
       <DialogContent className="!flex !flex-col gap-0 max-w-lg p-0 overflow-hidden">
         <DialogHeader className="shrink-0 px-6 pt-6 pb-4 border-b border-border">
-          <DialogTitle className="text-lg font-semibold">Editar Registro</DialogTitle>
+          <DialogTitle className="text-lg font-semibold">{t("hrg.att.editTitle")}</DialogTitle>
           <p className="text-sm text-muted-foreground">{empName}</p>
         </DialogHeader>
 
         <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-4">
           <div className="space-y-1.5">
-            <Label>Fecha</Label>
+            <Label>{t("common.date")}</Label>
             <Popover open={dateOpen} onOpenChange={setDateOpen}>
               <PopoverTrigger asChild>
                 <Button variant="outline" className={cn("w-full justify-start text-left font-normal")}>
@@ -382,12 +390,12 @@ function EditAttendanceModal({ record, onClose }: { record: AttendanceRecord | n
           </div>
 
           <div className="space-y-1.5">
-            <Label>Turno</Label>
+            <Label>{t("hrg.att.shift")}</Label>
             <Select value={shift} onValueChange={(v) => { setShift(v); const f = SHIFTS.find((s) => s.value === v); if (f) { setShiftStart(f.start); setShiftEnd(f.end); } }}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 {SHIFTS.map((s) => (
-                  <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                  <SelectItem key={s.value} value={s.value}>{t(s.label)}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -395,48 +403,48 @@ function EditAttendanceModal({ record, onClose }: { record: AttendanceRecord | n
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label>Inicio Turno</Label>
+              <Label>{t("hrg.att.shiftStart")}</Label>
               <Input type="time" value={shiftStart} onChange={(e) => setShiftStart(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <Label>Fin Turno</Label>
+              <Label>{t("hrg.att.shiftEnd")}</Label>
               <Input type="time" value={shiftEnd} onChange={(e) => setShiftEnd(e.target.value)} />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label>Hora de Entrada</Label>
+              <Label>{t("hrg.att.checkIn")}</Label>
               <Input type="datetime-local" value={checkIn} onChange={(e) => setCheckIn(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <Label>Hora de Salida</Label>
+              <Label>{t("hrg.att.checkOut")}</Label>
               <Input type="datetime-local" value={checkOut} onChange={(e) => setCheckOut(e.target.value)} />
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <Label>Estado</Label>
+            <Label>{t("common.status")}</Label>
             <Select value={status} onValueChange={setStatus}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 {STATUSES.map((s) => (
-                  <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                  <SelectItem key={s.value} value={s.value}>{t(s.label)}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
           <div className="space-y-1.5">
-            <Label>Notas</Label>
+            <Label>{t("hrg.notes")}</Label>
             <Textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
           </div>
         </div>
 
         <DialogFooter className="shrink-0 px-6 py-4 border-t border-border bg-muted/30">
-          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button variant="outline" onClick={onClose}>{t("common.cancel")}</Button>
           <Button onClick={() => mutation.mutate()} disabled={mutation.isPending}>
-            {mutation.isPending ? "Guardando..." : "Guardar Cambios"}
+            {mutation.isPending ? t("hrg.saving") : t("hrg.saveChanges")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -447,6 +455,7 @@ function EditAttendanceModal({ record, onClose }: { record: AttendanceRecord | n
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function HRAttendance() {
   const formatoUI = useFormato();
+  const { t, language } = useLanguage();
   const { data: records = [], isLoading } = useAttendance();
   const { data: departments = [] } = useDepartments();
   const queryClient = useQueryClient();
@@ -474,10 +483,10 @@ export default function HRAttendance() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["attendance"] });
-      toast({ title: "Registro eliminado" });
+      toast({ title: t("hrg.recordDeleted") });
       setDeleteId(null);
     },
-    onError: () => toast({ title: "Error al eliminar", variant: "destructive" }),
+    onError: () => toast({ title: t("common.errorDeleting"), variant: "destructive" }),
   });
 
   // ─── KPIs ──────────────────────────────────────────────────────────────────
@@ -505,24 +514,24 @@ export default function HRAttendance() {
       {/* ── Fixed Header ──────────────────────────────────────────────────────── */}
       <header className="shrink-0 bg-background/30 backdrop-blur-xl border-b border-white/10 px-6 pt-6 pb-4">
         <PageHeader
-          title="Control de Asistencia"
+          title={t("hrg.att.title")}
           subtitle={
             view === "auto"
-              ? "Check-in y puntualidad automáticos desde Hubstaff"
-              : "Registro y seguimiento manual de asistencia del equipo"
+              ? t("hrg.att.subtitleAuto")
+              : t("hrg.att.subtitleManual")
           }
           actions={
             <>
               <div className="inline-flex items-center gap-0.5 rounded-lg border border-white/10 bg-white/5 p-0.5">
                 <Button variant={view === "auto" ? "secondary" : "ghost"} size="sm" onClick={() => setView("auto")}>
-                  Automática (Hubstaff)
+                  {t("hrg.att.auto")}
                 </Button>
                 <Button variant={view === "manual" ? "secondary" : "ghost"} size="sm" onClick={() => setView("manual")}>
-                  Manual
+                  {t("hrg.att.manual")}
                 </Button>
               </div>
               {view === "manual" && (
-                <Button onClick={() => setModalOpen(true)} size="sm">+ Registrar</Button>
+                <Button onClick={() => setModalOpen(true)} size="sm">+ {t("hrg.att.registerShort")}</Button>
               )}
             </>
           }
@@ -543,17 +552,17 @@ export default function HRAttendance() {
             Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
           ) : (
             <>
-              <StatChip label="Total Registros" value={String(total)} icon={<Users className="h-3.5 w-3.5" />} color="bg-primary" hint="Todos los registros" onClick={() => setKpiPopup("total")} />
-              <StatChip label="Presentes" value={String(presentes)} icon={<UserCheck className="h-3.5 w-3.5" />} color="bg-success" hint={total > 0 ? `${((presentes / total) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("presentes")} />
-              <StatChip label="Tardanzas" value={String(tardanzas)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" hint={total > 0 ? `${((tardanzas / total) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("tardanzas")} />
-              <StatChip label="Ausentes" value={String(ausentes)} icon={<UserX className="h-3.5 w-3.5" />} color="bg-destructive" hint={total > 0 ? `${((ausentes / total) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("ausentes")} />
+              <StatChip label={t("hrg.att.kpi.total")} value={String(total)} icon={<Users className="h-3.5 w-3.5" />} color="bg-primary" hint={t("hrg.allRecords")} onClick={() => setKpiPopup("total")} />
+              <StatChip label={t("hrg.att.kpi.present")} value={String(presentes)} icon={<UserCheck className="h-3.5 w-3.5" />} color="bg-success" hint={total > 0 ? t("hrg.ofTotal", { pct: ((presentes / total) * 100).toFixed(0) }) : "—"} onClick={() => setKpiPopup("presentes")} />
+              <StatChip label={t("hrg.att.kpi.late")} value={String(tardanzas)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" hint={total > 0 ? t("hrg.ofTotal", { pct: ((tardanzas / total) * 100).toFixed(0) }) : "—"} onClick={() => setKpiPopup("tardanzas")} />
+              <StatChip label={t("hrg.att.kpi.absent")} value={String(ausentes)} icon={<UserX className="h-3.5 w-3.5" />} color="bg-destructive" hint={total > 0 ? t("hrg.ofTotal", { pct: ((ausentes / total) * 100).toFixed(0) }) : "—"} onClick={() => setKpiPopup("ausentes")} />
             </>
           )}
         </div>
 
         {/* Department Tabs */}
         <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1">
-          <Button variant={!deptTab ? "secondary" : "ghost"} size="sm" onClick={() => setDeptTab("")}>Todos</Button>
+          <Button variant={!deptTab ? "secondary" : "ghost"} size="sm" onClick={() => setDeptTab("")}>{t("common.all")}</Button>
           {departments.map((d) => (
             <Button key={d.id} variant={deptTab === d.id ? "secondary" : "ghost"} size="sm" onClick={() => setDeptTab(d.id)}>{d.name}</Button>
           ))}
@@ -563,25 +572,25 @@ export default function HRAttendance() {
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Buscar empleado..." className="pl-8" value={search} onChange={(e) => setSearch(e.target.value)} />
+            <Input placeholder={t("hrg.searchEmployee")} className="pl-8" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
 
           <Select value={statusFilter || undefined} onValueChange={(v) => setStatusFilter(v === "__all__" ? "" : v)}>
-            <SelectTrigger className="w-36"><SelectValue placeholder="Estado" /></SelectTrigger>
+            <SelectTrigger className="w-36"><SelectValue placeholder={t("common.status")} /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="__all__">Todos</SelectItem>
+              <SelectItem value="__all__">{t("common.all")}</SelectItem>
               {STATUSES.map((s) => (
-                <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                <SelectItem key={s.value} value={s.value}>{t(s.label)}</SelectItem>
               ))}
             </SelectContent>
           </Select>
 
           <Select value={shiftFilter || undefined} onValueChange={(v) => setShiftFilter(v === "__all__" ? "" : v)}>
-            <SelectTrigger className="w-40"><SelectValue placeholder="Turno" /></SelectTrigger>
+            <SelectTrigger className="w-40"><SelectValue placeholder={t("hrg.att.shift")} /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="__all__">Todos los turnos</SelectItem>
+              <SelectItem value="__all__">{t("hrg.att.allShifts")}</SelectItem>
               {SHIFTS.map((s) => (
-                <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                <SelectItem key={s.value} value={s.value}>{t(s.label)}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -591,14 +600,14 @@ export default function HRAttendance() {
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm" className={cn("w-32 justify-start text-left font-normal text-xs", !dateFrom && "text-muted-foreground")}>
                 <CalendarIcon className="mr-1.5 h-3.5 w-3.5" />
-                {dateFrom ? format(dateFrom, "dd/MM/yy") : "Desde"}
+                {dateFrom ? format(dateFrom, "dd/MM/yy") : t("hrg.att.from")}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
               <Calendar mode="single" selected={dateFrom} onSelect={(d) => { setDateFrom(d); setDateFromOpen(false); }} locale={formatoUI.fechas} className="p-3 pointer-events-auto" />
               {dateFrom && (
                 <div className="border-t p-2">
-                  <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => setDateFrom(undefined)}>Limpiar</Button>
+                  <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => setDateFrom(undefined)}>{t("hrg.clear")}</Button>
                 </div>
               )}
             </PopoverContent>
@@ -609,14 +618,14 @@ export default function HRAttendance() {
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm" className={cn("w-32 justify-start text-left font-normal text-xs", !dateTo && "text-muted-foreground")}>
                 <CalendarIcon className="mr-1.5 h-3.5 w-3.5" />
-                {dateTo ? format(dateTo, "dd/MM/yy") : "Hasta"}
+                {dateTo ? format(dateTo, "dd/MM/yy") : t("hrg.att.to")}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
               <Calendar mode="single" selected={dateTo} onSelect={(d) => { setDateTo(d); setDateToOpen(false); }} locale={formatoUI.fechas} className="p-3 pointer-events-auto" />
               {dateTo && (
                 <div className="border-t p-2">
-                  <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => setDateTo(undefined)}>Limpiar</Button>
+                  <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => setDateTo(undefined)}>{t("hrg.clear")}</Button>
                 </div>
               )}
             </PopoverContent>
@@ -624,7 +633,7 @@ export default function HRAttendance() {
 
           {(search || statusFilter || shiftFilter || dateFrom || dateTo) && (
             <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={() => { setSearch(""); setStatusFilter(""); setShiftFilter(""); setDateFrom(undefined); setDateTo(undefined); }}>
-              Limpiar filtros
+              {t("hrg.clearFilters")}
             </Button>
           )}
         </div>
@@ -635,16 +644,16 @@ export default function HRAttendance() {
             <Table>
               <TableHeader>
                 <TableRow className="sticky top-0 z-10 bg-card border-b">
-                  <TableHead className="text-xs font-medium text-muted-foreground">Empleado</TableHead>
-                  <TableHead className="text-xs font-medium text-muted-foreground">Turno</TableHead>
-                  <TableHead className="text-xs font-medium text-muted-foreground">Horario</TableHead>
-                  <TableHead className="text-xs font-medium text-muted-foreground">Fecha</TableHead>
+                  <TableHead className="text-xs font-medium text-muted-foreground">{t("hrg.employee")}</TableHead>
+                  <TableHead className="text-xs font-medium text-muted-foreground">{t("hrg.att.shift")}</TableHead>
+                  <TableHead className="text-xs font-medium text-muted-foreground">{t("hrg.schedule")}</TableHead>
+                  <TableHead className="text-xs font-medium text-muted-foreground">{t("common.date")}</TableHead>
                   <TableHead className="text-xs font-medium text-muted-foreground">Check-In</TableHead>
                   <TableHead className="text-xs font-medium text-muted-foreground">Check-Out</TableHead>
-                  <TableHead className="text-xs font-medium text-muted-foreground">Duración</TableHead>
-                  <TableHead className="text-xs font-medium text-muted-foreground">Estado</TableHead>
-                  <TableHead className="text-xs font-medium text-muted-foreground">Notas</TableHead>
-                  <TableHead className="text-xs font-medium text-muted-foreground sticky right-0 bg-card">Acciones</TableHead>
+                  <TableHead className="text-xs font-medium text-muted-foreground">{t("common.duration")}</TableHead>
+                  <TableHead className="text-xs font-medium text-muted-foreground">{t("common.status")}</TableHead>
+                  <TableHead className="text-xs font-medium text-muted-foreground">{t("hrg.notes")}</TableHead>
+                  <TableHead className="text-xs font-medium text-muted-foreground sticky right-0 bg-card">{t("common.actions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -660,8 +669,8 @@ export default function HRAttendance() {
                   <TableRow>
                     <TableCell colSpan={10} className="text-center text-muted-foreground py-12">
                       {records.length === 0
-                        ? "No hay registros de asistencia. Haz clic en \"+ Registrar Asistencia\" para empezar."
-                        : "Sin resultados para los filtros aplicados."}
+                        ? t("hrg.att.empty")
+                        : t("hrg.noResultsFilters")}
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -682,7 +691,7 @@ export default function HRAttendance() {
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{getShiftLabel(r.shift)}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{getShiftLabel(r.shift, t)}</TableCell>
                         <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                           {r.shift_start && r.shift_end ? `${r.shift_start.slice(0,5)}–${r.shift_end.slice(0,5)}` : "—"}
                         </TableCell>
@@ -691,15 +700,15 @@ export default function HRAttendance() {
                         <TableCell className="text-sm whitespace-nowrap font-mono">{formatTime(r.check_out)}</TableCell>
                         <TableCell className="text-sm whitespace-nowrap">{formatDuration(r.check_in, r.check_out)}</TableCell>
                         <TableCell>
-                          <Badge variant={getStatusVariant(r.status)} className="text-xs">{getStatusLabel(r.status)}</Badge>
+                          <Badge variant={getStatusVariant(r.status)} className="text-xs">{getStatusLabel(r.status, t)}</Badge>
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground max-w-[160px] truncate">{r.notes ?? "—"}</TableCell>
                         <TableCell className="sticky right-0 bg-card group-hover:bg-muted/30">
                           <div className="flex items-center gap-1">
-                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setEditRecord(r)} title="Editar">
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setEditRecord(r)} title={t("common.edit")}>
                               <Pencil className="h-3.5 w-3.5" />
                             </Button>
-                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => setDeleteId(r.id)} title="Eliminar">
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => setDeleteId(r.id)} title={t("common.delete")}>
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>
                           </div>
@@ -715,7 +724,7 @@ export default function HRAttendance() {
 
         {!isLoading && filtered.length > 0 && (
           <p className="text-xs text-muted-foreground">
-            Mostrando {filtered.length} de {records.length} registros
+            {t("hrg.att.showing", { shown: filtered.length, total: records.length })}
           </p>
         )}
       </div>
@@ -727,13 +736,13 @@ export default function HRAttendance() {
       <AlertDialog open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar registro?</AlertDialogTitle>
-            <AlertDialogDescription>Esta acción no se puede deshacer. El registro de asistencia será eliminado permanentemente.</AlertDialogDescription>
+            <AlertDialogTitle>{t("hrg.att.deleteTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("hrg.att.deleteBody")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel />
             <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => deleteId && deleteMutation.mutate(deleteId)}>
-              Eliminar
+              {t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -742,12 +751,13 @@ export default function HRAttendance() {
       <KpiDetailDialog
         open={kpiPopup !== null}
         onOpenChange={(o) => !o && setKpiPopup(null)}
+        emptyText={t("hrg.noRecordsToShow")}
         title={(() => {
           switch (kpiPopup) {
-            case "total": return `Total Registros — ${total}`;
-            case "presentes": return `Presentes — ${presentes}`;
-            case "tardanzas": return `Tardanzas — ${tardanzas}`;
-            case "ausentes": return `Ausentes — ${ausentes}`;
+            case "total": return t("hrg.kpiTitle", { label: t("hrg.att.kpi.total"), value: total });
+            case "presentes": return t("hrg.kpiTitle", { label: t("hrg.att.kpi.present"), value: presentes });
+            case "tardanzas": return t("hrg.kpiTitle", { label: t("hrg.att.kpi.late"), value: tardanzas });
+            case "ausentes": return t("hrg.kpiTitle", { label: t("hrg.att.kpi.absent"), value: ausentes });
             default: return "";
           }
         })()}
@@ -760,9 +770,10 @@ export default function HRAttendance() {
           const tone = (status: string): KpiRow["rightTone"] =>
             status === "presente" ? "success" : status === "ausente" ? "destructive" : status === "tardanza" ? "warning" : "default";
           return list.slice(0, 100).map((r: any): KpiRow => ({
-            primary: r.employee_name ?? `Empleado ${r.employee_id?.slice?.(0, 8) ?? "—"}`,
+            primary: r.employee_name ?? t("hrg.employeeId", { id: r.employee_id?.slice?.(0, 8) ?? "—" }),
             secondary: r.date ? format(new Date(r.date), "dd MMM yyyy") : undefined,
-            right: r.status ?? "—",
+            // En español, el estado tal cual (así estaba); en inglés, con su etiqueta.
+            right: language === "en" && r.status ? getStatusLabel(r.status, t) : r.status ?? "—",
             rightTone: tone(r.status ?? ""),
           }));
         })()}

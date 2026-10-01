@@ -44,8 +44,15 @@ const clariMarkdownComponents: Components = {
 import { useAiMessages } from "@/hooks/useAiConversations";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useLanguage } from "@/hooks/useLanguage";
+import { getTranslation, traducir, type TranslationKey } from "@/lib/i18n";
 
-type Msg = { role: "user" | "assistant"; content: string };
+type Msg = {
+  role: "user" | "assistant";
+  content: string;
+  /** El saludo del arranque: en pantalla se dibuja en el idioma de la interfaz. */
+  saludo?: TranslationKey;
+};
 
 import { supabase } from "@/integrations/supabase/client";
 
@@ -76,19 +83,14 @@ interface UserContextPayload {
 // El welcome cambia según el backend para que el primer turno deje
 // claro qué tipo de asistente es éste. Mantenemos los mensajes cortos
 // — el system prompt ya cubre las reglas de redirección a otros agentes.
+//
+// IDIOMA: en pantalla el saludo sale en el idioma de la interfaz (`saludo` +
+// t()), pero su `content` queda en ESPAÑOL: es lo que puede viajar al modelo
+// como turno del asistente, y lo que se le manda a Clari no se traduce.
 const welcomeFor = (endpoint: EndpointKey): Msg => {
-  if (endpoint === "clari-help") {
-    return {
-      role: "assistant",
-      content:
-        "¡Hola! 👋 Soy Clari. Te ayudo a navegar Maven — preguntame cómo hacer cualquier cosa en la app.",
-    };
-  }
-  return {
-    role: "assistant",
-    content:
-      "¡Hola! 👋 Soy tu asistente de ventas. Pídeme rankings, comparativas o tendencias de tus creadoras. Ej: *¿quién factura más esta semana?*",
-  };
+  const saludo: TranslationKey =
+    endpoint === "clari-help" ? "shared.clari.welcomeHelp" : "shared.clari.welcomeSales";
+  return { role: "assistant", content: getTranslation(saludo, "es"), saludo };
 };
 
 async function streamChat({
@@ -119,11 +121,12 @@ async function streamChat({
       Authorization: `Bearer ${token}`,
       apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
     },
-    body: JSON.stringify({ messages, config, userContext }),
+    // Solo role y content: la marca del saludo es de la pantalla, no del modelo.
+    body: JSON.stringify({ messages: messages.map(({ role, content }) => ({ role, content })), config, userContext }),
   });
 
   if (!resp.ok) {
-    let errorMsg = "Error al conectar con la IA";
+    let errorMsg = traducir("shared.clari.connectError");
     try {
       const body = await resp.json();
       if (body.error) errorMsg = body.error;
@@ -132,7 +135,7 @@ async function streamChat({
     return;
   }
 
-  if (!resp.body) { onError("Sin respuesta"); return; }
+  if (!resp.body) { onError(traducir("shared.clari.noResponse")); return; }
 
   const reader = resp.body.getReader();
   const decoder = new TextDecoder();
@@ -191,6 +194,7 @@ const ClariAiChat = ({
   onAutoCreate,
   endpoint = "ai-sales-chat",
 }: ClariAiChatProps) => {
+  const { t } = useLanguage();
   const { messages: dbMessages, saveMessage, updateConversationTitle } = useAiMessages(conversationId ?? null);
   const WELCOME = welcomeFor(endpoint);
   const [localMessages, setLocalMessages] = useState<Msg[]>([WELCOME]);
@@ -271,7 +275,7 @@ const ClariAiChat = ({
     };
 
     rec.onerror = (e: any) => {
-      if (e.error !== "aborted") toast.error("Error de micrófono: " + e.error);
+      if (e.error !== "aborted") toast.error(t("shared.clari.micError", { error: e.error }));
       setIsRecording(false);
     };
 
@@ -279,7 +283,7 @@ const ClariAiChat = ({
     rec.start();
     setIsRecording(true);
     recognitionRef.current = rec;
-  }, [isRecording]);
+  }, [isRecording, t]);
 
   const send = useCallback(async () => {
     const text = input.trim();
@@ -296,6 +300,10 @@ const ClariAiChat = ({
     }
 
     const userMsg: Msg = { role: "user", content: text };
+    // ⚠️ WELCOME se vuelve a crear en cada render, así que este filtro por
+    // referencia no lo saca nunca: el saludo SÍ viaja al modelo (en español) y el
+    // auto-título de abajo no corre. Se deja como estaba a propósito (i18n no
+    // cambia lo que ve Clari); arreglarlo es un cambio aparte.
     const contextMsgs = localMessages.filter((m) => m !== WELCOME);
     const allMsgs = [...contextMsgs, userMsg];
 
@@ -360,10 +368,10 @@ const ClariAiChat = ({
         },
       });
     } catch {
-      toast.error("Error de conexión");
+      toast.error(t("shared.clari.connectionError"));
       setIsLoading(false);
     }
-  }, [input, isLoading, isRecording, localMessages, conversationId, titleSet, saveMessage, updateConversationTitle, onMessageSaved, onConversationTitleSet, onAutoCreate]);
+  }, [input, isLoading, isRecording, localMessages, conversationId, titleSet, saveMessage, updateConversationTitle, onMessageSaved, onConversationTitleSet, onAutoCreate, t]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -407,7 +415,7 @@ const ClariAiChat = ({
                       )}
                       {m.role === "assistant" ? (
                         <div className="ai-chat-content">
-                          <ReactMarkdown remarkPlugins={[remarkGfm]} components={clariMarkdownComponents}>{m.content}</ReactMarkdown>
+                          <ReactMarkdown remarkPlugins={[remarkGfm]} components={clariMarkdownComponents}>{m.saludo ? t(m.saludo) : m.content}</ReactMarkdown>
                         </div>
                       ) : (
                         <p className="whitespace-pre-wrap leading-relaxed">{m.content}</p>
@@ -446,7 +454,7 @@ const ClariAiChat = ({
                   )}
                   {m.role === "assistant" ? (
                     <div className="ai-chat-content relative z-10">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]} components={clariMarkdownComponents}>{m.content}</ReactMarkdown>
+                      <ReactMarkdown remarkPlugins={[remarkGfm]} components={clariMarkdownComponents}>{m.saludo ? t(m.saludo) : m.content}</ReactMarkdown>
                     </div>
                   ) : (
                     <p className="whitespace-pre-wrap text-sm leading-relaxed relative z-10">{m.content}</p>
@@ -475,7 +483,7 @@ const ClariAiChat = ({
                 <div className="max-w-[80%] rounded-2xl border border-dashed border-violet-500/40 bg-violet-500/10 px-3 py-2 text-sm">
                   <div className="flex items-center gap-1.5 text-xs font-bold text-violet-500">
                     <Bot className="h-3 w-3 animate-pulse" />
-                    Clari escribiendo…
+                    {t("shared.clari.typing")}
                   </div>
                 </div>
               </div>
@@ -493,10 +501,10 @@ const ClariAiChat = ({
             onKeyDown={handleKeyDown}
             placeholder={
               !canChat
-                ? "Crea o selecciona un chat para comenzar…"
+                ? t("shared.clari.pickChat")
                 : isRecording
-                ? "🎙️ Escuchando…"
-                : "Escribe tu pregunta…"
+                ? t("shared.clari.listening")
+                : t("shared.clari.askPlaceholder")
             }
             rows={1}
             className={`flex-1 resize-none rounded-2xl border bg-background px-4 py-2.5 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-all ${
@@ -514,7 +522,7 @@ const ClariAiChat = ({
                   ? "border-destructive text-destructive animate-pulse hover:bg-destructive/10"
                   : "hover:bg-accent"
               }`}
-              title={isRecording ? "Detener grabación" : "Hablar"}
+              title={isRecording ? t("shared.clari.stopRecording") : t("shared.clari.speak")}
             >
               {isRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
             </Button>
@@ -524,6 +532,7 @@ const ClariAiChat = ({
             disabled={!input.trim() || isLoading || !canChat}
             size="icon"
             className="h-10 w-10 shrink-0 rounded-full shadow-md"
+            aria-label={t("common.send")}
           >
             <Send className="h-4 w-4" />
           </Button>

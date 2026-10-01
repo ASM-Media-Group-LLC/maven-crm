@@ -6,6 +6,7 @@
 // ya está cargado (la consulta trae hasta 1000 filas y hoy son 612), así el
 // clic es instantáneo y no dispara otra consulta.
 
+import type { TranslationKey } from "@/lib/i18n";
 import { CANALES, ESTADOS, TIPOS, AGENCIAS, type Pedido } from "./types";
 
 export type ColumnaOrden =
@@ -24,12 +25,13 @@ export const CLASE: Record<ColumnaOrden, Clase> = {
   sale_channel: "categoria", due_on: "fecha", agency: "categoria",
 };
 
-/** Textos del menú según la clase (así "Precio" ofrece mayor/menor y "Tipo" agrupa). */
-export const TEXTOS: Record<Clase, { desc: string; asc: string }> = {
-  numero: { desc: "Mayor a menor", asc: "Menor a mayor" },
-  fecha: { desc: "Más reciente primero", asc: "Más antiguo primero" },
-  texto: { desc: "Z → A", asc: "A → Z" },
-  categoria: { desc: "Agrupar (Z → A)", asc: "Agrupar (A → Z)" },
+/** Textos del menú según la clase (así "Precio" ofrece mayor/menor y "Tipo"
+ *  agrupa). Son claves del diccionario: la tabla los pasa por `t()`. */
+export const TEXTOS: Record<Clase, { desc: TranslationKey; asc: TranslationKey }> = {
+  numero: { desc: "custom.sort.numDesc", asc: "custom.sort.numAsc" },
+  fecha: { desc: "custom.sort.dateDesc", asc: "custom.sort.dateAsc" },
+  texto: { desc: "custom.sort.textDesc", asc: "custom.sort.textAsc" },
+  categoria: { desc: "custom.sort.catDesc", asc: "custom.sort.catAsc" },
 };
 
 // El orden "natural" de las categorías no es alfabético: el estado sigue el
@@ -89,11 +91,11 @@ export function valoresDe(pedidos: Pedido[], col: ColumnaOrden): string[] {
   return rango ? lista.sort((a, b) => rango.indexOf(a) - rango.indexOf(b)) : lista.sort(TEXTO.compare);
 }
 
-/** Etiqueta legible de un valor de columna categórica. */
-export function etiquetaValor(col: ColumnaOrden, valor: string): string {
-  if (col === "status") return ESTADOS.find((e) => e.id === valor)?.label ?? valor;
-  if (col === "content_type") { const t = TIPOS.find((x) => x.id === valor); return t ? `${t.emoji} ${t.label}` : valor; }
-  if (col === "sale_channel") return CANALES.find((c) => c.id === valor)?.label ?? valor;
+/** Etiqueta legible de un valor de columna categórica, en el idioma de `t`. */
+export function etiquetaValor(col: ColumnaOrden, valor: string, t: (k: TranslationKey) => string): string {
+  if (col === "status") { const e = ESTADOS.find((x) => x.id === valor); return e ? t(e.label) : valor; }
+  if (col === "content_type") { const x = TIPOS.find((y) => y.id === valor); return x ? `${x.emoji} ${t(x.label)}` : valor; }
+  if (col === "sale_channel") { const c = CANALES.find((x) => x.id === valor); return c ? t(c.label) : valor; }
   if (col === "agency") return AGENCIAS.find((a) => a.id === valor)?.label ?? valor;
   return valor;
 }

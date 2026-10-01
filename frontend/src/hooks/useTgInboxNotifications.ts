@@ -11,20 +11,23 @@ import {
   useBrowserNotifications,
   useNotificationPermission,
 } from "@/hooks/useBrowserNotifications";
+// La notificación del navegador es para quien la recibe: en su idioma, armada
+// con traducir() en el momento del aviso.
+import { traducir, type TranslationKey } from "@/lib/i18n";
 
 // Etiqueta legible cuando el mensaje no trae texto (mismo criterio que WhatsApp).
-const MEDIA_LABEL: Record<string, string> = {
-  photo: "📷 Foto",
-  video: "🎥 Video",
-  voice: "🎵 Audio",
-  document: "📄 Documento",
-  media: "Adjunto",
+const MEDIA_LABEL: Record<string, TranslationKey> = {
+  photo: "int.inbox.photo",
+  video: "int.inbox.video",
+  voice: "int.inbox.audio",
+  document: "int.inbox.document",
+  media: "int.inbox.attachment",
 };
 
 function previewOf(body: string | null, msgType: string): string {
   const t = (body ?? "").trim();
   if (t) return t.length > 120 ? t.slice(0, 120) + "…" : t;
-  return MEDIA_LABEL[msgType] ?? "Nuevo mensaje";
+  return traducir(MEDIA_LABEL[msgType] ?? "int.inbox.newMessage");
 }
 
 /**
@@ -91,7 +94,7 @@ export function useTgInboxNotifications() {
           if (!prefRef.current("inbox_mensaje", "in_app")) return;
 
           // Nombre del peer (best-effort; la RLS limita a conversaciones visibles).
-          let title = "Nuevo mensaje de Telegram";
+          let title = traducir("int.inbox.newTelegram");
           try {
             const { data } = await (supabase as any)
               .from("tg_conversations")

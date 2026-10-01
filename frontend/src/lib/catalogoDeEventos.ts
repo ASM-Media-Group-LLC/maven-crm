@@ -18,6 +18,9 @@
 // Un evento sin un canal es porque ese canal no existe para él (los mensajes de
 // la bandeja de WhatsApp no entran a la campana; el correo nuevo solo se avisa
 // al celular). Ahí la celda queda vacía, no "Pronto".
+import { traducir, type TranslationKey } from "@/lib/i18n";
+import { conEtiqueta } from "@/lib/etiquetaTraducida";
+
 export type CanalDeAviso = "in_app" | "push" | "email";
 
 /** Canales que vienen encendidos sin fila (el correo es opt-in). */
@@ -25,124 +28,91 @@ export const CANAL_ENCENDIDO_POR_DEFECTO: Record<CanalDeAviso, boolean> = { in_a
 
 export interface EventoDeAviso {
   type: string;
-  label: string;
-  descripcion?: string;
+  /** Clave del nombre del evento: la pantalla hace t(e.labelKey). */
+  labelKey: TranslationKey;
+  /** El nombre, traducido al leerlo (ver lib/etiquetaTraducida.ts). */
+  readonly label: string;
+  descripcionKey?: TranslationKey;
+  /** La descripción, traducida al leerla; undefined si el evento no tiene. */
+  readonly descripcion?: string;
   canales: readonly CanalDeAviso[];
 }
 
 export interface ModuloDeAvisos {
-  /** Nombre que se muestra y que se guarda en `module`. */
+  /** Nombre del módulo que se GUARDA en notification_preferences.module. Es dato:
+   *  no se traduce. Para mostrarlo, `labelKey` / `label`. */
   modulo: string;
+  /** Clave del nombre que se MUESTRA. */
+  labelKey: TranslationKey;
+  /** El nombre que se muestra, traducido al leerlo. */
+  readonly label: string;
   /** Módulo del sistema de permisos que hace falta para ver la tarjeta; null = todos. */
   permiso: string | null;
   eventos: readonly EventoDeAviso[];
 }
 
+function evento(
+  type: string,
+  labelKey: TranslationKey,
+  canales: readonly CanalDeAviso[],
+  descripcionKey?: TranslationKey,
+): EventoDeAviso {
+  const e = conEtiqueta({ type, canales }, labelKey);
+  if (!descripcionKey) return e;
+  return Object.defineProperties(e, {
+    descripcionKey: { value: descripcionKey, enumerable: true },
+    descripcion: { get: () => traducir(descripcionKey), enumerable: true },
+  });
+}
+
+function modulo(
+  nombreGuardado: string,
+  labelKey: TranslationKey,
+  permiso: string | null,
+  eventos: readonly EventoDeAviso[],
+): ModuloDeAvisos {
+  return conEtiqueta({ modulo: nombreGuardado, permiso, eventos }, labelKey);
+}
+
 export const CATALOGO_DE_EVENTOS: readonly ModuloDeAvisos[] = [
-  {
-    modulo: "Messenger",
-    permiso: null,
-    eventos: [
-      {
-        type: "chat_message",
-        label: "Mensajes nuevos",
-        descripcion: "Directos y grupos. Respeta los chats silenciados y el modo de cada chat. No entran a la campana: viven en la nube de Messenger.",
-        canales: ["in_app", "push"],
-      },
-      {
-        type: "chat_mention",
-        label: "Menciones",
-        descripcion: "Cuando alguien te nombra con @. Entra a la campana y avisa dentro de Maven aunque tengas push. Al celular llega como mensaje.",
-        canales: ["in_app"],
-      },
-    ],
-  },
-  {
-    modulo: "Correo",
-    permiso: "Correo",
-    eventos: [
-      {
-        type: "correo_nuevo",
-        label: "Correo nuevo en la bandeja de entrada",
-        canales: ["push"],
-      },
-      {
-        // Distinto de "correo nuevo" a propósito: que te nombren pidiendo algo
-        // no es lo mismo que recibir uno más, y se apaga por separado.
-        type: "correo_mencion",
-        label: "Te mencionaron con @ en un correo",
-        canales: ["in_app", "push"],
-      },
-    ],
-  },
-  {
-    modulo: "Cowork",
-    permiso: "Cowork",
-    // Todos solo si soy host de la sesión. Los cuatro llamados son los kinds
-    // que registra la edge cowork-session (camara, encuadre, luz, pantalla) y
-    // el trigger push_cowork_llamado los manda como 'cowork_llamado_<kind>'.
-    eventos: [
-      {
-        type: "cowork_pedido_host",
-        label: "Alguien pide supervisor",
-        descripcion: "Solo si soy host de la sesión.",
-        canales: ["in_app", "push", "email"],
-      },
-      { type: "cowork_llamado_camara", label: "Llamado: cámara apagada", canales: ["push", "email"] },
-      { type: "cowork_llamado_encuadre", label: "Llamado: mal encuadre", canales: ["push", "email"] },
-      { type: "cowork_llamado_luz", label: "Llamado: sin luz", canales: ["push", "email"] },
-      { type: "cowork_llamado_pantalla", label: "Llamado: no comparte pantalla", canales: ["push", "email"] },
-    ],
-  },
-  {
-    modulo: "Bandeja",
-    permiso: "Bandeja",
-    eventos: [
-      {
-        type: "inbox_asignacion",
-        label: "Me asignaron una conversación",
-        descripcion: "WhatsApp y Telegram. Solo cuando la asigna otra persona.",
-        canales: ["push", "email"],
-      },
-      {
-        type: "inbox_mensaje",
-        label: "Mensaje nuevo de un contacto",
-        descripcion: "WhatsApp y Telegram, en las conversaciones que veo.",
-        canales: ["in_app"],
-      },
-    ],
-  },
-  {
-    modulo: "Closers",
-    permiso: "Closers",
-    eventos: [
-      { type: "closer_assigned", label: "Lead asignada", canales: ["in_app", "push", "email"] },
-      { type: "closer_contact_overdue", label: "Contacto vencido", canales: ["in_app", "push", "email"] },
-      {
-        type: "closer_contact_decision",
-        label: "Decisión pendiente",
-        descripcion: "Después de 6 contactos hechos.",
-        canales: ["in_app", "push", "email"],
-      },
-    ],
-  },
-  {
-    modulo: "Evaluador",
-    permiso: "Evaluator",
-    eventos: [
-      { type: "chatter_evaluation", label: "Evaluación de chatter lista", canales: ["in_app", "push", "email"] },
-    ],
-  },
-  {
-    modulo: "Creadoras",
-    permiso: "Creadores",
-    eventos: [
-      { type: "onboarding_inactivity", label: "Inactividad en onboarding", canales: ["in_app", "push", "email"] },
-      { type: "onboarding_complete", label: "Onboarding completado", canales: ["in_app", "push", "email"] },
-      { type: "verification_approved", label: "Verificación aprobada", canales: ["in_app", "push", "email"] },
-      { type: "verification_rejected", label: "Verificación rechazada", canales: ["in_app", "push", "email"] },
-    ],
-  },
+  modulo("Messenger", "int.events.module.messenger", null, [
+    evento("chat_message", "int.events.chatMessage", ["in_app", "push"], "int.events.chatMessageDesc"),
+    evento("chat_mention", "int.events.chatMention", ["in_app"], "int.events.chatMentionDesc"),
+  ]),
+  modulo("Correo", "int.events.module.correo", "Correo", [
+    evento("correo_nuevo", "int.events.correoNuevo", ["push"]),
+    // Distinto de "correo nuevo" a propósito: que te nombren pidiendo algo
+    // no es lo mismo que recibir uno más, y se apaga por separado.
+    evento("correo_mencion", "int.events.correoMencion", ["in_app", "push"]),
+  ]),
+  // Todos solo si soy host de la sesión. Los cuatro llamados son los kinds
+  // que registra la edge cowork-session (camara, encuadre, luz, pantalla) y
+  // el trigger push_cowork_llamado los manda como 'cowork_llamado_<kind>'.
+  modulo("Cowork", "int.events.module.cowork", "Cowork", [
+    evento("cowork_pedido_host", "int.events.coworkPedidoHost", ["in_app", "push", "email"], "int.events.coworkPedidoHostDesc"),
+    evento("cowork_llamado_camara", "int.events.coworkCamara", ["push", "email"]),
+    evento("cowork_llamado_encuadre", "int.events.coworkEncuadre", ["push", "email"]),
+    evento("cowork_llamado_luz", "int.events.coworkLuz", ["push", "email"]),
+    evento("cowork_llamado_pantalla", "int.events.coworkPantalla", ["push", "email"]),
+  ]),
+  modulo("Bandeja", "int.events.module.bandeja", "Bandeja", [
+    evento("inbox_asignacion", "int.events.inboxAsignacion", ["push", "email"], "int.events.inboxAsignacionDesc"),
+    evento("inbox_mensaje", "int.events.inboxMensaje", ["in_app"], "int.events.inboxMensajeDesc"),
+  ]),
+  modulo("Closers", "int.events.module.closers", "Closers", [
+    evento("closer_assigned", "int.events.closerAssigned", ["in_app", "push", "email"]),
+    evento("closer_contact_overdue", "int.events.closerOverdue", ["in_app", "push", "email"]),
+    evento("closer_contact_decision", "int.events.closerDecision", ["in_app", "push", "email"], "int.events.closerDecisionDesc"),
+  ]),
+  modulo("Evaluador", "int.events.module.evaluador", "Evaluator", [
+    evento("chatter_evaluation", "int.events.chatterEvaluation", ["in_app", "push", "email"]),
+  ]),
+  modulo("Creadoras", "int.events.module.creadoras", "Creadores", [
+    evento("onboarding_inactivity", "int.events.onboardingInactivity", ["in_app", "push", "email"]),
+    evento("onboarding_complete", "int.events.onboardingComplete", ["in_app", "push", "email"]),
+    evento("verification_approved", "int.events.verificationApproved", ["in_app", "push", "email"]),
+    evento("verification_rejected", "int.events.verificationRejected", ["in_app", "push", "email"]),
+  ]),
 ];
 
 const POR_TIPO: ReadonlyMap<string, { modulo: string; evento: EventoDeAviso }> = new Map(

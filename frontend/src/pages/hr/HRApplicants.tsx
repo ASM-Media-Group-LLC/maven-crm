@@ -33,6 +33,9 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { useDepartments } from "@/hooks/useEmployees";
 import { PhoneInput } from "@/components/ui/phone-input";
+import { useLanguage } from "@/hooks/useLanguage";
+import { ConFormato } from "@/pages/admin/ConFormato";
+import { etiquetaHr, etiquetaHrO, etiquetaHrV, valorGuardado } from "./etiquetasHr";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface ApplicantRecord {
@@ -78,6 +81,11 @@ export default function HRApplicants() {
   const { data: departments = [] } = useDepartments();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { t, language } = useLanguage();
+  const estado = (s: string) => etiquetaHrV(t, "applStatus", s);
+  // La tabla caía al valor guardado; la tarjeta y el detalle, a "—".
+  const fuente = (s: string | null) => etiquetaHrO(t, "applSource", s);
+  const fuenteConocida = (s: string | null) => etiquetaHr(t, "applSource", s) ?? "—";
 
   // Filters
   const [search, setSearch] = useState("");
@@ -112,10 +120,10 @@ export default function HRApplicants() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["applicants"] });
-      toast({ title: "Candidato actualizado" });
+      toast({ title: t("hrg.appl.updated") });
       setEditItem(null);
     },
-    onError: () => toast({ title: "Error al actualizar", variant: "destructive" }),
+    onError: () => toast({ title: t("common.errorUpdating"), variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
@@ -125,10 +133,10 @@ export default function HRApplicants() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["applicants"] });
-      toast({ title: "Candidato eliminado" });
+      toast({ title: t("hrg.appl.deleted") });
       setDeleteItem(null);
     },
-    onError: () => toast({ title: "Error al eliminar", variant: "destructive" }),
+    onError: () => toast({ title: t("common.errorDeleting"), variant: "destructive" }),
   });
 
   // ─── KPIs ─────────────────────────────────────────────────────────────────
@@ -170,11 +178,11 @@ export default function HRApplicants() {
       {/* ── Fixed Header ──────────────────────────────────────────────────── */}
       <header className="shrink-0 bg-background/30 backdrop-blur-xl border-b border-white/10 px-6 pt-6 pb-4">
         <PageHeader
-          title="Candidatos"
-          subtitle="Gestiona candidatos y conviértelos en empleados"
+          title={t("hrg.appl.title")}
+          subtitle={t("hrg.appl.subtitle")}
           actions={
             <Button size="sm" onClick={() => navigate("/hr/candidatos/nuevo")}>
-              <Plus className="h-4 w-4 mr-1" />Nuevo Candidato
+              <Plus className="h-4 w-4 mr-1" />{t("hrg.appl.newTitle")}
             </Button>
           }
         />
@@ -189,17 +197,17 @@ export default function HRApplicants() {
             Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
           ) : (
             <>
-              <StatChip label="Total Candidatos" value={String(applicants.length)} icon={<Users className="h-3.5 w-3.5" />} color="bg-primary" hint="Todos los registros" onClick={() => setKpiPopup("total")} />
-              <StatChip label="Pendientes" value={String(totalPending)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" hint={applicants.length > 0 ? `${((totalPending / applicants.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("pending")} />
-              <StatChip label="En Entrevista" value={String(totalInterview)} icon={<UserCheck className="h-3.5 w-3.5" />} color="bg-primary" hint={applicants.length > 0 ? `${((totalInterview / applicants.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("interview")} />
-              <StatChip label="Contratados" value={String(totalHired)} icon={<CheckCircle className="h-3.5 w-3.5" />} color="bg-success" hint={applicants.length > 0 ? `${((totalHired / applicants.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("hired")} />
+              <StatChip label={t("hrg.appl.kpi.total")} value={String(applicants.length)} icon={<Users className="h-3.5 w-3.5" />} color="bg-primary" hint={t("hrg.allRecords")} onClick={() => setKpiPopup("total")} />
+              <StatChip label={t("common.pendingPl")} value={String(totalPending)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" hint={applicants.length > 0 ? t("hrg.ofTotal", { pct: ((totalPending / applicants.length) * 100).toFixed(0) }) : "—"} onClick={() => setKpiPopup("pending")} />
+              <StatChip label={t("hrg.appl.kpi.interview")} value={String(totalInterview)} icon={<UserCheck className="h-3.5 w-3.5" />} color="bg-primary" hint={applicants.length > 0 ? t("hrg.ofTotal", { pct: ((totalInterview / applicants.length) * 100).toFixed(0) }) : "—"} onClick={() => setKpiPopup("interview")} />
+              <StatChip label={t("hrg.appl.kpi.hired")} value={String(totalHired)} icon={<CheckCircle className="h-3.5 w-3.5" />} color="bg-success" hint={applicants.length > 0 ? t("hrg.ofTotal", { pct: ((totalHired / applicants.length) * 100).toFixed(0) }) : "—"} onClick={() => setKpiPopup("hired")} />
             </>
           )}
         </div>
 
         {/* Department Tabs */}
         <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1">
-          <Button variant={!deptTab ? "secondary" : "ghost"} size="sm" onClick={() => setDeptTab("")}>Todos</Button>
+          <Button variant={!deptTab ? "secondary" : "ghost"} size="sm" onClick={() => setDeptTab("")}>{t("common.all")}</Button>
           {departments.map((d: any) => (
             <Button key={d.id} variant={deptTab === d.id ? "secondary" : "ghost"} size="sm" onClick={() => setDeptTab(d.id)}>{d.name}</Button>
           ))}
@@ -209,30 +217,30 @@ export default function HRApplicants() {
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Buscar por nombre, email o posición..." className="pl-8" value={search} onChange={(e) => setSearch(e.target.value)} />
+            <Input placeholder={t("hrg.appl.searchPlaceholder")} className="pl-8" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
 
           <Select value={statusFilter || undefined} onValueChange={(v) => setStatusFilter(v === "__all__" ? "" : v)}>
-            <SelectTrigger className="w-40"><SelectValue placeholder="Estado" /></SelectTrigger>
+            <SelectTrigger className="w-40"><SelectValue placeholder={t("common.status")} /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="__all__">Todos</SelectItem>
-              {APPLICANT_STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+              <SelectItem value="__all__">{t("common.all")}</SelectItem>
+              {APPLICANT_STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{estado(s.value)}</SelectItem>)}
             </SelectContent>
           </Select>
 
           {/* View toggle */}
           <div className="inline-flex items-center rounded-md border border-border">
-            <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8 rounded-r-none" onClick={() => setViewMode("list")}>
+            <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8 rounded-r-none" onClick={() => setViewMode("list")} aria-label={t("hrg.dir.viewTable")}>
               <ListIcon className="h-4 w-4" />
             </Button>
-            <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8 rounded-l-none" onClick={() => setViewMode("grid")}>
+            <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8 rounded-l-none" onClick={() => setViewMode("grid")} aria-label={t("hrg.dir.viewGrid")}>
               <LayoutGrid className="h-4 w-4" />
             </Button>
           </div>
 
           {hasFilters && (
             <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={clearFilters}>
-              <X className="h-3.5 w-3.5 mr-1" />Limpiar filtros
+              <X className="h-3.5 w-3.5 mr-1" />{t("hrg.clearFilters")}
             </Button>
           )}
         </div>
@@ -250,14 +258,14 @@ export default function HRApplicants() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="sticky top-0 z-10 bg-card text-xs font-medium text-muted-foreground">Nombre</TableHead>
-                    <TableHead className="sticky top-0 z-10 bg-card text-xs font-medium text-muted-foreground">Email</TableHead>
-                    <TableHead className="sticky top-0 z-10 bg-card text-xs font-medium text-muted-foreground">Posición</TableHead>
-                    <TableHead className="sticky top-0 z-10 bg-card text-xs font-medium text-muted-foreground">Área</TableHead>
-                    <TableHead className="sticky top-0 z-10 bg-card text-xs font-medium text-muted-foreground">Fuente</TableHead>
-                    <TableHead className="sticky top-0 z-10 bg-card text-xs font-medium text-muted-foreground">Fecha</TableHead>
-                    <TableHead className="sticky top-0 z-10 bg-card text-xs font-medium text-muted-foreground">Estado</TableHead>
-                    <TableHead className="sticky top-0 right-0 z-20 bg-card text-xs font-medium text-muted-foreground">Acciones</TableHead>
+                    <TableHead className="sticky top-0 z-10 bg-card text-xs font-medium text-muted-foreground">{t("common.name")}</TableHead>
+                    <TableHead className="sticky top-0 z-10 bg-card text-xs font-medium text-muted-foreground">{t("hrg.email")}</TableHead>
+                    <TableHead className="sticky top-0 z-10 bg-card text-xs font-medium text-muted-foreground">{t("hrg.position")}</TableHead>
+                    <TableHead className="sticky top-0 z-10 bg-card text-xs font-medium text-muted-foreground">{t("common.area")}</TableHead>
+                    <TableHead className="sticky top-0 z-10 bg-card text-xs font-medium text-muted-foreground">{t("hrg.source")}</TableHead>
+                    <TableHead className="sticky top-0 z-10 bg-card text-xs font-medium text-muted-foreground">{t("common.date")}</TableHead>
+                    <TableHead className="sticky top-0 z-10 bg-card text-xs font-medium text-muted-foreground">{t("common.status")}</TableHead>
+                    <TableHead className="sticky top-0 right-0 z-20 bg-card text-xs font-medium text-muted-foreground">{t("common.actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -269,9 +277,9 @@ export default function HRApplicants() {
                     <TableRow>
                       <TableCell colSpan={8}>
                         {applicants.length === 0 ? (
-                          <EmptyState seed="hr-candidatos" title="No hay candidatos registrados" description={'Haz clic en "Nuevo Candidato" para empezar.'} />
+                          <EmptyState seed="hr-candidatos" title={t("hrg.appl.empty")} description={t("hrg.appl.emptyHint")} />
                         ) : (
-                          <EmptyState seed="hr-candidatos" title="Sin resultados" description="No hay coincidencias con los filtros aplicados." />
+                          <EmptyState seed="hr-candidatos" title={t("common.noResultsShort")} description={t("common.noMatches")} />
                         )}
                       </TableCell>
                     </TableRow>
@@ -297,25 +305,25 @@ export default function HRApplicants() {
                             ) : <span className="text-sm text-muted-foreground">—</span>}
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
-                            {APPLICANT_SOURCES.find((s) => s.value === app.source)?.label ?? app.source ?? "—"}
+                            {fuente(app.source)}
                           </TableCell>
                           <TableCell className="text-sm whitespace-nowrap">{format(new Date(app.created_at), "dd/MM/yyyy")}</TableCell>
                           <TableCell>
                             <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium", statusColors.bg, statusColors.text)}>
-                              {APPLICANT_STATUSES.find((s) => s.value === app.status)?.label ?? app.status}
+                              {estado(app.status)}
                             </span>
                           </TableCell>
                           <TableCell className="sticky right-0 bg-card group-hover:bg-muted/30">
                             <div className="flex items-center gap-1">
                               <Tooltip><TooltipTrigger asChild>
                                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setViewItem(app)}><Eye className="h-3.5 w-3.5" /></Button>
-                              </TooltipTrigger><TooltipContent side="left">Ver</TooltipContent></Tooltip>
+                              </TooltipTrigger><TooltipContent side="left">{t("common.view")}</TooltipContent></Tooltip>
                               <Tooltip><TooltipTrigger asChild>
                                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEdit(app)}><Pencil className="h-3.5 w-3.5" /></Button>
-                              </TooltipTrigger><TooltipContent side="left">Editar</TooltipContent></Tooltip>
+                              </TooltipTrigger><TooltipContent side="left">{t("common.edit")}</TooltipContent></Tooltip>
                               <Tooltip><TooltipTrigger asChild>
                                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => setDeleteItem(app)}><Trash2 className="h-3.5 w-3.5" /></Button>
-                              </TooltipTrigger><TooltipContent side="left">Eliminar</TooltipContent></Tooltip>
+                              </TooltipTrigger><TooltipContent side="left">{t("common.delete")}</TooltipContent></Tooltip>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -333,9 +341,9 @@ export default function HRApplicants() {
             ) : filtered.length === 0 ? (
               <div className="col-span-full">
                 {applicants.length === 0 ? (
-                  <EmptyState seed="hr-candidatos" title="No hay candidatos registrados" description={'Haz clic en "Nuevo Candidato" para empezar.'} />
+                  <EmptyState seed="hr-candidatos" title={t("hrg.appl.empty")} description={t("hrg.appl.emptyHint")} />
                 ) : (
-                  <EmptyState seed="hr-candidatos" title="Sin resultados" description="No hay coincidencias con los filtros aplicados." />
+                  <EmptyState seed="hr-candidatos" title={t("common.noResultsShort")} description={t("common.noMatches")} />
                 )}
               </div>
             ) : (
@@ -352,23 +360,23 @@ export default function HRApplicants() {
                           </div>
                           <div>
                             <p className="text-sm font-medium leading-tight">{app.full_name}</p>
-                            <p className="text-xs text-muted-foreground truncate max-w-[160px]">{app.email ?? "Sin email"}</p>
+                            <p className="text-xs text-muted-foreground truncate max-w-[160px]">{app.email ?? t("hrg.noEmail")}</p>
                           </div>
                         </div>
                         <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium shrink-0", statusColors.bg, statusColors.text)}>
-                          {APPLICANT_STATUSES.find((s) => s.value === app.status)?.label ?? app.status}
+                          {estado(app.status)}
                         </span>
                       </div>
                       <div className="space-y-1 text-xs text-muted-foreground">
-                        <p><span className="font-medium text-foreground">Posición:</span> {app.position_applied ?? "—"}</p>
-                        {app.departments?.name && <p><span className="font-medium text-foreground">Área:</span> {app.departments.name}</p>}
-                        <p><span className="font-medium text-foreground">Fuente:</span> {APPLICANT_SOURCES.find((s) => s.value === app.source)?.label ?? "—"}</p>
-                        <p><span className="font-medium text-foreground">Fecha:</span> {format(new Date(app.created_at), "dd/MM/yyyy")}</p>
+                        <p><span className="font-medium text-foreground">{t("hrg.position")}:</span> {app.position_applied ?? "—"}</p>
+                        {app.departments?.name && <p><span className="font-medium text-foreground">{t("common.area")}:</span> {app.departments.name}</p>}
+                        <p><span className="font-medium text-foreground">{t("hrg.source")}:</span> {fuenteConocida(app.source)}</p>
+                        <p><span className="font-medium text-foreground">{t("common.date")}:</span> {format(new Date(app.created_at), "dd/MM/yyyy")}</p>
                       </div>
                       <div className="flex items-center gap-1 pt-1 border-t border-border">
-                        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setViewItem(app)}><Eye className="h-3 w-3 mr-1" />Ver</Button>
-                        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => openEdit(app)}><Pencil className="h-3 w-3 mr-1" />Editar</Button>
-                        <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive hover:text-destructive" onClick={() => setDeleteItem(app)}><Trash2 className="h-3 w-3 mr-1" />Eliminar</Button>
+                        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setViewItem(app)}><Eye className="h-3 w-3 mr-1" />{t("common.view")}</Button>
+                        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => openEdit(app)}><Pencil className="h-3 w-3 mr-1" />{t("common.edit")}</Button>
+                        <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive hover:text-destructive" onClick={() => setDeleteItem(app)}><Trash2 className="h-3 w-3 mr-1" />{t("common.delete")}</Button>
                       </div>
                     </CardContent>
                   </Card>
@@ -382,27 +390,27 @@ export default function HRApplicants() {
       {/* ── View Modal ────────────────────────────────────────────────────── */}
       <Dialog open={!!viewItem} onOpenChange={() => setViewItem(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Detalle del Candidato</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t("hrg.appl.detailTitle")}</DialogTitle></DialogHeader>
           {viewItem && (
             <div className="space-y-3 text-sm">
               <div className="grid grid-cols-2 gap-3">
-                <div><p className="text-xs text-muted-foreground">Nombre</p><p className="font-medium">{viewItem.full_name}</p></div>
-                <div><p className="text-xs text-muted-foreground">Email</p><p>{viewItem.email ?? "—"}</p></div>
-                <div><p className="text-xs text-muted-foreground">Teléfono</p><p>{viewItem.phone ?? "—"}</p></div>
-                <div><p className="text-xs text-muted-foreground">Posición</p><p>{viewItem.position_applied ?? "—"}</p></div>
-                <div><p className="text-xs text-muted-foreground">Área</p><p>{viewItem.departments?.name ?? "—"}</p></div>
-                <div><p className="text-xs text-muted-foreground">Fuente</p><p>{APPLICANT_SOURCES.find((s) => s.value === viewItem.source)?.label ?? "—"}</p></div>
-                <div><p className="text-xs text-muted-foreground">Fecha</p><p>{format(new Date(viewItem.created_at), "dd/MM/yyyy")}</p></div>
+                <div><p className="text-xs text-muted-foreground">{t("common.name")}</p><p className="font-medium">{viewItem.full_name}</p></div>
+                <div><p className="text-xs text-muted-foreground">{t("hrg.email")}</p><p>{viewItem.email ?? "—"}</p></div>
+                <div><p className="text-xs text-muted-foreground">{t("common.phone")}</p><p>{viewItem.phone ?? "—"}</p></div>
+                <div><p className="text-xs text-muted-foreground">{t("hrg.position")}</p><p>{viewItem.position_applied ?? "—"}</p></div>
+                <div><p className="text-xs text-muted-foreground">{t("common.area")}</p><p>{viewItem.departments?.name ?? "—"}</p></div>
+                <div><p className="text-xs text-muted-foreground">{t("hrg.source")}</p><p>{fuenteConocida(viewItem.source)}</p></div>
+                <div><p className="text-xs text-muted-foreground">{t("common.date")}</p><p>{format(new Date(viewItem.created_at), "dd/MM/yyyy")}</p></div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Estado</p>
+                  <p className="text-xs text-muted-foreground">{t("common.status")}</p>
                   {(() => {
                     const c = APPLICANT_STATUS_COLORS[viewItem.status] ?? { bg: "bg-muted", text: "text-muted-foreground" };
-                    return <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium", c.bg, c.text)}>{APPLICANT_STATUSES.find((s) => s.value === viewItem.status)?.label ?? viewItem.status}</span>;
+                    return <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium", c.bg, c.text)}>{estado(viewItem.status)}</span>;
                   })()}
                 </div>
               </div>
               {viewItem.notes && (
-                <div><p className="text-xs text-muted-foreground">Notas</p><p className="whitespace-pre-wrap">{viewItem.notes}</p></div>
+                <div><p className="text-xs text-muted-foreground">{t("hrg.notes")}</p><p className="whitespace-pre-wrap">{viewItem.notes}</p></div>
               )}
             </div>
           )}
@@ -412,57 +420,57 @@ export default function HRApplicants() {
       {/* ── Edit Modal ────────────────────────────────────────────────────── */}
       <Dialog open={!!editItem} onOpenChange={() => setEditItem(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Editar Candidato</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t("hrg.appl.editTitle")}</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <Label>Nombre Completo <span className="text-destructive">*</span></Label>
+              <Label>{t("hrg.fullName")} <span className="text-destructive">*</span></Label>
               <Input value={editForm.full_name} onChange={(e) => setEditForm((f) => ({ ...f, full_name: e.target.value }))} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label>Email</Label>
+                <Label>{t("hrg.email")}</Label>
                 <Input type="email" value={editForm.email} onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))} />
               </div>
               <div className="space-y-1.5">
-                <Label>Teléfono</Label>
+                <Label>{t("common.phone")}</Label>
                 <PhoneInput value={editForm.phone} onChange={(v) => setEditForm((f) => ({ ...f, phone: v }))} />
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label>Posición</Label>
+              <Label>{t("hrg.position")}</Label>
               <Input value={editForm.position_applied} onChange={(e) => setEditForm((f) => ({ ...f, position_applied: e.target.value }))} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label>Departamento</Label>
+                <Label>{t("hrg.department")}</Label>
                 <Select value={editForm.department_id || undefined} onValueChange={(v) => setEditForm((f) => ({ ...f, department_id: v }))}>
-                  <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder={t("common.selectEllipsis")} /></SelectTrigger>
                   <SelectContent>{departments.map((d: any) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>Fuente</Label>
+                <Label>{t("hrg.source")}</Label>
                 <Select value={editForm.source || undefined} onValueChange={(v) => setEditForm((f) => ({ ...f, source: v }))}>
-                  <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
-                  <SelectContent>{APPLICANT_SOURCES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
+                  <SelectTrigger><SelectValue placeholder={t("common.selectEllipsis")} /></SelectTrigger>
+                  <SelectContent>{APPLICANT_SOURCES.map((s) => <SelectItem key={s.value} value={s.value}>{fuente(s.value)}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label>Estado</Label>
+              <Label>{t("common.status")}</Label>
               <Select value={editForm.status} onValueChange={(v) => setEditForm((f) => ({ ...f, status: v }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{APPLICANT_STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
+                <SelectContent>{APPLICANT_STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{estado(s.value)}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Notas</Label>
+              <Label>{t("hrg.notes")}</Label>
               <Textarea rows={3} value={editForm.notes} onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))} />
             </div>
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setEditItem(null)}>Cancelar</Button>
+              <Button variant="outline" onClick={() => setEditItem(null)}>{t("common.cancel")}</Button>
               <Button onClick={() => updateMutation.mutate()} disabled={!editForm.full_name || updateMutation.isPending}>
-                {updateMutation.isPending ? "Guardando..." : "Guardar Cambios"}
+                {updateMutation.isPending ? t("hrg.saving") : t("hrg.saveChanges")}
               </Button>
             </div>
           </div>
@@ -473,15 +481,15 @@ export default function HRApplicants() {
       <AlertDialog open={!!deleteItem} onOpenChange={() => setDeleteItem(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar candidato?</AlertDialogTitle>
+            <AlertDialogTitle>{t("hrg.appl.deleteTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Se eliminará permanentemente a <strong>{deleteItem?.full_name}</strong>. Esta acción no se puede deshacer.
+              <ConFormato texto={t("hrg.appl.deleteBody")} piezas={{ name: <strong>{deleteItem?.full_name}</strong> }} />
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel />
             <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => deleteItem && deleteMutation.mutate(deleteItem.id)}>
-              {deleteMutation.isPending ? "Eliminando..." : "Eliminar"}
+              {deleteMutation.isPending ? t("hrg.deleting") : t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -490,12 +498,13 @@ export default function HRApplicants() {
       <KpiDetailDialog
         open={kpiPopup !== null}
         onOpenChange={(o) => !o && setKpiPopup(null)}
+        emptyText={t("hrg.noRecordsToShow")}
         title={(() => {
           switch (kpiPopup) {
-            case "total": return `Total Candidatos — ${applicants.length}`;
-            case "pending": return `Pendientes — ${totalPending}`;
-            case "interview": return `En Entrevista — ${totalInterview}`;
-            case "hired": return `Contratados — ${totalHired}`;
+            case "total": return t("hrg.kpiTitle", { label: t("hrg.appl.kpi.total"), value: applicants.length });
+            case "pending": return t("hrg.kpiTitle", { label: t("common.pendingPl"), value: totalPending });
+            case "interview": return t("hrg.kpiTitle", { label: t("hrg.appl.kpi.interview"), value: totalInterview });
+            case "hired": return t("hrg.kpiTitle", { label: t("hrg.appl.kpi.hired"), value: totalHired });
             default: return "";
           }
         })()}
@@ -508,9 +517,10 @@ export default function HRApplicants() {
           const tone = (status: string): KpiRow["rightTone"] =>
             status === "hired" ? "success" : status === "rejected" ? "destructive" : status === "interview" || status === "interviewing" ? "warning" : "default";
           return list.slice(0, 100).map((a: any): KpiRow => ({
-            primary: a.full_name ?? "Sin nombre",
+            primary: a.full_name ?? t("hrg.noName"),
             secondary: a.position_applied ?? a.email ?? undefined,
-            right: a.status ?? "—",
+            // En español, el estado tal cual (así estaba); en inglés, con su etiqueta.
+            right: valorGuardado(t, language, "applStatus", a.status) ?? "—",
             rightTone: tone(a.status ?? ""),
           }));
         })()}

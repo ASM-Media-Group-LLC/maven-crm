@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Loader2, CheckCircle2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useMailConnection } from "@/hooks/useMailConnection";
+import { useLanguage } from "@/hooks/useLanguage";
 
 /**
  * Pantalla de retorno del OAuth de Zoho.
@@ -16,6 +17,7 @@ export default function CorreoConectarPage() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const { finish } = useMailConnection();
+  const { t } = useLanguage();
   const [done, setDone] = useState<string | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
 
@@ -35,13 +37,13 @@ export default function CorreoConectarPage() {
     if (denied) {
       setFailed(
         denied === "access_denied"
-          ? "Cancelaste la autorización. Tu correo no quedó conectado."
-          : `Zoho rechazó la autorización: ${denied}`,
+          ? t("mail.connect.denied")
+          : t("mail.connect.rejected", { reason: denied }),
       );
       return;
     }
     if (!code || !state) {
-      setFailed("Zoho no devolvió los datos necesarios. Vuelve a intentar desde Correo.");
+      setFailed(t("mail.connect.missingData"));
       return;
     }
 
@@ -67,17 +69,17 @@ export default function CorreoConectarPage() {
       {!done && !failed && (
         <>
           <Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
-          <p className="mt-5 text-muted-foreground">Conectando tu casilla…</p>
+          <p className="mt-5 text-muted-foreground">{t("mail.connect.connecting")}</p>
         </>
       )}
 
       {done && (
         <>
           <CheckCircle2 className="mx-auto h-10 w-10 text-success" />
-          <h1 className="mt-5 text-2xl font-semibold tracking-tight">Correo conectado</h1>
+          <h1 className="mt-5 text-2xl font-semibold tracking-tight">{t("mail.connect.done")}</h1>
           <p className="mt-2 text-muted-foreground">{done}</p>
           <Button className="mt-7" onClick={() => navigate("/correo")}>
-            Ir a Correo
+            {t("mail.connect.goToMail")}
           </Button>
         </>
       )}
@@ -85,10 +87,11 @@ export default function CorreoConectarPage() {
       {failed && (
         <>
           <AlertTriangle className="mx-auto h-10 w-10 text-destructive" />
-          <h1 className="mt-5 text-2xl font-semibold tracking-tight">No se pudo conectar</h1>
+          <h1 className="mt-5 text-2xl font-semibold tracking-tight">{t("mail.connect.failed")}</h1>
           <p className="mx-auto mt-2 max-w-md text-muted-foreground">{failed}</p>
           <Button className="mt-7" variant="outline" onClick={() => navigate("/correo")}>
-            Volver a Correo
+            {t("mail.connect.backToMail")}
+
           </Button>
         </>
       )}

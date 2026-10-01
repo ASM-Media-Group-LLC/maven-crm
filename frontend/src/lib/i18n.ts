@@ -28,6 +28,10 @@ import { cowork } from "./i18n/cowork";
 import { scouter } from "./i18n/scouter";
 import { apiKeys } from "./i18n/apiKeys";
 import { compartido } from "./i18n/compartido";
+import { hrGestion } from "./i18n/hrGestion";
+import { internos } from "./i18n/internos";
+import { paginas } from "./i18n/paginas";
+import { ventas } from "./i18n/ventas";
 
 export type Language = "es" | "en";
 
@@ -80,6 +84,10 @@ const translations = {
   ...scouter,
   ...apiKeys,
   ...compartido,
+  ...hrGestion,
+  ...internos,
+  ...paginas,
+  ...ventas,
 } as const;
 
 export type TranslationKey = keyof typeof translations;

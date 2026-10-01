@@ -50,7 +50,7 @@ export default function NotificationBell() {
       markAsRead.mutate(n.id);
     }
     if (n.required_permission_module && !canAccess(n.required_permission_module, n.required_permission_submodule ?? undefined)) {
-      toast({ title: "Sin acceso", description: "No tienes permiso para ver este recurso.", variant: "destructive" });
+      toast({ title: t("common.noAccess"), description: t("common.noPermission"), variant: "destructive" });
       return;
     }
     const url = resolveDeepLink(n.reference_type, n.reference_id, n.deep_link_url);
@@ -61,7 +61,7 @@ export default function NotificationBell() {
   return (
     <Popover open={abierta} onOpenChange={setAbierta}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className={BOTON_TOPBAR} title="Notificaciones">
+        <Button variant="ghost" size="icon" className={BOTON_TOPBAR} title={t("topbar.notifications")}>
           <Bell className="h-[18px] w-[18px]" />
           {unreadCount > 0 && (
             <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold leading-none text-destructive-foreground ring-2 ring-background">
@@ -81,7 +81,7 @@ export default function NotificationBell() {
               onClick={() => markAllAsRead.mutate()}
             >
               <CheckCheck className="h-3 w-3" />
-              Marcar todas
+              {t("shared.notif.markAll")}
             </Button>
           )}
         </div>
@@ -112,7 +112,7 @@ export default function NotificationBell() {
             className="w-full text-xs"
             onClick={() => { setAbierta(false); navigate("/notificaciones"); }}
           >
-            Ver todas las notificaciones
+            {t("shared.notif.seeAll")}
           </Button>
         </div>
       </PopoverContent>

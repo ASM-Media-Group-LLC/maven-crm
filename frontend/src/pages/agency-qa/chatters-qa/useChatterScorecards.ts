@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { idioma, type Language } from "@/lib/i18n";
 
 // QA de Chatters · Scorecard mensual (reemplaza el sheet "Medidor de chatters").
 // Tabla `chatter_scorecards`: 8 criterios 0-5 → total /40 → %, por compañía CP/CM/CU.
@@ -16,17 +17,18 @@ export const COMPANIES: { code: CompanyCode; label: string }[] = [
 export const companyLabel = (c: string) =>
   COMPANIES.find((x) => x.code === c)?.label ?? c;
 
-// Orden y nombres EXACTOS de las columnas del sheet (encabezado de Febrero).
+// Orden y nombres EXACTOS de las columnas del sheet (encabezado de Febrero): el
+// español de cada `labelKey` es ese encabezado (ver lib/i18n/agencyQa.ts).
 // `hubstaff: true` → criterios que la Fase 2 (Hubstaff) auto-completará.
 export const CRITERIA = [
-  { key: "c1_puntualidad", label: "Puntualidad y Cumplimiento", short: "Puntualidad", hubstaff: true },
-  { key: "c2_calidad_chats", label: "Calidad de chats", short: "Calidad" },
-  { key: "c3_cumplimiento_meta", label: "Cumplimiento de Meta", short: "Meta" },
-  { key: "c4_productividad_hubstaff", label: "Productividad Hubstaff", short: "Productividad", hubstaff: true },
-  { key: "c5_actitud_disciplina", label: "Actitud y disciplina", short: "Actitud" },
-  { key: "c6_gestion_estrategia", label: "Gestión y estrategia", short: "Gestión" },
-  { key: "c7_scripts", label: "Scripts", short: "Scripts" },
-  { key: "c8_camara_pantalla", label: "Cámara y Pantalla", short: "Cámara" },
+  { key: "c1_puntualidad", labelKey: "agencyQa.criterion.c1", shortKey: "agencyQa.criterion.c1Short", hubstaff: true },
+  { key: "c2_calidad_chats", labelKey: "agencyQa.criterion.c2", shortKey: "agencyQa.criterion.c2Short", hubstaff: false },
+  { key: "c3_cumplimiento_meta", labelKey: "agencyQa.criterion.c3", shortKey: "agencyQa.criterion.c3Short", hubstaff: false },
+  { key: "c4_productividad_hubstaff", labelKey: "agencyQa.criterion.c4", shortKey: "agencyQa.criterion.c4Short", hubstaff: true },
+  { key: "c5_actitud_disciplina", labelKey: "agencyQa.criterion.c5", shortKey: "agencyQa.criterion.c5Short", hubstaff: false },
+  { key: "c6_gestion_estrategia", labelKey: "agencyQa.criterion.c6", shortKey: "agencyQa.criterion.c6Short", hubstaff: false },
+  { key: "c7_scripts", labelKey: "agencyQa.criterion.c7", shortKey: "agencyQa.criterion.c7Short", hubstaff: false },
+  { key: "c8_camara_pantalla", labelKey: "agencyQa.criterion.c8", shortKey: "agencyQa.criterion.c8Short", hubstaff: false },
 ] as const;
 export type CriterionKey = (typeof CRITERIA)[number]["key"];
 export const MAX_TOTAL = 40;
@@ -174,9 +176,17 @@ export const useDeleteScorecard = () => {
   });
 };
 
-// "2026-02-01" → "Febrero 2026"
-const MONTHS = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
-export const periodLabel = (period: string) => {
+// "2026-02-01" → "Febrero 2026" / "February 2026".
+//
+// El idioma va explícito: la pantalla pasa el suyo (`language` de useLanguage) y el
+// correo del QA de chatters pasa "es" (lo lee el chatter, no quien apretó el botón).
+// Sin idioma usa el de la interfaz en ese momento: lo usan también pantallas de RRHH
+// (HRPersonCard, HrAttendanceAuto) que todavía no lo pasan.
+const MONTHS: Record<Language, string[]> = {
+  es: ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"],
+  en: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
+};
+export const periodLabel = (period: string, lang: Language = idioma()) => {
   const [y, m] = period.split("-").map(Number);
-  return `${MONTHS[(m ?? 1) - 1] ?? ""} ${y ?? ""}`.trim();
+  return `${MONTHS[lang][(m ?? 1) - 1] ?? ""} ${y ?? ""}`.trim();
 };

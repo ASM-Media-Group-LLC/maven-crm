@@ -19,6 +19,8 @@ import {
   veredictoLabel, veredictoTone, useQaReports, useCreateQaReport, useDeleteQaReport, useSendChatterQaEmail, useBluChatters, type EvaluatedModel, type ChatterQaReport,
 } from "./useChatterQaReports";
 import ChatterQaReportDetail from "./ChatterQaReportDetail";
+import { useLanguage } from "@/hooks/useLanguage";
+import { ConFormato } from "@/pages/admin/ConFormato";
 
 const toneBadge: Record<string, string> = {
   good: "border-success/40 text-success", warn: "border-warning/40 text-warning", bad: "border-destructive/40 text-destructive",
@@ -29,7 +31,10 @@ const currentMonth = () => new Date().toISOString().slice(0, 7);
 const fmtDay = (f: Formato, iso?: string | null) => (iso ? format(new Date(iso), "d MMM yyyy", { locale: f.fechas }) : "—");
 
 export default function ChattersQaQualitative() {
+  const { t, language } = useLanguage();
   const f = useFormato();
+  // En español queda el del navegador, como siempre; en inglés, en-US.
+  const fechaLocal = language === "en" ? "en-US" : undefined;
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const { data: reports = [], isLoading } = useQaReports(null); // todos; filtramos en UI
   const create = useCreateQaReport();
@@ -71,7 +76,7 @@ export default function ChattersQaQualitative() {
     create.mutate(
       { chatter_name: name, company, period: `${month}-01`, blu_employee_id: bluId, source: "manual", evaluated_models: newModels },
       {
-        onSuccess: (row) => { toast.success("Reporte creado"); setCreating(false); setName(""); setBluId(null); setNewModels([]); setSelectedId(row.id); },
+        onSuccess: (row) => { toast.success(t("agencyQa.qual.created")); setCreating(false); setName(""); setBluId(null); setNewModels([]); setSelectedId(row.id); },
         onError: (e) => toast.error((e as Error).message),
       },
     );
@@ -80,13 +85,11 @@ export default function ChattersQaQualitative() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground">
-          Reportes de QA por chatter — reemplaza el correo del supervisor. Redacta manual o genera un borrador con IA desde Mensajes Pro.
-        </p>
+        <p className="text-sm text-muted-foreground">{t("agencyQa.qual.intro")}</p>
         <div className="flex items-center gap-2">
-          <DateRangePicker from={dateFrom} to={dateTo} onApply={(f, t) => { setDateFrom(f); setDateTo(t); }} placeholder="Filtrar por fecha" />
+          <DateRangePicker from={dateFrom} to={dateTo} onApply={(f, t) => { setDateFrom(f); setDateTo(t); }} placeholder={t("agencyQa.qual.filterByDate")} />
           {!creating ? (
-            <Button size="sm" className="gap-1.5" onClick={() => setCreating(true)}><Plus className="h-4 w-4" /> Nuevo reporte</Button>
+            <Button size="sm" className="gap-1.5" onClick={() => setCreating(true)}><Plus className="h-4 w-4" /> {t("agencyQa.qual.newReport")}</Button>
           ) : null}
         </div>
       </div>
@@ -94,7 +97,7 @@ export default function ChattersQaQualitative() {
       {creating && (
         <div className="flex flex-wrap items-end gap-2 rounded-lg border border-dashed border-border p-3">
           <div className="flex flex-col gap-1">
-            <label className="text-[11px] font-medium text-muted-foreground">Chatter (de BLU)</label>
+            <label className="text-[11px] font-medium text-muted-foreground">{t("agencyQa.qual.chatterFromBlu")}</label>
             <SearchableSelect
               value={bluId != null ? String(bluId) : ""}
               onValueChange={(v) => {
@@ -109,7 +112,7 @@ export default function ChattersQaQualitative() {
                   if (suggested.length) {
                     setNewModels(suggested);
                     if (matched.length > suggested.length)
-                      toast.info(`${c.name} está asignado a ${matched.length} modelos; sugiere ${suggested.length} (el análisis admite hasta 4). Ajusta si quieres.`);
+                      toast.info(t("agencyQa.qual.suggested", { name: c.name, total: matched.length, n: suggested.length }));
                   } else {
                     setNewModels([]);
                   }
@@ -122,8 +125,8 @@ export default function ChattersQaQualitative() {
                 label: c.group_name ? `${c.name} · ${c.group_name}` : c.name,
                 searchAdditional: String(c.blu_employee_id),
               }))}
-              placeholder={bluChatters.length ? "Buscar chatter…" : "Cargando chatters…"}
-              searchPlaceholder="Nombre del chatter…"
+              placeholder={bluChatters.length ? t("agencyQa.score.searchChatter") : t("agencyQa.qual.loadingChatters")}
+              searchPlaceholder={t("agencyQa.qual.chatterName")}
               triggerClassName="h-9 w-56"
               popoverWidth="w-72"
             />
@@ -133,11 +136,11 @@ export default function ChattersQaQualitative() {
             <SelectContent>{COMPANIES.map((c) => <SelectItem key={c.code} value={c.code}>{c.label} ({c.code})</SelectItem>)}</SelectContent>
           </Select>
           <div className="flex flex-col gap-1">
-            <label className="text-[11px] font-medium text-muted-foreground">Mes</label>
+            <label className="text-[11px] font-medium text-muted-foreground">{t("agencyQa.score.month")}</label>
             <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="h-9 rounded-md border border-border bg-background px-2 text-sm" />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-[11px] font-medium text-muted-foreground">Modelos (puedes agregar varias)</label>
+            <label className="text-[11px] font-medium text-muted-foreground">{t("agencyQa.qual.modelsHint")}</label>
             <div className="flex min-h-9 flex-wrap items-center gap-1.5">
               {newModels.map((m) => (
                 <Badge key={m.model_id} variant="secondary" className="gap-1">{m.model_name}
@@ -145,19 +148,19 @@ export default function ChattersQaQualitative() {
                 </Badge>
               ))}
               <Select value="" onValueChange={addNewModel}>
-                <SelectTrigger className="h-8 w-44 text-xs"><SelectValue placeholder="+ Agregar modelo" /></SelectTrigger>
+                <SelectTrigger className="h-8 w-44 text-xs"><SelectValue placeholder={t("agencyQa.addModel")} /></SelectTrigger>
                 <SelectContent className="max-h-72">{models.map((m) => <SelectItem key={m.id} value={String(m.id)}>{bluModelLabel(m)}</SelectItem>)}</SelectContent>
               </Select>
             </div>
           </div>
-          <Button size="sm" onClick={submit} disabled={!name.trim() || create.isPending}>Crear</Button>
-          <Button size="sm" variant="ghost" onClick={() => { setCreating(false); setName(""); setBluId(null); setNewModels([]); }}>Cancelar</Button>
+          <Button size="sm" onClick={submit} disabled={!name.trim() || create.isPending}>{t("common.create")}</Button>
+          <Button size="sm" variant="ghost" onClick={() => { setCreating(false); setName(""); setBluId(null); setNewModels([]); }}>{t("common.cancel")}</Button>
         </div>
       )}
 
-      {isLoading && <p className="text-sm text-muted-foreground">Cargando…</p>}
-      {!isLoading && reports.length === 0 && <p className="text-sm text-muted-foreground">No hay reportes todavía. Crea el primero con "Nuevo reporte".</p>}
-      {!isLoading && reports.length > 0 && shown.length === 0 && <p className="text-sm text-muted-foreground">Sin reportes en el rango de fechas seleccionado.</p>}
+      {isLoading && <p className="text-sm text-muted-foreground">{t("common.loading")}</p>}
+      {!isLoading && reports.length === 0 && <p className="text-sm text-muted-foreground">{t("agencyQa.qual.empty", { button: t("agencyQa.qual.newReport") })}</p>}
+      {!isLoading && reports.length > 0 && shown.length === 0 && <p className="text-sm text-muted-foreground">{t("agencyQa.qual.emptyRange")}</p>}
 
       <div className="space-y-2">
         {shown.map((r) => (
@@ -167,24 +170,24 @@ export default function ChattersQaQualitative() {
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <span className="font-medium">{r.chatter_name}</span>
-                <span className="text-xs text-muted-foreground">{companyLabel(r.company)} · {periodLabel(r.period)} · hecho el {fmtDay(f, r.created_at)}</span>
+                <span className="text-xs text-muted-foreground">{companyLabel(r.company)} · {periodLabel(r.period, language)} · {t("agencyQa.qual.madeOn", { date: fmtDay(f, r.created_at) })}</span>
               </div>
               <p className="truncate text-xs text-muted-foreground">
-                {(r.evaluated_models ?? []).map((m) => m.model_name).join(", ") || "sin modelos"}
+                {(r.evaluated_models ?? []).map((m) => m.model_name).join(", ") || t("agencyQa.qual.noModels")}
                 {r.report?.hallazgo_principal ? ` · ${r.report.hallazgo_principal}` : ""}
               </p>
             </div>
-            {r.status === "processing" && <Badge variant="outline" className="gap-1"><Loader2 className="h-3 w-3 animate-spin" /> IA</Badge>}
-            {r.status === "failed" && <Badge variant="outline" className="gap-1 border-destructive/40 text-destructive"><AlertTriangle className="h-3 w-3" /> falló</Badge>}
-            {r.veredicto && <Badge variant="outline" className={toneBadge[veredictoTone(r.veredicto)]}>{veredictoLabel(r.veredicto)}</Badge>}
-            <span className="text-[10px] uppercase text-muted-foreground">{r.source === "manual" ? "manual" : "IA"}</span>
+            {r.status === "processing" && <Badge variant="outline" className="gap-1"><Loader2 className="h-3 w-3 animate-spin" /> {t("agencyQa.qual.ai")}</Badge>}
+            {r.status === "failed" && <Badge variant="outline" className="gap-1 border-destructive/40 text-destructive"><AlertTriangle className="h-3 w-3" /> {t("agencyQa.failedBadge")}</Badge>}
+            {r.veredicto && <Badge variant="outline" className={toneBadge[veredictoTone(r.veredicto)]}>{veredictoLabel(r.veredicto, language)}</Badge>}
+            <span className="text-[10px] uppercase text-muted-foreground">{r.source === "manual" ? t("agencyQa.qual.manual") : t("agencyQa.qual.ai")}</span>
             {r.status === "ready" && (
               <button type="button" disabled={sendEmail.isPending}
-                title={r.email_sent_at ? `Enviado ${new Date(r.email_sent_at).toLocaleString()} · reenviar` : "Enviar QA por email"}
+                title={r.email_sent_at ? t("agencyQa.qual.sentResend", { date: new Date(r.email_sent_at).toLocaleString(fechaLocal) }) : t("agencyQa.qual.sendByEmail")}
                 onClick={(e) => {
                   e.stopPropagation();
                   if (r.email_sent_at) { setToResend(r); return; } // ya enviado → confirmar reenvío con popup
-                  sendEmail.mutate(r, { onSuccess: () => toast.success("QA enviada por email"), onError: (err) => toast.error((err as Error).message) });
+                  sendEmail.mutate(r, { onSuccess: () => toast.success(t("agencyQa.qual.sentByEmail")), onError: (err) => toast.error((err as Error).message) });
                 }}
                 className={r.email_sent_at ? "text-success/70 hover:text-success" : "text-muted-foreground/50 hover:text-primary"}>
                 {r.email_sent_at ? <MailCheck className="h-4 w-4" /> : <Mail className="h-4 w-4" />}
@@ -202,11 +205,15 @@ export default function ChattersQaQualitative() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-destructive" /> Eliminar reporte
+              <AlertTriangle className="h-5 w-5 text-destructive" /> {t("agencyQa.qual.deleteTitle")}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              ¿Seguro que quieres eliminar el QA de <strong>{toDelete?.chatter_name}</strong>
-              {toDelete ? ` (${companyLabel(toDelete.company)} · ${periodLabel(toDelete.period)})` : ""}? Esta acción no se puede deshacer.
+              <ConFormato
+                texto={t("agencyQa.qual.deleteBody", {
+                  name: toDelete?.chatter_name ?? "",
+                  extra: toDelete ? ` (${companyLabel(toDelete.company)} · ${periodLabel(toDelete.period, language)})` : "",
+                })}
+              />
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -218,11 +225,11 @@ export default function ChattersQaQualitative() {
                 e.preventDefault();
                 if (!toDelete) return;
                 del.mutate(toDelete.id, {
-                  onSuccess: () => { toast.success("Reporte eliminado"); setToDelete(null); },
+                  onSuccess: () => { toast.success(t("agencyQa.qual.deleted")); setToDelete(null); },
                   onError: (err) => toast.error((err as Error).message),
                 });
               }}>
-              {del.isPending ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Eliminando…</> : "Eliminar"}
+              {del.isPending ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> {t("agencyQa.eliminating")}</> : t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -233,11 +240,17 @@ export default function ChattersQaQualitative() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <Mail className="h-5 w-5 text-primary" /> Reenviar QA por email
+              <Mail className="h-5 w-5 text-primary" /> {t("agencyQa.qual.resendTitle")}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              El QA de <strong>{toResend?.chatter_name}</strong> ya se envió
-              {toResend?.email_sent_at ? ` el ${new Date(toResend.email_sent_at).toLocaleString()}` : ""}. ¿Reenviarlo a los destinatarios configurados?
+              <ConFormato
+                texto={t("agencyQa.qual.resendBody", {
+                  name: toResend?.chatter_name ?? "",
+                  when: toResend?.email_sent_at
+                    ? t("agencyQa.qual.resendWhen", { date: new Date(toResend.email_sent_at).toLocaleString(fechaLocal) })
+                    : "",
+                })}
+              />
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -248,11 +261,11 @@ export default function ChattersQaQualitative() {
                 e.preventDefault();
                 if (!toResend) return;
                 sendEmail.mutate(toResend, {
-                  onSuccess: () => { toast.success("QA reenviada por email"); setToResend(null); },
+                  onSuccess: () => { toast.success(t("agencyQa.qual.resent")); setToResend(null); },
                   onError: (err) => toast.error((err as Error).message),
                 });
               }}>
-              {sendEmail.isPending ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Enviando…</> : "Reenviar"}
+              {sendEmail.isPending ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> {t("agencyQa.sending")}</> : t("agencyQa.resend")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

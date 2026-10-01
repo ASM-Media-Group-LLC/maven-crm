@@ -11,6 +11,8 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useMyWaChannels } from "@/hooks/useMyWaChannels";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
@@ -47,6 +49,7 @@ export function WaChatButton({
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [busy, setBusy] = useState(false);
   const [gateMsg, setGateMsg] = useState<string | null>(null);
 
@@ -59,26 +62,29 @@ export function WaChatButton({
     const res = data as { ok?: boolean; error?: string; conversation_id?: string } | null;
     // Rechazo "suave" del gating (HTTP 200 + ok:false): no es un error, es un aviso de
     // que el lead no es tuyo → popup claro, no el toast rojo de error.
+    // res.error lo escribe el servidor (wa-inbox-open) y se muestra tal cual.
     if (res && res.ok === false) {
-      setGateMsg(res.error || "Este lead no está disponible para ti.");
+      setGateMsg(res.error || t("shared.openChat.waNotAvailable"));
       return;
     }
     if (error || !res?.conversation_id) {
-      toast({ title: "No se pudo abrir el chat", description: error?.message || "Error", variant: "destructive" });
+      toast({ title: t("shared.openChat.failed"), description: error?.message || t("common.error"), variant: "destructive" });
       return;
     }
     // Recordamos de dónde venimos para mostrar "← Volver" en la bandeja y no perder
     // la pantalla/filtros del usuario (Contactos restaura su estado desde sessionStorage).
-    const labels: Record<string, string> = { contactos: "Contactos", creadores: "Creadoras", closers: "Closers" };
+    // La clave es el primer tramo de la ruta (dato); la etiqueta, del diccionario.
+    const labels: Record<string, TranslationKey> = { contactos: "shared.openChat.fromContacts", creadores: "shared.openChat.fromCreators", closers: "nav.closers" };
     const seg = location.pathname.split("/").filter(Boolean)[0] || "";
+    // Desde otra ruta: en español "atrás" como siempre; en inglés "the previous page".
     navigate(`/inbox?c=${res.conversation_id}`, {
-      state: { backTo: location.pathname + location.search, backLabel: labels[seg] || "atrás" },
+      state: { backTo: location.pathname + location.search, backLabel: t(labels[seg] ?? "shared.openChat.fromPrevious") },
     });
   };
 
   if (!phone && !closerCreatorId && !contactId) return <span className="text-xs text-muted-foreground">—</span>;
   if (channels.length === 0) {
-    return <span className="text-xs text-muted-foreground" title="No tienes canales de WhatsApp asignados">WhatsApp</span>;
+    return <span className="text-xs text-muted-foreground" title={t("shared.openChat.waNoChannels")}>WhatsApp</span>;
   }
   const btnClass = className ?? "h-7 gap-1 text-xs text-whatsapp hover:text-whatsapp/90";
   const trigger = channels.length === 1 ? (
@@ -93,7 +99,7 @@ export function WaChatButton({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <div className="px-2 py-1.5 text-xs text-muted-foreground">¿Desde qué canal?</div>
+        <div className="px-2 py-1.5 text-xs text-muted-foreground">{t("shared.openChat.whichChannel")}</div>
         {channels.map((ch) => (
           <DropdownMenuItem key={ch.id} onClick={() => open(ch.id)}>
             {ch.label || ch.evolution_instance}
@@ -109,11 +115,11 @@ export function WaChatButton({
       <AlertDialog open={!!gateMsg} onOpenChange={(o) => { if (!o) setGateMsg(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Este lead no es tuyo</AlertDialogTitle>
+            <AlertDialogTitle>{t("shared.openChat.waNotYours")}</AlertDialogTitle>
             <AlertDialogDescription>{gateMsg}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setGateMsg(null)}>Entendido</AlertDialogAction>
+            <AlertDialogAction onClick={() => setGateMsg(null)}>{t("common.understood")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

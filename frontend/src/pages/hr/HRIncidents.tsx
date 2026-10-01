@@ -31,6 +31,9 @@ import { INCIDENT_TYPES, INCIDENT_SEVERITIES, INCIDENT_STATUSES } from "@/lib/hr
 import { SEVERITY_COLORS } from "@/lib/hrAreaUtils";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+import { useLanguage } from "@/hooks/useLanguage";
+import { useFormato } from "@/hooks/useFormato";
+import { etiqueta, deSiempreSalvoEnIngles, ESTADO_INCIDENTE, SEVERIDAD, TIPO_INCIDENTE } from "./etiquetasRrhh";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface IncidentRecord {
@@ -88,6 +91,12 @@ function getInitials(first: string, last: string): string {
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function HRIncidents() {
+  const { t } = useLanguage();
+  const f = useFormato();
+  const DMY = f.idioma === "en" ? "MM/dd/yyyy" : "dd/MM/yyyy";
+  const tipo = (v: string) => etiqueta(t, TIPO_INCIDENTE, v, INCIDENT_TYPES.find((o) => o.value === v)?.label);
+  const severidad = (v: string) => etiqueta(t, SEVERIDAD, v, INCIDENT_SEVERITIES.find((o) => o.value === v)?.label);
+  const estado = (v: string) => etiqueta(t, ESTADO_INCIDENTE, v, INCIDENT_STATUSES.find((o) => o.value === v)?.label);
   const navigate = useNavigate();
   const { data: incidents = [], isLoading } = useIncidents();
   const { data: departments = [] } = useDepartments();
@@ -125,10 +134,10 @@ export default function HRIncidents() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employee-incidents-all"] });
-      toast({ title: "Incidente actualizado" });
+      toast({ title: t("hr.inc.updated") });
       setEditItem(null);
     },
-    onError: () => toast({ title: "Error al actualizar", variant: "destructive" }),
+    onError: () => toast({ title: t("common.errorUpdating"), variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
@@ -138,10 +147,10 @@ export default function HRIncidents() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employee-incidents-all"] });
-      toast({ title: "Incidente eliminado" });
+      toast({ title: t("hr.inc.deleted") });
       setDeleteItem(null);
     },
-    onError: () => toast({ title: "Error al eliminar", variant: "destructive" }),
+    onError: () => toast({ title: t("common.errorDeleting"), variant: "destructive" }),
   });
 
   // ─── KPIs ─────────────────────────────────────────────────────────────────
@@ -178,11 +187,11 @@ export default function HRIncidents() {
       {/* ── Fixed Header ──────────────────────────────────────────────────── */}
       <header className="shrink-0 bg-background/30 backdrop-blur-xl border-b border-white/10 px-6 pt-6 pb-4">
         <PageHeader
-          title="Incidentes Laborales"
-          subtitle={<>{totalOpen} incidentes abiertos · {incidents.length} total</>}
+          title={t("hr.inc.title")}
+          subtitle={t(totalOpen === 1 ? "hr.inc.subtitle.one" : "hr.inc.subtitle.other", { open: totalOpen, total: incidents.length })}
           actions={
             <Button size="sm" onClick={() => navigate("/hr/incidentes/nuevo")}>
-              <Plus className="h-4 w-4 mr-1" />Reportar Incidente
+              <Plus className="h-4 w-4 mr-1" />{t("hr.inc.report")}
             </Button>
           }
         />
@@ -197,17 +206,17 @@ export default function HRIncidents() {
             Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
           ) : (
             <>
-              <StatChip label="Total Incidentes" value={String(incidents.length)} icon={<AlertTriangle className="h-3.5 w-3.5" />} color="bg-primary" hint="Todos los registros" onClick={() => setKpiPopup("total")} />
-              <StatChip label="Abiertos" value={String(totalOpen)} icon={<AlertCircle className="h-3.5 w-3.5" />} color="bg-primary" hint={incidents.length > 0 ? `${((totalOpen / incidents.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("open")} />
-              <StatChip label="En Proceso" value={String(totalInProgress)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" hint={incidents.length > 0 ? `${((totalInProgress / incidents.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("inProgress")} />
-              <StatChip label="Críticos" value={String(totalCritical)} icon={<ShieldAlert className="h-3.5 w-3.5" />} color="bg-destructive" hint={incidents.length > 0 ? `${((totalCritical / incidents.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("critical")} />
+              <StatChip label={t("hr.inc.total")} value={String(incidents.length)} icon={<AlertTriangle className="h-3.5 w-3.5" />} color="bg-primary" hint={t("hr.allRecords")} onClick={() => setKpiPopup("total")} />
+              <StatChip label={t("hr.inc.open")} value={String(totalOpen)} icon={<AlertCircle className="h-3.5 w-3.5" />} color="bg-primary" hint={incidents.length > 0 ? t("hr.pctOfTotal", { pct: ((totalOpen / incidents.length) * 100).toFixed(0) }) : "—"} onClick={() => setKpiPopup("open")} />
+              <StatChip label={t("hr.opt.incStatus.in_progress")} value={String(totalInProgress)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" hint={incidents.length > 0 ? t("hr.pctOfTotal", { pct: ((totalInProgress / incidents.length) * 100).toFixed(0) }) : "—"} onClick={() => setKpiPopup("inProgress")} />
+              <StatChip label={t("hr.inc.critical")} value={String(totalCritical)} icon={<ShieldAlert className="h-3.5 w-3.5" />} color="bg-destructive" hint={incidents.length > 0 ? t("hr.pctOfTotal", { pct: ((totalCritical / incidents.length) * 100).toFixed(0) }) : "—"} onClick={() => setKpiPopup("critical")} />
             </>
           )}
         </div>
 
         {/* Department Tabs */}
         <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1">
-          <Button variant={!deptTab ? "secondary" : "ghost"} size="sm" onClick={() => setDeptTab("")}>Todos</Button>
+          <Button variant={!deptTab ? "secondary" : "ghost"} size="sm" onClick={() => setDeptTab("")}>{t("common.all")}</Button>
           {departments.map((d) => (
             <Button key={d.id} variant={deptTab === d.id ? "secondary" : "ghost"} size="sm" onClick={() => setDeptTab(d.id)}>{d.name}</Button>
           ))}
@@ -217,29 +226,29 @@ export default function HRIncidents() {
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Buscar empleado..." className="pl-8" value={search} onChange={(e) => setSearch(e.target.value)} />
+            <Input placeholder={t("hr.searchEmployee")} className="pl-8" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
 
           <Select value={severityFilter || undefined} onValueChange={(v) => setSeverityFilter(v === "__all__" ? "" : v)}>
-            <SelectTrigger className="w-36"><SelectValue placeholder="Severidad" /></SelectTrigger>
+            <SelectTrigger className="w-36"><SelectValue placeholder={t("hr.inc.severity")} /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="__all__">Todas</SelectItem>
-              {INCIDENT_SEVERITIES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+              <SelectItem value="__all__">{t("common.allF")}</SelectItem>
+              {INCIDENT_SEVERITIES.map((s) => <SelectItem key={s.value} value={s.value}>{severidad(s.value)}</SelectItem>)}
             </SelectContent>
           </Select>
 
           <Select value={statusFilter || undefined} onValueChange={(v) => setStatusFilter(v === "__all__" ? "" : v)}>
-            <SelectTrigger className="w-36"><SelectValue placeholder="Estado" /></SelectTrigger>
+            <SelectTrigger className="w-36"><SelectValue placeholder={t("common.status")} /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="__all__">Todos</SelectItem>
-              {INCIDENT_STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+              <SelectItem value="__all__">{t("common.all")}</SelectItem>
+              {INCIDENT_STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{estado(s.value)}</SelectItem>)}
             </SelectContent>
           </Select>
 
           <DateRangePicker
             from={dateFrom}
             to={dateTo}
-            onApply={(f, t) => { setDateFrom(f); setDateTo(t); }}
+            onApply={(desde, hasta) => { setDateFrom(desde); setDateTo(hasta); }}
           />
 
           {/* View toggle */}
@@ -254,7 +263,7 @@ export default function HRIncidents() {
 
           {hasFilters && (
             <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={clearFilters}>
-              <X className="h-3.5 w-3.5 mr-1" />Limpiar filtros
+              <X className="h-3.5 w-3.5 mr-1" />{t("hr.clearFilters")}
             </Button>
           )}
         </div>
@@ -266,13 +275,13 @@ export default function HRIncidents() {
               <Table>
                 <TableHeader>
                   <TableRow className="sticky top-0 z-10 bg-card border-b">
-                    <TableHead className="text-xs font-medium text-muted-foreground">Empleado</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">Título</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">Tipo</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">Severidad</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">Fecha</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">Estado</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground sticky right-0 bg-card">Acciones</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">{t("hr.employee")}</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">{t("common.title")}</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">{t("common.type")}</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">{t("hr.inc.severity")}</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">{t("common.date")}</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">{t("common.status")}</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground sticky right-0 bg-card">{t("common.actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -284,9 +293,9 @@ export default function HRIncidents() {
                     <TableRow>
                       <TableCell colSpan={7}>
                         {incidents.length === 0 ? (
-                          <EmptyState seed="hr-incidentes" title="No hay incidentes registrados" description={'Haz clic en "Reportar Incidente" para empezar.'} />
+                          <EmptyState seed="hr-incidentes" title={t("hr.inc.empty")} description={t("hr.inc.emptyHint")} />
                         ) : (
-                          <EmptyState seed="hr-incidentes" title="Sin resultados" description="No hay coincidencias con los filtros aplicados." />
+                          <EmptyState seed="hr-incidentes" title={t("common.noResultsShort")} description={t("common.noMatches")} />
                         )}
                       </TableCell>
                     </TableRow>
@@ -310,33 +319,33 @@ export default function HRIncidents() {
                             </div>
                           </TableCell>
                           <TableCell className="text-sm max-w-48 truncate">{inc.title}</TableCell>
-                          <TableCell className="text-sm text-muted-foreground">{INCIDENT_TYPES.find((t) => t.value === inc.incident_type)?.label ?? inc.incident_type}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground">{tipo(inc.incident_type)}</TableCell>
                           <TableCell>
                             <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium", sev.bg, sev.text)}>
-                              {INCIDENT_SEVERITIES.find((s) => s.value === inc.severity)?.label ?? inc.severity}
+                              {severidad(inc.severity)}
                             </span>
                           </TableCell>
-                          <TableCell className="text-sm whitespace-nowrap">{format(new Date(inc.incident_date), "dd/MM/yyyy")}</TableCell>
+                          <TableCell className="text-sm whitespace-nowrap">{format(new Date(inc.incident_date), DMY)}</TableCell>
                           <TableCell>
                             <Badge variant={inc.status === "resolved" || inc.status === "closed" ? "default" : "secondary"}>
-                              {INCIDENT_STATUSES.find((s) => s.value === inc.status)?.label ?? inc.status}
+                              {estado(inc.status)}
                             </Badge>
                           </TableCell>
                           <TableCell className="sticky right-0 bg-card group-hover:bg-muted/30">
                             <div className="flex items-center gap-1">
                               <Tooltip><TooltipTrigger asChild>
                                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setViewItem(inc)}><Eye className="h-3.5 w-3.5" /></Button>
-                              </TooltipTrigger><TooltipContent side="left">Ver</TooltipContent></Tooltip>
+                              </TooltipTrigger><TooltipContent side="left">{t("common.view")}</TooltipContent></Tooltip>
                               <Tooltip><TooltipTrigger asChild>
                                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => { setEditItem(inc); setEditForm({ status: inc.status, severity: inc.severity, corrective_action: inc.corrective_action || "" }); }}>
                                   <Pencil className="h-3.5 w-3.5" />
                                 </Button>
-                              </TooltipTrigger><TooltipContent side="left">Editar</TooltipContent></Tooltip>
+                              </TooltipTrigger><TooltipContent side="left">{t("common.edit")}</TooltipContent></Tooltip>
                               <Tooltip><TooltipTrigger asChild>
                                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => setDeleteItem(inc)}>
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </Button>
-                              </TooltipTrigger><TooltipContent side="left">Eliminar</TooltipContent></Tooltip>
+                              </TooltipTrigger><TooltipContent side="left">{t("common.delete")}</TooltipContent></Tooltip>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -356,9 +365,9 @@ export default function HRIncidents() {
               </div>
             ) : filtered.length === 0 ? (
               incidents.length === 0 ? (
-                <EmptyState seed="hr-incidentes" title="No hay incidentes registrados" description={'Haz clic en "Reportar Incidente" para empezar.'} />
+                <EmptyState seed="hr-incidentes" title={t("hr.inc.empty")} description={t("hr.inc.emptyHint")} />
               ) : (
-                <EmptyState seed="hr-incidentes" title="Sin resultados" description="No hay coincidencias con los filtros aplicados." />
+                <EmptyState seed="hr-incidentes" title={t("common.noResultsShort")} description={t("common.noMatches")} />
               )
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -382,7 +391,7 @@ export default function HRIncidents() {
                             </div>
                           </div>
                           <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium shrink-0", sev.bg, sev.text)}>
-                            {INCIDENT_SEVERITIES.find((s) => s.value === inc.severity)?.label ?? inc.severity}
+                            {severidad(inc.severity)}
                           </span>
                         </div>
 
@@ -390,16 +399,16 @@ export default function HRIncidents() {
                         <div className="space-y-1">
                           <p className="text-sm font-medium truncate">{inc.title}</p>
                           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <span>{INCIDENT_TYPES.find((t) => t.value === inc.incident_type)?.label ?? inc.incident_type}</span>
+                            <span>{tipo(inc.incident_type)}</span>
                             <span>·</span>
-                            <span>{format(new Date(inc.incident_date), "dd/MM/yyyy")}</span>
+                            <span>{format(new Date(inc.incident_date), DMY)}</span>
                           </div>
                         </div>
 
                         {/* Footer */}
                         <div className="flex items-center justify-between pt-1">
                           <Badge variant={inc.status === "resolved" || inc.status === "closed" ? "default" : "secondary"} className="text-xs">
-                            {INCIDENT_STATUSES.find((s) => s.value === inc.status)?.label ?? inc.status}
+                            {estado(inc.status)}
                           </Badge>
                           <div className="flex items-center gap-1">
                             <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setViewItem(inc)}><Eye className="h-3.5 w-3.5" /></Button>
@@ -423,7 +432,7 @@ export default function HRIncidents() {
         {/* Results counter */}
         {!isLoading && filtered.length > 0 && (
           <p className="text-xs text-muted-foreground">
-            Mostrando {filtered.length} de {incidents.length} incidentes
+            {t(incidents.length === 1 ? "hr.inc.showing.one" : "hr.inc.showing.other", { shown: filtered.length, total: incidents.length })}
           </p>
         )}
       </div>
@@ -431,19 +440,19 @@ export default function HRIncidents() {
       {/* ── View Modal ─────────────────────────────────────────────────────── */}
       <Dialog open={!!viewItem} onOpenChange={() => setViewItem(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Detalle del Incidente</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t("hr.inc.detail")}</DialogTitle></DialogHeader>
           {viewItem && (
             <div className="space-y-3 text-sm">
               <div className="grid grid-cols-2 gap-3">
-                <div><Label className="text-muted-foreground">Empleado</Label><p className="font-medium">{viewItem.employees ? `${viewItem.employees.first_name} ${viewItem.employees.last_name}` : "—"}</p></div>
-                <div><Label className="text-muted-foreground">Fecha</Label><p className="font-medium">{format(new Date(viewItem.incident_date), "dd/MM/yyyy")}</p></div>
-                <div><Label className="text-muted-foreground">Tipo</Label><p className="font-medium">{INCIDENT_TYPES.find((t) => t.value === viewItem.incident_type)?.label ?? viewItem.incident_type}</p></div>
-                <div><Label className="text-muted-foreground">Severidad</Label><p className="font-medium">{INCIDENT_SEVERITIES.find((s) => s.value === viewItem.severity)?.label ?? viewItem.severity}</p></div>
-                <div><Label className="text-muted-foreground">Estado</Label><p className="font-medium">{INCIDENT_STATUSES.find((s) => s.value === viewItem.status)?.label ?? viewItem.status}</p></div>
+                <div><Label className="text-muted-foreground">{t("hr.employee")}</Label><p className="font-medium">{viewItem.employees ? `${viewItem.employees.first_name} ${viewItem.employees.last_name}` : "—"}</p></div>
+                <div><Label className="text-muted-foreground">{t("common.date")}</Label><p className="font-medium">{format(new Date(viewItem.incident_date), DMY)}</p></div>
+                <div><Label className="text-muted-foreground">{t("common.type")}</Label><p className="font-medium">{tipo(viewItem.incident_type)}</p></div>
+                <div><Label className="text-muted-foreground">{t("hr.inc.severity")}</Label><p className="font-medium">{severidad(viewItem.severity)}</p></div>
+                <div><Label className="text-muted-foreground">{t("common.status")}</Label><p className="font-medium">{estado(viewItem.status)}</p></div>
               </div>
-              <div><Label className="text-muted-foreground">Título</Label><p className="font-medium">{viewItem.title}</p></div>
-              {viewItem.description && <div><Label className="text-muted-foreground">Descripción</Label><p>{viewItem.description}</p></div>}
-              {viewItem.corrective_action && <div><Label className="text-muted-foreground">Acción Correctiva</Label><p>{viewItem.corrective_action}</p></div>}
+              <div><Label className="text-muted-foreground">{t("common.title")}</Label><p className="font-medium">{viewItem.title}</p></div>
+              {viewItem.description && <div><Label className="text-muted-foreground">{t("common.description")}</Label><p>{viewItem.description}</p></div>}
+              {viewItem.corrective_action && <div><Label className="text-muted-foreground">{t("hr.inc.correctiveAction")}</Label><p>{viewItem.corrective_action}</p></div>}
             </div>
           )}
         </DialogContent>
@@ -452,37 +461,37 @@ export default function HRIncidents() {
       {/* ── Edit Modal ─────────────────────────────────────────────────────── */}
       <Dialog open={!!editItem} onOpenChange={() => setEditItem(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Editar Incidente</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t("hr.inc.edit")}</DialogTitle></DialogHeader>
           {editItem && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
-                <div><Label className="text-muted-foreground text-xs">Empleado</Label><p className="text-sm font-medium">{editItem.employees ? `${editItem.employees.first_name} ${editItem.employees.last_name}` : "—"}</p></div>
-                <div><Label className="text-muted-foreground text-xs">Título</Label><p className="text-sm font-medium">{editItem.title}</p></div>
+                <div><Label className="text-muted-foreground text-xs">{t("hr.employee")}</Label><p className="text-sm font-medium">{editItem.employees ? `${editItem.employees.first_name} ${editItem.employees.last_name}` : "—"}</p></div>
+                <div><Label className="text-muted-foreground text-xs">{t("common.title")}</Label><p className="text-sm font-medium">{editItem.title}</p></div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Estado</Label>
-                  <Select value={editForm.status} onValueChange={(v) => setEditForm((f) => ({ ...f, status: v }))}>
+                  <Label>{t("common.status")}</Label>
+                  <Select value={editForm.status} onValueChange={(v) => setEditForm((prev) => ({ ...prev, status: v }))}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>{INCIDENT_STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
+                    <SelectContent>{INCIDENT_STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{estado(s.value)}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Severidad</Label>
-                  <Select value={editForm.severity} onValueChange={(v) => setEditForm((f) => ({ ...f, severity: v }))}>
+                  <Label>{t("hr.inc.severity")}</Label>
+                  <Select value={editForm.severity} onValueChange={(v) => setEditForm((prev) => ({ ...prev, severity: v }))}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>{INCIDENT_SEVERITIES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
+                    <SelectContent>{INCIDENT_SEVERITIES.map((s) => <SelectItem key={s.value} value={s.value}>{severidad(s.value)}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label>Acción Correctiva</Label>
-                <Textarea value={editForm.corrective_action} onChange={(e) => setEditForm((f) => ({ ...f, corrective_action: e.target.value }))} rows={3} />
+                <Label>{t("hr.inc.correctiveAction")}</Label>
+                <Textarea value={editForm.corrective_action} onChange={(e) => setEditForm((prev) => ({ ...prev, corrective_action: e.target.value }))} rows={3} />
               </div>
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setEditItem(null)}>Cancelar</Button>
+                <Button variant="outline" onClick={() => setEditItem(null)}>{t("common.cancel")}</Button>
                 <Button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending}>
-                  {updateMutation.isPending ? "Guardando..." : "Guardar"}
+                  {updateMutation.isPending ? t("hr.saving") : t("common.save")}
                 </Button>
               </div>
             </div>
@@ -494,13 +503,13 @@ export default function HRIncidents() {
       <AlertDialog open={!!deleteItem} onOpenChange={() => setDeleteItem(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar incidente?</AlertDialogTitle>
-            <AlertDialogDescription>Esta acción no se puede deshacer. Se eliminará permanentemente el incidente "{deleteItem?.title}".</AlertDialogDescription>
+            <AlertDialogTitle>{t("hr.inc.deleteTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("hr.inc.deleteDesc", { title: deleteItem?.title ?? "" })}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel />
             <AlertDialogAction onClick={() => deleteItem && deleteMutation.mutate(deleteItem.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              {deleteMutation.isPending ? "Eliminando..." : "Eliminar"}
+              {deleteMutation.isPending ? t("hr.deleting") : t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -511,10 +520,10 @@ export default function HRIncidents() {
         onOpenChange={(o) => !o && setKpiPopup(null)}
         title={(() => {
           switch (kpiPopup) {
-            case "total": return `Total Incidentes — ${incidents.length}`;
-            case "open": return `Abiertos — ${totalOpen}`;
-            case "inProgress": return `En Proceso — ${totalInProgress}`;
-            case "critical": return `Críticos — ${totalCritical}`;
+            case "total": return `${t("hr.inc.total")} — ${incidents.length}`;
+            case "open": return `${t("hr.inc.open")} — ${totalOpen}`;
+            case "inProgress": return `${t("hr.opt.incStatus.in_progress")} — ${totalInProgress}`;
+            case "critical": return `${t("hr.inc.critical")} — ${totalCritical}`;
             default: return "";
           }
         })()}
@@ -527,12 +536,15 @@ export default function HRIncidents() {
           const tone = (severity: string): KpiRow["rightTone"] =>
             severity === "critical" ? "destructive" : severity === "high" ? "warning" : "default";
           return list.slice(0, 100).map((i: any): KpiRow => ({
-            primary: i.title ?? i.description ?? "Sin título",
-            secondary: i.employee_name ?? i.incident_type ?? undefined,
-            right: i.severity ?? i.status ?? "—",
+            primary: i.title ?? i.description ?? t("hr.noTitle"),
+            secondary: i.employee_name ?? (i.incident_type != null ? deSiempreSalvoEnIngles(f.idioma, t, TIPO_INCIDENTE, i.incident_type, i.incident_type) : undefined),
+            right: i.severity != null
+              ? deSiempreSalvoEnIngles(f.idioma, t, SEVERIDAD, i.severity, i.severity)
+              : i.status != null ? deSiempreSalvoEnIngles(f.idioma, t, ESTADO_INCIDENTE, i.status, i.status) : "—",
             rightTone: tone(i.severity ?? ""),
           }));
         })()}
+        emptyText={t("hr.kpiEmpty")}
       />
     </div>
   );

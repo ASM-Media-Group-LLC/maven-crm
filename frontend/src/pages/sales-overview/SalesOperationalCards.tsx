@@ -1,6 +1,7 @@
 import { BarChart3, Trophy, TrendingDown, Zap, Bell } from "lucide-react";
 import { LineChart, Line, ResponsiveContainer } from "recharts";
 import type { PeriodComparisonResult } from "./usePeriodComparison";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface Props {
   data: PeriodComparisonResult;
@@ -14,12 +15,13 @@ const fmt = (n: number) =>
 // Cards operacionales estilo Panel de Control / Dashboard v2 — todas
 // abren modal en lugar de navegar a /sales-overview/* (rutas eliminadas).
 const SalesOperationalCards = ({ data, onCardClick, sparklineData = [] }: Props) => {
+  const { t } = useLanguage();
   const alertCount = data.atRisk.length + data.falling.length;
 
   const cards = [
     {
       id: "comparatives",
-      title: "Comparativas",
+      title: t("sales.ov.comparatives"),
       icon: BarChart3,
       bg: "bg-primary",
       content: (
@@ -32,13 +34,13 @@ const SalesOperationalCards = ({ data, onCardClick, sparklineData = [] }: Props)
                 </LineChart>
               </ResponsiveContainer>
             ) : (
-              <span className="text-xs text-muted-foreground">Sin datos</span>
+              <span className="text-xs text-muted-foreground">{t("common.noData")}</span>
             )}
           </div>
           {/* La línea son los últimos meses cerrados, NO el rango del
               calendario: sin este pie se lee como si fuera el período elegido. */}
           {sparklineData.length > 1 && (
-            <p className="mt-0.5 text-[10px] text-muted-foreground">últimos {sparklineData.length} meses</p>
+            <p className="mt-0.5 text-[10px] text-muted-foreground">{t("sales.ov.lastMonths", { n: sparklineData.length })}</p>
           )}
         </>
       ),
@@ -56,13 +58,13 @@ const SalesOperationalCards = ({ data, onCardClick, sparklineData = [] }: Props)
               <span className="font-medium tabular-nums">{fmt(c.currentEarnings)}</span>
             </div>
           ))}
-          {data.top10.length === 0 && <span className="text-[11px] text-muted-foreground">Sin datos</span>}
+          {data.top10.length === 0 && <span className="text-[11px] text-muted-foreground">{t("common.noData")}</span>}
         </div>
       ),
     },
     {
       id: "falling",
-      title: "Bajando",
+      title: t("sales.ov.falling"),
       icon: TrendingDown,
       bg: "bg-warning",
       content: (
@@ -79,7 +81,7 @@ const SalesOperationalCards = ({ data, onCardClick, sparklineData = [] }: Props)
     },
     {
       id: "high_potential",
-      title: "Alto Potencial",
+      title: t("sales.ov.highPotential"),
       icon: Zap,
       bg: "bg-violet-500",
       content: (
@@ -88,7 +90,7 @@ const SalesOperationalCards = ({ data, onCardClick, sparklineData = [] }: Props)
     },
     {
       id: "alerts",
-      title: "Alertas",
+      title: t("sales.ov.alerts"),
       icon: Bell,
       bg: "bg-destructive",
       content: (

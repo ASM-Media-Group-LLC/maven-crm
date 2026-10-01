@@ -3,20 +3,26 @@ import { getPublicBaseUrl } from "@/lib/getPublicUrl";
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { getTranslation, idioma, traducir, type Language, type TranslationKey } from "@/lib/i18n";
 import { companyLabel, periodLabel, type CompanyCode } from "./useChatterScorecards";
 import { buildChatterQaEmailSubject, buildChatterQaEmailHtml, type ChatterQaEmailPayload } from "./chatterQaEmailTemplate";
 
 // QA cualitativo de chatters (QA-B): reporte estructurado que reemplaza el correo del supervisor.
 // Tabla chatter_qa_reports. Tabla nueva → (supabase as any), igual que el resto de hooks BLU.
 
+// `value` es lo que se guarda en chatter_qa_reports.veredicto (no se traduce); la
+// etiqueta sale del diccionario. El correo del QA la pide en español ("es").
 export const VEREDICTOS = [
-  { value: "excelente", label: "Excelente", tone: "good" },
-  { value: "bueno", label: "Bueno", tone: "good" },
-  { value: "requiere_mejora", label: "Requiere Mejora", tone: "warn" },
-  { value: "critico", label: "Crítico", tone: "bad" },
-] as const;
+  { value: "excelente", labelKey: "agencyQa.verdict.excellent", tone: "good" },
+  { value: "bueno", labelKey: "agencyQa.verdict.good", tone: "good" },
+  { value: "requiere_mejora", labelKey: "agencyQa.verdict.needsWork", tone: "warn" },
+  { value: "critico", labelKey: "agencyQa.verdict.critical", tone: "bad" },
+] as const satisfies ReadonlyArray<{ value: string; labelKey: TranslationKey; tone: string }>;
 export type Veredicto = (typeof VEREDICTOS)[number]["value"];
-export const veredictoLabel = (v?: string | null) => VEREDICTOS.find((x) => x.value === v)?.label ?? "—";
+export const veredictoLabel = (v?: string | null, lang: Language = idioma()) => {
+  const hit = VEREDICTOS.find((x) => x.value === v);
+  return hit ? getTranslation(hit.labelKey, lang) : "—";
+};
 export const veredictoTone = (v?: string | null) => VEREDICTOS.find((x) => x.value === v)?.tone ?? "warn";
 
 export interface EvaluatedModel { model_id: number; model_name: string }
@@ -229,6 +235,8 @@ export const useGenerateQaDraft = () => {
         return data;
       } catch (e) {
         // Falla dura (edge no respondió/timeout) → no dejar el reporte colgado en 'processing'.
+        // En español a propósito: error_message queda en la base y lo lee cualquiera
+        // que abra el reporte, en el idioma que sea (igual que los que escribe la edge).
         await (supabase as any).from("chatter_qa_reports").update({ status: "failed", error_message: "No se pudo completar el análisis: " + (e as Error).message }).eq("id", id);
         throw e;
       }
@@ -254,11 +262,12 @@ export function useQaProcessingWatcher() {
             const s = (r.sampling ?? {}) as any;
             const skipped = (s.models_skipped ?? []) as string[];
             const empties = (s.empty_models ?? []) as string[];
-            toast.success(`QA de ${r.chatter_name} listo`);
-            if (skipped.length) toast.warning(`${r.chatter_name}: se analizaron las primeras 4 modelos; quedaron afuera: ${skipped.join(", ")}.`, { duration: 8000 });
-            if (empties.length) toast.warning(`${r.chatter_name} no tomó chats 1-a-1 en: ${empties.join(", ")}.`, { duration: 7000 });
+            toast.success(traducir("agencyQa.watch.ready", { name: r.chatter_name }));
+            if (skipped.length) toast.warning(traducir("agencyQa.watch.skipped", { name: r.chatter_name, models: skipped.join(", ") }), { duration: 8000 });
+            if (empties.length) toast.warning(traducir("agencyQa.watch.empty", { name: r.chatter_name, models: empties.join(", ") }), { duration: 7000 });
           } else if (r.status === "failed") {
-            toast.error(r.error_message || `Falló el análisis de ${r.chatter_name}`, { duration: 8000 });
+            // error_message lo escribe la edge (o useGenerateQaDraft) en la base: es dato.
+            toast.error(r.error_message || traducir("agencyQa.watch.failed", { name: r.chatter_name }), { duration: 8000 });
           }
         }
       }
@@ -302,9 +311,10 @@ export const useUpdateChatterQaConfig = () => {
 const buildPayload = (row: ChatterQaReport): ChatterQaEmailPayload => ({
   chatterName: row.chatter_name,
   companyLabel: `${companyLabel(row.company)} (${row.company})`,
-  periodLabel: periodLabel(row.period),
+  // El correo sale en español siempre: lo lee el chatter, no quien apretó "Enviar".
+  periodLabel: periodLabel(row.period, "es"),
   evaluatorName: row.evaluator_name,
-  veredictoLabel: veredictoLabel(row.veredicto),
+  veredictoLabel: veredictoLabel(row.veredicto, "es"),
   tone: veredictoTone(row.veredicto) as "good" | "warn" | "bad",
   report: (row.report ?? {}) as ChatterQaEmailPayload["report"],
   evaluatedModels: row.evaluated_models ?? [],
@@ -321,7 +331,7 @@ export const useSendChatterQaEmail = () => {
       const alsoIds: string[] = [...(cfg?.notify_user_ids ?? [])];
       if (row.created_by && !alsoIds.includes(row.created_by)) alsoIds.push(row.created_by);
       if (to.length === 0 && alsoIds.length === 0)
-        throw new Error("No hay destinatarios. Configura emails en el tab Notificaciones.");
+        throw new Error(traducir("agencyQa.email.noRecipients"));
       const p = buildPayload(row);
       const { data, error } = await supabase.functions.invoke("send-notification-email", {
         body: { to, subject: buildChatterQaEmailSubject(p), html: buildChatterQaEmailHtml(p), tag: "chatter-qa", also_include_user_ids: alsoIds.length ? alsoIds : undefined },

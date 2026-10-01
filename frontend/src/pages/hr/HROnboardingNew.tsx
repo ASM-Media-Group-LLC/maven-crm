@@ -17,15 +17,21 @@ import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
 import { useCostCenters } from "@/hooks/useFinancialConfig";
 import { PageHeader } from "@/components/ui/page-header";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 
 // ─── Steps ──────────────────────────────────────────────────────────────────
-const STEPS = [
-  { label: "Empleado", description: "Selección y configuración" },
-  { label: "Financiero", description: "Salario y datos bancarios" },
-  { label: "Checklist", description: "Tareas de onboarding" },
+const STEPS: { label: TranslationKey; description: TranslationKey }[] = [
+  { label: "hrg.employee", description: "hrg.onb.step1Desc" },
+  { label: "hrg.onb.step2", description: "hrg.onb.step2Desc" },
+  { label: "hrg.off.step3", description: "hrg.onb.step3Desc" },
 ];
 
 // ─── Default checklist ──────────────────────────────────────────────────────
+// LA CHECKLIST SE GUARDA EN ESPAÑOL. category/title/description se copian tal
+// cual a employee_onboarding_tasks y los lee quien lleve el onboarding: son
+// DATO, no pantalla. Lo que se DIBUJA sale de `TAREAS_VISIBLES` (mismo orden,
+// índice por índice) y de `CATEGORIAS_VISIBLES`.
 const DEFAULT_CHECKLIST = [
   { category: "Documentación", title: "Contrato firmado", description: "Contrato laboral revisado y firmado por ambas partes" },
   { category: "Documentación", title: "Documento de identidad", description: "Copia del documento de identidad verificada" },
@@ -42,16 +48,42 @@ const DEFAULT_CHECKLIST = [
   { category: "Formación", title: "Presentación al equipo", description: "Introducción formal con compañeros y líderes" },
 ];
 
+const TAREAS_VISIBLES: readonly (readonly [TranslationKey, TranslationKey])[] = [
+  ["hrg.onb.task.contract", "hrg.onb.task.contractDesc"],
+  ["hrg.onb.task.id", "hrg.onb.task.idDesc"],
+  ["hrg.onb.task.photo", "hrg.onb.task.photoDesc"],
+  ["hrg.onb.task.socialSecurity", "hrg.onb.task.socialSecurityDesc"],
+  ["hrg.onb.task.bank", "hrg.onb.task.bankDesc"],
+  ["hrg.onb.task.email", "hrg.onb.task.emailDesc"],
+  ["hrg.onb.task.tools", "hrg.onb.task.toolsDesc"],
+  ["hrg.onb.task.credentials", "hrg.onb.task.credentialsDesc"],
+  ["hrg.onb.task.computer", "hrg.onb.task.computerDesc"],
+  ["hrg.onb.task.office", "hrg.onb.task.officeDesc"],
+  ["hrg.onb.task.induction", "hrg.onb.task.inductionDesc"],
+  ["hrg.onb.task.areaTraining", "hrg.onb.task.areaTrainingDesc"],
+  ["hrg.onb.task.meetTeam", "hrg.onb.task.meetTeamDesc"],
+];
+
+const CATEGORIAS_VISIBLES: Record<string, TranslationKey> = {
+  "Documentación": "hrg.off.cat.documents",
+  Accesos: "hrg.off.cat.access",
+  Equipamiento: "hrg.off.cat.equipment",
+  "Formación": "hrg.onb.cat.training",
+};
+
+// El nombre del banco se guarda tal cual en employees.bank_name: es DATO. Solo
+// "Otro" tiene otra forma de leerse.
 const BANK_NAMES = ["Bancolombia", "Davivienda", "BBVA", "Banco de Bogotá", "Nequi", "Daviplata", "Scotiabank", "Banco Popular", "Otro"];
-const ACCOUNT_TYPES = [
-  { value: "ahorros", label: "Ahorros" },
-  { value: "corriente", label: "Corriente" },
+const ACCOUNT_TYPES: { value: string; label: TranslationKey }[] = [
+  { value: "ahorros", label: "hrg.onb.account.savings" },
+  { value: "corriente", label: "hrg.onb.account.checking" },
 ];
 
 export default function HROnboardingNew() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { t } = useLanguage();
   const { centers: costCenters } = useCostCenters();
 
   const [step, setStep] = useState(0);
@@ -201,16 +233,17 @@ export default function HROnboardingNew() {
           employee_id: selectedEmployeeId,
           hours: 0,
           movement_type: "deposit",
+          // Se guarda en hour_bank.reason y lo lee RRHH en el banco de horas: DATO.
           reason: "Apertura de banco de horas",
           created_by: user?.id ?? null,
         });
       }
 
       queryClient.invalidateQueries({ queryKey: ["hr-onboardings"] });
-      toast({ title: "Onboarding iniciado correctamente" });
+      toast({ title: t("hrg.onb.started") });
       navigate("/hr/onboarding");
     } catch {
-      toast({ title: "Error al iniciar el onboarding", variant: "destructive" });
+      toast({ title: t("hrg.onb.startError"), variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
@@ -223,9 +256,9 @@ export default function HROnboardingNew() {
       {/* Header */}
       <div className="shrink-0 border-b border-white/10 bg-background/30 backdrop-blur-xl px-6 py-4">
         <Button variant="ghost" size="sm" className="mb-2 -ml-2 text-muted-foreground hover:text-foreground" onClick={() => navigate("/hr/onboarding")}>
-          <ArrowLeft className="h-4 w-4 mr-1" />Volver a Onboarding
+          <ArrowLeft className="h-4 w-4 mr-1" />{t("hrg.onb.back")}
         </Button>
-        <PageHeader title="Iniciar Onboarding" subtitle="Configura el proceso de integración para un nuevo empleado" />
+        <PageHeader title={t("hrg.onb.start")} subtitle={t("hrg.onb.newSubtitle")} />
       </div>
 
       {/* Stepper */}
@@ -242,8 +275,8 @@ export default function HROnboardingNew() {
                   {i < step ? <Check className="h-4 w-4" /> : i + 1}
                 </div>
                 <div className="hidden sm:block">
-                  <p className={`text-sm font-medium ${i <= step ? "text-foreground" : "text-muted-foreground"}`}>{s.label}</p>
-                  <p className="text-xs text-muted-foreground">{s.description}</p>
+                  <p className={`text-sm font-medium ${i <= step ? "text-foreground" : "text-muted-foreground"}`}>{t(s.label)}</p>
+                  <p className="text-xs text-muted-foreground">{t(s.description)}</p>
                 </div>
                 {i < STEPS.length - 1 && <div className={`hidden sm:block w-12 h-0.5 mx-2 ${i < step ? "bg-gradient-to-r from-accent to-primary" : "bg-muted"}`} />}
               </div>
@@ -262,9 +295,9 @@ export default function HROnboardingNew() {
             <Card>
               <CardContent className="pt-6 space-y-5">
                 <div className="space-y-1.5">
-                  <Label>Empleado <span className="text-destructive">*</span></Label>
+                  <Label>{t("hrg.employee")} <span className="text-destructive">*</span></Label>
                   <Select value={selectedEmployeeId || undefined} onValueChange={setSelectedEmployeeId}>
-                    <SelectTrigger><SelectValue placeholder="Seleccionar empleado..." /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder={t("hrg.selectEmployee")} /></SelectTrigger>
                     <SelectContent>
                       {availableEmployees.map((e: any) => (
                         <SelectItem key={e.id} value={e.id}>
@@ -274,18 +307,18 @@ export default function HROnboardingNew() {
                     </SelectContent>
                   </Select>
                   {availableEmployees.length === 0 && (
-                    <p className="text-xs text-muted-foreground">No hay empleados disponibles sin onboarding activo.</p>
+                    <p className="text-xs text-muted-foreground">{t("hrg.onb.noEmployees")}</p>
                   )}
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <Label>Fecha de Inicio</Label>
-                    <DateInput value={startDate} onChange={setStartDate} placeholder="Seleccionar fecha..." />
+                    <Label>{t("hrg.startDateOf")}</Label>
+                    <DateInput value={startDate} onChange={setStartDate} placeholder={t("hrg.selectDate")} />
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Buddy / Mentor</Label>
+                    <Label>{t("hrg.onb.buddy")}</Label>
                     <Select value={buddyId || undefined} onValueChange={setBuddyId}>
-                      <SelectTrigger><SelectValue placeholder="Asignar buddy..." /></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder={t("hrg.onb.assignBuddy")} /></SelectTrigger>
                       <SelectContent>
                         {employees.filter((e: any) => e.id !== selectedEmployeeId).map((e: any) => (
                           <SelectItem key={e.id} value={e.id}>{e.first_name} {e.last_name}</SelectItem>
@@ -295,8 +328,8 @@ export default function HROnboardingNew() {
                   </div>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Notas Iniciales</Label>
-                  <Textarea placeholder="Observaciones para el proceso de onboarding..." rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
+                  <Label>{t("hrg.onb.initialNotes")}</Label>
+                  <Textarea placeholder={t("hrg.onb.notesPlaceholder")} rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
                 </div>
               </CardContent>
             </Card>
@@ -308,19 +341,19 @@ export default function HROnboardingNew() {
               <CardContent className="pt-6 space-y-5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <Label>Salario Base <span className="text-destructive">*</span></Label>
+                    <Label>{t("hrg.opt.histField.base_salary")} <span className="text-destructive">*</span></Label>
                     <Input
                       type="number"
-                      placeholder="Ej: 2500000"
+                      placeholder={t("hrg.onb.salaryPlaceholder")}
                       value={baseSalary}
                       onChange={(e) => setBaseSalary(e.target.value)}
                       min={0}
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Centro de Costo</Label>
+                    <Label>{t("hrg.onb.costCenter")}</Label>
                     <Select value={costCenter || undefined} onValueChange={setCostCenter}>
-                      <SelectTrigger><SelectValue placeholder="Seleccionar centro..." /></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder={t("hrg.onb.selectCenter")} /></SelectTrigger>
                       <SelectContent>
                         {costCenters.map((c) => (
                           <SelectItem key={c.code} value={c.code}>{c.name} ({c.code})</SelectItem>
@@ -333,27 +366,27 @@ export default function HROnboardingNew() {
                 <Separator />
 
                 <div>
-                  <p className="text-sm font-semibold text-foreground mb-3">Datos Bancarios</p>
+                  <p className="text-sm font-semibold text-foreground mb-3">{t("hrg.bankDetails")}</p>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="space-y-1.5">
-                      <Label>Banco <span className="text-destructive">*</span></Label>
+                      <Label>{t("hrg.bank")} <span className="text-destructive">*</span></Label>
                       <Select value={bankName || undefined} onValueChange={setBankName}>
-                        <SelectTrigger><SelectValue placeholder="Seleccionar banco..." /></SelectTrigger>
+                        <SelectTrigger><SelectValue placeholder={t("hrg.onb.selectBank")} /></SelectTrigger>
                         <SelectContent>
-                          {BANK_NAMES.map((b) => <SelectItem key={b} value={b}>{b}</SelectItem>)}
+                          {BANK_NAMES.map((b) => <SelectItem key={b} value={b}>{b === "Otro" ? t("hrg.onb.otherBank") : b}</SelectItem>)}
                         </SelectContent>
                       </Select>
                     </div>
                     <div className="space-y-1.5">
-                      <Label>Número de Cuenta <span className="text-destructive">*</span></Label>
-                      <Input placeholder="Ej: 1234567890" value={bankAccountNumber} onChange={(e) => setBankAccountNumber(e.target.value)} />
+                      <Label>{t("hrg.onb.accountNumber")} <span className="text-destructive">*</span></Label>
+                      <Input placeholder={t("hrg.onb.accountPlaceholder")} value={bankAccountNumber} onChange={(e) => setBankAccountNumber(e.target.value)} />
                     </div>
                     <div className="space-y-1.5">
-                      <Label>Tipo de Cuenta</Label>
+                      <Label>{t("hrg.onb.accountType")}</Label>
                       <Select value={bankAccountType} onValueChange={setBankAccountType}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          {ACCOUNT_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                          {ACCOUNT_TYPES.map((o) => <SelectItem key={o.value} value={o.value}>{t(o.label)}</SelectItem>)}
                         </SelectContent>
                       </Select>
                     </div>
@@ -364,8 +397,8 @@ export default function HROnboardingNew() {
 
                 <div className="flex items-center justify-between rounded-lg border p-4 bg-muted/30">
                   <div>
-                    <p className="text-sm font-medium text-foreground">Activar Banco de Horas</p>
-                    <p className="text-xs text-muted-foreground">Habilita el banco de horas extra para este empleado</p>
+                    <p className="text-sm font-medium text-foreground">{t("hrg.onb.enableHourBank")}</p>
+                    <p className="text-xs text-muted-foreground">{t("hrg.onb.enableHourBankHint")}</p>
                   </div>
                   <Switch checked={hourBankEnabled} onCheckedChange={setHourBankEnabled} />
                 </div>
@@ -378,8 +411,8 @@ export default function HROnboardingNew() {
             <Card>
               <CardContent className="pt-6 space-y-5">
                 <div>
-                  <p className="text-sm font-semibold text-foreground">Checklist de Onboarding</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Selecciona las tareas que aplican para este empleado</p>
+                  <p className="text-sm font-semibold text-foreground">{t("hrg.onb.checklistTitle")}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{t("hrg.onb.checklistHint")}</p>
                 </div>
                 {categories.map(([category, tasks], catIdx) => {
                   const allSelected = tasks.every((t) => selectedTasks.has(t.index));
@@ -395,7 +428,7 @@ export default function HROnboardingNew() {
                             indeterminate={someSelected && !allSelected}
                             onCheckedChange={() => toggleCategory(category)}
                           />
-                          <span className="text-sm font-semibold text-foreground">{category}</span>
+                          <span className="text-sm font-semibold text-foreground">{CATEGORIAS_VISIBLES[category] ? t(CATEGORIAS_VISIBLES[category]) : category}</span>
                           <span className="text-xs text-muted-foreground">
                             ({tasks.filter((t) => selectedTasks.has(t.index)).length}/{tasks.length})
                           </span>
@@ -409,8 +442,8 @@ export default function HROnboardingNew() {
                                 className="mt-0.5"
                               />
                               <div>
-                                <p className="text-sm text-foreground group-hover:text-primary transition-colors">{task.title}</p>
-                                <p className="text-xs text-muted-foreground">{task.description}</p>
+                                <p className="text-sm text-foreground group-hover:text-primary transition-colors">{TAREAS_VISIBLES[task.index] ? t(TAREAS_VISIBLES[task.index][0]) : task.title}</p>
+                                <p className="text-xs text-muted-foreground">{TAREAS_VISIBLES[task.index] ? t(TAREAS_VISIBLES[task.index][1]) : task.description}</p>
                               </div>
                             </label>
                           ))}
@@ -430,20 +463,20 @@ export default function HROnboardingNew() {
         <div>
           {step > 0 && (
             <Button variant="outline" onClick={handlePrev}>
-              <ChevronLeft className="h-4 w-4 mr-1" />Anterior
+              <ChevronLeft className="h-4 w-4 mr-1" />{t("common.previous")}
             </Button>
           )}
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="outline" onClick={() => navigate("/hr/onboarding")}>Cancelar</Button>
+          <Button variant="outline" onClick={() => navigate("/hr/onboarding")}>{t("common.cancel")}</Button>
           {step < STEPS.length - 1 ? (
             <Button onClick={handleNext} disabled={!stepValid(step)}>
-              Siguiente<ChevronRight className="h-4 w-4 ml-1" />
+              {t("common.next")}<ChevronRight className="h-4 w-4 ml-1" />
             </Button>
           ) : (
             <Button onClick={handleSubmit} disabled={!stepValid(step) || isSubmitting}>
               <UserPlus className="h-4 w-4 mr-1" />
-              {isSubmitting ? "Iniciando..." : "Iniciar Onboarding"}
+              {isSubmitting ? t("hrg.starting") : t("hrg.onb.start")}
             </Button>
           )}
         </div>

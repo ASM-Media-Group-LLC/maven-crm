@@ -6,7 +6,6 @@ import { z } from "zod";
 import { ChevronLeft, ChevronRight, Check, CalendarIcon, Search, Link2, ArrowLeft } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -28,11 +27,21 @@ import {
   CONTRACT_TYPES, WORK_MODALITIES, NATIONAL_ID_TYPES, GENDER_OPTIONS,
   SALARY_FREQUENCIES, BANK_ACCOUNT_TYPES, EPS_OPTIONS, ARL_OPTIONS, AFP_OPTIONS,
 } from "@/lib/hrConstants";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
+import {
+  etiqueta, FRECUENCIA_PAGO, GENERO, MODALIDAD_TRABAJO, SEGURIDAD_SOCIAL, TIPO_CONTRATO, TIPO_CUENTA, TIPO_DOCUMENTO,
+} from "./etiquetasRrhh";
 
+// Los mensajes de zod son CLAVES del diccionario: el schema se arma una sola vez al
+// cargar el módulo, y un texto ya traducido ahí se quedaría en el idioma de ese
+// momento. Se traducen al dibujarse (ver `mensaje`).
+const MSG_REQUIRED: TranslationKey = "hr.emp.required";
+const MSG_INVALID_EMAIL: TranslationKey = "common.invalidEmail";
 const schema = z.object({
-  first_name: z.string().min(1, "Requerido"),
-  last_name: z.string().min(1, "Requerido"),
-  email: z.string().email("Email inválido").optional().or(z.literal("")),
+  first_name: z.string().min(1, MSG_REQUIRED),
+  last_name: z.string().min(1, MSG_REQUIRED),
+  email: z.string().email(MSG_INVALID_EMAIL).optional().or(z.literal("")),
   phone: z.string().optional(),
   mobile: z.string().optional(),
   birth_date: z.string().optional(),
@@ -66,15 +75,16 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
-const STEPS = [
-  { id: 1, label: "Datos Personales" },
-  { id: 2, label: "Datos Laborales" },
-  { id: 3, label: "Seguridad Social" },
-  { id: 4, label: "Información Bancaria" },
-  { id: 5, label: "Acceso (opcional)" },
+const STEPS: { id: number; label: TranslationKey }[] = [
+  { id: 1, label: "hr.emp.stepPersonal" },
+  { id: 2, label: "hr.emp.stepWork" },
+  { id: 3, label: "hr.emp.stepSocial" },
+  { id: 4, label: "hr.emp.stepBank" },
+  { id: 5, label: "hr.emp.stepAccess" },
 ];
 
 export default function EmployeeNew() {
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -89,6 +99,7 @@ export default function EmployeeNew() {
   const { data: allProfiles = [] } = useAllProfiles();
   const form = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: { country: "Colombia", national_id_type: "CC", contract_type: "indefinido", work_modality: "presencial", salary_frequency: "mensual", bank_account_type: "ahorros" } });
   const { register, handleSubmit, watch, setValue, formState: { errors } } = form;
+  const mensaje = (m: string | undefined) => (m ? t(m as TranslationKey) : "");
 
   const selectedDept = watch("department_id");
   const { data: positions = [] } = usePositions(selectedDept);
@@ -136,10 +147,10 @@ export default function EmployeeNew() {
       const { error } = await supabase.from("employees").insert(payload);
       if (error) throw error;
       queryClient.invalidateQueries({ queryKey: ["employees"] });
-      toast({ title: "Empleado creado correctamente" });
+      toast({ title: t("hr.emp.created") });
       navigate("/hr/directorio");
     } catch {
-      toast({ title: "Error al crear el empleado", variant: "destructive" });
+      toast({ title: t("hr.emp.errorCreating"), variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
@@ -156,11 +167,11 @@ export default function EmployeeNew() {
           onClick={() => navigate("/hr/directorio")}
         >
           <ArrowLeft className="h-4 w-4 mr-1" />
-          Volver al Directorio
+          {t("hr.emp.backToDirectory")}
         </Button>
         <PageHeader
-          title="Nuevo Empleado"
-          subtitle="Complete los datos para registrar un nuevo empleado"
+          title={t("hr.emp.title")}
+          subtitle={t("hr.emp.subtitle")}
         />
       </div>
 
@@ -177,7 +188,7 @@ export default function EmployeeNew() {
                 <span className={cn("flex h-7 w-7 items-center justify-center rounded-full border-2 text-xs font-bold transition-all", step === s.id ? "border-transparent bg-gradient-to-r from-accent to-primary text-white ring-2 ring-accent/30" : step > s.id ? "border-transparent bg-gradient-to-r from-accent to-primary text-white" : "border-muted-foreground/30 text-muted-foreground")}>
                   {step > s.id ? <Check className="h-3.5 w-3.5" /> : s.id}
                 </span>
-                <span className="hidden sm:inline">{s.label}</span>
+                <span className="hidden sm:inline">{t(s.label)}</span>
               </button>
               {i < STEPS.length - 1 && <div className={cn("h-px flex-1 mx-2 transition-colors", step > s.id ? "bg-gradient-to-r from-accent to-primary" : "bg-border")} />}
             </div>
@@ -193,44 +204,44 @@ export default function EmployeeNew() {
             {/* Step 1: Personal Info */}
             {step === 1 && (
               <Card>
-                <CardHeader><CardTitle className="text-base">Datos Personales</CardTitle></CardHeader>
+                <CardHeader><CardTitle className="text-base">{t("hr.emp.stepPersonal")}</CardTitle></CardHeader>
                 <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <Label>Nombres <span className="text-destructive">*</span></Label>
-                    <Input {...register("first_name")} placeholder="Nombre(s)" />
-                    {errors.first_name && <p className="text-xs text-destructive">{errors.first_name.message}</p>}
+                    <Label>{t("hr.emp.firstNames")} <span className="text-destructive">*</span></Label>
+                    <Input {...register("first_name")} placeholder={t("hr.emp.firstNamesPh")} />
+                    {errors.first_name && <p className="text-xs text-destructive">{mensaje(errors.first_name.message)}</p>}
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Apellidos <span className="text-destructive">*</span></Label>
-                    <Input {...register("last_name")} placeholder="Apellido(s)" />
-                    {errors.last_name && <p className="text-xs text-destructive">{errors.last_name.message}</p>}
+                    <Label>{t("hr.emp.lastNames")} <span className="text-destructive">*</span></Label>
+                    <Input {...register("last_name")} placeholder={t("hr.emp.lastNamesPh")} />
+                    {errors.last_name && <p className="text-xs text-destructive">{mensaje(errors.last_name.message)}</p>}
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Tipo de Documento</Label>
+                    <Label>{t("hr.emp.idType")}</Label>
                     <Select onValueChange={(v) => setValue("national_id_type", v)} defaultValue="CC">
                       <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>{NATIONAL_ID_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
+                      <SelectContent>{NATIONAL_ID_TYPES.map((o) => <SelectItem key={o.value} value={o.value}>{etiqueta(t, TIPO_DOCUMENTO, o.value, o.label)}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Número de Documento</Label>
-                    <Input {...register("national_id")} placeholder="Ej: 1234567890" />
+                    <Label>{t("hr.emp.idNumber")}</Label>
+                    <Input {...register("national_id")} placeholder={t("hr.emp.idNumberPh")} />
                   </div>
                   <div className="space-y-1.5">
                     <Label>Email</Label>
-                    <Input {...register("email")} type="email" placeholder="correo@empresa.com" />
-                    {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
+                    <Input {...register("email")} type="email" placeholder={t("hr.emp.emailPh")} />
+                    {errors.email && <p className="text-xs text-destructive">{mensaje(errors.email.message)}</p>}
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Teléfono</Label>
+                    <Label>{t("common.phone")}</Label>
                     <PhoneInput value={watch("phone") || ""} onChange={(v) => setValue("phone", v)} />
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Celular</Label>
+                    <Label>{t("hr.emp.mobile")}</Label>
                     <PhoneInput value={watch("mobile") || ""} onChange={(v) => setValue("mobile", v)} />
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Fecha de Nacimiento</Label>
+                    <Label>{t("hr.emp.birthDate")}</Label>
                     <DateInput
                       value={birthDate ? format(birthDate, "yyyy-MM-dd") : ""}
                       onChange={(v) => {
@@ -244,31 +255,31 @@ export default function EmployeeNew() {
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Género</Label>
+                    <Label>{t("hr.emp.gender")}</Label>
                     <Select onValueChange={(v) => setValue("gender", v)}>
-                      <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
-                      <SelectContent>{GENDER_OPTIONS.map((g) => <SelectItem key={g.value} value={g.value}>{g.label}</SelectItem>)}</SelectContent>
+                      <SelectTrigger><SelectValue placeholder={t("common.selectEllipsis")} /></SelectTrigger>
+                      <SelectContent>{GENDER_OPTIONS.map((g) => <SelectItem key={g.value} value={g.value}>{etiqueta(t, GENERO, g.value, g.label)}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Ciudad</Label>
-                    <Input {...register("city")} placeholder="Bogotá" />
+                    <Label>{t("common.city")}</Label>
+                    <Input {...register("city")} placeholder={t("hr.emp.cityPh")} />
                   </div>
                   <div className="space-y-1.5 sm:col-span-2">
-                    <Label>Dirección</Label>
-                    <Input {...register("address")} placeholder="Calle / Carrera / Manzana..." />
+                    <Label>{t("common.address")}</Label>
+                    <Input {...register("address")} placeholder={t("hr.emp.addressPh")} />
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Contacto de Emergencia</Label>
-                    <Input {...register("emergency_contact_name")} placeholder="Nombre del contacto" />
+                    <Label>{t("hr.emp.emergencyContact")}</Label>
+                    <Input {...register("emergency_contact_name")} placeholder={t("hr.emp.emergencyContactPh")} />
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Teléfono de Emergencia</Label>
+                    <Label>{t("hr.emp.emergencyPhone")}</Label>
                     <PhoneInput value={watch("emergency_contact_phone") || ""} onChange={(v) => setValue("emergency_contact_phone", v)} />
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Parentesco</Label>
-                    <Input {...register("emergency_contact_relation")} placeholder="Ej: Cónyuge, Madre..." />
+                    <Label>{t("hr.emp.relationship")}</Label>
+                    <Input {...register("emergency_contact_relation")} placeholder={t("hr.emp.relationshipPh")} />
                   </div>
                 </CardContent>
               </Card>
@@ -277,24 +288,24 @@ export default function EmployeeNew() {
             {/* Step 2: Work info */}
             {step === 2 && (
               <Card>
-                <CardHeader><CardTitle className="text-base">Datos Laborales</CardTitle></CardHeader>
+                <CardHeader><CardTitle className="text-base">{t("hr.emp.stepWork")}</CardTitle></CardHeader>
                 <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <Label>Departamento</Label>
+                    <Label>{t("hr.department")}</Label>
                     <Select onValueChange={(v) => { setValue("department_id", v); setValue("position_id", ""); }}>
-                      <SelectTrigger><SelectValue placeholder="Seleccionar departamento" /></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder={t("hr.emp.selectDepartment")} /></SelectTrigger>
                       <SelectContent>{departments.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Cargo</Label>
+                    <Label>{t("hr.jobTitle")}</Label>
                     <Select onValueChange={(v) => setValue("position_id", v)} disabled={!selectedDept && positions.length === 0}>
-                      <SelectTrigger><SelectValue placeholder={selectedDept ? "Seleccionar cargo" : "Primero elige departamento"} /></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder={selectedDept ? t("hr.emp.selectJobTitle") : t("hr.emp.pickDepartmentFirst")} /></SelectTrigger>
                       <SelectContent>{positions.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Fecha de Ingreso</Label>
+                    <Label>{t("hr.emp.hireDate")}</Label>
                     <DateInput
                       value={hireDate ? format(hireDate, "yyyy-MM-dd") : ""}
                       onChange={(v) => {
@@ -307,43 +318,43 @@ export default function EmployeeNew() {
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Tipo de Contrato</Label>
+                    <Label>{t("hr.emp.contractType")}</Label>
                     <Select onValueChange={(v) => setValue("contract_type", v)} defaultValue="indefinido">
                       <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>{CONTRACT_TYPES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
+                      <SelectContent>{CONTRACT_TYPES.map((c) => <SelectItem key={c.value} value={c.value}>{etiqueta(t, TIPO_CONTRATO, c.value, c.label)}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Modalidad de Trabajo</Label>
+                    <Label>{t("hr.emp.workMode")}</Label>
                     <Select onValueChange={(v) => setValue("work_modality", v)} defaultValue="presencial">
                       <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>{WORK_MODALITIES.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
+                      <SelectContent>{WORK_MODALITIES.map((m) => <SelectItem key={m.value} value={m.value}>{etiqueta(t, MODALIDAD_TRABAJO, m.value, m.label)}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Salario Base</Label>
+                    <Label>{t("hr.emp.baseSalary")}</Label>
                     <Input {...register("base_salary")} type="number" placeholder="0.00" />
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Frecuencia de Pago</Label>
+                    <Label>{t("hr.emp.payFrequency")}</Label>
                     <Select onValueChange={(v) => setValue("salary_frequency", v)} defaultValue="mensual">
                       <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>{SALARY_FREQUENCIES.map((f) => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}</SelectContent>
+                      <SelectContent>{SALARY_FREQUENCIES.map((fr) => <SelectItem key={fr.value} value={fr.value}>{etiqueta(t, FRECUENCIA_PAGO, fr.value, fr.label)}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1.5">
-                    <Label>¿Comisiona o Bonifica?</Label>
+                    <Label>{t("hr.emp.hasCommission")}</Label>
                     <Select onValueChange={(v) => setValue("has_commission", v)} defaultValue="no">
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="si">Sí</SelectItem>
-                        <SelectItem value="no">No</SelectItem>
+                        <SelectItem value="si">{t("hr.yes")}</SelectItem>
+                        <SelectItem value="no">{t("hr.no")}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1.5 sm:col-span-2">
-                    <Label>Notas Internas</Label>
-                    <Textarea {...register("notes")} placeholder="Observaciones relevantes..." rows={3} />
+                    <Label>{t("hr.emp.internalNotes")}</Label>
+                    <Textarea {...register("notes")} placeholder={t("hr.emp.internalNotesPh")} rows={3} />
                   </div>
                 </CardContent>
               </Card>
@@ -352,32 +363,32 @@ export default function EmployeeNew() {
             {/* Step 3: Social Security */}
             {step === 3 && (
               <Card>
-                <CardHeader><CardTitle className="text-base">Seguridad Social</CardTitle></CardHeader>
+                <CardHeader><CardTitle className="text-base">{t("hr.emp.stepSocial")}</CardTitle></CardHeader>
                 <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <Label>EPS</Label>
                     <Select onValueChange={(v) => setValue("eps", v)}>
-                      <SelectTrigger><SelectValue placeholder="Seleccionar EPS" /></SelectTrigger>
-                      <SelectContent>{EPS_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
+                      <SelectTrigger><SelectValue placeholder={t("hr.emp.selectEps")} /></SelectTrigger>
+                      <SelectContent>{EPS_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{etiqueta(t, SEGURIDAD_SOCIAL, o.value, o.label)}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1.5">
                     <Label>ARL</Label>
                     <Select onValueChange={(v) => setValue("arl", v)}>
-                      <SelectTrigger><SelectValue placeholder="Seleccionar ARL" /></SelectTrigger>
-                      <SelectContent>{ARL_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
+                      <SelectTrigger><SelectValue placeholder={t("hr.emp.selectArl")} /></SelectTrigger>
+                      <SelectContent>{ARL_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{etiqueta(t, SEGURIDAD_SOCIAL, o.value, o.label)}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1.5">
-                    <Label>AFP (Pensión)</Label>
+                    <Label>{t("hr.emp.afp")}</Label>
                     <Select onValueChange={(v) => setValue("afp", v)}>
-                      <SelectTrigger><SelectValue placeholder="Seleccionar AFP" /></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder={t("hr.emp.selectAfp")} /></SelectTrigger>
                       <SelectContent>{AFP_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Caja de Compensación</Label>
-                    <Input {...register("caja_compensacion")} placeholder="Ej: Compensar, Cafam..." />
+                    <Label>{t("hr.emp.compensationFund")}</Label>
+                    <Input {...register("caja_compensacion")} placeholder={t("hr.emp.compensationFundPh")} />
                   </div>
                 </CardContent>
               </Card>
@@ -386,26 +397,26 @@ export default function EmployeeNew() {
             {/* Step 4: Banking */}
             {step === 4 && (
               <Card>
-                <CardHeader><CardTitle className="text-base">Información Bancaria</CardTitle></CardHeader>
+                <CardHeader><CardTitle className="text-base">{t("hr.emp.stepBank")}</CardTitle></CardHeader>
                 <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <Label>Banco</Label>
-                    <Input {...register("bank_name")} placeholder="Ej: Bancolombia, Davivienda..." />
+                    <Label>{t("hr.emp.bank")}</Label>
+                    <Input {...register("bank_name")} placeholder={t("hr.emp.bankPh")} />
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Número de Cuenta</Label>
-                    <Input {...register("bank_account_number")} placeholder="Número de cuenta" />
+                    <Label>{t("hr.emp.accountNumber")}</Label>
+                    <Input {...register("bank_account_number")} placeholder={t("hr.emp.accountNumberPh")} />
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Tipo de Cuenta</Label>
+                    <Label>{t("hr.emp.accountType")}</Label>
                     <Select onValueChange={(v) => setValue("bank_account_type", v)} defaultValue="ahorros">
                       <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>{BANK_ACCOUNT_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
+                      <SelectContent>{BANK_ACCOUNT_TYPES.map((o) => <SelectItem key={o.value} value={o.value}>{etiqueta(t, TIPO_CUENTA, o.value, o.label)}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1.5 sm:col-span-2">
-                    <Label>Notas</Label>
-                    <Textarea {...register("bank_notes")} placeholder="Observaciones sobre la información bancaria..." rows={3} />
+                    <Label>{t("hr.notes")}</Label>
+                    <Textarea {...register("bank_notes")} placeholder={t("hr.emp.bankNotesPh")} rows={3} />
                   </div>
                 </CardContent>
               </Card>
@@ -415,37 +426,37 @@ export default function EmployeeNew() {
             {step === 5 && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2"><Link2 className="h-4 w-4" />Acceso a Plataforma</CardTitle>
-                  <CardDescription>Opcional. Vincula este empleado a un usuario existente en la plataforma.</CardDescription>
+                  <CardTitle className="text-base flex items-center gap-2"><Link2 className="h-4 w-4" />{t("hr.emp.platformAccess")}</CardTitle>
+                  <CardDescription>{t("hr.emp.platformAccessDesc")}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {linkedProfileId ? (
                     <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
-                      <UserAvatar name={allProfiles.find(p => p.id === linkedProfileId)?.full_name ?? "Usuario"} size="sm" className="h-9 w-9" />
+                      <UserAvatar name={allProfiles.find(p => p.id === linkedProfileId)?.full_name ?? t("common.user")} size="sm" className="h-9 w-9" />
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium">{allProfiles.find(p => p.id === linkedProfileId)?.full_name ?? "Usuario"}</p>
-                        <p className="text-xs text-muted-foreground">Usuario vinculado</p>
+                        <p className="text-sm font-medium">{allProfiles.find(p => p.id === linkedProfileId)?.full_name ?? t("common.user")}</p>
+                        <p className="text-xs text-muted-foreground">{t("hr.emp.linkedUser")}</p>
                       </div>
-                      <Button variant="outline" size="sm" onClick={() => setLinkedProfileId(null)}>Cambiar</Button>
+                      <Button variant="outline" size="sm" onClick={() => setLinkedProfileId(null)}>{t("hr.emp.change")}</Button>
                     </div>
                   ) : (
                     <Popover open={profileSearchOpen} onOpenChange={setProfileSearchOpen}>
                       <PopoverTrigger asChild>
                         <Button variant="outline" className="w-full justify-start">
                           <Search className="h-4 w-4 mr-2 text-muted-foreground" />
-                          Buscar y vincular usuario...
+                          {t("hr.emp.searchLinkUser")}
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-full p-0" align="start">
                         <Command>
-                          <CommandInput placeholder="Buscar usuario..." />
+                          <CommandInput placeholder={t("hr.emp.searchUser")} />
                           <CommandList>
-                            <CommandEmpty>No se encontraron usuarios.</CommandEmpty>
+                            <CommandEmpty>{t("hr.emp.noUsers")}</CommandEmpty>
                             <CommandGroup>
                               {allProfiles.map((profile) => (
                                 <CommandItem key={profile.id} value={profile.full_name ?? profile.id} onSelect={() => { setLinkedProfileId(profile.id); setProfileSearchOpen(false); }}>
                                   <UserAvatar name={profile.full_name} src={profile.avatar_url} size="xs" className="mr-2" />
-                                  {profile.full_name ?? "Sin nombre"}
+                                  {profile.full_name ?? t("hr.noName")}
                                 </CommandItem>
                               ))}
                             </CommandGroup>
@@ -454,7 +465,7 @@ export default function EmployeeNew() {
                       </PopoverContent>
                     </Popover>
                   )}
-                  <p className="text-xs text-muted-foreground">Si el empleado no necesita acceso a la plataforma, deja este campo vacío y haz clic en "Crear Empleado".</p>
+                  <p className="text-xs text-muted-foreground">{t("hr.emp.accessHint")}</p>
                 </CardContent>
               </Card>
             )}
@@ -465,19 +476,19 @@ export default function EmployeeNew() {
         <div className="shrink-0 border-t bg-background px-6 py-4">
           <div className="flex items-center justify-between">
             <Button type="button" variant="outline" size="sm" onClick={() => navigate("/hr/directorio")}>
-              Cancelar
+              {t("common.cancel")}
             </Button>
             <div className="flex items-center gap-2">
               <Button type="button" variant="outline" onClick={() => setStep((s) => Math.max(1, s - 1))} disabled={step === 1}>
-                <ChevronLeft className="h-4 w-4 mr-1" /> Anterior
+                <ChevronLeft className="h-4 w-4 mr-1" /> {t("common.previous")}
               </Button>
               {step < STEPS.length ? (
                 <Button type="button" onClick={() => setStep((s) => Math.min(STEPS.length, s + 1))}>
-                  Siguiente <ChevronRight className="h-4 w-4 ml-1" />
+                  {t("common.next")} <ChevronRight className="h-4 w-4 ml-1" />
                 </Button>
               ) : (
                 <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? "Guardando..." : "Crear Empleado"}
+                  {isSubmitting ? t("hr.saving") : t("hr.emp.create")}
                 </Button>
               )}
             </div>

@@ -12,43 +12,12 @@ import { ChevronLeft, ChevronRight, FileText, Clock, Users } from "lucide-react"
 import AudienceSelector from "./AudienceSelector";
 import { useUpdateAnnouncement, type AnnouncementRow, type AudienceTarget } from "./useAnnouncementsAdmin";
 import { supabase } from "@/integrations/supabase/client";
+import { useLanguage } from "@/hooks/useLanguage";
+import {
+  MODULOS_ANUNCIO, PASOS_ANUNCIO, PRIORIDADES_ANUNCIO, REPETICIONES_ANUNCIO, TIPOS_ANUNCIO,
+} from "./opcionesAnuncio";
 
-const TYPES = [
-  { value: "general", label: "General" },
-  { value: "policy", label: "Política" },
-  { value: "celebration", label: "Celebración" },
-  { value: "holiday", label: "Feriado" },
-  { value: "urgent", label: "Urgente" },
-  { value: "reminder", label: "Recordatorio" },
-  { value: "update", label: "Actualización interna" },
-];
-
-const PRIORITIES = [
-  { value: "low", label: "Baja" },
-  { value: "normal", label: "Normal" },
-  { value: "high", label: "Alta" },
-];
-
-const RECURRENCE = [
-  { value: "none", label: "Sin repetición" },
-  { value: "weekly", label: "Semanal" },
-  { value: "monthly", label: "Mensual" },
-];
-
-const MODULES = [
-  { value: "none", label: "Ninguno" },
-  { value: "hr", label: "Recursos Humanos" },
-  { value: "finance", label: "Finanzas" },
-  { value: "operations", label: "Operaciones" },
-  { value: "projects", label: "Proyectos" },
-  { value: "sales", label: "Ventas" },
-];
-
-const STEPS = [
-  { label: "Contenido", icon: FileText },
-  { label: "Programación", icon: Clock },
-  { label: "Audiencia", icon: Users },
-];
+const STEPS = PASOS_ANUNCIO.map((clave, i) => ({ clave, icon: [FileText, Clock, Users][i] }));
 
 type AudienceEntry = Omit<AudienceTarget, "id" | "announcement_id">;
 
@@ -59,6 +28,7 @@ interface Props {
 }
 
 const EditAnnouncementModal = ({ open, onOpenChange, announcement }: Props) => {
+  const { t } = useLanguage();
   const update = useUpdateAnnouncement();
   const [step, setStep] = useState(0);
 
@@ -137,7 +107,7 @@ const EditAnnouncementModal = ({ open, onOpenChange, announcement }: Props) => {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Editar Anuncio</DialogTitle>
+          <DialogTitle>{t("hrg.ann.editTitle")}</DialogTitle>
         </DialogHeader>
 
         {/* Stepper */}
@@ -160,7 +130,7 @@ const EditAnnouncementModal = ({ open, onOpenChange, announcement }: Props) => {
                   <Icon className="h-4 w-4" />
                 </div>
                 <span className={`text-xs font-medium hidden sm:block ${isActive ? "text-foreground" : "text-muted-foreground"}`}>
-                  {s.label}
+                  {t(s.clave)}
                 </span>
                 {i < STEPS.length - 1 && (
                   <div className="flex-1 h-0.5 rounded-full bg-muted mx-1">
@@ -177,39 +147,40 @@ const EditAnnouncementModal = ({ open, onOpenChange, announcement }: Props) => {
           {step === 0 && (
             <>
               <div className="space-y-2">
-                <Label>Título *</Label>
+                <Label>{t("common.title")} *</Label>
                 <Input value={title} onChange={(e) => setTitle(e.target.value)} />
               </div>
               <div className="space-y-2">
-                <Label>Contenido (Markdown)</Label>
+                <Label>{t("hrg.ann.contentMarkdown")}</Label>
                 <Textarea value={content} onChange={(e) => setContent(e.target.value)} rows={6} className="font-mono text-sm" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Tipo</Label>
+                  <Label>{t("common.type")}</Label>
                   <Select value={type} onValueChange={setType}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                      {TIPOS_ANUNCIO.map((o) => <SelectItem key={o.value} value={o.value}>{t(o.clave)}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Prioridad</Label>
+                  <Label>{t("hrg.ann.priority")}</Label>
                   <Select value={priority} onValueChange={setPriority}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {PRIORITIES.map((p) => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
+                      {PRIORIDADES_ANUNCIO.map((p) => <SelectItem key={p.value} value={p.value}>{t(p.clave)}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
               </div>
               <div className="space-y-2">
-                <Label>Módulo relacionado</Label>
+                <Label>{t("hrg.ann.relatedModule")}</Label>
                 <Select value={relatedModule} onValueChange={setRelatedModule}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {MODULES.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
+                    <SelectItem value="none">{t("common.none")}</SelectItem>
+                    {MODULOS_ANUNCIO.map((m) => <SelectItem key={m.value} value={m.value}>{t(m.clave)}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -220,25 +191,25 @@ const EditAnnouncementModal = ({ open, onOpenChange, announcement }: Props) => {
             <>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Fecha de publicación</Label>
+                  <Label>{t("hrg.ann.publishDate")}</Label>
                   <DateInput value={startsAt} onChange={setStartsAt} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Hora de publicación</Label>
+                  <Label>{t("hrg.ann.publishTime")}</Label>
                   <TimeSelect value={startsTime} onChange={setStartsTime} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Fecha de expiración</Label>
-                  <DateInput value={expiresAt} onChange={setExpiresAt} placeholder="Sin expiración" />
+                  <Label>{t("hrg.ann.expiryDate")}</Label>
+                  <DateInput value={expiresAt} onChange={setExpiresAt} placeholder={t("hrg.ann.noExpiry")} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Repetición</Label>
+                  <Label>{t("hrg.ann.recurrence")}</Label>
                   <Select value={recurrence} onValueChange={setRecurrence}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {RECURRENCE.map((r) => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
+                      {REPETICIONES_ANUNCIO.map((r) => <SelectItem key={r.value} value={r.value}>{t(r.clave)}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -247,26 +218,26 @@ const EditAnnouncementModal = ({ open, onOpenChange, announcement }: Props) => {
                 <div className="grid grid-cols-2 gap-4">
                   {expiresAt && (
                     <div className="space-y-2">
-                      <Label>Hora de expiración</Label>
+                      <Label>{t("hrg.ann.expiryTime")}</Label>
                       <TimeSelect value={expiresTime} onChange={setExpiresTime} />
                     </div>
                   )}
                   {recurrence !== "none" && (
                     <div className={`space-y-2 ${!expiresAt ? "col-start-2" : ""}`}>
-                      <Label>Fin de repetición</Label>
-                      <DateInput value={recurrenceEnd} onChange={setRecurrenceEnd} placeholder="Sin fin" />
+                      <Label>{t("hrg.ann.recurrenceEnd")}</Label>
+                      <DateInput value={recurrenceEnd} onChange={setRecurrenceEnd} placeholder={t("hrg.ann.noEnd")} />
                     </div>
                   )}
                 </div>
               )}
               <div className="space-y-2">
-                <Label>Estado</Label>
+                <Label>{t("common.status")}</Label>
                 <Select value={status} onValueChange={setStatus}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="draft">Borrador</SelectItem>
-                    <SelectItem value="scheduled">Programado</SelectItem>
-                    <SelectItem value="active">Activo</SelectItem>
+                    <SelectItem value="draft">{t("hrg.ann.status.draft")}</SelectItem>
+                    <SelectItem value="scheduled">{t("hrg.ann.status.scheduled")}</SelectItem>
+                    <SelectItem value="active">{t("hrg.ann.status.active")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -288,18 +259,18 @@ const EditAnnouncementModal = ({ open, onOpenChange, announcement }: Props) => {
         <DialogFooter className="mt-4 gap-2">
           {step > 0 && (
             <Button variant="outline" onClick={() => setStep(step - 1)} className="gap-1">
-              <ChevronLeft className="h-4 w-4" /> Anterior
+              <ChevronLeft className="h-4 w-4" /> {t("common.previous")}
             </Button>
           )}
           <div className="flex-1" />
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>{t("common.cancel")}</Button>
           {step < STEPS.length - 1 ? (
             <Button onClick={() => setStep(step + 1)} className="gap-1">
-              Siguiente <ChevronRight className="h-4 w-4" />
+              {t("common.next")} <ChevronRight className="h-4 w-4" />
             </Button>
           ) : (
             <Button onClick={handleSubmit} disabled={!title.trim() || update.isPending}>
-              {update.isPending ? "Guardando..." : "Guardar"}
+              {update.isPending ? t("hrg.saving") : t("common.save")}
             </Button>
           )}
         </DialogFooter>

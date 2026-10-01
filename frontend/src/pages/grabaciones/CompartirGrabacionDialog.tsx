@@ -6,6 +6,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { SelectorDePersonas } from "@/components/SelectorDePersonas";
 import { invokeRecordings, type RecordingRow } from "@/hooks/useRecordings";
 import { diffDestinatarios } from "@/lib/compartirGrabacion";
+import { useLanguage } from "@/hooks/useLanguage";
+import { traducir } from "@/lib/i18n";
 
 // Compartir una grabación con gente de Maven: a quien elijas le aparece en
 // SU lista de Grabaciones y se le avisa por correo. La lista completa la
@@ -13,6 +15,7 @@ import { diffDestinatarios } from "@/lib/compartirGrabacion";
 export function CompartirGrabacionDialog({
   grabacion, miId, onClose,
 }: { grabacion: RecordingRow | null; miId: string | null; onClose: () => void }) {
+  const { t } = useLanguage();
   const [actuales, setActuales] = useState<string[]>([]);
   const [elegidos, setElegidos] = useState<string[]>([]);
   const [cargando, setCargando] = useState(false);
@@ -30,7 +33,8 @@ export function CompartirGrabacionDialog({
         setActuales(ids);
         setElegidos(ids);
       } catch (e) {
-        toast.error((e as Error).message || "No se pudo cargar con quién está compartida");
+        // traducir() y no t(): el efecto solo depende de la grabación.
+        toast.error((e as Error).message || traducir("grab.share.loadError"));
       } finally {
         if (vivo) setCargando(false);
       }
@@ -47,14 +51,14 @@ export function CompartirGrabacionDialog({
       const res = await invokeRecordings("share", { recording_id: grabacion.id, user_ids: elegidos });
       const emails = (res.emails as number) ?? 0;
       const partes: string[] = [];
-      if (agregar.length) partes.push(`compartida con ${agregar.length} ${agregar.length === 1 ? "persona" : "personas"}`);
-      if (quitar.length) partes.push(`${quitar.length} ${quitar.length === 1 ? "persona quitada" : "personas quitadas"}`);
-      toast.success(`Grabación ${partes.join(" · ")}`, {
-        description: emails > 0 ? `Se avisó por correo a ${emails}.` : undefined,
+      if (agregar.length) partes.push(t(agregar.length === 1 ? "grab.share.addedOne" : "grab.share.addedMany", { n: agregar.length }));
+      if (quitar.length) partes.push(t(quitar.length === 1 ? "grab.share.removedOne" : "grab.share.removedMany", { n: quitar.length }));
+      toast.success(t("grab.share.done", { parts: partes.join(" · ") }), {
+        description: emails > 0 ? t("grab.share.emailed", { n: emails }) : undefined,
       });
       onClose();
     } catch (e) {
-      toast.error((e as Error).message || "No se pudo compartir");
+      toast.error((e as Error).message || t("grab.share.error"));
     } finally {
       setGuardando(false);
     }
@@ -64,10 +68,9 @@ export function CompartirGrabacionDialog({
     <Dialog open={!!grabacion} onOpenChange={(o) => !o && !guardando && onClose()}>
       <DialogContent className="max-w-[calc(100vw-1.5rem)] sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2"><Share2 className="h-4 w-4" /> Compartir grabación</DialogTitle>
+          <DialogTitle className="flex items-center gap-2"><Share2 className="h-4 w-4" /> {t("grab.share.title")}</DialogTitle>
           <DialogDescription>
-            {grabacion?.title || grabacion?.room_name}: a quien elijas le aparece en su lista de Grabaciones
-            y se le avisa por correo. Vence para todos en la misma fecha.
+            {t("grab.share.desc", { name: grabacion?.title || grabacion?.room_name || "" })}
           </DialogDescription>
         </DialogHeader>
 
@@ -82,10 +85,11 @@ export function CompartirGrabacionDialog({
         )}
 
         <DialogFooter className="flex-row items-center justify-end gap-2">
-          <Button variant="ghost" onClick={onClose} disabled={guardando}>Cancelar</Button>
+          <Button variant="ghost" onClick={onClose} disabled={guardando}>{t("common.cancel")}</Button>
           <Button onClick={() => void guardar()} disabled={guardando || cargando} className="gap-1.5 rounded-full">
             {guardando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Share2 className="h-4 w-4" />}
-            Guardar
+            {t("common.save")}
+
           </Button>
         </DialogFooter>
       </DialogContent>

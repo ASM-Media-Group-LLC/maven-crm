@@ -19,7 +19,7 @@ const ZOOM = 0.82;
 const A4_W = 595;
 const A4_H = 842;
 
-export default function PaymentNoteA4Preview({ note }: { note: PaymentNoteData }) {
+export default function PaymentNoteA4Preview({ note, zoom = ZOOM }: { note: PaymentNoteData; zoom?: number }) {
   const amt = Number(note.amount) || 0;
   const creatorName = note._creator?.artistic_name || note._creator?.name || "—";
   // Idioma fijo a propósito: fecha impresa en la nota de pago, igual que en el documento que recibe la creadora.
@@ -27,10 +27,12 @@ export default function PaymentNoteA4Preview({ note }: { note: PaymentNoteData }
     ? new Date(note.created_at).toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" })
     : "—";
 
+  // data-documento: esto es el documento (va en español siempre, lo recibe la creadora),
+  // no la pantalla. El test de Finanzas en inglés lo saltea por esta marca.
   return (
-    <div style={{ width: A4_W * ZOOM, height: A4_H * ZOOM, flexShrink: 0 }}>
+    <div data-documento style={{ width: A4_W * zoom, height: A4_H * zoom, flexShrink: 0 }}>
       <div
-        style={{ width: A4_W, height: A4_H, transform: `scale(${ZOOM})`, transformOrigin: "top left" }}
+        style={{ width: A4_W, height: A4_H, transform: `scale(${zoom})`, transformOrigin: "top left" }}
         className="bg-white rounded shadow-2xl border border-border/50 p-10 font-serif text-black text-[11px] leading-relaxed flex flex-col"
       >
         {/* Header */}

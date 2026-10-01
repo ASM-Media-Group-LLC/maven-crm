@@ -118,6 +118,15 @@ const AgencyCalls = ({ onOpenDetail }: AgencyCallsProps) => {
     modelId: modelFilter === "all" ? undefined : modelFilter,
   });
   const closersQ = useQaClosers();
+  // El hook deja name en null al closer sin nombre (cada pantalla pone el texto en
+  // su idioma): aquí, «Sin nombre» y el orden de siempre (en la S, no arriba de todo).
+  const closers = useMemo(
+    () =>
+      (closersQ.data ?? [])
+        .map((c) => ({ id: c.id, name: c.name ?? "Sin nombre" }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [closersQ.data],
+  );
   const modelsQ = useQaModels();
   const fireWebhook = useFireQaWebhook();
 
@@ -217,7 +226,7 @@ const AgencyCalls = ({ onOpenDetail }: AgencyCallsProps) => {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos los closers</SelectItem>
-            {closersQ.data?.map((c) => (
+            {closers.map((c) => (
               <SelectItem key={c.id} value={c.id}>
                 {c.name}
               </SelectItem>

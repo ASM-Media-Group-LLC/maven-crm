@@ -19,6 +19,9 @@ import {
   ArrowDown,
   Crown,
   Activity,
+  // Faltaba: la ficha de un lead con Instagram tiraba "Instagram is not defined"
+  // al abrirse (lo encontró el test de la pantalla en inglés).
+  Instagram,
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 // Una sola definición de "Esta semana" (lunes → domingo de la semana EN CURSO)
@@ -71,6 +74,8 @@ import ChattersRecruitmentTab from "./panel-de-control/ChattersRecruitmentTab";
 import WhatsappAgentTab from "./panel-de-control/WhatsappAgentTab";
 import BestCloserMonthlyDialog from "@/components/dashboard/BestCloserMonthlyDialog";
 import StatChip from "@/components/StatChip";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 
 // ─── KPI card ──────────────────────────────────────────────────────────
 
@@ -127,6 +132,7 @@ const DetailDialog = ({
 }) => {
   const navigate = useNavigate();
   const f = useFormato();
+  const { t } = useLanguage();
   // Metrics como totalLeads / totalGenerated / contacted usan el flow
   // de breakdown (RPC trae counts por categoría, rows se fetchean
   // lazy al expandir). El resto sigue con useMetricDetails que trae
@@ -260,7 +266,7 @@ const DetailDialog = ({
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0 flex-1">
               <DialogTitle className="text-lg font-bold tracking-tight flex items-center gap-3">
-                {metricLabel || "Detalle"}
+                {metricLabel || t("page.panel.detail")}
                 {!isLoading && (
                   <span className="inline-flex items-center rounded-full bg-primary/15 px-2.5 py-0.5 text-sm font-bold text-primary tabular-nums">
                     {totalCount.toLocaleString(f.intl("es-ES"))}
@@ -270,11 +276,11 @@ const DetailDialog = ({
               {!isLoading && groups.list.length > 0 && (
                 <p className="text-[11px] text-muted-foreground mt-1.5">
                   {supportsBreakdown
-                    ? `${totalCount.toLocaleString(f.intl("es-ES"))} ${totalCount === 1 ? "registro" : "registros"}`
+                    ? t(totalCount === 1 ? "page.panel.recordOne" : "page.panel.recordMany", { n: totalCount.toLocaleString(f.intl("es-ES")) })
                     : totalCount > data.length
-                      ? `Mostrando los ${data.length} más recientes de ${totalCount.toLocaleString(f.intl("es-ES"))} totales`
-                      : `${data.length.toLocaleString(f.intl("es-ES"))} ${data.length === 1 ? "registro" : "registros"}`}
-                  {groups.hasCategory && ` · ${groups.list.length} ${groups.list.length === 1 ? "categoría" : "categorías"}`}
+                      ? t("page.panel.showingRecent", { n: data.length, total: totalCount.toLocaleString(f.intl("es-ES")) })
+                      : t(data.length === 1 ? "page.panel.recordOne" : "page.panel.recordMany", { n: data.length.toLocaleString(f.intl("es-ES")) })}
+                  {groups.hasCategory && ` · ${t(groups.list.length === 1 ? "page.panel.categoryOne" : "page.panel.categoryMany", { n: groups.list.length })}`}
                 </p>
               )}
             </div>
@@ -284,9 +290,9 @@ const DetailDialog = ({
                   type="button"
                   onClick={() => setCollapsed(new Set())}
                   className="rounded-full bg-muted/40 px-2.5 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                  title="Expandir todas"
+                  title={t("page.panel.expandAll")}
                 >
-                  Expandir
+                  {t("page.panel.expand")}
                 </button>
                 <button
                   type="button"
@@ -294,9 +300,9 @@ const DetailDialog = ({
                     setCollapsed(new Set(groups.list.map((g) => g.cat)))
                   }
                   className="rounded-full bg-muted/40 px-2.5 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                  title="Colapsar todas"
+                  title={t("page.panel.collapseAll")}
                 >
-                  Colapsar
+                  {t("page.panel.collapse")}
                 </button>
               </div>
             )}
@@ -329,12 +335,12 @@ const DetailDialog = ({
                 <Users className="h-6 w-6 text-muted-foreground" />
               </div>
               <p className="text-sm text-muted-foreground text-center">
-                Sin registros en el rango seleccionado.
+                {t("page.panel.noRecords")}
               </p>
             </div>
           ) : !groups.hasCategory ? (
             <div className="space-y-1.5">
-              {data.map((row) => renderRow(row, navigate, onOpenChange, setDetailLead, f))}
+              {data.map((row) => renderRow(row, navigate, onOpenChange, setDetailLead, f, t))}
             </div>
           ) : (
             groups.list.map((g) => (
@@ -358,9 +364,9 @@ const DetailDialog = ({
 
         {!supportsBreakdown && data.length > 0 && totalCount > data.length && (
           <p className="text-[10px] text-muted-foreground text-center py-2.5 border-t border-border/40 bg-muted/20">
-            Mostrando los {data.length} más recientes de{" "}
-            <strong className="text-foreground">{totalCount.toLocaleString(f.intl("es-ES"))}</strong> totales —
-            exportar desde Reports para ver el listado completo.
+            {t("page.panel.footBefore", { n: data.length })}{" "}
+            <strong className="text-foreground">{totalCount.toLocaleString(f.intl("es-ES"))}</strong>{" "}
+            {t("page.panel.footAfter")}
           </p>
         )}
       </DialogContent>
@@ -409,6 +415,7 @@ const CategorySection = ({
   setDetailLead: (v: { source: "leadgen" | "scouter" | "creator"; id: string; title: string } | null) => void;
 }) => {
   const f = useFormato();
+  const { t } = useLanguage();
   // Lazy fetch: solo cuando supportsBreakdown && expandida. React-query
   // cachea por (metric, range, cat) — expandir/colapsar no re-fetchea.
   const { data: lazyRows, isLoading: isLazyLoading } = useMetricCategoryRows(
@@ -422,7 +429,8 @@ const CategorySection = ({
   return (
     <div className="space-y-2">
       <CategorySectionHeader
-        cat={cat}
+        // "Sin categoría" es la llave del balde en la base (con ella se piden las filas); en pantalla se traduce.
+        cat={cat === "Sin categoría" ? t("page.panel.noCategory") : cat}
         count={count}
         isCollapsed={isCollapsed}
         onToggle={onToggle}
@@ -435,14 +443,14 @@ const CategorySection = ({
             ))
           ) : rows.length === 0 ? (
             <p className="text-xs text-muted-foreground italic pl-3 py-2">
-              Sin registros visibles para esta categoría.
+              {t("page.panel.noVisibleInCategory")}
             </p>
           ) : (
             <>
-              {rows.map((row) => renderRow(row, navigate, onOpenChange, setDetailLead, f))}
+              {rows.map((row) => renderRow(row, navigate, onOpenChange, setDetailLead, f, t))}
               {supportsBreakdown && count > rows.length && (
                 <p className="text-[10px] text-muted-foreground text-center py-1.5 italic">
-                  Mostrando los {rows.length} más recientes de {count.toLocaleString(f.intl("es-ES"))} en esta categoría.
+                  {t("page.panel.showingRecentInCategory", { n: rows.length, total: count.toLocaleString(f.intl("es-ES")) })}
                 </p>
               )}
             </>
@@ -462,6 +470,7 @@ const renderRow = (
   onOpenChange: (o: boolean) => void,
   setDetailLead: (v: { source: "leadgen" | "scouter" | "creator"; id: string; title: string } | null) => void,
   f: Formato,
+  t: ReturnType<typeof useLanguage>["t"],
 ) => {
   const handleRowClick = () => {
     if (row.linkUrl) {
@@ -506,7 +515,7 @@ const renderRow = (
             <OutcomeBadge
               outcome={row.badge}
               size="xs"
-              labelOverride={{ cerro: "Cerró" }}
+              labelOverride={{ cerro: t("page.panel.closedBadge") }}
             />
           ) : (
             <Badge variant="outline" className="text-[10px]">
@@ -532,34 +541,36 @@ const renderRow = (
 // key/value. Funciona para los 3 sources: leadgen_entries, scouter_leads,
 // creators (para los Ingresos al CRM).
 
-const FIELD_LABELS: Record<string, string> = {
-  model_handle: "Handle (modelo)",
-  instagram_handle: "Instagram",
-  phone_e164: "Teléfono",
-  phone_raw: "Teléfono (raw)",
-  phone: "Teléfono",
-  status: "Status",
-  quality: "Calidad",
-  record_type: "Tipo de registro",
-  notes: "Notas",
-  source_link: "Source link",
-  state: "Estado/Provincia",
-  country: "País",
-  country_code: "Código país",
-  city: "Ciudad",
-  followers: "Seguidores",
-  bio: "Bio",
-  ai_score: "AI Score",
-  ai_status: "AI Status",
-  ai_reason: "AI Razón",
-  category: "Categoría",
-  platform: "Plataforma",
-  onlyfans_url: "OnlyFans URL",
-  name: "Nombre",
-  entered_crm_at: "Ingresada al CRM",
-  entered_crm_notes: "Notas CRM",
-  created_at: "Creada",
-  updated_at: "Actualizada",
+// La llave es la COLUMNA de la base (dato); el valor, cómo se dice en pantalla.
+// Una columna que no está aquí se muestra con su nombre crudo.
+const FIELD_LABELS: Record<string, TranslationKey> = {
+  model_handle: "page.panel.field.modelHandle",
+  instagram_handle: "page.panel.field.instagram",
+  phone_e164: "common.phone",
+  phone_raw: "page.panel.field.phoneRaw",
+  phone: "common.phone",
+  status: "page.panel.field.status",
+  quality: "page.panel.field.quality",
+  record_type: "page.panel.field.recordType",
+  notes: "page.panel.field.notes",
+  source_link: "page.panel.field.sourceLink",
+  state: "page.panel.field.state",
+  country: "common.country",
+  country_code: "page.panel.field.countryCode",
+  city: "common.city",
+  followers: "page.panel.field.followers",
+  bio: "page.panel.field.bio",
+  ai_score: "page.panel.field.aiScore",
+  ai_status: "page.panel.field.aiStatus",
+  ai_reason: "page.panel.field.aiReason",
+  category: "common.category",
+  platform: "page.panel.field.platform",
+  onlyfans_url: "page.panel.field.onlyfansUrl",
+  name: "common.name",
+  entered_crm_at: "page.panel.field.enteredCrmAt",
+  entered_crm_notes: "page.panel.field.crmNotes",
+  created_at: "page.panel.field.createdAt",
+  updated_at: "page.panel.field.updatedAt",
 };
 
 const HIDDEN_FIELDS = new Set([
@@ -594,6 +605,7 @@ const LeadDetailDialog = ({
   title: string;
 }) => {
   const { data, isLoading } = useLeadDetail(source, id);
+  const { t } = useLanguage();
 
   // Datos derivados del header — handle de IG, foto, nombre, categoría.
   // leadgen_entries usa `model_handle`; scouter_leads y creators usan
@@ -652,7 +664,7 @@ const LeadDetailDialog = ({
               "relative h-16 w-16 shrink-0 overflow-hidden rounded-full border-2 border-border bg-muted",
               igHandle && "cursor-pointer transition-all hover:border-primary",
             )}
-            aria-label={igHandle ? `Abrir Instagram de @${igHandle}` : "Sin Instagram"}
+            aria-label={igHandle ? t("page.panel.openIg", { handle: igHandle }) : t("page.panel.noIg")}
           >
             {photoUrl ? (
               <img
@@ -715,7 +727,7 @@ const LeadDetailDialog = ({
             </>
           ) : !data ? (
             <p className="text-sm text-muted-foreground text-center py-12">
-              No se encontró el registro.
+              {t("page.panel.notFound")}
             </p>
           ) : (() => {
             // Agrupamos los campos en secciones lógicas para que el
@@ -728,18 +740,18 @@ const LeadDetailDialog = ({
                 v !== "" &&
                 !(typeof v === "object" && Object.keys(v ?? {}).length === 0),
             );
-            type Section = { title: string; keys: string[] };
+            type Section = { title: TranslationKey; keys: string[] };
             const SECTIONS: Section[] = [
-              { title: "Contacto",   keys: ["phone_e164", "phone", "phone_raw", "source_link", "ig_url"] },
-              { title: "Ubicación",  keys: ["country", "country_code", "state", "city"] },
-              { title: "OnlyFans / Plataforma", keys: ["platform", "onlyfans_url", "ai_score", "ai_status", "ai_reason"] },
-              { title: "Estado",     keys: ["status", "record_type", "quality", "category", "verified"] },
-              { title: "Métricas",   keys: ["followers", "bio"] },
-              { title: "Notas",      keys: ["notes", "entered_crm_notes", "entered_crm_at"] },
-              { title: "Timestamps", keys: ["created_at", "updated_at"] },
+              { title: "page.panel.sec.contact",   keys: ["phone_e164", "phone", "phone_raw", "source_link", "ig_url"] },
+              { title: "common.location",  keys: ["country", "country_code", "state", "city"] },
+              { title: "page.panel.sec.platform", keys: ["platform", "onlyfans_url", "ai_score", "ai_status", "ai_reason"] },
+              { title: "common.status",     keys: ["status", "record_type", "quality", "category", "verified"] },
+              { title: "page.panel.sec.metrics",   keys: ["followers", "bio"] },
+              { title: "page.panel.field.notes",      keys: ["notes", "entered_crm_notes", "entered_crm_at"] },
+              { title: "page.panel.sec.timestamps", keys: ["created_at", "updated_at"] },
             ];
             const used = new Set<string>();
-            const sectioned: Array<{ title: string; entries: Array<[string, unknown]> }> = [];
+            const sectioned: Array<{ title: TranslationKey; entries: Array<[string, unknown]> }> = [];
             for (const sec of SECTIONS) {
               const matches = entries.filter(([k]) => sec.keys.includes(k));
               if (matches.length > 0) {
@@ -750,7 +762,7 @@ const LeadDetailDialog = ({
             // Cualquier campo que no calza en una sección conocida va
             // a "Otros" para no perderse.
             const others = entries.filter(([k]) => !used.has(k));
-            if (others.length > 0) sectioned.push({ title: "Otros", entries: others });
+            if (others.length > 0) sectioned.push({ title: "page.panel.sec.other", entries: others });
 
             return sectioned.map((sec) => (
               <div
@@ -759,7 +771,7 @@ const LeadDetailDialog = ({
               >
                 <div className="px-3 py-2 border-b border-border/40 bg-muted/30">
                   <p className="text-xs font-bold text-muted-foreground">
-                    {sec.title}
+                    {t(sec.title)}
                   </p>
                 </div>
                 <div className="divide-y divide-border/40">
@@ -769,13 +781,13 @@ const LeadDetailDialog = ({
                       className="grid grid-cols-[120px_1fr] gap-3 px-3 py-2 text-sm hover:bg-muted/20 transition-colors"
                     >
                       <span className="text-xs text-muted-foreground font-medium self-center">
-                        {FIELD_LABELS[k] ?? k}
+                        {FIELD_LABELS[k] ? t(FIELD_LABELS[k]) : k}
                       </span>
                       <span className="break-words self-center">
                         {typeof v === "boolean"
                           ? v
-                            ? "Sí"
-                            : "No"
+                            ? t("page.panel.yes")
+                            : t("page.panel.no")
                           : typeof v === "object"
                             ? JSON.stringify(v).slice(0, 200)
                             : String(v)}
@@ -799,6 +811,7 @@ const LeadDetailDialog = ({
 // pero la mayoría del uso es check del día en curso).
 const PanelDeControl = () => {
   const f = useFormato();
+  const { t } = useLanguage();
   const today = startOfDay(new Date());
   // Default: Hoy (antes era el mes entero — la mayoría del uso es
   // check del día en curso, no análisis histórico mensual).
@@ -852,11 +865,11 @@ const PanelDeControl = () => {
   // cadena queda monotónicamente decreciente porque numbersObtained es
   // subset de totalLeads, closerCalls subset de numbersObtained, etc.
   const funnelChartData = [
-    { stage: "Contactadas",     value: k.totalLeads,       fill: "#3b82f6" },
-    { stage: "Núm. obtenidos",  value: k.numbersObtained,  fill: "#06b6d4" },
-    { stage: "Llamadas",        value: k.closerCalls,      fill: "#8b5cf6" },
-    { stage: "Cierres",         value: k.closes,           fill: "#10b981" },
-    { stage: "Mov. CRM (neto)", value: k.crmAltas - k.crmBajas, fill: "#6366f1" },
+    { stage: t("page.panel.stage.contacted"),  value: k.totalLeads,       fill: "#3b82f6" },
+    { stage: t("page.panel.stage.numbers"),    value: k.numbersObtained,  fill: "#06b6d4" },
+    { stage: t("page.panel.stage.calls"),      value: k.closerCalls,      fill: "#8b5cf6" },
+    { stage: t("page.panel.stage.closes"),     value: k.closes,           fill: "#10b981" },
+    { stage: t("page.panel.stage.crmNet"),     value: k.crmAltas - k.crmBajas, fill: "#6366f1" },
   ];
 
   const cards: Array<{
@@ -869,20 +882,20 @@ const PanelDeControl = () => {
   }> = [
     {
       key: "totalLeads",
-      label: "Modelos contactadas",
+      label: t("page.panel.kpi.contacted"),
       value: k.totalLeads,
       icon: <Users className="h-3.5 w-3.5" />,
       gradient: "bg-primary",
       hint: (
         <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
           <span className="inline-flex items-center gap-1 rounded-full bg-success/15 ring-1 ring-success/30 px-2 py-0.5 text-[10px] font-bold text-success tabular-nums">
-            Nuevas
+            {t("page.panel.kpi.new")}
             <span className="text-success font-extrabold">
               {k.leadsNuevas.toLocaleString(f.intl("es-ES"))}
             </span>
           </span>
           <span className="inline-flex items-center gap-1 rounded-full bg-warning/15 ring-1 ring-warning/30 px-2 py-0.5 text-[10px] font-bold text-warning tabular-nums">
-            Existentes
+            {t("page.panel.kpi.existing")}
             <span className="text-warning font-extrabold">
               {k.leadsExistentes.toLocaleString(f.intl("es-ES"))}
             </span>
@@ -892,43 +905,43 @@ const PanelDeControl = () => {
     },
     {
       key: "numbersObtained",
-      label: "Números obtenidos",
+      label: t("page.panel.kpi.numbers"),
       value: k.numbersObtained,
       icon: <Phone className="h-3.5 w-3.5" />,
       gradient: "bg-cyan-500",
-      hint: "Capturas únicas (leadgen + closer + creator) sin duplicados",
+      hint: t("page.panel.kpi.numbersHint"),
     },
     {
       key: "closerCalls",
-      label: "Llamadas para cierre",
+      label: t("page.panel.kpi.calls"),
       value: k.closerCalls,
       icon: <PhoneCall className="h-3.5 w-3.5" />,
       gradient: "bg-primary",
-      hint: "Audios subidos al Company QA",
+      hint: t("page.panel.kpi.callsHint"),
     },
     {
       key: "closes",
-      label: "Cierres",
+      label: t("page.panel.stage.closes"),
       value: k.closes,
       icon: <CheckCircle2 className="h-3.5 w-3.5" />,
       gradient: "bg-success",
-      hint: "IA marcó la llamada como cerro",
+      hint: t("page.panel.kpi.closesHint"),
     },
     {
       key: "onHold",
-      label: "En espera",
+      label: t("common.waiting"),
       value: k.onHold,
       icon: <Clock className="h-3.5 w-3.5" />,
       gradient: "bg-warning",
-      hint: "Modelos pensándolo / no decidieron",
+      hint: t("page.panel.kpi.onHoldHint"),
     },
     {
       key: "rejections",
-      label: "Rechazos",
+      label: t("page.panel.kpi.rejections"),
       value: k.rejections,
       icon: <XCircle className="h-3.5 w-3.5" />,
       gradient: "bg-destructive",
-      hint: "IA marcó la llamada como no_cerro",
+      hint: t("page.panel.kpi.rejectionsHint"),
     },
   ];
 
@@ -951,9 +964,9 @@ const PanelDeControl = () => {
   // Labels para metrics que no viven en `cards` (hero card, sub-KPIs)
   // — sin esto el header del popup mostraba "Detalle" como fallback.
   const EXTRA_METRIC_LABELS: Partial<Record<MetricKey, string>> = {
-    totalGenerated: "Total leads Bot+LLG",
-    enteredCrm: "Ingresos al CRM",
-    contacted: "LLG Contactadas",
+    totalGenerated: t("page.panel.kpi.totalBotLlg"),
+    enteredCrm: t("page.panel.kpi.enteredCrm"),
+    contacted: t("page.panel.kpi.llgContacted"),
   };
   const activeMetricLabel =
     cards.find((c) => c.key === openMetric)?.label ??
@@ -972,8 +985,8 @@ const PanelDeControl = () => {
     // página no scrollea. `flex-1` toma toda la altura disponible.
     <main className="flex-1 overflow-y-auto p-6 space-y-5">
       <PageHeader
-        title="Panel de control"
-        subtitle="Funnel operativo en tiempo real — desde el contacto LLG hasta ingresos al CRM."
+        title={t("nav.controlPanel")}
+        subtitle={t("page.panel.subtitle")}
         actions={
           <>
             {/* Presets rápidos — pill segmentado. Click setea range y
@@ -1010,7 +1023,7 @@ const PanelDeControl = () => {
                 setRange({ from, to });
                 setActivePreset(null); // selección manual → preset desactivado
               }}
-              placeholder="Seleccionar fechas"
+              placeholder={t("page.panel.pickDates")}
             />
           </>
         }
@@ -1018,14 +1031,14 @@ const PanelDeControl = () => {
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as "modelos" | "chatters" | "cuentas-spammer" | "control-gasto" | "whatsapp-bot")}>
         <TabsList>
-          <TabsTrigger value="modelos">Reclutamiento modelos</TabsTrigger>
+          <TabsTrigger value="modelos">{t("page.panel.tab.models")}</TabsTrigger>
           <TabsTrigger value="cuentas-spammer" className="gap-1.5">
             <Activity className="h-3.5 w-3.5" />
-            Salud de Cuentas IG
+            {t("page.panel.tab.igHealth")}
           </TabsTrigger>
-          <TabsTrigger value="chatters">Reclutamiento chatters</TabsTrigger>
-          <TabsTrigger value="control-gasto">Control de Gasto</TabsTrigger>
-          {canSeeWhatsappBot && <TabsTrigger value="whatsapp-bot">Bot WhatsApp</TabsTrigger>}
+          <TabsTrigger value="chatters">{t("page.panel.tab.chatters")}</TabsTrigger>
+          <TabsTrigger value="control-gasto">{t("page.panel.tab.spend")}</TabsTrigger>
+          {canSeeWhatsappBot && <TabsTrigger value="whatsapp-bot">{t("page.panel.tab.waBot")}</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="cuentas-spammer" className="mt-4">
@@ -1056,7 +1069,7 @@ const PanelDeControl = () => {
         >
           <div className="relative">
             <p className="text-xs text-foreground/80 font-semibold">
-              Total leads generados
+              {t("page.panel.hero.total")}
             </p>
             <div className="flex items-end gap-3 mt-2">
               <p className="text-4xl font-bold tabular-nums leading-none">
@@ -1087,7 +1100,7 @@ const PanelDeControl = () => {
         >
           <div className="relative">
             <p className="text-xs text-foreground/80 font-semibold">
-              Tasa de números obtenidos por lead
+              {t("page.panel.hero.rate")}
             </p>
             <div className="flex items-end gap-3 mt-2">
               <p className="text-4xl font-bold tabular-nums leading-none">
@@ -1095,8 +1108,7 @@ const PanelDeControl = () => {
                 <span className="text-xl text-muted-foreground">%</span>
               </p>
               <p className="text-xs text-muted-foreground pb-1">
-                {k.numbersObtained.toLocaleString(f.intl("es-ES"))} de{" "}
-                {k.totalGenerated.toLocaleString(f.intl("es-ES"))} leads
+                {t("page.panel.hero.rateOf", { n: k.numbersObtained.toLocaleString(f.intl("es-ES")), total: k.totalGenerated.toLocaleString(f.intl("es-ES")) })}
               </p>
             </div>
           </div>
@@ -1127,14 +1139,14 @@ const PanelDeControl = () => {
             </div>
             <div>
               <p className="text-xs text-foreground/80 font-semibold">
-                Tasa de números obtenidos
+                {t("page.panel.rate.numbers")}
               </p>
               <p className="text-3xl font-bold tabular-nums leading-tight">
                 {phoneRateContacted}
                 <span className="text-lg text-muted-foreground">%</span>
               </p>
               <p className="text-[10px] text-muted-foreground mt-1">
-                Números / Contactadas ({k.numbersObtained.toLocaleString(f.intl("es-ES"))}/{k.totalLeads.toLocaleString(f.intl("es-ES"))})
+                {t("page.panel.rate.numbersFormula")} ({k.numbersObtained.toLocaleString(f.intl("es-ES"))}/{k.totalLeads.toLocaleString(f.intl("es-ES"))})
               </p>
             </div>
           </div>
@@ -1148,14 +1160,14 @@ const PanelDeControl = () => {
             </div>
             <div>
               <p className="text-xs text-foreground/80 font-semibold">
-                Tasa de cierre
+                {t("page.panel.rate.close")}
               </p>
               <p className="text-3xl font-bold tabular-nums leading-tight">
                 {conversionRate}
                 <span className="text-lg text-muted-foreground">%</span>
               </p>
               <p className="text-[10px] text-muted-foreground mt-1">
-                Cierres / Llamadas ({k.closes}/{k.closerCalls})
+                {t("page.panel.rate.closeFormula")} ({k.closes}/{k.closerCalls})
               </p>
             </div>
           </div>
@@ -1196,7 +1208,7 @@ const PanelDeControl = () => {
             </div>
             <div>
               <p className="text-xs text-foreground/80 font-semibold">
-                Movimientos del CRM
+                {t("page.panel.crmMoves")}
               </p>
               {isLoading ? (
                 <Skeleton className="mt-1 h-9 w-32" />
@@ -1256,7 +1268,7 @@ const PanelDeControl = () => {
             </div>
             <div>
               <p className="text-xs text-foreground/80 font-semibold">
-                Mejor cerrador{" "}
+                {t("page.panel.bestCloser")}{" "}
                 <span className="text-muted-foreground font-normal normal-case">
                   ·{" "}
                   {(() => {
@@ -1282,12 +1294,12 @@ const PanelDeControl = () => {
                     {bestCloser.name}
                   </p>
                   <p className="text-[11px] text-muted-foreground mt-1 tabular-nums">
-                    {bestCloser.closes.toLocaleString(f.intl("es-ES"))} cierres · calif promedio {Math.round(bestCloser.avgScore)}/100
+                    {t("page.panel.bestCloserStats", { n: bestCloser.closes.toLocaleString(f.intl("es-ES")), score: Math.round(bestCloser.avgScore) })}
                   </p>
                 </>
               ) : (
                 <p className="text-sm text-muted-foreground mt-1">
-                  Sin calls en el rango
+                  {t("page.panel.noCalls")}
                 </p>
               )}
             </div>
@@ -1299,23 +1311,24 @@ const PanelDeControl = () => {
 
       {/* Funnel visual flow — cross-team. "Contactadas" = LLG+Scouter. */}
       <Card className="p-4">
-        <h2 className="text-sm font-semibold mb-3">Flujo del funnel</h2>
+        <h2 className="text-sm font-semibold mb-3">{t("page.panel.funnelFlow")}</h2>
         <div className="flex items-center gap-2 flex-wrap text-xs">
-          <FunnelStep label="Contactadas" value={k.totalLeads} color="text-blue-400" />
+          <FunnelStep label={t("page.panel.stage.contacted")} value={k.totalLeads} color="text-blue-400" />
           <ArrowRight className="h-3 w-3 text-muted-foreground" />
-          <FunnelStep label="Con número" value={k.numbersObtained} color="text-cyan-400" />
+          <FunnelStep label={t("page.panel.stage.withNumber")} value={k.numbersObtained} color="text-cyan-400" />
           <ArrowRight className="h-3 w-3 text-muted-foreground" />
-          <FunnelStep label="Llamadas" value={k.closerCalls} color="text-violet-400" />
+          <FunnelStep label={t("page.panel.stage.calls")} value={k.closerCalls} color="text-violet-400" />
           <ArrowRight className="h-3 w-3 text-muted-foreground" />
-          <FunnelStep label="Cierres" value={k.closes} color="text-emerald-400" />
+          <FunnelStep label={t("page.panel.stage.closes")} value={k.closes} color="text-emerald-400" />
           <ArrowRight className="h-3 w-3 text-muted-foreground" />
-          <FunnelStep label="Mov. CRM" value={k.crmAltas - k.crmBajas} color="text-indigo-400" />
+          <FunnelStep label={t("page.panel.stage.crm")} value={k.crmAltas - k.crmBajas} color="text-indigo-400" />
         </div>
       </Card>
 
       {/* Bar chart — visualización del funnel en barras */}
       <Card className="p-4">
-        <h2 className="text-sm font-semibold mb-3">Distribución por etapa</h2>
+        <h2 className="text-sm font-semibold mb-3">{t("page.panel.byStage")}</h2>
+
         <div className="h-72 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
