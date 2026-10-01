@@ -1031,7 +1031,9 @@ const QUE_QUEDO = `select
   await anda(db, ANA, `update profiles set full_name = full_name, status = 'away' where id = '${ANA}'`, "un UPDATE que manda el mismo full_name pasa");
   await db.exec(`insert into auth.users(id, email, raw_user_meta_data) values ('a0000000-0000-4000-8000-0000000000ff', 'nueva@ejemplo.test', '{"full_name":"Nueva Persona"}')`);
   const nueva_ = await uno(db, `select p.full_name n, (select count(*)::int from tenant_members where user_id = p.id and tenant_id = '${T1}') tm from profiles p where p.id = 'a0000000-0000-4000-8000-0000000000ff'`);
-  check(nueva_?.n === "Nueva Persona" && nueva_?.tm === 1, `el alta (handle_new_user) sigue creando el perfil con su nombre y la membresía (${JSON.stringify(nueva_)})`);
+  // La membresía ya no la pone handle_new_user: la pone admin-user-actions con la
+  // agencia de quien crea la cuenta (20261001150000_agencias_base).
+  check(nueva_?.n === "Nueva Persona" && nueva_?.tm === 0, `el alta (handle_new_user) sigue creando el perfil con su nombre, y ya no mete a nadie en asm-tech (${JSON.stringify(nueva_)})`);
 
   // createDirectChat en una carrera (lib: hooks/abrirDirecto.ts): el tercer paso da
   // directo_duplicado. La app borra la conversación que acaba de crear, en UN
@@ -1103,21 +1105,12 @@ const QUE_QUEDO = `select
   await db.exec(`insert into auth.users(id, email, raw_user_meta_data) values ('${SIN}', 'sin@ejemplo.test', '{"full_name":"Sin Agencia"}');
     delete from public.tenant_members where user_id = '${SIN}';`);
   await falla(db, SIN, `insert into chat_conversations(type, created_by) values ('direct', '${SIN}')`, /chat_sin_agencia/, "con dos agencias, alguien sin agencia no crea conversaciones");
-  // Alguien que está en las dos: puede estar en los dos lados, pero no mezclarlos.
-  await db.exec(`insert into public.tenant_members(user_id, tenant_id, created_at) values ('${CARLA}', '${T2}', now())`);
-  await anda(db, OLGA, `insert into chat_participants(conversation_id, user_id, role) values ('${GO}', '${CARLA}', 'member')`, "Olga suma a Carla, que también es de su agencia");
-  await falla(db, CARLA, `insert into chat_participants(conversation_id, user_id, role) values ('${GO}', '${BETO}', 'member')`, /chat_otra_agencia/, "Carla no mete a Beto (solo de asm-tech) en el grupo de Olga");
-  // ⚠️ Límite conocido (documentado en la migración): la agencia de una conversación
-  // nueva es la membresía MÁS VIEJA de quien la crea. Carla (T1 y T2) no puede
-  // abrirle un directo a Olga (solo T2); Olga a Carla sí. Queda fijado para que el
-  // arreglo, cuando haya dos agencias, se note aquí.
-  const DM_CO = "c2000000-0000-4000-8000-000000000005", DM_OC = "c2000000-0000-4000-8000-000000000006";
-  await anda(db, CARLA, `insert into chat_conversations(id, type, created_by) values ('${DM_CO}', 'direct', '${CARLA}')`, "límite conocido: Carla (T1 y T2) abre un directo…");
-  await anda(db, CARLA, `insert into chat_participants(conversation_id, user_id, role) values ('${DM_CO}', '${CARLA}', 'admin')`, "…entra…");
-  await falla(db, CARLA, `insert into chat_participants(conversation_id, user_id, role) values ('${DM_CO}', '${OLGA}', 'member')`, /chat_otra_agencia: esa persona/, "…y no puede sumar a Olga (solo T2): el directo quedó en T1, su agencia más vieja");
-  await anda(db, OLGA, `insert into chat_conversations(id, type, created_by) values ('${DM_OC}', 'direct', '${OLGA}');`, "límite conocido: al revés, Olga abre el directo…");
-  await anda(db, OLGA, `insert into chat_participants(conversation_id, user_id, role) values ('${DM_OC}', '${OLGA}', 'admin')`, "…entra…");
-  await anda(db, OLGA, `insert into chat_participants(conversation_id, user_id, role) values ('${DM_OC}', '${CARLA}', 'member')`, "…y suma a Carla sin problema");
+  // Alguien en las dos agencias ya no puede existir: una persona es de una sola
+  // (20261001150000_agencias_base, tenant_members_una_agencia). El «límite
+  // conocido» que este banco fijaba aquí (Carla en T1 y T2 no podía abrirle un
+  // directo a Olga, solo de T2) se cerró por la raíz.
+  await falla(db, "postgres", `insert into public.tenant_members(user_id, tenant_id, created_at) values ('${CARLA}', '${T2}', now())`,
+    /tenant_members_una_agencia/, "Carla no puede quedar en dos agencias (ni siquiera como superusuario)");
   // createGroupChat con alguien de otra agencia en la lista: el insert masivo de
   // miembros falla ENTERO (nadie entra) y la app borra la conversación mientras el
   // creador todavía es participante, así no queda huérfana.
