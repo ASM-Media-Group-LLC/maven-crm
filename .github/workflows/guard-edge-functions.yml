@@ -143,6 +143,13 @@ jobs:
       - name: Banco — las personas por agencia (PGlite)
         run: deno run -A --node-modules-dir=none --no-lock supabase/tests/personas_por_agencia.ts
 
+      # Cowork por agencia, sobre el catálogo de PROD del 01/10 (roles + fixtures/prod_cowork_20261001.sql,
+      # con las huellas de las 21 funciones de Cowork): con una agencia cada persona ve lo mismo que
+      # en prod (11 funciones, 13 tablas, 8 salas); con dos, cada cosa se prueba abierta en prod y
+      # cerrada con la migración.
+      - name: Banco — Cowork por agencia (PGlite)
+        run: deno run -A --node-modules-dir=none --no-lock supabase/tests/cowork_por_agencia.ts
+
       # `deno test --no-check` no mira tipos: sin este paso, el tipo de msg() (clave que
       # existe, variables exactas) y los @ts-expect-error de mensajes.test.ts nunca
       # podrían fallar en CI. messenger.test.ts queda afuera: arrastra un error de tipos
