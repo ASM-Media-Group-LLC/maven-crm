@@ -205,7 +205,7 @@ const AdminApiKeys = () => {
   const caras = useCaras(keys.flatMap((k) => [k.acts_as?.id, k.webhook?.paused_by?.id]));
   const catalog = data?.scope_catalog?.length ? data.scope_catalog : FALLBACK_CATALOG;
   const groups = data?.scope_groups?.length ? data.scope_groups : FALLBACK_GROUPS;
-  const maxActive = data?.max_active_keys ?? 3;
+  const maxActive = data?.max_active_keys ?? 5;
   const activeCount = useMemo(() => keys.filter((k) => k.status === "active").length, [keys]);
   const atLimit = activeCount >= maxActive;
 

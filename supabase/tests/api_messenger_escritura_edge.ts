@@ -725,7 +725,7 @@ let primero = "";
   // Jhon y Alvaro, admins de Maven (manage-api-keys es solo para admins).
   await db.exec(`delete from public.user_roles where user_id in ('${JHON}', '${ALVARO}');
     insert into public.user_roles(user_id, role) values ('${JHON}', 'admin'), ('${ALVARO}', 'admin');`);
-  // Hasta 3 keys activas por agencia: quedan «BLU» y lugar para las de esta sección.
+  // Hasta 5 keys activas por agencia: quedan «BLU» y lugar para las de esta sección.
   await db.exec(`update public.api_keys set revoked_at = now() where id in ('${LLAVES.BLU2.id}', '${LLAVES.WEB.id}', '${LLAVES.LEE.id}', '${LLAVES.CREA.id}')`);
   const jwt = async (sub: string) => await firmar({ sub, role: "authenticated", aud: "authenticated", exp: Math.floor(Date.now() / 1000) + 3600 });
   const JWT = { JHON: await jwt(JHON), ALVARO: await jwt(ALVARO) };
