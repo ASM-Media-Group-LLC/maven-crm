@@ -11,9 +11,9 @@ export function idiomaDe(body: unknown): Idioma {
 const MENSAJES = {
   sinSesion: { es: "Unauthorized", en: "Unauthorized" },
   soloAdmins: { es: "Forbidden: solo administradores pueden gestionar API keys", en: "Forbidden: only administrators can manage API keys" },
-  sinAgencia: { es: "Forbidden: no pertenecés a ninguna agencia", en: "Forbidden: you don't belong to any agency" },
+  sinAgencia: { es: "Forbidden: no perteneces a ninguna agencia", en: "Forbidden: you don't belong to any agency" },
   variasAgencias: {
-    es: "Pertenecés a varias agencias; todavía no se puede elegir en cuál gestionar llaves",
+    es: "Perteneces a varias agencias; todavía no se puede elegir en cuál gestionar llaves",
     en: "You belong to several agencies; choosing which one to manage keys for isn't supported yet",
   },
   diasInvalidos: { es: "expires_in_days tiene que ser un número de días entre 0 y 3650", en: "expires_in_days must be a number of days between 0 and 3650" },
@@ -56,6 +56,57 @@ const MENSAJES = {
     en: "Messenger keys can expire in {dias} days at most",
   },
   accionDesconocida: { es: "Acción desconocida: {accion}", en: "Unknown action: {accion}" },
+
+  // ── messenger:write (./escritura.ts; la base los repite con MV422) ──
+  messengerEscrituraSinLectura: {
+    es: "El permiso de escribir en el Messenger va con el de leerlo (messenger:read)",
+    en: "The Messenger write permission requires the read permission (messenger:read)",
+  },
+  messengerEscrituraSoloNuevas: {
+    es: "El permiso de escribir en el Messenger solo se puede poner al crear una key nueva",
+    en: "The Messenger write permission can only be added when creating a new key",
+  },
+  confirmarEscrituraMessenger: {
+    es: "Confirma que la key va a mandar mensajes en el Messenger a TU nombre",
+    en: "Confirm that the key will send Messenger messages on YOUR behalf",
+  },
+  nombreVisibleRequerido: {
+    es: "Una key que escribe en el Messenger necesita un nombre visible: el que verán todos junto a la etiqueta API",
+    en: "A key that writes to the Messenger needs a display name: the one everyone will see next to the API label",
+  },
+  nombreVisibleSinEscritura: {
+    es: "El nombre visible solo va en una key que escribe en el Messenger",
+    en: "A display name only applies to a key that writes to the Messenger",
+  },
+  nombreVisibleForma: {
+    es: "El nombre visible va de 2 a 32 caracteres, con letras, números, espacios y . & _ -",
+    en: "The display name must be 2 to 32 characters long, using letters, numbers, spaces and . & _ -",
+  },
+  nombreVisibleReservado: {
+    es: "Ese nombre visible se parece al de Maven o al de un área (soporte, sistemas, RR. HH., finanzas…): elige otro",
+    en: "That display name looks like Maven's or a department's (support, systems, HR, finance…): choose another one",
+  },
+  nombreVisiblePersona: {
+    es: "Ese nombre visible se parece al de una persona de la agencia: elige otro",
+    en: "That display name looks like the name of someone in the agency: choose another one",
+  },
+  nombreVisibleOcupado: {
+    es: "Otra integración de la agencia ya usó ese nombre visible, aunque su key esté vencida o revocada: elige otro",
+    en: "Another integration in the agency already used that display name, even if its key expired or was revoked: choose another one",
+  },
+  nombreVisibleSoloDueno: {
+    es: "Solo la persona dueña de la key puede cambiar su nombre visible",
+    en: "Only the owner of the key can change its display name",
+  },
+  reemplazoInvalido: {
+    es: "La key que se reemplaza tiene que ser tuya y de esta agencia",
+    en: "The key being replaced must be yours and belong to this agency",
+  },
+  integracionInmutable: { es: "La integración de una key no cambia", en: "A key's integration can't change" },
+  errorAlGuardar: {
+    es: "No se pudo guardar la key. Prueba de nuevo en un momento.",
+    en: "Couldn't save the key. Try again in a moment.",
+  },
 
   // ── webhooks del Messenger (webhooks.ts) ──
   webhookUrlRequerida: { es: "Falta la URL del webhook", en: "The webhook URL is missing" },

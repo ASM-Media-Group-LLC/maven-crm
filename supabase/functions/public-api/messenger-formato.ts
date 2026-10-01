@@ -44,7 +44,7 @@ export type Cursor = { t: string; i: string };
 
 // Solo las dos formas que emite el servidor: la de la base ("+00:00") y la de JS
 // ("Z"). Una zona como "-05" o una fecha imposible ("31 de febrero") no pasan: si
-// pasaran, reventarían más adelante como un 503 "reintentá", y un cliente que
+// pasaran, reventarían más adelante como un 503 "reintenta", y un cliente que
 // obedece Retry-After reintentaría el mismo cursor malo para siempre.
 const MARCA_DE_TIEMPO = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})(\.\d{1,6})?(Z|[+-]\d{2}:\d{2})$/;
 
@@ -136,8 +136,19 @@ export type FilaDeMensaje = {
   is_deleted: boolean;
   created_at: string;
   updated_at: string;
+  /** La marca «vino por API» (migración 20261001200000): la pone la base y no cambia
+   *  nunca. Las dos van juntas: o las dos null (la app) o las dos con valor. */
+  api_key_id: string | null;
+  api_display_name: string | null;
   content_rich?: unknown;
 };
+
+/** Si el mensaje lo mandó una integración, con qué nombre visible («BLU»). `sender`
+ *  sigue siendo la persona real de la key. El id de la key no sale: lo ven todos los
+ *  participantes, y no les sirve para nada. */
+export function viaApi(m: Pick<FilaDeMensaje, "api_key_id" | "api_display_name">) {
+  return m.api_key_id ? { display_name: m.api_display_name ?? null } : null;
+}
 
 export type Persona = { id: string; name: string | null; avatar_url: string | null };
 
@@ -202,6 +213,7 @@ export function mensajeParaApi(
     is_thread_reply: m.is_thread_reply === true,
     is_edited: m.is_edited === true,
     is_deleted: borrado,
+    via_api: viaApi(m),
     created_at: m.created_at,
     updated_at: m.updated_at,
   };
@@ -218,6 +230,7 @@ export function vistaPrevia(m: FilaDeMensaje) {
     text_preview: texto === null ? null : texto.slice(0, 200),
     is_deleted: borrado,
     is_thread_reply: m.is_thread_reply === true,
+    via_api: viaApi(m),
     created_at: m.created_at,
   };
 }

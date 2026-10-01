@@ -20,6 +20,17 @@
 //   GET /public-api/messenger/conversations/:id/messages messenger:read (historia, con cursor)
 //   GET /public-api/messenger/feed                       messenger:read (lo nuevo en todas, con cursor)
 //
+// Escribir en el Messenger (messenger:write, que va siempre con messenger:read):
+//   GET    /public-api/messenger/people                                  a quién se le puede escribir
+//   POST   /public-api/messenger/conversations                           abrir un directo con su primer mensaje
+//   POST   /public-api/messenger/conversations/:id/messages              mandar un mensaje
+//   PATCH  /public-api/messenger/conversations/:id/messages/:messageId   editar lo que mandó la misma integración
+//   DELETE /public-api/messenger/conversations/:id/messages/:messageId   borrarlo
+// Los dos POST exigen Idempotency-Key (72 h). La pared es la BASE (migración
+// 20261001200000_api_messenger_escritura.sql): valida la key del claim `mvk` en cada
+// escritura, cobra los topes y pone la marca «vino por API». Este archivo nunca nombra
+// una tabla del chat ni una RPC de escritura: todo pasa por servirComoUsuario.
+//
 // LÍMITE: 1.000 pedidos por hora por llave (api_keys.limite_por_hora), en ventana
 // fija que se reinicia a la hora en punto, y 60 por minuto (limite_por_minuto) para
 // que no se gasten todos de golpe. Pasado cualquiera de los dos, 429 con
@@ -39,7 +50,7 @@
 // una agencia (`api_keys.tenant_id`, asignada por la base) y cada recurso declara
 // cómo se aísla en `./aislamiento.ts`. Un recurso que no sabe de qué
 // agencia es cada fila se APAGA solo en cuanto Maven tenga más de una. Antes de
-// agregar un endpoint, leé ese archivo: el test te va a obligar a hacerlo igual.
+// agregar un endpoint, lee ese archivo: el test va a obligar a hacerlo igual.
 //
 // IDIOMA. Todo `message` que ve el cliente sale de ./mensajes.ts: en inglés si el
 // pedido lo pide con Accept-Language, en español (el de siempre) si no. El código de
@@ -49,10 +60,21 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 // Local a esta función y no en _shared/: un cambio en _shared/ redespliega TODAS
 // las edge functions, y este módulo solo lo usa public-api.
 import { AISLAMIENTO_POR_RECURSO, decidir, esComoUsuario } from "./aislamiento.ts";
-import { clienteComoUsuario, comoUsuarioConfigurado } from "./como-usuario.ts";
+import { clienteDeLlave, comoUsuarioConfigurado } from "./como-usuario.ts";
 import { servirComoUsuario } from "./recursos-como-usuario.ts";
-import { cabecerasDeCupo, clientIp, ipAllowed } from "./peticion.ts";
+import { cabecerasDeCupo, clientIp, CUERPO_MAX_BYTES, fetchSinReintentos, ipAllowed, leerCuerpo } from "./peticion.ts";
 import { idiomaDelPedido, msg, varyConIdioma } from "./mensajes.ts";
+import { esMetodo, leerCuerpoDeEscritura, leerIdempotencia, METODOS, type ObjetoJson, scopesDeLaRuta } from "./escritura-formato.ts";
+
+// Los plazos de los clientes en una escritura (sin reintentos escondidos: ver
+// fetchSinReintentos). El de service_role cubre buscar la key, el cupo y el conteo de
+// agencias; el de la persona, la RPC de escritura entera (sus candados esperan como
+// mucho 500 ms cada uno).
+const PLAZO_ADMIN_MS = 3_000;
+const PLAZO_YO_MS = 8_000;
+// Si la base tardó más que esto en buscar la key y contar el cupo, una escritura no
+// se intenta (503 writes_paused): con la base lenta, mejor no sumarle carga.
+const BASE_LENTA_MS = 1_500;
 
 const corsHeaders = (req: Request) =>
   corsFor(req, {
@@ -82,7 +104,7 @@ const json = (req: Request, body: unknown, status = 200, extra: Record<string, s
 };
 
 // Un fallo NUESTRO (la base no respondió) no puede verse como "tu llave es
-// inválida" ni como "no tenés permiso": el cliente dejaría de reintentar, o
+// inválida" ni como "no tienes permiso": el cliente dejaría de reintentar, o
 // revocaría una llave que está bien.
 const noDisponible = (req: Request, donde: string, err: unknown) => {
   console.error(`[public-api] ${donde}:`, (err as { message?: string })?.message ?? err);
@@ -168,9 +190,17 @@ function pageParams(url: URL, defLimit = 100, maxLimit = 500) {
 }
 
 Deno.serve(async (req) => {
+  // Antes de buscar la key: lo que tarda la base cuenta desde aquí.
+  const t0 = Date.now();
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders(req) });
-  if (req.method !== "GET") return json(req, { error: "method_not_allowed" }, 405);
   const idioma = idiomaDelPedido(req);
+  const metodo = req.method;
+  if (!esMetodo(metodo)) {
+    return json(req, {
+      error: "method_not_allowed",
+      message: msg(idioma, "metodo_no_permitido", { permitidos: METODOS.join(", ") }),
+    }, 405, { "Allow": METODOS.join(", ") });
+  }
 
   // --- Auth por API key ---
   const authHeader = req.headers.get("Authorization") ?? "";
@@ -180,8 +210,11 @@ Deno.serve(async (req) => {
     return json(req, { error: "unauthorized", message: msg(idioma, "falta_llave") }, 401);
   }
 
+  // En una escritura, sin reintentos escondidos y con plazo (fetchSinReintentos). Las
+  // lecturas siguen como siempre: los recursos viejos no cambian de comportamiento.
   const admin = createClient(
     Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    metodo === "GET" ? {} : { global: { fetch: fetchSinReintentos(PLAZO_ADMIN_MS) } },
   );
 
   const key_hash = await sha256hex(rawKey);
@@ -210,7 +243,7 @@ Deno.serve(async (req) => {
   const need = (s: string) => scopes.includes(s);
 
   // De qué agencia es esta llave. La columna es NOT NULL, así que esto no debería
-  // pasar nunca; si pasa, se corta acá: una llave sin agencia no puede servir nada
+  // pasar nunca; si pasa, se corta aquí: una llave sin agencia no puede servir nada
   // sin arriesgar datos de otra.
   const tenantId = keyRow.tenant_id as string | null;
   if (!tenantId) {
@@ -237,6 +270,9 @@ Deno.serve(async (req) => {
   const { data: consumoFilas, error: consumoErr } = await admin
     .rpc("api_key_consumir", { _id: keyRow.id as string });
   if (consumoErr) console.error("[public-api] límite por hora:", consumoErr.message);
+  // Sin contador, una ESCRITURA no sigue: se corta aquí, antes de api_key_vigente y del
+  // conteo de agencias (una lectura se sirve igual, como siempre).
+  if (consumoErr && metodo !== "GET") return noDisponible(req, "límite por hora (escritura)", consumoErr);
   const consumo: Consumo | null = consumoErr
     ? null
     : ((Array.isArray(consumoFilas) ? consumoFilas[0] : consumoFilas) as Consumo | undefined) ?? null;
@@ -268,6 +304,9 @@ Deno.serve(async (req) => {
     .from("tenants").select("id", { count: "exact", head: true });
   if (agErr) console.error("[public-api] conteo de agencias:", agErr.message);
   const cantidadDeAgencias = agErr ? null : (agencias ?? null);
+  // Cuánto tardó la base en buscar la key, el cupo y el conteo (sin lo que tarde el
+  // cliente en mandar el cuerpo, que se lee después).
+  const demoraDeLaBase = Date.now() - t0;
 
   // --- Routing ---
   const url = new URL(req.url);
@@ -278,6 +317,12 @@ Deno.serve(async (req) => {
   const sub = rest[1] ?? null;
 
   if (!resource) {
+    if (metodo !== "GET") {
+      return json(req, {
+        error: "method_not_allowed",
+        message: msg(idioma, "metodo_no_permitido", { permitidos: "GET" }),
+      }, 405, { "Allow": "GET" });
+    }
     return json(req, {
       object: "api", name: "Maven Public API", version: "v1", your_scopes: scopes,
       // Toda respuesta de esta llave es de esta agencia y de ninguna otra.
@@ -288,6 +333,12 @@ Deno.serve(async (req) => {
         { path: "/messenger/conversations/{id}", scope: "messenger:read" },
         { path: "/messenger/conversations/{id}/messages", scope: "messenger:read" },
         { path: "/messenger/feed", scope: "messenger:read" },
+        // Escribir: messenger:write (que va siempre con messenger:read).
+        { method: "GET", path: "/messenger/people", scope: "messenger:write" },
+        { method: "POST", path: "/messenger/conversations", scope: "messenger:write" },
+        { method: "POST", path: "/messenger/conversations/{id}/messages", scope: "messenger:write" },
+        { method: "PATCH", path: "/messenger/conversations/{id}/messages/{message_id}", scope: "messenger:write" },
+        { method: "DELETE", path: "/messenger/conversations/{id}/messages/{message_id}", scope: "messenger:write" },
         { path: "/creators", scope: "creators:read" },
         { path: "/creators/{id}", scope: "creators:read" },
         { path: "/contacts", scope: "contacts:read" },
@@ -306,7 +357,7 @@ Deno.serve(async (req) => {
   }
 
   // ===== Puerta de aislamiento =====
-  // Todo recurso pasa por acá ANTES de tocar la base. Ver ./aislamiento.ts.
+  // Todo recurso pasa por aquí ANTES de tocar la base. Ver ./aislamiento.ts.
   const recursoClave = resource === "sales" && sub === "chatters" ? "sales/chatters" : resource;
   const veredicto = decidir(recursoClave, cantidadDeAgencias, AISLAMIENTO_POR_RECURSO, idioma);
   if (!veredicto.ok) {
@@ -319,14 +370,52 @@ Deno.serve(async (req) => {
     return json(req, { error: veredicto.error, message: veredicto.motivo }, veredicto.estado);
   }
 
+  // ===== Escrituras: lo que se mira antes de tocar el recurso =====
+  // (1) Solo los recursos como_usuario se escriben; los demás, 405 SIN leer el cuerpo.
+  if (metodo !== "GET" && !esComoUsuario(recursoClave)) {
+    return json(req, {
+      error: "method_not_allowed",
+      message: msg(idioma, "metodo_no_permitido", { permitidos: "GET" }),
+    }, 405, { "Allow": "GET" });
+  }
+  // (2) El cuerpo, solo de un POST/PATCH a una ruta que existe con ese método (lo
+  // demás lo contesta servirComoUsuario: 404 o 405, sin cuerpo). Tope de 64 KB.
+  let cuerpo: ObjetoJson | null = null;
+  const rutaDeEscritura = scopesDeLaRuta(recursoClave, metodo, rest.slice(1));
+  if ((metodo === "POST" || metodo === "PATCH") && rutaDeEscritura.ok) {
+    const leido = await leerCuerpo(req, CUERPO_MAX_BYTES);
+    if (!leido.ok && leido.estado === 413) return json(req, { error: "payload_too_large", message: msg(idioma, "cuerpo_muy_grande") }, 413);
+    if (!leido.ok && leido.estado === 415) return json(req, { error: "unsupported_media_type", message: msg(idioma, "tipo_de_contenido") }, 415);
+    if (!leido.ok) return json(req, { error: "invalid_json", message: msg(idioma, "cuerpo_mal_codificado") }, 400);
+    const objeto = leerCuerpoDeEscritura(leido.texto);
+    if (!objeto.ok && objeto.problema === "json_invalido") return json(req, { error: "invalid_json", message: msg(idioma, "cuerpo_json_invalido") }, 400);
+    if (!objeto.ok) return json(req, { error: "invalid_json", message: msg(idioma, "cuerpo_no_es_objeto") }, 400);
+    cuerpo = objeto.cuerpo;
+  }
+  // (3) La Idempotency-Key de un POST: si vino, que tenga la forma (la exige el handler).
+  let idempotencia: string | null = null;
+  if (metodo === "POST") {
+    const idem = leerIdempotencia(req.headers.get("Idempotency-Key"));
+    if (!idem.ok) return json(req, { error: "invalid_idempotency_key", message: msg(idioma, "idempotencia_invalida") }, 400);
+    idempotencia = idem.valor;
+  }
+  // (4) Con la base lenta, una escritura no se intenta.
+  if (metodo !== "GET" && demoraDeLaBase > BASE_LENTA_MS) {
+    console.error(`[public-api] escritura en pausa: la base tardó ${demoraDeLaBase} ms en la key y el cupo`);
+    return json(req, { error: "writes_paused", message: msg(idioma, "escritura_en_pausa") }, 503, { "Retry-After": "30" });
+  }
+
   // ===== Recursos que actúan como la persona de la llave =====
   // Sin service_role: la pared es la RLS de la base. Ver ./recursos-como-usuario.ts.
   if (esComoUsuario(recursoClave)) {
     if (!consumo?.actua_como) return noDisponible(req, "como quién actúa la llave", consumoErr ?? "sin respuesta");
     if (!comoUsuarioConfigurado()) return noDisponible(req, "sesión como usuario", "falta el secreto MAVEN_JWT_SECRET");
-    let yo: Awaited<ReturnType<typeof clienteComoUsuario>>;
+    // La sesión de la persona de la key, con el id de ESTA key en el claim `mvk` (sale de
+    // la fila encontrada por el hash, nunca del pedido): la base la valida en cada
+    // escritura. Sin reintentos escondidos y con plazo.
+    let yo: Awaited<ReturnType<typeof clienteDeLlave>>;
     try {
-      yo = await clienteComoUsuario(consumo.actua_como);
+      yo = await clienteDeLlave(consumo.actua_como, keyRow.id as string, { fetch: fetchSinReintentos(PLAZO_YO_MS) });
     } catch (e) {
       return noDisponible(req, "sesión como usuario", e);
     }
@@ -346,13 +435,28 @@ Deno.serve(async (req) => {
         baseDeArchivos: Deno.env.get("SUPABASE_URL") ?? "",
         cupo: { limite: consumo.limite, restantes: consumo.restantes, reinicio: consumo.reinicio },
         idioma,
+        metodo,
+        cuerpo,
+        idempotencia,
       });
     } catch (e) {
-      // Una caída de red hacia la base no puede salir como un 500 sin CORS.
+      // Una caída de red hacia la base no puede salir como un 500 sin CORS. Y en una
+      // escritura no se sabe si llegó a hacerse: se dice así (lección #1868).
+      if (metodo !== "GET") {
+        console.error(`[public-api] /${recursoClave} (${metodo}):`, (e as { message?: string })?.message ?? e);
+        return json(req, { error: "outcome_unknown", message: msg(idioma, "resultado_incierto") }, 503, { "Retry-After": "5" });
+      }
       return noDisponible(req, `/${recursoClave}`, e);
     }
-    if (r.ok) return json(req, r.cuerpo);
-    if (r.estado === 503) return noDisponible(req, `/${recursoClave}`, r.detalle);
+    if (r.ok) return json(req, r.cuerpo, r.estado);
+    if ("detalle" in r) return noDisponible(req, `/${recursoClave}`, r.detalle);
+    if (r.estado === 405) return json(req, { error: r.error, message: r.mensaje }, 405, { "Allow": r.permitidos.join(", ") });
+    if (r.estado === 429) {
+      return json(req, { error: r.error, message: r.mensaje, limit: r.limite, retry_after: r.reintentarEnSeg }, 429, {
+        "Retry-After": String(r.reintentarEnSeg),
+      });
+    }
+    if (r.estado === 503) return json(req, { error: r.error, message: r.mensaje }, 503, { "Retry-After": String(r.reintentarEnSeg) });
     return json(req, { error: r.error, message: r.mensaje }, r.estado);
   }
 

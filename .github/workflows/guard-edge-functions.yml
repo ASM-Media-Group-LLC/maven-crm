@@ -69,6 +69,7 @@ jobs:
           supabase/functions/manage-api-keys/index.ts
           supabase/functions/manage-api-keys/webhooks.test.ts
           supabase/functions/manage-api-keys/mensajes.test.ts
+          supabase/functions/manage-api-keys/escritura.test.ts
 
       # El despachador de timbres, con tipos (las acciones y clases de los logs son
       # uniones cerradas; y lineaDeLog además limpia en tiempo de ejecución).
@@ -109,6 +110,14 @@ jobs:
       - name: Banco — la escritura del Messenger por API (PGlite)
         run: deno run -A --node-modules-dir=none --no-lock supabase/tests/api_messenger_escritura.ts
 
+      # La escritura de PUNTA A PUNTA (PR 4): el public-api de verdad (su Deno.serve
+      # capturado, sin red) contra la misma base, con supabase-js en el medio y un
+      # PostgREST mínimo que verifica el JWT y corre con su rol y sus claims. Prueba que
+      # el token del edge (mvf + mvk) es el que la base reconoce, que las RPC y sus
+      # parámetros son los de la migración y que cada código de la base sale bien por HTTP.
+      - name: Banco — la escritura de punta a punta, edge + base (PGlite)
+        run: deno run -A --node-modules-dir=none --no-lock supabase/tests/api_messenger_escritura_edge.ts
+
       # `deno test --no-check` no mira tipos: sin este paso, el tipo de msg() (clave que
       # existe, variables exactas) y los @ts-expect-error de mensajes.test.ts nunca
       # podrían fallar en CI. messenger.test.ts queda afuera: arrastra un error de tipos
@@ -122,3 +131,4 @@ jobs:
           supabase/functions/public-api/mensajes.test.ts
           supabase/functions/public-api/peticion.test.ts
           supabase/functions/public-api/recursos-como-usuario.test.ts
+          supabase/functions/public-api/escritura-formato.test.ts

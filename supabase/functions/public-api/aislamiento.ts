@@ -8,7 +8,7 @@
 // cualquier llave le habría devuelto a una los ingresos, el pipeline comercial y
 // los empleados de la otra.
 //
-// LA REGLA. Cada recurso declara acá cómo se aísla. El router de public-api no
+// LA REGLA. Cada recurso declara aquí cómo se aísla. El router de public-api no
 // sirve un recurso que no esté en este mapa, y el test lee public-api/index.ts y
 // falla si aparece una tabla o función que nadie declaró.
 //
@@ -79,14 +79,16 @@ export const AISLAMIENTO_POR_RECURSO: MapaDeAislamiento = congelar({
   // Quién es la llave: la persona como la que actúa y su agencia. Sirve para probar
   // en vivo que la sesión fabricada funciona antes de abrir nada más sobre ella.
   me: { tipo: "como_usuario" },
-  // Las conversaciones de la persona de la llave, leídas con SU sesión: la RLS del
-  // Messenger es por participación, como en la app. Pero nada en la base impide
-  // todavía una conversación con gente de OTRA agencia, así que con dos o más se
-  // apaga.
+  // Las conversaciones de la persona de la llave, leídas y escritas con SU sesión: la
+  // RLS del Messenger es por participación, como en la app, y cada conversación tiene
+  // su agencia (migración A). Pero quién es de qué agencia sale de tenant_members, que
+  // todavía no dice la verdad, así que con dos o más agencias se apaga. La base, por su
+  // lado, también apaga la escritura por API con dos o más (api_llave_valida y
+  // api_escritura_habilitada): eso es un segundo cerrojo, no el aislamiento.
   messenger: {
     tipo: "como_usuario",
-    pendienteConVariasAgencias: "la base todavía no impide sumar a una conversación a alguien de otra " +
-      "agencia (la política INSERT de chat_participants no mira la agencia del agregado)",
+    pendienteConVariasAgencias: "tenant_members todavía no dice la verdad (handle_new_user mete a toda " +
+      "cuenta nueva en la agencia original); la base también apaga la escritura por API con 2 o más agencias",
   },
   sales: {
     tipo: "sin_agencia",
@@ -146,7 +148,7 @@ export function esComoUsuario(
 
 /** Cada tabla/función de datos que toca public-api, y a qué recurso pertenece. */
 export const FUENTES_POR_RECURSO: Record<string, string[]> = {
-  me: ["profiles", "current_tenant_id"],
+  me: ["profiles", "current_tenant_id", "api_mi_llave"],
   messenger: [
     "chat_participants",
     "chat_conversations",
@@ -156,6 +158,13 @@ export const FUENTES_POR_RECURSO: Record<string, string[]> = {
     "profiles",
     "get_last_messages",
     "messenger_unread_counts",
+    // La escritura (migración 20261001200000): RPC INVOKER que corren con la sesión de
+    // la persona, más el directorio, que pide messenger:write.
+    "messenger_directorio",
+    "api_messenger_enviar",
+    "api_messenger_abrir_directo",
+    "api_messenger_editar",
+    "api_messenger_borrar",
   ],
   sales: ["creator_daily_earnings"],
   employees: ["profiles", "user_roles"],
@@ -186,7 +195,7 @@ export type Veredicto =
  *  Tres salidas distintas, porque le dicen cosas distintas al cliente:
  *   - 404: el recurso no existe (o no declaró cómo aísla, que para el caso es igual).
  *   - 403: hay más de una agencia y este recurso no puede separarlas. No reintentes.
- *   - 503: no pudimos verificarlo. Es un problema NUESTRO; reintentá.
+ *   - 503: no pudimos verificarlo. Es un problema NUESTRO; reintenta.
  *  Cerrado siempre, pero sin mentir sobre por qué. */
 export function decidir(
   recurso: string,
@@ -210,7 +219,7 @@ export function decidir(
       ok: false,
       estado: 403,
       error: "resource_unavailable",
-      // String(): acá `pendiente` nunca es undefined (se retornó arriba), pero el tipo
+      // String(): aquí `pendiente` nunca es undefined (se retornó arriba), pero el tipo
       // no lo sabe; así sale igual que el template de antes.
       motivo: msg(idioma, "recurso_sin_aislamiento", { pendiente: String(pendiente) }),
     };

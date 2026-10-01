@@ -37,3 +37,18 @@ Deno.test("index.ts no devuelve textos escritos a mano: todo pasa por los mensaj
     !/^m\(/.test(e) && !/^\w+\.message$/.test(e) && e !== '"Unauthorized"' && !/^String\(/.test(e));
   assertEquals(aMano, [], "hay mensajes escritos a mano en manage-api-keys/index.ts");
 });
+
+Deno.test("el español es neutro (sin voseo), y la guarda puede fallar", () => {
+  // La misma lista de formas concretas que frontend/src/test/i18n/sinVoseo.test.ts (que
+  // no mira las edge functions). Si falla, se corrige el texto, no la lista.
+  const VOSEO = [
+    "vos", "sos", "acá", "podés", "tenés", "querés", "sabés", "hacés", "ponés", "decís", "usás", "necesitás",
+    "pertenecés", "creá", "usá", "probá", "volvé", "registrá", "borrá", "elegí", "hacé", "poné", "mandá", "agregá",
+    "guardá", "cambiá", "confirmá", "revisá", "intentá", "reintentá", "esperá", "actualizá", "tocá", "abrí", "cerrá",
+    "leé", "dejá", "buscá", "activá", "reanudá", "verificá", "pedile", "avisale", "decile", "fijate", "borralo", "revocala",
+  ];
+  const patron = new RegExp(`(?<![\\p{L}])(${VOSEO.join("|")})(?![\\p{L}])`, "iu");
+  const malas = Object.entries(TODOS_LOS_MENSAJES).filter(([, par]) => patron.test(par.es)).map(([k, par]) => `${k}: ${par.es}`);
+  assertEquals(malas, [], "pasar a tú neutro (perteneces, prueba, aquí…)");
+  assert(patron.test("Forbidden: no pertenecés a ninguna agencia") && !patron.test("Forbidden: no perteneces a ninguna agencia"));
+});
