@@ -137,6 +137,12 @@ jobs:
       - name: Banco — los roles por agencia (PGlite)
         run: deno run -A --node-modules-dir=none --no-lock supabase/tests/roles_por_agencia.ts
 
+      # Las personas por agencia, sobre los fixtures de PROD (Messenger 28/09 y API 01/10):
+      # los perfiles, el «Para» del Correo y el karma, cada uno abierto en prod y cerrado
+      # con las migraciones; con una agencia, cada persona ve lo mismo que en prod.
+      - name: Banco — las personas por agencia (PGlite)
+        run: deno run -A --node-modules-dir=none --no-lock supabase/tests/personas_por_agencia.ts
+
       # `deno test --no-check` no mira tipos: sin este paso, el tipo de msg() (clave que
       # existe, variables exactas) y los @ts-expect-error de mensajes.test.ts nunca
       # podrían fallar en CI. messenger.test.ts queda afuera: arrastra un error de tipos
