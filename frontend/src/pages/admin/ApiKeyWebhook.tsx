@@ -863,6 +863,9 @@ content-type: application/json
         <p><ConFormato texto={t("apiKeys.docs.webhooks.guarantees")} /></p>
         <p className="rounded-md border border-warning/40 bg-warning/5 p-2 text-foreground"><ConFormato texto={t("apiKeys.docs.webhooks.fallback")} /></p>
         <p><ConFormato texto={t("apiKeys.docs.webhooks.limits")} /></p>
+        {/* Una integración que contesta lo que le llega por el webhook puede entrar en
+            ronda con otra: exclude_own y el corte conversation_loop de la base. */}
+        <p data-docs-rondas><ConFormato texto={t("apiKeys.docs.webhooks.loops")} /></p>
       </div>
       <div className="mb-1 mt-3 font-medium">{t("apiKeys.docs.webhooks.example")}</div>
       <div className="rounded-md border border-border/60 bg-background p-3">

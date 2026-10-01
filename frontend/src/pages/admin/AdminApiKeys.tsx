@@ -1,7 +1,7 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  KeyRound, Plus, Check, Loader2, ShieldAlert, Trash2, Pencil, BookOpen, ExternalLink, X,
+  KeyRound, Plus, Check, Loader2, ShieldAlert, Trash2, Pencil, BookOpen, ExternalLink, X, MessageSquareX,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -25,6 +25,11 @@ import type { TranslationKey } from "@/lib/i18n";
 import { ConFormato, CopyButton, Persona } from "./apiKeysPiezas";
 import { useCaras } from "./carasDePersonas";
 import { CeldaWebhook, DialogoWebhook, DocsWebhooks, type WebhookResumen } from "./ApiKeyWebhook";
+import { AvisoVersionesViejas, DialogoRetirada } from "./ApiKeyEscritura";
+import {
+  SCOPE_MESSENGER_ESCRITURA, alternarScope, esScopeDeEscritura, esScopeMessenger, escribe, escribioAlgunaVez,
+  normalizarNombreVisible, problemaDelNombreVisible, type ProblemaDelNombre,
+} from "./apiKeysEscritura";
 
 // Settings → Administración → API keys (SOLO admins).
 // Gestión de la API pública de Maven, estilo Infloww: tabla + modal agrupado por
@@ -46,6 +51,10 @@ type ApiKey = {
   /** Su webhook del Messenger (a lo sumo uno). null = no tiene; undefined = el
    *  servidor no lo mandó (se trata como "no se sabe"). */
   webhook?: WebhookResumen | null;
+  /** messenger:write: el nombre con el que salen sus mensajes («BLU»). Es un DATO: no
+   *  se traduce. Y la integración (la comparten las keys de una rotación). */
+  api_display_name?: string | null;
+  integracion_id?: string;
 };
 type ListResp = {
   keys: ApiKey[]; scope_catalog: ScopeDef[]; scope_groups: string[]; max_active_keys: number;
@@ -55,9 +64,9 @@ type ListResp = {
   webhooks_unknown?: boolean;
 };
 
-// Leen conversaciones privadas: IPs exactas, vencimiento de 90 días como máximo y
-// solo en keys nuevas (decisión del 25/09; manage-api-keys y la base lo exigen).
-const SCOPE_MESSENGER = "messenger:read";
+// Los del Messenger (leer y escribir) van con IPs exactas, vencimiento de 90 días como
+// máximo y solo en keys nuevas (decisión del 25/09; manage-api-keys y la base lo
+// exigen). Ver esScopeMessenger en ./apiKeysEscritura.
 const DIAS_MESSENGER = [30, 90];
 
 // Por si el servidor no manda el catálogo: solo claves y grupos (los grupos son
@@ -89,6 +98,18 @@ const TEXTOS_SCOPE: Record<string, { label: TranslationKey; desc: TranslationKey
   "sales:chatters": { label: "apiKeys.scope.salesChatters.label", desc: "apiKeys.scope.salesChatters.desc" },
   "promolog:read": { label: "apiKeys.scope.promolog.label", desc: "apiKeys.scope.promolog.desc" },
   "messenger:read": { label: "apiKeys.scope.messenger.label", desc: "apiKeys.scope.messenger.desc" },
+  "messenger:write": { label: "apiKeys.scope.messengerWrite.label", desc: "apiKeys.scope.messengerWrite.desc" },
+};
+
+const TEXTO_DEL_NOMBRE: Record<ProblemaDelNombre, TranslationKey> = {
+  vacio: "apiKeys.form.displayName.required",
+  forma: "apiKeys.form.displayName.format",
+  reservado: "apiKeys.form.displayName.reserved",
+};
+const TEXTO_DEL_ESTADO: Record<ApiKey["status"], TranslationKey> = {
+  active: "apiKeys.status.active",
+  revoked: "apiKeys.status.revoked",
+  expired: "apiKeys.status.expired",
 };
 const TEXTOS_GRUPO: Record<string, TranslationKey> = {
   Creadoras: "apiKeys.group.Creadoras",
@@ -101,6 +122,14 @@ const TEXTOS_GRUPO: Record<string, TranslationKey> = {
 
 const API_BASE =
   `${import.meta.env.VITE_SUPABASE_URL ?? "https://lsagslbkliprespbyhts.supabase.co"}/functions/v1/public-api`;
+
+// Mandar un mensaje: los dos encabezados que exige un POST de escritura. La
+// Idempotency-Key se genera una por mensaje y se repite tal cual en cada reintento.
+const EJEMPLO_ESCRITURA = `curl -X POST "${API_BASE}/messenger/conversations/{id}/messages" \\
+  -H "Authorization: Bearer mvk_live_..." \\
+  -H "Content-Type: application/json" \\
+  -H "Idempotency-Key: 6f1c2e0a-report-2026-10-01" \\
+  -d '{"text": "Daily report is ready", "reply_to_id": null, "thread": false}'`;
 
 const EXPIRY_OPTIONS: { label: TranslationKey; days: number }[] = [
   { label: "apiKeys.form.exp30", days: 30 },
@@ -148,6 +177,23 @@ const AdminApiKeys = () => {
   const [ipText, setIpText] = useState("");
   const [expiryDays, setExpiryDays] = useState<number>(30); // -1 = mantener (solo edición)
   const [confirmaMessenger, setConfirmaMessenger] = useState(false);
+  // messenger:write: el nombre visible, la key que esta reemplaza (rotación) y la
+  // confirmación propia (acknowledge_messenger_writes_as).
+  const [nombreVisible, setNombreVisible] = useState("");
+  const [reemplazaA, setReemplazaA] = useState("");
+  const [confirmaEscritura, setConfirmaEscritura] = useState(false);
+  // El último error del servidor al guardar, en sus palabras (ya traducido): queda a
+  // la vista mientras se corrige, no solo en el aviso que se va.
+  const [errorAlGuardar, setErrorAlGuardar] = useState<string | null>(null);
+  // De qué key se retira lo que mandó. `vez` remonta el diálogo en cada apertura.
+  const [retirarDe, setRetirarDe] = useState<{ llave: ApiKey; vez: number } | null>(null);
+  // El nombre que trajo la rotación (no lo escribió la persona): al cambiar de key o
+  // volver a «Ninguna» se cambia o se quita. Si lo tocó, queda el suyo.
+  const nombreTraido = useRef<string | null>(null);
+  // Cualquier cambio en el formulario deja atrás el error: era del intento anterior
+  // (no solo el nombre: también las IPs, el vencimiento o los scopes).
+  useEffect(() => { setErrorAlGuardar(null); },
+    [name, scopes, ipMode, ipText, expiryDays, confirmaMessenger, nombreVisible, reemplazaA, confirmaEscritura]);
   const createMutPendiente = useRef(false);
 
   const { data, isLoading, isError, error, refetch } = useQuery({
@@ -166,9 +212,19 @@ const AdminApiKeys = () => {
   const parseIps = () =>
     ipMode === "none" ? [] : ipText.split(/[\n,]/).map((s) => s.trim()).filter(Boolean);
 
-  const conMessenger = scopes.includes(SCOPE_MESSENGER);
-  // En edición, Messenger solo se puede conservar o sacar, nunca sumar.
-  const teniaMessenger = !!editing?.scopes.includes(SCOPE_MESSENGER);
+  const conMessenger = scopes.some(esScopeMessenger);
+  const conEscritura = escribe(scopes);
+  // El nombre visible: en el alta, siempre que escriba; al editar, solo si cambió (el
+  // de hoy ya lo aceptó la base).
+  const nombreVisibleOriginal = editing?.api_display_name ?? null;
+  const nombreVisibleCambio = modalMode === "create" || normalizarNombreVisible(nombreVisible) !== (nombreVisibleOriginal ?? "");
+  const problemaDelNombre = conEscritura && nombreVisibleCambio ? problemaDelNombreVisible(nombreVisible) : null;
+  // La rotación: otra key de la MISMA persona que escribía (también revocada, vencida o
+  // ya sin write: es justo cuando se la reemplaza, y su nombre no lo puede usar otra). El servidor vuelve a exigir persona y agencia.
+  const reemplazables = useMemo(
+    () => keys.filter((k) => escribioAlgunaVez(k) && !!data?.you?.id && k.acts_as?.id === data.you.id),
+    [keys, data?.you?.id],
+  );
   // Sin nombre (perfil sin full_name) no se arma "ALL of you's": hay una frase propia.
   const yoNombre = data?.you?.name?.trim() || null;
   // En español manda el texto del servidor (es la fuente); en inglés, o si el
@@ -183,12 +239,16 @@ const AdminApiKeys = () => {
   const resetForm = () => {
     setName(""); setScopes(["creators:read"]); setIpMode("none"); setIpText(""); setExpiryDays(30); setFreshKey(null);
     setConfirmaMessenger(false);
+    setNombreVisible(""); setReemplazaA(""); setConfirmaEscritura(false); setErrorAlGuardar(null);
+    nombreTraido.current = null;
   };
   const openCreate = () => { resetForm(); setEditing(null); setModalMode("create"); };
   const openEdit = (k: ApiKey) => {
     setEditing(k); setName(k.name); setScopes(k.scopes);
     setIpMode(k.ip_whitelist?.length ? "restrict" : "none");
     setIpText((k.ip_whitelist ?? []).join("\n"));
+    setNombreVisible(k.api_display_name ?? ""); setReemplazaA(""); setConfirmaEscritura(false); setErrorAlGuardar(null);
+    nombreTraido.current = null;
     setExpiryDays(-1); setFreshKey(null); setModalMode("edit");
   };
   // Con el alta en vuelo no se cierra: la key llega UNA vez y, con el modal cerrado,
@@ -214,6 +274,12 @@ const AdminApiKeys = () => {
         expires_at: expiryDays === 0 ? null : new Date(Date.now() + expiryDays * 86400_000).toISOString(),
         // Solo si la persona lo confirmó en la pantalla: sin esto el servidor no la crea.
         ...(conMessenger && confirmaMessenger && data?.you?.id ? { acknowledge_messenger_reads_as: data.you.id } : {}),
+        // messenger:write: el nombre visible (lo valida la base), la rotación y la
+        // confirmación de que escribirá a SU nombre (el servidor exige que sea la de
+        // quien la crea). Sin write no se manda nada de esto.
+        ...(conEscritura ? { display_name: normalizarNombreVisible(nombreVisible) } : {}),
+        ...(conEscritura && reemplazaA ? { replaces_key_id: reemplazaA } : {}),
+        ...(conEscritura && confirmaEscritura && data?.you?.id ? { acknowledge_messenger_writes_as: data.you.id } : {}),
       }),
     // La key entera viaja UNA vez: vive en freshKey y la mutación la suelta (si no,
     // quedaba en la MutationCache mientras la página siguiera abierta).
@@ -221,7 +287,10 @@ const AdminApiKeys = () => {
     // Sin red no se pausa (el modal quedaba sin poder cerrarse): falla enseguida.
     networkMode: "always",
     onSuccess: (res) => { setFreshKey(res.key); qc.invalidateQueries({ queryKey: ["api-keys"] }); toast.success(t("apiKeys.toast.created")); },
-    onError: (e) => toast.error((e as Error)?.message ?? t("apiKeys.toast.createFailed")),
+    onError: (e) => {
+      const m = (e as Error)?.message || t("apiKeys.toast.createFailed");
+      setErrorAlGuardar(m); toast.error(m);
+    },
     onSettled: () => { createMutPendiente.current = false; queueMicrotask(() => createMut.reset()); },
   });
 
@@ -232,10 +301,15 @@ const AdminApiKeys = () => {
       // Con Messenger, al editar el vencimiento solo se mantiene (la pantalla no ofrece
       // otra cosa): no se manda aunque quede elegido de antes de volver a tildarlo.
       if (exp !== undefined && !conMessenger) patch.expires_at = exp;
+      // El nombre visible solo si sigue escribiendo y cambió (lo cambia solo su persona).
+      if (conEscritura && nombreVisibleCambio) patch.display_name = normalizarNombreVisible(nombreVisible);
       return adminInvoke("manage-api-keys", patch);
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["api-keys"] }); toast.success(t("apiKeys.toast.updated")); closeModal(); },
-    onError: (e) => toast.error((e as Error)?.message ?? t("apiKeys.toast.updateFailed")),
+    onError: (e) => {
+      const m = (e as Error)?.message || t("apiKeys.toast.updateFailed");
+      setErrorAlGuardar(m); toast.error(m);
+    },
   });
 
   const revokeMut = useMutation({
@@ -245,15 +319,31 @@ const AdminApiKeys = () => {
   });
 
   const toggleScope = (k: string) => {
-    const activa = !scopes.includes(k);
-    setScopes((prev) => prev.includes(k) ? prev.filter((s) => s !== k) : [...prev, k]);
-    if (k === SCOPE_MESSENGER && activa) {
+    // write va con read: tildar write tilda read, y destildar read destilda write.
+    const nuevos = alternarScope(scopes, k);
+    setScopes(nuevos);
+    const habia = scopes.some(esScopeMessenger);
+    const hay = nuevos.some(esScopeMessenger);
+    if (hay && !habia) {
       // Messenger exige IPs fijas y vencimiento corto: se ponen solos.
       setIpMode("restrict");
       if (modalMode === "create" && !DIAS_MESSENGER.includes(expiryDays)) setExpiryDays(30);
       if (modalMode === "edit") setExpiryDays(-1);
     }
-    if (k === SCOPE_MESSENGER && !activa) setConfirmaMessenger(false);
+    if (!hay) setConfirmaMessenger(false);
+    if (!escribe(nuevos)) { setConfirmaEscritura(false); setReemplazaA(""); nombreTraido.current = null; }
+  };
+
+  // La rotación trae el nombre visible de la key reemplazada (el servidor hace lo mismo
+  // si no viene otro); se puede cambiar.
+  const elegirReemplazo = (id: string) => {
+    setReemplazaA(id);
+    const traido = reemplazables.find((k) => k.id === id)?.api_display_name ?? null;
+    if (traido) { setNombreVisible(traido); nombreTraido.current = traido; return; }
+    // Volver a «Ninguna»: el nombre que trajo la key anterior se quita (el servidor lo
+    // rechaza, ya es de otra integración); el que escribió la persona queda.
+    if (nombreTraido.current !== null && nombreVisible === nombreTraido.current) setNombreVisible("");
+    nombreTraido.current = null;
   };
 
   const submitting = createMut.isPending || updateMut.isPending;
@@ -261,8 +351,11 @@ const AdminApiKeys = () => {
     ipMode === "restrict" && parseIps().length > 0 && !ipsConRango &&
     (modalMode === "edit" ? true : confirmaMessenger && DIAS_MESSENGER.includes(expiryDays))
   );
+  const reglasEscrituraOk = !conEscritura || (
+    problemaDelNombre === null && (modalMode === "edit" ? true : confirmaEscritura && !!data?.you?.id)
+  );
   const canSubmit = name.trim() && scopes.length > 0 && !submitting &&
-    (ipMode === "none" || parseIps().length > 0) && reglasMessengerOk;
+    (ipMode === "none" || parseIps().length > 0) && reglasMessengerOk && reglasEscrituraOk;
 
   return (
     <div className="space-y-5 p-6 lg:p-8">
@@ -352,7 +445,17 @@ const AdminApiKeys = () => {
                     <td data-label={t("apiKeys.col.key")} className="px-4 py-3"><code className="whitespace-nowrap rounded bg-muted px-1.5 py-0.5 text-xs">{k.key_prefix}…{k.last_four ?? ""}</code></td>
                     <td data-label={t("apiKeys.col.created")} className="px-4 py-3 whitespace-nowrap text-muted-foreground">{fmt(k.created_at, f.intl("es-CO"))}</td>
                     <td data-label={t("apiKeys.col.createdBy")} className="px-4 py-3 whitespace-nowrap text-muted-foreground">{k.created_by_email ?? "—"}</td>
-                    <td data-label={t("apiKeys.col.actsAs")} className="px-4 py-3 whitespace-nowrap text-muted-foreground">{k.acts_as ? <Persona nombre={k.acts_as.name} cara={caras.get(k.acts_as.id)} /> : "—"}</td>
+                    <td data-label={t("apiKeys.col.actsAs")} className="px-4 py-3 whitespace-nowrap text-muted-foreground">
+                      {k.acts_as ? (
+                        <span className="inline-flex min-w-0 max-w-full items-center gap-1.5">
+                          <Persona nombre={k.acts_as.name} cara={caras.get(k.acts_as.id)} />
+                          {/* «Jhon Lopez · como «BLU»»: el nombre visible es un dato, no se traduce. */}
+                          {escribe(k.scopes) && k.api_display_name && (
+                            <span className="truncate" data-nombre-visible>· {t("apiKeys.actsAsDisplayName", { name: k.api_display_name })}</span>
+                          )}
+                        </span>
+                      ) : "—"}
+                    </td>
                     <td data-label={t("apiKeys.col.ipWhitelist")} className="px-4 py-3 text-muted-foreground">
                       {k.ip_whitelist?.length ? (
                         <span title={k.ip_whitelist.join(", ")}>{k.ip_whitelist.length} IP{k.ip_whitelist.length > 1 ? "s" : ""}</span>
@@ -385,9 +488,18 @@ const AdminApiKeys = () => {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
+                        {/* En toda key que escribe o escribió, también revocada, vencida o
+                            sin write: es justo cuando hace falta limpiar lo que mandó. */}
+                        {escribioAlgunaVez(k) && (
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive"
+                            onClick={() => setRetirarDe((antes) => ({ llave: k, vez: (antes?.vez ?? 0) + 1 }))}
+                            title={t("apiKeys.withdraw.button")} aria-label={t("apiKeys.withdraw.button")}>
+                            <MessageSquareX className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                         {k.status === "active" && (
                           <>
-                            {!(k.scopes.includes(SCOPE_MESSENGER) && data?.you?.id && k.acts_as?.id !== data.you.id) && (
+                            {!(k.scopes.some(esScopeMessenger) && data?.you?.id && k.acts_as?.id !== data.you.id) && (
                               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(k)} title={t("common.edit")}>
                                 <Pencil className="h-3.5 w-3.5" />
                               </Button>
@@ -407,6 +519,9 @@ const AdminApiKeys = () => {
           </div>
         </Card>
       )}
+
+      {/* Retirar lo que mandó una integración (en tandas, con confirmación) */}
+      {retirarDe && <DialogoRetirada key={retirarDe.vez} llave={retirarDe.llave} onCerrar={() => setRetirarDe(null)} />}
 
       {/* Webhook de una key: registrar, estado y entregas */}
       <DialogoWebhook key={webhookDe?.vez ?? 0} abierto={webhookAbierto}
@@ -511,7 +626,9 @@ const AdminApiKeys = () => {
                         <div className="mb-2 text-sm font-semibold">{nombreGrupo(group)}</div>
                         <div className="space-y-1.5">
                           {items.map((s) => {
-                            const bloqueado = s.key === SCOPE_MESSENGER && modalMode === "edit" && !teniaMessenger;
+                            // En edición, Messenger solo se puede conservar o sacar, nunca sumar:
+                            // un scope del Messenger que la key no tenía no se tilda.
+                            const bloqueado = esScopeMessenger(s.key) && modalMode === "edit" && !editing?.scopes.includes(s.key);
                             return (
                             <label key={s.key}
                               className={`flex items-start gap-2.5 rounded-md p-1.5 ${bloqueado ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:bg-muted/30"}`}
@@ -521,7 +638,9 @@ const AdminApiKeys = () => {
                               <span className="min-w-0 flex-1">
                                 <span className="flex items-center justify-between gap-2">
                                   <span className="text-sm font-medium">{etiquetaScope(s)}</span>
-                                  <span className="shrink-0 text-xs text-muted-foreground">{t("apiKeys.form.readOnly")}</span>
+                                  {esScopeDeEscritura(s.key)
+                                    ? <span className="shrink-0 text-xs font-medium text-destructive">{t("apiKeys.form.writes")}</span>
+                                    : <span className="shrink-0 text-xs text-muted-foreground">{t("apiKeys.form.readOnly")}</span>}
                                 </span>
                                 <span className="block text-xs text-muted-foreground"><ConFormato texto={descripcionScope(s)} /></span>
                                 <code className="text-[10px] text-muted-foreground">{s.key}</code>
@@ -534,6 +653,40 @@ const AdminApiKeys = () => {
                     );
                   })}
                 </div>
+
+                {/* messenger:write: el nombre visible (y, al crear, a qué key reemplaza) */}
+                {conEscritura && (
+                  <div className="space-y-3 rounded-lg border border-border/60 bg-muted/10 p-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="key-display-name">{t("apiKeys.form.displayName")}</Label>
+                      <Input id="key-display-name" placeholder={t("apiKeys.form.displayNamePlaceholder")} value={nombreVisible}
+                        maxLength={64} aria-invalid={problemaDelNombre !== null && nombreVisible !== ""}
+                        aria-describedby="key-display-name-hint"
+                        onChange={(e) => { setNombreVisible(e.target.value); setErrorAlGuardar(null); }} />
+                      {/* En el alta, vacío todavía no es un error que se marque (no escribió
+                          nada). Al editar sí: lo borró y «Guardar» se apaga, hay que decir por qué. */}
+                      {problemaDelNombre && (nombreVisible !== "" || modalMode === "edit") && (
+                        <p className="text-xs text-destructive" data-error-nombre-visible>{t(TEXTO_DEL_NOMBRE[problemaDelNombre])}</p>
+                      )}
+                      <p id="key-display-name-hint" className="text-xs text-muted-foreground">{t("apiKeys.form.displayNameHint")}</p>
+                    </div>
+                    {modalMode === "create" && reemplazables.length > 0 && (
+                      <div className="space-y-1.5">
+                        <Label htmlFor="key-replaces">{t("apiKeys.form.replaces")}</Label>
+                        <select id="key-replaces" value={reemplazaA} onChange={(e) => elegirReemplazo(e.target.value)}
+                          className="w-full rounded-md border border-border/60 bg-background p-2 text-sm">
+                          <option value="">{t("apiKeys.form.replacesNone")}</option>
+                          {reemplazables.map((k) => (
+                            <option key={k.id} value={k.id}>
+                              {t("apiKeys.form.replacesOption", { name: k.name, display: k.api_display_name ?? "—", status: t(TEXTO_DEL_ESTADO[k.status]) })}
+                            </option>
+                          ))}
+                        </select>
+                        <p className="text-xs text-muted-foreground">{t("apiKeys.form.replacesHint")}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
               {conMessenger && modalMode === "create" && (
                 <div className="mt-4 space-y-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">
@@ -549,6 +702,23 @@ const AdminApiKeys = () => {
                     <span>{t("apiKeys.form.messengerConfirm")}</span>
                   </label>
                 </div>
+              )}
+              {conEscritura && modalMode === "create" && (
+                <div className="mt-3 space-y-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm" data-confirma-escritura>
+                  <p className="font-medium text-foreground">
+                    {yoNombre ? t("apiKeys.form.writeTitle", { name: yoNombre }) : t("apiKeys.form.writeTitleYou")}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{t("apiKeys.form.writeBody")}</p>
+                  <label className="flex cursor-pointer items-start gap-2 text-xs">
+                    <input type="checkbox" className="mt-0.5 h-4 w-4 accent-destructive"
+                      checked={confirmaEscritura} onChange={(e) => setConfirmaEscritura(e.target.checked)} />
+                    <span>{t("apiKeys.form.writeConfirm")}</span>
+                  </label>
+                </div>
+              )}
+              {conEscritura && modalMode === "create" && <div className="mt-3"><AvisoVersionesViejas /></div>}
+              {errorAlGuardar && (
+                <p role="alert" className="mt-3 rounded-md border border-destructive/40 bg-destructive/5 p-2 text-xs text-destructive">{errorAlGuardar}</p>
               )}
               <DialogFooter>
                 <Button variant="ghost" onClick={closeModal} disabled={createMut.isPending}>{t("common.cancel")}</Button>
@@ -618,6 +788,11 @@ const AdminApiKeys = () => {
                   { m: "GET", p: "/messenger/conversations/{id}", s: "messenger:read", d: "apiKeys.ep.conversation" },
                   { m: "GET", p: "/messenger/conversations/{id}/messages", s: "messenger:read", d: "apiKeys.ep.messages" },
                   { m: "GET", p: "/messenger/feed", s: "messenger:read", d: "apiKeys.ep.feed" },
+                  { m: "GET", p: "/messenger/people", s: SCOPE_MESSENGER_ESCRITURA, d: "apiKeys.ep.people" },
+                  { m: "POST", p: "/messenger/conversations", s: SCOPE_MESSENGER_ESCRITURA, d: "apiKeys.ep.openDirect" },
+                  { m: "POST", p: "/messenger/conversations/{id}/messages", s: SCOPE_MESSENGER_ESCRITURA, d: "apiKeys.ep.send" },
+                  { m: "PATCH", p: "/messenger/conversations/{id}/messages/{message_id}", s: SCOPE_MESSENGER_ESCRITURA, d: "apiKeys.ep.edit" },
+                  { m: "DELETE", p: "/messenger/conversations/{id}/messages/{message_id}", s: SCOPE_MESSENGER_ESCRITURA, d: "apiKeys.ep.delete" },
                   { m: "GET", p: "/creators", s: "creators:read", d: "apiKeys.ep.creators" },
                   { m: "GET", p: "/creators/{id}", s: "creators:read", d: "apiKeys.ep.creator" },
                   { m: "GET", p: "/contacts", s: "contacts:read", d: "apiKeys.ep.contacts" },
@@ -632,7 +807,8 @@ const AdminApiKeys = () => {
                   { m: "GET", p: "/sales/chatters", s: "sales:chatters", d: "apiKeys.ep.salesChatters" },
                   { m: "GET", p: "/promolog", s: "promolog:read", d: "apiKeys.ep.promolog" },
                 ] as { m: string; p: string; s: string | null; d: TranslationKey }[]).map((e) => (
-                  <div key={e.p} className="rounded-md border border-border/60 p-2.5">
+                  // La key es método + ruta: GET y POST /messenger/conversations son dos.
+                  <div key={`${e.m} ${e.p}`} className="rounded-md border border-border/60 p-2.5">
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge variant="outline" className="font-mono text-[10px]">{e.m}</Badge>
                       <code className="font-medium">{e.p}</code>
@@ -644,6 +820,22 @@ const AdminApiKeys = () => {
               </div>
             </div>
             <p className="text-xs text-muted-foreground"><ConFormato texto={t("apiKeys.docs.pagination")} /></p>
+            <div data-docs-escritura>
+              <div className="mb-1 font-medium">{t("apiKeys.docs.write")}</div>
+              <div className="space-y-2 text-xs text-muted-foreground">
+                <p><ConFormato texto={t("apiKeys.docs.writeBody")} /></p>
+                <p><ConFormato texto={t("apiKeys.docs.writeIdempotency")} /></p>
+              </div>
+              <div className="mb-1 mt-3 font-medium">{t("apiKeys.docs.writeExample")}</div>
+              <div className="rounded-md border border-border/60 bg-background p-3">
+                <pre className="overflow-x-auto text-[11px] leading-relaxed">{EJEMPLO_ESCRITURA}</pre>
+              </div>
+              <div className="mt-3 space-y-2 text-xs text-muted-foreground">
+                <p><ConFormato texto={t("apiKeys.docs.writeLimits")} /></p>
+                <p><ConFormato texto={t("apiKeys.docs.writeLoop")} /></p>
+                <p className="rounded-md border border-warning/40 bg-warning/5 p-2 text-foreground"><ConFormato texto={t("apiKeys.docs.writeUnknown")} /></p>
+              </div>
+            </div>
             <DocsWebhooks />
           </div>
           <DialogFooter><Button variant="outline" onClick={() => setDocsOpen(false)}>{t("common.close")}</Button></DialogFooter>

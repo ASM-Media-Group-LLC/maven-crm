@@ -1,7 +1,8 @@
 // Las reglas de messenger:write en manage-api-keys (diseño §2.1), por comportamiento,
 // y las guardas que leen index.ts: que las aplique, que la rotación busque la key
-// reemplazada en ESTA agencia y de ESTA persona, que la pantalla no ofrezca write
-// todavía y que un error de la base al guardar nunca salga crudo con un 500.
+// reemplazada en ESTA agencia y de ESTA persona, que la pantalla reciba el catálogo de
+// la pantalla (con write desde el PR 5) y que un error de la base al guardar nunca
+// salga crudo con un 500.
 
 import { assert, assertEquals } from "jsr:@std/assert";
 import {
@@ -21,28 +22,29 @@ const OTRO = "5a2d9c11-7e3b-4f60-9a8b-0c1d2e3f4a5b";
 const LEE = ["messenger:read"];
 const ESCRIBE = ["messenger:read", "messenger:write"];
 
-Deno.test("catálogo: write existe para validar, pero la pantalla todavía no lo ofrece", () => {
+Deno.test("catálogo: write existe para validar y, desde el PR 5, la pantalla lo ofrece", () => {
   assert(isValidScope("messenger:write") && isValidScope("messenger:read"));
-  assertEquals([...SCOPES_OCULTOS_EN_PANTALLA], ["messenger:write"]);
+  // La pantalla ya tiene el nombre visible, la rotación, la confirmación y la retirada:
+  // no se esconde nada.
+  assertEquals([...SCOPES_OCULTOS_EN_PANTALLA], []);
   assert(SCOPE_CATALOG_COMPLETO.some((s) => s.key === "messenger:write"));
-  assert(!SCOPE_CATALOG.some((s) => s.key === "messenger:write"));
-  assertEquals(SCOPE_CATALOG.length, SCOPE_CATALOG_COMPLETO.length - 1);
+  assert(SCOPE_CATALOG.some((s) => s.key === "messenger:write"));
+  assertEquals(SCOPE_CATALOG.map((s) => s.key), SCOPE_CATALOG_COMPLETO.map((s) => s.key));
   // Las dos son de Messenger: IPs exactas, vencimiento y solo en keys nuevas.
   assertEquals([...SCOPES_MESSENGER], ["messenger:read", "messenger:write"]);
 });
 
-Deno.test("lo oculto en pantalla tampoco se da por el servidor; con la lista vacía (PR 5), sí", () => {
-  // Hoy: messenger:write está oculto, así que se rechaza al crear y al editar, venga
-  // como venga el pedido (armado a mano, una página vieja…).
-  assertEquals(scopesNoDisponibles(ESCRIBE), ["messenger:write"]);
-  assertEquals(scopesNoDisponibles(["creators:read", "messenger:write", "messenger:read"]), ["messenger:write"]);
+Deno.test("lo oculto en pantalla tampoco se da por el servidor; con la lista vacía (PR 5), write se da", () => {
+  // Desde el PR 5 la lista está vacía: ni el alta ni la edición rechazan nada por estar
+  // oculto, y una key que escribe se crea si el pedido está en regla.
+  assertEquals(scopesNoDisponibles(ESCRIBE), []);
+  assertEquals(scopesNoDisponibles(["creators:read", "messenger:write", "messenger:read"]), []);
   assertEquals(scopesNoDisponibles(LEE), []);
-  assertEquals(scopesNoDisponibles(["creators:read", "contacts:phone"]), []);
-  // El PR 5 vacía SCOPES_OCULTOS_EN_PANTALLA: entonces no se rechaza nada y valen las
-  // reglas de write (que pasan con un pedido en regla).
-  assertEquals(scopesNoDisponibles(ESCRIBE, []), []);
   assertEquals(problemaAlCrear({ scopes: ESCRIBE, nombreVisible: "BLU", confirmaEscrituraComo: YO, quienCrea: YO }), null);
-  // Y con otra lista, lo que esa diga (la regla no está atada a messenger:write).
+  // La regla sigue en pie para el próximo scope que se esconda: con messenger:write
+  // oculto (como antes del PR 5) se rechaza, venga como venga el pedido.
+  assertEquals(scopesNoDisponibles(ESCRIBE, ["messenger:write"]), ["messenger:write"]);
+  assertEquals(scopesNoDisponibles(LEE, ["messenger:write"]), []);
   assertEquals(scopesNoDisponibles(["contacts:phone", "creators:read"], ["contacts:phone"]), ["contacts:phone"]);
 });
 

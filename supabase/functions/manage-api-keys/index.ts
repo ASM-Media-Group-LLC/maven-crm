@@ -208,8 +208,8 @@ Deno.serve(async (req) => {
       const { keys, webhooks_unknown } = conWebhooks((await conPersona(data ?? [])).map((k) => ({ ...k, status: statusOf(k) })), webhooks);
       return json(req, {
         keys, webhooks_unknown,
-        // El de la PANTALLA: sin SCOPES_OCULTOS_EN_PANTALLA (messenger:write hasta el PR 5).
-        // La validación usa el completo (isValidScope).
+        // El de la PANTALLA: sin SCOPES_OCULTOS_EN_PANTALLA (hoy vacía: messenger:write ya
+        // se ofrece). La validación usa el completo (isValidScope).
         scope_catalog: SCOPE_CATALOG, scope_groups: SCOPE_GROUPS, max_active_keys: MAX_ACTIVE_KEYS,
         // Quién está mirando: una key nueva actúa como esta persona. La página lo
         // usa para decir de quién son las conversaciones que leería con Messenger.

@@ -3,8 +3,8 @@
 // tanto en el gestor (manage-api-keys) como en la validación (public-api).
 //
 // Dos catálogos: el COMPLETO (con el que se valida, aquí y en public-api) y el que se
-// manda a la pantalla de Ajustes → API keys, que todavía no ofrece lo que está en
-// SCOPES_OCULTOS_EN_PANTALLA.
+// manda a la pantalla de Ajustes → API keys, que no ofrece lo que esté en
+// SCOPES_OCULTOS_EN_PANTALLA (hoy nada).
 //
 // Vive en manage-api-keys/ y no en _shared/ (desde el 25/09): es su único
 // importador, y un cambio en _shared/ redespliega TODAS las edge functions.
@@ -23,11 +23,11 @@ export const SCOPES_MESSENGER = ["messenger:read", "messenger:write"] as const;
 export const SCOPE_MESSENGER_LECTURA = "messenger:read";
 export const SCOPE_MESSENGER_ESCRITURA = "messenger:write";
 
-/** Lo que la pantalla de Ajustes todavía no ofrece. messenger:write se esconde hasta
- *  el PR 5 (la pantalla con el nombre visible, la rotación y la retirada): sin eso, una
- *  key que escribe no se puede crear bien desde Maven. La validación usa el catálogo
- *  COMPLETO. El PR 5 vacía esta lista. */
-export const SCOPES_OCULTOS_EN_PANTALLA: readonly string[] = ["messenger:write"];
+/** Lo que la pantalla de Ajustes no ofrece. messenger:write estuvo aquí hasta que la
+ *  pantalla tuvo el nombre visible, la rotación, la confirmación y la retirada (PR 5 de
+ *  la escritura): ya se ofrece. Sirve para esconder un scope nuevo mientras su pantalla
+ *  no está; la validación usa siempre el catálogo COMPLETO. */
+export const SCOPES_OCULTOS_EN_PANTALLA: readonly string[] = [];
 export const MESSENGER_MAX_DIAS = 90;
 
 export function esScopeMessenger(s: string): boolean {

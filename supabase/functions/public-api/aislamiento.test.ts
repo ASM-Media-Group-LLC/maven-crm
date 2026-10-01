@@ -312,11 +312,11 @@ Deno.test("como_usuario: cada recurso declara su scope de lectura y de escritura
   assertEquals(sinScope, ["me"], "un recurso como_usuario quedó sin scope");
   assertEquals(SCOPE_REQUERIDO.me.escritura, null, "/me no se escribe");
   assertEquals(SCOPE_REQUERIDO.messenger, { lectura: "messenger:read", escritura: "messenger:write" });
-  // La validación usa el catálogo completo; la pantalla, uno sin messenger:write hasta
-  // el PR 5 (SCOPES_OCULTOS_EN_PANTALLA). Si la validación usara el de la pantalla,
-  // ninguna key podría tener write; si la pantalla usara el completo, se ofrecería antes.
+  // La validación usa el catálogo completo (con messenger:write); la pantalla, el suyo
+  // (SCOPE_CATALOG, sin SCOPES_OCULTOS_EN_PANTALLA), que desde el PR 5 también lo tiene.
+  // Si la validación usara el de la pantalla, un scope escondido no se podría validar.
   assert(SCOPE_CATALOG_COMPLETO.some((s) => s.key === "messenger:write"), "el catálogo completo no tiene messenger:write");
-  assert(!SCOPE_CATALOG.some((s) => s.key === "messenger:write"), "messenger:write se ve en la pantalla antes del PR 5");
+  assert(SCOPE_CATALOG.some((s) => s.key === "messenger:write"), "la pantalla no ofrece messenger:write (PR 5)");
 });
 
 Deno.test("IP: la whitelist usa la IP de peticion.ts (probada por comportamiento en peticion.test.ts)", () => {
