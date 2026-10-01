@@ -48,6 +48,9 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
+import { traducir, type TranslationKey } from "@/lib/i18n";
+import { ConFormato } from "@/pages/admin/ConFormato";
 import {
   useCreateQaChatSession,
   useDeleteQaChatSession,
@@ -68,13 +71,15 @@ import {
 // respuesta. Cuando se conecte el backend, esa nota se reemplaza por la
 // llamada a la edge function que streamea tokens.
 
-const formatRelative = (iso: string, locale: string): string => {
+type Traductor = (key: TranslationKey, params?: Record<string, string | number>) => string;
+
+const formatRelative = (iso: string, locale: string, t: Traductor): string => {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "";
   const now = new Date();
   const diffMin = Math.floor((now.getTime() - date.getTime()) / 60_000);
-  if (diffMin < 1) return "ahora";
-  if (diffMin < 60) return `hace ${diffMin} min`;
+  if (diffMin < 1) return t("agencyQa.chat.now");
+  if (diffMin < 60) return t("agencyQa.sync.minAgo", { n: diffMin });
   const sameDay =
     date.getFullYear() === now.getFullYear() &&
     date.getMonth() === now.getMonth() &&
@@ -96,14 +101,19 @@ const formatRelative = (iso: string, locale: string): string => {
   return `${day} ${month}`;
 };
 
-const sessionTitle = (s: {
-  title: string | null;
-  scope_type: QaChatScope;
-  closer: { name: string } | null;
-}): string => {
+// `title` es lo que se guardó en qa_chat_sessions (hoy siempre null): si hay, se
+// muestra tal cual. Si no, se arma en el idioma de la pantalla.
+const sessionTitle = (
+  s: {
+    title: string | null;
+    scope_type: QaChatScope;
+    closer: { name: string } | null;
+  },
+  t: Traductor,
+): string => {
   if (s.title) return s.title;
-  if (s.scope_type === "closer") return `Sobre ${s.closer?.name ?? "(closer)"}`;
-  return "Sobre todo el equipo";
+  if (s.scope_type === "closer") return t("agencyQa.chat.aboutCloser", { name: s.closer?.name ?? "(closer)" });
+  return t("agencyQa.chat.aboutTeam");
 };
 
 // MikeAvatar — el muñequito del supervisor IA. La imagen vive en
@@ -185,7 +195,7 @@ const useSpeechRecognition = ({
 
   const start = () => {
     if (!Ctor) {
-      onError?.("Tu navegador no soporta dictado por voz. Usa Chrome o Safari.");
+      onError?.(traducir("agencyQa.chat.noSpeech"));
       return;
     }
     if (recRef.current) {
@@ -215,7 +225,7 @@ const useSpeechRecognition = ({
       if (text) onTranscript(text, !!finalText && !interim);
     };
     rec.onerror = (e) => {
-      onError?.(e.error || "Error de reconocimiento de voz.");
+      onError?.(e.error || traducir("agencyQa.chat.speechError"));
       setListening(false);
       recRef.current = null;
     };
@@ -228,7 +238,7 @@ const useSpeechRecognition = ({
       recRef.current = rec;
       setListening(true);
     } catch (e) {
-      onError?.((e as Error).message ?? "No se pudo iniciar el dictado.");
+      onError?.((e as Error).message ?? traducir("agencyQa.chat.speechStart"));
     }
   };
 
@@ -242,6 +252,7 @@ const useSpeechRecognition = ({
 };
 
 const AgencyQaChat = () => {
+  const { t } = useLanguage();
   const f = useFormato();
   const sessionsQ = useQaChatSessions();
   const closersQ = useQaClosers();
@@ -270,7 +281,7 @@ const AgencyQaChat = () => {
       setInput(base + sep + text);
     },
     onError: (msg) => {
-      toast.error("Dictado por voz", { description: msg });
+      toast.error(t("agencyQa.chat.dictation"), { description: msg });
     },
     // Idioma fijo a propósito: es el idioma del dictado por voz, no un formato.
     lang: "es-ES",
@@ -317,12 +328,12 @@ const AgencyQaChat = () => {
       // falló (rate limit, LLM error), el user message igual quedó persistido
       // pero no hay respuesta. Mostramos un toast warning con la causa.
       if (result.assistantError) {
-        toast.warning("Mike no pudo responder", {
+        toast.warning(t("agencyQa.chat.mikeFailed"), {
           description: result.assistantError,
         });
       }
     } catch (err) {
-      toast.error("No se pudo enviar el mensaje", {
+      toast.error(t("agencyQa.chat.couldNotSend"), {
         description: (err as Error).message,
       });
     }
@@ -339,7 +350,7 @@ const AgencyQaChat = () => {
       if (activeId === pendingDelete.id) setActiveId(null);
       setPendingDelete(null);
     } catch (err) {
-      toast.error("No se pudo borrar la conversación", {
+      toast.error(t("agencyQa.chat.couldNotDelete"), {
         description: (err as Error).message,
       });
     }
@@ -352,11 +363,7 @@ const AgencyQaChat = () => {
           <MikeAvatar size={44} />
           <div>
             <h2 className="text-base font-semibold">Chat with Mike</h2>
-            <p className="text-xs text-muted-foreground">
-              Mike es tu supervisor IA — conoce a cada closer, todas las QAs, y
-              te ayuda a coachear al equipo. Hazle preguntas sobre tendencias,
-              comparativas entre closers o qué le falta a alguien.
-            </p>
+            <p className="text-xs text-muted-foreground">{t("agencyQa.chat.intro")}</p>
           </div>
         </div>
       </div>
@@ -372,19 +379,18 @@ const AgencyQaChat = () => {
               className="gap-1.5"
             >
               <MessageSquarePlus className="h-3.5 w-3.5" />
-              Nueva conversación
+              {t("agencyQa.chat.new")}
             </Button>
 
             <div className="flex max-h-[60vh] flex-col gap-1 overflow-y-auto">
               {sessionsQ.isLoading ? (
                 <div className="flex items-center gap-1.5 px-2 py-3 text-xs text-muted-foreground">
                   <Loader2 className="h-3 w-3 animate-spin" />
-                  Cargando…
+                  {t("common.loading")}
                 </div>
               ) : (sessionsQ.data?.length ?? 0) === 0 ? (
                 <div className="px-2 py-3 text-xs italic text-muted-foreground">
-                  Sin conversaciones todavía. Click "+ Nueva conversación" para
-                  empezar.
+                  {t("agencyQa.chat.noSessions", { button: t("agencyQa.chat.new") })}
                 </div>
               ) : (
                 sessionsQ.data!.map((s) => (
@@ -399,24 +405,24 @@ const AgencyQaChat = () => {
                   >
                     <div className="flex w-full items-start justify-between gap-2">
                       <span className="line-clamp-2 flex-1 text-xs font-medium">
-                        {sessionTitle(s)}
+                        {sessionTitle(s, t)}
                       </span>
                       <span
                         role="button"
                         tabIndex={0}
                         onClick={(e) => {
                           e.stopPropagation();
-                          askDelete(s.id, sessionTitle(s));
+                          askDelete(s.id, sessionTitle(s, t));
                         }}
                         onKeyDown={(e) => {
                           if (e.key === "Enter" || e.key === " ") {
                             e.preventDefault();
                             e.stopPropagation();
-                            askDelete(s.id, sessionTitle(s));
+                            askDelete(s.id, sessionTitle(s, t));
                           }
                         }}
                         className="cursor-pointer text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"
-                        aria-label="Borrar conversación"
+                        aria-label={t("agencyQa.chat.deleteConversation")}
                       >
                         <Trash2 className="h-3 w-3" />
                       </span>
@@ -432,9 +438,9 @@ const AgencyQaChat = () => {
                       >
                         {s.scope_type === "closer"
                           ? (s.closer?.name ?? "(closer)")
-                          : "Todos"}
+                          : t("agencyQa.chat.all")}
                       </span>
-                      <span>· {formatRelative(s.updated_at, f.intl("es-AR"))}</span>
+                      <span>· {formatRelative(s.updated_at, f.intl("es-AR"), t)}</span>
                     </div>
                   </button>
                 ))
@@ -449,15 +455,17 @@ const AgencyQaChat = () => {
             <>
               <div className="border-b border-border/60 p-3">
                 <p className="text-sm font-semibold">
-                  {sessionTitle(activeSession)}
+                  {sessionTitle(activeSession, t)}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Hablando sobre:{" "}
-                  <strong>
-                    {activeSession.scope_type === "closer"
-                      ? (activeSession.closer?.name ?? "(closer borrado)")
-                      : "todos los closers"}
-                  </strong>
+                  <ConFormato
+                    texto={t("agencyQa.chat.talkingAbout", {
+                      who:
+                        activeSession.scope_type === "closer"
+                          ? (activeSession.closer?.name ?? t("agencyQa.chat.deletedCloser"))
+                          : t("agencyQa.chat.allClosers"),
+                    })}
+                  />
                 </p>
               </div>
 
@@ -465,14 +473,10 @@ const AgencyQaChat = () => {
                 {messagesQ.isLoading ? (
                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                     <Loader2 className="h-3 w-3 animate-spin" />
-                    Cargando mensajes…
+                    {t("agencyQa.chat.loadingMessages")}
                   </div>
                 ) : (messagesQ.data?.length ?? 0) === 0 ? (
-                  <p className="text-xs italic text-muted-foreground">
-                    Escribe una pregunta para arrancar. Algunos ejemplos:
-                    "¿quién cierra más?", "¿qué le falta a [closer]?",
-                    "compara [closer1] vs [closer2]".
-                  </p>
+                  <p className="text-xs italic text-muted-foreground">{t("agencyQa.chat.examples")}</p>
                 ) : (
                   messagesQ.data!.map((m) => {
                     const isAssistant = m.role === "assistant";
@@ -509,7 +513,7 @@ const AgencyQaChat = () => {
                             <div className="whitespace-pre-wrap">{m.content}</div>
                           </div>
                           <span className="text-[10px] text-muted-foreground">
-                            {formatRelative(m.created_at, f.intl("es-AR"))}
+                            {formatRelative(m.created_at, f.intl("es-AR"), t)}
                           </span>
                         </div>
                       </div>
@@ -530,7 +534,7 @@ const AgencyQaChat = () => {
                       <div className="max-w-[80%] rounded-2xl border border-dashed border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
                         <div className="flex items-center gap-1.5 text-xs font-bold text-amber-500">
                           <Sparkles className="h-3 w-3 animate-pulse" />
-                          Mike escribiendo…
+                          {t("agencyQa.chat.typing")}
                         </div>
                       </div>
                     </div>
@@ -558,11 +562,12 @@ const AgencyQaChat = () => {
                       void handleSend();
                     }
                   }}
-                  placeholder={`Pregunta a Mike sobre ${
-                    activeSession.scope_type === "closer"
-                      ? (activeSession.closer?.name ?? "este closer")
-                      : "el equipo"
-                  }…`}
+                  placeholder={t("agencyQa.chat.askAbout", {
+                    who:
+                      activeSession.scope_type === "closer"
+                        ? (activeSession.closer?.name ?? t("agencyQa.chat.thisCloser"))
+                        : t("agencyQa.chat.theTeam"),
+                  })}
                   rows={2}
                   className="resize-none text-sm"
                 />
@@ -581,14 +586,12 @@ const AgencyQaChat = () => {
                           ) : (
                             <Send className="h-3.5 w-3.5" />
                           )}
-                          Enviar
+                          {t("common.send")}
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent className="max-w-[220px]">
                         <p className="text-xs">
-                          Tu mensaje se persiste en{" "}
-                          <code>qa_chat_messages</code>. La respuesta la
-                          genera Mike (Anthropic) en la edge function.
+                          <ConFormato texto={t("agencyQa.chat.persistHint")} piezas={{ table: <code>qa_chat_messages</code> }} />
                         </p>
                       </TooltipContent>
                     </Tooltip>
@@ -613,23 +616,22 @@ const AgencyQaChat = () => {
                             {speech.listening ? (
                               <>
                                 <MicOff className="h-3.5 w-3.5" />
-                                Detener
+                                {t("agencyQa.chat.stop")}
                               </>
                             ) : (
                               <>
                                 <Mic className="h-3.5 w-3.5" />
-                                Dictar
+                                {t("agencyQa.chat.dictate")}
                               </>
                             )}
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent className="max-w-[220px]">
                           <p className="text-xs">
-                            Dictado por voz nativo del navegador (Web
-                            Speech API, español).{" "}
+                            {t("agencyQa.chat.dictationHint")}{" "}
                             {speech.listening
-                              ? "Habla ahora — el texto aparece en el cuadro."
-                              : "Click para dictar tu pregunta."}
+                              ? t("agencyQa.chat.speakNow")
+                              : t("agencyQa.chat.clickToDictate")}
                           </p>
                         </TooltipContent>
                       </Tooltip>
@@ -642,12 +644,12 @@ const AgencyQaChat = () => {
             <CardContent className="flex flex-1 items-center justify-center p-8">
               <div className="flex flex-col items-center gap-2 text-center">
                 <MikeAvatar size={64} />
-                <p className="text-sm font-semibold">
-                  Hola, soy Mike — supervisor del equipo.
-                </p>
+                <p className="text-sm font-semibold">{t("agencyQa.chat.hello")}</p>
                 <p className="max-w-md text-xs text-muted-foreground">
-                  Click "+ Nueva conversación" para arrancar. Elige un closer
-                  específico o "todos" para preguntas cross-equipo.
+                  {t("agencyQa.chat.helloHint", {
+                    button: t("agencyQa.chat.new"),
+                    all: t("agencyQa.chat.all").toLowerCase(),
+                  })}
                 </p>
               </div>
             </CardContent>
@@ -668,7 +670,7 @@ const AgencyQaChat = () => {
             setActiveId(session.id);
             setShowNew(false);
           } catch (err) {
-            toast.error("No se pudo crear la conversación", {
+            toast.error(t("agencyQa.chat.couldNotCreate"), {
               description: (err as Error).message,
             });
           }
@@ -685,14 +687,12 @@ const AgencyQaChat = () => {
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-destructive" />
-              Borrar conversación
+              {t("agencyQa.chat.deleteConversation")}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              ¿Seguro que quieres borrar la conversación{" "}
-              <strong>&ldquo;{pendingDelete?.title}&rdquo;</strong>?
+              <ConFormato texto={t("agencyQa.chat.deleteBody", { title: pendingDelete?.title ?? "" })} />
               <br />
-              Se eliminan todos sus mensajes. Esta acción no se puede
-              deshacer.
+              {t("agencyQa.chat.deleteWarn")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -705,10 +705,10 @@ const AgencyQaChat = () => {
               {deleteSession.isPending ? (
                 <>
                   <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                  Borrando…
+                  {t("agencyQa.deleting")}
                 </>
               ) : (
-                "Borrar"
+                t("agencyQa.delete")
               )}
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -721,7 +721,7 @@ const AgencyQaChat = () => {
 interface NewSessionDialogProps {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  closers: Array<{ id: string; name: string }>;
+  closers: Array<{ id: string; name: string | null }>;
   creating: boolean;
   onCreate: (scopeType: QaChatScope, scopeCloserId: string | null) => void;
 }
@@ -733,7 +733,19 @@ const NewSessionDialog = ({
   creating,
   onCreate,
 }: NewSessionDialogProps) => {
+  const { t } = useLanguage();
   const [scope, setScope] = useState<string>("all");
+
+  // El hook deja name en null cuando el perfil no tiene nombre: aquí se pone
+  // «Sin nombre» en el idioma de la pantalla y se ordena por lo que se ve (como
+  // antes, que el hook ordenaba con «Sin nombre» puesto y quedaba en la S).
+  const closersConEtiqueta = useMemo(
+    () =>
+      closers
+        .map((c) => ({ id: c.id, label: c.name ?? t("agencyQa.noNameBare") }))
+        .sort((a, b) => a.label.localeCompare(b.label)),
+    [closers, t],
+  );
 
   useEffect(() => {
     if (open) setScope("all");
@@ -743,16 +755,13 @@ const NewSessionDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Nueva conversación con Mike</DialogTitle>
-          <DialogDescription>
-            El scope queda fijo en esta sesión. Si quieres cambiar de closer
-            después, abre una sesión nueva.
-          </DialogDescription>
+          <DialogTitle>{t("agencyQa.chat.newTitle")}</DialogTitle>
+          <DialogDescription>{t("agencyQa.chat.newHint")}</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-2">
           <label className="text-xs font-medium text-muted-foreground">
-            ¿De qué quieres hablar?
+            {t("agencyQa.chat.whatAbout")}
           </label>
           <Select value={scope} onValueChange={setScope}>
             <SelectTrigger>
@@ -762,14 +771,14 @@ const NewSessionDialog = ({
               <SelectItem value="all">
                 <div className="flex items-center gap-1.5">
                   <Users className="h-3.5 w-3.5" />
-                  Todos los closers (cross-equipo)
+                  {t("agencyQa.chat.allCrossTeam")}
                 </div>
               </SelectItem>
-              {closers.map((c) => (
+              {closersConEtiqueta.map((c) => (
                 <SelectItem key={c.id} value={c.id}>
                   <div className="flex items-center gap-1.5">
                     <UserIcon className="h-3.5 w-3.5" />
-                    {c.name}
+                    {c.label}
                   </div>
                 </SelectItem>
               ))}
@@ -783,7 +792,7 @@ const NewSessionDialog = ({
             type="button"
             onClick={() => onOpenChange(false)}
           >
-            Cancelar
+            {t("common.cancel")}
           </Button>
           <Button
             type="button"
@@ -798,7 +807,7 @@ const NewSessionDialog = ({
             ) : (
               <MessageSquarePlus className="h-3.5 w-3.5" />
             )}
-            Empezar conversación
+            {t("agencyQa.chat.start")}
           </Button>
         </DialogFooter>
       </DialogContent>

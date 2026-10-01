@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useBluModels, useBluMasivos, bluModelLabel, type BluMasivo } from "../../sales-performance/useBluMp";
+import { useLanguage } from "@/hooks/useLanguage";
+import { ConFormato } from "@/pages/admin/ConFormato";
 
 const htmlToText = (h: string) => String(h || "").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
 const money = (n: number) => `$${(n || 0).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
@@ -35,6 +37,7 @@ function List({ icon: Icon, title, items, tone }: { icon: any; title: string; it
 }
 
 export default function ChattersQaMasivos() {
+  const { t } = useLanguage();
   const { data: models = [], isLoading: modelsLoading } = useBluModels();
   const [modelId, setModelId] = useState<number | null>(null);
   const { data: masivos = [], isLoading } = useBluMasivos(modelId);
@@ -53,37 +56,37 @@ export default function ChattersQaMasivos() {
       if (error) throw new Error(error.message);
       if (data?.error) throw new Error(String(data.error));
       setAnalysis(data.analysis as MasivosAnalysis);
-    } catch (e) { toast.error("No se pudo analizar: " + (e as Error).message); }
+    } catch (e) { toast.error(t("agencyQa.mass.couldNotAnalyze", { msg: (e as Error).message })); }
     finally { setAnalyzing(false); }
   };
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground">Calidad de los <b>masivos</b> (PPV/blasts) por modelo, cruzada con veces visto · ventas · dinero recaudado.</p>
+        <p className="text-sm text-muted-foreground"><ConFormato texto={t("agencyQa.mass.intro")} /></p>
         <Select value={modelId ? String(modelId) : ""} onValueChange={(v) => { setModelId(Number(v)); setAnalysis(null); }}>
-          <SelectTrigger className="w-64"><SelectValue placeholder={modelsLoading ? "Cargando modelos…" : "Elige un modelo"} /></SelectTrigger>
+          <SelectTrigger className="w-64"><SelectValue placeholder={modelsLoading ? t("agencyQa.mass.loadingModels") : t("agencyQa.mass.pickModel")} /></SelectTrigger>
           <SelectContent className="max-h-80">{models.map((m) => <SelectItem key={m.id} value={String(m.id)}>{bluModelLabel(m)}</SelectItem>)}</SelectContent>
         </Select>
       </div>
 
-      {!modelId && <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">Elige un modelo para ver sus masivos.</p>}
-      {modelId && isLoading && <p className="text-sm text-muted-foreground">Cargando masivos…</p>}
-      {modelId && !isLoading && masivos.length === 0 && <p className="text-sm text-muted-foreground">Este modelo no tiene masivos.</p>}
+      {!modelId && <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">{t("agencyQa.mass.pickModelHint")}</p>}
+      {modelId && isLoading && <p className="text-sm text-muted-foreground">{t("agencyQa.mass.loading")}</p>}
+      {modelId && !isLoading && masivos.length === 0 && <p className="text-sm text-muted-foreground">{t("agencyQa.mass.none")}</p>}
 
       {masivos.length > 0 && (
         <>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-            <Kpi icon={Megaphone} label="Masivos" value={String(masivos.length)} />
-            <Kpi icon={Send} label="Enviados" value={kpis.sent.toLocaleString()} />
-            <Kpi icon={Eye} label="Vistos" value={kpis.viewed.toLocaleString()} sub={`${pct(kpis.viewed, kpis.sent)} apertura`} />
-            <Kpi icon={ShoppingCart} label="Ventas" value={kpis.purchased.toLocaleString()} sub={`${pct(kpis.purchased, kpis.viewed)} conv.`} />
-            <Kpi icon={DollarSign} label="Recaudado" value={money(kpis.earnings)} />
+            <Kpi icon={Megaphone} label={t("agencyQa.tab.massMessages")} value={String(masivos.length)} />
+            <Kpi icon={Send} label={t("agencyQa.mass.sent")} value={kpis.sent.toLocaleString()} />
+            <Kpi icon={Eye} label={t("agencyQa.mass.viewed")} value={kpis.viewed.toLocaleString()} sub={t("agencyQa.mass.openRate", { pct: pct(kpis.viewed, kpis.sent) })} />
+            <Kpi icon={ShoppingCart} label={t("agencyQa.sales")} value={kpis.purchased.toLocaleString()} sub={t("agencyQa.mass.conv", { pct: pct(kpis.purchased, kpis.viewed) })} />
+            <Kpi icon={DollarSign} label={t("agencyQa.mass.collected")} value={money(kpis.earnings)} />
           </div>
 
           <div className="flex justify-end">
             <Button size="sm" className="gap-1.5" onClick={analyze} disabled={analyzing}>
-              {analyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />} Analizar calidad con IA
+              {analyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />} {t("agencyQa.mass.analyze")}
             </Button>
           </div>
 
@@ -91,13 +94,13 @@ export default function ChattersQaMasivos() {
             <div className="space-y-3">
               {analysis.resumen && <div className="rounded-2xl border border-white/[0.07] bg-gradient-to-br from-primary/10 to-transparent p-4 text-sm leading-relaxed backdrop-blur-md">{analysis.resumen}</div>}
               <div className="grid gap-3 md:grid-cols-2">
-                <List icon={ThumbsUp} title="Qué funciona" items={analysis.que_funciona} tone="text-success" />
-                <List icon={ThumbsDown} title="Qué no funciona" items={analysis.que_no_funciona} tone="text-destructive" />
+                <List icon={ThumbsUp} title={t("agencyQa.mass.works")} items={analysis.que_funciona} tone="text-success" />
+                <List icon={ThumbsDown} title={t("agencyQa.mass.doesntWork")} items={analysis.que_no_funciona} tone="text-destructive" />
               </div>
-              <List icon={Lightbulb} title="Recomendaciones" items={analysis.recomendaciones} tone="text-primary" />
+              <List icon={Lightbulb} title={t("agencyQa.recommendations")} items={analysis.recomendaciones} tone="text-primary" />
               <div className="grid gap-3 md:grid-cols-2">
-                <List icon={Quote} title="Mejores copys" items={analysis.mejores_copies} tone="text-success" />
-                <List icon={Quote} title="Peores copys" items={analysis.peores_copies} tone="text-destructive" />
+                <List icon={Quote} title={t("agencyQa.mass.bestCopy")} items={analysis.mejores_copies} tone="text-success" />
+                <List icon={Quote} title={t("agencyQa.mass.worstCopy")} items={analysis.peores_copies} tone="text-destructive" />
               </div>
             </div>
           )}
@@ -107,11 +110,11 @@ export default function ChattersQaMasivos() {
               <thead>
                 <tr className="border-b border-border bg-white/[0.03] text-xs text-muted-foreground">
                   <th className="px-3 py-2 text-left font-medium">Copy</th>
-                  <th className="px-2 py-2 text-left font-medium">Tipo</th>
-                  <th className="px-2 py-2 text-left font-medium">Quién</th>
-                  <th className="px-2 py-2 text-right font-medium">Env.</th>
-                  <th className="px-2 py-2 text-right font-medium">Visto</th>
-                  <th className="px-2 py-2 text-right font-medium">Ventas</th>
+                  <th className="px-2 py-2 text-left font-medium">{t("common.type")}</th>
+                  <th className="px-2 py-2 text-left font-medium">{t("agencyQa.mass.who")}</th>
+                  <th className="px-2 py-2 text-right font-medium">{t("agencyQa.mass.sentShort")}</th>
+                  <th className="px-2 py-2 text-right font-medium">{t("agencyQa.mass.viewedCol")}</th>
+                  <th className="px-2 py-2 text-right font-medium">{t("agencyQa.sales")}</th>
                   <th className="px-2 py-2 text-right font-medium">$</th>
                   <th className="px-2 py-2 text-right font-medium">Conv.</th>
                 </tr>
@@ -119,9 +122,9 @@ export default function ChattersQaMasivos() {
               <tbody>
                 {rows.map((m) => (
                   <tr key={m.id} className="border-b border-border/40 last:border-0 hover:bg-white/[0.03]">
-                    <td className="max-w-[340px] px-3 py-2"><p className="line-clamp-2 text-foreground/90">{htmlToText(m.copy) || <span className="text-muted-foreground">(sin texto)</span>}</p></td>
-                    <td className="px-2 py-2"><Badge variant="outline" className="text-[10px]">{m.type === "priority" ? "Priority" : m.isExternal ? "Externo" : "OF mass"}</Badge></td>
-                    <td className="px-2 py-2 text-xs text-muted-foreground">{m.senderName ?? <span className="italic">otro CRM</span>}</td>
+                    <td className="max-w-[340px] px-3 py-2"><p className="line-clamp-2 text-foreground/90">{htmlToText(m.copy) || <span className="text-muted-foreground">{t("agencyQa.mass.noText")}</span>}</p></td>
+                    <td className="px-2 py-2"><Badge variant="outline" className="text-[10px]">{m.type === "priority" ? "Priority" : m.isExternal ? t("agencyQa.mass.external") : "OF mass"}</Badge></td>
+                    <td className="px-2 py-2 text-xs text-muted-foreground">{m.senderName ?? <span className="italic">{t("agencyQa.mass.otherCrm")}</span>}</td>
                     <td className="px-2 py-2 text-right tabular-nums">{m.sent.toLocaleString()}</td>
                     <td className="px-2 py-2 text-right tabular-nums">{m.viewed.toLocaleString()}</td>
                     <td className="px-2 py-2 text-right tabular-nums font-medium">{m.purchased.toLocaleString()}</td>

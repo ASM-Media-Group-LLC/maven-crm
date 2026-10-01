@@ -4,20 +4,14 @@ import { Clock, CalendarClock, AlertTriangle, Users, CheckCircle2, LogIn } from 
 import { useQaAttendance, type QaRole } from "./useQaHubstaff";
 import { useHubstaffSyncStatus } from "./chatters-qa/useHubstaffEffort";
 import { periodLabel } from "./chatters-qa/useChatterScorecards";
+import { useLanguage } from "@/hooks/useLanguage";
+import { ConFormato } from "@/pages/admin/ConFormato";
+import type { TranslationKey } from "@/lib/i18n";
+import { haceCuanto } from "./haceCuanto";
 
 // Panel GENÉRICO de Asistencia (check-in + puntualidad) — idéntico para los 4 QA por rol.
 // Deriva el turno de la 1ª actividad de Hubstaff (vista v_qa_attendance, management-only).
 // Tolerancia 10 min = a tiempo (llegar antes cuenta a tiempo).
-
-const relativeTime = (iso: string | null): string => {
-  if (!iso) return "sin sincronizar";
-  const min = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
-  if (min < 1) return "recién";
-  if (min < 60) return `hace ${min} min`;
-  const h = Math.floor(min / 60);
-  if (h < 24) return `hace ${h}h`;
-  return `hace ${Math.floor(h / 24)}d`;
-};
 
 const hhmm = (min: number | null | undefined) => {
   if (min == null) return "—";
@@ -25,7 +19,19 @@ const hhmm = (min: number | null | undefined) => {
   return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
 };
 
+// La columna `turno` de v_qa_attendance llega como texto en español. Es dato (no se
+// cambia), pero se muestra en el idioma de la interfaz; uno que no esté aquí se ve tal cual.
+const TURNO_KEY: Record<string, TranslationKey> = {
+  "Según horario propio": "agencyQa.shift.own",
+  "Madrugada · 12am–8am": "agencyQa.shift.night",
+  "Mañana · 8am–4pm": "agencyQa.shift.morning",
+  "Tarde · 4pm–12am": "agencyQa.shift.afternoon",
+};
+
+type Traductor = (k: TranslationKey, p?: Record<string, string | number>) => string;
+
 export default function QaAttendancePanel({ role }: { role: QaRole }) {
+  const { t, language } = useLanguage();
   const { data: rows = [], isLoading } = useQaAttendance(role);
   const { data: sync } = useHubstaffSyncStatus();
 
@@ -38,15 +44,15 @@ export default function QaAttendancePanel({ role }: { role: QaRole }) {
   }, [rows]);
 
   if (isLoading) {
-    return <Card><CardContent className="p-6 text-sm text-muted-foreground">Cargando asistencia…</CardContent></Card>;
+    return <Card><CardContent className="p-6 text-sm text-muted-foreground">{t("agencyQa.attendance.loading")}</CardContent></Card>;
   }
 
   if (!rows.length) {
     return (
       <Card>
         <CardContent className="space-y-2 p-6 text-sm text-muted-foreground">
-          <div className="flex items-center gap-2 font-medium text-foreground"><CalendarClock className="h-4 w-4" /> Asistencia</div>
-          Todavía no hay datos de asistencia para este rol. El micro <code>hubstaff-bridge</code> sincroniza la 1ª actividad del día cada 6h.
+          <div className="flex items-center gap-2 font-medium text-foreground"><CalendarClock className="h-4 w-4" /> {t("agencyQa.tab.attendance")}</div>
+          <ConFormato texto={t("agencyQa.attendance.empty")} piezas={{ code: <code>hubstaff-bridge</code> }} />
         </CardContent>
       </Card>
     );
@@ -57,23 +63,23 @@ export default function QaAttendancePanel({ role }: { role: QaRole }) {
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <h3 className="flex items-center gap-2 text-lg font-semibold">
-            <CalendarClock className="h-4 w-4 text-emerald-500" /> Asistencia · check-in y puntualidad
+            <CalendarClock className="h-4 w-4 text-emerald-500" /> {t("agencyQa.attendance.title")}
           </h3>
           <p className="text-sm text-muted-foreground">
-            Hora de entrada (1ª actividad) vs turno deducido — {stats && periodLabel(stats.period)}.
+            {t("agencyQa.attendance.subtitle", { period: stats ? periodLabel(stats.period, language) : "" })}
           </p>
         </div>
-        <span className="text-xs text-muted-foreground">Sincronizado {relativeTime(sync?.last_sync_at ?? null)}</span>
+        <span className="text-xs text-muted-foreground">{t("agencyQa.sync.synced", { when: haceCuanto(sync?.last_sync_at ?? null, t) })}</span>
       </div>
 
       {stats && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatCard icon={Users} label="Personas" value={String(stats.count)} />
-          <StatCard icon={CheckCircle2} label="Puntualidad prom." value={`${stats.avgPunct}%`}
+          <StatCard icon={Users} label={t("agencyQa.people")} value={String(stats.count)} />
+          <StatCard icon={CheckCircle2} label={t("agencyQa.attendance.avgPunctuality")} value={`${stats.avgPunct}%`}
             tone={stats.avgPunct >= 90 ? "ok" : stats.avgPunct >= 75 ? "warn" : "bad"} />
-          <StatCard icon={Clock} label="Tardanzas (total)" value={String(stats.totalTard)}
+          <StatCard icon={Clock} label={t("agencyQa.attendance.lateTotal")} value={String(stats.totalTard)}
             tone={stats.totalTard ? "warn" : "ok"} />
-          <StatCard icon={AlertTriangle} label="A revisar" value={String(stats.aRevisar)}
+          <StatCard icon={AlertTriangle} label={t("agencyQa.attendance.toReview")} value={String(stats.aRevisar)}
             tone={stats.aRevisar ? "bad" : "ok"} />
         </div>
       )}
@@ -84,14 +90,14 @@ export default function QaAttendancePanel({ role }: { role: QaRole }) {
             <table className="tabla-movil w-full min-w-[680px] text-sm">
               <thead>
                 <tr className="border-b border-border text-xs text-muted-foreground">
-                  <th className="px-4 py-3 text-left font-semibold">Persona</th>
-                  <th className="px-3 py-3 text-left font-semibold">Turno</th>
-                  <th className="px-3 py-3 text-right font-semibold">Días</th>
-                  <th className="px-3 py-3 text-right font-semibold"><LogIn className="inline h-3 w-3" /> Entrada</th>
-                  <th className="px-3 py-3 text-right font-semibold">A tiempo</th>
-                  <th className="px-3 py-3 text-right font-semibold">Tardanzas</th>
-                  <th className="px-3 py-3 text-right font-semibold">Retraso prom.</th>
-                  <th className="px-4 py-3 text-left font-semibold">Estado</th>
+                  <th className="px-4 py-3 text-left font-semibold">{t("agencyQa.person")}</th>
+                  <th className="px-3 py-3 text-left font-semibold">{t("agencyQa.attendance.shift")}</th>
+                  <th className="px-3 py-3 text-right font-semibold">{t("common.days")}</th>
+                  <th className="px-3 py-3 text-right font-semibold"><LogIn className="inline h-3 w-3" /> {t("agencyQa.attendance.checkIn")}</th>
+                  <th className="px-3 py-3 text-right font-semibold">{t("agencyQa.attendance.onTime")}</th>
+                  <th className="px-3 py-3 text-right font-semibold">{t("agencyQa.attendance.late")}</th>
+                  <th className="px-3 py-3 text-right font-semibold">{t("agencyQa.attendance.avgDelay")}</th>
+                  <th className="px-4 py-3 text-left font-semibold">{t("common.status")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -103,7 +109,7 @@ export default function QaAttendancePanel({ role }: { role: QaRole }) {
                   return (
                     <tr key={r.hubstaff_user_id} className={`border-b border-border/60 ${rowTint}`}>
                       <td className="px-4 py-2.5 font-medium">{r.name}</td>
-                      <td className="px-3 py-2.5 text-muted-foreground">{r.turno ?? "—"}</td>
+                      <td className="px-3 py-2.5 text-muted-foreground">{r.turno ? (TURNO_KEY[r.turno] ? t(TURNO_KEY[r.turno]) : r.turno) : "—"}</td>
                       <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">{r.dias}</td>
                       <td className="px-3 py-2.5 text-right tabular-nums">{hhmm(r.checkin_prom_min)}</td>
                       <td className={`px-3 py-2.5 text-right font-semibold tabular-nums ${pctTone}`}>{pct}%</td>
@@ -111,7 +117,7 @@ export default function QaAttendancePanel({ role }: { role: QaRole }) {
                       <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">
                         {r.min_tarde_prom != null ? `+${r.min_tarde_prom}m` : "—"}
                       </td>
-                      <td className="px-4 py-2.5">{statusPill(pct, smallSample)}</td>
+                      <td className="px-4 py-2.5">{statusPill(t, pct, smallSample)}</td>
                     </tr>
                   );
                 })}
@@ -122,29 +128,27 @@ export default function QaAttendancePanel({ role }: { role: QaRole }) {
       </Card>
 
       <p className="px-1 text-[11px] leading-relaxed text-muted-foreground">
-        El <strong>turno</strong> se deduce de los horarios de inicio (mañana 8–4, tarde 4–12, madrugada 12–8).
-        "A tiempo" = arrancó dentro de <strong>10 min</strong> del inicio de su turno (llegar antes cuenta a tiempo).
-        Muestras &lt;4 días = "pocos datos" — el % se afina con el mes.
+        <ConFormato texto={t("agencyQa.attendance.footnote")} />
       </p>
     </div>
   );
 }
 
-function statusPill(pct: number, smallSample: boolean) {
+function statusPill(t: Traductor, pct: number, smallSample: boolean) {
   if (smallSample) {
-    return <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">pocos datos</span>;
+    return <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">{t("agencyQa.attendance.littleData")}</span>;
   }
   if (pct < 80) {
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-destructive/15 px-2 py-0.5 text-[11px] font-medium text-destructive">
-        <AlertTriangle className="h-3 w-3" /> impuntual
+        <AlertTriangle className="h-3 w-3" /> {t("agencyQa.attendance.unpunctual")}
       </span>
     );
   }
   if (pct >= 100) {
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-medium text-success">
-        <CheckCircle2 className="h-3 w-3" /> puntual
+        <CheckCircle2 className="h-3 w-3" /> {t("agencyQa.attendance.punctual")}
       </span>
     );
   }
