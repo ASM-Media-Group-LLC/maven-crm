@@ -7,21 +7,33 @@
 // adelante `ui_build_minimo` obliga a actualizar a quien quede atrás.
 //
 // Tres piezas, todas puras salvo la constante:
-//  - BUILD_PROPIO: la hora del build en ms (vite.config.ts → __MAVEN_BUILD__).
-//    Viaja en la presencia como `b` (useOnlinePresence), que es broadcast: no
-//    escribe nada en la base.
+//  - BUILD_PROPIO: la hora del build en ms, del <meta name="maven-build"> que
+//    vite.config.ts mete en index.html (lib/marcaDeBuild.ts explica por qué no va
+//    en el JavaScript). Viaja en la presencia como `b` (useOnlinePresence), que es
+//    broadcast: no escribe nada en la base.
 //  - versionesDesdePresencia: quién está conectado con un bundle anterior a un
 //    mínimo, o sin `b` (los bundles de antes de este cambio no lo mandan).
 //  - crearVigiaDelMinimo: al volver el foco, con freno, lee app_flags.valor de
 //    'ui_build_minimo' y, si el build propio es más viejo, fuerza la
 //    actualización UNA vez por pestaña (pwa.ts la conecta).
 
-/** La hora del build de ESTA pestaña (ms). 0 = no se sabe (tests, o un build sin
- *  el define): en ese caso no se manda `b` ni se fuerza nada. */
-export const BUILD_PROPIO: number =
-  typeof __MAVEN_BUILD__ === "number" && Number.isFinite(__MAVEN_BUILD__) && __MAVEN_BUILD__ > 0
-    ? __MAVEN_BUILD__
-    : 0;
+import { META_DEL_BUILD, interpretarMarcaDeBuild } from "./marcaDeBuild";
+
+/** La hora del build que cargó ESTA pestaña, leída del documento. */
+export function buildDelDocumento(
+  doc: { querySelector(sel: string): { getAttribute(n: string): string | null } | null } | null | undefined,
+): number {
+  try {
+    return interpretarMarcaDeBuild(doc?.querySelector(`meta[name="${META_DEL_BUILD}"]`)?.getAttribute("content"));
+  } catch {
+    return 0;
+  }
+}
+
+/** La hora del build de ESTA pestaña (ms), leída UNA vez al arrancar. 0 = no se
+ *  sabe (tests, o un index.html sin el <meta>): en ese caso no se manda `b` ni se
+ *  fuerza nada. El index.html y los chunks que carga son del mismo deploy. */
+export const BUILD_PROPIO: number = buildDelDocumento(typeof document === "undefined" ? null : document);
 
 /** `b` tal como viaja en la presencia: un número de ms válido, o null. */
 export function buildDeLaPresencia(p: unknown): number | null {
@@ -90,6 +102,7 @@ export function interpretarMinimo(valor: unknown, ahora: number): number | null 
 export interface AlmacenDeLaPestana {
   getItem(clave: string): string | null;
   setItem(clave: string, valor: string): void;
+  removeItem?(clave: string): void;
 }
 
 export interface DependenciasDelVigia {
@@ -97,8 +110,9 @@ export interface DependenciasDelVigia {
   propio: number;
   /** Lee app_flags.valor de 'ui_build_minimo'. Puede tirar o devolver null. */
   leerMinimo: () => Promise<unknown>;
-  /** Trae el bundle nuevo (update del SW y recarga). */
-  forzar: () => Promise<void> | void;
+  /** Trae el bundle nuevo (update del SW y recarga). false = no recargó porque a
+   *  último momento apareció una llamada (ver forzarActualizacion). */
+  forzar: () => Promise<boolean | void> | boolean | void;
   /** sessionStorage (o null si no hay). */
   almacen: AlmacenDeLaPestana | null;
   /** true mientras no se puede recargar (una llamada de LiveKit conectada en esta
@@ -163,7 +177,19 @@ export function crearVigiaDelMinimo(d: DependenciasDelVigia): () => Promise<Resu
       } catch {
         return "sin_almacen";
       }
-      await d.forzar();
+      const recargo = await d.forzar();
+      if (recargo === false) {
+        // Se frenó a último momento (entró una llamada mientras se buscaba el SW
+        // nuevo). La marca se borra: si quedara, la próxima revisión diría
+        // «ya_forzado» y esta pestaña no se actualizaría nunca.
+        try {
+          if (d.almacen.removeItem) d.almacen.removeItem(CLAVE_DEL_FORZADO);
+          else d.almacen.setItem(CLAVE_DEL_FORZADO, "");
+        } catch {
+          /* sin poder borrarla, a lo sumo esta pestaña no se fuerza: nunca un bucle */
+        }
+        return "en_llamada";
+      }
       return "forzado";
     } finally {
       enCurso = false;

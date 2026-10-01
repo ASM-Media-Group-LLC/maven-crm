@@ -106,7 +106,9 @@ export async function initPWA() {
     const alVolver = crearVigiaDelMinimo({
       propio: BUILD_PROPIO,
       leerMinimo: leerUiBuildMinimo,
-      forzar: () => forzarActualizacion(registro, updateSW),
+      // La llamada se vuelve a mirar justo antes de recargar: la búsqueda del SW
+      // nuevo tarda hasta 6,5 s y en ese rato alguien puede entrar a una.
+      forzar: () => forzarActualizacion(registro, updateSW, () => window.location.reload(), hayLlamadaActiva),
       almacen: almacenDeLaPestana(),
       ocupado: hayLlamadaActiva,
       ahora: () => Date.now(),

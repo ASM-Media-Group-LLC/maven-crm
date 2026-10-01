@@ -2,6 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { VitePWA } from "vite-plugin-pwa";
+import { pluginMarcaDeBuild } from "./frontend/src/lib/marcaDeBuild";
 
 // https://vitejs.dev/config/
 //
@@ -18,13 +19,6 @@ import { VitePWA } from "vite-plugin-pwa";
 export default defineConfig(({ mode }) => ({
   root: "frontend",
   publicDir: "public",
-  // La hora del build (ms). Viaja en la presencia como `b` y se compara con
-  // app_flags 'ui_build_minimo' para obligar a actualizar a las pestañas con un
-  // bundle viejo (lib/versionDelBundle.ts). En `npm run dev` es la hora en que
-  // arrancó el servidor.
-  define: {
-    __MAVEN_BUILD__: JSON.stringify(Date.now()),
-  },
   server: {
     host: "::",
     // Honour the PORT env var when present (Claude Code preview /
@@ -37,6 +31,10 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [
     react(),
+    // La hora del build va como <meta> en index.html, NO en el JavaScript: así dos
+    // builds del mismo código dan los mismos chunks y el mismo sw.js (ver
+    // lib/marcaDeBuild.ts). En `npm run dev` es la hora en que arrancó el servidor.
+    pluginMarcaDeBuild(),
     mode === "production" && VitePWA({
       registerType: "prompt",
       injectRegister: false,

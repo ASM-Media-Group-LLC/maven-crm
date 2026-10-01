@@ -13,6 +13,8 @@ const uno = (m: Record<string, string>) => Object.values(m)[0] ?? "";
 const FUENTE_PRESENCIA = uno((import.meta as unknown as Glob).glob("/frontend/src/hooks/useOnlinePresence.ts", { query: "?raw", import: "default", eager: true }));
 const FUENTE_PWA = uno((import.meta as unknown as Glob).glob("/frontend/src/pwa.ts", { query: "?raw", import: "default", eager: true }));
 const FUENTE_VITE = uno((import.meta as unknown as Glob).glob("/vite.config.ts", { query: "?raw", import: "default", eager: true }));
+// Todo lo que entra en los chunks: ninguno puede llevar la hora del build.
+const FUENTES_DEL_BUNDLE = (import.meta as unknown as Glob).glob("/frontend/src/**/*.{ts,tsx}", { query: "?raw", import: "default", eager: true });
 
 const base = vi.hoisted(() => ({
   sesion: { user: { id: "yo" } } as unknown,
@@ -40,6 +42,9 @@ import {
   type AlmacenDeLaPestana, type DependenciasDelVigia,
 } from "@/lib/versionDelBundle";
 import { leerUiBuildMinimo, forzarActualizacion } from "@/lib/minimoDelBundle";
+import { buildDelDocumento } from "@/lib/versionDelBundle";
+import { pluginMarcaDeBuild, interpretarMarcaDeBuild, META_DEL_BUILD } from "@/lib/marcaDeBuild";
+import { marcarLlamadaActiva, quitarLlamadaActiva, hayLlamadaActiva, olvidarLlamadasActivas } from "@/lib/llamadaActiva";
 
 beforeEach(() => {
   base.sesion = { user: { id: "yo" } };
@@ -109,7 +114,7 @@ describe("la presencia lleva el build (useOnlinePresence)", () => {
     expect(cuerpo).toContain("versionesDesdePresencia(canal?.presenceState?.()");
     expect(cuerpo).not.toMatch(/supabase|\.from\(|\.rpc\(/);
   });
-  it("en los tests no hay build (sin el define de Vite): no se manda b ni se fuerza nada", () => {
+  it("en los tests no hay build (sin el <meta> de index.html): no se manda b ni se fuerza nada", () => {
     expect(BUILD_PROPIO).toBe(0);
   });
 });
@@ -331,6 +336,233 @@ describe("forzarActualizacion: busca el SW nuevo y recarga", () => {
   });
 });
 
+// ─── La llamada que entra mientras se busca el SW nuevo ─────────────────────
+//
+// Entre la decisión del vigía y la recarga pasan hasta 6,5 s (update() hasta 5 s y
+// el SW en espera 1,5 s). Camino real: tocar el aviso de un llamado de Cowork
+// enfoca una pestaña vieja, el foco despierta al vigía y la persona entra a la
+// llamada en esos segundos. Antes la llamada se miraba UNA vez, al principio.
+
+describe("forzarActualizacion vuelve a mirar la llamada justo antes de recargar", () => {
+  const registroLento = (waiting: unknown) =>
+    ({ update: () => new Promise<void>((r) => setTimeout(r, 3000)), waiting } as unknown as ServiceWorkerRegistration);
+
+  it("si la llamada entra durante update(): no recarga y devuelve false", async () => {
+    vi.useFakeTimers();
+    try {
+      let enLlamada = false;
+      const recargar = vi.fn();
+      const p = forzarActualizacion(registroLento(null), vi.fn(), recargar, () => enLlamada);
+      setTimeout(() => { enLlamada = true; }, 1000);
+      await vi.advanceTimersByTimeAsync(10_000);
+      // MUTANTE: sin el `if (ocupado()) return false` antes de recargar → recarga.
+      expect(await p).toBe(false);
+      expect(recargar).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("con un SW esperando y una llamada ya conectada: ni updateSW(true) (que recarga solo) ni recarga", async () => {
+    vi.useFakeTimers();
+    try {
+      let enLlamada = false;
+      const updateSW = vi.fn(() => Promise.resolve());
+      const recargar = vi.fn();
+      const p = forzarActualizacion(registroLento({}), updateSW, recargar, () => enLlamada);
+      setTimeout(() => { enLlamada = true; }, 1000);
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(await p).toBe(false);
+      // MUTANTE: sin mirar antes de updateSW(true), el SW nuevo toma el control y la
+      // librería recarga por su cuenta.
+      expect(updateSW).not.toHaveBeenCalled();
+      expect(recargar).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("si la llamada entra en el segundo y medio de espera del SW: no recarga", async () => {
+    vi.useFakeTimers();
+    try {
+      let enLlamada = false;
+      const updateSW = vi.fn(() => Promise.resolve());
+      const recargar = vi.fn();
+      const p = forzarActualizacion({ update: () => Promise.resolve(), waiting: {} } as unknown as ServiceWorkerRegistration, updateSW, recargar, () => enLlamada);
+      await vi.advanceTimersByTimeAsync(100);
+      expect(updateSW).toHaveBeenCalledWith(true);
+      enLlamada = true;
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(await p).toBe(false);
+      expect(recargar).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("sin pasarle `ocupado`, mira la llamada de LiveKit de la pestaña (no corta una por olvido)", async () => {
+    olvidarLlamadasActivas();
+    marcarLlamadaActiva("sala-x");
+    try {
+      const recargar = vi.fn();
+      expect(await forzarActualizacion({ update: () => Promise.resolve(), waiting: null } as unknown as ServiceWorkerRegistration, vi.fn(), recargar)).toBe(false);
+      expect(recargar).not.toHaveBeenCalled();
+    } finally {
+      olvidarLlamadasActivas();
+    }
+  });
+
+  it("sin llamada recarga y devuelve true", async () => {
+    vi.useFakeTimers();
+    try {
+      const recargar = vi.fn();
+      const p = forzarActualizacion(registroLento(null), vi.fn(), recargar, () => false);
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(await p).toBe(true);
+      expect(recargar).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("el vigía con una llamada que entra a último momento (la sonda de la revisión)", () => {
+  /** sessionStorage de mentira con removeItem, como el de verdad. */
+  function sesion() {
+    const datos = new Map<string, string>();
+    return {
+      datos,
+      getItem: (k: string) => datos.get(k) ?? null,
+      setItem: (k: string, v: string) => { datos.set(k, v); },
+      removeItem: (k: string) => { datos.delete(k); },
+    };
+  }
+
+  it("no corta la llamada, borra la marca y vuelve a intentar cuando la llamada termina", async () => {
+    vi.useFakeTimers();
+    olvidarLlamadasActivas();
+    try {
+      let ahora = 1_000_000;
+      let llamadasCortadas = 0;
+      const recargar = vi.fn(() => { if (hayLlamadaActiva()) llamadasCortadas++; });
+      const registro = { update: () => new Promise<void>((r) => setTimeout(r, 3000)), waiting: null } as unknown as ServiceWorkerRegistration;
+      const pestana = sesion();
+      const vigia = crearVigiaDelMinimo({
+        propio: 100, leerMinimo: async () => "200", almacen: pestana, ocupado: hayLlamadaActiva,
+        ahora: () => ahora, desde: ahora - FRENO_DEL_MINIMO_MS - 1,
+        forzar: () => forzarActualizacion(registro, async () => {}, recargar, hayLlamadaActiva),
+      });
+
+      const p = vigia();
+      setTimeout(() => marcarLlamadaActiva("sala-1"), 1000); // entra mientras se busca el SW
+      await vi.advanceTimersByTimeAsync(10_000);
+      // Línea base (antes de este cambio): «forzado», 1 recarga con la llamada conectada.
+      expect(await p).toBe("en_llamada");
+      expect(recargar).not.toHaveBeenCalled();
+      expect(llamadasCortadas).toBe(0);
+      // MUTANTE: sin borrar la marca, la próxima revisión diría «ya_forzado» y la
+      // pestaña quedaría vieja para siempre.
+      expect(pestana.getItem(CLAVE_DEL_FORZADO)).toBeNull();
+
+      // Termina la llamada; en la próxima vuelta del foco (tras el freno) sí se actualiza.
+      quitarLlamadaActiva("sala-1");
+      ahora += FRENO_DEL_MINIMO_MS;
+      const q = vigia();
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(await q).toBe("forzado");
+      expect(recargar).toHaveBeenCalledTimes(1);
+      expect(llamadasCortadas).toBe(0);
+    } finally {
+      olvidarLlamadasActivas();
+      vi.useRealTimers();
+    }
+  });
+
+  it("sin removeItem, la marca se vacía igual", async () => {
+    const datos = new Map<string, string>();
+    const almacenSinRemove: AlmacenDeLaPestana = { getItem: (k) => datos.get(k) ?? null, setItem: (k, v) => { datos.set(k, v); } };
+    const revisar = crearVigiaDelMinimo({
+      propio: 100, leerMinimo: async () => "200", almacen: almacenSinRemove, ahora: () => 1e9, forzar: () => false,
+    });
+    expect(await revisar()).toBe("en_llamada");
+    expect(datos.get(CLAVE_DEL_FORZADO)).toBe("");
+  });
+});
+
+// ─── La hora del build, fuera de los chunks ─────────────────────────────────
+//
+// Antes era un `define` de Vite (Date.now()) que caía en el chunk de entrada: dos
+// builds del MISMO código cambiaban 219 de 264 nombres de chunks, sw.js y la
+// precaché. Docker rearma el frontend también en merges que no tocan el bundle, y
+// cada uno le mostraba «Nueva versión disponible» a todo el mundo. Ahora va como
+// <meta> en index.html (sin caché y fuera de la precaché).
+
+describe("la marca de build va en index.html, no en el JavaScript", () => {
+  it("el plugin mete <meta name=\"maven-build\"> con la hora del build, la misma en cada página", () => {
+    let t = 1_790_000_000_000;
+    const plugin = pluginMarcaDeBuild(() => t++);
+    const etiquetas = plugin.transformIndexHtml();
+    expect(etiquetas).toEqual([
+      { tag: "meta", attrs: { name: META_DEL_BUILD, content: "1790000000000" }, injectTo: "head" },
+    ]);
+    // Se toma UNA vez, al crear el plugin: index.html y harness.html dicen lo mismo.
+    expect(plugin.transformIndexHtml()).toEqual(etiquetas);
+  });
+
+  it("vite.config.ts usa el plugin y NO define la hora en el código", () => {
+    expect(FUENTE_VITE).toMatch(/plugins: \[\s*react\(\),[\s\S]*pluginMarcaDeBuild\(\),/);
+    // MUTANTE: volver al define → Date.now() en vite.config.ts y la constante en el bundle.
+    expect(FUENTE_VITE).not.toMatch(/\bdefine\s*:/);
+    expect(FUENTE_VITE).not.toContain("Date.now()");
+  });
+
+  it("ningún archivo del bundle usa __MAVEN_BUILD__ (la constante que cambiaba los chunks)", () => {
+    expect(Object.keys(FUENTES_DEL_BUNDLE).length).toBeGreaterThan(500);
+    const con = Object.entries(FUENTES_DEL_BUNDLE)
+      .filter(([ruta, src]) => !ruta.includes("/test/") && src.includes("__MAVEN_BUILD__"))
+      .map(([ruta]) => ruta);
+    expect(con).toEqual([]);
+  });
+
+  it("interpretarMarcaDeBuild: solo ms válidos", () => {
+    expect(interpretarMarcaDeBuild("1790845626241")).toBe(1_790_845_626_241);
+    expect(interpretarMarcaDeBuild(" 1790845626241 ")).toBe(1_790_845_626_241);
+    for (const v of [null, undefined, "", "abc", "-1", "0", "1.5", "1e12", "99999999999999999999"]) {
+      expect(interpretarMarcaDeBuild(v)).toBe(0);
+    }
+  });
+
+  it("buildDelDocumento lee el <meta> del documento; sin él, o roto, 0", () => {
+    const doc = document.implementation.createHTMLDocument("x");
+    expect(buildDelDocumento(doc)).toBe(0);
+    const meta = doc.createElement("meta");
+    meta.setAttribute("name", "maven-build");
+    meta.setAttribute("content", "1790845626241");
+    doc.head.appendChild(meta);
+    expect(buildDelDocumento(doc)).toBe(1_790_845_626_241);
+    meta.setAttribute("content", "ayer");
+    expect(buildDelDocumento(doc)).toBe(0);
+    expect(buildDelDocumento(null)).toBe(0);
+    expect(buildDelDocumento({ querySelector: () => { throw new Error("x"); } })).toBe(0);
+  });
+
+  it("BUILD_PROPIO sale del <meta> de la página al arrancar", async () => {
+    const meta = document.createElement("meta");
+    meta.setAttribute("name", "maven-build");
+    meta.setAttribute("content", "1790845626241");
+    document.head.appendChild(meta);
+    try {
+      vi.resetModules();
+      const fresco = await import("@/lib/versionDelBundle");
+      // MUTANTE: BUILD_PROPIO fijo en 0 (o leído de otro lado) → falla.
+      expect(fresco.BUILD_PROPIO).toBe(1_790_845_626_241);
+    } finally {
+      meta.remove();
+      vi.resetModules();
+    }
+  });
+});
+
 describe("pwa.ts conecta el vigía", () => {
   // pwa.ts importa el módulo virtual del plugin de PWA (no existe en los tests):
   // se lee el archivo.
@@ -340,14 +572,11 @@ describe("pwa.ts conecta el vigía", () => {
     expect(FUENTE_VITE.length).toBeGreaterThan(1000);
   });
   it("con el build propio, la lectura del mínimo, el sessionStorage y la llamada activa", () => {
-    expect(src).toMatch(/crearVigiaDelMinimo\(\{[\s\S]*propio: BUILD_PROPIO,[\s\S]*leerMinimo: leerUiBuildMinimo,[\s\S]*forzar: \(\) => forzarActualizacion\(registro, updateSW\),[\s\S]*almacen: almacenDeLaPestana\(\),[\s\S]*ocupado: hayLlamadaActiva,[\s\S]*desde: Date\.now\(\),/);
+    expect(src).toMatch(/crearVigiaDelMinimo\(\{[\s\S]*propio: BUILD_PROPIO,[\s\S]*leerMinimo: leerUiBuildMinimo,[\s\S]*forzar: \(\) => forzarActualizacion\(registro, updateSW, \(\) => window\.location\.reload\(\), hayLlamadaActiva\),[\s\S]*almacen: almacenDeLaPestana\(\),[\s\S]*ocupado: hayLlamadaActiva,[\s\S]*desde: Date\.now\(\),/);
   });
   it("al volver el foco (focus y visibilitychange), solo con la pestaña visible", () => {
     expect(src).toContain('window.addEventListener("focus", revisar)');
     expect(src).toContain('document.addEventListener("visibilitychange", revisar)');
     expect(src).toMatch(/const revisar = \(\) => \{ if \(document\.visibilityState === "visible"\) void alVolver\(\); \};/);
-  });
-  it("vite.config.ts define __MAVEN_BUILD__ con la hora del build", () => {
-    expect(FUENTE_VITE).toMatch(/__MAVEN_BUILD__: JSON\.stringify\(Date\.now\(\)\)/);
   });
 });
