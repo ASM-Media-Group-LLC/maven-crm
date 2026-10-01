@@ -73,13 +73,20 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Validate role against roles_config (dynamic, not hardcoded)
-      const { data: validRole } = await adminClient
+      // El rol tiene que existir y estar activo EN LA AGENCIA de la persona: desde
+      // 20261001190000_roles_por_agencia cada agencia tiene sus roles y el mismo
+      // nombre puede estar en varias (con .maybeSingle() eso daba error). select("*")
+      // y filtrar aquí: antes de aplicar la migración no hay tenant_id y se acepta
+      // el único que hay; después, solo el de su agencia.
+      const { data: agenciaDe } = await adminClient
+        .from("tenant_members").select("tenant_id").eq("user_id", user_id).maybeSingle();
+      const { data: rolesConEseNombre } = await adminClient
         .from("roles_config")
-        .select("id")
+        .select("*")
         .eq("name", role)
-        .eq("is_active", true)
-        .maybeSingle();
+        .eq("is_active", true);
+      const validRole = (rolesConEseNombre ?? []).find((r: Record<string, unknown>) =>
+        !("tenant_id" in r) || r.tenant_id === (agenciaDe as { tenant_id?: string } | null)?.tenant_id);
 
       if (!validRole) {
         return new Response(JSON.stringify({ error: `Invalid or inactive role: ${role}` }), {
