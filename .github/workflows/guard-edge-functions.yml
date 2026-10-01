@@ -62,7 +62,7 @@ jobs:
         run: deno test --allow-read supabase/functions/web-push/ supabase/functions/_shared/push-notify.test.ts
 
       # Las acciones de webhooks de manage-api-keys: el guard de arriba las corre sin
-      # tipos; acá el tipo de cada mensaje (clave que existe, variables) y de Datos.
+      # tipos; aquí el tipo de cada mensaje (clave que existe, variables) y de Datos.
       - name: Tipos — manage-api-keys
         run: >-
           deno check
@@ -94,6 +94,13 @@ jobs:
       # sin la migración y cerrarse con ella, y los flujos de la app seguir andando.
       - name: Banco — el Messenger por agencia y sus huecos (PGlite)
         run: deno run -A --node-modules-dir=none --no-lock supabase/tests/chat_agencia_y_huecos.ts
+
+      # Los avisos de sistema («Ana agregó a Beto al grupo») los arma la base: sobre
+      # el mismo fixture, un aviso con texto libre tiene que entrar sin la migración
+      # y no entrar con ella; los siete eventos de la RPC dan el texto exacto que
+      # escribía la app, y avisa exactamente quien puede hacer la acción.
+      - name: Banco — los avisos de sistema del Messenger (PGlite)
+        run: deno run -A --node-modules-dir=none --no-lock supabase/tests/chat_mensajes_de_sistema.ts
 
       # `deno test --no-check` no mira tipos: sin este paso, el tipo de msg() (clave que
       # existe, variables exactas) y los @ts-expect-error de mensajes.test.ts nunca

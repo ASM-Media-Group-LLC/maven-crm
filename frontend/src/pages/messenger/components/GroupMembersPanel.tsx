@@ -17,12 +17,14 @@ import { cn } from "@/lib/utils";
 import { puedeVerLaListaDeMiembros } from "../utils";
 import { useCanalQueRevive } from "@/hooks/useCanalQueRevive";
 import { useLanguage } from "@/hooks/useLanguage";
+import { avisarEvento, type ClienteParaAvisos, type EventoDeSistema } from "../avisoDeSistema";
 
-// ⚠️ Los `content` de los mensajes de sistema que se insertan acá ("X agregó a Y
-// al grupo", "X salió del grupo"…) se GUARDAN en chat_messages y los lee todo el
-// grupo, cada uno en su idioma: son dato y se quedan en español, igual que el
-// "Usuario"/"Admin" de relleno que llevan adentro. Lo que se traduce es lo que ve
-// quien está mirando: toasts, etiquetas y confirmaciones.
+// ⚠️ Los avisos de sistema de este panel ("X agregó a Y al grupo", "X salió del
+// grupo"…) los arma la BASE (chat_evento_sistema, ver avisoDeSistema.ts) con los
+// nombres de profiles: aquí solo se dice qué pasó y a quién. Se GUARDAN en
+// chat_messages y los lee todo el grupo, cada uno en su idioma: son dato y se
+// quedan en español, con su "Usuario"/"Admin" de relleno. Lo que se traduce es lo
+// que ve quien está mirando: toasts, etiquetas y confirmaciones.
 
 interface GroupMembersPanelProps {
   conversation: ConversationWithDetails;
@@ -187,7 +189,11 @@ export default function GroupMembersPanel({
     return () => { vigente = false; };
   }, [conversation.id]);
 
-  const reqName = (uid: string, sinNombre = t("messenger.usuario")) => reqProfiles[uid]?.full_name || profiles[uid]?.full_name || sinNombre;
+  const reqName = (uid: string) => reqProfiles[uid]?.full_name || profiles[uid]?.full_name || t("messenger.usuario");
+
+  // El aviso de lo que se acaba de hacer: el texto lo arma la base.
+  const avisar = (evento: EventoDeSistema, objetivo?: string) =>
+    avisarEvento(supabase as unknown as ClienteParaAvisos, conversation.id, evento, { objetivo });
 
   const approveRequest = async (req: { id: string; user_id: string }) => {
     setReqActing(req.id);
@@ -196,10 +202,7 @@ export default function GroupMembersPanel({
       toast.error(t("messenger.members.noSePudoAprobar"));
     } else {
       await supabase.from("chat_join_requests").delete().eq("id", req.id);
-      await supabase.from("chat_messages").insert({
-        conversation_id: conversation.id, sender_id: user!.id, type: "system",
-        content: `${profiles[user!.id]?.full_name || "Admin"} aceptó a ${reqName(req.user_id, "Usuario")} en el grupo`,
-      });
+      await avisar("acepto", req.user_id);
       setPendingReqs(prev => prev.filter(r => r.id !== req.id));
       onMembersChanged();
       toast.success(t("messenger.members.solicitudAprobada"));
@@ -220,7 +223,7 @@ export default function GroupMembersPanel({
     if (!showAddPanel) return;
     const load = async () => {
       setLoadingUsers(true);
-      // Selector: acá no se ofrece a nadie que esté en la papelera.
+      // Selector: aquí no se ofrece a nadie que esté en la papelera.
       const { data } = await supabase
         .from("profiles").select("id, full_name, avatar_url").is("deleted_at", null);
       setAllUsers((data as UserProfile[]) || []);
@@ -241,7 +244,6 @@ export default function GroupMembersPanel({
   const handleAddMember = async (userId: string) => {
     setAddingUserId(userId);
     const perfil = allUsers.find(u => u.id === userId);
-    const name = perfil?.full_name || "Usuario"; // dato: va al mensaje de sistema
     const nombreVisible = perfil?.full_name || t("messenger.usuario");
 
     // Un no-admin en un grupo con aprobación activada NO suma directo: crea una solicitud.
@@ -264,13 +266,7 @@ export default function GroupMembersPanel({
       toast.error(t("messenger.members.errorAgregar"));
     } else {
       toast.success(t("messenger.members.agregado", { name: nombreVisible }));
-      // Send system message
-      await supabase.from("chat_messages").insert({
-        conversation_id: conversation.id,
-        sender_id: user!.id,
-        content: `${profiles[user!.id]?.full_name || "Admin"} agregó a ${name} al grupo`,
-        type: "system",
-      });
+      await avisar("agrego", userId);
       onMembersChanged();
     }
     setAddingUserId(null);
@@ -288,12 +284,7 @@ export default function GroupMembersPanel({
       toast.error(t("messenger.members.errorEliminar"));
     } else {
       toast.success(t("messenger.members.eliminado", { name: removingUser.name }));
-      await supabase.from("chat_messages").insert({
-        conversation_id: conversation.id,
-        sender_id: user!.id,
-        content: `${profiles[user!.id]?.full_name || "Admin"} eliminó a ${removingUser.name} del grupo`,
-        type: "system",
-      });
+      await avisar("elimino", removingUser.id);
       onMembersChanged();
     }
     setRemoving(false);
@@ -315,14 +306,7 @@ export default function GroupMembersPanel({
       toast.error(t("messenger.members.noSePudoRol"));
     } else {
       toast.success(makeAdmin ? t("messenger.members.ahoraEsAdmin", { name: name }) : t("messenger.members.yaNoEsAdmin", { name: name }));
-      await supabase.from("chat_messages").insert({
-        conversation_id: conversation.id,
-        sender_id: user!.id,
-        content: makeAdmin
-          ? `${profiles[user!.id]?.full_name || "Admin"} nombró admin a ${name}`
-          : `${profiles[user!.id]?.full_name || "Admin"} quitó admin a ${name}`,
-        type: "system",
-      });
+      await avisar(makeAdmin ? "nombro_admin" : "quito_admin", userId);
       onMembersChanged();
     }
     setUpdatingRole(null);
@@ -330,7 +314,6 @@ export default function GroupMembersPanel({
 
   const handleLeaveGroup = async () => {
     setLeavingGroup(true);
-    const myName = profiles[user!.id]?.full_name || "Usuario";
 
     // Si soy el ÚLTIMO admin y quedan otros miembros, promuevo al más antiguo para no dejar
     // el grupo sin admin (mientras sigo siendo admin, que es cuando la RLS me deja).
@@ -353,14 +336,10 @@ export default function GroupMembersPanel({
         .eq("user_id", successor.user_id);
     }
 
-    // El mensaje de sistema VA ANTES de borrar mi fila: una vez que dejo de ser participante,
-    // la RLS de chat_messages rechaza el INSERT (antes fallaba en silencio y nadie se enteraba).
-    await supabase.from("chat_messages").insert({
-      conversation_id: conversation.id,
-      sender_id: user!.id,
-      content: `${myName} salió del grupo`,
-      type: "system",
-    });
+    // El aviso VA ANTES de borrar mi fila: una vez que dejo de ser participante, la
+    // base ya no me deja avisar nada en ese grupo (antes fallaba en silencio y nadie
+    // se enteraba).
+    await avisar("salio");
 
     const { error } = await supabase
       .from("chat_participants")
@@ -557,7 +536,6 @@ export default function GroupMembersPanel({
             </div>
           ) : conversation.participants.map(p => {
             const profile = profiles[p.user_id];
-            const name = profile?.full_name || "Usuario"; // dato: va a los mensajes de sistema
             const nombreVisible = profile?.full_name || t("messenger.usuario");
             const online = isOnline(p.user_id);
             const isSelf = p.user_id === user?.id;
@@ -597,7 +575,7 @@ export default function GroupMembersPanel({
                       variant="ghost"
                       size="icon"
                       className="h-7 w-7 shrink-0 text-muted-foreground hover:text-amber-500"
-                      onClick={() => handleToggleAdmin(p.user_id, name, p.role !== "admin")}
+                      onClick={() => handleToggleAdmin(p.user_id, nombreVisible, p.role !== "admin")}
                       disabled={updatingRole === p.user_id}
                       title={p.role === "admin" ? t("messenger.members.quitarAdmin") : t("messenger.members.hacerAdmin")}
                       aria-label={p.role === "admin" ? t("messenger.members.quitarAdminA", { name: nombreVisible }) : t("messenger.members.hacerAdminA", { name: nombreVisible })}
@@ -614,7 +592,7 @@ export default function GroupMembersPanel({
                       variant="ghost"
                       size="icon"
                       className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
-                      onClick={() => setRemovingUser({ id: p.user_id, name })}
+                      onClick={() => setRemovingUser({ id: p.user_id, name: nombreVisible })}
                       title={t("messenger.members.eliminarDelGrupo")}
                       aria-label={t("messenger.members.eliminarADelGrupo", { name: nombreVisible })}
                     >

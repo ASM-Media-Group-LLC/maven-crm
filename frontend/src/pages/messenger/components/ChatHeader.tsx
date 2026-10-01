@@ -18,6 +18,7 @@ import AvatarUpload from "./AvatarUpload";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { getInitials, puedeVerLaListaDeMiembros } from "../utils";
+import { avisarEvento, type ClienteParaAvisos } from "../avisoDeSistema";
 import { useLanguage } from "@/hooks/useLanguage";
 
 interface ChatHeaderProps {
@@ -81,12 +82,9 @@ export default function ChatHeader({
     const { data, error } = await supabase
       .from("chat_conversations").update({ name: v }).eq("id", conversation.id).select("id");
     if (error || !data || data.length === 0) { toast.error(t("messenger.header.noSePudoRenombrar")); return; }
-    // Mensaje de sistema: se GUARDA y lo leen todos, cada uno en su idioma. Es
-    // dato, no se traduce.
-    await supabase.from("chat_messages").insert({
-      conversation_id: conversation.id, sender_id: user!.id, type: "system",
-      content: `${profiles[user?.id ?? ""]?.full_name || "Alguien"} cambió el nombre del grupo a "${v}"`,
-    });
+    // El aviso «X cambió el nombre del grupo a "…"» lo arma la base con el nombre
+    // de quien renombra (avisoDeSistema.ts). Se guarda en español: es dato.
+    await avisarEvento(supabase as unknown as ClienteParaAvisos, conversation.id, "renombro", { texto: v });
     onAvatarChanged?.();
   };
   useEffect(() => { if (editingName) { nameInputRef.current?.focus(); nameInputRef.current?.select(); } }, [editingName]);
