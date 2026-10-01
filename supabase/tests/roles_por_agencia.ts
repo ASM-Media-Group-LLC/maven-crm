@@ -1,4 +1,4 @@
-// Los roles por agencia (migración 20261001190000_roles_por_agencia.sql), probados
+// Los roles por agencia (migración 20261001211000_roles_por_agencia.sql), probados
 // contra un Postgres de verdad (PGlite) cargado con el catálogo de PROD del 01/10
 // (fixtures/prod_roles_20261001.sql): las 56 funciones de roles copiadas textual,
 // con sus huellas.
@@ -8,7 +8,7 @@
 // Cómo está armado:
 //   0. El fixture trae sus huellas md5(prosrc); aquí se recalculan y, si alguna no
 //      coincide, el banco falla (el fixture no se toca a mano).
-//   1. La migración corre sobre prod + 20261001150000_agencias_base, y deja cada
+//   1. La migración corre sobre prod + 20261001210000_agencias_base, y deja cada
 //      función reescrita (respaldo incluido).
 //   2. EQUIVALENCIA: con una sola agencia, cada función de permisos da lo mismo
 //      que en prod, persona por persona (una matriz de ~40 preguntas × 8 personas,
@@ -26,8 +26,8 @@ import { PGlite } from "npm:@electric-sql/pglite@0.3";
 
 const leer = (rel: string) => Deno.readTextFileSync(new URL(rel, import.meta.url));
 const FIXTURE = leer("./fixtures/prod_roles_20261001.sql");
-const BASE = leer("../migrations/20261001150000_agencias_base.sql");
-const NOMBRE = "20261001190000_roles_por_agencia.sql";
+const BASE = leer("../migrations/20261001210000_agencias_base.sql");
+const NOMBRE = "20261001211000_roles_por_agencia.sql";
 const MIG = leer(`../migrations/${NOMBRE}`);
 const VUELTA = MIG.split("\n").filter((l) => l.startsWith("--|")).map((l) => l.replace(/^--\| ?/, "")).join("\n");
 const HUELLAS = new Map([...FIXTURE.matchAll(/^--   (\w+\([^)]*\))=([0-9a-f]{32})$/gm)].map((m) => [m[1], m[2]]));
@@ -101,7 +101,7 @@ async function nueva(modo: Modo, antes = ""): Promise<PGlite> {
   const db = new PGlite();
   await db.exec(FIXTURE);
   await db.exec(SEMILLA + antes);
-  await aplicar(db, "20261001150000_agencias_base.sql", BASE);
+  await aplicar(db, "20261001210000_agencias_base.sql", BASE);
   if (modo === "con") await aplicar(db, NOMBRE, MIG);
   return db;
 }

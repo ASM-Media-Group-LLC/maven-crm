@@ -74,7 +74,7 @@ Deno.serve(async (req) => {
       }
 
       // El rol tiene que existir y estar activo EN LA AGENCIA de la persona: desde
-      // 20261001190000_roles_por_agencia cada agencia tiene sus roles y el mismo
+      // 20261001211000_roles_por_agencia cada agencia tiene sus roles y el mismo
       // nombre puede estar en varias (con .maybeSingle() eso daba error). select("*")
       // y filtrar aquí: antes de aplicar la migración no hay tenant_id y se acepta
       // el único que hay; después, solo el de su agencia.

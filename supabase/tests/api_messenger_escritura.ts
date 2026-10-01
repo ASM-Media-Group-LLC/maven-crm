@@ -81,12 +81,21 @@ function objetivos(sql: string): string[] {
   for (const p of patrones) for (const m of s.matchAll(p)) if (DE_INTERES.has(m[1].toLowerCase())) hits.add(m[1].toLowerCase());
   return [...hits].sort();
 }
+// Migraciones que tocan objetos de este banco pero necesitan tablas que sus fixtures no traen.
+// Se prueban en su propio banco, con el motivo al lado.
+const NO_CARGAN_AQUI: Record<string, string> = {
+  "20261001211000_roles_por_agencia.sql":
+    "reescribe is_in_role_group y le suma tenant_id a user_roles, pero necesita roles_config, role_permissions, " +
+    "role_base_grants y sus triggers. Con una agencia da lo mismo que prod persona por persona; se prueba en " +
+    "roles_por_agencia.ts sobre el catálogo de prod.",
+};
 const DIR_MIG = new URL("../migrations/", import.meta.url);
 const CADENA: { n: string; sql: string }[] = [];
 const SALTADAS: string[] = [];
 for (const n of [...Deno.readDirSync(DIR_MIG)].map((e) => e.name).filter((x) => /^\d{14}_\w+\.sql$/.test(x) && x.slice(0, 14) > FIXTURE_HASTA).sort()) {
   const sql = Deno.readTextFileSync(new URL(n, DIR_MIG));
-  if (n === NOMBRE_B || objetivos(sql).length) CADENA.push({ n, sql }); else SALTADAS.push(n);
+  if (NO_CARGAN_AQUI[n]) SALTADAS.push(n);
+  else if (n === NOMBRE_B || objetivos(sql).length) CADENA.push({ n, sql }); else SALTADAS.push(n);
 }
 const ANTES_DE_B = CADENA.filter((m) => m.n < NOMBRE_B);
 const DESPUES_DE_B = CADENA.filter((m) => m.n > NOMBRE_B);

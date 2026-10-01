@@ -1,7 +1,7 @@
 -- ROLES POR AGENCIA (fase 0, entrega 2a del plan «Maven Basic»).
 -- Banco: supabase/tests/roles_por_agencia.ts, sobre el catálogo de prod del 01/10
 -- (fixtures/prod_roles_20261001.sql, con las huellas de las 56 funciones).
--- Requiere 20261001150000_agencias_base (una persona, una agencia).
+-- Requiere 20261001210000_agencias_base (una persona, una agencia).
 --
 -- Hasta hoy los roles eran de todo Maven: roles_config.name era único en toda la
 -- base, role_groups y role_base_grants tenían el nombre como clave, y las 45
@@ -261,7 +261,7 @@ create table public.roles_por_agencia_respaldo (fn text primary key, def text no
 alter table public.roles_por_agencia_respaldo enable row level security;
 revoke all on table public.roles_por_agencia_respaldo from public, anon, authenticated;
 comment on table public.roles_por_agencia_respaldo is
-  'Definiciones de antes de 20261001190000_roles_por_agencia, para su vuelta atrás. Sin políticas: solo postgres y service_role.';
+  'Definiciones de antes de 20261001211000_roles_por_agencia, para su vuelta atrás. Sin políticas: solo postgres y service_role.';
 
 -- Cuántas veces aplica cada regla en cada función (R1..R4, ver abajo).
 create temp table _roles_reglas (fn text primary key, esperado int[] not null) on commit drop;
@@ -324,7 +324,7 @@ $q$,
 $q$  IF NOT public.can_manage_users(_caller) THEN
     RETURN jsonb_build_object('allowed', false, 'reason','no_user_management_permission');
   END IF;
-  -- Otra agencia: nadie gestiona a quien no es de la suya (20261001190000).
+  -- Otra agencia: nadie gestiona a quien no es de la suya (20261001211000).
   IF _target IS NOT NULL
      AND (SELECT tm.tenant_id FROM public.tenant_members tm WHERE tm.user_id = _target)
          IS DISTINCT FROM (SELECT tm.tenant_id FROM public.tenant_members tm WHERE tm.user_id = _caller) THEN

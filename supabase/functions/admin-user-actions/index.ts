@@ -1229,7 +1229,7 @@ Deno.serve(async (req) => {
         // endpoint sí lo hace). Se valida igual acá: si no existe o está inactivo,
         // no se escribe. La jerarquía ya la chequeó gUpdate arriba.
         // En la agencia de la persona (ver manage-user-roles: cada agencia tiene
-        // sus roles desde 20261001190000; select("*") para andar antes y después).
+        // sus roles desde 20261001211000; select("*") para andar antes y después).
         const { data: agenciaDe } = await adminClient
           .from("tenant_members").select("tenant_id").eq("user_id", user_id).maybeSingle();
         const { data: rolesConEseNombre } = await adminClient

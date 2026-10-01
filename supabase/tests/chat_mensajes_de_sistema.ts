@@ -92,9 +92,17 @@ function objetivos(sql: string): string[] {
   return [...hits].sort();
 }
 const FIXTURE_HASTA = "20260929180000";
+// Migraciones que tocan objetos de este banco pero necesitan tablas que sus fixtures no traen.
+// Se prueban en su propio banco, con el motivo al lado.
+const NO_CARGAN_AQUI: Record<string, string> = {
+  "20261001211000_roles_por_agencia.sql":
+    "reescribe is_in_role_group y le suma tenant_id a user_roles, pero necesita roles_config, role_permissions, " +
+    "role_base_grants y sus triggers. Con una agencia da lo mismo que prod persona por persona; se prueba en " +
+    "roles_por_agencia.ts sobre el catálogo de prod.",
+};
 const DIR_MIG = new URL("../migrations/", import.meta.url);
 const CADENA: { n: string; sql: string }[] = [...Deno.readDirSync(DIR_MIG)].map((e) => e.name)
-  .filter((n) => /^\d{14}_\w+\.sql$/.test(n) && n.slice(0, 14) > FIXTURE_HASTA).sort()
+  .filter((n) => /^\d{14}_\w+\.sql$/.test(n) && n.slice(0, 14) > FIXTURE_HASTA && !NO_CARGAN_AQUI[n]).sort()
   .map((n) => ({ n, sql: n === NOMBRE_1B ? MIG_1B : Deno.readTextFileSync(new URL(n, DIR_MIG)) }))
   .filter((m) => objetivos(m.sql).length > 0);
 const iMia = CADENA.findIndex((m) => m.n === NOMBRE_1B);

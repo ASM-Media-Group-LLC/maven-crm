@@ -25,7 +25,7 @@ export const ROLE_TIER_FLAGS: Record<RoleTier, {
 };
 
 // Guarda el tipo de acceso de un rol en role_groups: UPDATE y, si no había fila,
-// INSERT. No es un upsert porque la clave cambió: desde 20261001190000_roles_por_agencia
+// INSERT. No es un upsert porque la clave cambió: desde 20261001211000_roles_por_agencia
 // es (tenant_id, role_name), así que «onConflict: role_name» ya no encaja. Esto anda
 // igual antes y después de la migración: la RLS deja ver y tocar solo la fila de la
 // propia agencia, y en un INSERT la agencia la pone la base.

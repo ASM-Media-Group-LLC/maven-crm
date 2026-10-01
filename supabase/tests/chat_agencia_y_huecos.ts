@@ -105,7 +105,7 @@ const FIXTURE_HASTA = "20260929180000";
 // el motivo. Si SÍ cambia el Messenger, lo que hay que hacer es sumar al fixture
 // lo que le falta.
 const NO_TOCAN_EL_MESSENGER: Record<string, string> = {
-  "20261001190000_roles_por_agencia.sql":
+  "20261001211000_roles_por_agencia.sql":
     "reescribe is_in_role_group y le suma tenant_id a user_roles, pero necesita las tablas de roles (roles_config, " +
     "role_permissions, role_base_grants y sus triggers) que este fixture no trae. Con una sola agencia da lo mismo que " +
     "prod persona por persona, y con dos se prueba en su propio banco sobre el catálogo de prod: roles_por_agencia.ts.",
