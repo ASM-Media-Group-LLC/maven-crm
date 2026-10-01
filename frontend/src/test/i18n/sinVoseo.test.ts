@@ -24,6 +24,8 @@ const VOSEO = [
   "guardá", "cambiá", "copiá", "confirmá", "revisá", "intentá", "reintentá", "esperá",
   "actualizá", "completá", "ingresá", "invitá", "tocá", "apretá", "abrí", "cerrá",
   "subí", "leé", "dejá", "buscá", "activá", "asigná", "reanudá", "verificá", "rechazá",
+  // «compará en tiempo constante» vivió en la referencia de los webhooks hasta el 01/10.
+  "compará", "generá", "revocá", "retirá",
   "pedile", "pediles", "avisale", "decile", "ponele", "hacele", "entregale", "contale",
   "pedime", "pasame", "avisame", "decime", "mostrame", "contame", "escribime", "mandame",
   "fijate", "acordate", "asegurate", "ponelo", "hacelo", "dejalo", "borralo", "revocala",

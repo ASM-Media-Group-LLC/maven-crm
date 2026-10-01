@@ -1,7 +1,8 @@
 // Las reglas de messenger:write en manage-api-keys (diseño §2.1), por comportamiento,
 // y las guardas que leen index.ts: que las aplique, que la rotación busque la key
-// reemplazada en ESTA agencia y de ESTA persona, que la pantalla no ofrezca write
-// todavía y que un error de la base al guardar nunca salga crudo con un 500.
+// reemplazada en ESTA agencia y de ESTA persona, que la pantalla reciba el catálogo de
+// la pantalla (con write desde el PR 5) y que un error de la base al guardar nunca
+// salga crudo con un 500.
 
 import { assert, assertEquals } from "jsr:@std/assert";
 import {
@@ -20,12 +21,14 @@ const OTRO = "5a2d9c11-7e3b-4f60-9a8b-0c1d2e3f4a5b";
 const LEE = ["messenger:read"];
 const ESCRIBE = ["messenger:read", "messenger:write"];
 
-Deno.test("catálogo: write existe para validar, pero la pantalla todavía no lo ofrece", () => {
+Deno.test("catálogo: write existe para validar y, desde el PR 5, la pantalla lo ofrece", () => {
   assert(isValidScope("messenger:write") && isValidScope("messenger:read"));
-  assertEquals([...SCOPES_OCULTOS_EN_PANTALLA], ["messenger:write"]);
+  // La pantalla ya tiene el nombre visible, la rotación, la confirmación y la retirada:
+  // no se esconde nada.
+  assertEquals([...SCOPES_OCULTOS_EN_PANTALLA], []);
   assert(SCOPE_CATALOG_COMPLETO.some((s) => s.key === "messenger:write"));
-  assert(!SCOPE_CATALOG.some((s) => s.key === "messenger:write"));
-  assertEquals(SCOPE_CATALOG.length, SCOPE_CATALOG_COMPLETO.length - 1);
+  assert(SCOPE_CATALOG.some((s) => s.key === "messenger:write"));
+  assertEquals(SCOPE_CATALOG.map((s) => s.key), SCOPE_CATALOG_COMPLETO.map((s) => s.key));
   // Las dos son de Messenger: IPs exactas, vencimiento y solo en keys nuevas.
   assertEquals([...SCOPES_MESSENGER], ["messenger:read", "messenger:write"]);
 });

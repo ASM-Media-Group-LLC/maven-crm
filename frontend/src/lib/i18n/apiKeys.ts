@@ -11,8 +11,8 @@ export const PREFIJOS_API_KEYS = ["apiKeys."] as const;
 
 export const apiKeys = {
   "apiKeys.subtitle": {
-    es: "Acceso programático de solo-lectura a los datos de Maven (creadoras, empleados, ventas).",
-    en: "Read-only programmatic access to Maven data (creators, employees, sales).",
+    es: "Acceso programático a los datos de Maven (creadoras, empleados, ventas) y, con su permiso, al Messenger: leerlo y mandar mensajes.",
+    en: "Programmatic access to Maven data (creators, employees, sales) and, with its own permission, to the Messenger: reading it and sending messages.",
   },
   "apiKeys.apiReference": { es: "Referencia del API", en: "API reference" },
   "apiKeys.createKey": { es: "Crear API key", en: "Create API key" },
@@ -56,6 +56,7 @@ export const apiKeys = {
     es: "No se pudo verificar si la persona como la que actúa esta key sigue activa. Recarga la página.",
     en: "Couldn't verify whether the person this key acts as is still active. Reload the page.",
   },
+  "apiKeys.actsAsDisplayName": { es: "como «{name}»", en: "as “{name}”" },
   "apiKeys.status.revoked": { es: "Revocada", en: "Revoked" },
   "apiKeys.status.expired": { es: "Vencida", en: "Expired" },
   "apiKeys.revoke": { es: "Revocar", en: "Revoke" },
@@ -95,6 +96,7 @@ export const apiKeys = {
   "apiKeys.form.exp365": { es: "1 año", en: "1 year" },
   "apiKeys.form.scopes": { es: "API scopes", en: "API scopes" },
   "apiKeys.form.readOnly": { es: "Solo lectura", en: "Read-only" },
+  "apiKeys.form.writes": { es: "Manda mensajes", en: "Sends messages" },
   "apiKeys.form.messengerOnlyNew": {
     es: "El Messenger solo se puede poner al crear una key nueva",
     en: "Messenger can only be added when creating a new key",
@@ -115,6 +117,61 @@ export const apiKeys = {
     es: "Entiendo que la key lee mis conversaciones y las de quienes me escriben.",
     en: "I understand the key reads my conversations and those of people who write to me.",
   },
+  // messenger:write: nombre visible, rotación y la confirmación propia
+  "apiKeys.form.displayName": { es: "Nombre visible", en: "Display name" },
+  "apiKeys.form.displayNamePlaceholder": { es: "Ej: BLU", en: "E.g.: BLU" },
+  "apiKeys.form.displayNameHint": {
+    es: "Es el nombre con el que salen los mensajes de la key, junto a la etiqueta API (por ejemplo «BLU»): lo ven todos en la burbuja, la lista de chats, la campana y el celular. De 2 a 32 caracteres, con letras, números, espacios y . & _ -. No puede parecerse a Maven, a un área (soporte, sistemas, RR. HH.…) ni a una persona de la agencia, y queda reservado para esta integración aunque la key venza.",
+    en: "It's the name the key's messages go out with, next to the API label (for example “BLU”): everyone sees it in the bubble, the chat list, the bell and on their phone. 2 to 32 characters, using letters, numbers, spaces and . & _ -. It can't look like Maven, a department (support, systems, HR…) or a person in the agency, and it stays reserved for this integration even after the key expires.",
+  },
+  "apiKeys.form.displayName.required": {
+    es: "Una key que escribe en el Messenger necesita un nombre visible: el que verán todos junto a la etiqueta API",
+    en: "A key that writes to the Messenger needs a display name: the one everyone will see next to the API label",
+  },
+  "apiKeys.form.displayName.format": {
+    es: "El nombre visible va de 2 a 32 caracteres, con letras, números, espacios y . & _ -",
+    en: "The display name must be 2 to 32 characters long, using letters, numbers, spaces and . & _ -",
+  },
+  "apiKeys.form.displayName.reserved": {
+    es: "Ese nombre visible se parece al de Maven o al de un área (soporte, sistemas, RR. HH., finanzas…): elige otro",
+    en: "That display name looks like Maven's or a department's (support, systems, HR, finance…): choose another one",
+  },
+  "apiKeys.form.replaces": { es: "Reemplaza a…", en: "Replaces…" },
+  "apiKeys.form.replacesNone": { es: "Ninguna: es una integración nueva", en: "None: it's a new integration" },
+  "apiKeys.form.replacesOption": { es: "{name} · «{display}» · {status}", en: "{name} · “{display}” · {status}" },
+  "apiKeys.form.replacesHint": {
+    es: "Si esta key reemplaza a otra tuya que escribía (porque vence o porque la revocaste), elígela: la nueva sigue siendo la misma integración, con su nombre visible, y puede editar y borrar lo que mandó la anterior.",
+    en: "If this key replaces another of yours that wrote messages (because it expires or because you revoked it), choose it: the new one stays the same integration, with its display name, and can edit and delete what the old one sent.",
+  },
+  "apiKeys.form.writeTitle": {
+    es: "Esta key va a mandar mensajes en el Messenger a nombre de {name}",
+    en: "This key will send Messenger messages on behalf of {name}",
+  },
+  "apiKeys.form.writeTitleYou": {
+    es: "Esta key va a mandar mensajes en el Messenger a tu nombre",
+    en: "This key will send Messenger messages on your behalf",
+  },
+  "apiKeys.form.writeBody": {
+    es: "En tus conversaciones y en directos nuevos con gente de la agencia. Cada mensaje sale con el nombre visible y la etiqueta API, pero sale de tu cuenta: tú y cualquier admin pueden retirarlo. Quien tenga la key escribe desde las IPs que pongas, hasta que venza o la revoques.",
+    en: "In your conversations and in new direct chats with people in the agency. Each message goes out with the display name and the API label, but it comes from your account: you or any admin can withdraw it. Whoever has the key can write from the IPs you set, until it expires or you revoke it.",
+  },
+  "apiKeys.form.writeConfirm": {
+    es: "Entiendo que la key manda mensajes a mi nombre, con el nombre visible y la etiqueta API.",
+    en: "I understand the key sends messages on my behalf, with the display name and the API label.",
+  },
+  "apiKeys.write.outdatedOne": {
+    es: "1 persona conectada con una versión de Maven sin la etiqueta API: {names}",
+    en: "1 person connected with a version of Maven without the API label: {names}",
+  },
+  "apiKeys.write.outdatedMany": {
+    es: "{n} personas conectadas con una versión de Maven sin la etiqueta API: {names}",
+    en: "{n} people connected with a version of Maven without the API label: {names}",
+  },
+  "apiKeys.write.outdatedMore": { es: "{n} más", en: "{n} more" },
+  "apiKeys.write.outdatedHint": {
+    es: "Verían los mensajes de esta key como si los escribieras tú, sin la etiqueta API. Pídeles que recarguen Maven antes de que se encienda la escritura.",
+    en: "They'd see this key's messages as if you wrote them, without the API label. Ask them to reload Maven before writing is turned on.",
+  },
   "apiKeys.form.create": { es: "Crear key", en: "Create key" },
   "apiKeys.toast.created": { es: "API key creada", en: "API key created" },
   "apiKeys.toast.createFailed": { es: "No pude crear la key", en: "Couldn't create the key" },
@@ -128,6 +185,63 @@ export const apiKeys = {
   "apiKeys.revokeDialog.body": {
     es: "La key deja de funcionar inmediatamente y cualquier integración que la use empezará a recibir 401. Si tiene un webhook, también se detiene. No se puede deshacer.",
     en: "The key stops working immediately and any integration using it will start getting 401. If it has a webhook, that stops too. This can't be undone.",
+  },
+
+  // Retirar lo que mandó una integración (api_retirar_mensajes_de_integracion)
+  "apiKeys.withdraw.button": { es: "Retirar lo que mandó desde…", en: "Withdraw what it sent since…" },
+  "apiKeys.withdraw.title": { es: "Retirar lo que mandó «{name}»", en: "Withdraw what “{name}” sent" },
+  "apiKeys.withdraw.body": {
+    es: "Se retira lo que mandó esta integración —todas sus keys, también las revocadas o vencidas— desde la fecha que elijas: cada mensaje se archiva para los admins, se vacía en el Messenger para todos y se borran sus notificaciones. No se puede deshacer.",
+    en: "This withdraws what this integration sent —all its keys, including revoked or expired ones— since the date you choose: each message is archived for admins, emptied in the Messenger for everyone, and its notifications are deleted. This can't be undone.",
+  },
+  "apiKeys.withdraw.revokeFirst": {
+    es: "La key sigue activa: si la integración sigue mandando, revócala primero para que no llegue nada nuevo.",
+    en: "The key is still active: if the integration is still sending, revoke it first so nothing new comes in.",
+  },
+  "apiKeys.withdraw.since": { es: "Desde", en: "Since" },
+  "apiKeys.withdraw.since.hora": { es: "La última hora", en: "The last hour" },
+  "apiKeys.withdraw.since.dia": { es: "Las últimas 24 horas", en: "The last 24 hours" },
+  "apiKeys.withdraw.since.semana": { es: "Los últimos 7 días", en: "The last 7 days" },
+  "apiKeys.withdraw.since.todo": { es: "Todo lo que mandó", en: "Everything it sent" },
+  "apiKeys.withdraw.since.fecha": { es: "Una fecha y hora…", en: "A date and time…" },
+  "apiKeys.withdraw.dateLabel": { es: "Fecha y hora desde la que se retira", en: "Date and time to withdraw from" },
+  "apiKeys.withdraw.confirm": {
+    es: "Entiendo que los mensajes se vacían para todos y que no se puede deshacer.",
+    en: "I understand the messages are emptied for everyone and that this can't be undone.",
+  },
+  "apiKeys.withdraw.go": { es: "Retirar", en: "Withdraw" },
+  "apiKeys.withdraw.stop": { es: "Detener", en: "Stop" },
+  "apiKeys.withdraw.again": { es: "Seguir retirando", en: "Keep withdrawing" },
+  "apiKeys.withdraw.starting": { es: "Retirando…", en: "Withdrawing…" },
+  "apiKeys.withdraw.progress": { es: "Retirando… {done} retirados, quedan {left}", en: "Withdrawing… {done} withdrawn, {left} left" },
+  "apiKeys.withdraw.moreThan": { es: "más de {n}", en: "more than {n}" },
+  "apiKeys.withdraw.done": { es: "Listo: se retiraron {n} mensajes.", en: "Done: {n} messages were withdrawn." },
+  "apiKeys.withdraw.doneOne": { es: "Listo: se retiró 1 mensaje.", en: "Done: 1 message was withdrawn." },
+  "apiKeys.withdraw.nothing": { es: "No había nada que retirar desde esa fecha.", en: "There was nothing to withdraw since that date." },
+  "apiKeys.withdraw.stopped": {
+    es: "Se detuvo: se retiraron {done} y quedan {left}. Puedes seguir cuando quieras.",
+    en: "Stopped: {done} withdrawn and {left} left. You can continue whenever you want.",
+  },
+  "apiKeys.withdraw.stuck": {
+    es: "Se retiraron {done}, pero quedan {left}. Si la integración sigue mandando, revoca la key y sigue retirando.",
+    en: "{done} were withdrawn, but {left} are left. If the integration is still sending, revoke the key and keep withdrawing.",
+  },
+  "apiKeys.withdraw.doneBefore": {
+    es: "Antes del error se retiraron {n}: esos ya quedaron retirados.",
+    en: "{n} were withdrawn before the error: those stay withdrawn.",
+  },
+  "apiKeys.withdraw.err.sin_sesion": {
+    es: "Tu sesión venció. Vuelve a iniciar sesión y sigue retirando.",
+    en: "Your session expired. Sign in again and keep withdrawing.",
+  },
+  "apiKeys.withdraw.err.sin_permiso": {
+    es: "Solo un admin de la agencia de la key o la persona de la key puede retirar lo que mandó.",
+    en: "Only an admin of the key's agency or the key's person can withdraw what it sent.",
+  },
+  "apiKeys.withdraw.err.sin_llave": { es: "Esa key ya no existe.", en: "That key no longer exists." },
+  "apiKeys.withdraw.err.otro": {
+    es: "No se pudo retirar. Prueba de nuevo en un momento.",
+    en: "Couldn't withdraw. Try again in a moment.",
   },
 
   // Grupos y scopes (en español se usa el texto que manda el servidor; esto es para inglés)
@@ -187,9 +301,20 @@ export const apiKeys = {
     es: "Lee TODAS las conversaciones del Messenger de la persona que crea la key — directas y grupos, también las futuras — exactamente como las ve ella en /messenger, con los mensajes que le mandan otras personas. No marca nada como leído. Exige IPs fijas y vencimiento de 90 días como máximo, y solo se puede poner al crear una key nueva.",
     en: "Reads ALL the Messenger conversations of the person who creates the key — direct chats and groups, including future ones — exactly as they see them in /messenger, including the messages other people send them. It doesn't mark anything as read. Requires fixed IPs and an expiration of 90 days at most, and can only be added when creating a new key.",
   },
+  "apiKeys.scope.messengerWrite.label": {
+    es: "⚠️ Mandar mensajes en el Messenger a nombre de quien crea la key",
+    en: "⚠️ Send Messenger messages on behalf of whoever creates the key",
+  },
+  "apiKeys.scope.messengerWrite.desc": {
+    es: "Manda mensajes de texto en las conversaciones de la persona que crea la key, abre chats directos con gente de su agencia y edita o borra lo que mandó la misma integración. Cada mensaje sale con el nombre visible de la key y la etiqueta API, y lo frenan los topes por minuto, hora y día. Va siempre con messenger:read, pide un nombre visible y que quien la crea confirme que escribirá a su nombre, y solo se puede poner al crear una key nueva.",
+    en: "Sends text messages in the conversations of the person who creates the key, opens direct chats with people in their agency, and edits or deletes what the same integration sent. Each message goes out with the key's display name and the API label, and is held back by per-minute, per-hour and per-day limits. It always goes with messenger:read, needs a display name and the creator's confirmation that it will write on their behalf, and can only be added when creating a new key.",
+  },
 
   // Referencia del API
-  "apiKeys.docs.description": { es: "Solo-lectura. Autenticación por API key.", en: "Read-only. API key authentication." },
+  "apiKeys.docs.description": {
+    es: "Autenticación por API key. Todo es de lectura, salvo las rutas del Messenger que piden messenger:write.",
+    en: "API key authentication. Everything is read-only, except the Messenger routes that require messenger:write.",
+  },
   "apiKeys.docs.baseUrl": { es: "Base URL", en: "Base URL" },
   "apiKeys.docs.auth": { es: "Autenticación", en: "Authentication" },
   "apiKeys.docs.authSend": {
@@ -217,8 +342,8 @@ export const apiKeys = {
     en: "Pagination: `limit` (max 500) + `offset`. Each response includes the total `count`. In Messenger, messages use a cursor (`next_cursor`, max 100 per page) and no count. Messenger keys require fixed IPs and an expiration; attachments are permanent public links: anyone with the link can open it, even after the key is revoked.",
   },
   "apiKeys.ep.me": {
-    es: "Como quién actúa esta key (acts_as: id, name, avatar_url), su agencia (agency_id) y el cupo que le queda esta hora (rate_limit). No necesita scope.",
-    en: "Who this key acts as (acts_as: id, name, avatar_url), its agency (agency_id) and how much of this hour's quota is left (rate_limit). No scope needed.",
+    es: "Como quién actúa esta key (acts_as: id, name, avatar_url), su agencia (agency_id) y el cupo que le queda esta hora (rate_limit). Con messenger:write, también messenger_write: el nombre visible, los topes y lo que queda de cada uno (null en una key que no escribe). No necesita scope.",
+    en: "Who this key acts as (acts_as: id, name, avatar_url), its agency (agency_id) and how much of this hour's quota is left (rate_limit). With messenger:write, also messenger_write: the display name, the limits and what's left of each (null for a key that doesn't write). No scope needed.",
   },
   "apiKeys.ep.conversations": {
     es: "La bandeja de la persona de la key, como en /messenger: cada conversación con type (direct | group), counterpart (en las directas), last_message (text_preview de 200 caracteres), unread_count (tope 100; null si no se pudo contar), me (role, last_read_at, is_muted), is_pinned, is_archived. Ordenada por última actividad. Filtros: limit (máx 100), offset. No es para sondear: para lo nuevo, /messenger/feed.",
@@ -235,6 +360,48 @@ export const apiKeys = {
   "apiKeys.ep.feed": {
     es: "Lo nuevo en TODAS las conversaciones, en orden: así recibe mensajes una integración (con webhook, el aviso le dice cuándo leer y además lee cada 15 min o menos como respaldo; sin webhook, lee cada tanto). Primer pedido con since (ISO, 72 h como máximo) o sin nada (últimos 15 min); después, siempre after=next_cursor. Si caught_up = true, espera 30 s o más antes del próximo. Mira como mucho una hora por pedido. exclude_own=true saca lo que mandó la propia persona. Solo mensajes nuevos: ediciones y borrados se ven releyendo la conversación.",
     en: "What's new across ALL conversations, in order: this is how an integration receives messages (with a webhook, the notification tells it when to read, and it still reads every 15 minutes or less as a fallback; without one, it reads every so often). First request with since (ISO, 72 h at most) or nothing (last 15 min); after that, always after=next_cursor. If caught_up = true, wait 30 s or more before the next one. It looks at one hour per request at most. exclude_own=true drops what the person sent themselves. New messages only: edits and deletions show up when you re-read the conversation.",
+  },
+  "apiKeys.ep.people": {
+    es: "A quién se le puede escribir: las personas activas de la agencia de la key, sin la persona de la key (id, name, avatar_url). Filtros: q (nombre, da igual con o sin acentos), limit (máx 100), offset. Pide messenger:read y messenger:write, y solo responde con la escritura encendida: apagada o en pausa, da 503 writes_paused.",
+    en: "Who you can write to: the active people in the key's agency, without the key's person (id, name, avatar_url). Filters: q (name, accents don't matter), limit (max 100), offset. Requires messenger:read and messenger:write, and only answers while writing is on: when it's off or paused, it gives 503 writes_paused.",
+  },
+  "apiKeys.ep.openDirect": {
+    es: "Abre un directo con una persona del directorio y le manda el primer mensaje, en el mismo paso. Cuerpo: type (direct), user_id y text. Si ya tienen un directo, se usa ese (200, created = false); si no, se crea (201). Nunca queda un directo vacío. Exige Idempotency-Key.",
+    en: "Opens a direct chat with a person from the directory and sends them the first message, in the same step. Body: type (direct), user_id and text. If you already have a direct chat, that one is used (200, created = false); otherwise it's created (201). A direct chat is never left empty. Requires Idempotency-Key.",
+  },
+  "apiKeys.ep.send": {
+    es: "Manda un mensaje de texto a una conversación donde la persona de la key participa (201; la repetición con la misma Idempotency-Key, 200 con idempotent_replay = true). Cuerpo: text, y opcionales reply_to_id (un mensaje de esa conversación) y thread (true para responder en el hilo de reply_to_id). Exige Idempotency-Key.",
+    en: "Sends a text message to a conversation the key's person is in (201; a repeat with the same Idempotency-Key, 200 with idempotent_replay = true). Body: text, plus optional reply_to_id (a message in that conversation) and thread (true to reply in reply_to_id's thread). Requires Idempotency-Key.",
+  },
+  "apiKeys.ep.edit": {
+    es: "Edita un mensaje que mandó la misma integración (también con una key anterior de la rotación). Cuerpo: text. Con el mismo texto, 200 sin cambios (changed = false). Lo escrito a mano o por otra integración da 403.",
+    en: "Edits a message sent by the same integration (also with an earlier key from the rotation). Body: text. With the same text, 200 without changes (changed = false). Messages written by hand or by another integration give 403.",
+  },
+  "apiKeys.ep.delete": {
+    es: "Borra un mensaje que mandó la misma integración, como lo borra la app (queda archivado para los admins). Sin cuerpo. Responde id y already_deleted.",
+    en: "Deletes a message sent by the same integration, the way the app does (it stays archived for admins). No body. Answers id and already_deleted.",
+  },
+  "apiKeys.docs.write": { es: "Escribir en el Messenger", en: "Writing to the Messenger" },
+  "apiKeys.docs.writeBody": {
+    es: "Las rutas que escriben piden `messenger:write`. Cada pedido va con `Content-Type: application/json` y un cuerpo de hasta 64 KB; un campo que no existe da `400 unknown_field`. El texto va de 1 a 4.000 caracteres, sin formato. Todo mensaje sale con el nombre visible de la key y la etiqueta API, y en la lectura trae `via_api` (`{display_name}`; `null` si lo escribió una persona): `sender` sigue siendo la persona real.",
+    en: "The routes that write require `messenger:write`. Each request goes with `Content-Type: application/json` and a body of up to 64 KB; a field that doesn't exist gives `400 unknown_field`. The text is 1 to 4,000 characters, plain. Every message goes out with the key's display name and the API label, and when read it carries `via_api` (`{display_name}`; `null` if a person wrote it): `sender` is still the real person.",
+  },
+  "apiKeys.docs.writeIdempotency": {
+    es: "Los dos `POST` exigen `Idempotency-Key`: de 8 a 100 caracteres ASCII visibles, sin espacios, válida **72 horas**. El mismo pedido con la misma key devuelve el mismo resultado con `idempotent_replay: true` (no manda otro mensaje); otro pedido con la misma key da `409 idempotency_key_reused`, y si el primero sigue en curso, `429 concurrent_write`. Genera una por mensaje y guárdala hasta tener la respuesta.",
+    en: "Both `POST` routes require `Idempotency-Key`: 8 to 100 visible ASCII characters, no spaces, valid for **72 hours**. The same request with the same key returns the same result with `idempotent_replay: true` (it doesn't send another message); a different request with the same key gives `409 idempotency_key_reused`, and if the first one is still in progress, `429 concurrent_write`. Generate one per message and keep it until you have the answer.",
+  },
+  "apiKeys.docs.writeExample": { es: "Ejemplo: mandar un mensaje", en: "Example: sending a message" },
+  "apiKeys.docs.writeLimits": {
+    es: "Topes: por key, **1.000 mensajes por hora** (60 por minuto y 10.000 por día) y destinatarios ponderados: cada mensaje pesa (personas de la conversación − 1) + 3, así que un directo pesa 4 y un grupo de 50 pesa 52 (300 por minuto, 4.000 por hora y 40.000 por día). Por conversación, entre todas las keys: 6 por minuto y 150 por día; los grupos de más de 50 personas no se escriben por API. Editar y borrar tienen su propio tope (30 por minuto y 300 por hora). Pasado uno: `429 rate_limited` con `limit` (cuál) y `Retry-After`. `GET /me` dice los topes vigentes y lo que queda (`messenger_write`). Cada escritura también gasta 1 de los 1.000 pedidos por hora.",
+    en: "Limits: per key, **1,000 messages per hour** (60 per minute and 10,000 per day) and weighted recipients: each message weighs (people in the conversation − 1) + 3, so a direct message weighs 4 and a group of 50 weighs 52 (300 per minute, 4,000 per hour and 40,000 per day). Per conversation, across all keys: 6 per minute and 150 per day; groups of more than 50 people can't be written to through the API. Editing and deleting have their own limit (30 per minute and 300 per hour). Past one: `429 rate_limited` with `limit` (which one) and `Retry-After`. `GET /me` tells you the current limits and what's left (`messenger_write`). Every write also uses 1 of the 1,000 requests per hour.",
+  },
+  "apiKeys.docs.writeLoop": {
+    es: "**Rondas entre bots:** si las últimas 20 filas de una conversación son todas de integraciones de 2 o más personas, la siguiente da `429` con `limit: conversation_loop` durante una hora. Un mensaje de una persona la desarma. Una sola integración que publica sola (reportes a un grupo) no se corta: la frenan los topes del día.",
+    en: "**Bot loops:** if the last 20 rows of a conversation all come from integrations of 2 or more people, the next one gives `429` with `limit: conversation_loop` for one hour. A message from a person breaks the loop. A single integration posting on its own (reports to a group) isn't cut off: the daily limits hold it back.",
+  },
+  "apiKeys.docs.writeUnknown": {
+    es: "**Resultado incierto:** si la respuesta es `503 outcome_unknown` o se corta la conexión, el mensaje **puede haber salido**. Reintenta con la **misma** `Idempotency-Key`: si salió, recibes el mismo mensaje con `idempotent_replay: true`; con una key nueva saldría dos veces. `503 writes_paused` quiere decir que la escritura está apagada o en pausa: reintenta después de `Retry-After`.",
+    en: "**Uncertain outcome:** if the answer is `503 outcome_unknown` or the connection drops, the message **may have gone out**. Retry with the **same** `Idempotency-Key`: if it went out, you get the same message with `idempotent_replay: true`; with a new key it would go out twice. `503 writes_paused` means writing is off or paused: retry after `Retry-After`.",
   },
   "apiKeys.ep.creators": {
     es: "Creadoras + redes (IG, TikTok, X, OnlyFans, Telegram…). Filtros: status, limit, offset.",
@@ -501,7 +668,7 @@ export const apiKeys = {
     en: "A Messenger key can have a webhook (the table's **Webhook** column). Maven checks every 15 s and, if there are new messages, sends your URL a **signed notification with no content**: how many, in which conversations and the cursors. The content is read with `GET /messenger/feed`.",
   },
   "apiKeys.docs.webhooks.signature": {
-    es: "Cada aviso lleva `webhook-id`, `webhook-timestamp` y `webhook-signature` (Standard Webhooks: HMAC-SHA256 con el secreto `whsec_…`). Verifica la firma sobre el cuerpo **tal cual llega**, compará en tiempo constante y rechaza timestamps de más de 5 minutos. Las librerías `standardwebhooks` (Node, Python, Go y otras) lo hacen solas.",
+    es: "Cada aviso lleva `webhook-id`, `webhook-timestamp` y `webhook-signature` (Standard Webhooks: HMAC-SHA256 con el secreto `whsec_…`). Verifica la firma sobre el cuerpo **tal cual llega**, compara en tiempo constante y rechaza timestamps de más de 5 minutos. Las librerías `standardwebhooks` (Node, Python, Go y otras) lo hacen solas.",
     en: "Each notification carries `webhook-id`, `webhook-timestamp` and `webhook-signature` (Standard Webhooks: HMAC-SHA256 with the `whsec_…` secret). Verify the signature over the body **exactly as received**, compare in constant time and reject timestamps more than 5 minutes off. The `standardwebhooks` libraries (Node, Python, Go and others) do it for you.",
   },
   "apiKeys.docs.webhooks.receiver": {
@@ -519,6 +686,10 @@ export const apiKeys = {
   "apiKeys.docs.webhooks.limits": {
     es: "Maven no tiene IPs de salida fijas: la firma es la prueba de que el aviso viene de Maven. El webhook deja de funcionar cuando la key vence (90 días como máximo): renovar es crear una key nueva y registrar el webhook de nuevo.",
     en: "Maven has no fixed outgoing IPs: the signature is the proof that the notification comes from Maven. The webhook stops working when the key expires (90 days at most): renewing means creating a new key and registering the webhook again.",
+  },
+  "apiKeys.docs.webhooks.loops": {
+    es: "**Bots que se contestan:** si tu integración responde lo que le llega, usa `exclude_own: true` (en el webhook y en `GET /messenger/feed`): así no recibe lo que manda su propia persona, tampoco por otra integración suya. No contestes mensajes con `via_api` sin una razón: si dos integraciones de personas distintas se responden entre sí, Maven corta la ronda a los 20 mensajes con `429 conversation_loop` durante una hora.",
+    en: "**Bots answering each other:** if your integration replies to what it receives, use `exclude_own: true` (in the webhook and in `GET /messenger/feed`): that way it doesn't get what its own person sends, including through another of their integrations. Don't answer messages with `via_api` without a reason: if two integrations of different people answer each other, Maven cuts the loop at 20 messages with `429 conversation_loop` for one hour.",
   },
   "apiKeys.docs.webhooks.example": { es: "Ejemplo de aviso", en: "Example notification" },
 } as const satisfies Record<string, { es: string; en: string }>;
