@@ -508,18 +508,21 @@ export type Database = {
           key: string
           note: string | null
           updated_at: string
+          valor: string | null
         }
         Insert: {
           enabled?: boolean
           key: string
           note?: string | null
           updated_at?: string
+          valor?: string | null
         }
         Update: {
           enabled?: boolean
           key?: string
           note?: string | null
           updated_at?: string
+          valor?: string | null
         }
         Relationships: []
       }
@@ -1019,6 +1022,8 @@ export type Database = {
       chat_messages: {
         Row: {
           album_id: string | null
+          api_display_name: string | null
+          api_key_id: string | null
           content: string | null
           conversation_id: string
           created_at: string
@@ -1036,6 +1041,8 @@ export type Database = {
         }
         Insert: {
           album_id?: string | null
+          api_display_name?: string | null
+          api_key_id?: string | null
           content?: string | null
           conversation_id: string
           created_at?: string
@@ -1053,6 +1060,8 @@ export type Database = {
         }
         Update: {
           album_id?: string | null
+          api_display_name?: string | null
+          api_key_id?: string | null
           content?: string | null
           conversation_id?: string
           created_at?: string

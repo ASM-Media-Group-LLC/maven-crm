@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { UserAvatar } from "@/components/UserAvatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ChatMessage, UserProfile } from "../types";
-import { formatTime, formatDate } from "../utils";
+import { formatTime, formatDate, remitenteVisible } from "../utils";
+import EtiquetaApi from "./EtiquetaApi";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/hooks/useLanguage";
 
@@ -118,8 +119,11 @@ export default function SearchResultsPanel({
               {group.label}
             </div>
             {group.items.map((msg) => {
-              const profile = profiles[msg.sender_id];
-              const name = profile?.full_name || t("messenger.usuario");
+              const remitente = remitenteVisible(msg, profiles, t);
+              // Una integración se muestra con su nombre e iniciales, nunca con la
+              // foto de la persona dueña de la key.
+              const profile = remitente.esApi ? undefined : profiles[msg.sender_id];
+              const name = remitente.nombre;
               const snippet = msg.content || "";
               const fileNameMatch = msg.file_name && msg.file_name.toLowerCase().includes(query.toLowerCase());
 
@@ -145,6 +149,9 @@ export default function SearchResultsPanel({
                       <span className="text-xs font-medium text-foreground truncate">
                         {name}
                       </span>
+                      {remitente.esApi && (
+                        <EtiquetaApi nombre={name} persona={remitente.personaReal} esMio={false} className="self-center" />
+                      )}
                       <span className="text-[10px] text-muted-foreground shrink-0">
                         {formatTime(msg.created_at, language)}
                       </span>

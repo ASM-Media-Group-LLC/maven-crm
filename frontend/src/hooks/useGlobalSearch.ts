@@ -6,7 +6,12 @@ export interface GlobalSearchResult {
   messageId: string;
   conversationId: string;
   conversationTitle: string;
+  /** Quién aparece como autor: el nombre visible de la key («BLU») si vino por API. */
   senderName: string;
+  /** true = lo mandó una integración (lo decide api_key_id, no el nombre). */
+  esApi: boolean;
+  /** La persona detrás del mensaje (dueña de la key, o quien lo escribió). */
+  personaReal: string;
   content: string;
   createdAt: string;
 }
@@ -69,7 +74,7 @@ export function useGlobalSearch() {
       // Search messages by content (using ilike for server-side filtering)
       const { data: messageRows } = await supabase
         .from("chat_messages")
-        .select("id, conversation_id, sender_id, content, created_at")
+        .select("id, conversation_id, sender_id, content, created_at, api_key_id, api_display_name")
         .in("conversation_id", convIds)
         .ilike("content", `%${query}%`)
         .eq("is_deleted", false)
@@ -90,14 +95,21 @@ export function useGlobalSearch() {
         nameMap.set(p.id, p.full_name ?? "Usuario");
       }
 
-      const matches: GlobalSearchResult[] = messageRows.map((msg) => ({
+      const matches: GlobalSearchResult[] = messageRows.map((msg) => {
+        const personaReal = nameMap.get(msg.sender_id) ?? "Usuario";
+        // El nombre de la key viene en la fila (dato, no se traduce ni se busca en profiles).
+        const esApi = msg.api_key_id != null;
+        return {
         messageId: msg.id,
         conversationId: msg.conversation_id,
         conversationTitle: titleMap.get(msg.conversation_id) ?? "Chat",
-        senderName: nameMap.get(msg.sender_id) ?? "Usuario",
+        senderName: esApi ? (msg.api_display_name || "API") : personaReal,
+        esApi,
+        personaReal,
         content: (msg.content?.length ?? 0) > 80 ? msg.content!.slice(0, 80) + "…" : msg.content ?? "",
         createdAt: msg.created_at,
-      }));
+        };
+      });
 
       setResults(matches);
     } catch (e) {
