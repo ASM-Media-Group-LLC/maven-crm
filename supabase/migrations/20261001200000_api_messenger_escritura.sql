@@ -11,7 +11,10 @@
 --     revocada ni vencida, es de esa persona, la persona sigue en la agencia, hay UNA
 --     sola agencia y la key tiene messenger:read + messenger:write), mira el
 --     interruptor y el freno, cobra los cupos y pone la marca «vino por API»;
---   · con `mvf` sin `mvk` no se escribe nada en chat_* ni en notifications;
+--   · con `mvf` o `mvk` como claim (aunque sea null) y sin una key en `mvk`, no se
+--     escribe nada en chat_* ni en notifications. El cerco usa UN solo predicado
+--     (`auth.jwt() ?| array['mvf','mvk']`): un token con `mvk` y sin `mvf` no pasa
+--     por «la app» en ninguna parte;
 --   · con role=service_role no se inserta en chat_messages, chat_conversations ni
 --     chat_participants: un bug de una edge con el cliente admin no se salta ni los
 --     cupos ni la marca (hoy nada del repo ni de prod inserta ahí con service_role;
@@ -35,7 +38,7 @@
 --   6   los triggers de la pared: chat_messages (insertar y editar),
 --       chat_conversations, chat_participants y api_keys (nombre visible, integración,
 --       reglas de messenger:write y las filas de cupo).
---   7   el cerco: políticas RESTRICTIVE «mvf» en toda escritura de chat_* y
+--   7   el cerco: políticas RESTRICTIVE «mvf o mvk» en toda escritura de chat_* y
 --       notifications que no cubre un trigger.
 --   8   funciones de prod que cambian: notify_chat_message («BLU (API)»),
 --       delete_chat_message (archiva las marcas), get_karma_profile (los mensajes por
@@ -49,7 +52,7 @@
 --
 -- Por qué no cambia nada en la app: los triggers nuevos, para una sesión de la app,
 -- solo ponen las marcas en NULL; las políticas del cerco dan true para toda sesión de
--- GoTrue (no trae `mvf`); las filas que ya están quedan con las marcas en NULL y no se
+-- GoTrue (no trae `mvf` ni `mvk`); las filas que ya están quedan con las marcas en NULL y no se
 -- reescriben (columnas nuevas sin default: solo catálogo); ninguna key tiene
 -- messenger:write (el alta la cierra el PR 4) y el interruptor está apagado.
 --
@@ -107,9 +110,13 @@
 --     sin fila = apagado para siempre);
 --   · net.http_request_queue existe y postgres la lee (2 filas en ese momento).
 --
--- El nombre: el último archivo del repo es 20261001100000_chat_mensajes_de_sistema
--- (PR 1b) y la última versión anotada en prod es 20261001065025 (el 1b, con la hora
--- en que se aplicó). apply_migration anota su propia hora.
+-- El nombre: el último archivo del repo es 20261001150000_karma_sin_anon y la última
+-- versión anotada en prod es 20261001073247 (esa misma, con la hora en que se aplicó).
+-- apply_migration anota su propia hora.
+--
+-- ⚠️ Al aplicarla: el SQL no lleva escapes \u ni caracteres invisibles literales (las
+-- clases de caracteres se arman con chr()), así que pasa igual por un transporte que
+-- decodifica JSON (el MCP). El banco revisa las dos cosas.
 --
 -- Candados. Todo va en UNA transacción, y cada ALTER / CREATE INDEX / CREATE TRIGGER
 -- / CREATE POLICY toma un candado fuerte que dura hasta el commit (CREATE POLICY pide
@@ -551,9 +558,15 @@ as $$
   select btrim(replace(normalize(_t, NFC), E'\r\n', E'\n'), E' \t\n')
 $$;
 
--- De 1 a 4.000 puntos de código, sin caracteres de control (salvo \n y \t), sin
--- C1 y sin los de dirección del texto (U+200E, U+200F, U+202A–U+202E, U+2066–U+2069:
--- con ellos un texto se lee distinto de lo que dice). Emojis y ZWJ, sí.
+-- De 1 a 4.000 puntos de código, con al menos un carácter que se vea, y sin la misma
+-- clase de invisibles que limpia chat_evento_sistema (PR 1b): controles C0 (salvo
+-- salto de línea y tabulador) y C1, el guion blando (U+00AD), los de dirección del
+-- texto (U+061C, U+200E, U+200F, U+202A–U+202E, U+2066–U+2069: con ellos un texto se
+-- lee distinto de lo que dice), los de ancho cero (U+180E, U+200B, U+200C,
+-- U+2060–U+2064, U+FEFF), U+2028/U+2029 y U+206A–U+206F. Se deja U+200D (ZWJ): arma
+-- los emojis compuestos. Las clases se arman con chr(<punto de código>): el archivo
+-- no lleva ningún carácter invisible literal ni un escape que un transporte pueda
+-- decodificar por el camino (el banco revisa las dos cosas).
 create or replace function public.api_texto_es_valido(_t text)
 returns boolean
 language sql
@@ -562,7 +575,13 @@ set search_path = ''
 as $$
   select _t is not null
      and char_length(_t) between 1 and 4000
-     and _t !~ '[\u0001-\u0008\u000B-\u001F\u007F-\u009F‎‏‪-‮⁦-⁩]'
+     and _t !~ ('[' || chr(1) || '-' || chr(8) || chr(11) || '-' || chr(31) || chr(127) || '-' || chr(159)
+                || chr(173) || chr(1564) || chr(6158) || chr(8203) || chr(8204) || chr(8206) || chr(8207)
+                || chr(8232) || '-' || chr(8238) || chr(8288) || '-' || chr(8292) || chr(8294) || '-' || chr(8303)
+                || chr(65279) || ']')
+     -- Al menos un carácter que no sea espacio (tampoco los de Unicode) ni el ZWJ.
+     and _t ~ ('[^[:space:]' || chr(160) || chr(5760) || chr(8192) || '-' || chr(8202) || chr(8205)
+               || chr(8239) || chr(8287) || chr(12288) || ']')
 $$;
 
 -- ════ 2. Columnas ════════════════════════════════════════════════════════════
@@ -1041,7 +1060,7 @@ begin
   _id := public.api_mvk();
   if _id is null then
     -- La app (y postgres sin claims). Las marcas no las pone el pedido.
-    if _c ? 'mvf' then
+    if _c ?| array['mvf', 'mvk'] then
       raise exception using errcode = 'MV403',
         message = 'api_sesion_fabricada_sin_llave: una sesión fabricada sin key no escribe en el chat',
         detail = '{"error": "forbidden"}';
@@ -1200,7 +1219,7 @@ begin
               and current_setting('maven.borrado_autorizado', true) is not distinct from old.id::text;
   _id := public.api_mvk();
   if _id is null then
-    if _c ? 'mvf' then
+    if _c ?| array['mvf', 'mvk'] then
       raise exception using errcode = 'MV403',
         message = 'api_sesion_fabricada_sin_llave: una sesión fabricada sin key no escribe en el chat',
         detail = '{"error": "forbidden"}';
@@ -1292,7 +1311,7 @@ begin
   end if;
   _id := public.api_mvk();
   if _id is null then
-    if _c ? 'mvf' then
+    if _c ?| array['mvf', 'mvk'] then
       raise exception using errcode = 'MV403',
         message = 'api_sesion_fabricada_sin_llave: una sesión fabricada sin key no escribe en el chat',
         detail = '{"error": "forbidden"}';
@@ -1367,7 +1386,7 @@ begin
   end if;
   _id := public.api_mvk();
   if _id is null then
-    if _c ? 'mvf' then
+    if _c ?| array['mvf', 'mvk'] then
       raise exception using errcode = 'MV403',
         message = 'api_sesion_fabricada_sin_llave: una sesión fabricada sin key no escribe en el chat',
         detail = '{"error": "forbidden"}';
@@ -1458,13 +1477,14 @@ begin
     return new;
   end if;
 
-  -- 1. Forma: NFC, recortado, espacios juntos; de 2 a 32, solo letras de Latin-1,
-  --    números, espacio y . & _ - (escrito con escapes).
+  -- 1. Forma: NFC, recortado, espacios juntos; de 2 a 32, solo letras de Latin-1
+  --    (U+00C0–U+00FF sin × ni ÷, armadas con chr()), números, espacio y . & _ -.
   new.api_display_name := regexp_replace(btrim(normalize(new.api_display_name, NFC)), ' {2,}', ' ', 'g');
   _esq := public.api_esqueleto(new.api_display_name);
   _sin := replace(_esq, ' ', '');
   if char_length(new.api_display_name) not between 2 and 32
-     or new.api_display_name !~ '^[A-Za-z0-9À-ÖØ-öø-ÿ .&_-]+$'
+     or new.api_display_name !~ ('^[A-Za-z0-9' || chr(192) || '-' || chr(214) || chr(216) || '-' || chr(246)
+                                  || chr(248) || '-' || chr(255) || ' .&_-]+$')
      or char_length(_sin) < 2 then
     raise exception using errcode = 'MV422',
       message = 'api_nombre_visible_forma: de 2 a 32 caracteres, con letras, números, espacio y . & _ -',
@@ -1537,38 +1557,42 @@ create trigger api_keys_cupos_de_escritura
 
 -- ════ 7. El cerco de la sesión fabricada ═════════════════════════════════════
 -- RESTRICTIVE y por comando (nunca FOR ALL: la bandeja de la API LEE chat_pinned y
--- chat_archived). El (select …) corre una vez por sentencia (initplan). Para una
--- sesión de la app (sin `mvf`) da true. Lo que no está aquí lo cierra un trigger:
+-- chat_archived). El (select …) corre una vez por sentencia (initplan). Un solo
+-- predicado, el mismo de las guardas DEFINER y de los triggers: es fabricada la sesión
+-- que trae `mvf` o `mvk` como claim de primer nivel, aunque sea con valor null (un
+-- token con `mvk` y sin `mvf` también queda afuera). Para una sesión de GoTrue, que
+-- no trae ninguno de los dos, da true; sin claims (postgres), también. Lo que no está aquí lo cierra un trigger:
 -- INSERT de chat_conversations y chat_participants, INSERT y UPDATE de chat_messages.
 -- chat_message_deletions no tiene políticas de escritura (nadie escribe ahí con sesión).
 -- Las funciones DEFINER que escriben en el chat no pasan por estas políticas: o tienen
--- su propia guarda `mvf` (delete_conversation_cascade, la retirada) o su única
+-- su propia guarda con el mismo predicado (delete_conversation_cascade, la retirada) o su única
 -- escritura cae en un trigger de la pared (delete_chat_message → UPDATE de
 -- chat_messages; chat_evento_sistema, del PR 1b → INSERT de chat_messages, donde una
 -- sesión fabricada da MV403 y una key también: por API no hay avisos de sistema). El
 -- banco lo revisa en el catálogo, sea cual sea el orden en que se apliquen 1b y B.
 create policy api_fabricada_no_borra on public.chat_messages as restrictive for delete to public
-  using ((select auth.jwt() ->> 'mvf') is null);
+  using ((select auth.jwt() ?| array['mvf', 'mvk']) is not true);
 
 create policy api_fabricada_no_cambia on public.chat_conversations as restrictive for update to public
-  using ((select auth.jwt() ->> 'mvf') is null) with check ((select auth.jwt() ->> 'mvf') is null);
+  using ((select auth.jwt() ?| array['mvf', 'mvk']) is not true) with check ((select auth.jwt() ?| array['mvf', 'mvk']) is not true);
 create policy api_fabricada_no_borra on public.chat_conversations as restrictive for delete to public
-  using ((select auth.jwt() ->> 'mvf') is null);
+  using ((select auth.jwt() ?| array['mvf', 'mvk']) is not true);
 
 create policy api_fabricada_no_cambia on public.chat_participants as restrictive for update to public
-  using ((select auth.jwt() ->> 'mvf') is null) with check ((select auth.jwt() ->> 'mvf') is null);
+  using ((select auth.jwt() ?| array['mvf', 'mvk']) is not true) with check ((select auth.jwt() ?| array['mvf', 'mvk']) is not true);
 create policy api_fabricada_no_borra on public.chat_participants as restrictive for delete to public
-  using ((select auth.jwt() ->> 'mvf') is null);
+  using ((select auth.jwt() ?| array['mvf', 'mvk']) is not true);
 
 do $$
 declare
   _t text;
+  _pred text := $p$(select auth.jwt() ?| array['mvf', 'mvk']) is not true$p$;
 begin
   foreach _t in array array['notifications', 'chat_reactions', 'chat_read_receipts', 'chat_pinned', 'chat_archived',
                             'chat_join_requests', 'chat_spaces', 'chat_space_conversations'] loop
-    execute format('create policy api_fabricada_no_inserta on public.%I as restrictive for insert to public with check ((select auth.jwt() ->> %L) is null)', _t, 'mvf');
-    execute format('create policy api_fabricada_no_cambia on public.%I as restrictive for update to public using ((select auth.jwt() ->> %L) is null) with check ((select auth.jwt() ->> %L) is null)', _t, 'mvf', 'mvf');
-    execute format('create policy api_fabricada_no_borra on public.%I as restrictive for delete to public using ((select auth.jwt() ->> %L) is null)', _t, 'mvf');
+    execute format('create policy api_fabricada_no_inserta on public.%I as restrictive for insert to public with check (%s)', _t, _pred);
+    execute format('create policy api_fabricada_no_cambia on public.%I as restrictive for update to public using (%s) with check (%s)', _t, _pred, _pred);
+    execute format('create policy api_fabricada_no_borra on public.%I as restrictive for delete to public using (%s)', _t, _pred);
   end loop;
 end $$;
 
@@ -1710,7 +1734,7 @@ AS $function$
 DECLARE
   _msg_ids uuid[];
 BEGIN
-  IF (auth.jwt() ->> 'mvf') IS NOT NULL THEN
+  IF (auth.jwt() ?| array['mvf', 'mvk']) IS TRUE THEN
     RAISE EXCEPTION USING ERRCODE = 'MV403',
       MESSAGE = 'api_sesion_fabricada_no_borra: una sesión fabricada no borra conversaciones',
       DETAIL = '{"error": "forbidden"}';
@@ -2346,7 +2370,8 @@ $$;
 -- ─── La retirada de emergencia ───────────────────────────────────────────────
 -- Un admin de la agencia de la key, o la persona de la key, retira lo que mandó una
 -- integración (TODAS sus keys) desde _desde: lo archiva (con la marca y quien
--- retira), lo vacía y se lleva sus notificaciones. Anda con la key revocada o vencida
+-- retira), lo vacía y se lleva sus notificaciones (de todos, también de quien ya
+-- salió). Anda con la key revocada o vencida
 -- y no depende del interruptor ni del freno: es manual y acotada (como mucho 200
 -- mensajes por llamada, para acotar los eventos de Realtime). La API no la puede usar.
 create or replace function public.api_retirar_mensajes_de_integracion(_llave uuid, _desde timestamptz, _limite integer default 200)
@@ -2362,8 +2387,9 @@ declare
   _m record;
   _hechos integer := 0;
   _quedan integer;
+  _enlaces text[] := '{}';
 begin
-  if (auth.jwt() ->> 'mvf') is not null then
+  if (auth.jwt() ?| array['mvf', 'mvk']) is true then
     raise exception using errcode = 'MV403',
       message = 'api_retirada_no_por_api: la retirada se hace desde Maven, no con una key',
       detail = '{"error": "forbidden"}';
@@ -2403,11 +2429,20 @@ begin
        set is_deleted = true, content = null, content_rich = null, file_url = null, file_name = null, file_size = null
      where id = _m.id;
     perform set_config('maven.borrado_autorizado', '', true);
-    delete from public.notifications n
-     where n.user_id in (select p.user_id from public.chat_participants p where p.conversation_id = _m.conversation_id)
-       and n.deep_link_url = '/messenger?c=' || _m.conversation_id || '&m=' || _m.id;
+    _enlaces := _enlaces || ('/messenger?c=' || _m.conversation_id || '&m=' || _m.id);
     _hechos := _hechos + 1;
   end loop;
+
+  -- Las notificaciones, de una vez: un solo recorrido de notifications para todos los
+  -- mensajes (deep_link_url no tiene índice; uno por mensaje en el grupo más grande de
+  -- prod, 41 personas y 175 mil notificaciones, eran 278 ms cada uno, y 200 se pasaban
+  -- de los 8 s de statement_timeout: no se retiraba nada). Y de todos, también de quien
+  -- ya salió de la conversación: el texto tampoco tiene que quedarle.
+  if _hechos > 0 then
+    delete from public.notifications n
+     using unnest(_enlaces) l(enlace)
+     where n.deep_link_url = l.enlace and n.reference_type = 'conversation';
+  end if;
 
   select count(*) into _quedan
     from (select 1 from public.chat_messages m
@@ -2433,7 +2468,11 @@ begin
     'api_cupo_gastar(text, integer, integer, integer, integer)', 'api_mvk()', 'api_llave_valida(uuid, boolean)',
     'api_persona_alcanzable(uuid, uuid)', 'chat_messages_api()', 'chat_messages_api_editar()',
     'chat_conversations_api()', 'chat_participants_api()', 'api_keys_nombre_visible()',
-    'api_keys_cupos_de_escritura()', 'api_esqueleto(text)', 'api_sin_acentos(text)', 'api_texto_es_valido(text)'] loop
+    'api_keys_cupos_de_escritura()', 'api_esqueleto(text)', 'api_sin_acentos(text)', 'api_texto_es_valido(text)',
+    -- La usa profiles_nombre_lo_cambia_un_admin (INVOKER), que con sesión de usuario
+    -- se corta antes (A) y con el mismo full_name ni la prepara (IF anidado). Abierta a
+    -- authenticated sería un oráculo de los nombres visibles de OTRA agencia.
+    'api_nombre_de_integracion(uuid, text)'] loop
     execute format('revoke all on function public.%s from public, anon, authenticated', _f);
   end loop;
   foreach _f in array array[
@@ -2445,14 +2484,12 @@ begin
     'api_messenger_enviar(uuid, text, uuid, boolean, text)', 'api_messenger_abrir_directo(uuid, text, text)',
     'api_messenger_editar(uuid, uuid, text)', 'api_messenger_borrar(uuid, uuid)',
     -- la retirada la llama la app (PR 5)
-    'api_retirar_mensajes_de_integracion(uuid, timestamptz, integer)',
-    -- profiles_nombre_lo_cambia_un_admin es INVOKER y corre con la sesión de quien
-    -- actualiza el perfil (el admin, con service_role). Da un booleano sobre nombres
-    -- visibles, que de todos modos se ven en los mensajes.
-    'api_nombre_de_integracion(uuid, text)'] loop
+    'api_retirar_mensajes_de_integracion(uuid, timestamptz, integer)'] loop
     execute format('revoke all on function public.%s from public, anon', _f);
     execute format('grant execute on function public.%s to authenticated', _f);
   end loop;
+  -- El admin cambia nombres con service_role (admin-user-actions).
+  grant execute on function public.api_nombre_de_integracion(uuid, text) to service_role;
 end $$;
 
 -- ════ 11. La purga de la idempotencia ════════════════════════════════════════
