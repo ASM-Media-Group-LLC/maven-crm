@@ -22,7 +22,7 @@
 --   closer_scope_agent_ids()=5ca29aaac09164ea4177ed9f2822908f
 --   franja_de_tipo(_is_admin boolean, _is_manager boolean, _is_supervisor boolean)=6703a59d891477c37d94015f666c68ef
 --   get_closers_roster()=3ba9471f227d1fd38fc38113812f2c9c
---   get_karma_profile(target uuid)=1aa22eb9f32d548fa57475c3032a980e
+--   get_karma_profile(target uuid)=d84bb4a4dba768cf9eee92b1ad4a3fa1
 --   has_chatter_evaluator_access(_user_id uuid)=e82ed610ed40dee67813f11ec110e2ba
 --   has_chatter_global_scope(_user_id uuid)=cae01820954c8bc735ebccb8c67e6c65
 --   has_closer_global_scope(_user_id uuid)=fba5bce4df934857a14a0c0613f2ac2c
@@ -695,6 +695,7 @@ begin
     into v_sent, v_active_days
   from chat_messages
   where sender_id = target and is_deleted = false and type <> 'system'
+    and api_key_id is null
     and created_at >= now() - interval '30 days';
   s_actividad := v_sent >= 100 and v_active_days >= 10;
 
