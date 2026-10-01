@@ -10,6 +10,7 @@ import { agruparEnAlbumes } from "@/lib/albumDeImagenes";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { Language } from "@/lib/i18n";
 import type { Traductor } from "../preview";
+import { isSameGroup } from "../utils";
 
 interface MessageListProps {
   messages: ChatMessage[];
@@ -66,11 +67,6 @@ function groupMessages(messages: ChatMessage[]) {
     }
   });
   return groups;
-}
-
-function isSameGroup(a: ChatMessage, b: ChatMessage): boolean {
-  if (a.sender_id !== b.sender_id) return false;
-  return Math.abs(new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) < 120000;
 }
 
 export default function MessageList({
@@ -267,6 +263,9 @@ export default function MessageList({
 
               return group.messages.map((msg, mi) => {
                 const isMe = msg.sender_id === currentUserId;
+                // Un mensaje por API lleva su nombre («BLU») también si es mío o
+                // es un directo: si no, quien tiene la key lo vería como suyo.
+                const esApi = msg.api_key_id != null;
                 const prevMsg = mi > 0 ? group.messages[mi - 1] : null;
                 const nextMsg = mi < group.messages.length - 1 ? group.messages[mi + 1] : null;
                 const isFirstInGroup = !prevMsg || !isSameGroup(prevMsg, msg);
@@ -298,7 +297,7 @@ export default function MessageList({
                       onRetry={onRetry ? () => onRetry(msg.id) : undefined}
                       replyMessage={msg.reply_to_id ? msgById.get(msg.reply_to_id) : undefined}
                       showAvatar={isLastInGroup && !isMe}
-                      showSender={isFirstInGroup && !isMe}
+                      showSender={isFirstInGroup && (!isMe || esApi)}
                       isLastInGroup={isLastInGroup}
                       reactions={getReactionsForMessage(msg.id)}
                       onToggleReaction={(emoji) => onToggleReaction(msg.id, emoji)}

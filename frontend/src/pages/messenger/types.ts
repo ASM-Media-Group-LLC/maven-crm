@@ -57,6 +57,14 @@ export interface ChatMessage {
   /** Documento TipTap (JSON) con el formato. NULL/ausente = texto plano.
    *  El texto plano SIEMPRE vive en `content` (vista previa, búsqueda, menciones). */
   content_rich?: RichNode | null;
+  /** La marca «vino por API» (migración 20261001200000). La ponen SOLO los
+   *  triggers de la base: la key con que se mandó y su nombre visible («BLU»),
+   *  copiado de api_keys en ese momento. Los dos null = lo escribió una persona
+   *  desde la app. Obligatorias a propósito (con valor anulable): un campo
+   *  opcional con otro nombre se apaga en silencio. El nombre es DATO y no se
+   *  traduce. Lo que decide si es de API es `api_key_id`, nunca el nombre. */
+  api_key_id: string | null;
+  api_display_name: string | null;
   created_at: string;
   updated_at: string;
   // Solo cliente (no viene de la BD): estado de envío de un mensaje propio optimista.

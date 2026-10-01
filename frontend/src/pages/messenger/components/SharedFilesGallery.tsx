@@ -7,6 +7,8 @@ import { ChatMessage, UserProfile } from "../types";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { Language, TranslationKey } from "@/lib/i18n";
+import { remitenteVisible } from "../utils";
+import EtiquetaApi from "./EtiquetaApi";
 
 interface SharedFilesGalleryProps {
   conversationId: string;
@@ -60,6 +62,19 @@ function isMediaFile(msg: ChatMessage): boolean {
 
 function isDocumentFile(msg: ChatMessage): boolean {
   return msg.type === "file" && !isMediaFile(msg);
+}
+
+/** Quién compartió: «BLU» + pastilla si vino por API (los enlaces salen de
+ *  mensajes de texto, que es lo único que manda una integración). */
+function AutorDelMensaje({ msg, profiles }: { msg: ChatMessage; profiles: Record<string, UserProfile> }) {
+  const { t } = useLanguage();
+  const remitente = remitenteVisible(msg, profiles, t);
+  return (
+    <span className="inline-flex items-center gap-1 align-middle">
+      {remitente.nombre}
+      {remitente.esApi && <EtiquetaApi nombre={remitente.nombre} persona={remitente.personaReal} esMio={false} />}
+    </span>
+  );
 }
 
 function getDomain(url: string): string {
@@ -246,7 +261,7 @@ export default function SharedFilesGallery({ conversationId, profiles, onClose }
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate text-foreground">{a.file_name || "Audio"}</p>
                           <span className="text-[11px] text-muted-foreground">
-                            {profiles[a.sender_id]?.full_name || t("messenger.usuario")} · {formatDate(a.created_at, language)}
+                            <AutorDelMensaje msg={a} profiles={profiles} /> · {formatDate(a.created_at, language)}
                           </span>
                         </div>
                       </div>
@@ -277,7 +292,7 @@ export default function SharedFilesGallery({ conversationId, profiles, onClose }
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate text-foreground">{doc.file_name || t("common.file")}</p>
                         <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                          <span>{profiles[doc.sender_id]?.full_name || t("messenger.usuario")}</span>
+                          <AutorDelMensaje msg={doc} profiles={profiles} />
                           <span>·</span>
                           <span>{formatDate(doc.created_at, language)}</span>
                           {doc.file_size && (
@@ -317,7 +332,7 @@ export default function SharedFilesGallery({ conversationId, profiles, onClose }
                         <p className="text-sm font-medium truncate text-foreground">{getDomain(url)}</p>
                         <p className="text-[11px] text-muted-foreground truncate">{url}</p>
                         <span className="text-[10px] text-muted-foreground">
-                          {profiles[msg.sender_id]?.full_name || t("messenger.usuario")} · {formatDate(msg.created_at, language)}
+                          <AutorDelMensaje msg={msg} profiles={profiles} /> · {formatDate(msg.created_at, language)}
                         </span>
                       </div>
                     </a>

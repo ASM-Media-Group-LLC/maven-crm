@@ -34,7 +34,7 @@ import {
 } from "@/lib/fondoDeLlamada";
 import type { ImagenDeFondo } from "@/lib/fondoDeLlamada";
 import { NoiseSuppresionTrackProcessor, supportsNoiseSuppression, loadNCPreference, saveNCPreference } from "@/lib/noise-suppression-processor";
-import { marcarLlamadaActiva, quitarLlamadaActiva } from "@/lib/llamadaActiva";
+import { marcarConexionEnCurso, marcarLlamadaActiva, quitarLlamadaActiva } from "@/lib/llamadaActiva";
 
 export type ConnectionQualityLevel = "excellent" | "good" | "poor" | "lost" | "unknown";
 
@@ -1133,6 +1133,10 @@ export function useLiveKit() {
     connectingRef.current = true;
     const intento = ++intentoRef.current;
     const vigente = () => intento === intentoRef.current;
+    // Mientras ENTRA también es una llamada: una recarga ahora (un deploy, o el
+    // mínimo de versión de pwa.ts) la cortaría igual. Se suelta en el finally; si
+    // conectó, la sala ya quedó marcada con marcarLlamadaActiva.
+    const soltarConexionEnCurso = marcarConexionEnCurso(roomName);
 
     let livekitUrlForError: string | undefined;
 
@@ -1601,6 +1605,7 @@ export function useLiveKit() {
       console.error("LiveKit connect error:", err);
       throw err;
     } finally {
+      soltarConexionEnCurso();
       // Tampoco libera el cerrojo del intento que lo reemplazó.
       if (vigente()) connectingRef.current = false;
     }

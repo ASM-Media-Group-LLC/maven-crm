@@ -10,7 +10,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ChatMessage, UserProfile } from "../types";
 import type { DeletedMessageArchive } from "../useDeletedMessages";
-import { profileName, safeFileUrl } from "../utils";
+import { remitenteVisible, safeFileUrl } from "../utils";
+import EtiquetaApi from "./EtiquetaApi";
 import { ReactionGroup } from "@/hooks/useReactions";
 import { cn } from "@/lib/utils";
 import ReactionPicker from "./ReactionPicker";
@@ -66,7 +67,10 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
   adjacentImages, isGridLeader, isPartOfGrid,
 }, ref) => {
   const { t, language } = useLanguage();
-  const senderName = profileName(profiles[message.sender_id], t("messenger.usuario"));
+  // Quién aparece como autor: «BLU» si vino por API (nunca la persona de la key).
+  const remitente = remitenteVisible(message, profiles, t);
+  const senderName = remitente.nombre;
+  const esApi = remitente.esApi;
   const [lightboxOpen, setLightboxOpen] = useState(false);
   // Táctil: las acciones (reaccionar, ⋮) salen al tocar la burbuja. Siempre
   // visibles ocupaban 64 px al lado de CADA mensaje y el chat se veía atiborrado.
@@ -135,6 +139,12 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
                 {deletedArchive.file_name || t("common.file")}
               </a>
             ) : null}
+            {deletedArchive.api_key_id != null && (
+              // Lo había mandado una integración: el archivo lo dice con su nombre.
+              <p className="text-[11px] font-semibold text-destructive/90">
+                {deletedArchive.api_display_name || t("messenger.api.etiqueta")} · {t("messenger.api.etiqueta")}
+              </p>
+            )}
             {deletedArchive.content && (
               <p className="text-sm whitespace-pre-wrap break-words mt-1">{deletedArchive.content}</p>
             )}
@@ -433,7 +443,11 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
       >
         {!isMe && (
           <div className="w-8 shrink-0 flex justify-center">
-            {showAvatar ? (
+            {showAvatar && esApi ? (
+              // Una integración no tiene cara ni ficha: iniciales de su nombre
+              // visible, nunca la foto de la persona dueña de la key.
+              <UserAvatar name={senderName} size="sm" className="h-7 w-7" />
+            ) : showAvatar ? (
               <button
                 type="button"
                 onClick={() => onOpenProfile?.(message.sender_id)}
@@ -503,7 +517,9 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
                 )}
                 {isMe && (
                   <>
-                    {message.type === "text" && (
+                    {/* Lo que mandó una integración no se edita desde la app (la
+                        base tampoco lo deja); borrarlo sí. */}
+                    {message.type === "text" && !esApi && (
                       <DropdownMenuItem onClick={startEdit}>
                         <Edit2 className="h-3.5 w-3.5 mr-2" /> {t("common.edit")}
                       </DropdownMenuItem>
@@ -528,18 +544,24 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
                 "text-[11px] mb-1.5 px-2.5 py-1.5 rounded-xl",
                 isMe ? "bg-primary-foreground/10" : "bg-background/60"
               )}>
-                <p className="font-semibold opacity-80">{profileName(profiles[replyMessage.sender_id], t("messenger.usuario"))}</p>
+                <p className="font-semibold opacity-80">{remitenteVisible(replyMessage, profiles, t).nombre}</p>
                 <p className="truncate opacity-70">{replyMessage.content}</p>
               </div>
             )}
 
-            {chatType === "group" && !isMe && showSender && (
-              <p className="text-[11px] font-semibold text-primary mb-0.5">{senderName}</p>
+            {/* El nombre va en los grupos (de los demás) y en TODO mensaje por API,
+                también en los directos y en los míos: es lo que separa a «BLU»
+                de la persona. */}
+            {showSender && (esApi || (chatType === "group" && !isMe)) && (
+              <p className={cn("text-[11px] font-semibold mb-0.5", isMe ? "text-white/90" : "text-primary")}>{senderName}</p>
             )}
 
             {renderContent()}
 
             <div className="flex items-center gap-1 mt-1 justify-end">
+              {esApi && (
+                <EtiquetaApi nombre={senderName} persona={remitente.personaReal} esMio={isMe} sobreColor={isMe} />
+              )}
               {message.is_edited && (
                 <span className={cn("text-[10px]", isMe ? "text-primary-foreground/50" : "text-muted-foreground")}>{t("messenger.bubble.editado")}</span>
               )}
