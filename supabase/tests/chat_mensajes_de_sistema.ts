@@ -31,6 +31,11 @@ import { PGlite } from "npm:@electric-sql/pglite@0.3";
 
 const leer = (rel: string) => Deno.readTextFileSync(new URL(rel, import.meta.url));
 const FIXTURE = leer("./fixtures/prod_chat_api_20260928.sql");
+// El complementario del 01/10 (api_keys, role_groups, get_karma_profile): lo necesita
+// la migración B de la escritura por API (20261001200000), que va DESPUÉS de esta en
+// la cadena. Lo que esta migración toca no está ahí; sus huellas las revisa
+// api_messenger_escritura.ts.
+const COMPLEMENTO = leer("./fixtures/prod_api_escritura_20261001.sql");
 const NOMBRE_1B = "20261001100000_chat_mensajes_de_sistema.sql";
 const NOMBRE_A = "20260930230000_chat_agencia_y_huecos.sql";
 const MIG_1B = Deno.args[0] ? Deno.readTextFileSync(Deno.args[0]) : leer(`../migrations/${NOMBRE_1B}`);
@@ -94,6 +99,9 @@ const CADENA: { n: string; sql: string }[] = [...Deno.readDirSync(DIR_MIG)].map(
   .filter((m) => objetivos(m.sql).length > 0);
 const iMia = CADENA.findIndex((m) => m.n === NOMBRE_1B);
 const ANTES = CADENA.slice(0, Math.max(iMia, 0));
+// Hasta esta, sin las que vienen después (la B de la escritura por API): para medir
+// lo que cambia ESTA migración.
+const HASTA_ESTA = CADENA.slice(0, iMia + 1);
 
 // ─── Gente, agencia y conversaciones del ensayo ──────────────────────────────
 const T1 = "10000000-0000-4000-8000-000000000001";
@@ -146,12 +154,13 @@ async function aplicar(db: PGlite, nombre: string, sql: string) {
     throw new Error(`la migración ${nombre} no carga sobre el fixture: ${msg(e)}`);
   }
 }
-type Modo = "base" | "1b";
+type Modo = "base" | "solo1b" | "1b";
 async function nueva(modo: Modo, extra = ""): Promise<PGlite> {
   const db = new PGlite();
   await db.exec(FIXTURE);
+  await db.exec(COMPLEMENTO);
   await db.exec(SEMILLA + extra);
-  for (const m of modo === "base" ? ANTES : CADENA) await aplicar(db, m.n, m.sql);
+  for (const m of modo === "base" ? ANTES : modo === "solo1b" ? HASTA_ESTA : CADENA) await aplicar(db, m.n, m.sql);
   return db;
 }
 const q = async (db: PGlite, sql: string) => (await db.query(sql)).rows as Fila[];
@@ -395,7 +404,9 @@ await seccion("0 · la base y la forma", async () => {
   const dif = distintasDeProd(await huellas(base));
   check(dif.length === 0, `la base (fixture + ${ANTES.length} migración/es) es prod del 01/10 en las ${Object.keys(HUELLAS_PROD_0110).length} huellas de lo que esto toca${dif.length ? ` — distintas: ${dif.join(", ")}` : ""}`);
   const conMia = await nueva("1b");
-  const difMia = distintasDeProd(await huellas(conMia));
+  // Lo que cambia ESTA migración, sin las posteriores de la cadena (la B suma columnas
+  // y políticas a chat_messages a propósito: lo prueba su banco).
+  const difMia = distintasDeProd(await huellas(await nueva("solo1b")));
   check(difMia.includes("triggers chat_messages") && !difMia.includes("politicas chat_messages") && !difMia.includes("columnas chat_messages"),
     `línea base que puede fallar: con la migración, la huella marca el trigger nuevo y no cambia ni columnas ni políticas de chat_messages (${difMia.join(", ")})`);
 
@@ -517,9 +528,12 @@ await seccion("1 · el hueco", async () => {
   const r3 = await probar(conMia, [[ANA, rpc(G1, "salio")], [ANA, libre(ANA, G1, "y ahora uno libre")]]);
   check(!r3.ok && /chat_sistema_sin_evento/.test(r3.error ?? ""), `…y un aviso libre en esa misma transacción no entra → ${r3.ok ? "PASÓ" : r3.error?.slice(0, 80)}`);
 
-  // Los caminos del servidor siguen escribiendo avisos.
-  await anda(conMia, "service_role", libre(JHON, G1, "Aviso del servidor"), "service_role (edge, cron) sigue insertando avisos de sistema");
-  await anda(conMia, "postgres", libre(JHON, G1, "Aviso de una migración"), "sin claims (migraciones, SQL a mano) también");
+  // Los caminos del servidor siguen escribiendo avisos: sin claims (cron, migraciones,
+  // SQL a mano). Desde la B (20261001200000), service_role ya no inserta en
+  // chat_messages (ninguna edge lo hace; lo prueba api_messenger_escritura.ts), pero
+  // sí corrige.
+  await anda(conMia, "postgres", libre(JHON, G1, "Aviso del servidor"), "sin claims (cron, migraciones, SQL a mano) se siguen insertando avisos de sistema");
+  await anda(conMia, "postgres", libre(JHON, G1, "Aviso de una migración"), "…y otro");
   await anda(conMia, "service_role", `update chat_messages set content = 'Aviso del servidor, corregido' where content = 'Aviso del servidor'`,
     "y service_role los puede corregir");
   // Un aviso se borra como cualquier mensaje (delete_chat_message archiva y vacía).
