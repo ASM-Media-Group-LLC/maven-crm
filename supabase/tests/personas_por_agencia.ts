@@ -1,8 +1,12 @@
 // Las personas por agencia (migraciones 20261001212000_personas_por_agencia.sql y
 // 20261001212100_personas_karma_y_directorio.sql), probadas contra un Postgres de
 // verdad (PGlite) con el catálogo de PROD: los fixtures del Messenger (28/09) y de
-// la escritura por API (01/10, que trae get_karma_profile y send_karma tal como
-// están en prod), más mail_recipient_directory copiada de prod con su huella.
+// la escritura por API (01/10), más las migraciones que prod ya tiene aplicadas y
+// tocan estas funciones (YA_EN_PROD: api_messenger_escritura le cambió
+// get_karma_profile), más mail_recipient_directory copiada de prod con su huella.
+// Las huellas de las tres funciones se comparan con las de prod del 01/10 a la
+// tarde. En el orden de prod, antes de estas va agencias_base (se aplica aquí
+// también); la de roles no carga en estos fixtures y se prueba en su banco.
 //
 //   deno run -A --node-modules-dir=none --no-lock supabase/tests/personas_por_agencia.ts
 //
@@ -21,6 +25,15 @@ const N1 = "20261001212000_personas_por_agencia.sql";
 const N2 = "20261001212100_personas_karma_y_directorio.sql";
 const M1 = leer(`../migrations/${N1}`);
 const M2 = leer(`../migrations/${N2}`);
+// Lo que prod ya tiene aplicado (schema_migrations, 01/10) y toca lo que este banco
+// mira. Sin esto se probaría el get_karma_profile de antes de la escritura por API.
+const YA_EN_PROD = ["20260930230000_chat_agencia_y_huecos.sql", "20261001100000_chat_mensajes_de_sistema.sql",
+  "20261001150000_karma_sin_anon.sql", "20261001200000_api_messenger_escritura.sql"].map((n) => ({ n, sql: leer(`../migrations/${n}`) }));
+const N0 = "20261001210000_agencias_base.sql";
+const M0 = leer(`../migrations/${N0}`);
+// Huellas de prod (md5(prosrc)) del 01/10 a la tarde.
+const HUELLA_KARMA = "d84bb4a4dba768cf9eee92b1ad4a3fa1";
+const HUELLA_SEND_KARMA = "b084b3561f41bb7c013e67de4f897f7d";
 const vuelta = (sql: string) => sql.split("\n").filter((l) => l.startsWith("--|")).map((l) => l.replace(/^--\| ?/, "")).join("\n");
 
 // mail_recipient_directory, copia textual de prod (01/10). Lo que lee y los
@@ -107,8 +120,10 @@ async function nueva(modo: Modo, antes = ""): Promise<PGlite> {
   await db.exec(CHAT);
   await db.exec(API);
   await db.exec(DIRECTORIO);
-  await db.exec(SEMILLA + antes);
-  if (modo === "con") { await aplicar(db, N1, M1); await aplicar(db, N2, M2); }
+  await db.exec(SEMILLA);
+  for (const m of YA_EN_PROD) await aplicar(db, m.n, m.sql);
+  await db.exec(antes);
+  if (modo === "con") { await aplicar(db, N0, M0); await aplicar(db, N1, M1); await aplicar(db, N2, M2); }
   return db;
 }
 const q = async (db: PGlite, sql: string) => (await db.query(sql)).rows as Fila[];
@@ -144,8 +159,8 @@ const huellaDe = async (db: PGlite, f: string) => (await uno(db, `select md5(pro
 {
   const db = await nueva("prod");
   check(await huellaDe(db, "public.mail_recipient_directory()") === HUELLA_DIRECTORIO, "mail_recipient_directory es la de prod (huella)");
-  check(await huellaDe(db, "public.get_karma_profile(uuid)") === "1aa22eb9f32d548fa57475c3032a980e", "get_karma_profile es la de prod (huella)");
-  check(await huellaDe(db, "public.send_karma(uuid)") === "b084b3561f41bb7c013e67de4f897f7d", "send_karma es la de prod (huella)");
+  check(await huellaDe(db, "public.get_karma_profile(uuid)") === HUELLA_KARMA, "get_karma_profile es la de prod (huella)");
+  check(await huellaDe(db, "public.send_karma(uuid)") === HUELLA_SEND_KARMA, "send_karma es la de prod (huella)");
 }
 
 // ════ 1. Con una sola agencia, todos ven lo mismo que en prod ════════════════
@@ -230,8 +245,8 @@ const con = await nueva("con", OTRA);
   await aplicar(db, "vuelta atrás de " + N2, vuelta(M2));
   await aplicar(db, "vuelta atrás de " + N1, vuelta(M1));
   check(await huellaDe(db, "public.mail_recipient_directory()") === HUELLA_DIRECTORIO
-    && await huellaDe(db, "public.get_karma_profile(uuid)") === "1aa22eb9f32d548fa57475c3032a980e"
-    && await huellaDe(db, "public.send_karma(uuid)") === "b084b3561f41bb7c013e67de4f897f7d", "las tres funciones vuelven byte a byte a prod");
+    && await huellaDe(db, "public.get_karma_profile(uuid)") === HUELLA_KARMA
+    && await huellaDe(db, "public.send_karma(uuid)") === HUELLA_SEND_KARMA, "las tres funciones vuelven byte a byte a prod");
   const pol = await uno(db, `select policyname, qual from pg_policies where tablename = 'profiles' and cmd = 'SELECT'`);
   check(pol?.policyname === "Authenticated users can view all profiles" && pol?.qual === "true", `la política vuelve a ser la de prod (${pol?.policyname}: ${pol?.qual})`);
   const acl = await uno(db, `select proacl::text a from pg_proc where oid = 'public.get_karma_profile(uuid)'::regprocedure`);
