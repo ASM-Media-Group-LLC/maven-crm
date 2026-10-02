@@ -99,16 +99,22 @@ export function useDriveVista(vista: VistaDrive, carpeta: string | null) {
       }
       if (vista === "compartido") {
         // Lo que me compartieron DIRECTAMENTE (no lo de adentro: eso se ve al
-        // entrar a la carpeta).
+        // entrar a la carpeta) y lo abierto a toda la agencia que no veo ya
+        // por otro lado (la base devuelve solo lo de más arriba).
         // Las unidades compartidas y mi «Mi unidad» de Google tienen su lugar:
         // no se repiten acá (como en Google).
-        const [{ data: sh, error: e1 }, unidades] = await Promise.all([
+        const [{ data: sh, error: e1 }, { data: ag, error: e2 }, unidades] = await Promise.all([
           tabla("drive_shares").select("item_id").eq("user_id", yo),
+          supabase.rpc("drive_de_toda_la_agencia" as never),
           unidadesQueVeo(),
         ]);
         if (e1) throw e1;
+        if (e2) throw e2;
         const aparte = new Set(unidades.filter((u) => u.tipo === "empresa" || u.persona === yo).map((u) => u.item_id));
-        const ids = ((sh ?? []) as unknown as { item_id: string }[]).map((s) => s.item_id).filter((id) => !aparte.has(id));
+        const ids = [...new Set([
+          ...((sh ?? []) as unknown as { item_id: string }[]).map((s) => s.item_id),
+          ...((ag ?? []) as unknown as { item_id: string }[]).map((s) => s.item_id),
+        ])].filter((id) => !aparte.has(id));
         if (!ids.length) return [];
         return ordenar(visibles(await fichasPorId(ids), yo));
       }
@@ -266,6 +272,46 @@ export function useCompartirDrive() {
       if (error) throw error;
     },
     onSuccess: (_d, v) => qc.invalidateQueries({ queryKey: ["drive-shares", v.itemId] }),
+  });
+}
+
+/** El acceso general de una ficha: abierta a toda la agencia (ella misma o una
+ *  carpeta de arriba) o null = «Restringido». */
+export interface AccesoGeneralDrive { item_id: string; nombre: string; rol: "lector" | "editor"; heredado: boolean }
+
+export function useAccesoGeneralDrive(itemId: string | undefined) {
+  return useQuery({
+    queryKey: ["drive-acceso-general", itemId],
+    enabled: !!itemId,
+    queryFn: async (): Promise<AccesoGeneralDrive | null> => {
+      const { data, error } = await supabase.rpc("drive_acceso_general" as never, { p_item: itemId } as never);
+      if (error) throw error;
+      const f = ((data ?? []) as unknown as { item_id: string; nombre: string; rol: "lector" | "editor"; nivel: number }[])[0];
+      return f ? { item_id: f.item_id, nombre: f.nombre, rol: f.rol, heredado: f.nivel > 0 } : null;
+    },
+  });
+}
+
+/** Abre una ficha a toda la agencia con un rol, o la vuelve a «Restringido»
+ *  (rol null). */
+export function useCambiarAccesoGeneral() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ itemId, rol }: { itemId: string; rol: "lector" | "editor" | null }) => {
+      if (!rol) {
+        const { error } = await tabla("drive_compartido_agencia").delete().eq("item_id", itemId);
+        if (error) throw error;
+        return;
+      }
+      const { error } = await tabla("drive_compartido_agencia")
+        .upsert({ item_id: itemId, rol } as never, { onConflict: "item_id" });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      // Cambia lo que ven todos: el acceso de lo de adentro y «Compartido conmigo».
+      qc.invalidateQueries({ queryKey: ["drive-acceso-general"] });
+      qc.invalidateQueries({ queryKey: ["drive"] });
+    },
   });
 }
 
