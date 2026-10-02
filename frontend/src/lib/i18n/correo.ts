@@ -350,4 +350,84 @@ export const correo = {
   "mail.comp.keepEditing": { es: "Seguir editando", en: "Keep editing" },
   "mail.comp.saveDraft": { es: "Guardar borrador", en: "Save draft" },
   // <<< i18n ola 3 (paginas-a)
+
+  // Correo · el ⋮ de cada mensaje de la conversación (Keila, 02/10)
+  "mail.msg.options": { es: "Más opciones de este mensaje", en: "More options for this message" },
+  "mail.msg.shareChat": { es: "Compartir en el chat", en: "Share in chat" },
+  "mail.msg.unreadFromHere": { es: "Marcar como no leído a partir de aquí", en: "Mark unread from here" },
+  "mail.msg.translate": { es: "Traducir", en: "Translate" },
+  "mail.msg.loadError": { es: "No se pudo traer ese mensaje", en: "Couldn't load that message" },
+
+  // Correo · traducir
+  "mail.translate.translating": { es: "Traduciendo…", en: "Translating…" },
+  "mail.translate.to": { es: "Traducido al {lang}", en: "Translated to {lang}" },
+  "mail.translate.lang.es": { es: "español", en: "Spanish" },
+  "mail.translate.lang.en": { es: "inglés", en: "English" },
+  "mail.translate.showOriginal": { es: "Ver original", en: "Show original" },
+  "mail.translate.hideOriginal": { es: "Ocultar original", en: "Hide original" },
+  "mail.translate.remove": { es: "Quitar traducción", en: "Remove translation" },
+  "mail.translate.error": { es: "No se pudo traducir", en: "Couldn't translate" },
+  "mail.translate.notConfigured": {
+    es: "La traducción no está disponible: falta configurar la IA. Avísale a un administrador.",
+    en: "Translation isn't available: the AI isn't set up yet. Let an admin know.",
+  },
+  "mail.translate.noText": { es: "Este correo no tiene texto para traducir.", en: "This email has no text to translate." },
+  "mail.translate.truncated": {
+    es: "El correo es muy largo: se tradujo solo el comienzo.",
+    en: "This email is very long: only the beginning was translated.",
+  },
+
+  // Correo · compartir en el chat
+  "mail.share.title": { es: "Compartir en el chat", en: "Share in chat" },
+  "mail.share.desc": {
+    es: "Elige la conversación. Se envía quién lo mandó, el asunto, la fecha, un resumen y el enlace para abrirlo en Maven.",
+    en: "Pick the conversation. It sends the sender, subject, date, a summary and the link to open it in Maven.",
+  },
+  "mail.share.search": { es: "Buscar conversación…", en: "Search conversations…" },
+  "mail.share.note": { es: "Escribe un mensaje (opcional)", en: "Write a message (optional)" },
+  "mail.share.sent": { es: "Compartido en {name}", en: "Shared in {name}" },
+  "mail.share.error": { es: "No se pudo compartir", en: "Couldn't share" },
+  "mail.share.noMatch": { es: "Ninguna conversación se llama así.", en: "No conversation matches." },
+  "mail.share.noChats": { es: "Todavía no tienes conversaciones en el Messenger.", en: "You don't have any Messenger conversations yet." },
+  "mail.share.loading": { es: "Cargando conversaciones…", en: "Loading conversations…" },
+  "mail.share.preview": { es: "Así se verá", en: "Preview" },
+  "mail.share.noLink": {
+    es: "Este correo no tiene identificador: se comparte sin el enlace.",
+    en: "This email has no ID: it's shared without the link.",
+  },
+  // ⚠️ Lo que va DENTRO del mensaje del chat se guarda y lo lee otra persona:
+  // se arma siempre con la columna `es` (ver lib/correo/compartirEnChat.ts).
+  "mail.share.msg.title": { es: "Correo compartido", en: "Shared email" },
+  "mail.share.msg.from": { es: "De: {v}", en: "From: {v}" },
+  "mail.share.msg.subject": { es: "Asunto: {v}", en: "Subject: {v}" },
+  "mail.share.msg.date": { es: "Fecha: {v}", en: "Date: {v}" },
+  "mail.share.msg.open": { es: "Abrir en Maven: {v}", en: "Open in Maven: {v}" },
+
+  // Correo · el enlace que abre un correo (/correo?mensaje=…)
+  "mail.link.notFound": { es: "Ese correo no está en tu casilla.", en: "That email isn't in your mailbox." },
+  "mail.link.error": { es: "No se pudo abrir el correo del enlace", en: "Couldn't open the linked email" },
+
+  // Correo · «No leídos primero»
+  "mail.unreadFirst": { es: "No leídos primero", en: "Unread first" },
+  "mail.section.unread": { es: "No leídos", en: "Unread" },
+  "mail.section.rest": { es: "Todo lo demás", en: "Everything else" },
+  "mail.section.unreadEmpty": { es: "No tienes correos sin leer.", en: "You have no unread emails." },
+  "mail.section.restEmpty": { es: "No hay más correos leídos en esta página.", en: "No more read emails on this page." },
+  "mail.section.unreadCapped": {
+    es: "Se muestran los {n} más recientes de {total} sin leer.",
+    en: "Showing the {n} most recent of {total} unread.",
+  },
+
+  // Correo · panel de lectura
+  "mail.view.readingPane": { es: "Panel de lectura", en: "Reading pane" },
+  "mail.view.split": { es: "Dividir", en: "Split" },
+  "mail.view.splitDesc": { es: "La lista al lado del correo abierto", en: "The list next to the open email" },
+  "mail.view.full": { es: "Sin división", en: "No split" },
+  "mail.view.fullDesc": { es: "El correo abierto ocupa todo el espacio", en: "The open email takes the whole space" },
+  "mail.view.backHint": { es: "Volver a la lista (u)", en: "Back to the list (u)" },
+
+  // Correo · arrastrar correos a una carpeta o etiqueta
+  "mail.drag.one": { es: "Mover 1 conversación", en: "Move 1 conversation" },
+  "mail.drag.many": { es: "Mover {n} conversaciones", en: "Move {n} conversations" },
+  "mail.drag.alreadyThere": { es: "Ya están en {name}", en: "They're already in {name}" },
 } as const satisfies Record<string, { es: string; en: string }>;
