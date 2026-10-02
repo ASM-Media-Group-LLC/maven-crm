@@ -171,6 +171,9 @@ export interface FilaImportada {
   storage_key: string | null;
   estado: "listo";
   created_at: string;
+  /** La última modificación en Google (rclone la deja como fecha del archivo).
+   *  El trigger la respeta solo al insertar desde la edge. */
+  updated_at: string;
 }
 export interface CompartidoImportado { item_id: string; user_id: string; rol: "lector" | "editor" }
 
@@ -202,7 +205,7 @@ export function validarLote(tenant: string, items: unknown, compartidos: unknown
     const fecha = typeof o.created_at === "string" && !Number.isNaN(Date.parse(o.created_at)) ? new Date(o.created_at).toISOString() : ahora;
     if (tipo === "carpeta") {
       if (o.storage_key != null || o.size != null) throw new HttpError(`Fila ${n}: una carpeta no tiene archivo`);
-      return { id, tenant_id: tenant, owner_id: null, parent_id: parent, tipo, nombre, mime: null, size: null, storage_key: null, estado: "listo", created_at: fecha };
+      return { id, tenant_id: tenant, owner_id: null, parent_id: parent, tipo, nombre, mime: null, size: null, storage_key: null, estado: "listo", created_at: fecha, updated_at: fecha };
     }
     const size = Number(o.size);
     if (!Number.isSafeInteger(size) || size < 0 || size > MAX_IMPORTADO) throw new HttpError(`Fila ${n}: tamaño inválido`);
@@ -210,7 +213,7 @@ export function validarLote(tenant: string, items: unknown, compartidos: unknown
     // ficha al archivo de otra agencia (ni a una subida normal de alguien).
     if (o.storage_key !== claveImportada(tenant, id)) throw new HttpError(`Fila ${n}: la ruta en el NAS no es la de un archivo importado`);
     const mime = typeof o.mime === "string" && o.mime.length > 0 && o.mime.length < 200 ? o.mime : "application/octet-stream";
-    return { id, tenant_id: tenant, owner_id: null, parent_id: parent, tipo, nombre, mime, size, storage_key: claveImportada(tenant, id), estado: "listo", created_at: fecha };
+    return { id, tenant_id: tenant, owner_id: null, parent_id: parent, tipo, nombre, mime, size, storage_key: claveImportada(tenant, id), estado: "listo", created_at: fecha, updated_at: fecha };
   });
   const shares = comps.map((x, n): CompartidoImportado => {
     const o = (x && typeof x === "object" ? x : {}) as Record<string, unknown>;
