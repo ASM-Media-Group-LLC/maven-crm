@@ -69,8 +69,10 @@ jobs:
       # herramientas de Clari, el catálogo sin additionalProperties (Gemini lo rechaza),
       # el JSON del análisis de QA y la herramienta forzada de la Parrilla. Sin red:
       # fetch es un doble que responde como OpenRouter (el catálogo sí baja sus imports).
+      # Y «Traducir» del Correo (mail-fetch): el HTML a texto con sus saltos de línea, el
+      # tope, que un error no devuelva la llave y que la acción lea solo filas de quien llama.
       - name: Guard — IA por OpenRouter
-        run: deno test --no-check -A supabase/functions/ai-orchestrator/openrouter.test.ts supabase/functions/qa-analyze/openrouter.test.ts supabase/functions/parrilla-generate/ia.test.ts
+        run: deno test --no-check -A supabase/functions/ai-orchestrator/openrouter.test.ts supabase/functions/qa-analyze/openrouter.test.ts supabase/functions/parrilla-generate/ia.test.ts supabase/functions/mail-fetch/traducir.test.ts
 
       # Cowork por agencia: todo id que nombra un pedido a cowork-session (sesión, salas,
       # meet, pedidos) tiene que ser de la agencia de quien llama y de ESA sesión; antes y

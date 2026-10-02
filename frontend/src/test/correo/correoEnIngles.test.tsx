@@ -81,6 +81,10 @@ vi.mock("@/hooks/useMailbox", async (original) => ({
     // Con `total`, la barra de la lista muestra el paginador («1–2 of 2» y ‹ ›).
     return { data: { messages: MENSAJES, total: MENSAJES.length }, isLoading: false, isFetching: false, isPlaceholderData: false, error: null, refetch: vi.fn() };
   },
+  // «Unread first»: la sección de arriba (no leídos de toda la bandeja).
+  useMailNoLeidos: (_f: string, habilitada: boolean) => ({
+    data: habilitada ? { total: 1, messages: [MENSAJES[0]] } : undefined, isLoading: false, error: null,
+  }),
   useMailSearch: () => ({ data: { messages: [] }, isFetching: false, error: null }),
   useMailMessage: (_f: string, sel: unknown) => ({ data: sel ? abierto : null, isLoading: false, error: null }),
   useImagenesIncrustadas: () => null,
@@ -282,6 +286,33 @@ describe("Correo en inglés", () => {
     expect(screen.getByRole("button", { name: "Remove Inbox" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Remove Clients" })).toBeTruthy();
     expect(enEspanol()).toEqual([]);
+  });
+
+  it("lo de Keila (02/10): el ⋮ de cada mensaje, «Unread first» y el panel de lectura, en inglés", async () => {
+    abierto = ABIERTO;
+    montar();
+    await screen.findByText("Folders");
+    // «No leídos primero»: el interruptor y las dos secciones.
+    fireEvent.click(screen.getByRole("button", { name: "Unread first" }));
+    expect(await screen.findByText("Unread")).toBeTruthy();
+    expect(screen.getByText("Everything else")).toBeTruthy();
+    expect(enEspanol()).toEqual([]);
+    // El panel de lectura.
+    fireEvent.keyDown(screen.getByRole("button", { name: "Reading pane" }), { key: "Enter" });
+    let menu = await screen.findByRole("menu");
+    expect(within(menu).getByText("No split")).toBeTruthy();
+    expect(enEspanol(menu)).toEqual([]);
+    fireEvent.keyDown(menu, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+    // El ⋮ del correo abierto.
+    fireEvent.click(screen.getAllByText("Quarterly report")[0]);
+    await screen.findByText("Show images");
+    fireEvent.keyDown(screen.getByRole("button", { name: "More options for this message" }), { key: "Enter" });
+    menu = await screen.findByRole("menu");
+    expect(within(menu).getAllByRole("menuitem").map((m) => m.textContent)).toEqual([
+      "Reply", "Forward", "Share in chat", "Delete", "Mark unread from here", "Translate",
+    ]);
+    expect(enEspanol(menu)).toEqual([]);
   });
 
   it("en español la bandeja dice lo de siempre", async () => {
