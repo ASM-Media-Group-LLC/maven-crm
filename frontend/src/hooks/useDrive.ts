@@ -119,12 +119,17 @@ export function useDriveVista(vista: VistaDrive, carpeta: string | null) {
         return ordenar(visibles(await fichasPorId(ids), yo));
       }
       if (vista === "recientes") {
-        const { data, error } = await tabla("drive_items").select(COLUMNAS)
-          .eq("tipo", "archivo").eq("estado", "listo").is("trashed_at", null)
-          .not("last_opened_at", "is", null)
-          .order("last_opened_at", { ascending: false }).limit(50);
+        // Lo que abrí YO, como en Google. ⚠️ No ordenar por last_opened_at: es
+        // una fecha por archivo para todos (Test veía lo que abría Daniel).
+        // Las fichas pasan igual por la RLS: si me quitan el acceso, se van.
+        const { data, error } = await tabla("drive_aperturas").select("item_id, abierto_at")
+          .eq("user_id", yo).order("abierto_at", { ascending: false }).limit(50);
         if (error) throw error;
-        return (data ?? []) as unknown as DriveItem[];
+        const aperturas = (data ?? []) as unknown as { item_id: string; abierto_at: string }[];
+        const porId = new Map((await fichasPorId(aperturas.map((a) => a.item_id))).map((f) => [f.id, f]));
+        return aperturas
+          .map((a) => porId.get(a.item_id))
+          .filter((f): f is DriveItem => !!f && f.tipo === "archivo" && f.estado === "listo");
       }
       // Papelera: solo lo que YO mandé ahí, y solo lo de arriba (si una
       // carpeta está en la papelera, sus hijos van con ella).

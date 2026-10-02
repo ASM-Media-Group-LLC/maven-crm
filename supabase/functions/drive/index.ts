@@ -229,8 +229,11 @@ Deno.serve(async (req) => {
         VENCE.bajar,
       );
       // «Abierto por última vez»: lo que después decide qué se archiva. Una
-      // miniatura o vista previa no pasa por acá.
-      await admin.from("drive_items").update({ last_opened_at: new Date().toISOString() }).eq("id", id);
+      // miniatura o vista previa no pasa por acá. Y, aparte, MI apertura: es
+      // lo que ve cada uno en «Recientes» (la fecha de la ficha es de todos).
+      const ahora = new Date().toISOString();
+      await admin.from("drive_items").update({ last_opened_at: ahora }).eq("id", id);
+      await admin.from("drive_aperturas").upsert({ user_id: yo, item_id: id, abierto_at: ahora }, { onConflict: "user_id,item_id" });
       return responder({ url: u });
     }
 

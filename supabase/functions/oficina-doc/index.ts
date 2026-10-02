@@ -471,8 +471,11 @@ Deno.serve(async (req) => {
           tema: body.tema === "dark" ? "dark" : body.tema === "light" ? "light" : undefined,
         });
         if (secretoOO) config.token = await firmar(config, secretoOO);
-        // Verlo ES abrirlo: cuenta para «Recientes» y para lo que se archiva.
-        await admin.from("drive_items").update({ last_opened_at: new Date().toISOString() }).eq("id", fila.id);
+        // Verlo ES abrirlo: cuenta para lo que se archiva (la fecha de la
+        // ficha, de todos) y para MIS «Recientes» (la apertura de cada uno).
+        const ahora = new Date().toISOString();
+        await admin.from("drive_items").update({ last_opened_at: ahora }).eq("id", fila.id);
+        await admin.from("drive_aperturas").upsert({ user_id: user.id, item_id: fila.id, abierto_at: ahora }, { onConflict: "user_id,item_id" });
         return responder({ servidor: servidorOO, config });
       }
 
