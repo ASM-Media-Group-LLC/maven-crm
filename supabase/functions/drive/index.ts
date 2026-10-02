@@ -11,10 +11,11 @@
 //   subir_confirmar  { id, recibo }                    → el archivo queda listo
 //   abrir            { id, descargar? }                → URL para verlo/bajarlo
 //   borrar_para_siempre { id }                         → borra en el NAS y la ficha
+//   crear_unidad     { nombre }                        → (admins) una unidad compartida
 //
 // Sin sesión, con permiso firmado por la MINI (mismo DRIVE_SECRETO):
 //   indice    { permiso, paginado?, desde? }  → el árbol para el índice diario
-//   importar  { permiso, items, compartidos } → fichas del archivo de Google
+//   importar  { permiso, items, compartidos, unidades? } → fichas del archivo de Google
 //
 // Variables: DRIVE_NAS_URL (la de la puerta), DRIVE_SECRETO (el mismo del NAS).
 
@@ -22,8 +23,8 @@ import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supa
 import { corsFor } from "../_shared/cors.ts";
 import { ahoraMas, firmar, verificar, VENCE } from "../_shared/drive-firma.ts";
 import {
-  armarIndice, chequearCupo, hayLugarEnElNas, HttpError, madresQueFaltanEnElLote, nombreValido, planDeSubida, TAMANO_PARTE,
-  validarLote, type ItemParaIndice,
+  armarIndice, chequearCupo, chequearEspacioDeLaAgencia, hayLugarEnElNas, HttpError, madresQueFaltanEnElLote, nombreValido,
+  planDeSubida, TAMANO_PARTE, validarLote, validarUnidades, type ItemParaIndice,
 } from "./logica.ts";
 
 Deno.serve(async (req) => {
@@ -68,6 +69,7 @@ Deno.serve(async (req) => {
       const { data: agencia } = await admin.from("tenants").select("id").eq("id", p.t).maybeSingle();
       if (!agencia) throw new HttpError("La agencia no existe", 404);
       const { filas, shares } = validarLote(p.t, body.items, body.compartidos);
+      const unidades = validarUnidades(body.unidades);
 
       // Cada carpeta madre que el lote no trae tiene que existir, ser carpeta y
       // ser de la MISMA agencia (si no, la FK lo frenaría con un error peor).
@@ -85,6 +87,13 @@ Deno.serve(async (req) => {
         const { error } = await admin.from("drive_items").upsert(filas, { onConflict: "id", ignoreDuplicates: true });
         if (error) throw new HttpError(error.message, 400);
       }
+      if (unidades.length) {
+        // Qué carpeta es una unidad. Que sea sin dueño y de la agencia, y que la
+        // persona sea de la agencia, lo exige el trigger de drive_unidades.
+        const { error } = await admin.from("drive_unidades")
+          .upsert(unidades.map((u) => ({ ...u, tenant_id: p.t })), { onConflict: "item_id", ignoreDuplicates: true });
+        if (error) throw new HttpError(error.message, 400);
+      }
       if (shares.length) {
         // Lo compartido tiene que ser de esta agencia (el trigger además exige
         // que la persona sea de la agencia del archivo).
@@ -100,7 +109,7 @@ Deno.serve(async (req) => {
         const { error } = await admin.from("drive_shares").upsert(shares, { onConflict: "item_id,user_id", ignoreDuplicates: true });
         if (error) throw new HttpError(error.message, 400);
       }
-      return responder({ ok: true, items: filas.length, compartidos: shares.length });
+      return responder({ ok: true, items: filas.length, compartidos: shares.length, unidades: unidades.length });
     }
 
     const authHeader = req.headers.get("Authorization") ?? "";
@@ -131,11 +140,26 @@ Deno.serve(async (req) => {
       const { data: tenant, error: eT } = await comoLaPersona.rpc("current_tenant_id");
       if (eT || !tenant) throw new HttpError("No encontré tu agencia", 403);
 
-      // El cupo de la persona (50 GB salvo que un admin le haya puesto otro).
-      const { data: uso, error: eU } = await comoLaPersona.rpc("drive_uso");
-      if (eU) throw new HttpError(eU.message, 500);
-      const fila = (Array.isArray(uso) ? uso[0] : uso) as { usado: number; cupo: number } | undefined;
-      chequearCupo(Number(fila?.usado ?? 0), Number(fila?.cupo ?? 0), size);
+      // Dentro de una unidad compartida gasta el espacio de la AGENCIA, como en
+      // Google; en lo demás, el cupo de la persona (50 GB salvo que un admin le
+      // haya puesto otro).
+      let unidad: string | null = null;
+      if (parentId) {
+        const { data, error } = await admin.rpc("drive_unidad_de", { p_item: parentId });
+        if (error) throw new HttpError(error.message, 500);
+        unidad = (data as string | null) ?? null;
+      }
+      if (unidad) {
+        const { data: uso, error: eU } = await comoLaPersona.rpc("drive_uso_agencia");
+        if (eU) throw new HttpError(eU.message, 500);
+        const fila = (Array.isArray(uso) ? uso[0] : uso) as { usado: number; cupo: number | null } | undefined;
+        chequearEspacioDeLaAgencia(Number(fila?.usado ?? 0), fila?.cupo == null ? null : Number(fila.cupo), size);
+      } else {
+        const { data: uso, error: eU } = await comoLaPersona.rpc("drive_uso");
+        if (eU) throw new HttpError(eU.message, 500);
+        const fila = (Array.isArray(uso) ? uso[0] : uso) as { usado: number; cupo: number } | undefined;
+        chequearCupo(Number(fila?.usado ?? 0), Number(fila?.cupo ?? 0), size);
+      }
 
       // Y que haya lugar en el NAS, ANTES de crear la ficha: si no entra, que
       // se sepa ahora y no a mitad de la subida. Si el NAS no contesta, la
@@ -241,6 +265,31 @@ Deno.serve(async (req) => {
       const { error } = await admin.from("drive_items").delete().eq("id", id);
       if (error) throw new HttpError(error.message, 500);
       return responder({ ok: true, archivos: archivos.length });
+    }
+
+    if (accion === "crear_unidad") {
+      // Como en Google Workspace: las unidades compartidas las crea un admin.
+      // La unidad no tiene dueño (es de la agencia) y quien la crea queda como
+      // editor para poder compartirla.
+      const nombre = nombreValido(body.nombre);
+      const { data: soyAdmin, error: eA } = await comoLaPersona.rpc("drive_soy_admin");
+      if (eA) throw new HttpError(eA.message, 500);
+      if (soyAdmin !== true) throw new HttpError("Solo un admin puede crear unidades compartidas", 403);
+      const { data: tenant, error: eT } = await comoLaPersona.rpc("current_tenant_id");
+      if (eT || !tenant) throw new HttpError("No encontré tu agencia", 403);
+      const id = crypto.randomUUID();
+      const { error: e1 } = await admin.from("drive_items").insert({
+        id, tenant_id: tenant, owner_id: null, parent_id: null, tipo: "carpeta", nombre, estado: "listo",
+      });
+      if (e1) throw new HttpError(e1.message, 400);
+      const { error: e2 } = await admin.from("drive_unidades").insert({ item_id: id, tenant_id: tenant, tipo: "empresa", creada_por: yo });
+      const { error: e3 } = e2 ? { error: null } : await admin.from("drive_shares").insert({ item_id: id, user_id: yo, rol: "editor" });
+      if (e2 || e3) {
+        // Sin la marca o sin el compartido sería una carpeta que nadie ve.
+        await admin.from("drive_items").delete().eq("id", id);
+        throw new HttpError((e2 ?? e3)!.message, 400);
+      }
+      return responder({ id });
     }
 
     throw new HttpError("Acción desconocida");

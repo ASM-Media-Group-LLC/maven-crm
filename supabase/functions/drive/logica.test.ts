@@ -134,3 +134,33 @@ Deno.test("importar: las madres que el lote no trae son las que la edge tiene qu
   const { filas } = validarLote(T, [carpeta(u(1), u(7)), archivo(u(2), u(1)), archivo(u(3), u(8)), archivo(u(4), u(8))], []);
   assert(JSON.stringify(madresQueFaltanEnElLote(filas).sort()) === JSON.stringify([u(7), u(8)]), "solo 7 y 8");
 });
+
+// ── Unidades compartidas y el espacio de la agencia ─────────────────────────
+import { chequearEspacioDeLaAgencia, validarUnidades } from "./logica.ts";
+
+Deno.test("espacio de la agencia: sin tope (KASH) siempre entra; con tope, frena al pasarse", () => {
+  assert(!tira(() => chequearEspacioDeLaAgencia(10e12, null, 5e12)), "sin tope no frena");
+  const g = 1024 ** 3;
+  assert(!tira(() => chequearEspacioDeLaAgencia(20 * g, 30 * g, 10 * g)), "justo el tope entra");
+  assert(tira(() => chequearEspacioDeLaAgencia(20 * g, 30 * g, 10 * g + 1)), "un byte más, no");
+});
+
+Deno.test("unidades del lote: empresa sin persona, personal con o sin persona", () => {
+  const us = validarUnidades([
+    { item_id: u(1), tipo: "empresa" },
+    { item_id: u(2), tipo: "personal", persona: u(9) },
+    { item_id: u(3), tipo: "personal", persona: null },
+  ]);
+  assert(us.length === 3 && us[0].persona === null && us[1].persona === u(9) && us[2].persona === null, "las tres");
+  assert(validarUnidades(undefined).length === 0, "sin unidades, nada");
+});
+
+Deno.test("⚠️ unidades del lote: lo raro rechaza el lote entero", () => {
+  for (const malo of [
+    [{ item_id: "x", tipo: "empresa" }],
+    [{ item_id: u(1), tipo: "otra" }],
+    [{ item_id: u(1), tipo: "personal", persona: "nadie" }],
+    [{ item_id: u(1), tipo: "empresa", persona: u(9) }],
+    [{ item_id: u(1), tipo: "empresa" }, { item_id: u(1), tipo: "empresa" }],
+  ]) assert(tira(() => validarUnidades(malo)), `dejó pasar ${JSON.stringify(malo)}`);
+});

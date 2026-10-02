@@ -11,12 +11,14 @@ const fuentes = (import.meta as unknown as {
   "/supabase/functions/drive/index.ts",
   "/infra/nas-drive/server.mjs",
   "/frontend/src/hooks/useDrive.ts",
+  "/supabase/migrations/20261002130000_drive_unidades.sql",
 ], { query: "?raw", import: "default", eager: true });
 const leer = (fin: string) => Object.entries(fuentes).find(([k]) => k.endsWith(fin))?.[1] ?? "";
 const mig = leer("oficina_drive.sql");
 const edge = leer("drive/index.ts");
 const nas = leer("nas-drive/server.mjs");
 const hook = leer("hooks/useDrive.ts");
+const unidades = leer("drive_unidades.sql");
 
 describe("⚠️ multi-agencia", () => {
   it("toda política de drive_items exige la agencia", () => {
@@ -82,3 +84,24 @@ describe("⚠️ carpetas grandes", () => {
     expect(tramo).toMatch(/\.order\("id"\)\.range\(desde, hasta\)/);
   });
 });
+
+describe("⚠️ unidades compartidas (como en Google)", () => {
+  it("lo de adentro de una unidad no gasta el cupo personal", () => {
+    expect(unidades.length).toBeGreaterThan(0);
+    const uso = unidades.slice(unidades.indexOf("FUNCTION public.drive_uso("), unidades.indexOf("FUNCTION public.drive_usos_de_mi_agencia"));
+    expect(uso).toMatch(/i\.owner_id = quien AND i\.tipo = 'archivo' AND i\.unidad_id IS NULL/);
+  });
+  it("unidad_id no cuenta como modificación (no pisa la fecha de Google)", () => {
+    expect(unidades).toMatch(/- 'updated_at' - 'last_opened_at' - 'unidad_id'\) IS DISTINCT FROM/);
+  });
+  it("solo un admin crea unidades, y la edge revisa con la sesión de la persona", () => {
+    const i = edge.indexOf('accion === "crear_unidad"');
+    expect(i).toBeGreaterThan(-1);
+    expect(edge.slice(i, i + 700)).toMatch(/comoLaPersona\.rpc\("drive_soy_admin"\)/);
+  });
+  it("subir dentro de una unidad revisa el espacio de la AGENCIA", () => {
+    expect(edge).toMatch(/rpc\("drive_unidad_de"/);
+    expect(edge).toMatch(/chequearEspacioDeLaAgencia\(/);
+  });
+});
+

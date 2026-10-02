@@ -19,10 +19,13 @@
 //
 // Uso (desde Terminal, por el permiso de macOS para los discos):
 //   set -a; . ~/maven-nas-drive/.env; set +a
-//   node importar.mjs plan.json [--prueba] [--solo <clave>] [--de-nuevo]
+//   node importar.mjs plan.json [--prueba] [--solo <clave>] [--de-nuevo] [--solo-raices]
 //     --prueba    recorre y cuenta; no enlaza ni manda nada
 //     --solo      una sola carpeta del plan (por su «clave»)
 //     --de-nuevo  repasa también las carpetas que ya figuran como hechas
+//     --solo-raices  manda solo la raíz de cada carpeta YA importada (sus
+//                 compartidos y qué unidad es), sin recorrer el disco: minutos
+//                 en vez de media hora para sumar accesos o marcar unidades
 
 import fs from "node:fs";
 import fsp from "node:fs/promises";
@@ -149,7 +152,7 @@ export const TAMANO_LOTE = 1500;
 
 const dormir = (ms) => new Promise((ok) => setTimeout(ok, ms));
 
-export async function mandar({ funciones, secreto, tenant, items = [], compartidos = [], fetchFn = fetch, intentos = 4, espera = dormir }) {
+export async function mandar({ funciones, secreto, tenant, items = [], compartidos = [], unidades = [], fetchFn = fetch, intentos = 4, espera = dormir }) {
   for (let i = 1; ; i++) {
     const permiso = firmar(secreto, { op: "importar", k: "importar", t: tenant, e: Math.floor(Date.now() / 1000) + 300 });
     let r, j;
@@ -157,7 +160,7 @@ export async function mandar({ funciones, secreto, tenant, items = [], compartid
       r = await fetchFn(`${funciones}/drive`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "importar", permiso, items, compartidos }),
+        body: JSON.stringify({ action: "importar", permiso, items, compartidos, unidades }),
       });
       j = await r.json().catch(() => ({}));
     } catch (e) {
@@ -173,11 +176,29 @@ export async function mandar({ funciones, secreto, tenant, items = [], compartid
 }
 
 /** Importa UNA carpeta del plan (una unidad o una Mi unidad). */
+/** El primer lote de una carpeta del plan: su raíz, con quién se comparte y,
+ *  si el plan lo dice, qué unidad es (una unidad compartida de la empresa o la
+ *  «Mi unidad» de Google de una persona). */
+function loteDeLaRaiz(carpeta, grupoId) {
+  const raizId = idCarpetaRaiz(carpeta.clave);
+  return {
+    items: [{ id: raizId, parent_id: grupoId, tipo: "carpeta", nombre: nombreParaMaven(carpeta.nombre) }],
+    compartidos: (carpeta.compartir ?? []).map((c) => ({ item_id: raizId, user_id: c.user_id, rol: c.rol })),
+    unidades: carpeta.unidad ? [{ item_id: raizId, tipo: carpeta.unidad.tipo, persona: carpeta.unidad.persona ?? null }] : [],
+  };
+}
+
+/** Solo la raíz (sin recorrer el disco): para marcar las unidades y sumar
+ *  compartidos a lo que ya se importó. */
+export async function marcarRaiz({ carpeta, grupoId, conf, fetchFn }) {
+  const { tenant, funciones, secreto } = conf;
+  await mandar({ funciones, secreto, tenant, ...loteDeLaRaiz(carpeta, grupoId), fetchFn });
+}
+
 export async function importarCarpeta({ carpeta, grupoId, conf, prueba = false, log = () => {}, fetchFn }) {
   const { tenant, discos, raizDrive, funciones, secreto } = conf;
-  const { clave, nombre, origen, compartir = [] } = carpeta;
+  const { clave, origen } = carpeta;
   const arbol = await recorrer(discos, origen);
-  const raizId = idCarpetaRaiz(clave);
   const stats = { clave, carpetas: arbol.carpetas.length, archivos: arbol.archivos.size, bytes: 0, enlacesNuevos: 0, enlacesYa: 0, enlacesRenovados: 0, dobles: arbol.dobles.length };
   for (const a of arbol.archivos.values()) stats.bytes += a.size;
   // Vacía también en Google (21 unidades el 01/10): no se crea, para no llenar
@@ -186,9 +207,8 @@ export async function importarCarpeta({ carpeta, grupoId, conf, prueba = false, 
   if (prueba) return stats;
   const enviar = (items, compartidos = []) => mandar({ funciones, secreto, tenant, items, compartidos, fetchFn });
 
-  // 1. La carpeta raíz y con quién se comparte.
-  await enviar([{ id: raizId, parent_id: grupoId, tipo: "carpeta", nombre: nombreParaMaven(nombre) }],
-    compartir.map((c) => ({ item_id: raizId, user_id: c.user_id, rol: c.rol })));
+  // 1. La carpeta raíz, con quién se comparte y qué unidad es.
+  await mandar({ funciones, secreto, tenant, ...loteDeLaRaiz(carpeta, grupoId), fetchFn });
 
   // 2. Las carpetas, de la menos a la más profunda (la madre llega antes).
   const filasCarpetas = arbol.carpetas
@@ -228,7 +248,8 @@ async function principal() {
   const prueba = args.includes("--prueba");
   const deNuevo = args.includes("--de-nuevo");
   const solo = args.includes("--solo") ? args[args.indexOf("--solo") + 1] : null;
-  if (!planRuta) throw new Error("Uso: node importar.mjs plan.json [--prueba] [--solo <clave>] [--de-nuevo]");
+  const soloRaices = args.includes("--solo-raices");
+  if (!planRuta) throw new Error("Uso: node importar.mjs plan.json [--prueba] [--solo <clave>] [--de-nuevo] [--solo-raices]");
   const plan = JSON.parse(await fsp.readFile(planRuta, "utf8"));
   const secreto = process.env.DRIVE_SECRETO ?? "";
   if (!prueba && secreto.length < 32) throw new Error("Falta DRIVE_SECRETO (cargar ~/maven-nas-drive/.env)");
@@ -248,6 +269,13 @@ async function principal() {
     }
     for (const carpeta of grupo.carpetas) {
       if (solo && carpeta.clave !== solo) continue;
+      if (soloRaices) {
+        // Solo lo que ya entró (las vacías no se crearon: no hay raíz que marcar).
+        if (!hecho[carpeta.clave] || hecho[carpeta.clave].vacia) continue;
+        if (!prueba) await marcarRaiz({ carpeta, grupoId: grupo.id, conf });
+        log(`${prueba ? "marcaría" : "raíz"} ${carpeta.nombre}: ${(carpeta.compartir ?? []).length} compartidos${carpeta.unidad ? `, unidad ${carpeta.unidad.tipo}` : ""}`);
+        continue;
+      }
       if (!prueba && !deNuevo && hecho[carpeta.clave]) { log(`ya estaba: ${carpeta.nombre}`); continue; }
       if (!prueba && solo) {
         await mandar({ ...conf, items: [{ id: grupo.id, parent_id: null, tipo: "carpeta", nombre: grupo.nombre }],

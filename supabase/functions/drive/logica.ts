@@ -142,6 +142,19 @@ export function chequearCupo(usado: number, cupo: number, size: number) {
 /** Lo mismo que exige el NAS (MARGEN_LIBRE de infra/nas-drive/server.mjs): el
  *  archivo tiene que entrar en ALGÚN disco dejando 5% libre. Por partes, dos
  *  veces el archivo (partes + archivo final conviven al juntarlas). */
+/** El espacio común de la agencia (lo de adentro de una unidad compartida).
+ *  cupo null = sin tope. */
+export function chequearEspacioDeLaAgencia(usado: number, cupo: number | null, size: number) {
+  if (cupo === null) return;
+  if (usado + size > cupo) {
+    throw new HttpError(
+      `Las unidades compartidas de tu agencia no tienen espacio: usan ${legible(usado)} de ${legible(cupo)} y este archivo pesa ${legible(size)}. ` +
+        "Vacía la papelera o pídele a un admin más espacio.",
+      413,
+    );
+  }
+}
+
 export function hayLugarEnElNas(raices: { ok: boolean; libre?: number; total?: number }[], size: number, porPartes: boolean) {
   const necesita = porPartes ? size * 2 : size;
   return raices.some((r) => r.ok && typeof r.libre === "number" && typeof r.total === "number" && r.libre - necesita >= r.total * 0.05);
@@ -229,4 +242,28 @@ export function validarLote(tenant: string, items: unknown, compartidos: unknown
 export function madresQueFaltanEnElLote(filas: FilaImportada[]): string[] {
   const carpetasDelLote = new Set(filas.filter((f) => f.tipo === "carpeta").map((f) => f.id));
   return [...new Set(filas.map((f) => f.parent_id).filter((p): p is string => !!p && !carpetasDelLote.has(p)))];
+}
+
+export interface UnidadImportada { item_id: string; tipo: "empresa" | "personal"; persona: string | null }
+
+/** Las unidades que trae un lote de la mini: qué carpeta es una unidad
+ *  compartida ('empresa') o la «Mi unidad» de Google de alguien ('personal').
+ *  Que la carpeta sea sin dueño y de la agencia, y la persona también, lo
+ *  revisan la edge y el trigger de drive_unidades. */
+export function validarUnidades(unidades: unknown): UnidadImportada[] {
+  const us = Array.isArray(unidades) ? unidades : [];
+  if (us.length > TOPE_LOTE) throw new HttpError(`Máximo ${TOPE_LOTE} unidades por lote`);
+  const vistas = new Set<string>();
+  return us.map((x, n): UnidadImportada => {
+    const o = (x && typeof x === "object" ? x : {}) as Record<string, unknown>;
+    const item = String(o.item_id ?? "");
+    if (!UUID.test(item)) throw new HttpError(`Unidad ${n}: id inválido`);
+    if (vistas.has(item)) throw new HttpError(`Unidad ${n}: repetida`);
+    vistas.add(item);
+    if (o.tipo !== "empresa" && o.tipo !== "personal") throw new HttpError(`Unidad ${n}: tipo inválido`);
+    const persona = o.persona == null ? null : String(o.persona);
+    if (persona !== null && !UUID.test(persona)) throw new HttpError(`Unidad ${n}: persona inválida`);
+    if (o.tipo === "empresa" && persona !== null) throw new HttpError(`Unidad ${n}: una unidad compartida no es de una persona`);
+    return { item_id: item, tipo: o.tipo, persona };
+  });
 }
