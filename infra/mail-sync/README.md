@@ -27,6 +27,7 @@ SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... MAIL_CRED_KEY=... npm start
 | `RECONCILIAR_MS` | 900000 | piso para abrir una carpeta aunque el STATUS diga que nada cambió (red de seguridad de banderas y conteos) |
 | `LATIDO_MS` | 300000 | como mucho cada tanto escribe `mail_credentials.last_sync_at`: responde "¿está vivo el worker para esta casilla?" |
 | `PER_FOLDER_INIT` | 50 | mensajes iniciales por carpeta |
+| `HEREDAR_DEL_HILO` | 1 | una respuesta NUEVA en Recibidos a una charla etiquetada hereda sus etiquetas; si la charla ya estaba fuera de Recibidos, se archiva con ella (`hilos.mjs`). `0` lo apaga. Nunca en la primera carga ni con respuestas de más de 7 días |
 | `HOT_FOLDERS` | INBOX,Notification,Newsletter | carpetas revisadas con la cadencia de `SWEEP_INBOX_MS` en vez de esperar el barrido completo. ⚠️ **Tienen que estar las tres**: las reglas de Zoho sacan del INBOX lo más urgente (códigos de GitHub y resets en `Notification`, códigos de Facebook en `Newsletter`). Con solo `INBOX` (10/09 → 16/09) esas dos carpetas entregaban con hasta **30 min** de atraso. No es caro: `revisarCarpeta` filtra con un STATUS y solo abre si algo cambió |
 | `STARTUP_STAGGER_MS` | 6000 | espaciado entre logins al arrancar — los logins en ráfaga (cada deploy) son lo que el proveedor castiga |
 | `PORT` | 4610 | `/health` |

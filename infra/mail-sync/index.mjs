@@ -25,6 +25,7 @@ import { simpleParser } from "mailparser";
 import { sanitizeEmailHtml } from "./sanitize.mjs";
 import { esAvisoDelProveedor } from "./notices.mjs";
 import { decidirSiAbrir } from "./barrido.mjs";
+import { ancestrosDe, decidirHerencia } from "./hilos.mjs";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -80,6 +81,9 @@ const RECONCILIAR_MS = Number(process.env.RECONCILIAR_MS || 900_000);
 const LATIDO_MS = Number(process.env.LATIDO_MS || 300_000);
 // Cuántos mensajes trae por carpeta la PRIMERA vez (después es incremental).
 const PER_FOLDER_INIT = Number(process.env.PER_FOLDER_INIT || 50);
+// Una respuesta a una charla etiquetada hereda sus etiquetas (y se archiva si
+// la charla ya estaba archivada). Ver hilos.mjs. HEREDAR_DEL_HILO=0 lo apaga.
+const HEREDAR_DEL_HILO = process.env.HEREDAR_DEL_HILO !== "0";
 // Techo del cuerpo guardado. Un correo de 5 MB de HTML no aporta nada.
 const MAX_BODY_BYTES = Number(process.env.MAX_BODY_BYTES || 300_000);
 const PORT = Number(process.env.PORT || 4610);
@@ -428,6 +432,9 @@ class CuentaSync {
 
       let maxUid = desdeUid;
       let nuevos = 0;
+      // Lo nuevo de Recibidos que responde a algo: candidatos a heredar las
+      // etiquetas de su conversación (ver heredarDelHilo).
+      const respuestas = [];
 
       if (exists > 0 && uidNext - 1 > desdeUid) {
         // Primera vez: solo los últimos N (nadie necesita el 2019 entero
@@ -444,10 +451,19 @@ class CuentaSync {
         )) {
           const uid = Number(msg.uid);
           if (uid <= desdeUid) continue; // '*' puede devolver el último igual
-          await this.guardarMensaje(clave, uidValidity, uid, msg);
+          const guardado = await this.guardarMensaje(clave, uidValidity, uid, msg);
+          // Solo lo incremental: en la primera carga de una casilla llegan los
+          // últimos 50 de golpe, y archivar en masa lo viejo no es heredar.
+          if (guardado && porUid && clave === "INBOX" && HEREDAR_DEL_HILO) respuestas.push({ uid, ...guardado });
           nuevos++;
           if (uid > maxUid) maxUid = uid;
         }
+      }
+      if (respuestas.length) {
+        // Nunca puede tirar el barrido: lo peor que pasa si falla es lo de
+        // antes (la respuesta queda en Recibidos sin etiqueta).
+        try { await this.heredarDelHilo(respuestas, uidValidity); }
+        catch (e) { this.log("heredar del hilo falló:", e?.message); }
       }
 
       // Banderas de lo reciente: si alguien leyó desde otro lado (o el
@@ -606,7 +622,76 @@ class CuentaSync {
       synced_at: new Date().toISOString(),
     }, { onConflict: "user_id,folder,uidvalidity,uid" });
 
-    if (error) this.log(`upsert uid ${uid} falló:`, error.message);
+    if (error) {
+      this.log(`upsert uid ${uid} falló:`, error.message);
+      return null;
+    }
+    return {
+      messageId: parsed.messageId ?? null,
+      inReplyTo: parsed.inReplyTo ?? null,
+      refs: parsed.references ?? null,
+      date: parsed.date ? parsed.date.toISOString() : null,
+    };
+  }
+
+  /** Las respuestas nuevas de Recibidos heredan las etiquetas de su charla, y
+   *  si la charla ya estaba archivada se archivan con ella (hilos.mjs decide).
+   *  Corre DENTRO del lock de Recibidos, con la carpeta seleccionada: el MOVE
+   *  sale de acá mismo. La fila de la caché se TRASLADA (no se borra), igual
+   *  que en el «Mover a» de la edge: si no, la etiqueta apuntaría a una fila
+   *  que no existe hasta el próximo barrido de Archivados (30 min). */
+  async heredarDelHilo(respuestas, uidValidityInbox) {
+    const yo = this.cred.user_id;
+    const porArchivar = [];
+    for (const r of respuestas) {
+      const ancestros = ancestrosDe(r);
+      if (!r.messageId || !ancestros.length) continue;
+      const { data: etis, error } = await db.from("mail_message_labels")
+        .select("message_id, label_id").eq("user_id", yo).in("message_id", ancestros);
+      if (error || !etis?.length) continue;
+      const { count: propias } = await db.from("mail_message_labels")
+        .select("label_id", { count: "exact", head: true }).eq("user_id", yo).eq("message_id", r.messageId);
+      const etiquetados = [...new Set(etis.map((e) => e.message_id))];
+      const { count: enRecibidos } = await db.from("mail_messages")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", yo).eq("folder", "INBOX").in("message_id", etiquetados);
+      const d = decidirHerencia({
+        etiquetasDelHilo: etis.map((e) => e.label_id),
+        yaTieneEtiquetas: (propias ?? 0) > 0,
+        etiquetadosEnRecibidos: (enRecibidos ?? 0) > 0,
+        fecha: r.date,
+        ahora: Date.now(),
+      });
+      if (!d.etiquetas.length) continue;
+      const { error: e2 } = await db.from("mail_message_labels").upsert(
+        d.etiquetas.map((label_id) => ({ user_id: yo, message_id: r.messageId, label_id })),
+        { onConflict: "user_id,message_id,label_id", ignoreDuplicates: true },
+      );
+      if (e2) { this.log(`no se pudo heredar la etiqueta de uid ${r.uid}:`, e2.message); continue; }
+      this.log(`uid ${r.uid}: heredó ${d.etiquetas.length} etiqueta(s) de su charla${d.archivar ? " y se archiva" : ""}`);
+      if (d.archivar) porArchivar.push(r.uid);
+    }
+    if (!porArchivar.length) return;
+
+    // La carpeta de archivo de Zoho es «Archive» (la misma que usa la edge).
+    const destino = this.carpetas?.get("Archive") ?? "Archive";
+    const movido = await this.client.messageMove(porArchivar.join(","), destino, { uid: true });
+    if (!movido) { this.log("no se pudo archivar lo heredado"); return; }
+    const mapa = movido.uidMap instanceof Map ? movido.uidMap : new Map();
+    const validez = Number(movido.uidValidity ?? 0);
+    for (const viejo of porArchivar) {
+      const nuevo = mapa.get(viejo);
+      if (nuevo && validez) {
+        const { error } = await db.from("mail_messages")
+          .update({ folder: "Archive", uidvalidity: validez, uid: Number(nuevo), synced_at: new Date().toISOString() })
+          .eq("user_id", yo).eq("folder", "INBOX").eq("uidvalidity", uidValidityInbox).eq("uid", viejo);
+        if (!error) continue;
+      }
+      // Sin el uid nuevo (o si el traslado chocó) la fila sale de Recibidos y
+      // el barrido de Archivados la trae.
+      await db.from("mail_messages").delete()
+        .eq("user_id", yo).eq("folder", "INBOX").eq("uidvalidity", uidValidityInbox).eq("uid", viejo);
+    }
   }
 
   async marcarError(msg) {
