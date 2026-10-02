@@ -134,6 +134,28 @@ export const oficina = {
   "drive.cupos.general": { es: "general", en: "default" },
   "drive.cupos.volver": { es: "Volver al general", en: "Reset to default" },
   "drive.cupos.guardado": { es: "Espacio guardado", en: "Storage saved" },
+  // Drive · visor de archivos (pages/oficina/drive/VisorArchivo.tsx)
+  "drive.visor.descripcion": { es: "Vista previa de {name}", en: "Preview of {name}" },
+  "drive.visor.posicion": { es: "{n} de {m}", en: "{n} of {m}" },
+  "drive.visor.otraPestana": { es: "Abrir en otra pestaña", en: "Open in a new tab" },
+  "drive.visor.cargando": { es: "Abriendo el archivo…", en: "Opening the file…" },
+  "drive.visor.error": { es: "No se pudo abrir el archivo", en: "Couldn’t open the file" },
+  "drive.visor.errorAyuda": { es: "Puede que el NAS no esté respondiendo. Prueba de nuevo o descárgalo.", en: "The NAS may not be responding. Try again or download it." },
+  "drive.visor.sinVista": { es: "Este archivo no tiene vista previa", en: "No preview available for this file" },
+  "drive.visor.sinVistaAyuda": { es: "Descárgalo para abrirlo con el programa que corresponda.", en: "Download it to open it with the right app." },
+  "drive.visor.muyGrande": { es: "Es demasiado grande para verlo aquí", en: "It’s too large to preview here" },
+  "drive.visor.muyGrandeAyuda": { es: "Los documentos de más de {tope} no se pueden previsualizar. Descárgalo para abrirlo.", en: "Documents over {tope} can’t be previewed. Download it to open it." },
+  "drive.visor.navegadorNoPuede": { es: "Tu navegador no puede mostrar este archivo", en: "Your browser can’t display this file" },
+  "drive.visor.navegadorNoPuedeAyuda": { es: "Descárgalo para abrirlo con otro programa.", en: "Download it to open it with another app." },
+  "drive.visor.textoCortado": { es: "Se muestra solo el primer {tope}. Descarga el archivo para verlo entero.", en: "Showing only the first {tope}. Download the file to see all of it." },
+  "drive.visor.textoVacio": { es: "El archivo está vacío.", en: "The file is empty." },
+  "drive.visor.editar.docx": { es: "Editar en Documentos de Maven", en: "Edit in Maven Docs" },
+  "drive.visor.editar.xlsx": { es: "Editar en Hojas de cálculo de Maven", en: "Edit in Maven Sheets" },
+  "drive.visor.editar.pptx": { es: "Editar en Presentaciones de Maven", en: "Edit in Maven Slides" },
+  "drive.visor.editarCorto": { es: "Editar", en: "Edit" },
+  "drive.visor.copiando": { es: "Creando una copia editable…", en: "Creating an editable copy…" },
+  "drive.visor.copiaLista": { es: "Copia creada en la Oficina. El original sigue en el Drive.", en: "Copy created in Office. The original stays in Drive." },
+  "drive.visor.copiaError": { es: "No se pudo crear la copia", en: "Couldn’t create the copy" },
 
   // >>> i18n ola 3 (paginas-a)
   // Oficina · la lista (docs, hojas, presentaciones)
