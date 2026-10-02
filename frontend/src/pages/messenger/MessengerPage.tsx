@@ -86,6 +86,32 @@ export default function MessengerPage() {
     }
   }, [searchParams, conversations, selectChat, setSearchParams]);
 
+  // VOLVER A LA MISMA CONVERSACIÓN. Ir al Correo y regresar desmonta esta
+  // página y el chat abierto se perdía: había que buscarlo de nuevo (Keila,
+  // 02/10). Se guarda por PESTAÑA (sessionStorage): dos pestañas no se pisan.
+  // Un enlace con ?c= / ?dm= manda sobre lo guardado.
+  const claveChatAbierto = user?.id ? `messenger.chatAbierto.${user.id}` : null;
+  const restauradoRef = useRef(false);
+  useEffect(() => {
+    if (restauradoRef.current || !claveChatAbierto) return;
+    if (searchParams.get("c") || searchParams.get("chat") || searchParams.get("dm")) {
+      restauradoRef.current = true;
+      return;
+    }
+    if (loading) return;
+    restauradoRef.current = true;
+    let guardado: string | null = null;
+    try { guardado = sessionStorage.getItem(claveChatAbierto); } catch { /* sin almacenamiento */ }
+    if (guardado && conversations.some((x) => x.id === guardado)) selectChat(guardado);
+  }, [claveChatAbierto, searchParams, loading, conversations, selectChat]);
+  useEffect(() => {
+    if (!restauradoRef.current || !claveChatAbierto) return;
+    try {
+      if (activeChatId) sessionStorage.setItem(claveChatAbierto, activeChatId);
+      else sessionStorage.removeItem(claveChatAbierto);
+    } catch { /* sin almacenamiento */ }
+  }, [activeChatId, claveChatAbierto]);
+
   // Abrir el modal de "Mensaje nuevo" al llegar desde el desplegable de mensajes
   // del topbar (/messenger?nuevo=1).
   useEffect(() => {
