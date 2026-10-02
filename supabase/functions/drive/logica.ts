@@ -146,3 +146,84 @@ export function hayLugarEnElNas(raices: { ok: boolean; libre?: number; total?: n
   const necesita = porPartes ? size * 2 : size;
   return raices.some((r) => r.ok && typeof r.libre === "number" && typeof r.total === "number" && r.libre - necesita >= r.total * 0.05);
 }
+
+// ── Importar el archivo de Google (lo pide la MINI, con permiso firmado) ────
+// Lo bajado de Google Drive al NAS entra al Drive de Maven SIN copiarse: la
+// mini crea un enlace duro de cada archivo en <agencia>/google/<id> (el mismo
+// disco, cero bytes de más) y manda acá las fichas en lotes. Sin dueño
+// (decisión de Jhon, 01/10): es el archivo de la empresa, no cuenta en el cupo
+// de nadie y lo administran los editores con los que se comparte.
+
+export const TOPE_LOTE = 2000;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+/** Un archivo del archivo puede pasar los 20 GB de una subida (videos crudos). */
+const MAX_IMPORTADO = 5 * 1024 ** 4;
+
+export interface FilaImportada {
+  id: string;
+  tenant_id: string;
+  owner_id: null;
+  parent_id: string | null;
+  tipo: "carpeta" | "archivo";
+  nombre: string;
+  mime: string | null;
+  size: number | null;
+  storage_key: string | null;
+  estado: "listo";
+  created_at: string;
+}
+export interface CompartidoImportado { item_id: string; user_id: string; rol: "lector" | "editor" }
+
+/** La ruta en el NAS de un archivo importado. La agencia va en el camino. */
+export const claveImportada = (tenant: string, id: string) => `${tenant}/google/${id}`;
+
+/** Valida un lote de la mini y lo deja listo para insertar. Todo o nada: una
+ *  fila mala rechaza el lote entero (la mini lo reintenta corregido). */
+export function validarLote(tenant: string, items: unknown, compartidos: unknown): { filas: FilaImportada[]; shares: CompartidoImportado[] } {
+  if (!UUID.test(tenant)) throw new HttpError("Agencia inválida");
+  const its = Array.isArray(items) ? items : [];
+  const comps = Array.isArray(compartidos) ? compartidos : [];
+  if (!its.length && !comps.length) throw new HttpError("Lote vacío");
+  if (its.length > TOPE_LOTE || comps.length > TOPE_LOTE) throw new HttpError(`Hasta ${TOPE_LOTE} filas por lote`);
+  const ahora = new Date().toISOString();
+  const vistos = new Set<string>();
+  const filas = its.map((x, n): FilaImportada => {
+    const o = (x && typeof x === "object" ? x : {}) as Record<string, unknown>;
+    const id = String(o.id ?? "");
+    if (!UUID.test(id)) throw new HttpError(`Fila ${n}: id inválido`);
+    if (vistos.has(id)) throw new HttpError(`Fila ${n}: id repetido en el lote`);
+    vistos.add(id);
+    const parent = o.parent_id == null ? null : String(o.parent_id);
+    if (parent !== null && (!UUID.test(parent) || parent === id)) throw new HttpError(`Fila ${n}: carpeta madre inválida`);
+    const tipo = o.tipo;
+    if (tipo !== "carpeta" && tipo !== "archivo") throw new HttpError(`Fila ${n}: tipo inválido`);
+    let nombre: string;
+    try { nombre = nombreValido(o.nombre); } catch { throw new HttpError(`Fila ${n}: nombre inválido`); }
+    const fecha = typeof o.created_at === "string" && !Number.isNaN(Date.parse(o.created_at)) ? new Date(o.created_at).toISOString() : ahora;
+    if (tipo === "carpeta") {
+      if (o.storage_key != null || o.size != null) throw new HttpError(`Fila ${n}: una carpeta no tiene archivo`);
+      return { id, tenant_id: tenant, owner_id: null, parent_id: parent, tipo, nombre, mime: null, size: null, storage_key: null, estado: "listo", created_at: fecha };
+    }
+    const size = Number(o.size);
+    if (!Number.isSafeInteger(size) || size < 0 || size > MAX_IMPORTADO) throw new HttpError(`Fila ${n}: tamaño inválido`);
+    // ⚠️ La ruta la fija la regla, no la mini: así un lote no puede apuntar una
+    // ficha al archivo de otra agencia (ni a una subida normal de alguien).
+    if (o.storage_key !== claveImportada(tenant, id)) throw new HttpError(`Fila ${n}: la ruta en el NAS no es la de un archivo importado`);
+    const mime = typeof o.mime === "string" && o.mime.length > 0 && o.mime.length < 200 ? o.mime : "application/octet-stream";
+    return { id, tenant_id: tenant, owner_id: null, parent_id: parent, tipo, nombre, mime, size, storage_key: claveImportada(tenant, id), estado: "listo", created_at: fecha };
+  });
+  const shares = comps.map((x, n): CompartidoImportado => {
+    const o = (x && typeof x === "object" ? x : {}) as Record<string, unknown>;
+    const item = String(o.item_id ?? ""), user = String(o.user_id ?? "");
+    if (!UUID.test(item) || !UUID.test(user)) throw new HttpError(`Compartido ${n}: ids inválidos`);
+    if (o.rol !== "lector" && o.rol !== "editor") throw new HttpError(`Compartido ${n}: rol inválido`);
+    return { item_id: item, user_id: user, rol: o.rol };
+  });
+  return { filas, shares };
+}
+
+/** Las carpetas madre que el lote nombra y no trae: tienen que existir ya. */
+export function madresQueFaltanEnElLote(filas: FilaImportada[]): string[] {
+  const carpetasDelLote = new Set(filas.filter((f) => f.tipo === "carpeta").map((f) => f.id));
+  return [...new Set(filas.map((f) => f.parent_id).filter((p): p is string => !!p && !carpetasDelLote.has(p)))];
+}

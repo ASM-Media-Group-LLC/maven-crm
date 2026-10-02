@@ -13,6 +13,7 @@ on:
       - "supabase/config.toml"
       - "supabase/migrations/**"
       - "supabase/tests/**"
+      - "infra/nas-drive/**"
       - ".github/workflows/deploy-edge-functions.yml"
       - ".github/workflows/guard-edge-functions.yml"
 
@@ -51,6 +52,12 @@ jobs:
       # infra/nas-drive), y las reglas de subida (tope, partes, nombres).
       - name: Guard — Drive (firma y subidas)
         run: deno test --no-check supabase/functions/_shared/drive-firma.test.ts supabase/functions/drive/logica.test.ts
+
+      # El lado del NAS (infra/nas-drive, Node): el servidor, el índice diario
+      # (paginado: arma el árbol en la mini) y el importador del archivo de Google
+      # (enlaces duros en el mismo disco, ids estables, nombres del Mac a NFC).
+      - name: Guard — Drive del NAS (servidor, índice e importador)
+        run: node --test infra/nas-drive/test.mjs infra/nas-drive/indice.test.mjs infra/nas-drive/importar.test.mjs
 
       # La IA por OpenRouter (desde el 01/10/2026 no hay llave de Anthropic): el bucle de
       # herramientas de Clari, el catálogo sin additionalProperties (Gemini lo rechaza),

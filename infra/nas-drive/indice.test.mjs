@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { aCsv, escribirIndice, pedirIndice } from "./indice.mjs";
+import { aCsv, armarFilas, escribirIndice, pedirIndice } from "./indice.mjs";
 import { verificar } from "./firma.mjs";
 
 const A = "11111111-1111-1111-1111-111111111111";
@@ -59,16 +59,40 @@ test("⚠️ una agencia con id raro no se convierte en ruta", async () => {
   await fs.rm(dir, { recursive: true, force: true });
 });
 
-test("pide el índice con un permiso firmado op=indice que vence en minutos", async () => {
+const item = (id, parent_id, nombre, extra = {}) => ({
+  id, tenant_id: A, owner_id: null, parent_id, tipo: parent_id === undefined ? "carpeta" : "archivo", nombre, size: 1, sha256: null,
+  storage_key: `${A}/${id}`, estado: "listo", trashed_at: null, created_at: "c", updated_at: "m", last_opened_at: null, ...extra,
+});
+
+test("pide el índice de a páginas, con un permiso firmado op=indice que vence en minutos, y arma las rutas acá", async () => {
   const secreto = "s".repeat(40);
-  let pedido;
-  const fetchFn = async (url, init) => { pedido = { url, body: JSON.parse(init.body) }; return new Response(JSON.stringify({ generado: "g", filas: [] })); };
-  await pedirIndice({ funciones: "https://x/functions/v1", secreto, fetchFn });
-  assert.equal(pedido.url, "https://x/functions/v1/drive");
-  const p = verificar(secreto, pedido.body.permiso);
+  const pedidos = [];
+  const paginas = [
+    { generado: "g", items: [item("a", null, "Contabilidad", { tipo: "carpeta", storage_key: null }), item("b", "a", "2026", { tipo: "carpeta", storage_key: null })], siguiente: "b", agencias: { [A]: "KASH" }, duenos: {} },
+    { generado: "g2", items: [item("c", "b", "Balance.pdf", { owner_id: "u1" }), item("d", "zz", "huérfano.pdf")], siguiente: null, agencias: {}, duenos: { u1: { nombre: "Keila", correo: "k@x" } } },
+  ];
+  const fetchFn = async (url, init) => { pedidos.push({ url, body: JSON.parse(init.body) }); return new Response(JSON.stringify(paginas[pedidos.length - 1])); };
+  const { generado, filas } = await pedirIndice({ funciones: "https://x/functions/v1", secreto, fetchFn });
+  assert.equal(pedidos[0].url, "https://x/functions/v1/drive");
+  assert.deepEqual(pedidos.map((p) => [p.body.paginado, p.body.desde]), [[true, null], [true, "b"]]);
+  const p = verificar(secreto, pedidos[1].body.permiso);
   assert.equal(p.op, "indice");
   assert.ok(p.e * 1000 - Date.now() <= 300_000);
+  assert.equal(generado, "g");
+  const balance = filas.find((f) => f.nombre === "Balance.pdf");
+  assert.equal(balance.ruta, "Contabilidad/2026/Balance.pdf", "la ruta cruza páginas");
+  assert.equal(balance.agencia, "KASH");
+  assert.equal(balance.dueno, "Keila");
+  assert.equal(filas.find((f) => f.nombre === "huérfano.pdf").ruta, "(sin carpeta)/huérfano.pdf");
   await assert.rejects(pedirIndice({ funciones: "https://x", secreto, fetchFn: async () => new Response('{"error":"no"}', { status: 403 }) }), /403/);
+  // Un cursor que no avanza: corta en vez de pedir para siempre.
+  const atascado = async (_u, init) => new Response(JSON.stringify({ items: [], siguiente: JSON.parse(init.body).desde ?? "x" }));
+  await assert.rejects(pedirIndice({ funciones: "https://x", secreto, fetchFn: atascado }), /misma página/);
+});
+
+test("armarFilas: un ciclo no cuelga el armado", () => {
+  const filas = armarFilas([item("a", "b", "A", { tipo: "carpeta" }), item("b", "a", "B", { tipo: "carpeta" })], {}, {});
+  assert.equal(filas.length, 2);
 });
 
 test("⚠️ una agencia que se quedó sin archivos recibe su índice VACÍO (no el de ayer)", async () => {

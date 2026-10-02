@@ -90,16 +90,80 @@ export async function escribirIndice({ raices, filas, generado, fecha, conservar
   return resultado;
 }
 
-export async function pedirIndice({ funciones, secreto, fetchFn = fetch }) {
-  const permiso = firmar(secreto, { op: "indice", k: "indice", e: Math.floor(Date.now() / 1000) + 300 });
-  const r = await fetchFn(`${funciones}/drive`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action: "indice", permiso }),
-  });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok || !Array.isArray(j.filas)) throw new Error(`Maven contestó ${r.status}: ${j.error ?? "sin filas"}`);
-  return j;
+/** Las filas del índice con la ruta legible de cada cosa
+ *  («Contabilidad/2026/Balance.pdf»). Es la MISMA regla que armarIndice de la
+ *  edge (supabase/functions/drive/logica.ts): desde que el índice viene por
+ *  páginas, el árbol entero solo existe acá. Una madre que no está se marca
+ *  «(sin carpeta)»; un ciclo (lo impide un trigger) no cuelga el armado. */
+export function armarFilas(items, agencias, duenos) {
+  const porId = new Map(items.map((i) => [i.id, i]));
+  const rutas = new Map();
+  const rutaDe = (i) => {
+    const hecha = rutas.get(i.id);
+    if (hecha !== undefined) return hecha;
+    const partes = [];
+    const vistos = new Set();
+    let actual = i;
+    while (actual && !vistos.has(actual.id) && partes.length < 60) {
+      vistos.add(actual.id);
+      partes.unshift(actual.nombre);
+      if (!actual.parent_id) break;
+      const madre = porId.get(actual.parent_id);
+      if (!madre) { partes.unshift("(sin carpeta)"); break; }
+      actual = madre;
+    }
+    const r = partes.join("/");
+    rutas.set(i.id, r);
+    return r;
+  };
+  return items
+    .map((i) => ({
+      agencia_id: i.tenant_id,
+      agencia: agencias[i.tenant_id] ?? "",
+      ruta: rutaDe(i),
+      tipo: i.tipo,
+      nombre: i.nombre,
+      dueno: (i.owner_id && duenos[i.owner_id]?.nombre) || "",
+      correo_dueno: (i.owner_id && duenos[i.owner_id]?.correo) || "",
+      tamano: i.size,
+      sha256: i.sha256 ?? "",
+      estado: i.estado,
+      en_papelera: !!i.trashed_at,
+      archivo_en_disco: i.storage_key ?? "",
+      creado: i.created_at,
+      modificado: i.updated_at,
+      abierto_por_ultima_vez: i.last_opened_at ?? "",
+    }))
+    .sort((a, b) => a.agencia_id.localeCompare(b.agencia_id) || a.ruta.localeCompare(b.ruta, "es"));
+}
+
+/** Pide el árbol de a páginas (cursor por id) con un permiso firmado op
+ *  «indice» que vence en minutos. Con el archivo de Google son cientos de
+ *  miles de fichas: todas juntas no entraban en la memoria de la edge. */
+export async function pedirIndice({ funciones, secreto, fetchFn = fetch, maxPaginas = 10_000 }) {
+  const items = [];
+  const agencias = {};
+  const duenos = {};
+  let desde = null;
+  let generado = null;
+  for (let pagina = 0; pagina < maxPaginas; pagina++) {
+    const permiso = firmar(secreto, { op: "indice", k: "indice", e: Math.floor(Date.now() / 1000) + 300 });
+    const r = await fetchFn(`${funciones}/drive`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "indice", permiso, paginado: true, desde }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !Array.isArray(j.items)) throw new Error(`Maven contestó ${r.status}: ${j.error ?? "sin filas"}`);
+    generado ??= j.generado;
+    items.push(...j.items);
+    Object.assign(agencias, j.agencias ?? {});
+    Object.assign(duenos, j.duenos ?? {});
+    if (!j.siguiente) return { generado, filas: armarFilas(items, agencias, duenos) };
+    if (j.siguiente === desde) throw new Error("Maven devolvió la misma página dos veces");
+    desde = j.siguiente;
+  }
+  throw new Error("Demasiadas páginas: algo anda mal con el cursor");
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

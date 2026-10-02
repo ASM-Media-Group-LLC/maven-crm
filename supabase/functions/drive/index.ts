@@ -12,13 +12,18 @@
 //   abrir            { id, descargar? }                → URL para verlo/bajarlo
 //   borrar_para_siempre { id }                         → borra en el NAS y la ficha
 //
+// Sin sesión, con permiso firmado por la MINI (mismo DRIVE_SECRETO):
+//   indice    { permiso, paginado?, desde? }  → el árbol para el índice diario
+//   importar  { permiso, items, compartidos } → fichas del archivo de Google
+//
 // Variables: DRIVE_NAS_URL (la de la puerta), DRIVE_SECRETO (el mismo del NAS).
 
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 import { corsFor } from "../_shared/cors.ts";
 import { ahoraMas, firmar, verificar, VENCE } from "../_shared/drive-firma.ts";
 import {
-  armarIndice, chequearCupo, hayLugarEnElNas, HttpError, nombreValido, planDeSubida, TAMANO_PARTE, type ItemParaIndice,
+  armarIndice, chequearCupo, hayLugarEnElNas, HttpError, madresQueFaltanEnElLote, nombreValido, planDeSubida, TAMANO_PARTE,
+  validarLote, type ItemParaIndice,
 } from "./logica.ts";
 
 Deno.serve(async (req) => {
@@ -44,7 +49,58 @@ Deno.serve(async (req) => {
     if (body.action === "indice") {
       const p = await verificar(secreto, String(body.permiso ?? ""));
       if (!p || p.op !== "indice") throw new HttpError("Permiso inválido", 403);
-      return responder(await indiceCompleto(createClient(url, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!)));
+      const admin = createClient(url, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+      // Paginado (la mini arma el árbol): con el archivo de Google son cientos
+      // de miles de fichas y todo junto no entra en la memoria de la edge.
+      if (body.paginado === true) return responder(await paginaDelIndice(admin, typeof body.desde === "string" ? body.desde : null));
+      return responder(await indiceCompleto(admin));
+    }
+
+    // ── Importar el archivo de Google (lo pide la MINI) ──────────────────────
+    // Sin sesión: permiso firmado op "importar" con la agencia (t) adentro. Las
+    // fichas entran sin dueño y con la ruta que fija la regla (validarLote).
+    // Idempotente: una ficha o un compartido que ya está no se toca, así que la
+    // mini puede relanzar un lote cortado sin duplicar nada.
+    if (body.action === "importar") {
+      const p = await verificar(secreto, String(body.permiso ?? ""));
+      if (!p || p.op !== "importar" || typeof p.t !== "string") throw new HttpError("Permiso inválido", 403);
+      const admin = createClient(url, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+      const { data: agencia } = await admin.from("tenants").select("id").eq("id", p.t).maybeSingle();
+      if (!agencia) throw new HttpError("La agencia no existe", 404);
+      const { filas, shares } = validarLote(p.t, body.items, body.compartidos);
+
+      // Cada carpeta madre que el lote no trae tiene que existir, ser carpeta y
+      // ser de la MISMA agencia (si no, la FK lo frenaría con un error peor).
+      const madres = madresQueFaltanEnElLote(filas);
+      for (let i = 0; i < madres.length; i += 200) {
+        const tramo = madres.slice(i, i + 200);
+        const { data, error } = await admin.from("drive_items").select("id, tipo, tenant_id").in("id", tramo);
+        if (error) throw new HttpError(error.message, 500);
+        const ok = new Set(((data ?? []) as { id: string; tipo: string; tenant_id: string }[])
+          .filter((m) => m.tipo === "carpeta" && m.tenant_id === p.t).map((m) => m.id));
+        const falta = tramo.find((m) => !ok.has(m));
+        if (falta) throw new HttpError(`La carpeta madre ${falta} no existe en esta agencia`, 400);
+      }
+      if (filas.length) {
+        const { error } = await admin.from("drive_items").upsert(filas, { onConflict: "id", ignoreDuplicates: true });
+        if (error) throw new HttpError(error.message, 400);
+      }
+      if (shares.length) {
+        // Lo compartido tiene que ser de esta agencia (el trigger además exige
+        // que la persona sea de la agencia del archivo).
+        const ids = [...new Set(shares.map((c) => c.item_id))];
+        for (let i = 0; i < ids.length; i += 200) {
+          const tramo = ids.slice(i, i + 200);
+          const { data, error } = await admin.from("drive_items").select("id, tenant_id").in("id", tramo);
+          if (error) throw new HttpError(error.message, 500);
+          const ok = new Set(((data ?? []) as { id: string; tenant_id: string }[]).filter((m) => m.tenant_id === p.t).map((m) => m.id));
+          const falta = tramo.find((m) => !ok.has(m));
+          if (falta) throw new HttpError(`No se puede compartir ${falta}: no es de esta agencia`, 400);
+        }
+        const { error } = await admin.from("drive_shares").upsert(shares, { onConflict: "item_id,user_id", ignoreDuplicates: true });
+        if (error) throw new HttpError(error.message, 400);
+      }
+      return responder({ ok: true, items: filas.length, compartidos: shares.length });
     }
 
     const authHeader = req.headers.get("Authorization") ?? "";
@@ -199,6 +255,40 @@ async function rolDe(cliente: SupabaseClient, id: string): Promise<string | null
   const { data, error } = await cliente.rpc("drive_mi_rol", { p_item: id });
   if (error) throw new HttpError(error.message, 500);
   return (data as string | null) ?? null;
+}
+
+const COLUMNAS_INDICE = "id, tenant_id, owner_id, parent_id, tipo, nombre, size, sha256, storage_key, estado, trashed_at, created_at, updated_at, last_opened_at";
+const POR_PAGINA = 5000;
+
+/** Una página del índice, en orden de id (cursor, no offset: un offset sobre
+ *  una tabla que cambia salta o repite filas). Con los nombres y correos de
+ *  los dueños de ESA página y los nombres de las agencias. */
+async function paginaDelIndice(admin: SupabaseClient, desde: string | null) {
+  const items: ItemParaIndice[] = [];
+  let cursor = desde;
+  while (items.length < POR_PAGINA) {
+    let q = admin.from("drive_items").select(COLUMNAS_INDICE).order("id").limit(1000);
+    if (cursor) q = q.gt("id", cursor);
+    const { data, error } = await q;
+    if (error) throw new HttpError(error.message, 500);
+    const filas = (data ?? []) as ItemParaIndice[];
+    items.push(...filas);
+    if (filas.length < 1000) { cursor = null; break; }
+    cursor = filas[filas.length - 1].id;
+  }
+  const siguiente = cursor && items.length ? items[items.length - 1].id : null;
+  const { data: tenants } = await admin.from("tenants").select("id, name");
+  const agencias = Object.fromEntries(((tenants ?? []) as { id: string; name: string }[]).map((t) => [t.id, t.name]));
+  const duenosIds = [...new Set(items.map((i) => i.owner_id).filter(Boolean))] as string[];
+  const duenos: Record<string, { nombre: string; correo: string }> = {};
+  for (const id of duenosIds) {
+    const [{ data: perfil }, { data: usuario }] = await Promise.all([
+      admin.from("profiles").select("full_name").eq("id", id).maybeSingle(),
+      admin.auth.admin.getUserById(id),
+    ]);
+    duenos[id] = { nombre: (perfil as { full_name?: string } | null)?.full_name ?? "", correo: usuario?.user?.email ?? "" };
+  }
+  return { generado: new Date().toISOString(), items, siguiente, agencias, duenos };
 }
 
 /** Todo el árbol, de a 1000 filas: PostgREST corta en 1000 sin avisar, y un
