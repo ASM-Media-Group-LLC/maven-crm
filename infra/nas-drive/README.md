@@ -51,3 +51,27 @@ LaunchAgent `ai.maven.nas-drive-indice` (usa `indice.sh`, log en
 `~/maven-nas-drive/indice.log`). Correrlo a mano:
 `launchctl kickstart gui/$(id -u)/ai.maven.nas-drive-indice`.
 Tests: `node --test infra/nas-drive/indice.test.mjs`.
+
+## Importar el archivo de Google (`importar.mjs`)
+
+Lo bajado de Google Drive al NAS (unidades compartidas en `/Volumes/NASx/<unidad>`
+y «Mi unidad» en `/Volumes/NASx/Mi unidad/<correo>`) entra al Drive de Maven
+**sin copiarse**: por cada archivo, un enlace duro en el mismo disco
+(`maven-drive/<agencia>/google/<id>`) y su ficha a la edge `drive` (acción
+`importar`, permiso firmado con `DRIVE_SECRETO`). Las fichas van sin dueño (archivo
+de la empresa, no cuenta en el cupo de nadie) y cada carpeta raíz se comparte con
+quien tenía acceso en Google. Los ids salen del camino: relanzar no duplica.
+
+    cd ~/importar
+    node importar.mjs plan.json --prueba          # recorre y cuenta, no toca nada
+    set -a; . ~/maven-nas-drive/.env; set +a
+    node importar.mjs plan.json --solo unidad:<id> # una sola, para probar
+    node importar.mjs plan.json                    # todo (salta lo ya hecho: importado.json)
+
+Desde Terminal (`open -a Terminal …`): por SSH macOS no deja leer los discos.
+
+Tests: `node --test infra/nas-drive/importar.test.mjs`.
+
+El índice diario pide el árbol **de a páginas** (`paginado: true`, cursor por id)
+y lo arma acá (`armarFilas`): con el archivo de Google son cientos de miles de
+fichas y todas juntas no entraban en la memoria de la edge.

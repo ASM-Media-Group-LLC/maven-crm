@@ -1,5 +1,5 @@
 // Correr: deno test --no-check supabase/functions/drive/logica.test.ts
-import { MAX_ARCHIVO, nombreValido, planDeSubida, TAMANO_PARTE } from "./logica.ts";
+import { claveImportada, madresQueFaltanEnElLote, MAX_ARCHIVO, nombreValido, planDeSubida, TAMANO_PARTE, TOPE_LOTE, validarLote } from "./logica.ts";
 
 function assert(c: boolean, m: string) { if (!c) throw new Error(m); }
 const tira = (f: () => unknown) => { try { f(); return false; } catch { return true; } };
@@ -80,4 +80,56 @@ Deno.test("lugar en el NAS: 5% libre después de guardar, y el doble si va por p
   assert(!hayLugarEnElNas(disco, 30, true), "por partes necesita 60, deja 40 < 50");
   assert(!hayLugarEnElNas([{ ok: false }], 1, false), "un disco caído no cuenta");
   assert(hayLugarEnElNas([{ ok: true, libre: 10, total: 1000 }, disco[0]], 50, false), "alcanza con uno");
+});
+
+// ── Importar el archivo de Google ───────────────────────────────────────────
+const T = "10000000-0000-4000-8000-000000000001";
+const OTRA = "10000000-0000-4000-8000-000000000002";
+const u = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+const carpeta = (id: string, parent: string | null = null) => ({ id, parent_id: parent, tipo: "carpeta", nombre: "Shootings" });
+const archivo = (id: string, parent: string | null, extra: Record<string, unknown> = {}) =>
+  ({ id, parent_id: parent, tipo: "archivo", nombre: "foto.jpg", mime: "image/jpeg", size: 1234, storage_key: claveImportada(T, id), created_at: "2025-02-20T21:05:00Z", ...extra });
+
+Deno.test("importar: un lote sano entra sin dueño, listo, con la ruta de la agencia y la fecha de Google", () => {
+  const { filas, shares } = validarLote(T, [carpeta(u(1)), archivo(u(2), u(1))], [{ item_id: u(1), user_id: u(9), rol: "editor" }]);
+  assert(filas.length === 2 && shares.length === 1, "cuenta");
+  const f = filas[1];
+  assert(f.owner_id === null && f.estado === "listo" && f.tenant_id === T, "sin dueño, listo, de la agencia");
+  assert(f.storage_key === `${T}/google/${u(2)}`, "la ruta del NAS lleva la agencia y google/");
+  assert(f.created_at === "2025-02-20T21:05:00.000Z", "conserva la fecha");
+  assert(filas[0].storage_key === null && filas[0].size === null && filas[0].mime === null, "la carpeta no tiene archivo");
+});
+
+Deno.test("⚠️ importar: un lote no puede apuntar una ficha a un archivo ajeno", () => {
+  for (const clave of [`${OTRA}/google/${u(2)}`, `${T}/${u(2)}`, `${T}/google/${u(3)}`, `${T}/google/${u(2)}/../x`, null]) {
+    assert(tira(() => validarLote(T, [archivo(u(2), null, { storage_key: clave })], [])), `dejó pasar ${clave}`);
+  }
+});
+
+Deno.test("importar: filas malas rechazan el lote entero", () => {
+  const malos: unknown[] = [
+    { ...archivo(u(2), null), id: "no-uuid" },
+    { ...archivo(u(2), null), parent_id: u(2) },
+    { ...archivo(u(2), null), tipo: "otro" },
+    { ...archivo(u(2), null), nombre: "a/b.jpg" },
+    { ...archivo(u(2), null), size: -1 },
+    { ...archivo(u(2), null), size: 1.5 },
+    { ...carpeta(u(1)), storage_key: claveImportada(T, u(1)) },
+  ];
+  for (const m of malos) assert(tira(() => validarLote(T, [m], [])), `dejó pasar ${JSON.stringify(m)}`);
+  assert(tira(() => validarLote(T, [archivo(u(2), null), archivo(u(2), null)], [])), "id repetido");
+  assert(tira(() => validarLote(T, [], [])), "vacío");
+  assert(tira(() => validarLote("x", [carpeta(u(1))], [])), "agencia inválida");
+  assert(tira(() => validarLote(T, Array.from({ length: TOPE_LOTE + 1 }, (_, i) => carpeta(u(i + 1))), [])), "más del tope");
+  assert(tira(() => validarLote(T, [], [{ item_id: u(1), user_id: u(9), rol: "dueno" }])), "rol que no existe");
+});
+
+Deno.test("importar: un archivo de más de 20 GB entra (videos crudos); sin mime, octet-stream", () => {
+  const { filas } = validarLote(T, [archivo(u(2), null, { size: 60 * 1024 ** 3, mime: undefined })], []);
+  assert(filas[0].size === 60 * 1024 ** 3 && filas[0].mime === "application/octet-stream", "tamaño y mime");
+});
+
+Deno.test("importar: las madres que el lote no trae son las que la edge tiene que buscar", () => {
+  const { filas } = validarLote(T, [carpeta(u(1), u(7)), archivo(u(2), u(1)), archivo(u(3), u(8)), archivo(u(4), u(8))], []);
+  assert(JSON.stringify(madresQueFaltanEnElLote(filas).sort()) === JSON.stringify([u(7), u(8)]), "solo 7 y 8");
 });
