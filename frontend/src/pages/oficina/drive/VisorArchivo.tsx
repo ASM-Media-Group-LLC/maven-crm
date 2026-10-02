@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import {
-  ChevronLeft, ChevronRight, Download, ExternalLink, File, FileAudio, FileImage, FileSpreadsheet, FileText,
+  ChevronLeft, ChevronRight, Copy, Download, ExternalLink, File, FileAudio, FileImage, FileSpreadsheet, FileText,
   FileVideo, Loader2, Pencil, Presentation, X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -12,7 +12,9 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { abrirArchivo, type DriveItem } from "@/hooks/useDrive";
 import { useEditarEnOficina } from "@/hooks/useVisorDrive";
 import { tamano } from "@/lib/drive/formato";
-import { destinoEnLaOficina, vistaDeArchivo, type TipoDeVista } from "@/lib/drive/tipoDeArchivo";
+import {
+  comoSeAbreEnLaOficina, destinoEnLaOficina, vistaDeArchivo, type TipoDeVista,
+} from "@/lib/drive/tipoDeArchivo";
 import type { TranslationKey } from "@/lib/i18n";
 import { ContenidoDelVisor } from "./VistasDelVisor";
 import { lasFlechasSonDeOtro } from "./gestos";
@@ -96,7 +98,11 @@ export default function VisorArchivo({ items, abierto, onAbierto }: Props) {
   if (!actual) return null;
 
   const vista = vistaDeArchivo(actual);
-  const destino = vista.tipo === "office" ? destinoEnLaOficina(actual) : null;
+  // Un .txt se LEE como texto, pero se edita en Documentos (convertido).
+  const destino = vista.tipo === "office" || vista.tipo === "texto" ? destinoEnLaOficina(actual) : null;
+  // Word/Excel/PowerPoint: «Editar» abre EL MISMO archivo (como Google); la
+  // copia queda aparte. Lo demás (.doc, .xls, .csv, .txt…) se edita como copia.
+  const enSuLugar = !!destino && comoSeAbreEnLaOficina(actual) === "editar";
   const Icono = destino ? ICONO_OFFICE[destino] : ICONO[vista.tipo];
   const enPestana = seVeEnUnaPestana(actual, vista.tipo);
   // La copia sigue aunque se pase a otro archivo: el «Creando…» va solo en el
@@ -113,6 +119,13 @@ export default function VisorArchivo({ items, abierto, onAbierto }: Props) {
       },
       onError: (e) => toast.error(`${t("drive.visor.copiaError")}: ${(e as Error).message}`),
     });
+  };
+
+  // «Editar»: en su lugar si se puede; si no, la copia.
+  const editarAqui = () => {
+    if (!enSuLugar) return copiar();
+    onAbierto(null);
+    navigate(`/oficina/drive/${actual.id}`);
   };
 
   const claseBoton = "h-9 shrink-0 rounded-full text-white/85 hover:bg-white/10 hover:text-white";
@@ -152,16 +165,29 @@ export default function VisorArchivo({ items, abierto, onAbierto }: Props) {
                 size="sm"
                 variant="ghost"
                 className={cn(claseBoton, "px-2 sm:px-3")}
-                onClick={copiar}
+                onClick={editarAqui}
                 disabled={editar.isPending}
                 aria-label={t(EDITAR_EN[destino])}
                 title={t(EDITAR_EN[destino])}
               >
-                {copiandoEste
+                {copiandoEste && !enSuLugar
                   ? <Loader2 className="h-4 w-4 animate-spin sm:mr-2" />
                   : <Pencil className="h-4 w-4 sm:mr-2" />}
-                <span className="hidden lg:inline">{copiandoEste ? t("drive.visor.copiando") : t(EDITAR_EN[destino])}</span>
+                <span className="hidden lg:inline">{copiandoEste && !enSuLugar ? t("drive.visor.copiando") : t(EDITAR_EN[destino])}</span>
                 <span className="hidden sm:inline lg:hidden">{t("drive.visor.editarCorto")}</span>
+              </Button>
+            )}
+            {enSuLugar && (
+              <Button
+                size="icon"
+                variant="ghost"
+                className={claseBoton}
+                onClick={copiar}
+                disabled={editar.isPending}
+                aria-label={t("drive.visor.hacerCopia")}
+                title={t("drive.visor.hacerCopia")}
+              >
+                {copiandoEste ? <Loader2 className="h-4 w-4 animate-spin" /> : <Copy className="h-4 w-4" />}
               </Button>
             )}
             {enPestana && (

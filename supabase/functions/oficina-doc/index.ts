@@ -13,13 +13,16 @@
 //   historial-restaurar  { id, version }     → { version } la nueva vigente
 //   adjunto      { url, nombre, hash, extension } → { servidor, config } (correo)
 //   ver_drive    { id, tema?, idioma? }     → { servidor, config } solo lectura
+//   editar_drive { id, tema?, idioma? }     → { servidor, config, modo, motivo, archivo }
+//                                             EL MISMO archivo, en modo edición
 //   desde_drive  { id }                     → { id, extension } copia editable
 //
 // (Las dos últimas son para archivos del DRIVE, que viven en el NAS: ver
 // drive.ts.)
 //
-// Y una que NO lleva sesión, porque la llama el servidor de ONLYOFFICE:
+// Y dos que NO llevan sesión, porque las llama el servidor de ONLYOFFICE:
 //   ?guardar=<token>               ← el aviso de "hay versión nueva"
+//   ?guardar_drive=<permiso>       ← lo mismo, para un archivo del Drive
 //
 // ⚠️ EL ARCHIVO NO PASA POR ACÁ AL ABRIR. A ONLYOFFICE se le entrega una URL
 // firmada de R2 que vence en una hora: bajar el documento es entre él y
@@ -34,11 +37,14 @@ import {
 import { EN_BLANCO } from "./plantillas.ts";
 import { firmar, verificar } from "./jwt.ts";
 import {
-  adivinarDelimitador, configDeVista, errorDeConversion, esDelServidor, formatoDeOffice, nombreSinExtension,
-  pedidoDeConversion, TOPE_COPIA, TOPE_VISTA,
+  adivinarDelimitador, codigoDePagina, comoSeAbre, configDeEdicion, configDeVista, errorDeConversion, esDelServidor,
+  esUuid, filasDeVersion, formatoDeOffice, nombreSinExtension, pedidoDeConversion, queHacerConElAviso, TAMANO_PARTE_NAS,
+  textoDeMuestra, TOPE_COPIA, TOPE_VISTA,
 } from "./drive.ts";
 import { ALLOWED_ORIGINS } from "../_shared/cors.ts";
-import { ahoraMas, firmar as firmarPermisoDelNas, VENCE } from "../_shared/drive-firma.ts";
+import {
+  ahoraMas, firmar as firmarPermisoDelNas, verificar as verificarPermisoDelNas, VENCE,
+} from "../_shared/drive-firma.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -118,6 +124,7 @@ const MIME: Record<string, string> = {
 
 interface FichaDelDrive {
   id: string;
+  owner_id: string | null;
   tipo: string;
   nombre: string;
   mime: string | null;
@@ -133,7 +140,7 @@ interface FichaDelDrive {
  *  `abrir` de la edge `drive`. */
 async function fichaDelDrive(comoLaPersona: SupabaseClient, id: string): Promise<FichaDelDrive> {
   const { data, error } = await comoLaPersona.from("drive_items")
-    .select("id, tipo, nombre, mime, size, sha256, storage_key, estado, updated_at")
+    .select("id, owner_id, tipo, nombre, mime, size, sha256, storage_key, estado, updated_at")
     .eq("id", id).maybeSingle();
   if (error) throw new HttpError(error.message, 400);
   const fila = data as FichaDelDrive | null;
@@ -152,6 +159,89 @@ async function urlDelNas(fila: FichaDelDrive, segundos: number): Promise<string>
     e: ahoraMas(segundos),
   });
   return `${base}/o?t=${permiso}`;
+}
+
+/** El secreto del Drive (el mismo del NAS y de la edge `drive`). */
+function secretoDelDrive(): string {
+  const secreto = Deno.env.get("DRIVE_SECRETO") ?? "";
+  if (secreto.length < 32) throw new HttpError("El Drive todavía no está conectado al NAS", 503);
+  return secreto;
+}
+
+/** Guarda bytes en el NAS como un archivo NUEVO (`clave` nunca existió: el NAS
+ *  rechaza pisar uno) y devuelve lo que firmó el NAS al terminar de escribir.
+ *  Entero si entra en una parte; si no, por partes, como una subida del Drive. */
+async function guardarEnElNas(clave: string, bytes: Uint8Array): Promise<{ size: number; sha256: string }> {
+  const base = (Deno.env.get("DRIVE_NAS_URL") ?? "").replace(/\/+$/, "");
+  const secreto = secretoDelDrive();
+  if (!base) throw new HttpError("El Drive todavía no está conectado al NAS", 503);
+  const permiso = async (datos: Record<string, unknown>) =>
+    `${base}/o?t=${await firmarPermisoDelNas(secreto, { ...datos, e: ahoraMas(VENCE.subir) } as never)}`;
+  const enviar = async (url: string, metodo: string, cuerpo: Uint8Array | null) => {
+    const r = await fetch(url, { method: metodo, body: cuerpo as unknown as BodyInit, signal: AbortSignal.timeout(120_000) });
+    const j = await r.json().catch(() => null) as { recibo?: string; error?: string } | null;
+    if (!r.ok) throw new HttpError(`El NAS no pudo guardar (${r.status}${j?.error ? `: ${j.error}` : ""})`, 502);
+    return j;
+  };
+  let respuesta: { recibo?: string } | null;
+  if (bytes.length <= TAMANO_PARTE_NAS) {
+    respuesta = await enviar(await permiso({ op: "put", k: clave, max: bytes.length }), "PUT", bytes);
+  } else {
+    const up = crypto.randomUUID();
+    const n = Math.ceil(bytes.length / TAMANO_PARTE_NAS);
+    for (let i = 0; i < n; i++) {
+      const pedazo = bytes.subarray(i * TAMANO_PARTE_NAS, (i + 1) * TAMANO_PARTE_NAS);
+      await enviar(await permiso({ op: "parte", k: clave, up, i, max: TAMANO_PARTE_NAS, total: bytes.length }), "PUT", pedazo);
+    }
+    respuesta = await enviar(await permiso({ op: "completar", k: clave, up, n, max: bytes.length }), "POST", null);
+  }
+  const rec = await verificarPermisoDelNas(secreto, String(respuesta?.recibo ?? ""));
+  if (!rec || rec.op !== "recibo" || rec.k !== clave) throw new HttpError("El recibo del NAS no es válido", 502);
+  return { size: Number(rec.size), sha256: String(rec.sha256) };
+}
+
+/** Abrir un archivo cuenta para lo que se archiva (la fecha de la ficha, de
+ *  todos) y para MIS «Recientes» (drive_aperturas, de cada uno). Sin `throw`:
+ *  nunca impide abrir. */
+async function anotarApertura(admin: SupabaseClient, fila: { id: string }, user: { id: string }): Promise<void> {
+  const ahora = new Date().toISOString();
+  await admin.from("drive_items").update({ last_opened_at: ahora }).eq("id", fila.id);
+  await admin.from("drive_aperturas").upsert({ user_id: user.id, item_id: fila.id, abierto_at: ahora }, { onConflict: "user_id,item_id" });
+}
+
+const enHex = (b: ArrayBuffer) => [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
+
+/** ¿Hay lugar para guardar ediciones de este archivo? Como una subida: dentro
+ *  de una unidad compartida cuenta el espacio de la AGENCIA; si no, el cupo
+ *  del DUEÑO del archivo (no el de quien edita, como en Google). Lo importado
+ *  sin dueño fuera de una unidad no cuenta en el cupo de nadie.
+ *
+ *  Se mira al ABRIR, no al guardar: al guardar ya no hay a quién avisarle y
+ *  rechazarlo sería perder lo escrito. Con el espacio lleno se abre para ver. */
+async function hayEspacioParaEditar(
+  admin: SupabaseClient, comoLaPersona: SupabaseClient, fila: FichaDelDrive, yo: string,
+): Promise<boolean> {
+  const fila1 = (data: unknown) => (Array.isArray(data) ? data[0] : data) as { usado?: number; cupo?: number | null } | undefined;
+  const { data: unidad, error: eU } = await admin.rpc("drive_unidad_de", { p_item: fila.id });
+  if (eU) throw new HttpError(eU.message, 500);
+  if (unidad) {
+    // Como la persona: es de la misma agencia que el archivo (la RLS la dejó
+    // verlo), y la función mide la agencia de quien llama.
+    const { data, error } = await comoLaPersona.rpc("drive_uso_agencia");
+    if (error) throw new HttpError(error.message, 500);
+    const f = fila1(data);
+    return f?.cupo == null || Number(f.usado ?? 0) < Number(f.cupo);
+  }
+  if (!fila.owner_id) return true;
+  const { data, error } = fila.owner_id === yo
+    ? await comoLaPersona.rpc("drive_uso")
+    // El cupo del dueño: con el admin (drive_uso deja a service_role medir a
+    // cualquiera; a una persona, solo el suyo).
+    : await admin.rpc("drive_uso", { p_user: fila.owner_id });
+  if (error) throw new HttpError(error.message, 500);
+  const f = fila1(data);
+  const cupo = Number(f?.cupo ?? 0);
+  return cupo <= 0 || Number(f?.usado ?? 0) < cupo;
 }
 
 /** Baja una URL entera a memoria, cortando si pasa del tope: un archivo más
@@ -316,6 +406,105 @@ Deno.serve(async (req) => {
       return responder({ error: 0 });
     }
 
+    // ── El aviso de ONLYOFFICE para un archivo del DRIVE ─────────────────
+    // Como el de arriba, sin sesión: lo manda el servidor de ONLYOFFICE con el
+    // permiso que se firmó al abrir (editar_drive). El archivo editado se guarda
+    // en el NAS como un archivo NUEVO; el anterior se queda donde está y entra
+    // al historial (drive_versiones). Nunca se pisa nada: lo importado de
+    // Google (<agencia>/google/<id>) el NAS ni siquiera lo deja tocar.
+    const permisoDrive = url.searchParams.get("guardar_drive");
+    if (permisoDrive) {
+      const cuerpo = await req.json().catch(() => ({} as Record<string, unknown>));
+      if (secretoOO) {
+        const jwt = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "") ||
+          String(cuerpo.token ?? "");
+        if (!jwt || !(await verificar(jwt, secretoOO))) {
+          console.error("[oficina-doc] aviso del Drive con firma inválida");
+          return responder({ error: 1 });
+        }
+      }
+      const secreto = Deno.env.get("DRIVE_SECRETO") ?? "";
+      const permiso = secreto.length >= 32 ? await verificarPermisoDelNas(secreto, permisoDrive) : null;
+      if (!permiso || permiso.op !== "oo-guardar" || !esUuid(permiso.k)) {
+        console.error("[oficina-doc] permiso de guardado del Drive inválido o vencido");
+        return responder({ error: 1 });
+      }
+      const servidorOO = (Deno.env.get("ONLYOFFICE_URL") ?? "").replace(/\/$/, "");
+
+      const { data: crudo } = await admin.from("drive_items")
+        .select("id, tenant_id, owner_id, tipo, nombre, mime, size, sha256, storage_key, updated_at")
+        .eq("id", permiso.k).maybeSingle();
+      const fila = crudo as {
+        id: string; tenant_id: string; owner_id: string | null; tipo: string; nombre: string; mime: string | null;
+        size: number | null; sha256: string | null; storage_key: string | null; updated_at: string;
+      } | null;
+      if (!fila || fila.tipo !== "archivo" || !fila.storage_key) {
+        // Lo borraron para siempre mientras estaba abierto: no hay dónde guardar.
+        console.error(`[oficina-doc] aviso para ${permiso.k}: el archivo ya no existe`);
+        return responder({ error: 0 });
+      }
+      const formato = formatoDeOffice(fila.nombre, fila.mime);
+      const que = formato
+        ? queHacerConElAviso(cuerpo, formato.ext, servidorOO)
+        : { accion: "rechazar" as const, motivo: "el archivo ya no es de Office" };
+      if (que.accion === "nada") {
+        if (/error/.test(que.motivo)) console.error(`[oficina-doc] ${fila.id}: ${que.motivo}`);
+        return responder({ error: 0 });
+      }
+      if (que.accion === "rechazar") {
+        // Con error, ONLYOFFICE se queda con lo editado (lista de «olvidados»)
+        // en vez de darlo por guardado.
+        console.error(`[oficina-doc] ${fila.id}: no se guardó: ${que.motivo}`);
+        return responder({ error: 1 });
+      }
+
+      try {
+        const bytes = await bajarConTope(que.url, TOPE_VISTA);
+        const huella = enHex(await crypto.subtle.digest("SHA-256", bytes as unknown as BufferSource));
+        if (huella === fila.sha256) return responder({ error: 0 }); // nada cambió de verdad
+
+        const llave = `${fila.tenant_id}/${crypto.randomUUID()}`;
+        const nas = await guardarEnElNas(llave, bytes);
+        if (nas.sha256 !== huella || nas.size !== bytes.length) {
+          throw new HttpError("El NAS guardó otra cosa de la que se mandó", 502);
+        }
+        const usuarios = Array.isArray(cuerpo.users) ? cuerpo.users : [];
+        const quien = esUuid(usuarios[0]) ? usuarios[0] : esUuid(permiso.u) ? permiso.u : null;
+        const ahora = new Date().toISOString();
+
+        // 1. El historial, ANTES de mover el puntero (como document_versions).
+        //    Si falla, se guarda igual: perder lo escrito es peor que un
+        //    archivo viejo sin anotar (queda en el log para encontrarlo).
+        const { count, error: eC } = await admin.from("drive_versiones")
+          .select("id", { count: "exact", head: true }).eq("item_id", fila.id);
+        const { error: eV } = eC ? { error: eC } : await admin.from("drive_versiones").insert(filasDeVersion({
+          itemId: fila.id,
+          anterior: { storage_key: fila.storage_key, size: fila.size, sha256: fila.sha256, updated_at: fila.updated_at, owner_id: fila.owner_id },
+          hayHistorial: (count ?? 0) > 0,
+          nueva: { storage_key: llave, size: bytes.length, sha256: huella },
+          quien,
+          ahora,
+        }));
+        if (eV) console.error(`[oficina-doc] ${fila.id}: sin historial (${eV.message}); la versión anterior sigue en el NAS en ${fila.storage_key}`);
+
+        // 2. El puntero, solo si nadie lo movió mientras tanto.
+        const { data: movida, error: eU } = await admin.from("drive_items")
+          .update({ storage_key: llave, size: bytes.length, sha256: huella, updated_at: ahora })
+          .eq("id", fila.id).eq("storage_key", fila.storage_key)
+          .select("id");
+        if (eU) throw new HttpError(eU.message, 500);
+        if (!movida?.length) {
+          console.error(`[oficina-doc] ${fila.id}: otro guardado llegó antes; esta edición quedó en ${llave} (historial)`);
+          return responder({ error: 0 });
+        }
+        console.log(`[oficina-doc] Drive ${fila.id} guardado en ${llave} (${bytes.length} bytes)`);
+        return responder({ error: 0 });
+      } catch (e) {
+        console.error(`[oficina-doc] ${fila.id}: no se pudo guardar:`, e instanceof Error ? e.message : e);
+        return responder({ error: 1 });
+      }
+    }
+
     // ── De acá para abajo, todo lleva sesión de Maven ──────────────────────
     const authHeader = req.headers.get("Authorization") ?? "";
     if (!authHeader) throw new HttpError("Sin sesión", 401);
@@ -447,6 +636,64 @@ Deno.serve(async (req) => {
     //
     // ⚠️ La ficha se lee con el token de la persona (fichaDelDrive): la RLS de
     // drive_items decide, igual que en la acción `abrir` de la edge `drive`.
+    // ── EDITAR un archivo del Drive en su lugar ─────────────────────────────
+    // Como el «modo de edición de Office» de Google: se abre EL MISMO archivo y
+    // lo guardado vuelve a él (con historial), así que abrirlo dos veces nunca
+    // crea dos copias. Se edita si la persona es dueña o editora, el formato
+    // vuelve igual de ONLYOFFICE (SE_EDITAN_EN_SU_LUGAR) y hay espacio; si no,
+    // se abre para ver y `motivo` dice por qué (la página ofrece la copia).
+    if (accion === "editar_drive") {
+      const servidorOO = (Deno.env.get("ONLYOFFICE_URL") ?? "").replace(/\/$/, "");
+      if (!servidorOO) throw new HttpError("ONLYOFFICE_URL sin configurar", 500);
+      const fila = await fichaDelDrive(comoLaPersona, String(body.id ?? ""));
+      const formato = formatoDeOffice(fila.nombre, fila.mime);
+      if (!formato) throw new HttpError("Este archivo no se abre con la Oficina", 400);
+      if (Number(fila.size ?? 0) > TOPE_VISTA) {
+        throw new HttpError(`El archivo pesa más de ${legibleMB(TOPE_VISTA)} y no se puede abrir aquí: descárgalo`, 413);
+      }
+      const idioma = body.idioma === "en" ? "en" : "es";
+      const tema = body.tema === "dark" ? "dark" : body.tema === "light" ? "light" : undefined;
+      const perfil = await comoLaPersona.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
+      const usuario = { id: user.id, nombre: (perfil.data?.full_name as string) || user.email || "Alguien" };
+      const archivo = { id: fila.id, nombre: fila.nombre, mime: fila.mime, size: fila.size, updated_at: fila.updated_at };
+
+      let motivo: "formato" | "permiso" | "espacio" | null = comoSeAbre(formato) === "editar" ? null : "formato";
+      if (!motivo) {
+        const { data: rol, error: eR } = await comoLaPersona.rpc("drive_mi_rol", { p_item: fila.id });
+        if (eR) throw new HttpError(eR.message, 500);
+        if (rol !== "dueno" && rol !== "editor") motivo = "permiso";
+      }
+      if (!motivo && !(await hayEspacioParaEditar(admin, comoLaPersona, fila, user.id))) motivo = "espacio";
+
+      await anotarApertura(admin, fila, user);
+      const urlArchivo = await urlDelNas(fila, VENCE.bajar);
+      if (motivo) {
+        const config = configDeVista({ archivo: fila, formato, url: urlArchivo, usuario, idioma, tema });
+        if (secretoOO) config.token = await firmar(config, secretoOO);
+        return responder({ servidor: servidorOO, config, modo: "ver", motivo, archivo });
+      }
+
+      // A dónde avisa ONLYOFFICE al guardar: un permiso firmado con el secreto
+      // del Drive, solo para ESTE archivo. Dura días y no horas: una hoja puede
+      // quedar abierta un fin de semana, y el aviso llega recién al cerrarla.
+      const permiso = await firmarPermisoDelNas(secretoDelDrive(), {
+        op: "oo-guardar", k: fila.id, u: user.id, e: ahoraMas(3 * 24 * 3600),
+      });
+      const origen = req.headers.get("origin") ?? "";
+      const config = configDeEdicion({
+        archivo: fila,
+        formato,
+        url: urlArchivo,
+        callbackUrl: `${supabaseUrl}/functions/v1/oficina-doc?guardar_drive=${encodeURIComponent(permiso)}`,
+        usuario,
+        idioma,
+        tema,
+        volverA: ALLOWED_ORIGINS.includes(origen) ? `${origen}/oficina/drive` : null,
+      });
+      if (secretoOO) config.token = await firmar(config, secretoOO);
+      return responder({ servidor: servidorOO, config, modo: "editar", motivo: null, archivo });
+    }
+
     if (accion === "ver_drive" || accion === "desde_drive") {
       const servidorOO = (Deno.env.get("ONLYOFFICE_URL") ?? "").replace(/\/$/, "");
       if (!servidorOO) throw new HttpError("ONLYOFFICE_URL sin configurar", 500);
@@ -473,9 +720,7 @@ Deno.serve(async (req) => {
         if (secretoOO) config.token = await firmar(config, secretoOO);
         // Verlo ES abrirlo: cuenta para lo que se archiva (la fecha de la
         // ficha, de todos) y para MIS «Recientes» (la apertura de cada uno).
-        const ahora = new Date().toISOString();
-        await admin.from("drive_items").update({ last_opened_at: ahora }).eq("id", fila.id);
-        await admin.from("drive_aperturas").upsert({ user_id: user.id, item_id: fila.id, abierto_at: ahora }, { onConflict: "user_id,item_id" });
+        await anotarApertura(admin, fila, user);
         return responder({ servidor: servidorOO, config });
       }
 
@@ -491,15 +736,18 @@ Deno.serve(async (req) => {
         // Ya es .docx, .xlsx o .pptx: se copia tal cual.
         bytes = await bajarConTope(await urlDelNas(fila, 10 * 60), TOPE_COPIA);
       } else {
-        // Un CSV necesita su separador: se mira el principio del archivo.
+        // Un CSV o un .txt no dicen su codificación (ni el CSV su
+        // separador): se mira el principio del archivo.
         let delimitador: number | undefined;
-        if (formato.ext === "csv") {
+        let codePage: number | undefined;
+        if (formato.ext === "csv" || formato.ext === "txt") {
           const muestra = await bajarConTope(await urlDelNas(fila, 10 * 60), 64 * 1024, { Range: "bytes=0-16383" })
             .catch(() => new Uint8Array());
-          delimitador = adivinarDelimitador(new TextDecoder().decode(muestra));
+          codePage = codigoDePagina(muestra);
+          if (formato.ext === "csv") delimitador = adivinarDelimitador(textoDeMuestra(muestra, codePage));
         }
         bytes = await convertirConOnlyOffice(servidorOO, secretoOO, pedidoDeConversion({
-          archivo: fila, formato, url: await urlDelNas(fila, 30 * 60), delimitador,
+          archivo: fila, formato, url: await urlDelNas(fila, 30 * 60), delimitador, codePage,
         }));
       }
 
@@ -528,13 +776,10 @@ Deno.serve(async (req) => {
         throw e;
       }
       console.log(`[oficina-doc] copia del Drive ${fila.id} → documento ${docId} (${bytes.length} bytes)`);
-      // Abrirlo en la Oficina TAMBIÉN es abrirlo (el «Abrir» de la Oficina y
-      // «Editar en…» del visor): cuenta para lo que se archiva y para MIS
-      // «Recientes», como en `ver_drive`. Sin `throw`: la copia ya está hecha
-      // y es lo que la persona pidió.
-      const ahora = new Date().toISOString();
-      await admin.from("drive_items").update({ last_opened_at: ahora }).eq("id", fila.id);
-      await admin.from("drive_aperturas").upsert({ user_id: user.id, item_id: fila.id, abierto_at: ahora }, { onConflict: "user_id,item_id" });
+      // Copiarlo a la Oficina TAMBIÉN es abrirlo: cuenta para lo que se
+      // archiva y para MIS «Recientes», como en `ver_drive`. Sin `throw`: la
+      // copia ya está hecha y es lo que la persona pidió.
+      await anotarApertura(admin, fila, user);
       return responder({ id: docId, extension: formato.destino });
     }
 

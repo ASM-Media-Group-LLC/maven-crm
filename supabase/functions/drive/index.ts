@@ -298,21 +298,27 @@ Deno.serve(async (req) => {
 
       // Todo lo de adentro (una carpeta arrastra a sus hijos).
       const archivos: string[] = [];
+      const fichas: string[] = [id];
       let nivel = [id];
       let vueltas = 0;
       while (nivel.length && vueltas++ < 60) {
         const { data } = await admin.from("drive_items").select("id, tipo, storage_key").in("parent_id", nivel);
         const hijos = (data ?? []) as { id: string; tipo: string; storage_key: string | null }[];
         for (const h of hijos) if (h.storage_key) archivos.push(h.storage_key);
+        for (const h of hijos) if (h.tipo === "archivo") fichas.push(h.id);
         nivel = hijos.filter((h) => h.tipo === "carpeta").map((h) => h.id);
       }
       const { data: propio } = await admin.from("drive_items").select("storage_key").eq("id", id).maybeSingle();
       if (propio?.storage_key) archivos.push(propio.storage_key);
+      // Y las versiones viejas de lo que se editó en la Oficina
+      // (drive_versiones): el NAS las guarda aparte y, sin esto, quedarían
+      // ocupando lugar para siempre sin ficha que las nombre.
+      archivos.push(...await versionesGuardadas(admin, fichas));
 
       // ⚠️ PRIMERO el NAS, después la ficha. Al revés, si el NAS no contesta,
       // quedaría un archivo huérfano que nadie ve pero ocupa lugar para
       // siempre. Así, si falla, la ficha sigue en la papelera y se reintenta.
-      for (const k of archivos) {
+      for (const k of new Set(archivos)) {
         const r = await fetch(await permisoNas({ op: "borrar", k }, VENCE.borrar), { method: "DELETE" });
         if (!r.ok && r.status !== 404) throw new HttpError(`El NAS no pudo borrar (${r.status}); prueba de nuevo`, 502);
       }
@@ -353,6 +359,22 @@ Deno.serve(async (req) => {
     return responder({ ...(e instanceof HttpError ? e.datos : undefined), error: (e as Error).message ?? "error" }, status);
   }
 });
+
+/** Los archivos del NAS de las versiones guardadas de esas fichas. Si la tabla
+ *  todavía no existe (la migración de drive_versiones no se aplicó), no hay
+ *  versiones: no se frena un borrado por eso. */
+async function versionesGuardadas(admin: SupabaseClient, ids: string[]): Promise<string[]> {
+  const claves: string[] = [];
+  for (let i = 0; i < ids.length; i += 150) {
+    const { data, error } = await admin.from("drive_versiones").select("storage_key").in("item_id", ids.slice(i, i + 150));
+    if (error) {
+      if (error.code === "42P01" || error.code === "PGRST205") return claves;
+      throw new HttpError(error.message, 500);
+    }
+    for (const v of (data ?? []) as { storage_key: string | null }[]) if (v.storage_key) claves.push(v.storage_key);
+  }
+  return claves;
+}
 
 const COLUMNAS_ZIP = "id, parent_id, tipo, nombre, size, storage_key, estado, trashed_at";
 /** El permiso del .zip se usa enseguida (el navegador lo manda al NAS apenas

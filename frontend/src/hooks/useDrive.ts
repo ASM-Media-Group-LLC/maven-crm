@@ -144,6 +144,43 @@ export function useDriveVista(vista: VistaDrive, carpeta: string | null) {
   });
 }
 
+/** Un resultado del buscador: la ficha y dónde está (la carpeta madre). */
+export interface ResultadoDelDrive extends DriveItem {
+  ubicacion: string | null;
+}
+
+/** Buscar en TODO el Drive que la persona puede ver, por nombre, como Google
+ *  (la función drive_buscar: candidatos por índice, visibilidad después). Con
+ *  `extensiones`, los archivos de esos formatos (las carpetas, siempre).
+ *  Desde 3 letras: con menos no busca. */
+export function useBuscarEnDrive(q: string, extensiones: string[] | null) {
+  const { user } = useAuth();
+  const texto = q.trim();
+  return useQuery({
+    queryKey: ["drive-buscar", texto, extensiones?.join(",") ?? "", user?.id],
+    enabled: !!user && texto.length >= 3,
+    staleTime: 30_000,
+    // Mientras llega lo nuevo se queda lo anterior: sin esto la lista
+    // parpadea vacía en cada letra.
+    placeholderData: (anterior) => anterior,
+    queryFn: async (): Promise<ResultadoDelDrive[]> => {
+      const { data, error } = await supabase.rpc("drive_buscar" as never, {
+        p_q: texto, p_extensiones: extensiones, p_limite: 50,
+      } as never);
+      if (error) throw error;
+      type Fila = Pick<DriveItem, "id" | "nombre" | "tipo" | "mime" | "size" | "updated_at" | "owner_id" | "parent_id"> & { ubicacion: string | null };
+      return ((data ?? []) as unknown as Fila[]).map((f) => ({
+        ...f,
+        // La función devuelve solo lo que ya está listo y fuera de la papelera.
+        estado: "listo" as const,
+        created_at: f.updated_at,
+        last_opened_at: null,
+        trashed_at: null,
+      }));
+    },
+  });
+}
+
 /** Una subida que todavía no terminó solo la ve quien la está subiendo. */
 function visibles(data: unknown, yo: string): DriveItem[] {
   return ((data ?? []) as DriveItem[]).filter((i) => i.estado === "listo" || i.owner_id === yo);
