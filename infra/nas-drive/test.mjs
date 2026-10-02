@@ -12,6 +12,7 @@ import zlib from "node:zlib";
 import { crearServidor, MAX_ENTRADAS_ZIP, MAX_PERMISO_ZIP, MAX_POR_PEDIDO, rutaDelZipValida } from "./server.mjs";
 import { firmar, verificar } from "./firma.mjs";
 import { armarZip, cabeceraLocal, crc32, crc32Js, descriptor, entradaCentral, LIMITE_32, necesitaZip64 } from "./zip.mjs";
+import { crearCola, rutaEnCache } from "./miniaturas.mjs";
 
 const SECRETO = "s".repeat(40);
 let dir, conf, srv, base;
@@ -438,4 +439,178 @@ test("zip: el permiso puede ser largo (miles de rutas), pero con tope; y hasta 5
   assert.ok(verificar(SECRETO, t, Date.now(), MAX_PERMISO_ZIP));
   const demasiadas = Array.from({ length: MAX_ENTRADAS_ZIP + 1 }, (_, i) => ({ n: `c${i}/` }));
   assert.equal((await pedirZip({ n: "x.zip", l: demasiadas })).status, 413);
+});
+
+// ── Miniaturas (op "mini") ──────────────────────────────────────────────────
+// sips y qlmanage se reemplazan por scripts falsos (configurables en conf): así
+// las pruebas corren en cualquier lado y se puede contar cuántas veces se
+// llamaron. Al final, una prueba con el sips y el Quick Look de verdad, solo
+// en un Mac.
+
+const herramientas = {};
+let registro;
+async function crearHerramientas() {
+  const carpeta = await fs.mkdtemp(path.join(os.tmpdir(), "nas-herramientas-"));
+  registro = path.join(carpeta, "registro.txt");
+  process.env.MINI_REGISTRO = registro;
+  const script = async (nombre, cuerpo) => {
+    const p = path.join(carpeta, nombre);
+    await fs.writeFile(p, `#!/usr/bin/env node\nconst fs = require("node:fs"); const path = require("node:path");\nconst a = process.argv.slice(2);\n${cuerpo}\n`);
+    await fs.chmod(p, 0o755);
+    return p;
+  };
+  // Escribe un «JPEG» en --out y anota con qué lo llamaron.
+  herramientas.sips = await script("sips", `
+    const entrada = a[a.indexOf("--out") - 1];
+    fs.appendFileSync(process.env.MINI_REGISTRO, "sips " + path.basename(entrada) + "\\n");
+    fs.writeFileSync(a[a.indexOf("--out") + 1], Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]));`);
+  // Como Quick Look: <carpeta -o>/<nombre del archivo>.png. Anota el nombre (con
+  // extensión) y cuántos bytes ve: tiene que ver el archivo de verdad.
+  herramientas.qlmanage = await script("qlmanage", `
+    const entrada = a[a.length - 1];
+    fs.appendFileSync(process.env.MINI_REGISTRO, "ql " + path.basename(entrada) + " " + fs.statSync(entrada).size + "\\n");
+    fs.writeFileSync(path.join(a[a.indexOf("-o") + 1], path.basename(entrada) + ".png"), "png");`);
+  herramientas.colgada = await script("colgada", "setTimeout(() => {}, 10000);");
+  herramientas.falla = await script("falla", "process.exit(3);");
+}
+const llamadas = async () => (await fs.readFile(registro, "utf8").catch(() => "")).trim().split("\n").filter(Boolean);
+const pedirMini = (datos, opciones) => fetch(url({ op: "mini", ...datos }), opciones);
+
+test("mini: una imagen con sips; la segunda vez sale de la caché del disco, sin volver a hacerla", async () => {
+  await crearHerramientas();
+  Object.assign(conf, { sips: herramientas.sips, qlmanage: herramientas.qlmanage, tiempoMiniatura: 5000 });
+  const k = await subir(Buffer.from("una foto"));
+  const r = await pedirMini({ k, x: "jpg" });
+  assert.equal(r.status, 200);
+  assert.equal(r.headers.get("content-type"), "image/jpeg");
+  assert.equal(r.headers.get("cache-control"), "private, max-age=86400");
+  assert.deepEqual([...Buffer.from(await r.arrayBuffer()).subarray(0, 3)], [0xff, 0xd8, 0xff]);
+  assert.deepEqual(await llamadas(), ["sips archivo.jpg"]);
+  const otra = await pedirMini({ k, x: "jpg" });
+  assert.equal(otra.status, 200);
+  await otra.arrayBuffer();
+  assert.deepEqual(await llamadas(), ["sips archivo.jpg"], "la segunda vez no se llama a sips");
+  // La caché está al lado de los datos, en el disco del archivo.
+  const enDisco = (await Promise.all(conf.raices.map((r) => fs.readdir(path.join(r, ".miniaturas")).catch(() => [])))).flat();
+  assert.ok(enDisco.length > 0);
+});
+
+test("mini: un PDF o un video por Quick Look, con un enlace DURO que lleva la extensión (no una copia)", async () => {
+  await fs.writeFile(registro, "");
+  const contenido = Buffer.alloc(12345, 1);
+  const k = await subir(contenido);
+  const r = await pedirMini({ k, x: "pdf" });
+  assert.equal(r.status, 200);
+  await r.arrayBuffer();
+  assert.deepEqual(await llamadas(), [`ql archivo.pdf ${contenido.length}`, "sips archivo.pdf.png"]);
+  // No queda nada en la carpeta temporal (un enlace duro ahí retendría el archivo).
+  for (const raiz of conf.raices) {
+    const tmp = await fs.readdir(path.join(raiz, ".miniaturas", ".tmp")).catch(() => []);
+    assert.deepEqual(tmp, []);
+  }
+});
+
+test("mini: ⚠️ si la herramienta no está o falla, 404 sin tirar el servidor, y no se reintenta enseguida", async () => {
+  await fs.writeFile(registro, "");
+  const k = await subir(Buffer.from("x"));
+  conf.sips = "/no/existe/sips";
+  assert.equal((await pedirMini({ k, x: "png" })).status, 404);
+  conf.sips = herramientas.falla;
+  const k2 = await subir(Buffer.from("y"));
+  assert.equal((await pedirMini({ k: k2, x: "png" })).status, 404);
+  // Con la herramienta arreglada, la que falló sigue sin miniatura por un día.
+  conf.sips = herramientas.sips;
+  assert.equal((await pedirMini({ k, x: "png" })).status, 404);
+  assert.deepEqual(await llamadas(), []);
+  assert.equal((await fetch(`${base}/salud`)).status, 200, "el servidor sigue");
+});
+
+test("mini: ⚠️ una herramienta colgada se corta a tiempo", async () => {
+  Object.assign(conf, { qlmanage: herramientas.colgada, tiempoMiniatura: 300 });
+  const k = await subir(Buffer.from("video"));
+  const inicio = Date.now();
+  assert.equal((await pedirMini({ k, x: "mov" })).status, 404);
+  assert.ok(Date.now() - inicio < 3000, `tardó ${Date.now() - inicio} ms`);
+  Object.assign(conf, { qlmanage: herramientas.qlmanage, tiempoMiniatura: 5000 });
+});
+
+test("mini: ⚠️ la clave con las mismas reglas que un get (y los importados también); la extensión, sin trucos", async () => {
+  for (const k of ["../../etc/passwd", `${agencia}/../x`, "hola.txt"]) {
+    assert.equal((await pedirMini({ k, x: "jpg" })).status, 400, k);
+  }
+  const k = await subir(Buffer.from("x"));
+  for (const x of ["../x", "jpg;rm", "JPG", "", "muylargaextension"]) {
+    assert.equal((await pedirMini({ k, x })).status, 400, x);
+  }
+  // Un permiso de miniatura no sirve para subir ni para borrar.
+  assert.equal((await pedirMini({ k, x: "jpg" }, { method: "DELETE" })).status, 405);
+  // Un importado de Google sí tiene miniatura (se lee, nunca se escribe).
+  const id = randomUUID();
+  const destino = path.join(conf.raices[0], agencia, "google", id);
+  await fs.mkdir(path.dirname(destino), { recursive: true });
+  await fs.writeFile(destino, "de google");
+  const g = await pedirMini({ k: `${agencia}/google/${id}`, x: "heic" });
+  assert.equal(g.status, 200);
+  await g.arrayBuffer();
+});
+
+test("mini: borrar el archivo borra también su miniatura", async () => {
+  const k = await subir(Buffer.from("para borrar"));
+  await (await pedirMini({ k, x: "jpg" })).arrayBuffer();
+  const raiz = (await Promise.all(conf.raices.map(async (r) => ((await fs.stat(path.join(r, k)).catch(() => null)) ? r : null)))).find(Boolean);
+  const mini = rutaEnCache(raiz, k, "para borrar".length);
+  await fs.access(mini);
+  assert.equal((await fetch(url({ op: "borrar", k }), { method: "DELETE" })).status, 204);
+  await assert.rejects(fs.access(mini));
+});
+
+test("mini: de a 2 a la vez, en fila; lo que ya nadie quiere se saltea; con la fila llena, «ahora no»", async () => {
+  const cola = crearCola(2, 3);
+  let ahora = 0;
+  let maximo = 0;
+  const tarea = () => async () => {
+    ahora++; maximo = Math.max(maximo, ahora);
+    await new Promise((r) => setTimeout(r, 30));
+    ahora--;
+    return "hecha";
+  };
+  let corrioLaSalteada = false;
+  const salteada = async () => { corrioLaSalteada = true; return "no"; };
+  // 2 corren y 3 esperan (el tope de la fila); la 6.ª no entra.
+  const corridas = [cola(tarea()), cola(tarea()), cola(tarea()), cola(salteada, () => false), cola(tarea())];
+  await assert.rejects(cola(tarea()), /demasiadas/, "la fila (3) está llena");
+  const resultados = await Promise.all(corridas);
+  assert.equal(maximo, 2);
+  assert.deepEqual(resultados, ["hecha", "hecha", "hecha", null, "hecha"]);
+  assert.equal(corrioLaSalteada, false);
+});
+
+test("mini: el sips y el Quick Look DE VERDAD (solo en un Mac)", { skip: process.platform !== "darwin" }, async () => {
+  Object.assign(conf, { sips: undefined, qlmanage: undefined, tiempoMiniatura: 15000 });
+  // Un PNG de 600×300 hecho a mano (filas sin filtro, comprimidas con zlib).
+  const ancho = 600, alto = 300;
+  const filas = Buffer.alloc((ancho * 3 + 1) * alto);
+  for (let y = 0; y < alto; y++) for (let x = 0; x < ancho; x++) filas[y * (ancho * 3 + 1) + 1 + x * 3] = (x * 255) / ancho;
+  const bloque = (tipo, datos) => {
+    const largo = Buffer.alloc(4); largo.writeUInt32BE(datos.length);
+    const td = Buffer.concat([Buffer.from(tipo), datos]);
+    const c = Buffer.alloc(4); c.writeUInt32BE(crc32Js(td));
+    return Buffer.concat([largo, td, c]);
+  };
+  const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(ancho, 0); ihdr.writeUInt32BE(alto, 4); ihdr[8] = 8; ihdr[9] = 2;
+  const png = Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), bloque("IHDR", ihdr), bloque("IDAT", zlib.deflateSync(filas)), bloque("IEND", Buffer.alloc(0))]);
+  const k = await subir(png);
+  const r = await pedirMini({ k, x: "png" });
+  assert.equal(r.status, 200);
+  const jpg = Buffer.from(await r.arrayBuffer());
+  assert.deepEqual([...jpg.subarray(0, 2)], [0xff, 0xd8], "un JPEG");
+  // Y un PDF por Quick Look (sips sabe escribir PDF).
+  const carpeta = await fs.mkdtemp(path.join(os.tmpdir(), "nas-pdf-"));
+  await fs.writeFile(path.join(carpeta, "a.png"), png);
+  execFileSync("sips", ["-s", "format", "pdf", path.join(carpeta, "a.png"), "--out", path.join(carpeta, "a.pdf")], { stdio: "ignore" });
+  const kPdf = await subir(await fs.readFile(path.join(carpeta, "a.pdf")));
+  const p = await pedirMini({ k: kPdf, x: "pdf" });
+  assert.equal(p.status, 200);
+  assert.deepEqual([...Buffer.from(await p.arrayBuffer()).subarray(0, 2)], [0xff, 0xd8]);
+  await fs.rm(carpeta, { recursive: true, force: true });
 });

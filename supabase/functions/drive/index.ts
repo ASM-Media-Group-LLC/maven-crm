@@ -11,6 +11,7 @@
 //   subir_confirmar  { id, recibo }                    → el archivo queda listo
 //   abrir            { id, descargar? }                → URL para verlo/bajarlo
 //   bajar_varios     { ids }                           → permiso para UN .zip (POST /zip del NAS)
+//   miniaturas       { ids }  (hasta 200)              → { urls: { id: URL de la miniatura } }
 //   borrar_para_siempre { id }                         → borra en el NAS y la ficha
 //   crear_unidad     { nombre }                        → (admins) una unidad compartida
 //
@@ -31,6 +32,7 @@ import {
   armarListaDelZip, CuentaDelZip, entraEnElZip, idsParaZip, nombreDelZip, PROFUNDIDAD_ZIP, TOPE_ZIP_ENTRADAS, TOPE_ZIP_PERMISO,
   type FichaZip,
 } from "./logica.ts";
+import { extensionParaMiniatura, idsParaMiniaturas, venceMiniatura } from "./logica.ts";
 
 Deno.serve(async (req) => {
   const CORS = corsFor(req, { "Access-Control-Allow-Methods": "POST, OPTIONS" });
@@ -265,6 +267,25 @@ Deno.serve(async (req) => {
       }
       // El permiso va en el CUERPO de un formulario (POST /zip), no en la URL.
       return responder({ url: `${nas}/zip`, t, archivos, bytes });
+    }
+
+    if (accion === "miniaturas") {
+      // Las miniaturas de una página de la cuadrícula, en UNA llamada. Como la
+      // persona: si la RLS no le muestra la ficha, no hay miniatura.
+      const ids = idsParaMiniaturas(body.ids);
+      const e = venceMiniatura();
+      const urls: Record<string, string> = {};
+      for (let i = 0; i < ids.length; i += 150) {
+        const { data, error } = await comoLaPersona.from("drive_items")
+          .select("id, tipo, nombre, mime, storage_key, estado").in("id", ids.slice(i, i + 150));
+        if (error) throw new HttpError(error.message, 500);
+        for (const f of (data ?? []) as { id: string; tipo: string; nombre: string; mime: string | null; storage_key: string | null; estado: string }[]) {
+          if (f.tipo !== "archivo" || f.estado !== "listo" || !f.storage_key) continue;
+          const x = extensionParaMiniatura(f.nombre, f.mime);
+          if (x) urls[f.id] = `${nas}/o?t=${await firmar(secreto, { op: "mini", k: f.storage_key, x, e } as never)}`;
+        }
+      }
+      return responder({ urls });
     }
 
     if (accion === "borrar_para_siempre") {
