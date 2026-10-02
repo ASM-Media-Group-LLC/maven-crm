@@ -19,9 +19,11 @@ export function firmar(secreto, datos) {
   return `${cuerpo}.${firma}`;
 }
 
-/** Devuelve los datos si la firma es buena y no venció; si no, null. */
-export function verificar(secreto, permiso, ahora = Date.now()) {
-  if (typeof permiso !== "string" || permiso.length > 4000) return null;
+/** Devuelve los datos si la firma es buena y no venció; si no, null.
+ *  `largoMax`: un permiso normal es corto; el de un .zip (POST /zip) lleva la
+ *  lista de archivos y se le da más lugar a propósito, solo ahí. */
+export function verificar(secreto, permiso, ahora = Date.now(), largoMax = 4000) {
+  if (typeof permiso !== "string" || permiso.length > largoMax) return null;
   const [cuerpo, firma, sobra] = permiso.split(".");
   if (!cuerpo || !firma || sobra !== undefined) return null;
   const esperada = createHmac("sha256", secreto).update(cuerpo).digest();

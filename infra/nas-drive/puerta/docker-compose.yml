@@ -40,6 +40,10 @@ services:
     network_mode: service:puerta-tailscale
     depends_on:
       - puerta-tailscale
+    # Sin filtro de rutas a propósito: /o, /salud y POST /zip (el .zip de
+    # varios archivos, 02/10) pasan tal cual; quien decide es la firma del NAS.
+    # La respuesta del .zip va sin Content-Length y Caddy la manda a medida que
+    # llega, sin acumularla.
     # ⚠️ SOLO por nombre (MagicDNS), nunca por IP. La IP de Tailscale de la
     # mini CAMBIÓ el 28/09 cuando se volvió a iniciar sesión (100.64.206.91 →
     # 100.127.43.97), y con las dos como destino Caddy alternaba al azar: la

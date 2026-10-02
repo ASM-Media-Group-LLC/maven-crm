@@ -15,6 +15,9 @@ const fuentes = (import.meta as unknown as {
   "/supabase/migrations/20261002180000_drive_aperturas_por_persona.sql",
   "/supabase/functions/oficina-doc/index.ts",
   "/supabase/migrations/20261002160000_drive_compartido_agencia.sql",
+  "/supabase/functions/drive/logica.ts",
+  "/frontend/src/hooks/useDriveVarios.ts",
+  "/infra/nas-drive/zip.mjs",
 ], { query: "?raw", import: "default", eager: true });
 const leer = (fin: string) => Object.entries(fuentes).find(([k]) => k.endsWith(fin))?.[1] ?? "";
 const mig = leer("oficina_drive.sql");
@@ -25,6 +28,9 @@ const unidades = leer("drive_unidades.sql");
 const aperturas = leer("drive_aperturas_por_persona.sql");
 const oficinaDoc = leer("oficina-doc/index.ts");
 const agencia = leer("drive_compartido_agencia.sql");
+const logica = leer("drive/logica.ts");
+const varios = leer("hooks/useDriveVarios.ts");
+const zip = leer("nas-drive/zip.mjs");
 
 describe("⚠️ multi-agencia", () => {
   it("toda política de drive_items exige la agencia", () => {
@@ -136,6 +142,64 @@ describe("⚠️ carpetas grandes", () => {
     const tramo = hook.slice(hook.lastIndexOf("fetchAllRows", i), i + 200);
     expect(tramo).toMatch(/fetchAllRows\(/);
     expect(tramo).toMatch(/\.order\("id"\)\.range\(desde, hasta\)/);
+  });
+});
+
+describe("⚠️ mover y bajar varios (María Villegas, 02/10)", () => {
+  it("los archivos se cargaron (si no, lo de abajo pasaría en vacío)", () => {
+    expect(logica).toMatch(/export function armarListaDelZip/);
+    expect(varios).toMatch(/export async function moverFichas/);
+    expect(zip).toMatch(/export async function\* armarZip/);
+  });
+
+  it("mover es un UPDATE de parent_id con la sesión de la persona: lo deciden la RLS y el trigger, nunca un cliente admin", () => {
+    const i = varios.indexOf("export async function moverFichas");
+    const cuerpo = varios.slice(i, varios.indexOf("\n}\n", i));
+    expect(cuerpo).toMatch(/tabla\("drive_items"\)\s*\.update\(\{ parent_id: destino \}/);
+    // Sin pedir las filas de vuelta, un UPDATE que la RLS frena (cero filas, sin error) se vería como hecho.
+    expect(cuerpo).toMatch(/\.select\("id"\)/);
+    expect(varios).not.toMatch(/service_role|SERVICE_ROLE|functions\.invoke\("drive", \{ body: \{ action: "mover/);
+    // La política y el trigger que lo cuidan siguen ahí.
+    expect(mig).toMatch(/CREATE POLICY drive_items_editar ON public\.drive_items\s+FOR UPDATE TO authenticated\s+USING \(tenant_id = \(SELECT public\.current_tenant_id\(\)\) AND public\.drive_mi_rol\(id\) IN \('dueno', 'editor'\)\)/);
+    const cuidar = unidades.slice(unidades.indexOf("CREATE OR REPLACE FUNCTION public.drive_items_cuidar()"));
+    expect(cuidar).toMatch(/IF public\.drive_mi_rol\(NEW\.parent_id\) NOT IN \('dueno', 'editor'\) THEN/);
+    expect(cuidar).toMatch(/p\.tenant_id = NEW\.tenant_id/);
+  });
+
+  it("bajar_varios lee lo elegido Y lo de adentro de las carpetas como la persona (la RLS decide qué entra)", () => {
+    const i = edge.indexOf('if (accion === "bajar_varios")');
+    expect(i).toBeGreaterThan(-1);
+    const rama = edge.slice(i, edge.indexOf("if (accion ===", i + 10));
+    expect(rama).toMatch(/await comoLaPersona\.from\("drive_items"\)/);
+    expect(rama).toMatch(/loDeAdentroComoLaPersona\(comoLaPersona,/);
+    expect(rama).not.toMatch(/\badmin\./);
+    const j = edge.indexOf("async function loDeAdentroComoLaPersona");
+    const expandir = edge.slice(j, edge.indexOf("\n}\n", j));
+    expect(expandir).not.toMatch(/\badmin\b/);
+    // Paginado: PostgREST corta en 1000 sin avisar.
+    expect(expandir).toMatch(/\.order\("id"\)\.range\(desde, desde \+ 999\)/);
+  });
+
+  it("el NAS revisa cada ruta del .zip con las mismas reglas que un get, y solo con permiso de zip", () => {
+    const i = nas.indexOf("export function validarPedidoZip");
+    const valida = nas.slice(i, nas.indexOf("\n}\n", i));
+    expect(valida).toMatch(/if \(!CLAVE_OK\.test\(k\) && !CLAVE_IMPORTADA\.test\(k\)\)/);
+    expect(valida).toMatch(/rutaDelZipValida\(n, carpeta\)/);
+    expect(nas).toMatch(/if \(!d \|\| d\.op !== "zip"\) return json\(res, 403/);
+    // El permiso largo se acepta SOLO en /zip; el resto sigue con el tope de siempre.
+    expect(nas.match(/MAX_PERMISO_ZIP\)/g)?.length).toBe(1);
+    expect(nas).toMatch(/const d = verificar\(conf\.secreto, url\.searchParams\.get\("t"\) \?\? ""\);/);
+  });
+
+  it("la edge y el NAS tienen los MISMOS topes (si la edge firmara más, el NAS lo rechazaría sin que se vea)", () => {
+    // Se compara la expresión tal cual está escrita («50 * 1024 ** 3»).
+    const valor = (src: string, nombre: string) => src.match(new RegExp(`${nombre} = ([\\d *]+);`))?.[1].replace(/\s+/g, "");
+    expect(valor(logica, "TOPE_ZIP_ENTRADAS")).toBe("5000");
+    expect(valor(nas, "MAX_ENTRADAS_ZIP")).toBe("5000");
+    expect(valor(logica, "TOPE_ZIP_BYTES")).toBe("50*1024**3");
+    expect(valor(nas, "MAX_BYTES_ZIP")).toBe("50*1024**3");
+    expect(valor(logica, "TOPE_ZIP_PERMISO")).toBe(valor(nas, "MAX_PERMISO_ZIP"));
+    expect(valor(nas, "MAX_PERMISO_ZIP")).toBe("4*1024*1024");
   });
 });
 
