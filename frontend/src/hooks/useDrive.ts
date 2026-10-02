@@ -354,10 +354,33 @@ function enviar(url: string, metodo: string, cuerpo: Blob | null, onProgreso: (n
   });
 }
 
-/** Sube archivos a una carpeta: pide el permiso a la edge, manda el archivo
- *  directo al NAS (entero o por partes de 32 MB) y confirma con el recibo que
- *  firma el NAS. Las partes van de a una: el orden importa menos que no
- *  saturar la subida de la oficina. */
+/** Sube UN archivo: pide el permiso a la edge, manda el archivo directo al NAS
+ *  (entero o por partes de 32 MB) y confirma con el recibo que firma el NAS.
+ *  Las partes van de a una: el orden importa menos que no saturar la subida de
+ *  la oficina. Devuelve el id de la ficha, que al volver ya está «listo». */
+async function subirArchivo(f: File, parentId: string | null, onProgreso: (enviado: number) => void): Promise<string> {
+  const ini = await llamar<Inicio>("subir_iniciar", {
+    parent_id: parentId, nombre: f.name, mime: f.type || "application/octet-stream", size: f.size,
+  });
+  let respuesta: { recibo?: string } | null;
+  if ("url" in ini) {
+    respuesta = await enviar(ini.url, "PUT", f, onProgreso) as { recibo?: string };
+  } else {
+    let base = 0;
+    for (let i = 0; i < ini.partes.length; i++) {
+      const pedazo = f.slice(i * ini.tamano_parte, (i + 1) * ini.tamano_parte);
+      await enviar(ini.partes[i], "PUT", pedazo, (e) => onProgreso(base + e));
+      base += pedazo.size;
+    }
+    respuesta = await enviar(ini.completar, "POST", null, () => {}) as { recibo?: string };
+  }
+  if (!respuesta?.recibo) throw new Error("El NAS no devolvió el recibo");
+  await llamar("subir_confirmar", { id: ini.id, recibo: respuesta.recibo });
+  return ini.id;
+}
+
+/** Sube archivos a una carpeta, de a uno (ver subirArchivo), con el avance de
+ *  cada uno para el panel de subidas. */
 export function useSubidasDrive() {
   const invalidar = useInvalidar();
   const [subidas, setSubidas] = useState<Subida[]>([]);
@@ -373,23 +396,7 @@ export function useSubidasDrive() {
       const f = archivos[n];
       const { clave } = nuevas[n];
       try {
-        const ini = await llamar<Inicio>("subir_iniciar", {
-          parent_id: parentId, nombre: f.name, mime: f.type || "application/octet-stream", size: f.size,
-        });
-        let respuesta: { recibo?: string } | null;
-        if ("url" in ini) {
-          respuesta = await enviar(ini.url, "PUT", f, (e) => cambiar(clave, { enviado: e })) as { recibo?: string };
-        } else {
-          let base = 0;
-          for (let i = 0; i < ini.partes.length; i++) {
-            const pedazo = f.slice(i * ini.tamano_parte, (i + 1) * ini.tamano_parte);
-            await enviar(ini.partes[i], "PUT", pedazo, (e) => cambiar(clave, { enviado: base + e }));
-            base += pedazo.size;
-          }
-          respuesta = await enviar(ini.completar, "POST", null, () => {}) as { recibo?: string };
-        }
-        if (!respuesta?.recibo) throw new Error("El NAS no devolvió el recibo");
-        await llamar("subir_confirmar", { id: ini.id, recibo: respuesta.recibo });
+        await subirArchivo(f, parentId, (e) => cambiar(clave, { enviado: e }));
         cambiar(clave, { estado: "lista", enviado: f.size });
       } catch (e) {
         cambiar(clave, { estado: "error", error: (e as Error).message });
@@ -399,6 +406,22 @@ export function useSubidasDrive() {
   }, [invalidar]);
 
   return { subidas, subir, limpiar: () => setSubidas((s) => s.filter((x) => x.estado === "subiendo")) };
+}
+
+/** «Abrir» › «Subir» de la Oficina: sube UN archivo y devuelve su id cuando ya
+ *  está listo, para abrirlo apenas termina. El mismo camino que el Drive
+ *  (subirArchivo); lo único distinto es que quien llama necesita el id. */
+export function useSubirUnArchivo() {
+  const invalidar = useInvalidar();
+  return useCallback(async (f: File, parentId: string | null, onProgreso: (enviado: number) => void) => {
+    try {
+      return await subirArchivo(f, parentId, onProgreso);
+    } finally {
+      // Haya salido bien o no: una subida a medias también cambia la lista y
+      // el espacio usado.
+      invalidar();
+    }
+  }, [invalidar]);
 }
 
 // ── Cupo ─────────────────────────────────────────────────────────────────────
