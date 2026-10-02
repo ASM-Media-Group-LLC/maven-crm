@@ -97,6 +97,7 @@ Deno.test("importar: un lote sano entra sin dueño, listo, con la ruta de la age
   assert(f.owner_id === null && f.estado === "listo" && f.tenant_id === T, "sin dueño, listo, de la agencia");
   assert(f.storage_key === `${T}/google/${u(2)}`, "la ruta del NAS lleva la agencia y google/");
   assert(f.created_at === "2025-02-20T21:05:00.000Z", "conserva la fecha");
+  assert(f.updated_at === "2025-02-20T21:05:00.000Z", "y la muestra como última modificación");
   assert(filas[0].storage_key === null && filas[0].size === null && filas[0].mime === null, "la carpeta no tiene archivo");
 });
 
