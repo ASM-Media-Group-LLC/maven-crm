@@ -53,6 +53,12 @@ jobs:
       - name: Guard — Drive (firma y subidas)
         run: deno test --no-check supabase/functions/_shared/drive-firma.test.ts supabase/functions/drive/logica.test.ts
 
+      # Un archivo del Drive en ONLYOFFICE (oficina-doc): la vista es solo
+      # lectura, la llave de caché es estable, la copia editable sale en
+      # docx/xlsx/pptx, y la firma HS256 es la estándar (vector de jwt.io).
+      - name: Guard — Drive en la Oficina (visor y copia editable)
+        run: deno test --no-check supabase/functions/oficina-doc/drive.test.ts supabase/functions/oficina-doc/jwt.test.ts
+
       # El lado del NAS (infra/nas-drive, Node): el servidor, el índice diario
       # (paginado: arma el árbol en la mini) y el importador del archivo de Google
       # (enlaces duros en el mismo disco, ids estables, nombres del Mac a NFC).
