@@ -43,6 +43,8 @@ interface MessageBubbleProps {
   onDelete: () => void;
   onRetry?: () => void;
   replyMessage?: ChatMessage;
+  /** Clic en la cita: lleva al mensaje original en la conversación. */
+  onIrALaCita?: () => void;
   showAvatar: boolean;
   showSender: boolean;
   isLastInGroup: boolean;
@@ -61,7 +63,7 @@ interface MessageBubbleProps {
 
 const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
   message, isMe, chatType, profiles, highlight, onReply, onOpenProfile, deletedArchive, onCopy, onEdit, onDelete, onRetry,
-  replyMessage, showAvatar, showSender, isLastInGroup,
+  replyMessage, onIrALaCita, showAvatar, showSender, isLastInGroup,
   reactions, onToggleReaction, readByUsers, deliveredByUsers, totalParticipants,
   threadCount = 0, unreadThreadCount = 0, onOpenThread,
   adjacentImages, isGridLeader, isPartOfGrid,
@@ -75,6 +77,8 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
   // Táctil: las acciones (reaccionar, ⋮) salen al tocar la burbuja. Siempre
   // visibles ocupaban 64 px al lado de CADA mensaje y el chat se veía atiborrado.
   const [accionesTactiles, setAccionesTactiles] = useState(false);
+  // «Responder» se eligió en el menú: al cerrarse no le devuelve el foco al ⋮.
+  const respondiendoRef = useRef(false);
   const [lightboxSrc, setLightboxSrc] = useState("");
   const [lightboxType, setLightboxType] = useState<"image" | "video">("image");
   // Todas las fotos y videos del chat, para las flechas del visor.
@@ -232,10 +236,14 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
             className="rounded-2xl max-w-full max-h-60 object-cover cursor-pointer hover:opacity-90 transition-opacity"
             onClick={() => openLightbox(message.file_url!, "image")}
           />
+          {/* El texto que acompaña a una imagen o archivo respeta sus saltos de
+              línea, como el de un mensaje de solo texto (Keila, 02/10: un mensaje
+              largo con 12 puntos se veía como un solo párrafo). Es un div y no
+              un <p>: el texto con formato trae sus propios párrafos. */}
           {message.content && message.content !== message.file_name && (
-            <p className="text-[13px] mt-1.5 leading-relaxed">{message.content_rich
+            <div className="text-[13px] mt-1.5 leading-relaxed whitespace-pre-wrap break-words">{message.content_rich
               ? <RichText doc={message.content_rich} renderText={highlightText} />
-              : highlightText(message.content)}</p>
+              : highlightText(message.content)}</div>
           )}
         </div>
       );
@@ -287,9 +295,9 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
           })}
         </div>
         {message.content && message.content !== message.file_name && (
-          <p className="text-[13px] mt-1.5 leading-relaxed">{message.content_rich
+          <div className="text-[13px] mt-1.5 leading-relaxed whitespace-pre-wrap break-words">{message.content_rich
               ? <RichText doc={message.content_rich} renderText={highlightText} />
-              : highlightText(message.content)}</p>
+              : highlightText(message.content)}</div>
         )}
       </div>
     );
@@ -348,9 +356,9 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
             </div>
           </div>
           {message.content && message.content !== message.file_name && (
-            <p className="text-[13px] mt-1.5 leading-relaxed">{message.content_rich
+            <div className="text-[13px] mt-1.5 leading-relaxed whitespace-pre-wrap break-words">{message.content_rich
               ? <RichText doc={message.content_rich} renderText={highlightText} />
-              : highlightText(message.content)}</p>
+              : highlightText(message.content)}</div>
           )}
         </div>
       );
@@ -496,8 +504,19 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
                   <MoreVertical className="h-3 w-3" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align={isMe ? "end" : "start"} className="min-w-[140px] rounded-2xl">
-                <DropdownMenuItem onClick={onReply}>
+              <DropdownMenuContent
+                align={isMe ? "end" : "start"}
+                className="min-w-[140px] rounded-2xl"
+                // Al cerrar, el menú le devuelve el foco al ⋮ y se lo quitaba al
+                // cuadro de escritura: había que hacer clic 2 o 3 veces para
+                // responder (Keila, 02/10). Con «Responder», el foco va al cuadro.
+                onCloseAutoFocus={(e) => {
+                  if (!respondiendoRef.current) return;
+                  respondiendoRef.current = false;
+                  e.preventDefault();
+                }}
+              >
+                <DropdownMenuItem onClick={() => { respondiendoRef.current = true; onReply(); }}>
                   <Reply className="h-3.5 w-3.5 mr-2" /> {t("common.reply")}
                 </DropdownMenuItem>
                 {onOpenThread && (
@@ -539,14 +558,22 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
             reactions.length > 0 && "mb-3",
             isMe ? "bg-gradient-to-br from-accent to-primary text-white shadow-sm" : "bg-muted"
           )}>
+            {/* La cita lleva al mensaje original, como en WhatsApp (Keila, 02/10). */}
             {replyMessage && (
-              <div className={cn(
-                "text-[11px] mb-1.5 px-2.5 py-1.5 rounded-xl",
-                isMe ? "bg-primary-foreground/10" : "bg-background/60"
-              )}>
+              <button
+                type="button"
+                disabled={!onIrALaCita}
+                onClick={(e) => { e.stopPropagation(); onIrALaCita?.(); }}
+                title={onIrALaCita ? t("messenger.bubble.irALaCita") : undefined}
+                className={cn(
+                  "block w-full min-w-0 text-left text-[11px] mb-1.5 px-2.5 py-1.5 rounded-xl disabled:cursor-default",
+                  isMe ? "bg-primary-foreground/10" : "bg-background/60",
+                  onIrALaCita && (isMe ? "hover:bg-primary-foreground/20" : "hover:bg-background/90"),
+                )}
+              >
                 <p className="font-semibold opacity-80">{remitenteVisible(replyMessage, profiles, t).nombre}</p>
                 <p className="truncate opacity-70">{replyMessage.content}</p>
-              </div>
+              </button>
             )}
 
             {/* El nombre va en los grupos (de los demás) y en TODO mensaje por API,

@@ -160,6 +160,19 @@ export default function ChatView({
     setHighlightedMsgId(messageId);
   }, []);
 
+  // Clic en una cita: al mensaje original, resaltado un momento. Se limpia
+  // antes para que volver a tocar la MISMA cita también lleve (el efecto que
+  // hace el scroll solo corre cuando el id cambia).
+  const quitarResaltadoRef = useRef<number | undefined>(undefined);
+  const irAlMensajeCitado = useCallback((messageId: string) => {
+    window.clearTimeout(quitarResaltadoRef.current);
+    setHighlightedMsgId(null);
+    requestAnimationFrame(() => setHighlightedMsgId(messageId));
+    quitarResaltadoRef.current = window.setTimeout(
+      () => setHighlightedMsgId((actual) => (actual === messageId ? null : actual)), 2500);
+  }, []);
+  useEffect(() => () => window.clearTimeout(quitarResaltadoRef.current), []);
+
   // SALTAR A UN MENSAJE (?m= de una notificación). María (16/09): "me abrió el
   // grupo pero no me llevó al hilo". Si el mensaje es una respuesta de hilo,
   // hay que abrir el hilo de su padre y resaltarla ahí; si es del timeline,
@@ -288,6 +301,7 @@ export default function ChatView({
         searchQuery={searchQuery}
         loading={loading}
         onReply={setReplyTo}
+        onIrAlMensaje={irAlMensajeCitado}
         onOpenProfile={setProfileUserId}
         deletedArchive={deletedArchive}
         onCopy={(content) => { navigator.clipboard.writeText(content); toast.success(t("messenger.chat.copiado")); }}

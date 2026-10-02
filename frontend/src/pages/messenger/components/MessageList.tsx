@@ -20,6 +20,8 @@ interface MessageListProps {
   searchQuery: string;
   loading: boolean;
   onReply: (msg: ChatMessage) => void;
+  /** Llevar la vista a un mensaje (el clic en una cita). */
+  onIrAlMensaje?: (messageId: string) => void;
   onOpenProfile?: (userId: string) => void;
   deletedArchive?: Record<string, DeletedMessageArchive>;
   onCopy: (content: string) => void;
@@ -71,7 +73,7 @@ function groupMessages(messages: ChatMessage[]) {
 
 export default function MessageList({
   messages, profiles, chatType, currentUserId, searchQuery,
-  loading, onReply, onOpenProfile, deletedArchive, onCopy, onEdit, onDelete, onRetry,
+  loading, onReply, onIrAlMensaje, onOpenProfile, deletedArchive, onCopy, onEdit, onDelete, onRetry,
   getReactionsForMessage, onToggleReaction, getReadByUsers, getDeliveredByUsers, totalParticipants,
   highlightedMsgId, onOpenThread, getThreadCount, getUnreadThreadCount,
   hasMore, loadingMore, onLoadMore, className,
@@ -296,6 +298,7 @@ export default function MessageList({
                       onDelete={() => onDelete(msg.id)}
                       onRetry={onRetry ? () => onRetry(msg.id) : undefined}
                       replyMessage={msg.reply_to_id ? msgById.get(msg.reply_to_id) : undefined}
+                      onIrALaCita={msg.reply_to_id && onIrAlMensaje ? () => onIrAlMensaje(msg.reply_to_id!) : undefined}
                       showAvatar={isLastInGroup && !isMe}
                       showSender={isFirstInGroup && (!isMe || esApi)}
                       isLastInGroup={isLastInGroup}

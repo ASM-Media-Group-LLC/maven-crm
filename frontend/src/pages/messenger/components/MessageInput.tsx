@@ -143,6 +143,15 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
   }, []);
   const [isRecording, setIsRecording] = useState(false);
   const composerRef = useRef<RichComposerHandle>(null);
+  // Al elegir «Responder», el cursor queda listo en el cuadro (Keila, 02/10:
+  // había que hacer clic 2 o 3 veces). Va en el cuadro siguiente: el menú de
+  // donde vino todavía se está cerrando.
+  const respondiendoA = replyTo?.id;
+  useEffect(() => {
+    if (!respondiendoA) return;
+    const cuadro = requestAnimationFrame(() => composerRef.current?.focus());
+    return () => cancelAnimationFrame(cuadro);
+  }, [respondiendoA]);
   // Barra de formato plegada por defecto (como el botón "Opciones de formato" de Google).
   const [showToolbar, setShowToolbar] = useState(false);
   // Teléfono: fila única estilo WhatsApp (+ · cajón con expresiones · cámara · mic/enviar).

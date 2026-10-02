@@ -149,6 +149,7 @@ export const messenger = {
   "messenger.bubble.eliminadoPorAutor": { es: "Eliminado por el autor", en: "Deleted by the author" },
   "messenger.bubble.enterParaGuardar": { es: "Enter para guardar · Esc para cancelar", en: "Enter to save · Esc to cancel" },
   "messenger.bubble.abrirHilo": { es: "Abrir hilo", en: "Open thread" },
+  "messenger.bubble.irALaCita": { es: "Ver el mensaje original", en: "Go to the original message" },
   "messenger.bubble.editado": { es: "editado", en: "edited" },
   "messenger.bubble.enviando": { es: "Enviando", en: "Sending" },
   "messenger.bubble.noSeEnvio": { es: "No se envió · toca para reintentar", en: "Not sent · tap to retry" },
