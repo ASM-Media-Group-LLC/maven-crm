@@ -14,6 +14,7 @@ const fuentes = (import.meta as unknown as {
   "/supabase/migrations/20261002130000_drive_unidades.sql",
   "/supabase/migrations/20261002180000_drive_aperturas_por_persona.sql",
   "/supabase/functions/oficina-doc/index.ts",
+  "/supabase/migrations/20261002160000_drive_compartido_agencia.sql",
 ], { query: "?raw", import: "default", eager: true });
 const leer = (fin: string) => Object.entries(fuentes).find(([k]) => k.endsWith(fin))?.[1] ?? "";
 const mig = leer("oficina_drive.sql");
@@ -23,6 +24,7 @@ const hook = leer("hooks/useDrive.ts");
 const unidades = leer("drive_unidades.sql");
 const aperturas = leer("drive_aperturas_por_persona.sql");
 const oficinaDoc = leer("oficina-doc/index.ts");
+const agencia = leer("drive_compartido_agencia.sql");
 
 describe("⚠️ multi-agencia", () => {
   it("toda política de drive_items exige la agencia", () => {
@@ -61,6 +63,33 @@ describe("⚠️ «Recientes» es lo que abrí YO (02/10: Test veía lo que abr�
   it("abrir (drive) y ver (oficina-doc) anotan la apertura de la persona", () => {
     expect(edge).toMatch(/from\("drive_aperturas"\)\.upsert\(\{ user_id: yo, item_id: id/);
     expect(oficinaDoc).toMatch(/from\("drive_aperturas"\)\.upsert\(\{ user_id: user\.id, item_id: fila\.id/);
+  });
+});
+
+describe("⚠️ abierto a toda la agencia (02/10)", () => {
+  it("la migración se cargó (si no, todo lo de abajo pasaría en vacío)", () => {
+    expect(agencia).toMatch(/CREATE TABLE public\.drive_compartido_agencia/);
+  });
+  it("la agencia de la fila la pone la base, desde la ficha: nadie abre algo a OTRA agencia", () => {
+    expect(agencia).toMatch(/SELECT i\.tenant_id INTO NEW\.tenant_id FROM public\.drive_items i WHERE i\.id = NEW\.item_id;/);
+    expect(agencia).toMatch(/BEFORE INSERT OR UPDATE ON public\.drive_compartido_agencia/);
+  });
+  it("drive_mi_rol nuevo sigue cortando por agencia ANTES de mirar lo abierto", () => {
+    const i = agencia.indexOf("CREATE OR REPLACE FUNCTION public.drive_mi_rol");
+    const cuerpo = agencia.slice(i, agencia.indexOf("$function$;", i));
+    const corte = cuerpo.indexOf("WHEN NOT EXISTS (SELECT 1 FROM cadena WHERE nivel = 0 AND tenant_id = public.current_tenant_id()) THEN NULL");
+    expect(corte).toBeGreaterThan(-1);
+    expect(corte).toBeLessThan(cuerpo.indexOf("drive_compartido_agencia"));
+  });
+  it("abrir o cerrar a la agencia pide dueño o editor, como compartir con una persona", () => {
+    for (const nombre of ["drive_compartido_agencia_dar", "drive_compartido_agencia_cambiar", "drive_compartido_agencia_quitar"]) {
+      const i = agencia.indexOf(`CREATE POLICY ${nombre}`);
+      expect(i, nombre).toBeGreaterThan(-1);
+      expect(agencia.slice(i, agencia.indexOf(";", i)), nombre).toMatch(/drive_mi_rol\(item_id\) IN \('dueno', 'editor'\)/);
+    }
+  });
+  it("«Compartido conmigo» también pide lo abierto a la agencia", () => {
+    expect(hook).toMatch(/supabase\.rpc\("drive_de_toda_la_agencia"/);
   });
 });
 
