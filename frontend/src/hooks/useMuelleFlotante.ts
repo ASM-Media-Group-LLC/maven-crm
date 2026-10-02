@@ -98,6 +98,11 @@ export function useMuelleFlotante() {
     const mover = (ev: PointerEvent) => {
       const d = dragRef.current;
       if (!d) return;
+      // Sin botón apretado, el arrastre YA terminó y no nos enteramos: se soltó
+      // encima de un iframe (el cuerpo de un correo se lee en uno) o fuera de
+      // la ventana, y el pointerup se lo quedó otro. Sin esto el muelle
+      // «perseguía el cursor» en el Correo (Keila, 02/10).
+      if (ev.buttons === 0) { soltar(); return; }
       const dx = ev.clientX - d.startX;
       const dy = ev.clientY - d.startY;
       if (!d.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
@@ -120,6 +125,7 @@ export function useMuelleFlotante() {
       window.removeEventListener("pointermove", mover);
       window.removeEventListener("pointerup", soltar);
       window.removeEventListener("pointercancel", soltar);
+      window.removeEventListener("blur", soltar);
       if (!d?.moved) return;
       // El click que viene después de soltar NO tiene que abrir nada.
       tragarClickRef.current = true;
@@ -132,6 +138,8 @@ export function useMuelleFlotante() {
     window.addEventListener("pointermove", mover, { passive: false });
     window.addEventListener("pointerup", soltar);
     window.addEventListener("pointercancel", soltar);
+    // Soltar dentro de un iframe (o pasar a otra ventana) se lleva el foco.
+    window.addEventListener("blur", soltar);
   }, [pos.x, pos.y]);
 
   const onClickCapture = useCallback((e: ReactMouseEvent) => {
