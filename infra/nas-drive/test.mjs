@@ -132,6 +132,28 @@ test("⚠️ rutas raras no pasan: solo <agencia>/<id>", async () => {
   }
 });
 
+test("los importados de Google (<agencia>/google/<id>) se leen y se borran, pero nunca se suben", async () => {
+  const id = randomUUID();
+  const k = `${agencia}/google/${id}`;
+  // Como lo deja importar.mjs: un archivo puesto en la raíz, no subido por el NAS.
+  const destino = path.join(conf.raices[0], agencia, "google", id);
+  await fs.mkdir(path.dirname(destino), { recursive: true });
+  await fs.writeFile(destino, "de google");
+  const g = await fetch(url({ op: "get", k }));
+  assert.equal(g.status, 200);
+  assert.equal(await g.text(), "de google");
+  for (const op of ["put", "parte", "completar"]) {
+    const metodo = op === "completar" ? "POST" : "PUT";
+    const r = await fetch(url({ op, k, max: 10, up: randomUUID(), i: 0, n: 1, total: 10 }), { method: metodo, body: metodo === "PUT" ? "x" : undefined });
+    assert.equal(r.status, 400, op);
+  }
+  for (const malo of [`${agencia}/google`, `${agencia}/drive/${id}`, `${agencia}/google/${id}/x`, `google/${id}`]) {
+    assert.equal((await fetch(url({ op: "get", k: malo }))).status, 400, malo);
+  }
+  assert.equal((await fetch(url({ op: "borrar", k }), { method: "DELETE" })).status, 204);
+  assert.equal(await fs.stat(destino).catch(() => null), null);
+});
+
 test("⚠️ no se pisa un archivo que ya existe", async () => {
   const k = clave();
   await fetch(url({ op: "put", k, max: 10 }), { method: "PUT", body: "uno" });

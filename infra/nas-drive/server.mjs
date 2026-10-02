@@ -33,6 +33,10 @@ import { verificar, recibo } from "./firma.mjs";
 
 export const MAX_POR_PEDIDO = 95 * 1024 * 1024; // el proxy de Cloudflare corta en 100 MB
 const CLAVE_OK = /^[0-9a-f-]{36}(\/[0-9a-f-]{36}){1,2}$/;
+// Los archivos importados de Google (importar.mjs): un enlace duro en
+// <agencia>/google/<id>. Se leen y se borran; nunca se suben (la edge no da
+// permisos de subida para estas rutas, y si alguno llegara, el NAS lo frena).
+const CLAVE_IMPORTADA = /^[0-9a-f-]{36}\/google\/[0-9a-f-]{36}$/;
 const SUBIDA_OK = /^[0-9a-f-]{36}$/;
 const PELIGROSOS = /html|svg|xml|javascript|ecmascript/i;
 
@@ -270,7 +274,9 @@ export function crearServidor(conf) {
 
       const d = verificar(conf.secreto, url.searchParams.get("t") ?? "");
       if (!d) return json(res, 403, { error: "permiso inválido o vencido" });
-      if (!CLAVE_OK.test(String(d.k))) return json(res, 400, { error: "ruta inválida" });
+      const importada = CLAVE_IMPORTADA.test(String(d.k));
+      if (!CLAVE_OK.test(String(d.k)) && !importada) return json(res, 400, { error: "ruta inválida" });
+      if (importada && d.op !== "get" && d.op !== "borrar") return json(res, 400, { error: "un archivo importado no se sube ni se reemplaza" });
 
       // La operación del permiso tiene que coincidir con el método: un
       // permiso para BAJAR no sirve para subir ni para borrar.
