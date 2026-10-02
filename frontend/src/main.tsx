@@ -9,6 +9,8 @@ import "./lib/promptDeInstalacion";
 import "./lib/altoDeLaApp";
 // iOS: sin zoom automático al enfocar el cajón de texto (solo iOS; ver el archivo).
 import "./lib/sinZoomAlEnfocar";
+// Windows: Alt + números del teclado numérico (Alt+64 = «@») no navega hacia atrás.
+import "./lib/codigosAlt";
 import { applyStoredSkin, applyStoredAppearance } from "./hooks/useSkin";
 import { irAlDominioCanonico } from "./lib/dominioCanonico";
 import { traducir } from "./lib/i18n";

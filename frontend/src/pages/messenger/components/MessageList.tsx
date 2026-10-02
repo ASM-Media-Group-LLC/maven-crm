@@ -12,6 +12,13 @@ import type { Language } from "@/lib/i18n";
 import type { Traductor } from "../preview";
 import { isSameGroup } from "../utils";
 
+/** Dónde quedó cada conversación al salir de la página: el mensaje de arriba
+ *  de la pantalla y cuánto se veía de él. Vive mientras la app esté abierta;
+ *  al volver (del Correo, por ejemplo) se retoma ahí en vez de saltar al fondo
+ *  (Keila, 02/10). Si estaba al fondo no se guarda nada: abre al fondo, como
+ *  siempre. */
+const dondeQuedo = new Map<string, { ancla: string; desfase: number }>();
+
 interface MessageListProps {
   messages: ChatMessage[];
   profiles: Record<string, UserProfile>;
@@ -20,6 +27,8 @@ interface MessageListProps {
   searchQuery: string;
   loading: boolean;
   onReply: (msg: ChatMessage) => void;
+  /** Llevar la vista a un mensaje (el clic en una cita). */
+  onIrAlMensaje?: (messageId: string) => void;
   onOpenProfile?: (userId: string) => void;
   deletedArchive?: Record<string, DeletedMessageArchive>;
   onCopy: (content: string) => void;
@@ -71,7 +80,7 @@ function groupMessages(messages: ChatMessage[]) {
 
 export default function MessageList({
   messages, profiles, chatType, currentUserId, searchQuery,
-  loading, onReply, onOpenProfile, deletedArchive, onCopy, onEdit, onDelete, onRetry,
+  loading, onReply, onIrAlMensaje, onOpenProfile, deletedArchive, onCopy, onEdit, onDelete, onRetry,
   getReactionsForMessage, onToggleReaction, getReadByUsers, getDeliveredByUsers, totalParticipants,
   highlightedMsgId, onOpenThread, getThreadCount, getUnreadThreadCount,
   hasMore, loadingMore, onLoadMore, className,
@@ -111,11 +120,23 @@ export default function MessageList({
     const lastId = lastMsg.id;
 
     if (conv !== currentConvRef.current) {
+      // Solo al VOLVER a la página (la lista recién montada): cambiar de chat
+      // dentro del Messenger sigue abriendo al fondo.
+      const alVolver = currentConvRef.current === null;
       currentConvRef.current = conv;
-      pinToBottomRef.current = true;
-      el.scrollTop = el.scrollHeight;
-      setNewCount(0);
-      setShowJump(false);
+      const quedo = alVolver && conv ? dondeQuedo.get(conv) : undefined;
+      const anclaEl = quedo ? msgRefs.current[quedo.ancla] : null;
+      if (quedo && anclaEl) {
+        pinToBottomRef.current = false;
+        el.scrollTop += anclaEl.getBoundingClientRect().top - el.getBoundingClientRect().top - quedo.desfase;
+        setNewCount(0);
+        setShowJump(true);
+      } else {
+        pinToBottomRef.current = true;
+        el.scrollTop = el.scrollHeight;
+        setNewCount(0);
+        setShowJump(false);
+      }
     } else if (messages.length > prevMessagesLengthRef.current) {
       // Distingue mensaje NUEVO al fondo de históricos prepend-eados arriba (mismo lastId).
       const isNewAtBottom = lastId !== prevLastIdRef.current;
@@ -168,12 +189,34 @@ export default function MessageList({
     }
   }, [messages, loadingMore]);
 
+  // Anotar dónde quedó (ver dondeQuedo), cuando el scroll se calma: medir cada
+  // burbuja en cada evento de scroll trabaría la lista.
+  const anotarRef = useRef<number | undefined>(undefined);
+  const anotarDondeQuedo = useCallback(() => {
+    window.clearTimeout(anotarRef.current);
+    anotarRef.current = window.setTimeout(() => {
+      const el = scrollRef.current;
+      const conv = currentConvRef.current;
+      if (!el || !conv) return;
+      if (pinToBottomRef.current) { dondeQuedo.delete(conv); return; }
+      const arriba = el.getBoundingClientRect().top;
+      for (const m of messages) {
+        const nodo = msgRefs.current[m.id];
+        if (!nodo) continue;
+        const r = nodo.getBoundingClientRect();
+        if (r.bottom > arriba) { dondeQuedo.set(conv, { ancla: m.id, desfase: r.top - arriba }); return; }
+      }
+    }, 150);
+  }, [messages]);
+  useEffect(() => () => window.clearTimeout(anotarRef.current), []);
+
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
     // ¿el usuario está pegado al fondo? Define si seguimos autoscrolleando.
     const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
     pinToBottomRef.current = atBottom;
+    anotarDondeQuedo();
     // Botón "↓": visible mientras esté scrolleado arriba; al volver al fondo se limpia.
     if (atBottom) { setNewCount(0); setShowJump(false); }
     else setShowJump(true);
@@ -183,7 +226,7 @@ export default function MessageList({
       wasLoadingMoreRef.current = true;
       onLoadMore();
     }
-  }, [hasMore, loadingMore, onLoadMore]);
+  }, [hasMore, loadingMore, onLoadMore, anotarDondeQuedo]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -296,6 +339,7 @@ export default function MessageList({
                       onDelete={() => onDelete(msg.id)}
                       onRetry={onRetry ? () => onRetry(msg.id) : undefined}
                       replyMessage={msg.reply_to_id ? msgById.get(msg.reply_to_id) : undefined}
+                      onIrALaCita={msg.reply_to_id && onIrAlMensaje ? () => onIrAlMensaje(msg.reply_to_id!) : undefined}
                       showAvatar={isLastInGroup && !isMe}
                       showSender={isFirstInGroup && (!isMe || esApi)}
                       isLastInGroup={isLastInGroup}
