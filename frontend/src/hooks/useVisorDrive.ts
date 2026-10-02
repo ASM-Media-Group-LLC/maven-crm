@@ -60,6 +60,37 @@ export function useVistaEnOffice(id: string | null, tema: "dark" | "light", idio
   });
 }
 
+/** Lo que contesta `editar_drive`: la config FIRMADA y si se edita o solo se
+ *  ve (y por qué). */
+export interface EdicionDelDrive extends AperturaEnOffice {
+  modo: "editar" | "ver";
+  motivo: "formato" | "permiso" | "espacio" | null;
+  archivo: { id: string; nombre: string; mime: string | null; size: number | null; updated_at: string };
+}
+
+/** Abrir EL MISMO archivo del Drive en ONLYOFFICE para editarlo, como el «modo
+ *  de edición de Office» de Google: lo guardado vuelve al Drive (con
+ *  historial). Si la persona no puede editarlo, o el formato no vuelve igual de
+ *  ONLYOFFICE, o no hay espacio, la edge lo abre para ver y dice por qué.
+ *
+ *  ⚠️ Se pide de nuevo en cada apertura (gcTime 0): lleva el permiso para
+ *  guardar y la URL del NAS, y una config vieja abriría otra sesión. Sin
+ *  `refetchOnWindowFocus`: una config nueva remonta el editor. */
+export function useEdicionDelDrive(id: string | undefined, tema: "dark" | "light", idioma: "es" | "en") {
+  return useQuery({
+    // Solo el id: cambiar el tema de Maven con el archivo abierto no tiene
+    // que remontar el editor (ONLYOFFICE tiene su propio selector de tema).
+    queryKey: ["drive-edicion", id],
+    enabled: !!id,
+    staleTime: Infinity,
+    gcTime: 0,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    retry: false,
+    queryFn: () => llamar<EdicionDelDrive>("oficina-doc", { action: "editar_drive", id, tema, idioma }),
+  });
+}
+
 export interface TextoDelArchivo {
   texto: string;
   /** Se mostró solo el principio (el archivo pasa de TOPE_TEXTO). */
@@ -172,9 +203,11 @@ export function useSvgComoImagen(url: string | undefined, size: number | null) {
   return estado;
 }
 
-/** «Editar en Documentos de Maven»: una copia editable en la Oficina. El
- *  original sigue en el Drive, como cuando Google abre un .docx con
- *  Documentos de Google. */
+/** Una copia editable en la Oficina (`desde_drive`). El original sigue en el
+ *  Drive. Es «Hacer una copia» (el «Guardar como Hojas de cálculo de Google»)
+ *  para Word/Excel/PowerPoint, que se editan en su lugar (useEdicionDelDrive),
+ *  y la manera de editar lo que ONLYOFFICE no devuelve en su formato (.doc,
+ *  .xls, .csv, .txt…), como Google convierte un .csv en un archivo de Hojas. */
 export function useEditarEnOficina() {
   const qc = useQueryClient();
   return useMutation({

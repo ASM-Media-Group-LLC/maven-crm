@@ -19,14 +19,18 @@ import { useFormato } from "@/hooks/useFormato";
 import type { Formato } from "@/lib/formato";
 import type { TranslationKey } from "@/lib/i18n";
 import {
-  useDriveVista, useRutaDrive, useSubirUnArchivo, useUsoDrive, type DriveItem, type VistaDrive,
+  useBuscarEnDrive, useDriveVista, useRutaDrive, useSubirUnArchivo, useUsoDrive, type DriveItem, type ResultadoDelDrive,
+  type VistaDrive,
 } from "@/hooks/useDrive";
 import { useEditarEnOficina } from "@/hooks/useVisorDrive";
+import { useDebouncedValue } from "@/hooks/useCommandSearch";
 import { tamano } from "@/lib/drive/formato";
-import { destinoEnLaOficina, type DestinoDeOficina } from "@/lib/drive/tipoDeArchivo";
 import {
-  aceptaElSelector, esAtajoDeAbrir, extensionesDe, paraAbrir, problemaParaSubir, TOPE_COPIA,
-  type ProblemaDeSubida,
+  comoSeAbreEnLaOficina, destinoEnLaOficina, TOPE_OFFICE, type DestinoDeOficina,
+} from "@/lib/drive/tipoDeArchivo";
+import {
+  aceptaElSelector, BUSQUEDA_MINIMA, esAtajoDeAbrir, extensionesDe, normalizar, paraAbrir, problemaParaSubir,
+  TOPE_COPIA, topeParaAbrir, type ProblemaDeSubida,
 } from "@/lib/drive/abrirEnLaOficina";
 import { soloUnClic } from "@/pages/oficina/drive/gestos";
 
@@ -35,10 +39,15 @@ import { soloUnClic } from "@/pages/oficina/drive/gestos";
 // Google Hojas de cálculo: pestañas Recientes / Mi unidad / Unidades
 // compartidas / Compartido conmigo / Subir, un buscador y el filtro por tipo.
 //
-// Abrir un archivo del Drive = la copia editable de la Oficina (`desde_drive`,
-// el mismo camino que «Editar en Documentos de Maven» del visor del Drive).
+// Abrir, como en Google (02/10: «que sea exactamente como Google»):
+//   - un Word, Excel o PowerPoint se abre EN SU LUGAR (/oficina/drive/:id): el
+//     mismo archivo del Drive en modo edición, guardando sobre él. Abrirlo dos
+//     veces nunca crea dos copias;
+//   - lo que ONLYOFFICE no devuelve en su formato (.doc, .xls, .odt, .csv,
+//     .txt…) se convierte a una copia editable (`desde_drive`), como Google
+//     convierte un .csv o un .txt en un archivo de Hojas o de Documentos.
 // Subir uno = subirlo a «Mi unidad» con la subida de siempre y abrirlo apenas
-// queda listo, como hace Google.
+// queda listo. El buscador, desde 3 letras, busca en TODO el Drive.
 //
 // ⚠️ El menú Archivo de ONLYOFFICE vive en su iframe y no se puede extender:
 // por eso el botón va en el encabezado de Maven, y ⌘O solo llega si el foco no
@@ -154,11 +163,17 @@ function Contenido({ formato, onCerrar }: { formato: DestinoDeOficina; onCerrar:
 
   const ocupado = !!abriendo || subiendo;
 
-  /** El camino ÚNICO para abrir: copia editable y al documento nuevo. Tira si
-   *  falla, para que cada quien diga el error a su manera. */
+  /** El camino ÚNICO para abrir un archivo del Drive (elegido o recién
+   *  subido): en su lugar, o convertido a una copia. Tira si la copia falla,
+   *  para que cada quien diga el error a su manera. */
   const { mutateAsync: copiar } = editar;
-  const abrirEnLaOficina = useCallback(async (id: string) => {
-    const { id: documento } = await copiar(id);
+  const abrirEnLaOficina = useCallback(async (a: { id: string; nombre: string; mime: string | null }) => {
+    if (comoSeAbreEnLaOficina(a) === "editar") {
+      onCerrar();
+      navigate(`/oficina/drive/${a.id}`);
+      return;
+    }
+    const { id: documento } = await copiar(a.id);
     if (!vivo.current) return;
     toast.success(t("drive.visor.copiaLista"));
     onCerrar();
@@ -168,9 +183,11 @@ function Contenido({ formato, onCerrar }: { formato: DestinoDeOficina; onCerrar:
   const abrirDelDrive = async (a: DriveItem) => {
     if (ocupado || a.tipo !== "archivo") return;
     setError(null);
+    // En su lugar no hay nada que esperar: se va directo al archivo.
+    if (comoSeAbreEnLaOficina(a) === "editar") return void abrirEnLaOficina(a);
     setAbriendo(a.nombre);
     try {
-      await abrirEnLaOficina(a.id);
+      await abrirEnLaOficina(a);
     } catch (e) {
       if (vivo.current) setError(t("oficina.abrir.error", { name: a.nombre, motivo: (e as Error).message }));
     } finally {
@@ -233,7 +250,10 @@ function Contenido({ formato, onCerrar }: { formato: DestinoDeOficina; onCerrar:
           onTodos={(v) => { setTodos(v); setSeleccionado(null); }}
           seleccionado={seleccionado}
           onSeleccionar={setSeleccionado}
-          onEntrar={(c) => irA(pestana, c)}
+          // Entrar a una carpeta desde los resultados de la búsqueda: si se
+          // estaba en Recientes (que no tiene carpetas), las migas van desde
+          // «Mi unidad».
+          onEntrar={(c) => irA(pestana === "recientes" && c ? "mia" : pestana, c)}
           onAbrir={abrirDelDrive}
           onSubir={() => irA("subir")}
           abriendo={abriendo}
@@ -287,9 +307,22 @@ function ListaParaAbrir({
   // la RLS deja ver allá, ni más ni menos.
   const items = useDriveVista(vista, carpeta);
   const ruta = useRutaDrive(carpeta);
-  const lista = useMemo(
-    () => paraAbrir(items.data ?? [], { destino: formato, todos, q }),
-    [items.data, formato, todos, q],
+  // Desde 3 letras se busca en TODO el Drive, como Google; con menos se filtra
+  // lo que se ve (una letra encontraría medio Drive).
+  const enTodoElDrive = normalizar(q).length >= BUSQUEDA_MINIMA;
+  const qBuscada = useDebouncedValue(q, 250);
+  const busqueda = useBuscarEnDrive(
+    enTodoElDrive && normalizar(qBuscada).length >= BUSQUEDA_MINIMA ? qBuscada : "",
+    todos ? extensionesDe(null) : extensionesDe(formato),
+  );
+  const fuente = enTodoElDrive ? busqueda : items;
+  const lista: (DriveItem | ResultadoDelDrive)[] = useMemo(
+    () => enTodoElDrive
+      // Los resultados ya vienen filtrados por nombre (todas las palabras, sin
+      // tildes): aquí solo se repasa el tipo.
+      ? paraAbrir(busqueda.data ?? [], { destino: formato, todos, q: "" })
+      : paraAbrir(items.data ?? [], { destino: formato, todos, q }),
+    [enTodoElDrive, busqueda.data, items.data, formato, todos, q],
   );
   const raiz = PESTANAS.find((p) => p.id === vista)!;
 
@@ -337,8 +370,18 @@ function ListaParaAbrir({
         </div>
       </div>
 
+      {enTodoElDrive ? (
+        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Search className="h-3.5 w-3.5" />
+          {t("oficina.abrir.resultados")}
+          {busqueda.isFetching && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-label={t("oficina.abrir.buscando")} />}
+        </p>
+      ) : q ? (
+        <p className="text-xs text-muted-foreground">{t("oficina.abrir.buscarMas", { n: BUSQUEDA_MINIMA })}</p>
+      ) : null}
+
       {/* Migas: Mi unidad › Contabilidad › 2026 */}
-      {carpeta && (
+      {carpeta && !enTodoElDrive && (
         <nav aria-label={t("drive.ruta")} className="flex min-w-0 flex-wrap items-center gap-0.5 text-sm">
           <button
             type="button"
@@ -379,14 +422,16 @@ function ListaParaAbrir({
           </div>
         )}
 
-        {items.isLoading ? (
+        {fuente.isLoading || (enTodoElDrive && !busqueda.data && !busqueda.error) ? (
           <div className="space-y-2 p-3">
             {[0, 1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-9 w-full" />)}
           </div>
-        ) : items.error ? (
+        ) : fuente.error ? (
           <div className="flex flex-col items-center gap-3 p-6 text-center">
-            <p className="text-sm text-destructive">{t("drive.error")}: {(items.error as Error).message}</p>
-            <Button variant="outline" size="sm" className="rounded-full" onClick={() => void items.refetch()}>
+            <p className="text-sm text-destructive">
+              {t(enTodoElDrive ? "oficina.abrir.buscarError" : "drive.error")}: {(fuente.error as Error).message}
+            </p>
+            <Button variant="outline" size="sm" className="rounded-full" onClick={() => void fuente.refetch()}>
               {t("common.retry")}
             </Button>
           </div>
@@ -394,10 +439,14 @@ function ListaParaAbrir({
           <div className="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center">
             <HardDrive className="h-9 w-9 text-muted-foreground/50" />
             <p className="text-sm font-medium">
-              {q ? t("oficina.abrir.sinCoincidencias", { q }) : t(VACIO[todos ? "todos" : formato])}
+              {enTodoElDrive
+                ? t("oficina.abrir.sinResultados", { q: q.trim() })
+                : q ? t("oficina.abrir.sinCoincidencias", { q }) : t(VACIO[todos ? "todos" : formato])}
             </p>
             <p className="max-w-sm text-xs text-muted-foreground">
-              {q
+              {enTodoElDrive
+                ? t("oficina.abrir.sinResultadosAyuda")
+                : q
                 ? t("oficina.abrir.sinCoincidenciasAyuda")
                 : vista === "recientes" && !carpeta
                   ? `${t("oficina.abrir.vacioRecientes")} ${t("oficina.abrir.vacioAyuda")}`
@@ -411,7 +460,7 @@ function ListaParaAbrir({
             )}
           </div>
         ) : (
-          <ul aria-label={t(raiz.clave)}>
+          <ul aria-label={enTodoElDrive ? t("oficina.abrir.resultados") : t(raiz.clave)}>
             {lista.map((i) => (
               <FilaParaAbrir
                 key={i.id}
@@ -434,7 +483,7 @@ function ListaParaAbrir({
 function FilaParaAbrir({
   item, formatoFecha, seleccionado, ocupado, onEntrar, onSeleccionar, onAbrir,
 }: {
-  item: DriveItem;
+  item: DriveItem | ResultadoDelDrive;
   formatoFecha: Formato;
   seleccionado: boolean;
   ocupado: boolean;
@@ -446,9 +495,12 @@ function FilaParaAbrir({
   const esCarpeta = item.tipo === "carpeta";
   const destino = esCarpeta ? null : destinoEnLaOficina(item);
   const Icono = esCarpeta ? Folder : destino ? ICONO[destino] : IconoDeArchivo;
-  // La copia pasa entera por la edge: lo que pasa del tope se ve, pero no se
-  // ofrece (la edge lo rechazaría después de hacer esperar).
-  const muyGrande = !esCarpeta && (item.size ?? 0) > TOPE_COPIA;
+  // Lo que pasa del tope se ve, pero no se ofrece (la edge lo rechazaría
+  // después de hacer esperar). El tope depende de cómo se abre.
+  const tope = esCarpeta ? Infinity : topeParaAbrir(item);
+  const muyGrande = !esCarpeta && (item.size ?? 0) > tope;
+  const seConvierte = !esCarpeta && comoSeAbreEnLaOficina(item) === "convertir";
+  const ubicacion = "ubicacion" in item ? item.ubicacion : null;
 
   return (
     <li className="border-b border-border/40 last:border-b-0">
@@ -480,9 +532,16 @@ function FilaParaAbrir({
           <Icono className={cn("h-5 w-5 shrink-0", esCarpeta ? "text-primary" : "text-muted-foreground")} />
           <span className="min-w-0">
             <span className={cn("block truncate", muyGrande && "text-muted-foreground")}>{item.nombre}</span>
-            {muyGrande && (
+            {muyGrande ? (
               <span className="block truncate text-xs text-muted-foreground">
-                {t("oficina.abrir.muyGrande", { tope: tamano(TOPE_COPIA) })}
+                {t("oficina.abrir.muyGrande", { tope: tamano(tope) })}
+              </span>
+            ) : (ubicacion || seConvierte) && (
+              <span className="block truncate text-xs text-muted-foreground">
+                {[
+                  ubicacion ? t("oficina.abrir.ubicacion", { carpeta: ubicacion }) : null,
+                  seConvierte ? t("oficina.abrir.seConvierte") : null,
+                ].filter(Boolean).join(" · ")}
               </span>
             )}
           </span>
@@ -513,7 +572,7 @@ function SubirParaAbrir({
 }: {
   formato: DestinoDeOficina;
   onOcupado: (v: boolean) => void;
-  abrirEnLaOficina: (id: string) => Promise<void>;
+  abrirEnLaOficina: (a: { id: string; nombre: string; mime: string | null }) => Promise<void>;
   vivo: React.MutableRefObject<boolean>;
 }) {
   const { t } = useLanguage();
@@ -540,7 +599,7 @@ function SubirParaAbrir({
         name: f.name,
         lista: listaDeFormatos(formato),
         peso: tamano(f.size),
-        tope: tamano(TOPE_COPIA),
+        tope: tamano(topeParaAbrir({ nombre: f.name, mime: f.type || null })),
         usado: tamano(uso.data?.usado ?? 0),
         cupo: tamano(uso.data?.cupo ?? 0),
       }));
@@ -569,10 +628,11 @@ function SubirParaAbrir({
       return;
     }
 
-    // 2. La copia editable, y al documento.
+    // 2. Se abre como cualquier archivo del Drive: un Word/Excel/PowerPoint en
+    //    su lugar; lo demás, como copia editable.
     setFase({ tipo: "abriendo", nombre: f.name });
     try {
-      await abrirEnLaOficina(id);
+      await abrirEnLaOficina({ id, nombre: f.name, mime: f.type || null });
     } catch (e) {
       if (vivo.current) {
         setError(t("oficina.abrir.subir.error.abrir", { name: f.name, motivo: (e as Error).message }));
@@ -646,7 +706,7 @@ function SubirParaAbrir({
             {error ? t("oficina.abrir.subir.otro") : t("oficina.abrir.subir.elegir")}
           </Button>
           <p className="max-w-md text-xs text-muted-foreground [text-wrap:balance]">
-            {t("oficina.abrir.subir.ayuda", { tope: tamano(TOPE_COPIA) })}
+            {t("oficina.abrir.subir.ayuda", { tope: tamano(TOPE_OFFICE), topeCopia: tamano(TOPE_COPIA) })}
           </p>
           <p className="max-w-md text-xs text-muted-foreground">
             {t("oficina.abrir.subir.formatos", { lista: listaDeFormatos(formato) })}

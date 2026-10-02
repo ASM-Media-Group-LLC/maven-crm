@@ -170,10 +170,24 @@ export const oficina = {
   "oficina.abrir.botonAyuda": { es: "Abrir un archivo ({atajo})", en: "Open a file ({atajo})" },
   "oficina.abrir.titulo": { es: "Abrir un archivo", en: "Open a file" },
   "oficina.abrir.descripcion": {
-    es: "Elige un archivo del Drive o súbelo desde tu computadora. Se abre una copia editable; el original no cambia.",
-    en: "Pick a file from Drive or upload it from your computer. An editable copy opens; the original stays as it is.",
+    es: "Elige un archivo del Drive o súbelo desde tu computadora. Word, Excel y PowerPoint se editan ahí mismo; los demás formatos se abren como una copia editable.",
+    en: "Pick a file from Drive or upload it from your computer. Word, Excel and PowerPoint files are edited in place; other formats open as an editable copy.",
   },
-  "oficina.abrir.buscar": { es: "Buscar por nombre en esta vista…", en: "Search by name in this view…" },
+  "oficina.abrir.buscar": { es: "Buscar en el Drive…", en: "Search Drive…" },
+  "oficina.abrir.buscarMas": {
+    es: "Escribe {n} letras o más para buscar en todo el Drive.",
+    en: "Type {n} or more letters to search all of Drive.",
+  },
+  "oficina.abrir.resultados": { es: "Resultados en todo el Drive", en: "Results across all of Drive" },
+  "oficina.abrir.buscando": { es: "Buscando…", en: "Searching…" },
+  "oficina.abrir.buscarError": { es: "No se pudo buscar en el Drive", en: "Couldn’t search Drive" },
+  "oficina.abrir.sinResultados": { es: "Nada con «{q}» en el Drive", en: "Nothing matching “{q}” in Drive" },
+  "oficina.abrir.sinResultadosAyuda": {
+    es: "Prueba con otra palabra o mira «Todos los de Oficina».",
+    en: "Try another word or switch to “All Office files”.",
+  },
+  "oficina.abrir.ubicacion": { es: "En «{carpeta}»", en: "In “{carpeta}”" },
+  "oficina.abrir.seConvierte": { es: "Se abre como una copia editable", en: "Opens as an editable copy" },
   "oficina.abrir.pestanas": { es: "De dónde abrir", en: "Where to open from" },
   "oficina.abrir.subir": { es: "Subir", en: "Upload" },
   "oficina.abrir.filtro": { es: "Qué archivos mostrar", en: "Which files to show" },
@@ -210,8 +224,8 @@ export const oficina = {
   "oficina.abrir.subir.o": { es: "o", en: "or" },
   "oficina.abrir.subir.elegir": { es: "Elegir un archivo de tu computadora", en: "Choose a file from your computer" },
   "oficina.abrir.subir.ayuda": {
-    es: "Se guarda en tu «Mi unidad» del Drive y se abre aquí para editarlo. Hasta {tope}.",
-    en: "It’s saved to your “My Drive” and opened here for editing. Up to {tope}.",
+    es: "Se guarda en tu «Mi unidad» del Drive y se abre aquí para editarlo. Hasta {tope} ({topeCopia} si hay que convertirlo).",
+    en: "It’s saved to your “My Drive” and opened here for editing. Up to {tope} ({topeCopia} if it needs converting).",
   },
   "oficina.abrir.subir.formatos": { es: "Formatos: {lista}", en: "Formats: {lista}" },
   "oficina.abrir.subir.subiendo": { es: "Subiendo «{name}»…", en: "Uploading “{name}”…" },
@@ -239,6 +253,32 @@ export const oficina = {
     es: "«{name}» quedó en tu «Mi unidad», pero no se pudo abrir: {motivo}",
     en: "“{name}” was saved to your “My Drive”, but it couldn’t be opened: {motivo}",
   },
+  // Oficina · un archivo del Drive abierto en su lugar (pages/oficina/ArchivoDelDrivePage.tsx)
+  "oficina.archivo.seGuardaEnElDrive": {
+    es: "Lo que cambies se guarda en este archivo del Drive",
+    en: "Your changes are saved to this Drive file",
+  },
+  "oficina.archivo.soloLectura": { es: "Solo lectura", en: "View only" },
+  "oficina.archivo.soloVer.formato": {
+    es: "Los archivos .{ext} se abren solo para ver: la Oficina no los guarda en ese formato. Para editarlo, haz una copia (queda como .{destino}).",
+    en: "{ext} files open view-only: Office can’t save them in that format. To edit it, make a copy (saved as .{destino}).",
+  },
+  "oficina.archivo.soloVer.permiso": {
+    es: "Solo puedes ver este archivo. Para editarlo, pídele acceso de editor a quien lo compartió, o haz una copia.",
+    en: "You can only view this file. To edit it, ask whoever shared it for editor access, or make a copy.",
+  },
+  "oficina.archivo.soloVer.espacio": {
+    es: "No queda espacio en el Drive para guardar cambios en este archivo, así que se abre solo para ver. Libera espacio o haz una copia.",
+    en: "There’s no Drive storage left to save changes to this file, so it opens view-only. Free up space or make a copy.",
+  },
+  "oficina.archivo.editarCopia": { es: "Editar una copia", en: "Edit a copy" },
+  "oficina.archivo.hacerCopia": { es: "Hacer una copia", en: "Make a copy" },
+  "oficina.archivo.hacerCopiaAyuda": {
+    es: "Hacer una copia en la Oficina (el archivo del Drive no cambia)",
+    en: "Make a copy in Office (the Drive file stays as it is)",
+  },
+  "oficina.archivo.volver": { es: "Volver al Drive", en: "Back to Drive" },
+  "drive.visor.hacerCopia": { es: "Hacer una copia en la Oficina", en: "Make a copy in Office" },
   "oficina.abrir.subir.quedoEnDrive": {
     es: "«{name}» quedó en tu «Mi unidad» del Drive.",
     en: "“{name}” was saved to your “My Drive”.",

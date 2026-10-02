@@ -22,6 +22,7 @@ export const FORMATOS_OFFICE: Record<string, { editor: Editor; destino: DestinoD
   odt: { editor: "word", destino: "docx" },
   ott: { editor: "word", destino: "docx" },
   rtf: { editor: "word", destino: "docx" },
+  txt: { editor: "word", destino: "docx" },
   xls: { editor: "cell", destino: "xlsx" },
   xlsx: { editor: "cell", destino: "xlsx" },
   xlsm: { editor: "cell", destino: "xlsx" },
@@ -40,6 +41,14 @@ export const FORMATOS_OFFICE: Record<string, { editor: Editor; destino: DestinoD
   odp: { editor: "slide", destino: "pptx" },
   otp: { editor: "slide", destino: "pptx" },
 };
+
+/** ⚠️ COPIA de SE_EDITAN_EN_SU_LUGAR de la misma edge (el mismo test las
+ *  compara). Lo que ONLYOFFICE edita y devuelve en el MISMO formato: se abre el
+ *  archivo del Drive en modo edición y se guarda sobre él, como el «modo de
+ *  edición de Office» de Google. Lo demás de Office se convierte a una copia. */
+export const SE_EDITAN_EN_SU_LUGAR: readonly string[] = [
+  "docx", "docm", "dotx", "xlsx", "xlsm", "xltx", "pptx", "pptm", "ppsx", "potx",
+];
 
 /** ⚠️ COPIA de POR_MIME de la misma edge. */
 export const POR_MIME: Record<string, string> = {
@@ -95,8 +104,10 @@ function tipoPorFormato(nombre: string, mime: string | null | undefined): Exclud
   if (IMAGEN.includes(ext)) return "imagen";
   if (VIDEO.includes(ext)) return "video";
   if (AUDIO.includes(ext)) return "audio";
-  if (FORMATOS_OFFICE[ext]) return "office";
+  // El texto ANTES que Office: un .txt se abre en Documentos (convertido),
+  // pero en el visor se lee como texto, que es lo que es.
   if (TEXTO.includes(ext)) return "texto";
+  if (FORMATOS_OFFICE[ext]) return "office";
   const m = mimeBase(mime);
   if (m === "application/pdf") return "pdf";
   if (POR_MIME[m]) return "office";
@@ -125,6 +136,15 @@ export function vistaDeArchivo(a: { nombre: string; mime: string | null; size: n
     return esSvg ? { tipo, esSvg } : { tipo };
   }
   return { tipo };
+}
+
+/** Cómo se abre en la Oficina: "editar" = EL MISMO archivo del Drive, en modo
+ *  edición; "convertir" = una copia editable (.doc, .xls, .csv, .txt…); null =
+ *  no es de Office. */
+export function comoSeAbreEnLaOficina(a: { nombre: string; mime: string | null }): "editar" | "convertir" | null {
+  const ext = formatoDeOffice(a.nombre, a.mime);
+  if (!ext) return null;
+  return SE_EDITAN_EN_SU_LUGAR.includes(ext) ? "editar" : "convertir";
 }
 
 /** A qué sección de la Oficina va la copia editable («Editar en Documentos de

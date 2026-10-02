@@ -238,6 +238,7 @@ function dibujar(items: DriveItem[], inicial: string | null) {
       <MemoryRouter initialEntries={["/oficina/drive"]}>
         <Routes>
           <Route path="/oficina/drive" element={<Prueba items={items} inicial={inicial} />} />
+          <Route path="/oficina/drive/:id" element={<p>Archivo del Drive en la Oficina</p>} />
           <Route path="/oficina/:id" element={<p>Documento abierto</p>} />
         </Routes>
       </MemoryRouter>
@@ -376,6 +377,27 @@ describe("Word, Excel y PowerPoint", () => {
     expect(invocaciones).toContainEqual({ fn: "oficina-doc", body: { action: "desde_drive", id: "d1" } });
   });
 
+  it("⚠️ un .docx se edita EN SU LUGAR (como Google): el mismo archivo, sin copia", () => {
+    dibujar([item("d1", "Contrato.docx")], "d1");
+    fireEvent.click(screen.getByRole("button", { name: "Editar en Documentos de Maven" }));
+    expect(screen.getByText("Archivo del Drive en la Oficina")).toBeInTheDocument();
+    expect(invocaciones.some((i) => i.body.action === "desde_drive")).toBe(false);
+  });
+
+  it("la copia queda como opción aparte («Hacer una copia en la Oficina»)", async () => {
+    dibujar([item("d1", "Contrato.docx")], "d1");
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Hacer una copia en la Oficina" }));
+    });
+    await waitFor(() => expect(screen.getByText("Documento abierto")).toBeInTheDocument());
+    expect(invocaciones).toContainEqual({ fn: "oficina-doc", body: { action: "desde_drive", id: "d1" } });
+  });
+
+  it("un .doc o un .csv no tienen copia aparte: «Editar» ya es la copia", () => {
+    dibujar([item("d1", "Acta.doc")], "d1");
+    expect(screen.queryByRole("button", { name: "Hacer una copia en la Oficina" })).not.toBeInTheDocument();
+  });
+
   it("un PDF o una imagen no ofrecen «Editar en…»", () => {
     dibujar([item("p", "cv.pdf")], "p");
     expect(screen.queryByRole("button", { name: /Editar en/ })).not.toBeInTheDocument();
@@ -423,5 +445,31 @@ describe("⚠️ el texto se muestra como TEXTO", () => {
     expect((window as unknown as { __pwned?: number }).__pwned).toBeUndefined();
     // El NAS lo manda como descarga: «otra pestaña» no se ofrece.
     expect(screen.queryByRole("button", { name: "Abrir en otra pestaña" })).not.toBeInTheDocument();
+  });
+});
+
+describe("un .txt (02/10: «como Google»)", () => {
+  const fetchReal = globalThis.fetch;
+  afterEach(() => { globalThis.fetch = fetchReal; });
+
+  it("se LEE como texto en el visor, y «Editar en Documentos de Maven» lo convierte a una copia", async () => {
+    const texto = "Lista de compras: café, azúcar";
+    globalThis.fetch = vi.fn(async () => new Response(texto, { status: 206 })) as typeof fetch;
+    dibujar([item("t1", "notas.txt", { mime: "text/plain", size: texto.length })], "t1");
+    await waitFor(() => expect(document.querySelector("pre")?.textContent).toBe(texto));
+    // Nada de ONLYOFFICE para mirarlo.
+    expect(invocaciones.some((i) => i.body.action === "ver_drive")).toBe(false);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Editar en Documentos de Maven" }));
+    });
+    await waitFor(() => expect(screen.getByText("Documento abierto")).toBeInTheDocument());
+    expect(invocaciones).toContainEqual({ fn: "oficina-doc", body: { action: "desde_drive", id: "t1" } });
+  });
+
+  it("un .md sigue siendo solo texto (no hay a dónde convertirlo)", async () => {
+    globalThis.fetch = vi.fn(async () => new Response("# Hola", { status: 206 })) as typeof fetch;
+    dibujar([item("m1", "LEEME.md", { size: 6 })], "m1");
+    await waitFor(() => expect(document.querySelector("pre")?.textContent).toBe("# Hola"));
+    expect(screen.queryByRole("button", { name: /Editar en/ })).not.toBeInTheDocument();
   });
 });

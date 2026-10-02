@@ -2,20 +2,36 @@
 // de Google Hojas de cálculo. Se elige un archivo del Drive —o se sube uno
 // desde la computadora— y se abre en la Oficina para editarlo.
 //
-// Abrir = sacarle la copia editable (`desde_drive` de la edge oficina-doc, lo
-// mismo que «Editar en Documentos de Maven» del visor del Drive). Por eso aquí
-// solo entra lo que esa acción acepta: FORMATOS_OFFICE y el tope de la copia.
+// Abrir es como en Google: un Word, Excel o PowerPoint se edita EN SU LUGAR —el
+// mismo archivo del Drive, guardando sobre él (`editar_drive` de la edge
+// oficina-doc)—, y lo que ONLYOFFICE no devuelve en su formato (.doc, .xls,
+// .odt, .csv, .txt…) se convierte a una copia editable (`desde_drive`), como
+// Google convierte un .csv o un .txt en un archivo de Hojas o Documentos.
 //
 // Solo las reglas, sin React, para poder probarlas sin dibujar el diálogo
 // (components/oficina/DialogoAbrirArchivo.tsx).
 
-import { destinoEnLaOficina, FORMATOS_OFFICE, type DestinoDeOficina } from "./tipoDeArchivo";
+import {
+  comoSeAbreEnLaOficina, destinoEnLaOficina, FORMATOS_OFFICE, TOPE_OFFICE, type DestinoDeOficina,
+} from "./tipoDeArchivo";
 
 /** ⚠️ COPIA de TOPE_COPIA de supabase/functions/oficina-doc/drive.ts: la copia
  *  pasa entera por la memoria de la edge. El test
  *  test/oficina/abrirArchivo.test.tsx exige que sean iguales; si aquí fuera más
  *  grande, la persona subiría el archivo entero para terminar en un error. */
 export const TOPE_COPIA = 50 * 1024 * 1024;
+
+/** Lo máximo que se abre según CÓMO se abre: en su lugar, lo que ONLYOFFICE
+ *  baja (TOPE_OFFICE, 100 MB); como copia, lo que entra en la memoria de la
+ *  edge (TOPE_COPIA, 50 MB). */
+export function topeParaAbrir(a: { nombre: string; mime: string | null }): number {
+  return comoSeAbreEnLaOficina(a) === "editar" ? TOPE_OFFICE : TOPE_COPIA;
+}
+
+/** Desde cuántas letras se busca en TODO el Drive (drive_buscar). Con menos,
+ *  el índice trigram no sirve y una letra encuentra medio Drive: se filtra lo
+ *  que se está viendo. */
+export const BUSQUEDA_MINIMA = 3;
 
 /** Las extensiones que abre una sección de la Oficina (null = cualquiera),
  *  con la suya primero: «.xlsx, .xls, .xlsm…» y no «.xls, .xlsx…». */
@@ -78,9 +94,10 @@ export function problemaParaSubir(
   f: { name: string; type: string; size: number },
   uso?: { usado: number; cupo: number } | null,
 ): ProblemaDeSubida | null {
-  if (!destinoEnLaOficina({ nombre: f.name, mime: f.type || null })) return "formato";
+  const a = { nombre: f.name, mime: f.type || null };
+  if (!destinoEnLaOficina(a)) return "formato";
   if (f.size === 0) return "vacio";
-  if (f.size > TOPE_COPIA) return "grande";
+  if (f.size > topeParaAbrir(a)) return "grande";
   if (uso && uso.cupo > 0 && uso.usado + f.size > uso.cupo) return "espacio";
   return null;
 }
