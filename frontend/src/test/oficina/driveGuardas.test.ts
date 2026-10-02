@@ -18,6 +18,7 @@ const fuentes = (import.meta as unknown as {
   "/supabase/functions/drive/logica.ts",
   "/frontend/src/hooks/useDriveVarios.ts",
   "/infra/nas-drive/zip.mjs",
+  "/infra/nas-drive/miniaturas.mjs",
 ], { query: "?raw", import: "default", eager: true });
 const leer = (fin: string) => Object.entries(fuentes).find(([k]) => k.endsWith(fin))?.[1] ?? "";
 const mig = leer("oficina_drive.sql");
@@ -31,6 +32,7 @@ const agencia = leer("drive_compartido_agencia.sql");
 const logica = leer("drive/logica.ts");
 const varios = leer("hooks/useDriveVarios.ts");
 const zip = leer("nas-drive/zip.mjs");
+const miniaturas = leer("nas-drive/miniaturas.mjs");
 
 describe("⚠️ multi-agencia", () => {
   it("toda política de drive_items exige la agencia", () => {
@@ -200,6 +202,32 @@ describe("⚠️ mover y bajar varios (María Villegas, 02/10)", () => {
     expect(valor(nas, "MAX_BYTES_ZIP")).toBe("50*1024**3");
     expect(valor(logica, "TOPE_ZIP_PERMISO")).toBe(valor(nas, "MAX_PERMISO_ZIP"));
     expect(valor(nas, "MAX_PERMISO_ZIP")).toBe("4*1024*1024");
+  });
+});
+
+describe("⚠️ miniaturas (Jhon, 02/10)", () => {
+  it("el archivo del NAS se cargó (si no, lo de abajo pasaría en vacío)", () => {
+    expect(miniaturas).toMatch(/export async function miniaturaDe/);
+  });
+  it("la edge firma miniaturas solo de lo que la RLS le muestra a la persona", () => {
+    const i = edge.indexOf('if (accion === "miniaturas")');
+    expect(i).toBeGreaterThan(-1);
+    const rama = edge.slice(i, edge.indexOf("if (accion ===", i + 10));
+    expect(rama).toMatch(/await comoLaPersona\.from\("drive_items"\)/);
+    expect(rama).not.toMatch(/\badmin\./);
+    expect(rama).toMatch(/op: "mini", k: f\.storage_key/);
+  });
+  it("en el NAS, un permiso de miniatura pasa por las MISMAS reglas de ruta que un get, y solo sirve para leer", () => {
+    // La clave se revisa en /o antes de mirar la operación.
+    const o = nas.slice(nas.indexOf('const d = verificar(conf.secreto, url.searchParams.get("t")'));
+    expect(o.indexOf("if (!CLAVE_OK.test(String(d.k)) && !importada)")).toBeLessThan(o.indexOf('if (d.op === "mini")'));
+    expect(nas).toMatch(/mini: \["GET"\]/);
+  });
+  it("las herramientas corren sin shell, con tiempo máximo y de a pocas", () => {
+    expect(miniaturas).toMatch(/execFile\(binario, args, \{ timeout: tiempo, killSignal: "SIGKILL"/);
+    expect(miniaturas).not.toMatch(/\bexec\(|shell: true|spawn\(/);
+    expect(miniaturas).toMatch(/export const MINIATURAS_A_LA_VEZ = 2;/);
+    expect(miniaturas).toMatch(/export const TIEMPO_MINIATURA = 15_000;/);
   });
 });
 

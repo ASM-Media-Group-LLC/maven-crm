@@ -31,6 +31,7 @@ import { pipeline } from "node:stream/promises";
 import { Readable, Transform } from "node:stream";
 import { verificar, recibo } from "./firma.mjs";
 import { armarZip } from "./zip.mjs";
+import { CARPETA_CACHE, crearCola, extensionValida, miniaturaDe, rutaEnCache, servirMiniatura } from "./miniaturas.mjs";
 
 export const MAX_POR_PEDIDO = 95 * 1024 * 1024; // el proxy de Cloudflare corta en 100 MB
 const CLAVE_OK = /^[0-9a-f-]{36}(\/[0-9a-f-]{36}){1,2}$/;
@@ -52,6 +53,9 @@ export function configDesdeEntorno(env = process.env) {
     origenes: (env.ORIGENES ?? "https://app.maven-ai.me").split(",").map((o) => o.trim()).filter(Boolean),
     puerto: Number(env.PUERTO ?? 8790),
     host: env.HOST ?? "127.0.0.1",
+    // Las herramientas de las miniaturas (miniaturas.mjs); por defecto las del Mac.
+    sips: env.SIPS || undefined,
+    qlmanage: env.QLMANAGE || undefined,
   };
 }
 
@@ -245,7 +249,16 @@ async function completar(conf, res, d) {
 }
 
 async function borrar(conf, res, d) {
-  for (const r of conf.raices) await fsp.rm(path.join(r, d.k), { force: true });
+  for (const r of conf.raices) {
+    // Su miniatura también (antes de borrar: el nombre sale del tamaño).
+    const s = await fsp.stat(path.join(r, d.k)).catch(() => null);
+    if (s) {
+      const mini = rutaEnCache(r, d.k, s.size);
+      await fsp.rm(mini, { force: true });
+      await fsp.rm(`${mini}.no`, { force: true });
+    }
+    await fsp.rm(path.join(r, d.k), { force: true });
+  }
   res.writeHead(204);
   res.end();
 }
@@ -324,10 +337,25 @@ async function ubicar(conf, rel) {
   for (const r of conf.raices) {
     try {
       const s = await fsp.stat(path.join(r, rel));
-      if (s.isFile()) return { ruta: path.join(r, rel), size: s.size, fecha: s.mtime };
+      if (s.isFile()) return { raiz: r, ruta: path.join(r, rel), size: s.size, fecha: s.mtime };
     } catch { /* sigue */ }
   }
   return null;
+}
+
+/** La miniatura (op "mini"): de la caché del disco o hecha en el momento.
+ *  Sin miniatura posible, 404 y la pantalla muestra el ícono del tipo. */
+async function servirMini(conf, req, res, d, cola, enCurso) {
+  if (!extensionValida(d.x)) return json(res, 400, { error: "extensión inválida" });
+  const a = await ubicar(conf, d.k);
+  if (!a) return json(res, 404, { error: "no existe" });
+  // Si la persona ya no la quiere (bajó la página), no se hace al llegarle el turno.
+  let vivo = true;
+  res.on("close", () => { vivo = false; });
+  const archivo = await miniaturaDe(conf, cola, enCurso, { raiz: a.raiz, ruta: a.ruta, clave: d.k, size: a.size, x: d.x }, () => vivo);
+  if (!archivo) return json(res, 404, { error: "sin miniatura" });
+  const s = await fsp.stat(archivo);
+  return servirMiniatura(res, archivo, s.size);
 }
 
 /** El nombre de la nota de lo que falta, sin chocar con una ruta del .zip. */
@@ -409,6 +437,10 @@ async function salud(conf, res) {
 }
 
 export function crearServidor(conf) {
+  // Las miniaturas se hacen de a pocas (sips y Quick Look usan CPU y disco) y un
+  // mismo archivo pedido dos veces a la vez se hace una sola.
+  const cola = crearCola(conf.miniaturasALaVez);
+  const enCurso = new Map();
   return http.createServer(async (req, res) => {
     try {
       cors(conf, req, res);
@@ -422,14 +454,15 @@ export function crearServidor(conf) {
       if (!d) return json(res, 403, { error: "permiso inválido o vencido" });
       const importada = CLAVE_IMPORTADA.test(String(d.k));
       if (!CLAVE_OK.test(String(d.k)) && !importada) return json(res, 400, { error: "ruta inválida" });
-      if (importada && d.op !== "get" && d.op !== "borrar") return json(res, 400, { error: "un archivo importado no se sube ni se reemplaza" });
+      if (importada && d.op !== "get" && d.op !== "mini" && d.op !== "borrar") return json(res, 400, { error: "un archivo importado no se sube ni se reemplaza" });
 
       // La operación del permiso tiene que coincidir con el método: un
       // permiso para BAJAR no sirve para subir ni para borrar.
-      const esperado = { get: ["GET", "HEAD"], put: ["PUT"], parte: ["PUT"], completar: ["POST"], borrar: ["DELETE"] }[d.op];
+      const esperado = { get: ["GET", "HEAD"], mini: ["GET"], put: ["PUT"], parte: ["PUT"], completar: ["POST"], borrar: ["DELETE"] }[d.op];
       if (!esperado || !esperado.includes(req.method)) return json(res, 405, { error: "operación no permitida con este permiso" });
 
       if (d.op === "get") return await servirArchivo(conf, req, res, d);
+      if (d.op === "mini") return await servirMini(conf, req, res, d, cola, enCurso);
       if (d.op === "put") return await subirEntero(conf, req, res, d);
       if (d.op === "parte") return await subirParte(conf, req, res, d);
       if (d.op === "completar") return await completar(conf, res, d);
@@ -445,6 +478,9 @@ export function crearServidor(conf) {
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const conf = configDesdeEntorno();
+  // ⚠️ Si el servidor se cayó a mitad de una miniatura, en .tmp quedó un enlace
+  // DURO al archivo: borrar el archivo no liberaría su lugar. Se limpia al arrancar.
+  for (const r of conf.raices) fs.rmSync(path.join(r, CARPETA_CACHE, ".tmp"), { recursive: true, force: true });
   const s = crearServidor(conf);
   // Subidas largas por el túnel: el límite por defecto de Node (5 min) cortaría
   // una parte de 95 MB con una conexión lenta.

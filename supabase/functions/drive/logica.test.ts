@@ -267,3 +267,36 @@ export const VECTOR_ZIP = {
   // Lo firmó infra/nas-drive/firma.mjs (Node) el 02/10.
   permiso: "eyJvcCI6InppcCIsImUiOjQxMDI0NDQ4MDAsIm4iOiJBw7FvLTIwMjYuemlwIiwibCI6W3sibiI6IkNvbnRhYmlsaWRhZC8ifSx7ImsiOiIxMTExMTExMS0xMTExLTExMTEtMTExMS0xMTExMTExMTExMTEvMjIyMjIyMjItMjIyMi0yMjIyLTIyMjItMjIyMjIyMjIyMjIyIiwibiI6IkNvbnRhYmlsaWRhZC9CYWxhbmNlIOKAlCBhw7FvLnBkZiJ9XX0.2A2QI0S31AhvUzhCDz1sM6aOdjqy62bWtC18bxnPXEw",
 };
+
+// ── Miniaturas ──────────────────────────────────────────────────────────────
+import { extensionParaMiniatura, idsParaMiniaturas, TOPE_MINIATURAS, TRAMO_MINIATURA, venceMiniatura } from "./logica.ts";
+
+Deno.test("miniaturas: por la extensión; el tipo de la ficha solo si la extensión no dice", () => {
+  const casos: [string, string | null, string | null][] = [
+    ["Foto.JPG", null, "jpg"], ["IMG_1234.HEIC", "application/octet-stream", "heic"], ["video.mov", null, "mov"],
+    ["Contrato.docx", null, "docx"], ["Balance.xlsx", "application/zip", "xlsx"], ["cv.pdf", null, "pdf"],
+    ["IMG_1234", "image/jpeg", "jpg"], ["grabacion", "video/mp4", "mp4"], ["escaneo", "application/pdf; charset=binary", "pdf"],
+    ["logo.svg", "image/svg+xml", null], ["notas.txt", "text/plain", null], ["fotos.zip", "application/zip", null], ["x", null, null],
+  ];
+  for (const [nombre, mime, esperada] of casos) {
+    assert(extensionParaMiniatura(nombre, mime) === esperada, `${nombre} (${mime}) → ${extensionParaMiniatura(nombre, mime)}`);
+  }
+});
+
+Deno.test("miniaturas: hasta 200 ids por pedido, todos uuid", () => {
+  assert(idsParaMiniaturas([u(1), u(1), u(2)]).length === 2, "sin repetir");
+  assert(idsParaMiniaturas([]).length === 0, "vacío vale (no hay nada que pedir)");
+  assert(tira(() => idsParaMiniaturas(Array.from({ length: TOPE_MINIATURAS + 1 }, (_, i) => u(i + 1)))), "tope");
+  assert(tira(() => idsParaMiniaturas(["x"])) && tira(() => idsParaMiniaturas("x")), "raros");
+});
+
+Deno.test("miniaturas: el vencimiento es el mismo durante un tramo (la URL se reusa de la caché) y vale entre 6 y 12 h", () => {
+  const base = Date.UTC(2026, 9, 2, 12, 0, 0);
+  const a = venceMiniatura(base);
+  const b = venceMiniatura(base + 5 * 3600 * 1000);
+  assert(a === b || b - a === TRAMO_MINIATURA, "estable dentro del tramo");
+  for (const ms of [base, base + 3600 * 1000, base + 5.9 * 3600 * 1000]) {
+    const resta = venceMiniatura(ms) - ms / 1000;
+    assert(resta > 6 * 3600 && resta <= 12 * 3600, `quedan ${resta / 3600} h`);
+  }
+});
