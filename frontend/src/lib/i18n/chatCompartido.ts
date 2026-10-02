@@ -1,10 +1,10 @@
 // Las piezas de chat que comparten Messenger, WhatsApp y Telegram: el
-// composer, los selectores de GIF y stickers, la grabadora de voz y el visor
-// de fotos.
+// composer, los selectores de emojis, GIF y stickers, la grabadora de voz y el
+// visor de fotos.
 //
 // Las claves de este archivo empiezan con uno de sus prefijos (los fija
 // test/i18n/diccionarioPorModulo.test.ts). Ver lib/i18n.ts.
-export const PREFIJOS_CHAT_COMPARTIDO = ["composer.", "gif.", "sticker.", "rec.", "lightbox."] as const;
+export const PREFIJOS_CHAT_COMPARTIDO = ["composer.", "emoji.", "gif.", "sticker.", "rec.", "lightbox."] as const;
 
 export const chatCompartido = {
   // Composer compartido (ChatComposer + pickers)
@@ -13,6 +13,24 @@ export const chatCompartido = {
   "composer.attach": { es: "Adjuntar foto / video", en: "Attach photo / video" },
   "composer.send": { es: "Enviar", en: "Send" },
   "composer.removeAttachment": { es: "Quitar adjunto", en: "Remove attachment" },
+  // Selector de emojis (components/chat/SelectorDeEmojis), el de Google: buscador,
+  // fila de categorías, «Uso frecuente» y una sección por categoría.
+  "emoji.buscar": { es: "Buscar emojis", en: "Search emoji" },
+  "emoji.categorias": { es: "Categorías de emojis", en: "Emoji categories" },
+  "emoji.frecuentes": { es: "Uso frecuente", en: "Frequently used" },
+  "emoji.resultados": { es: "Resultados de la búsqueda", en: "Search results" },
+  "emoji.sinResultados": { es: "Ningún emoji coincide con «{consulta}»", en: "No emoji matches “{consulta}”" },
+  "emoji.cargando": { es: "Cargando emojis…", en: "Loading emojis…" },
+  "emoji.noCargo": { es: "No se pudieron cargar los emojis", en: "Couldn't load the emojis" },
+  "emoji.cat.caras": { es: "Caras y emociones", en: "Smileys & emotion" },
+  "emoji.cat.personas": { es: "Personas y cuerpo", en: "People & body" },
+  "emoji.cat.animales": { es: "Animales y naturaleza", en: "Animals & nature" },
+  "emoji.cat.comida": { es: "Comida y bebida", en: "Food & drink" },
+  "emoji.cat.viajes": { es: "Viajes y lugares", en: "Travel & places" },
+  "emoji.cat.actividades": { es: "Actividades", en: "Activities" },
+  "emoji.cat.objetos": { es: "Objetos", en: "Objects" },
+  "emoji.cat.simbolos": { es: "Símbolos", en: "Symbols" },
+  "emoji.cat.banderas": { es: "Banderas", en: "Flags" },
   "gif.sendTitle": { es: "Enviar GIF", en: "Send GIF" },
   "gif.search": { es: "Buscar GIF…", en: "Search GIF…" },
   "gif.none": { es: "Sin resultados", en: "No results" },

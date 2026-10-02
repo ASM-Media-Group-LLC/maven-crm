@@ -359,9 +359,13 @@ export const messenger = {
   "messenger.avatar.errorInesperado": { es: "Error inesperado", en: "Unexpected error" },
   "messenger.avatar.cambiarFoto": { es: "Cambiar foto", en: "Change photo" },
 
+  // La barra de reacciones de la burbuja (ReactionPicker): ocho emojis que
+  // aprenden de lo que usas y un «+» que abre el selector completo.
+  "messenger.reacciones.reaccionar": { es: "Reaccionar", en: "React" },
+  "messenger.reacciones.otro": { es: "Reaccionar con otro emoji", en: "React with another emoji" },
+
   // Expresiones (emojis/GIF/stickers del teléfono) y búsqueda global.
   "messenger.expr.titulo": { es: "Emojis, GIF y stickers", en: "Emojis, GIFs and stickers" },
-  "messenger.expr.frecuentes": { es: "Frecuentes", en: "Frequent" },
   "messenger.globalSearch.placeholder": { es: "Buscar palabra clave en todos los chats…", en: "Search a keyword across all chats…" },
   "messenger.globalSearch.resumen": { es: "{resultados} en {conversaciones}", en: "{resultados} in {conversaciones}" },
   "messenger.globalSearch.unaConversacion": { es: "1 conversación", en: "1 conversation" },

@@ -31,23 +31,29 @@ afterEach(() => {
 });
 
 describe("Messenger → Expresiones: los títulos del catálogo de emojis", () => {
-  it("en inglés se leen traducidos; las llaves del catálogo no cambian", () => {
-    montar(<Expresiones favoritos={[]} onEmoji={() => {}} onGif={() => {}} onSticker={() => {}} />, "en");
+  // Desde el 02/10 la pestaña de emojis es el selector de Google
+  // (components/chat/SelectorDeEmojis), con sus nueve categorías.
+  it("en inglés se leen traducidos; las llaves del catálogo del evaluador no cambian", async () => {
+    montar(<Expresiones favoritos={["🦄"]} onEmoji={() => {}} onGif={() => {}} onSticker={() => {}} />, "en");
     fireEvent.click(screen.getByTestId("expresiones"));
-    for (const titulo of ["Faces", "Love", "Body", "Gestures", "Objects", "Other"]) {
-      expect(screen.getByText(titulo)).toBeInTheDocument();
+    expect(await screen.findByText("Smileys & emotion")).toBeInTheDocument();
+    // Las otras categorías llegan un cuadro después (primero se dibuja lo que se ve).
+    for (const titulo of ["Frequently used", "People & body", "Animals & nature", "Food & drink", "Flags"]) {
+      expect(await screen.findByText(titulo)).toBeInTheDocument();
     }
-    for (const llave of ["Caras", "Amor", "Cuerpo", "Gestos", "Objetos", "Otros"]) {
-      expect(screen.queryByText(llave)).toBeNull();
+    expect(screen.getByPlaceholderText("Search emoji")).toBeInTheDocument();
+    for (const enEspanol of ["Uso frecuente", "Caras y emociones", "Banderas"]) {
+      expect(screen.queryByText(enEspanol)).toBeNull();
     }
     // La llave es dato (la comparte el evaluador): sigue en español.
     expect(Object.keys(EMOJI_CATALOG)).toEqual(["Caras", "Amor", "Cuerpo", "Gestos", "Objetos", "Otros"]);
   });
 
-  it("en español, los de siempre", () => {
+  it("en español, en español", async () => {
     montar(<Expresiones favoritos={[]} onEmoji={() => {}} onGif={() => {}} onSticker={() => {}} />, "es");
     fireEvent.click(screen.getByTestId("expresiones"));
-    expect(screen.getByText("Caras")).toBeInTheDocument();
+    expect(await screen.findByText("Caras y emociones")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Buscar emojis")).toBeInTheDocument();
   });
 });
 

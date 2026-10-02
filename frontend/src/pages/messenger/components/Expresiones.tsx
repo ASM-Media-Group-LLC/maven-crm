@@ -3,7 +3,7 @@ import { Smile } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { EMOJI_CATALOG, NOMBRE_CATEGORIA } from "@/pages/chatter-evaluator/workspace/EmojiBar";
+import SelectorDeEmojis from "@/components/chat/SelectorDeEmojis";
 import { GifPanel } from "@/pages/inbox/GifPicker";
 import { StickerPanel } from "@/pages/inbox/StickerPicker";
 import { cn } from "@/lib/utils";
@@ -54,7 +54,7 @@ export default function Expresiones({
       {/* Alto FIJO: cada pestaña rellena el mismo espacio y scrollea adentro. Con
           alto libre el panel saltaba al cambiar de pestaña (emojis largo, GIF con
           spinner, stickers según cuántos haya). */}
-      <PopoverContent align="start" side="top" collisionPadding={8} className="flex h-[360px] w-[calc(100vw-1.5rem)] max-w-md flex-col p-2">
+      <PopoverContent align="start" side="top" collisionPadding={8} className="flex h-[400px] max-h-[70dvh] w-[calc(100vw-1.5rem)] max-w-md flex-col p-2">
         <Tabs value={tab} onValueChange={setTab} className="flex min-h-0 flex-1 flex-col">
           {/* h-9 con p-1 deja 28 px para las pestañas (text-xs + py-1.5 = 28): con h-8
               la pastilla activa se salía del contenedor por arriba y por abajo. */}
@@ -64,36 +64,10 @@ export default function Expresiones({
             <TabsTrigger value="stickers" className="py-1.5 text-xs">Stickers</TabsTrigger>
           </TabsList>
 
+          {/* El selector de Google (components/chat/SelectorDeEmojis): buscador,
+              categorías y «Uso frecuente» con los de la barra de escritorio. */}
           <TabsContent value="emojis" className="mt-2 min-h-0 flex-1">
-            <div className="h-full overflow-y-auto pr-1">
-              {favoritos.length > 0 && (
-                <section className="mb-2">
-                  <p className="mb-1 px-1 text-xs text-muted-foreground">{t("messenger.expr.frecuentes")}</p>
-                  <div className="grid grid-cols-8 gap-0.5">
-                    {favoritos.map((e) => (
-                      <button key={`fav-${e}`} type="button" onClick={() => onEmoji(e)} className="rounded-md py-1 text-2xl leading-none hover:bg-muted" aria-label={e}>
-                        {e}
-                      </button>
-                    ))}
-                  </div>
-                </section>
-              )}
-              {Object.entries(EMOJI_CATALOG).map(([grupo, lista]) => (
-                <section key={grupo} className="mb-2">
-                  {/* `grupo` es la llave del catálogo ("Caras"…); se muestra su etiqueta. */}
-                  <p className="mb-1 px-1 text-xs text-muted-foreground">
-                    {NOMBRE_CATEGORIA[grupo] ? t(NOMBRE_CATEGORIA[grupo]) : grupo}
-                  </p>
-                  <div className="grid grid-cols-8 gap-0.5">
-                    {lista.map((e) => (
-                      <button key={`${grupo}-${e}`} type="button" onClick={() => onEmoji(e)} className="rounded-md py-1 text-2xl leading-none hover:bg-muted" aria-label={e}>
-                        {e}
-                      </button>
-                    ))}
-                  </div>
-                </section>
-              ))}
-            </div>
+            <SelectorDeEmojis className="h-full" frecuentes={favoritos} onElegir={onEmoji} />
           </TabsContent>
 
           <TabsContent value="gif" className="mt-2 min-h-0 flex-1">
