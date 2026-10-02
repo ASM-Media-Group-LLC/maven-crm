@@ -12,6 +12,8 @@ const fuentes = (import.meta as unknown as {
   "/infra/nas-drive/server.mjs",
   "/frontend/src/hooks/useDrive.ts",
   "/supabase/migrations/20261002130000_drive_unidades.sql",
+  "/supabase/migrations/20261002180000_drive_aperturas_por_persona.sql",
+  "/supabase/functions/oficina-doc/index.ts",
 ], { query: "?raw", import: "default", eager: true });
 const leer = (fin: string) => Object.entries(fuentes).find(([k]) => k.endsWith(fin))?.[1] ?? "";
 const mig = leer("oficina_drive.sql");
@@ -19,6 +21,8 @@ const edge = leer("drive/index.ts");
 const nas = leer("nas-drive/server.mjs");
 const hook = leer("hooks/useDrive.ts");
 const unidades = leer("drive_unidades.sql");
+const aperturas = leer("drive_aperturas_por_persona.sql");
+const oficinaDoc = leer("oficina-doc/index.ts");
 
 describe("⚠️ multi-agencia", () => {
   it("toda política de drive_items exige la agencia", () => {
@@ -36,6 +40,27 @@ describe("⚠️ multi-agencia", () => {
   });
   it("la agencia va en la RUTA física del NAS", () => {
     expect(edge).toMatch(/const storageKey = `\$\{tenant\}\/\$\{id\}`;/);
+  });
+});
+
+describe("⚠️ «Recientes» es lo que abrí YO (02/10: Test veía lo que abría Daniel)", () => {
+  it("la migración y la edge del visor se cargaron (si no, lo de abajo pasaría en vacío)", () => {
+    expect(aperturas).toMatch(/CREATE TABLE public\.drive_aperturas/);
+    expect(oficinaDoc.length).toBeGreaterThan(0);
+  });
+  it("cada uno ve solo sus aperturas", () => {
+    expect(aperturas).toMatch(/USING \(user_id = \(SELECT auth\.uid\(\)\)\)/);
+  });
+  it("la pantalla lee MIS aperturas, no la fecha de la ficha (que es de todos)", () => {
+    const i = hook.indexOf('if (vista === "recientes")');
+    const rama = hook.slice(i, hook.indexOf("}", hook.indexOf("return aperturas", i)));
+    expect(rama).toMatch(/tabla\("drive_aperturas"\)/);
+    expect(rama).toMatch(/\.eq\("user_id", yo\)/);
+    expect(rama).not.toMatch(/order\("last_opened_at"/);
+  });
+  it("abrir (drive) y ver (oficina-doc) anotan la apertura de la persona", () => {
+    expect(edge).toMatch(/from\("drive_aperturas"\)\.upsert\(\{ user_id: yo, item_id: id/);
+    expect(oficinaDoc).toMatch(/from\("drive_aperturas"\)\.upsert\(\{ user_id: user\.id, item_id: fila\.id/);
   });
 });
 
