@@ -159,6 +159,23 @@ describe("qué archivos ofrece cada sección", () => {
     expect(esAtajoDeAbrir(k({}))).toBe(false);
   });
 
+  it("abrirlo en la Oficina cuenta como abrirlo: va a MIS «Recientes», después de hacer la copia", () => {
+    const fuentes = (import.meta as unknown as {
+      glob: (p: string[], o: Record<string, unknown>) => Record<string, string>;
+    }).glob(["/supabase/functions/oficina-doc/index.ts"], { query: "?raw", import: "default", eager: true });
+    const edgeFuente = Object.values(fuentes)[0] ?? "";
+    const desde = edgeFuente.indexOf("// ── desde_drive: la copia editable");
+    const hasta = edgeFuente.indexOf("return responder({ id: docId", desde);
+    // ⚠️ Si una marca no está, la guarda tiene que fallar, no pasar sin mirar.
+    expect(desde).toBeGreaterThan(-1);
+    expect(hasta).toBeGreaterThan(desde);
+    const rama = edgeFuente.slice(desde, hasta);
+    const copia = rama.indexOf("await subir(llave");
+    const apertura = rama.indexOf('from("drive_aperturas").upsert({ user_id: user.id, item_id: fila.id');
+    expect(copia).toBeGreaterThan(-1);
+    expect(apertura).toBeGreaterThan(copia);
+  });
+
   it("los textos nuevos tienen su inglés", () => {
     const claves = Object.keys(translations).filter((c) => c.startsWith("oficina.abrir."));
     expect(claves.length).toBeGreaterThan(20);
