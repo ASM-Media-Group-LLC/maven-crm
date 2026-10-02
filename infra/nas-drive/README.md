@@ -10,10 +10,12 @@ lugar. Decisión de Jhon (28/09/2026): **sin R2 y sin copia de seguridad**.
 - Escucha en `127.0.0.1:8790`: la única puerta desde afuera es el
   **Cloudflare Tunnel**.
 - `GET /salud` dice cuánto lugar queda en cada disco.
+- `POST /zip` arma **un .zip con varios archivos y carpetas** mientras baja
+  («Descargar» con varios elegidos en el Drive). Ver abajo.
 
 ## Instalado en mini5
 
-- `~/maven-nas-drive/` con `server.mjs`, `firma.mjs`, `.env` (chmod 600:
+- `~/maven-nas-drive/` con `server.mjs`, `firma.mjs`, `zip.mjs`, `.env` (chmod 600:
   `DRIVE_SECRETO`, `RAICES`, `ORIGENES`, `PUERTO`, `HOST`) e `iniciar.sh`.
 - LaunchAgent `~/Library/LaunchAgents/ai.maven.nas-drive.plist` (arranca solo
   y se reinicia si se cae). Log: `~/maven-nas-drive/servidor.log`.
@@ -24,11 +26,41 @@ lugar. Decisión de Jhon (28/09/2026): **sin R2 y sin copia de seguridad**.
 ## Actualizar
 
 ```bash
-scp infra/nas-drive/{server.mjs,firma.mjs} asm002@unlok-server-5:~/maven-nas-drive/
+scp infra/nas-drive/{server.mjs,firma.mjs,zip.mjs} asm002@unlok-server-5:~/maven-nas-drive/
 ssh asm002@unlok-server-5 'launchctl kickstart -k gui/$(id -u)/ai.maven.nas-drive'
 ```
 
+⚠️ `server.mjs` importa `zip.mjs` (desde el 02/10): si se copia uno sin el
+otro, el servidor no arranca y el Drive entero queda sin archivos.
+
 Tests: `node --test infra/nas-drive/test.mjs`.
+
+## Varios archivos en un .zip (`POST /zip`, `zip.mjs`)
+
+La edge `drive` (acción `bajar_varios`) decide qué entra —con la RLS de la
+persona, expandiendo las carpetas— y firma `{ op: "zip", e, n, l: [{ k, n }] }`
+(una carpeta va como `{ n: "Carpeta/" }`, sin `k`, para que una vacía también
+llegue). El navegador lo manda en el **cuerpo** de un formulario (campo `t`,
+`application/x-www-form-urlencoded`) a un iframe escondido: con miles de rutas
+el permiso pesa más de lo que aguanta una URL (el NAS acepta hasta 4 MB).
+
+- Cada `k` pasa por las mismas reglas que un `get` (incluidos los importados
+  de Google), todo de **una** agencia; las rutas de adentro no pueden tener
+  `..`, `/` al principio, `\` ni caracteres de control (si no, al descomprimir
+  se escribiría fuera de la carpeta), ni repetirse.
+- Topes: **5000** archivos y carpetas y **50 GB** (los mismos que la edge,
+  `TOPE_ZIP_*` en `supabase/functions/drive/logica.ts`).
+- STORE (sin comprimir: lo que hay ya viene comprimido), CRC-32 mientras pasa
+  (va en el «data descriptor»), **ZIP64** para archivos o .zip de más de 4 GB,
+  nombres UTF-8. Sin `Content-Length`: se arma mientras baja. Probado el 02/10
+  con un .zip real de 4,5 GB: `unzip -t` y `ditto -x -k` (el motor del Archive
+  Utility del Mac) lo abren.
+- Si el navegador corta, se deja de leer el disco. Un archivo que la base
+  tiene y el disco no, no corta el .zip: va una nota «No se pudieron
+  incluir.txt» con cuáles faltaron.
+- La puerta (`puerta/`) es un `caddy reverse-proxy` sin filtro de rutas:
+  `POST /zip` pasa igual que `/o`, y Caddy manda la respuesta a medida que
+  llega (sin `Content-Length` no la acumula).
 
 ## El índice diario (`indice.mjs`)
 

@@ -5,8 +5,13 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
-import { crearServidor, MAX_POR_PEDIDO } from "./server.mjs";
+import { execFileSync } from "node:child_process";
+import { Readable, Writable } from "node:stream";
+import { pipeline } from "node:stream/promises";
+import zlib from "node:zlib";
+import { crearServidor, MAX_ENTRADAS_ZIP, MAX_PERMISO_ZIP, MAX_POR_PEDIDO, rutaDelZipValida } from "./server.mjs";
 import { firmar, verificar } from "./firma.mjs";
+import { armarZip, cabeceraLocal, crc32, crc32Js, descriptor, entradaCentral, LIMITE_32, necesitaZip64 } from "./zip.mjs";
 
 const SECRETO = "s".repeat(40);
 let dir, conf, srv, base;
@@ -223,4 +228,214 @@ test("⚠️ si el archivo no entra en ningún disco (dejando 5% libre), 507 ANT
   const p = await fetch(url({ op: "parte", k: k2, up, i: 0, max: 10, total: enorme }), { method: "PUT", body: "x" });
   assert.equal(p.status, 507, "la primera parte reserva el archivo entero");
   assert.match((await p.json()).error, /no tiene lugar/);
+});
+
+// ── Varios archivos en un .zip (POST /zip) ──────────────────────────────────
+
+const pedirZip = (datos, { venceEn = 60, metodo = "POST" } = {}) => fetch(`${base}/zip`, {
+  method: metodo,
+  body: metodo === "POST" ? new URLSearchParams({ t: permiso({ op: "zip", ...datos }, venceEn) }) : undefined,
+});
+const subir = async (contenido) => {
+  const k = clave();
+  const r = await fetch(url({ op: "put", k, max: 10_000_000 }), { method: "PUT", body: contenido });
+  assert.equal(r.status, 200);
+  return k;
+};
+/** Guarda el .zip, lo prueba con el unzip del sistema y lo descomprime. */
+async function probarConUnzip(bytes) {
+  const carpeta = await fs.mkdtemp(path.join(os.tmpdir(), "nas-zip-"));
+  const archivo = path.join(carpeta, "prueba.zip");
+  await fs.writeFile(archivo, bytes);
+  // -t: lee TODO y compara cada CRC. Si algo del formato está mal, sale con error.
+  const salida = execFileSync("unzip", ["-t", archivo], { encoding: "utf8" });
+  const destino = path.join(carpeta, "afuera");
+  execFileSync("unzip", ["-q", archivo, "-d", destino]);
+  return { carpeta, destino, salida, archivo };
+}
+
+test("zip: tres archivos y una carpeta vacía; unzip -t lo da por bueno y los bytes son los mismos", async () => {
+  const a = Buffer.from(Array.from({ length: 300_000 }, (_, i) => (i * 7) % 256));
+  const b = Buffer.from("Balance — año 2026\n", "utf8");
+  const kA = await subir(a);
+  const kB = await subir(b);
+  // Un importado de Google, puesto como lo deja importar.mjs.
+  const idG = randomUUID();
+  const g = Buffer.alloc(5000, 9);
+  const destinoG = path.join(conf.raices[1], agencia, "google", idG);
+  await fs.mkdir(path.dirname(destinoG), { recursive: true });
+  await fs.writeFile(destinoG, g);
+
+  const r = await pedirZip({
+    n: "Maven-2026-10-02.zip",
+    l: [
+      { n: "Contabilidad/" },
+      { n: "Contabilidad/Año 2026/" },
+      { k: kA, n: "Contabilidad/Año 2026/datos.bin" },
+      { k: kB, n: "Contabilidad/Balance.txt" },
+      { n: "Vacía/" },
+      { k: `${agencia}/google/${idG}`, n: "de google.bin" },
+    ],
+  });
+  assert.equal(r.status, 200);
+  assert.equal(r.headers.get("content-type"), "application/zip");
+  assert.equal(r.headers.get("content-length"), null, "se arma mientras baja: sin Content-Length");
+  assert.match(r.headers.get("content-disposition"), /^attachment; filename="Maven-2026-10-02\.zip"; filename\*=UTF-8''Maven-2026-10-02\.zip$/);
+  const { carpeta, destino, salida } = await probarConUnzip(Buffer.from(await r.arrayBuffer()));
+  assert.match(salida, /No errors detected/);
+  assert.ok((await fs.readFile(path.join(destino, "Contabilidad", "Año 2026", "datos.bin"))).equals(a));
+  assert.ok((await fs.readFile(path.join(destino, "Contabilidad", "Balance.txt"))).equals(b));
+  assert.ok((await fs.readFile(path.join(destino, "de google.bin"))).equals(g));
+  assert.ok((await fs.stat(path.join(destino, "Vacía"))).isDirectory(), "la carpeta vacía también llega");
+  await fs.rm(carpeta, { recursive: true, force: true });
+});
+
+test("zip: ⚠️ ZIP64 (lo que usa un archivo de más de 4 GB) también lo lee unzip", async () => {
+  // Se fuerza ZIP64 en todo: mismas cabeceras, descriptores de 8 bytes y
+  // cierre ZIP64 que con un video de 5 GB, sin tener que escribir 5 GB.
+  const datos = [Buffer.alloc(70_000, 3), Buffer.from("chico"), Buffer.alloc(0)];
+  const entradas = [
+    { nombre: "Videos/", carpeta: true, fecha: new Date() },
+    ...datos.map((d, i) => ({ nombre: `Videos/parte ${i}.bin`, size: d.length, fecha: new Date(), abrir: async function* () { if (d.length) yield d; } })),
+  ];
+  const pedazos = [];
+  for await (const p of armarZip(entradas, { forzarZip64: true })) pedazos.push(p);
+  const bytes = Buffer.concat(pedazos);
+  // El cierre ZIP64 y su localizador están (firmas 0x06064b50 y 0x07064b50).
+  assert.ok(bytes.includes(Buffer.from([0x50, 0x4b, 0x06, 0x06])));
+  assert.ok(bytes.includes(Buffer.from([0x50, 0x4b, 0x06, 0x07])));
+  const { carpeta, destino, salida } = await probarConUnzip(bytes);
+  assert.match(salida, /No errors detected/);
+  for (const [i, d] of datos.entries()) assert.ok((await fs.readFile(path.join(destino, "Videos", `parte ${i}.bin`))).equals(d), `parte ${i}`);
+  if (process.platform === "darwin") {
+    // ditto es el motor del Archive Utility del Mac (lo que usa María).
+    const otro = path.join(carpeta, "ditto");
+    execFileSync("ditto", ["-x", "-k", path.join(carpeta, "prueba.zip"), otro]);
+    assert.ok((await fs.readFile(path.join(otro, "Videos", "parte 0.bin"))).equals(datos[0]));
+  }
+  await fs.rm(carpeta, { recursive: true, force: true });
+});
+
+test("zip: ZIP64 se pide por tamaño o por lugar, justo en el límite de 4 GB", () => {
+  assert.equal(necesitaZip64(LIMITE_32 - 1), false);
+  assert.equal(necesitaZip64(LIMITE_32), true, "0xFFFFFFFF es la marca de ZIP64: no se puede usar como tamaño");
+  assert.equal(necesitaZip64(5 * 1024 ** 3), true);
+  // Cabecera local de un archivo grande: tamaños en 0xFFFFFFFF y campo ZIP64.
+  const local = cabeceraLocal({ nombre: "video.mov", fecha: new Date(), zip64: true });
+  assert.equal(local.readUInt16LE(4), 45);
+  assert.equal(local.readUInt32LE(18), LIMITE_32);
+  assert.equal(local.readUInt16LE(30 + 9), 0x0001, "el campo ZIP64 va primero en el extra");
+  assert.equal(descriptor({ crc: 1, size: 5 * 1024 ** 3, zip64: true }).readBigUInt64LE(16), BigInt(5 * 1024 ** 3));
+  assert.equal(descriptor({ crc: 1, size: 10 }).length, 16);
+  // Un archivo chico que EMPIEZA después de los 4 GB: ZIP64 solo para el lugar.
+  const c = entradaCentral({ nombre: "x", fecha: new Date(), crc: 1, size: 10, desde: 6 * 1024 ** 3 });
+  assert.equal(c.readUInt32LE(20), 10);
+  assert.equal(c.readUInt32LE(42), LIMITE_32);
+  assert.equal(c.readUInt16LE(46 + 1), 0x0001);
+  assert.equal(c.readUInt16LE(46 + 1 + 2), 8, "solo el lugar: 8 bytes");
+  assert.equal(c.readBigUInt64LE(46 + 1 + 4), BigInt(6 * 1024 ** 3));
+});
+
+test("zip: el CRC-32 de JS da lo mismo que el de zlib (y que el vector de la norma)", () => {
+  assert.equal(crc32Js(Buffer.from("123456789")), 0xcbf43926);
+  const datos = Buffer.from(Array.from({ length: 100_000 }, (_, i) => (i * 31) % 251));
+  const enDosPartes = crc32Js(datos.subarray(50_000), crc32Js(datos.subarray(0, 50_000)));
+  assert.equal(enDosPartes, crc32Js(datos));
+  if (typeof zlib.crc32 === "function") assert.equal(crc32(datos), crc32Js(datos));
+});
+
+test("zip: ⚠️ si el navegador corta, se deja de leer el archivo", async () => {
+  let leidos = 0;
+  let cerrado = false;
+  const entradas = [{
+    nombre: "enorme.bin", size: 1000 * 65536, fecha: new Date(),
+    abrir: async function* () {
+      try {
+        for (let i = 0; i < 1000; i++) { leidos++; yield Buffer.alloc(65536); }
+      } finally { cerrado = true; }
+    },
+  }];
+  let recibidos = 0;
+  const navegador = new Writable({
+    write(p, _e, cb) {
+      recibidos += p.length;
+      // Corta a los ~2 MB, como quien cancela la descarga.
+      if (recibidos > 2 * 1024 * 1024) return cb(new Error("cancelado"));
+      cb();
+    },
+  });
+  await assert.rejects(pipeline(Readable.from(armarZip(entradas)), navegador));
+  assert.ok(cerrado, "el archivo se cerró");
+  assert.ok(leidos < 100, `leyó ${leidos} de 1000 pedazos`);
+});
+
+test("zip: un archivo que falta en el disco no corta el .zip: va una nota con cuál faltó", async () => {
+  const k = await subir(Buffer.from("está"));
+  const r = await pedirZip({ n: "x.zip", l: [{ k, n: "esta.txt" }, { k: clave(), n: "Fotos/perdida.jpg" }] });
+  assert.equal(r.status, 200);
+  const { carpeta, destino } = await probarConUnzip(Buffer.from(await r.arrayBuffer()));
+  assert.equal(await fs.readFile(path.join(destino, "esta.txt"), "utf8"), "está");
+  assert.match(await fs.readFile(path.join(destino, "No se pudieron incluir.txt"), "utf8"), /Fotos\/perdida\.jpg/);
+  await fs.rm(carpeta, { recursive: true, force: true });
+});
+
+test("zip: ⚠️ rutas que escribirían fuera de la carpeta al descomprimir («zip slip») no pasan", async () => {
+  const k = await subir(Buffer.from("x"));
+  for (const n of ["../fuera.txt", "a/../../fuera.txt", "/etc/passwd", "C:/Windows/x", "a\\b.txt", "a//b.txt", "./a.txt", "a/\u0000.txt", ""]) {
+    assert.equal(rutaDelZipValida(n, false), false, JSON.stringify(n));
+    const r = await pedirZip({ n: "x.zip", l: [{ k, n }] });
+    assert.equal(r.status, 400, JSON.stringify(n));
+  }
+  assert.equal(rutaDelZipValida("Carpeta/Sub/", true), true);
+  assert.equal(rutaDelZipValida("Carpeta/Sub", true), false, "una carpeta termina en /");
+  assert.equal(rutaDelZipValida("Carpeta/", false), false, "un archivo no");
+  // Repetida: al descomprimir una pisaría a la otra.
+  assert.equal((await pedirZip({ n: "x.zip", l: [{ k, n: "a.txt" }, { k, n: "a.txt" }] })).status, 400);
+});
+
+test("zip: ⚠️ cada archivo con las mismas reglas de ruta que bajar uno solo, y todo de UNA agencia", async () => {
+  for (const k of ["../../etc/passwd", `${agencia}/../x`, "hola.txt", `${agencia}/google`, `${agencia}/drive/${randomUUID()}`]) {
+    assert.equal((await pedirZip({ n: "x.zip", l: [{ k, n: "a.txt" }] })).status, 400, k);
+  }
+  const otraAgencia = `${randomUUID()}/${randomUUID()}`;
+  assert.equal((await pedirZip({ n: "x.zip", l: [{ k: clave(), n: "a" }, { k: otraAgencia, n: "b" }] })).status, 400);
+});
+
+test("zip: ⚠️ solo con permiso de zip, por POST y en /zip", async () => {
+  const k = await subir(Buffer.from("x"));
+  // Un permiso de bajar UN archivo no arma un .zip.
+  const deGet = await fetch(`${base}/zip`, { method: "POST", body: new URLSearchParams({ t: permiso({ op: "get", k }) }) });
+  assert.equal(deGet.status, 403);
+  // Ni un permiso de zip sirve en /o.
+  assert.notEqual((await fetch(`${base}/o?t=${permiso({ op: "zip", k, l: [{ k, n: "a" }] })}`)).status, 200);
+  assert.equal((await pedirZip({ l: [{ k, n: "a" }] }, { metodo: "GET" })).status, 405);
+  assert.equal((await pedirZip({ l: [{ k, n: "a" }] }, { venceEn: -5 })).status, 403, "vencido");
+  const otraFirma = firmar("otro".repeat(10), { op: "zip", e: Math.floor(Date.now() / 1000) + 60, l: [{ k, n: "a" }] });
+  assert.equal((await fetch(`${base}/zip`, { method: "POST", body: new URLSearchParams({ t: otraFirma }) })).status, 403);
+  const sinFormulario = await fetch(`${base}/zip`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+  assert.equal(sinFormulario.status, 415);
+});
+
+test("zip: el vector compartido con Maven, con acentos: Node verifica lo que firma Deno", () => {
+  // Mismo vector que supabase/functions/drive/logica.test.ts (VECTOR_ZIP).
+  const s = "vector-de-prueba-del-drive-0123456789abcdef";
+  const p = "eyJvcCI6InppcCIsImUiOjQxMDI0NDQ4MDAsIm4iOiJBw7FvLTIwMjYuemlwIiwibCI6W3sibiI6IkNvbnRhYmlsaWRhZC8ifSx7ImsiOiIxMTExMTExMS0xMTExLTExMTEtMTExMS0xMTExMTExMTExMTEvMjIyMjIyMjItMjIyMi0yMjIyLTIyMjItMjIyMjIyMjIyMjIyIiwibiI6IkNvbnRhYmlsaWRhZC9CYWxhbmNlIOKAlCBhw7FvLnBkZiJ9XX0.2A2QI0S31AhvUzhCDz1sM6aOdjqy62bWtC18bxnPXEw";
+  const d = verificar(s, p);
+  assert.equal(d.op, "zip");
+  assert.equal(d.l[1].n, "Contabilidad/Balance — año.pdf");
+  assert.equal(firmar(s, d), p);
+});
+
+test("zip: el permiso puede ser largo (miles de rutas), pero con tope; y hasta 5000 entradas", async () => {
+  const k = await subir(Buffer.from("x"));
+  const muchas = Array.from({ length: 300 }, (_, i) => ({ k, n: `Carpeta con un nombre largo de verdad/archivo número ${i}.txt` }));
+  const t = permiso({ op: "zip", n: "x.zip", l: muchas });
+  assert.ok(t.length > 4000, "más largo que un permiso normal");
+  assert.equal(verificar(SECRETO, t), null, "un permiso normal sigue con su tope de 4000");
+  const r = await fetch(`${base}/zip`, { method: "POST", body: new URLSearchParams({ t }) });
+  assert.equal(r.status, 200);
+  await r.arrayBuffer();
+  assert.ok(verificar(SECRETO, t, Date.now(), MAX_PERMISO_ZIP));
+  const demasiadas = Array.from({ length: MAX_ENTRADAS_ZIP + 1 }, (_, i) => ({ n: `c${i}/` }));
+  assert.equal((await pedirZip({ n: "x.zip", l: demasiadas })).status, 413);
 });

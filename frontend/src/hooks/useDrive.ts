@@ -185,6 +185,8 @@ function useInvalidar() {
     qc.invalidateQueries({ queryKey: ["drive-uso-agencia"] });
   };
 }
+/** Lo mismo para los hooks de hooks/useDriveVarios.ts (mover y bajar varios). */
+export const useInvalidarDrive = useInvalidar;
 
 export function useCrearCarpeta() {
   const invalidar = useInvalidar();
