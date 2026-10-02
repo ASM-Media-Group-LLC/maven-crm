@@ -1,9 +1,9 @@
-import { useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { format, isToday, isThisYear } from "date-fns";
 import {
   Building2, ChevronRight, Clock, Download, File, FileArchive, FileImage, FileSpreadsheet, FileText, FileVideo,
-  Folder, FolderPlus, HardDrive, Loader2, MoreVertical, Pencil, Plus, RotateCcw, Share2, Trash2,
+  Folder, FolderInput, FolderPlus, HardDrive, Loader2, MoreVertical, Pencil, Plus, RotateCcw, Share2, Trash2,
   Upload, Users, X, AlertTriangle, Check,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -11,6 +11,7 @@ import { Page } from "@/components/ui/page";
 import { PageHeader } from "@/components/ui/page-header";
 import { SubtabNav, SubtabNavItem } from "@/components/ui/subtab-nav";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -39,6 +40,28 @@ import { BarraDeUso, BarraDeUsoAgencia, CuposDialog } from "@/components/oficina
 import { useUserRole } from "@/hooks/useUserRole";
 import VisorArchivo from "@/pages/oficina/drive/VisorArchivo";
 import { soloUnClic } from "@/pages/oficina/drive/gestos";
+import BarraDeSeleccion, { type AccionesDeSeleccion } from "@/pages/oficina/drive/BarraDeSeleccion";
+import DriveMoverDialog, { type LugarMover } from "@/components/oficina/DriveMoverDialog";
+import {
+  ErrorDelZip, mandarAlNas, pedirZip, useDeshacerMover, useMoverDrive, usePapeleraVarias, useUnidadesDrive,
+  type ResultadoMover,
+} from "@/hooks/useDriveVarios";
+import {
+  alternarTodas, clicDeSeleccion, motivoDelError, MOTIVOS_MOVER, SIN_SELECCION, type EstadoSeleccion,
+} from "@/lib/drive/seleccion";
+
+import { useVistaDrive } from "@/hooks/useVistaDrive";
+import { useMiniaturasDrive } from "@/hooks/useMiniaturasDrive";
+import { agruparPorFecha, recortarGrupos, type Grupo, type TipoDeGrupo } from "@/lib/drive/agrupar";
+import { usePorTramos } from "@/pages/oficina/drive/porTramos";
+import {
+  CuadriculaDrive, SelectorDeVista, type ManejoDeElemento, type SeccionDeVista,
+} from "@/pages/oficina/drive/VistasDeDrive";
+
+/** Lo que se arrastra DENTRO del Drive (para mover), distinto de los archivos
+ *  que llegan desde la computadora (para subir: tipo "Files"). */
+const TIPO_ARRASTRE = "application/x-maven-drive";
+const tieneTipo = (e: React.DragEvent, tipo: string) => Array.from(e.dataTransfer?.types ?? []).includes(tipo);
 
 const VISTAS: { id: VistaDrive; clave: TranslationKey; icono: typeof HardDrive }[] = [
   { id: "mia", clave: "drive.vista.mia", icono: HardDrive },
@@ -142,7 +165,377 @@ export default function DrivePage() {
     if (archivos.length) void subir(archivos, carpeta);
   };
 
-  const lista = items.data ?? [];
+  const lista = useMemo(() => items.data ?? [], [items.data]);
+
+  // ── Cómo se ve (Jhon, 02/10): Lista, Cuadrícula o Galería, y si se agrupa
+  // por fecha. Lo que se ve, en el orden en que se ve: Shift-clic, el visor y
+  // las miniaturas siguen ESE orden.
+  const [prefs, cambiarPrefs] = useVistaDrive();
+  const enLista = prefs.modo === "lista";
+  const grupos = useMemo(
+    () => (prefs.agrupar ? agruparPorFecha(lista, (i) => i.trashed_at ?? i.updated_at) : null),
+    [prefs.agrupar, lista],
+  );
+  const ordenados = useMemo(() => (grupos ? grupos.flatMap((g) => g.items) : lista), [grupos, lista]);
+  const orden = useMemo(() => ordenados.map((i) => i.id), [ordenados]);
+
+  // ── Elegir varios (María Villegas, 02/10, «como Google») ──────────────────
+  // La selección es de UNA vista y carpeta: al cambiar de lugar arranca vacía
+  // (sin un efecto que la borre: se guarda junto con el lugar al que
+  // pertenece). Lo elegido es lo de la lista que está en el conjunto: si algo
+  // se movió o se borró, deja de contar solo.
+  const lugarActual = `${vista}|${carpeta ?? ""}`;
+  const [seleccion, setSeleccion] = useState<{ lugar: string; estado: EstadoSeleccion }>({ lugar: lugarActual, estado: SIN_SELECCION });
+  const estadoSel = seleccion.lugar === lugarActual ? seleccion.estado : SIN_SELECCION;
+  const elegir = (cambio: (e: EstadoSeleccion) => EstadoSeleccion) =>
+    setSeleccion((s) => ({ lugar: lugarActual, estado: cambio(s.lugar === lugarActual ? s.estado : SIN_SELECCION) }));
+  const soltarSeleccion = () => elegir(() => SIN_SELECCION);
+  const elegidos = lista.filter((i) => estadoSel.ids.has(i.id));
+  const haySeleccion = elegidos.length > 0;
+  const todasElegidas = haySeleccion && elegidos.length === lista.length;
+
+  // Esc suelta lo elegido, salvo que el Esc sea de un diálogo o un menú abierto.
+  useEffect(() => {
+    if (!haySeleccion) return;
+    const alTeclear = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      if (document.querySelector('[role="dialog"], [role="alertdialog"], [role="menu"]')) return;
+      setSeleccion((s) => ({ ...s, estado: SIN_SELECCION }));
+    };
+    window.addEventListener("keydown", alTeclear);
+    return () => window.removeEventListener("keydown", alTeclear);
+  }, [haySeleccion]);
+
+  // ── Mover ──────────────────────────────────────────────────────────────────
+  const unidades = useUnidadesDrive();
+  const moverDrive = useMoverDrive();
+  const deshacer = useDeshacerMover();
+  const papeleraVarias = usePapeleraVarias();
+  const [moviendo, setMoviendo] = useState<DriveItem[] | null>(null);
+  const [borrandoVarios, setBorrandoVarios] = useState<DriveItem[] | null>(null);
+  const [preparandoZip, setPreparandoZip] = useState(false);
+  // Una unidad compartida no se mueve (como en Google): es el principio de su ruta.
+  const sePuedeMover = (i: DriveItem) => !enPapelera && i.estado === "listo" && !unidades.data?.has(i.id);
+
+  /** El aviso de Google: «movido a X», con Deshacer; y lo que no se pudo, por qué. */
+  const avisarMovido = (r: ResultadoMover, de: DriveItem[], destino: string) => {
+    const motivo = (m: keyof typeof MOTIVOS_MOVER) => t(MOTIVOS_MOVER[m]);
+    if (r.movidos.length) {
+      soltarSeleccion();
+      const nombre = de.find((i) => i.id === r.movidos[0].id)?.nombre ?? "";
+      toast.success(
+        r.movidos.length === 1
+          ? t("drive.mover.listoUno", { name: nombre, destino })
+          : t("drive.mover.listoVarios", { n: r.movidos.length, destino }),
+        {
+          action: {
+            label: t("drive.mover.deshacer"),
+            onClick: () => deshacer.mutate(r, {
+              onSuccess: (d) => (d.fallidos.length
+                ? toast.error(t("drive.mover.deshacerError", { motivo: motivo(d.fallidos[0].motivo) }))
+                : toast.success(t("drive.mover.deshecho"))),
+              onError: (e) => toast.error(t("drive.mover.deshacerError", { motivo: motivo(motivoDelError(e)) })),
+            }),
+          },
+        },
+      );
+    }
+    if (r.fallidos.length) {
+      toast.error(r.movidos.length || r.fallidos.length > 1
+        ? t("drive.mover.algunosNo", { n: r.fallidos.length, motivo: motivo(r.fallidos[0].motivo) })
+        : t("drive.mover.error", { motivo: motivo(r.fallidos[0].motivo) }));
+    }
+  };
+
+  const moverA = (de: DriveItem[], destino: string | null, nombreDestino: string) => moverDrive.mutate({ items: de, destino }, {
+    onSuccess: (r) => avisarMovido(r, de, nombreDestino),
+    onError: (e) => toast.error(t("drive.mover.error", { motivo: t(MOTIVOS_MOVER[motivoDelError(e)]) })),
+  });
+
+  // Dónde arranca «Mover a…»: donde se está mirando (si es un lugar del selector).
+  const inicioMover = (): LugarMover => (vista === "mia" || vista === "unidades" || vista === "compartido"
+    ? { raiz: vista, ruta: carpeta ? (ruta.data ?? []).map((r) => ({ id: r.id, nombre: r.nombre })) : [] }
+    : { raiz: "mia", ruta: [] });
+
+  // Arrastrar filas a una carpeta (o a las migas). `arrastre` guarda QUÉ se
+  // arrastra: durante el arrastre el navegador no deja leer los datos.
+  const arrastre = useRef<DriveItem[] | null>(null);
+  const [sobre, setSobre] = useState<string | null>(null);
+  const empezarArrastre = (e: React.DragEvent, i: DriveItem) => {
+    const grupo = (estadoSel.ids.has(i.id) ? elegidos : [i]).filter(sePuedeMover);
+    if (!grupo.length) { e.preventDefault(); return; }
+    arrastre.current = grupo;
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData(TIPO_ARRASTRE, JSON.stringify(grupo.map((g) => g.id)));
+  };
+  const terminarArrastre = () => { arrastre.current = null; setSobre(null); };
+  /** Las props para que algo reciba lo arrastrado. `destino` null = la raíz de
+   *  Mi unidad (solo para lo que es mío, como en el selector). */
+  const recibeArrastre = (destino: string | null, clave: string, nombre: string) => {
+    const acepta = () => {
+      const de = arrastre.current;
+      if (!de) return false;
+      if (destino !== null && de.some((d) => d.id === destino)) return false;
+      if (destino === null && de.some((d) => d.owner_id !== user?.id)) return false;
+      return !de.every((d) => d.parent_id === destino);
+    };
+    return {
+      onDragOver: (e: React.DragEvent) => {
+        if (!tieneTipo(e, TIPO_ARRASTRE) || !acepta()) return;
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer.dropEffect = "move";
+        setSobre(clave);
+      },
+      onDragLeave: () => setSobre((s) => (s === clave ? null : s)),
+      onDrop: (e: React.DragEvent) => {
+        if (!tieneTipo(e, TIPO_ARRASTRE)) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const de = acepta() ? arrastre.current : null;
+        terminarArrastre();
+        if (de) moverA(de, destino, nombre);
+      },
+    };
+  };
+
+  // ── Descargar lo elegido ───────────────────────────────────────────────────
+  // Un archivo solo, como siempre. Varios (o una carpeta): UN .zip que arma el
+  // NAS mientras baja (infra/nas-drive/zip.mjs).
+  const bajar = async (de: DriveItem[]) => {
+    const listos = de.filter((i) => i.estado === "listo");
+    if (listos.length === 1 && listos[0].tipo === "archivo") {
+      return abrirArchivo(listos[0].id, true).catch((e) => toast.error((e as Error).message));
+    }
+    if (!listos.length) return;
+    const aviso = toast.loading(t("drive.zip.preparando"));
+    setPreparandoZip(true);
+    try {
+      const permiso = await pedirZip(listos.map((i) => i.id));
+      mandarAlNas(permiso.url, permiso.t, () => toast.error(t("drive.zip.errorNas")));
+      toast.success(t("drive.zip.empezo", { n: permiso.archivos }), { id: aviso });
+    } catch (e) {
+      const z = e instanceof ErrorDelZip ? e : null;
+      toast.error(
+        z?.codigo === "zip_demasiados" ? t("drive.zip.demasiados", { n: z.tope ?? "" })
+          : z?.codigo === "zip_muy_grande" ? t("drive.zip.muyGrande", { tope: tamano(z.tope ?? null) })
+            : z?.codigo === "zip_vacio" ? t("drive.zip.vacio")
+              : `${t("drive.zip.error")}: ${(e as Error).message}`,
+        { id: aviso },
+      );
+    } finally {
+      setPreparandoZip(false);
+    }
+  };
+
+  // ── Papelera de varios ─────────────────────────────────────────────────────
+  const papeleraDe = (de: DriveItem[], tirar: boolean) => papeleraVarias.mutate({ ids: de.map((i) => i.id), tirar }, {
+    onSuccess: ({ hechos, fallidos }) => {
+      if (hechos.length) {
+        soltarSeleccion();
+        const texto = tirar
+          ? (hechos.length === 1 ? t("drive.papelera.aviso") : t("drive.papelera.avisoVarios", { n: hechos.length }))
+          : (hechos.length === 1 ? t("drive.restaurado") : t("drive.restauradoVarios", { n: hechos.length }));
+        toast.success(texto, tirar ? {
+          action: { label: t("drive.mover.deshacer"), onClick: () => papeleraVarias.mutate({ ids: hechos, tirar: false }) },
+        } : undefined);
+      }
+      if (fallidos.length) toast.error(t("drive.papelera.algunosNo", { n: fallidos.length }));
+    },
+    onError: (e) => toast.error((e as Error).message),
+  });
+
+  const borrarVarios = async (de: DriveItem[]) => {
+    let hechos = 0;
+    const errores: string[] = [];
+    for (const i of de) {
+      try { await borrar.mutateAsync(i.id); hechos++; } catch (e) { errores.push((e as Error).message); }
+    }
+    if (hechos) { soltarSeleccion(); toast.success(t("drive.borradoVarios", { n: hechos })); }
+    if (errores.length) toast.error(t("drive.borrar.algunosNo", { n: errores.length, motivo: errores[0] }));
+  };
+
+  const acciones: AccionesDeSeleccion = enPapelera
+    ? { restaurar: () => papeleraDe(elegidos, false), borrar: () => setBorrandoVarios(elegidos) }
+    : {
+      descargar: elegidos.some((i) => i.estado === "listo") ? () => void bajar(elegidos) : undefined,
+      mover: elegidos.every(sePuedeMover) ? () => setMoviendo(elegidos) : undefined,
+      papelera: () => papeleraDe(elegidos, true),
+    };
+  const ocupadoConVarios = moverDrive.isPending || papeleraVarias.isPending || preparandoZip || borrar.isPending;
+
+  // De a tramos: hay carpetas con miles de archivos (ver drive/porTramos.ts).
+  const { limite, centinela, hayMas } = usePorTramos(`${lugarActual}|${prefs.modo}|${prefs.agrupar}`, ordenados.length);
+  const mostrados = useMemo(() => ordenados.slice(0, limite), [ordenados, limite]);
+  const TITULOS: Record<Exclude<TipoDeGrupo, "otroMes">, TranslationKey> = {
+    hoy: "drive.grupo.hoy", ayer: "drive.grupo.ayer", semana: "drive.grupo.semana", mes: "drive.grupo.mes",
+  };
+  const tituloDe = (g: Grupo<DriveItem>) => {
+    if (g.tipo !== "otroMes") return t(TITULOS[g.tipo]);
+    const mes = format(g.inicio, "LLLL", { locale: f.fechas });
+    return t("drive.grupo.mesDe", { mes: mes.charAt(0).toUpperCase() + mes.slice(1), anio: g.inicio.getFullYear() });
+  };
+  const secciones: SeccionDeVista[] = grupos
+    ? recortarGrupos(grupos, limite).map((g) => ({ clave: g.clave, titulo: tituloDe(g), items: g.items }))
+    : [{ clave: "todo", titulo: null, items: mostrados }];
+  // Las miniaturas, solo en cuadrícula y galería, y solo de lo dibujado.
+  const miniaturas = useMiniaturasDrive(mostrados, !enLista);
+
+  /** El menú ⋮ de un elemento: el mismo en la lista, la cuadrícula y la galería. */
+  const menuDe = (i: DriveItem) => {
+    const incompleta = i.estado !== "listo";
+    return (
+      <DropdownMenuContent align="end" className="w-52">
+        {enPapelera ? (
+          <>
+            <DropdownMenuItem onSelect={() => papelera.mutate({ id: i.id, tirar: false }, {
+              onSuccess: () => toast.success(t("drive.restaurado")),
+              onError: (e) => toast.error((e as Error).message),
+            })}>
+              <RotateCcw className="mr-2 h-4 w-4" />{t("drive.accion.restaurar")}
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => setBorrando(i)} className="text-destructive focus:text-destructive">
+              <Trash2 className="mr-2 h-4 w-4" />{t("drive.accion.borrar")}
+            </DropdownMenuItem>
+          </>
+        ) : (
+          <>
+            {!incompleta && (
+              <DropdownMenuItem onSelect={() => abrir(i)}>
+                {i.tipo === "carpeta" ? <Folder className="mr-2 h-4 w-4" /> : <FileText className="mr-2 h-4 w-4" />}
+                {t("drive.accion.abrir")}
+              </DropdownMenuItem>
+            )}
+            {/* Una carpeta también se baja: en un .zip, como en Google. */}
+            {!incompleta && (
+              <DropdownMenuItem onSelect={() => void bajar([i])}>
+                <Download className="mr-2 h-4 w-4" />{t("drive.accion.descargar")}
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem onSelect={() => setCompartiendo(i)}>
+              <Share2 className="mr-2 h-4 w-4" />{t("drive.accion.compartir")}
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => setRenombrando(i)}>
+              <Pencil className="mr-2 h-4 w-4" />{t("drive.accion.renombrar")}
+            </DropdownMenuItem>
+            {sePuedeMover(i) && (
+              <DropdownMenuItem onSelect={() => setMoviendo([i])}>
+                <FolderInput className="mr-2 h-4 w-4" />{t("drive.accion.mover")}
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => papelera.mutate({ id: i.id, tirar: true }, {
+              onSuccess: () => toast.success(t("drive.papelera.aviso")),
+              onError: (e) => toast.error((e as Error).message),
+            })}>
+              <Trash2 className="mr-2 h-4 w-4" />{t("drive.accion.papelera")}
+            </DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    );
+  };
+
+  /** Una fila de la lista (la vista de siempre). */
+  const filaDeLista = (i: DriveItem) => {
+    const Icono = iconoDe(i);
+    const incompleta = i.estado !== "listo";
+    const elegida = estadoSel.ids.has(i.id);
+    const recibe = i.tipo === "carpeta" && !enPapelera && !incompleta;
+    return (
+      <li
+        key={i.id}
+        draggable={sePuedeMover(i)}
+        onDragStart={(e) => empezarArrastre(e, i)}
+        onDragEnd={terminarArrastre}
+        {...(recibe ? recibeArrastre(i.id, i.id, i.nombre) : {})}
+        className={cn(
+          "group grid grid-cols-[1.25rem_minmax(0,1fr)_auto] items-center gap-3 border-b border-border/40 px-4 py-1.5 last:border-b-0 hover:bg-muted/40 md:grid-cols-[1.25rem_minmax(0,1fr)_10rem_9rem_6rem_2.5rem]",
+          elegida && "bg-primary/10 hover:bg-primary/15",
+          sobre === i.id && "bg-primary/15 ring-2 ring-inset ring-primary/50",
+        )}
+      >
+        {/* La casilla: a la vista al pasar el mouse (siempre en el
+            teléfono) y en todas las filas apenas hay algo elegido.
+            Shift suma el tramo desde la última que se tocó. */}
+        <Checkbox
+          checked={elegida}
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); elegir((s) => clicDeSeleccion(s, orden, i.id, e.shiftKey)); }}
+          aria-label={t("drive.seleccion.fila", { name: i.nombre })}
+          className={cn(
+            "transition-opacity",
+            !haySeleccion && "md:opacity-0 md:focus-visible:opacity-100 md:group-hover:opacity-100",
+          )}
+        />
+        {/* Un clic (o Enter) abre, carpeta o archivo: como Drive en el
+            teléfono. Con doble clic, en el celular no se podía abrir
+            nada, y el teclado (detail 0) no abría las carpetas. */}
+        {/* ⚠️ soloUnClic: el 2.º clic de un doble clic no abre otra vez. */}
+        {/* Con Shift o Ctrl/⌘ el clic ELIGE en vez de abrir, como en
+            Google: se ataja en la captura y el onClick no llega a correr. */}
+        <button
+          type="button"
+          onMouseDown={(e) => { if (e.shiftKey) e.preventDefault(); /* que Shift no pinte texto */ }}
+          onClickCapture={(e) => {
+            if (!e.shiftKey && !e.metaKey && !e.ctrlKey) return;
+            e.preventDefault();
+            e.stopPropagation();
+            elegir((s) => clicDeSeleccion(s, orden, i.id, e.shiftKey));
+          }}
+          onClick={soloUnClic(() => abrir(i))}
+          disabled={incompleta}
+          className="flex min-w-0 items-center gap-3 py-1 text-left text-sm disabled:cursor-default"
+        >
+          <Icono className={cn("h-5 w-5 shrink-0", i.tipo === "carpeta" ? "text-primary" : "text-muted-foreground")} />
+          <span className="min-w-0 truncate">{i.nombre}</span>
+          {incompleta && (
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-warning/15 px-2 text-[11px] text-warning">
+              <AlertTriangle className="h-3 w-3" />
+              {t("drive.subida.incompleta")}
+            </span>
+          )}
+        </button>
+        <span className="hidden truncate text-sm text-muted-foreground md:block">{nombreDe(i.owner_id)}</span>
+        <span className="hidden text-sm text-muted-foreground md:block">{cuando(i.trashed_at ?? i.updated_at, f)}</span>
+        <span className="hidden text-sm tabular-nums text-muted-foreground md:block">{i.tipo === "carpeta" ? "—" : tamano(i.size)}</span>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              aria-label={t("drive.accion.opciones", { name: i.nombre })}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              <MoreVertical className="h-4 w-4" />
+            </button>
+          </DropdownMenuTrigger>
+          {menuDe(i)}
+        </DropdownMenu>
+      </li>
+    );
+  };
+
+  /** Lo que la cuadrícula y la galería necesitan para elegir, arrastrar, abrir
+   *  y el menú: lo mismo que usa la lista. */
+  const manejo: ManejoDeElemento = {
+    elegida: (i) => estadoSel.ids.has(i.id),
+    haySeleccion,
+    alClicCasilla: (e, i) => { e.preventDefault(); e.stopPropagation(); elegir((s) => clicDeSeleccion(s, orden, i.id, e.shiftKey)); },
+    alClicCaptura: (e, i) => {
+      if (!e.shiftKey && !e.metaKey && !e.ctrlKey) return;
+      e.preventDefault();
+      e.stopPropagation();
+      elegir((s) => clicDeSeleccion(s, orden, i.id, e.shiftKey));
+    },
+    abrir,
+    arrastrable: sePuedeMover,
+    alEmpezarArrastre: empezarArrastre,
+    alTerminarArrastre: terminarArrastre,
+    recibe: (i) => (i.tipo === "carpeta" && !enPapelera && i.estado === "listo" ? recibeArrastre(i.id, i.id, i.nombre) : {}),
+    sobre,
+    menu: (i) => menuDe(i),
+    icono: iconoDe,
+    miniatura: (i) => miniaturas.get(i.id),
+  };
 
   return (
     <Page>
@@ -218,33 +611,57 @@ export default function DrivePage() {
           {vista === "unidades" ? <BarraDeUsoAgencia /> : <BarraDeUso />}
         </div>
 
-        {/* Migas: Mi unidad › Contabilidad › 2026 */}
-        {carpeta && (
-          <nav aria-label={t("drive.ruta")} className="flex min-w-0 flex-wrap items-center gap-0.5 text-sm">
-            <button type="button" onClick={() => ir(vista)} className="rounded-full px-2 py-1 text-muted-foreground hover:bg-muted hover:text-foreground">
-              {t(VISTAS.find((v) => v.id === vista)!.clave)}
-            </button>
-            {(ruta.data ?? []).map((r, n, todo) => (
-              <span key={r.id} className="flex min-w-0 items-center gap-0.5">
-                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-                {n === todo.length - 1 ? (
-                  <span className="truncate px-2 py-1 font-medium">{r.nombre}</span>
-                ) : (
-                  <button type="button" onClick={() => ir(vista, r.id)} className="truncate rounded-full px-2 py-1 text-muted-foreground hover:bg-muted hover:text-foreground">
-                    {r.nombre}
-                  </button>
-                )}
-              </span>
-            ))}
-          </nav>
-        )}
+        {/* Migas a la izquierda; cómo se ve (Lista · Cuadrícula · Galería) y
+            «Agrupar por fecha», a la derecha, como en Google Drive. */}
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          {carpeta && (
+            <nav aria-label={t("drive.ruta")} className="flex min-w-0 flex-wrap items-center gap-0.5 text-sm">
+              {/* Las migas también reciben lo que se arrastra (como en Google):
+                  la de «Mi unidad» es la raíz; las de las otras vistas no son
+                  una carpeta. */}
+              <button
+                type="button"
+                onClick={() => ir(vista)}
+                {...(vista === "mia" ? recibeArrastre(null, "__raiz__", t("drive.vista.mia")) : {})}
+                className={cn("rounded-full px-2 py-1 text-muted-foreground hover:bg-muted hover:text-foreground", sobre === "__raiz__" && "bg-primary/15 text-primary ring-2 ring-primary/40")}
+              >
+                {t(VISTAS.find((v) => v.id === vista)!.clave)}
+              </button>
+              {(ruta.data ?? []).map((r, n, todo) => (
+                <span key={r.id} className="flex min-w-0 items-center gap-0.5">
+                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  {n === todo.length - 1 ? (
+                    <span className="truncate px-2 py-1 font-medium">{r.nombre}</span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => ir(vista, r.id)}
+                      {...recibeArrastre(r.id, `miga:${r.id}`, r.nombre)}
+                      className={cn("truncate rounded-full px-2 py-1 text-muted-foreground hover:bg-muted hover:text-foreground", sobre === `miga:${r.id}` && "bg-primary/15 text-primary ring-2 ring-primary/40")}
+                    >
+                      {r.nombre}
+                    </button>
+                  )}
+                </span>
+              ))}
+            </nav>
+          )}
+          <SelectorDeVista
+            modo={prefs.modo}
+            agrupar={prefs.agrupar}
+            onModo={(modo) => cambiarPrefs({ modo })}
+            onAgrupar={(agrupar) => cambiarPrefs({ agrupar })}
+          />
+        </div>
 
         {enPapelera && (
           <p className="rounded-panel bg-muted/50 px-4 py-2 text-xs text-muted-foreground">{t("drive.papelera.ayuda")}</p>
         )}
 
         <div
-          onDragOver={(e) => { if (sePuedeSubir) { e.preventDefault(); setArrastrando(true); } }}
+          // Solo los archivos de la computadora muestran «Suelta para subir»: una
+          // fila arrastrada adentro del Drive es para mover, no para subir.
+          onDragOver={(e) => { if (sePuedeSubir && tieneTipo(e, "Files")) { e.preventDefault(); setArrastrando(true); } }}
           onDragLeave={() => setArrastrando(false)}
           onDrop={soltar}
           className={cn(
@@ -258,13 +675,38 @@ export default function DrivePage() {
             </div>
           )}
 
-          {/* Encabezado de columnas (se esconden en el teléfono) */}
-          <div className="grid grid-cols-[1fr_auto] items-center gap-3 border-b border-border/60 px-4 py-2 text-xs font-medium text-muted-foreground md:grid-cols-[minmax(0,1fr)_10rem_9rem_6rem_2.5rem]">
-            <span>{t("drive.col.nombre")}</span>
-            <span className="hidden md:block">{t("drive.col.dueno")}</span>
-            <span className="hidden md:block">{t("drive.col.modificado")}</span>
-            <span className="hidden md:block">{t("drive.col.tamano")}</span>
-            <span />
+          {/* Encabezado de columnas (se esconden en el teléfono). Con algo
+              elegido, la barra de acciones ocupa su lugar (como en Google) y
+              se queda arriba al bajar por una carpeta larga. */}
+          <div className={cn(
+            "sticky top-0 z-[5] grid min-h-[2.75rem] items-center gap-3 rounded-t-panel border-b border-border/60 bg-background px-4 py-1 text-xs font-medium text-muted-foreground",
+            enLista
+              ? "grid-cols-[1.25rem_minmax(0,1fr)_auto] md:grid-cols-[1.25rem_minmax(0,1fr)_10rem_9rem_6rem_2.5rem]"
+              : "grid-cols-[1.25rem_minmax(0,1fr)]",
+            haySeleccion && "bg-primary/5",
+          )}>
+            <Checkbox
+              checked={todasElegidas ? true : haySeleccion ? "indeterminate" : false}
+              disabled={!lista.length}
+              onClick={(e) => { e.preventDefault(); elegir((s) => alternarTodas(s, orden)); }}
+              aria-label={t(todasElegidas ? "drive.seleccion.ninguna" : "drive.seleccion.todas")}
+              title={t(todasElegidas ? "drive.seleccion.ninguna" : "drive.seleccion.todas")}
+            />
+            {haySeleccion ? (
+              <div className={cn("min-w-0", enLista && "col-span-2 md:col-span-5")}>
+                <BarraDeSeleccion n={elegidos.length} acciones={acciones} ocupado={ocupadoConVarios} onLimpiar={soltarSeleccion} />
+              </div>
+            ) : !enLista ? (
+              <span>{lista.length === 1 ? t("drive.elementos.uno") : t("drive.elementos.n", { n: lista.length })}</span>
+            ) : (
+              <>
+                <span>{t("drive.col.nombre")}</span>
+                <span className="hidden md:block">{t("drive.col.dueno")}</span>
+                <span className="hidden md:block">{t("drive.col.modificado")}</span>
+                <span className="hidden md:block">{t("drive.col.tamano")}</span>
+                <span />
+              </>
+            )}
           </div>
 
           {items.isLoading ? (
@@ -278,96 +720,24 @@ export default function DrivePage() {
               <HardDrive className="h-10 w-10 text-muted-foreground/50" />
               <p className="text-sm text-muted-foreground">{t(carpeta ? "drive.vacio.carpeta" : VACIO[vista])}</p>
             </div>
-          ) : (
+          ) : prefs.modo === "lista" ? (
             <ul>
-              {lista.map((i) => {
-                const Icono = iconoDe(i);
-                const incompleta = i.estado !== "listo";
-                return (
-                  <li
-                    key={i.id}
-                    className="group grid grid-cols-[1fr_auto] items-center gap-3 border-b border-border/40 px-4 py-1.5 last:border-b-0 hover:bg-muted/40 md:grid-cols-[minmax(0,1fr)_10rem_9rem_6rem_2.5rem]"
-                  >
-                    {/* Un clic (o Enter) abre, carpeta o archivo: como Drive en el
-                        teléfono. Con doble clic, en el celular no se podía abrir
-                        nada, y el teclado (detail 0) no abría las carpetas. */}
-                    {/* ⚠️ soloUnClic: el 2.º clic de un doble clic no abre otra vez. */}
-                    <button
-                      type="button"
-                      onClick={soloUnClic(() => abrir(i))}
-                      disabled={incompleta}
-                      className="flex min-w-0 items-center gap-3 py-1 text-left text-sm disabled:cursor-default"
-                    >
-                      <Icono className={cn("h-5 w-5 shrink-0", i.tipo === "carpeta" ? "text-primary" : "text-muted-foreground")} />
-                      <span className="min-w-0 truncate">{i.nombre}</span>
-                      {incompleta && (
-                        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-warning/15 px-2 text-[11px] text-warning">
-                          <AlertTriangle className="h-3 w-3" />
-                          {t("drive.subida.incompleta")}
-                        </span>
-                      )}
-                    </button>
-                    <span className="hidden truncate text-sm text-muted-foreground md:block">{nombreDe(i.owner_id)}</span>
-                    <span className="hidden text-sm text-muted-foreground md:block">{cuando(i.trashed_at ?? i.updated_at, f)}</span>
-                    <span className="hidden text-sm tabular-nums text-muted-foreground md:block">{i.tipo === "carpeta" ? "—" : tamano(i.size)}</span>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button
-                          type="button"
-                          aria-label={t("drive.accion.opciones", { name: i.nombre })}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
-                        >
-                          <MoreVertical className="h-4 w-4" />
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-52">
-                        {enPapelera ? (
-                          <>
-                            <DropdownMenuItem onSelect={() => papelera.mutate({ id: i.id, tirar: false }, {
-                              onSuccess: () => toast.success(t("drive.restaurado")),
-                              onError: (e) => toast.error((e as Error).message),
-                            })}>
-                              <RotateCcw className="mr-2 h-4 w-4" />{t("drive.accion.restaurar")}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onSelect={() => setBorrando(i)} className="text-destructive focus:text-destructive">
-                              <Trash2 className="mr-2 h-4 w-4" />{t("drive.accion.borrar")}
-                            </DropdownMenuItem>
-                          </>
-                        ) : (
-                          <>
-                            {!incompleta && (
-                              <DropdownMenuItem onSelect={() => abrir(i)}>
-                                {i.tipo === "carpeta" ? <Folder className="mr-2 h-4 w-4" /> : <FileText className="mr-2 h-4 w-4" />}
-                                {t("drive.accion.abrir")}
-                              </DropdownMenuItem>
-                            )}
-                            {i.tipo === "archivo" && !incompleta && (
-                              <DropdownMenuItem onSelect={() => abrirArchivo(i.id, true).catch((e) => toast.error((e as Error).message))}>
-                                <Download className="mr-2 h-4 w-4" />{t("drive.accion.descargar")}
-                              </DropdownMenuItem>
-                            )}
-                            <DropdownMenuItem onSelect={() => setCompartiendo(i)}>
-                              <Share2 className="mr-2 h-4 w-4" />{t("drive.accion.compartir")}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onSelect={() => setRenombrando(i)}>
-                              <Pencil className="mr-2 h-4 w-4" />{t("drive.accion.renombrar")}
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onSelect={() => papelera.mutate({ id: i.id, tirar: true }, {
-                              onSuccess: () => toast.success(t("drive.papelera.aviso")),
-                              onError: (e) => toast.error((e as Error).message),
-                            })}>
-                              <Trash2 className="mr-2 h-4 w-4" />{t("drive.accion.papelera")}
-                            </DropdownMenuItem>
-                          </>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </li>
-                );
-              })}
+              {secciones.map((s) => (
+                <Fragment key={s.clave}>
+                  {s.titulo && (
+                    <li role="presentation" className="border-b border-border/40 bg-muted/20 px-4 pb-1.5 pt-3 text-xs font-medium text-muted-foreground">
+                      {s.titulo}
+                    </li>
+                  )}
+                  {s.items.map(filaDeLista)}
+                </Fragment>
+              ))}
             </ul>
+          ) : (
+            <CuadriculaDrive modo={prefs.modo} secciones={secciones} manejo={manejo} />
           )}
+          {/* Al acercarse al final se dibujan los siguientes (carpetas de miles). */}
+          {hayMas && <div ref={centinela} aria-hidden className="h-8" />}
         </div>
       </div>
 
@@ -438,10 +808,43 @@ export default function DrivePage() {
       {compartiendo && (
         <DriveCompartirDialog item={compartiendo} onCerrar={() => setCompartiendo(null)} />
       )}
+      {moviendo && (
+        <DriveMoverDialog
+          items={moviendo}
+          inicio={inicioMover()}
+          onCerrar={() => setMoviendo(null)}
+          onMovido={(r, destino) => avisarMovido(r, moviendo, destino)}
+        />
+      )}
+      <AlertDialog open={!!borrandoVarios} onOpenChange={(v) => !v && setBorrandoVarios(null)}>
+        {borrandoVarios && (
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {borrandoVarios.length === 1 ? t("drive.borrar.titulo") : t("drive.borrar.tituloVarios", { n: borrandoVarios.length })}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {borrandoVarios.length === 1
+                  ? t("drive.borrar.cuerpo", { name: borrandoVarios[0].nombre })
+                  : t("drive.borrar.cuerpoVarios")}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>{t("drive.cancelar")}</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={() => void borrarVarios(borrandoVarios)}
+              >
+                {t("drive.accion.borrar")}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        )}
+      </AlertDialog>
 
       {subidas.length > 0 && <PanelDeSubidas subidas={subidas} onCerrar={limpiar} />}
       {viendoCupos && <CuposDialog onCerrar={() => setViendoCupos(false)} />}
-      <VisorArchivo items={lista} abierto={viendo} onAbierto={setViendo} />
+      <VisorArchivo items={ordenados} abierto={viendo} onAbierto={setViendo} />
     </Page>
   );
 }

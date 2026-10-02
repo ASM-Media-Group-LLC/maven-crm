@@ -10,7 +10,9 @@ export const MAX_ARCHIVO = 20 * 1024 * 1024 * 1024;
 export const TAMANO_PARTE = 32 * 1024 * 1024;
 
 export class HttpError extends Error {
-  constructor(message: string, public status = 400) { super(message); }
+  /** `datos`: lo que va además del mensaje en la respuesta (p. ej. `codigo`,
+   *  para que la pantalla lo diga en el idioma de la persona). */
+  constructor(message: string, public status = 400, public datos?: Record<string, unknown>) { super(message); }
 }
 
 /** Nombre de archivo sano: sin barras (serían carpetas), sin caracteres de
@@ -266,4 +268,205 @@ export function validarUnidades(unidades: unknown): UnidadImportada[] {
     if (o.tipo === "empresa" && persona !== null) throw new HttpError(`Unidad ${n}: una unidad compartida no es de una persona`);
     return { item_id: item, tipo: o.tipo, persona };
   });
+}
+
+// ── Bajar varios en un .zip (acción bajar_varios) ───────────────────────────
+// María Villegas, 02/10: como Google, elegir varios archivos y carpetas y bajar
+// UN .zip. La edge arma la lista (qué entra lo decide la RLS de la persona) y
+// el NAS (infra/nas-drive/zip.mjs) arma el .zip mientras baja.
+
+/** Los mismos topes que el NAS (MAX_ENTRADAS_ZIP y MAX_BYTES_ZIP de
+ *  infra/nas-drive/server.mjs): si la edge firmara más, el NAS lo rechazaría
+ *  con un error que la persona no ve. */
+export const TOPE_ZIP_ENTRADAS = 5000;
+export const TOPE_ZIP_BYTES = 50 * 1024 ** 3;
+/** El permiso viaja en el cuerpo de un formulario; el NAS acepta hasta 4 MB
+ *  (MAX_PERMISO_ZIP). */
+export const TOPE_ZIP_PERMISO = 4 * 1024 * 1024;
+/** Más hondo que esto no baja (lo mismo que drive_mi_rol). */
+export const PROFUNDIDAD_ZIP = 50;
+
+export interface FichaZip {
+  id: string;
+  parent_id: string | null;
+  tipo: "carpeta" | "archivo";
+  nombre: string;
+  size: number | null;
+  storage_key: string | null;
+  estado: string;
+  trashed_at: string | null;
+}
+/** Una entrada del permiso: un archivo ({ k, n }) o una carpeta ({ n: "…/" }). */
+export interface EntradaZip { k?: string; n: string }
+
+const demasiados = () =>
+  new HttpError(`Son más de ${TOPE_ZIP_ENTRADAS} archivos y carpetas para un solo .zip. Elige menos o baja las carpetas por separado.`, 413, {
+    codigo: "zip_demasiados", tope: TOPE_ZIP_ENTRADAS,
+  });
+const muyGrande = () =>
+  new HttpError(`Lo elegido pasa los ${legible(TOPE_ZIP_BYTES)} que puede tener un .zip. Elige menos o baja las carpetas por separado.`, 413, {
+    codigo: "zip_muy_grande", tope: TOPE_ZIP_BYTES,
+  });
+const nadaListo = () =>
+  new HttpError("No hay nada listo para bajar en lo que elegiste", 404, { codigo: "zip_vacio" });
+
+/** Los ids elegidos: uuids, sin repetir, al menos uno y con tope. */
+export function idsParaZip(ids: unknown): string[] {
+  if (!Array.isArray(ids) || ids.length === 0) throw nadaListo();
+  const unicos = [...new Set(ids.map(String))];
+  if (unicos.some((id) => !UUID.test(id))) throw new HttpError("Hay un id inválido", 400);
+  if (unicos.length > TOPE_ZIP_ENTRADAS) throw demasiados();
+  return unicos;
+}
+
+/** Cuenta lo que va entrando y frena apenas se pasa: así una carpeta importada
+ *  con 40 mil archivos no se lee entera para después decir que no. */
+export class CuentaDelZip {
+  entradas = 0;
+  bytes = 0;
+  sumar(f: Pick<FichaZip, "tipo" | "size">) {
+    this.entradas++;
+    if (f.tipo === "archivo") this.bytes += Number(f.size ?? 0);
+    if (this.entradas > TOPE_ZIP_ENTRADAS) throw demasiados();
+    if (this.bytes > TOPE_ZIP_BYTES) throw muyGrande();
+  }
+}
+
+/** Lo que entra: no lo de la papelera, no lo que se está subiendo, y un
+ *  archivo solo si tiene dónde estar en el NAS. */
+export const entraEnElZip = (f: FichaZip) =>
+  !f.trashed_at && f.estado === "listo" && (f.tipo === "carpeta" || !!f.storage_key);
+
+/** Un nombre que se puede descomprimir en Windows, Mac y Linux: sin
+ *  `<>:"|?*` ni caracteres de control, sin puntos ni espacios al final (Windows
+ *  los borra) y nunca «.» o «..». La base ya prohíbe las barras. */
+export function nombreParaElZip(nombre: string): string {
+  let s = nombre.normalize("NFC").replace(/[<>:"|?*\\/\u0000-\u001f\u007f]/g, "_").replace(/[. ]+$/, "").trim();
+  if (!s || s === "." || s === "..") s = "_";
+  return s.slice(0, 200);
+}
+
+/** «Foto.jpg» → «Foto (2).jpg»; «Carpeta» → «Carpeta (2)». */
+function conNumero(nombre: string, n: number, carpeta: boolean): string {
+  const punto = carpeta ? -1 : nombre.lastIndexOf(".");
+  return punto > 0 ? `${nombre.slice(0, punto)} (${n})${nombre.slice(punto)}` : `${nombre} (${n})`;
+}
+
+/** Carpetas primero y después por nombre, como en la pantalla. */
+const enOrden = (a: FichaZip, b: FichaZip) =>
+  a.tipo !== b.tipo ? (a.tipo === "carpeta" ? -1 : 1) : a.nombre.localeCompare(b.nombre, "es", { numeric: true });
+
+/**
+ * La lista del .zip: cada archivo con su ruta adentro («Contabilidad/2026/
+ * Balance.pdf») y cada carpeta como «…/» (para que una vacía también llegue).
+ * Dos cosas con el mismo nombre en la misma carpeta —o que solo cambian en
+ * mayúsculas: en el Mac y en Windows son el mismo archivo— se vuelven
+ * «nombre (2).ext». `hijos`: lo de adentro de cada carpeta (ya leído con la
+ * RLS de la persona).
+ */
+export function armarListaDelZip(elegidos: FichaZip[], hijos: Map<string, FichaZip[]>): { l: EntradaZip[]; archivos: number; bytes: number } {
+  const l: EntradaZip[] = [];
+  let archivos = 0;
+  let bytes = 0;
+  const visitadas = new Set<string>();
+  const agregar = (fichas: FichaZip[], base: string, nivel: number) => {
+    const usados = new Set<string>();
+    for (const f of fichas) {
+      if (!entraEnElZip(f)) continue;
+      const carpeta = f.tipo === "carpeta";
+      if (carpeta && (visitadas.has(f.id) || nivel > PROFUNDIDAD_ZIP)) continue;
+      const limpio = nombreParaElZip(f.nombre);
+      let nombre = limpio;
+      for (let n = 2; usados.has(nombre.toLocaleLowerCase("es")); n++) nombre = conNumero(limpio, n, carpeta);
+      usados.add(nombre.toLocaleLowerCase("es"));
+      const ruta = `${base}${nombre}`;
+      if (carpeta) {
+        visitadas.add(f.id);
+        l.push({ n: `${ruta}/` });
+        agregar([...(hijos.get(f.id) ?? [])].sort(enOrden), `${ruta}/`, nivel + 1);
+      } else {
+        l.push({ k: f.storage_key!, n: ruta });
+        archivos++;
+        bytes += Number(f.size ?? 0);
+      }
+    }
+  };
+  agregar(elegidos, "", 0);
+  if (l.length > TOPE_ZIP_ENTRADAS) throw demasiados();
+  if (bytes > TOPE_ZIP_BYTES) throw muyGrande();
+  if (!l.length) throw nadaListo();
+  return { l, archivos, bytes };
+}
+
+// ── Miniaturas (acción miniaturas) ──────────────────────────────────────────
+// Jhon, 02/10: vistas en cuadrícula y galería con miniaturas. Las hace el NAS
+// (infra/nas-drive/miniaturas.mjs: sips para imágenes, Quick Look para videos,
+// PDF y Office); aquí se decide a cuáles se les pide y se firma el permiso.
+
+/** Cuántas por pedido: una página de la cuadrícula cuesta UNA llamada. */
+export const TOPE_MINIATURAS = 200;
+
+/** ⚠️ Copiadas en frontend/src/lib/drive/miniaturas.ts (el build del frontend no
+ *  importa de supabase/); test/oficina/miniaturasDrive.test.tsx exige que sean
+ *  iguales. Las imágenes van por sips; lo demás, por Quick Look. Sin SVG: ese
+ *  se dibuja aparte y nunca pasa por una herramienta. */
+export const EXTENSIONES_CON_MINIATURA = [
+  "jpg", "jpeg", "png", "gif", "webp", "heic", "heif", "tif", "tiff", "bmp",
+  "mov", "mp4", "m4v",
+  "pdf",
+  "doc", "docx", "xls", "xlsx", "ppt", "pptx", "key", "pages", "numbers",
+] as const;
+/** Lo importado de Google llega muchas veces sin extensión útil: el tipo de la
+ *  ficha dice cuál usar. */
+export const MINIATURA_POR_MIME: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/gif": "gif",
+  "image/webp": "webp",
+  "image/heic": "heic",
+  "image/heif": "heif",
+  "image/tiff": "tiff",
+  "image/bmp": "bmp",
+  "video/quicktime": "mov",
+  "video/mp4": "mp4",
+  "video/x-m4v": "m4v",
+  "application/pdf": "pdf",
+  "application/msword": "doc",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+  "application/vnd.ms-excel": "xls",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+  "application/vnd.ms-powerpoint": "ppt",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
+};
+const CON_MINIATURA = new Set<string>(EXTENSIONES_CON_MINIATURA);
+
+/** La extensión con la que el NAS hace la miniatura, o null si no tiene. Manda
+ *  la extensión del nombre; el tipo de la ficha, solo si la extensión no dice. */
+export function extensionParaMiniatura(nombre: string, mime: string | null): string | null {
+  const ext = nombre.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] ?? "";
+  if (CON_MINIATURA.has(ext)) return ext;
+  const porTipo = MINIATURA_POR_MIME[(mime ?? "").split(";")[0].trim().toLowerCase()];
+  return porTipo ?? null;
+}
+
+export function idsParaMiniaturas(ids: unknown): string[] {
+  if (!Array.isArray(ids)) throw new HttpError("Faltan los ids");
+  const unicos = [...new Set(ids.map(String))];
+  if (unicos.length > TOPE_MINIATURAS) throw new HttpError(`Hasta ${TOPE_MINIATURAS} miniaturas por pedido`);
+  if (unicos.some((id) => !UUID.test(id))) throw new HttpError("Hay un id inválido");
+  return unicos;
+}
+
+/** Vencimiento en tramos de 6 h (vale entre 6 y 12 h): así la URL de una
+ *  miniatura no cambia en cada pedido y el navegador la reusa de su caché. */
+export const TRAMO_MINIATURA = 6 * 3600;
+export const venceMiniatura = (ahoraMs = Date.now()) => (Math.floor(ahoraMs / 1000 / TRAMO_MINIATURA) + 2) * TRAMO_MINIATURA;
+
+/** «Maven-2026-10-02.zip», como el «drive-download-…» de Google. Si se baja UNA
+ *  sola carpeta, el .zip lleva su nombre. La fecha es la de Bogotá. */
+export function nombreDelZip(elegidos: FichaZip[], ahora = new Date()): string {
+  const fecha = ahora.toLocaleDateString("sv-SE", { timeZone: "America/Bogota" });
+  const visibles = elegidos.filter(entraEnElZip);
+  const base = visibles.length === 1 && visibles[0].tipo === "carpeta" ? nombreParaElZip(visibles[0].nombre).slice(0, 150) : "Maven";
+  return `${base}-${fecha}.zip`;
 }

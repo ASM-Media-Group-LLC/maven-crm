@@ -16,6 +16,8 @@ import { corsFor } from "../_shared/cors.ts";
 //   imap_folders — carpetas vía IMAP con la credencial cifrada. Este es el
 //       camino DEFINITIVO: no requiere que la persona autorice nada, así que
 //       nunca ve la pantalla de Zoho. El de arriba queda como plan B.
+//   translate    — traduce el cuerpo de un correo con la IA (OpenRouter); ver
+//       traducir.ts. Necesita el secret OPENROUTER_API_KEY.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { listFolders, refreshUserToken } from "../_shared/zoho-mail.ts";
@@ -27,6 +29,9 @@ import { tamanoDeBase64 } from "../_shared/base64.ts";
 import { buildMessage, esDireccionSmtp, SmtpClient } from "../_shared/smtp.ts";
 import { unseal } from "../_shared/mail-crypto.ts";
 import { ocultarAvisosDelProveedor } from "../_shared/mail-notices.ts";
+import {
+  ErrorDeTraduccion, type Idioma, MODELO_ECONOMICO, pedirTraduccion, textoParaTraducir,
+} from "./traducir.ts";
 
 const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
 
@@ -104,6 +109,45 @@ Deno.serve(async (req) => {
       }>;
     };
     if (!action) return json(req, { error: "action is required" }, 400);
+
+    // ── Traducir un correo (el ⋮ de cada mensaje, Keila 02/10) ───────────
+    // No abre IMAP: el cuerpo sale de la caché, y SOLO de una fila de quien
+    // llama (por eso va con `user_id`: con service_role la RLS no filtra). Un
+    // correo del camino en vivo no tiene fila y manda su texto, recortado.
+    if (action === "translate") {
+      const apiKey = Deno.env.get("OPENROUTER_API_KEY");
+      // El código y no una frase: la pantalla lo muestra en el idioma de quien
+      // lee («la traducción no está activada»).
+      if (!apiKey) return json(req, { error: "sin_llave_ia" }, 503);
+      const { id: idFila, idioma } = body as { id?: unknown; idioma?: unknown };
+      const destino: Idioma = idioma === "en" ? "en" : "es";
+      let fuente: { text?: string | null; html?: string | null };
+      if (typeof idFila === "string" && idFila) {
+        const { data: fila, error: filaErr } = await admin.from("mail_messages")
+          .select("html, text_body")
+          .eq("id", idFila)
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (filaErr) return json(req, { error: "no se pudo leer el correo" }, 500);
+        if (!fila) return json(req, { error: "ese correo no está en tu casilla" }, 404);
+        fuente = { text: fila.text_body as string | null, html: fila.html as string | null };
+      } else {
+        fuente = {
+          text: typeof text === "string" ? text.slice(0, 20_000) : null,
+          html: typeof html === "string" ? html.slice(0, 100_000) : null,
+        };
+      }
+      const { texto, recortado } = textoParaTraducir(fuente);
+      if (!texto.trim()) return json(req, { error: "sin_texto" }, 400);
+      try {
+        const modelo = Deno.env.get("IA_MODELO_OPENROUTER") || MODELO_ECONOMICO;
+        const traduccion = await pedirTraduccion(fetch, apiKey, modelo, texto, destino);
+        return json(req, { traduccion, recortado, idioma: destino });
+      } catch (e) {
+        const status = e instanceof ErrorDeTraduccion ? e.status : 502;
+        return json(req, { error: (e as Error).message || "no se pudo traducir" }, status);
+      }
+    }
 
     // OJO: la búsqueda de la conexión OAuth va DENTRO de `folders`, no
     // antes del dispatch: `imap_folders` no necesita conexión OAuth, y

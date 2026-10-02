@@ -28,8 +28,10 @@ import fsp from "node:fs/promises";
 import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { pipeline } from "node:stream/promises";
-import { Transform } from "node:stream";
+import { Readable, Transform } from "node:stream";
 import { verificar, recibo } from "./firma.mjs";
+import { armarZip } from "./zip.mjs";
+import { CARPETA_CACHE, crearCola, extensionValida, miniaturaDe, rutaEnCache, servirMiniatura } from "./miniaturas.mjs";
 
 export const MAX_POR_PEDIDO = 95 * 1024 * 1024; // el proxy de Cloudflare corta en 100 MB
 const CLAVE_OK = /^[0-9a-f-]{36}(\/[0-9a-f-]{36}){1,2}$/;
@@ -51,6 +53,9 @@ export function configDesdeEntorno(env = process.env) {
     origenes: (env.ORIGENES ?? "https://app.maven-ai.me").split(",").map((o) => o.trim()).filter(Boolean),
     puerto: Number(env.PUERTO ?? 8790),
     host: env.HOST ?? "127.0.0.1",
+    // Las herramientas de las miniaturas (miniaturas.mjs); por defecto las del Mac.
+    sips: env.SIPS || undefined,
+    qlmanage: env.QLMANAGE || undefined,
   };
 }
 
@@ -235,7 +240,6 @@ async function completar(conf, res, d) {
     partes.push(p);
   }
   const max = Number(d.max);
-  const { Readable } = await import("node:stream");
   const todas = Readable.from((async function* () {
     for (const p of partes) yield* fs.createReadStream(p);
   })());
@@ -245,9 +249,178 @@ async function completar(conf, res, d) {
 }
 
 async function borrar(conf, res, d) {
-  for (const r of conf.raices) await fsp.rm(path.join(r, d.k), { force: true });
+  for (const r of conf.raices) {
+    // Su miniatura también (antes de borrar: el nombre sale del tamaño).
+    const s = await fsp.stat(path.join(r, d.k)).catch(() => null);
+    if (s) {
+      const mini = rutaEnCache(r, d.k, s.size);
+      await fsp.rm(mini, { force: true });
+      await fsp.rm(`${mini}.no`, { force: true });
+    }
+    await fsp.rm(path.join(r, d.k), { force: true });
+  }
   res.writeHead(204);
   res.end();
+}
+
+// ── Varios archivos en un .zip (POST /zip) ──────────────────────────────────
+// La edge `drive` (acción bajar_varios) decide QUÉ entra —con la RLS de la
+// persona— y lo firma: { op: "zip", e, n: nombre del .zip, l: [{ k, n }] }.
+// Una carpeta va como { n: "Carpeta/" } (sin k), para que una vacía también
+// llegue. El permiso va en el CUERPO (formulario) y no en la URL: con miles de
+// archivos pesa más de lo que aguanta una URL.
+
+/** Los mismos topes que la edge (supabase/functions/drive/logica.ts). */
+export const MAX_ENTRADAS_ZIP = 5000;
+export const MAX_BYTES_ZIP = 50 * 1024 ** 3;
+/** Un permiso de zip con 5000 rutas largas ronda 1–2 MB. */
+export const MAX_PERMISO_ZIP = 4 * 1024 * 1024;
+const MAX_CUERPO_ZIP = MAX_PERMISO_ZIP + 4096;
+const MAX_RUTA_ZIP = 1024;
+
+const error = (mensaje, status) => Object.assign(new Error(mensaje), { status });
+
+/** Una ruta adentro del .zip: relativa, sin «..», sin barras invertidas ni
+ *  caracteres de control. Al descomprimir, una ruta mala escribe FUERA de la
+ *  carpeta de destino («zip slip»). */
+export function rutaDelZipValida(n, carpeta) {
+  if (typeof n !== "string" || !n || n.length > MAX_RUTA_ZIP) return false;
+  if (/[\\\u0000-\u001f\u007f]/.test(n) || n.startsWith("/") || /^[a-zA-Z]:/.test(n)) return false;
+  if (carpeta !== n.endsWith("/")) return false;
+  const partes = (carpeta ? n.slice(0, -1) : n).split("/");
+  return partes.every((p) => p !== "" && p !== "." && p !== "..");
+}
+
+/** Revisa el pedido firmado ENTERO antes de mandar un byte. */
+export function validarPedidoZip(d) {
+  if (!Array.isArray(d.l) || d.l.length === 0) throw error("el .zip no tiene nada", 400);
+  if (d.l.length > MAX_ENTRADAS_ZIP) throw error(`un .zip lleva hasta ${MAX_ENTRADAS_ZIP} archivos y carpetas`, 413);
+  const vistos = new Set();
+  let agencia = null;
+  const lista = d.l.map((x) => {
+    const carpeta = !!x && typeof x === "object" && x.k === undefined;
+    const n = x?.n;
+    if (!rutaDelZipValida(n, carpeta)) throw error("ruta inválida dentro del .zip", 400);
+    if (vistos.has(n)) throw error("ruta repetida dentro del .zip", 400);
+    vistos.add(n);
+    if (carpeta) return { n, carpeta: true };
+    // Cada archivo con las MISMAS reglas que un permiso de bajar uno solo.
+    const k = String(x.k);
+    if (!CLAVE_OK.test(k) && !CLAVE_IMPORTADA.test(k)) throw error("ruta inválida", 400);
+    // Todo de UNA agencia (la persona solo ve la suya): la agencia va en el camino.
+    const suya = k.slice(0, 36);
+    if (agencia !== null && suya !== agencia) throw error("un .zip no mezcla agencias", 400);
+    agencia = suya;
+    return { n, k };
+  });
+  const nombre = typeof d.n === "string" && /\.zip$/i.test(d.n) && d.n.length <= 200 && !/[/\\\u0000-\u001f\u007f]/.test(d.n)
+    ? d.n : "Maven.zip";
+  return { nombre, lista };
+}
+
+function leerCuerpo(req, tope) {
+  return new Promise((resolve, reject) => {
+    const pedazos = [];
+    let total = 0;
+    req.on("data", (p) => {
+      total += p.length;
+      if (total > tope) { reject(error("el pedido es demasiado grande", 413)); req.destroy(); return; }
+      pedazos.push(p);
+    });
+    req.on("end", () => resolve(Buffer.concat(pedazos).toString("utf8")));
+    req.on("error", reject);
+  });
+}
+
+/** En qué raíz está un archivo y cuánto pesa, o null. */
+async function ubicar(conf, rel) {
+  for (const r of conf.raices) {
+    try {
+      const s = await fsp.stat(path.join(r, rel));
+      if (s.isFile()) return { raiz: r, ruta: path.join(r, rel), size: s.size, fecha: s.mtime };
+    } catch { /* sigue */ }
+  }
+  return null;
+}
+
+/** La miniatura (op "mini"): de la caché del disco o hecha en el momento.
+ *  Sin miniatura posible, 404 y la pantalla muestra el ícono del tipo. */
+async function servirMini(conf, req, res, d, cola, enCurso) {
+  if (!extensionValida(d.x)) return json(res, 400, { error: "extensión inválida" });
+  const a = await ubicar(conf, d.k);
+  if (!a) return json(res, 404, { error: "no existe" });
+  // Si la persona ya no la quiere (bajó la página), no se hace al llegarle el turno.
+  let vivo = true;
+  res.on("close", () => { vivo = false; });
+  const archivo = await miniaturaDe(conf, cola, enCurso, { raiz: a.raiz, ruta: a.ruta, clave: d.k, size: a.size, x: d.x }, () => vivo);
+  if (!archivo) return json(res, 404, { error: "sin miniatura" });
+  const s = await fsp.stat(archivo);
+  return servirMiniatura(res, archivo, s.size);
+}
+
+/** El nombre de la nota de lo que falta, sin chocar con una ruta del .zip. */
+function nombreLibre(base, ocupados) {
+  let n = base;
+  for (let i = 2; ocupados.has(n); i++) n = base.replace(/\.txt$/, ` (${i}).txt`);
+  return n;
+}
+
+async function servirZip(conf, req, res) {
+  if (req.method !== "POST") return json(res, 405, { error: "el .zip se pide con POST" });
+  if (!/^application\/x-www-form-urlencoded\b/i.test(String(req.headers["content-type"] ?? ""))) {
+    return json(res, 415, { error: "el permiso va como formulario (campo t)" });
+  }
+  const largo = Number(req.headers["content-length"]);
+  if (Number.isFinite(largo) && largo > MAX_CUERPO_ZIP) return json(res, 413, { error: "el pedido es demasiado grande" });
+  const cuerpo = await leerCuerpo(req, MAX_CUERPO_ZIP);
+  const d = verificar(conf.secreto, new URLSearchParams(cuerpo).get("t") ?? "", Date.now(), MAX_PERMISO_ZIP);
+  // Un permiso de bajar UN archivo no sirve aquí, ni uno de zip en /o.
+  if (!d || d.op !== "zip") return json(res, 403, { error: "permiso inválido o vencido" });
+  const { nombre, lista } = validarPedidoZip(d);
+
+  // Todo se ubica ANTES de empezar: si se pasa del tope, se avisa con un error
+  // y no con un .zip cortado a la mitad.
+  const entradas = [];
+  const faltan = [];
+  let total = 0;
+  const ahora = new Date();
+  for (const e of lista) {
+    if (e.carpeta) { entradas.push({ nombre: e.n, carpeta: true, fecha: ahora }); continue; }
+    const a = await ubicar(conf, e.k);
+    if (!a) { faltan.push(e.n); continue; }
+    total += a.size;
+    if (total > MAX_BYTES_ZIP) return json(res, 413, { error: "el .zip pasa el tope de 50 GB" });
+    entradas.push({
+      nombre: e.n, size: a.size, fecha: a.fecha,
+      abrir: () => fs.createReadStream(a.ruta, { start: 0, end: a.size - 1 }),
+    });
+  }
+  // Un archivo que la base tiene y el disco no: el .zip sale igual con lo
+  // demás, y una nota adentro dice cuál faltó (como hace Google).
+  if (faltan.length) {
+    const nota = Buffer.from(`No se encontraron en el NAS:\n\n${faltan.join("\n")}\n`, "utf8");
+    entradas.push({
+      nombre: nombreLibre("No se pudieron incluir.txt", new Set(lista.map((e) => e.n))),
+      size: nota.length, fecha: ahora, abrir: async function* () { yield nota; },
+    });
+  }
+
+  const ascii = nombre.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^\x20-\x7e]|["\\]/g, "_");
+  res.writeHead(200, {
+    "Content-Type": "application/zip",
+    "Content-Disposition": `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(nombre)}`,
+    // Sin Content-Length: el .zip se arma mientras baja.
+    "Cache-Control": "no-store",
+    "X-Content-Type-Options": "nosniff",
+  });
+  try {
+    // Si el navegador corta, pipeline destruye el generador y el archivo
+    // abierto se cierra: no se sigue leyendo el disco para nadie.
+    await pipeline(Readable.from(armarZip(entradas)), res);
+  } catch (e) {
+    if (e?.code !== "ERR_STREAM_PREMATURE_CLOSE") console.error("[nas-drive] zip", e);
+    res.destroy();
+  }
 }
 
 async function salud(conf, res) {
@@ -264,26 +437,32 @@ async function salud(conf, res) {
 }
 
 export function crearServidor(conf) {
+  // Las miniaturas se hacen de a pocas (sips y Quick Look usan CPU y disco) y un
+  // mismo archivo pedido dos veces a la vez se hace una sola.
+  const cola = crearCola(conf.miniaturasALaVez);
+  const enCurso = new Map();
   return http.createServer(async (req, res) => {
     try {
       cors(conf, req, res);
       const url = new URL(req.url ?? "/", "http://nas");
       if (req.method === "OPTIONS") { res.writeHead(204); return res.end(); }
       if (url.pathname === "/salud" && req.method === "GET") return await salud(conf, res);
+      if (url.pathname === "/zip") return await servirZip(conf, req, res);
       if (url.pathname !== "/o") return json(res, 404, { error: "no existe" });
 
       const d = verificar(conf.secreto, url.searchParams.get("t") ?? "");
       if (!d) return json(res, 403, { error: "permiso inválido o vencido" });
       const importada = CLAVE_IMPORTADA.test(String(d.k));
       if (!CLAVE_OK.test(String(d.k)) && !importada) return json(res, 400, { error: "ruta inválida" });
-      if (importada && d.op !== "get" && d.op !== "borrar") return json(res, 400, { error: "un archivo importado no se sube ni se reemplaza" });
+      if (importada && d.op !== "get" && d.op !== "mini" && d.op !== "borrar") return json(res, 400, { error: "un archivo importado no se sube ni se reemplaza" });
 
       // La operación del permiso tiene que coincidir con el método: un
       // permiso para BAJAR no sirve para subir ni para borrar.
-      const esperado = { get: ["GET", "HEAD"], put: ["PUT"], parte: ["PUT"], completar: ["POST"], borrar: ["DELETE"] }[d.op];
+      const esperado = { get: ["GET", "HEAD"], mini: ["GET"], put: ["PUT"], parte: ["PUT"], completar: ["POST"], borrar: ["DELETE"] }[d.op];
       if (!esperado || !esperado.includes(req.method)) return json(res, 405, { error: "operación no permitida con este permiso" });
 
       if (d.op === "get") return await servirArchivo(conf, req, res, d);
+      if (d.op === "mini") return await servirMini(conf, req, res, d, cola, enCurso);
       if (d.op === "put") return await subirEntero(conf, req, res, d);
       if (d.op === "parte") return await subirParte(conf, req, res, d);
       if (d.op === "completar") return await completar(conf, res, d);
@@ -299,6 +478,9 @@ export function crearServidor(conf) {
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const conf = configDesdeEntorno();
+  // ⚠️ Si el servidor se cayó a mitad de una miniatura, en .tmp quedó un enlace
+  // DURO al archivo: borrar el archivo no liberaría su lugar. Se limpia al arrancar.
+  for (const r of conf.raices) fs.rmSync(path.join(r, CARPETA_CACHE, ".tmp"), { recursive: true, force: true });
   const s = crearServidor(conf);
   // Subidas largas por el túnel: el límite por defecto de Node (5 min) cortaría
   // una parte de 95 MB con una conexión lenta.

@@ -10,6 +10,8 @@
 //   subir_iniciar    { parent_id, nombre, mime, size } → permisos para subir
 //   subir_confirmar  { id, recibo }                    → el archivo queda listo
 //   abrir            { id, descargar? }                → URL para verlo/bajarlo
+//   bajar_varios     { ids }                           → permiso para UN .zip (POST /zip del NAS)
+//   miniaturas       { ids }  (hasta 200)              → { urls: { id: URL de la miniatura } }
 //   borrar_para_siempre { id }                         → borra en el NAS y la ficha
 //   crear_unidad     { nombre }                        → (admins) una unidad compartida
 //
@@ -26,6 +28,11 @@ import {
   armarIndice, chequearCupo, chequearEspacioDeLaAgencia, hayLugarEnElNas, HttpError, madresQueFaltanEnElLote, nombreValido,
   planDeSubida, TAMANO_PARTE, validarLote, validarUnidades, type ItemParaIndice,
 } from "./logica.ts";
+import {
+  armarListaDelZip, CuentaDelZip, entraEnElZip, idsParaZip, nombreDelZip, PROFUNDIDAD_ZIP, TOPE_ZIP_ENTRADAS, TOPE_ZIP_PERMISO,
+  type FichaZip,
+} from "./logica.ts";
+import { extensionParaMiniatura, idsParaMiniaturas, venceMiniatura } from "./logica.ts";
 
 Deno.serve(async (req) => {
   const CORS = corsFor(req, { "Access-Control-Allow-Methods": "POST, OPTIONS" });
@@ -237,6 +244,50 @@ Deno.serve(async (req) => {
       return responder({ url: u });
     }
 
+    if (accion === "bajar_varios") {
+      // ⚠️ TODO como la persona: qué entra en el .zip lo decide la RLS, igual
+      // que al abrir un archivo. Con el cliente admin, un id ajeno metido a
+      // mano en el pedido bajaría lo que esa persona no puede ver.
+      const ids = idsParaZip(body.ids);
+      const cuenta = new CuentaDelZip();
+      const porId = new Map<string, FichaZip>();
+      for (let i = 0; i < ids.length; i += 150) {
+        const { data, error } = await comoLaPersona.from("drive_items").select(COLUMNAS_ZIP).in("id", ids.slice(i, i + 150));
+        if (error) throw new HttpError(error.message, 500);
+        for (const f of (data ?? []) as FichaZip[]) porId.set(f.id, f);
+      }
+      // En el orden en que se eligieron (el de la pantalla).
+      const elegidos = ids.map((id) => porId.get(id)).filter((f): f is FichaZip => !!f && entraEnElZip(f));
+      for (const f of elegidos) cuenta.sumar(f);
+      const hijos = await loDeAdentroComoLaPersona(comoLaPersona, elegidos.filter((f) => f.tipo === "carpeta").map((f) => f.id), cuenta);
+      const { l, archivos, bytes } = armarListaDelZip(elegidos, hijos);
+      const t = await firmar(secreto, { op: "zip", e: ahoraMas(VENCE_ZIP), n: nombreDelZip(elegidos), l } as never);
+      if (t.length > TOPE_ZIP_PERMISO) {
+        throw new HttpError("Son demasiados archivos (o nombres muy largos) para un solo .zip. Elige menos.", 413, { codigo: "zip_demasiados", tope: TOPE_ZIP_ENTRADAS });
+      }
+      // El permiso va en el CUERPO de un formulario (POST /zip), no en la URL.
+      return responder({ url: `${nas}/zip`, t, archivos, bytes });
+    }
+
+    if (accion === "miniaturas") {
+      // Las miniaturas de una página de la cuadrícula, en UNA llamada. Como la
+      // persona: si la RLS no le muestra la ficha, no hay miniatura.
+      const ids = idsParaMiniaturas(body.ids);
+      const e = venceMiniatura();
+      const urls: Record<string, string> = {};
+      for (let i = 0; i < ids.length; i += 150) {
+        const { data, error } = await comoLaPersona.from("drive_items")
+          .select("id, tipo, nombre, mime, storage_key, estado").in("id", ids.slice(i, i + 150));
+        if (error) throw new HttpError(error.message, 500);
+        for (const f of (data ?? []) as { id: string; tipo: string; nombre: string; mime: string | null; storage_key: string | null; estado: string }[]) {
+          if (f.tipo !== "archivo" || f.estado !== "listo" || !f.storage_key) continue;
+          const x = extensionParaMiniatura(f.nombre, f.mime);
+          if (x) urls[f.id] = `${nas}/o?t=${await firmar(secreto, { op: "mini", k: f.storage_key, x, e } as never)}`;
+        }
+      }
+      return responder({ urls });
+    }
+
     if (accion === "borrar_para_siempre") {
       const id = String(body.id ?? "");
       const rol = await rolDe(comoLaPersona, id);
@@ -305,7 +356,7 @@ Deno.serve(async (req) => {
   } catch (e) {
     const status = e instanceof HttpError ? e.status : 500;
     if (status === 500) console.error("[drive]", e);
-    return responder({ error: (e as Error).message ?? "error" }, status);
+    return responder({ ...(e instanceof HttpError ? e.datos : undefined), error: (e as Error).message ?? "error" }, status);
   }
 });
 
@@ -323,6 +374,45 @@ async function versionesGuardadas(admin: SupabaseClient, ids: string[]): Promise
     for (const v of (data ?? []) as { storage_key: string | null }[]) if (v.storage_key) claves.push(v.storage_key);
   }
   return claves;
+}
+
+const COLUMNAS_ZIP = "id, parent_id, tipo, nombre, size, storage_key, estado, trashed_at";
+/** El permiso del .zip se usa enseguida (el navegador lo manda al NAS apenas
+ *  llega); la descarga en sí puede durar horas: el NAS lo mira solo al empezar. */
+const VENCE_ZIP = 15 * 60;
+
+/** Lo de adentro de las carpetas elegidas, nivel por nivel y con la RLS de la
+ *  persona. De a 150 carpetas (una URL con más ids se corta) y de a 1000 filas
+ *  (PostgREST corta en 1000 sin avisar). La cuenta frena apenas se pasa del
+ *  tope, sin leer el resto. */
+async function loDeAdentroComoLaPersona(cliente: SupabaseClient, carpetas: string[], cuenta: CuentaDelZip) {
+  const hijos = new Map<string, FichaZip[]>();
+  const vistas = new Set(carpetas);
+  let nivel = carpetas;
+  for (let n = 0; nivel.length && n < PROFUNDIDAD_ZIP; n++) {
+    const siguiente: string[] = [];
+    for (let i = 0; i < nivel.length; i += 150) {
+      const tramo = nivel.slice(i, i + 150);
+      for (let desde = 0; ; desde += 1000) {
+        const { data, error } = await cliente.from("drive_items").select(COLUMNAS_ZIP)
+          .in("parent_id", tramo).is("trashed_at", null).eq("estado", "listo")
+          .order("id").range(desde, desde + 999);
+        if (error) throw new HttpError(error.message, 500);
+        const filas = (data ?? []) as FichaZip[];
+        for (const f of filas) {
+          if (!entraEnElZip(f) || !f.parent_id) continue;
+          cuenta.sumar(f);
+          const lista = hijos.get(f.parent_id) ?? [];
+          lista.push(f);
+          hijos.set(f.parent_id, lista);
+          if (f.tipo === "carpeta" && !vistas.has(f.id)) { vistas.add(f.id); siguiente.push(f.id); }
+        }
+        if (filas.length < 1000) break;
+      }
+    }
+    nivel = siguiente;
+  }
+  return hijos;
 }
 
 async function rolDe(cliente: SupabaseClient, id: string): Promise<string | null> {

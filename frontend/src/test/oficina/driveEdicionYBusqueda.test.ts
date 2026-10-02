@@ -117,7 +117,8 @@ describe("⚠️ guardar lo editado (oficina-doc ?guardar_drive)", () => {
     expect(r).toMatch(/await guardarEnElNas\(llave, bytes\)/);
     expect(r).not.toMatch(/guardarEnElNas\(fila\.storage_key/);
     // Y el NAS, por su lado, no deja subir sobre lo importado de Google.
-    expect(nas).toMatch(/if \(importada && d\.op !== "get" && d\.op !== "borrar"\)/);
+    // Lo importado solo se LEE (get, y la miniatura desde #2006) o se borra: nunca put/parte/completar.
+    expect(nas).toMatch(/if \(importada && d\.op !== "get" && d\.op !== "mini" && d\.op !== "borrar"\)/);
   });
 
   it("el historial se anota ANTES de mover el puntero, y el puntero solo se mueve si nadie lo movió", () => {

@@ -42,8 +42,10 @@ describe("⚠️ los UID son POR CARPETA", () => {
     // El uid 5 de Recibidos y el uid 5 de Archivados son correos DISTINTOS.
     // Mandarlos todos como si fueran de una sola no falla: MUEVE OTROS
     // mensajes. Es la clase de error que no se nota hasta que falta un correo.
-    expect(pagina).toMatch(/const porCarpeta = new Map<string, MailSummary\[\]>\(\)/);
-    expect(pagina).toMatch(/for \(const \[f, delGrupo\] of porCarpeta\)/);
+    // El agrupado vive en lib/correo/accionesDelMensaje.ts (lo usan también el
+    // ⋮ de cada mensaje y el arrastrar): ahí está probado con correos de varias
+    // carpetas (test/correo/accionesDelMensaje.test.ts).
+    expect(pagina).toMatch(/for \(const \[f, delGrupo\] of agruparPorCarpeta\(elegidos, carpeta\)\)/);
     expect(pagina).toMatch(/\{ folder: f, op, items: delGrupo/);
   });
 

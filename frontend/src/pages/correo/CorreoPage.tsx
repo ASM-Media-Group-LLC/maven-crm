@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { format, isToday, isThisYear } from "date-fns";
 import { es } from "date-fns/locale";
@@ -82,11 +82,27 @@ import {
   claveDe,
   correoDe,
   nombreDe,
+  type MailMessage,
   type MailSummary,
  useMailBulk, type OperacionMasiva,
   useAdjuntosParaReenviar,
+  useMailNoLeidos,
+  TOPE_NO_LEIDOS,
+  useTraerMensaje,
+  buscarCorreoPorMessageId,
 } from "@/hooks/useMailbox";
 import { agruparEnHilos, sinPrefijos, type Hilo } from "@/lib/mailHilos";
+import MenuDelMensaje, { type AccionesDelMensaje } from "@/components/correo/MenuDelMensaje";
+import TraduccionDelCorreo from "@/components/correo/TraduccionDelCorreo";
+import CompartirEnChatDialog from "@/components/correo/CompartirEnChatDialog";
+import { BotonNoLeidosPrimero, BotonPanelDeLectura, RotuloDeSeccion } from "@/components/correo/OpcionesDeVista";
+import { usePreferenciasCorreo } from "@/hooks/usePreferenciasCorreo";
+import {
+  agruparPorCarpeta, borradorDeReenvio, borradorDeRespuesta, desdeAqui, NO_SE_SUELTA, paraSoltarEnCarpeta,
+} from "@/lib/correo/accionesDelMensaje";
+import { juntarSinRepetir, partirNoLeidosPrimero } from "@/lib/correo/noLeidosPrimero";
+import { PARAM_MENSAJE, type CorreoACompartir } from "@/lib/correo/compartirEnChat";
+import { esAtajoDeVolver } from "@/lib/correo/atajos";
 import { resumenSinCita } from "@/lib/mailCita";
 import { useHiloCompleto } from "@/hooks/useHiloCompleto";
 import { opcionesDePosponer } from "@/lib/posponer";
@@ -95,7 +111,7 @@ import {
   useNoLeidosPorEtiqueta,
 } from "@/hooks/useEtiquetasCorreo";
 import type { ParDeColores } from "@/lib/correo/coloresEtiqueta";
-import { asuntoDeReenvio, destinatariosRespuesta, direccionesDe, participantesDe, tieneVariosInvolucrados } from "@/lib/mailAddr";
+import { direccionesDe, participantesDe, tieneVariosInvolucrados } from "@/lib/mailAddr";
 import { toast } from "sonner";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { TranslationKey } from "@/lib/i18n";
@@ -273,7 +289,17 @@ export default function CorreoPage() {
   // La página de la carpeta, como Gmail: «1–50 de 186» con ‹ ›. Grace no
   // podía llegar a sus correos 51 al 126 (28/09).
   const [pagina, setPagina] = useState(0);
-  const lista = useMailMessages(carpeta, hayBuzon, pagina);
+  // Cómo quiere ver el correo esta persona (Keila, 02/10): se guarda por persona.
+  const prefs = usePreferenciasCorreo();
+  // «Sin división»: el correo abierto ocupa todo; se vuelve con la flecha, «u» o Escape.
+  const sinDivision = prefs.lectura === "completa";
+  // «No leídos primero», solo en Recibidos (como Gmail). Mirando una etiqueta o
+  // buscando, la lista se arma de otra forma y no se parte.
+  const modoNoLeidos = prefs.noLeidosPrimero && carpeta === "INBOX" && !etiquetaVista && !enBusqueda;
+  // En ese modo la página trae solo los LEÍDOS («Todo lo demás») y los no
+  // leídos vienen de TODA la carpeta: uno sin leer de la página 3 va arriba.
+  const lista = useMailMessages(carpeta, hayBuzon, pagina, modoNoLeidos);
+  const noLeidosQ = useMailNoLeidos(carpeta, hayBuzon && modoNoLeidos);
   const totalCarpeta = lista.data?.total;
   const resultados = useMailSearch(carpeta, queryActiva, hayBuzon);
   // ⚠️ La carpeta del correo ABIERTO, que no siempre es la seleccionada: en la
@@ -293,8 +319,65 @@ export default function CorreoPage() {
   const precargar = usePrefetchMailMessage();
   const marcarLeido = useMarkSeen();
   const descargar = useDownloadAttachment();
+  // El cuerpo de OTRO mensaje de la conversación (no el abierto), para
+  // responderlo o reenviarlo desde su ⋮.
+  const traerMensaje = useTraerMensaje();
+  const [trayendoMensaje, setTrayendoMensaje] = useState(false);
+  // «Traducir» del ⋮: la clave del mensaje traducido. Si se abre otro, deja
+  // de coincidir y se ve el original, sin tener que limpiarlo.
+  const [traducido, setTraducido] = useState<string | null>(null);
+  // «Compartir en el chat» del ⋮.
+  const [compartiendo, setCompartiendo] = useState<CorreoACompartir | null>(null);
+  // Los correos que se están arrastrando (una fila o la selección) y la
+  // carpeta sobre la que están, para resaltarla.
+  const [arrastre, setArrastre] = useState<{ correos: MailSummary[]; hilos: number } | null>(null);
+  const [carpetaBajoArrastre, setCarpetaBajoArrastre] = useState<string | null>(null);
+  // Un correo que hay que abrir DESPUÉS de cambiar de carpeta (el enlace del
+  // chat): el efecto de `carpeta` suelta el abierto, y esto le dice cuál abrir.
+  const abrirAlCambiarDeCarpeta = useRef<MailSummary | null>(null);
   // La bandeja se actualiza sola cuando el sincronizador escribe (push).
   useMailRealtime(hayBuzon);
+
+  // `?mensaje=<Message-ID>`: el enlace de «Compartir en el chat». Se abre MI
+  // copia de ese correo (puede estar en otra carpeta, o no estar). La URL se
+  // limpia para que un refresh no lo vuelva a abrir.
+  useEffect(() => {
+    const id = params.get(PARAM_MENSAJE);
+    if (!id || !hayBuzon) return;
+    const limpio = new URLSearchParams(params);
+    limpio.delete(PARAM_MENSAJE);
+    setParams(limpio, { replace: true });
+    buscarCorreoPorMessageId(id)
+      .then((m) => {
+        if (!m) { toast.error(t("mail.link.notFound")); return; }
+        setEtiquetaVista(null);
+        setQueryActiva("");
+        setBusqueda("");
+        if (m.unread) marcarLeido.mutate({ folder: m.folder ?? "INBOX", m });
+        if (m.folder && m.folder !== carpeta) {
+          abrirAlCambiarDeCarpeta.current = m;
+          setCarpeta(m.folder);
+        } else {
+          setSel(m);
+        }
+      })
+      .catch(() => toast.error(t("mail.link.error")));
+    // Solo cuando cambia la URL: la carpeta de ese momento alcanza.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params, hayBuzon, setParams]);
+
+  // «u» o Escape: volver a la lista, como en Gmail, cuando el correo abierto
+  // ocupa todo el espacio («Sin división»).
+  useEffect(() => {
+    if (!sinDivision || !sel) return;
+    const alPulsar = (e: KeyboardEvent) => {
+      if (!esAtajoDeVolver(e, document)) return;
+      e.preventDefault();
+      setSel(null);
+    };
+    window.addEventListener("keydown", alPulsar);
+    return () => window.removeEventListener("keydown", alPulsar);
+  }, [sinDivision, sel]);
 
   // `?to=` (y opcional `?asunto=`): abrir el compositor con el destinatario
   // puesto. Lo usa la ficha de perfil del Messenger ("escribirle"). La URL se
@@ -313,7 +396,9 @@ export default function CorreoPage() {
   // de secuencia son por carpeta, así que dejarlo abriría OTRO correo. Y la
   // búsqueda se limpia: buscaba en la carpeta anterior.
   useEffect(() => {
-    setSel(null);
+    // Salvo que se haya cambiado de carpeta PARA abrir uno (el enlace del chat).
+    setSel(abrirAlCambiarDeCarpeta.current);
+    abrirAlCambiarDeCarpeta.current = null;
     setBusqueda("");
     setQueryActiva("");
     setSeleccion(new Set());
@@ -373,17 +458,22 @@ export default function CorreoPage() {
   // Acciones de la barra de selección: una sola llamada por lote (IMAP + caché).
   const masiva = useMailBulk();
   const [confirmarBorrado, setConfirmarBorrado] = useState<MailSummary[] | null>(null);
-  const NOMBRE_OP: Record<OperacionMasiva, (n: number) => string> = {
+  // El borrado lo pidió el ⋮ de UN mensaje de la conversación (y no la barra
+  // de selección, que borra conversaciones enteras).
+  const [borrandoDelHilo, setBorrandoDelHilo] = useState(false);
+  /** El aviso de cada operación. Eliminar depende de la carpeta DEL GRUPO, no
+   *  de la que se mira: un mensaje del hilo puede vivir en otra. */
+  const NOMBRE_OP = (f: string): Record<OperacionMasiva, (n: number) => string> => ({
     seen: (n) => t(n === 1 ? "mail.bulk.seenOne" : "mail.bulk.seenMany", { n }),
     unseen: (n) => t(n === 1 ? "mail.bulk.unseenOne" : "mail.bulk.unseenMany", { n }),
     archive: (n) => t(n === 1 ? "mail.bulk.archivedOne" : "mail.bulk.archivedMany", { n }),
     spam: (n) => t(n === 1 ? "mail.bulk.spamOne" : "mail.bulk.spamMany", { n }),
     move: (n) => t(n === 1 ? "mail.bulk.movedOne" : "mail.bulk.movedMany", { n }),
     snooze: (n) => t(n === 1 ? "mail.bulk.snoozedOne" : "mail.bulk.snoozedMany", { n }),
-    delete: (n) => carpeta === "Papelera"
+    delete: (n) => f === "Papelera"
       ? t(n === 1 ? "mail.bulk.deletedOne" : "mail.bulk.deletedMany", { n })
       : t(n === 1 ? "mail.bulk.trashedOne" : "mail.bulk.trashedMany", { n }),
-  };
+  });
   /** Pone o saca una etiqueta de lo seleccionado.
    *
    *  ⚠️ Los correos SIN `message_id` se quedan afuera y se avisa: la etiqueta
@@ -508,20 +598,14 @@ export default function CorreoPage() {
     // varias, así que mandarlos todos como si fueran de una sola no fallaría —
     // movería OTROS mensajes, los que tengan esos uid en la carpeta que se
     // mandó. Es la clase de error que no se nota hasta que falta un correo.
-    const porCarpeta = new Map<string, MailSummary[]>();
-    for (const m of elegidos) {
-      const f = m.folder ?? carpeta;
-      const ya = porCarpeta.get(f);
-      if (ya) ya.push(m); else porCarpeta.set(f, [m]);
-    }
-    for (const [f, delGrupo] of porCarpeta) {
+    for (const [f, delGrupo] of agruparPorCarpeta(elegidos, carpeta)) {
       masiva.mutate(
         { folder: f, op, items: delGrupo, dest, volverAt },
         {
           // El aviso cuenta LO DE ESTE GRUPO, no el total: con correos de dos
           // carpetas saldrían dos avisos diciendo el mismo número grande.
           onSuccess: (r) => {
-            toast.success((aviso ?? NOMBRE_OP[op])(delGrupo.length - (r.omitidos ?? 0)), {
+            toast.success((aviso ?? NOMBRE_OP(f)[op])(delGrupo.length - (r.omitidos ?? 0)), {
               description: r.omitidos
                 ? t("mail.bulk.skippedNoId", { n: r.omitidos })
                 : undefined,
@@ -557,7 +641,11 @@ export default function CorreoPage() {
         unread: !!m.unread,
         origen: "cache" as const,
       }))
-    : enBusqueda ? (resultados.data?.messages ?? []) : mensajes;
+    : enBusqueda
+      ? (resultados.data?.messages ?? [])
+      // «No leídos primero»: los no leídos de TODA la carpeta + los leídos de
+      // esta página. Así «seleccionar todos» y los hilos ven las dos secciones.
+      : modoNoLeidos ? juntarSinRepetir(noLeidosQ.data?.messages ?? [], mensajes) : mensajes;
 
   // ── Conversaciones ─────────────────────────────────────────────────────
   // La lista muestra un renglón por HILO, no por mensaje. Lo pidió Keila: con
@@ -571,6 +659,17 @@ export default function CorreoPage() {
       ? items.map((m) => ({ asunto: m.subject, mensajes: [m], ultimo: m, cantidad: 1 }))
       : agruparEnHilos(items)),
     [items, enBusqueda],
+  );
+
+  // Lo que estuvo en «No leídos» y se acaba de leer SIGUE arriba hasta cambiar
+  // de carpeta (Gmail hace lo mismo): si no, abrir un correo lo haría saltar de
+  // sección mientras lo lees.
+  const quedanArriba = useRef<Set<string>>(new Set());
+  useEffect(() => { quedanArriba.current = new Set(); }, [carpeta, modoNoLeidos]);
+  for (const m of noLeidosQ.data?.messages ?? []) quedanArriba.current.add(claveDe(m));
+  const secciones = useMemo(
+    () => (modoNoLeidos ? partirNoLeidosPrimero(hilos, (m) => quedanArriba.current.has(claveDe(m))) : null),
+    [modoNoLeidos, hilos],
   );
 
   /** El hilo al que pertenece el correo abierto, para mostrarlo entero. */
@@ -620,10 +719,10 @@ export default function CorreoPage() {
   const abiertoEnRecibidos = delAbierto.filter((m) => (m.folder ?? carpeta) === "INBOX");
   const cargandoItems = etiquetaVista
     ? correosDeEtiqueta.isLoading
-    : enBusqueda ? resultados.isFetching : lista.isLoading;
+    : enBusqueda ? resultados.isFetching : lista.isLoading || (modoNoLeidos && noLeidosQ.isLoading);
   const errorItems = etiquetaVista
     ? correosDeEtiqueta.error
-    : enBusqueda ? resultados.error : lista.error;
+    : enBusqueda ? resultados.error : lista.error ?? (modoNoLeidos ? noLeidosQ.error : null);
 
   // La precarga de los 2 más nuevos ya NO se hace desde acá: viene con la
   // lista (`with_bodies`), en la misma sesión IMAP. Disparar conexiones
@@ -667,49 +766,54 @@ export default function CorreoPage() {
     if (m.unread) marcarLeido.mutate({ folder: m.folder ?? carpeta, m });
   };
 
-  // Arma el borrador de respuesta. `aTodos`: además del remitente, arrastra
-  // el resto del Para y el Copia del original (menos yo mismo), como Gmail.
-  // La decisión de a QUIÉN va (lo delicado) vive en `destinatariosRespuesta`,
-  // que es pura y está testeada.
-  const abrirRespuesta = (aTodos: boolean) => {
-    const m = mensaje.data;
-    if (!m) return;
-    // El `Message-ID` viaja en el resumen seleccionado (caché o vivo). Sin
-    // él la respuesta le aparece suelta al otro, fuera de la conversación.
-    const messageId = sel?.messageId;
-    const { to, cc } = destinatariosRespuesta(
-      { from: m.from, to: m.to, cc: m.cc, yo: buzon?.email_address ?? "" },
-      aTodos,
-    );
-    setRedactar({
-      to,
-      cc: cc || undefined,
-      subject: /^re:/i.test(m.subject) ? m.subject : `Re: ${m.subject}`,
-      inReplyTo: messageId || undefined,
-      // ⚠️ `References` es la CADENA entera, no solo el padre: el del padre
-      // más el padre. Mandando solo el padre, el que recibe puede encadenar
-      // esta respuesta pero pierde el resto del hilo si le falta algún
-      // eslabón del medio — y una conversación larga se le parte en trozos.
-      // Es lo que arman Gmail y Outlook, y lo que pide RFC 5322 §3.6.4.
-      references: [...(sel?.refs ?? []), messageId]
-        .filter(Boolean).join(" ") || undefined,
-      citar: {
-        de: nombreDe(m.from),
-        fecha: fechaLarga(m.date),
-        texto: (m.text ?? "").slice(0, 4000),
-      },
-    });
+  /** El cuerpo completo de un mensaje de la conversación. El abierto ya está
+   *  cargado; cualquier otro se trae (de la caché, casi siempre al instante). */
+  const completoDe = (m: MailSummary): Promise<MailMessage> =>
+    sel && mensaje.data && claveDe(m) === claveDe(sel)
+      ? Promise.resolve(mensaje.data)
+      : traerMensaje(m.folder ?? carpeta, m);
+
+  /** Trae el mensaje para una acción del ⋮; si no se puede, avisa y da null. */
+  const traerParaAccion = async (m: MailSummary): Promise<MailMessage | null> => {
+    setTrayendoMensaje(true);
+    try {
+      return await completoDe(m);
+    } catch (e) {
+      toast.error(t("mail.msg.loadError"), { description: (e as Error).message });
+      return null;
+    } finally {
+      setTrayendoMensaje(false);
+    }
+  };
+
+  // Responder a UN mensaje de la conversación: el abierto (botones de abajo) o
+  // cualquier otro desde su ⋮. `aTodos`: además del remitente, arrastra el
+  // resto del Para y el Copia del original (menos yo mismo), como Gmail.
+  //
+  // ⚠️ Encadena con ESE mensaje (su Message-ID y su cadena de References), no
+  // con el abierto: eso y a QUIÉN va viven en `borradorDeRespuesta` y
+  // `destinatariosRespuesta`, puros y probados.
+  const responderA = async (m: MailSummary, aTodos: boolean) => {
+    const completo = await traerParaAccion(m);
+    if (!completo) return;
+    setRedactar(borradorDeRespuesta({
+      resumen: m, mensaje: completo, yo: buzon?.email_address ?? "", aTodos, fecha: fechaLarga(completo.date),
+    }));
   };
 
   // ── Reenviar ───────────────────────────────────────────────────────────
   // Lo pidió Carolina: no existía. Reenviar SIN los adjuntos no sería
   // reenviar —casi siempre el archivo ES el correo—, así que se bajan primero
   // y recién después se abre el compositor con todo puesto.
-  const reenviar = async () => {
-    const m = mensaje.data;
-    if (!m) return;
-    const uid = sel?.uid != null ? Number(sel.uid) : null;
-    const metas = m.attachments ?? [];
+  //
+  // ⚠️ Los adjuntos se bajan de la carpeta DEL MENSAJE: en una etiqueta o en
+  // el hilo cruzado puede no ser la que se mira, y los uid son por carpeta.
+  const reenviarA = async (m: MailSummary) => {
+    const completo = await traerParaAccion(m);
+    if (!completo) return;
+    const carpetaDelMensaje = m.folder ?? carpeta;
+    const uid = m.uid != null ? Number(m.uid) : null;
+    const metas = completo.attachments ?? [];
 
     let adjuntosIniciales: BorradorInicial["adjuntosIniciales"];
     if (metas.length > 0 && uid != null) {
@@ -724,7 +828,7 @@ export default function CorreoPage() {
       } else {
         try {
           adjuntosIniciales = await bajarParaReenviar.mutateAsync({
-            folder: carpeta, uid, adjuntos: metas,
+            folder: carpetaDelMensaje, uid, adjuntos: metas,
           });
         } catch (e) {
           // Que falle un adjunto no puede impedir reenviar el mensaje.
@@ -733,28 +837,178 @@ export default function CorreoPage() {
       }
     }
 
-    setRedactar({
-      // A quién va lo elige quien reenvía: ese es el punto del reenvío.
-      to: "",
-      subject: asuntoDeReenvio(m.subject),
-      // Su propio cajón de borrador: ver `firmaContexto`.
-      reenvioDe: sel?.messageId || `uid:${carpeta}:${uid ?? "?"}`,
-      // ⚠️ SIN `inReplyTo`: un reenvío no cuelga del hilo original. Ponerlo
-      // metería el correo en una conversación que su destinatario no tuvo.
-      citar: {
-        reenvio: true,
-        de: m.from,
-        para: m.to,
-        asunto: m.subject,
-        fecha: fechaLarga(m.date),
-        texto: (m.text ?? "").slice(0, 4000),
-      },
-      adjuntosIniciales,
-    });
+    setRedactar(borradorDeReenvio({
+      resumen: m, mensaje: completo, fecha: fechaLarga(completo.date),
+      carpeta: carpetaDelMensaje, adjuntosIniciales,
+    }));
   };
 
-  const responder = () => abrirRespuesta(false);
-  const responderATodos = () => abrirRespuesta(true);
+  const responder = () => { if (sel) void responderA(sel, false); };
+  const responderATodos = () => { if (sel) void responderA(sel, true); };
+  const reenviar = () => { if (sel) void reenviarA(sel); };
+
+  /** «Compartir en el chat»: quién, asunto, fecha, un resumen y el enlace. */
+  const compartirEnChat = async (m: MailSummary) => {
+    let resumen = m.snippet ?? "";
+    if (!resumen) resumen = (await traerParaAccion(m))?.text ?? "";
+    setCompartiendo({ de: m.from, asunto: m.subject, fecha: m.date, resumen, messageId: m.messageId });
+  };
+
+  /** «Marcar como no leído a partir de aquí»: este y los que vinieron
+   *  después, cada uno en SU carpeta (el hilo cruza carpetas). Y de vuelta a la
+   *  lista, como Gmail: quedarse leyendo lo marcaría leído otra vez. */
+  const noLeidoDesdeAqui = (m: MailSummary) => {
+    lanzarMasiva("unseen", desdeAqui(delAbierto, m));
+    setSel(null);
+  };
+
+  /** «Traducir»: se abre ese mensaje (si no era el abierto) y se traduce. */
+  const traducirMensaje = (m: MailSummary) => {
+    if (!sel || claveDe(m) !== claveDe(sel)) abrir(m);
+    setTraducido(claveDe(m));
+  };
+
+  const accionesPara = (m: MailSummary): AccionesDelMensaje => ({
+    onResponder: () => void responderA(m, false),
+    onReenviar: () => void reenviarA(m),
+    onCompartir: () => void compartirEnChat(m),
+    // Con la confirmación de siempre: «Confirmar SIEMPRE que se borra».
+    onEliminar: () => { setBorrandoDelHilo(true); setConfirmarBorrado([m]); },
+    onNoLeidoDesdeAqui: () => noLeidoDesdeAqui(m),
+    onTraducir: () => traducirMensaje(m),
+  });
+
+  /** El ⋮ de un mensaje de la conversación (en Borradores no hay: ahí se edita). */
+  const menuDe = (m: MailSummary, className?: string): ReactNode =>
+    carpeta === "Borrador" && !etiquetaVista ? null : (
+      <MenuDelMensaje acciones={accionesPara(m)} ocupado={trayendoMensaje} className={className} />
+    );
+  /** En los plegados, más tenue hasta pasar el mouse: una columna de ⋮ fuertes
+   *  compite con los nombres. En pantallas táctiles (sin hover), siempre. */
+  const menuDePlegado = (m: MailSummary) => menuDe(
+    m,
+    "opacity-50 group-hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100 [@media(hover:none)]:opacity-100",
+  );
+
+  // ── Arrastrar correos a una carpeta o a una etiqueta (Keila, 02/10) ──────
+  // Se arrastra una fila (la conversación entera) o, si esa fila está en la
+  // selección, TODA la selección. Soltar es lo mismo que «Mover a».
+  const empezarArrastre = (h: Hilo<MailSummary>, e: DragEvent) => {
+    const enSeleccion = h.mensajes.every((m) => seleccion.has(claveDe(m)));
+    const correos = enSeleccion ? items.filter((m) => seleccion.has(claveDe(m))) : h.mensajes;
+    const nHilos = enSeleccion
+      ? hilos.filter((x) => x.mensajes.every((m) => seleccion.has(claveDe(m)))).length
+      : 1;
+    setArrastre({ correos, hilos: Math.max(1, nHilos) });
+    const dt = e.dataTransfer;
+    if (!dt) return;
+    dt.effectAllowed = "move";
+    // Firefox no arranca un arrastre sin datos.
+    try { dt.setData("application/x-maven-correos", String(correos.length)); } catch { /* noop */ }
+    // La «etiqueta» que acompaña al puntero, con cuántas conversaciones van.
+    if (typeof dt.setDragImage === "function") {
+      const fantasma = document.createElement("div");
+      fantasma.textContent = t(nHilos > 1 ? "mail.drag.many" : "mail.drag.one", { n: nHilos });
+      fantasma.className = "fixed -left-[999px] top-0 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-lg";
+      document.body.appendChild(fantasma);
+      dt.setDragImage(fantasma, 14, 14);
+      setTimeout(() => fantasma.remove(), 0);
+    }
+  };
+  const terminarArrastre = () => {
+    setArrastre(null);
+    setCarpetaBajoArrastre(null);
+  };
+  /** ¿Esta carpeta recibe lo que se arrastra? No las que no son de correo
+   *  recibido (Enviados, Borradores, Pospuestos) ni donde ya están todos. */
+  const recibeArrastre = (f: string) =>
+    !!arrastre && !NO_SE_SUELTA.has(f) && paraSoltarEnCarpeta(arrastre.correos, f, carpeta).mover.length > 0;
+  const soltarEnCarpeta = (f: string) => {
+    const a = arrastre;
+    terminarArrastre();
+    if (!a) return;
+    const { mover } = paraSoltarEnCarpeta(a.correos, f, carpeta);
+    if (!mover.length) {
+      toast.info(t("mail.drag.alreadyThere", { name: nombreCarpeta(f) }));
+      return;
+    }
+    // Igual que «Mover a» esa carpeta: agrupado POR CARPETA dentro de lanzarMasiva.
+    lanzarMasiva("move", mover, f, undefined, (n) =>
+      n === 1 ? t("mail.moved.one", { name: nombreCarpeta(f) }) : t("mail.moved.many", { n, name: nombreCarpeta(f) }));
+  };
+  const soltarEnEtiqueta = (id: string, ruta: string) => {
+    const a = arrastre;
+    terminarArrastre();
+    // Igual que «Mover a» esa etiqueta: se le pone y sale de la bandeja.
+    if (a) moverAEtiqueta(id, ruta, a.correos);
+  };
+
+  /** ¿Lo que se va a eliminar YA está en la Papelera? Entonces se borra de
+   *  verdad. Se mira la carpeta de cada correo, no la que se mira: el ⋮ de un
+   *  mensaje del hilo puede apuntar a uno de otra carpeta. */
+  const borraDefinitivo = !!confirmarBorrado?.some((m) => (m.folder ?? carpeta) === "Papelera");
+  const confirmarElBorrado = () => {
+    const e = confirmarBorrado;
+    const delHilo = borrandoDelHilo;
+    setConfirmarBorrado(null);
+    setBorrandoDelHilo(false);
+    if (!e) return;
+    // Eliminar desde el ⋮ el mensaje ABIERTO de una conversación con más
+    // mensajes: la conversación sigue abierta en el más nuevo que queda, como
+    // en Gmail, en vez de cerrarse entera.
+    const otro = delHilo && e.length === 1 && sel && claveDe(e[0]) === claveDe(sel)
+      ? [...hiloAntes, ...hiloDespues].sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0))[0]
+      : undefined;
+    lanzarMasiva("delete", e);
+    if (otro) abrir(otro);
+  };
+
+  /** Una fila de la lista (una conversación). */
+  const filaDeHilo = (h: Hilo<MailSummary>) => (
+    <FilaMensaje
+      key={claveDe(h.ultimo)}
+      m={h.ultimo}
+      // El hilo entero cuenta como activo: da igual cuál de sus
+      // mensajes esté abierto, el renglón es el mismo.
+      activo={!!sel && h.mensajes.some((m) => claveDe(m) === claveDe(sel))}
+      // Y como seleccionado: marcar la conversación y que la acción
+      // masiva se lleve solo el último sería una trampa.
+      seleccionado={h.mensajes.every((m) => seleccion.has(claveDe(m)))}
+      onToggleSeleccion={() => toggleSeleccionHilo(h)}
+      onClick={() => abrir(h.ultimo)}
+      onPrecargar={() => precargar(carpeta, h.ultimo)}
+      onArrastrar={(e) => empezarArrastre(h, e)}
+      onFinArrastre={terminarArrastre}
+      mostrarDestinatario={carpeta === "Enviado" || carpeta === "Borrador"}
+      enHilo={h.cantidad}
+      // El hilo se llama como empezó, sin los "Re: RE: RV:" que
+      // van apilando los clientes. Lo calcula `agruparEnHilos`
+      // porque el más viejo CARGADO no siempre es la raíz.
+      asuntoDelHilo={h.asunto}
+      // Las de CUALQUIER mensaje del hilo: etiquetás una
+      // conversación, no un mensaje suelto adentro de ella.
+      etiquetas={(() => {
+        const ids = new Set<string>();
+        for (const m of h.mensajes) {
+          for (const id of etiquetasPorCorreo.data?.get(m.messageId ?? "") ?? []) ids.add(id);
+        }
+        // «En la lista de mensajes: Ocultar» saca la pastilla; y la
+        // de la etiqueta que estás mirando no se repite en cada
+        // renglón (Gmail hace lo mismo).
+        const suyas = nodosEtiqueta
+          .filter(({ etiqueta: e }) => ids.has(e.id) && e.enListaMensajes && e.id !== etiquetaVista)
+          .map(({ etiqueta: e, ruta }) => ({ id: e.id, ruta, color: e.color }));
+        // Mirando una etiqueta, Gmail marca con «Recibidos» lo que
+        // SIGUE en la bandeja: así se ve qué falta mover.
+        return etiquetaVista && h.mensajes.some((m) => m.folder === "INBOX")
+          ? [{ id: "__recibidos", ruta: t("mail.folder.inbox"), color: null }, ...suyas]
+          : suyas;
+      })()}
+      // Sin leer si CUALQUIERA del hilo lo está: si no, una
+      // conversación con una respuesta nueva se vería leída.
+      hiloSinLeer={h.mensajes.some((m) => m.unread)}
+    />
+  );
 
   // Retomar un borrador del servidor en el compositor: se cargan sus campos y
   // su UID, para reemplazarlo al re-guardar o borrarlo al enviar.
@@ -785,14 +1039,16 @@ export default function CorreoPage() {
     <div className="flex h-[calc(100dvh-4rem)] flex-col">
       {/* Encabezado */}
       <div className="flex items-center gap-3 border-b border-border/60 px-4 py-3">
-        {/* En móvil la flecha es la única forma de volver de un mensaje. */}
+        {/* En móvil la flecha es la única forma de volver de un mensaje. Y en
+            «Sin división» también en escritorio: la lista no está al lado. */}
         {!enLista && (
           <Button
             variant="ghost"
             size="icon"
-            className="rounded-full md:hidden"
+            className={cn("rounded-full", !sinDivision && "md:hidden")}
             onClick={() => setSel(null)}
             aria-label={t("mail.backToList")}
+            title={sinDivision ? t("mail.view.backHint") : undefined}
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
@@ -813,6 +1069,13 @@ export default function CorreoPage() {
           <h1 className="truncate text-lg font-semibold tracking-tight">{t("nav.mail")}</h1>
           <p className="truncate text-xs text-muted-foreground">{buzon.email_address}</p>
         </div>
+        {/* «Dividir» / «Sin división», como el panel de lectura de Gmail. En el
+            teléfono no hay qué dividir: siempre se ve una cosa por vez. */}
+        <BotonPanelDeLectura
+          lectura={prefs.lectura}
+          onCambiar={(lectura) => prefs.cambiar({ lectura })}
+          className="hidden md:inline-flex"
+        />
         <Button
           variant="ghost"
           size="icon"
@@ -867,10 +1130,24 @@ export default function CorreoPage() {
             const Icono = iconoCarpeta(f);
             // Mirando una etiqueta, ninguna carpeta se marca: la vista es UNA sola.
             const activa = !etiquetaVista && f === carpeta;
+            // Arrastrando correos: soltarlos acá es «Mover a» esta carpeta.
+            const recibe = recibeArrastre(f);
             return (
               <button
                 key={f}
                 onClick={() => irACarpeta(f)}
+                onDragOver={recibe ? (e) => {
+                  e.preventDefault();
+                  if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+                  if (carpetaBajoArrastre !== f) setCarpetaBajoArrastre(f);
+                } : undefined}
+                onDragLeave={recibe ? (e) => {
+                  if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+                    setCarpetaBajoArrastre((d) => (d === f ? null : d));
+                  }
+                } : undefined}
+                onDrop={recibe ? (e) => { e.preventDefault(); soltarEnCarpeta(f); } : undefined}
+                data-soltable={recibe ? "" : undefined}
                 title={carpetasAbiertas ? undefined : `${nombreCarpeta(f)}${unread > 0 ? ` · ${t("mail.nUnread", { n: unread })}` : ""}`}
                 aria-label={nombreCarpeta(f)}
                 aria-current={activa ? "page" : undefined}
@@ -880,6 +1157,7 @@ export default function CorreoPage() {
                   activa
                     ? "bg-primary/12 font-medium text-foreground before:absolute before:inset-y-2 before:left-0 before:w-[3px] before:rounded-r before:bg-gradient-to-b before:from-accent before:to-primary"
                     : "text-muted-foreground hover:bg-primary/5 hover:text-foreground",
+                  recibe && carpetaBajoArrastre === f && "bg-primary/15 text-foreground ring-2 ring-primary/60",
                 )}
               >
                 <span className="relative shrink-0">
@@ -915,14 +1193,20 @@ export default function CorreoPage() {
             etiquetaVista={etiquetaVista}
             onAbrir={(id) => { setEtiquetaVista(id); setSel(null); }}
             noLeidos={noLeidosPorEtiqueta.data}
+            soltar={{ activo: !!arrastre, onSoltar: soltarEnEtiqueta }}
           />
         </nav>
 
         {/* Lista */}
         <div
+          data-testid="columna-lista"
           className={cn(
-            "min-w-0 flex-col border-r border-border/60 md:flex md:w-80 md:shrink-0 lg:w-96 2xl:w-[28rem]",
-            enLista ? "flex flex-1" : "hidden",
+            "min-w-0 flex-col border-border/60",
+            sinDivision
+              // «Sin división»: la lista ocupa todo el ancho, y con un correo
+              // abierto se esconde (el correo ocupa su lugar), como en Gmail.
+              ? (enLista ? "flex flex-1" : "hidden")
+              : cn("border-r md:flex md:w-80 md:shrink-0 lg:w-96 2xl:w-[28rem]", enLista ? "flex flex-1" : "hidden"),
           )}
         >
           {/* Carpetas como píldoras cuando no está la columna lateral —
@@ -995,14 +1279,14 @@ export default function CorreoPage() {
               que el viewport y SE COME EL BORDE DERECHO (aquí, las horas de
               la lista — mismo bug que ya mordió a Messenger). Forzarlo a
               block lo clampa y deja funcionar a truncate/min-w-0. */}
-          <AlertDialog open={!!confirmarBorrado} onOpenChange={(o) => { if (!o) setConfirmarBorrado(null); }}>
+          <AlertDialog open={!!confirmarBorrado} onOpenChange={(o) => { if (!o) { setConfirmarBorrado(null); setBorrandoDelHilo(false); } }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {carpeta === "Papelera" ? t("mail.del.foreverTitle") : t("mail.del.trashTitle")}
+              {borraDefinitivo ? t("mail.del.foreverTitle") : t("mail.del.trashTitle")}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {carpeta === "Papelera"
+              {borraDefinitivo
                 ? (confirmarBorrado?.length === 1
                     ? t("mail.del.foreverOne")
                     : t("mail.del.foreverMany", { n: confirmarBorrado?.length ?? 0 }))
@@ -1015,9 +1299,9 @@ export default function CorreoPage() {
             <AlertDialogCancel />
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => { const e = confirmarBorrado; setConfirmarBorrado(null); if (e) lanzarMasiva("delete", e); }}
+              onClick={confirmarElBorrado}
             >
-              {carpeta === "Papelera" ? t("mail.deleteForever") : t("mail.moveToTrash")}
+              {borraDefinitivo ? t("mail.deleteForever") : t("mail.moveToTrash")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1131,21 +1415,33 @@ export default function CorreoPage() {
                       {t("mail.sel.clearShort")}
                     </button>
                   </>
-                ) : !etiquetaVista && !enBusqueda && totalCarpeta !== undefined ? (
-                  // «1–50 de 186» y ‹ ›, como Gmail. Solo en una carpeta: la
-                  // vista de una etiqueta y la búsqueda arman su propia lista.
-                  <Paginador
-                    desde={pagina * CORREOS_POR_PAGINA + 1}
-                    hasta={pagina * CORREOS_POR_PAGINA + mensajes.length}
-                    total={totalCarpeta}
-                    cargando={lista.isPlaceholderData}
-                    onAnterior={pagina > 0 ? () => setPagina((p) => p - 1) : undefined}
-                    onSiguiente={(pagina + 1) * CORREOS_POR_PAGINA < totalCarpeta ? () => setPagina((p) => p + 1) : undefined}
-                  />
                 ) : (
-                  <span className="ml-1 text-xs text-muted-foreground">
-                    {t(items.length === 1 ? "mail.countOne" : "mail.countMany", { n: items.length })}
-                  </span>
+                  <>
+                    {/* «No leídos primero», solo en Recibidos (como Gmail). */}
+                    {carpeta === "INBOX" && !etiquetaVista && !enBusqueda && (
+                      <BotonNoLeidosPrimero
+                        activo={prefs.noLeidosPrimero}
+                        onCambiar={(v) => { setPagina(0); prefs.cambiar({ noLeidosPrimero: v }); }}
+                      />
+                    )}
+                    {!etiquetaVista && !enBusqueda && totalCarpeta !== undefined ? (
+                      // «1–50 de 186» y ‹ ›, como Gmail. Solo en una carpeta: la
+                      // vista de una etiqueta y la búsqueda arman su propia lista.
+                      // Con «No leídos primero» cuenta la sección de abajo.
+                      <Paginador
+                        desde={pagina * CORREOS_POR_PAGINA + 1}
+                        hasta={pagina * CORREOS_POR_PAGINA + mensajes.length}
+                        total={totalCarpeta}
+                        cargando={lista.isPlaceholderData}
+                        onAnterior={pagina > 0 ? () => setPagina((p) => p - 1) : undefined}
+                        onSiguiente={(pagina + 1) * CORREOS_POR_PAGINA < totalCarpeta ? () => setPagina((p) => p + 1) : undefined}
+                      />
+                    ) : (
+                      <span className="ml-1 text-xs text-muted-foreground">
+                        {t(items.length === 1 ? "mail.countOne" : "mail.countMany", { n: items.length })}
+                      </span>
+                    )}
+                  </>
                 )}
               </div>
             );
@@ -1182,55 +1478,37 @@ export default function CorreoPage() {
                   />
                 )
               )}
-              {hilos.map((h) => (
-                <FilaMensaje
-                  key={claveDe(h.ultimo)}
-                  m={h.ultimo}
-                  // El hilo entero cuenta como activo: da igual cuál de sus
-                  // mensajes esté abierto, el renglón es el mismo.
-                  activo={!!sel && h.mensajes.some((m) => claveDe(m) === claveDe(sel))}
-                  // Y como seleccionado: marcar la conversación y que la acción
-                  // masiva se lleve solo el último sería una trampa.
-                  seleccionado={h.mensajes.every((m) => seleccion.has(claveDe(m)))}
-                  onToggleSeleccion={() => toggleSeleccionHilo(h)}
-                  onClick={() => abrir(h.ultimo)}
-                  onPrecargar={() => precargar(carpeta, h.ultimo)}
-                  mostrarDestinatario={carpeta === "Enviado" || carpeta === "Borrador"}
-                  enHilo={h.cantidad}
-                  // El hilo se llama como empezó, sin los "Re: RE: RV:" que
-                  // van apilando los clientes. Lo calcula `agruparEnHilos`
-                  // porque el más viejo CARGADO no siempre es la raíz.
-                  asuntoDelHilo={h.asunto}
-                  // Las de CUALQUIER mensaje del hilo: etiquetás una
-                  // conversación, no un mensaje suelto adentro de ella.
-                  etiquetas={(() => {
-                    const ids = new Set<string>();
-                    for (const m of h.mensajes) {
-                      for (const id of etiquetasPorCorreo.data?.get(m.messageId ?? "") ?? []) ids.add(id);
-                    }
-                    // «En la lista de mensajes: Ocultar» saca la pastilla; y la
-                    // de la etiqueta que estás mirando no se repite en cada
-                    // renglón (Gmail hace lo mismo).
-                    const suyas = nodosEtiqueta
-                      .filter(({ etiqueta: e }) => ids.has(e.id) && e.enListaMensajes && e.id !== etiquetaVista)
-                      .map(({ etiqueta: e, ruta }) => ({ id: e.id, ruta, color: e.color }));
-                    // Mirando una etiqueta, Gmail marca con «Recibidos» lo que
-                    // SIGUE en la bandeja: así se ve qué falta mover.
-                    return etiquetaVista && h.mensajes.some((m) => m.folder === "INBOX")
-                      ? [{ id: "__recibidos", ruta: t("mail.folder.inbox"), color: null }, ...suyas]
-                      : suyas;
-                  })()}
-                  // Sin leer si CUALQUIERA del hilo lo está: si no, una
-                  // conversación con una respuesta nueva se vería leída.
-                  hiloSinLeer={h.mensajes.some((m) => m.unread)}
-                />
-              ))}
+              {secciones && items.length > 0 ? (
+                // «No leídos primero»: dos secciones, como Gmail. Arriba los
+                // no leídos de TODA la bandeja; abajo, la página de leídos.
+                <>
+                  <RotuloDeSeccion texto={t("mail.section.unread")} cantidad={noLeidosQ.data?.total} />
+                  {secciones.noLeidos.length === 0 ? (
+                    <p className="px-2.5 py-2 text-xs text-muted-foreground">{t("mail.section.unreadEmpty")}</p>
+                  ) : (
+                    secciones.noLeidos.map(filaDeHilo)
+                  )}
+                  {(noLeidosQ.data?.total ?? 0) > TOPE_NO_LEIDOS && (
+                    <p className="px-2.5 py-1 text-[11px] text-muted-foreground">
+                      {t("mail.section.unreadCapped", { n: TOPE_NO_LEIDOS, total: noLeidosQ.data?.total ?? 0 })}
+                    </p>
+                  )}
+                  <RotuloDeSeccion texto={t("mail.section.rest")} />
+                  {secciones.resto.length === 0 ? (
+                    <p className="px-2.5 py-2 text-xs text-muted-foreground">{t("mail.section.restEmpty")}</p>
+                  ) : (
+                    secciones.resto.map(filaDeHilo)
+                  )}
+                </>
+              ) : (
+                hilos.map(filaDeHilo)
+              )}
             </div>
           </ScrollArea>
         </div>
 
         {/* Lectura */}
-        <div className={cn("min-w-0 flex-1", enLista ? "hidden md:block" : "block")}>
+        <div className={cn("min-w-0 flex-1", enLista ? (sinDivision ? "hidden" : "hidden md:block") : "block")}>
           {sel === null ? (
             <div className="hidden h-full flex-col items-center justify-center gap-3 md:flex">
               <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-accent/10 to-primary/10">
@@ -1345,7 +1623,7 @@ export default function CorreoPage() {
                     Plegados: quién, cuándo y su resumen. Se abren con un clic
                     y recién ahí se baja el cuerpo — abrir un hilo de veinte no
                     puede costar veinte descargas. */}
-                <TiraDeHilo mensajes={hiloAntes} abrir={abrir} className="mt-4" />
+                <TiraDeHilo mensajes={hiloAntes} abrir={abrir} menu={menuDePlegado} className="mt-4" />
 
                 <div className="mt-4 flex items-start gap-3">
                   <UserAvatar name={nombreDe(mensaje.data.from)} size="lg" className="shrink-0" />
@@ -1400,6 +1678,9 @@ export default function CorreoPage() {
                   <span className="shrink-0 pt-1 text-xs text-muted-foreground">
                     {fechaCorta(mensaje.data.date, formatoUi)}
                   </span>
+                  {/* El ⋮ del mensaje abierto, como en Gmail: el mismo de cada
+                      mensaje de la conversación. */}
+                  {menuDe(sel, "-mt-1")}
                 </div>
 
 
@@ -1475,18 +1756,31 @@ export default function CorreoPage() {
                 )}
 
                 <div className="mt-5 border-t border-border/60 pt-5">
-                  <MailBody
-                    html={cuerpoConImagenes}
-                    text={mensaje.data.text}
-                    remoteImages={mensaje.data.remote_images}
-                    truncated={mensaje.data.truncated}
-                  />
+                  {traducido === claveDe(sel) ? (
+                    // «Traducir» del ⋮: la traducción arriba y el original
+                    // plegado debajo, con «Ver original».
+                    <TraduccionDelCorreo correo={sel} mensaje={mensaje.data} onQuitar={() => setTraducido(null)}>
+                      <MailBody
+                        html={cuerpoConImagenes}
+                        text={mensaje.data.text}
+                        remoteImages={mensaje.data.remote_images}
+                        truncated={mensaje.data.truncated}
+                      />
+                    </TraduccionDelCorreo>
+                  ) : (
+                    <MailBody
+                      html={cuerpoConImagenes}
+                      text={mensaje.data.text}
+                      remoteImages={mensaje.data.remote_images}
+                      truncated={mensaje.data.truncated}
+                    />
+                  )}
                 </div>
 
                 {/* ── Lo POSTERIOR ────────────────────────────────────────
                     Casi siempre son las respuestas propias, que viven en
                     Enviados: el motivo por el que el hilo se veía a medias. */}
-                <TiraDeHilo mensajes={hiloDespues} abrir={abrir} className="mt-5" />
+                <TiraDeHilo mensajes={hiloDespues} abrir={abrir} menu={menuDePlegado} className="mt-5" />
 
                 {cargandoHilo && hiloAntes.length + hiloDespues.length === 0 && (
                   <p className="mt-4 text-xs text-muted-foreground">
@@ -1600,6 +1894,10 @@ export default function CorreoPage() {
       {gestionandoEtiquetas && (
         <EtiquetasDialog abierto onCerrar={() => setGestionandoEtiquetas(false)} />
       )}
+      {/* Montado SOLO abierto: lee la lista de conversaciones del Messenger. */}
+      {compartiendo && (
+        <CompartirEnChatDialog correo={compartiendo} onCerrar={() => setCompartiendo(null)} />
+      )}
     </div>
   );
 }
@@ -1618,13 +1916,22 @@ const PLEGADOS_A_LA_VISTA = 4;
  *
  *  ⚠️ Vienen de VARIAS carpetas (tus respuestas están en Enviados), y cada uno
  *  se abre en la suya: `abrir` usa el `folder` que trae el mensaje. */
-function FilaPlegada({ m, abrir }: { m: MailSummary; abrir: (m: MailSummary) => void }) {
+function FilaPlegada({
+  m, abrir, menu,
+}: {
+  m: MailSummary;
+  abrir: (m: MailSummary) => void;
+  /** El ⋮ del mensaje. Va AL LADO del botón que lo abre, no adentro: un botón
+   *  dentro de otro es HTML inválido que el navegador desarma. */
+  menu?: ReactNode;
+}) {
   const formatoUi = useFormato();
   return (
+    <div className="group flex min-w-0 items-center gap-1">
     <button
       type="button"
       onClick={() => abrir(m)}
-      className="flex w-full min-w-0 items-center gap-3 rounded-control px-2 py-2.5 text-left transition-colors hover:bg-muted/50"
+      className="flex w-full min-w-0 flex-1 items-center gap-3 rounded-control px-2 py-2.5 text-left transition-colors hover:bg-muted/50"
     >
       <UserAvatar name={nombreDe(m.from)} size="sm" className="shrink-0" />
       {/* ⚠️ `min-w-0` o el resumen largo se dibuja ENCIMA del vecino en vez de
@@ -1644,16 +1951,20 @@ function FilaPlegada({ m, abrir }: { m: MailSummary; abrir: (m: MailSummary) => 
         {fechaCorta(m.date, formatoUi)}
       </span>
     </button>
+    {menu}
+    </div>
   );
 }
 
 /** Los otros mensajes de la conversación, apilados como en Gmail: el primero,
  *  el medio resumido en una pastilla que se despliega, y los últimos. */
 function TiraDeHilo({
-  mensajes, abrir, className,
+  mensajes, abrir, menu, className,
 }: {
   mensajes: MailSummary[];
   abrir: (m: MailSummary) => void;
+  /** El ⋮ de cada mensaje plegado: se usa sin tener que abrirlo antes. */
+  menu?: (m: MailSummary) => ReactNode;
   className?: string;
 }) {
   const [verTodos, setVerTodos] = useState(false);
@@ -1683,7 +1994,7 @@ function TiraDeHilo({
               <span className="h-px flex-1 bg-border/50" />
             </div>
           )}
-          <FilaPlegada m={m} abrir={abrir} />
+          <FilaPlegada m={m} abrir={abrir} menu={menu?.(m)} />
         </li>
       ))}
     </ol>
@@ -1697,6 +2008,8 @@ function FilaMensaje({
   onToggleSeleccion,
   onClick,
   onPrecargar,
+  onArrastrar,
+  onFinArrastre,
   mostrarDestinatario,
   enHilo,
   hiloSinLeer,
@@ -1711,6 +2024,10 @@ function FilaMensaje({
   /** Pasar el mouse (o apoyar el dedo) ya dispara la descarga: para
    *  cuando llega el clic, el mensaje suele estar listo. */
   onPrecargar: () => void;
+  /** Arrastrar la fila (o la selección, si la fila está en ella) hasta una
+   *  carpeta o etiqueta de la columna = «Mover a». */
+  onArrastrar?: (e: DragEvent) => void;
+  onFinArrastre?: () => void;
   /** En Enviados y Borradores el remitente eres tú: verte a ti mismo en
    *  cada fila no informa nada. Lo util es A QUIEN fue. */
   mostrarDestinatario?: boolean;
@@ -1733,6 +2050,10 @@ function FilaMensaje({
   const sinLeer = hiloSinLeer ?? m.unread;
   return (
     <div
+      draggable={!!onArrastrar}
+      onDragStart={onArrastrar}
+      onDragEnd={onFinArrastre}
+      data-testid="fila-correo"
       className={cn(
         "group relative flex items-center gap-1 rounded-2xl pl-2 transition-colors",
         seleccionado && "bg-primary/10 ring-1 ring-primary/25",

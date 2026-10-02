@@ -37,13 +37,16 @@ type Dialogo =
  *  árbol de subetiquetas con su flecha para plegar y el ⋮ de cada una. Qué se
  *  ve lo decide `repartirEnColumna`; lo oculto no se dibuja. */
 export default function EtiquetasColumna({
-  abierta, etiquetaVista, onAbrir, noLeidos,
+  abierta, etiquetaVista, onAbrir, noLeidos, soltar,
 }: {
   /** La columna desplegada (con nombres) o plegada (solo iconos). */
   abierta: boolean;
   etiquetaVista: string | null;
   onAbrir: (id: string | null) => void;
   noLeidos: Map<string, number> | undefined;
+  /** Se están arrastrando correos: soltarlos sobre una etiqueta es «Mover a»
+   *  esa etiqueta (ponerla y sacarlos de la bandeja), como en Gmail. */
+  soltar?: { activo: boolean; onSoltar: (id: string, ruta: string) => void };
 }) {
   const { t } = useLanguage();
   const etiquetas = useEtiquetas();
@@ -102,6 +105,10 @@ export default function EtiquetasColumna({
       onModificar={() => setDialogo({ tipo: "editar", etiqueta: n.etiqueta })}
       onEliminar={() => pedirEliminar(n)}
       onSubetiqueta={() => setDialogo({ tipo: "nueva", madre: n.etiqueta.id })}
+      // La etiqueta que se está mirando no recibe: ya están ahí.
+      onSoltar={soltar?.activo && etiquetaVista !== n.etiqueta.id
+        ? () => soltar.onSoltar(n.etiqueta.id, n.ruta)
+        : undefined}
     />
   );
 
@@ -169,7 +176,7 @@ export default function EtiquetasColumna({
 
 function FilaEtiqueta({
   nodo, abierta, activa, sinLeer, plegada, onPlegar, onAbrir,
-  onColorPersonalizado, onModificar, onEliminar, onSubetiqueta,
+  onColorPersonalizado, onModificar, onEliminar, onSubetiqueta, onSoltar,
 }: {
   nodo: NodoEtiqueta;
   abierta: boolean;
@@ -182,9 +189,13 @@ function FilaEtiqueta({
   onModificar: () => void;
   onEliminar: () => void;
   onSubetiqueta: () => void;
+  /** Presente = hay correos arrastrándose y esta etiqueta los recibe. */
+  onSoltar?: () => void;
 }) {
   const { t } = useLanguage();
   const [menuAbierto, setMenuAbierto] = useState(false);
+  // El correo arrastrado está ENCIMA: se resalta para que se vea dónde cae.
+  const [sobre, setSobre] = useState(false);
   const e = nodo.etiqueta;
   const nombre = e.nombre;
   const sangria = abierta ? nodo.nivel * 14 : 0;
@@ -194,8 +205,23 @@ function FilaEtiqueta({
     // ⚠️ Un div y no un botón: adentro van TRES botones (plegar, abrir y ⋮), y
     // un botón dentro de otro es HTML inválido que el navegador desarma.
     <div
+      data-soltable={onSoltar ? "" : undefined}
+      onDragOver={onSoltar ? (ev) => {
+        ev.preventDefault();
+        if (ev.dataTransfer) ev.dataTransfer.dropEffect = "move";
+        if (!sobre) setSobre(true);
+      } : undefined}
+      onDragLeave={onSoltar ? (ev) => {
+        if (!ev.currentTarget.contains(ev.relatedTarget as Node | null)) setSobre(false);
+      } : undefined}
+      onDrop={onSoltar ? (ev) => {
+        ev.preventDefault();
+        setSobre(false);
+        onSoltar();
+      } : undefined}
       className={cn(
         "group relative flex w-full items-center rounded-2xl text-sm transition-colors",
+        onSoltar && sobre && "bg-primary/15 text-foreground ring-2 ring-primary/60",
         activa
           ? "bg-primary/12 font-medium text-foreground before:absolute before:inset-y-2 before:left-0 before:w-[3px] before:rounded-r before:bg-gradient-to-b before:from-accent before:to-primary"
           : sinLeer > 0
