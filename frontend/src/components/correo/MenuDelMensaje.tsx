@@ -47,7 +47,8 @@ export default function MenuDelMensaje({
           <MoreVertical className="h-4 w-4" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-64">
+      {/* w-72: «Marcar como no leído a partir de aquí» en un solo renglón. */}
+      <DropdownMenuContent align="end" className="w-72">
         <DropdownMenuItem onSelect={acciones.onResponder}>
           <Reply className="mr-2 h-4 w-4" />
           {t("common.reply")}

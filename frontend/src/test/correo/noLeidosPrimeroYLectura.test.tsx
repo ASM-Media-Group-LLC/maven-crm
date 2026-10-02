@@ -118,7 +118,7 @@ describe("«No leídos primero»", () => {
       "Asunto l1",
     ]);
     // La página de abajo pide SOLO los leídos.
-    expect(e.pedidas.at(-1)).toEqual({ carpeta: "INBOX", pagina: 0, soloLeidos: true });
+    expect(e.pedidas[e.pedidas.length - 1]).toEqual({ carpeta: "INBOX", pagina: 0, soloLeidos: true });
   });
 
   it("se guarda por persona: al volver sigue igual", async () => {

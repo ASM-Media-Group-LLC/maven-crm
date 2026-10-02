@@ -115,17 +115,21 @@ async function conTurno<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
-/** Llama a `mail-fetch` y devuelve el cuerpo ya tipado. */
+/** Llama a `mail-fetch` y devuelve el cuerpo ya tipado. SIN turno: solo para
+ *  acciones que no abren IMAP (traducir). */
+async function invocarMailFetch<T>(body: Record<string, unknown>): Promise<T> {
+  const { data, error } = await supabase.functions.invoke("mail-fetch", { body });
+  // supabase-js deja "non-2xx status code" y esconde el motivo real en la
+  // Response de `error.context`. Sin desenvolverlo el diagnóstico es a ciegas.
+  if (error) throw new Error(await describeFunctionError(error));
+  const payload = data as T & { error?: string };
+  if (payload?.error) throw new Error(payload.error);
+  return payload as T;
+}
+
+/** Llama a `mail-fetch` haciendo fila en el semáforo (máx. 2 a la vez). */
 function callMail<T>(body: Record<string, unknown>): Promise<T> {
-  return conTurno(async () => {
-    const { data, error } = await supabase.functions.invoke("mail-fetch", { body });
-    // supabase-js deja "non-2xx status code" y esconde el motivo real en la
-    // Response de `error.context`. Sin desenvolverlo el diagnóstico es a ciegas.
-    if (error) throw new Error(await describeFunctionError(error));
-    const payload = data as T & { error?: string };
-    if (payload?.error) throw new Error(payload.error);
-    return payload as T;
-  });
+  return conTurno(() => invocarMailFetch<T>(body));
 }
 
 /** Reglas de las consultas que PUEDEN abrir una sesión IMAP (el fallback).
@@ -502,8 +506,11 @@ export function useTraduccionCorreo(args: {
     enabled: habilitada,
     ...SESION_IMAP,
     staleTime: Infinity,
+    // ⚠️ Sin el semáforo: traducir no abre IMAP, y la IA puede tardar decenas
+    // de segundos. Con turno, una traducción lenta dejaba en fila a la lista y
+    // a los adjuntos (el semáforo es de 2).
     queryFn: () =>
-      callMail<{ traduccion: string; recortado: boolean; idioma: string }>({
+      invocarMailFetch<{ traduccion: string; recortado: boolean; idioma: string }>({
         action: "translate",
         idioma,
         ...(correo.origen === "cache" && correo.id
