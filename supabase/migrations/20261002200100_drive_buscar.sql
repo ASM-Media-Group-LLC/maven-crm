@@ -21,9 +21,12 @@ BEGIN
   IF to_regprocedure('extensions.unaccent(regdictionary, text)') IS NULL THEN
     RAISE EXCEPTION 'Falta la extensión unaccent en el esquema extensions';
   END IF;
+  -- ⚠️ En Maven pg_trgm está instalada en PUBLIC (no en extensions, como
+  -- unaccent): comprobado en prod el 02/10. Si algún día se mueve, esta guarda
+  -- y el índice de la migración siguiente lo dicen en vez de fallar raro.
   IF NOT EXISTS (SELECT 1 FROM pg_opclass c JOIN pg_namespace n ON n.oid = c.opcnamespace
-                 WHERE c.opcname = 'gin_trgm_ops' AND n.nspname = 'extensions') THEN
-    RAISE EXCEPTION 'Falta pg_trgm (gin_trgm_ops) en el esquema extensions';
+                 WHERE c.opcname = 'gin_trgm_ops' AND n.nspname = 'public') THEN
+    RAISE EXCEPTION 'Falta pg_trgm (gin_trgm_ops) en el esquema public';
   END IF;
 END $$;
 

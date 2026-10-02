@@ -9,7 +9,8 @@
 -- execute_sql con solo esta sentencia): CONCURRENTLY no corre dentro de una, y
 -- sin CONCURRENTLY el índice bloquearía las escrituras de drive_items mientras
 -- se arma (segundos con 430.000 filas: subidas y renombres esperando).
--- Requiere la migración anterior (la función drive_nombre_buscable).
+-- Requiere la migración anterior (la función drive_nombre_buscable). pg_trgm
+-- vive en el esquema PUBLIC en Maven (unaccent, en extensions).
 --
 -- Si se corta a mitad, queda un índice INVÁLIDO: se ve con
 --   SELECT indexrelid::regclass FROM pg_index WHERE NOT indisvalid;
@@ -22,7 +23,7 @@
 --   → Bitmap Index Scan on drive_items_nombre_trgm_idx
 
 CREATE INDEX CONCURRENTLY IF NOT EXISTS drive_items_nombre_trgm_idx
-  ON public.drive_items USING gin (public.drive_nombre_buscable(nombre) extensions.gin_trgm_ops)
+  ON public.drive_items USING gin (public.drive_nombre_buscable(nombre) public.gin_trgm_ops)
   WHERE trashed_at IS NULL;
 
 --| DROP INDEX CONCURRENTLY IF EXISTS public.drive_items_nombre_trgm_idx;

@@ -76,7 +76,7 @@ describe("⚠️ buscar en todo el Drive (drive_buscar)", () => {
     expect(envoltura).toMatch(/IMMUTABLE/);
     expect(envoltura).toMatch(/extensions\.unaccent\('extensions\.unaccent'::regdictionary, p\)/);
     expect(funcion()).toMatch(/public\.drive_nombre_buscable\(i\.nombre\) LIKE mas_largo/);
-    expect(indice).toMatch(/USING gin \(public\.drive_nombre_buscable\(nombre\) extensions\.gin_trgm_ops\)/);
+    expect(indice).toMatch(/USING gin \(public\.drive_nombre_buscable\(nombre\) public\.gin_trgm_ops\)/);
     expect(indice).toMatch(/WHERE trashed_at IS NULL;/);
   });
 
