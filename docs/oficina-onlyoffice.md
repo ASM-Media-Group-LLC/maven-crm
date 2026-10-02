@@ -119,6 +119,27 @@ el DNS todavía no exista.
 - **El editor se embebe desde una página HTTPS**, así que el servidor tiene que
   ser HTTPS o el navegador lo bloquea sin decir por qué.
 
+## Los archivos del Drive
+
+El visor del Drive (`pages/oficina/drive/VisorArchivo.tsx`) abre Word, Excel y
+PowerPoint —y los de OpenDocument, `.rtf` y `.csv`— en ONLYOFFICE, **solo
+lectura**. Dos acciones de `oficina-doc` (ver `oficina-doc/drive.ts`):
+
+- **`ver_drive`**: la config firmada con `document.url` = una URL firmada del
+  **NAS** (no de R2). ONLYOFFICE la baja desde su servidor; el NAS está detrás
+  de la puerta de Dokploy de esta misma máquina, así que no sale a internet.
+  Sin `callbackUrl`: el archivo vive en el NAS y no hay dónde guardar.
+- **`desde_drive`** («Editar en Documentos de Maven»): crea un documento de la
+  Oficina con una COPIA. Un `.docx`/`.xlsx`/`.pptx` se copia tal cual; el resto
+  pasa por el **conversor de ONLYOFFICE** (`POST /converter`, firmado igual que
+  la config). Tope de 50 MB: la copia pasa por la memoria de la edge.
+
+`oficina-doc` necesita para esto `DRIVE_NAS_URL` y `DRIVE_SECRETO`, los mismos
+secretos de la edge `drive` (son del proyecto: ya están cargados).
+
+⚠️ ONLYOFFICE no baja archivos de más de 100 MB (`maxDownloadBytes` por
+defecto): el visor no los manda y ofrece Descargar.
+
 ## Lo que quedó pendiente
 
 - **El email de Let's Encrypt** de ese Dokploy quedó en el default de fábrica

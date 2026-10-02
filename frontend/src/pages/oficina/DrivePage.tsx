@@ -37,6 +37,8 @@ import {
 import DriveCompartirDialog from "@/components/oficina/DriveCompartirDialog";
 import { BarraDeUso, CuposDialog } from "@/components/oficina/DriveCupos";
 import { useUserRole } from "@/hooks/useUserRole";
+import VisorArchivo from "@/pages/oficina/drive/VisorArchivo";
+import { soloUnClic } from "@/pages/oficina/drive/gestos";
 
 const VISTAS: { id: VistaDrive; clave: TranslationKey; icono: typeof HardDrive }[] = [
   { id: "mia", clave: "drive.vista.mia", icono: HardDrive },
@@ -102,6 +104,8 @@ export default function DrivePage() {
   const [compartiendo, setCompartiendo] = useState<DriveItem | null>(null);
   const [arrastrando, setArrastrando] = useState(false);
   const [viendoCupos, setViendoCupos] = useState(false);
+  /** El archivo abierto en el visor (id), o null. */
+  const [viendo, setViendo] = useState<string | null>(null);
   const { isAdmin } = useUserRole();
   const inputArchivos = useRef<HTMLInputElement>(null);
 
@@ -120,7 +124,8 @@ export default function DrivePage() {
   const abrir = (i: DriveItem) => {
     if (i.tipo === "carpeta") return ir(vista, i.id);
     if (i.estado !== "listo") return;
-    abrirArchivo(i.id, false).catch((e) => toast.error((e as Error).message));
+    // En el visor, no en otra pestaña (ver drive/VisorArchivo.tsx).
+    setViendo(i.id);
   };
 
   const soltar = (e: React.DragEvent) => {
@@ -274,9 +279,10 @@ export default function DrivePage() {
                     {/* Un clic (o Enter) abre, carpeta o archivo: como Drive en el
                         teléfono. Con doble clic, en el celular no se podía abrir
                         nada, y el teclado (detail 0) no abría las carpetas. */}
+                    {/* ⚠️ soloUnClic: el 2.º clic de un doble clic no abre otra vez. */}
                     <button
                       type="button"
-                      onClick={() => abrir(i)}
+                      onClick={soloUnClic(() => abrir(i))}
                       disabled={incompleta}
                       className="flex min-w-0 items-center gap-3 py-1 text-left text-sm disabled:cursor-default"
                     >
@@ -409,6 +415,7 @@ export default function DrivePage() {
 
       {subidas.length > 0 && <PanelDeSubidas subidas={subidas} onCerrar={limpiar} />}
       {viendoCupos && <CuposDialog onCerrar={() => setViendoCupos(false)} />}
+      <VisorArchivo items={lista} abierto={viendo} onAbierto={setViendo} />
     </Page>
   );
 }

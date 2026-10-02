@@ -64,7 +64,15 @@ const PDF_ILEGIBLE = "pdf-ilegible";
  *  que el plugin se enganche, y un `resize` disparado demasiado pronto lo deja
  *  peor. Dibujarlo nosotros saca el problema de raíz y además evita la barra de
  *  herramientas de Chrome, que duplicaba nuestros botones de descarga. */
-export default function VisorPdf({ bytes, nombre }: { bytes: Uint8Array; nombre: string }) {
+export default function VisorPdf({ bytes, url, nombre }: {
+  /** Los bytes del PDF (adjuntos del correo, que llegan enteros por IMAP)… */
+  bytes?: Uint8Array;
+  /** …o su URL (el Drive). Con URL, pdf.js pide la página que hace falta por
+   *  Range en vez de bajar el archivo entero: un escaneo de 200 MB abre igual.
+   *  El NAS contesta 206 y expone Content-Range/Accept-Ranges por CORS. */
+  url?: string;
+  nombre: string;
+}) {
   const { t } = useLanguage();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const hojaRef = useRef<HTMLDivElement | null>(null);
@@ -94,7 +102,8 @@ export default function VisorPdf({ bytes, nombre }: { bytes: Uint8Array; nombre:
         const pdfjs = await cargarPdfjs();
         // pdf.js se queda con el buffer que le pasan (lo deja vacío), así que va
         // una copia: el mismo Uint8Array puede volver a usarse al descargar.
-        const doc = (await pdfjs.getDocument({ data: bytes.slice() }).promise) as unknown as DocumentoPdf;
+        const fuente = bytes ? { data: bytes.slice() } : { url: url ?? "" };
+        const doc = (await pdfjs.getDocument(fuente).promise) as unknown as DocumentoPdf;
         if (!vivo) {
           void doc.destroy();
           return;
@@ -114,7 +123,7 @@ export default function VisorPdf({ bytes, nombre }: { bytes: Uint8Array; nombre:
       void docRef.current?.destroy();
       docRef.current = null;
     };
-  }, [bytes]);
+  }, [bytes, url]);
 
   // El ancho disponible manda: la página se dibuja para llenarlo.
   useEffect(() => {
