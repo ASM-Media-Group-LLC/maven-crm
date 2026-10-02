@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { HardDrive } from "lucide-react";
+import { Building2, HardDrive } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
 import { useLanguage } from "@/hooks/useLanguage";
-import { useGuardarCupo, useUsoDrive, useUsosDeMiAgencia, type UsoDePersona } from "@/hooks/useDrive";
+import { useGuardarCupo, useUsoAgencia, useUsoDrive, useUsosDeMiAgencia, type UsoDePersona } from "@/hooks/useDrive";
 import { tamano } from "@/lib/drive/formato";
 
 const GB = 1024 * 1024 * 1024;
@@ -52,6 +52,49 @@ export function BarraDeUso() {
         {t("drive.uso.barra", { usado: tamano(usado), cupo: tamano(cupo) })}
       </p>
       {casiLleno && <p className="text-xs text-warning">{t("drive.uso.casiLleno")}</p>}
+    </div>
+  );
+}
+
+/** El espacio de las unidades compartidas: es de la agencia, no de cada
+ *  persona (como en Google). Sin tope, solo se muestra cuánto se usa. */
+export function BarraDeUsoAgencia() {
+  const { t } = useLanguage();
+  const uso = useUsoAgencia();
+  if (!uso.data) return null;
+  const { usado, cupo } = uso.data;
+  const pct = cupo ? Math.min(100, (usado / cupo) * 100) : null;
+  const casiLleno = pct !== null && pct >= 90;
+  const texto = cupo === null
+    ? t("drive.usoAgencia.sinTope", { usado: tamano(usado) })
+    : t("drive.usoAgencia.barra", { usado: tamano(usado), cupo: tamano(cupo) });
+  return (
+    <div
+      className="flex w-full flex-col gap-2 rounded-panel border border-border/60 bg-card/60 px-4 py-3 sm:w-80"
+      data-testid="barra-uso-agencia"
+    >
+      <div className="flex items-center justify-between gap-3 text-xs">
+        <span className="flex items-center gap-1.5 font-medium text-foreground">
+          <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+          {t("drive.usoAgencia.titulo")}
+        </span>
+        {pct !== null && (
+          <span className={cn("tabular-nums", casiLleno ? "font-medium text-warning" : "text-muted-foreground")}>
+            {pct < 1 && usado > 0 ? "<1" : Math.round(pct)}%
+          </span>
+        )}
+      </div>
+      {pct !== null && (
+        <Progress
+          value={Math.max(pct, usado > 0 ? 1.5 : 0)}
+          aria-label={texto}
+          className="h-2 bg-foreground/10"
+          indicatorClassName={cn("rounded-full", casiLleno ? "bg-warning" : "bg-gradient-to-r from-accent to-primary")}
+        />
+      )}
+      <p className="text-xs text-muted-foreground">{texto}</p>
+      <p className="text-xs text-muted-foreground">{t("drive.usoAgencia.ayuda")}</p>
+      {casiLleno && <p className="text-xs text-warning">{t("drive.usoAgencia.casiLleno")}</p>}
     </div>
   );
 }

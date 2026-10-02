@@ -6,7 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import { verificar } from "./firma.mjs";
 import {
-  enlazar, idArchivo, idCarpeta, idCarpetaRaiz, importarCarpeta, mandar, mimeDe, nombreParaMaven, recorrer, uuidV5,
+  enlazar, idArchivo, idCarpeta, idCarpetaRaiz, importarCarpeta, mandar, marcarRaiz, mimeDe, nombreParaMaven, recorrer, uuidV5,
 } from "./importar.mjs";
 
 const SECRETO = "s".repeat(40);
@@ -175,3 +175,28 @@ test("una carpeta vacía (también en Google) no se crea", async () => {
   assert.equal(s.vacia, true);
   assert.equal(m.lotes.length, 0, "no manda ni la carpeta raíz");
 });
+
+test("la raíz dice qué unidad es: una unidad compartida, o la «Mi unidad» de Google de alguien", async () => {
+  const { d1, d2 } = await discosDePrueba();
+  const conf = { tenant: T, discos: [d1, d2], raizDrive: "maven-drive", funciones: "https://x", secreto: SECRETO };
+  const m = mavenFalsa();
+  await importarCarpeta({ carpeta: { clave: "unidad:E", nombre: "Shootings", origen: "Shootings", unidad: { tipo: "empresa" } }, grupoId: GRUPO, conf, fetchFn: m.fetchFn });
+  assert.deepEqual(m.lotes[0].unidades, [{ item_id: idCarpetaRaiz("unidad:E"), tipo: "empresa", persona: null }]);
+  assert.ok(m.lotes.slice(1).every((l) => l.unidades.length === 0), "solo la raíz la lleva");
+  const sin = mavenFalsa();
+  await importarCarpeta({ carpeta: { clave: "unidad:S", nombre: "S", origen: "Shootings" }, grupoId: GRUPO, conf, fetchFn: sin.fetchFn });
+  assert.deepEqual(sin.lotes[0].unidades, [], "un plan viejo, sin unidad, sigue andando");
+});
+
+test("--solo-raices: un solo lote con la raíz, sus compartidos y su unidad, sin tocar el disco", async () => {
+  const m = mavenFalsa();
+  const carpeta = { clave: "miunidad:ana@x.me", nombre: "Mi unidad · ana@x.me", origen: "no hace falta", compartir: [{ user_id: ANA, rol: "editor" }], unidad: { tipo: "personal", persona: ANA } };
+  await marcarRaiz({ carpeta, grupoId: GRUPO, conf: { tenant: T, funciones: "https://x", secreto: SECRETO }, fetchFn: m.fetchFn });
+  assert.equal(m.lotes.length, 1);
+  const raiz = idCarpetaRaiz("miunidad:ana@x.me");
+  assert.deepEqual(m.lotes[0].items, [{ id: raiz, parent_id: GRUPO, tipo: "carpeta", nombre: "Mi unidad · ana@x.me" }]);
+  assert.deepEqual(m.lotes[0].compartidos, [{ item_id: raiz, user_id: ANA, rol: "editor" }]);
+  assert.deepEqual(m.lotes[0].unidades, [{ item_id: raiz, tipo: "personal", persona: ANA }]);
+  assert.equal(m.lotes[0].permisoLeido.op, "importar");
+});
+

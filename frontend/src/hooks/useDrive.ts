@@ -24,12 +24,32 @@ export interface DriveItem {
   trashed_at: string | null;
 }
 
-export type VistaDrive = "mia" | "compartido" | "recientes" | "papelera";
+export type VistaDrive = "mia" | "unidades" | "compartido" | "recientes" | "papelera";
 
 const COLUMNAS = "id, owner_id, parent_id, tipo, nombre, mime, size, estado, created_at, updated_at, last_opened_at, trashed_at";
 
 /** `types.ts` es generado y todavía no conoce estas tablas. */
 const tabla = (n: string) => supabase.from(n as never);
+
+/** Qué carpetas son unidades (la RLS deja ver las que puedo abrir y mi «Mi
+ *  unidad» de Google): 'empresa' = unidad compartida de la agencia, 'personal'
+ *  = la «Mi unidad» de Google de alguien, importada. */
+interface UnidadVisible { item_id: string; tipo: "empresa" | "personal"; persona: string | null }
+async function unidadesQueVeo(): Promise<UnidadVisible[]> {
+  return fetchAllRows((desde, hasta) => tabla("drive_unidades").select("item_id, tipo, persona")
+    .order("item_id").range(desde, hasta));
+}
+
+/** Fichas por id, de a tramos (una URL con cientos de ids se corta). */
+async function fichasPorId(ids: string[]): Promise<DriveItem[]> {
+  const todas: DriveItem[] = [];
+  for (let i = 0; i < ids.length; i += 150) {
+    const { data, error } = await tabla("drive_items").select(COLUMNAS).in("id", ids.slice(i, i + 150)).is("trashed_at", null);
+    if (error) throw error;
+    todas.push(...((data ?? []) as unknown as DriveItem[]));
+  }
+  return todas;
+}
 
 /** Carpetas primero y después por nombre, como Google Drive. */
 export function ordenar(items: DriveItem[]): DriveItem[] {
@@ -63,20 +83,34 @@ export function useDriveVista(vista: VistaDrive, carpeta: string | null) {
         return ordenar(visibles(data, yo));
       }
       if (vista === "mia") {
-        const data = await fetchAllRows((desde, hasta) => tabla("drive_items").select(COLUMNAS)
-          .is("parent_id", null).eq("owner_id", yo).is("trashed_at", null).order("id").range(desde, hasta));
-        return ordenar(visibles(data, yo));
+        // Lo mío y, como en Google, mi «Mi unidad» de Google (importada).
+        const [data, unidades] = await Promise.all([
+          fetchAllRows((desde, hasta) => tabla("drive_items").select(COLUMNAS)
+            .is("parent_id", null).eq("owner_id", yo).is("trashed_at", null).order("id").range(desde, hasta)),
+          unidadesQueVeo(),
+        ]);
+        const deGoogle = await fichasPorId(unidades.filter((u) => u.tipo === "personal" && u.persona === yo).map((u) => u.item_id));
+        return ordenar(visibles([...data, ...deGoogle], yo));
+      }
+      if (vista === "unidades") {
+        // Las unidades compartidas de la agencia que puedo abrir.
+        const unidades = await unidadesQueVeo();
+        return ordenar(visibles(await fichasPorId(unidades.filter((u) => u.tipo === "empresa").map((u) => u.item_id)), yo));
       }
       if (vista === "compartido") {
         // Lo que me compartieron DIRECTAMENTE (no lo de adentro: eso se ve al
         // entrar a la carpeta).
-        const { data: sh, error: e1 } = await tabla("drive_shares").select("item_id").eq("user_id", yo);
+        // Las unidades compartidas y mi «Mi unidad» de Google tienen su lugar:
+        // no se repiten acá (como en Google).
+        const [{ data: sh, error: e1 }, unidades] = await Promise.all([
+          tabla("drive_shares").select("item_id").eq("user_id", yo),
+          unidadesQueVeo(),
+        ]);
         if (e1) throw e1;
-        const ids = ((sh ?? []) as unknown as { item_id: string }[]).map((s) => s.item_id);
+        const aparte = new Set(unidades.filter((u) => u.tipo === "empresa" || u.persona === yo).map((u) => u.item_id));
+        const ids = ((sh ?? []) as unknown as { item_id: string }[]).map((s) => s.item_id).filter((id) => !aparte.has(id));
         if (!ids.length) return [];
-        const { data, error } = await tabla("drive_items").select(COLUMNAS).in("id", ids).is("trashed_at", null);
-        if (error) throw error;
-        return ordenar(visibles(data, yo));
+        return ordenar(visibles(await fichasPorId(ids), yo));
       }
       if (vista === "recientes") {
         const { data, error } = await tabla("drive_items").select(COLUMNAS)
@@ -114,12 +148,15 @@ export function useRutaDrive(carpeta: string | null) {
     staleTime: 60_000,
     queryFn: async () => {
       const ruta: { id: string; nombre: string; owner_id: string | null }[] = [];
+      // Una unidad es el principio de su ruta, como en Google.
+      const raices = new Set((await unidadesQueVeo()).map((u) => u.item_id));
       let actual: string | null = carpeta;
       for (let i = 0; actual && i < 30; i++) {
         const { data } = await tabla("drive_items").select("id, nombre, parent_id, owner_id").eq("id", actual).maybeSingle();
         const f = data as unknown as { id: string; nombre: string; parent_id: string | null; owner_id: string | null } | null;
         if (!f) break;
         ruta.unshift({ id: f.id, nombre: f.nombre, owner_id: f.owner_id });
+        if (raices.has(f.id)) break;
         actual = f.parent_id;
       }
       return ruta;
@@ -134,6 +171,7 @@ function useInvalidar() {
     qc.invalidateQueries({ queryKey: ["drive-ruta"] });
     // Subir o borrar para siempre cambia el espacio usado.
     qc.invalidateQueries({ queryKey: ["drive-uso"] });
+    qc.invalidateQueries({ queryKey: ["drive-uso-agencia"] });
   };
 }
 
@@ -331,6 +369,35 @@ export function useUsoDrive() {
       const f = Array.isArray(filas) ? filas[0] : filas ?? undefined;
       return { usado: Number(f?.usado ?? 0), cupo: Number(f?.cupo ?? 0) };
     },
+  });
+}
+
+export interface UsoAgencia { usado: number; cupo: number | null; personas: number }
+
+/** El espacio común de la agencia: lo que está dentro de las unidades
+ *  compartidas. cupo null = sin tope (KASH); si no, como Starter de Google. */
+export function useUsoAgencia(habilitado = true) {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["drive-uso-agencia", user?.id],
+    enabled: !!user && habilitado,
+    staleTime: 60_000,
+    queryFn: async (): Promise<UsoAgencia> => {
+      const { data, error } = await supabase.rpc("drive_uso_agencia" as never);
+      if (error) throw error;
+      const filas = data as unknown as UsoAgencia[] | UsoAgencia | null;
+      const f = Array.isArray(filas) ? filas[0] : filas ?? undefined;
+      return { usado: Number(f?.usado ?? 0), cupo: f?.cupo == null ? null : Number(f.cupo), personas: Number(f?.personas ?? 0) };
+    },
+  });
+}
+
+/** Un admin crea una unidad compartida (sin dueño, de la agencia). */
+export function useCrearUnidad() {
+  const invalidar = useInvalidar();
+  return useMutation({
+    mutationFn: (nombre: string) => llamar<{ id: string }>("crear_unidad", { nombre: nombre.trim() }),
+    onSuccess: invalidar,
   });
 }
 

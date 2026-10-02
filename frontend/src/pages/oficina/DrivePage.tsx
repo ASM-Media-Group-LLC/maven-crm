@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { format, isToday, isThisYear } from "date-fns";
 import {
-  ChevronRight, Clock, Download, File, FileArchive, FileImage, FileSpreadsheet, FileText, FileVideo,
+  Building2, ChevronRight, Clock, Download, File, FileArchive, FileImage, FileSpreadsheet, FileText, FileVideo,
   Folder, FolderPlus, HardDrive, Loader2, MoreVertical, Pencil, Plus, RotateCcw, Share2, Trash2,
   Upload, Users, X, AlertTriangle, Check,
 } from "lucide-react";
@@ -31,15 +31,16 @@ import { useFormato } from "@/hooks/useFormato";
 import type { Formato } from "@/lib/formato";
 import { useDirectorioCorreo } from "@/hooks/useDirectorioCorreo";
 import {
-  abrirArchivo, useBorrarParaSiempre, useCrearCarpeta, useDriveVista, usePapelera, useRenombrar,
+  abrirArchivo, useBorrarParaSiempre, useCrearCarpeta, useCrearUnidad, useDriveVista, usePapelera, useRenombrar,
   useRutaDrive, useSubidasDrive, type DriveItem, type VistaDrive,
 } from "@/hooks/useDrive";
 import DriveCompartirDialog from "@/components/oficina/DriveCompartirDialog";
-import { BarraDeUso, CuposDialog } from "@/components/oficina/DriveCupos";
+import { BarraDeUso, BarraDeUsoAgencia, CuposDialog } from "@/components/oficina/DriveCupos";
 import { useUserRole } from "@/hooks/useUserRole";
 
 const VISTAS: { id: VistaDrive; clave: TranslationKey; icono: typeof HardDrive }[] = [
   { id: "mia", clave: "drive.vista.mia", icono: HardDrive },
+  { id: "unidades", clave: "drive.vista.unidades", icono: Building2 },
   { id: "compartido", clave: "drive.vista.compartido", icono: Users },
   { id: "recientes", clave: "drive.vista.recientes", icono: Clock },
   { id: "papelera", clave: "drive.vista.papelera", icono: Trash2 },
@@ -47,6 +48,7 @@ const VISTAS: { id: VistaDrive; clave: TranslationKey; icono: typeof HardDrive }
 
 const VACIO: Record<VistaDrive, TranslationKey> = {
   mia: "drive.vacio.mia",
+  unidades: "drive.vacio.unidades",
   compartido: "drive.vacio.compartido",
   recientes: "drive.vacio.recientes",
   papelera: "drive.vacio.papelera",
@@ -91,12 +93,14 @@ export default function DrivePage() {
   }, [directorio.data, user?.id, t]);
 
   const crear = useCrearCarpeta();
+  const crearUnidad = useCrearUnidad();
   const renombrar = useRenombrar();
   const papelera = usePapelera();
   const borrar = useBorrarParaSiempre();
   const { subidas, subir, limpiar } = useSubidasDrive();
 
   const [creando, setCreando] = useState(false);
+  const [creandoUnidad, setCreandoUnidad] = useState(false);
   const [renombrando, setRenombrando] = useState<DriveItem | null>(null);
   const [borrando, setBorrando] = useState<DriveItem | null>(null);
   const [compartiendo, setCompartiendo] = useState<DriveItem | null>(null);
@@ -106,8 +110,10 @@ export default function DrivePage() {
   const inputArchivos = useRef<HTMLInputElement>(null);
 
   // Subir y crear solo donde se puede: en Mi unidad, o dentro de una carpeta
-  // (si no tenés permiso de editar, la base lo rechaza y se avisa).
+  // (si no tienes permiso de editar, la base lo rechaza y se avisa).
   const sePuedeSubir = vista === "mia" || !!carpeta;
+  // Como en Google Workspace: las unidades compartidas las crea un admin.
+  const sePuedeCrearUnidad = isAdmin && vista === "unidades" && !carpeta;
   const enPapelera = vista === "papelera" && !carpeta;
 
   const ir = (v: VistaDrive, c: string | null = null) => {
@@ -139,6 +145,12 @@ export default function DrivePage() {
         title={t("drive.titulo")}
         actions={sePuedeSubir || isAdmin ? (
           <>
+          {sePuedeCrearUnidad && (
+            <Button onClick={() => setCreandoUnidad(true)}>
+              <Plus className="mr-1.5 h-4 w-4" />
+              {t("drive.unidad.nueva")}
+            </Button>
+          )}
           {isAdmin && (
             <Button variant="outline" onClick={() => setViendoCupos(true)} aria-label={t("drive.cupos.boton")}>
               <HardDrive className="h-4 w-4 sm:mr-1.5" />
@@ -198,7 +210,7 @@ export default function DrivePage() {
               </SubtabNavItem>
             ))}
           </SubtabNav>
-          <BarraDeUso />
+          {vista === "unidades" ? <BarraDeUsoAgencia /> : <BarraDeUso />}
         </div>
 
         {/* Migas: Mi unidad › Contabilidad › 2026 */}
@@ -363,6 +375,20 @@ export default function DrivePage() {
           onCerrar={() => setCreando(false)}
           onGuardar={(nombre) => crear.mutate({ nombre, parentId: carpeta }, {
             onSuccess: () => setCreando(false),
+            onError: (e) => toast.error((e as Error).message),
+          })}
+        />
+      )}
+      {creandoUnidad && (
+        <DialogoDeNombre
+          titulo={t("drive.unidad.nueva")}
+          etiqueta={t("drive.unidad.nombre")}
+          inicial={t("drive.unidad.sinNombre")}
+          boton={t("drive.unidad.crear")}
+          ocupado={crearUnidad.isPending}
+          onCerrar={() => setCreandoUnidad(false)}
+          onGuardar={(nombre) => crearUnidad.mutate(nombre, {
+            onSuccess: () => { setCreandoUnidad(false); toast.success(t("drive.unidad.creada")); },
             onError: (e) => toast.error((e as Error).message),
           })}
         />
