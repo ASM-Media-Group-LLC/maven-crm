@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, FileText, Loader2, Share2, WifiOff } from "lucide-react";
+import { ArrowLeft, FileText, FolderOpen, Loader2, Share2, WifiOff } from "lucide-react";
 import { Page } from "@/components/ui/page";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
@@ -12,13 +12,27 @@ import { useAbrirEnOnlyOffice, useEditorDeOffice } from "@/hooks/useOnlyOffice";
 import { useHistorialDeOficina } from "@/hooks/useHistorialDeOficina";
 import { useLanguage } from "@/hooks/useLanguage";
 import DialogoDeCompartir from "@/components/oficina/DialogoDeCompartir";
+import DialogoAbrirArchivo from "@/components/oficina/DialogoAbrirArchivo";
+import { atajoDeAbrir } from "@/lib/drive/abrirEnLaOficina";
+import type { DestinoDeOficina } from "@/lib/drive/tipoDeArchivo";
 
 /** El div donde ONLYOFFICE se monta. Tiene que ser un id y no una ref: la API
  *  del editor recibe el NOMBRE del contenedor, no el elemento. */
 const CONTENEDOR = "editor-de-oficina";
 
+const SECCIONES: readonly string[] = ["docx", "xlsx", "pptx"];
+
+/** Una página por documento. «Abrir» (⌘O) lleva de un documento a otro sin
+ *  salir de esta ruta, y sin la `key` el editor del anterior quedaba montado
+ *  sobre un contenedor que el esqueleto de carga acababa de sacar: el nuevo
+ *  podía buscar el div antes de que volviera a existir. Remontar todo deja el
+ *  mismo camino que abrirlo desde la lista. */
 export default function DocumentoPage() {
   const { id } = useParams<{ id: string }>();
+  return <DocumentoAbierto key={id} id={id} />;
+}
+
+function DocumentoAbierto({ id }: { id: string | undefined }) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { t } = useLanguage();
@@ -26,6 +40,7 @@ export default function DocumentoPage() {
   // el editor abriría con su color por defecto en vez del que se está viendo.
   const { resolvedTheme } = useTheme();
   const [compartiendo, setCompartiendo] = useState(false);
+  const [abriendoArchivo, setAbriendoArchivo] = useState(false);
   const doc = useDocumento(id);
   const abrir = useAbrirEnOnlyOffice();
   // Al salir del historial hay que volver a montar el editor en modo edición.
@@ -78,6 +93,8 @@ export default function DocumentoPage() {
   }
 
   const fallo = error || (abrir.error as Error | undefined)?.message;
+  // «Abrir» filtra por el tipo de este documento, como en Google.
+  const seccion = (SECCIONES.includes(cargado.extension) ? cargado.extension : "docx") as DestinoDeOficina;
 
   return (
     // `scroll={false}`: el editor maneja su propio alto y su propio scroll, como
@@ -91,18 +108,34 @@ export default function DocumentoPage() {
           subtitle={t("oficina.doc.version", { n: cargado.version })}
           actions={
             <>
-              {/* Un solo botón: adentro del diálogo están las personas
-                  concretas Y el acceso general. Antes eran dos controles
-                  separados para contestar la misma pregunta. */}
-              <Button
-                size="sm"
-                variant="outline"
-                className="shrink-0 rounded-full"
-                onClick={() => setCompartiendo(true)}
-              >
-                <Share2 className="mr-1.5 h-4 w-4" />
-                {t("doc.compartir")}
-              </Button>
+              {/* Abrir y Compartir van JUNTOS en un div: el encabezado pliega
+                  detrás de «⋯» más de dos acciones en el teléfono, y la flecha
+                  de volver quedaba escondida en esa hoja. */}
+              <div className="flex shrink-0 items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="shrink-0 rounded-full"
+                  onClick={() => setAbriendoArchivo(true)}
+                  aria-label={t("oficina.abrir.titulo")}
+                  title={t("oficina.abrir.botonAyuda", { atajo: atajoDeAbrir() })}
+                >
+                  <FolderOpen className="h-4 w-4 sm:mr-1.5" />
+                  <span className="hidden sm:inline">{t("oficina.abrir.boton")}</span>
+                </Button>
+                {/* Un solo botón: adentro del diálogo están las personas
+                    concretas Y el acceso general. Antes eran dos controles
+                    separados para contestar la misma pregunta. */}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="shrink-0 rounded-full"
+                  onClick={() => setCompartiendo(true)}
+                >
+                  <Share2 className="mr-1.5 h-4 w-4" />
+                  {t("doc.compartir")}
+                </Button>
+              </div>
               <Button size="icon" variant="ghost" className="h-9 w-9 shrink-0 rounded-full"
                 aria-label={t("oficina.backToOffice")} onClick={() => navigate("/oficina")}>
                 <ArrowLeft className="h-4 w-4" />
@@ -134,6 +167,8 @@ export default function DocumentoPage() {
           <div id={CONTENEDOR} className="h-full w-full" />
         </div>
       </div>
+
+      <DialogoAbrirArchivo abierto={abriendoArchivo} onCambiar={setAbriendoArchivo} formato={seccion} />
 
       {id && (
         <DialogoDeCompartir

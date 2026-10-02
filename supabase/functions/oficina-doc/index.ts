@@ -528,6 +528,13 @@ Deno.serve(async (req) => {
         throw e;
       }
       console.log(`[oficina-doc] copia del Drive ${fila.id} → documento ${docId} (${bytes.length} bytes)`);
+      // Abrirlo en la Oficina TAMBIÉN es abrirlo (el «Abrir» de la Oficina y
+      // «Editar en…» del visor): cuenta para lo que se archiva y para MIS
+      // «Recientes», como en `ver_drive`. Sin `throw`: la copia ya está hecha
+      // y es lo que la persona pidió.
+      const ahora = new Date().toISOString();
+      await admin.from("drive_items").update({ last_opened_at: ahora }).eq("id", fila.id);
+      await admin.from("drive_aperturas").upsert({ user_id: user.id, item_id: fila.id, abierto_at: ahora }, { onConflict: "user_id,item_id" });
       return responder({ id: docId, extension: formato.destino });
     }
 

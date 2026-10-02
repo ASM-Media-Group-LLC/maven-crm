@@ -165,6 +165,85 @@ export const oficina = {
   "drive.visor.copiaLista": { es: "Copia creada en la Oficina. El original sigue en el Drive.", en: "Copy created in Office. The original stays in Drive." },
   "drive.visor.copiaError": { es: "No se pudo crear la copia", en: "Couldn’t create the copy" },
 
+  // Oficina · «Abrir un archivo» (components/oficina/DialogoAbrirArchivo.tsx)
+  "oficina.abrir.boton": { es: "Abrir", en: "Open" },
+  "oficina.abrir.botonAyuda": { es: "Abrir un archivo ({atajo})", en: "Open a file ({atajo})" },
+  "oficina.abrir.titulo": { es: "Abrir un archivo", en: "Open a file" },
+  "oficina.abrir.descripcion": {
+    es: "Elige un archivo del Drive o súbelo desde tu computadora. Se abre una copia editable; el original no cambia.",
+    en: "Pick a file from Drive or upload it from your computer. An editable copy opens; the original stays as it is.",
+  },
+  "oficina.abrir.buscar": { es: "Buscar por nombre en esta vista…", en: "Search by name in this view…" },
+  "oficina.abrir.pestanas": { es: "De dónde abrir", en: "Where to open from" },
+  "oficina.abrir.subir": { es: "Subir", en: "Upload" },
+  "oficina.abrir.filtro": { es: "Qué archivos mostrar", en: "Which files to show" },
+  "oficina.abrir.filtro.docx": { es: "Documentos", en: "Documents" },
+  "oficina.abrir.filtro.xlsx": { es: "Hojas de cálculo", en: "Spreadsheets" },
+  "oficina.abrir.filtro.pptx": { es: "Presentaciones", en: "Presentations" },
+  "oficina.abrir.filtro.todos": { es: "Todos los de Oficina", en: "All Office files" },
+  "oficina.abrir.vacio.docx": { es: "Aquí no hay documentos", en: "No documents here" },
+  "oficina.abrir.vacio.xlsx": { es: "Aquí no hay hojas de cálculo", en: "No spreadsheets here" },
+  "oficina.abrir.vacio.pptx": { es: "Aquí no hay presentaciones", en: "No presentations here" },
+  "oficina.abrir.vacio.todos": { es: "Aquí no hay archivos de Oficina", en: "No Office files here" },
+  "oficina.abrir.vacioRecientes": {
+    es: "Aparecen aquí los archivos del Drive que se abrieron hace poco.",
+    en: "Drive files opened recently show up here.",
+  },
+  "oficina.abrir.vacioAyuda": {
+    es: "Prueba en otra pestaña o sube el archivo desde tu computadora.",
+    en: "Try another tab or upload the file from your computer.",
+  },
+  "oficina.abrir.sinCoincidencias": { es: "Nada con «{q}» en esta vista", en: "Nothing matching “{q}” in this view" },
+  "oficina.abrir.sinCoincidenciasAyuda": {
+    es: "Se busca en lo que se ve: entra a otra carpeta o pestaña para buscar ahí.",
+    en: "Search looks at what’s shown: open another folder or tab to search there.",
+  },
+  "oficina.abrir.irASubir": { es: "Subir un archivo", en: "Upload a file" },
+  "oficina.abrir.muyGrande": { es: "Más de {tope}: no se puede abrir", en: "Over {tope}: can’t be opened" },
+  "oficina.abrir.abriendo": { es: "Abriendo «{name}»…", en: "Opening “{name}”…" },
+  "oficina.abrir.abriendoAyuda": {
+    es: "Se crea una copia editable en la Oficina; el original sigue en el Drive. Si hay que convertirlo, puede tardar un poco.",
+    en: "An editable copy is created in Office; the original stays in Drive. If it needs converting, this can take a moment.",
+  },
+  "oficina.abrir.error": { es: "No se pudo abrir «{name}»: {motivo}", en: "Couldn’t open “{name}”: {motivo}" },
+  "oficina.abrir.subir.soltar": { es: "Arrastra un archivo aquí", en: "Drag a file here" },
+  "oficina.abrir.subir.o": { es: "o", en: "or" },
+  "oficina.abrir.subir.elegir": { es: "Elegir un archivo de tu computadora", en: "Choose a file from your computer" },
+  "oficina.abrir.subir.ayuda": {
+    es: "Se guarda en tu «Mi unidad» del Drive y se abre aquí para editarlo. Hasta {tope}.",
+    en: "It’s saved to your “My Drive” and opened here for editing. Up to {tope}.",
+  },
+  "oficina.abrir.subir.formatos": { es: "Formatos: {lista}", en: "Formats: {lista}" },
+  "oficina.abrir.subir.subiendo": { es: "Subiendo «{name}»…", en: "Uploading “{name}”…" },
+  "oficina.abrir.subir.progreso": { es: "{enviado} de {total}", en: "{enviado} of {total}" },
+  "oficina.abrir.subir.otro": { es: "Elegir otro archivo", en: "Choose another file" },
+  "oficina.abrir.subir.uno": {
+    es: "Elige un solo archivo: se abren de a uno.",
+    en: "Choose just one file: they open one at a time.",
+  },
+  "oficina.abrir.subir.error.formato": {
+    es: "«{name}» no se puede abrir en la Oficina. Sirven: {lista}.",
+    en: "“{name}” can’t be opened in Office. Supported: {lista}.",
+  },
+  "oficina.abrir.subir.error.vacio": { es: "«{name}» está vacío.", en: "“{name}” is empty." },
+  "oficina.abrir.subir.error.grande": {
+    es: "«{name}» pesa {peso}: lo máximo para abrirlo en la Oficina es {tope}.",
+    en: "“{name}” is {peso}: the most Office can open is {tope}.",
+  },
+  "oficina.abrir.subir.error.espacio": {
+    es: "No te alcanza el espacio del Drive: usas {usado} de {cupo} y «{name}» pesa {peso}. Vacía la papelera o pídele a un admin más espacio.",
+    en: "Not enough Drive storage: you use {usado} of {cupo} and “{name}” is {peso}. Empty the trash or ask an admin for more.",
+  },
+  "oficina.abrir.subir.error.subida": { es: "No se pudo subir «{name}»: {motivo}", en: "Couldn’t upload “{name}”: {motivo}" },
+  "oficina.abrir.subir.error.abrir": {
+    es: "«{name}» quedó en tu «Mi unidad», pero no se pudo abrir: {motivo}",
+    en: "“{name}” was saved to your “My Drive”, but it couldn’t be opened: {motivo}",
+  },
+  "oficina.abrir.subir.quedoEnDrive": {
+    es: "«{name}» quedó en tu «Mi unidad» del Drive.",
+    en: "“{name}” was saved to your “My Drive”.",
+  },
+
   // >>> i18n ola 3 (paginas-a)
   // Oficina · la lista (docs, hojas, presentaciones)
   "oficina.subtitle": { es: "Del equipo, escritos en Maven", en: "The team's, written in Maven" },

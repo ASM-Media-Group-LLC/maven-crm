@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { format, isToday, isThisYear } from "date-fns";
 import {
-  FileText, FileSpreadsheet, Presentation, Plus, Search, Users, Lock,
+  FileText, FileSpreadsheet, FolderOpen, Presentation, Plus, Search, Users, Lock,
   Trash2, RotateCcw, Loader2, X,
 } from "lucide-react";
 import { Page } from "@/components/ui/page";
@@ -26,6 +26,8 @@ import { useLanguage } from "@/hooks/useLanguage";
 import type { TranslationKey } from "@/lib/i18n";
 import { useFormato } from "@/hooks/useFormato";
 import type { Formato } from "@/lib/formato";
+import DialogoAbrirArchivo from "@/components/oficina/DialogoAbrirArchivo";
+import { atajoDeAbrir } from "@/lib/drive/abrirEnLaOficina";
 
 function cuando(iso: string, f: Formato): string {
   const d = new Date(iso);
@@ -77,6 +79,8 @@ export default function OficinaPage({ formato = "docx" }: { formato?: FormatoDeO
   const [q, setQ] = useState("");
   const [vista, setVista] = useState<FiltrosDocumentos["vista"]>("todos");
   const [confirmarBorrado, setConfirmarBorrado] = useState<Documento | null>(null);
+  /** «Abrir un archivo» (⌘O): uno del Drive o uno de la computadora. */
+  const [abriendoArchivo, setAbriendoArchivo] = useState(false);
 
   const docs = useDocumentos({ q, vista, extension: formato });
   const crear = useCrearDocumentoOffice();
@@ -114,14 +118,27 @@ export default function OficinaPage({ formato = "docx" }: { formato?: FormatoDeO
           subtitle={t("oficina.subtitle")}
           icon={<cfg.icono />}
           actions={
-            <Button onClick={nuevo} disabled={crear.isPending} className="rounded-full">
-              {crear.isPending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Plus className="mr-2 h-4 w-4" />
-              )}
-              {t(cfg.nuevo)}
-            </Button>
+            <>
+              {/* Como Archivo › Abrir de Google: para el Excel que alguien
+                  bajó y quiere seguir en Maven. */}
+              <Button
+                variant="outline"
+                onClick={() => setAbriendoArchivo(true)}
+                className="rounded-full"
+                title={t("oficina.abrir.botonAyuda", { atajo: atajoDeAbrir() })}
+              >
+                <FolderOpen className="mr-2 h-4 w-4" />
+                {t("oficina.abrir.boton")}
+              </Button>
+              <Button onClick={nuevo} disabled={crear.isPending} className="rounded-full">
+                {crear.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Plus className="mr-2 h-4 w-4" />
+                )}
+                {t(cfg.nuevo)}
+              </Button>
+            </>
           }
         />
 
@@ -199,10 +216,16 @@ export default function OficinaPage({ formato = "docx" }: { formato?: FormatoDeO
                   : t(cfg.ayuda)}
             </p>
             {!q && vista !== "papelera" && (
-              <Button onClick={nuevo} variant="outline" size="sm" className="mt-4 rounded-full">
-                <Plus className="mr-2 h-4 w-4" />
-                {t(cfg.nuevo)}
-              </Button>
+              <div className="mt-4 flex flex-wrap justify-center gap-2">
+                <Button onClick={nuevo} variant="outline" size="sm" className="rounded-full">
+                  <Plus className="mr-2 h-4 w-4" />
+                  {t(cfg.nuevo)}
+                </Button>
+                <Button onClick={() => setAbriendoArchivo(true)} variant="ghost" size="sm" className="rounded-full">
+                  <FolderOpen className="mr-2 h-4 w-4" />
+                  {t("oficina.abrir.titulo")}
+                </Button>
+              </div>
             )}
           </div>
         ) : (
@@ -273,6 +296,8 @@ export default function OficinaPage({ formato = "docx" }: { formato?: FormatoDeO
           </ul>
         )}
       </div>
+
+      <DialogoAbrirArchivo abierto={abriendoArchivo} onCambiar={setAbriendoArchivo} formato={formato} />
 
       {/* Borrar de la papelera SÍ es definitivo, así que se pregunta — y con el
           diálogo de Maven, no el del navegador. */}
