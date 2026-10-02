@@ -10,11 +10,13 @@ const fuentes = (import.meta as unknown as {
   "/supabase/migrations/20260928200000_oficina_drive.sql",
   "/supabase/functions/drive/index.ts",
   "/infra/nas-drive/server.mjs",
+  "/frontend/src/hooks/useDrive.ts",
 ], { query: "?raw", import: "default", eager: true });
 const leer = (fin: string) => Object.entries(fuentes).find(([k]) => k.endsWith(fin))?.[1] ?? "";
 const mig = leer("oficina_drive.sql");
 const edge = leer("drive/index.ts");
 const nas = leer("nas-drive/server.mjs");
+const hook = leer("hooks/useDrive.ts");
 
 describe("⚠️ multi-agencia", () => {
   it("toda política de drive_items exige la agencia", () => {
@@ -67,5 +69,16 @@ describe("⚠️ el NAS", () => {
   it("HTML/SVG/JS nunca se sirven como página", () => {
     expect(nas).toMatch(/const PELIGROSOS = \/html\|svg\|xml\|javascript\|ecmascript\/i;/);
     expect(nas).toMatch(/Content-Security-Policy", "default-src 'none'; sandbox"/);
+  });
+});
+
+describe("⚠️ carpetas grandes", () => {
+  it("el contenido de una carpeta se pide paginado (PostgREST corta en 1000 sin avisar)", () => {
+    expect(hook.length).toBeGreaterThan(0);
+    const i = hook.indexOf('.eq("parent_id", carpeta)');
+    expect(i).toBeGreaterThan(-1);
+    const tramo = hook.slice(hook.lastIndexOf("fetchAllRows", i), i + 200);
+    expect(tramo).toMatch(/fetchAllRows\(/);
+    expect(tramo).toMatch(/\.order\("id"\)\.range\(desde, hasta\)/);
   });
 });

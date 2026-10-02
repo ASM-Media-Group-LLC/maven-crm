@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { describeFunctionError } from "@/hooks/useMailConnection";
+import { fetchAllRows } from "@/lib/supabasePaginate";
 
 // Drive de Oficina. Las FICHAS (nombre, carpeta, dueño) se leen directo de la
 // base con la RLS de drive_items; el CONTENIDO va y viene del NAS por la puerta de Dokploy (Tailscale)
@@ -55,16 +56,15 @@ export function useDriveVista(vista: VistaDrive, carpeta: string | null) {
       const yo = user!.id;
       if (carpeta) {
         // Dentro de una carpeta, venga de donde venga (mía o compartida): la
-        // RLS ya dice qué se puede ver.
-        const { data, error } = await tabla("drive_items").select(COLUMNAS)
-          .eq("parent_id", carpeta).is("trashed_at", null);
-        if (error) throw error;
+        // RLS ya dice qué se puede ver. ⚠️ Paginado: PostgREST corta en 1000 y
+        // hay carpetas importadas de Google con decenas de miles de archivos.
+        const data = await fetchAllRows((desde, hasta) => tabla("drive_items").select(COLUMNAS)
+          .eq("parent_id", carpeta).is("trashed_at", null).order("id").range(desde, hasta));
         return ordenar(visibles(data, yo));
       }
       if (vista === "mia") {
-        const { data, error } = await tabla("drive_items").select(COLUMNAS)
-          .is("parent_id", null).eq("owner_id", yo).is("trashed_at", null);
-        if (error) throw error;
+        const data = await fetchAllRows((desde, hasta) => tabla("drive_items").select(COLUMNAS)
+          .is("parent_id", null).eq("owner_id", yo).is("trashed_at", null).order("id").range(desde, hasta));
         return ordenar(visibles(data, yo));
       }
       if (vista === "compartido") {
