@@ -16,6 +16,7 @@ import { EmojiBar, usePersistedEmojis } from "@/pages/chatter-evaluator/workspac
 import { GifPicker } from "@/pages/inbox/GifPicker";
 import { StickerPicker } from "@/pages/inbox/StickerPicker";
 import Expresiones from "./Expresiones";
+import SelectorDeEmojis from "@/components/chat/SelectorDeEmojis";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { ScriptsButton } from "@/components/chat/ScriptsButton";
 
@@ -529,6 +530,17 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
             onPick={(e) => composerRef.current?.insertText(e)}
             onAdd={(e) => setMessengerEmojis((curr) => (curr.includes(e) ? curr : [...curr, e]))}
             onRemove={(e) => setMessengerEmojis((curr) => curr.filter((x) => x !== e))}
+            // Solo el CONTENIDO del popup del «+»: el selector de Google. La barra,
+            // su lugar y lo que hace elegir ahí (sumar a la barra) no cambian.
+            selector={({ enLaBarra, onAgregar }) => (
+              <SelectorDeEmojis
+                className="h-[min(26rem,60vh)]"
+                deshabilitados={enLaBarra}
+                motivoDeshabilitado={t("chatters.emoji.alreadyInBar")}
+                onElegir={onAgregar}
+                enfocarBusqueda
+              />
+            )}
           />
         </div>
       )}

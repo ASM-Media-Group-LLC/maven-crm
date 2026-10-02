@@ -81,6 +81,12 @@ interface EmojiBarProps {
    *  Used to host the A−/A+ font zoom buttons in the same spot the
    *  original Roleplaychatters had them (.chat-zoom on the emoji row). */
   trailing?: React.ReactNode;
+  /** Lo que va DENTRO del popup del «+», en lugar del catálogo de siempre. Solo
+   *  cambia cómo se ve: el popup, su título y lo que pasa al elegir (se suma a la
+   *  barra, no se cierra, lo que ya está queda deshabilitado) son los mismos. Lo
+   *  usa el Messenger con el selector de Google; el Chatter, la bandeja y el
+   *  composer compartido siguen con EMOJI_CATALOG. */
+  selector?: (props: { enLaBarra: string[]; onAgregar: (emoji: string) => void }) => React.ReactNode;
 }
 
 export const EmojiBar = ({
@@ -90,6 +96,7 @@ export const EmojiBar = ({
   onRemove,
   editable = true,
   trailing,
+  selector,
 }: EmojiBarProps) => {
   const { t } = useLanguage();
   const [editMode, setEditMode] = useState(false);
@@ -170,6 +177,7 @@ export const EmojiBar = ({
             <DialogHeader>
               <DialogTitle>{t("chatters.emoji.add")}</DialogTitle>
             </DialogHeader>
+            {selector ? selector({ enLaBarra: emojis, onAgregar: handlePickFromCatalog }) : (
             <div className="max-h-[60vh] space-y-4 overflow-y-auto">
               {Object.entries(EMOJI_CATALOG).map(([category, list]) => (
                 <div key={category}>
@@ -200,6 +208,7 @@ export const EmojiBar = ({
                 </div>
               ))}
             </div>
+            )}
           </DialogContent>
         </Dialog>
       )}
