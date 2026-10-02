@@ -127,35 +127,48 @@ export function useTextoDelArchivo(url: string | undefined, size: number | null)
   });
 }
 
-/** Un SVG se muestra con <img> desde un blob con el tipo correcto.
+/** Tope de un SVG para mostrarlo: viaja entero en memoria como data: URL. */
+export const TOPE_SVG = 10 * 1024 * 1024;
+
+/** Los bytes de un SVG como `data:` URL, para dibujarlo con <img>. */
+export function svgComoDataUrl(bytes: Uint8Array): string {
+  let bin = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return `data:image/svg+xml;base64,${btoa(bin)}`;
+}
+
+/** Un SVG se muestra con <img> desde una `data:` URL con el tipo correcto.
  *
- *  ⚠️ Nunca en el DOM de la página (un SVG puede traer scripts) y nunca con la
- *  URL del NAS directa: el NAS lo manda como descarga y el navegador no lo
- *  dibuja. Dentro de un <img> el SVG no ejecuta nada. */
-export function useSvgComoImagen(url: string | undefined) {
+ *  ⚠️ Un SVG puede traer scripts. Por eso:
+ *   - nunca en el DOM de la página: solo dentro de un <img>, donde no corren;
+ *   - nunca desde un `blob:`: un blob tiene el ORIGEN DE MAVEN, y «Abrir imagen
+ *     en una pestaña nueva» lo abriría como documento, con los scripts
+ *     corriendo al lado de la sesión. Una `data:` URL no se puede abrir como
+ *     página (el navegador lo bloquea) y no tiene origen;
+ *   - y no con la URL del NAS directa: lo importado suele venir como
+ *     octet-stream, y con ese tipo el navegador no dibuja un SVG. */
+export function useSvgComoImagen(url: string | undefined, size: number | null) {
   const [estado, setEstado] = useState<{ src: string | null; error: boolean }>({ src: null, error: false });
   useEffect(() => {
     if (!url) return;
     let vivo = true;
-    let creada: string | null = null;
     setEstado({ src: null, error: false });
     (async () => {
       try {
+        if ((size ?? 0) > TOPE_SVG) throw new Error("grande");
         const r = await fetch(url);
         if (!r.ok) throw new Error(String(r.status));
-        const blob = new Blob([await r.arrayBuffer()], { type: "image/svg+xml" });
-        if (!vivo) return;
-        creada = URL.createObjectURL(blob);
-        setEstado({ src: creada, error: false });
+        const bytes = new Uint8Array(await r.arrayBuffer());
+        if (bytes.length > TOPE_SVG) throw new Error("grande");
+        if (vivo) setEstado({ src: svgComoDataUrl(bytes), error: false });
       } catch {
         if (vivo) setEstado({ src: null, error: true });
       }
     })();
     return () => {
       vivo = false;
-      if (creada) URL.revokeObjectURL(creada);
     };
-  }, [url]);
+  }, [url, size]);
   return estado;
 }
 

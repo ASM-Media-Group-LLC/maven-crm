@@ -95,7 +95,7 @@ describe("qué vista le toca a cada archivo", () => {
     expect(vista("x", null).tipo).toBe("ninguno");
   });
 
-  it("⚠️ un SVG se marca: se dibuja SOLO con <img> desde un blob", () => {
+  it("⚠️ un SVG se marca: se dibuja SOLO con <img> desde una data: URL", () => {
     expect(vista("logo.svg")).toEqual({ tipo: "imagen", esSvg: true });
     expect(vista("logo", "image/svg+xml")).toEqual({ tipo: "imagen", esSvg: true });
     expect(vista("logo.png").esSvg).toBeUndefined();
@@ -379,6 +379,29 @@ describe("Word, Excel y PowerPoint", () => {
   it("un PDF o una imagen no ofrecen «Editar en…»", () => {
     dibujar([item("p", "cv.pdf")], "p");
     expect(screen.queryByRole("button", { name: /Editar en/ })).not.toBeInTheDocument();
+  });
+});
+
+describe("⚠️ un SVG solo como imagen", () => {
+  const fetchReal = globalThis.fetch;
+  afterEach(() => { globalThis.fetch = fetchReal; });
+
+  it("se dibuja con <img> desde una data: URL (un blob: tendría el origen de Maven) y nada del SVG llega al DOM", async () => {
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" id="malo"><script>window.__svg=1</script><circle r="4"/></svg>';
+    globalThis.fetch = vi.fn(async () => new Response(svg, { status: 200 })) as typeof fetch;
+    const crear = vi.spyOn(URL, "createObjectURL");
+    dibujar([item("g1", "logo.svg", { mime: "application/octet-stream", size: svg.length })], "g1");
+    const img = await waitFor(() => {
+      const i = document.querySelector("img");
+      expect(i?.getAttribute("src")).toMatch(/^data:image\/svg\+xml;base64,/);
+      return i!;
+    });
+    expect(atob(img.getAttribute("src")!.split(",")[1])).toBe(svg);
+    expect(document.getElementById("malo")).toBeNull();
+    expect(document.body.innerHTML).not.toContain("__svg");
+    expect((window as unknown as { __svg?: number }).__svg).toBeUndefined();
+    expect(crear).not.toHaveBeenCalled();
+    crear.mockRestore();
   });
 });
 

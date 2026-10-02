@@ -111,9 +111,8 @@ export interface VistaDeArchivo {
   tipo: TipoDeVista;
   /** Por qué no se puede ver (solo si `tipo` es "ninguno"). */
   motivo?: "formato" | "grande";
-  /** Un SVG se dibuja SOLO con <img> desde un blob con su tipo (ver
-   *  VisorArchivo): el NAS lo sirve como descarga y un SVG puede traer
-   *  scripts, que en un <img> no corren. */
+  /** Un SVG se dibuja SOLO con <img> desde una data: URL (ver
+   *  useSvgComoImagen): un SVG puede traer scripts, que en un <img> no corren. */
   esSvg?: boolean;
 }
 

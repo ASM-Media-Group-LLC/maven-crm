@@ -90,7 +90,7 @@ export function ContenidoDelVisor({ archivo, onDescargar }: { archivo: DriveItem
   switch (vista.tipo) {
     case "imagen":
       return vista.esSvg
-        ? <ImagenSvg url={url.data} nombre={archivo.nombre} onFallo={noSePudo} />
+        ? <ImagenSvg url={url.data} archivo={archivo} onFallo={noSePudo} />
         : (
           <div className="flex h-full w-full items-center justify-center">
             <img
@@ -154,9 +154,9 @@ function Hoja({ children, completa = false }: { children: ReactNode; completa?: 
   );
 }
 
-function ImagenSvg({ url, nombre, onFallo }: { url: string; nombre: string; onFallo: () => void }) {
+function ImagenSvg({ url, archivo, onFallo }: { url: string; archivo: DriveItem; onFallo: () => void }) {
   const { t } = useLanguage();
-  const { src, error } = useSvgComoImagen(url);
+  const { src, error } = useSvgComoImagen(url, archivo.size);
   // Avisar al padre en un efecto y no durante el render (React lo prohíbe).
   useEffect(() => {
     if (error) onFallo();
@@ -165,9 +165,10 @@ function ImagenSvg({ url, nombre, onFallo }: { url: string; nombre: string; onFa
   if (!src) return <Cargando texto={t("drive.visor.cargando")} />;
   return (
     <div className="flex h-full w-full items-center justify-center">
-      {/* ⚠️ SOLO como imagen (etiqueta img): un SVG puede traer scripts, y
-          como imagen no corren. Nunca innerHTML ni la etiqueta object. */}
-      <img src={src} alt={nombre} onError={onFallo} className="max-h-full max-w-full rounded-control bg-white object-contain" />
+      {/* ⚠️ SOLO como imagen (etiqueta img) y desde una data: URL: un SVG
+          puede traer scripts, y como imagen no corren. Nunca innerHTML, ni la
+          etiqueta object, ni un blob (ver useSvgComoImagen). */}
+      <img src={src} alt={archivo.nombre} onError={onFallo} className="max-h-full max-w-full rounded-control bg-white object-contain" />
     </div>
   );
 }
