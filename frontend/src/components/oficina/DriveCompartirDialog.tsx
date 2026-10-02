@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Search } from "lucide-react";
+import { Building2, Lock, Search } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -11,12 +11,16 @@ import {
 import { UserAvatar } from "@/components/UserAvatar";
 import { useLanguage } from "@/hooks/useLanguage";
 import { candidatosDelDirectorio, useDirectorioCorreo } from "@/hooks/useDirectorioCorreo";
-import { useCompartidosDrive, useCompartirDrive, type DriveItem } from "@/hooks/useDrive";
+import {
+  useAccesoGeneralDrive, useCambiarAccesoGeneral, useCompartidosDrive, useCompartirDrive, type DriveItem,
+} from "@/hooks/useDrive";
 
 /** Compartir un archivo o una carpeta del Drive, como Google: se busca a la
  *  persona, entra como Lector y el permiso se sube después. El directorio es
  *  el mismo del Correo (gente con casilla en Maven); la base además rechaza a
- *  cualquiera de otra agencia. */
+ *  cualquiera de otra agencia. Abajo, el «Acceso general»: restringido o
+ *  abierto a toda la agencia (lo que en Google era «cualquier persona de
+ *  unlok.me»). */
 export default function DriveCompartirDialog({ item, onCerrar }: { item: DriveItem; onCerrar: () => void }) {
   const { t } = useLanguage();
   const [busqueda, setBusqueda] = useState("");
@@ -111,7 +115,79 @@ export default function DriveCompartirDialog({ item, onCerrar }: { item: DriveIt
             );
           })}
         </div>
+
+        <AccesoGeneral item={item} />
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** Restringido o toda la agencia, con su rol. Si lo abierto es una carpeta de
+ *  arriba, se dice de cuál: desde acá no se puede cerrar (como en Google). */
+function AccesoGeneral({ item }: { item: DriveItem }) {
+  const { t } = useLanguage();
+  const acceso = useAccesoGeneralDrive(item.id);
+  const cambiar = useCambiarAccesoGeneral();
+  const actual = acceso.data ?? null;
+  const abierto = !!actual;
+  const alFallar = (e: unknown) => toast.error((e as Error).message);
+  const poner = (rol: "lector" | "editor" | null) =>
+    cambiar.mutate({ itemId: item.id, rol }, {
+      onSuccess: () => toast.success(rol ? t("drive.compartir.agenciaListo") : t("drive.compartir.restringidoListo")),
+      onError: alFallar,
+    });
+  const Icono = abierto ? Building2 : Lock;
+
+  return (
+    <div className="flex flex-col gap-1">
+      <p className="text-sm font-medium">{t("drive.compartir.general")}</p>
+      <div className="flex items-center gap-3 py-1.5">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted">
+          <Icono className="h-4 w-4 text-muted-foreground" />
+        </span>
+        <div className="min-w-0 flex-1">
+          {actual?.heredado ? (
+            <p className="text-sm">{t("drive.compartir.agencia")}</p>
+          ) : (
+            <Select
+              value={abierto ? "agencia" : "restringido"}
+              disabled={acceso.isLoading || cambiar.isPending}
+              onValueChange={(v) => poner(v === "agencia" ? "lector" : null)}
+            >
+              <SelectTrigger className="h-8 w-auto gap-1 border-0 px-0 text-sm font-medium shadow-none focus:ring-0">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="restringido">{t("drive.compartir.restringido")}</SelectItem>
+                <SelectItem value="agencia">{t("drive.compartir.agencia")}</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+          <p className="text-xs text-muted-foreground">
+            {actual?.heredado
+              ? t("drive.compartir.heredado", { name: actual.nombre })
+              : abierto ? t("drive.compartir.agenciaAyuda") : t("drive.compartir.restringidoAyuda")}
+          </p>
+        </div>
+        {actual && !actual.heredado && (
+          <Select
+            value={actual.rol}
+            disabled={cambiar.isPending}
+            onValueChange={(v) => poner(v as "lector" | "editor")}
+          >
+            <SelectTrigger className="h-8 w-32"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="lector">{t("drive.compartir.lector")}</SelectItem>
+              <SelectItem value="editor">{t("drive.compartir.editor")}</SelectItem>
+            </SelectContent>
+          </Select>
+        )}
+        {actual?.heredado && (
+          <span className="shrink-0 text-xs text-muted-foreground">
+            {actual.rol === "editor" ? t("drive.compartir.editor") : t("drive.compartir.lector")}
+          </span>
+        )}
+      </div>
+    </div>
   );
 }
