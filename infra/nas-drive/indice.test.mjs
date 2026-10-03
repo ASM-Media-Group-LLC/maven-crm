@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { aCsv, armarFilas, escribirIndice, pedirIndice } from "./indice.mjs";
+import { aCsv, armarFilas, escribirIndice, partesCsv, partesJson, pedirIndice } from "./indice.mjs";
 import { verificar } from "./firma.mjs";
 
 const A = "11111111-1111-1111-1111-111111111111";
@@ -102,4 +102,40 @@ test("⚠️ una agencia que se quedó sin archivos recibe su índice VACÍO (no
   const j = JSON.parse(await fs.readFile(path.join(dir, A, "_indice", "actual.json"), "utf8"));
   assert.deepEqual(j.filas, []);
   await fs.rm(dir, { recursive: true, force: true });
+});
+
+// 03/10: con 890.000 filas, armar el CSV o el JSON como UN texto pasó el tope
+// de largo de un string de Node («Invalid string length») y esa noche no hubo
+// índice. Se escribe por partes: nunca hay un texto con todo.
+test("⚠️ por partes: muchas filas no arman un texto gigante y el archivo queda igual de legible", async () => {
+  const muchas = Array.from({ length: 25_000 }, (_, n) => fila(A, `Carpeta ${n % 7}/archivo, «${n}».pdf`, { tamano: n }));
+  const partes = [...partesCsv(muchas)];
+  assert.ok(partes.length > 10, `${partes.length} partes`);
+  assert.ok(Math.max(...partes.map((p) => p.length)) < 1_000_000, "ninguna parte con todo");
+  assert.ok([...partesJson({ generado: "g", agencia_id: A, filas: muchas })].length > 10);
+
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "indice-"));
+  const r = await escribirIndice({ raices: [dir], filas: muchas, generado: "g", fecha: "2026-10-03" });
+  assert.deepEqual([r.filas, r.discos.length, r.errores.length], [25_000, 1, 0]);
+  for (const nombre of ["2026-10-03.json", "actual.json"]) {
+    const j = JSON.parse(await fs.readFile(path.join(dir, A, "_indice", nombre), "utf8"));
+    assert.equal(j.generado, "g");
+    assert.equal(j.agencia_id, A);
+    assert.equal(j.filas.length, 25_000);
+    assert.deepEqual(j.filas[24_999], muchas[24_999]);
+  }
+  const csv = await fs.readFile(path.join(dir, A, "_indice", "actual.csv"), "utf8");
+  assert.ok(csv.startsWith("\uFEFF"), "BOM");
+  assert.equal(csv.split("\r\n").length, 25_000 + 2, "encabezado + filas + final");
+  assert.equal(csv, aCsv(muchas), "igual que armado de una vez");
+  // Sin temporales sueltos.
+  assert.deepEqual((await fs.readdir(path.join(dir, A, "_indice"))).filter((n) => n.includes(".tmp-")), []);
+  await fs.rm(dir, { recursive: true, force: true });
+});
+
+test("JSON por partes: vacío y con una fila también es JSON válido", () => {
+  for (const filas of [[], [fila(A, "a.pdf")], [fila(A, "a.pdf"), fila(A, "b.pdf")]]) {
+    const j = JSON.parse([...partesJson({ generado: "2026-10-03T07:15:00Z", agencia_id: A, filas })].join(""));
+    assert.deepEqual(j, { generado: "2026-10-03T07:15:00Z", agencia_id: A, filas });
+  }
 });
