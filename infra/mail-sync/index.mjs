@@ -84,6 +84,8 @@ const PER_FOLDER_INIT = Number(process.env.PER_FOLDER_INIT || 50);
 // Una respuesta a una charla etiquetada hereda sus etiquetas (y se archiva si
 // la charla ya estaba archivada). Ver hilos.mjs. HEREDAR_DEL_HILO=0 lo apaga.
 const HEREDAR_DEL_HILO = process.env.HEREDAR_DEL_HILO !== "0";
+// Cuánto tiempo una segunda copia del mismo correo «sigue» a la primera.
+const COPIA_VALE_MS = 60 * 60_000;
 // Techo del cuerpo guardado. Un correo de 5 MB de HTML no aporta nada.
 const MAX_BODY_BYTES = Number(process.env.MAX_BODY_BYTES || 300_000);
 const PORT = Number(process.env.PORT || 4610);
@@ -173,6 +175,10 @@ class CuentaSync {
     this.saltadas = 0; // carpetas saltadas gracias al STATUS
     this.ultimaRevision = null; // fin del último barrido, caliente o completo
     this.ultimoLatido = 0;
+    // Message-ID → cuándo se archivó por herencia. Para que la SEGUNDA copia de
+    // un mismo correo (Zoho a veces entrega dos) se vaya con la primera aunque
+    // llegue en otra vuelta. Vive con el proceso; con tope (ver heredarDelHilo).
+    this.archivadosPorHerencia = new Map();
   }
 
   log(...args) {
@@ -655,13 +661,21 @@ class CuentaSync {
       const { count: enRecibidos } = await db.from("mail_messages")
         .select("id", { count: "exact", head: true })
         .eq("user_id", yo).eq("folder", "INBOX").in("message_id", etiquetados);
+      const archivadaHace = this.archivadosPorHerencia.get(r.messageId);
       const d = decidirHerencia({
         etiquetasDelHilo: etis.map((e) => e.label_id),
         yaTieneEtiquetas: (propias ?? 0) > 0,
         etiquetadosEnRecibidos: (enRecibidos ?? 0) > 0,
         fecha: r.date,
         ahora: Date.now(),
+        otraCopiaArchivada: archivadaHace !== undefined && Date.now() - archivadaHace < COPIA_VALE_MS,
       });
+      if (d.archivar && !d.etiquetas.length) {
+        // La otra copia ya heredó: esta solo se archiva con ella.
+        this.log(`uid ${r.uid}: otra copia del mismo correo ya se archivó, va con ella`);
+        porArchivar.push(r.uid);
+        continue;
+      }
       if (!d.etiquetas.length) continue;
       const { error: e2 } = await db.from("mail_message_labels").upsert(
         d.etiquetas.map((label_id) => ({ user_id: yo, message_id: r.messageId, label_id })),
@@ -669,7 +683,17 @@ class CuentaSync {
       );
       if (e2) { this.log(`no se pudo heredar la etiqueta de uid ${r.uid}:`, e2.message); continue; }
       this.log(`uid ${r.uid}: heredó ${d.etiquetas.length} etiqueta(s) de su charla${d.archivar ? " y se archiva" : ""}`);
-      if (d.archivar) porArchivar.push(r.uid);
+      if (d.archivar) {
+        porArchivar.push(r.uid);
+        this.archivadosPorHerencia.set(r.messageId, Date.now());
+        if (this.archivadosPorHerencia.size > 500) {
+          // Lo más viejo primero (un Map recorre en orden de inserción).
+          for (const k of this.archivadosPorHerencia.keys()) {
+            this.archivadosPorHerencia.delete(k);
+            if (this.archivadosPorHerencia.size <= 400) break;
+          }
+        }
+      }
     }
     if (!porArchivar.length) return;
 

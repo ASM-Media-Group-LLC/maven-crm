@@ -224,3 +224,12 @@ test("una respuesta vieja que recién se baja se etiqueta pero NO se archiva sol
   const sinFecha = decidirHerencia({ etiquetasDelHilo: ["cripto"], yaTieneEtiquetas: false, etiquetadosEnRecibidos: false, fecha: null, ahora: AHORA });
   assert.equal(sinFecha.archivar, false);
 });
+
+test("SEGUNDA COPIA del mismo correo (Zoho entrega dos): se archiva con la primera", () => {
+  // uid 54 heredó y se archivó; uid 55 (mismo Message-ID) ya «tiene» la etiqueta.
+  const d = decidirHerencia({ etiquetasDelHilo: ["cxc"], yaTieneEtiquetas: true, etiquetadosEnRecibidos: false, fecha: hace(1), ahora: AHORA, otraCopiaArchivada: true });
+  assert.deepEqual(d, { etiquetas: [], archivar: true });
+  // Sin una copia archivada recién, «ya tiene etiquetas» sigue queriendo decir: no tocar.
+  const sinCopia = decidirHerencia({ etiquetasDelHilo: ["cxc"], yaTieneEtiquetas: true, etiquetadosEnRecibidos: false, fecha: hace(1), ahora: AHORA });
+  assert.deepEqual(sinCopia, { etiquetas: [], archivar: false });
+});
