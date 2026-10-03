@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { format, isThisYear, isToday } from "date-fns";
 import {
   AlertTriangle, Building2, ChevronRight, Clock, File as IconoDeArchivo, FileSpreadsheet, FileText, Folder,
   HardDrive, Loader2, Presentation, Search, Upload, Users, X,
@@ -15,8 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { SubtabNav, SubtabNavItem } from "@/components/ui/subtab-nav";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/hooks/useLanguage";
-import { useFormato } from "@/hooks/useFormato";
-import type { Formato } from "@/lib/formato";
+import { useFechasDeArchivos } from "@/hooks/useFechasDeArchivos";
 import type { TranslationKey } from "@/lib/i18n";
 import {
   useBuscarEnDrive, useDriveVista, useRutaDrive, useSubirUnArchivo, useUsoDrive, type DriveItem, type ResultadoDelDrive,
@@ -74,12 +72,6 @@ const ICONO: Record<DestinoDeOficina, typeof FileText> = {
   docx: FileText, xlsx: FileSpreadsheet, pptx: Presentation,
 };
 
-function cuando(iso: string, f: Formato): string {
-  const d = new Date(iso);
-  if (isToday(d)) return format(d, "HH:mm");
-  if (isThisYear(d)) return format(d, f.idioma === "en" ? "MMM d" : "d MMM", { locale: f.fechas });
-  return format(d, "d MMM yyyy", { locale: f.fechas });
-}
 
 /** «.xlsx, .xls, .ods…» para decir qué formatos sirven. */
 const listaDeFormatos = (destino: DestinoDeOficina | null) => extensionesDe(destino).map((e) => `.${e}`).join(", ");
@@ -302,7 +294,6 @@ function ListaParaAbrir({
   abriendo, ocupado,
 }: PropsDeLista) {
   const { t } = useLanguage();
-  const f = useFormato();
   // Las mismas consultas que la página del Drive: lo que se ve aquí es lo que
   // la RLS deja ver allá, ni más ni menos.
   const items = useDriveVista(vista, carpeta);
@@ -465,7 +456,6 @@ function ListaParaAbrir({
               <FilaParaAbrir
                 key={i.id}
                 item={i}
-                formatoFecha={f}
                 seleccionado={seleccionado?.id === i.id}
                 ocupado={ocupado}
                 onEntrar={() => onEntrar(i.id)}
@@ -481,10 +471,9 @@ function ListaParaAbrir({
 }
 
 function FilaParaAbrir({
-  item, formatoFecha, seleccionado, ocupado, onEntrar, onSeleccionar, onAbrir,
+  item, seleccionado, ocupado, onEntrar, onSeleccionar, onAbrir,
 }: {
   item: DriveItem | ResultadoDelDrive;
-  formatoFecha: Formato;
   seleccionado: boolean;
   ocupado: boolean;
   onEntrar: () => void;
@@ -492,6 +481,7 @@ function FilaParaAbrir({
   onAbrir: () => void;
 }) {
   const { t } = useLanguage();
+  const fechas = useFechasDeArchivos();
   const esCarpeta = item.tipo === "carpeta";
   const destino = esCarpeta ? null : destinoEnLaOficina(item);
   const Icono = esCarpeta ? Folder : destino ? ICONO[destino] : IconoDeArchivo;
@@ -546,7 +536,9 @@ function FilaParaAbrir({
             )}
           </span>
         </span>
-        <span className="hidden truncate text-xs text-muted-foreground sm:block">{cuando(item.updated_at, formatoFecha)}</span>
+        <time dateTime={item.updated_at} title={fechas.completa(item.updated_at)} className="hidden truncate text-xs text-muted-foreground sm:block">
+          {fechas.corta(item.updated_at)}
+        </time>
         <span className="text-right text-xs tabular-nums text-muted-foreground">{esCarpeta ? "" : tamano(item.size)}</span>
       </button>
     </li>

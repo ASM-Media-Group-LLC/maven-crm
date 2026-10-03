@@ -202,6 +202,14 @@ jobs:
       - name: Banco — Meet, llamadas y grabaciones por agencia (PGlite)
         run: deno run -A --node-modules-dir=none --no-lock supabase/tests/meet_por_agencia.ts
 
+      # Drive (03/10): quién mandó cada cosa a la papelera (trigger propio, antes
+      # que drive_items_cuidar) y el tamaño de las carpetas (drive_tamano_carpeta
+      # y drive_tamanos), sobre las migraciones reales del Drive: lo importado sin
+      # dueño se ve en la papelera de quien tiene la unidad, nadie de afuera mide
+      # nada, y la vuelta atrás deja la tabla como estaba.
+      - name: Banco — Drive, papelera y tamaños (PGlite)
+        run: deno run -A --node-modules-dir=none --no-lock supabase/tests/drive_papelera_y_detalles.ts
+
       # `deno test --no-check` no mira tipos: sin este paso, el tipo de msg() (clave que
       # existe, variables exactas) y los @ts-expect-error de mensajes.test.ts nunca
       # podrían fallar en CI. messenger.test.ts queda afuera: arrastra un error de tipos

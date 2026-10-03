@@ -11,8 +11,11 @@ import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useEditorDeOffice } from "@/hooks/useOnlyOffice";
 import { useEdicionDelDrive, useEditarEnOficina } from "@/hooks/useVisorDrive";
+import { SIN_PERMISO_DRIVE, useMiRolDrive, useRenombrar } from "@/hooks/useDrive";
 import DialogoAbrirArchivo from "@/components/oficina/DialogoAbrirArchivo";
+import NombreEditable from "@/components/oficina/NombreEditable";
 import { atajoDeAbrir } from "@/lib/drive/abrirEnLaOficina";
+import { conLaExtension, finDelNombreSinExtension } from "@/lib/drive/nombres";
 import { destinoEnLaOficina, extensionDe, type DestinoDeOficina } from "@/lib/drive/tipoDeArchivo";
 import type { TranslationKey } from "@/lib/i18n";
 
@@ -55,8 +58,20 @@ function ArchivoAbierto({ id }: { id: string | undefined }) {
   const apertura = useEdicionDelDrive(id, resolvedTheme === "dark" ? "dark" : "light", language === "en" ? "en" : "es");
   const { estado, error } = useEditorDeOffice(CONTENEDOR, apertura.data);
   const copiar = useEditarEnOficina();
+  const renombrar = useRenombrar();
+  const rol = useMiRolDrive(id);
+  /** El nombre después de cambiarlo aquí. ⚠️ No se toca la consulta de la
+   *  apertura: un objeto nuevo ahí remonta el editor (useEditorDeOffice) y
+   *  cortaría lo que se está escribiendo. */
+  const [nombreNuevo, setNombreNuevo] = useState<string | null>(null);
 
   const archivo = apertura.data?.archivo;
+  const nombre = nombreNuevo ?? archivo?.nombre ?? "";
+  // Cambiar el nombre: dueño o editor (lo mismo que pide la RLS). Mientras no
+  // se sabe el rol, lo que dijo la edge: si se abrió para editar, se puede.
+  const puedeRenombrar = rol.data !== undefined
+    ? rol.data === "dueno" || rol.data === "editor"
+    : apertura.data?.modo === "editar";
   const destino = (archivo && destinoEnLaOficina(archivo)) || "docx";
   const Icono = ICONO[destino];
   const editando = apertura.data?.modo === "editar";
@@ -80,8 +95,33 @@ function ArchivoAbierto({ id }: { id: string | undefined }) {
       <div className="flex min-h-0 flex-1 flex-col gap-3">
         <PageHeader
           icon={<Icono />}
+          // Como Google con un archivo de Office: clic en el nombre, se
+          // escribe, Enter guarda. Se edita sin la extensión y la conserva.
+          // Es la ficha del Drive (drive_items): cambia también en el Drive.
           title={archivo
-            ? <span className="break-all">{archivo.nombre}</span>
+            ? (
+              <NombreEditable
+                valor={nombre}
+                editarDesde={nombre.slice(0, finDelNombreSinExtension(nombre))}
+                aNombre={(texto) => conLaExtension(texto, nombre)}
+                editable={puedeRenombrar}
+                etiqueta={t("drive.accion.renombrar")}
+                maximo={255}
+                className="break-all"
+                onGuardar={async (nuevo) => {
+                  if (!id) return;
+                  try {
+                    await renombrar.mutateAsync({ id, nombre: nuevo });
+                    setNombreNuevo(nuevo);
+                  } catch (e) {
+                    toast.error((e as Error).message === SIN_PERMISO_DRIVE
+                      ? t("drive.renombrar.sinPermiso")
+                      : `${t("oficina.rename.error")}: ${(e as Error).message}`);
+                    throw e;
+                  }
+                }}
+              />
+            )
             // Mientras llega, un renglón gris: el «Abriendo…» ya está en el centro.
             : <span aria-hidden="true" className="inline-block h-7 w-56 max-w-full animate-pulse rounded-control bg-muted align-middle" />}
           subtitle={apertura.data ? t(editando ? "oficina.archivo.seGuardaEnElDrive" : "oficina.archivo.soloLectura") : undefined}

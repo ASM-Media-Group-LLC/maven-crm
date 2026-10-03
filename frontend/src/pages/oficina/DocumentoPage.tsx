@@ -6,13 +6,17 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTheme } from "next-themes";
+import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
-import { useDocumento } from "@/hooks/useDocumentos";
+import {
+  puedoEditarDocumento, SIN_PERMISO_DOCUMENTO, useDocumento, useDocumentosQuePuedoEditar, useRenombrarDocumento,
+} from "@/hooks/useDocumentos";
 import { useAbrirEnOnlyOffice, useEditorDeOffice } from "@/hooks/useOnlyOffice";
 import { useHistorialDeOficina } from "@/hooks/useHistorialDeOficina";
 import { useLanguage } from "@/hooks/useLanguage";
 import DialogoDeCompartir from "@/components/oficina/DialogoDeCompartir";
 import DialogoAbrirArchivo from "@/components/oficina/DialogoAbrirArchivo";
+import NombreEditable from "@/components/oficina/NombreEditable";
 import { atajoDeAbrir } from "@/lib/drive/abrirEnLaOficina";
 import type { DestinoDeOficina } from "@/lib/drive/tipoDeArchivo";
 
@@ -60,8 +64,17 @@ function DocumentoAbierto({ id }: { id: string | undefined }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
+  const renombrar = useRenombrarDocumento();
+  const paraEditar = useDocumentosQuePuedoEditar();
+
   const cargado = doc.data;
   const esMio = cargado?.owner_id === user?.id;
+  // ¿Puede cambiar el título? Lo que diga el editor (la edge decide «edit» o
+  // «view» con las mismas reglas que la RLS); mientras no llega, las reglas.
+  const modoDelEditor = (abrir.data?.config as { editorConfig?: { mode?: string } } | undefined)?.editorConfig?.mode;
+  const puedeRenombrar = !!cargado && (modoDelEditor
+    ? modoDelEditor === "edit"
+    : puedoEditarDocumento(cargado, user?.id, paraEditar.data));
 
   if (doc.isPending) {
     return (
@@ -104,7 +117,21 @@ function DocumentoAbierto({ id }: { id: string | undefined }) {
       <div className="flex min-h-0 flex-1 flex-col gap-3">
         <PageHeader
           icon={<FileText />}
-          title={cargado.title}
+          // Como Google Docs: clic en el nombre, se escribe, Enter guarda.
+          title={(
+            <NombreEditable
+              valor={cargado.title}
+              vacio={t("oficina.untitled")}
+              editable={puedeRenombrar}
+              etiqueta={t("oficina.rename.ayuda")}
+              onGuardar={(title) => renombrar.mutateAsync({ id: cargado.id, title }).catch((e: Error) => {
+                toast.error(e.message === SIN_PERMISO_DOCUMENTO
+                  ? t("oficina.rename.sinPermiso")
+                  : `${t("oficina.rename.error")}: ${e.message}`);
+                throw e;
+              })}
+            />
+          )}
           subtitle={t("oficina.doc.version", { n: cargado.version })}
           actions={
             <>

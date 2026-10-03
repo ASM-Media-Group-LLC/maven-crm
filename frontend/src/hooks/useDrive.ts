@@ -1,5 +1,5 @@
-import { useCallback, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useMemo, useState } from "react";
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { describeFunctionError } from "@/hooks/useMailConnection";
@@ -22,11 +22,25 @@ export interface DriveItem {
   updated_at: string;
   last_opened_at: string | null;
   trashed_at: string | null;
+  /** La unidad compartida ('empresa') que la contiene, o null. Para el
+   *  «Propietario» de lo importado (que no tiene dueño). */
+  unidad_id?: string | null;
+  /** Quién la mandó a la papelera (solo en la Papelera; null si fue antes del 03/10). */
+  trashed_by?: string | null;
+  /** Cuándo la abrí YO (solo en Recientes, de drive_aperturas). */
+  abierto_por_mi_at?: string | null;
+  /** El nombre de la carpeta donde estaba (solo en la Papelera), si la puedo ver. */
+  ubicacion?: string | null;
 }
 
 export type VistaDrive = "mia" | "unidades" | "compartido" | "recientes" | "papelera";
 
-const COLUMNAS = "id, owner_id, parent_id, tipo, nombre, mime, size, estado, created_at, updated_at, last_opened_at, trashed_at";
+const COLUMNAS = "id, owner_id, parent_id, tipo, nombre, mime, size, estado, created_at, updated_at, last_opened_at, trashed_at, unidad_id";
+
+/** Un cambio que la RLS no deja hacer NO da error: toca cero filas. Los hooks
+ *  que lo detectan (con `.select("id")`) tiran este error y la página lo dice
+ *  en su idioma. */
+export const SIN_PERMISO_DRIVE = "sin_permiso";
 
 /** `types.ts` es generado y todavía no conoce estas tablas. */
 const tabla = (n: string) => supabase.from(n as never);
@@ -127,21 +141,43 @@ export function useDriveVista(vista: VistaDrive, carpeta: string | null) {
         if (error) throw error;
         const aperturas = (data ?? []) as unknown as { item_id: string; abierto_at: string }[];
         const porId = new Map((await fichasPorId(aperturas.map((a) => a.item_id))).map((f) => [f.id, f]));
+        // La fecha que se muestra es la de MI apertura («Abierto por mí»).
         return aperturas
-          .map((a) => porId.get(a.item_id))
+          .map((a): DriveItem | undefined => { const f = porId.get(a.item_id); return f ? { ...f, abierto_por_mi_at: a.abierto_at } : undefined; })
           .filter((f): f is DriveItem => !!f && f.tipo === "archivo" && f.estado === "listo");
       }
-      // Papelera: solo lo que YO mandé ahí, y solo lo de arriba (si una
-      // carpeta está en la papelera, sus hijos van con ella).
-      const { data, error } = await tabla("drive_items").select(COLUMNAS)
-        .eq("owner_id", yo).not("trashed_at", "is", null)
-        .order("trashed_at", { ascending: false }).limit(500);
-      if (error) throw error;
-      const todos = (data ?? []) as unknown as DriveItem[];
-      const enPapelera = new Set(todos.map((i) => i.id));
-      return todos.filter((i) => !i.parent_id || !enPapelera.has(i.parent_id));
+      return papeleraQueVeo();
     },
   });
+}
+
+/** La papelera, como la de Google: TODO lo tirado que puedo ver, no solo lo
+ *  mío. Lo importado de Google no tiene dueño (owner_id null): con «solo lo
+ *  mío», quien lo tiraba lo perdía de vista y nadie podía restaurarlo (97
+ *  archivos y 8 carpetas el 03/10). La RLS de drive_items ya filtra por
+ *  drive_mi_rol: lo de una unidad compartida lo ven sus miembros, como la
+ *  papelera de una unidad de Google. Restaurar y borrar para siempre siguen
+ *  pidiendo dueño o editor (la RLS y la edge).
+ *
+ *  Solo lo de arriba: lo de adentro de una carpeta tirada va con ella. Con
+ *  quién lo tiró (`trashed_by`, migración 20261003140000) y dónde estaba. */
+async function papeleraQueVeo(): Promise<DriveItem[]> {
+  const { data, error } = await tabla("drive_items").select(`${COLUMNAS}, trashed_by`)
+    .not("trashed_at", "is", null)
+    .order("trashed_at", { ascending: false }).limit(500);
+  if (error) throw error;
+  const todos = (data ?? []) as unknown as DriveItem[];
+  const enPapelera = new Set(todos.map((i) => i.id));
+  const arriba = todos.filter((i) => !i.parent_id || !enPapelera.has(i.parent_id));
+  // Dónde estaba: el nombre de la carpeta madre, si la puedo ver (la RLS).
+  const madres = [...new Set(arriba.map((i) => i.parent_id).filter((p): p is string => !!p))];
+  const nombres = new Map<string, string>();
+  for (let i = 0; i < madres.length; i += 150) {
+    const { data: filas, error: e } = await tabla("drive_items").select("id, nombre").in("id", madres.slice(i, i + 150));
+    if (e) throw e;
+    for (const f of (filas ?? []) as unknown as { id: string; nombre: string }[]) nombres.set(f.id, f.nombre);
+  }
+  return arriba.map((i) => ({ ...i, ubicacion: i.parent_id ? nombres.get(i.parent_id) ?? null : null }));
 }
 
 /** Un resultado del buscador: la ficha y dónde está (la carpeta madre). */
@@ -220,6 +256,9 @@ function useInvalidar() {
     // Subir o borrar para siempre cambia el espacio usado.
     qc.invalidateQueries({ queryKey: ["drive-uso"] });
     qc.invalidateQueries({ queryKey: ["drive-uso-agencia"] });
+    // Y lo que ocupan las carpetas (subir, mover, tirar o restaurar).
+    qc.invalidateQueries({ queryKey: ["drive-tamanos"] });
+    qc.invalidateQueries({ queryKey: ["drive-tamano"] });
   };
 }
 /** Lo mismo para los hooks de hooks/useDriveVarios.ts (mover y bajar varios). */
@@ -237,27 +276,203 @@ export function useCrearCarpeta() {
   });
 }
 
+/** Cambiar el nombre. ⚠️ `.select("id")`: sin permiso de edición la RLS deja
+ *  el UPDATE en cero filas y SIN error; sin pedir la fila de vuelta se vería
+ *  como hecho. */
 export function useRenombrar() {
   const invalidar = useInvalidar();
   return useMutation({
     mutationFn: async ({ id, nombre }: { id: string; nombre: string }) => {
-      const { error } = await tabla("drive_items").update({ nombre: nombre.trim() } as never).eq("id", id);
+      const { data, error } = await tabla("drive_items").update({ nombre: nombre.trim() } as never).eq("id", id).select("id");
       if (error) throw error;
+      if (!(data as unknown[] | null)?.length) throw new Error(SIN_PERMISO_DRIVE);
     },
     onSuccess: invalidar,
   });
 }
 
-export function usePapelera() {
-  const invalidar = useInvalidar();
-  return useMutation({
-    mutationFn: async ({ id, tirar }: { id: string; tirar: boolean }) => {
-      const { error } = await tabla("drive_items")
-        .update({ trashed_at: tirar ? new Date().toISOString() : null } as never).eq("id", id);
-      if (error) throw error;
+// La papelera (una o varias) va por papeleraVarias (hooks/useDriveVarios.ts):
+// pide las filas de vuelta y dice qué no se pudo, para «Deshacer» y para avisar
+// a quien solo puede ver.
+
+// ── Detalles (el panel ⓘ) y el tamaño de las carpetas ────────────────────────
+
+/** La fila de un `maybeSingle()` o de una función que devuelve una tabla (que
+ *  llega como lista). */
+function primera<T>(data: unknown): T | null {
+  const f = Array.isArray(data) ? data[0] : data;
+  return f && typeof f === "object" ? (f as T) : null;
+}
+
+/** Una unidad que puedo ver, con su nombre: 'empresa' = unidad compartida;
+ *  'personal' = la «Mi unidad» de Google de alguien (`persona`), importada. */
+export interface UnidadConNombre { tipo: "empresa" | "personal"; persona: string | null; nombre: string }
+
+/** Las unidades que veo, por id. Para el «Propietario» de lo importado (sin
+ *  dueño): la unidad compartida que lo contiene, o la persona de la «Mi
+ *  unidad» de Google. Son unas cien: dos consultas. */
+export function useUnidadesConNombre() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["drive", "unidades-con-nombre", user?.id],
+    enabled: !!user,
+    staleTime: 5 * 60_000,
+    queryFn: async (): Promise<Map<string, UnidadConNombre>> => {
+      const unidades = await unidadesQueVeo();
+      const nombres = new Map<string, string>();
+      const ids = unidades.map((u) => u.item_id);
+      for (let i = 0; i < ids.length; i += 150) {
+        const { data, error } = await tabla("drive_items").select("id, nombre").in("id", ids.slice(i, i + 150));
+        if (error) throw error;
+        for (const f of (data ?? []) as unknown as { id: string; nombre: string }[]) nombres.set(f.id, f.nombre);
+      }
+      return new Map(unidades
+        .filter((u) => nombres.has(u.item_id))
+        .map((u) => [u.item_id, { tipo: u.tipo, persona: u.persona, nombre: nombres.get(u.item_id)! }]));
     },
-    onSuccess: invalidar,
   });
+}
+
+/** Una ficha por id (la carpeta en la que se está, para sus Detalles). */
+export function useFichaDrive(id: string | null, habilitado = true) {
+  return useQuery({
+    queryKey: ["drive", "ficha", id],
+    enabled: !!id && habilitado,
+    staleTime: 30_000,
+    queryFn: async (): Promise<DriveItem | null> => {
+      const { data, error } = await tabla("drive_items").select(COLUMNAS).eq("id", id!).maybeSingle();
+      if (error) throw error;
+      const f = primera<DriveItem>(data);
+      return f && f.id ? f : null;
+    },
+  });
+}
+
+/** Cuándo abrí YO un archivo («Abierto por mí» de los Detalles). */
+export function useAperturaMia(id: string | null, habilitado = true) {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["drive", "apertura", id, user?.id],
+    enabled: !!id && !!user && habilitado,
+    staleTime: 30_000,
+    queryFn: async (): Promise<string | null> => {
+      const { data, error } = await tabla("drive_aperturas").select("abierto_at")
+        .eq("item_id", id!).eq("user_id", user!.id).maybeSingle();
+      if (error) throw error;
+      const f = primera<{ abierto_at?: string }>(data);
+      return f?.abierto_at ?? null;
+    },
+  });
+}
+
+/** Mi rol sobre una ficha (dueno, editor, lector o null): para saber si el
+ *  nombre se puede cambiar antes de intentarlo. */
+export function useMiRolDrive(id: string | null | undefined) {
+  return useQuery({
+    queryKey: ["drive", "mi-rol", id],
+    enabled: !!id,
+    staleTime: 60_000,
+    queryFn: async (): Promise<"dueno" | "editor" | "lector" | null> => {
+      const { data, error } = await supabase.rpc("drive_mi_rol" as never, { p_item: id } as never);
+      if (error) throw error;
+      return (typeof data === "string" ? data : null) as "dueno" | "editor" | "lector" | null;
+    },
+  });
+}
+
+/** Lo que ocupa una carpeta (todo lo de adentro, sin la papelera). */
+export interface TamanoDeCarpeta { bytes: number; archivos: number; carpetas: number; completo: boolean }
+
+type FilaTamano = { item_id?: string; bytes: number | string; archivos: number | string; carpetas: number | string; completo: boolean };
+const aTamano = (f: FilaTamano): TamanoDeCarpeta => ({
+  bytes: Number(f.bytes) || 0, archivos: Number(f.archivos) || 0, carpetas: Number(f.carpetas) || 0, completo: f.completo !== false,
+});
+
+/** Una carpeta, para los Detalles (drive_tamano_carpeta: error si no la veo). */
+export function useTamanoCarpeta(id: string | null, habilitado = true) {
+  return useQuery({
+    queryKey: ["drive-tamano", id],
+    enabled: !!id && habilitado,
+    staleTime: 5 * 60_000,
+    queryFn: async (): Promise<TamanoDeCarpeta> => {
+      const { data, error } = await supabase.rpc("drive_tamano_carpeta" as never, { p_item: id } as never);
+      if (error) throw error;
+      const f = primera<FilaTamano>(data);
+      if (!f) throw new Error(SIN_PERMISO_DRIVE);
+      return aTamano(f);
+    },
+  });
+}
+
+/** De a cuántas carpetas por llamada (el tope de drive_tamanos). */
+export const TANDA_TAMANOS = 100;
+
+/** Pide los tamaños de una tanda. La función deja de empezar carpetas nuevas a
+ *  los ~3 s y devuelve las que alcanzó: las que faltan se piden de nuevo. Si
+ *  una vuelta no trae nada, lo que queda no se puede ver (o no es una
+ *  carpeta): se corta ahí. */
+export async function pedirTamanos(ids: readonly string[]): Promise<Map<string, TamanoDeCarpeta>> {
+  const listos = new Map<string, TamanoDeCarpeta>();
+  let faltan = [...ids];
+  for (let vuelta = 0; faltan.length && vuelta < 5; vuelta++) {
+    const { data, error } = await supabase.rpc("drive_tamanos" as never, { p_ids: faltan } as never);
+    if (error) throw error;
+    const filas = (Array.isArray(data) ? data : []) as FilaTamano[];
+    let nuevas = 0;
+    for (const f of filas) {
+      if (!f?.item_id || listos.has(f.item_id)) continue;
+      listos.set(f.item_id, aTamano(f));
+      nuevas++;
+    }
+    if (!nuevas) break;
+    faltan = faltan.filter((id) => !listos.has(id));
+  }
+  return listos;
+}
+
+export type EstadoDeTamano =
+  | { estado: "cargando" }
+  | { estado: "error" }
+  | { estado: "listo"; tamano: TamanoDeCarpeta }
+  /** No volvió: no la puedo ver entera o no se alcanzó a contar. */
+  | { estado: "sinDato" };
+
+/** El tamaño de las carpetas que se están dibujando (la columna «Tamaño» y las
+ *  tarjetas), de a tandas de 100: una llamada por tanda, no una por carpeta.
+ *  Las tandas se arman en el orden de la lista, así que al bajar y dibujar más
+ *  las de arriba no se vuelven a pedir. react-query guarda cada tanda 5 min;
+ *  subir, mover o tirar algo las vuelve a pedir (useInvalidar). */
+export function useTamanosDeCarpetas(ids: readonly string[]): (id: string) => EstadoDeTamano {
+  const { user } = useAuth();
+  const clave = ids.join(",");
+  const tandas = useMemo(() => {
+    const lista = clave ? clave.split(",") : [];
+    const salida: string[][] = [];
+    for (let i = 0; i < lista.length; i += TANDA_TAMANOS) salida.push(lista.slice(i, i + TANDA_TAMANOS));
+    return salida;
+  }, [clave]);
+  const resultados = useQueries({
+    queries: tandas.map((tanda) => ({
+      queryKey: ["drive-tamanos", user?.id, tanda.join(",")],
+      enabled: !!user,
+      staleTime: 5 * 60_000,
+      retry: 1,
+      queryFn: () => pedirTamanos(tanda),
+    })),
+  });
+  const enQueTanda = useMemo(() => {
+    const m = new Map<string, number>();
+    tandas.forEach((t, n) => t.forEach((id) => m.set(id, n)));
+    return m;
+  }, [tandas]);
+  return (id: string): EstadoDeTamano => {
+    const n = enQueTanda.get(id);
+    const r = n === undefined ? undefined : resultados[n];
+    if (!r || r.isPending) return { estado: "cargando" };
+    if (r.isError) return { estado: "error" };
+    const tamano = r.data?.get(id);
+    return tamano ? { estado: "listo", tamano } : { estado: "sinDato" };
+  };
 }
 
 export function useBorrarParaSiempre() {
