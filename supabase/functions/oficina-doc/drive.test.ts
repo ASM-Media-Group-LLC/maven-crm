@@ -2,7 +2,7 @@
 import {
   adivinarDelimitador, claveDeDrive, claveDeEdicion, codigoDePagina, comoSeAbre, configDeEdicion, configDeVista,
   errorDeConversion, esDelServidor, esUuid, filasDeVersion, formatoDeOffice, FORMATOS_OFFICE, nombreSinExtension,
-  pedidoDeConversion, POR_MIME, queHacerConElAviso, SE_EDITAN_EN_SU_LUGAR, TAMANO_PARTE_NAS, textoDeMuestra,
+  pedidoDeConversion, POR_MIME, queHacerConElAviso, restauradaEl, SE_EDITAN_EN_SU_LUGAR, TAMANO_PARTE_NAS, textoDeMuestra,
   TOPE_COPIA, TOPE_VISTA,
 } from "./drive.ts";
 import { TAMANO_PARTE } from "../drive/logica.ts";
@@ -59,6 +59,25 @@ Deno.test("⚠️ la llave de ONLYOFFICE es estable, válida y cambia si cambia 
   assert(claveDeDrive(sinHuella) === claveDeDrive({ ...sinHuella }), "estable sin huella");
   assert(claveDeDrive(sinHuella) !== claveDeDrive({ ...sinHuella, updated_at: "2026-10-02T12:00:00Z" }), "otra fecha, otra llave");
   assert(/^[0-9A-Za-z._=-]+$/.test(claveDeDrive({ ...sinHuella, updated_at: "basura" })), "fecha ilegible no rompe la llave");
+});
+
+Deno.test("⚠️ una versión RESTAURADA no reusa la llave que ONLYOFFICE ya usó con esa huella", () => {
+  // «Administrar versiones» › Restaurar vuelve a poner un archivo viejo, con su
+  // misma huella: con la llave de entonces ONLYOFFICE abriría lo de aquella
+  // sesión (o diría que «la versión cambió»).
+  const k = claveDeDrive(archivo);
+  const r1 = claveDeDrive({ ...archivo, restaurada_at: "2026-10-03T10:00:00Z" });
+  const r2 = claveDeDrive({ ...archivo, restaurada_at: "2026-10-03T11:00:00Z" });
+  assert(r1 !== k && r2 !== r1, "restaurada: otra llave, y otra cada vez que se restaura");
+  assert(/^[0-9A-Za-z._=-]{1,128}$/.test(r1), `caracteres o largo inválidos: ${r1}`);
+  assert(claveDeDrive({ ...archivo, restaurada_at: null }) === k, "lo que nunca se restauró conserva la llave de siempre");
+  assert(claveDeEdicion({ ...archivo, restaurada_at: "2026-10-03T10:00:00Z" }) !== claveDeEdicion(archivo), "la de edición también cambia");
+  assert(claveDeDrive({ ...archivo, restaurada_at: "basura" }) === k, "una fecha ilegible no rompe la llave");
+  // Un archivo del NAS aparece una vez por guardado: dos o más = se restauró.
+  igual(restauradaEl([]), null, "sin versiones");
+  igual(restauradaEl([{ created_at: "2026-10-01T00:00:00Z" }]), null, "una sola vez: no se restauró");
+  igual(restauradaEl([{ created_at: "2026-10-03T10:00:00Z" }, { created_at: "2026-10-01T00:00:00Z" }]), "2026-10-03T10:00:00Z",
+    "dos veces: la más nueva es la restauración");
 });
 
 Deno.test("⚠️ la vista es SOLO LECTURA: sin edición y sin a dónde avisar un guardado", () => {

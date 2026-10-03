@@ -251,13 +251,17 @@ describe("descargar lo elegido", () => {
     expect(abrirArchivo).toHaveBeenCalledWith("f1", true);
   });
 
-  it("varios (o una carpeta): la edge da el permiso y el navegador lo manda al NAS por POST, en un iframe escondido", async () => {
+  // Lo de siempre (el panel con avance para lo demás se prueba en
+  // driveDescargasVersionesEspacio.test.tsx): un .zip de más de 500 MB en un
+  // navegador que no deja escribir directo a disco (Safari/Firefox; jsdom
+  // tampoco) lo sigue bajando el navegador, con el permiso por POST.
+  it("varios (o una carpeta) muy grandes sin disco: la edge da el permiso y el navegador lo manda al NAS por POST, en un iframe escondido", async () => {
     const enviados: { action: string; target: string; t: string; method: string }[] = [];
     const submit = vi.spyOn(HTMLFormElement.prototype, "submit").mockImplementation(function (this: HTMLFormElement) {
       enviados.push({ action: this.action, target: this.target, method: this.method, t: (this.elements.namedItem("t") as HTMLInputElement).value });
     });
     respuestas.invoke = (_fn, body) => (body.action === "bajar_varios"
-      ? { data: { url: "https://nas.example/zip", t: "permiso-largo", archivos: 7, bytes: 10 }, error: null }
+      ? { data: { url: "https://nas.example/zip", t: "permiso-largo", archivos: 7, bytes: 2_000_000_000 }, error: null }
       : { data: null, error: null });
     dibujar();
     fireEvent.click(casilla("Contabilidad"));
@@ -270,7 +274,8 @@ describe("descargar lo elegido", () => {
     expect(marco).toHaveAttribute("hidden");
     // El permiso NUNCA va en la URL.
     expect(enviados[0].action).not.toContain("permiso-largo");
-    expect(toasts.exito).toContain("Descargando 7 archivos en un .zip");
+    // El panel de descargas dice dónde sigue (la barra del navegador).
+    expect(await screen.findByText(/sigue en las descargas del navegador/)).toBeInTheDocument();
     expect(abrirArchivo).not.toHaveBeenCalled();
     submit.mockRestore();
   });

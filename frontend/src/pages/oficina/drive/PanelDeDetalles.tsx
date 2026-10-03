@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ChevronRight, Info, Loader2, X, type LucideIcon } from "lucide-react";
+import { ChevronRight, History, Info, Loader2, X, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -39,6 +39,8 @@ export interface PanelDeDetallesProps {
   onIrA: (vista: VistaDrive, carpeta: string) => void;
   /** Sin la X propia: en la hoja del teléfono la pone la hoja. */
   onCerrar?: () => void;
+  /** «Administrar versiones» de un archivo (sin esto, no se ofrece: la papelera). */
+  onVersiones?: (i: DriveItem) => void;
 }
 
 export default function PanelDeDetalles(props: PanelDeDetallesProps) {
@@ -87,7 +89,7 @@ function Fila({ etiqueta, children }: { etiqueta: string; children: ReactNode })
   );
 }
 
-function DetallesDeUno({ item, duenoDe, nombreDe, unidades, icono, onIrA, tamanoDe }: PanelDeDetallesProps & { item: DriveItem }) {
+function DetallesDeUno({ item, duenoDe, nombreDe, unidades, icono, onIrA, tamanoDe, onVersiones }: PanelDeDetallesProps & { item: DriveItem }) {
   const { t } = useLanguage();
   const { user } = useAuth();
   const fechas = useFechasDeArchivos();
@@ -184,6 +186,17 @@ function DetallesDeUno({ item, duenoDe, nombreDe, unidades, icono, onIrA, tamano
         )}
         <Fila etiqueta={t("drive.detalles.creado")}>{fecha(item.created_at)}</Fila>
       </dl>
+      {/* Las versiones de lo editado en la Oficina, como en Google. */}
+      {!esCarpeta && !item.trashed_at && item.estado === "listo" && onVersiones && (
+        <button
+          type="button"
+          onClick={() => onVersiones(item)}
+          className="inline-flex items-center gap-2 self-start rounded-control text-sm text-primary hover:underline"
+        >
+          <History className="h-4 w-4" />
+          {t("drive.versiones.boton")}
+        </button>
+      )}
     </div>
   );
 }

@@ -38,8 +38,8 @@ import { EN_BLANCO } from "./plantillas.ts";
 import { firmar, verificar } from "./jwt.ts";
 import {
   adivinarDelimitador, codigoDePagina, comoSeAbre, configDeEdicion, configDeVista, errorDeConversion, esDelServidor,
-  esUuid, filasDeVersion, formatoDeOffice, nombreSinExtension, pedidoDeConversion, queHacerConElAviso, TAMANO_PARTE_NAS,
-  textoDeMuestra, TOPE_COPIA, TOPE_VISTA,
+  esUuid, filasDeVersion, formatoDeOffice, nombreSinExtension, pedidoDeConversion, queHacerConElAviso, restauradaEl,
+  TAMANO_PARTE_NAS, textoDeMuestra, TOPE_COPIA, TOPE_VISTA,
 } from "./drive.ts";
 import { ALLOWED_ORIGINS } from "../_shared/cors.ts";
 import {
@@ -133,6 +133,8 @@ interface FichaDelDrive {
   storage_key: string | null;
   estado: string;
   updated_at: string;
+  /** Si es una versión vieja restaurada, cuándo (para la llave de ONLYOFFICE). */
+  restaurada_at?: string | null;
 }
 
 /** La ficha, leída CON EL TOKEN DE LA PERSONA: si la RLS de drive_items no se
@@ -146,6 +148,13 @@ async function fichaDelDrive(comoLaPersona: SupabaseClient, id: string): Promise
   const fila = data as FichaDelDrive | null;
   if (!fila || fila.tipo !== "archivo" || !fila.storage_key) throw new HttpError("No existe o no tienes acceso", 404);
   if (fila.estado !== "listo") throw new HttpError("El archivo todavía se está subiendo", 409);
+  // ¿Es una versión vieja restaurada? Entra en la llave de ONLYOFFICE (ver
+  // claveDeDrive). Sin la tabla (migración sin aplicar), no hay versiones.
+  const { data: mismas, error: eV } = await comoLaPersona.from("drive_versiones")
+    .select("created_at").eq("item_id", fila.id).eq("storage_key", fila.storage_key)
+    .order("created_at", { ascending: false }).limit(2);
+  if (eV && eV.code !== "42P01" && eV.code !== "PGRST205") throw new HttpError(eV.message, 500);
+  fila.restaurada_at = restauradaEl((mismas ?? []) as { created_at: string }[]);
   return fila;
 }
 

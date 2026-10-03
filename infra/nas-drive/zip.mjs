@@ -274,3 +274,31 @@ export async function* armarZip(entradas, { forzarZip64 = false } = {}) {
   }
   yield cierre({ entradas: centrales.length, inicioCentral, tamanoCentral, forzarZip64 });
 }
+
+/**
+ * Cuántos bytes va a tener el .zip, ANTES de mandar uno (el Content-Length):
+ * con STORE (sin comprimir) los datos van tal cual y el tamaño de cada
+ * archivo se sabe por stat, así que el largo sale de sumar las mismas piezas
+ * que arma armarZip, con las MISMAS funciones (no una cuenta aparte que se
+ * pueda desfasar). Con el total, el navegador muestra el avance de verdad
+ * (la barra del Drive y la de descargas del navegador). Si un archivo cambia
+ * de tamaño a mitad de camino, armarZip corta (el total ya se anunció).
+ */
+export function tamanoDelZip(entradas, { forzarZip64 = false } = {}) {
+  let lugar = 0;
+  let tamanoCentral = 0;
+  for (const e of entradas) {
+    const desde = lugar;
+    if (e.carpeta) {
+      lugar += cabeceraLocal({ nombre: e.nombre, fecha: e.fecha, carpeta: true, zip64: forzarZip64 }).length;
+      tamanoCentral += entradaCentral({ nombre: e.nombre, fecha: e.fecha, carpeta: true, desde, zip64Local: forzarZip64, forzarZip64 }).length;
+      continue;
+    }
+    const zip64 = forzarZip64 || necesitaZip64(e.size);
+    lugar += cabeceraLocal({ nombre: e.nombre, fecha: e.fecha, zip64 }).length
+      + e.size
+      + descriptor({ crc: 0, size: e.size, zip64 }).length;
+    tamanoCentral += entradaCentral({ nombre: e.nombre, fecha: e.fecha, size: e.size, desde, zip64Local: zip64, forzarZip64 }).length;
+  }
+  return lugar + tamanoCentral + cierre({ entradas: entradas.length, inicioCentral: lugar, tamanoCentral, forzarZip64 }).length;
+}

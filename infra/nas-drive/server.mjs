@@ -30,7 +30,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { pipeline } from "node:stream/promises";
 import { Readable, Transform } from "node:stream";
 import { verificar, recibo } from "./firma.mjs";
-import { armarZip } from "./zip.mjs";
+import { armarZip, tamanoDelZip } from "./zip.mjs";
 import { CARPETA_CACHE, crearCola, extensionValida, miniaturaDe, rutaEnCache, servirMiniatura } from "./miniaturas.mjs";
 
 export const MAX_POR_PEDIDO = 95 * 1024 * 1024; // el proxy de Cloudflare corta en 100 MB
@@ -409,7 +409,10 @@ async function servirZip(conf, req, res) {
   res.writeHead(200, {
     "Content-Type": "application/zip",
     "Content-Disposition": `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(nombre)}`,
-    // Sin Content-Length: el .zip se arma mientras baja.
+    // El largo exacto, aunque el .zip se arme mientras baja (STORE y los
+    // tamaños por stat: tamanoDelZip). Con él, el Drive muestra cuánto falta y
+    // la barra de descargas del navegador también.
+    "Content-Length": String(tamanoDelZip(entradas)),
     "Cache-Control": "no-store",
     "X-Content-Type-Options": "nosniff",
   });

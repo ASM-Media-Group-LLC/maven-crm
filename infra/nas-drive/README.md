@@ -53,15 +53,22 @@ el permiso pesa más de lo que aguanta una URL (el NAS acepta hasta 4 MB).
   `TOPE_ZIP_*` en `supabase/functions/drive/logica.ts`).
 - STORE (sin comprimir: lo que hay ya viene comprimido), CRC-32 mientras pasa
   (va en el «data descriptor»), **ZIP64** para archivos o .zip de más de 4 GB,
-  nombres UTF-8. Sin `Content-Length`: se arma mientras baja. Probado el 02/10
-  con un .zip real de 4,5 GB: `unzip -t` y `ditto -x -k` (el motor del Archive
-  Utility del Mac) lo abren.
+  nombres UTF-8. Se arma mientras baja, pero **con `Content-Length` exacto**
+  (desde el 03/10, `tamanoDelZip`: con STORE y los tamaños por `stat`, el
+  largo sale de sumar las mismas piezas que arma `armarZip`): el panel de
+  descargas del Drive y la barra del navegador muestran cuánto falta. Probado
+  el 02/10 con un .zip real de 4,5 GB: `unzip -t` y `ditto -x -k` (el motor
+  del Archive Utility del Mac) lo abren.
 - Si el navegador corta, se deja de leer el disco. Un archivo que la base
   tiene y el disco no, no corta el .zip: va una nota «No se pudieron
   incluir.txt» con cuáles faltaron.
 - La puerta (`puerta/`) es un `caddy reverse-proxy` sin filtro de rutas:
   `POST /zip` pasa igual que `/o`, y Caddy manda la respuesta a medida que
-  llega (sin `Content-Length` no la acumula).
+  llega (no la acumula).
+- El Drive pide el .zip con `fetch` (el mismo formulario, un pedido «simple»
+  sin pregunta previa de CORS) para leer el avance; si es muy grande y el
+  navegador no deja escribir directo a disco (Safari/Firefox), lo manda como
+  antes a un iframe escondido.
 
 ## Miniaturas (op `mini`, `miniaturas.mjs`)
 

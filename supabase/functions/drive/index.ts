@@ -10,6 +10,8 @@
 //   subir_iniciar    { parent_id, nombre, mime, size } → permisos para subir
 //   subir_confirmar  { id, recibo }                    → el archivo queda listo
 //   abrir            { id, descargar? }                → URL para verlo/bajarlo
+//   abrir_version    { version }                       → URL para bajar una versión vieja
+//   restaurar_version { version }                      → (dueño o editor) la vuelve a dejar vigente
 //   bajar_varios     { ids }                           → permiso para UN .zip (POST /zip del NAS)
 //   miniaturas       { ids }  (hasta 200)              → { urls: { id: URL de la miniatura } }
 //   borrar_para_siempre { id }                         → borra en el NAS y la ficha
@@ -244,6 +246,68 @@ Deno.serve(async (req) => {
       return responder({ url: u });
     }
 
+    // ── Las versiones de lo editado en la Oficina («Administrar versiones») ──
+    // La lista la lee el navegador (la RLS de drive_versiones deja ver las de
+    // lo que se ve). Aquí, lo que el navegador no puede: el permiso del NAS
+    // para bajar una versión vieja y mover el puntero de la ficha al
+    // restaurarla.
+    if (accion === "abrir_version") {
+      // Como la persona: si la RLS no le muestra la versión (ni la ficha), no hay permiso.
+      const v = await versionComoLaPersona(comoLaPersona, body.version);
+      const { data: fila } = await comoLaPersona.from("drive_items")
+        .select("id, tipo, nombre, mime").eq("id", v.item_id).maybeSingle();
+      if (!fila || fila.tipo !== "archivo") throw new HttpError("No existe o no tienes acceso", 404);
+      // Con el nombre del archivo, como «Descargar» en «Administrar versiones» de Google.
+      const u = await permisoNas(
+        { op: "get", k: v.storage_key, ct: fila.mime ?? "application/octet-stream", n: fila.nombre, dl: true },
+        VENCE.bajar,
+      );
+      return responder({ url: u });
+    }
+
+    if (accion === "restaurar_version") {
+      // Volver a una versión vieja: la ficha apunta otra vez a su archivo del
+      // NAS. La de hoy NO se pierde (ya está en drive_versiones: cada guardado
+      // la anota) y la restaurada entra como versión NUEVA, con quién y cuándo,
+      // como en Google. ⚠️ La llave de ONLYOFFICE sale de la huella: con la
+      // misma huella que una versión vieja, la edge oficina-doc le suma la
+      // fecha de esta restauración (claveDeDrive), si no ONLYOFFICE abriría lo
+      // que tenía guardado con esa llave.
+      const v = await versionComoLaPersona(comoLaPersona, body.version);
+      const rol = await rolDe(comoLaPersona, v.item_id);
+      if (rol !== "dueno" && rol !== "editor") throw new HttpError("Solo quien puede editar el archivo puede restaurar una versión", 403);
+      const { data: crudo } = await admin.from("drive_items")
+        .select("id, tipo, estado, trashed_at, storage_key, size, owner_id").eq("id", v.item_id).maybeSingle();
+      const fila = crudo as { id: string; tipo: string; estado: string; trashed_at: string | null; storage_key: string | null; size: number | null; owner_id: string | null } | null;
+      if (!fila || fila.tipo !== "archivo" || !fila.storage_key) throw new HttpError("No existe o no tienes acceso", 404);
+      if (fila.estado !== "listo") throw new HttpError("El archivo todavía se está subiendo", 409);
+      if (fila.trashed_at) throw new HttpError("Está en la papelera: restáuralo primero", 409);
+      if (fila.storage_key === v.storage_key) return responder({ ok: true, igual: true });
+
+      // Si la versión pesa más que la de hoy, que entre en el espacio de donde
+      // se descuenta (como una subida: la agencia dentro de una unidad, si no el
+      // propietario).
+      const crece = Number(v.size ?? 0) - Number(fila.size ?? 0);
+      if (crece > 0) await chequearEspacioParaCrecer(admin, comoLaPersona, fila, yo, crece);
+
+      const ahora = new Date().toISOString();
+      const { data: nueva, error: eV } = await admin.from("drive_versiones").insert({
+        item_id: fila.id, storage_key: v.storage_key, size: v.size, sha256: v.sha256, saved_by: yo, created_at: ahora,
+      }).select("id").single();
+      if (eV) throw new HttpError(eV.message, 500);
+      // El puntero, solo si nadie guardó otra versión mientras tanto.
+      const { data: movida, error: eU } = await admin.from("drive_items")
+        .update({ storage_key: v.storage_key, size: v.size, sha256: v.sha256, updated_at: ahora })
+        .eq("id", fila.id).eq("storage_key", fila.storage_key)
+        .select("id");
+      if (eU || !movida?.length) {
+        await admin.from("drive_versiones").delete().eq("id", (nueva as { id: string }).id);
+        if (eU) throw new HttpError(eU.message, 500);
+        throw new HttpError("Alguien guardó otra versión justo ahora. Vuelve a intentarlo.", 409);
+      }
+      return responder({ ok: true });
+    }
+
     if (accion === "bajar_varios") {
       // ⚠️ TODO como la persona: qué entra en el .zip lo decide la RLS, igual
       // que al abrir un archivo. Con el cliente admin, un id ajeno metido a
@@ -413,6 +477,46 @@ async function loDeAdentroComoLaPersona(cliente: SupabaseClient, carpetas: strin
     nivel = siguiente;
   }
   return hijos;
+}
+
+interface VersionGuardada { id: string; item_id: string; storage_key: string; size: number | null; sha256: string | null }
+
+/** Una versión, leída CON EL TOKEN DE LA PERSONA: la RLS de drive_versiones
+ *  la muestra solo si la persona puede ver el archivo. */
+async function versionComoLaPersona(cliente: SupabaseClient, id: unknown): Promise<VersionGuardada> {
+  const vid = String(id ?? "");
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(vid)) throw new HttpError("Versión inválida", 400);
+  const { data, error } = await cliente.from("drive_versiones")
+    .select("id, item_id, storage_key, size, sha256").eq("id", vid).maybeSingle();
+  if (error) throw new HttpError(error.message, 500);
+  if (!data) throw new HttpError("No existe o no tienes acceso", 404);
+  return data as VersionGuardada;
+}
+
+/** ¿Entran `bytes` más en el espacio de donde se descuenta este archivo? Como
+ *  una subida: dentro de una unidad compartida, el de la agencia; si no, el
+ *  de su PROPIETARIO (no el de quien restaura, como al editar en la Oficina).
+ *  Lo importado sin dueño fuera de una unidad no cuenta en el de nadie. */
+async function chequearEspacioParaCrecer(
+  admin: SupabaseClient, comoLaPersona: SupabaseClient, fila: { id: string; owner_id: string | null }, yo: string, bytes: number,
+) {
+  const primera = (data: unknown) => (Array.isArray(data) ? data[0] : data) as { usado?: number; cupo?: number | null } | undefined;
+  const { data: unidad, error: eU } = await admin.rpc("drive_unidad_de", { p_item: fila.id });
+  if (eU) throw new HttpError(eU.message, 500);
+  if (unidad) {
+    const { data, error } = await comoLaPersona.rpc("drive_uso_agencia");
+    if (error) throw new HttpError(error.message, 500);
+    const f = primera(data);
+    chequearEspacioDeLaAgencia(Number(f?.usado ?? 0), f?.cupo == null ? null : Number(f.cupo), bytes);
+    return;
+  }
+  if (!fila.owner_id) return;
+  const { data, error } = fila.owner_id === yo
+    ? await comoLaPersona.rpc("drive_uso")
+    : await admin.rpc("drive_uso", { p_user: fila.owner_id });
+  if (error) throw new HttpError(error.message, 500);
+  const f = primera(data);
+  chequearCupo(Number(f?.usado ?? 0), Number(f?.cupo ?? 0), bytes);
 }
 
 async function rolDe(cliente: SupabaseClient, id: string): Promise<string | null> {
