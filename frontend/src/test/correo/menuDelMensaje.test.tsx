@@ -101,8 +101,10 @@ vi.mock("@/hooks/useMailbox", async (original) => ({
     isPending: false,
   }),
   useMailBulk: () => ({
-    mutate: (v: { folder: string; op: string; items: { uid?: unknown }[] }) =>
-      e.bulk.push({ folder: v.folder, op: v.op, uids: v.items.map((m) => m.uid) }),
+    mutateAsync: (v: { folder: string; op: string; items: { uid?: unknown }[] }) => {
+      e.bulk.push({ folder: v.folder, op: v.op, uids: v.items.map((m) => m.uid) });
+      return Promise.resolve({ ok: true, afectados: v.items.length, omitidos: 0 });
+    },
     isPending: false,
   }),
   useTraduccionCorreo: () => ({

@@ -226,6 +226,19 @@ export const correo = {
   "mail.moved.one": { es: "Movido a «{name}»", en: "Moved to \u201c{name}\u201d" },
   "mail.moved.many": { es: "{n} movidos a «{name}»", en: "{n} moved to \u201c{name}\u201d" },
   "mail.moved.skippedNoId": { es: "{n} sin identificador se quedaron donde estaban.", en: "{n} without an ID stayed where they were." },
+  // «Deshacer», como en Gmail: el botón del aviso y la tecla z.
+  "mail.undo.action": { es: "Deshacer", en: "Undo" },
+  "mail.undo.working": { es: "Deshaciendo…", en: "Undoing…" },
+  "mail.undo.done": { es: "Acción deshecha", en: "Action undone" },
+  "mail.undo.error": { es: "No se pudo deshacer", en: "Couldn't undo" },
+  "mail.undo.partialOne": {
+    es: "Se deshizo, pero 1 correo no se pudo devolver: sigue donde lo moviste.",
+    en: "Undone, but 1 email couldn't be put back: it's still where you moved it.",
+  },
+  "mail.undo.partialMany": {
+    es: "Se deshizo, pero {n} correos no se pudieron devolver: siguen donde los moviste.",
+    en: "Undone, but {n} emails couldn't be put back: they're still where you moved them.",
+  },
   "mail.page.of": { es: "{range} de {total}", en: "{range} of {total}" },
   "mail.page.newer": { es: "Más recientes", en: "Newer" },
   "mail.page.older": { es: "Más antiguos", en: "Older" },

@@ -1,5 +1,8 @@
-// Los atajos de teclado del correo. Por ahora uno: VOLVER A LA LISTA con «u» o
-// Escape, como en Gmail, cuando el correo abierto ocupa toda la pantalla.
+// Los atajos de teclado del correo, los de Gmail:
+//  - VOLVER A LA LISTA con «u» o Escape, cuando el correo abierto ocupa toda la
+//    pantalla.
+//  - DESHACER la última acción con «z» (archivar, mover, eliminar…), mientras
+//    su aviso sigue a la vista.
 
 interface TeclaPulsada {
   key: string;
@@ -27,6 +30,19 @@ function hayAlgoEncima(doc: Document): boolean {
 export function esAtajoDeVolver(e: TeclaPulsada, doc: Document): boolean {
   if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return false;
   if (e.key !== "u" && e.key !== "U" && e.key !== "Escape") return false;
+  if (escribiendo(e.target)) return false;
+  return !hayAlgoEncima(doc);
+}
+
+/** ¿Esta tecla es «deshacer» (la «z» de Gmail)?
+ *
+ *  ⚠️ Escribiendo, la z es una letra: en el buscador, en el compositor o en el
+ *  buscador de «Mover a» no puede devolver correos a ningún lado. Con Ctrl/⌘
+ *  tampoco: Ctrl+Z es el deshacer del TEXTO, del navegador, y no se le roba. Ni
+ *  con un diálogo o un menú encima (la z es suya). */
+export function esAtajoDeDeshacer(e: TeclaPulsada, doc: Document): boolean {
+  if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return false;
+  if (e.key !== "z") return false;
   if (escribiendo(e.target)) return false;
   return !hayAlgoEncima(doc);
 }

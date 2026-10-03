@@ -72,7 +72,7 @@ describe("⚠️ lo movido se TRASLADA en la caché, no se borra (Jhon, 28/09)",
   // (30 min en las carpetas frías). Una etiqueta puesta con «Mover a»
   // quedaba vacía mientras tanto.
   it("el bulk traslada ANTES de borrar lo que no pudo ubicar", () => {
-    const i = edge.indexOf("trasladados = await trasladarEnCache(");
+    const i = edge.indexOf("const ubicacion = await trasladarEnCache(");
     const j = edge.indexOf('await admin.from("mail_messages").delete()\n            .eq("user_id", user.id).eq("folder", box).in("uid", lista);');
     expect(i, "no está el traslado").toBeGreaterThan(-1);
     expect(j, "no está el borrado de lo no ubicado").toBeGreaterThan(i);

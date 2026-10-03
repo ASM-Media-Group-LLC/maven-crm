@@ -85,6 +85,7 @@ import {
   type MailMessage,
   type MailSummary,
  useMailBulk, type OperacionMasiva,
+  useListasDelCorreo,
   useAdjuntosParaReenviar,
   useMailNoLeidos,
   TOPE_NO_LEIDOS,
@@ -100,6 +101,10 @@ import { usePreferenciasCorreo } from "@/hooks/usePreferenciasCorreo";
 import {
   agruparPorCarpeta, borradorDeReenvio, borradorDeRespuesta, desdeAqui, NO_SE_SUELTA, paraSoltarEnCarpeta,
 } from "@/lib/correo/accionesDelMensaje";
+import {
+  etiquetaDeVuelta, sePuedeDeshacer, uidDe, type CambioDeEtiqueta,
+} from "@/lib/correo/deshacer";
+import { useDeshacerCorreo } from "@/hooks/useDeshacerCorreo";
 import { juntarSinRepetir, partirNoLeidosPrimero } from "@/lib/correo/noLeidosPrimero";
 import { PARAM_MENSAJE, type CorreoACompartir } from "@/lib/correo/compartirEnChat";
 import { esAtajoDeVolver } from "@/lib/correo/atajos";
@@ -457,6 +462,13 @@ export default function CorreoPage() {
 
   // Acciones de la barra de selección: una sola llamada por lote (IMAP + caché).
   const masiva = useMailBulk();
+  // «Deshacer» de Gmail: el aviso de cada acción lleva el botón, y la z
+  // deshace la última. Ver hooks/useDeshacerCorreo y lib/correo/deshacer.
+  const listas = useListasDelCorreo();
+  const { avisar, avisarError } = useDeshacerCorreo();
+  /** Las etiquetas que tenía cada correo ANTES de tocarlo: con eso se sabe qué
+   *  devolver al deshacer (solo lo que cambió). */
+  const etiquetasQueTenia = (messageId: string): string[] => etiquetasPorCorreo.data?.get(messageId) ?? [];
   const [confirmarBorrado, setConfirmarBorrado] = useState<MailSummary[] | null>(null);
   // El borrado lo pidió el ⋮ de UN mensaje de la conversación (y no la barra
   // de selección, que borra conversaciones enteras).
@@ -494,10 +506,13 @@ export default function CorreoPage() {
       return;
     }
     const sinId = elegidos.length - ids.length;
+    // Lo contrario, calculado ANTES de cambiar nada: solo a los que cambian.
+    const deVuelta = etiquetaDeVuelta({ messageIds: ids, labelId, poner }, etiquetasQueTenia);
     etiquetar.mutate({ messageIds: ids, labelId, poner }, {
       onSuccess: () => {
-        toast.success(poner ? t("mail.labels.applied") : t("mail.labels.removed"), {
-          description: sinId ? t("mail.labels.skippedNoId", { n: sinId }) : undefined,
+        avisar(poner ? t("mail.labels.applied") : t("mail.labels.removed"), {
+          descripcion: sinId ? t("mail.labels.skippedNoId", { n: sinId }) : undefined,
+          accion: deVuelta ? { etiquetas: [deVuelta] } : null,
         });
         if (!correos) setSeleccion(new Set());
       },
@@ -520,7 +535,10 @@ export default function CorreoPage() {
    *
    *  ⚠️ Primero la etiqueta y DESPUÉS el archivado, y solo de los que la
    *  recibieron: si se archivara uno sin `message_id` (que no se puede
-   *  etiquetar), saldría de Recibidos sin quedar en ningún lado. */
+   *  etiquetar), saldría de Recibidos sin quedar en ningún lado.
+   *
+   *  «Deshacer» revierte TODO: le saca la etiqueta (a los que no la tenían),
+   *  le devuelve la que se le quitó y lo devuelve a la bandeja. */
   const moverAEtiqueta = (labelId: string, ruta: string, correos?: MailSummary[]) => {
     const elegidos = correos ?? items.filter((m) => seleccion.has(claveDe(m)));
     const conId = elegidos.filter((m) => m.messageId);
@@ -531,24 +549,41 @@ export default function CorreoPage() {
     }
     const sinId = elegidos.length - conId.length;
     const desde = etiquetaVista;
+    // Lo contrario de cada cambio de etiqueta, ANTES de hacerlo.
+    const deVuelta = [
+      etiquetaDeVuelta({ messageIds: ids, labelId, poner: true }, etiquetasQueTenia),
+      desde && desde !== labelId
+        ? etiquetaDeVuelta({ messageIds: ids, labelId: desde, poner: false }, etiquetasQueTenia)
+        : null,
+    ].filter((c): c is CambioDeEtiqueta => !!c);
+    const soloEtiquetas = deVuelta.length ? { etiquetas: deVuelta } : null;
     etiquetar.mutate({ messageIds: ids, labelId, poner: true }, {
       onSuccess: () => {
         const aviso = (n: number) =>
           n === 1 ? t("mail.moved.one", { name: ruta }) : t("mail.moved.many", { n, name: ruta });
         const detalle = sinId ? t("mail.moved.skippedNoId", { n: sinId }) : undefined;
-        if (desde) {
-          if (desde !== labelId) etiquetar.mutate({ messageIds: ids, labelId: desde, poner: false });
-          toast.success(aviso(conId.length), { description: detalle });
+        const listo = () => {
+          avisar(aviso(conId.length), { descripcion: detalle, accion: soloEtiquetas });
           if (!correos) setSeleccion(new Set());
+        };
+        if (desde) {
+          // El aviso (con su «Deshacer») solo cuando la de antes ya salió:
+          // deshacer antes de tiempo la devolvería y enseguida se la sacaría.
+          if (desde !== labelId) {
+            etiquetar.mutate({ messageIds: ids, labelId: desde, poner: false }, {
+              onSuccess: listo,
+              onError: (e) => toast.error((e as Error).message),
+            });
+          } else {
+            listo();
+          }
           return;
         }
         const salen = conId.filter((m) => SE_VACIAN_AL_MOVER.has(m.folder ?? carpeta));
         if (salen.length) {
-          lanzarMasiva("archive", salen, undefined, undefined, aviso);
-          if (detalle) toast.info(detalle);
+          lanzarMasiva("archive", salen, undefined, undefined, { aviso, descripcion: detalle, etiquetas: deVuelta });
         } else {
-          toast.success(aviso(conId.length), { description: detalle });
-          if (!correos) setSeleccion(new Set());
+          listo();
         }
       },
       onError: (e) => toast.error((e as Error).message),
@@ -585,11 +620,22 @@ export default function CorreoPage() {
 
   const lanzarMasiva = (
     op: OperacionMasiva, elegidos: MailSummary[], dest?: string, volverAt?: string,
-    /** Otro texto para el aviso (p. ej. «Movido a Pagos» en vez de «archivado»). */
-    aviso?: (n: number) => string,
+    extra?: {
+      /** Otro texto para el aviso (p. ej. «Movido a Pagos» en vez de «archivado»). */
+      aviso?: (n: number) => string;
+      /** Una línea más debajo del aviso. */
+      descripcion?: string;
+      /** Cambios de etiqueta que «Deshacer» también tiene que revertir
+       *  («Mover a» una etiqueta = ponerla + archivar). */
+      etiquetas?: CambioDeEtiqueta[];
+    },
   ) => {
-    const n = elegidos.length;
-    if (sel && elegidos.some((m) => claveDe(m) === claveDe(sel)) && op !== "seen" && op !== "unseen") setSel(null);
+    const cierraElAbierto = !!sel && op !== "seen" && op !== "unseen" &&
+      elegidos.some((m) => claveDe(m) === claveDe(sel));
+    // La conversación que la acción cierra, con SU carpeta: «Deshacer» la
+    // vuelve a abrir, y en otra vista la carpeta que se mira puede ser otra.
+    const abierto = cierraElAbierto && sel ? { ...sel, folder: sel.folder ?? carpeta } : null;
+    if (cierraElAbierto) setSel(null);
     setSeleccion(new Set());
     // ⚠️ UNA LLAMADA POR CARPETA, y no una sola con la carpeta seleccionada.
     //
@@ -598,23 +644,72 @@ export default function CorreoPage() {
     // varias, así que mandarlos todos como si fueran de una sola no fallaría —
     // movería OTROS mensajes, los que tengan esos uid en la carpeta que se
     // mandó. Es la clase de error que no se nota hasta que falta un correo.
-    for (const [f, delGrupo] of agruparPorCarpeta(elegidos, carpeta)) {
-      masiva.mutate(
-        { folder: f, op, items: delGrupo, dest, volverAt },
-        {
-          // El aviso cuenta LO DE ESTE GRUPO, no el total: con correos de dos
-          // carpetas saldrían dos avisos diciendo el mismo número grande.
-          onSuccess: (r) => {
-            toast.success((aviso ?? NOMBRE_OP(f)[op])(delGrupo.length - (r.omitidos ?? 0)), {
-              description: r.omitidos
-                ? t("mail.bulk.skippedNoId", { n: r.omitidos })
-                : undefined,
-            });
-          },
-          onError: (e) => toast.error((e as Error).message || t("mail.bulk.error")),
-        },
-      );
+    const porCarpeta = [...agruparPorCarpeta(elegidos, carpeta)];
+    // ⚠️ La foto de las listas ANTES de lanzar: cada llamada saca sus correos
+    // de la lista al instante (optimista), y «Deshacer» los repone desde aquí.
+    const foto = listas.foto(porCarpeta.map(([f]) => f));
+    // ⚠️ `mutateAsync` y no `mutate` con callbacks: con varias llamadas
+    // seguidas, react-query solo dispara los callbacks de `mutate` de la
+    // ÚLTIMA. La respuesta de cada grupo hace falta (el uid nuevo, para
+    // deshacer), y el error de cualquiera también.
+    // El turno del aviso de ESTA acción: un error que llega cuando ya hubo otra
+    // no puede tapar el aviso de la otra. Se asigna abajo, antes de que llegue
+    // cualquier respuesta.
+    let turno = -1;
+    const grupos = porCarpeta.map(([f, delGrupo]) => {
+      const respuesta = masiva.mutateAsync({ folder: f, op, items: delGrupo, dest, volverAt });
+      respuesta.catch((e) => avisarError((e as Error).message || t("mail.bulk.error"), turno));
+      return { origen: f, correos: delGrupo, respuesta };
+    });
+
+    // ── El aviso: UNO para toda la acción, como Gmail ──────────────────────
+    // Sale ya, junto con el cambio de la lista, y no cuando contesta el
+    // servidor: si no, durante esos segundos la z deshacía la acción anterior.
+    const enviados = (g: { correos: MailSummary[] }) => g.correos.filter((m) => uidDe(m) != null).length;
+    const sumar = (gs: { correos: MailSummary[] }[]) => gs.reduce((n, g) => n + enviados(g), 0);
+    const deshacibles = grupos.filter((g) => sePuedeDeshacer(op, g.origen));
+    const definitivos = grupos.filter((g) => !sePuedeDeshacer(op, g.origen));
+    const omitidos = elegidos.length - sumar(grupos);
+    // Ninguno con uid: la llamada falla y su error es el aviso.
+    if (omitidos === elegidos.length) return;
+    // «Mover a» una carpeta dice cuál, como el arrastre.
+    const avisoMover = op === "move" && dest
+      ? (n: number) => n === 1
+        ? t("mail.moved.one", { name: nombreCarpeta(dest) })
+        : t("mail.moved.many", { n, name: nombreCarpeta(dest) })
+      : undefined;
+    const notas = [
+      // Eliminar desde una etiqueta: lo que ya estaba en la Papelera se borró
+      // de verdad (eso no tiene vuelta) y el resto fue a la Papelera.
+      deshacibles.length && definitivos.length ? NOMBRE_OP("Papelera").delete(sumar(definitivos)) : null,
+      omitidos ? t("mail.bulk.skippedNoId", { n: omitidos }) : null,
+      extra?.descripcion ?? null,
+    ].filter(Boolean).join(" ") || undefined;
+
+    if (!deshacibles.length) {
+      // Borrado definitivo: no hay «Deshacer» (por eso se confirma antes).
+      turno = avisar(NOMBRE_OP("Papelera").delete(sumar(definitivos)), { descripcion: notas });
+      return;
     }
+    const texto = (extra?.aviso ?? avisoMover ?? NOMBRE_OP(deshacibles[0].origen)[op])(sumar(deshacibles));
+    turno = avisar(texto, {
+      descripcion: notas,
+      accion: {
+        masiva: { op, dest, grupos, foto },
+        etiquetas: extra?.etiquetas,
+        // Gmail vuelve a la conversación que se archivó desde adentro.
+        alDeshacer: abierto ? () => setSel((s) => s ?? abierto) : undefined,
+        // Y le pone el uid que tiene AHORA (el de antes ya no existe): sin
+        // esto, ver o bajar un adjunto lo buscaría con el viejo.
+        alVolver: abierto
+          ? (vueltos) => setSel((s) => {
+              if (!s || claveDe(s) !== claveDe(abierto)) return s;
+              const v = vueltos.find((x) => claveDe(x) === claveDe(abierto));
+              return v ? { ...s, uid: v.uid, folder: v.folder } : s;
+            })
+          : undefined,
+      },
+    });
   };
   // Mirando una etiqueta, la lista son SUS correos —de cualquier carpeta— y no
   // los de la carpeta seleccionada.
@@ -932,9 +1027,9 @@ export default function CorreoPage() {
       toast.info(t("mail.drag.alreadyThere", { name: nombreCarpeta(f) }));
       return;
     }
-    // Igual que «Mover a» esa carpeta: agrupado POR CARPETA dentro de lanzarMasiva.
-    lanzarMasiva("move", mover, f, undefined, (n) =>
-      n === 1 ? t("mail.moved.one", { name: nombreCarpeta(f) }) : t("mail.moved.many", { n, name: nombreCarpeta(f) }));
+    // Igual que «Mover a» esa carpeta (mismo aviso, mismo «Deshacer»):
+    // agrupado POR CARPETA dentro de lanzarMasiva.
+    lanzarMasiva("move", mover, f);
   };
   const soltarEnEtiqueta = (id: string, ruta: string) => {
     const a = arrastre;

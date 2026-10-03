@@ -96,7 +96,10 @@ vi.mock("@/hooks/useMailbox", async (original) => ({
   useMailSignature: () => FIRMA,
   useSaveMailSignature: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useMailBulk: () => ({
-    mutate: (v: { folder: string; op: string }) => estado.masiva.push({ folder: v.folder, op: v.op }),
+    mutateAsync: (v: { folder: string; op: string }) => {
+      estado.masiva.push({ folder: v.folder, op: v.op });
+      return Promise.resolve({ ok: true, afectados: 1, omitidos: 0 });
+    },
     isPending: false,
   }),
   useAdjuntosParaReenviar: () => ({ mutateAsync: vi.fn(() => Promise.resolve([])), isPending: false }),

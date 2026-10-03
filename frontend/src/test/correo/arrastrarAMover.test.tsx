@@ -53,10 +53,11 @@ vi.mock("@/hooks/useMailbox", async (original) => ({
   useMailRealtime: () => {},
   useMailSignature: () => ({ data: { enabled: false, html: "" } }),
   useMailBulk: () => ({
-    mutate: (v: { folder: string; op: string; dest?: string; items: { uid?: unknown }[] }, o?: { onSuccess?: (r: object) => void }) => {
+    // `mutateAsync`: la página necesita la respuesta de CADA grupo (para «Deshacer»).
+    mutateAsync: (v: { folder: string; op: string; dest?: string; items: { uid?: unknown }[] }) => {
       e.orden.push(`bulk:${v.op}:${v.folder}`);
       e.bulk.push({ folder: v.folder, op: v.op, ...(v.dest ? { dest: v.dest } : {}), uids: v.items.map((m) => m.uid) });
-      o?.onSuccess?.({});
+      return Promise.resolve({ ok: true, afectados: v.items.length, omitidos: 0 });
     },
     isPending: false,
   }),
