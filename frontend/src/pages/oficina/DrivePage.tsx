@@ -429,8 +429,8 @@ export default function DrivePage() {
     : [{ clave: "todo", titulo: null, items: mostrados }];
   // Las miniaturas, solo en cuadrícula y galería, y solo de lo dibujado.
   const miniaturas = useMiniaturasDrive(mostrados, !enLista);
-  // El tamaño de las carpetas dibujadas (Jhon, 03/10): de a tandas de 100,
-  // una llamada por tanda (ver useTamanosDeCarpetas).
+  // El tamaño de las carpetas dibujadas (Jhon, 03/10): de a tandas chicas y a
+  // la vez, con el último tamaño conocido mientras cuenta (ver useTamanosDeCarpetas).
   const carpetasDibujadas = useMemo(
     () => mostrados.filter((i) => i.tipo === "carpeta" && i.estado === "listo").map((i) => i.id),
     [mostrados],
