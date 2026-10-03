@@ -290,7 +290,7 @@ describe("fechas, tipos y nombres (sin dibujar)", () => {
   });
   it("cambiar el nombre conserva la extensión, como Google con un archivo de Office", () => {
     expect(finDelNombreSinExtension("Balance.xlsx")).toBe(7);
-    expect(finDelNombreSinExtension(".env")).toBe(4);
+    expect(finDelNombreSinExtension(".oculto")).toBe(7);
     expect(finDelNombreSinExtension("Carpeta")).toBe(7);
     expect(conLaExtension("Balance 2026", "Balance.xlsx")).toBe("Balance 2026.xlsx");
     expect(conLaExtension("Balance 2026.XLSX", "Balance.xlsx")).toBe("Balance 2026.XLSX");
