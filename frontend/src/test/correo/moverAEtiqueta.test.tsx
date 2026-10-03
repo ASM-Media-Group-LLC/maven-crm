@@ -15,9 +15,9 @@ vi.mock("@/hooks/useLanguage", (original) =>
   import("@/test/messenger/espanolEnTests").then((m) => m.idiomaEnEspanol(original)));
 
 const orden: string[] = [];
-const bulk = vi.fn((vars: { folder: string; op: string; items: { messageId?: string }[] }, opts?: { onSuccess?: (r: object) => void }) => {
+const bulk = vi.fn((vars: { folder: string; op: string; items: { messageId?: string }[] }) => {
   orden.push(`bulk:${vars.op}:${vars.folder}:${vars.items.map((m) => m.messageId ?? "sin-id").join(",")}`);
-  opts?.onSuccess?.({});
+  return Promise.resolve({ ok: true, afectados: vars.items.length, omitidos: 0 });
 });
 const etiquetar = vi.fn((vars: { messageIds: string[]; labelId: string; poner: boolean }, opts?: { onSuccess?: () => void }) => {
   orden.push(`${vars.poner ? "poner" : "sacar"}:${vars.labelId}:${vars.messageIds.join(",")}`);
@@ -55,7 +55,7 @@ vi.mock("@/hooks/useMailbox", async (original) => ({
   useDownloadAttachment: () => ({ mutate: vi.fn(), isPending: false }),
   useMailRealtime: () => {},
   useMailSignature: () => ({ data: { enabled: false, html: "" } }),
-  useMailBulk: () => ({ mutate: bulk, isPending: false }),
+  useMailBulk: () => ({ mutateAsync: bulk, isPending: false }),
 }));
 
 vi.mock("@/hooks/useEtiquetasCorreo", async (original) => ({

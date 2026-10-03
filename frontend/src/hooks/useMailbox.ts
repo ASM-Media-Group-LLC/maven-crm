@@ -5,6 +5,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { describeFunctionError } from "@/hooks/useMailConnection";
 import { base64ABlob } from "@/lib/base64Blob";
 import { adjuntosIncrustados, incrustarCids } from "@/lib/mailCid";
+import {
+  reponerEnLista, uidDe, type DestinoDelMovimiento, type FilaEnCache,
+} from "@/lib/correo/deshacer";
 
 /**
  * Buzón del usuario: carpetas, mensajes, lectura y envío.
@@ -411,7 +414,7 @@ async function fetchMensajeCache(id: string): Promise<MailMessage> {
     html: (data.html as string | null) ?? null,
     text: (data.text_body as string | null) ?? null,
     remote_images: (data.remote_images as number) ?? 0,
-    attachments: (data.attachments as MailAttachment[]) ?? [],
+    attachments: (data.attachments as unknown as MailAttachment[]) ?? [],
     truncated: !!data.truncated,
   };
 }
@@ -581,6 +584,17 @@ export function useMarkSeen() {
 export type OperacionMasiva =
   | "seen" | "unseen" | "delete" | "archive" | "spam" | "move" | "snooze";
 
+/** Lo que contesta la edge a una acción masiva. */
+export interface RespuestaMasiva {
+  ok: true;
+  afectados: number;
+  /** Los que no se mandaron por no tener uid. */
+  omitidos: number;
+  /** Solo si se MOVIERON: adónde fue a parar cada uno. Lo usa «Deshacer». Una
+   *  edge anterior no lo manda. */
+  destino?: DestinoDelMovimiento;
+}
+
 /** Acciones sobre VARIOS correos de una carpeta (la barra de selección).
  *  Optimista: la lista cambia al instante y se reconcilia con la respuesta.
  *  Solo aplica a mensajes con UID (los de la caché); los del camino en vivo
@@ -589,17 +603,23 @@ export function useMailBulk() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (
-      { folder, op, items, dest, volverAt }:
+      { folder, op, items, dest, volverAt, cancelarPosponer }:
       {
         folder: string; op: OperacionMasiva; items: MailSummary[];
         dest?: string;
         /** Para `snooze`: cuándo tiene que reaparecer, en ISO. */
         volverAt?: string;
+        /** «Deshacer» de Posponer (move desde Snoozed): borra también su
+         *  despertador. Una edge anterior lo ignora. */
+        cancelarPosponer?: boolean;
       },
-    ) => {
-      const uids = items.map((m) => Number(m.uid)).filter((u) => Number.isInteger(u) && u > 0);
+    ): Promise<RespuestaMasiva> => {
+      const uids = items.map(uidDe).filter((u): u is number => u != null);
       if (!uids.length) throw new Error("Estos correos no tienen identificador; abre la carpeta de nuevo e inténtalo.");
-      const r = await callMail<{ ok: true; afectados: number }>({ action: "bulk", folder, op, uids, dest, volver_at: volverAt });
+      const r = await callMail<{ ok: true; afectados: number; destino?: DestinoDelMovimiento }>({
+        action: "bulk", folder, op, uids, dest, volver_at: volverAt,
+        ...(cancelarPosponer ? { cancelar_posponer: true } : {}),
+      });
       return { ...r, omitidos: items.length - uids.length };
     },
     onMutate: ({ folder, op, items }) => {
@@ -631,6 +651,47 @@ export function useMailBulk() {
       qc.invalidateQueries({ queryKey: ["mail-hilo"] });
     },
   });
+}
+
+/** Una foto de las listas de unas carpetas (todas sus páginas y la sección
+ *  «No leídos»), tomada ANTES de una acción. */
+export type FotoDeListas = Array<[readonly unknown[], { messages?: MailSummary[] } | undefined]>;
+
+/** Para «Deshacer»: la lista vuelve a mostrar lo que la acción sacó, AL
+ *  INSTANTE y en el mismo lugar, sin esperar al servidor. Después el servidor
+ *  confirma (o no) y la lista se vuelve a leer como siempre. */
+export function useListasDelCorreo() {
+  const qc = useQueryClient();
+  return useMemo(() => ({
+    /** ⚠️ Antes de lanzar la acción: su `onMutate` saca los correos al momento. */
+    foto: (carpetas: string[]): FotoDeListas =>
+      [...new Set(carpetas)].flatMap((f) =>
+        qc.getQueriesData<{ messages?: MailSummary[] }>({ queryKey: ["mail-messages", f] })),
+    reponer: (foto: FotoDeListas, claves: Set<string>) => {
+      for (const [queryKey, antes] of foto) {
+        if (!antes?.messages) continue;
+        qc.setQueryData(queryKey, (ahora: { messages?: MailSummary[] } | undefined) =>
+          ahora?.messages
+            ? { ...ahora, messages: reponerEnLista(ahora.messages, antes.messages!, claves, claveDe) }
+            : ahora);
+      }
+    },
+  }), [qc]);
+}
+
+/** El respaldo de «Deshacer» cuando la edge no dijo el uid nuevo: dónde está
+ *  HOY cada fila de la caché. La edge traslada la MISMA fila (mismo `id`) a la
+ *  carpeta nueva con el uid de allá, así que se busca por `id`. */
+export async function filasDeLaCache(ids: string[]): Promise<FilaEnCache[]> {
+  const unicos = [...new Set(ids.filter(Boolean))];
+  if (!unicos.length) return [];
+  const { data, error } = await supabase.from("mail_messages" as never)
+    .select("id, folder, uid")
+    .in("id", unicos);
+  if (error) throw error;
+  return ((data ?? []) as unknown as Record<string, unknown>[]).map((f) => ({
+    id: f.id as string, folder: f.folder as string, uid: Number(f.uid),
+  }));
 }
 
 /** La bandeja se actualiza SOLA: el sincronizador inserta en mail_messages

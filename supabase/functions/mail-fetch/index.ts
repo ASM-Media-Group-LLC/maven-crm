@@ -32,6 +32,7 @@ import { ocultarAvisosDelProveedor } from "../_shared/mail-notices.ts";
 import {
   ErrorDeTraduccion, type Idioma, MODELO_ECONOMICO, pedirTraduccion, textoParaTraducir,
 } from "./traducir.ts";
+import { type DestinoDelMovimiento, destinoParaLaRespuesta } from "./destino.ts";
 
 const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
 
@@ -421,14 +422,20 @@ Deno.serve(async (req) => {
     // quien lo abre, no un efecto de que lo hayamos descargado.
     // === BULK === (Jhon, 09/09/2026: la barra de selección del correo, como
     // en Gmail, tiene que HACER algo). Una sola sesión IMAP para todo el lote.
-    //   op: seen | unseen | delete | archive | spam · uids: number[] (máx. 200)
+    //   op: seen | unseen | delete | archive | spam | move | snooze
+    //   uids: number[] (máx. 200)
     // Carpetas de Zoho: Papelera, Archive, "Correo no deseado". Eliminar mueve
     // a Papelera; dentro de la Papelera borra de verdad. La caché
     // (mail_messages / mail_folders) se ajusta al momento y el sincronizador
     // la termina de cuadrar en su próximo barrido.
+    // Lo que se MUEVE contesta además `destino` ({ folder, uidvalidity, mapa:
+    // [[uid viejo, uid nuevo]…] }): con eso la pantalla lo puede DESHACER
+    // moviéndolo de vuelta desde el destino, con el uid de allá.
+    //   cancelar_posponer: true (solo con op move desde Snoozed) — el
+    //   «Deshacer» de Posponer: además borra el despertador.
     if (action === "bulk") {
-      const { op, uids, dest: destPedido, volver_at: volverPedido } = body as
-        { op?: string; uids?: unknown; dest?: unknown; volver_at?: unknown };
+      const { op, uids, dest: destPedido, volver_at: volverPedido, cancelar_posponer: cancelarPosponer } = body as
+        { op?: string; uids?: unknown; dest?: unknown; volver_at?: unknown; cancelar_posponer?: unknown };
       const ops = new Set(["seen", "unseen", "delete", "archive", "spam", "move", "snooze"]);
       if (!op || !ops.has(op)) return json(req, { error: "op inválida" }, 400);
       const lista = (Array.isArray(uids) ? uids : [])
@@ -543,6 +550,29 @@ Deno.serve(async (req) => {
           }
         }
 
+        // ── «Deshacer» de Posponer: deja de estar pospuesto ──────────────
+        // Mueve de Snoozed a la carpeta de la que salió Y borra su despertador.
+        // Sin esto la fila de `mail_snoozed` seguía viva: si lo volvías a
+        // posponer antes de esa hora quedaban DOS filas pendientes (la clave
+        // única no frena dos `devuelto_at` en NULL) y la vieja lo despertaba
+        // antes de tiempo.
+        // ⚠️ SOLO si se pide (`cancelar_posponer`), no en cualquier salida de
+        // Snoozed: archivar desde Pospuestos y deshacerlo lo DEVUELVE a Snoozed,
+        // y ahí tiene que seguir teniendo quién lo despierte.
+        // ⚠️ Antes de trasladar la caché: los message_id salen de las filas que
+        // todavía dicen Snoozed.
+        if (movidos && op === "move" && box === "Snoozed" && cancelarPosponer === true) {
+          const { data: dormidos } = await admin.from("mail_messages")
+            .select("message_id")
+            .eq("user_id", user.id).eq("folder", box).in("uid", lista);
+          const idsDormidos = ((dormidos ?? []) as { message_id: string | null }[])
+            .map((f) => f.message_id).filter(Boolean) as string[];
+          if (idsDormidos.length) {
+            await admin.from("mail_snoozed").delete()
+              .eq("user_id", user.id).is("devuelto_at", null).in("message_id", idsDormidos);
+          }
+        }
+
         // Caché al momento (la RLS del usuario no deja borrar filas: va con admin).
         //
         // ⚠️ LO MOVIDO SE TRASLADA, NO SE BORRA. Antes la fila se borraba y el
@@ -555,10 +585,15 @@ Deno.serve(async (req) => {
         // uid nuevo): la misma clave con la que el barrido la va a encontrar,
         // así que cuando pase la actualiza en vez de duplicarla.
         let trasladados = 0;
+        // Adónde fue a parar cada uno, para que la pantalla pueda DESHACER
+        // (mover de vuelta con el uid de ahora). Ver destino.ts.
+        let destinoRespuesta: DestinoDelMovimiento | undefined;
         if (movidos && destFinal && movimiento) {
-          trasladados = await trasladarEnCache({
+          const ubicacion = await trasladarEnCache({
             admin, client, userId: user.id, box, dest: destFinal, lista, movimiento,
           });
+          trasladados = ubicacion.ubicadas;
+          destinoRespuesta = destinoParaLaRespuesta(destFinal, ubicacion.uidvalidity, ubicacion.mapa, lista);
         }
         if (movidos) {
           // Lo que no se pudo ubicar en el destino (sin Message-ID, o el
@@ -585,7 +620,11 @@ Deno.serve(async (req) => {
             .eq("user_id", user.id).eq("folder", destFinal);
         }
 
-        return json(req, { ok: true, op, folder: box, afectados: lista.length, trasladados });
+        // `destino` es NUEVO y opcional: quien no lo conoce lo ignora.
+        return json(req, {
+          ok: true, op, folder: box, afectados: lista.length, trasladados,
+          ...(destinoRespuesta ? { destino: destinoRespuesta } : {}),
+        });
       } catch (e) {
         return json(req, { error: (e as Error).message ?? "error de IMAP" }, 502);
       } finally {
@@ -1343,7 +1382,9 @@ Deno.serve(async (req) => {
 });
 
 /** Pasa las filas de la caché de lo que se acaba de mover a su carpeta nueva.
- *  Devuelve cuántas quedaron ubicadas; las demás las borra quien llama.
+ *  Devuelve cuántas quedaron ubicadas (las demás las borra quien llama) y el
+ *  uid que recibió cada uno en el destino (`mapa`: uid viejo → uid nuevo), que
+ *  es lo que necesita «Deshacer» para mover de vuelta.
  *
  *  El uid nuevo sale de COPYUID si el servidor lo mandó. Si no, se busca cada
  *  correo por su Message-ID en el destino (con tope: un lote de 200 no puede
@@ -1357,13 +1398,15 @@ async function trasladarEnCache({ admin, client, userId, box, dest, lista, movim
   dest: string;
   lista: number[];
   movimiento: { uidvalidity?: number; mapa: Map<number, number> };
-}): Promise<number> {
+}): Promise<{ ubicadas: number; uidvalidity: number | null; mapa: Map<number, number> }> {
   const TOPE_BUSQUEDAS = 40;
+  // Lo que dijo COPYUID vale aunque el correo no tenga fila en la caché.
+  const mapa = new Map(movimiento.mapa);
   const { data } = await admin.from("mail_messages")
     .select("id, uid, message_id")
     .eq("user_id", userId).eq("folder", box).in("uid", lista);
   const filas = (data ?? []) as { id: string; uid: number; message_id: string | null }[];
-  if (!filas.length) return 0;
+  if (!filas.length) return { ubicadas: 0, uidvalidity: movimiento.uidvalidity ?? null, mapa };
 
   let uidvalidity = movimiento.uidvalidity ?? null;
   const nuevos = new Map<string, number>();
@@ -1381,7 +1424,10 @@ async function trasladarEnCache({ admin, client, userId, box, dest, lista, movim
         if (sel.ok) {
           for (const f of faltan) {
             const u = await client.uidPorMessageId(f.message_id!);
-            if (u) nuevos.set(f.id, u);
+            if (u) {
+              nuevos.set(f.id, u);
+              mapa.set(Number(f.uid), u);
+            }
           }
         }
       }
@@ -1391,7 +1437,9 @@ async function trasladarEnCache({ admin, client, userId, box, dest, lista, movim
       console.warn(`[mail-fetch] no se pudo ubicar en ${dest}: ${(e as Error).message}`);
     }
   }
-  if (uidvalidity == null) return 0;
+  // Sin UIDVALIDITY no se puede escribir la fila (es parte de su clave), pero
+  // el mapa de COPYUID sigue siendo cierto para deshacer.
+  if (uidvalidity == null) return { ubicadas: 0, uidvalidity: null, mapa };
 
   let ubicadas = 0;
   for (const [id, uid] of nuevos) {
@@ -1404,5 +1452,5 @@ async function trasladarEnCache({ admin, client, userId, box, dest, lista, movim
     await admin.from("mail_messages").delete().eq("id", id);
     ubicadas++;
   }
-  return ubicadas;
+  return { ubicadas, uidvalidity, mapa };
 }

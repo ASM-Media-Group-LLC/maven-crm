@@ -44,9 +44,11 @@ jobs:
 
       # Mover un correo tiene que decir ADÓNDE fue a parar (COPYUID), para que
       # la caché lo traslade en vez de borrarlo, y no dejar pasar un Message-ID
-      # con comillas o saltos de línea a un comando IMAP.
+      # con comillas o saltos de línea a un comando IMAP. Y la respuesta que
+      # usa «Deshacer» (mail-fetch/destino.ts): solo pares de lo pedido, nunca
+      # dos correos atados al mismo uid de destino.
       - name: Guard — mover correos (IMAP)
-        run: deno test --no-check supabase/functions/_shared/imap-mover.test.ts
+        run: deno test --no-check supabase/functions/_shared/imap-mover.test.ts supabase/functions/mail-fetch/destino.test.ts
 
       # Drive: Maven y el NAS tienen que firmar IGUAL (vector compartido con
       # infra/nas-drive), y las reglas de subida (tope, partes, nombres).

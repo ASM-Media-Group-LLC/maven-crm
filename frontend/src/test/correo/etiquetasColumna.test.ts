@@ -45,7 +45,10 @@ describe("⚠️ los UID son POR CARPETA", () => {
     // El agrupado vive en lib/correo/accionesDelMensaje.ts (lo usan también el
     // ⋮ de cada mensaje y el arrastrar): ahí está probado con correos de varias
     // carpetas (test/correo/accionesDelMensaje.test.ts).
-    expect(pagina).toMatch(/for \(const \[f, delGrupo\] of agruparPorCarpeta\(elegidos, carpeta\)\)/);
+    // Una llamada por grupo (con `mutateAsync`: la respuesta de cada uno hace
+    // falta para «Deshacer»).
+    expect(pagina).toMatch(/\[\.\.\.agruparPorCarpeta\(elegidos, carpeta\)\]/);
+    expect(pagina).toMatch(/porCarpeta\.map\(\(\[f, delGrupo\]\) =>/);
     expect(pagina).toMatch(/\{ folder: f, op, items: delGrupo/);
   });
 
