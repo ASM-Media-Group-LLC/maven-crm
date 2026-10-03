@@ -754,6 +754,25 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
   pointer-events: none;
   height: 0;
 }
+/* Redactar correo: con firma, o con la cita de una respuesta, el editor nunca
+   está «vacío» y la ayuda (que es donde se cuenta lo de mencionar con @) no se
+   veía nunca. Se muestra también en la primera línea mientras siga vacía. Gris
+   fijo: la hoja del correo es blanca también con Maven en oscuro. En UNA línea
+   (con «…» si no cabe): partida en dos, en el teléfono tapaba la firma de abajo. */
+.mail-composer .ProseMirror > p.is-empty:first-child {
+  position: relative;
+}
+.mail-composer .ProseMirror > p.is-empty:first-child::before {
+  content: attr(data-placeholder);
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: auto;
+  color: #a3a3a3;
+  pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 /* ───────────────── Karma Points — ficha de perfil del Messenger ───────────────── */
 .kp-card{

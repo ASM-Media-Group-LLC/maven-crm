@@ -27,6 +27,9 @@ function textoAntesDelCursor(editor: Editor): { texto: string; desde: number } |
   };
 }
 
+/** El ancho de la lista (`w-72`), para que no se salga por la derecha. */
+const ANCHO_DE_LA_LISTA = 288;
+
 interface Props {
   editor: Editor | null;
   /** Para no ofrecerse uno mismo. */
@@ -72,7 +75,15 @@ export default function MencionesEnElCuerpo({ editor, miUserId, onMencionar }: P
       try {
         const c = editor.view.coordsAtPos(desde);
         const caja = ancla.current?.getBoundingClientRect();
-        if (caja) setPos({ top: c.bottom - caja.top + 4, left: Math.max(0, c.left - caja.left) });
+        // Sin pasarse del borde derecho del cuerpo: en el teléfono, una @ escrita
+        // a mitad de renglón dejaba la lista cortada por la hoja.
+        const ancho = ancla.current?.parentElement?.clientWidth || Infinity;
+        if (caja) {
+          setPos({
+            top: c.bottom - caja.top + 4,
+            left: Math.max(0, Math.min(c.left - caja.left, ancho - ANCHO_DE_LA_LISTA)),
+          });
+        }
       } catch {
         setPos(null);
       }
@@ -128,15 +139,21 @@ export default function MencionesEnElCuerpo({ editor, miUserId, onMencionar }: P
       style={{ top: pos?.top ?? 0, left: pos?.left ?? 0 }}
       className={cn(
         "absolute z-30 w-72 overflow-hidden rounded-panel",
-        "border border-border bg-popover shadow-lg",
+        // `text-popover-foreground`: la lista vive DENTRO de la hoja blanca del
+        // correo, que fija la letra en gris oscuro. Sin esto, con Maven en
+        // oscuro (su tema por defecto) los nombres salían oscuro sobre oscuro.
+        "border border-border bg-popover text-popover-foreground shadow-lg",
       )}
       role="listbox"
       aria-label={t("correo.mencion.listaLabel")}
     >
-      <p className="border-b border-border/60 px-3 py-2 text-xs text-muted-foreground">
+      {/* `!my-0`, `!list-none` y `!pl-0`: el compositor le devuelve a los
+          párrafos y listas del CUERPO sus márgenes y viñetas, y esa regla
+          también alcanzaba a esta lista (salía un «•» al lado de cada persona). */}
+      <p className="!my-0 border-b border-border/60 px-3 py-2 text-xs text-muted-foreground">
         {t("correo.mencion.ayuda")}
       </p>
-      <ul className="max-h-60 overflow-y-auto py-1">
+      <ul className="max-h-60 !list-none overflow-y-auto py-1 !pl-0">
         {gente.map((p, i) => (
           <li key={p.user_id}>
             <button

@@ -16,6 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils";
 import { RichNode } from "../types";
 import { richTieneFormato } from "./RichText";
+import { ListaConVinetasPorLinea, ListaNumeradaPorLinea } from "./listasPorLinea";
 import { useLanguage } from "@/hooks/useLanguage";
 
 export interface RichComposerHandle {
@@ -75,7 +76,13 @@ const RichComposer = forwardRef<RichComposerHandle, Props>(({
 
   const editor = useEditor({
     extensions: [
-      StarterKit.configure({ heading: false }),
+      // Las listas del StarterKit envuelven el PÁRRAFO entero, y aquí los
+      // renglones se hacen con Shift+Enter (Enter envía), que no crea párrafos:
+      // numerar una línea numeraba también la introducción de arriba. Las de
+      // `listasPorLinea` toman solo la línea (o las líneas seleccionadas).
+      StarterKit.configure({ heading: false, bulletList: false, orderedList: false }),
+      ListaConVinetasPorLinea,
+      ListaNumeradaPorLinea,
       Underline,
       TextStyle,
       Color,
