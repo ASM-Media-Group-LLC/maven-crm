@@ -22,6 +22,21 @@ export function agregarEstilo(el: Element, css: string): void {
   el.setAttribute("style", previo ? `${previo};${css}` : css);
 }
 
+/** `rgb(220, 38, 38)` → `#dc2626`.
+ *
+ *  El editor escribe los estilos por el CSSOM (`style.cssText`) y el navegador
+ *  los guarda normalizados: el color elegido como `#ffff00` sale del editor como
+ *  `rgb(255, 255, 0)`. El hexadecimal es el formato que entiende cualquier
+ *  cliente de correo, también los de escritorio viejos, así que se vuelve a él.
+ *  `rgba()` se deja como está: con transparencia no hay hexadecimal de 6. */
+export function rgbAHex(css: string): string {
+  return css.replace(
+    /rgb\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)/gi,
+    (_, r: string, g: string, b: string) =>
+      "#" + [r, g, b].map((n) => Math.min(255, Number(n)).toString(16).padStart(2, "0")).join(""),
+  );
+}
+
 /** El HTML del editor, vestido para clientes de correo.
  *
  *  Se trabaja sobre el DOM PARSEADO, no con reemplazos de texto sobre el
@@ -37,6 +52,12 @@ export function agregarEstilo(el: Element, css: string): void {
 export function htmlParaCorreo(html: string): string {
   const doc = new DOMParser().parseFromString(`<body>${html}</body>`, "text/html");
   const body = doc.body;
+
+  // Los colores del editor (letra y resaltado) viajan EN LÍNEA en su <span>; aquí
+  // solo se pasan a hexadecimal (ver rgbAHex).
+  body.querySelectorAll("[style]").forEach((el) =>
+    el.setAttribute("style", rgbAHex(el.getAttribute("style") ?? "")),
+  );
 
   body.querySelectorAll("p").forEach((el) => {
     if (el.closest("li")) {

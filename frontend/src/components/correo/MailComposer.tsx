@@ -69,6 +69,7 @@ import TextStyle from "@tiptap/extension-text-style";
 import { Color } from "@tiptap/extension-color";
 import Placeholder from "@tiptap/extension-placeholder";
 import { Extension } from "@tiptap/core";
+import { ColorDeFondo, FONDOS } from "./colorDeFondo";
 import { useLanguage } from "@/hooks/useLanguage";
 import { traducir, type TranslationKey } from "@/lib/i18n";
 
@@ -311,6 +312,50 @@ function Separador() {
   return <div className="mx-0.5 h-5 w-px shrink-0 bg-border" />;
 }
 
+/** Una columna del menú de color: título, la grilla y el botón para quitar. */
+function PaletaDeColor({
+  titulo,
+  colores,
+  onElegir,
+  textoQuitar,
+  onQuitar,
+}: {
+  titulo: string;
+  colores: string[][];
+  onElegir: (color: string) => void;
+  textoQuitar: string;
+  onQuitar: () => void;
+}) {
+  return (
+    <div role="group" aria-label={titulo} className="flex flex-col gap-1.5">
+      <p className="text-xs font-medium text-muted-foreground">{titulo}</p>
+      {colores.map((fila, i) => (
+        <div key={i} className="flex gap-1.5">
+          {fila.map((c) => (
+            <button
+              key={c}
+              type="button"
+              title={c}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => onElegir(c)}
+              className="h-6 w-6 rounded-full border border-border/60 transition-transform hover:scale-110"
+              style={{ backgroundColor: c }}
+            />
+          ))}
+        </div>
+      ))}
+      <button
+        type="button"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={onQuitar}
+        className="mt-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted"
+      >
+        {textoQuitar}
+      </button>
+    </div>
+  );
+}
+
 function BarraFormato({ editor }: { editor: Editor }) {
   const { t } = useLanguage();
   const [url, setUrl] = useState("");
@@ -426,44 +471,36 @@ function BarraFormato({ editor }: { editor: Editor }) {
         <Strikethrough className="h-4 w-4" />
       </BotonBarra>
 
-      {/* Color de texto */}
+      {/* Color: de fondo (resaltar) y de la letra, en el mismo menú, como en
+          Gmail. El fondo va primero porque es lo que se busca para marcar algo. */}
       <Popover>
         <PopoverTrigger asChild>
           <button
             type="button"
-            title={t("mail.ed.textColor")}
-            aria-label={t("mail.ed.textColor")}
+            title={t("mail.ed.colors")}
+            aria-label={t("mail.ed.colors")}
             onMouseDown={(e) => e.preventDefault()}
             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
             <Palette className="h-4 w-4" />
           </button>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-2" align="start">
-          <div className="flex flex-col gap-1.5">
-            {COLORES.map((fila, i) => (
-              <div key={i} className="flex gap-1.5">
-                {fila.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    title={c}
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => editor.chain().focus().setColor(c).run()}
-                    className="h-6 w-6 rounded-full border border-border/60 transition-transform hover:scale-110"
-                    style={{ backgroundColor: c }}
-                  />
-                ))}
-              </div>
-            ))}
-            <button
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => editor.chain().focus().unsetColor().run()}
-              className="mt-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted"
-            >
-              {t("mail.ed.autoColor")}
-            </button>
+        <PopoverContent className="w-auto p-3" align="start">
+          <div className="flex flex-col gap-4 sm:flex-row">
+            <PaletaDeColor
+              titulo={t("mail.ed.bgColor")}
+              colores={FONDOS}
+              onElegir={(c) => editor.chain().focus().setBackgroundColor(c).run()}
+              textoQuitar={t("mail.ed.noHighlight")}
+              onQuitar={() => editor.chain().focus().unsetBackgroundColor().run()}
+            />
+            <PaletaDeColor
+              titulo={t("mail.ed.textColor")}
+              colores={COLORES}
+              onElegir={(c) => editor.chain().focus().setColor(c).run()}
+              textoQuitar={t("mail.ed.autoColor")}
+              onQuitar={() => editor.chain().focus().unsetColor().run()}
+            />
           </div>
         </PopoverContent>
       </Popover>
@@ -756,6 +793,8 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
       Link.configure({ openOnClick: false, autolink: true, linkOnPaste: true }),
       TextStyle,
       Color,
+      // Resaltar: el fondo viaja en línea en el mismo <span> que el color.
+      ColorDeFondo,
       FontSize,
       Placeholder.configure({ placeholder: t("mail.comp.bodyPlaceholder") }),
       // `allowBase64`: al pegar, la imagen entra como `data:` y recién al
