@@ -339,7 +339,7 @@ export const correo = {
   "mail.comp.imageTooBig": { es: "Con esa imagen el correo pasa los 20 MB.", en: "With that image the email goes over 20 MB." },
   "mail.comp.readImageError": { es: "No se pudo leer {name}.", en: "Couldn't read {name}." },
   "mail.comp.theImage": { es: "la imagen", en: "the image" },
-  "mail.comp.bodyPlaceholder": { es: "Escribe tu mensaje…", en: "Write your message…" },
+  "mail.comp.bodyPlaceholder": { es: "Escribe tu mensaje. Con @ sumas a alguien", en: "Write your message. Type @ to add someone" },
   "mail.comp.sent": { es: "Correo enviado", en: "Email sent" },
   "mail.comp.draftSaved": { es: "Borrador guardado", en: "Draft saved" },
   "mail.comp.draftLocalOnly": { es: "Guardado en este equipo (no en el servidor): {error}", en: "Saved on this device (not on the server): {error}" },
