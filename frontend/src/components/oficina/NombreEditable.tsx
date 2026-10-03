@@ -81,7 +81,7 @@ export default function NombreEditable({
           }}
           style={{ width: `${Math.min(Math.max(texto.length + 2, 10), 60)}ch` }}
           className={cn(
-            "-mx-1.5 max-w-full rounded-control border border-input bg-background px-1.5 [font:inherit] [letter-spacing:inherit]",
+            "-mx-1.5 max-w-[calc(100%+0.75rem)] rounded-control border border-input bg-background px-1.5 [font:inherit] [letter-spacing:inherit]",
             "outline-none focus-visible:ring-2 focus-visible:ring-ring",
             className,
           )}
@@ -94,13 +94,17 @@ export default function NombreEditable({
     return <span className={cn("break-words", className)}>{mostrado || vacio}</span>;
   }
 
+  // El tope de ancho es el 100 % MÁS los 12 px de los márgenes negativos
+  // (-mx-1.5). Con `max-w-full` a secas el botón quedaba 12 px más angosto que
+  // su propio texto (el título mide el texto MENOS los márgenes) y hasta «Sin
+  // título» se partía en dos renglones.
   return (
     <button
       type="button"
       title={etiqueta}
       onClick={empezar}
       className={cn(
-        "-mx-1.5 max-w-full cursor-text rounded-control px-1.5 text-left [font:inherit] [letter-spacing:inherit]",
+        "-mx-1.5 max-w-[calc(100%+0.75rem)] cursor-text rounded-control px-1.5 text-left [font:inherit] [letter-spacing:inherit]",
         "break-words transition-shadow hover:ring-1 hover:ring-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         className,
       )}
