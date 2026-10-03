@@ -83,6 +83,25 @@ jobs:
       - name: Guard — Cowork por agencia (cowork-session)
         run: deno test --allow-read supabase/functions/cowork-session/agencia.test.ts
 
+      # Meet, llamadas, grabaciones y LiveKit por agencia (entrega 3c): la guarda
+      # _shared/livekit-agencia.ts sabe de qué agencia es cada sala (cowork_, meet_,
+      # call-) antes y después de la migración 20261003120000, y el test lee los
+      # index.ts: livekit-token, livekit-moderate, meet-room, meet-guest y recordings
+      # la corren antes de actuar, y stop ya no deja elegir destinatarios a cualquiera.
+      # Con tipos.
+      - name: Guard — Meet y LiveKit por agencia (livekit-agencia)
+        run: deno test --allow-read supabase/functions/_shared/livekit-agencia.test.ts
+
+      # Las cinco edges de llamadas, con tipos (antes ninguna corría deno check).
+      - name: Tipos — edges de llamadas (LiveKit, Meet, grabaciones)
+        run: >-
+          deno check
+          supabase/functions/livekit-token/index.ts
+          supabase/functions/livekit-moderate/index.ts
+          supabase/functions/meet-room/index.ts
+          supabase/functions/meet-guest/index.ts
+          supabase/functions/recordings/index.ts
+
       # web-push: el título, el cuerpo y a quién le llega el push del Messenger
       # (_shared/push-notify.ts) y quién aparece como emisor (web-push/nombre-emisor.ts:
       # ahí va a entrar el nombre visible de la key cuando se escriba por API). Con
@@ -173,6 +192,15 @@ jobs:
       # cerrada con la migración.
       - name: Banco — Cowork por agencia (PGlite)
         run: deno run -A --node-modules-dir=none --no-lock supabase/tests/cowork_por_agencia.ts
+
+      # Meet, llamadas y grabaciones por agencia, sobre el catálogo de PROD del 01/10
+      # (roles + Cowork + fixtures/prod_meet_20261001.sql, con las huellas de sus 7
+      # funciones): con una agencia cada persona ve lo mismo que en prod (9 tablas, la
+      # vista de uso, 9 salas); con dos, cada hueco (M1–M3, L1–L3, G1–G4) se prueba
+      # abierto en prod y cerrado con la migración; la guarda de las edges dice lo
+      # mismo que agencia_de_sala_livekit; la vuelta atrás deja todo como en prod.
+      - name: Banco — Meet, llamadas y grabaciones por agencia (PGlite)
+        run: deno run -A --node-modules-dir=none --no-lock supabase/tests/meet_por_agencia.ts
 
       # `deno test --no-check` no mira tipos: sin este paso, el tipo de msg() (clave que
       # existe, variables exactas) y los @ts-expect-error de mensajes.test.ts nunca

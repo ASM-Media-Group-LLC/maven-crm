@@ -19,6 +19,7 @@ import { corsFor } from "../_shared/cors.ts";
 // puede mutear ni echar a nadie.
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { agenciaDePersona, agenciaDeReunion } from "../_shared/livekit-agencia.ts";
 
 const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
 
@@ -39,7 +40,7 @@ function base64UrlEncode(data: Uint8Array): string {
   return btoa(b64).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-function strToBytes(s: string): Uint8Array {
+function strToBytes(s: string): Uint8Array<ArrayBuffer> {
   return new TextEncoder().encode(s);
 }
 
@@ -175,7 +176,7 @@ serve(async (req) => {
       if (guestToken.length < 32) return err(req, "Solicitud inválida", 400);
 
       const { data: request } = await admin.from("meet_guest_requests")
-        .select("id, meet_room_id, guest_name, status, left_at")
+        .select("id, meet_room_id, guest_name, status, left_at, decided_by")
         .eq("guest_token", guestToken).maybeSingle();
       if (!request) return err(req, "Solicitud no encontrada", 404);
 
@@ -189,9 +190,19 @@ serve(async (req) => {
       if (request.status === "pending") return json(req, { status: "pending" });
 
       const { data: room } = await admin.from("meet_rooms")
-        .select("name, livekit_room_name, status").eq("id", request.meet_room_id).maybeSingle();
+        .select("*").eq("id", request.meet_room_id).maybeSingle();
       if (!room) return err(req, "Reunión no encontrada", 404);
       if (room.status !== "active") return json(req, { status: "ended" });
+
+      // La admisión vale solo si la dio alguien de la agencia de la reunión
+      // (entrega 3c; meet-room y la base ya lo exigen al admitir). Si no, es como
+      // un rechazo: el invitado puede volver a pedir y que lo admita alguien de
+      // adentro. El token es de ESTA sala y de ninguna otra: la del pedido, nunca
+      // una que mande el cliente.
+      const agenciaDeLaReunion = await agenciaDeReunion(admin, room);
+      if (!agenciaDeLaReunion || await agenciaDePersona(admin, request.decided_by) !== agenciaDeLaReunion) {
+        return json(req, { status: "denied" });
+      }
 
       // Identidad propia y marcada, para que en la sala se vea que es un invitado
       // y no se confunda con una cuenta de Maven.

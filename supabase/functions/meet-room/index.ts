@@ -10,6 +10,7 @@ import { corsFor } from "../_shared/cors.ts";
 // necesita poder leer la tabla (ni enumerarla), igual que el join de Cowork.
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { agenciaDePersona, agenciaDeReunion, SIN_AGENCIA } from "../_shared/livekit-agencia.ts";
 
 const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
 
@@ -53,6 +54,19 @@ serve(async (req) => {
 
     const body = await req.json();
     const { action } = body;
+
+    // ── Cada reunión es de una agencia (entrega 3c) ──────────────────────
+    // Con service_role esta función veía TODAS las reuniones: con el código o el
+    // nombre de sala de otra agencia se entraba (joinByCode, resolve), se le
+    // cambiaba el nombre o se terminaba (rename, end), y cualquiera admitía a un
+    // invitado en cualquier reunión (decideGuest). Ahora, una reunión de otra
+    // agencia contesta igual que una que no existe; quien no es de la agencia
+    // entra como invitado, por la sala de espera (MeetGuestPage cae sola al
+    // formulario de invitado cuando joinByCode no responde OK).
+    const miAgencia = await agenciaDePersona(admin, userId);
+    if (!miAgencia) return err(req, SIN_AGENCIA, 403);
+    // deno-lint-ignore no-explicit-any
+    const esDeMiAgencia = async (reunion: any) => !!reunion && await agenciaDeReunion(admin, reunion) === miAgencia;
 
     // ═══════════════════════════════════════════════════════════════
     // CREATE
@@ -100,9 +114,9 @@ serve(async (req) => {
       if (code.length !== 6) return err(req, "El código debe tener 6 caracteres");
 
       const { data: room } = await admin.from("meet_rooms")
-        .select("id, code, name, livekit_room_name, status, created_by")
+        .select("*")
         .eq("code", code).maybeSingle();
-      if (!room) return err(req, "Código inválido", 404);
+      if (!room || !(await esDeMiAgencia(room))) return err(req, "Código inválido", 404);
       if (room.status !== "active") return err(req, "Esa reunión ya terminó", 410);
 
       await rememberMembership(admin, room.id, userId);
@@ -124,9 +138,9 @@ serve(async (req) => {
       if (!livekitRoom.startsWith("meet_")) return err(req, "No es una sala de Meet");
 
       const { data: room } = await admin.from("meet_rooms")
-        .select("id, code, name, livekit_room_name, status, created_by")
+        .select("*")
         .eq("livekit_room_name", livekitRoom).maybeSingle();
-      if (!room) return err(req, "Reunión no encontrada", 404);
+      if (!room || !(await esDeMiAgencia(room))) return err(req, "Reunión no encontrada", 404);
       if (room.status !== "active") return err(req, "Esa reunión ya terminó", 410);
 
       await rememberMembership(admin, room.id, userId);
@@ -151,8 +165,8 @@ serve(async (req) => {
       if (!clean) return err(req, "Escribe un nombre para la reunión");
 
       const { data: room } = await admin.from("meet_rooms")
-        .select("id, livekit_room_name").eq("id", id).maybeSingle();
-      if (!room) return err(req, "Reunión no encontrada", 404);
+        .select("*").eq("id", id).maybeSingle();
+      if (!room || !(await esDeMiAgencia(room))) return err(req, "Reunión no encontrada", 404);
 
       // Anfitrión, co-anfitrión o admin: la misma regla que para moderar.
       const { data: puede } = await admin.rpc("can_moderate_livekit_room", {
@@ -211,7 +225,10 @@ serve(async (req) => {
       if (request.status !== "pending") return err(req, "Esa solicitud ya fue resuelta", 409);
 
       const { data: room } = await admin.from("meet_rooms")
-        .select("id, status").eq("id", request.meet_room_id).maybeSingle();
+        .select("*").eq("id", request.meet_room_id).maybeSingle();
+      // A un invitado lo admite alguien de la agencia de la reunión, no cualquier
+      // cuenta de Maven (la base también lo exige: meet_invitados_agencia).
+      if (!(await esDeMiAgencia(room))) return err(req, "Solicitud no encontrada", 404);
       if (!room || room.status !== "active") return err(req, "Esa reunión ya terminó", 410);
 
       const { error: upErr } = await admin.from("meet_guest_requests")
@@ -234,8 +251,8 @@ serve(async (req) => {
       if (!id) return err(req, "id required");
 
       const { data: room } = await admin.from("meet_rooms")
-        .select("id, created_by").eq("id", id).maybeSingle();
-      if (!room) return err(req, "Reunión no encontrada", 404);
+        .select("*").eq("id", id).maybeSingle();
+      if (!room || !(await esDeMiAgencia(room))) return err(req, "Reunión no encontrada", 404);
       if (room.created_by !== userId) return err(req, "Solo el anfitrión puede terminar la reunión", 403);
 
       const { error: upErr } = await admin.from("meet_rooms")
