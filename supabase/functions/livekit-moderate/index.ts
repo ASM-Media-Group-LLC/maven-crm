@@ -15,6 +15,7 @@ import { corsFor } from "../_shared/cors.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { enviarAvisoASala, nombreDeUsuario } from "../_shared/livekit-aviso.ts";
+import { agenciaDePersona, revisarSala } from "../_shared/livekit-agencia.ts";
 
 const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
 
@@ -32,7 +33,7 @@ function base64UrlEncode(data: Uint8Array): string {
   return btoa(b64).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-function strToBytes(s: string): Uint8Array {
+function strToBytes(s: string): Uint8Array<ArrayBuffer> {
   return new TextEncoder().encode(s);
 }
 
@@ -131,6 +132,15 @@ serve(async (req) => {
     const action = String(body.action ?? "");
     const room = String(body.room ?? "").trim();
     if (!room) return err(req, "room required");
+
+    // ── La sala tiene que ser de la agencia de quien llama (entrega 3c) ──
+    // ANTES de cualquier acción, también de «quién está»: con el nombre de una
+    // sala de otra agencia se veía quién estaba adentro (nombre y foto) y un
+    // admin de cualquier agencia terminaba la llamada (endRoom solo miraba el
+    // rol). Una sala de otra agencia contesta igual que una que no existe.
+    const miAgencia = await agenciaDePersona(admin, userId);
+    const sala = await revisarSala(admin, miAgencia, room);
+    if (!sala.ok) return err(req, sala.error, sala.status);
 
     const lkUrl = Deno.env.get("LIVEKIT_URL")!;
     const lkKey = Deno.env.get("LIVEKIT_API_KEY")!;
@@ -406,6 +416,11 @@ serve(async (req) => {
         .select("id, created_by").eq("livekit_room_name", room).maybeSingle();
       if (!meetRoom) return err(req, "Reunión no encontrada", 404);
       if (meetRoom.created_by === targetUserId) return err(req, "Ya es el anfitrión");
+      // Co-anfitrión solo alguien de la agencia de la reunión (la base también
+      // lo exige: meet_misma_agencia). Un invitado de afuera no tiene cuenta.
+      if (body.isCohost === true && await agenciaDePersona(admin, targetUserId) !== sala.agencia) {
+        return err(req, "Esa persona no es de tu agencia");
+      }
 
       if (body.isCohost === true) {
         const { error: insErr } = await admin.from("meet_room_cohosts")

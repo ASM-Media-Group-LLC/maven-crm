@@ -11,10 +11,13 @@ import { corsFor } from "../_shared/cors.ts";
 // excepciones — es lo que hace viable el disco del VPS) y recién después
 // marca las filas.
 //
-// PERMISOS: start/stop cualquier usuario autenticado que esté en la sala
-// (el frontend solo lo ofrece dentro de la llamada); download/delete se
-// verifican acá contra la MISMA regla del RLS (dueño, destinatario o
-// admin) — el service_role bypassa RLS, así que el chequeo es explícito.
+// PERMISOS (entrega 3c, por agencia): toda acción de usuario mira primero que
+// la sala o la grabación sea de la agencia de quien llama; si no, contesta como
+// si no existiera. start: quien está DE VERDAD en la sala (se le pregunta a
+// LiveKit). stop: quien la inició, quien está en la sala o quien la modera; los
+// destinatarios los elige SOLO quien la inició (antes cualquiera que la parara
+// se agregaba a sí mismo). download/view/syncSizes: lo que el RLS le deja ver a
+// esa persona (se le pregunta con SU sesión), y delete: dueño o admin.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 // ?deps= NO es opcional: sin pinear @bufbuild/protobuf, esm.sh resuelve la
@@ -24,6 +27,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { EgressClient, EgressStatus, EncodedFileOutput, EncodedFileType, RoomServiceClient } from "https://esm.sh/livekit-server-sdk@2.9.2?deps=@bufbuild/protobuf@1.10.0";
 import { buildMessage, SmtpClient } from "../_shared/smtp.ts";
 import { enviarAvisoASala, nombreDeUsuario } from "../_shared/livekit-aviso.ts";
+import {
+  agenciaDeGrabacion, agenciaDePersona, deLaAgencia, destinatariosAlParar, estaEnLaSala, revisarSala, SIN_AGENCIA,
+} from "../_shared/livekit-agencia.ts";
 import { unseal } from "../_shared/mail-crypto.ts";
 import { AwsClient } from "https://esm.sh/aws4fetch@1.0.20";
 
@@ -226,30 +232,28 @@ async function firmarUrl(archivo: string, accion: "d" | "v" | "f" | "stat", vida
   return `${base}/${accion}/${archivo}?exp=${exp}&sig=${sig}`;
 }
 
-/** ¿Puede este usuario tocar esta grabación? La MISMA regla que el RLS,
- *  repetida acá porque el service_role no pasa por RLS. */
+/** ¿Puede este usuario ver (y por eso bajar o reproducir) esta grabación?
+ *
+ *  Se le pregunta al RLS con la sesión de ESA persona (meeting_recordings_select:
+ *  dueño, destinatario, admin o el alcance de Grabaciones): la lista de
+ *  /grabaciones y la descarga dicen lo mismo, sin repetir la regla acá. Antes
+ *  se repetía con service_role mirando el rol 'admin' sin agencia: el admin de
+ *  cualquier agencia bajaba las grabaciones de todas.
+ *
+ *  Y además la agencia, explícita: hasta que se aplique la migración
+ *  20261003120000 el RLS todavía no la mira. */
 // deno-lint-ignore no-explicit-any
-async function puedeVer(admin: any, userId: string, rec: { id: string; started_by: string }): Promise<boolean> {
-  if (rec.started_by === userId) return true;
-  const { data: dest } = await admin
-    .from("meeting_recording_recipients")
-    .select("user_id").eq("recording_id", rec.id).eq("user_id", userId).maybeSingle();
-  if (dest) return true;
-  const { data: rol } = await admin
-    .from("user_roles").select("role").eq("user_id", userId).eq("role", "admin").maybeSingle();
-  if (rol) return true;
-  // "Permisos de datos" de Grabaciones (Administración → Roles): con "todos" ve
-  // cualquier grabación; con "subordinados", las que grabó alguien de nivel
-  // inferior al suyo. Mismas funciones que usa la policy meeting_recordings_select.
-  const { data: global } = await admin.rpc("has_grabaciones_global_scope", { _user_id: userId });
-  if (global === true) return true;
-  const { data: equipo } = await admin.rpc("has_grabaciones_team_scope", { _user_id: userId });
-  if (equipo !== true) return false;
-  const [{ data: mio }, { data: suyo }] = await Promise.all([
-    admin.rpc("actor_level", { _user_id: userId }),
-    admin.rpc("actor_level", { _user_id: rec.started_by }),
-  ]);
-  return Number(suyo ?? 0) < Number(mio ?? 0);
+async function puedeVer(admin: any, comoUsuario: any, miAgencia: string, rec: { id: string }): Promise<boolean> {
+  if (await agenciaDeGrabacion(admin, rec.id) !== miAgencia) return false;
+  const { data } = await comoUsuario.from("meeting_recordings").select("id").eq("id", rec.id).maybeSingle();
+  return !!data;
+}
+
+/** ¿Es esta grabación de mi agencia? (con la migración, su tenant_id; antes,
+ *  la de su sala). Una de otra agencia se contesta como inexistente. */
+// deno-lint-ignore no-explicit-any
+async function esDeMiAgencia(admin: any, miAgencia: string, recordingId: string): Promise<boolean> {
+  return await agenciaDeGrabacion(admin, recordingId) === miAgencia;
 }
 
 Deno.serve(async (req) => {
@@ -355,6 +359,11 @@ Deno.serve(async (req) => {
     const { data: { user } } = await authClient.auth.getUser(authHeader.replace("Bearer ", ""));
     if (!user?.id) return json(req, { error: "Unauthorized" }, 401);
 
+    // Toda acción de usuario es dentro de SU agencia (entrega 3c). Una cuenta
+    // sin agencia (registro público) no graba, no para ni baja nada.
+    const miAgencia = await agenciaDePersona(admin, user.id);
+    if (!miAgencia) return json(req, { error: SIN_AGENCIA }, 403);
+
     // === START ===
     if (action === "start") {
       const { room_name, source, title } = body as {
@@ -362,6 +371,15 @@ Deno.serve(async (req) => {
       };
       if (!room_name) return json(req, { error: "room_name es requerido" }, 400);
       const src = source === "meet" ? "meet" : "cowork";
+
+      // La sala tiene que ser de mi agencia, y yo tengo que estar ADENTRO: antes
+      // cualquier cuenta grababa cualquier sala con solo saber su nombre (y se
+      // quedaba con el archivo, porque quien inicia la recibe siempre).
+      const sala = await revisarSala(admin, miAgencia, room_name);
+      if (!sala.ok) return json(req, { error: sala.error }, sala.status);
+      const gente = await personasEnLaSala(room_name);
+      if (gente === null) return json(req, { error: "No se pudo comprobar que estés en la llamada. Intenta de nuevo." }, 503);
+      if (!estaEnLaSala(gente, user.id)) return json(req, { error: "Tienes que estar en la llamada para grabarla" }, 403);
 
       // Una grabación activa por sala: dos egress componiendo lo mismo es
       // puro gasto y confunde a todos.
@@ -435,6 +453,10 @@ Deno.serve(async (req) => {
       if (!recording_id && !room_name) {
         return json(req, { error: "recording_id o room_name es requerido" }, 400);
       }
+      // Por sala: solo una sala de mi agencia (si no, «no encontrada»).
+      if (!recording_id && !(await revisarSala(admin, miAgencia, room_name)).ok) {
+        return json(req, { error: "grabación no encontrada" }, 404);
+      }
 
       // Por id (quien la inició lo guardó) o por sala: quien NO la inició no
       // conoce el id (el RLS no le deja ver la fila), pero tiene que poder
@@ -447,11 +469,22 @@ Deno.serve(async (req) => {
             .eq("room_name", room_name).eq("status", "recording")
             .is("deleted_at", null).order("started_at", { ascending: false })
             .limit(1).maybeSingle();
-      if (!rec) return json(req, { error: "grabación no encontrada" }, 404);
+      if (!rec || !(await esDeMiAgencia(admin, miAgencia, rec.id))) return json(req, { error: "grabación no encontrada" }, 404);
       // Detener puede cualquiera que esté en la reunión; el frontend solo
       // lo ofrece dentro de la llamada. Restringir al iniciador dejaría
-      // grabaciones eternas si esa persona se cae de la llamada.
+      // grabaciones eternas si esa persona se cae de la llamada. Pero «estar en
+      // la reunión» se comprueba (entrega 3c): quien la inició (se va con la
+      // pestaña: detenerAlSalir), quien está en la sala según LiveKit, o quien
+      // la modera.
       if (rec.status !== "recording") return json(req, { error: "esta grabación ya no está en curso" }, 409);
+      if (rec.started_by !== user.id) {
+        const gente = await personasEnLaSala(rec.room_name);
+        const adentro = gente !== null && estaEnLaSala(gente, user.id);
+        if (!adentro) {
+          const { data: modera } = await admin.rpc("can_moderate_livekit_room", { _user_id: user.id, _room: rec.room_name });
+          if (modera !== true) return json(req, { error: "Tienes que estar en la llamada para detener la grabación" }, 403);
+        }
+      }
 
       await admin.from("meeting_recordings")
         .update({ status: "processing", ended_at: new Date().toISOString() })
@@ -509,8 +542,18 @@ Deno.serve(async (req) => {
         por: { uuid: user.id, nombre: await nombreDeUsuario(admin, user.id) },
       });
 
-      // Destinatarios elegidos al parar + siempre quien la inició.
-      const destinatarios = [...new Set([...(recipients ?? []), rec.started_by])];
+      // Destinatarios elegidos al parar + siempre quien la inició. Los elige SOLO
+      // quien la inició, y solo gente de la agencia (entrega 3c): antes quien la
+      // paraba se agregaba a sí mismo —o a cualquiera, de cualquier agencia— y se
+      // quedaba con una grabación que no era suya.
+      const pedidos = (Array.isArray(recipients) ? recipients : []).filter((u): u is string => typeof u === "string");
+      const { destinatarios, ignorados } = destinatariosAlParar({
+        quienPara: user.id,
+        quienGrabo: rec.started_by,
+        pedidos,
+        deLaAgencia: rec.started_by === user.id ? await deLaAgencia(admin, miAgencia, pedidos) : [],
+      });
+      if (ignorados) console.warn(`[recordings] stop ${rec.id}: ${ignorados} destinatario(s) ignorado(s)`);
       await admin.from("meeting_recording_recipients").upsert(
         destinatarios.map((u) => ({ recording_id: rec.id, user_id: u })),
         { onConflict: "recording_id,user_id" },
@@ -559,7 +602,7 @@ Deno.serve(async (req) => {
         { id: string; started_by: string; egress_id: string; storage_key: string | null;
           room_name: string; title: string | null; started_at: string }
       >) {
-        if (!(await puedeVer(admin, user.id, c))) continue;
+        if (!(await puedeVer(admin, authClient, miAgencia, c))) continue;
         if (await egressActivo(c.egress_id)) continue;
         if (await finalizarHuerfana(admin, c)) cerradas++;
       }
@@ -575,7 +618,7 @@ Deno.serve(async (req) => {
       let actualizadas = 0;
       for (const rec of (pendientes ?? []) as Array<{ id: string; started_by: string; storage_key: string }>) {
         // Solo las que esta persona puede ver: la misma regla que el resto.
-        if (!(await puedeVer(admin, user.id, rec))) continue;
+        if (!(await puedeVer(admin, authClient, miAgencia, rec))) continue;
         try {
           const size = await tamanoDelArchivo(rec.storage_key);
           if (!size) continue;
@@ -596,7 +639,7 @@ Deno.serve(async (req) => {
       if (!rec || rec.deleted_at || rec.status !== "ready" || !rec.storage_key) {
         return json(req, { error: "grabación no disponible" }, 404);
       }
-      if (!(await puedeVer(admin, user.id, rec))) return json(req, { error: "Forbidden" }, 403);
+      if (!(await puedeVer(admin, authClient, miAgencia, rec))) return json(req, { error: "Forbidden" }, 403);
       // 10 minutos: suficiente para arrancar la descarga, inútil si el
       // link se filtra en un chat.
       const urlD = await urlDelArchivo(rec.storage_key, "d", 600);
@@ -618,7 +661,7 @@ Deno.serve(async (req) => {
       if (!rec || rec.deleted_at || rec.status !== "ready" || !rec.storage_key) {
         return json(req, { error: "grabación no disponible" }, 404);
       }
-      if (!(await puedeVer(admin, user.id, rec))) return json(req, { error: "Forbidden" }, 403);
+      if (!(await puedeVer(admin, authClient, miAgencia, rec))) return json(req, { error: "Forbidden" }, 403);
       const urlV = await urlDelArchivo(rec.storage_key, "v", 3 * 3600);
       if (!urlV) return json(req, { error: "El archivo de esta grabación no está disponible" }, 404);
       return json(req, { ok: true, url: urlV });
@@ -636,7 +679,9 @@ Deno.serve(async (req) => {
         .from("meeting_recordings")
         .select("id, started_by, room_name, title, started_at, status, deleted_at")
         .eq("id", recording_id).maybeSingle();
-      if (!rec || rec.deleted_at) return json(req, { error: "grabación no encontrada" }, 404);
+      if (!rec || rec.deleted_at || !(await esDeMiAgencia(admin, miAgencia, rec.id))) {
+        return json(req, { error: "grabación no encontrada" }, 404);
+      }
 
       // Comparte quien la inició, un admin, o cualquiera que la VEA: se lo
       // pregunta al RLS con el cliente del usuario (cubre "me la compartieron"
@@ -660,10 +705,10 @@ Deno.serve(async (req) => {
       if (rec.status !== "ready") return json(req, { error: "solo se comparte una grabación terminada" }, 409);
       // La lista deseada COMPLETA. Quien grabó queda siempre; se agrega lo
       // nuevo, se quita lo que ya no está, y el correo va solo a los nuevos.
+      // Solo gente de la agencia de la grabación (entrega 3c; la base también lo
+      // exige: grabacion_misma_agencia).
       const deseados = new Set(
-        (Array.isArray(user_ids) ? user_ids : [])
-          .filter((u): u is string => typeof u === "string" && /^[0-9a-f-]{36}$/i.test(u))
-          .slice(0, 100),
+        await deLaAgencia(admin, miAgencia, (Array.isArray(user_ids) ? user_ids : []).slice(0, 100)),
       );
       deseados.add(rec.started_by);
       const agregar = [...deseados].filter((u) => !actuales.includes(u));
@@ -690,9 +735,12 @@ Deno.serve(async (req) => {
         .from("meeting_recordings")
         .select("id, started_by, storage_key, deleted_at")
         .eq("id", recording_id).maybeSingle();
-      if (!rec || rec.deleted_at) return json(req, { error: "grabación no encontrada" }, 404);
+      if (!rec || rec.deleted_at || !(await esDeMiAgencia(admin, miAgencia, rec.id))) {
+        return json(req, { error: "grabación no encontrada" }, 404);
+      }
 
-      // Borrar solo quien la inició o un admin (la regla del RLS de UPDATE).
+      // Borrar solo quien la inició o un admin (la regla del RLS de UPDATE), de
+      // su agencia: la grabación ya se comprobó arriba.
       const { data: rol } = await admin
         .from("user_roles").select("role").eq("user_id", user.id).eq("role", "admin").maybeSingle();
       if (rec.started_by !== user.id && !rol) return json(req, { error: "Forbidden" }, 403);
