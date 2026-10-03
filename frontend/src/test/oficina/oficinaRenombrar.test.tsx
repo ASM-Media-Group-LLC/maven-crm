@@ -312,3 +312,23 @@ describe("un archivo del Drive abierto en la Oficina", () => {
     expect(screen.queryByRole("button", { name: "Balance.xlsx" })).not.toBeInTheDocument();
   });
 });
+
+// Jhon, 03/10: «el nombre del documento siempre sale en dos renglones», hasta
+// «Sin título». El botón corre su borde 6 px a cada lado (-mx-1.5) para que el
+// texto quede alineado con «Versión N»; el título mide el texto MENOS esos 12 px
+// y `max-w-full` dejaba el botón 12 px más angosto que su texto. El tope tiene
+// que sumar los márgenes. jsdom no mide, así que se cuida la clase.
+describe("el nombre de arriba entra en un renglón", () => {
+  it("el botón y el cuadro de texto topan en 100 % + los 12 px de sus márgenes negativos", async () => {
+    const { default: NombreEditable } = await import("@/components/oficina/NombreEditable");
+    render(<NombreEditable valor="Sin título" editable etiqueta="Cambiar nombre" onGuardar={async () => {}} />);
+    const boton = screen.getByRole("button", { name: "Sin título" });
+    expect(boton.className).toContain("-mx-1.5");
+    expect(boton.className).toContain("max-w-[calc(100%+0.75rem)]");
+    expect(boton.className).not.toMatch(/(^|\s)max-w-full(\s|$)/);
+    fireEvent.click(boton);
+    const campo = screen.getByRole("textbox", { name: "Cambiar nombre" });
+    expect(campo.className).toContain("max-w-[calc(100%+0.75rem)]");
+    expect(campo.className).not.toMatch(/(^|\s)max-w-full(\s|$)/);
+  });
+});
