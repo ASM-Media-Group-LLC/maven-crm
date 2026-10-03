@@ -77,6 +77,8 @@ async function llamar<T>(action: string, cuerpo: Record<string, unknown>): Promi
   if ((data as { error?: string })?.error) throw new Error((data as { error: string }).error);
   return data as T;
 }
+/** Lo mismo para los hooks de otros archivos (versiones). */
+export const llamarDrive = llamar;
 
 /** Lo que se ve en una vista: el contenido de una carpeta, lo compartido, lo
  *  reciente o la papelera. */
@@ -259,6 +261,8 @@ function useInvalidar() {
     // Y lo que ocupan las carpetas (subir, mover, tirar o restaurar).
     qc.invalidateQueries({ queryKey: ["drive-tamanos"] });
     qc.invalidateQueries({ queryKey: ["drive-tamano"] });
+    // Y las versiones (restaurar una agrega otra).
+    qc.invalidateQueries({ queryKey: ["drive-versiones"] });
   };
 }
 /** Lo mismo para los hooks de hooks/useDriveVarios.ts (mover y bajar varios). */

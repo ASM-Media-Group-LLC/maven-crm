@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { format } from "date-fns";
 import {
   Building2, ChevronRight, Clock, Download, File, FileArchive, FileImage, FileSpreadsheet, FileText, FileVideo,
-  Folder, FolderInput, FolderPlus, HardDrive, Info, Loader2, MoreVertical, Pencil, Plus, RotateCcw, Share2, Trash2,
+  Folder, FolderInput, FolderPlus, HardDrive, History, Info, Loader2, MoreVertical, Pencil, Plus, RotateCcw, Share2, Trash2,
   Upload, Users, X, AlertTriangle, Check,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -44,9 +44,12 @@ import { soloUnClic } from "@/pages/oficina/drive/gestos";
 import BarraDeSeleccion, { type AccionesDeSeleccion } from "@/pages/oficina/drive/BarraDeSeleccion";
 import DriveMoverDialog, { type LugarMover } from "@/components/oficina/DriveMoverDialog";
 import {
-  ErrorDelZip, mandarAlNas, pedirZip, useDeshacerMover, useMoverDrive, usePapeleraVarias, useUnidadesDrive,
-  type ResultadoMover,
+  useDeshacerMover, useMoverDrive, usePapeleraVarias, useUnidadesDrive, type ResultadoMover,
 } from "@/hooks/useDriveVarios";
+import { useDescargasZip } from "@/hooks/useDescargasZip";
+import PanelDeDescargas from "@/pages/oficina/drive/PanelDeDescargas";
+import { useAvisoDeEspacio } from "@/components/oficina/DriveAvisoEspacio";
+import DriveVersionesDialog from "@/components/oficina/DriveVersionesDialog";
 import {
   alternarTodas, clicDeSeleccion, motivoDelError, MOTIVOS_MOVER, SIN_SELECCION, type EstadoSeleccion,
 } from "@/lib/drive/seleccion";
@@ -246,7 +249,10 @@ export default function DrivePage() {
   const papeleraVarias = usePapeleraVarias();
   const [moviendo, setMoviendo] = useState<DriveItem[] | null>(null);
   const [borrandoVarios, setBorrandoVarios] = useState<DriveItem[] | null>(null);
-  const [preparandoZip, setPreparandoZip] = useState(false);
+  const { descargas, bajar: bajarZip, cancelar: cancelarDescarga, elegirDonde, limpiar: limpiarDescargas } = useDescargasZip();
+  const preparandoZip = descargas.some((d) => d.estado === "preparando");
+  /** El archivo cuyas versiones se están mirando («Administrar versiones»). */
+  const [versionesDe, setVersionesDe] = useState<DriveItem | null>(null);
   // Una unidad compartida no se mueve (como en Google): es el principio de su ruta.
   const sePuedeMover = (i: DriveItem) => !enPapelera && i.estado === "listo" && !unidades.data?.has(i.id);
 
@@ -284,6 +290,10 @@ export default function DrivePage() {
     onSuccess: (r) => avisarMovido(r, de, nombreDestino),
     onError: (e) => toast.error(t("drive.mover.error", { motivo: t(MOTIVOS_MOVER[motivoDelError(e)]) })),
   });
+
+  // El aviso de cuando lo que se mueve cambia de espacio (Mi unidad ↔ unidad
+  // compartida): ver components/oficina/DriveAvisoEspacio.tsx.
+  const espacio = useAvisoDeEspacio();
 
   // Dónde arranca «Mover a…»: donde se está mirando (si es un lugar del selector).
   const inicioMover = (): LugarMover => (vista === "mia" || vista === "unidades" || vista === "compartido"
@@ -327,38 +337,31 @@ export default function DrivePage() {
         e.stopPropagation();
         const de = acepta() ? arrastre.current : null;
         terminarArrastre();
-        if (de) moverA(de, destino, nombre);
+        // Si cambia de qué espacio se descuenta, primero el aviso (como en Google).
+        if (de) void espacio.confirmar(de, destino, nombre).then((seguir) => { if (seguir) moverA(de, destino, nombre); });
       },
     };
   };
 
   // ── Descargar lo elegido ───────────────────────────────────────────────────
   // Un archivo solo, como siempre. Varios (o una carpeta): UN .zip que arma el
-  // NAS mientras baja (infra/nas-drive/zip.mjs).
+  // NAS mientras baja (infra/nas-drive/zip.mjs), con su avance y «Cancelar» en
+  // el panel de descargas (hooks/useDescargasZip.ts).
   const bajar = async (de: DriveItem[]) => {
     const listos = de.filter((i) => i.estado === "listo");
     if (listos.length === 1 && listos[0].tipo === "archivo") {
       return abrirArchivo(listos[0].id, true).catch((e) => toast.error((e as Error).message));
     }
     if (!listos.length) return;
-    const aviso = toast.loading(t("drive.zip.preparando"));
-    setPreparandoZip(true);
-    try {
-      const permiso = await pedirZip(listos.map((i) => i.id));
-      mandarAlNas(permiso.url, permiso.t, () => toast.error(t("drive.zip.errorNas")));
-      toast.success(t("drive.zip.empezo", { n: permiso.archivos }), { id: aviso });
-    } catch (e) {
-      const z = e instanceof ErrorDelZip ? e : null;
-      toast.error(
-        z?.codigo === "zip_demasiados" ? t("drive.zip.demasiados", { n: z.tope ?? "" })
-          : z?.codigo === "zip_muy_grande" ? t("drive.zip.muyGrande", { tope: tamano(z.tope ?? null) })
-            : z?.codigo === "zip_vacio" ? t("drive.zip.vacio")
-              : `${t("drive.zip.error")}: ${(e as Error).message}`,
-        { id: aviso },
-      );
-    } finally {
-      setPreparandoZip(false);
-    }
+    const z = await bajarZip(listos.map((i) => i.id));
+    if (!z) return;
+    // La edge no lo dejó armar: se dice por qué, en el idioma de la persona.
+    toast.error(
+      z.codigo === "zip_demasiados" ? t("drive.zip.demasiados", { n: z.tope ?? "" })
+        : z.codigo === "zip_muy_grande" ? t("drive.zip.muyGrande", { tope: tamano(z.tope ?? null) })
+          : z.codigo === "zip_vacio" ? t("drive.zip.vacio")
+            : `${t("drive.zip.error")}: ${z.message}`,
+    );
   };
 
   // ── La papelera (una o varias) ─────────────────────────────────────────────
@@ -485,6 +488,12 @@ export default function DrivePage() {
             <DropdownMenuItem onSelect={() => verDetalles(i)}>
               <Info className="mr-2 h-4 w-4" />{t("drive.detalles.boton")}
             </DropdownMenuItem>
+            {/* Como «Administrar versiones» de Google: las de lo editado en la Oficina. */}
+            {i.tipo === "archivo" && !incompleta && (
+              <DropdownMenuItem onSelect={() => setVersionesDe(i)}>
+                <History className="mr-2 h-4 w-4" />{t("drive.versiones.boton")}
+              </DropdownMenuItem>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={() => papeleraDe([i], true, false)}>
               <Trash2 className="mr-2 h-4 w-4" />{t("drive.accion.papelera")}
@@ -654,6 +663,7 @@ export default function DrivePage() {
     tamanoDe,
     icono: iconoDe,
     onIrA: (v: VistaDrive, c: string) => { setDetalleDe(null); ir(v, c); },
+    onVersiones: enPapelera ? undefined : (i: DriveItem) => setVersionesDe(i),
   };
 
   return (
@@ -999,7 +1009,27 @@ export default function DrivePage() {
         )}
       </AlertDialog>
 
-      {subidas.length > 0 && <PanelDeSubidas subidas={subidas} onCerrar={limpiar} />}
+      {/* Abajo a la derecha, como en Google Drive: las descargas en .zip y las
+          subidas, una arriba de la otra.
+          ⚠️ No pegado al borde: ahí viven los botones flotantes del Messenger
+          y del asistente, y el panel quedaba debajo de ellos (visto en prod el
+          28/09). En el teléfono va encima de esos botones; en pantallas
+          grandes, a su izquierda. */}
+      {(subidas.length > 0 || descargas.length > 0) && (
+        <div className="fixed bottom-36 right-4 z-50 flex w-[min(22rem,calc(100vw-2rem))] flex-col gap-2 sm:bottom-4 sm:right-20">
+          {descargas.length > 0 && (
+            <PanelDeDescargas
+              descargas={descargas}
+              onCancelar={cancelarDescarga}
+              onElegirDonde={elegirDonde}
+              onCerrar={limpiarDescargas}
+            />
+          )}
+          {subidas.length > 0 && <PanelDeSubidas subidas={subidas} onCerrar={limpiar} />}
+        </div>
+      )}
+      {versionesDe && <DriveVersionesDialog item={versionesDe} nombreDe={nombreDe} onCerrar={() => setVersionesDe(null)} />}
+      {espacio.dialogo}
       {viendoCupos && <CuposDialog onCerrar={() => setViendoCupos(false)} />}
       <VisorArchivo items={ordenados} abierto={viendo} onAbierto={setViendo} />
     </Page>
@@ -1012,11 +1042,9 @@ function PanelDeSubidas({ subidas, onCerrar }: { subidas: ReturnType<typeof useS
   const { t } = useLanguage();
   const pendientes = subidas.filter((s) => s.estado === "subiendo").length;
   return (
-    // ⚠️ No abajo a la derecha pegado al borde: ahí viven los botones flotantes
-    // del Messenger y del asistente, y el panel quedaba debajo de ellos
-    // (visto en prod el 28/09). En el teléfono va encima de esos botones; en
-    // pantallas grandes, a su izquierda.
-    <div className="fixed bottom-36 right-4 z-50 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-panel border border-border bg-card shadow-xl sm:bottom-4 sm:right-20">
+    // Dónde va (abajo a la derecha, sin tapar los botones flotantes) lo decide
+    // la página, junto con el de las descargas.
+    <div className="overflow-hidden rounded-panel border border-border bg-card shadow-xl">
       <div className="flex items-center justify-between bg-muted/60 px-4 py-2 text-sm font-medium">
         {pendientes ? t("drive.subiendo", { n: pendientes }) : t("drive.subidas.titulo")}
         <button type="button" onClick={onCerrar} disabled={pendientes > 0} aria-label={t("drive.subidas.cerrar")} className="rounded-full p-1 hover:bg-muted disabled:opacity-40">

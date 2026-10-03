@@ -16,6 +16,7 @@ import {
   crearCarpetaEn, puedeGuardar, useMoverDrive, useRolesDrive, useSubcarpetasDrive, type ResultadoMover,
 } from "@/hooks/useDriveVarios";
 import { MOTIVOS_MOVER, motivoDelError } from "@/lib/drive/seleccion";
+import { useAvisoDeEspacio } from "@/components/oficina/DriveAvisoEspacio";
 
 export type RaizMover = "mia" | "unidades" | "compartido";
 export interface LugarMover { raiz: RaizMover; ruta: { id: string; nombre: string }[] }
@@ -88,10 +89,19 @@ export default function DriveMoverDialog({
           : null;
   const nombreDestino = actual?.nombre ?? t("drive.vista.mia");
 
-  const moverAqui = () => mover.mutate({ items, destino }, {
-    onSuccess: (r) => { onMovido(r, nombreDestino); onCerrar(); },
-    onError: (e) => toast.error(t("drive.mover.error", { motivo: t(MOTIVOS_MOVER[motivoDelError(e)]) })),
-  });
+  // Si cambia de qué espacio se descuenta (Mi unidad ↔ unidad compartida),
+  // primero el aviso, como en Google.
+  const espacio = useAvisoDeEspacio();
+  const [revisando, setRevisando] = useState(false);
+  const moverAqui = async () => {
+    setRevisando(true);
+    const seguir = await espacio.confirmar(items, destino, nombreDestino).finally(() => setRevisando(false));
+    if (!seguir) return;
+    mover.mutate({ items, destino }, {
+      onSuccess: (r) => { onMovido(r, nombreDestino); onCerrar(); },
+      onError: (e) => toast.error(t("drive.mover.error", { motivo: t(MOTIVOS_MOVER[motivoDelError(e)]) })),
+    });
+  };
 
   const crearCarpeta = async (nombre: string) => {
     setGuardandoCarpeta(true);
@@ -214,12 +224,13 @@ export default function DriveMoverDialog({
           </Button>
           <div className="flex items-center gap-2">
             <Button type="button" variant="ghost" onClick={onCerrar}>{t("drive.cancelar")}</Button>
-            <Button type="button" onClick={moverAqui} disabled={!sePuedeGuardar || yaEstan || mover.isPending}>
-              {mover.isPending && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+            <Button type="button" onClick={() => void moverAqui()} disabled={!sePuedeGuardar || yaEstan || mover.isPending || revisando}>
+              {(mover.isPending || revisando) && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
               {t("drive.mover.aqui")}
             </Button>
           </div>
         </DialogFooter>
+        {espacio.dialogo}
       </DialogContent>
     </Dialog>
   );

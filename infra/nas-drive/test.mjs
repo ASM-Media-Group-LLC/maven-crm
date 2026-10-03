@@ -11,7 +11,7 @@ import { pipeline } from "node:stream/promises";
 import zlib from "node:zlib";
 import { crearServidor, MAX_ENTRADAS_ZIP, MAX_PERMISO_ZIP, MAX_POR_PEDIDO, rutaDelZipValida } from "./server.mjs";
 import { firmar, verificar } from "./firma.mjs";
-import { armarZip, cabeceraLocal, crc32, crc32Js, descriptor, entradaCentral, LIMITE_32, necesitaZip64 } from "./zip.mjs";
+import { armarZip, cabeceraLocal, cierre, crc32, crc32Js, descriptor, entradaCentral, LIMITE_32, necesitaZip64, tamanoDelZip } from "./zip.mjs";
 import { crearCola, rutaEnCache } from "./miniaturas.mjs";
 
 const SECRETO = "s".repeat(40);
@@ -280,9 +280,11 @@ test("zip: tres archivos y una carpeta vacía; unzip -t lo da por bueno y los by
   });
   assert.equal(r.status, 200);
   assert.equal(r.headers.get("content-type"), "application/zip");
-  assert.equal(r.headers.get("content-length"), null, "se arma mientras baja: sin Content-Length");
   assert.match(r.headers.get("content-disposition"), /^attachment; filename="Maven-2026-10-02\.zip"; filename\*=UTF-8''Maven-2026-10-02\.zip$/);
-  const { carpeta, destino, salida } = await probarConUnzip(Buffer.from(await r.arrayBuffer()));
+  const cuerpo = Buffer.from(await r.arrayBuffer());
+  // Se arma mientras baja, pero el largo se sabe antes: el navegador muestra el avance.
+  assert.equal(Number(r.headers.get("content-length")), cuerpo.length, "Content-Length exacto");
+  const { carpeta, destino, salida } = await probarConUnzip(cuerpo);
   assert.match(salida, /No errors detected/);
   assert.ok((await fs.readFile(path.join(destino, "Contabilidad", "Año 2026", "datos.bin"))).equals(a));
   assert.ok((await fs.readFile(path.join(destino, "Contabilidad", "Balance.txt"))).equals(b));
@@ -315,6 +317,44 @@ test("zip: ⚠️ ZIP64 (lo que usa un archivo de más de 4 GB) también lo lee 
     assert.ok((await fs.readFile(path.join(otro, "Videos", "parte 0.bin"))).equals(datos[0]));
   }
   await fs.rm(carpeta, { recursive: true, force: true });
+});
+
+test("zip: el largo (Content-Length) se sabe antes de mandar un byte y es exactamente lo que sale", async () => {
+  const fecha = new Date("2026-10-03T12:00:00Z");
+  const juntar = async (entradas, opciones) => {
+    const pedazos = [];
+    for await (const p of armarZip(entradas, opciones)) pedazos.push(p);
+    return Buffer.concat(pedazos).length;
+  };
+  const archivo = (nombre, d) => ({ nombre, size: d.length, fecha, abrir: async function* () { if (d.length) yield d; } });
+  const casos = [
+    [],
+    [{ nombre: "Vacía/", carpeta: true, fecha }],
+    [archivo("vacío.txt", Buffer.alloc(0))],
+    [
+      { nombre: "Contabilidad/", carpeta: true, fecha },
+      { nombre: "Contabilidad/Año 2026/", carpeta: true, fecha },
+      archivo("Contabilidad/Año 2026/datos.bin", Buffer.alloc(70_000, 3)),
+      archivo("Contabilidad/Balance — ñandú.txt", Buffer.from("Balance — año 2026\n", "utf8")),
+      archivo("No se pudieron incluir.txt", Buffer.from("No se encontraron en el NAS:\n\nFotos/x.jpg\n")),
+    ],
+  ];
+  for (const entradas of casos) {
+    for (const forzarZip64 of [false, true]) {
+      assert.equal(tamanoDelZip(entradas, { forzarZip64 }), await juntar(entradas, { forzarZip64 }), `${entradas.length} entradas, ZIP64 ${forzarZip64}`);
+    }
+  }
+  // Más de 65.535 entradas: el cierre pasa a ZIP64 solo.
+  const muchas = Array.from({ length: 70_000 }, (_, i) => archivo(`f${i}.txt`, Buffer.alloc(0)));
+  assert.equal(tamanoDelZip(muchas), await juntar(muchas), "70.000 entradas");
+  // Un archivo de más de 4 GB (sin escribirlo): las mismas piezas que armarZip.
+  const enorme = { nombre: "video.mov", size: 5 * 1024 ** 3, fecha };
+  const cab = cabeceraLocal({ nombre: enorme.nombre, fecha, zip64: true }).length;
+  const desc = descriptor({ crc: 0, size: enorme.size, zip64: true }).length;
+  const central = entradaCentral({ nombre: enorme.nombre, fecha, size: enorme.size, desde: 0, zip64Local: true }).length;
+  const fin = cierre({ entradas: 1, inicioCentral: cab + enorme.size + desc, tamanoCentral: central }).length;
+  assert.equal(fin, 22 + 56 + 20, "el directorio central empieza pasados los 4 GB: cierre ZIP64");
+  assert.equal(tamanoDelZip([enorme]), cab + enorme.size + desc + central + fin, "5 GB: cabecera ZIP64, descriptor de 8 bytes");
 });
 
 test("zip: ZIP64 se pide por tamaño o por lugar, justo en el límite de 4 GB", () => {
@@ -374,7 +414,9 @@ test("zip: un archivo que falta en el disco no corta el .zip: va una nota con cu
   const k = await subir(Buffer.from("está"));
   const r = await pedirZip({ n: "x.zip", l: [{ k, n: "esta.txt" }, { k: clave(), n: "Fotos/perdida.jpg" }] });
   assert.equal(r.status, 200);
-  const { carpeta, destino } = await probarConUnzip(Buffer.from(await r.arrayBuffer()));
+  const cuerpo = Buffer.from(await r.arrayBuffer());
+  assert.equal(Number(r.headers.get("content-length")), cuerpo.length, "el largo cuenta también la nota");
+  const { carpeta, destino } = await probarConUnzip(cuerpo);
   assert.equal(await fs.readFile(path.join(destino, "esta.txt"), "utf8"), "está");
   assert.match(await fs.readFile(path.join(destino, "No se pudieron incluir.txt"), "utf8"), /Fotos\/perdida\.jpg/);
   await fs.rm(carpeta, { recursive: true, force: true });

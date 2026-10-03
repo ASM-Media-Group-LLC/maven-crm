@@ -114,6 +114,9 @@ export interface ArchivoDelDrive {
   nombre: string;
   sha256: string | null;
   updated_at: string;
+  /** Si el contenido de hoy es una versión vieja RESTAURADA («Administrar
+   *  versiones»), cuándo se restauró (ver claveDeDrive). */
+  restaurada_at?: string | null;
 }
 
 /** La `key` del documento para ONLYOFFICE.
@@ -123,13 +126,30 @@ export interface ArchivoDelDrive {
  *  vez crea otra ficha), pero la llave lleva igual la huella —o, en lo
  *  importado de Google, que no la tiene, la fecha de modificación— para que un
  *  reemplazo futuro no herede la caché. Solo letras, números y `-`: es lo que
- *  ONLYOFFICE acepta, y el tope es de 128. */
+ *  ONLYOFFICE acepta, y el tope es de 128.
+ *
+ *  ⚠️ RESTAURAR una versión vieja (edge `drive`, restaurar_version) vuelve a
+ *  poner su archivo, con su MISMA huella: la llave sería la misma que tuvo esa
+ *  versión, que ONLYOFFICE ya usó (y guardó: abriría lo que quedó de aquella
+ *  sesión, o diría que «la versión cambió»). Por eso, si el contenido de hoy
+ *  es una restauración, la llave lleva además cuándo se restauró. Lo que nunca
+ *  se restauró conserva la llave de siempre. */
 export function claveDeDrive(a: ArchivoDelDrive): string {
   const ms = Date.parse(a.updated_at);
   const version = a.sha256 && /^[0-9a-f]{64}$/.test(a.sha256)
     ? a.sha256.slice(0, 20)
     : (Number.isFinite(ms) ? ms : 0).toString(36);
-  return `drv-${a.id}-${version}`.replace(/[^0-9A-Za-z._=-]/g, "").slice(0, 128);
+  const restaurada = a.restaurada_at ? Date.parse(a.restaurada_at) : NaN;
+  const marca = Number.isFinite(restaurada) ? `-r${restaurada.toString(36)}` : "";
+  return `drv-${a.id}-${version}${marca}`.replace(/[^0-9A-Za-z._=-]/g, "").slice(0, 128);
+}
+
+/** Cuándo se restauró el contenido de hoy, si es una versión vieja vuelta a
+ *  poner: las filas de drive_versiones con el MISMO archivo que la ficha
+ *  (de la más nueva a la más vieja). Un archivo aparece una vez por guardado;
+ *  dos o más veces = se restauró, y la más nueva es la restauración. */
+export function restauradaEl(filasConElMismoArchivo: { created_at: string }[]): string | null {
+  return filasConElMismoArchivo.length >= 2 ? filasConElMismoArchivo[0].created_at : null;
 }
 
 /** La configuración (sin firmar) para VER un archivo del Drive en ONLYOFFICE.
