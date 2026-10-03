@@ -31,13 +31,19 @@ export const DIAS_PARA_ARCHIVAR = 7;
  * @param {boolean}  p.etiquetadosEnRecibidos  algún mensaje etiquetado del hilo sigue en Recibidos
  * @param {string|null} p.fecha           fecha del mensaje nuevo (ISO)
  * @param {number}   p.ahora
+ * @param {boolean}  [p.otraCopiaArchivada]  otra copia del MISMO correo (mismo
+ *   Message-ID) se acaba de archivar por herencia en esta casilla
  * @returns {{ etiquetas: string[], archivar: boolean }}
  */
-export function decidirHerencia({ etiquetasDelHilo, yaTieneEtiquetas, etiquetadosEnRecibidos, fecha, ahora }) {
+export function decidirHerencia({ etiquetasDelHilo, yaTieneEtiquetas, etiquetadosEnRecibidos, fecha, ahora, otraCopiaArchivada = false }) {
   const nada = { etiquetas: [], archivar: false };
   // Si ya tiene etiquetas, alguien ya lo ordenó (o ya se heredó y la persona lo
   // devolvió a Recibidos a propósito): no se toca, ni se vuelve a archivar.
-  if (yaTieneEtiquetas) return nada;
+  // SALVO que sea la SEGUNDA COPIA de un correo que acaba de heredar: Zoho a
+  // veces entrega dos (mismo Message-ID: llega directo y por una lista). Las
+  // etiquetas van por Message-ID, así que la segunda ya «las tiene» y se
+  // quedaba sola en Recibidos (Keila, 02/10: uid 54 archivado, uid 55 no).
+  if (yaTieneEtiquetas) return otraCopiaArchivada ? { etiquetas: [], archivar: true } : nada;
   const etiquetas = [...new Set((etiquetasDelHilo ?? []).filter(Boolean))];
   if (!etiquetas.length) return nada;
   const t = Date.parse(fecha ?? "");
