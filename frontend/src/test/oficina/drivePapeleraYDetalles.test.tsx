@@ -448,3 +448,61 @@ describe("el panel de Detalles (ⓘ)", () => {
     }
   });
 });
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Jhon, 03/10: «se tarda bastante en mostrarme el tamaño». Dos causas en la
+// pantalla: de a 100 por llamada, TODAS esperaban a la carpeta más pesada; y
+// nada se recordaba entre visitas.
+describe("el tamaño de las carpetas, sin esperar", () => {
+  it("con muchas carpetas: tandas de 8, todas a la vez (no una de 100)", async () => {
+    const muchas = Array.from({ length: 20 }, (_, n) => carpeta(`k${n}`, `Carpeta ${String(n).padStart(2, "0")}`));
+    respuestas.tabla = base({ mia: muchas });
+    dibujar();
+    await waitFor(() => expect(llamadas.filter((l) => l.fn === "drive_tamanos")).toHaveLength(3));
+    const tandas = llamadas.filter((l) => l.fn === "drive_tamanos").map((l) => (l.args.p_ids as string[]).length);
+    expect(tandas).toEqual([8, 8, 4]);
+  });
+
+  it("lo último conocido se ve al instante; cuando la base termina de contar, se reemplaza", async () => {
+    const { recordarTamanos } = await import("@/lib/drive/tamanosRecordados");
+    recordarTamanos("yo", new Map([["c1", { bytes: 7 * 1024 * 1024, archivos: 30, carpetas: 3, completo: true }]]));
+    let soltar: () => void = () => {};
+    const antes = respuestas.rpc;
+    respuestas.rpc = (fn, args) => (fn === "drive_tamanos"
+      ? new Promise((ok) => { soltar = () => ok(antes(fn, args)); }) as never
+      : antes(fn, args));
+    dibujar();
+    // Mientras cuenta: la de antes (sin rayita) y, la que nunca se contó, la rayita.
+    await waitFor(() => expect(within(fila("Contabilidad")).getAllByText("7.0 MB").length).toBeGreaterThan(0));
+    expect(within(fila("Contabilidad")).queryAllByRole("status", { name: "Calculando el tamaño…" })).toHaveLength(0);
+    expect(within(fila("Shootings")).getAllByRole("status", { name: "Calculando el tamaño…" }).length).toBeGreaterThan(0);
+    await act(async () => { soltar(); });
+    await waitFor(() => expect(within(fila("Contabilidad")).getAllByText("3.0 MB").length).toBeGreaterThan(0));
+    expect(within(fila("Shootings")).getAllByText("0 B").length).toBeGreaterThan(0);
+  });
+
+  it("lo recordado es de cada persona, tiene tope y sin localStorage no rompe nada", async () => {
+    const { recordarTamanos, tamanosRecordados, MAXIMO_RECORDADOS } = await import("@/lib/drive/tamanosRecordados");
+    const s = { bytes: 1, archivos: 1, carpetas: 0, completo: false };
+    recordarTamanos("ana", new Map([["x", s]]));
+    expect(tamanosRecordados("ana").get("x")).toEqual(s);
+    expect(tamanosRecordados("beto").size).toBe(0);
+    expect(tamanosRecordados(undefined).size).toBe(0);
+
+    const muchos = new Map(Array.from({ length: MAXIMO_RECORDADOS + 50 }, (_, n) => [`id${n}`, s] as const));
+    recordarTamanos("ana", muchos);
+    expect(tamanosRecordados("ana").size).toBe(MAXIMO_RECORDADOS);
+
+    // Incógnito / cookies bloqueadas: localStorage LANZA al tocarlo.
+    vi.stubGlobal("localStorage", {
+      getItem: () => { throw new Error("SecurityError"); },
+      setItem: () => { throw new Error("QuotaExceededError"); },
+    });
+    try {
+      expect(tamanosRecordados("ana").size).toBe(0);
+      expect(() => recordarTamanos("ana", new Map([["y", s]]))).not.toThrow();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});

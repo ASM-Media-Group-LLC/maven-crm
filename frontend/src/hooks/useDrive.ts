@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { describeFunctionError } from "@/hooks/useMailConnection";
 import { fetchAllRows } from "@/lib/supabasePaginate";
+import { recordarTamanos, tamanosRecordados } from "@/lib/drive/tamanosRecordados";
 
 // Drive de Oficina. Las FICHAS (nombre, carpeta, dueño) se leen directo de la
 // base con la RLS de drive_items; el CONTENIDO va y viene del NAS por la puerta de Dokploy (Tailscale)
@@ -392,24 +393,34 @@ const aTamano = (f: FilaTamano): TamanoDeCarpeta => ({
   bytes: Number(f.bytes) || 0, archivos: Number(f.archivos) || 0, carpetas: Number(f.carpetas) || 0, completo: f.completo !== false,
 });
 
-/** Una carpeta, para los Detalles (drive_tamano_carpeta: error si no la veo). */
+/** Una carpeta, para los Detalles (drive_tamano_carpeta: error si no la veo).
+ *  Mientras cuenta, muestra el último tamaño conocido (ver tamanosRecordados). */
 export function useTamanoCarpeta(id: string | null, habilitado = true) {
+  const { user } = useAuth();
   return useQuery({
     queryKey: ["drive-tamano", id],
     enabled: !!id && habilitado,
     staleTime: 5 * 60_000,
+    placeholderData: () => (id ? tamanosRecordados(user?.id).get(id) : undefined),
     queryFn: async (): Promise<TamanoDeCarpeta> => {
       const { data, error } = await supabase.rpc("drive_tamano_carpeta" as never, { p_item: id } as never);
       if (error) throw error;
       const f = primera<FilaTamano>(data);
       if (!f) throw new Error(SIN_PERMISO_DRIVE);
-      return aTamano(f);
+      const t = aTamano(f);
+      if (id) recordarTamanos(user?.id, new Map([[id, t]]));
+      return t;
     },
   });
 }
 
 /** De a cuántas carpetas por llamada (el tope de drive_tamanos). */
 export const TANDA_TAMANOS = 100;
+
+/** De a cuántas las pide la lista. Tandas CHICAS y en paralelo: una tanda se ve
+ *  recién cuando termina su carpeta más pesada (KASH sola tarda ~2 s), así que
+ *  de a 100 todas esperaban a la peor. De a 8, la pesada solo frena a 7. */
+export const TANDA_EN_PANTALLA = 8;
 
 /** Pide los tamaños de una tanda. La función deja de empezar carpetas nuevas a
  *  los ~3 s y devuelve las que alcanzó: las que faltan se piden de nuevo. Si
@@ -442,26 +453,34 @@ export type EstadoDeTamano =
   | { estado: "sinDato" };
 
 /** El tamaño de las carpetas que se están dibujando (la columna «Tamaño» y las
- *  tarjetas), de a tandas de 100: una llamada por tanda, no una por carpeta.
- *  Las tandas se arman en el orden de la lista, así que al bajar y dibujar más
- *  las de arriba no se vuelven a pedir. react-query guarda cada tanda 5 min;
- *  subir, mover o tirar algo las vuelve a pedir (useInvalidar). */
+ *  tarjetas), de a tandas de TANDA_EN_PANTALLA, todas a la vez: una llamada por
+ *  tanda, no una por carpeta. Las tandas se arman en el orden de la lista, así
+ *  que al bajar y dibujar más las de arriba no se vuelven a pedir.
+ *  react-query guarda cada tanda 5 min; subir, mover o tirar algo las vuelve a
+ *  pedir (useInvalidar). Mientras una tanda cuenta, se muestra el último tamaño
+ *  conocido de cada carpeta (tamanosRecordados) en vez de la rayita. */
 export function useTamanosDeCarpetas(ids: readonly string[]): (id: string) => EstadoDeTamano {
   const { user } = useAuth();
   const clave = ids.join(",");
   const tandas = useMemo(() => {
     const lista = clave ? clave.split(",") : [];
     const salida: string[][] = [];
-    for (let i = 0; i < lista.length; i += TANDA_TAMANOS) salida.push(lista.slice(i, i + TANDA_TAMANOS));
+    for (let i = 0; i < lista.length; i += TANDA_EN_PANTALLA) salida.push(lista.slice(i, i + TANDA_EN_PANTALLA));
     return salida;
   }, [clave]);
+  // Se relee al cambiar de carpeta: así entra lo que se contó en esta misma sesión.
+  const recordados = useMemo(() => tamanosRecordados(user?.id), [user?.id, clave]);
   const resultados = useQueries({
     queries: tandas.map((tanda) => ({
       queryKey: ["drive-tamanos", user?.id, tanda.join(",")],
       enabled: !!user,
       staleTime: 5 * 60_000,
       retry: 1,
-      queryFn: () => pedirTamanos(tanda),
+      queryFn: async () => {
+        const listos = await pedirTamanos(tanda);
+        recordarTamanos(user?.id, listos);
+        return listos;
+      },
     })),
   });
   const enQueTanda = useMemo(() => {
@@ -472,8 +491,11 @@ export function useTamanosDeCarpetas(ids: readonly string[]): (id: string) => Es
   return (id: string): EstadoDeTamano => {
     const n = enQueTanda.get(id);
     const r = n === undefined ? undefined : resultados[n];
-    if (!r || r.isPending) return { estado: "cargando" };
-    if (r.isError) return { estado: "error" };
+    if (!r || r.isPending || r.isError) {
+      const antes = recordados.get(id);
+      if (antes) return { estado: "listo", tamano: antes };
+      return !r || r.isPending ? { estado: "cargando" } : { estado: "error" };
+    }
     const tamano = r.data?.get(id);
     return tamano ? { estado: "listo", tamano } : { estado: "sinDato" };
   };
