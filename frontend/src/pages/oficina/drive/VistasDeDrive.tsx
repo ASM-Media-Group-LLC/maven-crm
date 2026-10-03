@@ -35,6 +35,8 @@ export interface ManejoDeElemento {
   menu: (i: DriveItem) => ReactNode;
   icono: (i: DriveItem) => LucideIcon;
   miniatura: (i: DriveItem) => string | undefined;
+  /** La línea chica debajo del nombre: el tamaño (y en los archivos, la fecha). */
+  pie: (i: DriveItem) => ReactNode;
 }
 
 export interface SeccionDeVista { clave: string; titulo: string | null; items: DriveItem[] }
@@ -188,7 +190,10 @@ function CuadritoDeCarpeta({ i, manejo }: { i: DriveItem; manejo: ManejoDeElemen
           className="flex min-w-0 flex-1 items-center gap-2 py-1 text-left text-sm font-medium"
         >
           <Icono className="h-5 w-5 shrink-0 text-primary" />
-          <span className="min-w-0 truncate">{i.nombre}</span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate">{i.nombre}</span>
+            <span className="block truncate text-xs font-normal text-muted-foreground">{manejo.pie(i)}</span>
+          </span>
         </button>
         <BotonDeMenu i={i} manejo={manejo} />
       </div>
@@ -216,7 +221,10 @@ function TarjetaDeArchivo({ i, manejo }: { i: DriveItem; manejo: ManejoDeElement
       </button>
       <div className="flex min-w-0 items-center gap-2 py-1.5 pl-3 pr-1">
         <Icono className="h-4 w-4 shrink-0 text-muted-foreground" />
-        <span className="min-w-0 flex-1 truncate text-sm" title={i.nombre}>{i.nombre}</span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm" title={i.nombre}>{i.nombre}</span>
+          <span className="block truncate text-xs text-muted-foreground">{manejo.pie(i)}</span>
+        </span>
         <BotonDeMenu i={i} manejo={manejo} />
       </div>
       <CasillaDeTarjeta i={i} manejo={manejo} className="absolute left-2 top-2" />

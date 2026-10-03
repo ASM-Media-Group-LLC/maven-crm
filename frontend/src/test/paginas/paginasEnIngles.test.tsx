@@ -155,6 +155,10 @@ vi.mock("@/hooks/useDocumentos", () => ({
   }),
   usePapelera: () => ({ mutate: vi.fn() }),
   useBorrarDocumento: () => ({ mutate: vi.fn() }),
+  useRenombrarDocumento: () => ({ mutate: vi.fn(), isPending: false }),
+  useDocumentosQuePuedoEditar: () => ({ data: new Set<string>() }),
+  puedoEditarDocumento: () => true,
+  SIN_PERMISO_DOCUMENTO: "sin_permiso",
 }));
 vi.mock("@/hooks/useOnlyOffice", () => ({ useCrearDocumentoOffice: () => ({ mutate: vi.fn(), isPending: false }) }));
 

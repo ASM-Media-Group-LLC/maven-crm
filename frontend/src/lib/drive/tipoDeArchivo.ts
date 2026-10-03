@@ -5,6 +5,8 @@
 // importado de Google y muchas subidas llegan como `application/octet-stream`,
 // y confiar en el tipo declarado dejaría sin vista justo a esos.
 
+import type { TranslationKey } from "@/lib/i18n";
+
 export type TipoDeVista = "imagen" | "video" | "audio" | "pdf" | "office" | "texto" | "ninguno";
 export type DestinoDeOficina = "docx" | "xlsx" | "pptx";
 type Editor = "word" | "cell" | "slide";
@@ -172,4 +174,40 @@ export function pareceBinario(bytes: Uint8Array): boolean {
   const n = Math.min(bytes.length, 8192);
   for (let i = 0; i < n; i++) if (bytes[i] === 0) return true;
   return false;
+}
+
+// ── «Tipo» en el panel de Detalles ──────────────────────────────────────────
+
+const DE_MICROSOFT = [
+  "doc", "docx", "docm", "dot", "dotx", "xls", "xlsx", "xlsm", "xlt", "xltx",
+  "ppt", "pptx", "pptm", "pps", "ppsx", "pot", "potx",
+];
+const COMPRIMIDOS = ["zip", "rar", "7z", "tar", "gz", "tgz"];
+
+/** Qué es una ficha, para la fila «Tipo» de los Detalles (como Google:
+ *  «Carpeta», «Microsoft Excel», «PDF», «Imagen»…). Devuelve la clave del
+ *  diccionario y la extensión, para que la página lo diga en su idioma. */
+export function tipoDeFicha(
+  a: { tipo: "carpeta" | "archivo"; nombre: string; mime: string | null },
+  esUnidad = false,
+): { clave: TranslationKey; ext: string } {
+  const ext = extensionDe(a.nombre);
+  if (a.tipo === "carpeta") return { clave: esUnidad ? "drive.tipo.unidad" : "drive.tipo.carpeta", ext };
+  const office = formatoDeOffice(a.nombre, a.mime);
+  if (office && !TEXTO.includes(ext)) {
+    const { editor } = FORMATOS_OFFICE[office];
+    if (DE_MICROSOFT.includes(office)) {
+      return { clave: editor === "word" ? "drive.tipo.word" : editor === "cell" ? "drive.tipo.excel" : "drive.tipo.powerpoint", ext };
+    }
+    if (office === "csv") return { clave: "drive.tipo.csv", ext };
+    return { clave: editor === "word" ? "drive.tipo.documento" : editor === "cell" ? "drive.tipo.hoja" : "drive.tipo.presentacion", ext };
+  }
+  const vista = tipoPorFormato(a.nombre, a.mime);
+  if (vista === "pdf") return { clave: "drive.tipo.pdf", ext };
+  if (vista === "imagen") return { clave: "drive.tipo.imagen", ext };
+  if (vista === "video") return { clave: "drive.tipo.video", ext };
+  if (vista === "audio") return { clave: "drive.tipo.audio", ext };
+  if (vista === "texto") return { clave: "drive.tipo.texto", ext };
+  if (COMPRIMIDOS.includes(ext) || /zip|rar|7z|tar|gzip/.test(mimeBase(a.mime))) return { clave: "drive.tipo.comprimido", ext };
+  return { clave: ext ? "drive.tipo.otro" : "drive.tipo.archivo", ext };
 }

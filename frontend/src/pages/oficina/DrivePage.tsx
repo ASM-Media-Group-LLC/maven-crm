@@ -1,9 +1,9 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { format, isToday, isThisYear } from "date-fns";
+import { format } from "date-fns";
 import {
   Building2, ChevronRight, Clock, Download, File, FileArchive, FileImage, FileSpreadsheet, FileText, FileVideo,
-  Folder, FolderInput, FolderPlus, HardDrive, Loader2, MoreVertical, Pencil, Plus, RotateCcw, Share2, Trash2,
+  Folder, FolderInput, FolderPlus, HardDrive, Info, Loader2, MoreVertical, Pencil, Plus, RotateCcw, Share2, Trash2,
   Upload, Users, X, AlertTriangle, Check,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -12,14 +12,11 @@ import { PageHeader } from "@/components/ui/page-header";
 import { SubtabNav, SubtabNavItem } from "@/components/ui/subtab-nav";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
-} from "@/components/ui/dialog";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -29,12 +26,16 @@ import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { TranslationKey } from "@/lib/i18n";
 import { useFormato } from "@/hooks/useFormato";
-import type { Formato } from "@/lib/formato";
+import { useFechasDeArchivos } from "@/hooks/useFechasDeArchivos";
 import { useDirectorioCorreo } from "@/hooks/useDirectorioCorreo";
 import {
-  abrirArchivo, useBorrarParaSiempre, useCrearCarpeta, useCrearUnidad, useDriveVista, usePapelera, useRenombrar,
-  useRutaDrive, useSubidasDrive, type DriveItem, type VistaDrive,
+  abrirArchivo, SIN_PERMISO_DRIVE, useBorrarParaSiempre, useCrearCarpeta, useCrearUnidad, useDriveVista, useFichaDrive,
+  useRenombrar, useRutaDrive, useSubidasDrive, useTamanosDeCarpetas, useUnidadesConNombre, type DriveItem, type VistaDrive,
 } from "@/hooks/useDrive";
+import DialogoDeNombre from "@/components/oficina/DialogoDeNombre";
+import PanelDeDetalles, { type ObjetivoDeDetalles } from "@/pages/oficina/drive/PanelDeDetalles";
+import { useAnchoMinimo } from "@/hooks/useAnchoMinimo";
+import { TamanoCarpeta } from "@/pages/oficina/drive/Tamanos";
 import DriveCompartirDialog from "@/components/oficina/DriveCompartirDialog";
 import { BarraDeUso, BarraDeUsoAgencia, CuposDialog } from "@/components/oficina/DriveCupos";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -82,12 +83,9 @@ const VACIO: Record<VistaDrive, TranslationKey> = {
 export { tamano } from "@/lib/drive/formato";
 import { tamano } from "@/lib/drive/formato";
 
-function cuando(iso: string, f: Formato): string {
-  const d = new Date(iso);
-  if (isToday(d)) return format(d, "HH:mm");
-  if (isThisYear(d)) return format(d, f.idioma === "en" ? "MMM d" : "d MMM", { locale: f.fechas });
-  return format(d, "d MMM yyyy", { locale: f.fechas });
-}
+/** Desde qué ancho el panel de Detalles va al costado de la lista (como en
+ *  Google); más angosto, en una hoja que entra desde la derecha. */
+const ANCHO_PANEL_AL_COSTADO = 1280;
 
 export function iconoDe(i: Pick<DriveItem, "tipo" | "mime" | "nombre">) {
   if (i.tipo === "carpeta") return Folder;
@@ -104,6 +102,7 @@ export function iconoDe(i: Pick<DriveItem, "tipo" | "mime" | "nombre">) {
 export default function DrivePage() {
   const { t } = useLanguage();
   const f = useFormato();
+  const fechas = useFechasDeArchivos();
   const { user } = useAuth();
   const [params, setParams] = useSearchParams();
   const vista = (VISTAS.find((v) => v.id === params.get("vista"))?.id ?? "mia") as VistaDrive;
@@ -117,10 +116,29 @@ export default function DrivePage() {
     return (id: string | null) => (id === user?.id ? t("drive.yo") : (id && m.get(id)) || "—");
   }, [directorio.data, user?.id, t]);
 
+  // ── «Propietario» (Jhon, 03/10): lo importado de Google no tiene dueño y se
+  // veía «—». Como Google: en una unidad compartida, la unidad (las unidades
+  // no tienen dueño); en la «Mi unidad» de Google de alguien, esa persona; si
+  // no se sabe de dónde viene, «Importado de Google».
+  const unidadesConNombre = useUnidadesConNombre();
+  const raizDeLaRuta = carpeta ? ruta.data?.[0] : undefined;
+  const duenoDe = (i: DriveItem): { texto: string; titulo?: string } => {
+    if (i.owner_id) return { texto: nombreDe(i.owner_id) };
+    const u = unidadesConNombre.data;
+    const propia = u?.get(i.id);
+    if (propia?.tipo === "empresa") return { texto: t("drive.tipo.unidad") };
+    if (propia?.tipo === "personal" && propia.persona) return { texto: nombreDe(propia.persona) };
+    const unidad = i.unidad_id ? u?.get(i.unidad_id) : undefined;
+    if (unidad) return { texto: unidad.nombre, titulo: t("drive.dueno.unidad", { name: unidad.nombre }) };
+    // Dentro de la «Mi unidad» de Google de alguien: lo de adentro es suyo.
+    const deLaRuta = raizDeLaRuta ? u?.get(raizDeLaRuta.id) : undefined;
+    if (deLaRuta?.tipo === "personal" && deLaRuta.persona) return { texto: nombreDe(deLaRuta.persona) };
+    return { texto: t("drive.dueno.google") };
+  };
+
   const crear = useCrearCarpeta();
   const crearUnidad = useCrearUnidad();
   const renombrar = useRenombrar();
-  const papelera = usePapelera();
   const borrar = useBorrarParaSiempre();
   const { subidas, subir, limpiar } = useSubidasDrive();
 
@@ -167,14 +185,22 @@ export default function DrivePage() {
 
   const lista = useMemo(() => items.data ?? [], [items.data]);
 
+  /** La fecha de cada vista, la misma en la columna y al agrupar: en la
+   *  papelera, cuándo se tiró; en Recientes, cuándo lo abrí YO; si no, la
+   *  última modificación. */
+  const fechaDe = (i: DriveItem): string =>
+    (enPapelera ? i.trashed_at : vista === "recientes" && !carpeta ? i.abierto_por_mi_at : null) ?? i.updated_at;
+
   // ── Cómo se ve (Jhon, 02/10): Lista, Cuadrícula o Galería, y si se agrupa
   // por fecha. Lo que se ve, en el orden en que se ve: Shift-clic, el visor y
   // las miniaturas siguen ESE orden.
   const [prefs, cambiarPrefs] = useVistaDrive();
   const enLista = prefs.modo === "lista";
   const grupos = useMemo(
-    () => (prefs.agrupar ? agruparPorFecha(lista, (i) => i.trashed_at ?? i.updated_at) : null),
-    [prefs.agrupar, lista],
+    () => (prefs.agrupar ? agruparPorFecha(lista, fechaDe) : null),
+    // fechaDe solo depende de la vista (enPapelera, vista, carpeta).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [prefs.agrupar, lista, enPapelera, vista, carpeta],
   );
   const ordenados = useMemo(() => (grupos ? grupos.flatMap((g) => g.items) : lista), [grupos, lista]);
   const orden = useMemo(() => ordenados.map((i) => i.id), [ordenados]);
@@ -187,8 +213,15 @@ export default function DrivePage() {
   const lugarActual = `${vista}|${carpeta ?? ""}`;
   const [seleccion, setSeleccion] = useState<{ lugar: string; estado: EstadoSeleccion }>({ lugar: lugarActual, estado: SIN_SELECCION });
   const estadoSel = seleccion.lugar === lugarActual ? seleccion.estado : SIN_SELECCION;
-  const elegir = (cambio: (e: EstadoSeleccion) => EstadoSeleccion) =>
+  // ── Detalles (ⓘ): de lo que se eligió en «Ver detalles» del menú; si no, de
+  // lo seleccionado; si no, de la carpeta en la que se está. Elegir otra cosa
+  // le gana a «Ver detalles» (como en Google).
+  const [detallesAbiertos, setDetallesAbiertos] = useState(false);
+  const [detalleDe, setDetalleDe] = useState<string | null>(null);
+  const elegir = (cambio: (e: EstadoSeleccion) => EstadoSeleccion) => {
+    setDetalleDe(null);
     setSeleccion((s) => ({ lugar: lugarActual, estado: cambio(s.lugar === lugarActual ? s.estado : SIN_SELECCION) }));
+  };
   const soltarSeleccion = () => elegir(() => SIN_SELECCION);
   const elegidos = lista.filter((i) => estadoSel.ids.has(i.id));
   const haySeleccion = elegidos.length > 0;
@@ -328,19 +361,35 @@ export default function DrivePage() {
     }
   };
 
-  // ── Papelera de varios ─────────────────────────────────────────────────────
-  const papeleraDe = (de: DriveItem[], tirar: boolean) => papeleraVarias.mutate({ ids: de.map((i) => i.id), tirar }, {
+  // ── La papelera (una o varias) ─────────────────────────────────────────────
+  // Como Google: «Movido a la papelera · Deshacer». Lo que la RLS no deja
+  // tocar (alguien que solo puede ver) vuelve como no hecho y se dice por qué.
+  // `soltar`: desde el menú ⋮ de una sola fila, lo que estaba elegido sigue elegido.
+  const papeleraDe = (de: DriveItem[], tirar: boolean, soltar = true) => papeleraVarias.mutate({ ids: de.map((i) => i.id), tirar }, {
     onSuccess: ({ hechos, fallidos }) => {
       if (hechos.length) {
-        soltarSeleccion();
+        if (soltar) soltarSeleccion();
         const texto = tirar
           ? (hechos.length === 1 ? t("drive.papelera.aviso") : t("drive.papelera.avisoVarios", { n: hechos.length }))
           : (hechos.length === 1 ? t("drive.restaurado") : t("drive.restauradoVarios", { n: hechos.length }));
         toast.success(texto, tirar ? {
-          action: { label: t("drive.mover.deshacer"), onClick: () => papeleraVarias.mutate({ ids: hechos, tirar: false }) },
+          action: {
+            label: t("drive.mover.deshacer"),
+            onClick: () => papeleraVarias.mutate({ ids: hechos, tirar: false }, {
+              onSuccess: (r) => (r.fallidos.length
+                ? toast.error(t("drive.papelera.restaurarAlgunosNo", { n: r.fallidos.length }))
+                : toast.success(t("drive.mover.deshecho"))),
+              onError: (e) => toast.error((e as Error).message),
+            }),
+          },
         } : undefined);
       }
-      if (fallidos.length) toast.error(t("drive.papelera.algunosNo", { n: fallidos.length }));
+      if (fallidos.length) {
+        const solo = fallidos.length === 1 && de.length === 1 ? de[0].nombre : null;
+        toast.error(tirar
+          ? (solo ? t("drive.papelera.tirarNo", { name: solo }) : t("drive.papelera.algunosNo", { n: fallidos.length }))
+          : (solo ? t("drive.papelera.restaurarNo", { name: solo }) : t("drive.papelera.restaurarAlgunosNo", { n: fallidos.length })));
+      }
     },
     onError: (e) => toast.error((e as Error).message),
   });
@@ -380,6 +429,15 @@ export default function DrivePage() {
     : [{ clave: "todo", titulo: null, items: mostrados }];
   // Las miniaturas, solo en cuadrícula y galería, y solo de lo dibujado.
   const miniaturas = useMiniaturasDrive(mostrados, !enLista);
+  // El tamaño de las carpetas dibujadas (Jhon, 03/10): de a tandas de 100,
+  // una llamada por tanda (ver useTamanosDeCarpetas).
+  const carpetasDibujadas = useMemo(
+    () => mostrados.filter((i) => i.tipo === "carpeta" && i.estado === "listo").map((i) => i.id),
+    [mostrados],
+  );
+  const tamanoDe = useTamanosDeCarpetas(carpetasDibujadas);
+
+  const verDetalles = (i: DriveItem) => { setDetalleDe(i.id); setDetallesAbiertos(true); };
 
   /** El menú ⋮ de un elemento: el mismo en la lista, la cuadrícula y la galería. */
   const menuDe = (i: DriveItem) => {
@@ -388,12 +446,13 @@ export default function DrivePage() {
       <DropdownMenuContent align="end" className="w-52">
         {enPapelera ? (
           <>
-            <DropdownMenuItem onSelect={() => papelera.mutate({ id: i.id, tirar: false }, {
-              onSuccess: () => toast.success(t("drive.restaurado")),
-              onError: (e) => toast.error((e as Error).message),
-            })}>
+            <DropdownMenuItem onSelect={() => papeleraDe([i], false, false)}>
               <RotateCcw className="mr-2 h-4 w-4" />{t("drive.accion.restaurar")}
             </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => verDetalles(i)}>
+              <Info className="mr-2 h-4 w-4" />{t("drive.detalles.boton")}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={() => setBorrando(i)} className="text-destructive focus:text-destructive">
               <Trash2 className="mr-2 h-4 w-4" />{t("drive.accion.borrar")}
             </DropdownMenuItem>
@@ -423,11 +482,11 @@ export default function DrivePage() {
                 <FolderInput className="mr-2 h-4 w-4" />{t("drive.accion.mover")}
               </DropdownMenuItem>
             )}
+            <DropdownMenuItem onSelect={() => verDetalles(i)}>
+              <Info className="mr-2 h-4 w-4" />{t("drive.detalles.boton")}
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => papelera.mutate({ id: i.id, tirar: true }, {
-              onSuccess: () => toast.success(t("drive.papelera.aviso")),
-              onError: (e) => toast.error((e as Error).message),
-            })}>
+            <DropdownMenuItem onSelect={() => papeleraDe([i], true, false)}>
               <Trash2 className="mr-2 h-4 w-4" />{t("drive.accion.papelera")}
             </DropdownMenuItem>
           </>
@@ -436,12 +495,42 @@ export default function DrivePage() {
     );
   };
 
+  /** Las columnas de la lista. En la papelera, una más desde pantallas
+   *  grandes: «Ubicación original». */
+  const columnasDeLista = enPapelera
+    ? "grid-cols-[1.25rem_minmax(0,1fr)_auto] md:grid-cols-[1.25rem_minmax(0,1fr)_10rem_9rem_6rem_2.5rem] lg:grid-cols-[1.25rem_minmax(0,1fr)_10rem_9rem_12rem_6rem_2.5rem]"
+    : "grid-cols-[1.25rem_minmax(0,1fr)_auto] md:grid-cols-[1.25rem_minmax(0,1fr)_10rem_9rem_6rem_2.5rem]";
+
+  /** Dónde estaba algo de la papelera: su carpeta (si la puedo ver); arriba
+   *  de todo, «Mi unidad» o «Unidades compartidas». */
+  const ubicacionOriginal = (i: DriveItem): string => i.ubicacion
+    ?? (i.parent_id ? "—"
+      : i.owner_id === user?.id ? t("drive.vista.mia")
+        : unidadesConNombre.data?.get(i.id)?.tipo === "empresa" ? t("drive.vista.unidades") : "—");
+
+  /** El tamaño: el del archivo o, el de una carpeta, lo que suma adentro. */
+  const tamanoDeFicha = (i: DriveItem) => (i.tipo === "carpeta"
+    ? (i.estado === "listo" ? <TamanoCarpeta estado={tamanoDe(i.id)} /> : "—")
+    : tamano(i.size));
+
+  /** La fecha de la vista, corta, con la completa en el globito. */
+  const fechaCorta = (i: DriveItem, className?: string) => {
+    const iso = fechaDe(i);
+    return <time dateTime={iso} title={fechas.completa(iso)} className={className}>{fechas.corta(iso)}</time>;
+  };
+
+  /** La línea chica debajo del nombre en las tarjetas: tamaño (y fecha). */
+  const pieDe = (i: DriveItem) => (i.tipo === "carpeta"
+    ? tamanoDeFicha(i)
+    : <>{tamano(i.size)} · {fechaCorta(i)}</>);
+
   /** Una fila de la lista (la vista de siempre). */
   const filaDeLista = (i: DriveItem) => {
     const Icono = iconoDe(i);
     const incompleta = i.estado !== "listo";
     const elegida = estadoSel.ids.has(i.id);
     const recibe = i.tipo === "carpeta" && !enPapelera && !incompleta;
+    const dueno = enPapelera ? { texto: i.trashed_by ? nombreDe(i.trashed_by) : "—" } : duenoDe(i);
     return (
       <li
         key={i.id}
@@ -450,7 +539,8 @@ export default function DrivePage() {
         onDragEnd={terminarArrastre}
         {...(recibe ? recibeArrastre(i.id, i.id, i.nombre) : {})}
         className={cn(
-          "group grid grid-cols-[1.25rem_minmax(0,1fr)_auto] items-center gap-3 border-b border-border/40 px-4 py-1.5 last:border-b-0 hover:bg-muted/40 md:grid-cols-[1.25rem_minmax(0,1fr)_10rem_9rem_6rem_2.5rem]",
+          "group grid items-center gap-3 border-b border-border/40 px-4 py-1.5 last:border-b-0 hover:bg-muted/40",
+          columnasDeLista,
           elegida && "bg-primary/10 hover:bg-primary/15",
           sobre === i.id && "bg-primary/15 ring-2 ring-inset ring-primary/50",
         )}
@@ -487,7 +577,12 @@ export default function DrivePage() {
           className="flex min-w-0 items-center gap-3 py-1 text-left text-sm disabled:cursor-default"
         >
           <Icono className={cn("h-5 w-5 shrink-0", i.tipo === "carpeta" ? "text-primary" : "text-muted-foreground")} />
-          <span className="min-w-0 truncate">{i.nombre}</span>
+          <span className="min-w-0">
+            <span className="block truncate">{i.nombre}</span>
+            {/* En el teléfono no entran las columnas: tamaño y fecha, abajo.
+                aria-hidden: el nombre del botón sigue siendo el del archivo. */}
+            <span aria-hidden="true" className="block truncate text-xs text-muted-foreground md:hidden">{pieDe(i)}</span>
+          </span>
           {incompleta && (
             <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-warning/15 px-2 text-[11px] text-warning">
               <AlertTriangle className="h-3 w-3" />
@@ -495,9 +590,12 @@ export default function DrivePage() {
             </span>
           )}
         </button>
-        <span className="hidden truncate text-sm text-muted-foreground md:block">{nombreDe(i.owner_id)}</span>
-        <span className="hidden text-sm text-muted-foreground md:block">{cuando(i.trashed_at ?? i.updated_at, f)}</span>
-        <span className="hidden text-sm tabular-nums text-muted-foreground md:block">{i.tipo === "carpeta" ? "—" : tamano(i.size)}</span>
+        <span className="hidden truncate text-sm text-muted-foreground md:block" title={dueno.titulo}>{dueno.texto}</span>
+        {fechaCorta(i, "hidden truncate text-sm text-muted-foreground md:block")}
+        {enPapelera && (
+          <span className="hidden truncate text-sm text-muted-foreground lg:block" title={ubicacionOriginal(i)}>{ubicacionOriginal(i)}</span>
+        )}
+        <span className="hidden text-sm tabular-nums text-muted-foreground md:block">{tamanoDeFicha(i)}</span>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
@@ -535,6 +633,27 @@ export default function DrivePage() {
     menu: (i) => menuDe(i),
     icono: iconoDe,
     miniatura: (i) => miniaturas.get(i.id),
+    pie: pieDe,
+  };
+
+  // Lo que muestra el panel de Detalles.
+  const fichaDeLaCarpeta = useFichaDrive(carpeta, detallesAbiertos && !!carpeta);
+  const elegidoParaDetalles = detalleDe ? lista.find((i) => i.id === detalleDe) : undefined;
+  const objetivo: ObjetivoDeDetalles = elegidoParaDetalles ? { tipo: "uno", item: elegidoParaDetalles }
+    : elegidos.length === 1 ? { tipo: "uno", item: elegidos[0] }
+      : elegidos.length > 1 ? { tipo: "varios", items: elegidos }
+        : carpeta ? (fichaDeLaCarpeta.data ? { tipo: "uno", item: fichaDeLaCarpeta.data } : fichaDeLaCarpeta.isPending ? { tipo: "cargando" } : { tipo: "nada" })
+          : { tipo: "nada" };
+  const panelAlCostado = useAnchoMinimo(ANCHO_PANEL_AL_COSTADO);
+  const cerrarDetalles = () => { setDetallesAbiertos(false); setDetalleDe(null); };
+  const propsDelPanel = {
+    objetivo,
+    duenoDe,
+    nombreDe,
+    unidades: unidadesConNombre.data,
+    tamanoDe,
+    icono: iconoDe,
+    onIrA: (v: VistaDrive, c: string) => { setDetalleDe(null); ir(v, c); },
   };
 
   return (
@@ -652,12 +771,28 @@ export default function DrivePage() {
             onModo={(modo) => cambiarPrefs({ modo })}
             onAgrupar={(agrupar) => cambiarPrefs({ agrupar })}
           />
+          {/* ⓘ de Google Drive: abre y cierra el panel de Detalles. */}
+          <button
+            type="button"
+            aria-pressed={detallesAbiertos}
+            onClick={() => (detallesAbiertos ? cerrarDetalles() : setDetallesAbiertos(true))}
+            aria-label={t(detallesAbiertos ? "drive.detalles.ocultar" : "drive.detalles.boton")}
+            title={t(detallesAbiertos ? "drive.detalles.ocultar" : "drive.detalles.boton")}
+            className={cn(
+              "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition-colors",
+              detallesAbiertos ? "border-primary/40 bg-primary/15 text-primary" : "border-border/60 text-muted-foreground hover:bg-muted hover:text-foreground",
+            )}
+          >
+            <Info className="h-4 w-4" />
+          </button>
         </div>
 
         {enPapelera && (
           <p className="rounded-panel bg-muted/50 px-4 py-2 text-xs text-muted-foreground">{t("drive.papelera.ayuda")}</p>
         )}
 
+        {/* La lista y, en pantallas anchas, el panel de Detalles al costado. */}
+        <div className={cn(detallesAbiertos && panelAlCostado && "flex items-start gap-4")}>
         <div
           // Solo los archivos de la computadora muestran «Suelta para subir»: una
           // fila arrastrada adentro del Drive es para mover, no para subir.
@@ -665,7 +800,7 @@ export default function DrivePage() {
           onDragLeave={() => setArrastrando(false)}
           onDrop={soltar}
           className={cn(
-            "relative min-h-[16rem] rounded-panel border border-border/60",
+            "relative min-h-[16rem] min-w-0 flex-1 rounded-panel border border-border/60",
             arrastrando && "border-primary ring-2 ring-primary/30",
           )}
         >
@@ -680,9 +815,7 @@ export default function DrivePage() {
               se queda arriba al bajar por una carpeta larga. */}
           <div className={cn(
             "sticky top-0 z-[5] grid min-h-[2.75rem] items-center gap-3 rounded-t-panel border-b border-border/60 bg-background px-4 py-1 text-xs font-medium text-muted-foreground",
-            enLista
-              ? "grid-cols-[1.25rem_minmax(0,1fr)_auto] md:grid-cols-[1.25rem_minmax(0,1fr)_10rem_9rem_6rem_2.5rem]"
-              : "grid-cols-[1.25rem_minmax(0,1fr)]",
+            enLista ? columnasDeLista : "grid-cols-[1.25rem_minmax(0,1fr)]",
             haySeleccion && "bg-primary/5",
           )}>
             <Checkbox
@@ -693,7 +826,7 @@ export default function DrivePage() {
               title={t(todasElegidas ? "drive.seleccion.ninguna" : "drive.seleccion.todas")}
             />
             {haySeleccion ? (
-              <div className={cn("min-w-0", enLista && "col-span-2 md:col-span-5")}>
+              <div className={cn("min-w-0", enLista && "col-span-2 md:col-span-5", enLista && enPapelera && "lg:col-span-6")}>
                 <BarraDeSeleccion n={elegidos.length} acciones={acciones} ocupado={ocupadoConVarios} onLimpiar={soltarSeleccion} />
               </div>
             ) : !enLista ? (
@@ -701,8 +834,11 @@ export default function DrivePage() {
             ) : (
               <>
                 <span>{t("drive.col.nombre")}</span>
-                <span className="hidden md:block">{t("drive.col.dueno")}</span>
-                <span className="hidden md:block">{t("drive.col.modificado")}</span>
+                <span className="hidden md:block">{t(enPapelera ? "drive.col.eliminadoPor" : "drive.col.dueno")}</span>
+                <span className="hidden md:block">
+                  {t(enPapelera ? "drive.col.eliminado" : vista === "recientes" && !carpeta ? "drive.col.abierto" : "drive.col.modificado")}
+                </span>
+                {enPapelera && <span className="hidden lg:block">{t("drive.col.ubicacion")}</span>}
                 <span className="hidden md:block">{t("drive.col.tamano")}</span>
                 <span />
               </>
@@ -739,7 +875,23 @@ export default function DrivePage() {
           {/* Al acercarse al final se dibujan los siguientes (carpetas de miles). */}
           {hayMas && <div ref={centinela} aria-hidden className="h-8" />}
         </div>
+        {detallesAbiertos && panelAlCostado && (
+          <aside className="sticky top-0 flex max-h-[calc(100dvh-6rem)] w-80 shrink-0 flex-col overflow-hidden rounded-panel border border-border/60 bg-card">
+            <PanelDeDetalles {...propsDelPanel} onCerrar={cerrarDetalles} />
+          </aside>
+        )}
+        </div>
       </div>
+
+      {/* En pantallas angostas, el panel entra desde la derecha. */}
+      {detallesAbiertos && !panelAlCostado && (
+        <Sheet open onOpenChange={(v) => { if (!v) cerrarDetalles(); }}>
+          <SheetContent side="right" className="flex w-[22rem] max-w-full flex-col p-0" aria-describedby={undefined}>
+            <SheetTitle className="sr-only">{t("drive.detalles.titulo")}</SheetTitle>
+            <PanelDeDetalles {...propsDelPanel} />
+          </SheetContent>
+        </Sheet>
+      )}
 
       {creando && (
         <DialogoDeNombre
@@ -776,10 +928,15 @@ export default function DrivePage() {
           inicial={renombrando.nombre}
           boton={t("drive.guardar")}
           ocupado={renombrar.isPending}
+          renombrando
+          // Como Google: en un archivo queda elegido el nombre sin la extensión.
+          sinExtension={renombrando.tipo === "archivo"}
           onCerrar={() => setRenombrando(null)}
           onGuardar={(nombre) => renombrar.mutate({ id: renombrando.id, nombre }, {
             onSuccess: () => setRenombrando(null),
-            onError: (e) => toast.error((e as Error).message),
+            onError: (e) => toast.error((e as Error).message === SIN_PERMISO_DRIVE
+              ? t("drive.renombrar.sinPermiso")
+              : (e as Error).message),
           })}
         />
       )}
@@ -846,37 +1003,6 @@ export default function DrivePage() {
       {viendoCupos && <CuposDialog onCerrar={() => setViendoCupos(false)} />}
       <VisorArchivo items={ordenados} abierto={viendo} onAbierto={setViendo} />
     </Page>
-  );
-}
-
-function DialogoDeNombre({
-  titulo, etiqueta, inicial, boton, ocupado, onCerrar, onGuardar,
-}: {
-  titulo: string; etiqueta: string; inicial: string; boton: string; ocupado: boolean;
-  onCerrar: () => void; onGuardar: (nombre: string) => void;
-}) {
-  const { t } = useLanguage();
-  const [nombre, setNombre] = useState(inicial);
-  return (
-    <Dialog open onOpenChange={(v) => !v && onCerrar()}>
-      <DialogContent className="max-w-sm">
-        <DialogHeader><DialogTitle>{titulo}</DialogTitle></DialogHeader>
-        <form onSubmit={(e) => { e.preventDefault(); if (nombre.trim()) onGuardar(nombre.trim()); }} className="flex flex-col gap-4">
-          <Input
-            aria-label={etiqueta}
-            value={nombre}
-            onChange={(e) => setNombre(e.target.value)}
-            maxLength={255}
-            autoFocus
-            onFocus={(e) => e.currentTarget.select()}
-          />
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={onCerrar}>{t("drive.cancelar")}</Button>
-            <Button type="submit" disabled={!nombre.trim() || ocupado}>{boton}</Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
   );
 }
 

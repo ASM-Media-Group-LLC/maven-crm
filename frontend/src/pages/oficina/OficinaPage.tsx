@@ -1,9 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { format, isToday, isThisYear } from "date-fns";
 import {
   FileText, FileSpreadsheet, FolderOpen, Presentation, Plus, Search, Users, Lock,
-  Trash2, RotateCcw, Loader2, X,
+  Trash2, RotateCcw, Loader2, X, MoreVertical, Pencil, Share2, ExternalLink,
 } from "lucide-react";
 import { Page } from "@/components/ui/page";
 import { PageHeader } from "@/components/ui/page-header";
@@ -14,27 +13,25 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import {
-  useDocumentos, usePapelera, useBorrarDocumento,
+  useDocumentos, usePapelera, useBorrarDocumento, useRenombrarDocumento, useDocumentosQuePuedoEditar,
+  puedoEditarDocumento, SIN_PERMISO_DOCUMENTO,
   type Documento, type FiltrosDocumentos,
 } from "@/hooks/useDocumentos";
 import { useCrearDocumentoOffice, type FormatoDeOficina } from "@/hooks/useOnlyOffice";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { TranslationKey } from "@/lib/i18n";
-import { useFormato } from "@/hooks/useFormato";
-import type { Formato } from "@/lib/formato";
+import { useFechasDeArchivos } from "@/hooks/useFechasDeArchivos";
 import DialogoAbrirArchivo from "@/components/oficina/DialogoAbrirArchivo";
+import DialogoDeNombre from "@/components/oficina/DialogoDeNombre";
+import DialogoDeCompartir from "@/components/oficina/DialogoDeCompartir";
 import { atajoDeAbrir } from "@/lib/drive/abrirEnLaOficina";
-
-function cuando(iso: string, f: Formato): string {
-  const d = new Date(iso);
-  if (isToday(d)) return format(d, "HH:mm");
-  if (isThisYear(d)) return format(d, f.idioma === "en" ? "MMM d" : "d 'de' MMM", { locale: f.fechas });
-  return format(d, "d MMM yyyy", { locale: f.fechas });
-}
 
 /** Cada formato es su propia sección del menú, como en Google: la lista de
  *  hojas no se mezcla con la de documentos. Lo único que cambia es el formato
@@ -73,7 +70,7 @@ const VISTAS: { id: FiltrosDocumentos["vista"]; label: TranslationKey }[] = [
 export default function OficinaPage({ formato = "docx" }: { formato?: FormatoDeOficina }) {
   const navigate = useNavigate();
   const { t } = useLanguage();
-  const f = useFormato();
+  const fechas = useFechasDeArchivos();
   const cfg = FORMATOS[formato];
   const { user } = useAuth();
   const [q, setQ] = useState("");
@@ -81,11 +78,16 @@ export default function OficinaPage({ formato = "docx" }: { formato?: FormatoDeO
   const [confirmarBorrado, setConfirmarBorrado] = useState<Documento | null>(null);
   /** «Abrir un archivo» (⌘O): uno del Drive o uno de la computadora. */
   const [abriendoArchivo, setAbriendoArchivo] = useState(false);
+  /** «Cambiar nombre» y «Compartir» del menú ⋮ de una fila. */
+  const [renombrando, setRenombrando] = useState<Documento | null>(null);
+  const [compartiendo, setCompartiendo] = useState<Documento | null>(null);
 
   const docs = useDocumentos({ q, vista, extension: formato });
   const crear = useCrearDocumentoOffice();
   const papelera = usePapelera();
   const borrar = useBorrarDocumento();
+  const renombrar = useRenombrarDocumento();
+  const paraEditar = useDocumentosQuePuedoEditar();
 
   const nuevo = () => {
     crear.mutate({ extension: formato }, {
@@ -98,12 +100,24 @@ export default function OficinaPage({ formato = "docx" }: { formato?: FormatoDeO
     papelera.mutate(
       { id: d.id, tirar },
       {
-        onSuccess: () =>
-          toast.success(tirar ? t("oficina.trashed") : t("oficina.restored")),
+        // Como Google: «Movido a la papelera · Deshacer».
+        onSuccess: () => (tirar
+          ? toast.success(t("oficina.trashed"), {
+            action: { label: t("drive.mover.deshacer"), onClick: () => mover(d, false) },
+          })
+          : toast.success(t("oficina.restored"))),
         onError: (e) => toast.error((e as Error).message || t("oficina.moveError")),
       },
     );
   };
+
+  const cambiarNombre = (d: Documento, title: string) =>
+    renombrar.mutate({ id: d.id, title }, {
+      onSuccess: () => setRenombrando(null),
+      onError: (e) => toast.error((e as Error).message === SIN_PERMISO_DOCUMENTO
+        ? t("oficina.rename.sinPermiso")
+        : `${t("oficina.rename.error")}: ${(e as Error).message}`),
+    });
 
   const lista = docs.data ?? [];
 
@@ -259,7 +273,7 @@ export default function OficinaPage({ formato = "docx" }: { formato?: FormatoDeO
                             <><Lock className="h-3 w-3" /> {t("oficina.private")}</>
                           )}
                           <span aria-hidden="true">·</span>
-                          <span>{cuando(d.updated_at, f)}</span>
+                          <time dateTime={d.updated_at} title={fechas.completa(d.updated_at)}>{fechas.corta(d.updated_at)}</time>
                         </span>
                       </span>
                     </button>
@@ -278,17 +292,48 @@ export default function OficinaPage({ formato = "docx" }: { formato?: FormatoDeO
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
-                    ) : esMio ? (
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8 shrink-0 rounded-full opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
-                        aria-label={t("oficina.moveToTrash", { name: d.title })}
-                        onClick={() => mover(d, true)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    ) : null}
+                    ) : (
+                      // El menú ⋮ de Google Docs: abrir, abrir aparte, cambiar
+                      // el nombre, compartir y la papelera (esta, solo el
+                      // dueño: a los demás el trigger tocar_documento no los
+                      // deja esconderlo).
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 shrink-0 rounded-full text-muted-foreground"
+                            aria-label={t("oficina.menu.opciones", { name: d.title || t("oficina.untitled") })}
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-64">
+                          <DropdownMenuItem onSelect={() => navigate(`/oficina/${d.id}`)}>
+                            <cfg.icono className="mr-2 h-4 w-4" />{t("oficina.menu.abrir")}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => window.open(`/oficina/${d.id}`, "_blank", "noopener")}>
+                            <ExternalLink className="mr-2 h-4 w-4" />{t("oficina.menu.abrirPestana")}
+                          </DropdownMenuItem>
+                          {puedoEditarDocumento(d, user?.id, paraEditar.data) && (
+                            <DropdownMenuItem onSelect={() => setRenombrando(d)}>
+                              <Pencil className="mr-2 h-4 w-4" />{t("oficina.menu.renombrar")}
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuItem onSelect={() => setCompartiendo(d)}>
+                            <Share2 className="mr-2 h-4 w-4" />{t("oficina.menu.compartir")}
+                          </DropdownMenuItem>
+                          {esMio && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onSelect={() => mover(d, true)}>
+                                <Trash2 className="mr-2 h-4 w-4" />{t("oficina.menu.papelera")}
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
                   </div>
                 </li>
               );
@@ -298,6 +343,39 @@ export default function OficinaPage({ formato = "docx" }: { formato?: FormatoDeO
       </div>
 
       <DialogoAbrirArchivo abierto={abriendoArchivo} onCambiar={setAbriendoArchivo} formato={formato} />
+
+      {renombrando && (
+        <DialogoDeNombre
+          titulo={t("oficina.rename.titulo")}
+          etiqueta={t("oficina.rename.etiqueta")}
+          inicial={renombrando.title}
+          boton={t("oficina.rename.guardar")}
+          ocupado={renombrar.isPending}
+          renombrando
+          maximo={200}
+          onCerrar={() => setRenombrando(null)}
+          onGuardar={(title) => cambiarNombre(renombrando, title)}
+        />
+      )}
+
+      {compartiendo && (
+        <DialogoDeCompartir
+          abierto
+          onCerrar={() => setCompartiendo(null)}
+          documentoId={compartiendo.id}
+          titulo={compartiendo.title || t("oficina.untitled")}
+          ownerId={compartiendo.owner_id}
+          visibilidad={compartiendo.visibility}
+          onVisibilidadCambiada={() => {
+            // La fila tiene que mostrar el acceso nuevo (Equipo / Privado).
+            void docs.refetch().then((r) => {
+              const nuevo = r.data?.find((x) => x.id === compartiendo.id);
+              if (nuevo) setCompartiendo(nuevo);
+            });
+          }}
+          soyDueno={compartiendo.owner_id === user?.id}
+        />
+      )}
 
       {/* Borrar de la papelera SÍ es definitivo, así que se pregunta — y con el
           diálogo de Maven, no el del navegador. */}
