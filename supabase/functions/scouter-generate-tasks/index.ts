@@ -734,7 +734,7 @@ async function callGroqWithRetry(
         role: "user",
         content:
           userMessage +
-          '\n\nDevolvé SOLO el JSON con la clave "leads" — sin texto antes, sin markdown, sin backticks.',
+          '\n\nDevuelve SOLO el JSON con la clave "leads" — sin texto antes, sin markdown, sin backticks.',
       },
     ],
     temperature: 0.4,
