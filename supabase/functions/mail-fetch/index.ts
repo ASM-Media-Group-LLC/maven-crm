@@ -1353,7 +1353,10 @@ Deno.serve(async (req) => {
                   message: subject,
                   module_origin: "Correo",
                   required_permission_module: "Correo",
-                  priority: "normal",
+                  // validate_notification_fields solo acepta high/medium/low:
+                  // con "normal" la base rechazaba el aviso y nunca llegó uno.
+                  // high = como una mención del Messenger (también va al teléfono).
+                  priority: "high",
                   deep_link_url: "/correo",
                 })),
               );
