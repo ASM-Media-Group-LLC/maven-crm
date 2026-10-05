@@ -43,7 +43,7 @@ describe("subirPorPartes", () => {
     expect(n.pedidos).toEqual(["PUT parte/0", "PUT parte/1", "PUT parte/2", "POST completar"]);
     const tamanos = (n.enviar as ReturnType<typeof vi.fn>).mock.calls.slice(0, 3).map((c) => (c[2] as Blob).size);
     expect(tamanos).toEqual([8 * MB, 8 * MB, 4 * MB]);
-    expect(progreso.at(-1)).toBe(20 * MB);
+    expect(progreso[progreso.length - 1]).toBe(20 * MB);
   });
 
   it("se corta la red en una parte: la reintenta sola, esperando cada vez más", async () => {
