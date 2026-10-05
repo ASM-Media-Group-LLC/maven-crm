@@ -111,6 +111,30 @@ jobs:
       - name: Guard — web-push
         run: deno test --allow-read supabase/functions/web-push/ supabase/functions/_shared/push-notify.test.ts
 
+      # El buzón de Zoho de una cuenta dada de baja se borra al PURGARLA (a los 30
+      # días), no al suspenderla (Jhon, 05/10): la decisión (corp@unlok.me nunca, la
+      # cuenta recuperada no se toca, toda salida con su motivo), que la baja no toque
+      # Zoho, que la purga encole el buzón antes de app_purge_user_refs, y la
+      # paginación de listAccounts. Con tipos las tres edges que lo usan.
+      - name: Guard — buzones de Zoho al purgar
+        run: deno test --allow-read --allow-env --no-check supabase/functions/_shared/buzon-por-borrar.test.ts supabase/functions/_shared/zoho.test.ts
+
+      - name: Tipos — bajas de cuentas y buzones de Zoho
+        run: >-
+          deno check
+          supabase/functions/admin-user-actions/index.ts
+          supabase/functions/buzones-por-borrar/index.ts
+          supabase/functions/zoho-provision/index.ts
+          supabase/functions/_shared/buzon-por-borrar.test.ts
+
+      # La misma regla en la base (20261005120000), contra PGlite y las migraciones
+      # reales de la papelera: la purga del cron encola el buzón antes de destruir,
+      # una purga que falla no deja nada a medias, el cron solo llama si hay algo
+      # vencido, nada lo llama anon/authenticated, y la vuelta atrás deja la purga
+      # con la huella exacta de prod.
+      - name: Banco — buzones de Zoho al purgar (PGlite)
+        run: deno run -A --node-modules-dir=none --no-lock supabase/tests/buzones_por_borrar.ts
+
       # Las acciones de webhooks de manage-api-keys: el guard de arriba las corre sin
       # tipos; aquí el tipo de cada mensaje (clave que existe, variables) y de Datos.
       - name: Tipos — manage-api-keys

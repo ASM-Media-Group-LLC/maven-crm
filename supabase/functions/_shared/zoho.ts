@@ -298,12 +298,34 @@ export function enableMailbox(accountId: string): Promise<ZohoResult> {
   });
 }
 
+/** Casillas que Maven NO borra nunca, pase lo que pase.
+ *
+ *  corp@unlok.me es el Superadministrador de la organización de Zoho: si se
+ *  borra, nadie puede volver a administrar Zoho (ni crear casillas, ni
+ *  liberar puestos, ni recuperar el correo de nadie). Que alguien la use
+ *  como acceso a Maven y después la den de baja no puede llevarse puesta a
+ *  la organización entera. */
+export const CASILLAS_INTOCABLES: readonly string[] = ["corp@unlok.me"];
+
+export function esCasillaIntocable(email: string): boolean {
+  return CASILLAS_INTOCABLES.includes(email.trim().toLowerCase());
+}
+
 /** Borra la casilla (y da de baja al usuario de la org) POR EMAIL. Zoho espera
  *  `emailList` (o `accountList` de zuids) en el body — mandar `{accountId}` no
  *  hacía nada. Es la misma operación que "Eliminar usuario" del panel de Zoho,
  *  que libera el puesto. Irreversible — preferir disableMailbox si solo se
- *  quiere suspender. */
+ *  quiere suspender.
+ *
+ *  ⚠️ La guarda de CASILLAS_INTOCABLES vive AQUÍ, en el último paso antes de
+ *  Zoho, además de en quien llama: así ningún camino nuevo puede saltársela. */
 export function deleteMailbox(email: string): Promise<ZohoResult> {
+  if (esCasillaIntocable(email)) {
+    return Promise.resolve({
+      ok: false,
+      error: `${email.trim()} es el Superadministrador de Zoho: Maven nunca la borra`,
+    });
+  }
   return zohoFetch(`/accounts`, {
     method: "DELETE",
     body: JSON.stringify({ emailList: [email] }),
