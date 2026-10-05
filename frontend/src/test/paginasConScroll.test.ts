@@ -29,7 +29,9 @@ const leer = (ruta: string): string | null => fuentes[ruta] ?? null;
 
 /** No son páginas sino LAYOUTS: montan un `<Outlet>`/`children` y el scroll lo
  *  pone cada hijo (por eso HRStaffSchedules trae el suyo). */
-const SON_LAYOUT = new Set(["HRLayout"]);
+const SON_LAYOUT = new Set(["HRLayout",
+  // El marco del portal de creadoras: monta un <Outlet> y cada página trae su <Page>.
+  "PortalLayout"]);
 
 /** Páginas que NO viven dentro del AppShell: la ventana scrollea sola. */
 const FUERA_DEL_SHELL = new Set([
@@ -37,6 +39,8 @@ const FUERA_DEL_SHELL = new Set([
   "VideoCallPage", "MeetGuestPage", "ChatterPublicSession", "DesignSystem", "Docs", "Roadmap",
   // Medidas del dispositivo para depurar la PWA: pública, fuera del shell, scroll del documento.
   "DiagnosticoPantalla",
+  // Portal de creadoras: entrar y elegir contraseña, públicas como Login y ResetPassword.
+  "PortalEntrar", "PortalContrasena",
 ]);
 
 /** El scroll de un MODAL no es el scroll de la página.

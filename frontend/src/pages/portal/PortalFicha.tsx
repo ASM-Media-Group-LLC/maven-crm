@@ -22,6 +22,8 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { Page } from "@/components/ui/page";
+import { PageHeader } from "@/components/ui/page-header";
 import { cn } from "@/lib/utils";
 
 // MI FICHA: la creadora completa su parte de «Operaciones» (22 respuestas, en
@@ -73,19 +75,19 @@ function FormularioFicha({ creatorId }: { creatorId: string }) {
 
   if (ficha.isLoading) {
     return (
-      <div className="mx-auto w-full max-w-5xl space-y-4 px-4 py-6 md:px-8 md:py-10">
+      <Page className="space-y-4">
         <Skeleton className="h-8 w-40" />
         <Skeleton className="h-2 w-full" />
         <Skeleton className="h-40 w-full" />
-      </div>
+      </Page>
     );
   }
   if (ficha.isError || !guardada) {
     return (
-      <div className="mx-auto w-full max-w-5xl px-4 py-10 text-center md:px-8">
-        <p className="text-sm text-muted-foreground">{t("portal.ficha.errorCargar")}</p>
+      <Page className="text-center">
+        <p className="mt-6 text-sm text-muted-foreground">{t("portal.ficha.errorCargar")}</p>
         <Button className="mt-4" variant="outline" onClick={() => ficha.refetch()}>{t("portal.shell.reintentar")}</Button>
-      </div>
+      </Page>
     );
   }
 
@@ -94,19 +96,17 @@ function FormularioFicha({ creatorId }: { creatorId: string }) {
   const activaSec = SECCIONES.find((s) => s.id === seccion) ?? SECCIONES[0];
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-6 md:px-8 md:py-10">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight md:text-3xl">{t("portal.ficha.titulo")}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{t("portal.ficha.subtitulo")}</p>
-        </div>
-        <span className="text-sm font-medium tabular-nums text-muted-foreground">{t("portal.ficha.progreso", { hechas, total })}</span>
-      </div>
+    <Page>
+      <PageHeader
+        title={t("portal.ficha.titulo")}
+        subtitle={t("portal.ficha.subtitulo")}
+        actions={<span className="text-sm font-medium tabular-nums text-muted-foreground">{t("portal.ficha.progreso", { hechas, total })}</span>}
+      />
       <Progress value={(hechas / total) * 100} className="mt-4 h-2" aria-label={t("portal.ficha.progreso", { hechas, total })} />
 
       <div className="mt-6 lg:grid lg:grid-cols-[14rem_1fr] lg:gap-8">
         {/* Las tres secciones: arriba en el celular, al costado en el computador */}
-        <div role="tablist" aria-label={t("portal.ficha.titulo")} className="grid grid-cols-3 gap-2 lg:sticky lg:top-6 lg:flex lg:h-fit lg:flex-col">
+        <div role="tablist" aria-label={t("portal.ficha.titulo")} className="flex gap-2 lg:sticky lg:top-6 lg:h-fit lg:flex-col">
           {SECCIONES.map((s) => {
             const n = respondidas(actual, s.campos.map((c) => c.clave));
             const elegida = s.id === seccion;
@@ -118,7 +118,7 @@ function FormularioFicha({ creatorId }: { creatorId: string }) {
                 aria-selected={elegida}
                 onClick={() => setSeccion(s.id)}
                 className={cn(
-                  "flex min-h-14 flex-col items-start justify-center rounded-xl border px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  "flex min-h-14 min-w-0 flex-1 flex-col items-start justify-center rounded-panel border px-3 py-2 text-left lg:flex-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                   elegida ? "border-primary bg-primary/10" : "border-border bg-card hover:bg-muted",
                 )}
               >
@@ -131,7 +131,7 @@ function FormularioFicha({ creatorId }: { creatorId: string }) {
 
         <section role="tabpanel" aria-label={t(activaSec.titulo)} className="mt-6 lg:mt-0">
           <p className="text-sm text-muted-foreground">{t(activaSec.descripcion)}</p>
-          <div className="mt-4 space-y-4">
+          <div className="mt-4 grid gap-4 2xl:grid-cols-2">
             {activaSec.campos.map((def) => (
               <Campo key={def.clave} def={def} valor={actual[def.clave] ?? ""} onCambio={(v) => cambiar(def.clave, v)} />
             ))}
@@ -146,7 +146,7 @@ function FormularioFicha({ creatorId }: { creatorId: string }) {
       {/* Cambios sin guardar: la barra aparece encima del menú de abajo */}
       {pendientes && (
         <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-40 border-t border-border bg-background/95 px-4 py-3 backdrop-blur md:bottom-0 md:left-64">
-          <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
+          <div className="flex items-center justify-between gap-3">
             <p className="text-sm font-medium">{t("portal.ficha.pendientes")}</p>
             <div className="flex shrink-0 gap-2">
               <Button variant="ghost" className="min-h-11" onClick={() => setBorrador({})} disabled={guardar.isPending}>
@@ -160,7 +160,7 @@ function FormularioFicha({ creatorId }: { creatorId: string }) {
           </div>
         </div>
       )}
-    </div>
+    </Page>
   );
 }
 
@@ -170,7 +170,7 @@ function Campo({ def, valor, onCambio }: { def: DefCampo; valor: string; onCambi
   const ayudaId = `${id}-ayuda`;
   const hecha = valor.trim().length > 0;
   return (
-    <div className={cn("rounded-2xl border bg-card p-4 transition-colors", hecha ? "border-border" : "border-dashed border-border")}>
+    <div className={cn("rounded-card border bg-card p-4 transition-colors", hecha ? "border-border" : "border-dashed border-border")}>
       <Label id={`${id}-pregunta`} htmlFor={id} className="text-base font-semibold leading-snug">{t(def.pregunta)}</Label>
       {def.ayuda && <p id={ayudaId} className="mt-1 text-sm text-muted-foreground">{t(def.ayuda)}</p>}
       <div className="mt-3">

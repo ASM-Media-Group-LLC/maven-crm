@@ -9,6 +9,8 @@ import { SKINS, useSkin } from "@/hooks/useSkin";
 import { usePortal } from "@/hooks/usePortal";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { Page } from "@/components/ui/page";
+import { PageHeader } from "@/components/ui/page-header";
 import FormContrasena from "./FormContrasena";
 
 // Ajustes del portal: claro u oscuro, el skin de Maven (los mismos del equipo, se
@@ -23,7 +25,7 @@ const TEMAS = [
 
 function Bloque({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-2xl border border-border bg-card p-5">
+    <section className="rounded-card border border-border bg-card p-5">
       <h2 className="text-base font-semibold">{titulo}</h2>
       <div className="mt-4">{children}</div>
     </section>
@@ -46,12 +48,12 @@ export default function PortalAjustes() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-6 md:px-8 md:py-10">
-      <h1 className="text-2xl font-bold tracking-tight md:text-3xl">{t("portal.ajustes.titulo")}</h1>
+    <Page>
+      <PageHeader title={t("portal.ajustes.titulo")} />
 
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
         <Bloque titulo={t("portal.ajustes.apariencia")}>
-          <div role="radiogroup" aria-label={t("portal.ajustes.apariencia")} className="grid grid-cols-3 gap-2">
+          <div role="radiogroup" aria-label={t("portal.ajustes.apariencia")} className="flex gap-2">
             {TEMAS.map(({ id, icono: Icono, etiqueta }) => {
               const activo = (theme ?? "dark") === id;
               return (
@@ -62,7 +64,7 @@ export default function PortalAjustes() {
                   aria-checked={activo}
                   onClick={() => setTheme(id)}
                   className={cn(
-                    "flex min-h-16 flex-col items-center justify-center gap-1.5 rounded-xl border px-2 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    "flex min-h-16 min-w-0 flex-1 flex-col items-center justify-center gap-1.5 rounded-panel border px-2 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                     activo ? "border-primary bg-primary/10 text-primary" : "border-border hover:bg-muted",
                   )}
                 >
@@ -86,7 +88,7 @@ export default function PortalAjustes() {
                   aria-checked={activo}
                   onClick={() => setSkin(s.id)}
                   className={cn(
-                    "flex min-h-11 items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    "flex min-h-11 items-center gap-2 rounded-panel border px-3 py-2 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                     activo ? "border-primary bg-primary/10" : "border-border hover:bg-muted",
                   )}
                 >
@@ -129,7 +131,7 @@ export default function PortalAjustes() {
               {fichas.map((f) => {
                 const esta = f.creator_id === activa.creator_id;
                 return (
-                  <li key={f.creator_id} className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-border px-3 py-2">
+                  <li key={f.creator_id} className="flex min-h-11 items-center justify-between gap-3 rounded-panel border border-border px-3 py-2">
                     <span className="min-w-0 truncate font-medium">{f.agencia}</span>
                     {esta ? (
                       <span className="shrink-0 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">{t("portal.ajustes.agenciaActiva")}</span>
@@ -150,6 +152,6 @@ export default function PortalAjustes() {
           </Button>
         </div>
       </div>
-    </div>
+    </Page>
   );
 }

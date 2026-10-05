@@ -71,7 +71,7 @@ export default function FormContrasena({ oscuro = false, onListo }: { oscuro?: b
             onClick={() => setVer((v) => !v)}
             aria-label={t(ver ? "portal.contrasena.ocultar" : "portal.contrasena.mostrar")}
             className={cn(
-              "absolute right-1 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              "absolute right-1 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               oscuro ? "text-white/60 hover:text-white" : "text-muted-foreground hover:text-foreground",
             )}
           >

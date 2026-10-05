@@ -6,13 +6,15 @@ import { CAMPOS_FICHA, respondidas, SECCIONES } from "@/lib/portal/ficha";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Page } from "@/components/ui/page";
+import { PageHeader } from "@/components/ui/page-header";
 
 // Inicio del portal: el saludo, cuánto le falta de su ficha y lo que viene
 // (contenido y personalizados llegan en las fases 2 y 3).
 
-function saludo(hora: number): "portal.inicio.manana" | "portal.inicio.tarde" | "portal.inicio.noche" {
-  if (hora >= 5 && hora < 12) return "portal.inicio.manana";
-  if (hora >= 12 && hora < 19) return "portal.inicio.tarde";
+function saludo(h: number): "portal.inicio.manana" | "portal.inicio.tarde" | "portal.inicio.noche" {
+  if (h >= 5 && h < 12) return "portal.inicio.manana";
+  if (h >= 12 && h < 19) return "portal.inicio.tarde";
   return "portal.inicio.noche";
 }
 
@@ -27,16 +29,15 @@ export default function PortalInicio() {
     .map((s) => t(s.titulo));
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-6 md:px-8 md:py-10">
-      <p className="text-sm text-muted-foreground">{t(saludo(new Date().getHours()))}</p>
-      <h1 className="mt-1 text-3xl font-bold tracking-tight [text-wrap:balance] md:text-4xl">
-        {t("portal.inicio.hola", { nombre: nombreParaMostrar(activa) })}
-      </h1>
-      <p className="mt-2 text-sm text-muted-foreground">{t("portal.inicio.agencia", { agencia: activa.agencia })}</p>
+    <Page>
+      <PageHeader
+        title={t("portal.inicio.hola", { nombre: nombreParaMostrar(activa) })}
+        subtitle={`${t(saludo(new Date().getHours()))} · ${t("portal.inicio.agencia", { agencia: activa.agencia })}`}
+      />
 
-      <div className="mt-8 grid gap-4 lg:grid-cols-[3fr_2fr]">
+      <div className="mt-6 grid gap-4 lg:grid-cols-[3fr_2fr]">
         {/* Su ficha: lo único que ya puede hacer desde aquí */}
-        <section className="rounded-2xl border border-border bg-card p-5 md:p-6">
+        <section className="rounded-card border border-border bg-card p-5 md:p-6">
           {ficha.isLoading ? (
             <div className="space-y-3">
               <Skeleton className="h-6 w-48" />
@@ -70,24 +71,24 @@ export default function PortalInicio() {
         </section>
 
         {/* Lo que viene: dicho con honestidad, sin botones que no hacen nada */}
-        <section className="rounded-2xl border border-dashed border-border p-5 md:p-6">
+        <section className="rounded-card border border-dashed border-border p-5 md:p-6">
           <div className="flex items-center gap-2 text-sm font-semibold">
             <Gift className="h-4 w-4 text-primary" aria-hidden="true" />
             {t("portal.inicio.prontoTitulo")}
           </div>
           <p className="mt-2 text-sm text-muted-foreground">{t("portal.inicio.prontoTexto")}</p>
           <ul className="mt-4 space-y-2 text-sm">
-            <li className="flex items-center gap-3 rounded-lg bg-muted/60 px-3 py-2.5 text-muted-foreground">
+            <li className="flex items-center gap-3 rounded-control bg-muted/60 px-3 py-2.5 text-muted-foreground">
               <FolderUp className="h-4 w-4" aria-hidden="true" />
               {t("portal.inicio.prontoContenido")}
             </li>
-            <li className="flex items-center gap-3 rounded-lg bg-muted/60 px-3 py-2.5 text-muted-foreground">
+            <li className="flex items-center gap-3 rounded-control bg-muted/60 px-3 py-2.5 text-muted-foreground">
               <Clapperboard className="h-4 w-4" aria-hidden="true" />
               {t("portal.inicio.prontoPedidos")}
             </li>
           </ul>
         </section>
       </div>
-    </div>
+    </Page>
   );
 }

@@ -87,7 +87,7 @@ export default function PortalEntrar() {
                 type="button"
                 onClick={() => setVer((v) => !v)}
                 aria-label={t(ver ? "portal.contrasena.ocultar" : "portal.contrasena.mostrar")}
-                className="absolute right-1 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-md text-white/60 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="absolute right-1 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-control text-white/60 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 {ver ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
               </button>
@@ -104,7 +104,7 @@ export default function PortalEntrar() {
           </Button>
         </form>
 
-        <p className="rounded-xl bg-white/[0.04] px-4 py-3 text-center text-sm text-white/60">{t("portal.entrar.primeraVez")}</p>
+        <p className="rounded-panel bg-white/[0.04] px-4 py-3 text-center text-sm text-white/60">{t("portal.entrar.primeraVez")}</p>
         <p className="text-center text-sm text-white/40">
           {t("portal.entrar.equipo")}{" "}
           <Link to="/login" className="text-white/70 hover:text-white hover:underline">{t("portal.entrar.equipoLink")}</Link>

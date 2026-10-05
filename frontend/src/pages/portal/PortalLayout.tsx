@@ -150,7 +150,7 @@ export default function PortalLayout() {
         {/* Computador: menú al costado */}
         <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r border-border bg-card/60 p-4 md:flex">
           <div className="flex items-center gap-2.5 px-2 py-1">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary">
+            <span className="flex h-9 w-9 items-center justify-center rounded-panel bg-primary">
               <MarcaM alto="13px" />
             </span>
             <span className="font-semibold">{t("portal.shell.espacio")}</span>
@@ -163,7 +163,7 @@ export default function PortalLayout() {
                 end={exacta}
                 className={({ isActive }) =>
                   cn(
-                    "flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    "flex min-h-11 items-center gap-3 rounded-control px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                     isActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground",
                   )
                 }
@@ -173,7 +173,7 @@ export default function PortalLayout() {
               </NavLink>
             ))}
           </nav>
-          <div className="mt-auto space-y-3 rounded-xl border border-border bg-background p-3">
+          <div className="mt-auto space-y-3 rounded-panel border border-border bg-background p-3">
             <div className="flex items-center gap-3">
               {avatar("h-10 w-10")}
               <div className="min-w-0">
@@ -199,14 +199,15 @@ export default function PortalLayout() {
             <div className="min-w-0 shrink">{selectorDeAgencia}</div>
           </header>
 
-          <main className="flex-1 pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-10">
+          {/* Cada página trae su <Page>; aquí solo el aire para el menú de abajo. */}
+          <div className="flex flex-1 flex-col pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-4">
             <Outlet />
-          </main>
+          </div>
 
           {/* Celular: el menú abajo, al alcance del pulgar */}
           <nav
             aria-label={t("portal.nav.menu")}
-            className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-3 border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
+            className="fixed inset-x-0 bottom-0 z-30 flex border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
           >
             {SECCIONES.map(({ a, icono: Icono, etiqueta, exacta }) => (
               <NavLink
@@ -215,7 +216,7 @@ export default function PortalLayout() {
                 end={exacta}
                 className={({ isActive }) =>
                   cn(
-                    "flex min-h-16 flex-col items-center justify-center gap-1 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+                    "flex min-h-16 flex-1 flex-col items-center justify-center gap-1 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
                     isActive ? "text-primary" : "text-muted-foreground",
                   )
                 }
