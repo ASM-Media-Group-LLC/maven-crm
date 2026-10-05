@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, useRef, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { esCuentaDeCreadora } from "@/lib/portal/cuenta";
 import React from "react";
 import { BUILD_PROPIO, versionesDesdePresencia, type PersonaConVersionVieja } from "@/lib/versionDelBundle";
 
@@ -57,7 +58,10 @@ const OnlinePresenceContext = createContext<OnlinePresenceContextType>({
 });
 
 export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
+  // Una cuenta de creadora (portal) no publica presencia: no es del equipo y no
+  // tiene por qué aparecer como «en línea» en el Messenger ni en Cowork.
+  const { user: cuenta } = useAuth();
+  const user = esCuentaDeCreadora(cuenta) ? null : cuenta;
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const [userStatuses, setUserStatuses] = useState<Record<string, UserStatus>>({});
   const [statusTexts, setStatusTexts] = useState<Record<string, string>>({});

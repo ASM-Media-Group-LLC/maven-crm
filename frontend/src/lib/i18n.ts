@@ -32,6 +32,7 @@ import { hrGestion } from "./i18n/hrGestion";
 import { internos } from "./i18n/internos";
 import { paginas } from "./i18n/paginas";
 import { ventas } from "./i18n/ventas";
+import { portal } from "./i18n/portal";
 
 export type Language = "es" | "en";
 
@@ -88,6 +89,7 @@ const translations = {
   ...internos,
   ...paginas,
   ...ventas,
+  ...portal,
 } as const;
 
 export type TranslationKey = keyof typeof translations;

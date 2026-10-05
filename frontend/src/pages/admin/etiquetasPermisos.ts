@@ -112,6 +112,7 @@ export const ETIQUETAS: Record<string, TranslationKey> = {
   "Editar Blu CRM": "admin.perm.editBluCrm",
   "Editar Banking": "admin.perm.editBanking",
   "Cambiar Plataforma": "admin.perm.changePlatform",
+  "Invitar al portal": "admin.perm.invitePortal",
   "Editar": "admin.perm.edit",
   "Enviar al grupo": "admin.perm.sendToGroup",
   "Crear pedido": "admin.perm.createRequest",

@@ -8,12 +8,28 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
+import { ETIQUETA_AGENCIA, esCampoFicha } from "@/lib/portal/ficha";
 
 interface Props {
   creatorId: string;
+  /** Para nombrar a la creadora en lo que cambió ella desde el portal (su perfil
+   *  no es de la agencia: no sale en profiles). */
+  creatorName?: string;
 }
 
-const HistorialTabContent = ({ creatorId }: Props) => {
+// Las acciones que anota la base (trigger creators_ficha_historial y la edge
+// portal-creadoras, 20261006100000) llegan como claves: «ficha:tono_voz»,
+// «portal:hobbies», «portal_acceso:invitada». Las de antes son texto en español
+// («Cambio de estado») y se muestran tal cual.
+const ACCESO: Record<string, TranslationKey> = {
+  "portal_acceso:invitada": "portal.historial.invitada",
+  "portal_acceso:enlace": "portal.historial.enlace",
+  "portal_acceso:correo": "portal.historial.correo",
+  "portal_acceso:quitada": "portal.historial.quitada",
+};
+
+const HistorialTabContent = ({ creatorId, creatorName }: Props) => {
   const f = useFormato();
   const { t } = useLanguage();
   const { data: entries, isLoading } = useQuery({
@@ -28,6 +44,29 @@ const HistorialTabContent = ({ creatorId }: Props) => {
       return data;
     },
   });
+  // Los nombres de quienes cambiaron algo (la gente de la agencia).
+  const ids = [...new Set((entries ?? []).map((e) => e.user_id))];
+  const { data: nombres } = useQuery({
+    queryKey: ["creator_history", creatorId, "nombres", ids.join(",")],
+    enabled: ids.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("profiles").select("id, full_name").in("id", ids);
+      if (error) throw error;
+      return new Map((data ?? []).map((p) => [p.id, p.full_name ?? ""]));
+    },
+  });
+
+  const desdePortal = (accion: string) => accion.startsWith("portal:");
+  const titulo = (accion: string) => {
+    if (ACCESO[accion]) return t(ACCESO[accion]);
+    const [origen, campo] = accion.split(":");
+    if ((origen === "ficha" || origen === "portal") && campo && esCampoFicha(campo)) {
+      return t("portal.acceso.cambio", { campo: t(ETIQUETA_AGENCIA[campo]) });
+    }
+    return accion;
+  };
+  const quien = (accion: string, uid: string) =>
+    nombres?.get(uid) || (desdePortal(accion) && creatorName) || shortId(uid);
 
   const formatDate = (dateStr: string) => {
     try {
@@ -87,11 +126,16 @@ const HistorialTabContent = ({ creatorId }: Props) => {
                 <div className="flex-1 min-w-0 space-y-1.5">
                   <div className="flex items-start justify-between gap-2">
                     <div className="space-y-1">
-                      <p className="text-sm font-semibold">{entry.action}</p>
+                      <p className="text-sm font-semibold">
+                        {titulo(entry.action)}
+                        {desdePortal(entry.action) && (
+                          <Badge variant="outline" className="ml-2 align-middle text-[10px]">{t("portal.historial.desdePortal")}</Badge>
+                        )}
+                      </p>
                       <p className="text-xs text-muted-foreground">
                         {t("creadores.history.modifiedBy")}{" "}
                         <Badge variant="secondary-soft" className="ml-1 text-[10px] px-1.5 py-0">
-                          {shortId(entry.user_id)}
+                          {quien(entry.action, entry.user_id)}
                         </Badge>
                       </p>
                     </div>
