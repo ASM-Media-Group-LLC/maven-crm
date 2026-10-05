@@ -1,5 +1,5 @@
 // El buzón de Zoho se borra al PURGAR la cuenta (migración
-// 20261005120000_buzon_zoho_al_purgar.sql), probado contra un Postgres de
+// 20261005120100_buzon_zoho_al_purgar.sql), probado contra un Postgres de
 // verdad (PGlite).
 //
 //   deno run -A --node-modules-dir=none --no-lock supabase/tests/buzones_por_borrar.ts
@@ -35,7 +35,7 @@ const leer = (rel: string) => Deno.readTextFileSync(new URL(rel, import.meta.url
 const PAPELERA = leer("../migrations/20260907190000_cuentas_recuperables_30_dias.sql");
 const REVOCA = leer("../migrations/20260916203000_baja_revoca_credencial_de_correo.sql");
 const PURGA = leer("../migrations/20260907200000_purga_cuentas_vencidas.sql");
-const NOMBRE = "20261005120000_buzon_zoho_al_purgar.sql";
+const NOMBRE = "20261005120100_buzon_zoho_al_purgar.sql";
 const MIG = leer(`../migrations/${NOMBRE}`);
 const VUELTA = MIG.split("\n").filter((l) => l.startsWith("--|")).map((l) => l.replace(/^--\| ?/, "")).join("\n");
 

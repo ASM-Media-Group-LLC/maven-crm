@@ -65,7 +65,7 @@ create table if not exists public.buzones_por_borrar (
 
 comment on table public.buzones_por_borrar is
   'Buzones de Zoho de cuentas purgadas, por borrar. La llenan las purgas (antes de '
-  'destruir la cuenta) y la vacía la edge buzones-por-borrar. Ver 20261005120000.';
+  'destruir la cuenta) y la vacía la edge buzones-por-borrar. Ver 20261005120100.';
 
 create index if not exists buzones_por_borrar_pendientes_idx
   on public.buzones_por_borrar (borrar_desde) where estado = 'pendiente';

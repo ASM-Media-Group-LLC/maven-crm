@@ -319,7 +319,7 @@ Deno.test("purga manual: averigua y encola el buzón antes de app_purge_user_ref
 });
 
 Deno.test("purga automática (SQL): encola el buzón antes de app_purge_user_refs", () => {
-  const sql = Deno.readTextFileSync(new URL("../../migrations/20261005120000_buzon_zoho_al_purgar.sql", import.meta.url));
+  const sql = Deno.readTextFileSync(new URL("../../migrations/20261005120100_buzon_zoho_al_purgar.sql", import.meta.url));
   const ini = sql.indexOf("create or replace function public.app_purgar_cuentas_vencidas(");
   const fin = sql.indexOf("$$;", ini);
   const f = sql.slice(ini, fin);
