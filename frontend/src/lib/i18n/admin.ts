@@ -56,7 +56,10 @@ export const admin = {
   "admin.users.theUser": { es: "El usuario", en: "The user" },
   "admin.users.theUserLower": { es: "el usuario", en: "the user" },
   "admin.users.deletedTitle": { es: "{name} quedó eliminado", en: "{name} was deleted" },
-  "admin.users.mailboxFreed": { es: "Se liberó el puesto de correo ({mailbox}).", en: "The email seat was freed ({mailbox})." },
+  "admin.users.mailboxKept": {
+    es: "Su casilla ({mailbox}) se conserva {days} días por si la recuperas; después se borra.",
+    en: "Their mailbox ({mailbox}) is kept for {days} days in case you restore the account; after that it's deleted.",
+  },
   "admin.users.couldNotCreate": { es: "No se pudo crear a {name}", en: "Couldn't create {name}" },
   "admin.users.colHrRecord": { es: "Ficha HR", en: "HR record" },
   "admin.users.colRegistered": { es: "Fecha de registro", en: "Sign-up date" },
@@ -74,8 +77,8 @@ export const admin = {
     en: "Anything deleted can be restored for {days} days.",
   },
   "admin.trash.intro": {
-    es: "Estas cuentas están suspendidas: no pueden entrar, pero no se borró ningún dato. Pasados {days} días se eliminan de forma definitiva. Al recuperar una, la casilla de correo **no** vuelve: se dio de baja para liberar el puesto y hay que crearla de nuevo.",
-    en: "These accounts are suspended: they can't sign in, but no data was deleted. After {days} days they're deleted for good. If you restore one, its mailbox does **not** come back: it was removed to free up the seat and has to be created again.",
+    es: "Estas cuentas están suspendidas: no pueden entrar, pero no se borró ningún dato, tampoco su casilla de correo. Pasados {days} días se eliminan de forma definitiva, y su casilla también. Al recuperar una, vuelve con su correo.",
+    en: "These accounts are suspended: they can't sign in, but no data was deleted, not even their mailbox. After {days} days they're deleted for good, mailbox included. If you restore one, it comes back with its email.",
   },
   "admin.trash.colDeleted": { es: "Eliminada", en: "Deleted" },
   "admin.trash.colBy": { es: "Por", en: "By" },
@@ -86,8 +89,8 @@ export const admin = {
   "admin.trash.purgeName": { es: "Borrar definitivamente a {name}", en: "Permanently delete {name}" },
   "admin.trash.purgeTitle": { es: "¿Borrar definitivamente a {name}?", en: "Permanently delete {name}?" },
   "admin.trash.purgeNoUndo": {
-    es: "Esto no se puede deshacer, y no espera los {days} días.",
-    en: "This can't be undone, and it doesn't wait for the {days} days.",
+    es: "Esto no se puede deshacer, y no espera los {days} días. Solo su casilla de correo espera: se borra cuando se cumplen.",
+    en: "This can't be undone, and it doesn't wait for the {days} days. Only their mailbox waits: it's deleted when they're up.",
   },
   "admin.trash.purgeWhat": {
     es: "Se van sus roles, su correo, sus horas de Cowork, las evaluaciones donde fue examinador y los espacios de chat o salas de Meet que haya creado (esos desaparecen para todos). Además, todo lo que creó en el CRM —creadoras, negocios, promos— queda sin autor.",
@@ -152,8 +155,8 @@ export const admin = {
   "admin.changeRole.newRole": { es: "Nuevo rol", en: "New role" },
   "admin.deleteUser.title": { es: "¿Eliminar usuario?", en: "Delete user?" },
   "admin.deleteUser.body": {
-    es: "Esta acción eliminará permanentemente al usuario **{name}** y todos sus datos asociados. Si tiene casilla de correo de Maven, también se elimina y se libera su puesto en Zoho. Esta acción no se puede deshacer.",
-    en: "This will permanently delete **{name}** and all their associated data. If they have a Maven mailbox, it's deleted too and their Zoho seat is freed. This can't be undone.",
+    es: "La cuenta de **{name}** queda suspendida: no puede entrar, pero no se borra ningún dato y la puedes recuperar durante {days} días desde Eliminadas. Su casilla de correo de Maven, si tiene, se conserva esos días y se borra al final.",
+    en: "**{name}**'s account is suspended: they can't sign in, but no data is deleted and you can restore it from Deleted for {days} days. Their Maven mailbox, if they have one, is kept for those days and deleted at the end.",
   },
   "admin.deleteRole.title": { es: "¿Eliminar rol?", en: "Delete role?" },
   "admin.deleteRole.body": {

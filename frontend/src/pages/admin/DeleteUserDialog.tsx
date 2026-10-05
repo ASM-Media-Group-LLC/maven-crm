@@ -2,6 +2,10 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useLanguage } from "@/hooks/useLanguage";
 import { ConFormato } from "./ConFormato";
 
+// Lo que dura la papelera (DIAS_DE_PAPELERA de _shared/buzon-por-borrar.ts en las
+// edges). La pestaña Eliminadas lo lee del servidor; este aviso sale antes.
+const DIAS_DE_PAPELERA = 30;
+
 interface DeleteUserDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -18,7 +22,7 @@ const DeleteUserDialog = ({ open, onOpenChange, userName, onConfirm, isLoading }
       <AlertDialogHeader>
         <AlertDialogTitle>{t("admin.deleteUser.title")}</AlertDialogTitle>
         <AlertDialogDescription>
-          <ConFormato texto={t("admin.deleteUser.body", { name: userName })} />
+          <ConFormato texto={t("admin.deleteUser.body", { name: userName, days: DIAS_DE_PAPELERA })} />
         </AlertDialogDescription>
       </AlertDialogHeader>
       <AlertDialogFooter>
