@@ -19,6 +19,7 @@ import { buildSocialUrl } from "@/lib/utils";
 import { useUserRole } from "@/hooks/useUserRole";
 import { etiquetaEstado } from "./etiquetasCreadora";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useAgenciaDeCreadoras } from "@/hooks/useAgenciaDeCreadoras";
 
 const statusVariant: Record<string, "success-soft" | "primary-soft" | "warning-soft" | "destructive-soft" | "secondary-soft"> = {
   active: "success-soft",
@@ -63,6 +64,7 @@ interface Props {
 
 const CreadoresGrid = ({ creators }: Props) => {
   const { t } = useLanguage();
+  const { agenciaDe } = useAgenciaDeCreadoras();
   const [viewingCreator, setViewingCreator] = useState<CreatorWithBusiness | null>(null);
   const { isAgent, isAdmin, isManager } = useUserRole();
   const canSeeAllData = isAdmin || isManager || !isAgent;
@@ -78,9 +80,8 @@ const CreadoresGrid = ({ creators }: Props) => {
           const location = showRealLocation
             ? [c.country, c.city].filter(Boolean).join(", ")
             : ((c as any).ubicacion_artistica || "");
-          const agency = c.creator_business?.company?.name ?? c.creator_business?.assigned_agency;
-          const kashType = c.creator_business?.kash_type;
-          const agencyLabel = [agency, kashType].filter(Boolean).join(" - ");
+          // «Kash Plus», «Atomick»… (antes «Kash - Plus»): la regla única.
+          const agencyLabel = agenciaDe(c.creator_business);
 
           return (
             <Card

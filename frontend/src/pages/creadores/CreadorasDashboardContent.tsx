@@ -20,6 +20,7 @@ import CreadoresHeader from "./CreadoresHeader";
 import { etiquetaEstado } from "./etiquetasCreadora";
 import type { TranslationKey } from "@/lib/i18n";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useAgenciaDeCreadoras } from "@/hooks/useAgenciaDeCreadoras";
 
 const emptyFilters = { search: "", agency: "", status: "", category: "", country: "", city: "", manager: "" };
 
@@ -49,6 +50,7 @@ const CATEGORIA_SALIDA: Record<string, TranslationKey> = {
 };
 
 const CreadorasDashboardContent = () => {
+  const { agenciaDe } = useAgenciaDeCreadoras();
   const f = useFormato();
   const { t } = useLanguage();
   // El nombre que se muestra de un grupo (las llaves "sin dato" se traducen).
@@ -128,7 +130,7 @@ const CreadorasDashboardContent = () => {
   const byAgency = useMemo(() => {
     const map: Record<string, number> = {};
     for (const c of allCreators) {
-      const a = c.creator_business?.company?.name ?? c.creator_business?.assigned_agency ?? SIN_AGENCIA;
+      const a = (agenciaDe(c.creator_business) || SIN_AGENCIA);
       map[a] = (map[a] ?? 0) + 1;
     }
     return Object.entries(map).sort((a, b) => b[1] - a[1]);
@@ -371,7 +373,7 @@ const CreadorasDashboardContent = () => {
                       <div className="hidden sm:flex items-center gap-4 text-right shrink-0">
                         <div>
                           <p className="text-xs text-muted-foreground">{t("creadores.table.colAgency")}</p>
-                          <p className="text-xs font-medium truncate max-w-[120px]">{c.creator_business?.company?.name ?? c.creator_business?.assigned_agency ?? "—"}</p>
+                          <p className="text-xs font-medium truncate max-w-[120px]">{(agenciaDe(c.creator_business) || "—")}</p>
                         </div>
                         <Badge variant="outline" className={`text-[10px] ${statusBadgeClass[c.status ?? ""] ?? ""}`}>
                           {etiquetaEstado(t, c.status)}
@@ -457,7 +459,7 @@ const CreadorasDashboardContent = () => {
             const igUrl = handle ? `https://instagram.com/${handle}` : null;
             const stats: { label: string; value: string }[] = [
               { label: t("common.status"), value: etiquetaEstado(t, c.status) },
-              { label: t("creadores.table.colAgency"), value: c.creator_business?.company?.name ?? c.creator_business?.assigned_agency ?? "—" },
+              { label: t("creadores.table.colAgency"), value: (agenciaDe(c.creator_business) || "—") },
               { label: t("common.country"), value: c.country ?? "—" },
               { label: t("common.category"), value: c.category ?? "—" },
               { label: t("creadores.dash.registered"), value: c.created_at ? format(new Date(c.created_at), "dd MMM yyyy", { locale: f.fechas }) : "—" },
@@ -609,9 +611,9 @@ const CreadorasDashboardContent = () => {
                     )}
                   </div>
                   <div className="hidden sm:flex items-center gap-3 text-right shrink-0">
-                    {(c.creator_business?.company?.name || c.creator_business?.assigned_agency) && (
+                    {agenciaDe(c.creator_business) && (
                       <span className="text-[10px] text-muted-foreground truncate max-w-[110px]">
-                        {c.creator_business?.company?.name ?? c.creator_business?.assigned_agency}
+                        {agenciaDe(c.creator_business)}
                       </span>
                     )}
                     {c.country && (

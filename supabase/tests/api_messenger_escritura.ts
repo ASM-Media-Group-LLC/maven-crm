@@ -88,6 +88,9 @@ const NO_CARGAN_AQUI: Record<string, string> = {
     "reescribe is_in_role_group y le suma tenant_id a user_roles, pero necesita roles_config, role_permissions, " +
     "role_base_grants y sus triggers. Con una agencia da lo mismo que prod persona por persona; se prueba en " +
     "roles_por_agencia.ts sobre el catálogo de prod.",
+  "20261006130000_agencia_lineas.sql":
+    "crea agencia_lineas (con FK a scouter_companies, que este fixture no trae) y le cambia el NOMBRE a una agencia " +
+    "(ASM Tech → Kash): el Messenger y su API usan el id de la agencia, nunca el nombre. Se prueba en agencia_lineas.ts.",
 };
 const DIR_MIG = new URL("../migrations/", import.meta.url);
 const CADENA: { n: string; sql: string }[] = [];

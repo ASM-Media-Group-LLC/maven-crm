@@ -33,6 +33,7 @@ import type { CreatorWithBusiness } from "./useCreadores";
 import { cleanHandle, buildSocialUrl, displayHandle } from "@/lib/utils";
 import { etiquetaEstado, conNombre, etiquetaIdioma } from "./etiquetasCreadora";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useAgenciaDeCreadoras } from "@/hooks/useAgenciaDeCreadoras";
 
 const statusVariant: Record<string, "success-soft" | "primary-soft" | "warning-soft" | "destructive-soft" | "secondary-soft"> = {
   active: "success-soft",
@@ -106,6 +107,7 @@ const SocialLink = ({ icon, handle, url, rawHandle }: { icon: React.ReactNode; h
 };
 
 const ViewCreadorModal = ({ open, onOpenChange, creator }: Props) => {
+  const { agenciaDe } = useAgenciaDeCreadoras();
   const f = useFormato();
   const { t } = useLanguage();
   const navigate = useNavigate();
@@ -220,7 +222,7 @@ const ViewCreadorModal = ({ open, onOpenChange, creator }: Props) => {
                 <InfoField icon={MapPin} label={t("common.location")} value={
                   <span>{flag && <span className="mr-1">{flag}</span>}{c.city || c.country || "—"}</span>
                 } />
-                <InfoField icon={Building2} label={t("creadores.table.colAgency")} value={c.creator_business?.company?.name ?? c.creator_business?.assigned_agency} />
+                <InfoField icon={Building2} label={t("creadores.table.colAgency")} value={agenciaDe(c.creator_business) || null} />
                 <InfoField icon={Mail} label={t("common.email")} value={c.email} />
                 <InfoField icon={Phone} label="WhatsApp" value={<WaChatButton creatorId={c.id} phone={toE164({ whatsapp: c.whatsapp_number, phone: c.phone })} name={c.name} />} />
                 <InfoField icon={Send} label="Telegram" value={(c.whatsapp_number || c.phone) ? <TgChatButton creatorId={c.id} phone={toE164({ whatsapp: c.whatsapp_number, phone: c.phone })} name={c.name} /> : null} />
