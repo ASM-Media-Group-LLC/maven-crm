@@ -300,3 +300,16 @@ Deno.test("miniaturas: el vencimiento es el mismo durante un tramo (la URL se re
     assert(resta > 6 * 3600 && resta <= 12 * 3600, `quedan ${resta / 3600} h`);
   }
 });
+
+// ── Los tipos por la firma (Jhon, 06/10) ─────────────────────────────────────
+Deno.test("validarTipos: agrupa por tipo, sin repetir; solo uuid y tipos de la lista", async () => {
+  const { validarTipos, TOPE_TIPOS } = await import("./logica.ts");
+  const a = "11111111-1111-4111-8111-111111111111", b = "22222222-2222-4222-8222-222222222222";
+  const g = validarTipos([{ id: a, mime: "video/mp4" }, { id: b, mime: "video/mp4" }, { id: a, mime: "video/mp4" }]);
+  if (JSON.stringify([...g]) !== JSON.stringify([["video/mp4", [a, b]]])) throw new Error(JSON.stringify([...g]));
+  const falla = (x: unknown) => { try { validarTipos(x); return false; } catch { return true; } };
+  if (!falla([])) throw new Error("vacío");
+  if (!falla([{ id: "x", mime: "video/mp4" }])) throw new Error("id");
+  if (!falla([{ id: a, mime: "text/html" }])) throw new Error("un tipo fuera de la lista (html) no entra");
+  if (!falla(Array.from({ length: TOPE_TIPOS + 1 }, () => ({ id: a, mime: "video/mp4" })))) throw new Error("tope");
+});

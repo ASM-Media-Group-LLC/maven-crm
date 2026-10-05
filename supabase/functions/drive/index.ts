@@ -28,7 +28,7 @@ import { corsFor } from "../_shared/cors.ts";
 import { ahoraMas, firmar, verificar, VENCE } from "../_shared/drive-firma.ts";
 import {
   armarIndice, chequearCupo, chequearEspacioDeLaAgencia, hayLugarEnElNas, HttpError, madresQueFaltanEnElLote, nombreValido,
-  planDeSubida, TAMANO_PARTE, validarLote, validarUnidades, type ItemParaIndice,
+  planDeSubida, TAMANO_PARTE, validarLote, validarUnidades, type ItemParaIndice, validarTipos,
 } from "./logica.ts";
 import {
   armarListaDelZip, CuentaDelZip, entraEnElZip, idsParaZip, nombreDelZip, PROFUNDIDAD_ZIP, TOPE_ZIP_ENTRADAS, TOPE_ZIP_PERMISO,
@@ -119,6 +119,30 @@ Deno.serve(async (req) => {
         if (error) throw new HttpError(error.message, 400);
       }
       return responder({ ok: true, items: filas.length, compartidos: shares.length, unidades: unidades.length });
+    }
+
+    // ── El tipo real de los archivos sin extensión (lo pide la MINI) ─────────
+    // Sin sesión: permiso firmado op «tipos». La mini pide los que faltan, lee
+    // sus primeros bytes en el NAS y manda el tipo; la base solo lo cambia si
+    // sigue genérico y sin tocar la fecha (20261006150000_drive_tipos_por_firma).
+    if (body.action === "tipos_pendientes" || body.action === "tipos_corregir") {
+      const p = await verificar(secreto, String(body.permiso ?? ""));
+      if (!p || p.op !== "tipos") throw new HttpError("Permiso inválido", 403);
+      const admin = createClient(url, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+      if (body.action === "tipos_pendientes") {
+        const desde = typeof body.desde === "string" && body.desde.length === 36 ? body.desde : null;
+        const { data, error } = await admin.rpc("drive_sin_tipo", { p_desde: desde, p_limite: 1000 });
+        if (error) throw new HttpError(error.message, 500);
+        const items = (data ?? []) as { id: string; storage_key: string }[];
+        return responder({ items, siguiente: items.length === 1000 ? items[items.length - 1].id : null });
+      }
+      let corregidos = 0;
+      for (const [mime, ids] of validarTipos(body.tipos)) {
+        const { data, error } = await admin.rpc("drive_corregir_tipos", { p_ids: ids, p_mime: mime });
+        if (error) throw new HttpError(error.message, 400);
+        corregidos += Number(data ?? 0);
+      }
+      return responder({ ok: true, corregidos });
     }
 
     const authHeader = req.headers.get("Authorization") ?? "";
