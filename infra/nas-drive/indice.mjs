@@ -26,24 +26,60 @@ export const COLUMNAS = [
 ];
 const DIAS_QUE_SE_GUARDAN = 30;
 
-/** CSV que Excel abre bien: BOM para que lea UTF-8 (acentos), comillas
- *  dobles escapadas, y todo campo entre comillas si trae coma, comilla o
- *  salto de línea. */
+// ⚠️ POR PARTES (03/10): con el archivo de Google el índice pasó de 2 filas a
+// 890.000 y armarlo como UN texto (CSV entero, JSON con sangría) superó el
+// tope de largo de un string de Node: «Invalid string length» en los dos
+// discos, y esa noche no hubo índice. Ahora se escribe de a FILAS_POR_PARTE.
+const FILAS_POR_PARTE = 2000;
+
+const celdaCsv = (v) => {
+  const s = v === null || v === undefined ? "" : String(v);
+  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+};
+
+/** El CSV de a pedazos. CSV que Excel abre bien: BOM para que lea UTF-8
+ *  (acentos), comillas dobles escapadas, y todo campo entre comillas si trae
+ *  coma, comilla o salto de línea. */
+export function* partesCsv(filas) {
+  yield "\uFEFF" + COLUMNAS.join(",") + "\r\n";
+  for (let i = 0; i < filas.length; i += FILAS_POR_PARTE) {
+    let parte = "";
+    for (const f of filas.slice(i, i + FILAS_POR_PARTE)) parte += COLUMNAS.map((c) => celdaCsv(f[c])).join(",") + "\r\n";
+    yield parte;
+  }
+}
+
+/** El JSON de a pedazos: { generado, agencia_id, filas: [ ...una por línea ] }. */
+export function* partesJson({ generado, agencia_id, filas }) {
+  yield `{\n "generado": ${JSON.stringify(generado ?? null)},\n "agencia_id": ${JSON.stringify(agencia_id)},\n "filas": [`;
+  for (let i = 0; i < filas.length; i += FILAS_POR_PARTE) {
+    yield (i ? ",\n  " : "\n  ") + filas.slice(i, i + FILAS_POR_PARTE).map((f) => JSON.stringify(f)).join(",\n  ");
+  }
+  yield filas.length ? "\n ]\n}\n" : "]\n}\n";
+}
+
+/** El CSV entero como un texto (para lo chico y las pruebas). */
 export function aCsv(filas) {
-  const celda = (v) => {
-    const s = v === null || v === undefined ? "" : String(v);
-    return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-  };
-  const lineas = [COLUMNAS.join(",")];
-  for (const f of filas) lineas.push(COLUMNAS.map((c) => celda(f[c])).join(","));
-  return "﻿" + lineas.join("\r\n") + "\r\n";
+  return [...partesCsv(filas)].join("");
 }
 
 /** Escribe a un temporal y lo pone en su lugar: si se corta a mitad, el
  *  «actual» de ayer sigue entero en vez de quedar un archivo roto. */
-async function escribirAtomico(destino, contenido) {
+async function escribirAtomico(destino, partes) {
   const tmp = `${destino}.tmp-${process.pid}`;
-  await fsp.writeFile(tmp, contenido);
+  const fh = await fsp.open(tmp, "w");
+  try {
+    for (const parte of partes) await fh.write(parte);
+  } finally {
+    await fh.close();
+  }
+  await fsp.rename(tmp, destino);
+}
+
+/** «actual» = copia del de hoy, también a un temporal primero. */
+async function copiarAtomico(origen, destino) {
+  const tmp = `${destino}.tmp-${process.pid}`;
+  await fsp.copyFile(origen, tmp);
   await fsp.rename(tmp, destino);
 }
 
@@ -67,12 +103,10 @@ export async function escribirIndice({ raices, filas, generado, fecha, conservar
         if (!/^[0-9a-f-]{36}$/.test(agencia)) continue; // nunca una ruta rara
         const dir = path.join(raiz, agencia, "_indice");
         await fsp.mkdir(dir, { recursive: true });
-        const csv = aCsv(lista);
-        const json = JSON.stringify({ generado, agencia_id: agencia, filas: lista }, null, 1);
-        await escribirAtomico(path.join(dir, `${fecha}.csv`), csv);
-        await escribirAtomico(path.join(dir, `${fecha}.json`), json);
-        await escribirAtomico(path.join(dir, "actual.csv"), csv);
-        await escribirAtomico(path.join(dir, "actual.json"), json);
+        await escribirAtomico(path.join(dir, `${fecha}.csv`), partesCsv(lista));
+        await escribirAtomico(path.join(dir, `${fecha}.json`), partesJson({ generado, agencia_id: agencia, filas: lista }));
+        await copiarAtomico(path.join(dir, `${fecha}.csv`), path.join(dir, "actual.csv"));
+        await copiarAtomico(path.join(dir, `${fecha}.json`), path.join(dir, "actual.json"));
         // Los de más de N días se van; «actual» nunca.
         const fechas = [...new Set((await fsp.readdir(dir))
           .map((n) => n.match(/^(\d{4}-\d{2}-\d{2})\.(csv|json)$/)?.[1]).filter(Boolean))].sort();
