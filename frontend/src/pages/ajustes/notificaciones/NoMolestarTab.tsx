@@ -5,30 +5,32 @@ import { Input } from "@/components/ui/input";
 import { useNotificationSettings } from "@/hooks/useNotificationSettings";
 import { toast } from "sonner";
 import { Moon, Clock, ShieldCheck } from "lucide-react";
+import { useLanguage } from "@/hooks/useLanguage";
 
 const NoMolestarTab = () => {
   const { settings, updateSettings } = useNotificationSettings();
+  const { t } = useLanguage();
 
   const handleToggle = (key: string, current: boolean) => {
     updateSettings.mutate(
       { [key]: !current } as any,
-      { onSuccess: () => toast.success("Preferencia actualizada") }
+      { onSuccess: () => toast.success(t("settings.notif.prefUpdated")) }
     );
   };
 
   const handleTimeChange = (key: string, value: string) => {
     updateSettings.mutate(
       { [key]: value } as any,
-      { onSuccess: () => toast.success("Horario actualizado") }
+      { onSuccess: () => toast.success(t("settings.notif.dnd.scheduleUpdated")) }
     );
   };
 
   return (
     <Card className="border-border">
       <CardHeader className="pb-3">
-        <CardTitle className="text-base">Modo No Molestar</CardTitle>
+        <CardTitle className="text-base">{t("settings.notif.dnd.title")}</CardTitle>
         <CardDescription className="text-xs">
-          Silencia notificaciones durante ciertos periodos. Las notificaciones se almacenarán y podrás verlas después.
+          {t("settings.notif.dnd.desc")}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -37,9 +39,9 @@ const NoMolestarTab = () => {
           <div className="flex items-start gap-3">
             <Moon className="h-4 w-4 mt-0.5 text-muted-foreground" />
             <div>
-              <Label className="text-sm font-medium">Activar No Molestar</Label>
+              <Label className="text-sm font-medium">{t("settings.notif.dnd.enable")}</Label>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Silenciar todas las notificaciones no críticas
+                {t("settings.notif.dnd.enableDesc")}
               </p>
             </div>
           </div>
@@ -56,14 +58,14 @@ const NoMolestarTab = () => {
               <Clock className="h-4 w-4 mt-0.5 text-muted-foreground" />
               <div className="space-y-3 flex-1">
                 <div>
-                  <Label className="text-sm font-medium">Horario</Label>
+                  <Label className="text-sm font-medium">{t("settings.notif.dnd.schedule")}</Label>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Define el periodo de silencio
+                    {t("settings.notif.dnd.scheduleDesc")}
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="space-y-1">
-                    <Label className="text-[11px] text-muted-foreground">Desde</Label>
+                    <Label className="text-[11px] text-muted-foreground">{t("settings.notif.dnd.from")}</Label>
                     <Input
                       type="time"
                       className="w-32 text-xs h-8"
@@ -73,7 +75,7 @@ const NoMolestarTab = () => {
                   </div>
                   <span className="text-muted-foreground mt-5">—</span>
                   <div className="space-y-1">
-                    <Label className="text-[11px] text-muted-foreground">Hasta</Label>
+                    <Label className="text-[11px] text-muted-foreground">{t("settings.notif.dnd.to")}</Label>
                     <Input
                       type="time"
                       className="w-32 text-xs h-8"
@@ -90,10 +92,11 @@ const NoMolestarTab = () => {
               <div className="flex items-start gap-3">
                 <ShieldCheck className="h-4 w-4 mt-0.5 text-muted-foreground" />
                 <div>
-                  <Label className="text-sm font-medium">Excepciones para críticas</Label>
+                  <Label className="text-sm font-medium">{t("settings.notif.dnd.critical")}</Label>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Permitir notificaciones de prioridad crítica incluso durante No Molestar
+                    {t("settings.notif.dnd.criticalDesc")}
                   </p>
+
                 </div>
               </div>
               <Switch

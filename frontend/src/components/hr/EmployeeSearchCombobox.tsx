@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useEmployees } from "@/hooks/useEmployees";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface EmployeeSearchComboboxProps {
   value: string | null;
@@ -13,7 +14,8 @@ interface EmployeeSearchComboboxProps {
   excludeId?: string;
 }
 
-export function EmployeeSearchCombobox({ value, onChange, placeholder = "Seleccionar empleado...", excludeId }: EmployeeSearchComboboxProps) {
+export function EmployeeSearchCombobox({ value, onChange, placeholder, excludeId }: EmployeeSearchComboboxProps) {
+  const { t } = useLanguage();
   const [open, setOpen] = useState(false);
   const { data: employees = [] } = useEmployees();
 
@@ -24,19 +26,19 @@ export function EmployeeSearchCombobox({ value, onChange, placeholder = "Selecci
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button variant="outline" role="combobox" aria-expanded={open} className="w-full justify-between font-normal">
-          {selected ? `${selected.first_name} ${selected.last_name}` : placeholder}
+          {selected ? `${selected.first_name} ${selected.last_name}` : (placeholder ?? t("shared.employeePicker.placeholder"))}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-full p-0" align="start">
         <Command>
-          <CommandInput placeholder="Buscar empleado..." />
+          <CommandInput placeholder={t("shared.employeePicker.search")} />
           <CommandList>
-            <CommandEmpty>No se encontró ningún empleado.</CommandEmpty>
+            <CommandEmpty>{t("shared.employeePicker.empty")}</CommandEmpty>
             <CommandGroup className="max-h-60 overflow-y-auto">
             <CommandItem value="" onSelect={() => { onChange(null); setOpen(false); }} className="text-muted-foreground">
               <User className="mr-2 h-4 w-4" />
-              Ninguno
+              {t("common.none")}
             </CommandItem>
             {filtered.map((emp) => (
               <CommandItem

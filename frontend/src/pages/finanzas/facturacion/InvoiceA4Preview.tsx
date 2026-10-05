@@ -30,6 +30,7 @@ interface InvoiceData {
 }
 
 function fmt(n: number) {
+  // Idioma fijo a propósito: es la factura que se exporta a PDF para la creadora, no texto de pantalla.
   return new Intl.NumberFormat("es-CO", { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(n);
 }
 
@@ -47,6 +48,7 @@ export default function InvoiceA4Preview({ invoice, template, zoom = DEFAULT_ZOO
   const creatorPhone = invoice.creators?.phone || "—";
   const rawBiz = invoice.creators?.creator_business;
   const billingAddress = (Array.isArray(rawBiz) ? rawBiz[0]?.billing_address : rawBiz?.billing_address) || "—";
+  // Idioma fijo a propósito: es la factura que se exporta a PDF para la creadora, no texto de pantalla.
   const invoiceDate = invoice.created_at
     ? new Date(invoice.created_at).toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" })
     : new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
@@ -60,8 +62,10 @@ export default function InvoiceA4Preview({ invoice, template, zoom = DEFAULT_ZOO
 
   const addressLines = companyAddress.split("\n");
 
+  // data-documento: esto es el documento (va en español siempre, lo recibe la creadora),
+  // no la pantalla. El test de Finanzas en inglés lo saltea por esta marca.
   return (
-    <div style={{ width: A4_W * zoom, height: A4_H * zoom, flexShrink: 0 }}>
+    <div data-documento style={{ width: A4_W * zoom, height: A4_H * zoom, flexShrink: 0 }}>
       <div
         style={{ width: A4_W, height: A4_H, transform: `scale(${zoom})`, transformOrigin: "top left" }}
         className="bg-white rounded shadow-2xl p-10 font-serif text-black text-[11px] leading-relaxed flex flex-col"
@@ -107,6 +111,7 @@ export default function InvoiceA4Preview({ invoice, template, zoom = DEFAULT_ZOO
           <p className="font-semibold text-gray-800">Invoice details</p>
           <p><span className="font-semibold text-gray-800">Invoice no.: </span><span className="text-gray-600">{invoice.invoice_number || "—"}</span></p>
           <p><span className="font-semibold text-gray-800">Invoice date: </span><span className="text-gray-600">{invoiceDate}</span></p>
+          {/* Idioma fijo a propósito: es la factura que se exporta a PDF para la creadora, no texto de pantalla. */}
           <p><span className="font-semibold text-gray-800">Due date: </span><span className="text-gray-600">{invoice.due_date ? new Date(invoice.due_date + "T12:00:00").toLocaleDateString("es-ES") : "—"}</span></p>
           {invoice.payment_method && (
             <p><span className="font-semibold text-gray-800">Payment: </span><span className="text-gray-600">{invoice.payment_method}</span></p>

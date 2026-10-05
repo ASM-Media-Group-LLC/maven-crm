@@ -15,20 +15,42 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
-import { ABSENCE_TYPES, INCIDENT_SEVERITIES, TRAINING_STATUSES, PERFORMANCE_EVALUATION_STATUSES, HISTORY_CHANGE_TYPES, HISTORY_FIELD_LABELS } from "@/lib/hrConstants";
-import { SEVERITY_COLORS } from "@/lib/hrAreaUtils";
+import { useFormato } from "@/hooks/useFormato";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/ui/page-header";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { Language, TranslationKey } from "@/lib/i18n";
+import { etiquetaHrV, rolHr, valorGuardado, type GrupoHr, type Traductor } from "./etiquetasHr";
 
-const ROLE_LABELS: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-  admin: { label: "Admin", variant: "destructive" },
-  manager: { label: "Manager", variant: "default" },
-  employee: { label: "Empleado", variant: "secondary" },
-  supervisor: { label: "Supervisor", variant: "default" },
-  agent: { label: "Agente", variant: "secondary" },
-  closer: { label: "Closer", variant: "secondary" },
+// El rol vinculado, como lo nombraba esta ficha: estos seis con su nombre y
+// cualquier otro con el valor tal cual. En inglés, los que no están acá salen
+// de rolHr (etiquetasHr.ts).
+const ROLE_LABELS: Record<string, { label: TranslationKey | null; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+  // label null: se escribe igual en los dos idiomas.
+  admin: { label: null, variant: "destructive" },
+  manager: { label: null, variant: "default" },
+  employee: { label: "hrg.opt.hrRole.employee", variant: "secondary" },
+  supervisor: { label: null, variant: "default" },
+  agent: { label: "hrg.opt.hrRole.agent", variant: "secondary" },
+  closer: { label: null, variant: "secondary" },
 };
+const NOMBRE_FIJO: Record<string, string> = { admin: "Admin", manager: "Manager", supervisor: "Supervisor", closer: "Closer" };
+function nombreRol(t: Traductor, idioma: Language, rol: string): string {
+  const cfg = ROLE_LABELS[rol];
+  if (cfg) return cfg.label ? t(cfg.label) : NOMBRE_FIJO[rol];
+  return idioma === "en" ? rolHr(t, rol) : rol;
+}
+
+// El historial guarda valores crudos (old_value/new_value) y así se leen en
+// español. En inglés, los campos que son una lista conocida se leen con su
+// etiqueta; el resto (ids, salario) tal cual.
+const GRUPO_POR_CAMPO: Record<string, GrupoHr> = {
+  status: "empStatus",
+  contract_type: "contract",
+  work_modality: "modality",
+};
+const valorHistorial = (t: Traductor, idioma: Language, campo: string, valor: string) =>
+  GRUPO_POR_CAMPO[campo] ? valorGuardado(t, idioma, GRUPO_POR_CAMPO[campo], valor) : valor;
 
 const MODALITY_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   remoto: Wifi,
@@ -39,6 +61,11 @@ const MODALITY_ICONS: Record<string, React.ComponentType<{ className?: string }>
 export default function EmployeeProfile() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const f = useFormato();
+  const { t, language } = useLanguage();
+  // Los valores guardados que esta ficha mostraba tal cual ("fijo", "ahorros",
+  // "pending"…): en español se siguen viendo así; en inglés, con su etiqueta.
+  const crudo = <V extends string | null | undefined>(grupo: GrupoHr, valor: V) => valorGuardado(t, language, grupo, valor);
   const { data: employee, isLoading } = useEmployee(id);
   const { data: absences = [] } = useEmployeeAbsences(id);
   const { data: incidents = [] } = useEmployeeIncidents(id);
@@ -75,9 +102,9 @@ export default function EmployeeProfile() {
     return (
       <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
         <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-          <p className="text-muted-foreground">Empleado no encontrado.</p>
+          <p className="text-muted-foreground">{t("hrg.prof.notFound")}</p>
           <Button variant="ghost" size="sm" className="mt-4" onClick={() => navigate("/hr/directorio")}>
-            <ArrowLeft className="h-4 w-4 mr-1" /> Volver al directorio
+            <ArrowLeft className="h-4 w-4 mr-1" /> {t("hrg.prof.backToDirectory")}
           </Button>
         </div>
       </main>
@@ -91,7 +118,7 @@ export default function EmployeeProfile() {
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
       <header className="shrink-0 border-b border-white/10 bg-background/30 backdrop-blur-xl px-6 py-4">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/hr/directorio")}>
+          <Button variant="ghost" size="icon" onClick={() => navigate("/hr/directorio")} aria-label={t("hrg.prof.backToDirectory")}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="flex-1 min-w-0">
@@ -103,7 +130,7 @@ export default function EmployeeProfile() {
                   {employee.positions?.name && <Badge variant="outline">{employee.positions.name}</Badge>}
                 </span>
               }
-              subtitle={[employee.employee_code, employee.departments?.name, employee.hire_date ? `Ingreso: ${format(new Date(employee.hire_date), "dd/MM/yyyy")}` : null].filter(Boolean).join(" · ")}
+              subtitle={[employee.employee_code, employee.departments?.name, employee.hire_date ? t("hrg.prof.hiredOn", { date: format(new Date(employee.hire_date), "dd/MM/yyyy") }) : null].filter(Boolean).join(" · ")}
             />
           </div>
         </div>
@@ -113,22 +140,22 @@ export default function EmployeeProfile() {
         {/* Tabs */}
         <Tabs defaultValue="resumen">
           <TabsList className="flex-wrap h-auto gap-1">
-            <TabsTrigger value="resumen">Resumen</TabsTrigger>
-            <TabsTrigger value="info-laboral">Info Laboral</TabsTrigger>
-            <TabsTrigger value="tiempo">Control de Tiempo</TabsTrigger>
-            <TabsTrigger value="desempeno">Desempeño ({performance.length})</TabsTrigger>
-            <TabsTrigger value="documentos">Documentos ({documents.length})</TabsTrigger>
+            <TabsTrigger value="resumen">{t("hrg.prof.tab.summary")}</TabsTrigger>
+            <TabsTrigger value="info-laboral">{t("hrg.prof.tab.work")}</TabsTrigger>
+            <TabsTrigger value="tiempo">{t("hrg.prof.tab.time")}</TabsTrigger>
+            <TabsTrigger value="desempeno">{t("hrg.prof.tab.performance", { n: performance.length })}</TabsTrigger>
+            <TabsTrigger value="documentos">{t("hrg.prof.tab.documents", { n: documents.length })}</TabsTrigger>
             <TabsTrigger value="finanzas">
               <DollarSign className="h-3.5 w-3.5 mr-1" />
-              Finanzas
+              {t("hrg.prof.tab.finance")}
             </TabsTrigger>
             <TabsTrigger value="historial">
               <History className="h-3.5 w-3.5 mr-1" />
-              Historial ({history.length})
+              {t("hrg.prof.tab.history", { n: history.length })}
             </TabsTrigger>
             <TabsTrigger value="acceso" className="flex items-center gap-1.5">
               <Link2 className="h-3.5 w-3.5" />
-              Acceso
+              {t("hrg.prof.tab.access")}
               <span className={cn("h-2 w-2 rounded-full inline-block", employee?.profile_id ? "bg-primary" : "bg-muted-foreground/40")} />
             </TabsTrigger>
           </TabsList>
@@ -146,16 +173,16 @@ export default function EmployeeProfile() {
                     )}
                   </div>
                   <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                    <InfoField label="Cargo" value={employee.positions?.name} />
-                    <InfoField label="Departamento">
+                    <InfoField label={t("hrg.opt.histField.position_id")} value={employee.positions?.name} />
+                    <InfoField label={t("hrg.department")}>
                       <EmployeeAreaBadge departmentName={employee.departments?.name} departmentCode={employee.departments?.code} />
                     </InfoField>
-                    <InfoField label="Contrato" value={employee.contract_type} capitalize />
-                    <InfoField label="Ingreso" value={employee.hire_date ? format(new Date(employee.hire_date), "dd/MM/yyyy") : undefined} />
-                    <InfoField label="Modalidad">
+                    <InfoField label={t("hrg.dir.contract")} value={crudo("contract", employee.contract_type)} capitalize={language !== "en"} />
+                    <InfoField label={t("hrg.dir.hired")} value={employee.hire_date ? format(new Date(employee.hire_date), "dd/MM/yyyy") : undefined} />
+                    <InfoField label={t("hrg.dir.modality")}>
                       <div className="flex items-center gap-1.5 mt-1">
                         <ModalityIcon className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span className="text-sm font-medium capitalize">{employee.work_modality ?? "—"}</span>
+                        <span className={cn("text-sm font-medium", language !== "en" && "capitalize")}>{crudo("modality", employee.work_modality) ?? "—"}</span>
                       </div>
                     </InfoField>
                     {employee.email && (
@@ -180,41 +207,41 @@ export default function EmployeeProfile() {
           <TabsContent value="info-laboral" className="mt-4 space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Card>
-                <CardHeader className="pb-2"><CardTitle className="text-sm">Datos Personales</CardTitle></CardHeader>
+                <CardHeader className="pb-2"><CardTitle className="text-sm">{t("hrg.prof.personal")}</CardTitle></CardHeader>
                 <CardContent className="space-y-2 text-sm">
-                  <InfoRow label="Nombre" value={fullName} />
-                  <InfoRow label="Documento" value={employee.national_id ? `${employee.national_id_type ?? "CC"}: ${employee.national_id}` : undefined} />
-                  <InfoRow label="Fecha Nac." value={employee.birth_date ? format(new Date(employee.birth_date), "dd/MM/yyyy") : undefined} />
-                  <InfoRow label="Género" value={employee.gender} />
-                  <InfoRow label="Ciudad" value={employee.city} />
-                  <InfoRow label="Dirección" value={employee.address} />
+                  <InfoRow label={t("common.name")} value={fullName} />
+                  <InfoRow label={t("hrg.prof.document")} value={employee.national_id ? `${employee.national_id_type ?? "CC"}: ${employee.national_id}` : undefined} />
+                  <InfoRow label={t("hrg.prof.birthDate")} value={employee.birth_date ? format(new Date(employee.birth_date), "dd/MM/yyyy") : undefined} />
+                  <InfoRow label={t("hrg.prof.gender")} value={crudo("gender", employee.gender)} />
+                  <InfoRow label={t("common.city")} value={employee.city} />
+                  <InfoRow label={t("common.address")} value={employee.address} />
                 </CardContent>
               </Card>
               <Card>
-                <CardHeader className="pb-2"><CardTitle className="text-sm">Seguridad Social</CardTitle></CardHeader>
+                <CardHeader className="pb-2"><CardTitle className="text-sm">{t("hrg.prof.socialSecurity")}</CardTitle></CardHeader>
                 <CardContent className="space-y-2 text-sm">
                   <InfoRow label="EPS" value={employee.eps} />
                   <InfoRow label="ARL" value={employee.arl} />
                   <InfoRow label="AFP" value={employee.afp} />
-                  <InfoRow label="Caja de Comp." value={employee.caja_compensacion} />
+                  <InfoRow label={t("hrg.prof.compensationFund")} value={employee.caja_compensacion} />
                 </CardContent>
               </Card>
               <Card>
-                <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><CreditCard className="h-4 w-4" />Datos Bancarios</CardTitle></CardHeader>
+                <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><CreditCard className="h-4 w-4" />{t("hrg.bankDetails")}</CardTitle></CardHeader>
                 <CardContent className="space-y-2 text-sm">
-                  <InfoRow label="Banco" value={employee.bank_name} />
-                  <InfoRow label="No. Cuenta" value={employee.bank_account_number} />
-                  <InfoRow label="Tipo" value={employee.bank_account_type} />
-                  <InfoRow label="Salario Base" value={employee.base_salary ? `$${employee.base_salary.toLocaleString("es-CO")}` : undefined} />
-                  <InfoRow label="Frecuencia" value={employee.salary_frequency} />
+                  <InfoRow label={t("hrg.bank")} value={employee.bank_name === "Otro" ? t("hrg.onb.otherBank") : employee.bank_name} />
+                  <InfoRow label={t("hrg.prof.accountNo")} value={employee.bank_account_number} />
+                  <InfoRow label={t("common.type")} value={crudo("bankAccount", employee.bank_account_type)} />
+                  <InfoRow label={t("hrg.opt.histField.base_salary")} value={employee.base_salary ? `$${employee.base_salary.toLocaleString(f.intl("es-CO"))}` : undefined} />
+                  <InfoRow label={t("hrg.prof.frequency")} value={crudo("salaryFreq", employee.salary_frequency)} />
                 </CardContent>
               </Card>
               <Card>
-                <CardHeader className="pb-2"><CardTitle className="text-sm">Contacto de Emergencia</CardTitle></CardHeader>
+                <CardHeader className="pb-2"><CardTitle className="text-sm">{t("hrg.prof.emergency")}</CardTitle></CardHeader>
                 <CardContent className="space-y-2 text-sm">
-                  <InfoRow label="Nombre" value={employee.emergency_contact_name} />
-                  <InfoRow label="Teléfono" value={employee.emergency_contact_phone} />
-                  <InfoRow label="Parentesco" value={employee.emergency_contact_relation} />
+                  <InfoRow label={t("common.name")} value={employee.emergency_contact_name} />
+                  <InfoRow label={t("common.phone")} value={employee.emergency_contact_phone} />
+                  <InfoRow label={t("hrg.prof.relationship")} value={employee.emergency_contact_relation} />
                 </CardContent>
               </Card>
             </div>
@@ -226,29 +253,29 @@ export default function EmployeeProfile() {
               {/* Attendance summary */}
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm flex items-center gap-2"><Clock className="h-4 w-4" />Asistencia (30 días)</CardTitle>
+                  <CardTitle className="text-sm flex items-center gap-2"><Clock className="h-4 w-4" />{t("hrg.prof.attendance30")}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {attendanceSummary ? (
                     <div className="grid grid-cols-3 gap-2 text-center">
                       <div>
                         <p className="text-2xl font-bold text-success">{attendanceSummary.present}</p>
-                        <p className="text-xs text-muted-foreground">Presentes</p>
+                        <p className="text-xs text-muted-foreground">{t("hrg.att.kpi.present")}</p>
                       </div>
                       <div>
                         <p className="text-2xl font-bold text-warning">{attendanceSummary.late}</p>
-                        <p className="text-xs text-muted-foreground">Tardanzas</p>
+                        <p className="text-xs text-muted-foreground">{t("hrg.att.kpi.late")}</p>
                       </div>
                       <div>
                         <p className="text-2xl font-bold text-destructive">{attendanceSummary.absent}</p>
-                        <p className="text-xs text-muted-foreground">Ausencias</p>
+                        <p className="text-xs text-muted-foreground">{t("hrg.prof.absences")}</p>
                       </div>
                     </div>
                   ) : (
                     <Skeleton className="h-16" />
                   )}
                   <Button variant="outline" size="sm" className="w-full" onClick={() => navigate("/hr/asistencia")}>
-                    <ExternalLink className="h-3.5 w-3.5 mr-2" />Ver detalle
+                    <ExternalLink className="h-3.5 w-3.5 mr-2" />{t("hrg.viewDetail")}
                   </Button>
                 </CardContent>
               </Card>
@@ -256,7 +283,7 @@ export default function EmployeeProfile() {
               {/* Hour bank */}
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm flex items-center gap-2"><Clock className="h-4 w-4" />Banco de Horas</CardTitle>
+                  <CardTitle className="text-sm flex items-center gap-2"><Clock className="h-4 w-4" />{t("hrg.hourBank")}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {hourBankBalance ? (
@@ -264,13 +291,13 @@ export default function EmployeeProfile() {
                       <p className={cn("text-3xl font-bold", hourBankBalance.balance >= 0 ? "text-success" : "text-destructive")}>
                         {hourBankBalance.balance >= 0 ? "+" : ""}{hourBankBalance.balance.toFixed(1)}h
                       </p>
-                      <p className="text-xs text-muted-foreground">{hourBankBalance.movements} movimientos</p>
+                      <p className="text-xs text-muted-foreground">{t("hrg.prof.movements", { n: hourBankBalance.movements })}</p>
                     </div>
                   ) : (
                     <Skeleton className="h-16" />
                   )}
                   <Button variant="outline" size="sm" className="w-full" onClick={() => navigate("/hr/horarios/banco-horas")}>
-                    <ExternalLink className="h-3.5 w-3.5 mr-2" />Ver detalle
+                    <ExternalLink className="h-3.5 w-3.5 mr-2" />{t("hrg.viewDetail")}
                   </Button>
                 </CardContent>
               </Card>
@@ -278,23 +305,23 @@ export default function EmployeeProfile() {
               {/* Vacations */}
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm flex items-center gap-2"><Calendar className="h-4 w-4" />Vacaciones {new Date().getFullYear()}</CardTitle>
+                  <CardTitle className="text-sm flex items-center gap-2"><Calendar className="h-4 w-4" />{t("hrg.prof.vacationYear", { year: new Date().getFullYear() })}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {vacationBalance ? (
                     <div className="text-center space-y-2">
                       <p className="text-3xl font-bold text-primary">{vacationBalance.available - vacationBalance.taken}</p>
-                      <p className="text-xs text-muted-foreground">días disponibles de {vacationBalance.total}</p>
+                      <p className="text-xs text-muted-foreground">{t("hrg.prof.daysAvailableOf", { total: vacationBalance.total })}</p>
                       <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
                         <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${(vacationBalance.taken / vacationBalance.total) * 100}%` }} />
                       </div>
-                      <p className="text-xs text-muted-foreground">{vacationBalance.taken} tomados</p>
+                      <p className="text-xs text-muted-foreground">{t("hrg.prof.taken", { n: vacationBalance.taken })}</p>
                     </div>
                   ) : (
                     <Skeleton className="h-16" />
                   )}
                   <Button variant="outline" size="sm" className="w-full" onClick={() => navigate("/hr/vacaciones")}>
-                    <ExternalLink className="h-3.5 w-3.5 mr-2" />Ver detalle
+                    <ExternalLink className="h-3.5 w-3.5 mr-2" />{t("hrg.viewDetail")}
                   </Button>
                 </CardContent>
               </Card>
@@ -307,24 +334,24 @@ export default function EmployeeProfile() {
               {/* Nómina */}
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm flex items-center gap-2"><Receipt className="h-4 w-4" />Historial de Nómina</CardTitle>
+                  <CardTitle className="text-sm flex items-center gap-2"><Receipt className="h-4 w-4" />{t("hrg.prof.payrollHistory")}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
                   {payrollHistory.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-4">Sin registros de nómina</p>
+                    <p className="text-sm text-muted-foreground text-center py-4">{t("hrg.prof.noPayroll")}</p>
                   ) : (
                     payrollHistory.slice(0, 5).map((pd: any) => (
                       <div key={pd.id} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm transition-colors">
                         <div>
                           <p className="font-medium">{pd.payroll_periods?.period_name ?? "—"}</p>
-                          <p className="text-xs text-muted-foreground">Bruto: ${Number(pd.gross_salary || 0).toLocaleString("es-CO")} · Neto: ${Number(pd.net_total || 0).toLocaleString("es-CO")}</p>
+                          <p className="text-xs text-muted-foreground">{t("hrg.prof.grossNet", { gross: `$${Number(pd.gross_salary || 0).toLocaleString(f.intl("es-CO"))}`, net: `$${Number(pd.net_total || 0).toLocaleString(f.intl("es-CO"))}` })}</p>
                         </div>
-                        <Badge variant="outline" className="text-xs">{pd.payroll_periods?.status ?? "—"}</Badge>
+                        <Badge variant="outline" className="text-xs">{crudo("payrollStatus", pd.payroll_periods?.status) ?? "—"}</Badge>
                       </div>
                     ))
                   )}
                   <Button variant="outline" size="sm" className="w-full" onClick={() => navigate("/finanzas/nomina")}>
-                    <ExternalLink className="h-3.5 w-3.5 mr-2" />Ver detalle
+                    <ExternalLink className="h-3.5 w-3.5 mr-2" />{t("hrg.viewDetail")}
                   </Button>
                 </CardContent>
               </Card>
@@ -332,24 +359,24 @@ export default function EmployeeProfile() {
               {/* Comisiones */}
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm flex items-center gap-2"><TrendingUp className="h-4 w-4" />Comisiones</CardTitle>
+                  <CardTitle className="text-sm flex items-center gap-2"><TrendingUp className="h-4 w-4" />{t("hrg.prof.commissions")}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
                   {empCommissions.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-4">Sin comisiones registradas</p>
+                    <p className="text-sm text-muted-foreground text-center py-4">{t("hrg.prof.noCommissions")}</p>
                   ) : (
                     empCommissions.slice(0, 5).map((c: any) => (
                       <div key={c.id} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm transition-colors">
                         <div>
                           <p className="font-medium">{c.period}</p>
-                          <p className="text-xs text-muted-foreground">{c.commission_type} · Est: ${Number(c.estimated_amount || 0).toLocaleString("es-CO")}</p>
+                          <p className="text-xs text-muted-foreground">{c.commission_type} · Est: ${Number(c.estimated_amount || 0).toLocaleString(f.intl("es-CO"))}</p>
                         </div>
-                        <Badge variant={c.status === "pagado" ? "default" : "secondary"} className="text-xs">{c.status}</Badge>
+                        <Badge variant={c.status === "pagado" ? "default" : "secondary"} className="text-xs">{crudo("commissionStatus", c.status)}</Badge>
                       </div>
                     ))
                   )}
                   <Button variant="outline" size="sm" className="w-full" onClick={() => navigate("/finanzas/horas-variables")}>
-                    <ExternalLink className="h-3.5 w-3.5 mr-2" />Ver detalle
+                    <ExternalLink className="h-3.5 w-3.5 mr-2" />{t("hrg.viewDetail")}
                   </Button>
                 </CardContent>
               </Card>
@@ -357,24 +384,24 @@ export default function EmployeeProfile() {
               {/* Deducciones */}
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm flex items-center gap-2"><Wallet className="h-4 w-4" />Deducciones</CardTitle>
+                  <CardTitle className="text-sm flex items-center gap-2"><Wallet className="h-4 w-4" />{t("hrg.prof.deductions")}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
                   {empDeductions.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-4">Sin deducciones registradas</p>
+                    <p className="text-sm text-muted-foreground text-center py-4">{t("hrg.prof.noDeductions")}</p>
                   ) : (
                     empDeductions.slice(0, 5).map((d: any) => (
                       <div key={d.id} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm transition-colors">
                         <div>
-                          <p className="font-medium">{d.deduction_type}</p>
-                          <p className="text-xs text-muted-foreground">{d.month_year} · ${Number(d.amount || 0).toLocaleString("es-CO")}</p>
+                          <p className="font-medium">{crudo("deductionType", d.deduction_type)}</p>
+                          <p className="text-xs text-muted-foreground">{d.month_year} · ${Number(d.amount || 0).toLocaleString(f.intl("es-CO"))}</p>
                         </div>
-                        <Badge variant={d.status === "applied" ? "default" : "secondary"} className="text-xs">{d.status}</Badge>
+                        <Badge variant={d.status === "applied" ? "default" : "secondary"} className="text-xs">{crudo("deductionStatus", d.status)}</Badge>
                       </div>
                     ))
                   )}
                   <Button variant="outline" size="sm" className="w-full" onClick={() => navigate("/hr/deducciones")}>
-                    <ExternalLink className="h-3.5 w-3.5 mr-2" />Ver detalle
+                    <ExternalLink className="h-3.5 w-3.5 mr-2" />{t("hrg.viewDetail")}
                   </Button>
                 </CardContent>
               </Card>
@@ -384,7 +411,7 @@ export default function EmployeeProfile() {
           {/* ── Tab: Desempeño ── */}
           <TabsContent value="desempeno" className="mt-4">
             {performance.length === 0 ? (
-              <EmptyState icon={TrendingUp} label="Sin evaluaciones registradas" />
+              <EmptyState icon={TrendingUp} label={t("hrg.prof.noEvaluations")} />
             ) : (
               <div className="space-y-2">
                 {performance.map((p) => (
@@ -396,7 +423,7 @@ export default function EmployeeProfile() {
                       </div>
                       <div className="text-right">
                         <p className="text-lg font-bold text-primary">{p.overall_score?.toFixed(1) ?? "—"}<span className="text-xs text-muted-foreground font-normal">/5</span></p>
-                        <Badge variant="secondary">{PERFORMANCE_EVALUATION_STATUSES.find((s) => s.value === p.status)?.label ?? p.status}</Badge>
+                        <Badge variant="secondary">{etiquetaHrV(t, "perfStatus", p.status)}</Badge>
                       </div>
                     </CardContent>
                   </Card>
@@ -408,7 +435,7 @@ export default function EmployeeProfile() {
           {/* ── Tab: Documentos ── */}
           <TabsContent value="documentos" className="mt-4">
             {documents.length === 0 ? (
-              <EmptyState icon={FileText} label="Sin documentos cargados" />
+              <EmptyState icon={FileText} label={t("hrg.prof.noDocuments")} />
             ) : (
               <div className="space-y-2">
                 {documents.map((doc) => (
@@ -417,10 +444,10 @@ export default function EmployeeProfile() {
                       <FileText className="h-5 w-5 text-muted-foreground shrink-0" />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{doc.file_name}</p>
-                        <p className="text-xs text-muted-foreground">{doc.document_type} · {format(new Date(doc.uploaded_at), "dd/MM/yyyy")}</p>
+                        <p className="text-xs text-muted-foreground">{crudo("docType", doc.document_type)} · {format(new Date(doc.uploaded_at), "dd/MM/yyyy")}</p>
                       </div>
                       <Button variant="outline" size="sm" asChild>
-                        <a href={doc.file_url} target="_blank" rel="noopener noreferrer">Ver</a>
+                        <a href={doc.file_url} target="_blank" rel="noopener noreferrer">{t("common.view")}</a>
                       </Button>
                     </CardContent>
                   </Card>
@@ -432,28 +459,28 @@ export default function EmployeeProfile() {
           {/* ── Tab: Historial ── */}
           <TabsContent value="historial" className="mt-4">
             {history.length === 0 ? (
-              <EmptyState icon={History} label="Sin cambios registrados" />
+              <EmptyState icon={History} label={t("hrg.prof.noHistory")} />
             ) : (
               <div className="relative space-y-0">
                 <div className="absolute left-4 top-0 bottom-0 w-px bg-border" />
                 {history.map((h) => {
-                  const typeLabel = HISTORY_CHANGE_TYPES.find(t => t.value === h.change_type)?.label ?? h.change_type;
-                  const fieldLabel = HISTORY_FIELD_LABELS[h.field_changed] ?? h.field_changed;
+                  const typeLabel = etiquetaHrV(t, "histType", h.change_type);
+                  const fieldLabel = etiquetaHrV(t, "histField", h.field_changed);
                   return (
                     <div key={h.id} className="relative pl-10 py-4">
                       <div className="absolute left-2.5 top-5 h-3 w-3 rounded-full bg-primary border-2 border-background" />
                       <div className="space-y-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <Badge variant="secondary" className="text-xs">{typeLabel}</Badge>
-                          <span className="text-xs text-muted-foreground">{format(new Date(h.effective_date), "dd MMM yyyy", { locale: es })}</span>
+                          <span className="text-xs text-muted-foreground">{format(new Date(h.effective_date), "dd MMM yyyy", { locale: f.fechas })}</span>
                         </div>
                         <p className="text-sm">
                           <span className="text-muted-foreground">{fieldLabel}:</span>{" "}
-                          {h.old_value && <span className="line-through text-muted-foreground/60">{h.old_value}</span>}
+                          {h.old_value && <span className="line-through text-muted-foreground/60">{valorHistorial(t, language, h.field_changed, h.old_value)}</span>}
                           {h.old_value && h.new_value && " → "}
-                          {h.new_value && <span className="font-medium">{h.new_value}</span>}
+                          {h.new_value && <span className="font-medium">{valorHistorial(t, language, h.field_changed, h.new_value)}</span>}
                         </p>
-                        {h.reason && <p className="text-xs text-muted-foreground">Motivo: {h.reason}</p>}
+                        {h.reason && <p className="text-xs text-muted-foreground">{t("hrg.prof.reasonLine", { reason: h.reason })}</p>}
                         {h.notes && <p className="text-xs text-muted-foreground italic">{h.notes}</p>}
                       </div>
                     </div>
@@ -469,10 +496,10 @@ export default function EmployeeProfile() {
               <CardHeader>
                 <CardTitle className="text-sm flex items-center gap-2">
                   <Link2 className="h-4 w-4" />
-                  Acceso a Plataforma
+                  {t("hrg.prof.platformAccess")}
                 </CardTitle>
                 <CardDescription>
-                  Vincula este empleado a una cuenta de usuario de la plataforma. Es opcional: un empleado puede existir sin acceso.
+                  {t("hrg.prof.platformAccessHint")}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -480,15 +507,15 @@ export default function EmployeeProfile() {
                   <div className="space-y-4">
                     <div className="flex items-center gap-1.5 text-sm font-medium text-primary">
                       <CheckCircle2 className="h-4 w-4" />
-                      Acceso activo
+                      {t("hrg.prof.accessActive")}
                     </div>
                     <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
                       <UserAvatar name={linkedProfile.full_name} src={linkedProfile.avatar_url} size="md" />
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm">{linkedProfile.full_name ?? "Sin nombre"}</p>
+                        <p className="font-medium text-sm">{linkedProfile.full_name ?? t("hrg.noName")}</p>
                         {linkedProfile.role && (
                           <Badge variant={ROLE_LABELS[linkedProfile.role]?.variant ?? "outline"} className="mt-1 text-xs">
-                            {ROLE_LABELS[linkedProfile.role]?.label ?? linkedProfile.role}
+                            {nombreRol(t, language, linkedProfile.role)}
                           </Badge>
                         )}
                       </div>
@@ -501,30 +528,30 @@ export default function EmployeeProfile() {
                       disabled={unlinkMutation.isPending}
                     >
                       <Link2Off className="h-4 w-4 mr-2" />
-                      {unlinkMutation.isPending ? "Desvinculando..." : "Desvincular usuario"}
+                      {unlinkMutation.isPending ? t("hrg.prof.unlinking") : t("hrg.prof.unlink")}
                     </Button>
                   </div>
                 ) : (
                   <div className="space-y-4">
                     <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                       <XCircle className="h-4 w-4" />
-                      Sin acceso a plataforma
+                      {t("hrg.prof.noAccess")}
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      Este empleado no tiene una cuenta de usuario vinculada. Puede operar sin acceso o vincularse a un usuario existente.
+                      {t("hrg.prof.noAccessHint")}
                     </p>
                     <Popover open={linkOpen} onOpenChange={setLinkOpen}>
                       <PopoverTrigger asChild>
                         <Button variant="outline" size="sm">
                           <Search className="h-4 w-4 mr-2" />
-                          Vincular usuario existente
+                          {t("hrg.prof.linkExisting")}
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-72 p-0" align="start">
                         <Command>
-                          <CommandInput placeholder="Buscar usuario..." />
+                          <CommandInput placeholder={t("hrg.prof.searchUser")} />
                           <CommandList>
-                            <CommandEmpty>No se encontraron usuarios.</CommandEmpty>
+                            <CommandEmpty>{t("hrg.prof.noUsers")}</CommandEmpty>
                             <CommandGroup>
                               {allProfiles.map((profile) => (
                                 <CommandItem
@@ -536,7 +563,7 @@ export default function EmployeeProfile() {
                                   }}
                                 >
                                   <UserAvatar name={profile.full_name} src={profile.avatar_url} size="xs" className="mr-2" />
-                                  {profile.full_name ?? "Sin nombre"}
+                                  {profile.full_name ?? t("hrg.noName")}
                                 </CommandItem>
                               ))}
                             </CommandGroup>

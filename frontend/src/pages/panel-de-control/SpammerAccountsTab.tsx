@@ -52,6 +52,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useTenantProfiles } from "@/hooks/useAgencyQa";
 import { useAuth } from "@/hooks/useAuth";
+import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 import { toast } from "sonner";
 import AddSpammerAccountDialog from "./AddSpammerAccountDialog";
 
@@ -60,6 +63,28 @@ import AddSpammerAccountDialog from "./AddSpammerAccountDialog";
 // varios usan la misma cuenta, se muestra UNA card con la lista de
 // closers que la operan). Cada card es clickeable y abre un popup
 // con el análisis IA completo de credibilidad de agencia.
+//
+// Idioma: el texto de la pantalla sale de lib/i18n/leadgen.ts
+// ("leadgen.igAccounts.*"), porque la pestaña se ve sobre todo desde "Mis
+// Cuentas IG" de LeadGen. Lo que escribió la IA (resumen, fortalezas, red
+// flags, recomendaciones) y el error del scan son DATOS guardados en la base:
+// se muestran tal cual.
+
+/** Un texto del diccionario con **dobles asteriscos** para la negrita: así cada
+ *  frase es UNA clave y se traduce entera, sin partirla alrededor del <strong>. */
+function ConNegrita({ texto, className }: { texto: string; className?: string }) {
+  return (
+    <>
+      {texto.split(/(\*\*[^*]+\*\*)/g).map((parte, i) =>
+        parte.startsWith("**") && parte.endsWith("**") && parte.length > 4 ? (
+          <strong key={i} className={className}>{parte.slice(2, -2)}</strong>
+        ) : (
+          parte
+        ),
+      )}
+    </>
+  );
+}
 
 interface AggregatedAccount {
   // Datos agregados por handle (la representante es la fila más
@@ -72,29 +97,30 @@ interface AggregatedAccount {
 }
 
 const SCORE_BUCKETS: Array<{
-  label: string;
+  label: TranslationKey;
   test: (score: number) => boolean;
   bg: string;
   ring: string;
   text: string;
 }> = [
-  { label: "Alto", test: (s) => s >= 80, bg: "bg-emerald-500/15", ring: "ring-emerald-500/40", text: "text-emerald-400" },
-  { label: "Bueno", test: (s) => s >= 65, bg: "bg-sky-500/15", ring: "ring-sky-500/40", text: "text-sky-400" },
-  { label: "Medio", test: (s) => s >= 45, bg: "bg-amber-500/15", ring: "ring-amber-500/40", text: "text-amber-400" },
-  { label: "Bajo", test: (s) => s >= 25, bg: "bg-orange-500/15", ring: "ring-orange-500/40", text: "text-orange-400" },
-  { label: "Muy bajo", test: (_s) => true, bg: "bg-rose-500/15", ring: "ring-rose-500/40", text: "text-rose-400" },
+  { label: "leadgen.igAccounts.score.high", test: (s) => s >= 80, bg: "bg-emerald-500/15", ring: "ring-emerald-500/40", text: "text-emerald-400" },
+  { label: "leadgen.igAccounts.score.good", test: (s) => s >= 65, bg: "bg-sky-500/15", ring: "ring-sky-500/40", text: "text-sky-400" },
+  { label: "leadgen.igAccounts.score.medium", test: (s) => s >= 45, bg: "bg-amber-500/15", ring: "ring-amber-500/40", text: "text-amber-400" },
+  { label: "leadgen.igAccounts.score.low", test: (s) => s >= 25, bg: "bg-orange-500/15", ring: "ring-orange-500/40", text: "text-orange-400" },
+  { label: "leadgen.igAccounts.score.veryLow", test: (_s) => true, bg: "bg-rose-500/15", ring: "ring-rose-500/40", text: "text-rose-400" },
 ];
 
-const scoreCfg = (score: number | null) => {
-  if (score == null) return { label: "Sin scan", bg: "bg-muted/40", ring: "ring-border", text: "text-muted-foreground" };
+// `label` es la CLAVE del nivel: se traduce al dibujarlo.
+const scoreCfg = (score: number | null): { label: TranslationKey; bg: string; ring: string; text: string } => {
+  if (score == null) return { label: "leadgen.igAccounts.score.none", bg: "bg-muted/40", ring: "ring-border", text: "text-muted-foreground" };
   return SCORE_BUCKETS.find((b) => b.test(score))!;
 };
 
-const fmtCount = (n: number | null | undefined): string => {
+const fmtCount = (n: number | null | undefined, locale: string): string => {
   if (n == null) return "—";
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
-  return n.toLocaleString("es");
+  return n.toLocaleString(locale);
 };
 
 type StatPopupKind = "all" | "pending" | "failed";
@@ -114,6 +140,7 @@ interface SpammerAccountsTabProps {
 }
 
 const SpammerAccountsTab = ({ viewMode = "all" }: SpammerAccountsTabProps = {}) => {
+  const { t } = useLanguage();
   const { user } = useAuth();
   const accountsQ = useSpammerAccounts();
   const profilesQ = useTenantProfiles();
@@ -163,7 +190,7 @@ const SpammerAccountsTab = ({ viewMode = "all" }: SpammerAccountsTabProps = {}) 
         new Map(
           rows
             .filter((r) => r.user_id)
-            .map((r) => [r.user_id, { id: r.user_id, name: profileNameById.get(r.user_id) ?? "(sin nombre)" }]),
+            .map((r) => [r.user_id, { id: r.user_id, name: profileNameById.get(r.user_id) ?? t("leadgen.noNameParens") }]),
         ).values(),
       );
       aggArr.push({
@@ -182,7 +209,7 @@ const SpammerAccountsTab = ({ viewMode = "all" }: SpammerAccountsTabProps = {}) 
       return a.representative.instagram_handle.localeCompare(b.representative.instagram_handle);
     });
     return aggArr;
-  }, [accountsQ.data, profilesQ.data]);
+  }, [accountsQ.data, profilesQ.data, viewMode, user?.id, t]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -210,9 +237,9 @@ const SpammerAccountsTab = ({ viewMode = "all" }: SpammerAccountsTabProps = {}) 
     [aggregated],
   );
   const popupTitle =
-    statPopup === "all" ? "Todas las cuentas" :
-    statPopup === "pending" ? "Esperando scan" :
-    statPopup === "failed" ? "Fallidas" : "";
+    statPopup === "all" ? t("leadgen.igAccounts.allAccounts") :
+    statPopup === "pending" ? t("leadgen.igAccounts.waitingScan") :
+    statPopup === "failed" ? t("leadgen.igAccounts.failed") : "";
   const popupList: AggregatedAccount[] =
     statPopup === "all" ? aggregated :
     statPopup === "pending" ? pendingList :
@@ -242,11 +269,11 @@ const SpammerAccountsTab = ({ viewMode = "all" }: SpammerAccountsTabProps = {}) 
   const handleRescan = async (id: string) => {
     try {
       await rescan.mutateAsync(id);
-      toast.success("Re-escaneo en marcha", {
-        description: "Vuelve en unos segundos a ver el resultado.",
+      toast.success(t("leadgen.igAccounts.rescanStarted"), {
+        description: t("leadgen.igAccounts.rescanStartedDesc"),
       });
     } catch (err) {
-      toast.error("No se pudo re-escanear", {
+      toast.error(t("leadgen.igAccounts.rescanError"), {
         description: (err as Error).message,
       });
     }
@@ -260,22 +287,20 @@ const SpammerAccountsTab = ({ viewMode = "all" }: SpammerAccountsTabProps = {}) 
       <div className="flex flex-wrap items-center gap-2">
         <Instagram className="h-4 w-4 text-instagram-pink shrink-0" />
         <h2 className="text-sm font-semibold">
-          {viewMode === "mine" ? "Mis cuentas IG" : "Salud de Cuentas IG"}
+          {viewMode === "mine" ? t("leadgen.igAccounts.titleMine") : t("leadgen.igAccounts.titleAll")}
         </h2>
         <span
           className="text-[11px] text-muted-foreground"
           title={
-            viewMode === "mine"
-              ? "Tus cuentas de IG que usas para outreach. Cada cuenta se escanea con IA que evalúa qué tan creíble se ve para que las creadoras respondan. Click en una card para ver el análisis del scan."
-              : "Cuentas de IG que el equipo usa para outreach (LGs/scouters). Cada cuenta se escanea con IA (Sonnet 4.6) que evalúa qué tan creíble se ve para que las creadoras objetivo respondan. Click en una card para ver el detalle del análisis."
+            viewMode === "mine" ? t("leadgen.igAccounts.hintMine") : t("leadgen.igAccounts.hintAll")
           }
         >
-          · IA escanea cada cuenta nueva — click en una card para ver el análisis completo
+          {t("leadgen.igAccounts.hintShort")}
         </span>
         <div className="relative ml-auto w-full sm:w-64">
           <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder={viewMode === "mine" ? "Buscar handle o nombre…" : "Buscar handle, nombre, scouter…"}
+            placeholder={viewMode === "mine" ? t("leadgen.igAccounts.searchMine") : t("leadgen.igAccounts.searchAll")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="h-8 pl-8 text-xs"
@@ -285,14 +310,14 @@ const SpammerAccountsTab = ({ viewMode = "all" }: SpammerAccountsTabProps = {}) 
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatBox
-          label="Cuentas únicas"
+          label={t("leadgen.igAccounts.uniqueAccounts")}
           value={stats.totalUnique}
           icon={UsersIcon}
           color="indigo"
           onClick={() => setStatPopup("all")}
         />
         <StatBox
-          label="Score promedio"
+          label={t("leadgen.igAccounts.avgScore")}
           value={stats.avgScore || "—"}
           icon={TrendingUp}
           color={
@@ -302,7 +327,7 @@ const SpammerAccountsTab = ({ viewMode = "all" }: SpammerAccountsTabProps = {}) 
           }
         />
         <StatBox
-          label="Esperando scan"
+          label={t("leadgen.igAccounts.waitingScan")}
           value={stats.pending}
           icon={Loader2}
           color="amber"
@@ -310,7 +335,7 @@ const SpammerAccountsTab = ({ viewMode = "all" }: SpammerAccountsTabProps = {}) 
           spinning={stats.pending > 0}
         />
         <StatBox
-          label="Fallidas"
+          label={t("leadgen.igAccounts.failed")}
           value={stats.failed}
           icon={XCircle}
           color="rose"
@@ -321,7 +346,7 @@ const SpammerAccountsTab = ({ viewMode = "all" }: SpammerAccountsTabProps = {}) 
       {accountsQ.isLoading ? (
         <Card className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
-          Cargando cuentas…
+          {t("leadgen.igAccounts.loading")}
         </Card>
       ) : filtered.length === 0 ? (
         // Empty state. Cuando es viewMode='mine' mostramos un CTA directo
@@ -334,22 +359,22 @@ const SpammerAccountsTab = ({ viewMode = "all" }: SpammerAccountsTabProps = {}) 
             title={
               aggregated.length === 0
                 ? viewMode === "mine"
-                  ? "Todavía no tienes cuentas registradas"
-                  : "Todavía no hay cuentas registradas"
-                : "Sin resultados para esa búsqueda"
+                  ? t("leadgen.igAccounts.emptyMine")
+                  : t("leadgen.igAccounts.emptyAll")
+                : t("leadgen.igAccounts.noSearchResults")
             }
             description={
               aggregated.length === 0
                 ? viewMode === "mine"
-                  ? "Agrega tu primera cuenta de Instagram para que la IA evalúe qué tan creíble se ve."
-                  : "Cuando un scouter agregue su primera cuenta en Scouter Assist > Cuentas, aparecerá aquí con su análisis IA."
-                : "Prueba con otro handle, nombre o scouter."
+                  ? t("leadgen.igAccounts.emptyMineDesc")
+                  : t("leadgen.igAccounts.emptyAllDesc")
+                : t("leadgen.igAccounts.noSearchResultsDesc")
             }
             action={
               viewMode === "mine" && aggregated.length === 0 ? (
                 <Button size="sm" className="gap-1.5" onClick={() => setAddDialogOpen(true)}>
                   <Plus className="h-4 w-4" />
-                  Agregar mi primera cuenta
+                  {t("leadgen.igAccounts.addFirst")}
                 </Button>
               ) : undefined
             }
@@ -368,9 +393,9 @@ const SpammerAccountsTab = ({ viewMode = "all" }: SpammerAccountsTabProps = {}) 
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted/50 transition-colors group-hover:bg-primary/15">
                 <Plus className="h-6 w-6" />
               </div>
-              <span className="text-sm font-medium">Agregar cuenta</span>
+              <span className="text-sm font-medium">{t("leadgen.igAccounts.addAccount")}</span>
               <span className="max-w-[180px] text-center text-[11px] leading-tight">
-                Suma una cuenta IG. La IA la escanea automático.
+                {t("leadgen.igAccounts.addAccountHint")}
               </span>
             </button>
           )}
@@ -429,6 +454,8 @@ const SpammerCard = ({
   onClick: () => void;
   hideOperators?: boolean;
 }) => {
+  const f = useFormato();
+  const { t } = useLanguage();
   const r = account.representative;
   const cfg = scoreCfg(r.ai_score);
   const isScanning = r.scan_status === "pending" || r.scan_status === "scanning";
@@ -457,7 +484,8 @@ const SpammerCard = ({
           e.stopPropagation();
           setConfirmDelete(true);
         }}
-        title="Eliminar esta cuenta"
+        title={t("leadgen.igAccounts.deleteThis")}
+        aria-label={t("leadgen.igAccounts.deleteThis")}
         className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-background/80 text-muted-foreground opacity-0 transition-all hover:bg-destructive/15 hover:text-destructive group-hover:opacity-100 focus:opacity-100"
       >
         <Trash2 className="h-3.5 w-3.5" />
@@ -475,19 +503,19 @@ const SpammerCard = ({
             {r.is_restricted && (
               <span
                 className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-xs font-bold bg-destructive/20 text-destructive"
-                title="IG marcó la cuenta como restringida — oculta a viewers no-loggeados."
+                title={t("leadgen.igAccounts.restrictedHint")}
               >
                 <Lock className="h-2.5 w-2.5" />
-                Restringida
+                {t("leadgen.igAccounts.restricted")}
               </span>
             )}
             {!r.is_restricted && r.scan_status === "awaiting_screenshot" && (
               <span
                 className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-xs font-bold bg-warning/20 text-warning"
-                title="No pudimos leer el perfil automáticamente. Reintenta el scan o sube un screenshot — no significa que esté restringida."
+                title={t("leadgen.igAccounts.notReadHint")}
               >
                 <AlertCircle className="h-2.5 w-2.5" />
-                Sin leer
+                {t("leadgen.igAccounts.notRead")}
               </span>
             )}
           </div>
@@ -500,9 +528,9 @@ const SpammerCard = ({
 
       {/* Métricas IG */}
       <div className="grid grid-cols-3 gap-1 px-4 pb-3 text-center">
-        <Metric label="Followers" value={fmtCount(r.followers_count)} />
-        <Metric label="Following" value={fmtCount(r.following_count)} />
-        <Metric label="Posts" value={fmtCount(r.posts_count)} />
+        <Metric label="Followers" value={fmtCount(r.followers_count, f.intl("es-ES"))} />
+        <Metric label="Following" value={fmtCount(r.following_count, f.intl("es-ES"))} />
+        <Metric label="Posts" value={fmtCount(r.posts_count, f.intl("es-ES"))} />
       </div>
 
       {/* Summary IA + estado */}
@@ -510,18 +538,18 @@ const SpammerCard = ({
         {isScanning ? (
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <Loader2 className="h-3 w-3 animate-spin" />
-            Escaneando con IA…
+            {t("leadgen.igAccounts.scanning")}
           </div>
         ) : r.scan_status === "failed" ? (
           <div className="flex items-start gap-1.5 text-xs text-destructive">
             <AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />
-            <span className="line-clamp-2">{r.scan_error ?? "Scan fallido"}</span>
+            <span className="line-clamp-2">{r.scan_error ?? t("leadgen.igAccounts.scanFailed")}</span>
           </div>
         ) : !r.is_restricted && r.scan_status === "awaiting_screenshot" ? (
           <div className="flex items-start gap-1.5 text-xs text-warning">
             <AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />
             <span className="line-clamp-2">
-              No se pudo leer — reintenta el scan o sube un screenshot.
+              {t("leadgen.igAccounts.couldNotRead")}
             </span>
           </div>
         ) : r.ai_analysis ? (
@@ -529,7 +557,7 @@ const SpammerCard = ({
             {r.ai_analysis.summary}
           </p>
         ) : (
-          <p className="text-xs italic text-muted-foreground">Sin análisis todavía.</p>
+          <p className="text-xs italic text-muted-foreground">{t("leadgen.igAccounts.noAnalysisYet")}</p>
         )}
       </div>
 
@@ -539,12 +567,12 @@ const SpammerCard = ({
         <div className="flex items-center gap-1.5 border-t border-border/60 bg-card px-4 py-2 text-[11px] text-muted-foreground">
           <UserCog className="h-3 w-3" />
           {account.operators.length === 0 ? (
-            <span className="italic">Sin scouter asignado</span>
+            <span className="italic">{t("leadgen.igAccounts.noScouter")}</span>
           ) : account.operators.length === 1 ? (
             <span className="truncate">{account.operators[0].name}</span>
           ) : (
             <span className="truncate">
-              {account.operators.length} scouters la usan
+              {t("leadgen.igAccounts.scoutersUseIt", { count: account.operators.length })}
             </span>
           )}
         </div>
@@ -554,14 +582,11 @@ const SpammerCard = ({
     <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>¿Eliminar @{r.instagram_handle}?</AlertDialogTitle>
+          <AlertDialogTitle>{t("leadgen.igAccounts.deleteTitle", { handle: r.instagram_handle })}</AlertDialogTitle>
           <AlertDialogDescription>
-            Esta cuenta dejará de aparecer en "Mis Cuentas IG" y no se usará más
-            para outreach. Si la quemaron en IG y quieres agregar una nueva,
-            primero eliminala acá.
+            {t("leadgen.igAccounts.deleteDesc")}
             <br /><br />
-            Si más de un scouter la tenía registrada, se elimina solo TU
-            registro — los demás siguen viéndola.
+            {t("leadgen.igAccounts.deleteDescShared")}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -576,7 +601,7 @@ const SpammerCard = ({
             }}
             className="bg-destructive hover:bg-destructive/90 focus:ring-destructive"
           >
-            {deleteAccount.isPending ? "Eliminando..." : "Sí, eliminar"}
+            {deleteAccount.isPending ? t("leadgen.delete.deleting") : t("leadgen.igAccounts.confirmDelete")}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
@@ -770,81 +795,56 @@ const StatBox = ({
 // menciona como opción.
 
 const RestrictedRecoveryGuide = () => {
+  const { t } = useLanguage();
+  const fuerte = "text-foreground";
   return (
     <div className="rounded-lg border border-success/30 bg-success/5 p-3 space-y-3">
       <div className="flex items-center gap-2">
         <Sparkles className="h-4 w-4 text-success" />
         <h3 className="text-xs font-bold text-success">
-          Cómo recuperar esta cuenta
+          {t("leadgen.igAccounts.guide.title")}
         </h3>
       </div>
 
       <div className="space-y-3 text-xs">
         <div>
           <p className="font-semibold text-foreground mb-1">
-            Decisión 0 — ¿Recuperar o abandonar?
+            {t("leadgen.igAccounts.guide.decisionTitle")}
           </p>
           <p className="text-muted-foreground leading-relaxed">
-            Si es cuenta nueva (&lt;3 meses) o con nombre genérico,
-            <strong className="text-foreground"> abandonar y crear fresh </strong>
-            suele ser más rápido que pelear la restricción (puede tomar semanas).
-            Si tiene historial decente, vale la pena recuperar.
+            <ConNegrita texto={t("leadgen.igAccounts.guide.decisionBody")} className={fuerte} />
           </p>
         </div>
 
         <div>
           <p className="font-semibold text-foreground mb-1">
-            Si decides recuperar:
+            {t("leadgen.igAccounts.guide.ifRecover")}
           </p>
           <ol className="list-decimal space-y-1.5 pl-4 text-muted-foreground marker:text-success">
-            <li>
-              <strong className="text-foreground">Verificar email Y teléfono real</strong> (no
-              virtual): Settings → Account → Personal information.
-            </li>
-            <li>
-              <strong className="text-foreground">Activar 2FA</strong>: Settings → Security →
-              Two-factor authentication.
-            </li>
-            <li>
-              <strong className="text-foreground">Revisar reports/violations</strong>: Settings →
-              Help → Account status. Eliminar posts marcados.
-            </li>
-            <li>
-              <strong className="text-foreground">Cambiar a perfil business</strong>: Settings →
-              Account type → Switch to Business. Category: "Talent Agency".
-            </li>
-            <li>
-              <strong className="text-foreground">Apelar formalmente</strong>: Settings → Help →
-              Report a Problem. Explica que eres una agencia legítima.
-            </li>
-            <li>
-              <strong className="text-foreground text-destructive">PARAR todo outreach</strong> por 7-14 días.
-              Navega normal, like a posts, sigue cuentas, postea 2-3 cosas propias. Si sigues
-              spammeando DMs, IG nunca levanta el flag.
-            </li>
-            <li>
-              <strong className="text-foreground">Volver gradual</strong>: 5 DMs/día semana 3, 10
-              DMs/día semana 4, máximo 20/día después. Cada DM personalizado.
-            </li>
+            <li><ConNegrita texto={t("leadgen.igAccounts.guide.step1")} className={fuerte} /></li>
+            <li><ConNegrita texto={t("leadgen.igAccounts.guide.step2")} className={fuerte} /></li>
+            <li><ConNegrita texto={t("leadgen.igAccounts.guide.step3")} className={fuerte} /></li>
+            <li><ConNegrita texto={t("leadgen.igAccounts.guide.step4")} className={fuerte} /></li>
+            <li><ConNegrita texto={t("leadgen.igAccounts.guide.step5")} className={fuerte} /></li>
+            <li><ConNegrita texto={t("leadgen.igAccounts.guide.step6")} className="text-foreground text-destructive" /></li>
+            <li><ConNegrita texto={t("leadgen.igAccounts.guide.step7")} className={fuerte} /></li>
           </ol>
         </div>
 
         <div>
           <p className="font-semibold text-foreground mb-1">
-            Si decides abandonar y crear nueva:
+            {t("leadgen.igAccounts.guide.ifAbandon")}
           </p>
           <ul className="list-disc space-y-1 pl-4 text-muted-foreground marker:text-success">
-            <li>SIM física fresca, email dedicado, dispositivo limpio.</li>
-            <li>Día 1: profile completo (foto logo, bio profesional, link al sitio, business).</li>
-            <li>Días 1-14: warm-up — browsear, likes, posts propios. <strong className="text-destructive">CERO DMs</strong>.</li>
-            <li>Día 14+: ramp-up gradual de outreach.</li>
+            <li>{t("leadgen.igAccounts.guide.fresh1")}</li>
+            <li>{t("leadgen.igAccounts.guide.fresh2")}</li>
+            <li><ConNegrita texto={t("leadgen.igAccounts.guide.fresh3")} className="text-destructive" /></li>
+            <li>{t("leadgen.igAccounts.guide.fresh4")}</li>
           </ul>
         </div>
 
         <div className="rounded-md bg-warning/10 border border-warning/30 p-2 text-[11px] text-warning">
-          <strong>Reglas permanentes:</strong> nunca copy-paste el mismo DM ·
-          espaciar 2-3 min entre DMs · 1 IP/device por cuenta · profile completo
-          ANTES de cualquier outreach · mínimo 5 posts del roster en feed.
+          <ConNegrita texto={t("leadgen.igAccounts.guide.rules")} />
         </div>
       </div>
     </div>
@@ -858,6 +858,7 @@ const RestrictedRecoveryGuide = () => {
 // la cuenta real, no con un snapshot vacío.
 
 const RestrictedScreenshotZone = ({ account }: { account: SpammerAccount }) => {
+  const { t } = useLanguage();
   const uploadMut = useUploadSpammerScreenshots();
   const removeMut = useRemoveSpammerScreenshot();
   const paths = account.manual_screenshot_paths ?? [];
@@ -897,11 +898,11 @@ const RestrictedScreenshotZone = ({ account }: { account: SpammerAccount }) => {
     if (files.length === 0) return;
     for (const f of files) {
       if (!f.type.startsWith("image/")) {
-        toast.error(`"${f.name}" no es una imagen.`);
+        toast.error(t("leadgen.igAccounts.notAnImage", { name: f.name }));
         return;
       }
       if (f.size > 10 * 1024 * 1024) {
-        toast.error(`"${f.name}" pesa más de 10 MB.`);
+        toast.error(t("leadgen.igAccounts.tooLarge", { name: f.name }));
         return;
       }
     }
@@ -927,15 +928,20 @@ const RestrictedScreenshotZone = ({ account }: { account: SpammerAccount }) => {
         <div className="flex-1 min-w-0">
           <p className="text-xs font-semibold mb-1">
             {hasScreenshots
-              ? `${paths.length} screenshot${paths.length > 1 ? "s" : ""} cargado${paths.length > 1 ? "s" : ""} — el análisis usa la data real`
+              ? t(
+                  paths.length === 1
+                    ? "leadgen.igAccounts.screenshotsLoaded.one"
+                    : "leadgen.igAccounts.screenshotsLoaded.other",
+                  { count: paths.length },
+                )
               : awaiting
-              ? "Pega uno o varios screenshots del perfil"
-              : "Mejorar análisis con screenshots"}
+              ? t("leadgen.igAccounts.pasteScreenshots")
+              : t("leadgen.igAccounts.improveWithScreenshots")}
           </p>
           <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">
             {account.is_restricted
-              ? "Como IG oculta la cuenta a viewers no-loggeados, el bot no puede leer bio/foto/link. Saca screenshots del perfil desde tu browser (logueado) y subilos acá — puedes agregar varios (bio, posts, link, etc) y Claude vision los lee y enriquece el análisis."
-              : "No pudimos leer la cuenta automáticamente (muy nueva o IG bloqueó la lectura). Saca screenshots del perfil desde tu browser (logueado) y subilos acá — puedes agregar varios (bio, posts, link, etc) y Claude vision los lee y arma el análisis con la data real."}
+              ? t("leadgen.igAccounts.screenshotsRestrictedHint")
+              : t("leadgen.igAccounts.screenshotsUnreadHint")}
           </p>
           <label className="inline-flex">
             <input
@@ -965,12 +971,12 @@ const RestrictedScreenshotZone = ({ account }: { account: SpammerAccount }) => {
               {uploadMut.isPending ? (
                 <>
                   <Loader2 className="h-3 w-3 animate-spin" />
-                  Subiendo…
+                  {t("leadgen.igAccounts.uploading")}
                 </>
               ) : hasScreenshots ? (
-                "Agregar más screenshots"
+                t("leadgen.igAccounts.addMoreScreenshots")
               ) : (
-                "Subir screenshots"
+                t("leadgen.igAccounts.uploadScreenshots")
               )}
             </span>
           </label>
@@ -994,7 +1000,7 @@ const RestrictedScreenshotZone = ({ account }: { account: SpammerAccount }) => {
                 {url ? (
                   <img
                     src={url}
-                    alt="Screenshot del perfil"
+                    alt={t("leadgen.igAccounts.profileScreenshot")}
                     className="h-full w-full object-cover"
                   />
                 ) : (
@@ -1013,8 +1019,8 @@ const RestrictedScreenshotZone = ({ account }: { account: SpammerAccount }) => {
                   }
                   disabled={removing}
                   className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-white opacity-0 transition-opacity hover:bg-destructive group-hover:opacity-100 focus:opacity-100 disabled:opacity-50"
-                  aria-label="Quitar screenshot"
-                  title="Quitar screenshot"
+                  aria-label={t("leadgen.igAccounts.removeScreenshot")}
+                  title={t("leadgen.igAccounts.removeScreenshot")}
                 >
                   {removing ? (
                     <Loader2 className="h-3 w-3 animate-spin" />
@@ -1039,10 +1045,11 @@ const SEVERITY_STYLE: Record<SpammerAccountAiRedFlag["severity"], string> = {
   high: "bg-destructive/15 text-destructive",
 };
 
-const WOULD_RESPOND_STYLE: Record<NonNullable<SpammerAccountAiAnalysis["would_respond"]>, { label: string; cls: string }> = {
-  si: { label: "Sí respondería", cls: "bg-success/15 text-success" },
-  tal_vez: { label: "Tal vez respondería", cls: "bg-warning/15 text-warning" },
-  no: { label: "No respondería", cls: "bg-destructive/15 text-destructive" },
+// La llave (si / tal_vez / no) es lo que devuelve la IA: dato. `label` es la clave.
+const WOULD_RESPOND_STYLE: Record<NonNullable<SpammerAccountAiAnalysis["would_respond"]>, { label: TranslationKey; cls: string }> = {
+  si: { label: "leadgen.igAccounts.wouldReply", cls: "bg-success/15 text-success" },
+  tal_vez: { label: "leadgen.igAccounts.mightReply", cls: "bg-warning/15 text-warning" },
+  no: { label: "leadgen.igAccounts.wouldNotReply", cls: "bg-destructive/15 text-destructive" },
 };
 
 const SpammerDetailDialog = ({
@@ -1058,6 +1065,8 @@ const SpammerDetailDialog = ({
   onRescan: (id: string) => void;
   rescanning: boolean;
 }) => {
+  const f = useFormato();
+  const { t } = useLanguage();
   if (!account) return null;
   const r = account.representative;
   const a = r.ai_analysis;
@@ -1082,12 +1091,14 @@ const SpammerDetailDialog = ({
                 </a>
                 <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
                 {r.is_verified && (
-                  <CheckCircle2 className="h-4 w-4 text-primary" title="Verificada" />
+                  <span title={t("leadgen.igAccounts.verified")} aria-label={t("leadgen.igAccounts.verified")}>
+                    <CheckCircle2 className="h-4 w-4 text-primary" />
+                  </span>
                 )}
               </DialogTitle>
               <DialogDescription className="text-xs">
-                {r.display_name ?? "Sin nombre visible"} · {fmtCount(r.followers_count)} followers ·{" "}
-                {fmtCount(r.following_count)} following · {fmtCount(r.posts_count)} posts
+                {r.display_name ?? t("leadgen.igAccounts.noDisplayName")} · {fmtCount(r.followers_count, f.intl("es-ES"))} followers ·{" "}
+                {fmtCount(r.following_count, f.intl("es-ES"))} following · {fmtCount(r.posts_count, f.intl("es-ES"))} posts
               </DialogDescription>
             </div>
             <ScoreBadge score={r.ai_score} cfg={cfg} />
@@ -1101,13 +1112,10 @@ const SpammerDetailDialog = ({
               <Lock className="h-4 w-4 mt-0.5 shrink-0 text-destructive" />
               <div className="text-xs leading-relaxed">
                 <span className="font-semibold text-destructive text-xs block mb-1">
-                  IG marcó la cuenta como restringida
+                  {t("leadgen.igAccounts.restrictedBannerTitle")}
                 </span>
                 <span className="text-foreground/80">
-                  IG la oculta a viewers no-loggeados. Cuando esta cuenta le mande DM a una creadora, lo más
-                  probable es que el perfil le aparezca con muro de login o aviso de cuenta restringida —
-                  no van a poder validar quién manda el mensaje. Típicamente pasa por contenido NSFW, patrones
-                  de spam previos, reportes de usuarios, o cuenta sin verificar mail/teléfono.
+                  {t("leadgen.igAccounts.restrictedBannerBody")}
                 </span>
               </div>
             </div>
@@ -1123,7 +1131,7 @@ const SpammerDetailDialog = ({
         {r.is_restricted && (
           <details className="rounded-lg border border-border bg-card/40 p-3">
             <summary className="cursor-pointer text-xs font-semibold text-muted-foreground hover:text-foreground">
-              ¿Quieres enriquecer el análisis con screenshots? (opcional)
+              {t("leadgen.igAccounts.enrichOptional")}
             </summary>
             <div className="mt-3">
               <RestrictedScreenshotZone account={r} />
@@ -1140,12 +1148,10 @@ const SpammerDetailDialog = ({
               <AlertCircle className="h-4 w-4 mt-0.5 shrink-0 text-warning" />
               <div className="text-xs leading-relaxed">
                 <span className="font-semibold text-warning text-xs block mb-1">
-                  No pudimos leer el perfil automáticamente
+                  {t("leadgen.igAccounts.unreadBannerTitle")}
                 </span>
                 <span className="text-foreground/80">
-                  Suele pasar con cuentas muy nuevas (todavía sin indexar) o cuando IG bloquea la lectura
-                  desde el servidor. <strong>No</strong> significa que la cuenta esté restringida. Reintenta
-                  el scan con el botón de abajo, o sube un screenshot del perfil (logueado) para analizarla igual.
+                  <ConNegrita texto={t("leadgen.igAccounts.unreadBannerBody")} />
                 </span>
               </div>
             </div>
@@ -1166,29 +1172,31 @@ const SpammerDetailDialog = ({
             <div className="flex flex-wrap items-center gap-2">
               {wr && (
                 <span className={cn("inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold", wr.cls)}>
-                  {wr.label}
+                  {t(wr.label)}
                 </span>
               )}
               <span className={cn("inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold", cfg.bg, cfg.text)}>
                 <Sparkles className="h-3 w-3" />
-                {cfg.label}
+                {t(cfg.label)}
               </span>
               {r.last_scanned_at && (
                 <span className="text-[11px] text-muted-foreground">
-                  Escaneado {new Date(r.last_scanned_at).toLocaleDateString("es-AR", { day: "2-digit", month: "short", year: "numeric" })}
+                  {t("leadgen.igAccounts.scannedOn", {
+                    date: new Date(r.last_scanned_at).toLocaleDateString(f.intl("es-AR"), { day: "2-digit", month: "short", year: "numeric" }),
+                  })}
                 </span>
               )}
             </div>
 
             <p className="text-sm leading-relaxed">
-              <span className="text-xs font-bold text-violet-400 mr-2">Resumen</span>
+              <span className="text-xs font-bold text-violet-400 mr-2">{t("leadgen.perf.summary")}</span>
               {a.summary}
             </p>
 
             {a.would_respond === "no" && a.why_not && (
               <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
                 <div className="text-xs font-bold text-destructive mb-1">
-                  Por qué NO respondería
+                  {t("leadgen.igAccounts.whyNot")}
                 </div>
                 <p className="text-sm">{a.why_not}</p>
               </div>
@@ -1197,7 +1205,7 @@ const SpammerDetailDialog = ({
             {a.urgent_improvements && a.urgent_improvements.length > 0 && (
               <div className="rounded-lg border border-warning/30 bg-warning/5 p-3">
                 <div className="text-xs font-bold text-warning mb-2">
-                  Mejoras urgentes
+                  {t("leadgen.igAccounts.urgentImprovements")}
                 </div>
                 <ul className="space-y-1 pl-4 list-disc text-sm marker:text-warning">
                   {a.urgent_improvements.map((u, i) => (
@@ -1211,7 +1219,7 @@ const SpammerDetailDialog = ({
               {a.strengths.length > 0 && (
                 <div className="rounded-lg border border-success/30 bg-success/5 p-3">
                   <div className="text-xs font-bold text-success mb-2">
-                    Fortalezas
+                    {t("leadgen.igAccounts.strengths")}
                   </div>
                   <ul className="space-y-1 pl-4 list-disc text-xs marker:text-success">
                     {a.strengths.map((s, i) => (
@@ -1242,7 +1250,7 @@ const SpammerDetailDialog = ({
             {a.recommendations.length > 0 && (
               <div className="rounded-lg border border-border/60 p-3">
                 <div className="text-xs font-bold text-muted-foreground mb-2">
-                  Recomendaciones a mediano plazo
+                  {t("leadgen.igAccounts.recommendations")}
                 </div>
                 <ul className="space-y-1 pl-4 list-disc text-xs marker:text-muted-foreground">
                   {a.recommendations.map((rec, i) => (
@@ -1255,20 +1263,20 @@ const SpammerDetailDialog = ({
         ) : (
           <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-xs italic text-muted-foreground">
             {r.scan_status === "failed"
-              ? `Scan fallido: ${r.scan_error ?? "error desconocido"}`
+              ? t("leadgen.igAccounts.scanFailedWith", { error: r.scan_error ?? t("leadgen.igAccounts.unknownError") })
               : r.scan_status === "scanning" || r.scan_status === "pending"
-                ? "Escaneo en curso… vuelve en unos segundos."
-                : "Sin análisis IA disponible para esta cuenta."}
+                ? t("leadgen.igAccounts.scanInProgress")
+                : t("leadgen.igAccounts.noAiAnalysis")}
           </div>
         )}
 
         {/* Operators */}
         <div className="rounded-md border border-border/40 p-3">
           <div className="text-xs font-bold text-muted-foreground mb-2">
-            Scouters que la usan ({account.operators.length})
+            {t("leadgen.igAccounts.scoutersUsing", { count: account.operators.length })}
           </div>
           {account.operators.length === 0 ? (
-            <p className="text-xs italic text-muted-foreground">Sin scouter asignado.</p>
+            <p className="text-xs italic text-muted-foreground">{t("leadgen.igAccounts.noScouterDot")}</p>
           ) : (
             <ul className="flex flex-wrap gap-1.5">
               {account.operators.map((op) => (
@@ -1299,7 +1307,7 @@ const SpammerDetailDialog = ({
             ) : (
               <RefreshCw className="h-3.5 w-3.5" />
             )}
-            Re-escanear ahora
+            {t("leadgen.igAccounts.rescanNow")}
           </Button>
         </div>
       </DialogContent>
@@ -1333,7 +1341,17 @@ const StatListDialog = ({
   onOpenDetail,
   rescanning,
 }: StatListDialogProps) => {
+  const { t } = useLanguage();
   const showRescan = kind === "pending" || kind === "failed";
+  const uno = items.length === 1;
+  const resumen =
+    kind === "pending"
+      ? t(uno ? "leadgen.igAccounts.list.pending.one" : "leadgen.igAccounts.list.pending.other", { count: items.length })
+      : kind === "failed"
+        ? t(uno ? "leadgen.igAccounts.list.failed.one" : "leadgen.igAccounts.list.failed.other", { count: items.length })
+        : kind === "all"
+          ? t(uno ? "leadgen.igAccounts.list.all.one" : "leadgen.igAccounts.list.all.other", { count: items.length })
+          : t(uno ? "leadgen.igAccounts.list.count.one" : "leadgen.igAccounts.list.count.other", { count: items.length });
 
   const rescanAll = () => {
     items.forEach((a) => onRescan(a.representative.id));
@@ -1347,10 +1365,7 @@ const StatListDialog = ({
             <div className="min-w-0 flex-1">
               <DialogTitle>{title}</DialogTitle>
               <DialogDescription className="text-xs">
-                {items.length} {items.length === 1 ? "cuenta" : "cuentas"}
-                {kind === "pending" && " esperando o ejecutando scan IA"}
-                {kind === "failed" && " — el scan falló (cuenta privada, baneada, o IG bloqueó la API)"}
-                {kind === "all" && " registradas en este tenant"}
+                {resumen}
               </DialogDescription>
             </div>
             {showRescan && items.length > 0 && (
@@ -1366,7 +1381,7 @@ const StatListDialog = ({
                 ) : (
                   <RefreshCw className="h-3.5 w-3.5" />
                 )}
-                Re-escanear todas
+                {t("leadgen.igAccounts.list.rescanAll")}
               </Button>
             )}
           </div>
@@ -1377,10 +1392,10 @@ const StatListDialog = ({
             icon={<Instagram className="h-8 w-8 text-muted-foreground" />}
             title={
               kind === "pending"
-                ? "No hay cuentas en cola de scan."
+                ? t("leadgen.igAccounts.list.emptyPending")
                 : kind === "failed"
-                  ? "No hay cuentas con scan fallido."
-                  : "No hay cuentas registradas todavía."
+                  ? t("leadgen.igAccounts.list.emptyFailed")
+                  : t("leadgen.igAccounts.list.emptyAll")
             }
           />
         ) : (
@@ -1397,7 +1412,7 @@ const StatListDialog = ({
                     type="button"
                     onClick={() => onOpenDetail(r.instagram_handle)}
                     className="flex flex-1 items-center gap-2.5 min-w-0 text-left"
-                    title="Ver detalle"
+                    title={t("common.viewDetail")}
                   >
                     <Avatar src={r.profile_pic_url} fallback={r.instagram_handle} size={36} />
                     <div className="min-w-0 flex-1">
@@ -1411,10 +1426,10 @@ const StatListDialog = ({
                         {r.is_restricted && (
                           <span
                             className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-xs font-bold bg-destructive/20 text-destructive"
-                            title="IG marcó la cuenta como restringida — las creators target no pueden verla sin login."
+                            title={t("leadgen.igAccounts.restrictedTargetHint")}
                           >
                             <Lock className="h-2.5 w-2.5" />
-                            Restringida
+                            {t("leadgen.igAccounts.restricted")}
                           </span>
                         )}
                       </div>
@@ -1460,14 +1475,14 @@ const StatListDialog = ({
                       className="gap-1 shrink-0"
                       disabled={rescanning || r.scan_status === "scanning"}
                       onClick={() => onRescan(r.id)}
-                      title="Re-escanear esta cuenta"
+                      title={t("leadgen.igAccounts.list.rescanThis")}
                     >
                       {r.scan_status === "scanning" ? (
                         <Loader2 className="h-3 w-3 animate-spin" />
                       ) : (
                         <RefreshCw className="h-3 w-3" />
                       )}
-                      <span className="text-[11px]">Escanear</span>
+                      <span className="text-[11px]">{t("leadgen.igAccounts.list.scan")}</span>
                     </Button>
                   )}
                 </li>

@@ -14,59 +14,120 @@
 //   GET /public-api/cowork/time/segments cowork:read    (cada tramo del reloj, al detalle)
 //   GET /public-api/cowork/breaks       cowork:read     (cada pausa: baño o break, con tope y exceso)
 //   GET /public-api/cowork/meets        cowork:read     (cada meet grupal: quién lo invocó, quién estuvo y cuánto)
+//   GET /public-api/me                  (sin scope)     (como quién actúa la llave, y su cupo)
+//   GET /public-api/messenger/conversations              messenger:read (la bandeja de la persona)
+//   GET /public-api/messenger/conversations/:id          messenger:read (una conversación y sus miembros)
+//   GET /public-api/messenger/conversations/:id/messages messenger:read (historia, con cursor)
+//   GET /public-api/messenger/feed                       messenger:read (lo nuevo en todas, con cursor)
+//
+// Escribir en el Messenger (messenger:write, que va siempre con messenger:read):
+//   GET    /public-api/messenger/people                                  a quién se le puede escribir
+//   POST   /public-api/messenger/conversations                           abrir un directo con su primer mensaje
+//   POST   /public-api/messenger/conversations/:id/messages              mandar un mensaje
+//   PATCH  /public-api/messenger/conversations/:id/messages/:messageId   editar lo que mandó la misma integración
+//   DELETE /public-api/messenger/conversations/:id/messages/:messageId   borrarlo
+// Los dos POST exigen Idempotency-Key (72 h). La pared es la BASE (migración
+// 20261001200000_api_messenger_escritura.sql): valida la key del claim `mvk` en cada
+// escritura, cobra los topes y pone la marca «vino por API». Este archivo nunca nombra
+// una tabla del chat ni una RPC de escritura: todo pasa por servirComoUsuario.
+//
+// LÍMITE: 1.000 pedidos por hora por llave (api_keys.limite_por_hora), en ventana
+// fija que se reinicia a la hora en punto, y 60 por minuto (limite_por_minuto) para
+// que no se gasten todos de golpe. Pasado cualquiera de los dos, 429 con
+// Retry-After. Las respuestas a una llave válida llevan X-RateLimit-Limit /
+// -Remaining / -Reset, que son los de la hora.
+//
+// ACTÚA COMO. Cada llave está atada a una persona real (api_keys.acts_as_user_id,
+// fija desde que se crea). Los recursos `como_usuario` se consultan con la sesión de
+// esa persona y no con service_role: ver ./como-usuario.ts. Si esa persona ya no está
+// activa en Maven, la llave deja de servir.
 //
 // La key se busca por su hash SHA-256; se chequea que no esté revocada ni vencida,
 // que la IP esté permitida (si tiene whitelist) y que tenga el scope del recurso.
+//
+// ⚠️ AISLAMIENTO ENTRE AGENCIAS. Esta función corre con service_role: SALTA LA RLS.
+// La única pared entre agencias es lo que el código filtre. Cada llave pertenece a
+// una agencia (`api_keys.tenant_id`, asignada por la base) y cada recurso declara
+// cómo se aísla en `./aislamiento.ts`. Un recurso que no sabe de qué
+// agencia es cada fila se APAGA solo en cuanto Maven tenga más de una. Antes de
+// agregar un endpoint, lee ese archivo: el test va a obligar a hacerlo igual.
+//
+// IDIOMA. Todo `message` que ve el cliente sale de ./mensajes.ts: en inglés si el
+// pedido lo pide con Accept-Language, en español (el de siempre) si no. El código de
+// máquina (`error`), el estado, las cabeceras y los datos no cambian nunca.
 import { corsFor } from "../_shared/cors.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+// Local a esta función y no en _shared/: un cambio en _shared/ redespliega TODAS
+// las edge functions, y este módulo solo lo usa public-api.
+import { AISLAMIENTO_POR_RECURSO, decidir, esComoUsuario } from "./aislamiento.ts";
+import { clienteDeLlave, comoUsuarioConfigurado } from "./como-usuario.ts";
+import { servirComoUsuario } from "./recursos-como-usuario.ts";
+import { cabecerasDeCupo, clientIp, CUERPO_MAX_BYTES, fetchSinReintentos, ipAllowed, leerCuerpo } from "./peticion.ts";
+import { idiomaDelPedido, msg, varyConIdioma } from "./mensajes.ts";
+import { esMetodo, leerCuerpoDeEscritura, leerIdempotencia, METODOS, type ObjetoJson, scopesDeLaRuta } from "./escritura-formato.ts";
+
+// Los plazos de los clientes en una escritura (sin reintentos escondidos: ver
+// fetchSinReintentos). El de service_role cubre buscar la key, el cupo y el conteo de
+// agencias. El de la persona es MÁS largo que el statement_timeout de authenticated
+// (8 s): con la base lenta, la base corta primero y responde 57014 (volvió atrás
+// entera: 503 temporarily_unavailable, se reintenta seguro), en vez de cortar el edge
+// sin respuesta (503 outcome_unknown: no se sabe si se hizo).
+const PLAZO_ADMIN_MS = 3_000;
+const PLAZO_YO_MS = 10_000;
+// Si la base tardó más que esto en buscar la key y contar el cupo, una escritura no
+// se intenta (503 writes_paused): con la base lenta, mejor no sumarle carga.
+const BASE_LENTA_MS = 1_500;
 
 const corsHeaders = (req: Request) =>
   corsFor(req, {
     "Access-Control-Allow-Headers": "authorization, x-api-key, content-type, apikey",
     "Access-Control-Allow-Methods": "GET, OPTIONS",
+    // Sin esto un navegador no deja leer el cupo que queda.
+    "Access-Control-Expose-Headers": "X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, Retry-After",
   });
 
-const json = (req: Request, body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), {
+// Cabeceras que van en TODAS las respuestas de un pedido (el cupo que le queda a la
+// llave), una vez que se conocen. Por pedido y sin estado compartido entre pedidos.
+const cabecerasDelPedido = new WeakMap<Request, Record<string, string>>();
+
+const json = (req: Request, body: unknown, status = 200, extra: Record<string, string> = {}) => {
+  const cors = corsHeaders(req);
+  return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders(req), "Content-Type": "application/json" },
+    headers: {
+      ...cors,
+      "Content-Type": "application/json",
+      ...(cabecerasDelPedido.get(req) ?? {}),
+      ...extra,
+      // El texto depende de Accept-Language: se SUMA al Vary: Origin del CORS, no lo pisa.
+      "Vary": varyConIdioma(cors["Vary"]),
+    },
   });
+};
+
+// Un fallo NUESTRO (la base no respondió) no puede verse como "tu llave es
+// inválida" ni como "no tienes permiso": el cliente dejaría de reintentar, o
+// revocaría una llave que está bien.
+const noDisponible = (req: Request, donde: string, err: unknown) => {
+  console.error(`[public-api] ${donde}:`, (err as { message?: string })?.message ?? err);
+  return json(req, {
+    error: "temporarily_unavailable",
+    message: msg(idiomaDelPedido(req), "no_disponible"),
+  }, 503, { "Retry-After": "30" });
+};
+
+// La llave vive mientras la persona como la que actúa siga vigente: sin baja, sin
+// bloqueo y en la agencia de la llave. Si no, deja de servir aunque nadie se haya
+// acordado de revocarla.
+const personaNoVigente = (req: Request) =>
+  json(req, {
+    error: "unauthorized",
+    message: msg(idiomaDelPedido(req), "persona_no_vigente"),
+  }, 401);
 
 async function sha256hex(s: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
   return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-// --- IP whitelist ---
-function clientIp(req: Request): string | null {
-  const xff = req.headers.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0].trim();
-  return req.headers.get("x-real-ip");
-}
-function ipv4ToInt(ip: string): number | null {
-  const p = ip.split(".");
-  if (p.length !== 4) return null;
-  let n = 0;
-  for (const o of p) { const x = Number(o); if (!Number.isInteger(x) || x < 0 || x > 255) return null; n = (n << 8) + x; }
-  return n >>> 0;
-}
-function ipv4InCidr(ip: string, cidr: string): boolean {
-  const [base, bitsStr] = cidr.split("/");
-  const bits = Number(bitsStr);
-  const a = ipv4ToInt(ip), b = ipv4ToInt(base);
-  if (a === null || b === null || !Number.isInteger(bits) || bits < 0 || bits > 32) return false;
-  if (bits === 0) return true;
-  const mask = bits === 32 ? 0xffffffff : (~((1 << (32 - bits)) - 1)) >>> 0;
-  return (a & mask) === (b & mask);
-}
-function ipAllowed(ip: string | null, whitelist: string[]): boolean {
-  if (!whitelist || whitelist.length === 0) return true; // sin restricción
-  if (!ip) return false;
-  for (const entry of whitelist) {
-    if (entry === ip) return true;
-    if (entry.includes("/") && ipv4InCidr(ip, entry)) return true;
-  }
-  return false;
 }
 
 // --- Normalización de redes: { handle, url } por red. Si el valor ya es URL, se respeta. ---
@@ -131,41 +192,123 @@ function pageParams(url: URL, defLimit = 100, maxLimit = 500) {
 }
 
 Deno.serve(async (req) => {
+  // Antes de buscar la key: lo que tarda la base cuenta desde aquí.
+  const t0 = Date.now();
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders(req) });
-  if (req.method !== "GET") return json(req, { error: "method_not_allowed" }, 405);
+  const idioma = idiomaDelPedido(req);
+  const metodo = req.method;
+  if (!esMetodo(metodo)) {
+    return json(req, {
+      error: "method_not_allowed",
+      message: msg(idioma, "metodo_no_permitido", { permitidos: METODOS.join(", ") }),
+    }, 405, { "Allow": METODOS.join(", ") });
+  }
 
   // --- Auth por API key ---
   const authHeader = req.headers.get("Authorization") ?? "";
   const bearer = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
   const rawKey = (req.headers.get("X-API-Key") || bearer || "").trim();
   if (!rawKey || !rawKey.startsWith("mvk_")) {
-    return json(req, { error: "unauthorized", message: "Falta la API key (Authorization: Bearer mvk_live_...)" }, 401);
+    return json(req, { error: "unauthorized", message: msg(idioma, "falta_llave") }, 401);
   }
 
+  // En una escritura, sin reintentos escondidos y con plazo (fetchSinReintentos). Las
+  // lecturas siguen como siempre: los recursos viejos no cambian de comportamiento.
   const admin = createClient(
     Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    metodo === "GET" ? {} : { global: { fetch: fetchSinReintentos(PLAZO_ADMIN_MS) } },
   );
 
   const key_hash = await sha256hex(rawKey);
-  const { data: keyRow } = await admin
+  const { data: keyRow, error: keyErr } = await admin
     .from("api_keys")
-    .select("id, scopes, ip_whitelist, revoked_at, expires_at")
+    .select("id, scopes, ip_whitelist, revoked_at, expires_at, tenant_id")
     .eq("key_hash", key_hash).maybeSingle();
+  // Antes el error se descartaba y una base caída respondía "API key inválida".
+  // Además es la red si esta función se desplegara antes que la migración que crea
+  // la columna tenant_id: 503 y no 401 para todas las llaves.
+  if (keyErr) return noDisponible(req, "búsqueda de la llave", keyErr);
 
-  if (!keyRow) return json(req, { error: "unauthorized", message: "API key inválida" }, 401);
-  if (keyRow.revoked_at) return json(req, { error: "unauthorized", message: "API key revocada" }, 401);
+  if (!keyRow) return json(req, { error: "unauthorized", message: msg(idioma, "llave_invalida") }, 401);
+  if (keyRow.revoked_at) return json(req, { error: "unauthorized", message: msg(idioma, "llave_revocada") }, 401);
   if (keyRow.expires_at && new Date(keyRow.expires_at as string).getTime() <= Date.now()) {
-    return json(req, { error: "unauthorized", message: "API key vencida" }, 401);
+    return json(req, { error: "unauthorized", message: msg(idioma, "llave_vencida") }, 401);
   }
   const ip = clientIp(req);
   if (!ipAllowed(ip, (keyRow.ip_whitelist as string[]) ?? [])) {
-    return json(req, { error: "forbidden", message: `IP ${ip ?? "desconocida"} no está en la whitelist de esta API key` }, 403);
+    return json(req, {
+      error: "forbidden",
+      message: msg(idioma, "ip_no_permitida", { ip: ip ?? msg(idioma, "ip_desconocida") }),
+    }, 403);
   }
   const scopes: string[] = (keyRow.scopes as string[]) ?? [];
   const need = (s: string) => scopes.includes(s);
 
-  // bump de uso (best-effort, atómico, no bloquea la respuesta)
-  admin.rpc("increment_api_key_usage", { _id: keyRow.id as string }).then(() => {}, () => {});
+  // De qué agencia es esta llave. La columna es NOT NULL, así que esto no debería
+  // pasar nunca; si pasa, se corta aquí: una llave sin agencia no puede servir nada
+  // sin arriesgar datos de otra.
+  const tenantId = keyRow.tenant_id as string | null;
+  if (!tenantId) {
+    return json(req, { error: "unauthorized", message: msg(idioma, "llave_sin_agencia") }, 401);
+  }
+
+  // --- Límite por hora + como quién actúa la llave: una ida a la base por pedido ---
+  // Reemplaza a increment_api_key_usage (la misma fila, la misma escritura, con la
+  // ventana sumada). Pasado el límite NO escribe: rechaza leyendo, para que una llave
+  // desbocada no se convierta en escrituras sobre la base. Va DESPUÉS de la
+  // whitelist: si no, alguien con la llave filtrada pero desde otra IP podría
+  // gastarle el cupo al dueño.
+  //
+  // Si el contador falla, los recursos de siempre se sirven igual: un contador caído
+  // no puede dejar sin servicio a todas las integraciones, y antes de esto no había
+  // límite ninguno. Lo que actúa como usuario, en cambio, se cierra con 503: sin esta
+  // respuesta no se sabe como quién actuar.
+  type Consumo = {
+    permitido: boolean; limite: number; restantes: number; reinicio: string;
+    actua_como: string | null; usuario_activo: boolean;
+    // Del freno por minuto. Opcionales: antes de su migración no vienen.
+    limite_minuto?: number | null; motivo?: "hora" | "minuto" | null;
+  };
+  const { data: consumoFilas, error: consumoErr } = await admin
+    .rpc("api_key_consumir", { _id: keyRow.id as string });
+  if (consumoErr) console.error("[public-api] límite por hora:", consumoErr.message);
+  // Sin contador, una ESCRITURA no sigue: se corta aquí, antes de api_key_vigente y del
+  // conteo de agencias (una lectura se sirve igual, como siempre).
+  if (consumoErr && metodo !== "GET") return noDisponible(req, "límite por hora (escritura)", consumoErr);
+  const consumo: Consumo | null = consumoErr
+    ? null
+    : ((Array.isArray(consumoFilas) ? consumoFilas[0] : consumoFilas) as Consumo | undefined) ?? null;
+  if (consumo) {
+    const { porMinuto, cabeceras, esperaSeg: espera } = cabecerasDeCupo(consumo, Date.now());
+    cabecerasDelPedido.set(req, cabeceras);
+    if (!consumo.permitido) {
+      return json(req, {
+        error: "rate_limited",
+        message: porMinuto
+          ? msg(idioma, "limite_por_minuto", { n: consumo.limite_minuto ?? 60, s: espera })
+          : msg(idioma, "limite_por_hora", { n: consumo.limite, hora: consumo.reinicio }),
+      }, 429, { "Retry-After": String(espera) });
+    }
+    if (!consumo.usuario_activo) return personaNoVigente(req);
+  } else {
+    // El contador falló (p. ej. la base en modo solo lectura). El límite queda
+    // abierto a propósito, pero la baja no: una sola lectura, y solo en este camino.
+    // Si tampoco responde (o la migración todavía no está), no se sabe: se sirve.
+    const { data: vigente, error: vErr } = await admin.rpc("api_key_vigente", { _id: keyRow.id as string });
+    if (vErr) console.error("[public-api] persona de la llave:", vErr.message);
+    if (!vErr && vigente === false) return personaNoVigente(req);
+  }
+
+  // Cuántas agencias hay en Maven. Los recursos que no saben de qué agencia es cada
+  // fila solo se sirven cuando la respuesta es exactamente 1. Si la consulta falla,
+  // null: `decidir` cierra con 503, no con 403.
+  const { count: agencias, error: agErr } = await admin
+    .from("tenants").select("id", { count: "exact", head: true });
+  if (agErr) console.error("[public-api] conteo de agencias:", agErr.message);
+  const cantidadDeAgencias = agErr ? null : (agencias ?? null);
+  // Cuánto tardó la base en buscar la key, el cupo y el conteo (sin lo que tarde el
+  // cliente en mandar el cuerpo, que se lee después).
+  const demoraDeLaBase = Date.now() - t0;
 
   // --- Routing ---
   const url = new URL(req.url);
@@ -176,9 +319,28 @@ Deno.serve(async (req) => {
   const sub = rest[1] ?? null;
 
   if (!resource) {
+    if (metodo !== "GET") {
+      return json(req, {
+        error: "method_not_allowed",
+        message: msg(idioma, "metodo_no_permitido", { permitidos: "GET" }),
+      }, 405, { "Allow": "GET" });
+    }
     return json(req, {
       object: "api", name: "Maven Public API", version: "v1", your_scopes: scopes,
+      // Toda respuesta de esta llave es de esta agencia y de ninguna otra.
+      agency_id: tenantId,
       resources: [
+        { path: "/me", scope: null },
+        { path: "/messenger/conversations", scope: "messenger:read" },
+        { path: "/messenger/conversations/{id}", scope: "messenger:read" },
+        { path: "/messenger/conversations/{id}/messages", scope: "messenger:read" },
+        { path: "/messenger/feed", scope: "messenger:read" },
+        // Escribir: messenger:write (que va siempre con messenger:read).
+        { method: "GET", path: "/messenger/people", scope: "messenger:write" },
+        { method: "POST", path: "/messenger/conversations", scope: "messenger:write" },
+        { method: "POST", path: "/messenger/conversations/{id}/messages", scope: "messenger:write" },
+        { method: "PATCH", path: "/messenger/conversations/{id}/messages/{message_id}", scope: "messenger:write" },
+        { method: "DELETE", path: "/messenger/conversations/{id}/messages/{message_id}", scope: "messenger:write" },
         { path: "/creators", scope: "creators:read" },
         { path: "/creators/{id}", scope: "creators:read" },
         { path: "/contacts", scope: "contacts:read" },
@@ -196,14 +358,118 @@ Deno.serve(async (req) => {
     });
   }
 
+  // ===== Puerta de aislamiento =====
+  // Todo recurso pasa por aquí ANTES de tocar la base. Ver ./aislamiento.ts.
+  const recursoClave = resource === "sales" && sub === "chatters" ? "sales/chatters" : resource;
+  const veredicto = decidir(recursoClave, cantidadDeAgencias, AISLAMIENTO_POR_RECURSO, idioma);
+  if (!veredicto.ok) {
+    // Al log va un texto FIJO en español (el mismo comienzo que antes) y no
+    // `veredicto.motivo`, que viene en el idioma del cliente: una búsqueda o una alerta
+    // sobre el log no puede depender del Accept-Language de quien llamó.
+    if (veredicto.estado === 503) {
+      return noDisponible(req, "puerta de aislamiento", `No se pudo verificar el aislamiento entre agencias (conteo: ${cantidadDeAgencias})`);
+    }
+    return json(req, { error: veredicto.error, message: veredicto.motivo }, veredicto.estado);
+  }
+
+  // ===== Escrituras: lo que se mira antes de tocar el recurso =====
+  // (1) Solo los recursos como_usuario se escriben; los demás, 405 SIN leer el cuerpo.
+  if (metodo !== "GET" && !esComoUsuario(recursoClave)) {
+    return json(req, {
+      error: "method_not_allowed",
+      message: msg(idioma, "metodo_no_permitido", { permitidos: "GET" }),
+    }, 405, { "Allow": "GET" });
+  }
+  // (2) El cuerpo, solo de un POST/PATCH a una ruta que existe con ese método (lo
+  // demás lo contesta servirComoUsuario: 404 o 405, sin cuerpo). Tope de 64 KB.
+  let cuerpo: ObjetoJson | null = null;
+  const rutaDeEscritura = scopesDeLaRuta(recursoClave, metodo, rest.slice(1));
+  if ((metodo === "POST" || metodo === "PATCH") && rutaDeEscritura.ok) {
+    const leido = await leerCuerpo(req, CUERPO_MAX_BYTES);
+    if (!leido.ok && leido.estado === 413) return json(req, { error: "payload_too_large", message: msg(idioma, "cuerpo_muy_grande") }, 413);
+    if (!leido.ok && leido.estado === 415) return json(req, { error: "unsupported_media_type", message: msg(idioma, "tipo_de_contenido") }, 415);
+    if (!leido.ok) return json(req, { error: "invalid_json", message: msg(idioma, "cuerpo_mal_codificado") }, 400);
+    const objeto = leerCuerpoDeEscritura(leido.texto);
+    if (!objeto.ok && objeto.problema === "json_invalido") return json(req, { error: "invalid_json", message: msg(idioma, "cuerpo_json_invalido") }, 400);
+    if (!objeto.ok) return json(req, { error: "invalid_json", message: msg(idioma, "cuerpo_no_es_objeto") }, 400);
+    cuerpo = objeto.cuerpo;
+  }
+  // (3) La Idempotency-Key de un POST: si vino, que tenga la forma (la exige el handler).
+  let idempotencia: string | null = null;
+  if (metodo === "POST") {
+    const idem = leerIdempotencia(req.headers.get("Idempotency-Key"));
+    if (!idem.ok) return json(req, { error: "invalid_idempotency_key", message: msg(idioma, "idempotencia_invalida") }, 400);
+    idempotencia = idem.valor;
+  }
+  // (4) Con la base lenta, una escritura no se intenta.
+  if (metodo !== "GET" && demoraDeLaBase > BASE_LENTA_MS) {
+    console.error(`[public-api] escritura en pausa: la base tardó ${demoraDeLaBase} ms en la key y el cupo`);
+    return json(req, { error: "writes_paused", message: msg(idioma, "escritura_en_pausa") }, 503, { "Retry-After": "30" });
+  }
+
+  // ===== Recursos que actúan como la persona de la llave =====
+  // Sin service_role: la pared es la RLS de la base. Ver ./recursos-como-usuario.ts.
+  if (esComoUsuario(recursoClave)) {
+    if (!consumo?.actua_como) return noDisponible(req, "como quién actúa la llave", consumoErr ?? "sin respuesta");
+    if (!comoUsuarioConfigurado()) return noDisponible(req, "sesión como usuario", "falta el secreto MAVEN_JWT_SECRET");
+    // La sesión de la persona de la key, con el id de ESTA key en el claim `mvk` (sale de
+    // la fila encontrada por el hash, nunca del pedido): la base la valida en cada
+    // escritura. Sin reintentos escondidos y con plazo.
+    let yo: Awaited<ReturnType<typeof clienteDeLlave>>;
+    try {
+      yo = await clienteDeLlave(consumo.actua_como, keyRow.id as string, { fetch: fetchSinReintentos(PLAZO_YO_MS) });
+    } catch (e) {
+      return noDisponible(req, "sesión como usuario", e);
+    }
+    if (!yo) return noDisponible(req, "sesión como usuario", "falta el secreto MAVEN_JWT_SECRET");
+    let r: Awaited<ReturnType<typeof servirComoUsuario>>;
+    try {
+      r = await servirComoUsuario(recursoClave, yo, {
+        agenciaDeLaLlave: tenantId,
+        actuaComo: consumo.actua_como,
+        scopes,
+        ruta: rest.slice(1),
+        consulta: Object.fromEntries(url.searchParams),
+        llave: {
+          conWhitelist: ((keyRow.ip_whitelist as string[] | null) ?? []).length > 0,
+          venceEl: (keyRow.expires_at as string | null) ?? null,
+        },
+        baseDeArchivos: Deno.env.get("SUPABASE_URL") ?? "",
+        cupo: { limite: consumo.limite, restantes: consumo.restantes, reinicio: consumo.reinicio },
+        idioma,
+        metodo,
+        cuerpo,
+        idempotencia,
+      });
+    } catch (e) {
+      // Una caída de red hacia la base no puede salir como un 500 sin CORS. Y en una
+      // escritura no se sabe si llegó a hacerse: se dice así (lección #1868).
+      if (metodo !== "GET") {
+        console.error(`[public-api] /${recursoClave} (${metodo}):`, (e as { message?: string })?.message ?? e);
+        return json(req, { error: "outcome_unknown", message: msg(idioma, "resultado_incierto") }, 503, { "Retry-After": "5" });
+      }
+      return noDisponible(req, `/${recursoClave}`, e);
+    }
+    if (r.ok) return json(req, r.cuerpo, r.estado);
+    if ("detalle" in r) return noDisponible(req, `/${recursoClave}`, r.detalle);
+    if (r.estado === 405) return json(req, { error: r.error, message: r.mensaje }, 405, { "Allow": r.permitidos.join(", ") });
+    if (r.estado === 429) {
+      return json(req, { error: r.error, message: r.mensaje, limit: r.limite, retry_after: r.reintentarEnSeg }, 429, {
+        "Retry-After": String(r.reintentarEnSeg),
+      });
+    }
+    if (r.estado === 503) return json(req, { error: r.error, message: r.mensaje }, 503, { "Retry-After": String(r.reintentarEnSeg) });
+    return json(req, { error: r.error, message: r.mensaje }, r.estado);
+  }
+
   // ===== /creators =====
   if (resource === "creators") {
-    if (!need("creators:read")) return json(req, { error: "forbidden", message: "Falta el scope creators:read" }, 403);
+    if (!need("creators:read")) return json(req, { error: "forbidden", message: msg(idioma, "falta_scope", { scope: "creators:read" }) }, 403);
 
     if (sub) {
       const { data: c, error } = await admin.from("creators").select(CREATOR_COLUMNS).eq("id", sub).maybeSingle();
       if (error) return json(req, { error: "server_error", message: error.message }, 500);
-      if (!c) return json(req, { error: "not_found", message: "Creadora no encontrada" }, 404);
+      if (!c) return json(req, { error: "not_found", message: msg(idioma, "creadora_no_encontrada") }, 404);
       const { data: ofa } = await admin.from("creator_of_accounts").select("account_handle, onlyfans_url").eq("creator_id", sub);
       return json(req, { object: "creator", data: shapeCreator(c as unknown as Row, ofa ?? []) });
     }
@@ -245,7 +511,7 @@ Deno.serve(async (req) => {
   // saltea las tres capas. El scope separado es lo unico que la frena, y permite
   // revocar el telefono sin cortar el resto del acceso.
   if (resource === "contacts") {
-    if (!need("contacts:read")) return json(req, { error: "forbidden", message: "Falta el scope contacts:read" }, 403);
+    if (!need("contacts:read")) return json(req, { error: "forbidden", message: msg(idioma, "falta_scope", { scope: "contacts:read" }) }, 403);
     const conPii = need("contacts:phone");
 
     const COLS = "id, name, handle, platform, email, phone, country_code, city, company, " +
@@ -288,7 +554,7 @@ Deno.serve(async (req) => {
     if (sub) {
       const { data: c, error } = await admin.from("closers_contacts").select(COLS).eq("id", sub).maybeSingle();
       if (error) return json(req, { error: "server_error", message: error.message }, 500);
-      if (!c) return json(req, { error: "not_found", message: "Contacto no encontrado" }, 404);
+      if (!c) return json(req, { error: "not_found", message: msg(idioma, "contacto_no_encontrado") }, 404);
       return json(req, { object: "contact", pii: conPii, data: shape(c as unknown as Row) });
     }
 
@@ -302,7 +568,7 @@ Deno.serve(async (req) => {
     if (kind) {
       const validos = ["modelo", "agencia", "ex_creadora"];
       if (!validos.includes(kind)) {
-        return json(req, { error: "bad_request", message: `kind invalido. Usa: ${validos.join(" | ")}` }, 400);
+        return json(req, { error: "bad_request", message: msg(idioma, "kind_invalido", { opciones: validos.join(" | ") }) }, 400);
       }
       q = q.eq("contact_kind", kind);
     }
@@ -323,13 +589,25 @@ Deno.serve(async (req) => {
 
   // ===== /employees =====
   if (resource === "employees") {
-    if (!need("employees:read")) return json(req, { error: "forbidden", message: "Falta el scope employees:read" }, 403);
+    if (!need("employees:read")) return json(req, { error: "forbidden", message: msg(idioma, "falta_scope", { scope: "employees:read" }) }, 403);
     const { limit, offset } = pageParams(url);
     const roleFilter = url.searchParams.get("role");
+
+    // Defensa extra, NO el aislamiento: tenant_members todavía no es confiable (ver
+    // ./aislamiento.ts) y por eso /employees se apaga con 2+ agencias. profiles no
+    // tiene columna de agencia; las personas se separan por tenant_members.
+    const { data: miembros, error: mErr } = await admin
+      .from("tenant_members").select("user_id").eq("tenant_id", tenantId);
+    if (mErr) return json(req, { error: "server_error", message: mErr.message }, 500);
+    const idsDeLaAgencia = (miembros ?? []).map((m) => (m as { user_id: string }).user_id);
+    if (idsDeLaAgencia.length === 0) {
+      return json(req, { object: "list", resource: "employees", count: 0, limit, offset, data: [] });
+    }
 
     const { data: profs, count, error } = await admin
       .from("profiles")
       .select("id, full_name, avatar_url, is_owner, created_at", { count: "exact" })
+      .in("id", idsDeLaAgencia)
       .order("full_name", { ascending: true }).range(offset, offset + limit - 1);
     if (error) return json(req, { error: "server_error", message: error.message }, 500);
 
@@ -354,7 +632,7 @@ Deno.serve(async (req) => {
   if (resource === "sales") {
     // /sales/chatters -> ventas por chatter
     if (sub === "chatters") {
-      if (!need("sales:chatters")) return json(req, { error: "forbidden", message: "Falta el scope sales:chatters" }, 403);
+      if (!need("sales:chatters")) return json(req, { error: "forbidden", message: msg(idioma, "falta_scope", { scope: "sales:chatters" }) }, 403);
       const { limit, offset } = pageParams(url);
       let q = admin.from("chatter_daily_sales")
         .select("blu_employee_id, date, name, total_sales, sold_messages, fans_chatted", { count: "exact" });
@@ -373,15 +651,19 @@ Deno.serve(async (req) => {
       });
       return json(req, { object: "list", resource: "sales/chatters", count: count ?? data.length, limit, offset, data });
     }
-    if (sub) return json(req, { error: "not_found", message: `Sub-recurso de sales desconocido: ${sub}` }, 404);
+    if (sub) return json(req, { error: "not_found", message: msg(idioma, "sales_sub_recurso_desconocido", { sub }) }, 404);
 
     // /sales -> ganancias diarias por creadora
-    if (!need("sales:read")) return json(req, { error: "forbidden", message: "Falta el scope sales:read" }, 403);
+    if (!need("sales:read")) return json(req, { error: "forbidden", message: msg(idioma, "falta_scope", { scope: "sales:read" }) }, 403);
     const { limit, offset } = pageParams(url);
     let q = admin.from("creator_daily_earnings").select(
       "date, creator_id, blu_creator_name, total_gross, subscription_gross, new_sub_gross, recurring_sub_gross, tips_gross, message_gross, post_gross, referral_gross, stream_gross, chargebacks_gross, contribution_pct, active_fans, new_fans",
       { count: "exact" },
     );
+    // Defensa extra, NO el aislamiento: el tenant_id de esta tabla todavía no es
+    // confiable (ver ./aislamiento.ts) y por eso /sales se apaga con 2+ agencias.
+    // Queda para que la consulta ya esté bien el día que la columna diga la verdad.
+    q = q.eq("tenant_id", tenantId);
     const from = url.searchParams.get("from"), to = url.searchParams.get("to"), creatorId = url.searchParams.get("creator_id");
     if (from) q = q.gte("date", from);
     if (to) q = q.lte("date", to);
@@ -408,7 +690,7 @@ Deno.serve(async (req) => {
 
   // ===== /hubstaff =====
   if (resource === "hubstaff") {
-    if (!need("hubstaff:read")) return json(req, { error: "forbidden", message: "Falta el scope hubstaff:read" }, 403);
+    if (!need("hubstaff:read")) return json(req, { error: "forbidden", message: msg(idioma, "falta_scope", { scope: "hubstaff:read" }) }, 403);
     const { limit, offset } = pageParams(url);
     const { data, error } = await admin.rpc("api_hubstaff_daily", {
       _from: url.searchParams.get("from"),
@@ -426,8 +708,8 @@ Deno.serve(async (req) => {
   // con los segundos repartidos por estado. `time/segments` = cada tramo, al
   // detalle: inicio, fin, estado y motivo, sesión y sala.
   if (resource === "cowork") {
-    if (!need("cowork:read")) return json(req, { error: "forbidden", message: "Falta el scope cowork:read" }, 403);
-    if (sub !== "time" && sub !== "breaks" && sub !== "meets") return json(req, { error: "not_found", message: "Usa /cowork/time, /cowork/time/segments, /cowork/breaks o /cowork/meets" }, 404);
+    if (!need("cowork:read")) return json(req, { error: "forbidden", message: msg(idioma, "falta_scope", { scope: "cowork:read" }) }, 403);
+    if (sub !== "time" && sub !== "breaks" && sub !== "meets") return json(req, { error: "not_found", message: msg(idioma, "cowork_rutas") }, 404);
     const { limit, offset } = pageParams(url);
     const detalle = rest[2] === "segments";
     const params = {
@@ -494,6 +776,11 @@ Deno.serve(async (req) => {
       no_camera_seconds: r.seg_sin_camara,
       no_screen_seconds: r.seg_sin_pantalla,
       away_seconds: r.seg_fuera_de_camara,
+      // La sala se cayó. Se pagan hasta 10 min de caídas por hora (ya están
+      // dentro de active_seconds); el resto, no. `?? 0` por si esta
+      // edge sale antes que la migración: la clave no desaparece del JSON.
+      disconnected_seconds: r.seg_sin_conexion ?? 0,
+      disconnected_long_seconds: r.seg_sin_conexion_larga ?? 0,
       in_room_seconds: r.seg_en_sala,
       sessions: r.sesiones,
       first_join: r.primer_ingreso,
@@ -505,7 +792,7 @@ Deno.serve(async (req) => {
 
   // ===== /promolog =====
   if (resource === "promolog") {
-    if (!need("promolog:read")) return json(req, { error: "forbidden", message: "Falta el scope promolog:read" }, 403);
+    if (!need("promolog:read")) return json(req, { error: "forbidden", message: msg(idioma, "falta_scope", { scope: "promolog:read" }) }, 403);
     const { limit, offset } = pageParams(url);
     const { data, error } = await admin.rpc("api_promolog_daily", {
       _from: url.searchParams.get("from"),
@@ -519,5 +806,5 @@ Deno.serve(async (req) => {
     return json(req, { object: "list", resource: "promolog", count: (data ?? []).length, limit, offset, data: data ?? [] });
   }
 
-  return json(req, { error: "not_found", message: `Recurso desconocido: ${resource}` }, 404);
+  return json(req, { error: "not_found", message: msg(idioma, "recurso_desconocido", { recurso: resource }) }, 404);
 });

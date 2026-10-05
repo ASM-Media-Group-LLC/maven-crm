@@ -42,6 +42,8 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { useFormato } from "@/hooks/useFormato";
+import type { Formato } from "@/lib/formato";
 import { useMyProfile } from "@/hooks/useUserProfile";
 import {
   useQaCall,
@@ -73,9 +75,9 @@ import OutcomeBadge from "@/components/agency-qa/OutcomeBadge";
 
 const formatLevel = (lv: string) => lv.charAt(0).toUpperCase() + lv.slice(1);
 
-const fmtDate = (iso: string) => {
+const fmtDate = (iso: string, f: Formato) => {
   const d = new Date(`${iso}T00:00:00`);
-  return d.toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" });
+  return d.toLocaleDateString(f.intl("es-ES"), { day: "2-digit", month: "short", year: "numeric" });
 };
 
 const Avatar = ({ name, dataUrl, size = 36 }: { name: string; dataUrl: string | null; size?: number }) => {
@@ -527,6 +529,7 @@ const CallDetailDrawer = ({
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }) => {
+  const f = useFormato();
   const callQ = useQaCall(callId);
   const [showTranscript, setShowTranscript] = useState(false);
   const call = callQ.data;
@@ -569,7 +572,7 @@ const CallDetailDrawer = ({
                     {call.model?.name ?? "Sin modelo"} · {call.closer?.name ?? "Sin closer"}
                   </SheetTitle>
                   <SheetDescription>
-                    {fmtDate(call.call_date)} · evaluado por {call.evaluator_name}
+                    {fmtDate(call.call_date, f)} · evaluado por {call.evaluator_name}
                   </SheetDescription>
                 </div>
                 <span
@@ -701,6 +704,7 @@ const CallDetailDrawer = ({
 // qa_human_feedback en el prompt como [FEEDBACK DEL SUPERVISOR] —
 // equivalente al humanContext de kash.
 const FeedbackSection = ({ callId }: { callId: string }) => {
+  const f = useFormato();
   const { user } = useAuth();
   const profileQ = useMyProfile();
   const feedbackQ = useQaHumanFeedback(callId);
@@ -780,7 +784,7 @@ const FeedbackSection = ({ callId }: { callId: string }) => {
 
   const fmtTs = (iso: string) => {
     try {
-      return new Date(iso).toLocaleString("es-AR", {
+      return new Date(iso).toLocaleString(f.intl("es-AR"), {
         day: "2-digit",
         month: "short",
         hour: "2-digit",

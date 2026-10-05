@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { adminInvoke, SessionExpiredError } from "@/lib/adminInvoke";
 import { useToast } from "@/hooks/use-toast";
+import { traducir } from "@/lib/i18n";
 
 /** Una cuenta eliminada que todavía se puede recuperar. */
 export interface CuentaEnPapelera {
@@ -30,7 +31,7 @@ export function usePapelera(activa: boolean) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["cuentas-en-papelera"],
     // Solo pega a la edge cuando el tab está abierto: es una pantalla que se
     // visita de vez en cuando, no hace falta cargarla con la página.
@@ -51,7 +52,7 @@ export function usePapelera(activa: boolean) {
 
   const alFallar = (e: Error) => {
     toast({
-      title: e instanceof SessionExpiredError ? "Sesión expirada" : "Error",
+      title: traducir(e instanceof SessionExpiredError ? "common.sessionExpired" : "common.error"),
       description: e.message,
       variant: "destructive",
     });
@@ -75,6 +76,9 @@ export function usePapelera(activa: boolean) {
     cuentas: data?.users ?? [],
     diasDePapelera: data?.dias_de_papelera ?? 30,
     isLoading,
+    // Un fallo de la llamada NO es "no hay cuentas": la tabla lo dice y ofrece
+    // reintentar. Así se destapó el 400 del edge (Jhon, 24/09).
+    error: error ? (error as Error).message : null,
     refetch,
     recuperar,
     purgar,

@@ -33,7 +33,7 @@ import { useBestCloser } from "@/hooks/useOperationsDashboard";
 import KpiDetailDialog, { type KpiRow } from "./KpiDetailDialog";
 import { useDashboard2Summary } from "@/pages/sales-performance/useDashboard2Summary";
 import { formatDistanceToNow, format } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import { useWeeklyStats, useOperationalKPIs, useRecentActivity } from "@/hooks/useDashboardData";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -157,6 +157,7 @@ function loadShortcuts(): string[] {
 /* ── Component ────────────────────────────────────── */
 
 const DashboardContent = () => {
+  const f = useFormato();
   const { t } = useLanguage();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -175,8 +176,8 @@ const DashboardContent = () => {
   ).split(" ")[0];
   // "domingo 23 de agosto" con la primera letra en mayúscula
   const fechaHoy = (() => {
-    const f = format(new Date(), "EEEE d 'de' MMMM", { locale: es });
-    return f.charAt(0).toUpperCase() + f.slice(1);
+    const hoy = format(new Date(), f.idioma === "en" ? "EEEE, MMMM d" : "EEEE d 'de' MMMM", { locale: f.fechas });
+    return hoy.charAt(0).toUpperCase() + hoy.slice(1);
   })();
 
   // Quick Actions state
@@ -364,7 +365,7 @@ const DashboardContent = () => {
             <UserAvatar name={bestCloserQ.data.name} size="lg" ring />
             <div className="min-w-0 flex-1">
               <div className="text-xs font-extrabold text-amber-500">
-                {t("dashboard.bestCloser", { month: format(new Date(), "MMMM", { locale: es }) })}
+                {t("dashboard.bestCloser", { month: format(new Date(), "MMMM", { locale: f.fechas }) })}
               </div>
               <div className="truncate font-display text-lg font-bold">{bestCloserQ.data.name}</div>
               <div className="text-xs text-muted-foreground">
@@ -482,7 +483,7 @@ const DashboardContent = () => {
                         <p className="text-xs text-muted-foreground">
                           {b.isToday
                             ? t("dashboard.birthdayToday")
-                            : t("dashboard.birthdayOn", { date: format(new Date(b.birth_date + "T12:00:00"), "d 'de' MMMM", { locale: es }) })}
+                            : t("dashboard.birthdayOn", { date: format(new Date(b.birth_date + "T12:00:00"), f.idioma === "en" ? "MMMM d" : "d 'de' MMMM", { locale: f.fechas }) })}
                         </p>
                       </div>
                       {b.isToday && (
@@ -536,7 +537,7 @@ const DashboardContent = () => {
                         </div>
                         <p className="text-xs text-muted-foreground">
                           {item.date
-                            ? formatDistanceToNow(new Date(item.date), { addSuffix: true, locale: es })
+                            ? formatDistanceToNow(new Date(item.date), { addSuffix: true, locale: f.fechas })
                             : ""}
                         </p>
                       </div>

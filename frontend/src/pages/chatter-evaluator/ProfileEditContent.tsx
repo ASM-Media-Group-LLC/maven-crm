@@ -19,6 +19,8 @@ import {
 } from "@/hooks/useChatterEvaluator";
 import { VaultGallery } from "./VaultGallery";
 import type { ChatterProfile } from "./types";
+import { useLanguage } from "@/hooks/useLanguage";
+import { getTranslation, type TranslationKey } from "@/lib/i18n";
 import {
   getCustomSections,
   getLabelOverrides,
@@ -30,24 +32,27 @@ import {
 interface BilingualConfig {
   key: keyof ChatterProfile;
   keyEn: keyof ChatterProfile;
-  label: string;
+  /** Clave de i18n del nombre del campo. La columna ES muestra SIEMPRE su
+   *  versión en español y la EN la inglesa, sea cual sea el idioma de la
+   *  interfaz: son las etiquetas por defecto de cada idioma del personaje. */
+  label: TranslationKey;
   type: "input" | "textarea";
 }
 
 const BILINGUAL_FIELDS: BilingualConfig[] = [
-  { key: "name",        keyEn: "name_en",        label: "Nombre",            type: "input" },
-  { key: "nationality", keyEn: "nationality_en", label: "Nacionalidad",      type: "input" },
-  { key: "location",    keyEn: "location_en",    label: "Ubicación",         type: "input" },
-  { key: "age",         keyEn: "age_en",         label: "Edad",              type: "input" },
-  { key: "greeting",    keyEn: "greeting_en",    label: "Saludo",            type: "textarea" },
-  { key: "users_term",  keyEn: "users_term_en",  label: "Trato a usuarios",  type: "textarea" },
-  { key: "body",        keyEn: "body_en",        label: "Cuerpo",            type: "input" },
-  { key: "nudity",      keyEn: "nudity_en",      label: "Desnudez",          type: "input" },
-  { key: "anal",        keyEn: "anal_en",        label: "Anal",              type: "input" },
-  { key: "collabs",     keyEn: "collabs_en",     label: "Colaboraciones",    type: "textarea" },
-  { key: "videocall",   keyEn: "videocall_en",   label: "Videollamadas",     type: "textarea" },
-  { key: "custom",      keyEn: "custom_en",      label: "Customs",           type: "textarea" },
-  { key: "extra",       keyEn: "extra_en",       label: "Reglas extra",      type: "textarea" },
+  { key: "name",        keyEn: "name_en",        label: "chatters.field.name",        type: "input" },
+  { key: "nationality", keyEn: "nationality_en", label: "chatters.field.nationality", type: "input" },
+  { key: "location",    keyEn: "location_en",    label: "chatters.field.location",    type: "input" },
+  { key: "age",         keyEn: "age_en",         label: "chatters.field.age",         type: "input" },
+  { key: "greeting",    keyEn: "greeting_en",    label: "chatters.field.greeting",    type: "textarea" },
+  { key: "users_term",  keyEn: "users_term_en",  label: "chatters.field.usersTerm",   type: "textarea" },
+  { key: "body",        keyEn: "body_en",        label: "chatters.field.body",        type: "input" },
+  { key: "nudity",      keyEn: "nudity_en",      label: "chatters.field.nudity",      type: "input" },
+  { key: "anal",        keyEn: "anal_en",        label: "chatters.field.anal",        type: "input" },
+  { key: "collabs",     keyEn: "collabs_en",     label: "chatters.field.collabs",     type: "textarea" },
+  { key: "videocall",   keyEn: "videocall_en",   label: "chatters.field.videocall",   type: "textarea" },
+  { key: "custom",      keyEn: "custom_en",      label: "chatters.field.customs",     type: "textarea" },
+  { key: "extra",       keyEn: "extra_en",       label: "chatters.field.extraRules",  type: "textarea" },
 ];
 
 type FormState = {
@@ -115,6 +120,7 @@ const buildPatch = (s: FormState): ChatterProfileUpdate => {
 };
 
 const ChatterProfileEditContent = () => {
+  const { t } = useLanguage();
   const { profileKey } = useParams<{ profileKey: string }>();
   const navigate = useNavigate();
   const profilesQ = useChatterProfiles();
@@ -141,7 +147,7 @@ const ChatterProfileEditContent = () => {
   if (profilesQ.isLoading || !form) {
     return (
       <main className="flex-1 p-6">
-        <p className="text-sm text-muted-foreground">Cargando…</p>
+        <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
       </main>
     );
   }
@@ -150,9 +156,9 @@ const ChatterProfileEditContent = () => {
     return (
       <main className="flex-1 p-6">
         <Card className="p-6">
-          <p className="text-sm">Perfil no encontrado: <code>{profileKey}</code></p>
+          <p className="text-sm">{t("chatters.profile.notFound")} <code>{profileKey}</code></p>
           <Button asChild variant="ghost" className="mt-4">
-            <Link to="/chatter-evaluator"><ArrowLeft className="mr-2 h-4 w-4" /> Volver</Link>
+            <Link to="/chatter-evaluator"><ArrowLeft className="mr-2 h-4 w-4" /> {t("common.back")}</Link>
           </Button>
         </Card>
       </main>
@@ -251,12 +257,12 @@ const ChatterProfileEditContent = () => {
     const patch = buildPatch(form);
     try {
       await update.mutateAsync({ id: profile.id, patch });
-      toast.success("Perfil guardado", {
-        description: `${form.fields.name || profile.name} actualizado correctamente.`,
+      toast.success(t("chatters.profileEdit.saved"), {
+        description: t("chatters.profileEdit.savedDesc", { name: form.fields.name || profile.name }),
       });
       navigate(`/chatter-evaluator/${profile.key}`);
     } catch (e) {
-      toast.error("No se pudo guardar", {
+      toast.error(t("common.couldNotSave"), {
         description: (e as Error).message,
       });
     }
@@ -273,9 +279,9 @@ const ChatterProfileEditContent = () => {
       // even if the user navigates away without clicking "Guardar".
       setForm((s) => (s ? { ...s, avatar_url: url } : s));
       await update.mutateAsync({ id: profile.id, patch: { avatar_url: url } });
-      toast.success("Avatar actualizado");
+      toast.success(t("chatters.profileEdit.avatarUpdated"));
     } catch (e) {
-      toast.error("No se pudo subir el avatar", {
+      toast.error(t("chatters.profileEdit.avatarUploadFailed"), {
         description: (e as Error).message,
       });
     } finally {
@@ -303,17 +309,17 @@ const ChatterProfileEditContent = () => {
               }
             }}
           >
-            <ArrowLeft className="mr-2 h-4 w-4" /> Volver
+            <ArrowLeft className="mr-2 h-4 w-4" /> {t("common.back")}
           </Button>
           <Button onClick={handleSave} disabled={update.isPending} className="gap-2">
             {update.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            Guardar cambios
+            {t("chatters.profileEdit.saveChanges")}
           </Button>
         </div>
 
         <PageHeader
-          title={<>Editar: {profile.name}</>}
-          subtitle="Estos cambios afectan a TODOS los examiners — perfiles son recursos compartidos."
+          title={t("chatters.profileEdit.titleN", { name: profile.name })}
+          subtitle={t("chatters.profileEdit.subtitle")}
         />
 
         {/* Avatar section */}
@@ -334,7 +340,7 @@ const ChatterProfileEditContent = () => {
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
-                    sin avatar
+                    {t("chatters.profileEdit.noAvatar")}
                   </div>
                 )}
                 {/* Hover overlay → click to upload */}
@@ -343,17 +349,17 @@ const ChatterProfileEditContent = () => {
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploadAvatar.isPending}
                   className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/70 text-white opacity-0 transition-opacity hover:opacity-100 focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-100"
-                  aria-label="Cambiar avatar"
+                  aria-label={t("chatters.profileEdit.changeAvatar")}
                 >
                   {uploadAvatar.isPending ? (
                     <>
                       <Loader2 className="h-6 w-6 animate-spin" />
-                      <span className="text-xs">Subiendo…</span>
+                      <span className="text-xs">{t("chatters.profileEdit.uploading")}</span>
                     </>
                   ) : (
                     <>
                       <Camera className="h-6 w-6" />
-                      <span className="text-xs">Cambiar foto</span>
+                      <span className="text-xs">{t("chatters.profileEdit.changePhoto")}</span>
                     </>
                   )}
                 </button>
@@ -385,7 +391,7 @@ const ChatterProfileEditContent = () => {
                       ) : (
                         <Upload className="h-3 w-3" />
                       )}
-                      Subir desde dispositivo
+                      {t("chatters.profileEdit.uploadFromDevice")}
                     </Button>
                   </div>
                   <Input
@@ -396,13 +402,12 @@ const ChatterProfileEditContent = () => {
                   />
                   {form.avatar_url.includes("roleplaychatters.imaginehub.me") && (
                     <p className="mt-1 text-[11px] text-warning/80">
-                      ⚠ Este avatar todavía está alojado en el servidor anterior. Sube uno nuevo
-                      para que pase a tu Storage propio.
+                      {t("chatters.profileEdit.oldServerWarning")}
                     </p>
                   )}
                 </div>
                 <div>
-                  <Label>Posición X: {form.avatar_x}%</Label>
+                  <Label>{t("chatters.profileEdit.positionX", { n: form.avatar_x })}</Label>
                   <Slider
                     value={[form.avatar_x]}
                     onValueChange={([v]) => setForm((s) => (s ? { ...s, avatar_x: v } : s))}
@@ -412,7 +417,7 @@ const ChatterProfileEditContent = () => {
                   />
                 </div>
                 <div>
-                  <Label>Posición Y: {form.avatar_y}%</Label>
+                  <Label>{t("chatters.profileEdit.positionY", { n: form.avatar_y })}</Label>
                   <Slider
                     value={[form.avatar_y]}
                     onValueChange={([v]) => setForm((s) => (s ? { ...s, avatar_y: v } : s))}
@@ -439,18 +444,20 @@ const ChatterProfileEditContent = () => {
         {/* Bilingual fields */}
         <Card>
           <CardContent className="space-y-4 p-6">
-            <h2 className="text-lg font-semibold">Personaje y reglas</h2>
+            <h2 className="text-lg font-semibold">{t("chatters.profile.characterAndRules")}</h2>
             <p className="text-xs text-muted-foreground">
-              Haz clic en el lápiz para renombrar cualquier etiqueta (ES + EN). El nuevo
-              nombre aparecerá tanto aquí como en el panel del chatter y del examinador.
+              {t("chatters.profileEdit.renameHelp")}
             </p>
             <div className="space-y-5">
               {BILINGUAL_FIELDS.map((c) => {
                 const Cmp = c.type === "textarea" ? Textarea : Input;
                 const fieldKey = c.key as string;
                 const ov = form.labelOverrides[fieldKey];
-                const labelEs = ov?.es?.trim() || c.label;
-                const labelEn = ov?.en?.trim() || c.label;
+                // Etiqueta por defecto de CADA idioma del personaje (no de la interfaz).
+                const defaultEs = getTranslation(c.label, "es");
+                const defaultEn = getTranslation(c.label, "en");
+                const labelEs = ov?.es?.trim() || defaultEs;
+                const labelEn = ov?.en?.trim() || defaultEn;
 
                 const renderLabel = (lang: "es" | "en", value: string, valueKey: string) => {
                   const id = `${fieldKey}__${lang}`;
@@ -472,7 +479,7 @@ const ChatterProfileEditContent = () => {
                               (e.target as HTMLInputElement).blur();
                             }
                           }}
-                          placeholder={c.label}
+                          placeholder={lang === "en" ? defaultEn : defaultEs}
                           className="h-7 max-w-[220px] text-sm font-medium"
                         />
                       ) : (
@@ -488,7 +495,7 @@ const ChatterProfileEditContent = () => {
                             variant="ghost"
                             onClick={() => setEditingLabelId(id)}
                             className="h-6 w-6 text-muted-foreground hover:text-foreground"
-                            aria-label={`Renombrar etiqueta ${lang.toUpperCase()}`}
+                            aria-label={t("chatters.profileEdit.renameLabel", { idioma: lang.toUpperCase() })}
                           >
                             <Pencil className="h-3 w-3" />
                           </Button>
@@ -529,7 +536,7 @@ const ChatterProfileEditContent = () => {
                           onClick={() => clearLabelOverride(fieldKey)}
                           className="text-[10px] text-muted-foreground hover:text-foreground"
                         >
-                          Restaurar etiqueta original
+                          {t("chatters.profileEdit.restoreLabel")}
                         </button>
                       </div>
                     )}
@@ -546,23 +553,22 @@ const ChatterProfileEditContent = () => {
         <Card>
           <CardContent className="space-y-3 p-6">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Secciones personalizadas</h2>
+              <h2 className="text-lg font-semibold">{t("chatters.profileEdit.customSections")}</h2>
               <Button
                 onClick={addCustomSection}
                 size="sm"
                 variant="outline"
                 className="gap-1"
               >
-                <Plus className="h-4 w-4" /> Agregar sección
+                <Plus className="h-4 w-4" /> {t("chatters.profileEdit.addSection")}
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              Cada sección extra tiene título y contenido en español e inglés. Aparecerán
-              como tarjetas adicionales en los paneles del chatter y del examinador.
+              {t("chatters.profileEdit.customSectionsHelp")}
             </p>
             {form.customSections.length === 0 && (
               <p className="text-sm text-muted-foreground">
-                Sin secciones personalizadas todavía.
+                {t("chatters.profileEdit.noCustomSections")}
               </p>
             )}
             {form.customSections.map((s, i) => (
@@ -572,19 +578,19 @@ const ChatterProfileEditContent = () => {
               >
                 <div className="flex items-center justify-between gap-2">
                   <Label className="text-xs font-semibold text-muted-foreground">
-                    Sección {i + 1}
+                    {t("chatters.profileEdit.sectionN", { n: i + 1 })}
                   </Label>
                   <Button
                     onClick={() => removeCustomSection(i)}
                     size="icon"
                     variant="ghost"
-                    aria-label="Eliminar sección"
+                    aria-label={t("chatters.profileEdit.deleteSection")}
                   >
                     <X className="h-4 w-4" />
                   </Button>
                 </div>
                 <div>
-                  <div className="mb-1 text-xs text-muted-foreground">Título</div>
+                  <div className="mb-1 text-xs text-muted-foreground">{t("common.title")}</div>
                   <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                     <div>
                       <div className="mb-1 flex items-center gap-1.5">
@@ -592,7 +598,7 @@ const ChatterProfileEditContent = () => {
                       </div>
                       <Input
                         value={s.title}
-                        placeholder="Título ES (ej. Personalidad)"
+                        placeholder={t("chatters.profileEdit.titleEsPh")}
                         onChange={(e) => setSectionField(i, "title", e.target.value)}
                       />
                     </div>
@@ -602,14 +608,14 @@ const ChatterProfileEditContent = () => {
                       </div>
                       <Input
                         value={s.title_en}
-                        placeholder="Title EN (e.g. Personality)"
+                        placeholder={t("chatters.profileEdit.titleEnPh")}
                         onChange={(e) => setSectionField(i, "title_en", e.target.value)}
                       />
                     </div>
                   </div>
                 </div>
                 <div>
-                  <div className="mb-1 text-xs text-muted-foreground">Contenido</div>
+                  <div className="mb-1 text-xs text-muted-foreground">{t("chatters.profileEdit.content")}</div>
                   <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                     <div>
                       <div className="mb-1 flex items-center gap-1.5">
@@ -617,7 +623,7 @@ const ChatterProfileEditContent = () => {
                       </div>
                       <Textarea
                         value={s.value}
-                        placeholder="Contenido ES"
+                        placeholder={t("chatters.profileEdit.contentEsPh")}
                         rows={3}
                         onChange={(e) => setSectionField(i, "value", e.target.value)}
                       />
@@ -628,7 +634,7 @@ const ChatterProfileEditContent = () => {
                       </div>
                       <Textarea
                         value={s.value_en}
-                        placeholder="Content EN"
+                        placeholder={t("chatters.profileEdit.contentEnPh")}
                         rows={3}
                         onChange={(e) => setSectionField(i, "value_en", e.target.value)}
                       />
@@ -644,31 +650,31 @@ const ChatterProfileEditContent = () => {
         <Card>
           <CardContent className="space-y-3 p-6">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Catálogo de precios</h2>
+              <h2 className="text-lg font-semibold">{t("chatters.profile.priceList")}</h2>
               <Button onClick={addPriceRow} size="sm" variant="outline" className="gap-1">
-                <Plus className="h-4 w-4" /> Agregar
+                <Plus className="h-4 w-4" /> {t("common.add")}
               </Button>
             </div>
             {form.prices.length === 0 && (
-              <p className="text-sm text-muted-foreground">Sin precios todavía.</p>
+              <p className="text-sm text-muted-foreground">{t("chatters.profileEdit.noPrices")}</p>
             )}
             {form.prices.map((p, i) => (
               <div key={i} className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_180px_auto]">
                 <Input
                   value={p.service}
-                  placeholder="Nombre del servicio (ej. Dick Rating)"
+                  placeholder={t("chatters.profileEdit.servicePh")}
                   onChange={(e) => setPrice(i, "service", e.target.value)}
                 />
                 <Input
                   value={p.price}
-                  placeholder="Precio (ej. $35)"
+                  placeholder={t("chatters.profileEdit.pricePh")}
                   onChange={(e) => setPrice(i, "price", e.target.value)}
                 />
                 <Button
                   onClick={() => removePriceRow(i)}
                   size="icon"
                   variant="ghost"
-                  aria-label="Eliminar fila"
+                  aria-label={t("chatters.profileEdit.deleteRow")}
                 >
                   <X className="h-4 w-4" />
                 </Button>
@@ -688,11 +694,11 @@ const ChatterProfileEditContent = () => {
                   Vault ({vaultQ.isLoading ? "…" : vaultQ.data?.length ?? 0})
                 </h2>
                 <p className="text-xs text-muted-foreground">
-                  Contenido precargado del personaje (fotos / videos).
+                  {t("chatters.profileEdit.vaultHelp")}
                 </p>
               </div>
               {vaultQ.isLoading ? (
-                <p className="text-sm text-muted-foreground">Cargando vault…</p>
+                <p className="text-sm text-muted-foreground">{t("chatters.profile.loadingVault")}</p>
               ) : (
                 <VaultGallery
                   items={vaultQ.data ?? []}
@@ -709,7 +715,7 @@ const ChatterProfileEditContent = () => {
         <div className="flex justify-end pt-2">
           <Button onClick={handleSave} disabled={update.isPending} className="gap-2">
             {update.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            Guardar cambios
+            {t("chatters.profileEdit.saveChanges")}
           </Button>
         </div>
       </div>

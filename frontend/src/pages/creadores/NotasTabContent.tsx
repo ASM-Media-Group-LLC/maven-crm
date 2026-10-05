@@ -3,7 +3,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Save, StickyNote } from "lucide-react";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,12 +12,15 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/hooks/use-toast";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface Props {
   creatorId: string;
 }
 
 const NotasTabContent = ({ creatorId }: Props) => {
+  const f = useFormato();
+  const { t } = useLanguage();
   const [noteText, setNoteText] = useState("");
   const [saving, setSaving] = useState(false);
   const queryClient = useQueryClient();
@@ -48,9 +51,9 @@ const NotasTabContent = ({ creatorId }: Props) => {
       if (error) throw error;
       setNoteText("");
       queryClient.invalidateQueries({ queryKey: ["creator_notes", creatorId] });
-      toast({ title: "Nota guardada", description: "La nota se ha registrado correctamente." });
+      toast({ title: t("creadores.notes.saved"), description: t("creadores.notes.savedDesc") });
     } catch (e: any) {
-      toast({ title: "Error al guardar nota", description: e.message, variant: "destructive" });
+      toast({ title: t("creadores.notes.saveError"), description: e.message, variant: "destructive" });
     } finally {
       setSaving(false);
     }
@@ -58,13 +61,13 @@ const NotasTabContent = ({ creatorId }: Props) => {
 
   const formatDate = (dateStr: string) => {
     try {
-      return format(new Date(dateStr), "d MMM yyyy, HH:mm", { locale: es });
+      return format(new Date(dateStr), "d MMM yyyy, HH:mm", { locale: f.fechas });
     } catch {
       return dateStr;
     }
   };
 
-  const shortId = (uuid: string) => uuid.split("-")[0] ?? "Usuario";
+  const shortId = (uuid: string) => uuid.split("-")[0] ?? t("common.user");
 
   if (isLoading) {
     return (
@@ -86,14 +89,14 @@ const NotasTabContent = ({ creatorId }: Props) => {
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg">
           <StickyNote className="h-5 w-5" />
-          Notas
+          {t("creadores.profile.tabNotes")}
         </CardTitle>
-        <CardDescription>Historial de notas sobre esta creadora</CardDescription>
+        <CardDescription>{t("creadores.notes.subtitle")}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="space-y-3">
           <Textarea
-            placeholder="Escribe una nueva nota..."
+            placeholder={t("creadores.notes.newPh")}
             value={noteText}
             onChange={(e) => setNoteText(e.target.value)}
             rows={4}
@@ -101,7 +104,7 @@ const NotasTabContent = ({ creatorId }: Props) => {
           <div className="flex justify-end">
             <Button onClick={handleSave} disabled={saving || !noteText.trim()}>
               <Save className="h-4 w-4" />
-              Guardar Nota
+              {t("creadores.notes.save")}
             </Button>
           </div>
         </div>
@@ -124,8 +127,8 @@ const NotasTabContent = ({ creatorId }: Props) => {
         ) : (
           <EmptyState
             icon={<StickyNote className="h-8 w-8 text-muted-foreground" />}
-            title="No hay notas registradas"
-            description="Agrega una nota para comenzar"
+            title={t("creadores.notes.empty")}
+            description={t("creadores.notes.emptyDesc")}
           />
         )}
       </CardContent>

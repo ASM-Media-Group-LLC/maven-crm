@@ -17,6 +17,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 import { buildSocialUrl } from "@/lib/utils";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
@@ -58,12 +60,13 @@ const platformOptions = [
   { value: "otra", label: "Otra" },
 ] as const;
 
-const strategyOptions = [
-  { value: "incentivo_economico", label: "Incentivo económico" },
-  { value: "llamada_motivacional", label: "Llamada motivacional" },
-  { value: "mensaje_estrategico", label: "Mensaje estratégico" },
-  { value: "recordatorio_amable", label: "Recordatorio amable" },
-  { value: "otro", label: "Otro" },
+// `value` es lo que se guarda en promolog_entries.action_taken: NO se traduce.
+const strategyOptions: Array<{ value: string; labelKey: TranslationKey }> = [
+  { value: "incentivo_economico", labelKey: "promolog.strategyIncentive" },
+  { value: "llamada_motivacional", labelKey: "promolog.strategyMotivationalCall" },
+  { value: "mensaje_estrategico", labelKey: "promolog.strategyStrategicMessage" },
+  { value: "recordatorio_amable", labelKey: "promolog.strategyFriendlyReminder" },
+  { value: "otro", labelKey: "promolog.strategyOther" },
 ];
 
 type Photo = { id?: string; url: string; promoted: boolean };
@@ -103,6 +106,9 @@ const toPlatformValue = (platform: string | null | undefined): { value: string; 
 const cleanHandle = (h: string) => h.replace(/^@/, "").replace(/\/$/, "").split("/").pop();
 
 const PromologEntryFormDialog = ({ open, onOpenChange, mode, creator, entry, dayStories, dayEntries, onSaved }: Props) => {
+  const { t } = useLanguage();
+  // "otra" es el valor guardado; solo el rótulo cambia de idioma.
+  const optLabel = (o: { value: string; label: string }) => (o.value === "otra" ? t("promolog.other") : o.label);
   const { toast } = useToast();
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -233,7 +239,7 @@ const PromologEntryFormDialog = ({ open, onOpenChange, mode, creator, entry, day
         { label: "X", icon: <XIcon className="h-3.5 w-3.5" />, url: buildSocialUrl("twitter", creatorSocials.twitter_handle) },
         { label: "TikTok", icon: <TikTokIcon className="h-3.5 w-3.5" />, url: buildSocialUrl("tiktok", creatorSocials.tiktok_handle) },
         { label: "YouTube", icon: <Youtube className="h-3.5 w-3.5" />, url: buildSocialUrl("youtube", creatorSocials.youtube_handle) },
-        { label: "Otra", icon: <ExternalLink className="h-3.5 w-3.5" />, url: creatorSocials.other_url || "" },
+        { label: t("promolog.other"), icon: <ExternalLink className="h-3.5 w-3.5" />, url: creatorSocials.other_url || "" },
       ].filter((c) => c.url)
     : [];
 
@@ -282,7 +288,7 @@ const PromologEntryFormDialog = ({ open, onOpenChange, mode, creator, entry, day
       const { error: upErr } = await supabase.storage.from("creator-files").upload(path, file, { contentType: file.type, upsert: true });
       if (upErr) throw upErr;
       const { data: signed, error: signErr } = await supabase.storage.from("creator-files").createSignedUrl(path, 60 * 60 * 24 * 365);
-      if (signErr || !signed?.signedUrl) throw signErr ?? new Error("No se pudo firmar la URL");
+      if (signErr || !signed?.signedUrl) throw signErr ?? new Error(t("promolog.couldNotSignUrl"));
       urls.push(signed.signedUrl);
     }
     return urls;
@@ -297,7 +303,7 @@ const PromologEntryFormDialog = ({ open, onOpenChange, mode, creator, entry, day
       const urls = await uploadFiles(files);
       setPhotos((prev) => [...prev, ...urls.map((url) => ({ url, promoted: true }))]);
     } catch (err) {
-      toast({ title: "Error subiendo evidencia", description: (err as Error).message, variant: "destructive" });
+      toast({ title: t("promolog.errorUploadingEvidence"), description: (err as Error).message, variant: "destructive" });
     } finally {
       setUploading(false);
       if (e.target) e.target.value = "";
@@ -313,7 +319,7 @@ const PromologEntryFormDialog = ({ open, onOpenChange, mode, creator, entry, day
       const urls = await uploadFiles(files);
       setNetPhotos((prev) => ({ ...prev, [net]: [...(prev[net] || []), ...urls.map((url) => ({ url, promoted: true }))] }));
     } catch (err) {
-      toast({ title: "Error subiendo evidencia", description: (err as Error).message, variant: "destructive" });
+      toast({ title: t("promolog.errorUploadingEvidence"), description: (err as Error).message, variant: "destructive" });
     } finally {
       setUploading(false);
       if (e.target) e.target.value = "";
@@ -345,12 +351,12 @@ const PromologEntryFormDialog = ({ open, onOpenChange, mode, creator, entry, day
       if (mode === "add") {
         if (!creator?.id) return;
         if (selectedNets.length === 0) {
-          toast({ title: "Elige al menos una red", description: "Marca las redes que revisaste.", variant: "destructive" });
+          toast({ title: t("promolog.pickAtLeastOneNetwork"), description: t("promolog.markNetworksReviewed"), variant: "destructive" });
           setSaving(false);
           return;
         }
         if (addAnySi && !platform) {
-          toast({ title: "Falta la plataforma", description: "Elige a dónde apunta la promo (OnlyFans, etc.).", variant: "destructive" });
+          toast({ title: t("promolog.platformMissing"), description: t("promolog.pickPlatformDesc"), variant: "destructive" });
           setSaving(false);
           return;
         }
@@ -373,17 +379,17 @@ const PromologEntryFormDialog = ({ open, onOpenChange, mode, creator, entry, day
         }
         const { error } = await supabase.from("promolog_entries").insert(rows);
         if (error) throw error;
-        toast({ title: "Promoción registrada", description: `${selectedNets.length} ${selectedNets.length === 1 ? "red" : "redes"} guardada(s) para hoy.` });
+        toast({ title: t("promolog.promoSaved"), description: t(selectedNets.length === 1 ? "promolog.networksSavedTodayOne" : "promolog.networksSavedTodayMany", { count: selectedNets.length }) });
       } else {
         // EDIT multi-red: upsert por red. NUNCA borra filas del bot (solo fotos manuales removidas).
         if (!entry) return;
         if (selectedNets.length === 0) {
-          toast({ title: "Elige al menos una red", description: "Marca las redes del día.", variant: "destructive" });
+          toast({ title: t("promolog.pickAtLeastOneNetwork"), description: t("promolog.markDayNetworks"), variant: "destructive" });
           setSaving(false);
           return;
         }
         if (addAnySi && !platform) {
-          toast({ title: "Falta la plataforma", description: "Elige a dónde apunta la promo (OnlyFans/Unlok).", variant: "destructive" });
+          toast({ title: t("promolog.platformMissing"), description: t("promolog.pickPlatformDescEdit"), variant: "destructive" });
           setSaving(false);
           return;
         }
@@ -431,14 +437,14 @@ const PromologEntryFormDialog = ({ open, onOpenChange, mode, creator, entry, day
         const results = await Promise.all(ops);
         const firstErr = results.find((r: any) => r?.error)?.error;
         if (firstErr) throw firstErr;
-        toast({ title: "Promoción actualizada", description: `${selectedNets.length} ${selectedNets.length === 1 ? "red" : "redes"} guardada(s).` });
+        toast({ title: t("promolog.promoUpdated"), description: t(selectedNets.length === 1 ? "promolog.networksSavedOne" : "promolog.networksSavedMany", { count: selectedNets.length }) });
       }
       queryClient.invalidateQueries({ queryKey: ["promolog-entries"] });
       queryClient.invalidateQueries({ queryKey: ["promolog-calendar"] });
       onSaved?.();
       onOpenChange(false);
     } catch (err) {
-      toast({ title: "Error", description: (err as Error).message, variant: "destructive" });
+      toast({ title: t("common.error"), description: (err as Error).message, variant: "destructive" });
     } finally {
       setSaving(false);
     }
@@ -450,8 +456,8 @@ const PromologEntryFormDialog = ({ open, onOpenChange, mode, creator, entry, day
         {/* Header fijo */}
         <div className="shrink-0 p-6 pb-4 space-y-4">
           <DialogHeader className="pr-8">
-            <DialogTitle>{mode === "add" ? "Registrar Promoción" : "Editar Promoción"}</DialogTitle>
-            <DialogDescription className="sr-only">{mode === "add" ? "Registrar una nueva promoción para esta creadora" : "Editar los detalles de la promoción"}</DialogDescription>
+            <DialogTitle>{mode === "add" ? t("promolog.registerPromo") : t("promolog.editPromo")}</DialogTitle>
+            <DialogDescription className="sr-only">{mode === "add" ? t("promolog.registerPromoDesc") : t("promolog.editPromoDesc")}</DialogDescription>
           </DialogHeader>
           <Card className="bg-muted">
             <CardContent className="p-3 space-y-2">
@@ -471,7 +477,7 @@ const PromologEntryFormDialog = ({ open, onOpenChange, mode, creator, entry, day
                       href={c.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      title={`Abrir ${c.label}`}
+                      title={t("promolog.openNetwork", { network: c.label })}
                       className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background/60 px-2.5 py-1 text-xs transition-colors hover:border-primary/50 hover:text-primary"
                     >
                       {c.icon}
@@ -496,7 +502,7 @@ const PromologEntryFormDialog = ({ open, onOpenChange, mode, creator, entry, day
                 {mode === "add" && alreadyToday.size > 0 && (
                   <div className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2.5">
                     <p className="text-xs font-medium text-warning">
-                      Ya registrado hoy — normalmente no hace falta volver a cargarlo:
+                      {t("promolog.alreadyLoggedToday")}
                     </p>
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {[...alreadyToday.entries()].map(([net, v]) => {
@@ -505,11 +511,11 @@ const PromologEntryFormDialog = ({ open, onOpenChange, mode, creator, entry, day
                         return (
                           <span key={net} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background/70 px-2 py-0.5 text-[11px]">
                             {Icon ? <Icon className="h-3 w-3" /> : null}
-                            {opt?.label ?? net}
+                            {opt ? optLabel(opt) : net}
                             {v.promoted ? (
-                              <span className="inline-flex items-center gap-0.5 font-semibold text-success"><Check className="h-3 w-3" />Sí</span>
+                              <span className="inline-flex items-center gap-0.5 font-semibold text-success"><Check className="h-3 w-3" />{t("promolog.yes")}</span>
                             ) : (
-                              <span className="inline-flex items-center gap-0.5 font-semibold text-destructive"><X className="h-3 w-3" />No</span>
+                              <span className="inline-flex items-center gap-0.5 font-semibold text-destructive"><X className="h-3 w-3" />{t("promolog.no")}</span>
                             )}
                             {v.byBot && <span className="text-muted-foreground">· bot</span>}
                           </span>
@@ -520,8 +526,8 @@ const PromologEntryFormDialog = ({ open, onOpenChange, mode, creator, entry, day
                 )}
                 {/* Multi-select de redes */}
                 <div className="space-y-2">
-                  <span className="text-sm font-medium">Redes Sociales <span className="text-destructive">*</span></span>
-                  <p className="text-xs text-muted-foreground">Elige una o varias. Por cada red marcas si promocionó y subes su evidencia.</p>
+                  <span className="text-sm font-medium">{t("promolog.socialNetworks")} <span className="text-destructive">*</span></span>
+                  <p className="text-xs text-muted-foreground">{t("promolog.socialNetworksHelp")}</p>
                   <div className="grid grid-cols-4 gap-2">
                     {networkOptions.map((opt) => {
                       const Icon = opt.icon;
@@ -530,9 +536,9 @@ const PromologEntryFormDialog = ({ open, onOpenChange, mode, creator, entry, day
                         <button key={opt.value} type="button" onClick={() => toggleNet(opt.value)} className={`relative flex flex-col items-center justify-center gap-1.5 rounded-md px-2 py-3 text-xs font-medium transition-colors ${isSelected ? "border-2 border-primary bg-accent text-accent-foreground" : "border border-input bg-background text-muted-foreground hover:bg-accent"}`}>
                           {isSelected && <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-primary-foreground"><Check className="h-2.5 w-2.5" /></span>}
                           {mode === "add" && !isSelected && alreadyToday.has(opt.value) && (
-                            <span className="absolute left-1 top-1 h-2 w-2 rounded-full bg-warning" title="Ya registrado hoy" />
+                            <span className="absolute left-1 top-1 h-2 w-2 rounded-full bg-warning" title={t("promolog.alreadyLoggedTodayShort")} />
                           )}
-                          <Icon className="h-5 w-5" />{opt.label}
+                          <Icon className="h-5 w-5" />{optLabel(opt)}
                         </button>
                       );
                     })}
@@ -548,23 +554,23 @@ const PromologEntryFormDialog = ({ open, onOpenChange, mode, creator, entry, day
                     <Card key={opt.value} className="border-border/70">
                       <CardContent className="space-y-3 p-3">
                         <div className="flex items-center justify-between gap-2">
-                          <span className="inline-flex items-center gap-1.5 text-sm font-semibold"><Icon className="h-4 w-4" />Evidencia {opt.label}</span>
+                          <span className="inline-flex items-center gap-1.5 text-sm font-semibold"><Icon className="h-4 w-4" />{t("promolog.evidenceFor", { network: optLabel(opt) })}</span>
                           <div className="inline-flex overflow-hidden rounded-md border border-border text-[11px] font-semibold">
-                            <button type="button" onClick={() => setNetResult((r) => ({ ...r, [opt.value]: "si" }))} className={`flex items-center gap-1 px-2.5 py-1 transition-colors ${res === "si" ? "bg-success text-white" : "bg-muted/50 text-muted-foreground hover:text-success"}`}><Check className="h-3 w-3" />Sí</button>
-                            <button type="button" onClick={() => setNetResult((r) => ({ ...r, [opt.value]: "no" }))} className={`flex items-center gap-1 px-2.5 py-1 transition-colors ${res === "no" ? "bg-destructive text-white" : "bg-muted/50 text-muted-foreground hover:text-destructive"}`}><X className="h-3 w-3" />No</button>
+                            <button type="button" onClick={() => setNetResult((r) => ({ ...r, [opt.value]: "si" }))} className={`flex items-center gap-1 px-2.5 py-1 transition-colors ${res === "si" ? "bg-success text-white" : "bg-muted/50 text-muted-foreground hover:text-success"}`}><Check className="h-3 w-3" />{t("promolog.yes")}</button>
+                            <button type="button" onClick={() => setNetResult((r) => ({ ...r, [opt.value]: "no" }))} className={`flex items-center gap-1 px-2.5 py-1 transition-colors ${res === "no" ? "bg-destructive text-white" : "bg-muted/50 text-muted-foreground hover:text-destructive"}`}><X className="h-3 w-3" />{t("promolog.no")}</button>
                           </div>
                         </div>
                         <div className="border-2 border-dashed border-input rounded-md p-3 text-center cursor-pointer hover:bg-accent/50 transition-colors" onClick={() => document.getElementById(`tg-file-${opt.value}`)?.click()}>
                           <Upload className="h-5 w-5 mx-auto text-muted-foreground mb-1" />
-                          <span className="text-xs text-muted-foreground">{uploading ? "Subiendo…" : `Subir foto(s) de ${opt.label}`}</span>
+                          <span className="text-xs text-muted-foreground">{uploading ? t("promolog.uploading") : t("promolog.uploadPhotosFor", { network: optLabel(opt) })}</span>
                           <input id={`tg-file-${opt.value}`} type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleNetPhotos(opt.value, e)} />
                         </div>
                         {ph.length > 0 && (
                           <div className="grid grid-cols-3 gap-2">
                             {ph.map((p, i) => (
                               <div key={`${opt.value}-${i}`} className="relative overflow-hidden rounded-md border border-input">
-                                <img src={p.url} alt={`Evidencia ${opt.label} ${i + 1}`} className="h-20 w-full object-cover" />
-                                <button type="button" title="Quitar" onClick={() => setNetPhotos((prev) => ({ ...prev, [opt.value]: (prev[opt.value] || []).filter((_, j) => j !== i) }))} className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"><X className="h-3 w-3" /></button>
+                                <img src={p.url} alt={t("promolog.evidenceAltNet", { network: optLabel(opt), n: i + 1 })} className="h-20 w-full object-cover" />
+                                <button type="button" title={t("promolog.remove")} onClick={() => setNetPhotos((prev) => ({ ...prev, [opt.value]: (prev[opt.value] || []).filter((_, j) => j !== i) }))} className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"><X className="h-3 w-3" /></button>
                               </div>
                             ))}
                           </div>
@@ -578,22 +584,22 @@ const PromologEntryFormDialog = ({ open, onOpenChange, mode, creator, entry, day
                 {addAnySi && (
                   <>
                     <div className="space-y-2">
-                      <span className="text-sm font-medium">Plataforma <span className="text-destructive">*</span></span>
+                      <span className="text-sm font-medium">{t("promolog.platform")} <span className="text-destructive">*</span></span>
                       <div className="grid grid-cols-3 gap-2">
                         {platformOptions.map((opt) => (
                           <button key={opt.value} type="button" onClick={() => { setPlatform(opt.value); if (opt.value !== "otra") setCustomPlatform(""); }} className={`flex items-center justify-center rounded-md px-3 py-3 text-xs font-medium transition-colors ${platform === opt.value ? "border-2 border-primary bg-accent text-accent-foreground" : "border border-input bg-background text-muted-foreground hover:bg-accent"}`}>
-                            {opt.label}
+                            {optLabel(opt)}
                           </button>
                         ))}
                       </div>
-                      {platform === "otra" && <Input placeholder="Nombre de la plataforma..." value={customPlatform} onChange={(e) => setCustomPlatform(e.target.value)} />}
+                      {platform === "otra" && <Input placeholder={t("promolog.platformName")} value={customPlatform} onChange={(e) => setCustomPlatform(e.target.value)} />}
                     </div>
                     <div className="space-y-2">
-                      <span className="text-sm font-medium">¿Qué se hizo para que promocione?</span>
+                      <span className="text-sm font-medium">{t("promolog.whatWasDone")}</span>
                       <div className="grid grid-cols-2 gap-2">
                         {strategyOptions.map((opt) => (
                           <button key={opt.value} type="button" onClick={() => setStrategy(opt.value)} className={`flex items-center justify-center rounded-md px-3 py-2.5 text-xs font-medium transition-colors ${strategy === opt.value ? "border-2 border-primary bg-accent text-accent-foreground" : "border border-input bg-background text-muted-foreground hover:bg-accent"}`}>
-                            {opt.label}
+                            {t(opt.labelKey)}
                           </button>
                         ))}
                       </div>
@@ -602,8 +608,8 @@ const PromologEntryFormDialog = ({ open, onOpenChange, mode, creator, entry, day
                 )}
 
                 <div className="space-y-2">
-                  <span className="text-sm font-medium">Notas</span>
-                  <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Agregar notas..." className="min-h-[70px]" />
+                  <span className="text-sm font-medium">{t("promolog.notes")}</span>
+                  <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={t("promolog.addNotes")} className="min-h-[70px]" />
                 </div>
               </>
             ) : (
@@ -611,36 +617,36 @@ const PromologEntryFormDialog = ({ open, onOpenChange, mode, creator, entry, day
                 {result === "si" && (
                   <>
                     <div className="space-y-2">
-                      <span className="text-sm font-medium">Red Social <span className="text-destructive">*</span></span>
+                      <span className="text-sm font-medium">{t("promolog.networkPlaceholder")} <span className="text-destructive">*</span></span>
                       <div className="grid grid-cols-4 gap-2">
                         {networkOptions.map((opt) => {
                           const Icon = opt.icon;
                           const isSelected = network === opt.value;
                           return (
                             <button key={opt.value} type="button" onClick={() => setNetwork(opt.value)} className={`flex flex-col items-center justify-center gap-1.5 rounded-md px-2 py-3 text-xs font-medium transition-colors ${isSelected ? "border-2 border-primary bg-accent text-accent-foreground" : "border border-input bg-background text-muted-foreground hover:bg-accent"}`}>
-                              <Icon className="h-5 w-5" />{opt.label}
+                              <Icon className="h-5 w-5" />{optLabel(opt)}
                             </button>
                           );
                         })}
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <span className="text-sm font-medium">Plataforma <span className="text-destructive">*</span></span>
+                      <span className="text-sm font-medium">{t("promolog.platform")} <span className="text-destructive">*</span></span>
                       <div className="grid grid-cols-3 gap-2">
                         {platformOptions.map((opt) => (
                           <button key={opt.value} type="button" onClick={() => { setPlatform(opt.value); if (opt.value !== "otra") setCustomPlatform(""); }} className={`flex items-center justify-center rounded-md px-3 py-3 text-xs font-medium transition-colors ${platform === opt.value ? "border-2 border-primary bg-accent text-accent-foreground" : "border border-input bg-background text-muted-foreground hover:bg-accent"}`}>
-                            {opt.label}
+                            {optLabel(opt)}
                           </button>
                         ))}
                       </div>
-                      {platform === "otra" && <Input placeholder="Nombre de la plataforma..." value={customPlatform} onChange={(e) => setCustomPlatform(e.target.value)} />}
+                      {platform === "otra" && <Input placeholder={t("promolog.platformName")} value={customPlatform} onChange={(e) => setCustomPlatform(e.target.value)} />}
                     </div>
                     <div className="space-y-2">
-                      <span className="text-sm font-medium">¿Qué se hizo para que promocione?</span>
+                      <span className="text-sm font-medium">{t("promolog.whatWasDone")}</span>
                       <div className="grid grid-cols-2 gap-2">
                         {strategyOptions.map((opt) => (
                           <button key={opt.value} type="button" onClick={() => setStrategy(opt.value)} className={`flex items-center justify-center rounded-md px-3 py-2.5 text-xs font-medium transition-colors ${strategy === opt.value ? "border-2 border-primary bg-accent text-accent-foreground" : "border border-input bg-background text-muted-foreground hover:bg-accent"}`}>
-                            {opt.label}
+                            {t(opt.labelKey)}
                           </button>
                         ))}
                       </div>
@@ -648,14 +654,14 @@ const PromologEntryFormDialog = ({ open, onOpenChange, mode, creator, entry, day
                   </>
                 )}
                 <div className="space-y-2">
-                  <span className="text-sm font-medium">Notas</span>
-                  <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={result === "no" ? "¿Por qué no se pudo hacer la promo?..." : "Agregar notas..."} className="min-h-[80px]" />
+                  <span className="text-sm font-medium">{t("promolog.notes")}</span>
+                  <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={result === "no" ? t("promolog.whyNoPromo") : t("promolog.addNotes")} className="min-h-[80px]" />
                 </div>
                 <div className="space-y-2">
-                  <span className="text-sm font-medium">Evidencia (fotos)</span>
+                  <span className="text-sm font-medium">{t("promolog.evidencePhotos")}</span>
                   <div className="border-2 border-dashed border-input rounded-md p-4 text-center cursor-pointer hover:bg-accent/50 transition-colors" onClick={() => fileRef.current?.click()}>
                     <Upload className="h-6 w-6 mx-auto text-muted-foreground mb-1" />
-                    <span className="text-xs text-muted-foreground">{uploading ? "Subiendo…" : "Subir una o varias fotos"}</span>
+                    <span className="text-xs text-muted-foreground">{uploading ? t("promolog.uploading") : t("promolog.uploadOneOrMore")}</span>
                     <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={handleEditPhotos} />
                   </div>
                   {photos.length > 0 && (
@@ -663,20 +669,20 @@ const PromologEntryFormDialog = ({ open, onOpenChange, mode, creator, entry, day
                       <div className="grid grid-cols-2 gap-2">
                         {photos.map((ph, i) => (
                           <div key={ph.id ?? `new-${i}`} className="relative overflow-hidden rounded-md border border-input">
-                            <img src={ph.url} alt={`Evidencia ${i + 1}`} className="h-28 w-full object-cover" />
-                            <button type="button" title="Quitar" onClick={() => setPhotos((prev) => prev.filter((_, j) => j !== i))} className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80">
+                            <img src={ph.url} alt={t("promolog.evidenceAlt", { n: i + 1 })} className="h-28 w-full object-cover" />
+                            <button type="button" title={t("promolog.remove")} onClick={() => setPhotos((prev) => prev.filter((_, j) => j !== i))} className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80">
                               <X className="h-3.5 w-3.5" />
                             </button>
                             {result === "si" && (
                               <div className="absolute inset-x-0 bottom-0 flex">
-                                <button type="button" onClick={() => setPhotos((prev) => prev.map((p, j) => (j === i ? { ...p, promoted: true } : p)))} className={`flex-1 py-1 text-[11px] font-semibold transition-colors ${ph.promoted ? "bg-success text-white" : "bg-black/60 text-white/80 hover:bg-black/70"}`}>Sí</button>
-                                <button type="button" onClick={() => setPhotos((prev) => prev.map((p, j) => (j === i ? { ...p, promoted: false } : p)))} className={`flex-1 py-1 text-[11px] font-semibold transition-colors ${!ph.promoted ? "bg-destructive text-white" : "bg-black/60 text-white/80 hover:bg-black/70"}`}>No</button>
+                                <button type="button" onClick={() => setPhotos((prev) => prev.map((p, j) => (j === i ? { ...p, promoted: true } : p)))} className={`flex-1 py-1 text-[11px] font-semibold transition-colors ${ph.promoted ? "bg-success text-white" : "bg-black/60 text-white/80 hover:bg-black/70"}`}>{t("promolog.yes")}</button>
+                                <button type="button" onClick={() => setPhotos((prev) => prev.map((p, j) => (j === i ? { ...p, promoted: false } : p)))} className={`flex-1 py-1 text-[11px] font-semibold transition-colors ${!ph.promoted ? "bg-destructive text-white" : "bg-black/60 text-white/80 hover:bg-black/70"}`}>{t("promolog.no")}</button>
                               </div>
                             )}
                           </div>
                         ))}
                       </div>
-                      {result === "si" && <p className="text-[11px] text-muted-foreground">Marca Sí/No en cada foto. El día queda "Sí" si al menos una es Sí.</p>}
+                      {result === "si" && <p className="text-[11px] text-muted-foreground">{t("promolog.markEachPhoto")}</p>}
                     </>
                   )}
                 </div>
@@ -688,8 +694,8 @@ const PromologEntryFormDialog = ({ open, onOpenChange, mode, creator, entry, day
         {/* Footer fijo */}
         <div className="shrink-0 p-6 pt-4 border-t">
           <DialogFooter>
-            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-            <Button disabled={uploading || saving} onClick={handleSave}>{mode === "add" ? "Guardar Promoción" : "Guardar Cambios"}</Button>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>{t("common.cancel")}</Button>
+            <Button disabled={uploading || saving} onClick={handleSave}>{mode === "add" ? t("promolog.savePromo") : t("promolog.saveChanges")}</Button>
           </DialogFooter>
         </div>
       </DialogContent>

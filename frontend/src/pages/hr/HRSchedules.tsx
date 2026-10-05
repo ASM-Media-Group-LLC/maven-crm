@@ -24,38 +24,49 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format, startOfWeek, endOfWeek, addDays, isSameDay, isWithinInterval, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, getDay } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import { cn } from "@/lib/utils";
 import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import { PageHeader } from "@/components/ui/page-header";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const SCHEDULE_TYPES = [
-  { value: "manana", label: "Mañana", icon: Sun, color: "bg-amber-500/10 text-amber-600 border-amber-500/30" },
-  { value: "tarde", label: "Tarde", icon: Sunset, color: "bg-orange-500/10 text-orange-600 border-orange-500/30" },
-  { value: "noche", label: "Noche", icon: Moon, color: "bg-indigo-500/10 text-indigo-600 border-indigo-500/30" },
-  { value: "flexible", label: "Flexible", icon: Zap, color: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30" },
-] as const;
+// `value` es lo que se guarda en work_schedules.schedule_type: DATO, no se traduce.
+const SCHEDULE_TYPES: readonly { value: string; label: TranslationKey; icon: typeof Sun; color: string }[] = [
+  { value: "manana", label: "hrg.sch.type.morning", icon: Sun, color: "bg-amber-500/10 text-amber-600 border-amber-500/30" },
+  { value: "tarde", label: "hrg.sch.type.afternoon", icon: Sunset, color: "bg-orange-500/10 text-orange-600 border-orange-500/30" },
+  { value: "noche", label: "hrg.sch.type.night", icon: Moon, color: "bg-indigo-500/10 text-indigo-600 border-indigo-500/30" },
+  { value: "flexible", label: "hrg.sch.type.flexible", icon: Zap, color: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30" },
+];
+
+// Lunes primero, como el calendario de esta pantalla.
+const DIAS_SEMANA: readonly TranslationKey[] = [
+  "hrg.day.mon", "hrg.day.tue", "hrg.day.wed", "hrg.day.thu", "hrg.day.fri", "hrg.day.sat", "hrg.day.sun",
+];
 
 function getTypeConfig(val: string) {
   return SCHEDULE_TYPES.find((t) => t.value === val);
 }
 
 function TypeBadge({ type }: { type: string }) {
+  const { t } = useLanguage();
   const cfg = getTypeConfig(type);
   if (!cfg) return <Badge variant="secondary">{type}</Badge>;
   const Icon = cfg.icon;
   return (
     <Badge variant="outline" className={cn("text-xs gap-1", cfg.color)}>
       <Icon className="h-3 w-3" />
-      {cfg.label}
+      {t(cfg.label)}
     </Badge>
   );
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 const HRSchedules = () => {
+  const f = useFormato();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -135,11 +146,11 @@ const HRSchedules = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["work_schedules"] });
-      toast({ title: "Turno creado exitosamente" });
+      toast({ title: t("hrg.sch.created") });
       setCreateOpen(false);
       resetForm();
     },
-    onError: () => toast({ title: "Error al crear turno", variant: "destructive" }),
+    onError: () => toast({ title: t("hrg.sch.createError"), variant: "destructive" }),
   });
 
   const editMutation = useMutation({
@@ -150,11 +161,11 @@ const HRSchedules = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["work_schedules"] });
-      toast({ title: "Turno actualizado exitosamente" });
+      toast({ title: t("hrg.sch.updated") });
       setEditData(null);
       resetForm();
     },
-    onError: () => toast({ title: "Error al actualizar turno", variant: "destructive" }),
+    onError: () => toast({ title: t("hrg.sch.updateError"), variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
@@ -164,10 +175,10 @@ const HRSchedules = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["work_schedules"] });
-      toast({ title: "Turno eliminado" });
+      toast({ title: t("hrg.sch.deleted") });
       setDeleteId(null);
     },
-    onError: () => toast({ title: "Error al eliminar turno", variant: "destructive" }),
+    onError: () => toast({ title: t("hrg.sch.deleteError"), variant: "destructive" }),
   });
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -191,7 +202,7 @@ const HRSchedules = () => {
 
   function handleSubmit() {
     if (!formTitle || !formStartDate || !formEndDate) {
-      toast({ title: "Completa los campos requeridos", variant: "destructive" });
+      toast({ title: t("common.requiredFields"), variant: "destructive" });
       return;
     }
     const vals: any = {
@@ -264,7 +275,7 @@ const HRSchedules = () => {
 
   // Week view
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
-  const dayLabels = ["LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB", "DOM"];
+  const dayLabels = DIAS_SEMANA.map((k) => t(k));
 
   // ─── Render ───────────────────────────────────────────────────────────────
   if (isLoading) return <div className="p-6 space-y-4">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-20 w-full" />)}</div>;
@@ -273,31 +284,31 @@ const HRSchedules = () => {
     <Dialog open={createOpen || !!editData} onOpenChange={(o) => { if (!o) { setCreateOpen(false); setEditData(null); resetForm(); } }}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{editData ? "Editar Turno" : "Crear Turno"}</DialogTitle>
-          <DialogDescription>{editData ? "Modifica los datos del turno" : "Completa la información del nuevo turno"}</DialogDescription>
+          <DialogTitle>{editData ? t("hrg.sch.editTitle") : t("hrg.sch.create")}</DialogTitle>
+          <DialogDescription>{editData ? t("hrg.sch.editHint") : t("hrg.sch.createHint")}</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div>
-            <Label>Título *</Label>
-            <Input value={formTitle} onChange={(e) => setFormTitle(e.target.value)} placeholder="Ej: Turno Mañana Enero" />
+            <Label>{t("common.title")} *</Label>
+            <Input value={formTitle} onChange={(e) => setFormTitle(e.target.value)} placeholder={t("hrg.sch.titlePlaceholder")} />
           </div>
           <div>
-            <Label>Tipo de turno *</Label>
+            <Label>{t("hrg.sch.shiftType")} *</Label>
             <Select value={formType} onValueChange={setFormType}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {SCHEDULE_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                {SCHEDULE_TYPES.map((o) => <SelectItem key={o.value} value={o.value}>{t(o.label)}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label>Fecha Inicio *</Label>
+              <Label>{t("hrg.startDate")} *</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !formStartDate && "text-muted-foreground")}>
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {formStartDate ? format(formStartDate, "dd/MM/yyyy") : "Seleccionar"}
+                    {formStartDate ? format(formStartDate, "dd/MM/yyyy") : t("common.select")}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -306,12 +317,12 @@ const HRSchedules = () => {
               </Popover>
             </div>
             <div>
-              <Label>Fecha Fin *</Label>
+              <Label>{t("hrg.endDate")} *</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !formEndDate && "text-muted-foreground")}>
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {formEndDate ? format(formEndDate, "dd/MM/yyyy") : "Seleccionar"}
+                    {formEndDate ? format(formEndDate, "dd/MM/yyyy") : t("common.select")}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -322,33 +333,33 @@ const HRSchedules = () => {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label>Hora Inicio</Label>
+              <Label>{t("hrg.sch.startTime")}</Label>
               <Input type="time" value={formStartTime} onChange={(e) => setFormStartTime(e.target.value)} />
             </div>
             <div>
-              <Label>Hora Fin</Label>
+              <Label>{t("hrg.sch.endTime")}</Label>
               <Input type="time" value={formEndTime} onChange={(e) => setFormEndTime(e.target.value)} />
             </div>
           </div>
           <div>
-            <Label>Departamento</Label>
+            <Label>{t("hrg.department")}</Label>
             <Select value={formDepartment} onValueChange={setFormDepartment}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="all">{t("common.all")}</SelectItem>
                 {departments.map((d: any) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
           <div>
-            <Label>Descripción</Label>
-            <Textarea value={formDescription} onChange={(e) => setFormDescription(e.target.value)} placeholder="Detalles adicionales" />
+            <Label>{t("common.description")}</Label>
+            <Textarea value={formDescription} onChange={(e) => setFormDescription(e.target.value)} placeholder={t("hrg.sch.descriptionPlaceholder")} />
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => { setCreateOpen(false); setEditData(null); resetForm(); }}>Cancelar</Button>
+          <Button variant="outline" onClick={() => { setCreateOpen(false); setEditData(null); resetForm(); }}>{t("common.cancel")}</Button>
           <Button onClick={handleSubmit} disabled={createMutation.isPending || editMutation.isPending}>
-            {editData ? "Guardar Cambios" : "Crear Turno"}
+            {editData ? t("hrg.saveChanges") : t("hrg.sch.create")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -360,11 +371,11 @@ const HRSchedules = () => {
       {/* Header */}
       <div className="shrink-0 bg-background border-b px-6 py-4">
         <PageHeader
-          title="Horarios y Turnos"
-          subtitle="Gestión de turnos, horas extra y banco de horas"
+          title={t("hrg.sch.title")}
+          subtitle={t("hrg.sch.subtitle")}
           actions={
             <Button onClick={() => { resetForm(); setCreateOpen(true); }}>
-              <Plus className="h-4 w-4 mr-2" /> Crear Turno
+              <Plus className="h-4 w-4 mr-2" /> {t("hrg.sch.create")}
             </Button>
           }
         />
@@ -375,10 +386,10 @@ const HRSchedules = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Turnos clickeables (lista propia). Las dos últimas siguen
               navegando porque tienen su propia ruta detallada. */}
-          <StatChip label="Turnos Esta Semana" value={String(turnosThisWeek)} icon={<CalendarDays className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("week")} />
-          <StatChip label="Turnos Hoy" value={String(turnosToday)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("today")} />
-          <StatChip label="Horas Extra" value={String(overtimeCount)} icon={<Timer className="h-3.5 w-3.5" />} color="bg-warning" hint="Ver detalle" onClick={() => navigate("/hr/horarios/horas-extras")} />
-          <StatChip label="Banco de Horas" value={`${hourBankTotal}h`} icon={<Banknote className="h-3.5 w-3.5" />} color="bg-success" hint="Ver detalle" onClick={() => navigate("/hr/horarios/banco-horas")} />
+          <StatChip label={t("hrg.sch.kpi.week")} value={String(turnosThisWeek)} icon={<CalendarDays className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("week")} />
+          <StatChip label={t("hrg.sch.kpi.today")} value={String(turnosToday)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("today")} />
+          <StatChip label={t("hrg.sch.kpi.overtime")} value={String(overtimeCount)} icon={<Timer className="h-3.5 w-3.5" />} color="bg-warning" hint={t("hrg.viewDetail")} onClick={() => navigate("/hr/horarios/horas-extras")} />
+          <StatChip label={t("hrg.hourBank")} value={`${hourBankTotal}h`} icon={<Banknote className="h-3.5 w-3.5" />} color="bg-success" hint={t("hrg.viewDetail")} onClick={() => navigate("/hr/horarios/banco-horas")} />
         </div>
 
         {/* Navigation Cards */}
@@ -388,8 +399,8 @@ const HRSchedules = () => {
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-lg bg-warning/10"><Timer className="h-5 w-5 text-warning" /></div>
                 <div>
-                  <p className="font-medium">Horas Extras</p>
-                  <p className="text-xs text-muted-foreground">Registrar y gestionar horas extras</p>
+                  <p className="font-medium">{t("hrg.ot.title")}</p>
+                  <p className="text-xs text-muted-foreground">{t("hrg.sch.overtimeCard")}</p>
                 </div>
               </div>
               <ArrowRight className="h-4 w-4 text-muted-foreground" />
@@ -400,8 +411,8 @@ const HRSchedules = () => {
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-lg bg-success/10"><Banknote className="h-5 w-5 text-success" /></div>
                 <div>
-                  <p className="font-medium">Banco de Horas</p>
-                  <p className="text-xs text-muted-foreground">Gestionar acumulación y uso de horas</p>
+                  <p className="font-medium">{t("hrg.hourBank")}</p>
+                  <p className="text-xs text-muted-foreground">{t("hrg.sch.hourBankCard")}</p>
                 </div>
               </div>
               <ArrowRight className="h-4 w-4 text-muted-foreground" />
@@ -413,24 +424,24 @@ const HRSchedules = () => {
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative flex-1 min-w-[200px] max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Buscar turnos..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+            <Input placeholder={t("hrg.sch.searchPlaceholder")} value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
           </div>
           <Select value={typeFilter || undefined} onValueChange={(v) => setTypeFilter(v === "__all__" ? "" : v)}>
-            <SelectTrigger className="w-[160px]"><SelectValue placeholder="Tipo" /></SelectTrigger>
+            <SelectTrigger className="w-[160px]"><SelectValue placeholder={t("common.type")} /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="__all__">Todos</SelectItem>
-              {SCHEDULE_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+              <SelectItem value="__all__">{t("common.all")}</SelectItem>
+              {SCHEDULE_TYPES.map((o) => <SelectItem key={o.value} value={o.value}>{t(o.label)}</SelectItem>)}
             </SelectContent>
           </Select>
           {(search || typeFilter) && (
             <Button variant="ghost" size="sm" onClick={() => { setSearch(""); setTypeFilter(""); }}>
-              <span className="mr-1.5">✕</span> Limpiar filtros
+              <span className="mr-1.5">✕</span> {t("hrg.clearFilters")}
             </Button>
           )}
           <div className="ml-auto flex items-center border rounded-lg">
-            <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="sm" onClick={() => setViewMode("list")}><ListIcon className="h-4 w-4" /></Button>
-            <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="sm" onClick={() => setViewMode("grid")}><LayoutGrid className="h-4 w-4" /></Button>
-            <Button variant={viewMode === "calendar" ? "secondary" : "ghost"} size="sm" onClick={() => setViewMode("calendar")}><CalendarDays className="h-4 w-4" /></Button>
+            <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="sm" onClick={() => setViewMode("list")} aria-label={t("hrg.dir.viewTable")}><ListIcon className="h-4 w-4" /></Button>
+            <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="sm" onClick={() => setViewMode("grid")} aria-label={t("hrg.dir.viewGrid")}><LayoutGrid className="h-4 w-4" /></Button>
+            <Button variant={viewMode === "calendar" ? "secondary" : "ghost"} size="sm" onClick={() => setViewMode("calendar")} aria-label={t("hrg.viewCalendar")}><CalendarDays className="h-4 w-4" /></Button>
           </div>
         </div>
 
@@ -441,18 +452,18 @@ const HRSchedules = () => {
               <Table>
                 <TableHeader className="sticky top-0 z-10 bg-card">
                   <TableRow>
-                    <TableHead className="text-xs">Título</TableHead>
-                    <TableHead className="text-xs">Tipo</TableHead>
-                    <TableHead className="text-xs">Fecha Inicio</TableHead>
-                    <TableHead className="text-xs">Fecha Fin</TableHead>
-                    <TableHead className="text-xs">Horario</TableHead>
-                    <TableHead className="text-xs">Departamento</TableHead>
-                    <TableHead className="text-xs sticky right-0 bg-card">Acciones</TableHead>
+                    <TableHead className="text-xs">{t("common.title")}</TableHead>
+                    <TableHead className="text-xs">{t("common.type")}</TableHead>
+                    <TableHead className="text-xs">{t("hrg.startDate")}</TableHead>
+                    <TableHead className="text-xs">{t("hrg.endDate")}</TableHead>
+                    <TableHead className="text-xs">{t("hrg.schedule")}</TableHead>
+                    <TableHead className="text-xs">{t("hrg.department")}</TableHead>
+                    <TableHead className="text-xs sticky right-0 bg-card">{t("common.actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filtered.length === 0 ? (
-                    <TableRow><TableCell colSpan={7} className="text-center py-10 text-muted-foreground">No hay turnos registrados</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={7} className="text-center py-10 text-muted-foreground">{t("hrg.sch.empty")}</TableCell></TableRow>
                   ) : filtered.map((s: any) => (
                     <TableRow key={s.id}>
                       <TableCell className="font-medium">{s.title}</TableCell>
@@ -460,7 +471,7 @@ const HRSchedules = () => {
                       <TableCell className="text-sm">{format(parseISO(s.start_date), "dd/MM/yyyy")}</TableCell>
                       <TableCell className="text-sm">{format(parseISO(s.end_date), "dd/MM/yyyy")}</TableCell>
                       <TableCell className="text-sm">{s.start_time && s.end_time ? `${s.start_time.slice(0,5)} - ${s.end_time.slice(0,5)}` : "—"}</TableCell>
-                      <TableCell className="text-sm">{s.departments?.name || "Todos"}</TableCell>
+                      <TableCell className="text-sm">{s.departments?.name || t("common.all")}</TableCell>
                       <TableCell className="sticky right-0 bg-card">
                         <div className="flex items-center gap-1">
                           <Button variant="ghost" size="sm" onClick={() => setViewData(s)}><Eye className="h-3.5 w-3.5" /></Button>
@@ -480,14 +491,14 @@ const HRSchedules = () => {
         {viewMode === "grid" && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filtered.length === 0 ? (
-              <div className="col-span-full text-center py-10 text-muted-foreground">No hay turnos registrados</div>
+              <div className="col-span-full text-center py-10 text-muted-foreground">{t("hrg.sch.empty")}</div>
             ) : filtered.map((s: any) => (
               <Card key={s.id} className="hover:border-primary/30 transition-colors">
                 <CardContent className="p-4 space-y-3">
                   <div className="flex items-start justify-between">
                     <div>
                       <p className="font-medium">{s.title}</p>
-                      <p className="text-xs text-muted-foreground">{s.departments?.name || "Todos"}</p>
+                      <p className="text-xs text-muted-foreground">{s.departments?.name || t("common.all")}</p>
                     </div>
                     <TypeBadge type={s.schedule_type} />
                   </div>
@@ -511,10 +522,10 @@ const HRSchedules = () => {
           <div className="space-y-6">
             {/* Legend */}
             <div className="flex flex-wrap gap-3">
-              {SCHEDULE_TYPES.map((t) => (
-                <div key={t.value} className="flex items-center gap-1.5 text-xs">
-                  <div className={cn("w-3 h-3 rounded-full", t.value === "manana" ? "bg-amber-500" : t.value === "tarde" ? "bg-orange-500" : t.value === "noche" ? "bg-indigo-500" : "bg-emerald-500")} />
-                  {t.label}
+              {SCHEDULE_TYPES.map((tp) => (
+                <div key={tp.value} className="flex items-center gap-1.5 text-xs">
+                  <div className={cn("w-3 h-3 rounded-full", tp.value === "manana" ? "bg-amber-500" : tp.value === "tarde" ? "bg-orange-500" : tp.value === "noche" ? "bg-indigo-500" : "bg-emerald-500")} />
+                  {t(tp.label)}
                 </div>
               ))}
             </div>
@@ -523,9 +534,9 @@ const HRSchedules = () => {
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-4">
-                  <Button variant="outline" size="sm" onClick={() => setCalMonth(addDays(startOfMonth(calMonth), -1))}>←</Button>
-                  <h3 className="font-medium capitalize">{format(calMonth, "MMMM yyyy", { locale: es })}</h3>
-                  <Button variant="outline" size="sm" onClick={() => setCalMonth(addDays(endOfMonth(calMonth), 1))}>→</Button>
+                  <Button variant="outline" size="sm" onClick={() => setCalMonth(addDays(startOfMonth(calMonth), -1))} aria-label={t("hrg.sch.prevMonth")}>←</Button>
+                  <h3 className="font-medium capitalize">{format(calMonth, "MMMM yyyy", { locale: f.fechas })}</h3>
+                  <Button variant="outline" size="sm" onClick={() => setCalMonth(addDays(endOfMonth(calMonth), 1))} aria-label={t("hrg.sch.nextMonth")}>→</Button>
                 </div>
                 <div className="grid grid-cols-7 gap-1">
                   {dayLabels.map((d) => <div key={d} className="text-center text-xs font-medium text-muted-foreground py-1">{d}</div>)}
@@ -553,7 +564,7 @@ const HRSchedules = () => {
             {/* Week View */}
             <Card>
               <CardContent className="p-4">
-                <h3 className="font-medium mb-3">Semana Actual</h3>
+                <h3 className="font-medium mb-3">{t("hrg.sch.currentWeek")}</h3>
                 <div className="grid grid-cols-7 gap-2">
                   {weekDays.map((day, i) => {
                     const daySchedules = getSchedulesForDay(day);
@@ -582,15 +593,15 @@ const HRSchedules = () => {
       {/* View Modal */}
       <Dialog open={!!viewData} onOpenChange={(o) => !o && setViewData(null)}>
         <DialogContent className="sm:max-w-md">
-          <DialogHeader><DialogTitle>Detalle del Turno</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t("hrg.sch.detailTitle")}</DialogTitle></DialogHeader>
           {viewData && (
             <div className="space-y-3 text-sm">
-              <div><span className="text-muted-foreground">Título:</span> <span className="font-medium">{viewData.title}</span></div>
-              <div><span className="text-muted-foreground">Tipo:</span> <TypeBadge type={viewData.schedule_type} /></div>
-              <div><span className="text-muted-foreground">Período:</span> {format(parseISO(viewData.start_date), "dd/MM/yyyy")} → {format(parseISO(viewData.end_date), "dd/MM/yyyy")}</div>
-              {viewData.start_time && <div><span className="text-muted-foreground">Horario:</span> {viewData.start_time.slice(0,5)} - {viewData.end_time?.slice(0,5)}</div>}
-              <div><span className="text-muted-foreground">Departamento:</span> {viewData.departments?.name || "Todos"}</div>
-              {viewData.description && <div><span className="text-muted-foreground">Descripción:</span> {viewData.description}</div>}
+              <div><span className="text-muted-foreground">{t("common.title")}:</span> <span className="font-medium">{viewData.title}</span></div>
+              <div><span className="text-muted-foreground">{t("common.type")}:</span> <TypeBadge type={viewData.schedule_type} /></div>
+              <div><span className="text-muted-foreground">{t("common.period")}:</span> {format(parseISO(viewData.start_date), "dd/MM/yyyy")} → {format(parseISO(viewData.end_date), "dd/MM/yyyy")}</div>
+              {viewData.start_time && <div><span className="text-muted-foreground">{t("hrg.schedule")}:</span> {viewData.start_time.slice(0,5)} - {viewData.end_time?.slice(0,5)}</div>}
+              <div><span className="text-muted-foreground">{t("hrg.department")}:</span> {viewData.departments?.name || t("common.all")}</div>
+              {viewData.description && <div><span className="text-muted-foreground">{t("common.description")}:</span> {viewData.description}</div>}
             </div>
           )}
         </DialogContent>
@@ -600,12 +611,12 @@ const HRSchedules = () => {
       <AlertDialog open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar este turno?</AlertDialogTitle>
-            <AlertDialogDescription>Esta acción no se puede deshacer.</AlertDialogDescription>
+            <AlertDialogTitle>{t("hrg.sch.deleteTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("common.cannotBeUndone")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel />
-            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => deleteId && deleteMutation.mutate(deleteId)}>Eliminar</AlertDialogAction>
+            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => deleteId && deleteMutation.mutate(deleteId)}>{t("common.delete")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -613,7 +624,10 @@ const HRSchedules = () => {
       <KpiDetailDialog
         open={kpiPopup !== null}
         onOpenChange={(o) => !o && setKpiPopup(null)}
-        title={kpiPopup === "week" ? `Turnos Esta Semana — ${turnosThisWeek}` : `Turnos Hoy — ${turnosToday}`}
+        emptyText={t("hrg.noRecordsToShow")}
+        title={kpiPopup === "week"
+          ? t("hrg.kpiTitle", { label: t("hrg.sch.kpi.week"), value: turnosThisWeek })
+          : t("hrg.kpiTitle", { label: t("hrg.sch.kpi.today"), value: turnosToday })}
         rows={(() => {
           if (!kpiPopup) return [];
           const now = new Date();
@@ -629,8 +643,8 @@ const HRSchedules = () => {
             list = schedules.filter((s: any) => s.start_at && new Date(s.start_at).toDateString() === now.toDateString());
           }
           return list.slice(0, 100).map((s: any): KpiRow => ({
-            primary: s.title ?? s.employee_name ?? "Sin título",
-            secondary: s.start_at ? new Date(s.start_at).toLocaleString("es") : undefined,
+            primary: s.title ?? s.employee_name ?? t("hrg.sch.untitled"),
+            secondary: s.start_at ? new Date(s.start_at).toLocaleString(f.intl("es-ES")) : undefined,
             right: s.shift_type ?? "—",
           }));
         })()}

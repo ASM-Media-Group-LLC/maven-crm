@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import { useMeetRooms, MeetRoom } from "@/hooks/useMeetRooms";
 import { parseJoinInput } from "@/lib/meetJoinInput";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface VideoRoomsPanelProps {
   onClose: () => void;
@@ -26,6 +27,7 @@ interface VideoRoomsPanelProps {
 // espera para externos. Este panel es solo la puerta corta.
 export default function VideoRoomsPanel({ onClose }: VideoRoomsPanelProps) {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const { myRooms, loading, createRoom, joinByCode, resolveByLivekitRoom, endRoom } = useMeetRooms();
   const [joinInput, setJoinInput] = useState("");
   const [creating, setCreating] = useState(false);
@@ -50,9 +52,9 @@ export default function VideoRoomsPanel({ onClose }: VideoRoomsPanelProps) {
       const room = await createRoom();
       openCall(room);
       await navigator.clipboard.writeText(shareLink(room)).catch(() => { /* sin portapapeles */ });
-      toast.success(`Reunión creada · código ${room.code}`, { description: "Link copiado." });
+      toast.success(t("messenger.rooms.creada", { codigo: room.code }), { description: t("messenger.rooms.linkCopiado") });
     } catch (e: any) {
-      toast.error(e.message || "No se pudo crear la reunión");
+      toast.error(e.message || t("messenger.rooms.noSePudoCrear"));
     } finally {
       setCreating(false);
     }
@@ -69,19 +71,19 @@ export default function VideoRoomsPanel({ onClose }: VideoRoomsPanelProps) {
       setJoinInput("");
       openCall(room);
     } catch (e: any) {
-      toast.error(e.message || "No se pudo entrar a la reunión");
+      toast.error(e.message || t("messenger.rooms.noSePudoEntrar"));
     } finally {
       setJoining(false);
     }
   };
 
   const handleEnd = async (room: MeetRoom) => {
-    if (!window.confirm(`¿Terminar "${room.name}"? El link y el código dejan de funcionar.`)) return;
+    if (!window.confirm(t("messenger.rooms.confirmarTerminar", { name: room.name }))) return;
     try {
       await endRoom(room.id);
-      toast.success("Reunión terminada");
+      toast.success(t("messenger.rooms.terminada"));
     } catch (e: any) {
-      toast.error(e.message || "No se pudo terminar la reunión");
+      toast.error(e.message || t("messenger.rooms.noSePudoTerminar"));
     }
   };
 
@@ -90,9 +92,9 @@ export default function VideoRoomsPanel({ onClose }: VideoRoomsPanelProps) {
       <div className="flex items-center justify-between p-4 border-b border-border shrink-0">
         <div className="flex items-center gap-2">
           <Video className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-semibold text-foreground">Reuniones</h2>
+          <h2 className="text-lg font-semibold text-foreground">{t("messenger.rooms.reuniones")}</h2>
         </div>
-        <Button variant="ghost" size="icon" onClick={onClose}>
+        <Button variant="ghost" size="icon" onClick={onClose} aria-label={t("common.close")}>
           <X className="h-4 w-4" />
         </Button>
       </div>
@@ -101,7 +103,7 @@ export default function VideoRoomsPanel({ onClose }: VideoRoomsPanelProps) {
         <div className="grid grid-cols-3 gap-2">
           <Button onClick={handleCreate} disabled={creating} className="h-auto py-3 flex-col gap-1 rounded-2xl">
             {creating ? <Loader2 className="h-5 w-5 animate-spin" /> : <Plus className="h-5 w-5" />}
-            <span className="text-xs">Nueva</span>
+            <span className="text-xs">{t("common.newF")}</span>
           </Button>
           <Button
             variant="outline"
@@ -109,7 +111,7 @@ export default function VideoRoomsPanel({ onClose }: VideoRoomsPanelProps) {
             className="h-auto py-3 flex-col gap-1 rounded-2xl"
           >
             <Link2 className="h-5 w-5" />
-            <span className="text-xs">Unirse</span>
+            <span className="text-xs">{t("messenger.incoming.unirse")}</span>
           </Button>
           <Button variant="secondary" onClick={() => navigate("/cowork")} className="h-auto py-3 flex-col gap-1 rounded-2xl">
             <Users2 className="h-5 w-5" />
@@ -120,7 +122,7 @@ export default function VideoRoomsPanel({ onClose }: VideoRoomsPanelProps) {
         <div className="flex gap-2">
           <Input
             id="join-link-input"
-            placeholder="Código o enlace de la reunión..."
+            placeholder={t("messenger.rooms.codigoOEnlace")}
             className="h-9 bg-primary/5 border-0 text-xs rounded-full"
             value={joinInput}
             onChange={(e) => setJoinInput(e.target.value)}
@@ -132,9 +134,9 @@ export default function VideoRoomsPanel({ onClose }: VideoRoomsPanelProps) {
             onClick={handleJoin}
             disabled={!joinInput.trim() || joining}
             className="rounded-full"
-            title="Entrar con el código o el link"
+            title={t("messenger.rooms.entrarConCodigo")}
           >
-            {joining ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Entrar"}
+            {joining ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : t("messenger.rooms.entrar")}
           </Button>
         </div>
 
@@ -143,14 +145,14 @@ export default function VideoRoomsPanel({ onClose }: VideoRoomsPanelProps) {
           onClick={() => navigate("/meet")}
           className="text-[11px] text-muted-foreground hover:text-primary transition-colors w-full text-center"
         >
-          Ver todas en Meet
+          {t("messenger.rooms.verTodasEnMeet")}
         </button>
       </div>
 
       <ScrollArea className="flex-1 px-4 pb-4">
         {!loading && myRooms.length === 0 && (
           <p className="text-xs text-muted-foreground text-center px-2 py-6">
-            No tienes reuniones abiertas. Crea una y comparte el link o el código.
+            {t("messenger.rooms.sinReuniones")}
           </p>
         )}
         <div className="space-y-3">
@@ -167,10 +169,10 @@ export default function VideoRoomsPanel({ onClose }: VideoRoomsPanelProps) {
                       type="button"
                       onClick={() => {
                         navigator.clipboard.writeText(room.code);
-                        toast.success(`Código copiado: ${room.code}`);
+                        toast.success(t("messenger.rooms.codigoCopiado", { codigo: room.code }));
                       }}
                       className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary transition-colors"
-                      title="Copiar código"
+                      title={t("messenger.rooms.copiarCodigo")}
                     >
                       <KeyRound className="h-2.5 w-2.5" />
                       <span className="font-mono tracking-[0.15em]">{room.code}</span>
@@ -183,19 +185,19 @@ export default function VideoRoomsPanel({ onClose }: VideoRoomsPanelProps) {
                   <Button
                     size="sm"
                     className="flex-1 h-8 text-xs"
-                    title={`Entrar a ${room.name}`}
+                    title={t("messenger.rooms.entrarA", { name: room.name })}
                     onClick={() => openCall(room)}
                   >
-                    Entrar
+                    {t("messenger.rooms.entrar")}
                   </Button>
                   <Button
                     variant="outline"
                     size="icon"
                     className="h-8 w-8 shrink-0"
-                    title="Copiar link de invitación"
+                    title={t("messenger.rooms.copiarLink")}
                     onClick={() => {
                       navigator.clipboard.writeText(shareLink(room));
-                      toast.success("Link copiado — sirve con o sin cuenta en Maven");
+                      toast.success(t("messenger.rooms.linkCopiadoSirve"));
                     }}
                   >
                     <Link2 className="h-3 w-3" />
@@ -204,7 +206,7 @@ export default function VideoRoomsPanel({ onClose }: VideoRoomsPanelProps) {
                     variant="outline"
                     size="icon"
                     className="h-8 w-8 shrink-0 text-destructive hover:text-destructive"
-                    title="Terminar reunión"
+                    title={t("messenger.rooms.terminarReunion")}
                     onClick={() => handleEnd(room)}
                   >
                     <PhoneOff className="h-3 w-3" />

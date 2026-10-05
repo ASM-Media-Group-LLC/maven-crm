@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useFormato } from "@/hooks/useFormato";
 import { EmployeeSearchCombobox } from "@/components/hr/EmployeeSearchCombobox";
 import { HRMetricCard } from "@/components/hr/HRMetricCard";
 import { Button } from "@/components/ui/button";
@@ -27,10 +28,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { UserAvatar } from "@/components/UserAvatar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isWithinInterval, parseISO, isSameDay, addMonths, subMonths } from "date-fns";
-import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { TRAINING_STATUSES, TRAINING_MODALITIES, TRAINING_TARGET_ROLES, TRAINING_CONTENT_TYPES } from "@/lib/hrConstants";
 import { PageHeader } from "@/components/ui/page-header";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
+import { etiquetaHr, etiquetaHrO, etiquetaHrV, type Traductor } from "./etiquetasHr";
 
 // ── Data hooks ──
 function useRoleAssignments(targetRole: string) {
@@ -150,6 +153,20 @@ function isExpiringSoon(a: any): boolean {
 const CONTENT_TYPE_ICONS: Record<string, typeof Video> = { video: Video, documento: FileText, quiz: HelpCircle, practica: Wrench };
 function getContentIcon(type: string) { return CONTENT_TYPE_ICONS[type] || FileText; }
 
+// El nombre del rol llega por prop desde HRTrainingChatters / HRTrainingTech, en
+// español. Para los roles conocidos se usa el del diccionario (en español es el
+// mismo texto); para uno nuevo, el de la prop.
+const NOMBRE_ROL: Record<string, TranslationKey> = {
+  chatter: "hrg.tr.roleName.chatter",
+  technology: "hrg.opt.trainRole.technology",
+};
+const nombreRol = (t: Traductor, targetRole: string, roleLabel: string) =>
+  NOMBRE_ROL[targetRole] ? t(NOMBRE_ROL[targetRole]) : roleLabel;
+
+const DIAS_SEMANA: readonly TranslationKey[] = [
+  "hrg.day.mon", "hrg.day.tue", "hrg.day.wed", "hrg.day.thu", "hrg.day.fri", "hrg.day.sat", "hrg.day.sun",
+];
+
 // ══════════════════════════════════════════════
 // MAIN COMPONENT
 // ══════════════════════════════════════════════
@@ -202,6 +219,8 @@ function RoleListView({ targetRole, roleLabel, onConfig, onAssign, onViewDetail 
   targetRole: string; roleLabel: string; onConfig: () => void; onAssign: () => void; onViewDetail: (a: any) => void;
 }) {
   const navigate = useNavigate();
+  const { t } = useLanguage();
+  const rol = nombreRol(t, targetRole, roleLabel);
   const { data: assignments = [], isLoading } = useRoleAssignments(targetRole);
   const { data: programs = [] } = useRolePrograms(targetRole);
   const [search, setSearch] = useState("");
@@ -278,7 +297,7 @@ function RoleListView({ targetRole, roleLabel, onConfig, onAssign, onViewDetail 
   // Calendar
   const [calMonth, setCalMonth] = useState(new Date());
   const calDays = eachDayOfInterval({ start: startOfMonth(calMonth), end: endOfMonth(calMonth) });
-  const dayLabels = ["LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB", "DOM"];
+  const dayLabels = DIAS_SEMANA.map((k) => t(k));
 
   function getAssignmentsForDay(day: Date) {
     return filtered.filter((a: any) => {
@@ -299,15 +318,15 @@ function RoleListView({ targetRole, roleLabel, onConfig, onAssign, onViewDetail 
       {/* Header */}
       <div className="shrink-0 bg-background border-b px-6 py-4">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/hr/capacitacion")}><ArrowLeft className="h-5 w-5" /></Button>
+          <Button variant="ghost" size="icon" onClick={() => navigate("/hr/capacitacion")} aria-label={t("common.back")}><ArrowLeft className="h-5 w-5" /></Button>
           <PageHeader
             className="flex-1"
-            title={`Capacitación ${roleLabel}`}
-            subtitle={`Programas, contenidos y seguimiento para ${roleLabel.toLowerCase()}`}
+            title={t("hrg.tr.title", { role: rol })}
+            subtitle={t("hrg.tr.subtitle", { role: rol.toLowerCase() })}
             actions={
               <div className="flex gap-2">
-                <Button variant="outline" onClick={onConfig}><Settings className="h-4 w-4 mr-1.5" />Configuración</Button>
-                <Button onClick={onAssign}><Plus className="h-4 w-4 mr-1.5" />Asignar</Button>
+                <Button variant="outline" onClick={onConfig}><Settings className="h-4 w-4 mr-1.5" />{t("hrg.tr.settings")}</Button>
+                <Button onClick={onAssign}><Plus className="h-4 w-4 mr-1.5" />{t("hrg.tr.assign")}</Button>
               </div>
             }
           />
@@ -319,16 +338,16 @@ function RoleListView({ targetRole, roleLabel, onConfig, onAssign, onViewDetail 
           {/* KPIs */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="cursor-pointer" onClick={() => handleKpiClick("")}>
-              <HRMetricCard title="Total Asignadas" value={kpis.total} icon={ClipboardList} color="primary" className={statusFilter === "" ? "ring-2 ring-primary/50" : ""} />
+              <HRMetricCard title={t("hrg.tr.kpi.total")} value={kpis.total} icon={ClipboardList} color="primary" className={statusFilter === "" ? "ring-2 ring-primary/50" : ""} />
             </div>
             <div className="cursor-pointer" onClick={() => handleKpiClick("in_progress")}>
-              <HRMetricCard title="En Progreso" value={kpis.inProgress} icon={Clock} color="warning" className={statusFilter === "in_progress" ? "ring-2 ring-warning/50" : ""} />
+              <HRMetricCard title={t("hrg.opt.trainStatus.in_progress")} value={kpis.inProgress} icon={Clock} color="warning" className={statusFilter === "in_progress" ? "ring-2 ring-warning/50" : ""} />
             </div>
             <div className="cursor-pointer" onClick={() => handleKpiClick("completed")}>
-              <HRMetricCard title="Completadas" value={kpis.completed} icon={CheckCircle} color="success" className={statusFilter === "completed" ? "ring-2 ring-success/50" : ""} />
+              <HRMetricCard title={t("hrg.perf.completedPl")} value={kpis.completed} icon={CheckCircle} color="success" className={statusFilter === "completed" ? "ring-2 ring-success/50" : ""} />
             </div>
             <div className="cursor-pointer" onClick={() => handleKpiClick("overdue")}>
-              <HRMetricCard title="Vencidas" value={kpis.overdue} icon={AlertTriangle} color="destructive" className={statusFilter === "overdue" ? "ring-2 ring-destructive/50" : ""} />
+              <HRMetricCard title={t("hrg.tr.kpi.overdue")} value={kpis.overdue} icon={AlertTriangle} color="destructive" className={statusFilter === "overdue" ? "ring-2 ring-destructive/50" : ""} />
             </div>
           </div>
 
@@ -336,11 +355,11 @@ function RoleListView({ targetRole, roleLabel, onConfig, onAssign, onViewDetail 
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <RoleIcon className="h-5 w-5 text-muted-foreground" />
-              <h3 className="text-base font-semibold">Programas de {roleLabel}</h3>
+              <h3 className="text-base font-semibold">{t("hrg.tr.programsOf", { role: rol })}</h3>
               <Badge variant="outline" className="ml-1">{programs.length}</Badge>
             </div>
             {programs.length === 0 ? (
-              <p className="rounded-xl border border-dashed border-border bg-muted/30 px-4 py-4 text-sm text-muted-foreground">No hay programas configurados para {roleLabel}.</p>
+              <p className="rounded-xl border border-dashed border-border bg-muted/30 px-4 py-4 text-sm text-muted-foreground">{t("hrg.tr.noProgramsFor", { role: rol })}</p>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                 {programs.map((p: any) => {
@@ -350,15 +369,15 @@ function RoleListView({ targetRole, roleLabel, onConfig, onAssign, onViewDetail 
                       <CardContent className="p-4 space-y-2">
                         <div className="flex items-start justify-between">
                           <p className="text-sm font-semibold">{p.name}</p>
-                          {p.is_mandatory && <Badge variant="default" className="shrink-0 text-xs">Obligatorio</Badge>}
+                          {p.is_mandatory && <Badge variant="default" className="shrink-0 text-xs">{t("hrg.tr.mandatory")}</Badge>}
                         </div>
                         {p.description && <p className="text-xs text-muted-foreground line-clamp-2">{p.description}</p>}
                         <div className="flex items-center gap-3 text-xs text-muted-foreground">
                           {p.duration_hours && <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" />{p.duration_hours}h</span>}
-                          <span className="flex items-center gap-1"><BookOpen className="h-3.5 w-3.5" />{mc ? mc.total : 0} módulos</span>
+                          <span className="flex items-center gap-1"><BookOpen className="h-3.5 w-3.5" />{t("hrg.tr.modulesCount", { n: mc ? mc.total : 0 })}</span>
                           {mc && mc.total > 0 && (
                             <span className={cn("text-xs", mc.withContent === mc.total ? "text-success" : "text-warning")}>
-                              {mc.withContent}/{mc.total} con contenido
+                              {t("hrg.tr.withContent", { done: mc.withContent, total: mc.total })}
                             </span>
                           )}
                         </div>
@@ -374,19 +393,19 @@ function RoleListView({ targetRole, roleLabel, onConfig, onAssign, onViewDetail 
           <div className="flex items-center gap-3 flex-wrap">
             <div className="relative flex-1 max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Buscar empleado o programa..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
+              <Input placeholder={t("hrg.tr.searchPlaceholder")} className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
             <Select value={statusFilter || undefined} onValueChange={(v) => setStatusFilter(v === "__all__" ? "" : v)}>
-              <SelectTrigger className="w-44"><SelectValue placeholder="Estado" /></SelectTrigger>
+              <SelectTrigger className="w-44"><SelectValue placeholder={t("common.status")} /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="__all__">Todos los estados</SelectItem>
-                {TRAINING_STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                <SelectItem value="__all__">{t("common.allStatuses")}</SelectItem>
+                {TRAINING_STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{etiquetaHrO(t, "trainStatus", s.value)}</SelectItem>)}
               </SelectContent>
             </Select>
             <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1 ml-auto">
-              <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setViewMode("list")}><LayoutList className="h-4 w-4" /></Button>
-              <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setViewMode("grid")}><LayoutGrid className="h-4 w-4" /></Button>
-              <Button variant={viewMode === "calendar" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setViewMode("calendar")}><CalendarDays className="h-4 w-4" /></Button>
+              <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setViewMode("list")} aria-label={t("hrg.dir.viewTable")}><LayoutList className="h-4 w-4" /></Button>
+              <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setViewMode("grid")} aria-label={t("hrg.dir.viewGrid")}><LayoutGrid className="h-4 w-4" /></Button>
+              <Button variant={viewMode === "calendar" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setViewMode("calendar")} aria-label={t("hrg.viewCalendar")}><CalendarDays className="h-4 w-4" /></Button>
             </div>
           </div>
 
@@ -406,12 +425,14 @@ function RoleListView({ targetRole, roleLabel, onConfig, onAssign, onViewDetail 
 
 // ── Calendar View ──
 function CalendarView({ calMonth, setCalMonth, calDays, dayLabels, getAssignmentsForDay, onViewDetail }: any) {
+  const f = useFormato();
+  const { t } = useLanguage();
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <Button variant="outline" size="sm" onClick={() => setCalMonth((m: Date) => subMonths(m, 1))}>← Anterior</Button>
-        <h3 className="text-sm font-semibold capitalize">{format(calMonth, "MMMM yyyy", { locale: es })}</h3>
-        <Button variant="outline" size="sm" onClick={() => setCalMonth((m: Date) => addMonths(m, 1))}>Siguiente →</Button>
+        <Button variant="outline" size="sm" onClick={() => setCalMonth((m: Date) => subMonths(m, 1))}>← {t("common.previous")}</Button>
+        <h3 className="text-sm font-semibold capitalize">{format(calMonth, "MMMM yyyy", { locale: f.fechas })}</h3>
+        <Button variant="outline" size="sm" onClick={() => setCalMonth((m: Date) => addMonths(m, 1))}>{t("common.next")} →</Button>
       </div>
       <div className="border rounded-lg overflow-hidden">
         <div className="grid grid-cols-7">
@@ -444,7 +465,7 @@ function CalendarView({ calMonth, setCalMonth, calDays, dayLabels, getAssignment
                       {a.employees ? `${a.employees.first_name?.[0]}. ${a.employees.last_name}` : "—"}
                     </div>
                   ))}
-                  {dayAssignments.length > 3 && <p className="text-[10px] text-muted-foreground">+{dayAssignments.length - 3} más</p>}
+                  {dayAssignments.length > 3 && <p className="text-[10px] text-muted-foreground">{t("hrg.tr.more", { n: dayAssignments.length - 3 })}</p>}
                 </div>
               </div>
             );
@@ -459,6 +480,8 @@ function CalendarView({ calMonth, setCalMonth, calDays, dayLabels, getAssignment
 function AssignmentsTable({ assignments, isLoading, progressMap, moduleCounts, onViewDetail }: {
   assignments: any[]; isLoading: boolean; progressMap: Record<string, { completed: number; total: number }>; moduleCounts: Record<string, number>; onViewDetail: (a: any) => void;
 }) {
+  const f = useFormato();
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -468,8 +491,8 @@ function AssignmentsTable({ assignments, isLoading, progressMap, moduleCounts, o
       const { error } = await supabase.from("employee_training_assignments").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["training-assignments"] }); toast({ title: "Asignación eliminada" }); setDeleteId(null); },
-    onError: () => toast({ title: "Error al eliminar", variant: "destructive" }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["training-assignments"] }); toast({ title: t("hrg.tr.assignmentDeleted") }); setDeleteId(null); },
+    onError: () => toast({ title: t("common.errorDeleting"), variant: "destructive" }),
   });
 
   return (
@@ -478,13 +501,13 @@ function AssignmentsTable({ assignments, isLoading, progressMap, moduleCounts, o
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Empleado</TableHead>
-              <TableHead>Programa</TableHead>
-              <TableHead>Fecha Inicio</TableHead>
-              <TableHead>Fecha Límite</TableHead>
-              <TableHead>Progreso</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead className="text-right">Acciones</TableHead>
+              <TableHead>{t("hrg.employee")}</TableHead>
+              <TableHead>{t("hrg.tr.program")}</TableHead>
+              <TableHead>{t("hrg.startDate")}</TableHead>
+              <TableHead>{t("hrg.tr.deadline")}</TableHead>
+              <TableHead>{t("hrg.progress")}</TableHead>
+              <TableHead>{t("common.status")}</TableHead>
+              <TableHead className="text-right">{t("common.actions")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -493,7 +516,7 @@ function AssignmentsTable({ assignments, isLoading, progressMap, moduleCounts, o
                 <TableRow key={i}>{Array.from({ length: 7 }).map((_, j) => <TableCell key={j}><Skeleton className="h-5" /></TableCell>)}</TableRow>
               ))
             ) : assignments.length === 0 ? (
-              <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-10">Sin capacitaciones asignadas</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-10">{t("hrg.tr.noAssignments")}</TableCell></TableRow>
             ) : (
               assignments.map((a: any) => {
                 const emp = a.employees;
@@ -512,11 +535,11 @@ function AssignmentsTable({ assignments, isLoading, progressMap, moduleCounts, o
                       </div>
                     </TableCell>
                     <TableCell className="text-sm">{prog?.name || "—"}</TableCell>
-                    <TableCell className="text-sm">{a.start_date ? new Date(a.start_date).toLocaleDateString("es-CO") : "—"}</TableCell>
+                    <TableCell className="text-sm">{a.start_date ? new Date(a.start_date).toLocaleDateString(f.intl("es-CO")) : "—"}</TableCell>
                     <TableCell className="text-sm">
                       <div className="flex items-center gap-1.5">
-                        {a.completion_date ? new Date(a.completion_date).toLocaleDateString("es-CO") : "—"}
-                        {expiring && <Badge variant="outline" className="text-xs bg-warning/10 text-warning border-warning/30">Por vencer</Badge>}
+                        {a.completion_date ? new Date(a.completion_date).toLocaleDateString(f.intl("es-CO")) : "—"}
+                        {expiring && <Badge variant="outline" className="text-xs bg-warning/10 text-warning border-warning/30">{t("hrg.tr.dueSoon")}</Badge>}
                       </div>
                     </TableCell>
                     <TableCell className="w-32">
@@ -527,13 +550,13 @@ function AssignmentsTable({ assignments, isLoading, progressMap, moduleCounts, o
                     </TableCell>
                     <TableCell>
                       <Badge variant={getStatusBadgeVariant(a.status)}>
-                        {TRAINING_STATUSES.find((s) => s.value === a.status)?.label ?? a.status}
+                        {etiquetaHrV(t, "trainStatus", a.status)}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onViewDetail(a)}><Eye className="h-4 w-4" /></Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeleteId(a.id)}><Trash2 className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onViewDetail(a)} aria-label={t("common.view")}><Eye className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeleteId(a.id)} aria-label={t("common.delete")}><Trash2 className="h-4 w-4" /></Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -546,10 +569,10 @@ function AssignmentsTable({ assignments, isLoading, progressMap, moduleCounts, o
 
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>¿Eliminar asignación?</AlertDialogTitle><AlertDialogDescription>Esta acción no se puede deshacer.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogHeader><AlertDialogTitle>{t("hrg.tr.deleteAssignment")}</AlertDialogTitle><AlertDialogDescription>{t("common.cannotBeUndone")}</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel />
-            <AlertDialogAction onClick={() => deleteId && deleteMutation.mutate(deleteId)}>Eliminar</AlertDialogAction>
+            <AlertDialogAction onClick={() => deleteId && deleteMutation.mutate(deleteId)}>{t("common.delete")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -561,8 +584,9 @@ function AssignmentsTable({ assignments, isLoading, progressMap, moduleCounts, o
 function AssignmentsGrid({ assignments, isLoading, progressMap, moduleCounts, onViewDetail }: {
   assignments: any[]; isLoading: boolean; progressMap: Record<string, { completed: number; total: number }>; moduleCounts: Record<string, number>; onViewDetail: (a: any) => void;
 }) {
+  const { t } = useLanguage();
   if (isLoading) return <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-40 rounded-lg" />)}</div>;
-  if (assignments.length === 0) return <p className="text-center text-muted-foreground py-10">Sin capacitaciones asignadas</p>;
+  if (assignments.length === 0) return <p className="text-center text-muted-foreground py-10">{t("hrg.tr.noAssignments")}</p>;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -581,8 +605,8 @@ function AssignmentsGrid({ assignments, isLoading, progressMap, moduleCounts, on
                   <p className="text-xs text-muted-foreground">{emp?.departments?.name || "—"}</p>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
-                  {expiring && <Badge variant="outline" className="text-xs bg-warning/10 text-warning border-warning/30">Por vencer</Badge>}
-                  <Badge variant={getStatusBadgeVariant(a.status)}>{TRAINING_STATUSES.find((s) => s.value === a.status)?.label ?? a.status}</Badge>
+                  {expiring && <Badge variant="outline" className="text-xs bg-warning/10 text-warning border-warning/30">{t("hrg.tr.dueSoon")}</Badge>}
+                  <Badge variant={getStatusBadgeVariant(a.status)}>{etiquetaHrV(t, "trainStatus", a.status)}</Badge>
                 </div>
               </div>
               <p className="text-sm font-medium">{prog?.name || "—"}</p>
@@ -602,6 +626,8 @@ function AssignmentsGrid({ assignments, isLoading, progressMap, moduleCounts, on
 // ASSIGNMENT DETAIL VIEW
 // ══════════════════════════════════════════════
 function AssignmentDetailView({ assignment, onBack }: { assignment: any; onBack: () => void }) {
+  const f = useFormato();
+  const { t } = useLanguage();
   const emp = assignment.employees;
   const prog = assignment.training_programs;
   const { data: modules = [], isLoading: modulesLoading } = useTrainingModules(prog?.id || null);
@@ -654,7 +680,7 @@ function AssignmentDetailView({ assignment, onBack }: { assignment: any; onBack:
       queryClient.invalidateQueries({ queryKey: ["training-assignments"] });
       queryClient.invalidateQueries({ queryKey: ["module-progress"] });
     },
-    onError: () => toast({ title: "Error al actualizar progreso", variant: "destructive" }),
+    onError: () => toast({ title: t("hrg.tr.progressError"), variant: "destructive" }),
   });
 
   const isLoading = modulesLoading || progressLoading;
@@ -663,13 +689,13 @@ function AssignmentDetailView({ assignment, onBack }: { assignment: any; onBack:
     <div className="flex flex-col h-full">
       <div className="shrink-0 bg-background border-b px-6 py-4">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={onBack}><ArrowLeft className="h-5 w-5" /></Button>
+          <Button variant="ghost" size="icon" onClick={onBack} aria-label={t("common.back")}><ArrowLeft className="h-5 w-5" /></Button>
           <PageHeader
             className="flex-1"
             title={
               <>
                 {emp ? `${emp.first_name} ${emp.last_name}` : "—"}{" "}
-                <Badge variant={getStatusBadgeVariant(assignment.status)}>{TRAINING_STATUSES.find((s) => s.value === assignment.status)?.label ?? assignment.status}</Badge>
+                <Badge variant={getStatusBadgeVariant(assignment.status)}>{etiquetaHrV(t, "trainStatus", assignment.status)}</Badge>
               </>
             }
             subtitle={prog?.name || "—"}
@@ -679,28 +705,28 @@ function AssignmentDetailView({ assignment, onBack }: { assignment: any; onBack:
       <div className="flex-1 overflow-auto">
         <div className="px-6 py-5 space-y-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="space-y-1"><p className="text-xs text-muted-foreground">Fecha Inicio</p><p className="text-sm font-medium">{assignment.start_date ? new Date(assignment.start_date).toLocaleDateString("es-CO") : "—"}</p></div>
-            <div className="space-y-1"><p className="text-xs text-muted-foreground">Fecha Límite</p><p className="text-sm font-medium">{assignment.completion_date ? new Date(assignment.completion_date).toLocaleDateString("es-CO") : "—"}</p></div>
-            <div className="space-y-1"><p className="text-xs text-muted-foreground">Departamento</p><p className="text-sm font-medium">{emp?.departments?.name || "—"}</p></div>
-            <div className="space-y-1"><p className="text-xs text-muted-foreground">Rol del Programa</p><p className="text-sm font-medium">{TRAINING_TARGET_ROLES.find((r) => r.value === prog?.target_role)?.label || "General"}</p></div>
+            <div className="space-y-1"><p className="text-xs text-muted-foreground">{t("hrg.startDate")}</p><p className="text-sm font-medium">{assignment.start_date ? new Date(assignment.start_date).toLocaleDateString(f.intl("es-CO")) : "—"}</p></div>
+            <div className="space-y-1"><p className="text-xs text-muted-foreground">{t("hrg.tr.deadline")}</p><p className="text-sm font-medium">{assignment.completion_date ? new Date(assignment.completion_date).toLocaleDateString(f.intl("es-CO")) : "—"}</p></div>
+            <div className="space-y-1"><p className="text-xs text-muted-foreground">{t("hrg.department")}</p><p className="text-sm font-medium">{emp?.departments?.name || "—"}</p></div>
+            <div className="space-y-1"><p className="text-xs text-muted-foreground">{t("hrg.tr.programRole")}</p><p className="text-sm font-medium">{etiquetaHr(t, "trainRole", prog?.target_role) || t("hrg.opt.trainRole.general")}</p></div>
           </div>
 
-          {assignment.notes && <div className="space-y-1"><p className="text-xs text-muted-foreground">Notas</p><p className="text-sm">{assignment.notes}</p></div>}
+          {assignment.notes && <div className="space-y-1"><p className="text-xs text-muted-foreground">{t("hrg.notes")}</p><p className="text-sm">{assignment.notes}</p></div>}
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-medium">Progreso General</p>
-              <span className="text-sm font-semibold">{completedCount}/{totalModules} módulos · {progressPercent}%</span>
+              <p className="text-sm font-medium">{t("hrg.tr.overallProgress")}</p>
+              <span className="text-sm font-semibold">{t("hrg.tr.modulesProgress", { done: completedCount, total: totalModules, pct: progressPercent })}</span>
             </div>
             <Progress value={progressPercent} className="h-2.5" />
           </div>
 
           <div className="space-y-2">
-            <h3 className="text-sm font-semibold">Módulos del Programa</h3>
+            <h3 className="text-sm font-semibold">{t("hrg.tr.programModules")}</h3>
             {isLoading ? (
               <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-14 rounded-lg" />)}</div>
             ) : modules.length === 0 ? (
-              <p className="rounded-xl border border-dashed border-border bg-muted/30 px-4 py-4 text-sm text-muted-foreground">Este programa no tiene módulos configurados.</p>
+              <p className="rounded-xl border border-dashed border-border bg-muted/30 px-4 py-4 text-sm text-muted-foreground">{t("hrg.tr.noModulesConfigured")}</p>
             ) : (
               <div className="border rounded-lg divide-y">
                 {modules.map((m: any, idx: number) => {
@@ -722,9 +748,9 @@ function AssignmentDetailView({ assignment, onBack }: { assignment: any; onBack:
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         {m.duration_minutes && <span className="text-xs text-muted-foreground">{m.duration_minutes} min</span>}
-                        {m.is_required && <Badge variant="outline" className="text-xs">Req.</Badge>}
-                        {m.content_url && <a href={m.content_url} target="_blank" rel="noreferrer"><Button variant="ghost" size="icon" className="h-7 w-7"><Eye className="h-3.5 w-3.5" /></Button></a>}
-                        {isCompleted && mp?.completed_at && <span className="text-xs text-muted-foreground">{new Date(mp.completed_at).toLocaleDateString("es-CO")}</span>}
+                        {m.is_required && <Badge variant="outline" className="text-xs">{t("hrg.tr.requiredShort")}</Badge>}
+                        {m.content_url && <a href={m.content_url} target="_blank" rel="noreferrer"><Button variant="ghost" size="icon" className="h-7 w-7" aria-label={t("hrg.tr.openContent")}><Eye className="h-3.5 w-3.5" /></Button></a>}
+                        {isCompleted && mp?.completed_at && <span className="text-xs text-muted-foreground">{new Date(mp.completed_at).toLocaleDateString(f.intl("es-CO"))}</span>}
                       </div>
                     </div>
                   );
@@ -742,6 +768,8 @@ function AssignmentDetailView({ assignment, onBack }: { assignment: any; onBack:
 // ASSIGN TRAINING VIEW
 // ══════════════════════════════════════════════
 function AssignTrainingView({ targetRole, roleLabel, onBack }: { targetRole: string; roleLabel: string; onBack: () => void }) {
+  const { t } = useLanguage();
+  const rol = nombreRol(t, targetRole, roleLabel);
   const { data: programs = [] } = useRolePrograms(targetRole);
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -756,51 +784,51 @@ function AssignTrainingView({ targetRole, roleLabel, onBack }: { targetRole: str
       });
       if (error) throw error;
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["training-assignments"] }); toast({ title: "Capacitación asignada" }); onBack(); },
-    onError: () => toast({ title: "Error al asignar", variant: "destructive" }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["training-assignments"] }); toast({ title: t("hrg.tr.assigned") }); onBack(); },
+    onError: () => toast({ title: t("common.errorAssigning"), variant: "destructive" }),
   });
 
   return (
     <div className="flex flex-col h-full">
       <div className="shrink-0 bg-background border-b px-6 py-4">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={onBack}><ArrowLeft className="h-5 w-5" /></Button>
+          <Button variant="ghost" size="icon" onClick={onBack} aria-label={t("common.back")}><ArrowLeft className="h-5 w-5" /></Button>
           <PageHeader
             className="flex-1"
-            title={`Asignar Capacitación — ${roleLabel}`}
-            subtitle={`Asigna un programa de ${roleLabel.toLowerCase()} a un empleado`}
+            title={t("hrg.tr.assignTitle", { role: rol })}
+            subtitle={t("hrg.tr.assignSubtitle", { role: rol.toLowerCase() })}
           />
         </div>
       </div>
       <div className="flex-1 overflow-auto">
         <div className="px-6 py-6 space-y-5">
           <div className="space-y-1.5">
-            <Label>Empleado <span className="text-destructive">*</span></Label>
+            <Label>{t("hrg.employee")} <span className="text-destructive">*</span></Label>
             <EmployeeSearchCombobox value={form.employee_id || null} onChange={(v) => setForm((f) => ({ ...f, employee_id: v ?? "" }))} />
           </div>
           <div className="space-y-1.5">
-            <Label>Programa de Capacitación <span className="text-destructive">*</span></Label>
+            <Label>{t("hrg.tr.trainingProgram")} <span className="text-destructive">*</span></Label>
             <Select value={form.training_program_id} onValueChange={(v) => setForm((f) => ({ ...f, training_program_id: v }))}>
-              <SelectTrigger><SelectValue placeholder="Seleccionar programa..." /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder={t("hrg.tr.selectProgram")} /></SelectTrigger>
               <SelectContent>{programs.map((p: any) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
             </Select>
           </div>
           <div className="space-y-1.5">
-            <Label>Fecha de Inicio</Label>
+            <Label>{t("hrg.startDateOf")}</Label>
             <DateInput value={form.start_date} onChange={(v) => setForm((f) => ({ ...f, start_date: v }))} />
           </div>
           <div className="space-y-1.5">
-            <Label>Supervisor (opcional)</Label>
+            <Label>{t("hrg.tr.supervisorOptional")}</Label>
             <EmployeeSearchCombobox value={form.supervisor_id || null} onChange={(v) => setForm((f) => ({ ...f, supervisor_id: v ?? "" }))} />
           </div>
           <div className="space-y-1.5">
-            <Label>Notas adicionales</Label>
-            <Textarea placeholder="Notas o instrucciones..." rows={3} value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} />
+            <Label>{t("hrg.tr.additionalNotes")}</Label>
+            <Textarea placeholder={t("hrg.tr.notesPlaceholder")} rows={3} value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} />
           </div>
           <div className="flex gap-2 pt-2">
-            <Button variant="outline" onClick={onBack}>Cancelar</Button>
+            <Button variant="outline" onClick={onBack}>{t("common.cancel")}</Button>
             <Button onClick={() => mutation.mutate()} disabled={!form.employee_id || !form.training_program_id || mutation.isPending}>
-              {mutation.isPending ? "Asignando..." : "Asignar Capacitación"}
+              {mutation.isPending ? t("hrg.tr.assigning") : t("hrg.tr.assignTraining")}
             </Button>
           </div>
         </div>
@@ -815,6 +843,8 @@ function AssignTrainingView({ targetRole, roleLabel, onBack }: { targetRole: str
 function ProgramConfigView({ targetRole, roleLabel, onBack, onManageModules }: {
   targetRole: string; roleLabel: string; onBack: () => void; onManageModules: (p: any) => void;
 }) {
+  const { t } = useLanguage();
+  const rol = nombreRol(t, targetRole, roleLabel);
   const { data: programs = [], isLoading } = useRolePrograms(targetRole);
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -871,8 +901,8 @@ function ProgramConfigView({ targetRole, roleLabel, onBack, onManageModules }: {
       });
       if (error) throw error;
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["training-programs"] }); toast({ title: "Programa creado" }); setShowNew(false); resetForm(); },
-    onError: () => toast({ title: "Error al crear", variant: "destructive" }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["training-programs"] }); toast({ title: t("hrg.tr.programCreated") }); setShowNew(false); resetForm(); },
+    onError: () => toast({ title: t("common.errorCreating"), variant: "destructive" }),
   });
 
   const updateMutation = useMutation({
@@ -885,8 +915,8 @@ function ProgramConfigView({ targetRole, roleLabel, onBack, onManageModules }: {
       }).eq("id", editProgram.id);
       if (error) throw error;
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["training-programs"] }); toast({ title: "Programa actualizado" }); setEditProgram(null); resetForm(); },
-    onError: () => toast({ title: "Error al actualizar", variant: "destructive" }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["training-programs"] }); toast({ title: t("hrg.tr.programUpdated") }); setEditProgram(null); resetForm(); },
+    onError: () => toast({ title: t("common.errorUpdating"), variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
@@ -894,8 +924,8 @@ function ProgramConfigView({ targetRole, roleLabel, onBack, onManageModules }: {
       const { error } = await supabase.from("training_programs").update({ is_active: false }).eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["training-programs"] }); toast({ title: "Programa eliminado" }); setDeleteId(null); },
-    onError: () => toast({ title: "Error al eliminar", variant: "destructive" }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["training-programs"] }); toast({ title: t("hrg.tr.programDeleted") }); setDeleteId(null); },
+    onError: () => toast({ title: t("common.errorDeleting"), variant: "destructive" }),
   });
 
   const openEdit = (p: any) => {
@@ -910,12 +940,12 @@ function ProgramConfigView({ targetRole, roleLabel, onBack, onManageModules }: {
     <div className="flex flex-col h-full">
       <div className="shrink-0 bg-background border-b px-6 py-4">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={onBack}><ArrowLeft className="h-5 w-5" /></Button>
+          <Button variant="ghost" size="icon" onClick={onBack} aria-label={t("common.back")}><ArrowLeft className="h-5 w-5" /></Button>
           <PageHeader
             className="flex-1"
-            title={`Programas de ${roleLabel}`}
-            subtitle="Gestiona los programas y módulos de capacitación"
-            actions={<Button onClick={() => { resetForm(); setShowNew(true); }}><Plus className="h-4 w-4 mr-1.5" />Nuevo Programa</Button>}
+            title={t("hrg.tr.programsOf", { role: rol })}
+            subtitle={t("hrg.tr.programsSubtitle")}
+            actions={<Button onClick={() => { resetForm(); setShowNew(true); }}><Plus className="h-4 w-4 mr-1.5" />{t("hrg.tr.newProgram")}</Button>}
           />
         </div>
       </div>
@@ -925,23 +955,23 @@ function ProgramConfigView({ targetRole, roleLabel, onBack, onManageModules }: {
           <div className="flex items-center gap-3 flex-wrap">
             <div className="relative w-48">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Buscar programa..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
+              <Input placeholder={t("hrg.tr.searchProgram")} className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
             <Select value={modalityFilter || undefined} onValueChange={(v) => setModalityFilter(v === "__all__" ? "" : v)}>
-              <SelectTrigger className="w-[140px]"><SelectValue placeholder="Modalidad" /></SelectTrigger>
+              <SelectTrigger className="w-[140px]"><SelectValue placeholder={t("hrg.dir.modality")} /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="__all__">Todas</SelectItem>
-                {TRAINING_MODALITIES.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
+                <SelectItem value="__all__">{t("common.allF")}</SelectItem>
+                {TRAINING_MODALITIES.map((m) => <SelectItem key={m.value} value={m.value}>{etiquetaHrO(t, "trainModality", m.value)}</SelectItem>)}
               </SelectContent>
             </Select>
             {hasActiveFilters && (
               <Button variant="ghost" size="sm" onClick={clearFilters}>
-                <X className="mr-1.5 h-4 w-4" />Limpiar filtros
+                <X className="mr-1.5 h-4 w-4" />{t("hrg.clearFilters")}
               </Button>
             )}
             <div className="ml-auto flex gap-1">
-              <Button variant={configView === "list" ? "secondary" : "ghost"} size="icon" onClick={() => setConfigView("list")}><List className="h-4 w-4" /></Button>
-              <Button variant={configView === "grid" ? "secondary" : "ghost"} size="icon" onClick={() => setConfigView("grid")}><LayoutGrid className="h-4 w-4" /></Button>
+              <Button variant={configView === "list" ? "secondary" : "ghost"} size="icon" onClick={() => setConfigView("list")} aria-label={t("hrg.dir.viewTable")}><List className="h-4 w-4" /></Button>
+              <Button variant={configView === "grid" ? "secondary" : "ghost"} size="icon" onClick={() => setConfigView("grid")} aria-label={t("hrg.dir.viewGrid")}><LayoutGrid className="h-4 w-4" /></Button>
             </div>
           </div>
 
@@ -950,7 +980,7 @@ function ProgramConfigView({ targetRole, roleLabel, onBack, onManageModules }: {
               {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-44 rounded-lg" />)}
             </div>
           ) : filtered.length === 0 ? (
-            <EmptyState seed="hr-training-programas" title="No hay programas configurados" description="Crea un programa para comenzar." />
+            <EmptyState seed="hr-training-programas" title={t("hrg.tr.noPrograms")} description={t("hrg.tr.noProgramsHint")} />
           ) : configView === "grid" ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filtered.map((p: any) => {
@@ -960,22 +990,22 @@ function ProgramConfigView({ targetRole, roleLabel, onBack, onManageModules }: {
                     <CardContent className="p-4 space-y-3">
                       <div className="flex items-start justify-between">
                         <p className="text-sm font-semibold">{p.name}</p>
-                        {p.is_mandatory && <Badge variant="default" className="text-xs">Obligatorio</Badge>}
+                        {p.is_mandatory && <Badge variant="default" className="text-xs">{t("hrg.tr.mandatory")}</Badge>}
                       </div>
                       {p.description && <p className="text-xs text-muted-foreground line-clamp-2">{p.description}</p>}
                       <div className="flex items-center gap-3 text-xs text-muted-foreground">
                         {p.duration_hours && <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" />{p.duration_hours}h</span>}
-                        <span className="flex items-center gap-1"><BookOpen className="h-3.5 w-3.5" />{mc ? mc.total : 0} módulos</span>
+                        <span className="flex items-center gap-1"><BookOpen className="h-3.5 w-3.5" />{t("hrg.tr.modulesCount", { n: mc ? mc.total : 0 })}</span>
                         {mc && mc.total > 0 && (
                           <span className={cn("text-xs", mc.withContent === mc.total ? "text-success" : "text-warning")}>
-                            {mc.withContent}/{mc.total} con contenido
+                            {t("hrg.tr.withContent", { done: mc.withContent, total: mc.total })}
                           </span>
                         )}
                       </div>
                       <div className="flex items-center gap-1 pt-1">
-                        <Button variant="outline" size="sm" onClick={() => onManageModules(p)}><BookOpen className="h-3.5 w-3.5 mr-1" />Módulos</Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(p)}><Pencil className="h-4 w-4" /></Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeleteId(p.id)}><Trash2 className="h-4 w-4" /></Button>
+                        <Button variant="outline" size="sm" onClick={() => onManageModules(p)}><BookOpen className="h-3.5 w-3.5 mr-1" />{t("hrg.tr.modules")}</Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(p)} aria-label={t("common.edit")}><Pencil className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeleteId(p.id)} aria-label={t("common.delete")}><Trash2 className="h-4 w-4" /></Button>
                       </div>
                     </CardContent>
                   </Card>
@@ -987,18 +1017,18 @@ function ProgramConfigView({ targetRole, roleLabel, onBack, onManageModules }: {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Nombre</TableHead>
-                    <TableHead>Modalidad</TableHead>
-                    <TableHead>Duración</TableHead>
-                    <TableHead>Módulos</TableHead>
-                    <TableHead>Obligatorio</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
+                    <TableHead>{t("common.name")}</TableHead>
+                    <TableHead>{t("hrg.dir.modality")}</TableHead>
+                    <TableHead>{t("common.duration")}</TableHead>
+                    <TableHead>{t("hrg.tr.modules")}</TableHead>
+                    <TableHead>{t("hrg.tr.mandatory")}</TableHead>
+                    <TableHead className="text-right">{t("common.actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filtered.map((p: any) => {
                     const mc = programModuleCounts[p.id];
-                    const modalityLabel = TRAINING_MODALITIES.find((m) => m.value === p.modality)?.label || p.modality || "—";
+                    const modalityLabel = etiquetaHr(t, "trainModality", p.modality) || p.modality || "—";
                     return (
                       <TableRow key={p.id}>
                         <TableCell className="font-medium">{p.name}</TableCell>
@@ -1012,12 +1042,12 @@ function ProgramConfigView({ targetRole, roleLabel, onBack, onManageModules }: {
                             </span>
                           )}
                         </TableCell>
-                        <TableCell>{p.is_mandatory ? <Badge variant="default" className="text-xs">Sí</Badge> : <span className="text-muted-foreground text-sm">No</span>}</TableCell>
+                        <TableCell>{p.is_mandatory ? <Badge variant="default" className="text-xs">{t("hrg.yes")}</Badge> : <span className="text-muted-foreground text-sm">{t("hrg.no")}</span>}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
-                            <Button variant="outline" size="sm" onClick={() => onManageModules(p)}><BookOpen className="h-3.5 w-3.5 mr-1" />Módulos</Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(p)}><Pencil className="h-4 w-4" /></Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeleteId(p.id)}><Trash2 className="h-4 w-4" /></Button>
+                            <Button variant="outline" size="sm" onClick={() => onManageModules(p)}><BookOpen className="h-3.5 w-3.5 mr-1" />{t("hrg.tr.modules")}</Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(p)} aria-label={t("common.edit")}><Pencil className="h-4 w-4" /></Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeleteId(p.id)} aria-label={t("common.delete")}><Trash2 className="h-4 w-4" /></Button>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -1033,42 +1063,42 @@ function ProgramConfigView({ targetRole, roleLabel, onBack, onManageModules }: {
       {/* Create / Edit Dialog */}
       <Dialog open={isFormDialog} onOpenChange={(o) => { if (!o) { setShowNew(false); setEditProgram(null); resetForm(); } }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>{isEditing ? "Editar Programa" : "Nuevo Programa de Capacitación"}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{isEditing ? t("hrg.tr.editProgram") : t("hrg.tr.newTrainingProgram")}</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <Label>Nombre <span className="text-destructive">*</span></Label>
-              <Input placeholder="Nombre del programa" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
+              <Label>{t("common.name")} <span className="text-destructive">*</span></Label>
+              <Input placeholder={t("hrg.tr.programNamePlaceholder")} value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label>Modalidad</Label>
+                <Label>{t("hrg.dir.modality")}</Label>
                 <Select value={form.modality} onValueChange={(v) => setForm((f) => ({ ...f, modality: v }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{TRAINING_MODALITIES.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
+                  <SelectContent>{TRAINING_MODALITIES.map((m) => <SelectItem key={m.value} value={m.value}>{etiquetaHrO(t, "trainModality", m.value)}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>Duración (horas)</Label>
+                <Label>{t("hrg.tr.durationHours")}</Label>
                 <Input type="number" placeholder="8" value={form.duration_hours} onChange={(e) => setForm((f) => ({ ...f, duration_hours: e.target.value }))} />
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label>Proveedor</Label>
-              <Input placeholder="Proveedor" value={form.provider} onChange={(e) => setForm((f) => ({ ...f, provider: e.target.value }))} />
+              <Label>{t("hrg.tr.provider")}</Label>
+              <Input placeholder={t("hrg.tr.provider")} value={form.provider} onChange={(e) => setForm((f) => ({ ...f, provider: e.target.value }))} />
             </div>
             <div className="space-y-1.5">
-              <Label>Descripción</Label>
-              <Textarea placeholder="Describe el programa..." rows={3} value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
+              <Label>{t("common.description")}</Label>
+              <Textarea placeholder={t("hrg.tr.programDescPlaceholder")} rows={3} value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
             </div>
             <div className="flex items-center gap-2">
               <input type="checkbox" id="mandatory" checked={form.is_mandatory} onChange={(e) => setForm((f) => ({ ...f, is_mandatory: e.target.checked }))} className="rounded border-border" />
-              <Label htmlFor="mandatory">Programa obligatorio</Label>
+              <Label htmlFor="mandatory">{t("hrg.tr.mandatoryProgram")}</Label>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowNew(false); setEditProgram(null); resetForm(); }}>Cancelar</Button>
+            <Button variant="outline" onClick={() => { setShowNew(false); setEditProgram(null); resetForm(); }}>{t("common.cancel")}</Button>
             <Button onClick={() => isEditing ? updateMutation.mutate() : createMutation.mutate()} disabled={!form.name || createMutation.isPending || updateMutation.isPending}>
-              {(createMutation.isPending || updateMutation.isPending) ? "Guardando..." : isEditing ? "Guardar" : "Crear Programa"}
+              {(createMutation.isPending || updateMutation.isPending) ? t("hrg.saving") : isEditing ? t("common.save") : t("hrg.tr.createProgram")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1076,10 +1106,10 @@ function ProgramConfigView({ targetRole, roleLabel, onBack, onManageModules }: {
 
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>¿Eliminar programa?</AlertDialogTitle><AlertDialogDescription>El programa se desactivará.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogHeader><AlertDialogTitle>{t("hrg.tr.deleteProgram")}</AlertDialogTitle><AlertDialogDescription>{t("hrg.tr.deleteProgramBody")}</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel />
-            <AlertDialogAction onClick={() => deleteId && deleteMutation.mutate(deleteId)}>Eliminar</AlertDialogAction>
+            <AlertDialogAction onClick={() => deleteId && deleteMutation.mutate(deleteId)}>{t("common.delete")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -1091,6 +1121,7 @@ function ProgramConfigView({ targetRole, roleLabel, onBack, onManageModules }: {
 // MODULE MANAGEMENT VIEW
 // ══════════════════════════════════════════════
 function ModuleManagementView({ program, onBack }: { program: any; onBack: () => void }) {
+  const { t } = useLanguage();
   const { data: modules = [], isLoading } = useTrainingModules(program.id);
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -1110,8 +1141,8 @@ function ModuleManagementView({ program, onBack }: { program: any; onBack: () =>
       });
       if (error) throw error;
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["training-modules", program.id] }); toast({ title: "Módulo creado" }); setShowNew(false); resetForm(); },
-    onError: () => toast({ title: "Error al crear módulo", variant: "destructive" }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["training-modules", program.id] }); toast({ title: t("hrg.tr.moduleCreated") }); setShowNew(false); resetForm(); },
+    onError: () => toast({ title: t("hrg.tr.moduleCreateError"), variant: "destructive" }),
   });
 
   const updateMutation = useMutation({
@@ -1124,8 +1155,8 @@ function ModuleManagementView({ program, onBack }: { program: any; onBack: () =>
       }).eq("id", editModule.id);
       if (error) throw error;
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["training-modules", program.id] }); toast({ title: "Módulo actualizado" }); setEditModule(null); resetForm(); },
-    onError: () => toast({ title: "Error al actualizar", variant: "destructive" }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["training-modules", program.id] }); toast({ title: t("hrg.tr.moduleUpdated") }); setEditModule(null); resetForm(); },
+    onError: () => toast({ title: t("common.errorUpdating"), variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
@@ -1133,8 +1164,8 @@ function ModuleManagementView({ program, onBack }: { program: any; onBack: () =>
       const { error } = await supabase.from("training_modules").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["training-modules", program.id] }); toast({ title: "Módulo eliminado" }); setDeleteId(null); },
-    onError: () => toast({ title: "Error al eliminar", variant: "destructive" }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["training-modules", program.id] }); toast({ title: t("hrg.tr.moduleDeleted") }); setDeleteId(null); },
+    onError: () => toast({ title: t("common.errorDeleting"), variant: "destructive" }),
   });
 
   const openEdit = (m: any) => {
@@ -1151,12 +1182,12 @@ function ModuleManagementView({ program, onBack }: { program: any; onBack: () =>
       if (!file) return;
       const path = `training-modules/${program.id}/${moduleId}/${file.name}`;
       const { error: uploadError } = await supabase.storage.from("creator-files").upload(path, file, { upsert: true });
-      if (uploadError) { toast({ title: "Error al subir archivo", variant: "destructive" }); return; }
+      if (uploadError) { toast({ title: t("hrg.tr.uploadError"), variant: "destructive" }); return; }
       const { data: signedData } = await supabase.storage.from("creator-files").createSignedUrl(path, 86400);
       const { error: updateError } = await supabase.from("training_modules").update({ content_url: signedData?.signedUrl || path }).eq("id", moduleId);
-      if (updateError) { toast({ title: "Error al guardar URL", variant: "destructive" }); return; }
+      if (updateError) { toast({ title: t("hrg.tr.saveUrlError"), variant: "destructive" }); return; }
       queryClient.invalidateQueries({ queryKey: ["training-modules", program.id] });
-      toast({ title: "Contenido subido exitosamente" });
+      toast({ title: t("hrg.tr.contentUploaded") });
     };
     input.click();
   };
@@ -1168,12 +1199,12 @@ function ModuleManagementView({ program, onBack }: { program: any; onBack: () =>
     <div className="flex flex-col h-full">
       <div className="shrink-0 bg-background border-b px-6 py-4">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={onBack}><ArrowLeft className="h-5 w-5" /></Button>
+          <Button variant="ghost" size="icon" onClick={onBack} aria-label={t("common.back")}><ArrowLeft className="h-5 w-5" /></Button>
           <PageHeader
             className="flex-1"
             title={program.name}
-            subtitle={`Módulos del programa · ${modules.length} módulos`}
-            actions={<Button onClick={() => { resetForm(); setShowNew(true); }}><Plus className="h-4 w-4 mr-1.5" />Nuevo Módulo</Button>}
+            subtitle={t("hrg.tr.modulesSubtitle", { n: modules.length })}
+            actions={<Button onClick={() => { resetForm(); setShowNew(true); }}><Plus className="h-4 w-4 mr-1.5" />{t("hrg.tr.newModule")}</Button>}
           />
         </div>
       </div>
@@ -1182,19 +1213,19 @@ function ModuleManagementView({ program, onBack }: { program: any; onBack: () =>
           {isLoading ? (
             <div className="space-y-3">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-lg" />)}</div>
           ) : modules.length === 0 ? (
-            <EmptyState seed="hr-training-modulos" title="No hay módulos" description="Agrega uno para comenzar." />
+            <EmptyState seed="hr-training-modulos" title={t("hrg.tr.noModules")} description={t("hrg.tr.noModulesHint")} />
           ) : (
             <div className="border rounded-lg overflow-hidden">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-16">#</TableHead>
-                    <TableHead>Título</TableHead>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead>Duración</TableHead>
-                    <TableHead>Contenido</TableHead>
-                    <TableHead>Requerido</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
+                    <TableHead>{t("common.title")}</TableHead>
+                    <TableHead>{t("common.type")}</TableHead>
+                    <TableHead>{t("common.duration")}</TableHead>
+                    <TableHead>{t("hrg.tr.content")}</TableHead>
+                    <TableHead>{t("hrg.required")}</TableHead>
+                    <TableHead className="text-right">{t("common.actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1207,24 +1238,24 @@ function ModuleManagementView({ program, onBack }: { program: any; onBack: () =>
                         <TableCell>
                           <div className="flex items-center gap-1.5">
                             <ContentIcon className="h-3.5 w-3.5 text-muted-foreground" />
-                            <span className="text-sm">{TRAINING_CONTENT_TYPES.find((t) => t.value === m.content_type)?.label || m.content_type}</span>
+                            <span className="text-sm">{etiquetaHr(t, "trainContent", m.content_type) || m.content_type}</span>
                           </div>
                         </TableCell>
                         <TableCell className="text-sm">{m.duration_minutes ? `${m.duration_minutes} min` : "—"}</TableCell>
                         <TableCell>
                           {m.content_url ? (
-                            <a href={m.content_url} target="_blank" rel="noreferrer" className="text-sm text-primary hover:underline">Ver</a>
+                            <a href={m.content_url} target="_blank" rel="noreferrer" className="text-sm text-primary hover:underline">{t("common.view")}</a>
                           ) : (
                             <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => handleFileUpload(m.id)}>
-                              <Upload className="h-3.5 w-3.5 mr-1" />Subir
+                              <Upload className="h-3.5 w-3.5 mr-1" />{t("hrg.tr.upload")}
                             </Button>
                           )}
                         </TableCell>
-                        <TableCell>{m.is_required ? <Badge variant="default" className="text-xs">Sí</Badge> : <Badge variant="outline" className="text-xs">No</Badge>}</TableCell>
+                        <TableCell>{m.is_required ? <Badge variant="default" className="text-xs">{t("hrg.yes")}</Badge> : <Badge variant="outline" className="text-xs">{t("hrg.no")}</Badge>}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1">
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(m)}><Pencil className="h-4 w-4" /></Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeleteId(m.id)}><Trash2 className="h-4 w-4" /></Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(m)} aria-label={t("common.edit")}><Pencil className="h-4 w-4" /></Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeleteId(m.id)} aria-label={t("common.delete")}><Trash2 className="h-4 w-4" /></Button>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -1239,42 +1270,42 @@ function ModuleManagementView({ program, onBack }: { program: any; onBack: () =>
 
       <Dialog open={isFormDialog} onOpenChange={(o) => { if (!o) { setShowNew(false); setEditModule(null); resetForm(); } }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>{isEditing ? "Editar Módulo" : "Nuevo Módulo"}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{isEditing ? t("hrg.tr.editModule") : t("hrg.tr.newModule")}</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <Label>Título <span className="text-destructive">*</span></Label>
-              <Input placeholder="Título del módulo" value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />
+              <Label>{t("common.title")} <span className="text-destructive">*</span></Label>
+              <Input placeholder={t("hrg.tr.moduleTitlePlaceholder")} value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label>Tipo de Contenido</Label>
+                <Label>{t("hrg.tr.contentType")}</Label>
                 <Select value={form.content_type} onValueChange={(v) => setForm((f) => ({ ...f, content_type: v }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{TRAINING_CONTENT_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
+                  <SelectContent>{TRAINING_CONTENT_TYPES.map((o) => <SelectItem key={o.value} value={o.value}>{etiquetaHrO(t, "trainContent", o.value)}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>Duración (min)</Label>
+                <Label>{t("hrg.tr.durationMin")}</Label>
                 <Input type="number" placeholder="30" value={form.duration_minutes} onChange={(e) => setForm((f) => ({ ...f, duration_minutes: e.target.value }))} />
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label>Descripción</Label>
-              <Textarea placeholder="Descripción del módulo..." rows={2} value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
+              <Label>{t("common.description")}</Label>
+              <Textarea placeholder={t("hrg.tr.moduleDescPlaceholder")} rows={2} value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
             </div>
             <div className="space-y-1.5">
-              <Label>URL del contenido (opcional)</Label>
+              <Label>{t("hrg.tr.contentUrl")}</Label>
               <Input placeholder="https://..." value={form.content_url} onChange={(e) => setForm((f) => ({ ...f, content_url: e.target.value }))} />
             </div>
             <div className="flex items-center gap-2">
               <input type="checkbox" id="required" checked={form.is_required} onChange={(e) => setForm((f) => ({ ...f, is_required: e.target.checked }))} className="rounded border-border" />
-              <Label htmlFor="required">Módulo requerido</Label>
+              <Label htmlFor="required">{t("hrg.tr.requiredModule")}</Label>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowNew(false); setEditModule(null); resetForm(); }}>Cancelar</Button>
+            <Button variant="outline" onClick={() => { setShowNew(false); setEditModule(null); resetForm(); }}>{t("common.cancel")}</Button>
             <Button onClick={() => isEditing ? updateMutation.mutate() : createMutation.mutate()} disabled={!form.title || createMutation.isPending || updateMutation.isPending}>
-              {(createMutation.isPending || updateMutation.isPending) ? "Guardando..." : isEditing ? "Guardar" : "Crear Módulo"}
+              {(createMutation.isPending || updateMutation.isPending) ? t("hrg.saving") : isEditing ? t("common.save") : t("hrg.tr.createModule")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1282,10 +1313,10 @@ function ModuleManagementView({ program, onBack }: { program: any; onBack: () =>
 
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>¿Eliminar módulo?</AlertDialogTitle><AlertDialogDescription>Esta acción no se puede deshacer.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogHeader><AlertDialogTitle>{t("hrg.tr.deleteModule")}</AlertDialogTitle><AlertDialogDescription>{t("common.cannotBeUndone")}</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel />
-            <AlertDialogAction onClick={() => deleteId && deleteMutation.mutate(deleteId)}>Eliminar</AlertDialogAction>
+            <AlertDialogAction onClick={() => deleteId && deleteMutation.mutate(deleteId)}>{t("common.delete")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

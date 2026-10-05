@@ -1,6 +1,5 @@
 import * as React from "react";
 import { format, startOfToday, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subMonths, parse, isValid, endOfDay } from "date-fns";
-import { es } from "date-fns/locale";
 import { CalendarIcon } from "lucide-react";
 import { DayPicker, type DateRange } from "react-day-picker";
 
@@ -11,6 +10,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { buttonVariants } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useFormato } from "@/hooks/useFormato";
+import { useTSiHay } from "@/hooks/useTSiHay";
+import type { TranslationKey } from "@/lib/i18n";
 
 interface DateRangePickerProps {
   from: Date | undefined;
@@ -20,34 +22,44 @@ interface DateRangePickerProps {
   className?: string;
 }
 
-const presets = [
+// `id` es la llave (React y el caso "Todo"); lo que se lee sale de `etiqueta`.
+const presets: Array<{
+  id: string;
+  etiqueta: TranslationKey;
+  getValue: () => { from: Date | undefined; to: Date | undefined };
+}> = [
   {
-    label: "Todo",
+    id: "all",
+    etiqueta: "shared.ui.range.all",
     getValue: () => ({ from: undefined as Date | undefined, to: undefined as Date | undefined }),
   },
   {
-    label: "Hoy",
+    id: "today",
+    etiqueta: "common.today",
     getValue: () => {
       const today = startOfToday();
       return { from: today, to: today };
     },
   },
   {
-    label: "Ayer",
+    id: "yesterday",
+    etiqueta: "shared.ui.range.yesterday",
     getValue: () => {
       const yesterday = subDays(startOfToday(), 1);
       return { from: yesterday, to: yesterday };
     },
   },
   {
-    label: "Esta semana",
+    id: "this_week",
+    etiqueta: "common.thisWeek",
     getValue: () => ({
       from: startOfWeek(startOfToday(), { weekStartsOn: 1 }),
       to: endOfWeek(startOfToday(), { weekStartsOn: 1 }),
     }),
   },
   {
-    label: "Semana pasada",
+    id: "last_week",
+    etiqueta: "shared.ui.range.lastWeek",
     getValue: () => {
       const lastWeek = subDays(startOfToday(), 7);
       return {
@@ -57,14 +69,16 @@ const presets = [
     },
   },
   {
-    label: "Este mes",
+    id: "this_month",
+    etiqueta: "common.thisMonth",
     getValue: () => ({
       from: startOfMonth(startOfToday()),
       to: endOfMonth(startOfToday()),
     }),
   },
   {
-    label: "Mes pasado",
+    id: "last_month",
+    etiqueta: "shared.ui.range.lastMonth",
     getValue: () => {
       const lastMonth = subMonths(startOfToday(), 1);
       return {
@@ -79,10 +93,13 @@ function DateRangePicker({
   from,
   to,
   onApply,
-  placeholder = "Seleccionar fechas",
+  placeholder: placeholderProp,
   className,
 }: DateRangePickerProps) {
   const isMobile = useIsMobile();
+  const f = useFormato();
+  const t = useTSiHay();
+  const placeholder = placeholderProp ?? t("shared.ui.selectDates");
   const [open, setOpen] = React.useState(false);
   const [range, setRange] = React.useState<DateRange | undefined>(
     from || to ? { from, to } : undefined
@@ -112,7 +129,7 @@ function DateRangePicker({
   const handlePreset = (preset: (typeof presets)[number]) => {
     const value = preset.getValue();
     if (!value.from && !value.to) {
-      // "Todo" preset — apply immediately
+      // Preset "Todo" (sin fechas): se aplica en el acto
       setRange(undefined);
       syncInputsFromRange(undefined);
       onApply(undefined, undefined);
@@ -153,9 +170,9 @@ function DateRangePicker({
   };
 
   const triggerLabel = from && to
-    ? `${format(from, "d MMM", { locale: es })} – ${format(to, "d MMM yyyy", { locale: es })}`
+    ? `${format(from, "d MMM", { locale: f.fechas })} – ${format(to, "d MMM yyyy", { locale: f.fechas })}`
     : from
-      ? `${format(from, "d MMM yyyy", { locale: es })}`
+      ? `${format(from, "d MMM yyyy", { locale: f.fechas })}`
       : placeholder;
 
   // Trigger estándar Maven: el botón es VISIBLE — tinte primary + icon
@@ -189,7 +206,7 @@ function DateRangePicker({
           <span className="truncate">{triggerLabel}</span>
           {hasRange && (
             <span className="ml-1 shrink-0 rounded-full bg-primary/20 px-1.5 py-0.5 text-xs font-bold text-primary">
-              Activo
+              {t("common.active")}
             </span>
           )}
         </Button>
@@ -198,16 +215,16 @@ function DateRangePicker({
         <div className="flex max-h-[80vh] overflow-auto">
           {/* Presets sidebar */}
           <div className="border-r border-border p-2 space-y-0.5 w-[160px] shrink-0 hidden sm:block">
-            <p className="text-xs font-medium text-muted-foreground mb-2">Acceso rápido</p>
+            <p className="text-xs font-medium text-muted-foreground mb-2">{t("shared.ui.quickPicks")}</p>
             {presets.map((preset) => (
               <Button
-                key={preset.label}
+                key={preset.id}
                 variant="ghost"
                 size="sm"
                 className="w-full justify-start text-sm"
                 onClick={() => handlePreset(preset)}
               >
-                {preset.label}
+                {t(preset.etiqueta)}
               </Button>
             ))}
           </div>
@@ -219,7 +236,7 @@ function DateRangePicker({
               selected={range}
               onSelect={handleSelect}
               numberOfMonths={isMobile ? 1 : 2}
-              locale={es}
+              locale={f.fechas}
               showOutsideDays
               className="pointer-events-auto"
               classNames={{
@@ -277,10 +294,10 @@ function DateRangePicker({
             {/* Footer */}
             <div className="sticky bottom-0 bg-popover z-10 flex justify-end gap-2 mt-3 pt-3 border-t border-border">
               <Button variant="ghost" size="sm" onClick={handleCancel}>
-                Cancelar
+                {t("common.cancel")}
               </Button>
               <Button size="sm" onClick={handleApply}>
-                Aplicar
+                {t("shared.ui.apply")}
               </Button>
             </div>
           </div>

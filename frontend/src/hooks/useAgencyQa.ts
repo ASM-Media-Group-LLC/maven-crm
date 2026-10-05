@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getPublicBaseUrl } from "@/lib/getPublicUrl";
 import { supabase } from "@/integrations/supabase/client";
+import { traducir, type TranslationKey } from "@/lib/i18n";
 import {
   buildQaEmailHtml,
   buildQaEmailSubject,
@@ -26,7 +27,8 @@ export interface QaModel {
 
 export interface QaCloser {
   id: string;
-  name: string;
+  /** null = el perfil no tiene nombre: la pantalla pone «Sin nombre» en su idioma. */
+  name: string | null;
   active: boolean;
   created_at: string;
 }
@@ -199,7 +201,7 @@ export const useTranscribeAudio = () =>
             // body no era JSON, dejamos detail null
           }
         }
-        throw new Error(detail ?? error.message ?? "Error al transcribir.");
+        throw new Error(detail ?? error.message ?? traducir("agencyQa.err.transcribe"));
       }
       const payload = data as {
         text?: string;
@@ -263,7 +265,7 @@ export const useAnalyzeQaCall = () => {
             // body no era JSON parseable, dejamos detail null
           }
         }
-        throw new Error(detail ?? error.message ?? "Error al analizar.");
+        throw new Error(detail ?? error.message ?? traducir("agencyQa.err.analyze"));
       }
       if ((data as { error?: string })?.error) {
         throw new Error((data as { error: string }).error);
@@ -546,7 +548,7 @@ export const useReprocessQaCall = () => {
       const { data: row, error: rErr } = await sb
         .from("qa_calls").select("id, audio_path, transcript").eq("id", callId).single();
       if (rErr) throw rErr;
-      if (!row?.audio_path) throw new Error("La QA no tiene audio para procesar.");
+      if (!row?.audio_path) throw new Error(traducir("agencyQa.err.noAudio"));
       await sb.from("qa_calls").update({ status: "processing", error_message: null }).eq("id", callId);
       try {
         let transcript: string | null = (row.transcript as string | null) || null;
@@ -558,6 +560,8 @@ export const useReprocessQaCall = () => {
           const p = tr as { text?: string; audio_metrics?: unknown; error?: string };
           if (p?.error) throw new Error(p.error);
           transcript = (p?.text ?? "").trim();
+          // En español a propósito: este mensaje termina en qa_calls.error_message (lo
+          // guarda el catch de abajo) y lo lee cualquiera en QA History, como los de la edge.
           if (!transcript) throw new Error("La transcripción está vacía. ¿El audio tiene voz audible?");
           await sb.from("qa_calls").update({ transcript, audio_metrics: p?.audio_metrics ?? null }).eq("id", callId);
         }
@@ -612,7 +616,7 @@ export const useUpsertQaCloser = () =>
   useMutation({
     mutationFn: async (name: string): Promise<string> => {
       const trimmed = name.trim();
-      if (!trimmed) throw new Error("Nombre del closer vacío.");
+      if (!trimmed) throw new Error(traducir("agencyQa.err.emptyCloser"));
       const { data: existing, error: lookupErr } = await sb
         .from("profiles")
         .select("id")
@@ -620,7 +624,7 @@ export const useUpsertQaCloser = () =>
         .maybeSingle();
       if (lookupErr) throw lookupErr;
       if (!existing?.id) {
-        throw new Error(`No existe un user con nombre "${trimmed}". Créalo en Settings → Administración → Usuarios.`);
+        throw new Error(traducir("agencyQa.err.noSuchUser", { name: trimmed }));
       }
       return existing.id as string;
     },
@@ -644,7 +648,7 @@ export const useUpsertQaModel = () =>
   useMutation({
     mutationFn: async (input: UpsertQaModelInput): Promise<string> => {
       const trimmed = input.name.trim();
-      if (!trimmed) throw new Error("Nombre de la modelo vacío.");
+      if (!trimmed) throw new Error(traducir("agencyQa.err.emptyModel"));
 
       // Si tenemos model_id (vino del combobox de models canónicos),
       // priorizamos ese match — un qa_model linkeado a ese model.
@@ -1089,11 +1093,12 @@ export const useQaClosers = () =>
       return ((data ?? []) as any[])
         .map((r) => ({
           id: r.user_id as string,
-          name: (r.profiles?.full_name as string) ?? "Sin nombre",
+          // Sin nombre → null y la pantalla pone «Sin nombre» en su idioma (y ordena por lo que muestra).
+          name: (r.profiles?.full_name as string | null | undefined) ?? null,
           active: true,
           created_at: (r.profiles?.created_at as string) ?? new Date().toISOString(),
         }))
-        .sort((a, b) => a.name.localeCompare(b.name));
+        .sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
     },
   });
 
@@ -1275,13 +1280,15 @@ export const scoreColor = (score: number | null): string => {
   return "rgb(220 38 38)";
 };
 
+// La clave (cerro / no_cerro / en_espera) es el call_outcome que guarda la IA en
+// claude_analysis: es dato y no se traduce. La etiqueta sale del diccionario.
 export const OUTCOME_META: Record<
-  Exclude<CallOutcome, null | string>,
-  { label: string; bg: string; icon: string }
+  "cerro" | "no_cerro" | "en_espera",
+  { labelKey: TranslationKey; bg: string; icon: string }
 > = {
-  cerro:     { label: "Exitoso",   bg: "rgb(22 163 74)",  icon: "✓" },
-  no_cerro:  { label: "Rechazado", bg: "rgb(220 38 38)",  icon: "✗" },
-  en_espera: { label: "En espera", bg: "rgb(202 138 4)",  icon: "⏳" },
+  cerro:     { labelKey: "agencyQa.outcome.closed",    bg: "rgb(22 163 74)",  icon: "✓" },
+  no_cerro:  { labelKey: "agencyQa.outcome.notClosed", bg: "rgb(220 38 38)",  icon: "✗" },
+  en_espera: { labelKey: "agencyQa.outcome.waiting",   bg: "rgb(202 138 4)",  icon: "⏳" },
 };
 
 // ─── QA Config (notificaciones globales) ──────────────────────────────
@@ -1376,7 +1383,7 @@ const fireQaWebhookInBackground = async ({ callId }: FireInput): Promise<void> =
     closer: { name: string } | null;
   }) | null;
 
-  if (!call) throw new Error("QA call no encontrada para webhook.");
+  if (!call) throw new Error(traducir("agencyQa.err.callNotFound"));
   if (!config) return;
 
   const score = call.claude_score ?? call.claude_analysis?.overall_score ?? 0;
@@ -1398,6 +1405,8 @@ const fireQaWebhookInBackground = async ({ callId }: FireInput): Promise<void> =
   // forma de mandar el email — abortamos.
   if (recipients.length === 0 && !uploaderUserId) return;
 
+  // El correo sale en español siempre (qaEmailTemplate.ts): lo lee el closer y los
+  // destinatarios, no quien apretó "Reenviar". Por eso los "(sin nombre)" de aquí.
   const a = call.claude_analysis ?? {};
   const outcome = (a.call_outcome as string | null) ?? null;
   const emailPayload: QaEmailPayload = {
@@ -1450,7 +1459,7 @@ const fireQaWebhookInBackground = async ({ callId }: FireInput): Promise<void> =
   );
   if (mailError) {
     throw new Error(
-      (mailError as Error).message ?? "send-notification-email falló",
+      (mailError as Error).message ?? traducir("agencyQa.err.sendFailed"),
     );
   }
 };
@@ -1542,7 +1551,7 @@ export const useCreateQaChatSession = () => {
       const { data: userRes, error: userErr } = await supabase.auth.getUser();
       if (userErr) throw userErr;
       const userId = userRes.user?.id;
-      if (!userId) throw new Error("No hay sesión activa.");
+      if (!userId) throw new Error(traducir("agencyQa.err.noSession"));
       // tenant_id se autocompleta vía DEFAULT current_tenant_id() en la
       // tabla. user_id sí lo seteamos explícito porque la RLS pide
       // user_id = auth.uid() en el WITH CHECK.
@@ -1628,7 +1637,7 @@ export const useSendQaChatMessage = () => {
               // body no era JSON
             }
           }
-          assistantError = detail ?? invokeErr.message ?? "Clari no respondió.";
+          assistantError = detail ?? invokeErr.message ?? traducir("agencyQa.err.noReply");
         } else if ((invokeData as { error?: string })?.error) {
           assistantError = (invokeData as { error: string }).error;
         } else {
@@ -1636,7 +1645,7 @@ export const useSendQaChatMessage = () => {
             (invokeData as { message?: QaChatMessage })?.message ?? null;
         }
       } catch (err) {
-        assistantError = (err as Error).message ?? "Clari no respondió.";
+        assistantError = (err as Error).message ?? traducir("agencyQa.err.noReply");
       }
 
       return { user: userMsg as QaChatMessage, assistant, assistantError };

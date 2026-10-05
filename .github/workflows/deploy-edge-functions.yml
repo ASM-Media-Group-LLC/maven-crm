@@ -70,6 +70,37 @@ jobs:
           # autenticado (5000 req/h en vez de 60) y deja de ser una lotería.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          # Pinneada por la misma razón que la CLI de arriba: reproducible, y sin
+          # depender de resolver "latest" contra una API externa en cada deploy.
+          deno-version: 2.9.5
+
+      # ⚠️ GUARD DE SEGURIDAD — aislamiento entre agencias del API pública.
+      # public-api corre con service_role (salta la RLS): la única pared entre
+      # agencias es lo que el código filtre. Este test falla si alguien agrega una
+      # tabla o un endpoint sin declarar cómo aísla, si promueve un recurso a
+      # "aislado" sin arreglar el dato, o si se pierde un filtro. Si falla, NO se
+      # despliega nada, a propósito: prod se queda con el código anterior, que es
+      # mucho mejor que desplegar una fuga de datos entre clientes.
+      # Corre SIEMPRE, no solo cuando cambia public-api: un cambio en _shared/
+      # también la redespliega.
+      # Desde el 24/09 también cubre lo que ACTÚA COMO usuario (la sesión fabricada,
+      # /me, que esos handlers nunca vean service_role) y el límite por hora.
+      - name: Guard — aislamiento entre agencias
+        run: deno test --allow-read --no-check supabase/functions/public-api/ supabase/functions/manage-api-keys/ supabase/functions/messenger-webhooks/
+
+      # Mismo criterio: si la salida de los webhooks deja de bloquear lo que tiene
+      # que bloquear, no se despliega nada.
+      - name: Guard — salida de los webhooks
+        run: deno test --allow-read supabase/functions/_shared/webhook-salida.test.ts
+
+      # Y el push del Messenger: si deja de armar bien el título, el cuerpo o a quién
+      # le llega, tampoco se despliega nada (la misma guarda que en el PR).
+      - name: Guard — web-push
+        run: deno test --allow-read supabase/functions/web-push/ supabase/functions/_shared/push-notify.test.ts
+
       - name: Determinar qué deployar
         id: changes
         run: |
@@ -98,7 +129,29 @@ jobs:
           fi
 
           # Nombre de cada función cambiada = primer segmento tras supabase/functions/
-          FUNCS="$(echo "$CHANGED" | sed -n 's#^supabase/functions/\([^/]*\)/.*#\1#p' | sort -u | grep -v '^_' | tr '\n' ' ')"
+          #
+          # ⚠️ El `|| true` del grep NO es cosmético. `grep` sale con 1 cuando no
+          # selecciona ninguna línea, y con `set -euo pipefail` eso tiraba el paso
+          # entero justo en el caso "no hay nada que desplegar": un diff sin
+          # funciones (solo cambió este workflow) o con solo carpetas `_` que no
+          # son `_shared` (p. ej. `_tests/`). Estuvo roto desde siempre y nadie lo
+          # vio porque casi nunca cambia el workflow solo; salió al mergear #1935
+          # con un "Run failed" falso y sin desplegar nada.
+          FUNCS="$(echo "$CHANGED" | sed -n 's#^supabase/functions/\([^/]*\)/.*#\1#p' | sort -u | { grep -v '^_' || true; } | tr '\n' ' ')"
+
+          # IMPORTS CRUZADOS: el bundle de una función lleva una COPIA de lo que importa
+          # de otra carpeta. Si cambia la carpeta importada, hay que redesplegar también
+          # a las que la importan; si no, siguen corriendo el código viejo. La tabla la
+          # verifica messenger-webhooks/estructura.test.ts: un import cruzado nuevo sin
+          # su regla acá rompe el guard.
+          #   public-api/        → messenger-webhooks (el feed como la persona) y
+          #                        manage-api-keys (vía _shared/webhook-salida.ts)
+          #   parrilla-generate/ → parrilla-weekly
+          # (here-string y no `echo | grep -q`: con pipefail, un SIGPIPE del echo haría
+          # que el if diera falso y la regla no se aplicara)
+          if grep -q '^supabase/functions/public-api/' <<< "$CHANGED"; then FUNCS="$FUNCS messenger-webhooks manage-api-keys"; fi
+          if grep -q '^supabase/functions/parrilla-generate/' <<< "$CHANGED"; then FUNCS="$FUNCS parrilla-weekly"; fi
+          FUNCS="$(echo $FUNCS | tr ' ' '\n' | sort -u | { grep -v '^$' || true; } | tr '\n' ' ')"
           echo "Funciones cambiadas: [$FUNCS]"
           echo "deploy_all=false" >> "$GITHUB_OUTPUT"
           echo "funcs=$FUNCS" >> "$GITHUB_OUTPUT"
@@ -125,14 +178,47 @@ jobs:
             exit 0
           fi
           echo "Funciones a deployar:$FUNCS"
+
+          # ⚠️ REINTENTO ante fallas pasajeras del runner. El 24/09 (PR #1912)
+          # `manage-api-keys` murió con "failed to bundle function: exit 125":
+          # Docker no pudo arrancar el contenedor que empaqueta la función. No
+          # era el código — la función siguiente bajó la misma imagen y salió
+          # bien en la misma corrida —, pero el deploy quedó rojo y hubo que
+          # re-ejecutarlo a mano, con prod dos minutos a medio desplegar.
+          #
+          # Se reintenta CUALQUIER falla, no solo el 125: una caída de la API de
+          # Supabase también es pasajera, y un error de código de verdad falla
+          # igual los tres intentos y se reporta como antes. Redesplegar la
+          # misma función es idempotente.
+          #
+          # Si sale en el 2º o 3º intento queda un ::warning:: en el resumen:
+          # la inestabilidad tiene que VERSE aunque el deploy termine verde.
+          deploy_con_reintento() {
+            local fn="$1" intento espera
+            for intento in 1 2 3; do
+              if supabase functions deploy "$fn" --project-ref "$PROJECT_REF"; then
+                if [ "$intento" -gt 1 ]; then
+                  echo "::warning::$fn se desplegó en el intento $intento (hubo una falla pasajera antes)"
+                fi
+                return 0
+              fi
+              if [ "$intento" -lt 3 ]; then
+                espera=$((intento * 15))
+                echo "::warning::Falló el deploy de $fn (intento $intento de 3) — reintento en ${espera}s"
+                sleep "$espera"
+              fi
+            done
+            return 1
+          }
+
           FAILED=""
           for fn in $FUNCS; do
             if [ ! -f "supabase/functions/$fn/index.ts" ]; then
               echo "skip $fn (sin supabase/functions/$fn/index.ts)"; continue
             fi
             echo "== Deploy $fn =="
-            if ! supabase functions deploy "$fn" --project-ref "$PROJECT_REF"; then
-              echo "::error::Falló el deploy de $fn"
+            if ! deploy_con_reintento "$fn"; then
+              echo "::error::Falló el deploy de $fn tras 3 intentos"
               FAILED="$FAILED $fn"
             fi
           done

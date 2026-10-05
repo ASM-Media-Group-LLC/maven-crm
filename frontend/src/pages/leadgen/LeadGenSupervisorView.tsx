@@ -9,6 +9,7 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { LeadGenEntry, LeadGenQA } from "./useLeadGen";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface Props {
   leads: LeadGenEntry[];
@@ -16,6 +17,7 @@ interface Props {
 }
 
 const LeadGenSupervisorView = ({ leads, profiles }: Props) => {
+  const { t } = useLanguage();
   // Fetch QA reviews for the displayed entries
   const entryIds = useMemo(() => leads.map(l => l.id), [leads]);
 
@@ -42,9 +44,9 @@ const LeadGenSupervisorView = ({ leads, profiles }: Props) => {
 
   const profilesMap = useMemo(() => {
     const map: Record<string, string> = {};
-    profiles.forEach(p => { map[p.id] = p.full_name || "Sin nombre"; });
+    profiles.forEach(p => { map[p.id] = p.full_name || t("leadgen.noName"); });
     return map;
-  }, [profiles]);
+  }, [profiles, t]);
 
   // Group QA by supervisor
   const supervisorStats = useMemo(() => {
@@ -77,15 +79,15 @@ const LeadGenSupervisorView = ({ leads, profiles }: Props) => {
       <div className="rounded-lg border overflow-hidden bg-gradient-to-br from-primary/15 via-primary/10 to-primary/5 border-l-[3px] border-l-primary">
         <div className="p-6 flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-semibold text-primary">Actividad de Supervisores</h3>
+            <h3 className="text-lg font-semibold text-primary">{t("leadgen.sup.title")}</h3>
             <p className="text-sm text-muted-foreground mt-1">
-              QA reviews realizadas en el período seleccionado
+              {t("leadgen.sup.subtitle")}
             </p>
           </div>
           <div className="flex items-center gap-3 text-right">
             <div>
               <p className="text-3xl font-bold text-primary">{qaReviews.length}</p>
-              <p className="text-xs text-muted-foreground">Reviews Totales</p>
+              <p className="text-xs text-muted-foreground">{t("leadgen.sup.totalReviews")}</p>
             </div>
             <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
               <Shield className="h-5 w-5 text-primary" />
@@ -124,7 +126,7 @@ const LeadGenSupervisorView = ({ leads, profiles }: Props) => {
               {supervisorStats.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">
-                    No hay reviews de QA en este período
+                    {t("leadgen.sup.empty")}
                   </TableCell>
                 </TableRow>
               )}

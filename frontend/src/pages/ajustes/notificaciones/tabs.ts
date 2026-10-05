@@ -1,12 +1,13 @@
 import { Settings, Bell, Radio, BarChart3, FileText, Moon } from "lucide-react";
 
+// `id` viaja en la URL (?tab=…): es dato y no se traduce. Lo que se ve es `labelKey`.
 export const TABS = [
-  { id: "general", label: "General", icon: Settings },
-  { id: "canales", label: "Canales", icon: Radio },
-  { id: "eventos", label: "Eventos", icon: Bell },
-  { id: "prioridad", label: "Prioridad", icon: BarChart3 },
-  { id: "resumenes", label: "Resúmenes", icon: FileText },
-  { id: "no-molestar", label: "No Molestar", icon: Moon },
+  { id: "general", labelKey: "settings.notif.tab.general", icon: Settings },
+  { id: "canales", labelKey: "settings.notif.tab.channels", icon: Radio },
+  { id: "eventos", labelKey: "settings.notif.tab.events", icon: Bell },
+  { id: "prioridad", labelKey: "settings.notif.tab.priority", icon: BarChart3 },
+  { id: "resumenes", labelKey: "settings.notif.tab.digests", icon: FileText },
+  { id: "no-molestar", labelKey: "settings.notif.tab.dnd", icon: Moon },
 ] as const;
 
 export type TabId = (typeof TABS)[number]["id"];

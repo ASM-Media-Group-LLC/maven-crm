@@ -8,6 +8,7 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface Props {
   creatorId: string;
@@ -16,6 +17,7 @@ interface Props {
 }
 
 const VerificationSection = ({ creatorId, creatorName, currentStatus }: Props) => {
+  const { t } = useLanguage();
   const { role } = useUserRole();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -47,7 +49,7 @@ const VerificationSection = ({ creatorId, creatorName, currentStatus }: Props) =
         });
       }
 
-      // Notification
+      // La notificación se GUARDA y la leen otras personas: queda en español.
       await supabase.from("notifications").insert({
         type: "verification_approved",
         title: "Verificación aprobada",
@@ -62,9 +64,9 @@ const VerificationSection = ({ creatorId, creatorName, currentStatus }: Props) =
 
       qc.invalidateQueries({ queryKey: ["creator", creatorId] });
       qc.invalidateQueries({ queryKey: ["creators"] });
-      toast({ title: "Verificación aprobada", description: `${creatorName} ahora está activa.` });
+      toast({ title: t("creadores.verify.approved"), description: t("creadores.verify.approvedDesc", { name: creatorName }) });
     } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      toast({ title: t("common.error"), description: err.message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -72,7 +74,7 @@ const VerificationSection = ({ creatorId, creatorName, currentStatus }: Props) =
 
   const handleReject = async () => {
     if (!rejectReason.trim()) {
-      toast({ title: "Motivo requerido", description: "Escribe un motivo para el rechazo.", variant: "destructive" });
+      toast({ title: t("creadores.verify.reasonRequired"), description: t("creadores.verify.reasonRequiredDesc"), variant: "destructive" });
       return;
     }
     setLoading(true);
@@ -107,11 +109,11 @@ const VerificationSection = ({ creatorId, creatorName, currentStatus }: Props) =
 
       qc.invalidateQueries({ queryKey: ["creator", creatorId] });
       qc.invalidateQueries({ queryKey: ["creators"] });
-      toast({ title: "Verificación rechazada", description: "El estado volvió a borrador." });
+      toast({ title: t("creadores.verify.rejected"), description: t("creadores.verify.rejectedDesc") });
       setRejecting(false);
       setRejectReason("");
     } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      toast({ title: t("common.error"), description: err.message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -122,27 +124,27 @@ const VerificationSection = ({ creatorId, creatorName, currentStatus }: Props) =
       <CardContent className="p-4 space-y-3">
         <div className="flex items-center gap-2">
           <AlertTriangle className="h-5 w-5 text-warning" />
-          <h3 className="font-semibold text-sm">Verificación Pendiente</h3>
+          <h3 className="font-semibold text-sm">{t("creadores.verify.pending")}</h3>
         </div>
         <p className="text-sm text-muted-foreground">
-          Esta creadora completó el onboarding y requiere aprobación para activarse.
+          {t("creadores.verify.pendingDesc")}
         </p>
 
         {!rejecting ? (
           <div className="flex gap-2">
             <Button size="sm" onClick={handleApprove} disabled={loading} className="bg-success hover:bg-success/90 text-success-foreground">
               {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
-              Aprobar Verificación
+              {t("creadores.verify.approve")}
             </Button>
             <Button size="sm" variant="destructive" onClick={() => setRejecting(true)} disabled={loading}>
               <ShieldX className="mr-2 h-4 w-4" />
-              Rechazar
+              {t("creadores.verify.reject")}
             </Button>
           </div>
         ) : (
           <div className="space-y-2">
             <Textarea
-              placeholder="Motivo del rechazo (ej. Foto borrosa, documentos incompletos...)"
+              placeholder={t("creadores.verify.reasonPh")}
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}
               rows={2}
@@ -150,10 +152,10 @@ const VerificationSection = ({ creatorId, creatorName, currentStatus }: Props) =
             <div className="flex gap-2">
               <Button size="sm" variant="destructive" onClick={handleReject} disabled={loading}>
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Confirmar Rechazo
+                {t("creadores.verify.confirmReject")}
               </Button>
               <Button size="sm" variant="outline" onClick={() => { setRejecting(false); setRejectReason(""); }} disabled={loading}>
-                Cancelar
+                {t("common.cancel")}
               </Button>
             </div>
           </div>

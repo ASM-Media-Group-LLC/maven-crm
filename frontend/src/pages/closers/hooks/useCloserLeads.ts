@@ -7,6 +7,8 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { useToast } from "@/hooks/use-toast";
 import { normalizeHandle } from "@/lib/handle-utils";
 import { celebrateClose } from "@/lib/celebrateClose";
+import { useLanguage } from "@/hooks/useLanguage";
+import { traducir, type TranslationKey } from "@/lib/i18n";
 
 export interface ContactNote {
   contact_date: string;
@@ -65,12 +67,27 @@ export const CLOSER_STAGES = [
   "No interesada",
 ] as const;
 
-export const STAGE_LABELS: Record<string, string> = {
-  Nuevo: "Nuevo",
-  Asignada: "Asignada",
-  Confirmada: "Confirmada",
-  Completada: "Completada",
-  "No interesada": "No interesada",
+// Cómo se MUESTRA cada etapa. La llave es el valor guardado en
+// closer_creators.stage (dato, en español, no se traduce); lo que cambia con el
+// idioma es solo la etiqueta. Una etapa que no está acá se muestra tal cual.
+const STAGE_LABEL_KEYS: Record<string, TranslationKey> = {
+  Nuevo: "closers.stage.new",
+  Asignada: "closers.stage.assigned",
+  "En negociación": "closers.stage.negotiating",
+  "Formulario enviado": "closers.stage.formSent",
+  "Acuerdo enviado": "closers.stage.agreementSent",
+  Confirmada: "closers.stage.confirmed",
+  Completada: "closers.stage.completed",
+  "No interesada": "closers.stage.notInterested",
+};
+
+/** Traductor mínimo: sirve `t` de useLanguage() o `traducir`. */
+export type Traductor = (key: TranslationKey, params?: Record<string, string | number>) => string;
+
+export const stageLabel = (t: Traductor, stage: string | null | undefined): string => {
+  if (!stage) return "";
+  const key = STAGE_LABEL_KEYS[stage];
+  return key ? t(key) : stage;
 };
 
 export const TAB_STAGE_MAP: Record<string, string[]> = {
@@ -87,13 +104,13 @@ export const TAB_STAGE_MAP: Record<string, string[]> = {
 // Filtro de ORIGEN / línea de negocio (reemplaza los viejos tabs Ex-creadores /
 // Agencias / Ventas). Cada opción se traduce a un filtro sobre los LEADS
 // (closer_creators) y, cuando corresponde, sobre el DIRECTORIO (closers_contacts).
-export const ORIGIN_FILTERS: { value: string; label: string }[] = [
+export const ORIGIN_FILTERS: { value: string; labelKey: TranslationKey }[] = [
   // "target" = las modelos que BUSCAMOS reclutar (prospectos), no creadoras
   // activas de la agencia. El value "modelos" es la llave interna, no se toca.
-  { value: "modelos", label: "Modelos target" },
-  { value: "ex_creadora", label: "Ex-creadoras" },
-  { value: "agencia", label: "Agencias" },
-  { value: "venta_plataforma", label: "Ventas de plataforma" },
+  { value: "modelos", labelKey: "closers.origin.models" },
+  { value: "ex_creadora", labelKey: "closers.origin.exCreators" },
+  { value: "agencia", labelKey: "closers.agencies" },
+  { value: "venta_plataforma", labelKey: "closers.origin.platformSales" },
 ];
 
 // Escala de categoría canónica para el filtro. Los datos tienen casing sucio
@@ -125,12 +142,23 @@ const B2B_SOURCE = "agencia";
 //                 (suscripción mensual).
 //   agencias    → B2B: venderle producto a una agencia externa (suscripción).
 export type BusinessLine = "kash" | "plataformas" | "agencias";
-export const BUSINESS_LINES: { value: BusinessLine | "todo"; label: string }[] = [
-  { value: "todo", label: "Todo" },
-  { value: "kash", label: "Kash" },
-  { value: "plataformas", label: "Plataformas" },
-  { value: "agencias", label: "Agencias" },
+export const BUSINESS_LINES: { value: BusinessLine | "todo"; labelKey: TranslationKey }[] = [
+  { value: "todo", labelKey: "closers.line.all" },
+  { value: "kash", labelKey: "closers.line.kash" },
+  { value: "plataformas", labelKey: "closers.platforms" },
+  { value: "agencias", labelKey: "closers.agencies" },
 ];
+
+// Las cards de revenue del dashboard: la LLAVE ("Rev. OnlyFans"…) es la que
+// viaja al popup y la que compara useClosersKpiPopup para saber qué traer, así
+// que no se traduce. Esto es solo la etiqueta que se muestra.
+export const REVENUE_KPI_LABEL_KEYS: Record<string, TranslationKey> = {
+  "Rev. OnlyFans": "closers.rev.onlyfans",
+  "Rev. Plataformas": "closers.rev.platforms",
+  "Rev. Suscripciones": "closers.rev.subscriptions",
+  "Rev. Agencias": "closers.rev.agencies",
+  "Rev. Total": "closers.rev.total",
+};
 
 export const businessLineOf = (leadSource: string | null, dealType: string | null): BusinessLine => {
   if ((leadSource || "maven") === B2B_SOURCE) return "agencias";
@@ -159,28 +187,54 @@ const EMPTY_SUBSCRIPTION_REVENUE: { total: number; byPlatform: Record<string, nu
   byPlatform: {},
 };
 
+// Llave del desglose por plataforma para las filas sin plataforma. Es DATO (se
+// usa como clave del mapa y viaja al popup); para mostrarla, platformLabel().
+export const NO_PLATFORM = "Sin plataforma";
+
 export const canonicalPlatform = (raw?: string | null): string => {
   const name = (raw || "").trim();
-  if (!name) return "Sin plataforma";
+  if (!name) return NO_PLATFORM;
   return PLATFORM_CANON.get(name.toLowerCase()) ?? name;
 };
+
+/** Nombre de plataforma para mostrar. Los nombres son marcas y van tal cual;
+ *  solo se traducen los dos valores genéricos ("Otra", "Sin plataforma"). */
+export const platformLabel = (t: Traductor, platform: string): string =>
+  platform === "Otra" ? t("closers.platformOther")
+    : platform === NO_PLATFORM ? t("closers.noPlatform")
+    : platform;
 export const CHANNELS = ["Instagram", "WhatsApp", "Telegram"] as const;
+// Resultado de un contacto: el VALOR se guarda en closer_contact_history.result
+// (y lo leen las RPC de actividad), así que queda en español. Se traduce la
+// etiqueta con resultLabel().
 export const RESULTS = ["Contestó", "No contestó", "Interesada", "No interesada", "Pendiente"] as const;
+const RESULT_LABEL_KEYS: Record<string, TranslationKey> = {
+  "Contestó": "closers.result.answered",
+  "No contestó": "closers.result.noAnswer",
+  Interesada: "closers.result.interested",
+  "No interesada": "closers.result.notInterested",
+  Pendiente: "closers.result.pending",
+};
+export const resultLabel = (t: Traductor, result: string | null | undefined): string => {
+  if (!result) return "";
+  const key = RESULT_LABEL_KEYS[result];
+  return key ? t(key) : result;
+};
 
 // Motivo estructurado al cerrar un lead (stage → "No interesada"). El code se
 // guarda en closer_creators.close_reason_code; el detalle libre sigue en
 // rejection_reason. Alimenta el embudo de reclutamiento (drop-off por motivo).
-export const CLOSE_REASONS: { code: string; label: string }[] = [
-  { code: "no_factura_of", label: "No factura en OnlyFans" },
-  { code: "categoria_baja", label: "No cumple requisitos / categoría baja" },
-  { code: "dejo_de_responder", label: "Dejó de responder" },
-  { code: "sin_whatsapp", label: "Número sin WhatsApp / inválido" },
-  { code: "ya_con_agencia", label: "Ya trabaja con otra agencia" },
-  { code: "no_interesada", label: "No le interesa" },
-  { code: "otro", label: "Otro (ver detalle)" },
+export const CLOSE_REASONS: { code: string; labelKey: TranslationKey }[] = [
+  { code: "no_factura_of", labelKey: "closers.closeReason.noOfRevenue" },
+  { code: "categoria_baja", labelKey: "closers.closeReason.lowCategory" },
+  { code: "dejo_de_responder", labelKey: "closers.closeReason.stoppedResponding" },
+  { code: "sin_whatsapp", labelKey: "closers.closeReason.noWhatsapp" },
+  { code: "ya_con_agencia", labelKey: "closers.closeReason.otherAgency" },
+  { code: "no_interesada", labelKey: "closers.closeReason.notInterested" },
+  { code: "otro", labelKey: "closers.closeReason.other" },
 ];
-export const CLOSE_REASON_LABELS: Record<string, string> = Object.fromEntries(
-  CLOSE_REASONS.map((r) => [r.code, r.label]),
+export const CLOSE_REASON_LABEL_KEYS: Record<string, TranslationKey> = Object.fromEntries(
+  CLOSE_REASONS.map((r) => [r.code, r.labelKey]),
 );
 
 // Cadencia de contactos (días acumulados): el 1er contacto se espera 1 día
@@ -276,6 +330,7 @@ const PAGE_SIZE = 50;
 
 export const useCloserLeads = () => {
   const { toast } = useToast();
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { isAdmin, isManager, isSupervisor, role } = useUserRole();
@@ -589,7 +644,9 @@ export const useCloserLeads = () => {
           : Promise.resolve({ data: [] }),
       ]);
       const profilesMap: Record<string, string> = {};
-      for (const p of profilesRes.data || []) profilesMap[(p as any).id] = (p as any).full_name || "Sin nombre";
+      // "" = el perfil existe pero no tiene nombre: la etiqueta "Sin nombre" se
+      // pone al armar la fila (en el idioma de la pantalla, no en el del cache).
+      for (const p of profilesRes.data || []) profilesMap[(p as any).id] = (p as any).full_name || "";
       const contactCountMap: Record<string, number> = {};
       const contactNotesMap: Record<string, ContactNote[]> = {};
       for (const h of historyRes.data || []) {
@@ -612,6 +669,8 @@ export const useCloserLeads = () => {
     const contactCountMap = enrichment?.contactCountMap ?? {};
     const contactNotesMap = enrichment?.contactNotesMap ?? {};
     const sourceContactMap = enrichment?.sourceContactMap ?? {};
+    const agentNameOf = (id: string | null): string | null =>
+      id && id in profilesMap ? (profilesMap[id] || t("closers.noName")) : null;
     return rawRows.map((c: any) => ({
       ...c,
       leadgen_entry_id: c.leadgen_entry_id ?? null,
@@ -619,7 +678,7 @@ export const useCloserLeads = () => {
       agency_commission: c.agency_commission ?? 0,
       extras: c.extras ?? 0,
       main_platform: c.main_platform ?? null,
-      agent_name: c.assigned_to ? (profilesMap[c.assigned_to] || null) : (c.created_by ? (profilesMap[c.created_by] || null) : null),
+      agent_name: agentNameOf(c.assigned_to ?? c.created_by ?? null),
       contact_count: contactCountMap[c.id] || 0,
       contact_notes: contactNotesMap[c.id] || [],
       source_contact_id: c.source_contact_id ?? null,
@@ -627,7 +686,7 @@ export const useCloserLeads = () => {
       _source: "closer" as const,
       _lg_status: null,
     }));
-  }, [rawRows, enrichment]);
+  }, [rawRows, enrichment, t]);
 
   // Los 4 queries de KPI respetan dateFrom/dateTo cuando dateField =
   // "passed_date" — match con lo que hace el listado de Operaciones.
@@ -964,7 +1023,7 @@ export const useCloserLeads = () => {
     },
     onError: (e: Error) => {
       queryClient.invalidateQueries({ queryKey: ["closer-creators-list"] });
-      toast({ title: "Error", description: e.message, variant: "destructive" });
+      toast({ title: traducir("common.error"), description: e.message, variant: "destructive" });
     },
   });
 
@@ -1016,10 +1075,15 @@ export const useCloserLeads = () => {
             ? Number(row?.subscription_amount ?? 0)
             : Number(row?.estimated_monetization ?? 0);
           toast({
-            title: row?.instagram_handle ? `🎉 Cerraste a @${row.instagram_handle}` : "🎉 Trato cerrado",
+            title: row?.instagram_handle
+              ? traducir("closers.toast.youClosed", { handle: row.instagram_handle })
+              : traducir("closers.toast.dealClosed"),
             description: monto > 0
-              ? `Pasó a Completada · $${monto.toLocaleString()} ${row?.deal_type === "venta_plataforma" ? "de suscripción" : "de monetización estimada"}.`
-              : "Pasó a Completada.",
+              ? traducir(
+                  row?.deal_type === "venta_plataforma" ? "closers.toast.completedSub" : "closers.toast.completedEst",
+                  { amount: monto.toLocaleString() },
+                )
+              : traducir("closers.toast.completed"),
           });
         }
       }
@@ -1028,7 +1092,7 @@ export const useCloserLeads = () => {
     },
     onError: (e: Error) => {
       queryClient.invalidateQueries({ queryKey: ["closer-creators-list"] });
-      toast({ title: "Error", description: e.message, variant: "destructive" });
+      toast({ title: traducir("common.error"), description: e.message, variant: "destructive" });
     },
   });
 
@@ -1075,16 +1139,16 @@ export const useCloserLeads = () => {
         .from("closer_creators").update(updates).eq("id", id).select("id");
       if (error) throw error;
       if (!updated || updated.length === 0) {
-        throw new Error("No se pudo asignar: la lead ya no existe o no tienes permiso sobre ella.");
+        throw new Error(traducir("closers.err.assignGone"));
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["closer-creators-list"] });
       queryClient.invalidateQueries({ queryKey: ["closer-creators-counts"] });
-      toast({ title: "Creator asignada" });
+      toast({ title: traducir("closers.toast.assigned") });
     },
     onError: (e: Error) => {
-      toast({ title: "Error al asignar", description: e.message, variant: "destructive" });
+      toast({ title: traducir("common.errorAssigning"), description: e.message, variant: "destructive" });
     },
   });
 
@@ -1094,7 +1158,7 @@ export const useCloserLeads = () => {
   // otro la tomó primero, el UPDATE matchea 0 filas → avisamos.
   const claimLead = useMutation({
     mutationFn: async ({ id }: { id: string }) => {
-      if (!user?.id) throw new Error("No hay usuario autenticado");
+      if (!user?.id) throw new Error(traducir("closers.err.noUser"));
 
       // En los tabs Ex-creadores/Agencias las filas son CONTACTOS del directorio,
       // no leads: tomar uno es asignárselo vía RPC (que crea el lead heredando el
@@ -1123,7 +1187,7 @@ export const useCloserLeads = () => {
         .select("id");
       if (error) throw error;
       if (!data || data.length === 0) {
-        throw new Error("Esta lead ya fue tomada por otra persona.");
+        throw new Error(traducir("closers.err.alreadyTaken"));
       }
     },
     onSuccess: () => {
@@ -1134,16 +1198,16 @@ export const useCloserLeads = () => {
       // (ver el filtro neq lead_source=agencia): mandarlas a buscar a "Asignaciones"
       // era mandarlas donde por diseño nunca van a estar.
       toast({
-        title: "Tomada",
+        title: traducir("closers.toast.taken"),
         description: activeTab === "agencias"
-          ? "Quedó asignada a ti, en el tab Agencias."
-          : "Quedó asignada a ti, en Asignaciones.",
+          ? traducir("closers.toast.takenAgencies")
+          : traducir("closers.toast.takenAssigned"),
       });
     },
     onError: (e: Error) => {
       queryClient.invalidateQueries({ queryKey: ["closer-creators-list"] });
       queryClient.invalidateQueries({ queryKey: ["closer-creators-counts"] });
-      toast({ title: "No se pudo tomar", description: e.message, variant: "destructive" });
+      toast({ title: traducir("closers.toast.couldNotTake"), description: e.message, variant: "destructive" });
     },
   });
 

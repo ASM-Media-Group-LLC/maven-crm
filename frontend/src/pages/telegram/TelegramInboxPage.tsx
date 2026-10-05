@@ -549,7 +549,7 @@ const TelegramInboxPage = () => {
               onClick={() => navigate(backNav.backTo!)}
               className="flex items-center gap-1.5 border-b border-border px-4 py-2 text-xs font-medium text-primary hover:bg-muted/50"
             >
-              <ArrowLeft className="h-3.5 w-3.5" /> Volver a {backNav.backLabel || "atrás"}
+              <ArrowLeft className="h-3.5 w-3.5" /> {t("messenger.header.volverA", { name: backNav.backLabel || t("messenger.page.atras") })}
             </button>
           )}
           <div className="relative px-3 pb-2 pt-3">
@@ -820,7 +820,8 @@ const TelegramInboxPage = () => {
                               {showSender ? (
                                 <div className="mb-0.5 text-[11px] font-semibold text-white/85">{firstName(m.sender_user_id)}</div>
                               ) : sentOutsideMaven ? (
-                                <div className="mb-0.5 inline-flex items-center gap-1 rounded bg-white/15 px-1.5 py-0.5 text-[10px] font-medium text-white/90">↗ Externo · fuera de Maven</div>
+                                <div className="mb-0.5 inline-flex items-center gap-1 rounded bg-white/15 px-1.5 py-0.5 text-[10px] font-medium text-white/90">↗ {t("tg.sentOutsideMaven")}</div>
+
                               ) : null}
 
                               {hasQuote && (

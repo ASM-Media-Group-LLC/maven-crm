@@ -2,6 +2,12 @@ import { useEffect } from "react";
 import { getPublicBaseUrl } from "@/lib/getPublicUrl";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+// Avisos y errores de pantalla por traducir() (salen de mutaciones y promesas).
+// El correo del veredicto, el mensaje de compra que se guarda en el chat, la
+// notificación y los criterios originales NO: son dato que lee otra persona.
+import { traducir } from "@/lib/i18n";
+import { useFormato } from "@/hooks/useFormato";
+import type { Formato } from "@/lib/formato";
 import { supabase } from "@/integrations/supabase/client";
 import { buildEmailHtml, buildEmailSubject } from "@/pages/chatter-evaluator/emailTemplate";
 import type {
@@ -123,7 +129,7 @@ export const useCreateChatterProfile = () => {
   return useMutation({
     mutationFn: async (input: ChatterProfileCreate): Promise<ChatterProfile> => {
       const cleanKey = input.key.trim().toLowerCase().replace(/\s+/g, "");
-      if (!cleanKey) throw new Error("La clave interna es obligatoria");
+      if (!cleanKey) throw new Error(traducir("shared.evaluator.keyRequired"));
       // Check uniqueness up-front — gives a friendlier error than the
       // raw Postgres "duplicate key violates unique constraint".
       const { data: existing } = await sb
@@ -131,7 +137,7 @@ export const useCreateChatterProfile = () => {
         .select("id")
         .eq("key", cleanKey)
         .maybeSingle();
-      if (existing) throw new Error("Ya existe un perfil con esa clave");
+      if (existing) throw new Error(traducir("shared.evaluator.keyExists"));
 
       const row = {
         ...input,
@@ -222,7 +228,7 @@ export const useUploadChatterAvatar = () =>
       file: File;
     }): Promise<{ url: string; path: string }> => {
       if (!file.type.startsWith("image/")) {
-        throw new Error("El archivo debe ser una imagen.");
+        throw new Error(traducir("shared.evaluator.mustBeImage"));
       }
       const path = `_avatars/${profileKey}-${Date.now()}-${sanitizeFilename(file.name)}`;
       const { error: upErr } = await supabase.storage
@@ -578,8 +584,8 @@ const monthKeyOf = (d: Date): string =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 // Label legible para el chart: "ene 26", "feb 26"... el año va en YY
 // para no comer ancho cuando hay 12 buckets pegados.
-const monthLabelOf = (d: Date): string => {
-  const month = d.toLocaleString("es-ES", { month: "short" }).replace(".", "");
+const monthLabelOf = (d: Date, f: Formato): string => {
+  const month = d.toLocaleString(f.intl("es-ES"), { month: "short" }).replace(".", "");
   return `${month} ${String(d.getFullYear()).slice(-2)}`;
 };
 
@@ -604,14 +610,17 @@ const startOfMonth = (now: Date): Date => {
 export const useChatterEvaluationStats = (customRange?: {
   from?: Date;
   to?: Date;
-}) =>
-  useQuery({
+}) => {
+  const f = useFormato();
+  return useQuery({
     // Incluímos el rango custom en la queryKey para que React Query refetchee
     // (y recalcule el bucket `custom`) cuando el user cambia las fechas.
+    // El idioma también: las etiquetas de mes ("ene 26") se arman acá adentro.
     queryKey: [
       "chatter-evaluation-stats",
       customRange?.from?.toISOString() ?? null,
       customRange?.to?.toISOString() ?? null,
+      f.idioma,
     ],
     queryFn: async (): Promise<ChatterEvaluationStats> => {
       // Join inverso: cada evaluación trae su sesión y, vía la sesión,
@@ -683,7 +692,7 @@ export const useChatterEvaluationStats = (customRange?: {
       for (let i = 11; i >= 0; i--) {
         const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
         const key = monthKeyOf(d);
-        monthlyMap.set(key, { label: monthLabelOf(d), apto: 0, noApto: 0 });
+        monthlyMap.set(key, { label: monthLabelOf(d, f), apto: 0, noApto: 0 });
         monthlyOrder.push(key);
       }
       const monthlyCutoff = new Date(
@@ -757,6 +766,7 @@ export const useChatterEvaluationStats = (customRange?: {
       };
     },
   });
+};
 
 /**
  * Lista de sesiones para el workspace + header.
@@ -826,7 +836,7 @@ export const useCreateChatterSession = () => {
     mutationFn: async (input: CreateSessionInput): Promise<ChatterSession> => {
       const { data: userData, error: userErr } = await supabase.auth.getUser();
       if (userErr) throw userErr;
-      if (!userData.user) throw new Error("No autenticado");
+      if (!userData.user) throw new Error(traducir("shared.evaluator.notSignedIn"));
 
       const id = genSessionId();
       const examinerUserId = input.examinerUserId ?? userData.user.id;
@@ -886,6 +896,8 @@ export const useCreateChatterSession = () => {
 // del lado server, así que esto es solo para UX.
 export interface ChatterEvaluatorOption {
   user_id: string;
+  /** "" si la persona no tiene nombre: el repuesto ("Sin nombre" / "No name")
+   *  lo pone la pantalla que lo dibuja, en su idioma (NewSessionDialog). */
   full_name: string;
   avatar_url: string | null;
 }
@@ -910,7 +922,7 @@ export const useChatterEvaluators = () =>
         avatar_url: string | null;
       }>).map((row) => ({
         user_id: row.user_id,
-        full_name: row.full_name || "Sin nombre",
+        full_name: row.full_name || "",
         avatar_url: row.avatar_url ?? null,
       }));
     },
@@ -922,7 +934,7 @@ export const useRenameChatterSession = () => {
   return useMutation({
     mutationFn: async ({ id, chatterName }: { id: string; chatterName: string }): Promise<void> => {
       const trimmed = chatterName.trim();
-      if (!trimmed) throw new Error("El nombre no puede estar vacío");
+      if (!trimmed) throw new Error(traducir("shared.evaluator.nameEmpty"));
       const { error } = await sb
         .from("chatter_sessions")
         .update({ chatter_name: trimmed })
@@ -981,7 +993,7 @@ export const useExtendChatterSession = () => {
   return useMutation({
     mutationFn: async ({ id, addMinutes }: { id: string; addMinutes: number }): Promise<void> => {
       if (!Number.isFinite(addMinutes) || addMinutes <= 0) {
-        throw new Error("Minutos inválidos");
+        throw new Error(traducir("shared.evaluator.invalidMinutes"));
       }
       // Read current duration first — Postgres can't do `field = field + n`
       // through PostgREST without a stored function, and we already have a
@@ -1090,7 +1102,7 @@ export const useEditExaminerMessage = () => {
             content_history: Array<{ content: string | null; edited_at: string | null }> | null;
           }
         | null;
-      if (!current) throw new Error("mensaje no encontrado");
+      if (!current) throw new Error(traducir("shared.evaluator.messageNotFound"));
       const history = Array.isArray(current.content_history)
         ? current.content_history
         : [];
@@ -1414,8 +1426,8 @@ const fireWebhookInBackground = async (
     // visual viaja con el deploy normal de Maven, sin tocar nada server-side.
     const recipients = config?.notification_emails ?? [];
     if (recipients.length === 0) {
-      toast.warning("Reporte sin destinatarios", {
-        description: "Configura emails en Admin → Notificaciones.",
+      toast.warning(traducir("shared.evaluator.noRecipients"), {
+        description: traducir("shared.evaluator.noRecipientsDesc"),
       });
       return;
     }
@@ -1429,10 +1441,10 @@ const fireWebhookInBackground = async (
       },
     );
     if (mailError) {
-      toast.warning("Email no enviado", {
+      toast.warning(traducir("shared.evaluator.emailNotSent"), {
         description:
           (mailError as Error).message ??
-          "Falló send-notification-email — la evaluación quedó guardada.",
+          traducir("shared.evaluator.emailNotSentDesc"),
       });
       return;
     }
@@ -1443,11 +1455,11 @@ const fireWebhookInBackground = async (
         sent_at: new Date().toISOString(),
       })
       .eq("id", evaluation.id);
-    toast.success("Reporte enviado", {
-      description: `Email a ${recipients.length} destinatario(s) vía Maven.`,
+    toast.success(traducir("shared.evaluator.reportSent"), {
+      description: traducir("shared.evaluator.reportSentDesc", { count: recipients.length }),
     });
   } catch (e) {
-    toast.warning("Reporte: webhook falló", {
+    toast.warning(traducir("shared.evaluator.webhookFailed"), {
       description: (e as Error).message,
     });
   }
@@ -1461,7 +1473,7 @@ export const useSubmitEvaluation = () => {
     }> => {
       const { data: userData, error: userErr } = await supabase.auth.getUser();
       if (userErr) throw userErr;
-      if (!userData.user) throw new Error("No autenticado");
+      if (!userData.user) throw new Error(traducir("shared.evaluator.notSignedIn"));
 
       // 1) Insert evaluation row
       const row = {
@@ -1555,7 +1567,7 @@ export const useResendChatterEmail = () =>
         .limit(1)
         .maybeSingle();
       if (error) throw error;
-      if (!data) throw new Error("No hay evaluación para esta sesión");
+      if (!data) throw new Error(traducir("shared.evaluator.noEvaluation"));
       await fireWebhookInBackground(data as ChatterEvaluation, sessionId);
     },
   });

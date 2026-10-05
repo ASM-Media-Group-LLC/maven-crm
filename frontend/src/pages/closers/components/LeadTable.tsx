@@ -28,7 +28,8 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel,
 } from "@/components/ui/alert-dialog";
 import { MoreHorizontal, ExternalLink, Loader2, AlertTriangle, Clock, ChevronDown, UserPlus, ShoppingCart, Undo2, ArrowUpDown, StickyNote, Plus, ImagePlus, X } from "lucide-react";
-import { CloserCreatorRow, ContactNote, CLOSER_STAGES, PLATFORMS, CHANNELS, RESULTS, CLOSE_REASONS, CLOSE_REASON_LABELS, isContactOverdue, needsContactDecision, getNextContactDate } from "../hooks/useCloserLeads";
+import { CloserCreatorRow, ContactNote, CLOSER_STAGES, PLATFORMS, CHANNELS, RESULTS, CLOSE_REASONS, CLOSE_REASON_LABEL_KEYS, isContactOverdue, needsContactDecision, getNextContactDate, stageLabel, resultLabel, platformLabel, type Traductor } from "../hooks/useCloserLeads";
+import { useLanguage } from "@/hooks/useLanguage";
 import { useContactHistory } from "../useContactHistory";
 import PlatformSalesPanel from "./PlatformSalesPanel";
 import { format } from "date-fns";
@@ -118,11 +119,15 @@ InlineNumber.displayName = "InlineNumber";
 // un preview legible de hasta 2 líneas (con ícono), y al hacer clic abre un Popover con un
 // Textarea cómodo (multilínea, ⌘/Ctrl+Enter para guardar, Esc para cancelar). Estado vacío
 // con una pista clara ("+ Nota") en vez de un guión mudo.
-const InlineText = memo(({ value, onSave, placeholder = "—", emptyLabel = "Nota", footer, attachments }: {
-  value: string | null; onSave: (v: string | null) => void; placeholder?: string; emptyLabel?: string; footer?: ReactNode;
+const InlineText = memo(({ value, onSave, placeholder = "—", kind = "note", footer, attachments }: {
+  value: string | null; onSave: (v: string | null) => void; placeholder?: string;
+  /** Qué se escribe: una nota o el motivo de cierre (cambia la pista y el placeholder). */
+  kind?: "note" | "reason"; footer?: ReactNode;
   /** Bloque de adjuntos (capturas) que se muestra debajo del recuadro de la nota. */
   attachments?: ReactNode;
 }) => {
+  const { t } = useLanguage();
+  const emptyLabel = kind === "note" ? t("closers.note") : t("closers.reason");
   const [open, setOpen] = useState(false);
   const [text, setText] = useState(value || "");
 
@@ -165,17 +170,17 @@ const InlineText = memo(({ value, onSave, placeholder = "—", emptyLabel = "Not
             }}
             autoFocus
             rows={4}
-            placeholder={`Escribe ${emptyLabel === "Nota" ? "una nota" : "el motivo"}…`}
+            placeholder={kind === "note" ? t("closers.table.writeNote") : t("closers.table.writeReason")}
             className="resize-none rounded-none border-0 text-sm shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
           />
           {footer}
         </div>
         {attachments && <div className="mt-2">{attachments}</div>}
         <div className="mt-2 flex items-center justify-between">
-          <span className="text-[10px] text-muted-foreground">⌘/Ctrl+Enter para guardar · Esc para cancelar</span>
+          <span className="text-[10px] text-muted-foreground">{t("closers.table.saveHint")}</span>
           <div className="flex gap-1.5">
-            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setOpen(false)}>Cancelar</Button>
-            <Button size="sm" className="h-7 px-2 text-xs" onClick={save}>Guardar</Button>
+            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setOpen(false)}>{t("common.cancel")}</Button>
+            <Button size="sm" className="h-7 px-2 text-xs" onClick={save}>{t("common.save")}</Button>
           </div>
         </div>
       </PopoverContent>
@@ -225,12 +230,13 @@ InlineCategorySelect.displayName = "InlineCategorySelect";
 
 // ─── InlineCloseReasonSelect (motivo estructurado de cierre) ───
 const InlineCloseReasonSelect = memo(({ value, onSave }: { value: string | null; onSave: (v: string) => void }) => {
+  const { t } = useLanguage();
   const [open, setOpen] = useState(false);
   return (
     <Popover open={open} onOpenChange={setOpen} modal={true}>
       <PopoverTrigger asChild>
         <button className="cursor-pointer hover:opacity-80 inline-flex items-center gap-1">
-          <Badge variant={value ? "destructive-soft" : "outline"}>{value ? (CLOSE_REASON_LABELS[value] || value) : "—"}</Badge>
+          <Badge variant={value ? "destructive-soft" : "outline"}>{value ? (CLOSE_REASON_LABEL_KEYS[value] ? t(CLOSE_REASON_LABEL_KEYS[value]) : value) : "—"}</Badge>
           <ChevronDown className="h-3 w-3 text-muted-foreground" />
         </button>
       </PopoverTrigger>
@@ -242,7 +248,7 @@ const InlineCloseReasonSelect = memo(({ value, onSave }: { value: string | null;
               className={`text-left text-sm px-2 py-1 rounded cursor-pointer hover:bg-muted ${r.code === value ? "bg-primary/10 font-medium" : ""}`}
               onClick={() => { onSave(r.code); setOpen(false); }}
             >
-              {r.label}
+              {t(r.labelKey)}
             </button>
           ))}
         </div>
@@ -254,6 +260,7 @@ InlineCloseReasonSelect.displayName = "InlineCloseReasonSelect";
 
 // ─── InlineSourceSelect ───
 const InlineSourceSelect = memo(({ value, onSave, options }: { value: string | null; onSave: (v: string | null) => void; options: string[] }) => {
+  const { t } = useLanguage();
   const [open, setOpen] = useState(false);
   const [customMode, setCustomMode] = useState(false);
   const [customText, setCustomText] = useState("");
@@ -288,7 +295,7 @@ const InlineSourceSelect = memo(({ value, onSave, options }: { value: string | n
               ))}
             </div>
             <Button variant="ghost" size="sm" className="w-full text-xs mt-1" onClick={() => setCustomMode(true)}>
-              Otra...
+              {t("closers.table.otherEllipsis")}
             </Button>
           </>
         ) : (
@@ -297,13 +304,13 @@ const InlineSourceSelect = memo(({ value, onSave, options }: { value: string | n
               value={customText}
               onChange={(e) => setCustomText(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") saveCustom(); if (e.key === "Escape") { setCustomMode(false); setCustomText(""); } }}
-              placeholder="Nueva cuenta..."
+              placeholder={t("closers.table.newAccount")}
               autoFocus
               className="h-8 text-sm"
             />
             <div className="flex justify-end gap-1">
-              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { setCustomMode(false); setCustomText(""); }}>Cancelar</Button>
-              <Button size="sm" className="h-7 text-xs" onClick={saveCustom} disabled={!customText.trim()}>Guardar</Button>
+              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { setCustomMode(false); setCustomText(""); }}>{t("common.cancel")}</Button>
+              <Button size="sm" className="h-7 text-xs" onClick={saveCustom} disabled={!customText.trim()}>{t("common.save")}</Button>
             </div>
           </div>
         )}
@@ -315,17 +322,18 @@ InlineSourceSelect.displayName = "InlineSourceSelect";
 
 // ─── InlineStageSelect ───
 const InlineStageSelect = memo(({ value, onSave, disabled }: { value: string; onSave: (v: string) => void; disabled?: boolean }) => {
+  const { t } = useLanguage();
   const [open, setOpen] = useState(false);
   const displayValue = value === "Pendiente LG" ? "Nuevo" : value;
   if (disabled) {
-    return <Badge variant={stageVariant(displayValue)}>{displayValue}</Badge>;
+    return <Badge variant={stageVariant(displayValue)}>{stageLabel(t, displayValue)}</Badge>;
   }
   const stages = [...CLOSER_STAGES];
   return (
     <Popover open={open} onOpenChange={setOpen} modal={true}>
       <PopoverTrigger asChild>
         <button className="inline-flex items-center gap-1 cursor-pointer">
-          <Badge variant={stageVariant(displayValue)}>{displayValue}</Badge>
+          <Badge variant={stageVariant(displayValue)}>{stageLabel(t, displayValue)}</Badge>
           <ChevronDown className="h-3 w-3 text-muted-foreground" />
         </button>
       </PopoverTrigger>
@@ -337,7 +345,7 @@ const InlineStageSelect = memo(({ value, onSave, disabled }: { value: string; on
               className={`cursor-pointer hover:opacity-80 ${s === value ? "ring-2 ring-offset-1 ring-offset-background ring-primary/50 rounded-full" : ""}`}
               onClick={() => { onSave(s); setOpen(false); }}
             >
-              <Badge variant={stageVariant(s)}>{s}</Badge>
+              <Badge variant={stageVariant(s)}>{stageLabel(t, s)}</Badge>
             </button>
           ))}
         </div>
@@ -352,6 +360,7 @@ const ContactCountCell = ({ creatorId, count, isContact }: { creatorId: string; 
   const [open, setOpen] = useState(false);
   const { history, isLoading, addContact, maxReached } = useContactHistory(open ? creatorId : null);
   const { toast } = useToast();
+  const { t } = useLanguage();
   const qc = useQueryClient();
   const [channel, setChannel] = useState("");
   const [result, setResult] = useState("");
@@ -391,10 +400,10 @@ const ContactCountCell = ({ creatorId, count, isContact }: { creatorId: string; 
         setUploading(true);
         try {
           await uploadLeadScreenshots(leadId, shots);
-          toast({ description: `Contacto registrado · ${shots.length} captura${shots.length > 1 ? "s" : ""} adjunta${shots.length > 1 ? "s" : ""}` });
+          toast({ description: t(shots.length > 1 ? "closers.contact.loggedWithShotsMany" : "closers.contact.loggedWithShotsOne", { n: shots.length }) });
           qc.invalidateQueries({ queryKey: ["lead-screenshots", leadId] });
         } catch (e) {
-          toast({ variant: "destructive", title: "Contacto guardado, pero una captura falló", description: (e as Error).message });
+          toast({ variant: "destructive", title: t("closers.contact.shotFailed"), description: (e as Error).message });
         } finally {
           setUploading(false);
         }
@@ -408,7 +417,7 @@ const ContactCountCell = ({ creatorId, count, isContact }: { creatorId: string; 
   return (
     <Popover open={open} onOpenChange={setOpen} modal={true}>
       <PopoverTrigger asChild>
-        <button className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-0.5 text-xs font-semibold cursor-pointer hover:bg-muted/50 transition-colors" title={`${count} de 6 contactos`}>
+        <button className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-0.5 text-xs font-semibold cursor-pointer hover:bg-muted/50 transition-colors" title={t("closers.contact.countOf6", { n: count })}>
           <span className="flex items-center gap-0.5" aria-hidden="true">
             {Array.from({ length: 6 }).map((_, i) => (
               <span
@@ -421,11 +430,11 @@ const ContactCountCell = ({ creatorId, count, isContact }: { creatorId: string; 
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-80 p-3 space-y-3" align="start" side="bottom">
-        <p className="text-sm font-semibold">Historial de contactos</p>
+        <p className="text-sm font-semibold">{t("closers.contact.history")}</p>
         {isLoading ? (
-          <p className="text-xs text-muted-foreground">Cargando...</p>
+          <p className="text-xs text-muted-foreground">{t("common.loading")}</p>
         ) : history.length === 0 ? (
-          <p className="text-xs text-muted-foreground">Sin contactos registrados</p>
+          <p className="text-xs text-muted-foreground">{t("closers.contact.none")}</p>
         ) : (
           <div className="max-h-36 overflow-y-auto space-y-1.5">
             {history.map((h) => (
@@ -434,7 +443,7 @@ const ContactCountCell = ({ creatorId, count, isContact }: { creatorId: string; 
                   <span className="font-medium">{h.channel}</span>
                   <span className="text-muted-foreground">{format(new Date(h.contact_date), "dd/MM/yy")}</span>
                 </div>
-                {h.result && <span className="text-muted-foreground">{h.result}</span>}
+                {h.result && <span className="text-muted-foreground">{resultLabel(t, h.result)}</span>}
                 {h.notes && <p className="text-muted-foreground/70 truncate">{h.notes}</p>}
               </div>
             ))}
@@ -444,28 +453,28 @@ const ContactCountCell = ({ creatorId, count, isContact }: { creatorId: string; 
         {!maxReached && (
           <>
             <div className="border-t border-border pt-2">
-              <p className="text-xs font-medium mb-2">Nuevo contacto</p>
+              <p className="text-xs font-medium mb-2">{t("closers.contact.new")}</p>
               <div className="space-y-2">
                 <div>
-                  <Label className="text-xs">Canal *</Label>
+                  <Label className="text-xs">{t("closers.channelRequired")}</Label>
                   <Select value={channel} onValueChange={setChannel}>
-                    <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+                    <SelectTrigger className="h-8 text-sm"><SelectValue placeholder={t("common.select")} /></SelectTrigger>
                     <SelectContent>
                       {CHANNELS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
-                  <Label className="text-xs">Resultado</Label>
+                  <Label className="text-xs">{t("closers.result")}</Label>
                   <Select value={result} onValueChange={setResult}>
-                    <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+                    <SelectTrigger className="h-8 text-sm"><SelectValue placeholder={t("common.select")} /></SelectTrigger>
                     <SelectContent>
-                      {RESULTS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                      {RESULTS.map((r) => <SelectItem key={r} value={r}>{resultLabel(t, r)}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
-                  <Label className="text-xs">Notas</Label>
+                  <Label className="text-xs">{t("closers.notes")}</Label>
                   <Textarea
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
@@ -478,11 +487,11 @@ const ContactCountCell = ({ creatorId, count, isContact }: { creatorId: string; 
                     }}
                     rows={2}
                     className="text-sm"
-                    placeholder="Notas… (puedes pegar capturas con ⌘/Ctrl+V)"
+                    placeholder={t("closers.contact.notesPlaceholder")}
                   />
                 </div>
                 <div>
-                  <Label className="text-xs">Capturas</Label>
+                  <Label className="text-xs">{t("closers.shots.screenshots")}</Label>
                   <input
                     ref={fileRef}
                     type="file"
@@ -500,7 +509,7 @@ const ContactCountCell = ({ creatorId, count, isContact }: { creatorId: string; 
                             type="button"
                             onClick={() => setShots((prev) => prev.filter((_, j) => j !== i))}
                             className="absolute -top-1 -right-1 rounded-full bg-background border border-border p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                            title="Quitar"
+                            title={t("closers.shots.remove")}
                           >
                             <X className="h-3 w-3" />
                           </button>
@@ -509,13 +518,13 @@ const ContactCountCell = ({ creatorId, count, isContact }: { creatorId: string; 
                     </div>
                   )}
                   <Button type="button" size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => fileRef.current?.click()}>
-                    <ImagePlus className="h-3.5 w-3.5" /> Adjuntar captura
+                    <ImagePlus className="h-3.5 w-3.5" /> {t("closers.shots.attach")}
                   </Button>
-                  <p className="text-[10px] text-muted-foreground mt-1">Quedan en el lead; el bot puede leerlas.</p>
+                  <p className="text-[10px] text-muted-foreground mt-1">{t("closers.shots.botReads")}</p>
                 </div>
                 <div className="flex justify-end">
                   <Button size="sm" onClick={handleSubmit} disabled={!channel || addContact.isPending || uploading}>
-                    {addContact.isPending || uploading ? "..." : "Guardar"}
+                    {addContact.isPending || uploading ? "..." : t("common.save")}
                   </Button>
                 </div>
               </div>
@@ -534,6 +543,7 @@ const LeadWhatsappButton = ({ leadId, source, resolvedPhone }: { leadId: string;
   const { data: channels = [] } = useMyWaChannels();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [busy, setBusy] = useState(false);
   const [gateMsg, setGateMsg] = useState<string | null>(null);
 
@@ -546,11 +556,11 @@ const LeadWhatsappButton = ({ leadId, source, resolvedPhone }: { leadId: string;
     // Rechazo "suave" del gating (HTTP 200 + ok:false): NO es un error, es un aviso de
     // que el lead no es tuyo → popup claro, no el toast rojo de error.
     if (data && data.ok === false) {
-      setGateMsg(data.error || "Este lead no está disponible para ti.");
+      setGateMsg(data.error || t("closers.wa.notAvailable"));
       return;
     }
     if (error || !data?.conversation_id) {
-      toast({ title: "No se pudo abrir el chat", description: error?.message || "Error", variant: "destructive" });
+      toast({ title: t("closers.wa.couldNotOpen"), description: error?.message || t("common.error"), variant: "destructive" });
       return;
     }
     navigate(`/inbox?c=${data.conversation_id}`);
@@ -561,7 +571,7 @@ const LeadWhatsappButton = ({ leadId, source, resolvedPhone }: { leadId: string;
   // Leadgen (sin fila de closer): sí necesita el teléfono resuelto en el cliente.
   if (source !== "closer" && !resolvedPhone) return <span className="text-muted-foreground text-xs">—</span>;
   if (channels.length === 0) {
-    return <span className="text-muted-foreground text-xs" title="No tienes canales de WhatsApp asignados">WhatsApp</span>;
+    return <span className="text-muted-foreground text-xs" title={t("closers.wa.noChannels")}>WhatsApp</span>;
   }
 
   const trigger = channels.length === 1 ? (
@@ -576,7 +586,7 @@ const LeadWhatsappButton = ({ leadId, source, resolvedPhone }: { leadId: string;
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <div className="px-2 py-1.5 text-xs text-muted-foreground">¿Desde qué canal?</div>
+        <div className="px-2 py-1.5 text-xs text-muted-foreground">{t("closers.wa.whichChannel")}</div>
         {channels.map((ch) => (
           <DropdownMenuItem key={ch.id} onClick={() => open(ch.id)}>
             {ch.label || ch.evolution_instance}
@@ -593,11 +603,11 @@ const LeadWhatsappButton = ({ leadId, source, resolvedPhone }: { leadId: string;
       <AlertDialog open={!!gateMsg} onOpenChange={(o) => { if (!o) setGateMsg(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Este lead no es tuyo</AlertDialogTitle>
+            <AlertDialogTitle>{t("closers.wa.notYours")}</AlertDialogTitle>
             <AlertDialogDescription>{gateMsg}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setGateMsg(null)}>Entendido</AlertDialogAction>
+            <AlertDialogAction onClick={() => setGateMsg(null)}>{t("common.understood")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -606,12 +616,12 @@ const LeadWhatsappButton = ({ leadId, source, resolvedPhone }: { leadId: string;
 };
 
 // Fecha relativa corta ("hoy" / "ayer" / "hace N d") para columnas de fecha.
-const relDays = (d: string | null | undefined): string => {
+const relDays = (t: Traductor, d: string | null | undefined): string => {
   if (!d) return "";
   const days = Math.floor((Date.now() - new Date(d).getTime()) / 86400000);
-  if (days <= 0) return "hoy";
-  if (days === 1) return "ayer";
-  return `hace ${days} d`;
+  if (days <= 0) return t("closers.rel.today");
+  if (days === 1) return t("closers.rel.yesterday");
+  return t("closers.rel.daysAgo", { n: days });
 };
 
 // Celda "Seguimiento": la pill de contactos (con puntos de progreso, MISMO popover de
@@ -621,6 +631,7 @@ const relDays = (d: string | null | undefined): string => {
 // Lista read-only de las notas hechas en cada contacto (closer_contact_history),
 // para mostrar debajo de la nota libre del lead en la columna "Notas".
 const ContactNotesList = ({ notes }: { notes: ContactNote[] }) => {
+  const { t } = useLanguage();
   const withNote = (notes || [])
     .map((n, i) => ({ ...n, idx: i + 1 }))
     .filter((n) => (n.notes || "").trim().length > 0);
@@ -629,7 +640,7 @@ const ContactNotesList = ({ notes }: { notes: ContactNote[] }) => {
     <div className="space-y-1 border-t border-border bg-muted/40 px-3 py-2">
       {withNote.map((n) => (
         <p key={n.idx} className="text-xs leading-snug text-muted-foreground">
-          <span className="font-medium">Contacto {n.idx}{n.channel ? ` · ${n.channel}` : ""}:</span>{" "}
+          <span className="font-medium">{t("closers.contact.nth", { n: n.idx })}{n.channel ? ` · ${n.channel}` : ""}:</span>{" "}
           {n.notes}
         </p>
       ))}
@@ -638,6 +649,7 @@ const ContactNotesList = ({ notes }: { notes: ContactNote[] }) => {
 };
 
 const SeguimientoCell = ({ c }: { c: CloserCreatorRow }) => {
+  const { t } = useLanguage();
   const overdue = isContactOverdue(c.passed_date, c.contact_count, c.last_contact_date, c.stage);
   const decision = needsContactDecision(c.stage, c.contact_count);
   const lastAttempt = c.contact_count >= 6;
@@ -646,22 +658,22 @@ const SeguimientoCell = ({ c }: { c: CloserCreatorRow }) => {
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
       <ContactCountCell creatorId={c.id} count={c.contact_count} isContact={(c as unknown as { __isContact?: boolean }).__isContact} />
       <span className="text-[11px] text-muted-foreground whitespace-nowrap">
-        {c.last_contact_date ? `últ ${format(new Date(c.last_contact_date), "dd/MM")}` : "sin contacto"}
-        {next ? ` · próx ${format(next, "dd/MM")}` : ""}
+        {c.last_contact_date ? t("closers.follow.last", { date: format(new Date(c.last_contact_date), "dd/MM") }) : t("closers.follow.noContact")}
+        {next ? ` · ${t("closers.follow.next", { date: format(next, "dd/MM") })}` : ""}
       </span>
       {overdue && (
-        <Badge variant="destructive" className="text-[10px] h-5 gap-0.5 whitespace-nowrap" title="El contacto programado venció">
-          <AlertTriangle className="h-3 w-3" /> Vencido
+        <Badge variant="destructive" className="text-[10px] h-5 gap-0.5 whitespace-nowrap" title={t("closers.follow.overdueHint")}>
+          <AlertTriangle className="h-3 w-3" /> {t("closers.follow.overdue")}
         </Badge>
       )}
       {decision && (
-        <Badge className="text-[10px] h-5 gap-0.5 whitespace-nowrap bg-orange-500 hover:bg-orange-600 text-white" title="6 contactos hechos — decidir si seguir o marcar No interesada">
-          <AlertTriangle className="h-3 w-3" /> Decidir
+        <Badge className="text-[10px] h-5 gap-0.5 whitespace-nowrap bg-orange-500 hover:bg-orange-600 text-white" title={t("closers.follow.decideHint")}>
+          <AlertTriangle className="h-3 w-3" /> {t("closers.follow.decide")}
         </Badge>
       )}
       {lastAttempt && !decision && (
         <Badge className="text-[10px] h-5 bg-warning/20 text-warning gap-0.5 whitespace-nowrap">
-          <Clock className="h-3 w-3" /> Último intento
+          <Clock className="h-3 w-3" /> {t("closers.follow.lastAttempt")}
         </Badge>
       )}
     </div>
@@ -673,6 +685,7 @@ const SeguimientoCell = ({ c }: { c: CloserCreatorRow }) => {
 // se edita desde el botón "Editar" del lead). No es un campo editable inline — es un
 // indicativo/atajo, igual que los botones de contacto.
 const OfLink = ({ url }: { url: string | null | undefined }) => {
+  const { t } = useLanguage();
   if (!url) return null;
   const href = url.startsWith("http") ? url : `https://onlyfans.com/${url.replace(/^\/+/, "")}`;
   return (
@@ -680,7 +693,7 @@ const OfLink = ({ url }: { url: string | null | undefined }) => {
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      title="Abrir OnlyFans"
+      title={t("closers.openOnlyFans")}
       className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[#00AFF0] hover:bg-[#00AFF0]/10"
     >
       <OnlyFansIcon className="h-4 w-4" />
@@ -720,6 +733,7 @@ const SortHeader = ({ label, sortKey: key, currentKey, asc, onSort, className = 
 );
 
 const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChange, onAssign, onClaim, onConvertToCreator, isAdmin, sourceAccounts, platformSalesByCreator }: Props) => {
+  const { t } = useLanguage();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [platformModalId, setPlatformModalId] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<string | null>(null);
@@ -814,7 +828,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
     return (
       <div>
         {sortedCreators.length === 0 ? (
-          <p className="text-center text-muted-foreground py-8">Sin registros</p>
+          <p className="text-center text-muted-foreground py-8">{t("closers.noRecords")}</p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {sortedCreators.map((c) => {
@@ -835,10 +849,10 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                       <ExternalLink className="h-3 w-3" />
                     </a>
                     <div className="flex flex-col items-end gap-1">
-                      <Badge variant={stageVariant(c.stage)} className="text-[10px]">{c.stage}</Badge>
+                      <Badge variant={stageVariant(c.stage)} className="text-[10px]">{stageLabel(t, c.stage)}</Badge>
                       {isPlatformDeal && (
-                        <Badge variant="primary-soft" className="text-[9px] h-4" title="Venta de plataforma (suscripción mensual)">
-                          Venta{c.main_platform ? `: ${c.main_platform}` : ""}
+                        <Badge variant="primary-soft" className="text-[9px] h-4" title={t("closers.table.saleHint")}>
+                          {t("closers.table.sale")}{c.main_platform ? `: ${platformLabel(t, c.main_platform)}` : ""}
                         </Badge>
                       )}
                     </div>
@@ -846,31 +860,31 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
 
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <div>
-                      <p className="text-[10px] uppercase text-muted-foreground">Agente</p>
-                      <p className="font-medium truncate">{c.agent_name || "Sin asignar"}</p>
+                      <p className="text-[10px] uppercase text-muted-foreground">{t("closers.agent")}</p>
+                      <p className="font-medium truncate">{c.agent_name || t("common.unassigned")}</p>
                     </div>
                     <div>
-                      <p className="text-[10px] uppercase text-muted-foreground">Cuenta origen</p>
+                      <p className="text-[10px] uppercase text-muted-foreground">{t("closers.sourceAccount")}</p>
                       <p className="font-medium truncate">{c.source_account || "—"}</p>
                     </div>
                     <div>
-                      <p className="text-[10px] uppercase text-muted-foreground">Categoría</p>
+                      <p className="text-[10px] uppercase text-muted-foreground">{t("common.category")}</p>
                       <p className="font-medium truncate">{c.category || "—"}</p>
                     </div>
                     <div>
-                      <p className="text-[10px] uppercase text-muted-foreground">Contactos</p>
+                      <p className="text-[10px] uppercase text-muted-foreground">{t("closers.contacts")}</p>
                       <p className="font-medium">{c.contact_count}/6</p>
                     </div>
                     {(c.stage === "Confirmada" || c.stage === "Completada") && (
                       <>
                         <div>
-                          <p className="text-[10px] uppercase text-muted-foreground">Plataformas</p>
+                          <p className="text-[10px] uppercase text-muted-foreground">{t("closers.platforms")}</p>
                           <div className="flex flex-wrap gap-0.5">
                             {(platformSalesByCreator?.[c.id] || []).length > 0
                               ? (platformSalesByCreator?.[c.id] || []).map((s, i) => (
                                   <Badge key={i} variant="secondary" className="text-[9px] h-4">{s.platform}</Badge>
                                 ))
-                              : <p className="font-medium">{c.main_platform || "—"}</p>
+                              : <p className="font-medium">{c.main_platform ? platformLabel(t, c.main_platform) : "—"}</p>
                             }
                           </div>
                         </div>
@@ -880,13 +894,13 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
 
                   <div className="flex items-center gap-1 pt-1">
                     {contactOverdue && (
-                      <Badge variant="destructive" className="text-[10px] h-5 gap-0.5" title="Contacto vencido — el closer no respetó la cadencia">
-                        <AlertTriangle className="h-3 w-3" /> Vencido
+                      <Badge variant="destructive" className="text-[10px] h-5 gap-0.5" title={t("closers.follow.overdueCadenceHint")}>
+                        <AlertTriangle className="h-3 w-3" /> {t("closers.follow.overdue")}
                       </Badge>
                     )}
                     {decisionPending && (
-                      <Badge className="text-[10px] h-5 gap-0.5 bg-orange-500 hover:bg-orange-600 text-white" title="6 contactos hechos — decidir si seguir o marcar No interesada">
-                        <AlertTriangle className="h-3 w-3" /> Decidir
+                      <Badge className="text-[10px] h-5 gap-0.5 bg-orange-500 hover:bg-orange-600 text-white" title={t("closers.follow.decideHint")}>
+                        <AlertTriangle className="h-3 w-3" /> {t("closers.follow.decide")}
                       </Badge>
                     )}
                     {c.phone && <LeadContactButtons leadId={c.id} source={c._source} resolvedPhone={c.resolved_whatsapp_phone} />}
@@ -899,10 +913,10 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
 
         {completadasTotals && completadasTotals.count > 0 && (
           <div className="flex items-center justify-between px-4 py-3 mt-4 border border-border rounded-lg bg-muted/30 text-sm">
-            <span className="font-medium">{completadasTotals.count} modelos cerradas</span>
+            <span className="font-medium">{t("closers.table.modelsClosed", { n: completadasTotals.count })}</span>
             <div className="flex gap-6">
-              <span>Monetización: <strong>${completadasTotals.monetization.toLocaleString()}</strong></span>
-              <span>Rev. Plataformas: <strong>${completadasTotals.platformRev.toLocaleString()}</strong></span>
+              <span>{t("closers.table.monetizationLabel")} <strong>${completadasTotals.monetization.toLocaleString()}</strong></span>
+              <span>{t("closers.table.platformRevLabel")} <strong>${completadasTotals.platformRev.toLocaleString()}</strong></span>
             </div>
           </div>
         )}
@@ -923,11 +937,11 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
           <TableRow>
             <TableHead className={`w-8 ${stickyBase}`}>#</TableHead>
             <SortHeader label="Lead" sortKey="instagram_handle" {...sp} />
-            <SortHeader label="Asignada" sortKey="passed_date" {...sp} />
-            <SortHeader label="Seguimiento" sortKey="contact_count" {...sp} />
-            <TableHead className={stickyBase}>Contactar</TableHead>
-            <TableHead className={stickyBase}>Notas</TableHead>
-            <TableHead className={stickyAction}>Acciones</TableHead>
+            <SortHeader label={t("closers.stage.assigned")} sortKey="passed_date" {...sp} />
+            <SortHeader label={t("closers.table.followUp")} sortKey="contact_count" {...sp} />
+            <TableHead className={stickyBase}>{t("closers.table.reachOut")}</TableHead>
+            <TableHead className={stickyBase}>{t("closers.notes")}</TableHead>
+            <TableHead className={stickyAction}>{t("common.actions")}</TableHead>
           </TableRow>
         );
       case "confirmadas":
@@ -935,15 +949,15 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
           <TableRow>
             <TableHead className={`w-8 ${stickyBase}`}>#</TableHead>
             <SortHeader label="Lead" sortKey="instagram_handle" {...sp} />
-            <TableHead className={stickyBase}>Contactar</TableHead>
-            <SortHeader label="Monetización" sortKey="estimated_monetization" {...sp} />
-            <SortHeader label="% Comisión" sortKey="agency_commission" {...sp} />
+            <TableHead className={stickyBase}>{t("closers.table.reachOut")}</TableHead>
+            <SortHeader label={t("closers.monetization")} sortKey="estimated_monetization" {...sp} />
+            <SortHeader label={t("closers.commissionPct")} sortKey="agency_commission" {...sp} />
             <TableHead className={stickyBase}>Extras</TableHead>
-            <TableHead className={stickyBase}>Plataforma</TableHead>
+            <TableHead className={stickyBase}>{t("closers.platform")}</TableHead>
             <TableHead className={stickyBase}>Revenue</TableHead>
-            <TableHead className={stickyBase}>Notas</TableHead>
+            <TableHead className={stickyBase}>{t("closers.notes")}</TableHead>
             <TableHead className={`w-8 ${stickyBase}`}></TableHead>
-            <TableHead className={stickyAction}>Acciones</TableHead>
+            <TableHead className={stickyAction}>{t("common.actions")}</TableHead>
           </TableRow>
         );
       case "completadas":
@@ -951,12 +965,12 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
           <TableRow>
             <TableHead className={`w-8 ${stickyBase}`}>#</TableHead>
             <SortHeader label="Lead" sortKey="instagram_handle" {...sp} />
-            <SortHeader label="Monetización" sortKey="estimated_monetization" {...sp} />
-            <SortHeader label="% Comisión" sortKey="agency_commission" {...sp} />
-            <TableHead className={stickyBase}>Plataformas</TableHead>
-            <TableHead className={stickyBase}>Rev. Plat.</TableHead>
-            <TableHead className={stickyBase}>Notas</TableHead>
-            <TableHead className={stickyAction}>Acciones</TableHead>
+            <SortHeader label={t("closers.monetization")} sortKey="estimated_monetization" {...sp} />
+            <SortHeader label={t("closers.commissionPct")} sortKey="agency_commission" {...sp} />
+            <TableHead className={stickyBase}>{t("closers.platforms")}</TableHead>
+            <TableHead className={stickyBase}>{t("closers.table.platRev")}</TableHead>
+            <TableHead className={stickyBase}>{t("closers.notes")}</TableHead>
+            <TableHead className={stickyAction}>{t("common.actions")}</TableHead>
           </TableRow>
         );
       case "no_interesadas":
@@ -964,10 +978,10 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
           <TableRow>
             <TableHead className={`w-8 ${stickyBase}`}>#</TableHead>
             <SortHeader label="Lead" sortKey="instagram_handle" {...sp} />
-            <TableHead className={stickyBase}>Motivo</TableHead>
-            <TableHead className={stickyBase}>Detalle</TableHead>
-            <TableHead className={stickyBase}>Notas</TableHead>
-            <TableHead className={stickyAction}>Acciones</TableHead>
+            <TableHead className={stickyBase}>{t("closers.reason")}</TableHead>
+            <TableHead className={stickyBase}>{t("closers.details")}</TableHead>
+            <TableHead className={stickyBase}>{t("closers.notes")}</TableHead>
+            <TableHead className={stickyAction}>{t("common.actions")}</TableHead>
           </TableRow>
         );
       case "nuevo":
@@ -976,10 +990,10 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
           <TableRow>
             <TableHead className={`w-8 ${stickyBase}`}>#</TableHead>
             <SortHeader label="Lead" sortKey="instagram_handle" {...sp} />
-            <SortHeader label="Estado" sortKey="stage" {...sp} />
-            <TableHead className={stickyBase}>Contactar</TableHead>
-            <TableHead className={stickyBase}>Notas</TableHead>
-            <TableHead className={stickyAction}>Acciones</TableHead>
+            <SortHeader label={t("common.status")} sortKey="stage" {...sp} />
+            <TableHead className={stickyBase}>{t("closers.table.reachOut")}</TableHead>
+            <TableHead className={stickyBase}>{t("closers.notes")}</TableHead>
+            <TableHead className={stickyAction}>{t("common.actions")}</TableHead>
           </TableRow>
         );
       default: // todas
@@ -987,11 +1001,11 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
           <TableRow>
             <TableHead className={`w-8 ${stickyBase}`}>#</TableHead>
             <SortHeader label="Lead" sortKey="instagram_handle" {...sp} />
-            <SortHeader label="Estado" sortKey="stage" {...sp} />
-            <SortHeader label="Seguimiento" sortKey="contact_count" {...sp} />
-            <TableHead className={stickyBase}>Contactar</TableHead>
-            <TableHead className={stickyBase}>Notas</TableHead>
-            <TableHead className={stickyAction}>Acciones</TableHead>
+            <SortHeader label={t("common.status")} sortKey="stage" {...sp} />
+            <SortHeader label={t("closers.table.followUp")} sortKey="contact_count" {...sp} />
+            <TableHead className={stickyBase}>{t("closers.table.reachOut")}</TableHead>
+            <TableHead className={stickyBase}>{t("closers.notes")}</TableHead>
+            <TableHead className={stickyAction}>{t("common.actions")}</TableHead>
           </TableRow>
         );
     }
@@ -1023,20 +1037,20 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
           <ExternalLink className="h-3 w-3" />
         </a>
         {isPlatformDeal && (
-          <Badge variant="primary-soft" className="text-[9px] h-4 whitespace-nowrap" title="Venta de plataforma (suscripción mensual, sin comisión %)">
-            Venta{c.main_platform ? `: ${c.main_platform}` : ""}
+          <Badge variant="primary-soft" className="text-[9px] h-4 whitespace-nowrap" title={t("closers.table.saleNoCommissionHint")}>
+            {t("closers.table.sale")}{c.main_platform ? `: ${platformLabel(t, c.main_platform)}` : ""}
           </Badge>
         )}
         {/* Origen del lead: de qué base viene. Sólo se marca lo que NO es Maven,
             así las ~2.5k filas de siempre se ven igual que antes. */}
         {c.lead_source === "ex_creadora" && (
-          <Badge variant="warning-soft" className="text-[9px] h-4 whitespace-nowrap" title="Viene de la base EX MODELOS KASH (ya fue creadora de la agencia)">
-            Ex-creadora
+          <Badge variant="warning-soft" className="text-[9px] h-4 whitespace-nowrap" title={t("closers.table.exCreatorHint")}>
+            {t("closers.table.exCreator")}
           </Badge>
         )}
         {c.lead_source === "agencia" && (
-          <Badge variant="secondary-soft" className="text-[9px] h-4 whitespace-nowrap" title="Lead B2B: agencia de la base de agencias">
-            Agencia
+          <Badge variant="secondary-soft" className="text-[9px] h-4 whitespace-nowrap" title={t("closers.table.agencyHint")}>
+            {t("closers.agency")}
           </Badge>
         )}
       </>
@@ -1052,35 +1066,35 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
               <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                 <InlineSourceSelect value={c.source_account} onSave={(v) => onFieldChange(c.id, "source_account", v)} options={LEADGEN_COMPANIES} />
                 <InlineCategorySelect value={c.category} onSave={(v) => onFieldChange(c.id, "category", v)} />
-                {c.created_at && <span className="text-[10px] text-muted-foreground/70 whitespace-nowrap">creado {format(new Date(c.created_at), "dd/MM")}</span>}
+                {c.created_at && <span className="text-[10px] text-muted-foreground/70 whitespace-nowrap">{t("closers.createdOn", { date: format(new Date(c.created_at), "dd/MM") })}</span>}
               </div>
             </TableCell>
             <TableCell className="align-top">
               <div className="text-sm">{c.passed_date ? format(new Date(c.passed_date), "dd/MM/yy") : "—"}</div>
               <div className="text-[11px] text-muted-foreground">
-                {relDays(c.passed_date)}{c.agent_name ? ` · ${c.agent_name}` : ""}
+                {relDays(t, c.passed_date)}{c.agent_name ? ` · ${c.agent_name}` : ""}
               </div>
             </TableCell>
             <TableCell className="align-top">
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <ContactCountCell creatorId={c.id} count={c.contact_count} />
                 <span className="text-[11px] text-muted-foreground whitespace-nowrap">
-                  {c.last_contact_date ? `últ ${format(new Date(c.last_contact_date), "dd/MM")}` : "sin contacto"}
-                  {nextDate ? ` · próx ${format(nextDate, "dd/MM")}` : ""}
+                  {c.last_contact_date ? t("closers.follow.last", { date: format(new Date(c.last_contact_date), "dd/MM") }) : t("closers.follow.noContact")}
+                  {nextDate ? ` · ${t("closers.follow.next", { date: format(nextDate, "dd/MM") })}` : ""}
                 </span>
                 {contactOverdue && (
-                  <Badge variant="destructive" className="text-[10px] h-5 gap-0.5 whitespace-nowrap" title="El contacto programado venció">
-                    <AlertTriangle className="h-3 w-3" /> Vencido
+                  <Badge variant="destructive" className="text-[10px] h-5 gap-0.5 whitespace-nowrap" title={t("closers.follow.overdueHint")}>
+                    <AlertTriangle className="h-3 w-3" /> {t("closers.follow.overdue")}
                   </Badge>
                 )}
                 {decisionPending && (
-                  <Badge className="text-[10px] h-5 gap-0.5 whitespace-nowrap bg-orange-500 hover:bg-orange-600 text-white" title="6 contactos hechos — decidir si seguir o marcar No interesada">
-                    <AlertTriangle className="h-3 w-3" /> Decidir
+                  <Badge className="text-[10px] h-5 gap-0.5 whitespace-nowrap bg-orange-500 hover:bg-orange-600 text-white" title={t("closers.follow.decideHint")}>
+                    <AlertTriangle className="h-3 w-3" /> {t("closers.follow.decide")}
                   </Badge>
                 )}
                 {isLastAttempt && !decisionPending && (
                   <Badge className="text-[10px] h-5 bg-warning/20 text-warning gap-0.5 whitespace-nowrap">
-                    <Clock className="h-3 w-3" /> Último intento
+                    <Clock className="h-3 w-3" /> {t("closers.follow.lastAttempt")}
                   </Badge>
                 )}
               </div>
@@ -1099,10 +1113,10 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                     {isCloser && (
                       <>
                         <DropdownMenuItem onClick={() => onStageChange(c.id, "Confirmada")}>
-                          Mover a Confirmada
+                          {t("closers.moveTo", { stage: stageLabel(t, "Confirmada") })}
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => requestStageChange(c.id, "No interesada")}>
-                          Marcar No interesada
+                          {t("closers.markNotInterested")}
                         </DropdownMenuItem>
                       </>
                     )}
@@ -1110,7 +1124,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                       <>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => onAssign(c.id, c.assigned_to)}>
-                          <UserPlus className="h-4 w-4 mr-2" /> Reasignar
+                          <UserPlus className="h-4 w-4 mr-2" /> {t("closers.table.reassign")}
                         </DropdownMenuItem>
                       </>
                     )}
@@ -1129,7 +1143,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
               <TableCell className="align-top">
                 <div className="flex items-center gap-1.5">{igLink}</div>
                 <div className="text-[10px] text-muted-foreground/70 mt-1">
-                  {c.created_at ? `creado ${format(new Date(c.created_at), "dd/MM")}` : ""}{c.agent_name ? ` · ${c.agent_name}` : ""}
+                  {c.created_at ? t("closers.createdOn", { date: format(new Date(c.created_at), "dd/MM") }) : ""}{c.agent_name ? ` · ${c.agent_name}` : ""}
                 </div>
               </TableCell>
               <TableCell className="align-top"><LeadContactButtons leadId={c.id} source={c._source} resolvedPhone={c.resolved_whatsapp_phone} onlyfansUrl={c.onlyfans_url} /></TableCell>
@@ -1140,7 +1154,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
               </TableCell>
               <TableCell className="align-top">
                 {isPlatformDeal
-                  ? <span className="text-xs text-muted-foreground" title="Venta de plataforma: suscripción fija, sin comisión %">— susc.</span>
+                  ? <span className="text-xs text-muted-foreground" title={t("closers.table.fixedSubHint")}>{t("closers.table.subShort")}</span>
                   : <InlineNumber value={c.agency_commission} suffix="%" onSave={(v) => onFieldChange(c.id, "agency_commission", v)} disabled={!canEditComisiones} />}
               </TableCell>
               <TableCell className="align-top">
@@ -1149,10 +1163,10 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
               <TableCell className="align-top">
                 <Select value={c.main_platform || ""} onValueChange={(v) => onFieldChange(c.id, "main_platform", v)}>
                   <SelectTrigger className="h-7 w-28 text-xs">
-                    <SelectValue placeholder="Plataforma" />
+                    <SelectValue placeholder={t("closers.platform")} />
                   </SelectTrigger>
                   <SelectContent>
-                    {PLATFORMS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                    {PLATFORMS.map((p) => <SelectItem key={p} value={p}>{platformLabel(t, p)}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </TableCell>
@@ -1172,10 +1186,10 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem onClick={() => onStageChange(c.id, "Completada")}>
-                      Mover a Completada
+                      {t("closers.moveTo", { stage: stageLabel(t, "Completada") })}
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => onStageChange(c.id, "Asignada")}>
-                      Volver a Asignada
+                      {t("closers.table.backToAssigned")}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -1200,7 +1214,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
               <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                 <InlineCategorySelect value={c.category} onSave={(v) => onFieldChange(c.id, "category", v)} />
                 <span className="text-[10px] text-muted-foreground/70 whitespace-nowrap">
-                  {c.created_at ? `creado ${format(new Date(c.created_at), "dd/MM")}` : ""}{c.agent_name ? ` · ${c.agent_name}` : ""}
+                  {c.created_at ? t("closers.createdOn", { date: format(new Date(c.created_at), "dd/MM") }) : ""}{c.agent_name ? ` · ${c.agent_name}` : ""}
                 </span>
                 <OfLink url={c.onlyfans_url} />
               </div>
@@ -1212,7 +1226,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             </TableCell>
             <TableCell className="align-top">
               {isPlatformDeal
-                ? <span className="text-xs text-muted-foreground" title="Venta de plataforma: suscripción fija, sin comisión %">— susc.</span>
+                ? <span className="text-xs text-muted-foreground" title={t("closers.table.fixedSubHint")}>{t("closers.table.subShort")}</span>
                 : <InlineNumber value={c.agency_commission} suffix="%" onSave={(v) => onFieldChange(c.id, "agency_commission", v)} disabled={!canEditComisiones} />}
             </TableCell>
             <TableCell
@@ -1230,7 +1244,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                     )}
                   </>
                 ) : (
-                  <span className="text-muted-foreground text-xs">Agregar...</span>
+                  <span className="text-muted-foreground text-xs">{t("closers.table.addEllipsis")}</span>
                 )}
               </div>
             </TableCell>
@@ -1248,7 +1262,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem onClick={() => setPlatformModalId(c.id)}>
                     <ShoppingCart className="mr-2 h-4 w-4" />
-                    Ventas por Plataforma
+                    {t("closers.salesByPlatform")}
                   </DropdownMenuItem>
                   {/* Solo RECLUTAMIENTO se convierte a creadora. Una venta de
                       plataforma es a alguien que YA es creadora (convertir = ruido
@@ -1256,13 +1270,13 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                       "handle" es el nombre de la agencia y no matchea a nadie). */}
                   {onConvertToCreator && canConvert && c.deal_type === "reclutamiento" && (
                     <DropdownMenuItem onClick={() => onConvertToCreator(c)}>
-                      <UserPlus className="h-4 w-4 mr-2" /> Convertir a Creadora
+                      <UserPlus className="h-4 w-4 mr-2" /> {t("closers.convertToCreator")}
                     </DropdownMenuItem>
                   )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => onStageChange(c.id, "Asignada")}>
                     <Undo2 className="mr-2 h-4 w-4" />
-                    Devolver a Asignada
+                    {t("closers.table.returnToAssigned")}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -1277,8 +1291,8 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableCell className="align-top">
               <div className="flex items-center gap-1.5">{igLink}</div>
               <div className="flex items-center gap-x-1.5 gap-y-0.5 mt-1 flex-wrap text-[10px] text-muted-foreground/70">
-                <span>{c.created_at ? `creado ${format(new Date(c.created_at), "dd/MM")}` : ""}{c.agent_name ? ` · ${c.agent_name}` : ""}</span>
-                {c.last_contact_date && <span>· últ contacto {format(new Date(c.last_contact_date), "dd/MM")}</span>}
+                <span>{c.created_at ? t("closers.createdOn", { date: format(new Date(c.created_at), "dd/MM") }) : ""}{c.agent_name ? ` · ${c.agent_name}` : ""}</span>
+                {c.last_contact_date && <span>· {t("closers.follow.lastContact", { date: format(new Date(c.last_contact_date), "dd/MM") })}</span>}
                 <OfLink url={c.onlyfans_url} />
               </div>
             </TableCell>
@@ -1286,7 +1300,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
               <InlineCloseReasonSelect value={c.close_reason_code} onSave={(v) => onFieldChange(c.id, "close_reason_code", v)} />
             </TableCell>
             <TableCell className="align-top">
-              <InlineText value={c.rejection_reason} onSave={(v) => onFieldChange(c.id, "rejection_reason", v)} emptyLabel="Motivo" />
+              <InlineText value={c.rejection_reason} onSave={(v) => onFieldChange(c.id, "rejection_reason", v)} kind="reason" />
             </TableCell>
             <TableCell className="align-top">
               <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} footer={<ContactNotesList notes={c.contact_notes} />} attachments={<LeadScreenshots leadId={c.id} />} />
@@ -1299,7 +1313,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem onClick={() => onStageChange(c.id, "Asignada", c._source)}>
                     <Undo2 className="mr-2 h-4 w-4" />
-                    Volver a Asignada
+                    {t("closers.table.backToAssigned")}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -1318,7 +1332,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                 <InlineSourceSelect value={c.source_account} onSave={(v) => onFieldChange(c.id, "source_account", v)} options={LEADGEN_COMPANIES} />
                 <InlineCategorySelect value={c.category} onSave={(v) => onFieldChange(c.id, "category", v)} />
                 <span className="text-[10px] text-muted-foreground/70 whitespace-nowrap">
-                  {c.created_at ? `creado ${format(new Date(c.created_at), "dd/MM")}` : ""}{c.agent_name ? ` · ${c.agent_name}` : ""}
+                  {c.created_at ? t("closers.createdOn", { date: format(new Date(c.created_at), "dd/MM") }) : ""}{c.agent_name ? ` · ${c.agent_name}` : ""}
                 </span>
               </div>
             </TableCell>
@@ -1339,15 +1353,15 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                       RLS "Closers can claim unassigned pool" lo permite solo
                       para sí y solo sobre filas sin dueño. */}
                   <DropdownMenuItem onClick={() => onClaim?.(c.id)}>
-                    <UserPlus className="h-4 w-4 mr-2" /> Tomar (asignármela)
+                    <UserPlus className="h-4 w-4 mr-2" /> {t("closers.table.take")}
                   </DropdownMenuItem>
                   {(isAdmin || canAssign) && (
                     <>
                       <DropdownMenuItem onClick={() => onAssign(c.id, c.assigned_to)}>
-                        <UserPlus className="h-4 w-4 mr-2" /> Asignar a otro closer
+                        <UserPlus className="h-4 w-4 mr-2" /> {t("closers.table.assignOther")}
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => onStageChange(c.id, "Asignada")}>
-                        Mover a Asignada
+                        {t("closers.moveTo", { stage: stageLabel(t, "Asignada") })}
                       </DropdownMenuItem>
                     </>
                   )}
@@ -1372,12 +1386,12 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                 <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                   {c.category && <Badge variant={CATEGORY_VARIANT[c.category] || "outline"}>{c.category}</Badge>}
                   <span className="text-[10px] text-muted-foreground/70 whitespace-nowrap">
-                    {c.created_at ? `creado ${format(new Date(c.created_at), "dd/MM")}` : ""}
+                    {c.created_at ? t("closers.createdOn", { date: format(new Date(c.created_at), "dd/MM") }) : ""}
                   </span>
                 </div>
               </TableCell>
               <TableCell className="align-top">
-                <Badge variant="outline" title="Contacto del directorio — aún no es un lead. Tómalo o registra un seguimiento para trabajarlo.">Contacto</Badge>
+                <Badge variant="outline" title={t("closers.table.directoryHint")}>{t("closers.contact")}</Badge>
               </TableCell>
               <TableCell className="align-top"><SeguimientoCell c={c} /></TableCell>
               <TableCell className="align-top"><LeadContactButtons leadId={c.id} source={c._source} resolvedPhone={c.resolved_whatsapp_phone} onlyfansUrl={c.onlyfans_url} /></TableCell>
@@ -1392,11 +1406,11 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem onClick={() => onClaim?.(c.id)}>
-                        <UserPlus className="h-4 w-4 mr-2" /> Tomar (asignármela)
+                        <UserPlus className="h-4 w-4 mr-2" /> {t("closers.table.take")}
                       </DropdownMenuItem>
                       {(isAdmin || canAssign) && (
                         <DropdownMenuItem onClick={() => onAssign(c.id, c.assigned_to, c._source)}>
-                          <UserPlus className="h-4 w-4 mr-2" /> Asignar
+                          <UserPlus className="h-4 w-4 mr-2" /> {t("closers.assign")}
                         </DropdownMenuItem>
                       )}
                     </DropdownMenuContent>
@@ -1415,7 +1429,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                 <InlineSourceSelect value={c.source_account} onSave={(v) => onFieldChange(c.id, "source_account", v)} options={LEADGEN_COMPANIES} />
                 <InlineCategorySelect value={c.category} onSave={(v) => onFieldChange(c.id, "category", v)} />
                 <span className="text-[10px] text-muted-foreground/70 whitespace-nowrap">
-                  {c.created_at ? `creado ${format(new Date(c.created_at), "dd/MM")}` : ""}{c.agent_name ? ` · ${c.agent_name}` : ""}
+                  {c.created_at ? t("closers.createdOn", { date: format(new Date(c.created_at), "dd/MM") }) : ""}{c.agent_name ? ` · ${c.agent_name}` : ""}
                 </span>
               </div>
             </TableCell>
@@ -1439,21 +1453,21 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                     {isPoolTab && (
                       <>
                         <DropdownMenuItem onClick={() => onClaim?.(c.id)}>
-                          <UserPlus className="h-4 w-4 mr-2" /> Tomar (asignármela)
+                          <UserPlus className="h-4 w-4 mr-2" /> {t("closers.table.take")}
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                       </>
                     )}
                     {CLOSER_STAGES.filter((s) => s !== c.stage && s !== "Asignada").map((s) => (
                       <DropdownMenuItem key={s} onClick={() => requestStageChange(c.id, s, c._source)}>
-                        Mover a {s}
+                        {t("closers.moveTo", { stage: stageLabel(t, s) })}
                       </DropdownMenuItem>
                     ))}
                     {(isAdmin || canAssign) && (
                       <>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => onAssign(c.id, c.assigned_to, c._source)}>
-                          <UserPlus className="h-4 w-4 mr-2" /> Asignar
+                          <UserPlus className="h-4 w-4 mr-2" /> {t("closers.assign")}
                         </DropdownMenuItem>
                       </>
                     )}
@@ -1476,7 +1490,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
           {sortedCreators.length === 0 ? (
             <TableRow>
               <TableCell colSpan={12} className="text-center text-muted-foreground py-8">
-                Sin registros
+                {t("closers.noRecords")}
               </TableCell>
             </TableRow>
           ) : (
@@ -1487,10 +1501,10 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
 
       {completadasTotals && completadasTotals.count > 0 && (
         <div className="flex items-center justify-between px-4 py-3 border-t border-border bg-muted/30 text-sm">
-          <span className="font-medium">{completadasTotals.count} modelos cerradas</span>
+          <span className="font-medium">{t("closers.table.modelsClosed", { n: completadasTotals.count })}</span>
           <div className="flex gap-6">
-              <span>Monetización: <strong>${completadasTotals.monetization.toLocaleString()}</strong></span>
-              <span>Rev. Plataformas: <strong>${completadasTotals.platformRev.toLocaleString()}</strong></span>
+              <span>{t("closers.table.monetizationLabel")} <strong>${completadasTotals.monetization.toLocaleString()}</strong></span>
+              <span>{t("closers.table.platformRevLabel")} <strong>${completadasTotals.platformRev.toLocaleString()}</strong></span>
           </div>
         </div>
       )}
@@ -1509,36 +1523,36 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
       <AlertDialog open={!!closeReasonTarget} onOpenChange={(o) => { if (!o) setCloseReasonTarget(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Por qué se cierra?</AlertDialogTitle>
+            <AlertDialogTitle>{t("closers.table.whyClosing")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Elige el motivo del cierre. Alimenta el embudo de reclutamiento para ver dónde y por qué se caen los leads.
+              {t("closers.table.whyClosingDesc")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="space-y-3 py-1">
             <div className="space-y-1">
-              <Label className="text-xs">Motivo *</Label>
+              <Label className="text-xs">{t("closers.table.reasonRequired")}</Label>
               <Select value={closeReasonCode} onValueChange={setCloseReasonCode}>
-                <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Seleccionar motivo" /></SelectTrigger>
+                <SelectTrigger className="h-9 text-sm"><SelectValue placeholder={t("closers.table.selectReason")} /></SelectTrigger>
                 <SelectContent>
-                  {CLOSE_REASONS.map((r) => <SelectItem key={r.code} value={r.code}>{r.label}</SelectItem>)}
+                  {CLOSE_REASONS.map((r) => <SelectItem key={r.code} value={r.code}>{t(r.labelKey)}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Detalle (opcional)</Label>
+              <Label className="text-xs">{t("closers.table.detailOptional")}</Label>
               <Textarea
                 value={closeReasonDetail}
                 onChange={(e) => setCloseReasonDetail(e.target.value)}
                 rows={2}
                 className="text-sm"
-                placeholder="Notas del cierre…"
+                placeholder={t("closers.table.closingNotes")}
               />
             </div>
           </div>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setCloseReasonTarget(null)}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => setCloseReasonTarget(null)} />
             <AlertDialogAction disabled={!closeReasonCode} onClick={(e) => { e.preventDefault(); confirmCloseReason(); }}>
-              Marcar No interesada
+              {t("closers.markNotInterested")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

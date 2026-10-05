@@ -124,7 +124,7 @@ const OffboardingListPage = () => {
           action={
             <Button onClick={() => setInitiateOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
-              Iniciar Offboarding
+              {t("creadores.off.start")}
             </Button>
           }
         />
@@ -139,10 +139,10 @@ const OffboardingListPage = () => {
             {/* KPI Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
-                { label: "Total", value: stats.total, color: "text-foreground" },
+                { label: t("cr.total"), value: stats.total, color: "text-foreground" },
                 { label: t("cr.offStatusInProgress"), value: stats.enProceso, color: "text-primary" },
                 { label: t("common.pendingPl"), value: stats.pendientes, color: "text-warning" },
-                { label: "Finalizados", value: stats.finalizados, color: "text-muted-foreground" },
+                { label: t("creadores.off.finished"), value: stats.finalizados, color: "text-muted-foreground" },
               ].map((s) => (
                 <Card key={s.label}>
                   <CardContent className="pt-5 pb-4">
@@ -166,7 +166,7 @@ const OffboardingListPage = () => {
               </div>
               <Select value={statusFilter || undefined} onValueChange={(v) => setStatusFilter(v === "_all" ? "" : v)}>
                 <SelectTrigger className="w-44">
-                  <SelectValue placeholder="Estado" />
+                  <SelectValue placeholder={t("common.status")} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="_all">{t("common.all")}</SelectItem>
@@ -186,13 +186,15 @@ const OffboardingListPage = () => {
                   ))}
                 </SelectContent>
               </Select>
-              <DateRangePicker from={dateFrom} to={dateTo} onApply={(from, to) => { setDateFrom(from); setDateTo(to); }} />
+              <DateRangePicker from={dateFrom} to={dateTo} placeholder={t("creadores.off.selectDates")} onApply={(from, to) => { setDateFrom(from); setDateTo(to); }} />
               <div className="flex items-center border border-border rounded-md overflow-hidden ml-auto">
                 <Button
                   variant={viewMode === "table" ? "secondary" : "ghost"}
                   size="icon"
                   className="h-9 w-9 rounded-none"
                   onClick={() => setViewMode("table")}
+                  aria-label={t("creadores.list.tableView")}
+                  title={t("creadores.list.tableView")}
                 >
                   <List className="h-4 w-4" />
                 </Button>
@@ -201,6 +203,8 @@ const OffboardingListPage = () => {
                   size="icon"
                   className="h-9 w-9 rounded-none"
                   onClick={() => setViewMode("grid")}
+                  aria-label={t("creadores.list.gridView")}
+                  title={t("creadores.list.gridView")}
                 >
                   <LayoutGrid className="h-4 w-4" />
                 </Button>
@@ -218,13 +222,13 @@ const OffboardingListPage = () => {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Creator</TableHead>
-                        <TableHead>Estado</TableHead>
+                        <TableHead>{t("cr.creator")}</TableHead>
+                        <TableHead>{t("common.status")}</TableHead>
                         <TableHead>{t("common.category")}</TableHead>
                         <TableHead>{t("cr.exitDateShort")}</TableHead>
-                        <TableHead>Aprobaciones</TableHead>
+                        <TableHead>{t("creadores.off.approvals")}</TableHead>
                         <TableHead>Checklist</TableHead>
-                        <TableHead className="text-right">Revenue Perdido</TableHead>
+                        <TableHead className="text-right">{t("creadores.dash.lostRevenue")}</TableHead>
                         <TableHead></TableHead>
                       </TableRow>
                     </TableHeader>
@@ -266,6 +270,8 @@ const OffboardingListPage = () => {
                                   variant="ghost"
                                   size="icon"
                                   className="h-7 w-7"
+                                  aria-label={t("creadores.off.openProfile")}
+                                  title={t("creadores.off.openProfile")}
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     navigate(`/creadores/${o.creator_id}`);
@@ -278,6 +284,8 @@ const OffboardingListPage = () => {
                                     variant="ghost"
                                     size="icon"
                                     className="h-7 w-7 text-destructive"
+                                    aria-label={t("common.delete")}
+                                    title={t("common.delete")}
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       setDeletingId({ id: o.id, name: o.creator_name ?? "—" });
@@ -325,7 +333,7 @@ const OffboardingListPage = () => {
                             <p className="font-medium">{o.exit_date ?? "—"}</p>
                           </div>
                           <div>
-                            <span className="text-muted-foreground">Aprobaciones</span>
+                            <span className="text-muted-foreground">{t("creadores.off.approvals")}</span>
                             <p className="font-medium">{o.approval_count ?? 0}/2</p>
                           </div>
                           <div>
@@ -335,7 +343,7 @@ const OffboardingListPage = () => {
                         </div>
                         {o.estimated_lost_revenue != null && (
                           <div className="pt-2 border-t border-border">
-                            <span className="text-xs text-muted-foreground">Revenue Perdido</span>
+                            <span className="text-xs text-muted-foreground">{t("creadores.dash.lostRevenue")}</span>
                             <p className="text-sm font-bold text-destructive">${Number(o.estimated_lost_revenue).toLocaleString()}</p>
                           </div>
                         )}

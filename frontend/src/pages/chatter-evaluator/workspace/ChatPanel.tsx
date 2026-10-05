@@ -35,6 +35,7 @@ import { MediaViewer } from "./MediaViewer";
 import { TipPopup, playTipSound } from "./TipPopup";
 import { useUpdateChatterConfig } from "@/hooks/useChatterEvaluator";
 import { toast } from "sonner";
+import { useLanguage } from "@/hooks/useLanguage";
 import { supabase } from "@/integrations/supabase/client";
 import {
   useChatterMessages,
@@ -132,7 +133,7 @@ const MediaThumb = ({
 }) => {
   const isGif = isGifUrl(url);
   if (isGif) {
-    // .gif nativo → <img> (anima solo); Giphy/Tenor .mp4 → <video> autoplay+loop+muted.
+    // .gif nativo → etiqueta img (anima solo); Giphy/Tenor .mp4 → etiqueta video autoplay+loop+muted.
     const gifIsImg = /\.gif(\?|#|$)/i.test(url);
     return gifIsImg ? (
       <img
@@ -261,6 +262,7 @@ const ReactionPickerButton = ({
   align: "left" | "right";
   onToggle: (emoji: string) => void;
 }) => {
+  const { t } = useLanguage();
   const [open, setOpen] = useState(false);
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -270,8 +272,8 @@ const ReactionPickerButton = ({
           className={`absolute top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full bg-background text-muted-foreground opacity-0 shadow-sm ring-1 ring-border transition-opacity hover:bg-muted hover:text-foreground group-hover/bubble:opacity-100 data-[state=open]:opacity-100 ${
             align === "right" ? "left-[-30px]" : "right-[-30px]"
           }`}
-          title="Reaccionar"
-          aria-label="Reaccionar"
+          title={t("common.react")}
+          aria-label={t("common.react")}
         >
           <SmilePlus className="h-3.5 w-3.5" />
         </button>
@@ -287,7 +289,7 @@ const ReactionPickerButton = ({
                 setOpen(false);
               }}
               className="flex h-8 w-8 items-center justify-center rounded-md text-lg transition-colors hover:bg-muted"
-              title={`Reaccionar con ${e}`}
+              title={t("chatters.chat.reactWith", { emoji: e })}
             >
               {e}
             </button>
@@ -343,11 +345,12 @@ const MessageBubble = ({
   /** El mensaje al que ESTE responde (resuelto por el parent), o null. */
   repliedTo: ChatterMessage | null;
 }) => {
+  const { t } = useLanguage();
   if (msg.deleted === "full") return null;
 
   // Texto corto del mensaje citado para la previsualización (reply).
   const quotePreview = (m: ChatterMessage): string =>
-    (m.content?.trim() || (m.images && m.images.length > 0 ? "📷 Foto" : "mensaje"));
+    (m.content?.trim() || (m.images && m.images.length > 0 ? t("chatters.chat.photo") : t("chatters.chat.messageLower")));
   const quoteAuthor = (m: ChatterMessage): string =>
     m.role === "fan" ? fanName : profile?.name ?? "chatter";
 
@@ -452,13 +455,13 @@ const MessageBubble = ({
                 type="button"
                 onClick={() => onShowHistory(msg)}
                 className="ml-1 text-[10px] italic opacity-60 hover:opacity-100 hover:underline"
-                title="Ver historial de cambios"
+                title={t("chatters.chat.viewEditHistory")}
               >
-                (editado)
+                {t("chatters.chat.edited")}
               </button>
             )}
             {msg.deleted === "chatter" && (
-              <div className="mt-0.5 text-[10px] italic opacity-90">eliminado</div>
+              <div className="mt-0.5 text-[10px] italic opacity-90">{t("chatters.chat.deletedLower")}</div>
             )}
             {/* Examiner-side 3-dot menu. Posicionado del lado del avatar
                 (top-right para mensajes del fan/examiner, que están right-
@@ -472,8 +475,8 @@ const MessageBubble = ({
                   <button
                     type="button"
                     className="absolute -right-2 -top-2 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-background text-muted-foreground opacity-0 shadow-sm ring-1 ring-border transition-opacity hover:bg-muted hover:text-foreground group-hover/bubble:opacity-100 data-[state=open]:opacity-100"
-                    title="Opciones del mensaje"
-                    aria-label="Opciones del mensaje"
+                    title={t("chatters.chat.messageOptions")}
+                    aria-label={t("chatters.chat.messageOptions")}
                   >
                     <MoreVertical className="h-3 w-3" />
                   </button>
@@ -481,12 +484,12 @@ const MessageBubble = ({
                 <DropdownMenuContent align="end" className="w-44">
                   <DropdownMenuItem onClick={() => onEdit(msg)}>
                     <Pencil className="mr-2 h-3.5 w-3.5" />
-                    Editar mensaje
+                    {t("chatters.chat.editMessage")}
                   </DropdownMenuItem>
                   {msg.edited_at && (msg.content_history?.length ?? 0) > 0 && (
                     <DropdownMenuItem onClick={() => onShowHistory(msg)}>
                       <History className="mr-2 h-3.5 w-3.5" />
-                      Historial de cambios
+                      {t("chatters.chat.editHistory")}
                     </DropdownMenuItem>
                   )}
                   <DropdownMenuItem
@@ -494,7 +497,7 @@ const MessageBubble = ({
                     className="text-destructive focus:text-destructive"
                   >
                     <Trash2 className="mr-2 h-3.5 w-3.5" />
-                    Eliminar mensaje
+                    {t("chatters.chat.deleteMessage")}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -515,8 +518,8 @@ const MessageBubble = ({
               type="button"
               onClick={() => onReply(msg)}
               className={`absolute -top-2 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-background text-muted-foreground opacity-0 shadow-sm ring-1 ring-border transition-opacity hover:bg-muted hover:text-foreground group-hover/bubble:opacity-100 ${isFan ? "-left-2" : "-right-2"}`}
-              title="Responder (citar)"
-              aria-label="Responder"
+              title={t("chatters.chat.replyQuote")}
+              aria-label={t("common.reply")}
             >
               <Reply className="h-3 w-3" />
             </button>
@@ -559,7 +562,7 @@ const MessageBubble = ({
                     type="button"
                     onClick={() => onPurchase(msg)}
                     disabled={msg.purchased || purchasing}
-                    title={msg.purchased ? "Comprado" : `Comprar — $${msg.price}`}
+                    title={msg.purchased ? t("chatters.chat.purchased") : t("chatters.chat.buyN", { precio: `$${msg.price}` })}
                     className={`absolute right-[-44px] top-1/2 z-[5] flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border-2 text-base font-bold shadow-md transition-all ${
                       msg.purchased
                         ? "cursor-default border-success bg-success/15 text-success"
@@ -621,6 +624,7 @@ const formatRemaining = (ms: number): string => {
 };
 
 export const ChatPanel = ({ session }: Props) => {
+  const { t } = useLanguage();
   const messagesQ = useChatterMessages(session?.id ?? null);
 
   // Auto-end client-side cuando el tiempo expira (3ra capa de defensa,
@@ -660,8 +664,8 @@ export const ChatPanel = ({ session }: Props) => {
       return;
     }
     if (!speechSupported) {
-      toast.error("Tu navegador no soporta dictado por voz", {
-        description: "Prueba con Chrome, Edge o Safari.",
+      toast.error(t("chatters.chat.noDictation"), {
+        description: t("chatters.chat.noDictationDesc"),
       });
       return;
     }
@@ -680,6 +684,7 @@ export const ChatPanel = ({ session }: Props) => {
     };
     rec.continuous = true;
     rec.interimResults = true;
+    // Idioma fijo a propósito: es el idioma en que se DICTA el mensaje (reconocimiento de voz), no el de la interfaz.
     rec.lang = "es-ES";
     rec.onresult = (ev) => {
       const results = ev.results as unknown as Array<{ 0: { transcript: string }; isFinal: boolean }>;
@@ -698,7 +703,7 @@ export const ChatPanel = ({ session }: Props) => {
     };
     rec.onerror = (e) => {
       if (e.error && e.error !== "aborted") {
-        toast.error("Dictado por voz", { description: e.error });
+        toast.error(t("chatters.chat.dictation"), { description: e.error });
       }
       setListening(false);
       speechRecRef.current = null;
@@ -713,7 +718,7 @@ export const ChatPanel = ({ session }: Props) => {
       speechRecRef.current = rec;
       setListening(true);
     } catch (e) {
-      toast.error("No se pudo iniciar el dictado", { description: (e as Error).message });
+      toast.error(t("chatters.chat.couldNotStartDictation"), { description: (e as Error).message });
     }
   };
   const lastMessageIdRef = useRef<string | null>(null);
@@ -744,7 +749,7 @@ export const ChatPanel = ({ session }: Props) => {
     profileQ.data?.full_name?.trim() ||
     authUser?.user_metadata?.full_name?.trim() ||
     authUser?.email ||
-    "Sin nombre";
+    "Sin nombre"; // se guarda como user_name de la reacción: dato, no texto de pantalla
 
   const handleToggleReaction = (msg: ChatterMessage, emoji: string) => {
     if (!currentUserId || !session) return;
@@ -758,7 +763,7 @@ export const ChatPanel = ({ session }: Props) => {
       },
       {
         onError: (e) => {
-          toast.error("No se pudo guardar la reacción", {
+          toast.error(t("chatters.chat.couldNotSaveReaction"), {
             description: (e as Error).message,
           });
         },
@@ -783,8 +788,8 @@ export const ChatPanel = ({ session }: Props) => {
 
   // Tick clock every second for countdown
   useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
   }, []);
 
   // Auto-cierra la sesión cuando expires_at se cumple. El examiner ya
@@ -981,7 +986,7 @@ export const ChatPanel = ({ session }: Props) => {
         .eq("id", session.id as never)
         .then(() => {}, () => {});
     } catch (e) {
-      toast.error("No se pudo enviar", { description: (e as Error).message });
+      toast.error(t("common.couldNotSend"), { description: (e as Error).message });
       setInput(content); // restore
     } finally {
       // Devuelve el foco al textarea después del send. Sin esto, el
@@ -1101,7 +1106,7 @@ export const ChatPanel = ({ session }: Props) => {
   const handleFileUpload = async (file: File) => {
     if (!session) return;
     if (file.size > 50 * 1024 * 1024) {
-      toast.error("Archivo muy grande", { description: "Máximo 50 MB." });
+      toast.error(t("chatters.chat.fileTooLarge"), { description: t("chatters.chat.max50mb") });
       return;
     }
     setUploading(true);
@@ -1134,9 +1139,9 @@ export const ChatPanel = ({ session }: Props) => {
         fromExaminer: true,
         replyToId: replyId,
       });
-      toast.success("Imagen enviada");
+      toast.success(t("chatters.chat.imageSent"));
     } catch (e) {
-      toast.error("No se pudo subir", { description: (e as Error).message });
+      toast.error(t("common.couldNotUpload"), { description: (e as Error).message });
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -1159,7 +1164,7 @@ export const ChatPanel = ({ session }: Props) => {
         replyToId: replyId,
       });
     } catch (e) {
-      toast.error("No se pudo enviar el GIF", { description: (e as Error).message });
+      toast.error(t("chatters.chat.couldNotSendGif"), { description: (e as Error).message });
     }
   };
 
@@ -1173,7 +1178,7 @@ export const ChatPanel = ({ session }: Props) => {
     setUploading(true);
     try {
       const resp = await fetch(signedUrl);
-      if (!resp.ok) throw new Error("no se pudo leer el sticker");
+      if (!resp.ok) throw new Error(t("chatters.chat.couldNotReadSticker"));
       const blob = await resp.blob();
       const ext = blob.type.includes("gif") ? "gif" : "webp";
       const path = `_chat_uploads/${session.id}/sticker-${crypto.randomUUID()}.${ext}`;
@@ -1192,7 +1197,7 @@ export const ChatPanel = ({ session }: Props) => {
         replyToId: replyId,
       });
     } catch (e) {
-      toast.error("No se pudo enviar el sticker", { description: (e as Error).message });
+      toast.error(t("chatters.chat.couldNotSendSticker"), { description: (e as Error).message });
     } finally {
       setUploading(false);
     }
@@ -1209,7 +1214,7 @@ export const ChatPanel = ({ session }: Props) => {
       if (files.length > 0) {
         setUploading(true);
         for (const file of files) {
-          if (file.size > 50 * 1024 * 1024) throw new Error(`${file.name || "archivo"}: máximo 50 MB`);
+          if (file.size > 50 * 1024 * 1024) throw new Error(t("chatters.chat.fileMax50mbN", { name: file.name || t("chatters.chat.fileLower") }));
           const sanitized =
             (file.name || "upload").toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80) ||
             `upload-${Date.now()}`;
@@ -1238,7 +1243,7 @@ export const ChatPanel = ({ session }: Props) => {
         .eq("id", session.id as never)
         .then(() => {}, () => {});
     } catch (e) {
-      toast.error("No se pudo enviar", { description: (e as Error).message });
+      toast.error(t("common.couldNotSend"), { description: (e as Error).message });
       throw e; // el composer mantiene texto + adjuntos
     } finally {
       setUploading(false);
@@ -1249,12 +1254,12 @@ export const ChatPanel = ({ session }: Props) => {
     if (!session) return;
     let amount = amountArg;
     if (typeof amount !== "number") {
-      const raw = prompt("Monto del tip ($):", "10");
+      const raw = prompt(t("chatters.chat.tipAmountPrompt"), "10");
       if (!raw) return;
       amount = parseFloat(raw);
     }
     if (isNaN(amount) || amount <= 0) {
-      toast.error("Monto inválido");
+      toast.error(t("chatters.chat.invalidAmount"));
       return;
     }
     try {
@@ -1263,10 +1268,10 @@ export const ChatPanel = ({ session }: Props) => {
         role: "system",
         msgType: "tip",
         price: amount,
-        content: `Tip de $${amount}`,
+        content: `Tip de $${amount}`, // se guarda en chatter_messages: dato, no se traduce
       });
     } catch (e) {
-      toast.error("No se pudo enviar tip", { description: (e as Error).message });
+      toast.error(t("chatters.chat.couldNotSendTip"), { description: (e as Error).message });
     }
   };
 
@@ -1331,7 +1336,7 @@ export const ChatPanel = ({ session }: Props) => {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 p-8 text-center text-muted-foreground">
         <MessageCircle className="h-10 w-10" />
-        <p className="text-sm">Selecciona una sesión a la izquierda para empezar a chatear.</p>
+        <p className="text-sm">{t("chatters.chat.pickSession")}</p>
       </div>
     );
   }
@@ -1342,7 +1347,7 @@ export const ChatPanel = ({ session }: Props) => {
       await navigator.clipboard.writeText(url);
       setLinkCopied(true);
       setTimeout(() => setLinkCopied(false), 1500);
-      toast.success("Link copiado");
+      toast.success(t("chatters.newSess.linkCopied"));
     } catch (e) {
       toast.error((e as Error).message);
     }
@@ -1364,9 +1369,9 @@ export const ChatPanel = ({ session }: Props) => {
         const isLow = remaining > 0 && remaining < 5 * 60_000;
         const ended = session.status === "ended";
         const timeLabel = ended
-          ? "Cerrada"
+          ? t("chatters.chat.closed")
           : session.status === "waiting"
-          ? "Esperando…"
+          ? t("chatters.chat.waiting")
           : formatRemaining(remaining);
         const timeClass = ended
           ? "text-muted-foreground"
@@ -1404,14 +1409,14 @@ export const ChatPanel = ({ session }: Props) => {
                         setRenameOpen(true);
                       }}
                       className="shrink-0 rounded p-0.5 opacity-60 hover:bg-muted hover:opacity-100"
-                      title="Editar nombre"
-                      aria-label="Editar nombre del chatter"
+                      title={t("chatters.chat.editName")}
+                      aria-label={t("chatters.chat.editChatterName")}
                     >
                       <Pencil className="h-3 w-3" />
                     </button>
                   )}
                   {session.typing_chatter && !ended && (
-                    <span className="italic text-success">escribiendo…</span>
+                    <span className="italic text-success">{t("chatters.sess.typing")}</span>
                   )}
                 </div>
               </div>
@@ -1420,7 +1425,7 @@ export const ChatPanel = ({ session }: Props) => {
             {/* Metrics (centered, fixed-width column so they don't slide
                 with the side content) */}
             <div className="flex flex-wrap items-center justify-center gap-6">
-              <Metric label="TIEMPO" value={timeLabel} valueClass={`font-mono ${timeClass}`} />
+              <Metric label={t("chatters.chat.metricTime")} value={timeLabel} valueClass={`font-mono ${timeClass}`} />
               <Metric label="MSGS" value={String(metrics.msgCount)} valueClass="font-mono" />
               <Metric label="WPM" value={String(metrics.wpm)} valueClass="font-mono" />
               <Metric label="RESP. TIME" value={metrics.respTime} valueClass="font-mono" />
@@ -1435,8 +1440,8 @@ export const ChatPanel = ({ session }: Props) => {
                 size="icon"
                 variant="outline"
                 onClick={handleCopyLink}
-                title="Copiar link para el chatter"
-                aria-label="Copiar link para el chatter"
+                title={t("chatters.chat.copyLink")}
+                aria-label={t("chatters.chat.copyLink")}
                 className="h-8 w-8"
               >
                 {linkCopied ? (
@@ -1453,8 +1458,8 @@ export const ChatPanel = ({ session }: Props) => {
                   setAddTimeOpen(true);
                 }}
                 disabled={ended}
-                title="Añadir tiempo a la sesión"
-                aria-label="Añadir tiempo a la sesión"
+                title={t("chatters.chat.addTimeTitle")}
+                aria-label={t("chatters.chat.addTimeTitle")}
                 className="h-8 w-8"
               >
                 <Clock className="h-4 w-4" />
@@ -1464,8 +1469,8 @@ export const ChatPanel = ({ session }: Props) => {
                 variant="outline"
                 onClick={() => setEndOpen(true)}
                 disabled={ended}
-                title="Terminar la sesión de chat"
-                aria-label="Terminar la sesión de chat"
+                title={t("chatters.chat.endChatTitle")}
+                aria-label={t("chatters.chat.endChatTitle")}
                 className="h-8 w-8 border-destructive/60 text-destructive hover:bg-destructive/10 hover:text-destructive"
               >
                 <Square className="h-4 w-4 fill-current" />
@@ -1478,11 +1483,11 @@ export const ChatPanel = ({ session }: Props) => {
       {/* Messages */}
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto p-3 space-y-3" style={{ fontSize: `${chatFontSize}px` }}>
         {messagesQ.isLoading && (
-          <p className="text-xs text-muted-foreground">Cargando mensajes…</p>
+          <p className="text-xs text-muted-foreground">{t("chatters.chat.loadingMessages")}</p>
         )}
         {!messagesQ.isLoading && messages.length === 0 && (
           <p className="text-xs text-muted-foreground">
-            Aún no hay mensajes. Empieza tipeando como JavixBuster (rol "fan").
+            {t("chatters.chat.noMessages")}
           </p>
         )}
         {messages
@@ -1513,7 +1518,7 @@ export const ChatPanel = ({ session }: Props) => {
                 },
                 {
                   onError: (err) =>
-                    toast.error("No se pudo comprar", { description: (err as Error).message }),
+                    toast.error(t("chatters.chat.couldNotBuy"), { description: (err as Error).message }),
                 },
               );
             }}
@@ -1537,7 +1542,7 @@ export const ChatPanel = ({ session }: Props) => {
           value={input}
           onChange={handleInputChange}
           onSend={composerSend}
-          placeholder={`Mensaje como ${fanName}…`}
+          placeholder={t("chatters.chat.messageAs", { name: fanName })}
           busy={uploading}
           emojis={examinerEmojis}
           onAddEmoji={(e) => persistEmojis([...examinerEmojis, e])}
@@ -1549,18 +1554,18 @@ export const ChatPanel = ({ session }: Props) => {
                 <Reply className="h-4 w-4 shrink-0 text-primary" />
                 <div className="min-w-0 flex-1">
                   <div className="text-[11px] font-semibold text-primary">
-                    Respondiendo a {replyTo.role === "fan" ? fanName : profile?.name ?? "chatter"}
+                    {t("chatters.chat.replyingTo", { name: replyTo.role === "fan" ? fanName : profile?.name ?? "chatter" })}
                   </div>
                   <div className="truncate text-xs text-muted-foreground">
-                    {replyTo.content?.trim() || (replyTo.images && replyTo.images.length > 0 ? "📷 Foto" : "mensaje")}
+                    {replyTo.content?.trim() || (replyTo.images && replyTo.images.length > 0 ? t("chatters.chat.photo") : t("chatters.chat.messageLower"))}
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setReplyTo(null)}
                   className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-                  title="Cancelar respuesta"
-                  aria-label="Cancelar respuesta"
+                  title={t("chatters.chat.cancelReply")}
+                  aria-label={t("chatters.chat.cancelReply")}
                 >
                   <XIcon className="h-4 w-4" />
                 </button>
@@ -1576,14 +1581,14 @@ export const ChatPanel = ({ session }: Props) => {
                   <Button
                     size="icon"
                     variant="ghost"
-                    title="Enviar tip"
+                    title={t("chatters.chat.sendTip")}
                     className="h-9 w-9 text-amber-500 hover:bg-amber-500/10 hover:text-amber-400"
                   >
                     <DollarSign className="h-4 w-4" strokeWidth={3} />
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-56 p-2" align="start" side="top">
-                  <div className="mb-1 text-xs font-medium text-muted-foreground">Tip rápido</div>
+                  <div className="mb-1 text-xs font-medium text-muted-foreground">{t("chatters.chat.quickTip")}</div>
                   <div className="grid grid-cols-3 gap-1">
                     {[5, 10, 20, 50, 100, 200].map((amt) => (
                       <Button key={amt} size="sm" variant="outline" className="h-8 text-xs" onClick={() => handleSendTip(amt)}>
@@ -1592,7 +1597,7 @@ export const ChatPanel = ({ session }: Props) => {
                     ))}
                   </div>
                   <Button size="sm" variant="ghost" className="mt-1 w-full text-xs" onClick={() => handleSendTip()}>
-                    Otro monto…
+                    {t("chatters.chat.otherAmount")}
                   </Button>
                 </PopoverContent>
               </Popover>
@@ -1601,7 +1606,7 @@ export const ChatPanel = ({ session }: Props) => {
                   onClick={toggleDictation}
                   size="icon"
                   variant={listening ? "default" : "ghost"}
-                  title={listening ? "Detener dictado" : "Dictar (Web Speech)"}
+                  title={listening ? t("chatters.chat.stopDictation") : t("chatters.chat.dictate")}
                   className={listening ? "h-9 w-9 bg-destructive text-destructive-foreground hover:bg-destructive/90" : "h-9 w-9 text-muted-foreground"}
                 >
                   {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
@@ -1640,17 +1645,16 @@ export const ChatPanel = ({ session }: Props) => {
       >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Editar mensaje</DialogTitle>
+            <DialogTitle>{t("chatters.chat.editMessage")}</DialogTitle>
             <DialogDescription>
-              El chatter va a ver el texto nuevo + una pequeña tag
-              "(editado)" debajo de la burbuja.
+              {t("chatters.chat.editMessageDesc")}
             </DialogDescription>
           </DialogHeader>
           <Textarea
             value={editDraft}
             onChange={(e) => setEditDraft(e.target.value)}
             rows={4}
-            placeholder="Texto del mensaje…"
+            placeholder={t("chatters.chat.messageTextPh")}
             className="resize-none"
           />
           <DialogFooter>
@@ -1662,7 +1666,7 @@ export const ChatPanel = ({ session }: Props) => {
               }}
               disabled={editMsgMut.isPending}
             >
-              Cancelar
+              {t("common.cancel")}
             </Button>
             <Button
               onClick={() => {
@@ -1681,7 +1685,7 @@ export const ChatPanel = ({ session }: Props) => {
                       setEditDraft("");
                     },
                     onError: (err) =>
-                      toast.error("No se pudo editar", {
+                      toast.error(t("chatters.chat.couldNotEdit"), {
                         description: (err as Error).message,
                       }),
                   },
@@ -1690,7 +1694,7 @@ export const ChatPanel = ({ session }: Props) => {
               disabled={editMsgMut.isPending || !editDraft.trim()}
             >
               {editMsgMut.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Guardar
+              {t("common.save")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1702,20 +1706,19 @@ export const ChatPanel = ({ session }: Props) => {
       <Dialog open={!!historyMsg} onOpenChange={(o) => !o && setHistoryMsg(null)}>
         <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Historial del mensaje</DialogTitle>
+            <DialogTitle>{t("chatters.chat.messageHistory")}</DialogTitle>
             <DialogDescription>
-              {historyMsg?.content_history?.length ?? 0} versión(es) anterior(es).
-              La actual es la que ve el chatter ahora.
+              {t("chatters.chat.previousVersions", { n: historyMsg?.content_history?.length ?? 0 })}
             </DialogDescription>
           </DialogHeader>
           {historyMsg && (
             <div className="space-y-2">
               <div className="rounded-lg border border-primary/40 bg-primary/5 p-3">
                 <div className="mb-1 flex items-center gap-2 text-xs font-semibold text-primary">
-                  <span>Actual</span>
+                  <span>{t("chatters.chat.current")}</span>
                   {historyMsg.edited_at && (
                     <span className="font-normal normal-case text-muted-foreground">
-                      editada {new Date(historyMsg.edited_at).toLocaleString()}
+                      {t("chatters.chat.editedAt", { date: new Date(historyMsg.edited_at).toLocaleString() })}
                     </span>
                   )}
                 </div>
@@ -1724,14 +1727,14 @@ export const ChatPanel = ({ session }: Props) => {
               {(historyMsg.content_history ?? []).map((h, i) => (
                 <div key={i} className="rounded-lg border bg-muted/30 p-3">
                   <div className="mb-1 text-xs font-semibold text-muted-foreground">
-                    {i === 0 ? "Versión previa" : `Versión hace ${i + 1}`}
+                    {i === 0 ? t("chatters.chat.previousVersion") : t("chatters.chat.versionAgo", { n: i + 1 })}
                     {h.edited_at && (
                       <span className="ml-2 font-normal normal-case">
                         ({new Date(h.edited_at).toLocaleString()})
                       </span>
                     )}
                   </div>
-                  <div className="whitespace-pre-wrap text-sm">{h.content || <em className="opacity-60">(vacío)</em>}</div>
+                  <div className="whitespace-pre-wrap text-sm">{h.content || <em className="opacity-60">{t("chatters.field.empty")}</em>}</div>
                 </div>
               ))}
             </div>
@@ -1744,10 +1747,10 @@ export const ChatPanel = ({ session }: Props) => {
       <AlertDialog open={!!confirmDelMsg} onOpenChange={(o) => !o && setConfirmDelMsg(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Eliminar mensaje</AlertDialogTitle>
+            <AlertDialogTitle>{t("chatters.chat.deleteMessage")}</AlertDialogTitle>
             <AlertDialogDescription>
               {confirmDelMsg
-                ? `¿Eliminar este mensaje? Desaparece para ti y el chatter. No se puede deshacer.`
+                ? t("chatters.chat.deleteMessageConfirm")
                 : ""}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -1763,14 +1766,14 @@ export const ChatPanel = ({ session }: Props) => {
                   {
                     onSuccess: () => setConfirmDelMsg(null),
                     onError: (err) =>
-                      toast.error("No se pudo eliminar", { description: (err as Error).message }),
+                      toast.error(t("common.couldNotDelete"), { description: (err as Error).message }),
                   },
                 );
               }}
               disabled={deleteMsgMut.isPending}
             >
               {deleteMsgMut.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Eliminar
+              {t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1781,10 +1784,9 @@ export const ChatPanel = ({ session }: Props) => {
       <AlertDialog open={endOpen} onOpenChange={setEndOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Terminar sesión</AlertDialogTitle>
+            <AlertDialogTitle>{t("chatters.chat.endSession")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Esto cierra la sesión para el chatter. No podrá seguir escribiendo
-              y el link se invalida. ¿Seguro?
+              {t("chatters.chat.endSessionDesc")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1796,10 +1798,10 @@ export const ChatPanel = ({ session }: Props) => {
                 endMut.mutate(session.id, {
                   onSuccess: () => {
                     setEndOpen(false);
-                    toast.success("Sesión terminada");
+                    toast.success(t("chatters.chat.sessionEnded"));
                   },
                   onError: (err) =>
-                    toast.error("No se pudo terminar", {
+                    toast.error(t("chatters.sess.couldNotEnd"), {
                       description: (err as Error).message,
                     }),
                 });
@@ -1807,7 +1809,7 @@ export const ChatPanel = ({ session }: Props) => {
               disabled={endMut.isPending}
             >
               {endMut.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Terminar
+              {t("chatters.chat.end")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1817,13 +1819,13 @@ export const ChatPanel = ({ session }: Props) => {
       <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Editar nombre del chatter</DialogTitle>
+            <DialogTitle>{t("chatters.chat.editChatterName")}</DialogTitle>
           </DialogHeader>
           <Input
             autoFocus
             value={renameValue}
             onChange={(e) => setRenameValue(e.target.value)}
-            placeholder="Nombre del chatter"
+            placeholder={t("chatters.newSess.chatterName")}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();
@@ -1833,10 +1835,10 @@ export const ChatPanel = ({ session }: Props) => {
                   {
                     onSuccess: () => {
                       setRenameOpen(false);
-                      toast.success("Nombre actualizado");
+                      toast.success(t("chatters.chat.nameUpdated"));
                     },
                     onError: (err) =>
-                      toast.error("No se pudo actualizar", { description: (err as Error).message }),
+                      toast.error(t("common.couldNotUpdate"), { description: (err as Error).message }),
                   },
                 );
               }
@@ -1844,7 +1846,7 @@ export const ChatPanel = ({ session }: Props) => {
           />
           <DialogFooter>
             <Button variant="outline" onClick={() => setRenameOpen(false)} disabled={renameMut.isPending}>
-              Cancelar
+              {t("common.cancel")}
             </Button>
             <Button
               onClick={() => {
@@ -1854,17 +1856,17 @@ export const ChatPanel = ({ session }: Props) => {
                   {
                     onSuccess: () => {
                       setRenameOpen(false);
-                      toast.success("Nombre actualizado");
+                      toast.success(t("chatters.chat.nameUpdated"));
                     },
                     onError: (err) =>
-                      toast.error("No se pudo actualizar", { description: (err as Error).message }),
+                      toast.error(t("common.couldNotUpdate"), { description: (err as Error).message }),
                   },
                 );
               }}
               disabled={!renameValue.trim() || renameMut.isPending}
             >
               {renameMut.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Guardar
+              {t("common.save")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1874,9 +1876,9 @@ export const ChatPanel = ({ session }: Props) => {
       <Dialog open={addTimeOpen} onOpenChange={setAddTimeOpen}>
         <DialogContent className="max-w-sm text-center">
           <DialogHeader>
-            <DialogTitle>Agregar tiempo</DialogTitle>
+            <DialogTitle>{t("chatters.chat.addTime")}</DialogTitle>
             <DialogDescription>
-              Suma minutos al tiempo total de la sesión. El chatter lo verá al instante.
+              {t("chatters.chat.addTimeDesc")}
             </DialogDescription>
           </DialogHeader>
           <div className="flex items-center justify-center gap-2 py-2">
@@ -1897,20 +1899,20 @@ export const ChatPanel = ({ session }: Props) => {
                     {
                       onSuccess: () => {
                         setAddTimeOpen(false);
-                        toast.success(`+${m} min agregados`);
+                        toast.success(t("chatters.chat.minutesAdded", { n: m }));
                       },
                       onError: (err) =>
-                        toast.error("No se pudo extender", { description: (err as Error).message }),
+                        toast.error(t("chatters.chat.couldNotExtend"), { description: (err as Error).message }),
                     },
                   );
                 }
               }}
             />
-            <span className="text-sm text-muted-foreground">minutos</span>
+            <span className="text-sm text-muted-foreground">{t("chatters.chat.minutesLower")}</span>
           </div>
           <DialogFooter className="justify-center sm:justify-center">
             <Button variant="outline" onClick={() => setAddTimeOpen(false)} disabled={extendMut.isPending}>
-              Cancelar
+              {t("common.cancel")}
             </Button>
             <Button
               onClick={() => {
@@ -1921,17 +1923,17 @@ export const ChatPanel = ({ session }: Props) => {
                   {
                     onSuccess: () => {
                       setAddTimeOpen(false);
-                      toast.success(`+${m} min agregados`);
+                      toast.success(t("chatters.chat.minutesAdded", { n: m }));
                     },
                     onError: (err) =>
-                      toast.error("No se pudo extender", { description: (err as Error).message }),
+                      toast.error(t("chatters.chat.couldNotExtend"), { description: (err as Error).message }),
                   },
                 );
               }}
               disabled={extendMut.isPending}
             >
               {extendMut.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Agregar
+              {t("common.add")}
             </Button>
           </DialogFooter>
         </DialogContent>

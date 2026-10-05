@@ -13,6 +13,8 @@ import {
   type FunnelWindow,
 } from "@/hooks/useScouterLeads";
 import { ManagerDashboard } from "@/components/scouter/ManagerDashboard";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 
 // Funnel subtab — pipeline metrics for Scouter Assist. Reuses the
 // counts in scouter_leads (no new tables needed) and renders:
@@ -24,23 +26,24 @@ import { ManagerDashboard } from "@/components/scouter/ManagerDashboard";
 //   - Top discovery sources table
 //   - Per-company breakdown (with conversion to active%)
 
-const WINDOW_OPTIONS: Array<{ value: FunnelWindow; label: string }> = [
-  { value: "7d",  label: "Últimos 7 días" },
-  { value: "30d", label: "Últimos 30 días" },
-  { value: "90d", label: "Últimos 90 días" },
-  { value: "all", label: "Todo el histórico" },
+const WINDOW_OPTIONS: Array<{ value: FunnelWindow; labelKey: TranslationKey }> = [
+  { value: "7d",  labelKey: "scouter.funnel.last7" },
+  { value: "30d", labelKey: "scouter.funnel.last30" },
+  { value: "90d", labelKey: "scouter.funnel.last90" },
+  { value: "all", labelKey: "common.entireHistory" },
 ];
 
 const STAGES = [
-  { key: "discovered", label: "Descubiertos",        icon: Search,        color: "rgb(99 102 241)" },
-  { key: "contacted",  label: "Contactados",         icon: MessageSquare, color: "rgb(14 165 233)" },
-  { key: "confirmed",  label: "Confirmados",         icon: Handshake,     color: "rgb(22 163 74)" },
-  { key: "active",     label: "Activos / cerrados",  icon: Trophy,        color: "rgb(34 197 94)" },
+  { key: "discovered", labelKey: "scouter.funnel.stage.discovered", icon: Search,        color: "rgb(99 102 241)" },
+  { key: "contacted",  labelKey: "scouter.funnel.stage.contacted",  icon: MessageSquare, color: "rgb(14 165 233)" },
+  { key: "confirmed",  labelKey: "scouter.funnel.stage.confirmed",  icon: Handshake,     color: "rgb(22 163 74)" },
+  { key: "active",     labelKey: "scouter.funnel.stage.active",     icon: Trophy,        color: "rgb(34 197 94)" },
 ] as const;
 
 const formatPct = (n: number) => `${(n * 100).toFixed(1)}%`;
 
 const ScouterFunnel = () => {
+  const { t } = useLanguage();
   const [window, setWindow] = useState<FunnelWindow>("30d");
   const funnelQ = useScouterFunnel(window);
   const companiesQ = useScouterCompanies();
@@ -75,7 +78,7 @@ const ScouterFunnel = () => {
         <div>
           <h2 className="text-base font-semibold">Funnel</h2>
           <p className="text-xs text-muted-foreground">
-            De descubierto a activo — counts y conversiones por etapa.
+            {t("scouter.funnel.subtitle")}
           </p>
         </div>
         <Select value={window} onValueChange={(v) => setWindow(v as FunnelWindow)}>
@@ -85,7 +88,7 @@ const ScouterFunnel = () => {
           <SelectContent>
             {WINDOW_OPTIONS.map((o) => (
               <SelectItem key={o.value} value={o.value}>
-                {o.label}
+                {t(o.labelKey)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -111,7 +114,7 @@ const ScouterFunnel = () => {
                     <div className="flex items-center justify-between gap-3 text-sm">
                       <div className="flex items-center gap-2">
                         <Icon className="h-4 w-4" style={{ color: stage.color }} />
-                        <span className="font-medium">{stage.label}</span>
+                        <span className="font-medium">{t(stage.labelKey)}</span>
                       </div>
                       <div className="flex items-center gap-3 tabular-nums">
                         <span className="font-bold">{value}</span>
@@ -133,7 +136,7 @@ const ScouterFunnel = () => {
               })}
             </div>
             <div className="mt-4 flex items-center justify-between rounded-md bg-muted/40 px-3 py-2 text-sm">
-              <span className="text-muted-foreground">Conversión global (descubiertos → activos)</span>
+              <span className="text-muted-foreground">{t("scouter.funnel.overall")}</span>
               <span className="font-bold tabular-nums" style={{ color: "rgb(34 197 94)" }}>
                 {formatPct(data.rates.overall)}
               </span>
@@ -144,16 +147,16 @@ const ScouterFunnel = () => {
           <div className="grid grid-cols-2 gap-3">
             <OutcomeCard
               icon={XCircle}
-              label="Rechazados"
+              label={t("scouter.funnel.rejected")}
               value={data.funnel.rejected}
-              hint="Cierre fallido"
+              hint={t("scouter.funnel.rejectedHint")}
               color="rgb(248 113 113)"
             />
             <OutcomeCard
               icon={EyeOff}
-              label="Descartados"
+              label={t("scouter.funnel.discarded")}
               value={data.funnel.discarded}
-              hint="Sacados del pipeline"
+              hint={t("scouter.funnel.discardedHint")}
               color="rgb(161 161 170)"
             />
           </div>
@@ -163,10 +166,10 @@ const ScouterFunnel = () => {
             {/* Top sources */}
             <div className="rounded-xl border border-border bg-card p-4">
               <h3 className="mb-3 text-xs font-semibold text-muted-foreground">
-                Top fuentes de descubrimiento
+                {t("scouter.funnel.topSources")}
               </h3>
               {data.topSources.length === 0 ? (
-                <p className="text-xs text-muted-foreground">Sin fuentes registradas en este período.</p>
+                <p className="text-xs text-muted-foreground">{t("scouter.funnel.noSources")}</p>
               ) : (
                 <ul className="space-y-2">
                   {data.topSources.map((s) => {
@@ -194,10 +197,10 @@ const ScouterFunnel = () => {
             {/* Per-company breakdown */}
             <div className="rounded-xl border border-border bg-card p-4">
               <h3 className="mb-3 text-xs font-semibold text-muted-foreground">
-                Por compañía
+                {t("scouter.funnel.byCompany")}
               </h3>
               {data.perCompany.length === 0 ? (
-                <p className="text-xs text-muted-foreground">Sin compañías con leads en este período.</p>
+                <p className="text-xs text-muted-foreground">{t("scouter.funnel.noCompanies")}</p>
               ) : (
                 <ul className="space-y-2">
                   {data.perCompany.slice(0, 8).map((c) => {
@@ -216,7 +219,7 @@ const ScouterFunnel = () => {
                             <span className="font-bold" style={{ color: "rgb(34 197 94)" }}>
                               {c.active}
                             </span>{" "}
-                            activos
+                            {t("scouter.funnel.activeSuffix")}
                           </span>
                           <span className="rounded-md bg-muted/40 px-1.5 py-0.5">
                             {formatPct(conv)}
@@ -234,11 +237,11 @@ const ScouterFunnel = () => {
 
       {/* ─── Sección: Progreso del equipo ─────────────────────────────
           Vivía en ScouterHome arriba de los filtros, pero ocupaba mucho
-          espacio vertical en una vista enfocada a Listado. Acá tiene su
+          espacio vertical en una vista enfocada a Listado. Aquí tiene su
           lugar natural junto al Funnel. */}
       <div className="pt-2 border-t border-border/60">
         <div className="pt-4">
-          <h2 className="text-base font-semibold mb-3">Progreso del equipo</h2>
+          <h2 className="text-base font-semibold mb-3">{t("scouter.teamProgress")}</h2>
           <ManagerDashboard date={managerDate} onDateChange={setManagerDate} />
         </div>
       </div>

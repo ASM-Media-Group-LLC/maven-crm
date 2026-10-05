@@ -15,7 +15,9 @@ import { useAutoPiP } from "./useAutoPiP";
 import { suscribirOrdenesDePausa } from "@/lib/ordenesDePausa";
 
 import { Loader2, WifiOff, Copy, ChevronLeft, ChevronRight, DoorOpen, Check } from "lucide-react";
-import { TITULO_OTRA_PESTANA, DETALLE_OTRA_PESTANA, BOTON_USAR_AQUI } from "@/lib/sesionDuplicada";
+import { CLAVES_OTRA_PESTANA } from "@/lib/sesionDuplicada";
+import { caidaEnCurso, conexionDeSala, marcarCaida, olvidarCaida } from "@/lib/conexionSala";
+import type { ConexionSala } from "@/lib/coworkTiempoRegla";
 import { cn } from "@/lib/utils";
 import { puedeCompartirPantalla } from "@/lib/compartirPantalla";
 import { toast } from "sonner";
@@ -24,6 +26,7 @@ import { useFaceNudge, useScreenShareNudge } from "@/hooks/useFaceNudge";
 import { latirEnLlamada, salirDeLlamada, LATIDO_LLAMADA_MS } from "@/lib/llamadaEnMaven";
 import { useRegistrarLlamados } from "@/hooks/useRegistrarLlamados";
 import { esBlur, alternarBlur, leerFondoGuardado, guardarFondo, type BackgroundEffect } from "@/lib/fondoDeLlamada";
+import { useLanguage } from "@/hooks/useLanguage";
 
 const DEFAULT_VIEW_SETTINGS: ViewSettings = { layout: "auto", maxTiles: 49, hideNoVideo: false };
 
@@ -68,7 +71,11 @@ interface LiveKitCallViewProps {
   /** Custom token provider; bypasses the default livekit-token edge function */
   getToken?: () => Promise<{ token: string; url: string }>;
   /** Fires whenever the local participant's media state changes */
-  onMediaStateChange?: (state: { micOn: boolean; camOn: boolean; screenShareOn: boolean }) => void;
+  onMediaStateChange?: (state: {
+    micOn: boolean; camOn: boolean; screenShareOn: boolean;
+    /** Cómo está respecto de la sala. null = todavía entrando (no se sabe). */
+    conexionSala: ConexionSala | null;
+  }) => void;
   /**
    * Opt-in de la vigilancia de encuadre (¿se le ve la cara?). Solo se activa si
    * el contenedor pasa este callback: una llamada 1:1 del chat no lo necesita.
@@ -126,6 +133,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   // Lista de salas del navegador (solo Cowork supervisor+): estado del popup.
   const [salasAbiertas, setSalasAbiertas] = useState(false);
   const lk = useLiveKit();
+  const { t } = useLanguage();
 
   // Silencio local del audio entrante (p.ej. el Hub de Cowork mientras el
   // coordinador está metido en una sala). setVolume(0) por participante remoto:
@@ -161,27 +169,54 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   // puede reabrir sola (el navegador exige un clic): queda pendiente y se
   // muestra un botón.
   const antesDePausaRef = useRef<{ mic: boolean; cam: boolean; pantalla: boolean } | null>(null);
-  const [pantallaPendiente, setPantallaPendiente] = useState(false);
+  const [pantallaPendiente, setPantallaPendiente] = useState<null | "pausa">(null);
+  // ⚠️ VOLVIENDO DE UNA CAÍDA SE ENTRA CON CÁMARA Y MICRÓFONO APAGADOS. Se probó
+  // restaurarlos "como estaban" y cada combinación terminaba con el micrófono
+  // abierto sin que la persona lo pidiera: una pausa marcada a mitad del
+  // intento, alguien que la había silenciado, un F5 que arranca creyendo que
+  // estaba todo prendido, tocar el micrófono con la sala caída. Entrar apagado
+  // es como se entra a Cowork, y la persona está ahí: acaba de tocar Reconectar.
+  // Se declara acá arriba porque el efecto de conexión lo lee. Arranca con la
+  // marca de la pestaña: un F5 en plena caída también vuelve apagado.
+  const volviendoDeCaidaRef = useRef(caidaEnCurso(roomName));
+  // Si el intento EN CURSO entró apagado: solo entonces se avisa "quedaron apagados".
+  const intentoApagadoRef = useRef(false);
   const lkRef = useRef(lk);
   lkRef.current = lk;
   useEffect(() => suscribirOrdenesDePausa((orden) => {
     const l = lkRef.current;
+    // Sin sala no se toca nada: los interruptores actuarían sobre una sala que ya
+    // no existe (se tomaba el micrófono 15 s), y lo que "estaba prendido" no se
+    // sabe (tras un F5 arranca en true). Se vuelve de la caída con todo apagado.
+    const conSala = l.connectionState === ConnectionState.Connected
+      || l.connectionState === ConnectionState.Reconnecting
+      || l.connectionState === ConnectionState.SignalReconnecting;
+    // ⚠️ Se decide con el estado REAL del micrófono, el mismo que mira toggleMic,
+    // y no con `isMicOn`: si otro la había silenciado, `isMicOn` decía
+    // "prendido", la pausa llamaba a toggleMic para apagarlo y toggleMic —que sí
+    // sabe que está apagado— lo PRENDÍA durante toda la pausa.
+    const micReal = (): boolean => {
+      const lp = l.getRoom()?.localParticipant;
+      return typeof lp?.isMicrophoneEnabled === "boolean" ? lp.isMicrophoneEnabled : l.isMicOn;
+    };
     if (orden === "apagar") {
-      antesDePausaRef.current = { mic: l.isMicOn, cam: l.isCamOn, pantalla: l.isScreenSharing };
+      if (!conSala) { antesDePausaRef.current = null; setPantallaPendiente(null); return; }
+      const mic = micReal();
+      antesDePausaRef.current = { mic, cam: l.isCamOn, pantalla: l.isScreenSharing };
       if (l.isScreenSharing) void l.toggleScreenShare();
       if (l.isCamOn) void l.toggleCam();
-      if (l.isMicOn) void l.toggleMic();
-      setPantallaPendiente(false);
+      if (mic) void l.toggleMic();
+      setPantallaPendiente(null);
       return;
     }
     const antes = antesDePausaRef.current;
     antesDePausaRef.current = null;
-    if (!antes) return;
+    if (!antes || !conSala) return;
     if (antes.cam && !l.isCamOn) void l.toggleCam();
-    if (antes.mic && !l.isMicOn) void l.toggleMic();
-    if (antes.pantalla && !l.isScreenSharing) setPantallaPendiente(true);
+    if (antes.mic && !micReal()) void l.toggleMic();
+    if (antes.pantalla && !l.isScreenSharing) setPantallaPendiente("pausa");
   }), []);
-  useEffect(() => { if (lk.isScreenSharing) setPantallaPendiente(false); }, [lk.isScreenSharing]);
+  useEffect(() => { if (lk.isScreenSharing) setPantallaPendiente(null); }, [lk.isScreenSharing]);
 
   // PiP automático estilo Google Meet: al cambiar de pestaña/ventana, la llamada
   // aparece en la ventanita flotante del navegador (pantalla compartida o hablante).
@@ -299,11 +334,14 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
     let retried = false;
 
+    // Volviendo de una caída: todo apagado (ver volviendoDeCaidaRef).
+    const deCaida = volviendoDeCaidaRef.current;
+    intentoApagadoRef.current = deCaida;
     const tryConnect = async () => {
       try {
         await lk.connect(roomName, displayNameRef.current, isAdmin, {
-          initialMicOn,
-          initialCamOn,
+          initialMicOn: deCaida ? false : initialMicOn,
+          initialCamOn: deCaida ? false : initialCamOn,
           audioDeviceId: initialAudioDeviceId,
           videoDeviceId: initialVideoDeviceId,
           audioOutputDeviceId: initialAudioOutputDeviceId,
@@ -339,7 +377,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   useEffect(() => {
     if (!pantallaInicialRef.current || lk.connectionState !== ConnectionState.Connected || lk.isScreenSharing) return;
     pantallaInicialRef.current = false;
-    Promise.resolve(lk.toggleScreenShare()).catch(() => toast.info("Toca «Compartir pantalla» para volver a compartirla"));
+    Promise.resolve(lk.toggleScreenShare()).catch(() => toast.info(t("messenger.callView.tocaCompartir")));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lk.connectionState]);
 
@@ -357,12 +395,13 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     // le avisa a quien se va.
     const mia = leerMiGrabacion(roomName);
     if (mia) {
-      const ok = window.confirm("Estás grabando esta reunión. Si sales, la grabación se detiene y queda guardada en Grabaciones. ¿Salir?");
+      const ok = window.confirm(t("messenger.callView.confirmarSalirGrabando"));
       if (!ok) return;
       void detenerAlSalir(roomName, mia.id);
     }
-    lk.disconnect(); onLeave(); if (!suppressLeaveToast) toast.info("Llamada finalizada");
-  }, [lk, onLeave, suppressLeaveToast, roomName]);
+    olvidarCaida(roomName);
+    lk.disconnect(); onLeave(); if (!suppressLeaveToast) toast.info(t("messenger.callView.llamadaFinalizada"));
+  }, [lk, onLeave, suppressLeaveToast, roomName, t]);
 
   // Una acción de moderación puede volver con 403 del servidor (no eres
   // anfitrión, o intentás moderar al anfitrión): mostramos el motivo. Con el
@@ -373,9 +412,9 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
       await fn();
       toast.success(okMessage);
     } catch (e: any) {
-      toast.error(e?.message || "No se pudo aplicar la acción");
+      toast.error(e?.message || t("messenger.callView.noSePudoAplicar"));
     }
-  }, []);
+  }, [t]);
 
   const handleModeration = useCallback(
     (fn: (identity: string) => Promise<void>, okMessage: string) => (identity: string) => {
@@ -455,6 +494,70 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   // La lista se sigue usando para DIBUJAR (el tile de pantalla), que es su
   // trabajo. Para decidir si se le reclama a alguien, manda el estado real.
   const localScreenShare = compartiendoReal;
+
+  // ── LA SALA SE CAYÓ ───────────────────────────────────────────────────────
+  // Antes, cuando LiveKit se rendía (~19 s de reintentos) la persona quedaba con
+  // la grilla vacía, sin cartel, sin botón y sin reconexión: una caída duraba lo
+  // que tardara en darse cuenta, y el reloj de Cowork la anotaba como "sin
+  // cámara". Ahora se informa la conexión al reloj (que paga hasta 10 min de
+  // caídas por hora) y se muestra un cartel con un botón para volver. Decisión
+  // de Jhon, 29/09/2026.
+  // Sobrevive a recargar la página (sessionStorage, por sala y por pestaña): si
+  // no, un F5 en medio de la caída —o la recarga sola por un deploy— hacía que el
+  // primer intento fallido se leyera como "primera entrada": el reloj volvía a
+  // anotar "sin cámara" y aparecía la pantalla de error que saca de la sala.
+  const [yaEstuvoConectada, setYaEstuvoConectada] = useState(() => caidaEnCurso(roomName));
+  // Otra sala se mira por su cuenta: entrar a una sala nueva no es "caerse".
+  useEffect(() => { setYaEstuvoConectada(caidaEnCurso(roomName)); }, [roomName]);
+  // Irse de la sala dentro de la app (cambiar de sala, colgar desde la
+  // ventanita) borra la marca. Un F5 o una recarga por deploy no corren esta
+  // limpieza, así que la marca sobrevive justo en el caso para el que existe.
+  useEffect(() => () => olvidarCaida(roomName), [roomName]);
+  // Se marca al LLEGAR a conectada, no con cualquier render conectado: al cambiar
+  // de sala hay un render con el nombre nuevo y la conexión vieja todavía viva.
+  // Arranca en "desconectada": la vista que se monta YA conectada también cuenta
+  // como llegada.
+  const estadoAnteriorRef = useRef<ConnectionState | string>(ConnectionState.Disconnected);
+  const [volvioDeCaida, setVolvioDeCaida] = useState(false);
+  useEffect(() => {
+    const antes = estadoAnteriorRef.current;
+    estadoAnteriorRef.current = lk.connectionState;
+    if (lk.connectionState !== ConnectionState.Connected || antes === ConnectionState.Connected) return;
+    setYaEstuvoConectada(true);
+    olvidarCaida(roomName);
+    volviendoDeCaidaRef.current = false;
+    if (intentoApagadoRef.current) { intentoApagadoRef.current = false; setVolvioDeCaida(true); }
+  }, [lk.connectionState, roomName]);
+  const conexionActual = conexionDeSala(lk.connectionState, lk.razonDeSalida, yaEstuvoConectada);
+  const salaCaida = conexionActual === "desconectada";
+  const salaConectada = lk.connectionState === ConnectionState.Connected;
+
+  useEffect(() => {
+    if (!salaCaida) return;
+    volviendoDeCaidaRef.current = true;
+    marcarCaida(roomName);
+  }, [salaCaida, roomName]);
+  // El aviso de vuelta se va solo en cuanto prende la cámara o el micrófono.
+  useEffect(() => { if (lk.isCamOn || lk.isMicOn) setVolvioDeCaida(false); }, [lk.isCamOn, lk.isMicOn]);
+  // Con sala de verdad (conectada o en los segundos de reintento de LiveKit).
+  // Fuera de eso —caída, otra pestaña, la primera entrada que falló— los avisos
+  // de "prende la cámara" mandarían a arreglar lo que no está roto.
+  const conSalaViva = conexionActual === "conectada" || conexionActual === "reconectando";
+  // Con la sala caída los interruptores no hacen nada: actuaban sobre una sala
+  // que ya no existe (se tomaba el micrófono 15 s y salía "el micrófono no
+  // enciende"). Se avisa qué hacer.
+  const primeroReconectar = useCallback(() => {
+    toast.info(t(lkRef.current.connectionState === ConnectionState.Disconnected
+      ? "messenger.callView.primeroReconecta" : "messenger.callView.esperaALaSala"));
+  }, [t]);
+
+  // ⚠️ SE VUELVE CON UN BOTÓN, NO SOLA. Esta vista la usan TODAS las llamadas de
+  // Maven, y la vuelta automática abría problemas peores que la caída: una
+  // laptop que perdió el wifi volvía sola horas después a la llamada, con el
+  // micrófono abierto; en Cowork, el equipo abandonado le quitaba el lugar al
+  // teléfono que la persona sí estaba usando. Con el botón, vuelve quien está.
+  // El botón solo aparece sin un intento en curso (ver el cartel).
+  const puedeReconectar = salaCaida && lk.connectionState === ConnectionState.Disconnected;
   const onMediaStateChangeRef = useRef(onMediaStateChange);
   onMediaStateChangeRef.current = onMediaStateChange;
   // Vigilancia de encuadre sobre la cámara local. El track sale del room de
@@ -492,7 +595,10 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   // navegar a otra sección de Maven (se muda a la ventanita flotante); la
   // página no. Cuando el aviso vivía allá, se apagaba justo cuando la persona
   // se iba a mirar otra pestaña — o sea, justo cuando más falta hace.
-  useFaceNudge(supervisorEncuadre ? faceWatch : null);
+  // Con la sala caída la cámara se ve apagada aunque no lo esté: reclamarle
+  // "prende la cámara" la mandaría a arreglar lo que no está roto, en vez de
+  // enterarse de que se cayó la sala (para eso está el cartel).
+  useFaceNudge(supervisorEncuadre && conSalaViva ? faceWatch : null);
   // Cualquier llamada que NO es la sala de Cowork (Messenger, Meet, la 1:1 con
   // el coordinador) deja un latido en localStorage mientras está montada: el
   // supervisor de encuadre de Cowork lo consulta en cada tic y se calla — estar
@@ -506,7 +612,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   }, [supervisorEncuadre]);
   // En Cowork la pantalla compartida es la mitad del trabajo: sin ella se ve la
   // cara pero no QUÉ está haciendo la persona.
-  useScreenShareNudge(localScreenShare, !!supervisorEncuadre);
+  useScreenShareNudge(localScreenShare, !!supervisorEncuadre && conSalaViva);
   // Y que quede constancia: los mismos llamados, guardados. Va acá al lado de
   // los avisos a propósito — se anota lo que la persona efectivamente escuchó,
   // no una regla parecida calculada en otra parte que puede irse separando.
@@ -518,7 +624,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     // todo el mundo se ve apagada aunque esté prendida. Sin esto, una caída de
     // veinte minutos le anotaba a cada persona veinte minutos de "cámara
     // apagada" — y como Supabase vive en otro servidor, las escrituras salían.
-    conectado: lk.connectionState === ConnectionState.Connected,
+    conectado: salaConectada,
   });
   const onFaceStateChangeRef = useRef(onFaceStateChange);
   onFaceStateChangeRef.current = onFaceStateChange;
@@ -526,10 +632,44 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     onFaceStateChangeRef.current?.(faceWatch);
   }, [faceWatch]);
 
+  // ⚠️ EL BUG ERA LA LISTA DE DEPENDENCIAS.
+  //
+  // El efecto reportaba `camaraRealOn` pero su lista de dependencias miraba
+  // `localCamOn`, que es OTRA variable. Y con la pantalla compartida —que es
+  // justo cuando importa— `localCamOn` queda CLAVADO en false: la lista de
+  // participantes trae DOS recuadros para quien comparte (`tilesDeParticipante`
+  // en useLiveKit.ts) y el PRIMERO es el de la pantalla, con `isCameraOff: true`
+  // escrito a mano; el `find(p => p.isLocal)` de arriba agarra ese. Entonces la
+  // dependencia no cambiaba nunca, el efecto no se volvía a ejecutar y el
+  // `setInterval` re-mandaba cada 10 s el `camaraRealOn` que había quedado
+  // atrapado en el closure.
+  //
+  // Reportado por Maria Villegas el 28/09/2026: su cara visible en la grilla de
+  // Maven y el reloj diciendo "cámara apagada" durante 5 minutos, con el tramo
+  // empezando 3 segundos después de re-entrar a la sala. Prender y apagar la
+  // cámara no la destrababa —no cambia ninguna dependencia—; solo tocar el
+  // micrófono o dejar de compartir.
+  //
+  // ⚠️ FALLA EN LAS DOS DIRECCIONES, y por eso urge: congelado en `false` no le
+  // cuenta tiempo que trabajó; congelado en `true` le cuenta tiempo con la
+  // cámara apagada. Este reloj reemplaza a Hubstaff: mueve pago.
+  //
+  // Lo que arregla el bug son las DEPENDENCIAS: ahora miran `camaraRealOn`, que
+  // es el valor que de verdad se reporta, así que un cambio sale en el momento
+  // y no hasta 10 s después.
+  // El ref es aparte y es defensivo: hace que el repetidor lea siempre el valor
+  // vigente, así que si mañana alguien agrega un cuarto dato al aviso y se
+  // olvida de ponerlo en las dependencias, el repetidor no puede volver a
+  // quedarse pegado. Mismo patrón que `onMediaStateChangeRef` de acá arriba.
+  // `conexionSala` va en el mismo aviso que la cámara, y no en otro: con la sala
+  // caída los dos cambian en el mismo render, y el reloj tiene que ver los dos
+  // juntos para no anotar un "sin cámara" de paso.
+  const mediaReportadaRef = useRef<{ micOn: boolean; camOn: boolean; screenShareOn: boolean; conexionSala: ConexionSala | null }>({
+    micOn: false, camOn: false, screenShareOn: false, conexionSala: null,
+  });
+  mediaReportadaRef.current = { micOn: localMicOn, camOn: camaraRealOn, screenShareOn: localScreenShare, conexionSala: conexionActual };
   useEffect(() => {
-    const avisar = () => onMediaStateChangeRef.current?.({
-      micOn: localMicOn, camOn: camaraRealOn, screenShareOn: localScreenShare,
-    });
+    const avisar = () => onMediaStateChangeRef.current?.(mediaReportadaRef.current);
     avisar();
     // Se repite cada 10 s aunque no cambie nada. El aviso "solo al cambiar"
     // deja a la persona invisible para el supervisor si ESE aviso se pierde
@@ -537,7 +677,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     // cualquier hueco en 10 segundos de atraso en vez de un turno entero.
     const id = window.setInterval(avisar, 10_000);
     return () => window.clearInterval(id);
-  }, [localMicOn, localCamOn, localScreenShare]);
+  }, [localMicOn, camaraRealOn, localScreenShare, conexionActual]);
 
   const effectiveLayout: "grid" | "sidebar" = useMemo(() => {
     if (pinnedSid) return "sidebar";
@@ -584,21 +724,24 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
 
   const room = lk.getRoom();
 
-  if (lk.connectionState === ConnectionState.Connecting) {
+  // Volviendo de una caída NO se tapa la llamada: se queda el cartel.
+  if (lk.connectionState === ConnectionState.Connecting && !yaEstuvoConectada) {
     return (
       <div className="flex flex-col h-full bg-background text-foreground items-center justify-center gap-4">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
-        <p className="text-sm text-muted-foreground">Conectando a la sala...</p>
+        <p className="text-sm text-muted-foreground">{t("messenger.callView.conectando")}</p>
       </div>
     );
   }
 
-  if (lk.error) {
+  // Un intento de volver que falla deja `error`: no es para mostrar la pantalla
+  // de error, cuyo único botón SACA de la sala. Se sigue intentando.
+  if (lk.error && !salaCaida) {
     return (
       <div className="flex flex-col h-full bg-background text-foreground items-center justify-center gap-4">
-        <p className="text-destructive font-medium">Error de conexión</p>
+        <p className="text-destructive font-medium">{t("messenger.callView.errorConexion")}</p>
         <p className="text-sm text-muted-foreground max-w-md text-center">{lk.error}</p>
-        <button onClick={handleLeave} className="mt-4 px-4 py-2 rounded-full bg-primary text-white text-sm hover:bg-primary/90">Volver</button>
+        <button onClick={handleLeave} className="mt-4 px-4 py-2 rounded-full bg-primary text-white text-sm hover:bg-primary/90">{t("common.back")}</button>
       </div>
     );
   }
@@ -623,11 +766,11 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
       <button
         type="button"
         onClick={() => setSalasAbiertas((v) => !v)}
-        title="Cambiar de sala: te saca de la actual y entras muteado a la elegida"
+        title={t("messenger.callView.cambiarDeSala")}
         className={`flex items-center gap-1.5 rounded-full bg-muted/60 px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:bg-muted ${effectiveCompact ? "max-w-[190px]" : "max-w-[240px]"}`}
       >
         <DoorOpen className="h-3.5 w-3.5 shrink-0" />
-        <span className="truncate">{salasNavegables[salaActualIdx]?.name ?? "Salas"}</span>
+        <span className="truncate">{salasNavegables[salaActualIdx]?.name ?? t("messenger.callView.salas")}</span>
         <ChevronRight className={`h-3 w-3 shrink-0 transition-transform ${salasAbiertas ? "-rotate-90" : "rotate-90"}`} />
       </button>
       {salasAbiertas && (
@@ -654,7 +797,26 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
 
       {lk.isReconnecting && (
         <div className="shrink-0 flex items-center justify-center gap-2 py-1.5 bg-warning/15 text-warning text-xs font-medium">
-          <WifiOff className="h-3.5 w-3.5 animate-pulse" /> Reconectando...
+          <WifiOff className="h-3.5 w-3.5 animate-pulse" /> {t("messenger.callView.reconectando")}
+        </div>
+      )}
+      {salaCaida && (
+        <div role="status" className="shrink-0 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 py-2 px-3 bg-warning/15 text-warning text-xs font-medium text-center">
+          <WifiOff className="h-3.5 w-3.5 shrink-0 animate-pulse" />
+          {puedeReconectar ? (
+            <>
+              <span>{t("messenger.callView.salaCaida")}</span>
+              <button
+                type="button"
+                onClick={() => setReintentoManual((n) => n + 1)}
+                className="rounded-full bg-warning px-3 py-1 text-warning-foreground font-semibold hover:bg-warning/90"
+              >
+                {t("messenger.callView.reconectarAhora")}
+              </button>
+            </>
+          ) : (
+            <span>{t("messenger.callView.volviendoALaSala")}</span>
+          )}
         </div>
       )}
 
@@ -662,32 +824,41 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
           reconecta solo a propósito: si lo hiciera, patearía a la otra pestaña,
           que volvería a patear a esta, y así para siempre. Se le muestra qué
           pasó y se le deja elegir dónde quedarse. */}
+      {volvioDeCaida && !salaCaida && (
+        <div role="status" className="shrink-0 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 py-2 px-3 bg-primary/15 text-foreground text-xs font-medium text-center">
+          {/* La pantalla solo se nombra en Cowork, donde se comparte. */}
+          <span>{t(supervisorEncuadre && !hideScreenShare ? "messenger.callView.volvisteALaSala" : "messenger.callView.volvisteALaLlamada")}</span>
+          <button type="button" onClick={() => setVolvioDeCaida(false)} className="underline underline-offset-2 opacity-80 hover:opacity-100">
+            {t("messenger.callView.entendido")}
+          </button>
+        </div>
+      )}
       {pantallaPendiente && (
         <div className="shrink-0 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 py-2 px-3 bg-primary/15 text-foreground text-xs font-medium text-center">
-          <span>Volviste de la pausa. Tu cámara y tu micrófono ya están encendidos; la pantalla hay que retomarla.</span>
+          <span>{t("messenger.callView.volvisteDeLaPausa")}</span>
           <button
             type="button"
-            onClick={() => { void lk.toggleScreenShare(); setPantallaPendiente(false); }}
+            onClick={() => { void lk.toggleScreenShare(); setPantallaPendiente(null); }}
             className="rounded-full bg-primary px-3 py-1 text-primary-foreground font-semibold hover:bg-primary/90"
           >
-            Volver a compartir pantalla
+            {t("messenger.callView.volverACompartir")}
           </button>
-          <button type="button" onClick={() => setPantallaPendiente(false)} className="underline underline-offset-2 opacity-80 hover:opacity-100">
-            Ahora no
+          <button type="button" onClick={() => setPantallaPendiente(null)} className="underline underline-offset-2 opacity-80 hover:opacity-100">
+            {t("messenger.callView.ahoraNo")}
           </button>
         </div>
       )}
       {lk.otraPestanaTomoLaSesion && (
         <div className="shrink-0 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 py-2 px-3 bg-warning/15 text-warning text-xs font-medium text-center">
           <Copy className="h-3.5 w-3.5 shrink-0" />
-          <span>{TITULO_OTRA_PESTANA}.</span>
-          <span className="font-normal opacity-80">{DETALLE_OTRA_PESTANA}</span>
+          <span>{t(CLAVES_OTRA_PESTANA.titulo)}.</span>
+          <span className="font-normal opacity-80">{t(CLAVES_OTRA_PESTANA.detalle)}</span>
           <button
             type="button"
             onClick={() => setReintentoManual((n) => n + 1)}
             className="underline underline-offset-2 hover:opacity-80"
           >
-            {BOTON_USAR_AQUI}
+            {t(CLAVES_OTRA_PESTANA.usarAqui)}
           </button>
         </div>
       )}
@@ -765,7 +936,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
 
           {lk.participants.length <= 1 && (
             <div className="pointer-events-none absolute inset-x-0 bottom-8 flex justify-center px-4">
-              <div className="rounded-full bg-[hsl(220_3%_20%/0.9)] border border-border px-3 py-1.5 text-xs text-muted-foreground backdrop-blur-sm">Esperando a que otros participantes se unan...</div>
+              <div className="rounded-full bg-[hsl(220_3%_20%/0.9)] border border-border px-3 py-1.5 text-xs text-muted-foreground backdrop-blur-sm">{t("messenger.callView.esperando")}</div>
             </div>
           )}
 
@@ -786,28 +957,28 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
           <CallParticipantsSidebar
             participants={lk.participants}
             isAdmin={isAdmin}
-            onMuteParticipant={handleModeration(lk.muteParticipant, "Silenciado")}
-            onRemoveParticipant={handleModeration(lk.removeParticipant, "Sacado de la llamada")}
+            onMuteParticipant={handleModeration(lk.muteParticipant, t("messenger.callView.silenciado"))}
+            onRemoveParticipant={handleModeration(lk.removeParticipant, t("messenger.callView.sacado"))}
             onSetCanPublish={(identity, canPublish) =>
               runModeration(
                 () => lk.setParticipantCanPublish(identity, canPublish),
-                canPublish ? "Puede volver a hablar" : "Queda solo como oyente",
+                canPublish ? t("messenger.callView.puedeHablar") : t("messenger.callView.soloOyente"),
               )}
             onSetCohost={(identity, isCohost) =>
               runModeration(
                 () => lk.setCohost(identity, isCohost),
-                isCohost ? "Ahora es co-anfitrión" : "Ya no es co-anfitrión",
+                isCohost ? t("messenger.callView.ahoraCoanfitrion") : t("messenger.callView.yaNoCoanfitrion"),
               )}
             onMuteAll={() => runModeration(
               async () => {
                 const muted = await lk.muteAllParticipants();
                 return muted;
               },
-              "Todos silenciados",
+              t("messenger.callView.todosSilenciados"),
             )}
             onEndForAll={hideEndForAll ? undefined : async () => {
-              if (!window.confirm("¿Terminar la llamada para todos los participantes?")) return;
-              await runModeration(lk.endRoomForAll, "Llamada terminada para todos");
+              if (!window.confirm(t("messenger.callView.confirmarTerminarTodos"))) return;
+              await runModeration(lk.endRoomForAll, t("messenger.callView.terminadaParaTodos"));
             }}
             onClose={() => setParticipantsOpen(false)}
           />
@@ -819,7 +990,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
 
       {/* Navegador de salas (Cowork): flechas estilo Instagram + lista. Al
           moverse, el dueño cuelga la sala anterior y te mete MUTEADO a la
-          nueva (initialMicOn=false del flujo de entrar a sala): no quedás como
+          nueva (initialMicOn=false del flujo de entrar a sala): no quedas como
           presencia fantasma ni hablando donde ya no estás mirando. */}
       {roomSwitcher && roomSwitcher.rooms.length > 1 && (() => {
         const n = roomSwitcher.rooms.length;
@@ -830,8 +1001,8 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
           <>
             <button
               type="button"
-              title={`Ir a ${anterior.name}`}
-              aria-label={`Ir a ${anterior.name}`}
+              title={t("messenger.callView.irA", { name: anterior.name })}
+              aria-label={t("messenger.callView.irA", { name: anterior.name })}
               onClick={() => roomSwitcher.onSwitch(anterior.id)}
               className="absolute left-1.5 top-1/2 -translate-y-1/2 z-30 h-9 w-9 rounded-full flex items-center justify-center bg-black/45 text-white/85 backdrop-blur-sm hover:bg-black/65 hover:text-white transition-colors"
             >
@@ -839,8 +1010,8 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
             </button>
             <button
               type="button"
-              title={`Ir a ${siguiente.name}`}
-              aria-label={`Ir a ${siguiente.name}`}
+              title={t("messenger.callView.irA", { name: siguiente.name })}
+              aria-label={t("messenger.callView.irA", { name: siguiente.name })}
               onClick={() => roomSwitcher.onSwitch(siguiente.id)}
               className="absolute right-1.5 top-1/2 -translate-y-1/2 z-30 h-9 w-9 rounded-full flex items-center justify-center bg-black/45 text-white/85 backdrop-blur-sm hover:bg-black/65 hover:text-white transition-colors"
             >
@@ -862,11 +1033,11 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         currentAudioInputId={audioInputId}
         currentAudioOutputId={audioOutputId}
         currentVideoInputId={videoInputId}
-        onToggleMic={lk.toggleMic}
+        onToggleMic={salaCaida ? primeroReconectar : lk.toggleMic}
         isNoiseCancellationOn={lk.isNoiseCancellationOn}
         onToggleNoiseCancellation={lk.toggleNoiseCancellation}
-        onToggleCam={lk.toggleCam}
-        onToggleScreenShare={lk.toggleScreenShare}
+        onToggleCam={salaCaida ? primeroReconectar : lk.toggleCam}
+        onToggleScreenShare={salaCaida ? primeroReconectar : lk.toggleScreenShare}
         onToggleHand={lk.toggleHand}
         onToggleChat={() => { const w = !chatOpen; setChatOpen(w); if (w) { setParticipantsOpen(false); lk.clearUnreadChat(); } }}
         onToggleParticipants={() => { setParticipantsOpen(!participantsOpen); if (!participantsOpen) setChatOpen(false); }}

@@ -17,6 +17,8 @@ import {
   useQaReport, useUpdateQaReport, useGenerateQaDraft, useSendChatterQaEmail,
   type ChatterQaReport, type QaReportBody, type EvaluatedModel,
 } from "./useChatterQaReports";
+import { useLanguage } from "@/hooks/useLanguage";
+import { ConFormato } from "@/pages/admin/ConFormato";
 
 type FanIndex = Record<string, { m: number; c: number; n?: string }>;
 const toneBadge: Record<string, string> = {
@@ -43,6 +45,7 @@ function Linkified({ text, fanIndex }: { text: string; fanIndex: FanIndex }) {
 
 // ── Editor de lista de strings (modo edición) ──
 function StringList({ label, items, onChange, placeholder }: { label: string; items: string[]; onChange: (v: string[]) => void; placeholder?: string }) {
+  const { t } = useLanguage();
   return (
     <div className="space-y-1.5">
       <p className="text-sm font-semibold">{label}</p>
@@ -56,7 +59,7 @@ function StringList({ label, items, onChange, placeholder }: { label: string; it
         </div>
       ))}
       <Button type="button" variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => onChange([...items, ""])}>
-        <Plus className="h-3.5 w-3.5" /> Agregar
+        <Plus className="h-3.5 w-3.5" /> {t("common.add")}
       </Button>
     </div>
   );
@@ -113,6 +116,9 @@ function Section({ icon: Icon, title, accent, collapsible, defaultOpen = true, c
 }
 
 export default function ChatterQaReportDetail({ id, onBack }: { id: string; onBack: () => void }) {
+  // Arriba de todo: esta pantalla tiene dos returns tempranos (cargando / analizando).
+  const { t, language } = useLanguage();
+  const fechaLocal = language === "en" ? "en-US" : undefined;
   const { data: row, isLoading } = useQaReport(id);
   const update = useUpdateQaReport();
   const draft = useGenerateQaDraft();
@@ -141,7 +147,7 @@ export default function ChatterQaReportDetail({ id, onBack }: { id: string; onBa
 
   const fanIndex = useMemo<FanIndex>(() => ((row?.sampling as any)?.fan_index ?? {}) as FanIndex, [row]);
 
-  if (isLoading || !row || editing === null) return <div className="p-6 text-sm text-muted-foreground">Cargando reporte…</div>;
+  if (isLoading || !row || editing === null) return <div className="p-6 text-sm text-muted-foreground">{t("agencyQa.report.loading")}</div>;
 
   // Mientras el borrador IA corre (status en DB = 'processing', o la mutación recién disparada),
   // reemplazamos el formulario por una pantalla linda. El análisis sigue server-side: el usuario
@@ -149,7 +155,7 @@ export default function ChatterQaReportDetail({ id, onBack }: { id: string; onBa
   if (row.status === "processing" || draft.isPending) {
     return (
       <div className="space-y-4">
-        <button onClick={onBack} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"><ArrowLeft className="h-3.5 w-3.5" /> Volver</button>
+        <button onClick={onBack} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"><ArrowLeft className="h-3.5 w-3.5" /> {t("common.back")}</button>
         <div className="relative overflow-hidden rounded-2xl border border-white/10 p-10 text-center"
           style={{ background: "linear-gradient(135deg, hsl(var(--primary) / 0.20), hsl(var(--accent) / 0.08) 45%, hsl(var(--card)) 100%)", boxShadow: "0 0 90px -28px hsl(var(--accent) / 0.45)" }}>
           <div className="relative mx-auto mb-5 inline-flex h-20 w-20 items-center justify-center">
@@ -157,9 +163,9 @@ export default function ChatterQaReportDetail({ id, onBack }: { id: string; onBa
             <span className="absolute inset-0 rounded-full bg-primary/15" />
             <Sparkles className="relative h-9 w-9 animate-pulse text-primary" />
           </div>
-          <h2 className="text-xl font-bold tracking-tight">Analizando con IA…</h2>
+          <h2 className="text-xl font-bold tracking-tight">{t("agencyQa.report.analyzing")}</h2>
           <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-            Leyendo las conversaciones de <strong className="text-foreground">{row.chatter_name}</strong> en Mensajes Pro y evaluando la ejecución comercial. Suele tardar ~20-40s.
+            <ConFormato texto={t("agencyQa.report.analyzingBody", { name: row.chatter_name })} claseNegrita="text-foreground" />
           </p>
           {!!row.evaluated_models?.length && (
             <div className="mt-3 flex flex-wrap justify-center gap-1.5">
@@ -167,7 +173,7 @@ export default function ChatterQaReportDetail({ id, onBack }: { id: string; onBa
             </div>
           )}
           <div className="mt-6 flex items-center justify-center gap-2 text-xs text-muted-foreground">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Puedes seguir navegando — te avisamos cuando termine.
+            <Loader2 className="h-3.5 w-3.5 animate-spin" /> {t("agencyQa.report.keepBrowsing")}
           </div>
         </div>
       </div>
@@ -182,7 +188,7 @@ export default function ChatterQaReportDetail({ id, onBack }: { id: string; onBa
   const save = () => {
     update.mutate(
       { id, patch: { report, veredicto: (veredicto || null) as ChatterQaReport["veredicto"], evaluated_models: evModels, source: row.source === "ai_draft" ? "ai_edited" : row.source } },
-      { onSuccess: () => { setDirty(false); setEditing(false); toast.success("Reporte guardado"); }, onError: (e) => toast.error((e as Error).message) },
+      { onSuccess: () => { setDirty(false); setEditing(false); toast.success(t("agencyQa.report.saved")); }, onError: (e) => toast.error((e as Error).message) },
     );
   };
   const addModel = (mid: string) => {
@@ -200,21 +206,21 @@ export default function ChatterQaReportDetail({ id, onBack }: { id: string; onBa
       <div className="relative overflow-hidden rounded-2xl border border-white/10 p-5"
         style={{ background: "linear-gradient(135deg, hsl(var(--primary) / 0.18), hsl(var(--accent) / 0.07) 45%, hsl(var(--card)) 100%)", boxShadow: "0 0 90px -28px hsl(var(--accent) / 0.4)" }}>
         <div className="flex items-start justify-between gap-3">
-          <button onClick={onBack} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"><ArrowLeft className="h-3.5 w-3.5" /> Volver</button>
+          <button onClick={onBack} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"><ArrowLeft className="h-3.5 w-3.5" /> {t("common.back")}</button>
           <div className="flex flex-wrap items-center justify-end gap-2">
             <Button variant="outline" size="sm" className="h-8 gap-1.5 border-white/15 bg-background/40 backdrop-blur" disabled={draft.isPending || evModels.length === 0}
               onClick={() => draft.mutate({ id })}>{/* status→'processing' → pantalla "Analizando…"; el resultado (verde/rojo + warnings) lo avisa useQaProcessingWatcher */}
-              <Sparkles className="h-4 w-4" /> {row.source === "manual" && !hasContent(row) ? "Generar con IA" : "Regenerar IA"}
+              <Sparkles className="h-4 w-4" /> {row.source === "manual" && !hasContent(row) ? t("agencyQa.report.generateAi") : t("agencyQa.report.regenerateAi")}
             </Button>
             <Button variant="outline" size="sm" className="h-8 gap-1.5 border-white/15 bg-background/40 backdrop-blur" disabled={sendEmail.isPending || row.status !== "ready" || !hasContent(row)}
-              onClick={() => sendEmail.mutate(row, { onSuccess: () => toast.success("Email enviado"), onError: (e) => toast.error((e as Error).message) })}
-              title={row.email_sent_at ? `Ya se envió ${new Date(row.email_sent_at).toLocaleString()}` : "Enviar el QA por email"}>
-              {sendEmail.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />} {row.email_sent_at ? "Reenviar email" : "Enviar email"}
+              onClick={() => sendEmail.mutate(row, { onSuccess: () => toast.success(t("agencyQa.report.emailSent")), onError: (e) => toast.error((e as Error).message) })}
+              title={row.email_sent_at ? t("agencyQa.report.alreadySent", { date: new Date(row.email_sent_at).toLocaleString(fechaLocal) }) : t("agencyQa.report.sendQaEmail")}>
+              {sendEmail.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />} {row.email_sent_at ? t("agencyQa.resendEmail") : t("agencyQa.report.sendEmail")}
             </Button>
             {!editing
-              ? <Button size="sm" className="h-8 gap-1.5" onClick={() => setEditing(true)}><Pencil className="h-4 w-4" /> Editar</Button>
+              ? <Button size="sm" className="h-8 gap-1.5" onClick={() => setEditing(true)}><Pencil className="h-4 w-4" /> {t("common.edit")}</Button>
               : <>
-                  <Button size="sm" className="h-8 gap-1.5" disabled={!dirty || update.isPending} onClick={save}><Save className="h-4 w-4" /> Guardar</Button>
+                  <Button size="sm" className="h-8 gap-1.5" disabled={!dirty || update.isPending} onClick={save}><Save className="h-4 w-4" /> {t("common.save")}</Button>
                   <Button size="sm" variant="ghost" className="h-8 gap-1.5" onClick={() => { setEditing(false); setDirty(false); setReport(row.report ?? {}); setVeredicto(row.veredicto ?? ""); setEvModels(row.evaluated_models ?? []); }}><X className="h-4 w-4" /></Button>
                 </>}
           </div>
@@ -225,21 +231,21 @@ export default function ChatterQaReportDetail({ id, onBack }: { id: string; onBa
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-2xl font-bold tracking-tight">{row.chatter_name}</h2>
-                {veredicto && <span className={`inline-flex items-center rounded-full border px-3 py-0.5 text-sm font-semibold sm:hidden ${toneBadge[tone]}`}>{veredictoLabel(veredicto)}</span>}
-                {row.status === "processing" && <Badge variant="outline" className="gap-1.5"><Loader2 className="h-3.5 w-3.5 animate-spin" /> generando…</Badge>}
-                {row.status === "failed" && <Badge variant="outline" className="gap-1.5 border-destructive/40 text-destructive"><AlertTriangle className="h-3.5 w-3.5" /> falló</Badge>}
+                {veredicto && <span className={`inline-flex items-center rounded-full border px-3 py-0.5 text-sm font-semibold sm:hidden ${toneBadge[tone]}`}>{veredictoLabel(veredicto, language)}</span>}
+                {row.status === "processing" && <Badge variant="outline" className="gap-1.5"><Loader2 className="h-3.5 w-3.5 animate-spin" /> {t("agencyQa.report.generating")}</Badge>}
+                {row.status === "failed" && <Badge variant="outline" className="gap-1.5 border-destructive/40 text-destructive"><AlertTriangle className="h-3.5 w-3.5" /> {t("agencyQa.failedBadge")}</Badge>}
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
-                {companyLabel(row.company)} ({row.company}) · {periodLabel(row.period)} · Evaluó: {row.evaluator_name}
-                {sampling?.threads_sampled ? <> · <Sparkles className="inline h-3 w-3" /> {sampling.models} modelo(s) · {sampling.threads_sampled} hilos · {sampling.messages_read} mensajes</> : null}
-                {row.email_sent_at ? <> · <MailCheck className="inline h-3 w-3 text-success" /> enviado</> : null}
+                {companyLabel(row.company)} ({row.company}) · {periodLabel(row.period, language)} · {t("agencyQa.report.evaluatedBy", { name: row.evaluator_name })}
+                {sampling?.threads_sampled ? <> · <Sparkles className="inline h-3 w-3" /> {t("agencyQa.report.sampling", { models: sampling.models, threads: sampling.threads_sampled, messages: sampling.messages_read })}</> : null}
+                {row.email_sent_at ? <> · <MailCheck className="inline h-3 w-3 text-success" /> {t("agencyQa.report.sent")}</> : null}
               </p>
             </div>
           </div>
           {veredicto && (
             <div className="hidden shrink-0 flex-col items-center gap-2 sm:flex">
               <VeredictoGauge veredicto={veredicto} />
-              <span className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${toneBadge[tone]}`}>{veredictoLabel(veredicto)}</span>
+              <span className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${toneBadge[tone]}`}>{veredictoLabel(veredicto, language)}</span>
             </div>
           )}
         </div>
@@ -249,11 +255,11 @@ export default function ChatterQaReportDetail({ id, onBack }: { id: string; onBa
       {editing ? (
         /* ══════════ MODO EDICIÓN ══════════ */
         <div className="space-y-4">
-          <Section icon={Flag} title="Resultado y modelos">
+          <Section icon={Flag} title={t("agencyQa.report.resultAndModels")}>
             <div className="flex flex-wrap items-center gap-3">
               <Select value={veredicto} onValueChange={(v) => { setVeredicto(v); setDirty(true); }}>
-                <SelectTrigger className="h-8 w-44"><SelectValue placeholder="Veredicto" /></SelectTrigger>
-                <SelectContent>{VEREDICTOS.map((v) => <SelectItem key={v.value} value={v.value}>{v.label}</SelectItem>)}</SelectContent>
+                <SelectTrigger className="h-8 w-44"><SelectValue placeholder={t("agencyQa.report.verdict")} /></SelectTrigger>
+                <SelectContent>{VEREDICTOS.map((v) => <SelectItem key={v.value} value={v.value}>{t(v.labelKey)}</SelectItem>)}</SelectContent>
               </Select>
               <div className="flex flex-wrap items-center gap-1.5">
                 {evModels.map((m) => (
@@ -262,48 +268,48 @@ export default function ChatterQaReportDetail({ id, onBack }: { id: string; onBa
                   </Badge>
                 ))}
                 <Select value="" onValueChange={addModel}>
-                  <SelectTrigger className="h-7 w-44 text-xs"><SelectValue placeholder="+ Agregar modelo" /></SelectTrigger>
+                  <SelectTrigger className="h-7 w-44 text-xs"><SelectValue placeholder={t("agencyQa.addModel")} /></SelectTrigger>
                   <SelectContent className="max-h-72">{models.map((m) => <SelectItem key={m.id} value={String(m.id)}>{bluModelLabel(m)}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
             </div>
           </Section>
-          <Section icon={FileText} title="Introducción / objetivo"><Textarea rows={2} value={report.intro ?? ""} onChange={(e) => patch({ intro: e.target.value })} placeholder="Objetivo de la evaluación…" /></Section>
-          <Section icon={MessageSquareText} title="Resumen / diagnóstico"><Textarea rows={3} value={report.resumen ?? ""} onChange={(e) => patch({ resumen: e.target.value })} /></Section>
-          <Section icon={ThumbsUp} title="Aspectos positivos" accent="bg-success/15 text-success"><StringList label="" items={report.aspectos_positivos ?? []} onChange={(v) => patch({ aspectos_positivos: v })} /></Section>
-          <Section icon={Wrench} title="Aspectos de mejora" accent="bg-warning/15 text-warning">
+          <Section icon={FileText} title={t("agencyQa.report.intro")}><Textarea rows={2} value={report.intro ?? ""} onChange={(e) => patch({ intro: e.target.value })} placeholder={t("agencyQa.report.introPlaceholder")} /></Section>
+          <Section icon={MessageSquareText} title={t("agencyQa.report.summaryDiag")}><Textarea rows={3} value={report.resumen ?? ""} onChange={(e) => patch({ resumen: e.target.value })} /></Section>
+          <Section icon={ThumbsUp} title={t("agencyQa.report.positives")} accent="bg-success/15 text-success"><StringList label="" items={report.aspectos_positivos ?? []} onChange={(v) => patch({ aspectos_positivos: v })} /></Section>
+          <Section icon={Wrench} title={t("agencyQa.report.improvements")} accent="bg-warning/15 text-warning">
             {mejoras.map((m, i) => (
               <div key={i} className="mb-2 flex items-start gap-2">
                 <div className="flex-1 space-y-1.5">
-                  <Input value={m.categoria} placeholder="Categoría (ej. Falta de calentamiento)" onChange={(e) => { const n = [...mejoras]; n[i] = { ...m, categoria: e.target.value }; patch({ aspectos_mejora: n }); }} />
-                  <Textarea rows={2} value={m.detalle} placeholder="Detalle" onChange={(e) => { const n = [...mejoras]; n[i] = { ...m, detalle: e.target.value }; patch({ aspectos_mejora: n }); }} />
+                  <Input value={m.categoria} placeholder={t("agencyQa.report.categoryPlaceholder")} onChange={(e) => { const n = [...mejoras]; n[i] = { ...m, categoria: e.target.value }; patch({ aspectos_mejora: n }); }} />
+                  <Textarea rows={2} value={m.detalle} placeholder={t("agencyQa.report.detailPlaceholder")} onChange={(e) => { const n = [...mejoras]; n[i] = { ...m, detalle: e.target.value }; patch({ aspectos_mejora: n }); }} />
                 </div>
                 <button type="button" onClick={() => patch({ aspectos_mejora: mejoras.filter((_, j) => j !== i) })} className="mt-2 text-muted-foreground/50 hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
               </div>
             ))}
-            <Button type="button" variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => patch({ aspectos_mejora: [...mejoras, { categoria: "", detalle: "" }] })}><Plus className="h-3.5 w-3.5" /> Agregar categoría</Button>
+            <Button type="button" variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => patch({ aspectos_mejora: [...mejoras, { categoria: "", detalle: "" }] })}><Plus className="h-3.5 w-3.5" /> {t("agencyQa.report.addCategory")}</Button>
           </Section>
-          <Section icon={Users} title="Observaciones por modelo">
+          <Section icon={Users} title={t("agencyQa.report.perModel")}>
             {obs.map((o, i) => (
               <div key={i} className="mb-2 rounded-md border border-border/60 p-3 space-y-2">
                 <div className="flex items-center justify-between">
-                  <Input value={o.model_name ?? ""} placeholder="Modelo" className="h-8 w-56 font-medium" onChange={(e) => { const n = [...obs]; n[i] = { ...o, model_name: e.target.value }; patch({ observaciones_por_modelo: n }); }} />
+                  <Input value={o.model_name ?? ""} placeholder={t("agencyQa.model")} className="h-8 w-56 font-medium" onChange={(e) => { const n = [...obs]; n[i] = { ...o, model_name: e.target.value }; patch({ observaciones_por_modelo: n }); }} />
                   <button type="button" onClick={() => patch({ observaciones_por_modelo: obs.filter((_, j) => j !== i) })} className="text-muted-foreground/50 hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
                 </div>
-                <StringList label="Observaciones" items={o.observaciones ?? []} onChange={(v) => { const n = [...obs]; n[i] = { ...o, observaciones: v }; patch({ observaciones_por_modelo: n }); }} />
+                <StringList label={t("agencyQa.report.observations")} items={o.observaciones ?? []} onChange={(v) => { const n = [...obs]; n[i] = { ...o, observaciones: v }; patch({ observaciones_por_modelo: n }); }} />
               </div>
             ))}
-            <Button type="button" variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => patch({ observaciones_por_modelo: [...obs, { model_name: "", observaciones: [""] }] })}><Plus className="h-3.5 w-3.5" /> Agregar modelo</Button>
+            <Button type="button" variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => patch({ observaciones_por_modelo: [...obs, { model_name: "", observaciones: [""] }] })}><Plus className="h-3.5 w-3.5" /> {t("agencyQa.report.addModel")}</Button>
           </Section>
-          <Section icon={Megaphone} title="Venta masiva" accent="bg-fuchsia-500/15 text-fuchsia-500">
-            <p className="mb-2 text-xs text-muted-foreground">Diagnóstico manual de los masivos del chatter (dejalo vacío si no aplica). El detalle —mejores/peores · patrones · recomendaciones— lo completa el borrador IA cuando detecta masivos suyos.</p>
-            <Textarea rows={3} value={report.venta_masiva?.resumen ?? ""} placeholder="Diagnóstico de los masivos…"
+          <Section icon={Megaphone} title={t("agencyQa.report.massSales")} accent="bg-fuchsia-500/15 text-fuchsia-500">
+            <p className="mb-2 text-xs text-muted-foreground">{t("agencyQa.report.massHint")}</p>
+            <Textarea rows={3} value={report.venta_masiva?.resumen ?? ""} placeholder={t("agencyQa.report.massPlaceholder")}
               onChange={(e) => patchVm({ resumen: e.target.value })} />
           </Section>
-          <Section icon={Lightbulb} title="Recomendaciones" accent="bg-primary/15 text-primary"><StringList label="" items={report.recomendaciones ?? []} onChange={(v) => patch({ recomendaciones: v })} /></Section>
-          <Section icon={Flag} title="Conclusión y hallazgo">
-            <Textarea rows={3} value={report.conclusion ?? ""} onChange={(e) => patch({ conclusion: e.target.value })} placeholder="Conclusión" className="mb-2" />
-            <Textarea rows={2} value={report.hallazgo_principal ?? ""} onChange={(e) => patch({ hallazgo_principal: e.target.value })} placeholder="Hallazgo principal" />
+          <Section icon={Lightbulb} title={t("agencyQa.recommendations")} accent="bg-primary/15 text-primary"><StringList label="" items={report.recomendaciones ?? []} onChange={(v) => patch({ recomendaciones: v })} /></Section>
+          <Section icon={Flag} title={t("agencyQa.report.conclusionAndFinding")}>
+            <Textarea rows={3} value={report.conclusion ?? ""} onChange={(e) => patch({ conclusion: e.target.value })} placeholder={t("agencyQa.report.conclusion")} className="mb-2" />
+            <Textarea rows={2} value={report.hallazgo_principal ?? ""} onChange={(e) => patch({ hallazgo_principal: e.target.value })} placeholder={t("agencyQa.report.mainFinding")} />
           </Section>
         </div>
       ) : (
@@ -311,21 +317,21 @@ export default function ChatterQaReportDetail({ id, onBack }: { id: string; onBa
         <div className="space-y-4">
           {evModels.length > 0 && (
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-xs text-muted-foreground">Modelos:</span>
+              <span className="text-xs text-muted-foreground">{t("agencyQa.report.modelsLabel")}</span>
               {evModels.map((m) => <Badge key={m.model_id} variant="secondary">{m.model_name}</Badge>)}
             </div>
           )}
           {report.intro && <p className="text-sm text-muted-foreground">{report.intro}</p>}
           {report.resumen && (
-            <Section icon={MessageSquareText} title="Resumen" collapsible defaultOpen><p className="text-sm leading-relaxed text-foreground/90"><Linkified text={report.resumen} fanIndex={fanIndex} /></p></Section>
+            <Section icon={MessageSquareText} title={t("agencyQa.report.summary")} collapsible defaultOpen><p className="text-sm leading-relaxed text-foreground/90"><Linkified text={report.resumen} fanIndex={fanIndex} /></p></Section>
           )}
           {!!report.aspectos_positivos?.length && (
-            <Section icon={ThumbsUp} title="Aspectos positivos" accent="bg-success/15 text-success" collapsible defaultOpen={false} count={report.aspectos_positivos?.length}>
+            <Section icon={ThumbsUp} title={t("agencyQa.report.positives")} accent="bg-success/15 text-success" collapsible defaultOpen={false} count={report.aspectos_positivos?.length}>
               <ul className="space-y-1.5">{report.aspectos_positivos.map((p, i) => <li key={i} className="flex gap-2 text-sm"><ThumbsUp className="mt-0.5 h-3.5 w-3.5 shrink-0 text-success" /><span><Linkified text={p} fanIndex={fanIndex} /></span></li>)}</ul>
             </Section>
           )}
           {!!report.aspectos_mejora?.length && (
-            <Section icon={Wrench} title="Aspectos de mejora" accent="bg-warning/15 text-warning" collapsible defaultOpen={false} count={report.aspectos_mejora?.length}>
+            <Section icon={Wrench} title={t("agencyQa.report.improvements")} accent="bg-warning/15 text-warning" collapsible defaultOpen={false} count={report.aspectos_mejora?.length}>
               <div className="space-y-2.5">{report.aspectos_mejora.map((m, i) => (
                 <div key={i} className="rounded-lg border border-warning/20 bg-warning/5 p-2.5">
                   <p className="text-sm font-semibold text-warning">{m.categoria}</p>
@@ -335,7 +341,7 @@ export default function ChatterQaReportDetail({ id, onBack }: { id: string; onBa
             </Section>
           )}
           {!!report.observaciones_por_modelo?.length && (
-            <Section icon={Users} title="Observaciones por modelo" collapsible defaultOpen={false} count={report.observaciones_por_modelo?.length}>
+            <Section icon={Users} title={t("agencyQa.report.perModel")} collapsible defaultOpen={false} count={report.observaciones_por_modelo?.length}>
               <div className="space-y-3">{report.observaciones_por_modelo.map((o, i) => (
                 <div key={i} className="rounded-lg border border-border/60 p-3">
                   <p className="mb-1.5 text-sm font-semibold">{o.model_name}</p>
@@ -369,44 +375,46 @@ export default function ChatterQaReportDetail({ id, onBack }: { id: string; onBa
               </div>
             );
             return (
-              <Section icon={Megaphone} title="Venta masiva" accent="bg-fuchsia-500/15 text-fuchsia-500" collapsible defaultOpen={false}
+              <Section icon={Megaphone} title={t("agencyQa.report.massSales")} accent="bg-fuchsia-500/15 text-fuchsia-500" collapsible defaultOpen={false}
                 count={(vm!.mejores?.length ?? 0) + (vm!.peores?.length ?? 0)}>
                 {vm!.resumen && <p className="mb-3 text-sm leading-relaxed text-foreground/90">{vm!.resumen}</p>}
                 {s && s.count > 0 && (
                   <div className="mb-3 flex flex-wrap gap-x-4 gap-y-1 rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-xs tabular-nums">
-                    <span><b>{s.count}</b> masivos</span><span><b>{s.sent.toLocaleString()}</b> enviados</span>
-                    <span><b>{s.viewed.toLocaleString()}</b> vistos</span><span><b>{s.purchased.toLocaleString()}</b> ventas ({conv})</span>
+                    <span><ConFormato texto={t("agencyQa.report.massCount", { n: s.count })} /></span>
+                    <span><ConFormato texto={t("agencyQa.report.massSent", { n: s.sent.toLocaleString() })} /></span>
+                    <span><ConFormato texto={t("agencyQa.report.massViewed", { n: s.viewed.toLocaleString() })} /></span>
+                    <span><ConFormato texto={t("agencyQa.report.massPurchased", { n: s.purchased.toLocaleString(), conv })} /></span>
                     <span className="text-success"><b>${s.earnings.toLocaleString()}</b></span>
                   </div>
                 )}
                 <div className="grid gap-3 md:grid-cols-2">
-                  {!!vm!.mejores?.length && <div className="space-y-1.5"><p className="text-xs font-semibold text-success">Más efectivos</p>{vm!.mejores.map((it, i) => <ItemCard key={i} it={it} tone="good" />)}</div>}
-                  {!!vm!.peores?.length && <div className="space-y-1.5"><p className="text-xs font-semibold text-destructive">Menos efectivos</p>{vm!.peores.map((it, i) => <ItemCard key={i} it={it} tone="bad" />)}</div>}
+                  {!!vm!.mejores?.length && <div className="space-y-1.5"><p className="text-xs font-semibold text-success">{t("agencyQa.report.mostEffective")}</p>{vm!.mejores.map((it, i) => <ItemCard key={i} it={it} tone="good" />)}</div>}
+                  {!!vm!.peores?.length && <div className="space-y-1.5"><p className="text-xs font-semibold text-destructive">{t("agencyQa.report.leastEffective")}</p>{vm!.peores.map((it, i) => <ItemCard key={i} it={it} tone="bad" />)}</div>}
                 </div>
                 {!!vm!.patrones?.length && (
-                  <div className="mt-3"><p className="mb-1 text-xs font-semibold text-foreground/80">Patrones</p>
+                  <div className="mt-3"><p className="mb-1 text-xs font-semibold text-foreground/80">{t("agencyQa.report.patterns")}</p>
                     <ul className="space-y-1">{vm!.patrones.map((p, i) => <li key={i} className="flex gap-2 text-sm text-foreground/85"><span className="text-fuchsia-500">·</span><span>{p}</span></li>)}</ul></div>
                 )}
                 {!!vm!.recomendaciones?.length && (
-                  <div className="mt-3"><p className="mb-1 text-xs font-semibold text-foreground/80">Recomendaciones</p>
+                  <div className="mt-3"><p className="mb-1 text-xs font-semibold text-foreground/80">{t("agencyQa.recommendations")}</p>
                     <ul className="space-y-1.5">{vm!.recomendaciones.map((r, i) => <li key={i} className="flex gap-2 text-sm"><Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" /><span>{r}</span></li>)}</ul></div>
                 )}
               </Section>
             );
           })()}
           {!!report.recomendaciones?.length && (
-            <Section icon={Lightbulb} title="Recomendaciones" accent="bg-primary/15 text-primary" collapsible defaultOpen={false} count={report.recomendaciones?.length}>
+            <Section icon={Lightbulb} title={t("agencyQa.recommendations")} accent="bg-primary/15 text-primary" collapsible defaultOpen={false} count={report.recomendaciones?.length}>
               <ul className="space-y-1.5">{report.recomendaciones.map((r, i) => <li key={i} className="flex gap-2 text-sm"><Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" /><span><Linkified text={r} fanIndex={fanIndex} /></span></li>)}</ul>
             </Section>
           )}
-          {report.conclusion && <Section icon={Flag} title="Conclusión" collapsible defaultOpen={false}><p className="text-sm leading-relaxed text-foreground/90"><Linkified text={report.conclusion} fanIndex={fanIndex} /></p></Section>}
+          {report.conclusion && <Section icon={Flag} title={t("agencyQa.report.conclusion")} collapsible defaultOpen={false}><p className="text-sm leading-relaxed text-foreground/90"><Linkified text={report.conclusion} fanIndex={fanIndex} /></p></Section>}
           {report.hallazgo_principal && (
             <div className={`rounded-xl border p-4 ${toneBadge[tone]}`}>
-              <p className="mb-1 flex items-center gap-1.5 text-xs font-semibold opacity-80"><Flag className="h-3.5 w-3.5" /> Hallazgo principal</p>
+              <p className="mb-1 flex items-center gap-1.5 text-xs font-semibold opacity-80"><Flag className="h-3.5 w-3.5" /> {t("agencyQa.report.mainFinding")}</p>
               <p className="text-sm font-medium leading-relaxed"><Linkified text={report.hallazgo_principal} fanIndex={fanIndex} /></p>
             </div>
           )}
-          {!hasContent(row) && <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">Reporte vacío. Toca <b>Editar</b> para redactarlo, o <b>Generar con IA</b> (agrega modelos primero).</p>}
+          {!hasContent(row) && <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground"><ConFormato texto={t("agencyQa.report.empty", { edit: t("common.edit"), generate: t("agencyQa.report.generateAi") })} /></p>}
         </div>
       )}
     </div>

@@ -13,6 +13,8 @@ import { useTypingInbox } from "@/hooks/useTypingInbox";
 import { getStatusColor } from "@/pages/messenger/components/StatusPicker";
 import { formatTime, truncate, getMessagePreview } from "@/pages/messenger/preview";
 import type { ConversationWithDetails } from "@/pages/messenger/types";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 
 type Tab = "all" | "unread" | "groups";
 
@@ -27,10 +29,10 @@ type Tab = "all" | "unread" | "groups";
 const HUECO_AVATAR = "flex h-10 w-10 shrink-0 items-center justify-center";
 const ANCLA_AVATAR = "relative inline-flex";
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: "all", label: "Todos" },
-  { id: "unread", label: "No leídos" },
-  { id: "groups", label: "Grupos" },
+const TABS: { id: Tab; label: TranslationKey }[] = [
+  { id: "all", label: "common.all" },
+  { id: "unread", label: "messenger.sidebar.noLeidos" },
+  { id: "groups", label: "messenger.sidebar.grupos" },
 ];
 
 /**
@@ -54,6 +56,7 @@ export default function ChatsPanel({
   onCerrar?: () => void;
 }) {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const { conversations, loading, profiles, createDirectChat } = useChatShared();
   const { isOnline, getStatus, getStatusColorPersonal } = useOnlinePresence();
   const { quienEscribe } = useTypingInbox();
@@ -116,14 +119,14 @@ export default function ChatsPanel({
         <div className="flex items-center gap-0.5">
           <Button
             variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground"
-            title="Mensaje nuevo" onClick={onNuevo}
+            title={t("messenger.dock.mensajeNuevo")} aria-label={t("messenger.dock.mensajeNuevo")} onClick={onNuevo}
           >
             <PenSquare className="h-4 w-4" />
           </Button>
           {onCerrar && (
             <Button
               variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground"
-              title="Cerrar" aria-label="Cerrar" onClick={onCerrar}
+              title={t("common.close")} aria-label={t("common.close")} onClick={onCerrar}
             >
               <X className="h-4 w-4" />
             </Button>
@@ -137,7 +140,7 @@ export default function ChatsPanel({
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar en Messenger"
+            placeholder={t("messenger.dock.buscarEnMessenger")}
             className="h-9 rounded-full bg-muted/60 pl-8 text-sm"
           />
         </div>
@@ -154,7 +157,7 @@ export default function ChatsPanel({
               tab === tb.id ? "bg-primary/15 text-primary" : "text-muted-foreground hover:bg-muted",
             )}
           >
-            {tb.label}
+            {t(tb.label)}
           </button>
         ))}
       </div>
@@ -173,10 +176,10 @@ export default function ChatsPanel({
         style={{ height: alto }}
       >
         {loading ? (
-          <p className="p-4 text-center text-xs text-muted-foreground">Cargando…</p>
+          <p className="p-4 text-center text-xs text-muted-foreground">{t("common.loading")}</p>
         ) : visibles.length === 0 && personas.length === 0 ? (
           <p className="p-4 text-center text-xs text-muted-foreground">
-            {search ? "Sin resultados" : tab === "unread" ? "No tienes mensajes sin leer" : "Sin conversaciones"}
+            {search ? t("common.noResultsShort") : tab === "unread" ? t("messenger.dock.sinNoLeidos") : t("messenger.dock.sinConversaciones")}
           </p>
         ) : (
           <div className="p-1.5">
@@ -196,7 +199,7 @@ export default function ChatsPanel({
             {personas.length > 0 && (
               <>
                 <p className="px-2 pb-1 pt-3 text-xs font-semibold text-muted-foreground">
-                  Otras personas
+                  {t("messenger.dock.otrasPersonas")}
                 </p>
                 {personas.map((p) => (
                   <FilaPersona
@@ -216,7 +219,7 @@ export default function ChatsPanel({
 
       <div className="border-t border-border/40 p-2">
         <Button variant="ghost" size="sm" className="w-full text-xs font-semibold text-primary" onClick={onVerTodo}>
-          Ver todo en Messenger
+          {t("messenger.dock.verTodo")}
         </Button>
       </div>
     </>
@@ -233,7 +236,8 @@ function FilaPersona({
   colorPersonal: string | null;
   onClick: () => void;
 }) {
-  const nombre = perfil.full_name || "Sin nombre";
+  const { t } = useLanguage();
+  const nombre = perfil.full_name || t("messenger.sidebar.sinNombre");
   return (
     <button
       type="button"
@@ -254,12 +258,12 @@ function FilaPersona({
       </div>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium">{nombre}</p>
-        <p className="truncate text-xs text-muted-foreground">Enviar mensaje</p>
+        <p className="truncate text-xs text-muted-foreground">{t("messenger.dock.enviarMensaje")}</p>
       </div>
       {/* La acción se nombra al pasar por encima: deja claro que tocar acá
           ABRE una conversación nueva, no busca dentro de una que ya existe. */}
       <span className="shrink-0 text-[11px] font-semibold text-primary opacity-0 transition-opacity group-hover:opacity-100">
-        Escribir
+        {t("messenger.dock.escribir")}
       </span>
     </button>
   );
@@ -276,6 +280,7 @@ function FilaChat({
   colorPersonal: (id: string) => string | null;
   onClick: () => void;
 }) {
+  const { t, language } = useLanguage();
   const isGroup = conversation.type === "group";
   const otro = isGroup ? undefined : conversation.participants.find((p) => p.user_id !== userId);
   const hasUnread = conversation.unreadCount > 0;
@@ -338,7 +343,7 @@ function FilaChat({
             {conversation.displayName}
           </span>
           <span className={cn("shrink-0 text-[10px]", hasUnread ? "font-semibold text-primary" : "text-muted-foreground")}>
-            {formatTime(conversation.lastMessage?.created_at)}
+            {formatTime(conversation.lastMessage?.created_at, t, language)}
           </span>
         </div>
         <p className={cn(
@@ -347,7 +352,7 @@ function FilaChat({
             ? "font-medium text-primary"
             : hasUnread ? "font-medium text-foreground" : "text-muted-foreground",
         )}>
-          {escribiendo ? "escribiendo…" : truncate(getMessagePreview(conversation, userId), 40)}
+          {escribiendo ? t("messenger.sidebar.escribiendo") : truncate(getMessagePreview(conversation, userId, t), 40)}
         </p>
       </div>
 

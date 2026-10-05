@@ -4,22 +4,31 @@ import { Loader2 } from "lucide-react";
 import { UserAvatar } from "@/components/UserAvatar";
 import { cn } from "@/lib/utils";
 import type { PersonaEnSala } from "@/hooks/useQuienesEstanEnLaSala";
+import { useLanguage } from "@/hooks/useLanguage";
+import { traducir } from "@/lib/i18n";
+import type { Traductor } from "../preview";
 
 const MAX_CARAS = 5;
 
 // Redacta la frase como la diría una persona: "Ana", "Ana y Luis",
 // "Ana, Luis y Marta", "Ana, Luis y 3 más". Con más de tres nombres deja de
 // enumerar, así la frase no crece con la reunión.
-export function fraseDeQuienesEstan(nombres: string[]): string {
+//
+// `t` lo pasa el componente (el idioma de quien mira); sin él, el idioma que la
+// app tiene fijado en ese momento.
+export function fraseDeQuienesEstan(
+  nombres: string[],
+  t: Traductor = (clave, params) => traducir(clave, params),
+): string {
   const limpios = nombres.map((n) => n.trim()).filter(Boolean);
-  if (limpios.length === 0) return "Nadie más ha llegado todavía";
-  if (limpios.length === 1) return `${limpios[0]} está en esta llamada`;
+  if (limpios.length === 0) return t("messenger.quienes.nadie");
+  if (limpios.length === 1) return t("messenger.quienes.uno", { name: limpios[0] });
   if (limpios.length <= 3) {
     const cabeza = limpios.slice(0, -1).join(", ");
-    return `${cabeza} y ${limpios[limpios.length - 1]} están en esta llamada`;
+    return t("messenger.quienes.varios", { cabeza, ultimo: limpios[limpios.length - 1] });
   }
   const resto = limpios.length - 2;
-  return `${limpios[0]}, ${limpios[1]} y ${resto} más están en esta llamada`;
+  return t("messenger.quienes.muchos", { a: limpios[0], b: limpios[1], n: resto });
 }
 
 export default function QuienesEstan({
@@ -31,6 +40,7 @@ export default function QuienesEstan({
   cargando?: boolean;
   className?: string;
 }) {
+  const { t } = useLanguage();
   if (cargando && personas.length === 0) {
     return (
       <div
@@ -39,7 +49,7 @@ export default function QuienesEstan({
         aria-live="polite"
       >
         <Loader2 className="h-3.5 w-3.5 animate-spin" />
-        Viendo quién está…
+        {t("messenger.quienes.viendo")}
       </div>
     );
   }
@@ -78,7 +88,7 @@ export default function QuienesEstan({
           personas.length > 0 ? "text-foreground" : "text-muted-foreground",
         )}
       >
-        {fraseDeQuienesEstan(personas.map((p) => p.nombre))}
+        {fraseDeQuienesEstan(personas.map((p) => p.nombre), t)}
       </p>
     </div>
   );

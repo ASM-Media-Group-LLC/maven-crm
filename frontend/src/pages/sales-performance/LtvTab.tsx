@@ -1,4 +1,5 @@
 import { UserCheck, Info } from "lucide-react";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // LTV ESTIMADO (interim, mientras llega la ingesta per-fan B1):
 //   LTV ≈ ARPU mensual × vida media del fan.
@@ -26,22 +27,23 @@ export interface LtvData {
 const money = (n: number | null | undefined) => (n == null ? "—" : "$" + Math.round(n).toLocaleString("en-US"));
 
 const LtvTab = ({ data, loading, periodLabel }: { data: LtvData | null; loading: boolean; periodLabel?: string }) => {
-  if (loading) return <div className="p-8 text-center text-sm text-muted-foreground">Calculando LTV…</div>;
+  const { t } = useLanguage();
+  if (loading) return <div className="p-8 text-center text-sm text-muted-foreground">{t("sales.ltv.loading")}</div>;
   if (!data || data.perCreator.length === 0)
-    return <div className="rounded-lg border border-border bg-card text-center py-12 text-sm text-muted-foreground">Sin datos de ingreso/fans en {periodLabel ?? "el rango"}.</div>;
+    return <div className="rounded-lg border border-border bg-card text-center py-12 text-sm text-muted-foreground">{t("sales.ltv.empty", { period: periodLabel ?? t("sales.ltv.range") })}</div>;
 
   return (
     <div className="space-y-5">
       <div className="rounded-lg bg-success/5 border border-success/30 px-4 py-2.5">
         <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-          <UserCheck className="h-3.5 w-3.5 text-success" /> Customer Lifetime Value — estimado
+          <UserCheck className="h-3.5 w-3.5 text-success" /> {t("sales.ltv.title")}
         </p>
         <p className="text-[10px] text-muted-foreground mt-0.5 flex items-start gap-1">
           <Info className="h-3 w-3 mt-px shrink-0" />
           <span>
-            <strong>LTV ≈ ARPU mensual × vida media.</strong> ARPU = ingreso / fans activos prom; vida media = duración prom de
-            suscripción ({data.avgLifespanMonths != null ? data.avgLifespanMonths.toFixed(1) : "—"} meses). Estimación sobre TODA
-            la base (no solo top-fans). El LTV <em>medido por fan</em> llega con la ingesta de Mensajes Pro (B1). Fuente:{" "}
+            <strong>{t("sales.ltv.formula")}</strong>{" "}
+            {t("sales.ltv.explain1", { months: data.avgLifespanMonths != null ? data.avgLifespanMonths.toFixed(1) : "—" })}{" "}
+            <em>{t("sales.ltv.measured")}</em> {t("sales.ltv.explain2")}{" "}
             <code className="bg-muted px-1 rounded font-mono text-[10px]">creator_daily_earnings</code> ×{" "}
             <code className="bg-muted px-1 rounded font-mono text-[10px]">creator_top_fans</code>.
           </span>
@@ -50,19 +52,19 @@ const LtvTab = ({ data, loading, periodLabel }: { data: LtvData | null; loading:
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="rounded-xl border border-success/40 bg-success/5 p-3 text-center">
-          <p className="text-[10px] text-muted-foreground uppercase">LTV estimado</p>
+          <p className="text-[10px] text-muted-foreground uppercase">{t("sales.ltv.estimated")}</p>
           <p className="text-xl font-bold tabular-nums text-success">{money(data.aggLtv)}</p>
         </div>
         <div className="rounded-xl border border-border bg-card p-3 text-center">
-          <p className="text-[10px] text-muted-foreground uppercase">ARPU / mes</p>
+          <p className="text-[10px] text-muted-foreground uppercase">{t("sales.ltv.arpuMonth")}</p>
           <p className="text-lg font-bold tabular-nums">{money(data.aggArpuMonthly)}</p>
         </div>
         <div className="rounded-xl border border-border bg-card p-3 text-center">
-          <p className="text-[10px] text-muted-foreground uppercase">Vida media</p>
+          <p className="text-[10px] text-muted-foreground uppercase">{t("sales.ltv.lifespan")}</p>
           <p className="text-lg font-bold tabular-nums">{data.avgLifespanMonths != null ? `${data.avgLifespanMonths.toFixed(1)} m` : "—"}</p>
         </div>
         <div className="rounded-xl border border-border bg-card p-3 text-center">
-          <p className="text-[10px] text-muted-foreground uppercase">Fans activos</p>
+          <p className="text-[10px] text-muted-foreground uppercase">{t("sales.ltv.activeFans")}</p>
           <p className="text-lg font-bold tabular-nums">{data.totalActiveFans.toLocaleString("en-US")}</p>
         </div>
       </div>
@@ -71,10 +73,10 @@ const LtvTab = ({ data, loading, periodLabel }: { data: LtvData | null; loading:
         <table className="tabla-movil w-full border-collapse text-sm">
           <thead>
             <tr className="bg-muted/50 text-muted-foreground">
-              <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">Creadora</th>
-              <th className="px-3 py-2 text-right font-semibold whitespace-nowrap">Fans activos</th>
-              <th className="px-3 py-2 text-right font-semibold whitespace-nowrap">ARPU / mes</th>
-              <th className="px-3 py-2 text-right font-semibold whitespace-nowrap">LTV estimado</th>
+              <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">{t("sales.creator")}</th>
+              <th className="px-3 py-2 text-right font-semibold whitespace-nowrap">{t("sales.ltv.activeFans")}</th>
+              <th className="px-3 py-2 text-right font-semibold whitespace-nowrap">{t("sales.ltv.arpuMonth")}</th>
+              <th className="px-3 py-2 text-right font-semibold whitespace-nowrap">{t("sales.ltv.estimated")}</th>
             </tr>
           </thead>
           <tbody>

@@ -2,13 +2,15 @@ import { useQuery } from "@tanstack/react-query";
 import { EmptyState } from "@/components/EmptyState";
 import { DollarSign, TrendingUp } from "lucide-react";
 import { format, parseISO } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCreatorDailyEarnings } from "@/hooks/useCreatorDailyEarnings";
 import CreatorEarningsCalendar from "./CreatorEarningsCalendar";
+import type { TranslationKey } from "@/lib/i18n";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface Props {
   creatorId: string;
@@ -19,6 +21,8 @@ const money2 = (n: number | null) =>
 const money0 = (n: number) => `$${Math.round(n || 0).toLocaleString("en-US")}`;
 
 const MonetizacionTabContent = ({ creatorId }: Props) => {
+  const f = useFormato();
+  const { t } = useLanguage();
   // ── Ingreso diario desde BLU (creator_daily_earnings), MES ACTUAL ──
   const now = new Date();
   const year = now.getFullYear();
@@ -30,9 +34,9 @@ const MonetizacionTabContent = ({ creatorId }: Props) => {
 
   const sum = (k: keyof (typeof daily)[number]) => daily.reduce((a, e) => a + (Number(e[k]) || 0), 0);
   const totalGross = sum("total_gross");
-  const channels: Array<[string, keyof (typeof daily)[number]]> = [
-    ["Suscripciones", "subscription_gross"], ["Mensajes", "message_gross"], ["Tips", "tips_gross"],
-    ["Posts (PPV)", "post_gross"], ["Referidos", "referral_gross"], ["Streams", "stream_gross"],
+  const channels: Array<[TranslationKey, keyof (typeof daily)[number]]> = [
+    ["creadores.money.chSubscriptions", "subscription_gross"], ["creadores.money.chMessages", "message_gross"], ["creadores.money.chTips", "tips_gross"],
+    ["creadores.money.chPosts", "post_gross"], ["creadores.money.chReferrals", "referral_gross"], ["creadores.money.chStreams", "stream_gross"],
   ];
 
   // ── Monetización mensual (manual, tabla existente) ──
@@ -51,7 +55,7 @@ const MonetizacionTabContent = ({ creatorId }: Props) => {
 
   const formatMonth = (monthYear: string) => {
     try {
-      return format(parseISO(monthYear), "MMMM yyyy", { locale: es }).replace(/^\w/, (c) => c.toUpperCase());
+      return format(parseISO(monthYear), "MMMM yyyy", { locale: f.fechas }).replace(/^\w/, (c) => c.toUpperCase());
     } catch {
       return monthYear;
     }
@@ -65,9 +69,9 @@ const MonetizacionTabContent = ({ creatorId }: Props) => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
             <TrendingUp className="h-5 w-5" />
-            Ingresos OnlyFans (BLU)
+            {t("creadores.money.ofIncome")}
           </CardTitle>
-          <CardDescription>Gross diario · este mes</CardDescription>
+          <CardDescription>{t("creadores.money.ofIncomeDesc")}</CardDescription>
         </CardHeader>
         <CardContent>
           {loadingDaily ? (
@@ -77,15 +81,15 @@ const MonetizacionTabContent = ({ creatorId }: Props) => {
               {/* Total del período + desglose por canal */}
               <div className="flex flex-wrap items-end gap-x-6 gap-y-1">
                 <div>
-                  <div className="text-xs text-muted-foreground">Total del mes</div>
+                  <div className="text-xs text-muted-foreground">{t("creadores.money.monthTotal")}</div>
                   <div className="text-2xl font-bold tabular-nums">{money0(totalGross)}</div>
                 </div>
-                <div className="text-xs text-muted-foreground pb-1">{daily.length} días con ingreso</div>
+                <div className="text-xs text-muted-foreground pb-1">{t("creadores.money.daysWithIncome", { n: daily.length })}</div>
               </div>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {channels.filter(([, k]) => sum(k) > 0).map(([label, k]) => (
                   <div key={String(k)} className="rounded-md border border-border bg-muted/20 px-3 py-2">
-                    <div className="text-[11px] text-muted-foreground">{label}</div>
+                    <div className="text-[11px] text-muted-foreground">{t(label)}</div>
                     <div className="text-sm font-semibold tabular-nums">{money0(sum(k))}</div>
                   </div>
                 ))}
@@ -95,7 +99,7 @@ const MonetizacionTabContent = ({ creatorId }: Props) => {
             </div>
           ) : (
             <p className="text-sm text-muted-foreground text-center py-8">
-              Sin datos de ingresos (BLU) en los últimos 30 días.
+              {t("creadores.money.noIncome")}
             </p>
           )}
         </CardContent>
@@ -106,9 +110,9 @@ const MonetizacionTabContent = ({ creatorId }: Props) => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
             <DollarSign className="h-5 w-5" />
-            Monetización Mensual
+            {t("creadores.money.monthly")}
           </CardTitle>
-          <CardDescription>Histórico de monetización por mes (carga manual)</CardDescription>
+          <CardDescription>{t("creadores.money.monthlyDesc")}</CardDescription>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -118,9 +122,9 @@ const MonetizacionTabContent = ({ creatorId }: Props) => {
               <Table>
                 <TableHeader className="sticky top-0 z-10 bg-card">
                   <TableRow>
-                    <TableHead>Mes</TableHead>
-                    <TableHead>Monto</TableHead>
-                    <TableHead>Notas</TableHead>
+                    <TableHead>{t("common.month")}</TableHead>
+                    <TableHead>{t("creadores.money.amount")}</TableHead>
+                    <TableHead>{t("creadores.ops.notes")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -135,7 +139,7 @@ const MonetizacionTabContent = ({ creatorId }: Props) => {
               </Table>
             </div>
           ) : (
-            <EmptyState seed="creador-monetizacion" title="No hay datos de monetización registrados" />
+            <EmptyState seed="creador-monetizacion" title={t("creadores.money.empty")} />
           )}
         </CardContent>
       </Card>

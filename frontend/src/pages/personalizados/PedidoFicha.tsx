@@ -15,7 +15,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
 import {
   CAMINO, DIAS_VENCIDO, SIGUIENTES, SOLO_SUPERVISOR, acentoDe, agenciaDe, alertaDe,
   estadoDe, flagDe, tipoDe, usd,
@@ -31,8 +32,6 @@ interface Props {
   onClose: () => void;
   onEditar: (p: Pedido) => void;
 }
-
-const fecha = (d: string | null | undefined) => (d ? format(new Date(d.length === 10 ? `${d}T12:00:00` : d), "d MMM yyyy", { locale: es }) : "—");
 
 // Defaults ESTABLES para cuando la query está deshabilitada (ficha cerrada):
 // un `= []` inline sería un array nuevo por render y, como `adjuntos` es
@@ -56,6 +55,7 @@ function Titulo({ icono: I, children, extra }: { icono: typeof Paperclip; childr
 // y cuánto le falta, que es la pregunta que el equipo le hacía al sheet
 // leyendo la columna de estado fila por fila.
 function Recorrido({ estado }: { estado: Estado }) {
+  const { t } = useLanguage();
   const actual = CAMINO.indexOf(estado);
   if (actual < 0) return null; // salida lateral: la cuenta la banda de resultado
   // Lo hecho va del color del estado ACTUAL (un pedido entregado se ve como una
@@ -68,7 +68,7 @@ function Recorrido({ estado }: { estado: Estado }) {
         <li key={e} className="min-w-0 flex-1">
           <div className={`h-1.5 rounded-full transition-colors ${i <= actual ? ac.punto : "bg-white/10"} ${i < actual ? "opacity-60" : ""}`} />
           <p className={`mt-1.5 truncate text-[10px] ${i === actual ? `font-semibold ${ac.texto}` : i < actual ? "text-muted-foreground" : "text-muted-foreground/40"}`}>
-            {estadoDe(e).corto}
+            {t(estadoDe(e).corto)}
           </p>
         </li>
       ))}
@@ -85,6 +85,9 @@ function Recorrido({ estado }: { estado: Estado }) {
 // ESTADO en el degradé del header, la foto de la creadora y el recorrido, para
 // que cada pedido se lea distinto y no como una lista de campos grises.
 export default function PedidoFicha({ pedido, onClose, onEditar }: Props) {
+  const formatoUi = useFormato();
+  const { t } = useLanguage();
+  const fecha = (d: string | null | undefined) => (d ? format(new Date(d.length === 10 ? `${d}T12:00:00` : d), "d MMM yyyy", { locale: formatoUi.fechas }) : "—");
   const { puedeAprobar, puedeGestionar } = usePermisosPersonalizados();
   const { nombreDe } = useCatalogos();
   const { cambiarEstado, editar, borrar, subirAdjunto, borrarAdjunto } = useMutacionesPedidos();
@@ -128,24 +131,26 @@ export default function PedidoFicha({ pedido, onClose, onEditar }: Props) {
   const saldo = precio - pagado;
   // Reloj del plazo: 7 días avisa, 12 vence. No aplica a pedidos cerrados.
   const alerta = alertaDe(pedido);
-  const chatter = pedido.chatter_name || nombreDe(pedido.chatter_id) || "Sin chatter";
+  // Una bandera fuera del catálogo se muestra con su id tal cual.
+  const etiquetaFlag = (id: string) => { const k = flagDe(id); return k ? t(k) : id; };
+  const chatter = pedido.chatter_name || nombreDe(pedido.chatter_id) || t("custom.detail.noChatter");
 
   const mover = async (estado: Estado) => {
     if (estado === "denegado") { setDenegando(true); return; }
     try {
       await cambiarEstado.mutateAsync({ id: pedido.id, estado });
-      toast.success(`Pedido → ${estadoDe(estado).label}`);
+      toast.success(t("custom.detail.movedTo", { status: t(estadoDe(estado).label) }));
     } catch (e) {
-      toast.error("No se pudo cambiar el estado", { description: (e as Error).message });
+      toast.error(t("custom.detail.statusError"), { description: (e as Error).message });
     }
   };
   const confirmarDenegar = async () => {
     try {
       await cambiarEstado.mutateAsync({ id: pedido.id, estado: "denegado", motivo: motivo.trim() || undefined });
-      toast.success("Pedido denegado");
+      toast.success(t("custom.detail.denied"));
       setDenegando(false);
     } catch (e) {
-      toast.error("No se pudo denegar", { description: (e as Error).message });
+      toast.error(t("custom.detail.denyError"), { description: (e as Error).message });
     }
   };
   const guardarNotas = async () => {
@@ -154,18 +159,18 @@ export default function PedidoFicha({ pedido, onClose, onEditar }: Props) {
       await editar.mutateAsync({ id: pedido.id, patch: { notes: notas.trim() || null } });
       setNotasGuardadas(true);
       window.setTimeout(() => setNotasGuardadas(false), 2500);
-    } catch (e) { toast.error("No se pudieron guardar las notas", { description: (e as Error).message }); }
+    } catch (e) { toast.error(t("custom.detail.notesError"), { description: (e as Error).message }); }
   };
   const subir = async (files: FileList | File[] | null) => {
     if (!files || !("length" in files) || !files.length) return;
     for (const f of Array.from(files)) {
       try { await subirAdjunto.mutateAsync({ requestId: pedido.id, file: f, kind: kindSubida }); }
-      catch (e) { toast.error(`No se pudo subir ${f.name}`, { description: (e as Error).message }); }
+      catch (e) { toast.error(t("custom.detail.uploadError", { name: f.name }), { description: (e as Error).message }); }
     }
     if (fileRef.current) fileRef.current.value = "";
   };
   const quitarAdjunto = async (a: PedidoAdjunto) => {
-    try { await borrarAdjunto.mutateAsync(a); } catch (e) { toast.error("No se pudo quitar", { description: (e as Error).message }); }
+    try { await borrarAdjunto.mutateAsync(a); } catch (e) { toast.error(t("custom.detail.removeError"), { description: (e as Error).message }); }
   };
 
   const siguientes = SIGUIENTES[pedido.status].filter((s) => !SOLO_SUPERVISOR.includes(s) || puedeAprobar);
@@ -181,20 +186,20 @@ export default function PedidoFicha({ pedido, onClose, onEditar }: Props) {
             <UserAvatar name={pedido.creator_name} src={foto} size="xl" ring className="mt-0.5" />
             <div className="min-w-0 flex-1 pr-8">
               <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
-                <Badge variant="outline" className={`rounded-full ${est.tono}`}>{est.label}</Badge>
+                <Badge variant="outline" className={`rounded-full ${est.tono}`}>{t(est.label)}</Badge>
                 <Badge variant="outline" className={`rounded-full ${ag.tono}`}>{ag.label}</Badge>
-                {tipo && <Badge variant="outline" className="rounded-full">{tipo.emoji} {tipo.label}</Badge>}
-                {pedido.sale_channel === "buster" && <Badge variant="outline" className="rounded-full border-orange-500/30 bg-orange-500/15 text-orange-600 dark:text-orange-400">⚡ Hora Buster</Badge>}
+                {tipo && <Badge variant="outline" className="rounded-full">{tipo.emoji} {t(tipo.label)}</Badge>}
+                {pedido.sale_channel === "buster" && <Badge variant="outline" className="rounded-full border-orange-500/30 bg-orange-500/15 text-orange-600 dark:text-orange-400">⚡ {t("custom.channel.buster")}</Badge>}
                 {alerta && (
-                  <Badge variant="outline" className={`rounded-full ${alerta.tono}`} title={`El plazo de un personalizado es de ${DIAS_VENCIDO} días.`}>
+                  <Badge variant="outline" className={`rounded-full ${alerta.tono}`} title={t("custom.alert.tipDeadline", { max: DIAS_VENCIDO })}>
                     {alerta.nivel === "vencido" ? <AlertTriangle className="mr-1 h-3 w-3" /> : null}
-                    {alerta.texto}
+                    {t(alerta.texto, { dias: alerta.dias })}
                   </Badge>
                 )}
               </div>
               <DialogTitle className="truncate text-xl leading-tight">{pedido.creator_name}</DialogTitle>
               <p className="mt-0.5 truncate text-sm text-muted-foreground">
-                para <span className="font-medium text-foreground">@{pedido.fan_handle}</span>
+                {t("custom.detail.for")} <span className="font-medium text-foreground">@{pedido.fan_handle}</span>
               </p>
               <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                 <span className="inline-flex items-center gap-1.5">
@@ -204,7 +209,7 @@ export default function PedidoFicha({ pedido, onClose, onEditar }: Props) {
                 <span className="inline-flex items-center gap-1"><CalendarDays className="h-3 w-3" />{fecha(pedido.requested_on)}</span>
                 {pedido.due_on && (
                   <span className={`inline-flex items-center gap-1 ${alerta?.nivel === "vencido" ? "font-medium text-destructive" : ""}`}>
-                    <Clock className="h-3 w-3" />Entrega {fecha(pedido.due_on)}
+                    <Clock className="h-3 w-3" />{t("custom.detail.dueOn", { date: fecha(pedido.due_on) })}
                   </span>
                 )}
               </div>
@@ -219,9 +224,9 @@ export default function PedidoFicha({ pedido, onClose, onEditar }: Props) {
             <div className={`flex items-start gap-3 rounded-2xl border border-white/5 px-4 py-3 ${ac.tinte}`}>
               {pedido.status === "denegado" ? <Ban className={`h-5 w-5 shrink-0 ${ac.texto}`} /> : <RotateCcw className={`h-5 w-5 shrink-0 ${ac.texto}`} />}
               <div className="min-w-0">
-                <p className={`text-sm font-semibold ${ac.texto}`}>{est.label}</p>
+                <p className={`text-sm font-semibold ${ac.texto}`}>{t(est.label)}</p>
                 <p className="text-sm text-muted-foreground">
-                  {pedido.denied_reason || (pedido.status === "reembolsado" ? "Se le devolvió la plata al fan." : "Sin motivo anotado.")}
+                  {pedido.denied_reason || (pedido.status === "reembolsado" ? t("custom.detail.refunded") : t("custom.detail.noReason"))}
                 </p>
               </div>
             </div>
@@ -229,11 +234,11 @@ export default function PedidoFicha({ pedido, onClose, onEditar }: Props) {
 
           {denegando && (
             <div className="space-y-2 rounded-2xl border border-destructive/30 bg-destructive/5 p-4">
-              <Label className="text-xs">Motivo (lo ve el chatter)</Label>
-              <Textarea rows={2} value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Por qué no se hace este pedido" />
+              <Label className="text-xs">{t("custom.detail.denyReason")}</Label>
+              <Textarea rows={2} value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder={t("custom.detail.denyReasonPh")} />
               <div className="flex justify-end gap-2">
-                <Button size="sm" variant="ghost" onClick={() => setDenegando(false)}>Cancelar</Button>
-                <Button size="sm" variant="destructive" onClick={() => void confirmarDenegar()} disabled={cambiarEstado.isPending}>Denegar pedido</Button>
+                <Button size="sm" variant="ghost" onClick={() => setDenegando(false)}>{t("common.cancel")}</Button>
+                <Button size="sm" variant="destructive" onClick={() => void confirmarDenegar()} disabled={cambiarEstado.isPending}>{t("custom.detail.denyOrder")}</Button>
               </div>
             </div>
           )}
@@ -241,7 +246,7 @@ export default function PedidoFicha({ pedido, onClose, onEditar }: Props) {
           {/* QUÉ PIDIÓ — es el corazón de la ficha, así que va en un card
               propio y con cuerpo de texto legible, no en letra chica. */}
           <section>
-            <Titulo icono={Quote}>Qué pidió</Titulo>
+            <Titulo icono={Quote}>{t("custom.detail.whatAsked")}</Titulo>
             <div className="rounded-2xl border border-white/5 bg-background/40 p-4">
               <p className="whitespace-pre-wrap text-[15px] leading-relaxed">{pedido.description}</p>
               {pedido.duration_or_qty && (
@@ -254,13 +259,13 @@ export default function PedidoFicha({ pedido, onClose, onEditar }: Props) {
 
           {/* PLATA — el precio manda; el resto acompaña. */}
           <section>
-            <Titulo icono={Wallet}>Plata</Titulo>
+            <Titulo icono={Wallet}>{t("custom.detail.money")}</Titulo>
             <div className="rounded-2xl border border-white/5 bg-background/40 p-4">
               <div className="grid grid-cols-3 divide-x divide-white/5">
                 {[
-                  { l: "Precio", v: usd(pedido.price_usd), grande: true },
-                  { l: "Pagado", v: usd(pedido.paid_usd) },
-                  { l: "Gasto del fan", v: usd(pedido.fan_total_spent_usd) },
+                  { l: t("custom.col.price"), v: usd(pedido.price_usd), grande: true },
+                  { l: t("custom.col.paid"), v: usd(pedido.paid_usd) },
+                  { l: t("custom.detail.fanSpend"), v: usd(pedido.fan_total_spent_usd) },
                 ].map((k) => (
                   <div key={k.l} className="px-4 first:pl-0 last:pr-0">
                     <p className="text-xs text-muted-foreground">{k.l}</p>
@@ -279,7 +284,7 @@ export default function PedidoFicha({ pedido, onClose, onEditar }: Props) {
                     />
                   </div>
                   <p className={`mt-1.5 text-[11px] ${saldo > 0 ? "text-warning" : "text-muted-foreground"}`}>
-                    {saldo > 0 ? `Falta cobrar ${usd(saldo)} de ${usd(precio)}` : "Cobrado completo"}
+                    {saldo > 0 ? t("custom.detail.toCollect", { due: usd(saldo), price: usd(precio) }) : t("custom.detail.paidInFull")}
                   </p>
                 </div>
               )}
@@ -291,7 +296,7 @@ export default function PedidoFicha({ pedido, onClose, onEditar }: Props) {
             <section className="space-y-1.5 rounded-2xl border border-warning/20 bg-warning/5 px-4 py-3">
               {pedido.flags.map((f) => (
                 <p key={f} className="flex items-start gap-2 text-xs text-warning">
-                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />{flagDe(f)}
+                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />{etiquetaFlag(f)}
                 </p>
               ))}
             </section>
@@ -309,17 +314,17 @@ export default function PedidoFicha({ pedido, onClose, onEditar }: Props) {
                 <>
                   <select value={kindSubida} onChange={(e) => setKindSubida(e.target.value as "referencia" | "entrega")}
                     className="h-7 rounded-full border-0 bg-white/5 px-2 text-xs">
-                    <option value="referencia">Referencia</option>
-                    <option value="entrega">Entrega</option>
+                    <option value="referencia">{t("custom.attach.reference")}</option>
+                    <option value="entrega">{t("custom.attach.delivery")}</option>
                   </select>
                   <input ref={fileRef} type="file" multiple className="hidden" onChange={(e) => void subir(e.target.files)} />
                   <Button size="sm" variant="outline" className="h-7 gap-1 rounded-full text-xs" onClick={() => fileRef.current?.click()} disabled={subirAdjunto.isPending}>
-                    {subirAdjunto.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Paperclip className="h-3 w-3" />} Subir
+                    {subirAdjunto.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Paperclip className="h-3 w-3" />} {t("custom.attach.upload")}
                   </Button>
                 </>
               }
             >
-              Adjuntos
+              {t("custom.attach.title")}
             </Titulo>
             {adjuntos.length === 0 ? (
               <button
@@ -328,8 +333,8 @@ export default function PedidoFicha({ pedido, onClose, onEditar }: Props) {
                 className={`flex w-full flex-col items-center justify-center gap-1.5 rounded-2xl border border-dashed py-7 transition-colors ${soltando ? "border-primary bg-primary/10" : "border-white/15 bg-background/20 hover:border-primary/40 hover:bg-white/5"}`}
               >
                 <ImagePlus className="h-5 w-5 text-muted-foreground/70" />
-                <span className="text-xs text-muted-foreground">Suelta los archivos aquí o haz clic para elegirlos</span>
-                <span className="text-[11px] text-muted-foreground/60">Las referencias del fan y la entrega de la creadora</span>
+                <span className="text-xs text-muted-foreground">{t("custom.attach.drop")}</span>
+                <span className="text-[11px] text-muted-foreground/60">{t("custom.attach.dropHint")}</span>
               </button>
             ) : (
               <div className={`grid grid-cols-3 gap-2 rounded-2xl transition-colors ${soltando ? "bg-primary/10 ring-1 ring-primary" : ""}`}>
@@ -347,11 +352,11 @@ export default function PedidoFicha({ pedido, onClose, onEditar }: Props) {
                         </div>
                       )}
                       <span className={`absolute left-1.5 top-1.5 rounded-full px-1.5 py-0.5 text-[9px] font-medium backdrop-blur-sm ${a.kind === "entrega" ? "bg-success/80 text-success-foreground" : "bg-black/55 text-white"}`}>
-                        {a.kind === "entrega" ? "Entrega" : "Ref."}
+                        {a.kind === "entrega" ? t("custom.attach.delivery") : t("custom.attach.refShort")}
                       </span>
                       <div className="absolute inset-x-0 bottom-0 flex justify-end gap-1 bg-gradient-to-t from-black/70 to-transparent p-1.5 opacity-0 transition-opacity group-hover:opacity-100">
-                        {u && <a href={u} target="_blank" rel="noopener noreferrer" title="Abrir" className="flex h-6 w-6 items-center justify-center rounded-full bg-white/15 text-white hover:bg-white/25"><ExternalLink className="h-3 w-3" /></a>}
-                        <button type="button" title="Quitar" onClick={() => void quitarAdjunto(a)} className="flex h-6 w-6 items-center justify-center rounded-full bg-white/15 text-white hover:bg-destructive"><X className="h-3 w-3" /></button>
+                        {u && <a href={u} target="_blank" rel="noopener noreferrer" title={t("custom.attach.open")} className="flex h-6 w-6 items-center justify-center rounded-full bg-white/15 text-white hover:bg-white/25"><ExternalLink className="h-3 w-3" /></a>}
+                        <button type="button" title={t("custom.attach.remove")} onClick={() => void quitarAdjunto(a)} className="flex h-6 w-6 items-center justify-center rounded-full bg-white/15 text-white hover:bg-destructive"><X className="h-3 w-3" /></button>
                       </div>
                     </div>
                   );
@@ -364,16 +369,16 @@ export default function PedidoFicha({ pedido, onClose, onEditar }: Props) {
           <section>
             <Titulo
               icono={StickyNote}
-              extra={notasGuardadas ? <span className="inline-flex items-center gap-1 text-[11px] text-success"><Check className="h-3 w-3" />Guardado</span> : null}
+              extra={notasGuardadas ? <span className="inline-flex items-center gap-1 text-[11px] text-success"><Check className="h-3 w-3" />{t("custom.detail.saved")}</span> : null}
             >
-              Notas internas
+              {t("custom.detail.internalNotes")}
             </Titulo>
             <Textarea
               rows={3}
               value={notas}
               onChange={(e) => setNotas(e.target.value)}
               onBlur={() => void guardarNotas()}
-              placeholder="Lo que el equipo tenga que saber de este pedido. Se guarda al salir del campo."
+              placeholder={t("custom.detail.notesPh")}
               className="resize-none rounded-2xl border-white/5 bg-background/40"
             />
           </section>
@@ -381,25 +386,25 @@ export default function PedidoFicha({ pedido, onClose, onEditar }: Props) {
           {/* HISTORIAL como línea de tiempo: el punto toma el color del estado
               al que pasó, así el recorrido se lee también hacia atrás. */}
           <section>
-            <Titulo icono={History}>Historial</Titulo>
+            <Titulo icono={History}>{t("custom.detail.history")}</Titulo>
             {eventos.length === 0 ? (
-              <p className="text-xs text-muted-foreground">Sin movimientos todavía.</p>
+              <p className="text-xs text-muted-foreground">{t("custom.detail.noHistory")}</p>
             ) : (
               <ol className="relative space-y-3 pl-5 before:absolute before:bottom-1.5 before:left-[5px] before:top-1.5 before:w-px before:bg-white/10">
                 {eventos.map((ev) => (
                   <li key={ev.id} className="relative text-xs">
                     <span className={`absolute -left-5 top-1 h-2.5 w-2.5 rounded-full ring-2 ring-card ${acentoDe(ev.to_status).punto}`} />
-                    <span className="font-medium">{nombreDe(ev.actor_id) ?? (ev.actor_id ? "Alguien" : "Sistema")}</span>
-                    {" "}{ev.from_status ? `pasó de ${estadoDe(ev.from_status).label} a ` : "creó el pedido como "}
-                    <span className={`font-medium ${acentoDe(ev.to_status).texto}`}>{estadoDe(ev.to_status).label}</span>
+                    <span className="font-medium">{nombreDe(ev.actor_id) ?? (ev.actor_id ? t("custom.detail.someone") : t("custom.detail.system"))}</span>
+                    {" "}{ev.from_status ? t("custom.detail.movedFrom", { from: t(estadoDe(ev.from_status).label) }) : t("custom.detail.createdAs")}{" "}
+                    <span className={`font-medium ${acentoDe(ev.to_status).texto}`}>{t(estadoDe(ev.to_status).label)}</span>
                     {ev.note && <span className="text-muted-foreground"> — {ev.note}</span>}
-                    <span className="text-muted-foreground"> · {formatDistanceToNow(new Date(ev.created_at), { addSuffix: true, locale: es })}</span>
+                    <span className="text-muted-foreground"> · {formatDistanceToNow(new Date(ev.created_at), { addSuffix: true, locale: formatoUi.fechas })}</span>
                   </li>
                 ))}
               </ol>
             )}
             {pedido.source === "sheet" && (
-              <p className="mt-2 text-[11px] text-muted-foreground/70">Importado del sheet{pedido.source_ref ? ` (${pedido.source_ref})` : ""}.</p>
+              <p className="mt-2 text-[11px] text-muted-foreground/70">{t("custom.detail.imported", { ref: pedido.source_ref ? ` (${pedido.source_ref})` : "" })}</p>
             )}
           </section>
         </div>
@@ -407,16 +412,16 @@ export default function PedidoFicha({ pedido, onClose, onEditar }: Props) {
         {/* PIE fijo: la acción que sigue siempre a la vista, sin scrollear. */}
         <footer className="flex items-center gap-1 border-t border-white/10 bg-card/80 px-4 py-3 backdrop-blur-xl">
           <Button variant="ghost" size="sm" className="gap-1.5 rounded-full text-muted-foreground hover:text-foreground" onClick={() => onEditar(pedido)}>
-            <Pencil className="h-3.5 w-3.5" /> Editar
+            <Pencil className="h-3.5 w-3.5" /> {t("common.edit")}
           </Button>
           {puedeGestionar && (
-            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground hover:text-destructive" onClick={() => setBorrando(true)} title="Eliminar pedido">
+            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground hover:text-destructive" onClick={() => setBorrando(true)} title={t("custom.detail.deleteOrder")}>
               <Trash2 className="h-3.5 w-3.5" />
             </Button>
           )}
           <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
             {!puedeAprobar && pedido.status === "solicitado" && (
-              <p className="text-[11px] text-muted-foreground">Esperando aprobación de un supervisor.</p>
+              <p className="text-[11px] text-muted-foreground">{t("custom.detail.awaitingApproval")}</p>
             )}
             {siguientes.map((s) => {
               const e = estadoDe(s);
@@ -426,7 +431,7 @@ export default function PedidoFicha({ pedido, onClose, onEditar }: Props) {
                   className={`rounded-full ${destructivo ? "border-destructive/40 text-destructive hover:bg-destructive/10" : ""}`}
                   disabled={cambiarEstado.isPending} onClick={() => void mover(s)}>
                   {cambiarEstado.isPending ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : null}
-                  {s === "denegado" ? "Denegar" : s === "reembolsado" ? "Marcar reembolso" : `Pasar a ${e.label}`}
+                  {s === "denegado" ? t("custom.detail.deny") : s === "reembolsado" ? t("custom.detail.markRefund") : t("custom.detail.moveTo", { status: t(e.label) })}
                 </Button>
               );
             })}
@@ -436,14 +441,14 @@ export default function PedidoFicha({ pedido, onClose, onEditar }: Props) {
         <AlertDialog open={borrando} onOpenChange={setBorrando}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>¿Eliminar este pedido?</AlertDialogTitle>
-              <AlertDialogDescription>Se borra con su historial y adjuntos. Si solo no se va a hacer, mejor denegarlo: queda el registro.</AlertDialogDescription>
+              <AlertDialogTitle>{t("custom.detail.deleteTitle")}</AlertDialogTitle>
+              <AlertDialogDescription>{t("custom.detail.deleteDesc")}</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel />
               <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                onClick={async (e) => { e.preventDefault(); try { await borrar.mutateAsync(pedido.id); toast.success("Pedido eliminado"); onClose(); } catch (err) { toast.error("No se pudo eliminar", { description: (err as Error).message }); } }}>
-                Eliminar
+                onClick={async (e) => { e.preventDefault(); try { await borrar.mutateAsync(pedido.id); toast.success(t("custom.detail.deleted")); onClose(); } catch (err) { toast.error(t("common.couldNotDelete"), { description: (err as Error).message }); } }}>
+                {t("common.delete")}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

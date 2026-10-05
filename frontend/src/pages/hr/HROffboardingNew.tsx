@@ -15,15 +15,22 @@ import { DateInput } from "@/components/ui/date-input";
 import { Progress } from "@/components/ui/progress";
 import { PageHeader } from "@/components/ui/page-header";
 import { usePayrollParams } from "@/hooks/useFinancialConfig";
+import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 // generateSettlementPdf pulls jspdf — loaded on demand below.
 
 // ─── Steps ──────────────────────────────────────────────────────────────────
-const STEPS = [
-  { label: "Empleado", description: "Selección y terminación" },
-  { label: "Motivo", description: "Razón y resumen financiero" },
-  { label: "Checklist", description: "Tareas y liquidación" },
+const STEPS: { label: TranslationKey; description: TranslationKey }[] = [
+  { label: "hrg.employee", description: "hrg.off.step1Desc" },
+  { label: "hrg.off.step2", description: "hrg.off.step2Desc" },
+  { label: "hrg.off.step3", description: "hrg.off.step3Desc" },
 ];
 
+// LA CHECKLIST SE GUARDA EN ESPAÑOL. category/title/description se copian tal
+// cual a employee_offboarding_tasks y los lee quien lleve el offboarding, en su
+// idioma: son DATO, no pantalla. Lo que se DIBUJA en este paso sale de
+// `TAREAS_VISIBLES` (mismo orden, índice por índice) y de `CATEGORIAS_VISIBLES`.
 const DEFAULT_CHECKLIST = [
   { category: "Accesos", title: "Revocar correo corporativo", description: "Desactivar cuenta de email corporativo" },
   { category: "Accesos", title: "Revocar acceso a plataformas", description: "Slack, Notion, CRM y demás herramientas" },
@@ -44,25 +51,57 @@ const DEFAULT_CHECKLIST = [
   { category: "Administrativo", title: "Cierre de nómina", description: "Procesar último pago y cierre de nómina" },
 ];
 
-const TERMINATION_TYPES = [
-  { value: "voluntary", label: "Voluntaria" },
-  { value: "involuntary", label: "Involuntaria" },
-  { value: "end_of_contract", label: "Fin de Contrato" },
-  { value: "mutual_agreement", label: "Mutuo Acuerdo" },
+const TAREAS_VISIBLES: readonly (readonly [TranslationKey, TranslationKey])[] = [
+  ["hrg.off.task.email", "hrg.off.task.emailDesc"],
+  ["hrg.off.task.platforms", "hrg.off.task.platformsDesc"],
+  ["hrg.off.task.vpn", "hrg.off.task.vpnDesc"],
+  ["hrg.off.task.badge", "hrg.off.task.badgeDesc"],
+  ["hrg.off.task.laptop", "hrg.off.task.laptopDesc"],
+  ["hrg.off.task.keys", "hrg.off.task.keysDesc"],
+  ["hrg.off.task.otherEquipment", "hrg.off.task.otherEquipmentDesc"],
+  ["hrg.off.task.letter", "hrg.off.task.letterDesc"],
+  ["hrg.off.task.clearance", "hrg.off.task.clearanceDesc"],
+  ["hrg.off.task.certificate", "hrg.off.task.certificateDesc"],
+  ["hrg.off.task.settlement", "hrg.off.task.settlementDesc"],
+  ["hrg.off.task.handover", "hrg.off.task.handoverDesc"],
+  ["hrg.off.task.processes", "hrg.off.task.processesDesc"],
+  ["hrg.off.task.files", "hrg.off.task.filesDesc"],
+  ["hrg.off.task.notifyTeam", "hrg.off.task.notifyTeamDesc"],
+  ["hrg.off.task.socialSecurity", "hrg.off.task.socialSecurityDesc"],
+  ["hrg.off.task.payrollClose", "hrg.off.task.payrollCloseDesc"],
 ];
 
-const EXIT_REASONS = [
-  "Mejor oferta laboral",
-  "Problemas personales",
-  "Bajo rendimiento",
-  "Reestructuración",
-  "Fin de contrato",
-  "Clima laboral",
-  "Otro",
+const CATEGORIAS_VISIBLES: Record<string, TranslationKey> = {
+  Accesos: "hrg.off.cat.access",
+  Equipamiento: "hrg.off.cat.equipment",
+  "Documentación": "hrg.off.cat.documents",
+  Transferencia: "hrg.off.cat.handover",
+  Administrativo: "hrg.off.cat.admin",
+};
+
+const TERMINATION_TYPES: { value: string; label: TranslationKey }[] = [
+  { value: "voluntary", label: "hrg.off.term.voluntary" },
+  { value: "involuntary", label: "hrg.off.term.involuntary" },
+  { value: "end_of_contract", label: "hrg.off.term.endOfContract" },
+  { value: "mutual_agreement", label: "hrg.off.term.mutual" },
+];
+
+// El motivo se guarda en español en employee_offboarding.termination_reason (lo
+// leen otras personas): `value` es DATO. Se ve `label`.
+const EXIT_REASONS: { value: string; label: TranslationKey }[] = [
+  { value: "Mejor oferta laboral", label: "hrg.off.reason.betterOffer" },
+  { value: "Problemas personales", label: "hrg.off.reason.personal" },
+  { value: "Bajo rendimiento", label: "hrg.off.reason.lowPerformance" },
+  { value: "Reestructuración", label: "hrg.off.reason.restructuring" },
+  { value: "Fin de contrato", label: "hrg.off.reason.endOfContract" },
+  { value: "Clima laboral", label: "hrg.off.reason.workEnvironment" },
+  { value: "Otro", label: "hrg.off.reason.other" },
 ];
 
 export default function HROffboardingNew() {
   const navigate = useNavigate();
+  const formatoUi = useFormato();
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { params: payrollParams } = usePayrollParams();
@@ -206,7 +245,7 @@ export default function HROffboardingNew() {
   const vacationDaysPending = Math.max(0, vacationDaysAccrued - vacationDaysTaken);
   const vacationAmount = baseSalary > 0 ? (baseSalary / 30) * vacationDaysPending : 0;
 
-  const fmt = (n: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(n);
+  const fmt = (n: number) => new Intl.NumberFormat(formatoUi.intl("es-CO"), { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(n);
 
   const handleDownloadSettlement = async () => {
     if (!selectedEmployee) return;
@@ -265,10 +304,10 @@ export default function HROffboardingNew() {
       }).eq("id", selectedEmployeeId);
 
       queryClient.invalidateQueries({ queryKey: ["hr-offboardings"] });
-      toast({ title: "Offboarding iniciado correctamente" });
+      toast({ title: t("hrg.off.started") });
       navigate("/hr/offboarding");
     } catch {
-      toast({ title: "Error al iniciar el offboarding", variant: "destructive" });
+      toast({ title: t("hrg.off.startError"), variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
@@ -281,11 +320,11 @@ export default function HROffboardingNew() {
       {/* Header */}
       <div className="shrink-0 border-b border-white/10 bg-background/30 backdrop-blur-xl px-6 py-4">
         <Button variant="ghost" size="sm" className="mb-2 -ml-2 text-muted-foreground hover:text-foreground" onClick={() => navigate("/hr/offboarding")}>
-          <ArrowLeft className="h-4 w-4 mr-1" />Volver a Offboarding
+          <ArrowLeft className="h-4 w-4 mr-1" />{t("hrg.off.back")}
         </Button>
         <PageHeader
-          title="Iniciar Offboarding"
-          subtitle="Configura el proceso de salida de un empleado"
+          title={t("hrg.off.title")}
+          subtitle={t("hrg.off.subtitle")}
         />
       </div>
 
@@ -303,8 +342,8 @@ export default function HROffboardingNew() {
                   {i < step ? <Check className="h-4 w-4" /> : i + 1}
                 </div>
                 <div className="hidden sm:block">
-                  <p className={`text-sm font-medium ${i <= step ? "text-foreground" : "text-muted-foreground"}`}>{s.label}</p>
-                  <p className="text-xs text-muted-foreground">{s.description}</p>
+                  <p className={`text-sm font-medium ${i <= step ? "text-foreground" : "text-muted-foreground"}`}>{t(s.label)}</p>
+                  <p className="text-xs text-muted-foreground">{t(s.description)}</p>
                 </div>
                 {i < STEPS.length - 1 && <div className={`hidden sm:block w-12 h-0.5 mx-2 ${i < step ? "bg-gradient-to-r from-accent to-primary" : "bg-muted"}`} />}
               </div>
@@ -323,9 +362,9 @@ export default function HROffboardingNew() {
             <Card>
               <CardContent className="pt-6 space-y-5">
                 <div className="space-y-1.5">
-                  <Label>Empleado <span className="text-destructive">*</span></Label>
+                  <Label>{t("hrg.employee")} <span className="text-destructive">*</span></Label>
                   <Select value={selectedEmployeeId || undefined} onValueChange={setSelectedEmployeeId}>
-                    <SelectTrigger><SelectValue placeholder="Seleccionar empleado..." /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder={t("hrg.selectEmployee")} /></SelectTrigger>
                     <SelectContent>
                       {availableEmployees.map((e: any) => (
                         <SelectItem key={e.id} value={e.id}>
@@ -337,23 +376,23 @@ export default function HROffboardingNew() {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <Label>Tipo de Terminación <span className="text-destructive">*</span></Label>
+                    <Label>{t("hrg.off.terminationType")} <span className="text-destructive">*</span></Label>
                     <Select value={terminationType || undefined} onValueChange={setTerminationType}>
-                      <SelectTrigger><SelectValue placeholder="Seleccionar tipo..." /></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder={t("hrg.selectType")} /></SelectTrigger>
                       <SelectContent>
-                        {TERMINATION_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                        {TERMINATION_TYPES.map((o) => <SelectItem key={o.value} value={o.value}>{t(o.label)}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Fecha de Terminación <span className="text-destructive">*</span></Label>
-                    <DateInput value={terminationDate} onChange={setTerminationDate} placeholder="Seleccionar fecha..." />
+                    <Label>{t("hrg.off.terminationDate")} <span className="text-destructive">*</span></Label>
+                    <DateInput value={terminationDate} onChange={setTerminationDate} placeholder={t("hrg.selectDate")} />
                   </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <Label>Fecha Entrevista de Salida</Label>
-                    <DateInput value={exitInterviewDate} onChange={setExitInterviewDate} placeholder="Opcional..." />
+                    <Label>{t("hrg.off.exitInterviewDate")}</Label>
+                    <DateInput value={exitInterviewDate} onChange={setExitInterviewDate} placeholder={t("hrg.off.optional")} />
                   </div>
                 </div>
               </CardContent>
@@ -366,17 +405,17 @@ export default function HROffboardingNew() {
               <Card>
                 <CardContent className="pt-6 space-y-5">
                   <div className="space-y-1.5">
-                    <Label>Motivo de Salida <span className="text-destructive">*</span></Label>
+                    <Label>{t("hrg.off.exitReason")} <span className="text-destructive">*</span></Label>
                     <Select value={exitReason || undefined} onValueChange={setExitReason}>
-                      <SelectTrigger><SelectValue placeholder="Seleccionar motivo..." /></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder={t("hrg.off.selectReason")} /></SelectTrigger>
                       <SelectContent>
-                        {EXIT_REASONS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                        {EXIT_REASONS.map((r) => <SelectItem key={r.value} value={r.value}>{t(r.label)}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Detalle del Motivo</Label>
-                    <Textarea placeholder="Descripción detallada del motivo de salida..." rows={3} value={terminationDetail} onChange={(e) => setTerminationDetail(e.target.value)} />
+                    <Label>{t("hrg.off.reasonDetail")}</Label>
+                    <Textarea placeholder={t("hrg.off.reasonDetailPlaceholder")} rows={3} value={terminationDetail} onChange={(e) => setTerminationDetail(e.target.value)} />
                   </div>
                 </CardContent>
               </Card>
@@ -384,22 +423,22 @@ export default function HROffboardingNew() {
               {selectedEmployee && (
                 <Card>
                   <CardContent className="pt-6">
-                    <p className="text-sm font-semibold text-foreground mb-4">Resumen Financiero</p>
+                    <p className="text-sm font-semibold text-foreground mb-4">{t("hrg.off.financialSummary")}</p>
                     <div className="space-y-3">
                       <div className="flex items-center justify-between py-2 border-b border-border/50">
-                        <span className="text-sm text-muted-foreground">Salario Base</span>
+                        <span className="text-sm text-muted-foreground">{t("hrg.opt.histField.base_salary")}</span>
                         <span className="text-sm font-medium text-foreground">{fmt(baseSalary)}</span>
                       </div>
                       <div className="flex items-center justify-between py-2 border-b border-border/50">
-                        <span className="text-sm text-muted-foreground">Vacaciones Pendientes</span>
-                        <span className="text-sm font-medium text-foreground">{vacationDaysPending.toFixed(1)} días ({fmt(vacationAmount)})</span>
+                        <span className="text-sm text-muted-foreground">{t("hrg.off.pendingVacation")}</span>
+                        <span className="text-sm font-medium text-foreground">{t("hrg.off.daysAmount", { days: vacationDaysPending.toFixed(1), amount: fmt(vacationAmount) })}</span>
                       </div>
                       <div className="flex items-center justify-between py-2 border-b border-border/50">
-                        <span className="text-sm text-muted-foreground">Banco de Horas</span>
+                        <span className="text-sm text-muted-foreground">{t("hrg.hourBank")}</span>
                         <span className="text-sm font-medium text-foreground">{hourBankBalance}h ({fmt(hourBankAmount)})</span>
                       </div>
                       <div className="flex items-center justify-between py-2 pt-3">
-                        <span className="text-sm font-semibold text-foreground">Total Liquidación Proyectada</span>
+                        <span className="text-sm font-semibold text-foreground">{t("hrg.off.projectedTotal")}</span>
                         <span className="text-base font-bold text-primary">{fmt(baseSalary + vacationAmount + hourBankAmount)}</span>
                       </div>
                     </div>
@@ -416,12 +455,12 @@ export default function HROffboardingNew() {
                 <CardContent className="pt-6 space-y-5">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-semibold text-foreground">Checklist de Offboarding</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">Selecciona las tareas que aplican para este proceso</p>
+                      <p className="text-sm font-semibold text-foreground">{t("hrg.off.checklistTitle")}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{t("hrg.off.checklistHint")}</p>
                     </div>
                     {selectedEmployee && (
                       <Button variant="outline" size="sm" onClick={handleDownloadSettlement}>
-                        <Download className="h-4 w-4 mr-1" />Liquidación Proyectada
+                        <Download className="h-4 w-4 mr-1" />{t("hrg.off.projectedSettlement")}
                       </Button>
                     )}
                   </div>
@@ -439,7 +478,7 @@ export default function HROffboardingNew() {
                               indeterminate={someSelected && !allSelected}
                               onCheckedChange={() => toggleCategory(category)}
                             />
-                            <span className="text-sm font-semibold text-foreground">{category}</span>
+                            <span className="text-sm font-semibold text-foreground">{CATEGORIAS_VISIBLES[category] ? t(CATEGORIAS_VISIBLES[category]) : category}</span>
                             <span className="text-xs text-muted-foreground">
                               ({tasks.filter((t) => selectedTasks.has(t.index)).length}/{tasks.length})
                             </span>
@@ -453,8 +492,8 @@ export default function HROffboardingNew() {
                                   className="mt-0.5"
                                 />
                                 <div>
-                                  <p className="text-sm text-foreground group-hover:text-primary transition-colors">{task.title}</p>
-                                  <p className="text-xs text-muted-foreground">{task.description}</p>
+                                  <p className="text-sm text-foreground group-hover:text-primary transition-colors">{TAREAS_VISIBLES[task.index] ? t(TAREAS_VISIBLES[task.index][0]) : task.title}</p>
+                                  <p className="text-xs text-muted-foreground">{TAREAS_VISIBLES[task.index] ? t(TAREAS_VISIBLES[task.index][1]) : task.description}</p>
                                 </div>
                               </label>
                             ))}
@@ -475,20 +514,20 @@ export default function HROffboardingNew() {
         <div>
           {step > 0 && (
             <Button variant="outline" onClick={handlePrev}>
-              <ChevronLeft className="h-4 w-4 mr-1" />Anterior
+              <ChevronLeft className="h-4 w-4 mr-1" />{t("common.previous")}
             </Button>
           )}
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="outline" onClick={() => navigate("/hr/offboarding")}>Cancelar</Button>
+          <Button variant="outline" onClick={() => navigate("/hr/offboarding")}>{t("common.cancel")}</Button>
           {step < STEPS.length - 1 ? (
             <Button onClick={handleNext} disabled={!stepValid(step)}>
-              Siguiente<ChevronRight className="h-4 w-4 ml-1" />
+              {t("common.next")}<ChevronRight className="h-4 w-4 ml-1" />
             </Button>
           ) : (
             <Button onClick={handleSubmit} disabled={!stepValid(step) || isSubmitting}>
               <UserMinus className="h-4 w-4 mr-1" />
-              {isSubmitting ? "Iniciando..." : "Iniciar Offboarding"}
+              {isSubmitting ? t("hrg.starting") : t("hrg.off.title")}
             </Button>
           )}
         </div>

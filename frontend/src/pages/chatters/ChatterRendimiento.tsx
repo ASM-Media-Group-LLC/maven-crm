@@ -13,6 +13,8 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { EmptyState } from "@/components/EmptyState";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/hooks/useLanguage";
+import { useFormato } from "@/hooks/useFormato";
 import {
   useChatterPeriodo, useCobertura, useDiasDeChatter, useModelosDelDia, useMasivos,
   isoDia, tonoDeNota, money, NOMBRE_FALTANTE,
@@ -25,17 +27,15 @@ import {
 // como el promedio del mes y alguien tomaría una decisión sobre una persona con
 // eso. Se muestra el dato, pero nunca sin su contexto.
 function AvisoCobertura({ dias, diasConDatos }: { dias: number; diasConDatos: number }) {
+  const { t } = useLanguage();
   const parcial = diasConDatos < dias;
   if (!parcial) return null;
   return (
     <div className="flex items-start gap-2.5 rounded-xl border border-warning/30 bg-warning/10 px-3.5 py-2.5">
       <AlertTriangle className="h-4 w-4 shrink-0 text-warning mt-0.5" />
       <p className="text-xs leading-relaxed text-foreground/90">
-        <span className="font-medium">Notas provisionales.</span>{" "}
-        Del periodo elegido ({dias} {dias === 1 ? "día" : "días"}) hay registro en {diasConDatos}. La agencia está migrando
-        de Infloww a BLU, así que lo esperado se calcula con las personas que ya se mudaron y va a
-        moverse cuando entren las demás. Sirve para ver la operación; todavía no para
-        evaluar a nadie.
+        <span className="font-medium">{t("chatters.rend.provisionalTitle")}</span>{" "}
+        {t("chatters.rend.provisionalBody", { days: dias, unidad: t(dias === 1 ? "chatters.dayOne" : "chatters.dayMany"), conDatos: diasConDatos })}
       </p>
     </div>
   );
@@ -51,14 +51,18 @@ function AvisoCobertura({ dias, diasConDatos }: { dias: number; diasConDatos: nu
 const rutaInterna = (r: string | null): boolean => !!r && /^\/[A-Za-z0-9\-_/]*(\?[^#]*)?$/.test(r) && !r.startsWith("//");
 
 function FeedbackCelda({ fila }: { fila: ChatterPeriodo }) {
+  const { t } = useLanguage();
   const pts = Number(fila.feedback_puntos ?? 0);
   if (!fila.feedback_n) return <span className="text-muted-foreground">—</span>;
   const base = fila.nota_base_promedio == null ? null : Number(fila.nota_base_promedio);
   return (
     <span
-      title={base != null
-        ? `Nota sin feedback ${base.toFixed(2)} → con feedback ${Number(fila.nota_promedio).toFixed(2)} · ${fila.feedback_n} registro${fila.feedback_n === 1 ? "" : "s"}`
-        : `${fila.feedback_n} registro${fila.feedback_n === 1 ? "" : "s"}`}
+      title={(() => {
+        const registros = t(fila.feedback_n === 1 ? "chatters.rend.recordsOne" : "chatters.rend.recordsMany", { n: fila.feedback_n });
+        return base != null
+          ? t("chatters.rend.feedbackBeforeAfter", { base: base.toFixed(2), nota: Number(fila.nota_promedio).toFixed(2), registros })
+          : registros;
+      })()}
       className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold tabular-nums",
         pts < 0 ? "border-destructive/30 bg-destructive/10 text-destructive"
         : pts > 0 ? "border-success/30 bg-success/10 text-success"
@@ -71,8 +75,9 @@ function FeedbackCelda({ fila }: { fila: ChatterPeriodo }) {
 }
 
 function NotaBadge({ nota, dias }: { nota: number | null; dias?: number }) {
+  const { t } = useLanguage();
   if (nota == null) {
-    return <span className="text-xs text-muted-foreground">Sin datos</span>;
+    return <span className="text-xs text-muted-foreground">{t("common.noData")}</span>;
   }
   return (
     <span className={cn("inline-flex items-baseline gap-1 rounded-lg border px-2 py-0.5 tabular-nums", tonoDeNota(nota))}>
@@ -90,9 +95,11 @@ function NotaBadge({ nota, dias }: { nota: number | null; dias?: number }) {
 function TiraDeDias({
   identityId, desde, hasta, diaSel, onDia,
 }: { identityId: string; desde: string; hasta: string; diaSel: string | null; onDia: (d: string) => void }) {
+  const { t } = useLanguage();
   const { data, isLoading } = useDiasDeChatter(identityId, desde, hasta);
+  const faltante = (f: string) => (NOMBRE_FALTANTE[f] ? t(NOMBRE_FALTANTE[f]) : f);
   if (isLoading) return <div className="h-9 flex items-center"><Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" /></div>;
-  if (!data?.length) return <p className="text-xs text-muted-foreground">Todavía no hay días calculados.</p>;
+  if (!data?.length) return <p className="text-xs text-muted-foreground">{t("chatters.rend.noDaysYet")}</p>;
 
   return (
     <TooltipProvider delayDuration={120}>
@@ -117,15 +124,15 @@ function TiraDeDias({
                 <p className="font-medium">{d.dia}</p>
                 {d.nota == null ? (
                   <p className="text-xs mt-1">
-                    Sin nota{faltan.length > 0 && `: ${faltan.map((f) => NOMBRE_FALTANTE[f] ?? f).join(", ")}`}
+                    {t("chatters.rend.noScore")}{faltan.length > 0 && `: ${faltan.map(faltante).join(", ")}`}
                   </p>
                 ) : (
                   <div className="text-xs mt-1 space-y-0.5">
-                    <p>Vendió {money(d.ventas)} · se esperaba {money(d.ventas_esperadas)}</p>
-                    {d.horas != null && <p>Horas {d.horas.toFixed(1)}</p>}
+                    <p>{t("chatters.rend.soldVsExpected", { sales: money(d.ventas), esperado: money(d.ventas_esperadas) })}</p>
+                    {d.horas != null && <p>{t("chatters.rend.hoursN", { n: d.horas.toFixed(1) })}</p>}
                     {faltan.length > 0 && (
                       <p className="text-warning">
-                        Calculada sin: {faltan.map((f) => NOMBRE_FALTANTE[f] ?? f).join(", ")}
+                        {t("chatters.calculatedWithout", { lista: faltan.map(faltante).join(", ") })}
                       </p>
                     )}
                   </div>
@@ -140,16 +147,17 @@ function TiraDeDias({
 }
 
 function ModelosDelDia({ identityId, dia }: { identityId: string; dia: string }) {
+  const { t } = useLanguage();
   const { data, isLoading } = useModelosDelDia(identityId, dia);
   if (isLoading) return <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />;
   if (!data?.length) {
-    return <p className="text-xs text-muted-foreground">De este día no tenemos el cruce con modelos.</p>;
+    return <p className="text-xs text-muted-foreground">{t("chatters.rend.noModelCrossRef")}</p>;
   }
   return (
     <div className="flex flex-wrap gap-1.5">
       {data.map((m) => (
         <span key={m.blu_model_id} className="inline-flex items-center gap-1.5 rounded-lg bg-secondary px-2 py-1 text-xs">
-          <span className="text-foreground">{m.model_name ?? `Modelo ${m.blu_model_id}`}</span>
+          <span className="text-foreground">{m.model_name ?? t("chatters.modelN", { id: m.blu_model_id })}</span>
           <span className="tabular-nums font-medium">{money(m.sales)}</span>
           <span className="text-muted-foreground">· {m.fans_chatted} fans</span>
         </span>
@@ -159,24 +167,26 @@ function ModelosDelDia({ identityId, dia }: { identityId: string; dia: string })
 }
 
 function Masivos({ identityId, desde, hasta }: { identityId: string; desde: string; hasta: string }) {
+  const { t } = useLanguage();
+  const fmt = useFormato();
   const { data, isLoading } = useMasivos(identityId, desde, hasta);
   if (isLoading) return <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />;
-  if (!data?.length) return <p className="text-xs text-muted-foreground">Sin masivos atribuidos en el periodo.</p>;
+  if (!data?.length) return <p className="text-xs text-muted-foreground">{t("chatters.rend.noMassMessages")}</p>;
 
   return (
     <div className="overflow-x-auto">
       <table className="tabla-movil w-full text-xs">
         <thead className="text-muted-foreground">
           <tr className="border-b border-border">
-            <th className="py-1.5 pr-3 text-left font-medium">Día</th>
-            <th className="py-1.5 pr-3 text-left font-medium">Modelo</th>
-            <th className="py-1.5 pr-3 text-left font-medium">Mensaje</th>
-            <th className="py-1.5 pr-3 text-right font-medium">Precio</th>
-            <th className="py-1.5 pr-3 text-right font-medium">Enviados</th>
-            <th className="py-1.5 pr-3 text-right font-medium">Vistos</th>
-            <th className="py-1.5 pr-3 text-right font-medium">Compraron</th>
-            <th className="py-1.5 pr-3 text-right font-medium">Conversión</th>
-            <th className="py-1.5 text-right font-medium">Generó</th>
+            <th className="py-1.5 pr-3 text-left font-medium">{t("chatters.rend.colDay")}</th>
+            <th className="py-1.5 pr-3 text-left font-medium">{t("chatters.rend.colModel")}</th>
+            <th className="py-1.5 pr-3 text-left font-medium">{t("chatters.rend.colMessage")}</th>
+            <th className="py-1.5 pr-3 text-right font-medium">{t("chatters.rend.colPrice")}</th>
+            <th className="py-1.5 pr-3 text-right font-medium">{t("chatters.rend.colSent")}</th>
+            <th className="py-1.5 pr-3 text-right font-medium">{t("chatters.rend.colViewed")}</th>
+            <th className="py-1.5 pr-3 text-right font-medium">{t("chatters.rend.colPurchased")}</th>
+            <th className="py-1.5 pr-3 text-right font-medium">{t("chatters.conversion")}</th>
+            <th className="py-1.5 text-right font-medium">{t("chatters.rend.colEarned")}</th>
           </tr>
         </thead>
         <tbody>
@@ -190,10 +200,10 @@ function Masivos({ identityId, desde, hasta }: { identityId: string; desde: stri
                 <td className="py-1.5 pr-3 whitespace-nowrap text-muted-foreground">{m.dia}</td>
                 <td className="py-1.5 pr-3 whitespace-nowrap">{m.model_name ?? "—"}</td>
                 <td className="py-1.5 pr-3 max-w-[280px] truncate" title={m.copy ?? ""}>{m.copy ?? "—"}</td>
-                <td className="py-1.5 pr-3 text-right tabular-nums">{m.price ? money(m.price) : "Gratis"}</td>
-                <td className="py-1.5 pr-3 text-right tabular-nums">{m.sent.toLocaleString("es")}</td>
-                <td className="py-1.5 pr-3 text-right tabular-nums">{m.viewed.toLocaleString("es")}</td>
-                <td className="py-1.5 pr-3 text-right tabular-nums">{m.purchased.toLocaleString("es")}</td>
+                <td className="py-1.5 pr-3 text-right tabular-nums">{m.price ? money(m.price) : t("chatters.rend.free")}</td>
+                <td className="py-1.5 pr-3 text-right tabular-nums">{m.sent.toLocaleString(fmt.intl("es-ES"))}</td>
+                <td className="py-1.5 pr-3 text-right tabular-nums">{m.viewed.toLocaleString(fmt.intl("es-ES"))}</td>
+                <td className="py-1.5 pr-3 text-right tabular-nums">{m.purchased.toLocaleString(fmt.intl("es-ES"))}</td>
                 <td className="py-1.5 pr-3 text-right tabular-nums">
                   {conv == null ? <span className="text-muted-foreground">—</span> : `${conv.toFixed(1)}%`}
                 </td>
@@ -208,23 +218,24 @@ function Masivos({ identityId, desde, hasta }: { identityId: string; desde: stri
 }
 
 function Detalle({ fila, desde, hasta }: { fila: ChatterPeriodo; desde: string; hasta: string }) {
+  const { t } = useLanguage();
   const [dia, setDia] = useState<string | null>(null);
   return (
     <div className="space-y-4 border-t border-border bg-secondary/30 px-4 py-4">
       <section className="space-y-2">
-        <h4 className="text-xs font-medium text-muted-foreground">Nota por día</h4>
+        <h4 className="text-xs font-medium text-muted-foreground">{t("chatters.rend.scoreByDay")}</h4>
         <TiraDeDias identityId={fila.identity_id} desde={desde} hasta={hasta} diaSel={dia} onDia={setDia} />
       </section>
 
       {dia && (
         <section className="space-y-2">
-          <h4 className="text-xs font-medium text-muted-foreground">Modelos que atendió el {dia}</h4>
+          <h4 className="text-xs font-medium text-muted-foreground">{t("chatters.rend.modelsOnDay", { day: dia })}</h4>
           <ModelosDelDia identityId={fila.identity_id} dia={dia} />
         </section>
       )}
 
       <section className="space-y-2">
-        <h4 className="text-xs font-medium text-muted-foreground">Masivos del periodo</h4>
+        <h4 className="text-xs font-medium text-muted-foreground">{t("chatters.rend.massInPeriod")}</h4>
         <Masivos identityId={fila.identity_id} desde={desde} hasta={hasta} />
       </section>
     </div>
@@ -232,6 +243,7 @@ function Detalle({ fila, desde, hasta }: { fila: ChatterPeriodo; desde: string; 
 }
 
 export default function ChatterRendimiento() {
+  const { t } = useLanguage();
   // Mismo selector que Panel de control: chips rápidos + calendario de rango.
   const [range, setRange] = useState<DateRange>(() => rangeForPreset("this_month"));
   const [preset, setPreset] = useState<RangePreset | null>("this_month");
@@ -286,18 +298,18 @@ export default function ChatterRendimiento() {
             className="mb-1 -ml-2 h-7 gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground"
             onClick={() => navigate(volverA!)}
           >
-            <ArrowLeft className="h-3.5 w-3.5" /> Volver al dashboard
+            <ArrowLeft className="h-3.5 w-3.5" /> {t("chatters.rend.backToDashboard")}
           </Button>
         )}
         <PageHeader
-          title="Rendimiento de chatters"
-          subtitle="Ventas contra lo esperado, masivos y nota diaria"
+          title={t("chatters.rend.title")}
+          subtitle={t("chatters.rend.subtitle")}
           actions={
             <DateRangePresets
               range={range}
               activePreset={preset}
               onChange={(r, p) => { setRange(r); setPreset(p); }}
-              placeholder="Elegir fechas"
+              placeholder={t("chatters.rend.pickDates")}
             />
           }
         />
@@ -306,13 +318,13 @@ export default function ChatterRendimiento() {
       <AvisoCobertura dias={dias} diasConDatos={diasConDatos} />
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-        <Resumen icon={Users} label="Chatters activos" valor={String(totales.chatters)}
-          nota={`${totales.conNota} con nota`} />
-        <Resumen icon={Gauge} label="Nota del equipo"
-          valor={totales.nota == null ? "—" : totales.nota.toFixed(1)} nota="ponderada por días" />
-        <Resumen icon={DollarSign} label="Ventas" valor={money(totales.ventas)} />
-        <Resumen icon={Clock} label="Horas" valor={totales.horas ? totales.horas.toFixed(0) : "—"} />
-        <Resumen icon={Send} label="Masivos" valor={String(totales.masivos)} nota="atribuidos" />
+        <Resumen icon={Users} label={t("chatters.rend.activeChatters")} valor={String(totales.chatters)}
+          nota={t("chatters.rend.withScore", { n: totales.conNota })} />
+        <Resumen icon={Gauge} label={t("chatters.rend.teamScore")}
+          valor={totales.nota == null ? "—" : totales.nota.toFixed(1)} nota={t("chatters.rend.weightedByDays")} />
+        <Resumen icon={DollarSign} label={t("chatters.sales")} valor={money(totales.ventas)} />
+        <Resumen icon={Clock} label={t("common.hours")} valor={totales.horas ? totales.horas.toFixed(0) : "—"} />
+        <Resumen icon={Send} label={t("chatters.massMessages")} valor={String(totales.masivos)} nota={t("chatters.rend.attributed")} />
       </div>
 
       <Card className="overflow-hidden">
@@ -321,21 +333,21 @@ export default function ChatterRendimiento() {
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
         ) : !activos.length ? (
-          <EmptyState icon={Users} title="Sin chatters" description="No hay chatters activos para mostrar." />
+          <EmptyState icon={Users} title={t("chatters.rend.noChatters")} description={t("chatters.rend.noActiveChatters")} />
         ) : (
           <div className="overflow-x-auto">
             <table className="tabla-movil w-full text-sm">
               <thead className="border-b border-border bg-secondary/50 text-xs text-muted-foreground">
                 <tr>
                   <th className="py-2.5 pl-4 pr-3 text-left font-medium">Chatter</th>
-                  <th className="py-2.5 pr-3 text-left font-medium">Nota</th>
-                  <th className="py-2.5 pr-3 text-center font-medium" title="Puntos que el supervisor sumó o restó en el período. La Nota ya los incluye.">Feedback TL</th>
-                  <th className="py-2.5 pr-3 text-right font-medium">Ventas</th>
-                  <th className="py-2.5 pr-3 text-right font-medium">Esperado</th>
-                  <th className="py-2.5 pr-3 text-right font-medium">Horas</th>
-                  <th className="py-2.5 pr-3 text-right font-medium">Modelos</th>
-                  <th className="py-2.5 pr-3 text-right font-medium">Masivos</th>
-                  <th className="py-2.5 pr-4 text-right font-medium">Conversión</th>
+                  <th className="py-2.5 pr-3 text-left font-medium">{t("chatters.score")}</th>
+                  <th className="py-2.5 pr-3 text-center font-medium" title={t("chatters.rend.feedbackTlHint")}>{t("chatters.rend.feedbackTl")}</th>
+                  <th className="py-2.5 pr-3 text-right font-medium">{t("chatters.sales")}</th>
+                  <th className="py-2.5 pr-3 text-right font-medium">{t("chatters.expected")}</th>
+                  <th className="py-2.5 pr-3 text-right font-medium">{t("common.hours")}</th>
+                  <th className="py-2.5 pr-3 text-right font-medium">{t("chatters.models")}</th>
+                  <th className="py-2.5 pr-3 text-right font-medium">{t("chatters.massMessages")}</th>
+                  <th className="py-2.5 pr-4 text-right font-medium">{t("chatters.conversion")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -355,7 +367,7 @@ export default function ChatterRendimiento() {
                             <span className="font-medium text-foreground">{f.display_name}</span>
                             {!f.maven_user_id && (
                               <Badge variant="outline" className="h-4 px-1 text-[9px] text-muted-foreground">
-                                sin cuenta Maven
+                                {t("chatters.rend.noMavenAccount")}
                               </Badge>
                             )}
                           </span>
@@ -398,12 +410,8 @@ export default function ChatterRendimiento() {
       <p className="flex items-start gap-1.5 text-[11px] leading-relaxed text-muted-foreground">
         <Info className="h-3.5 w-3.5 shrink-0 mt-px" />
         <span>
-          <strong className="font-medium text-foreground">Esperado</strong> es cuánto debería
-          vender esa persona ese día: se suman las modelos que atendió, y de cada una se toma lo
-          que suele producir <em>un</em> chatter — el total de la modelo repartido entre quienes
-          la cubren, porque son tres turnos. Así 400 puede ser mucho para uno y poco para otro.
-          Un componente sin dato no cuenta como cero: se reparte el peso entre los que sí hay, y
-          si faltan todos, el día queda «Sin datos».
+          <strong className="font-medium text-foreground">{t("chatters.expected")}</strong>{" "}
+          {t("chatters.rend.footA")} <em>{t("chatters.rend.footOne")}</em> {t("chatters.rend.footB")}
         </span>
       </p>
     </div>

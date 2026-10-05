@@ -1,294 +1,309 @@
 // ============================================================
 // HR MODULE v2.0 — Centralized Constants
 // ============================================================
+//
+// `value` es lo que se guarda en la base (employees.contract_type,
+// hr_absences.absence_type…) y NO se traduce. La etiqueta sale del diccionario
+// (lib/i18n/internos.ts): la pantalla puede hacer t(o.labelKey), y `o.label` se
+// traduce al leerlo, así que las pantallas que ya dibujaban `o.label` siguen
+// igual y salen en inglés. Ver lib/etiquetaTraducida.ts.
+import { conEtiqueta, etiquetasPorClave, opciones } from "@/lib/etiquetaTraducida";
 
-export const CONTRACT_TYPES = [
-  { value: "indefinido", label: "Indefinido" },
-  { value: "fijo", label: "Término Fijo" },
-  { value: "obra", label: "Obra o Labor" },
-  { value: "prestacion_servicios", label: "Prestación de Servicios" },
-  { value: "aprendizaje", label: "Aprendizaje" },
-  { value: "temporal", label: "Temporal" },
-];
+// Nombres propios (EPS, ARL y fondos de pensiones de Colombia): son marcas y se
+// escriben igual en los dos idiomas, así que no pasan por el diccionario.
+const marca = (value: string, nombre: string) => ({ value, label: nombre });
 
-export const WORK_MODALITIES = [
-  { value: "presencial", label: "Presencial" },
-  { value: "remoto", label: "Remoto" },
-  { value: "hibrido", label: "Híbrido" },
-];
+export const CONTRACT_TYPES = opciones([
+  ["indefinido", "int.hr.contract.indefinido"],
+  ["fijo", "int.hr.contract.fijo"],
+  ["obra", "int.hr.contract.obra"],
+  ["prestacion_servicios", "int.hr.contract.prestacion"],
+  ["aprendizaje", "int.hr.contract.aprendizaje"],
+  ["temporal", "int.hr.contract.temporal"],
+]);
 
-export const EMPLOYEE_STATUS_OPTIONS = [
-  { value: "activo", label: "Activo" },
-  { value: "inactivo", label: "Inactivo" },
-  { value: "en_licencia", label: "En Licencia" },
-  { value: "suspendido", label: "Suspendido" },
-  { value: "vacaciones", label: "Vacaciones" },
-];
+export const WORK_MODALITIES = opciones([
+  ["presencial", "int.hr.onSite"],
+  ["remoto", "int.hr.remote"],
+  ["hibrido", "int.hr.hybrid"],
+]);
 
-export const ABSENCE_TYPES = [
-  { value: "enfermedad", label: "Enfermedad" },
-  { value: "accidente", label: "Accidente de Trabajo" },
-  { value: "personal", label: "Personal" },
-  { value: "duelo", label: "Duelo" },
-  { value: "maternidad", label: "Licencia Maternidad" },
-  { value: "paternidad", label: "Licencia Paternidad" },
-  { value: "calamidad", label: "Calamidad Doméstica" },
-  { value: "injustificada", label: "Injustificada" },
-];
+export const EMPLOYEE_STATUS_OPTIONS = opciones([
+  ["activo", "common.active"],
+  ["inactivo", "common.inactive"],
+  ["en_licencia", "int.hr.status.onLeave"],
+  ["suspendido", "int.hr.status.suspended"],
+  ["vacaciones", "int.hr.status.vacation"],
+]);
 
-export const INCIDENT_SEVERITIES = [
-  { value: "low", label: "Baja" },
-  { value: "medium", label: "Media" },
-  { value: "high", label: "Alta" },
-  { value: "critical", label: "Crítica" },
-];
+export const ABSENCE_TYPES = opciones([
+  ["enfermedad", "int.hr.absence.enfermedad"],
+  ["accidente", "int.hr.absence.accidente"],
+  ["personal", "int.hr.absence.personal"],
+  ["duelo", "int.hr.absence.duelo"],
+  ["maternidad", "int.hr.absence.maternidad"],
+  ["paternidad", "int.hr.absence.paternidad"],
+  ["calamidad", "int.hr.absence.calamidad"],
+  ["injustificada", "int.hr.absence.injustificada"],
+]);
 
-export const INCIDENT_TYPES = [
-  { value: "disciplinario", label: "Disciplinario" },
-  { value: "seguridad", label: "Seguridad" },
-  { value: "comportamiento", label: "Comportamiento" },
-  { value: "asistencia", label: "Asistencia" },
-  { value: "desempeno", label: "Desempeño" },
-  { value: "otro", label: "Otro" },
-];
+export const INCIDENT_SEVERITIES = opciones([
+  ["low", "int.level.low"],
+  ["medium", "int.level.medium"],
+  ["high", "int.level.high"],
+  ["critical", "int.hr.criticalF"],
+]);
 
-export const INCIDENT_STATUSES = [
-  { value: "open", label: "Abierto" },
-  { value: "in_progress", label: "En Proceso" },
-  { value: "resolved", label: "Resuelto" },
-  { value: "closed", label: "Cerrado" },
-];
+export const INCIDENT_TYPES = opciones([
+  ["disciplinario", "int.hr.incident.disciplinario"],
+  ["seguridad", "int.hr.incident.seguridad"],
+  ["comportamiento", "int.hr.incident.comportamiento"],
+  ["asistencia", "int.hr.incident.asistencia"],
+  ["desempeno", "int.hr.incident.desempeno"],
+  ["otro", "int.other"],
+]);
 
-export const APPLICANT_STATUSES = [
-  { value: "applied", label: "Postulado" },
-  { value: "reviewing", label: "En Revisión" },
-  { value: "interview", label: "Entrevista" },
-  { value: "offer", label: "Oferta" },
-  { value: "hired", label: "Contratado" },
-  { value: "rejected", label: "Rechazado" },
-];
+export const INCIDENT_STATUSES = opciones([
+  ["open", "int.hr.incidentStatus.open"],
+  ["in_progress", "int.hr.incidentStatus.inProgress"],
+  ["resolved", "int.hr.incidentStatus.resolved"],
+  ["closed", "int.hr.incidentStatus.closed"],
+]);
+
+export const APPLICANT_STATUSES = opciones([
+  ["applied", "int.hr.applicant.applied"],
+  ["reviewing", "int.hr.applicant.reviewing"],
+  ["interview", "int.hr.applicant.interview"],
+  ["offer", "int.hr.applicant.offer"],
+  ["hired", "int.hr.applicant.hired"],
+  ["rejected", "int.hr.applicant.rejected"],
+]);
 
 export const APPLICANT_SOURCES = [
-  { value: "direct", label: "Directo" },
-  { value: "linkedin", label: "LinkedIn" },
-  { value: "referral", label: "Referido" },
-  { value: "portal", label: "Portal de Empleo" },
-  { value: "university", label: "Universidad" },
-  { value: "agency", label: "Agencia" },
-  { value: "social", label: "Redes Sociales" },
+  ...opciones([["direct", "int.hr.source.direct"]]),
+  marca("linkedin", "LinkedIn"),
+  ...opciones([
+    ["referral", "int.hr.source.referral"],
+    ["portal", "int.hr.source.portal"],
+    ["university", "int.hr.source.university"],
+    ["agency", "int.hr.source.agency"],
+    ["social", "int.hr.source.social"],
+  ]),
 ];
 
 export const EPS_OPTIONS = [
-  { value: "sanitas", label: "Sanitas" },
-  { value: "nueva_eps", label: "Nueva EPS" },
-  { value: "compensar", label: "Compensar" },
-  { value: "sura", label: "Sura" },
-  { value: "salud_total", label: "Salud Total" },
-  { value: "famisanar", label: "Famisanar" },
-  { value: "coomeva", label: "Coomeva" },
-  { value: "colsanitas", label: "Colsanitas" },
-  { value: "otro", label: "Otra" },
+  marca("sanitas", "Sanitas"),
+  marca("nueva_eps", "Nueva EPS"),
+  marca("compensar", "Compensar"),
+  marca("sura", "Sura"),
+  marca("salud_total", "Salud Total"),
+  marca("famisanar", "Famisanar"),
+  marca("coomeva", "Coomeva"),
+  marca("colsanitas", "Colsanitas"),
+  ...opciones([["otro", "int.otherF"]]),
 ];
 
 export const ARL_OPTIONS = [
-  { value: "positiva", label: "Positiva" },
-  { value: "sura_arl", label: "Sura ARL" },
-  { value: "colmena", label: "Colmena" },
-  { value: "liberty", label: "Liberty Seguros" },
-  { value: "axa_colpatria", label: "AXA Colpatria" },
-  { value: "seguros_bolivar", label: "Seguros Bolívar" },
-  { value: "otro", label: "Otra" },
+  marca("positiva", "Positiva"),
+  marca("sura_arl", "Sura ARL"),
+  marca("colmena", "Colmena"),
+  marca("liberty", "Liberty Seguros"),
+  marca("axa_colpatria", "AXA Colpatria"),
+  marca("seguros_bolivar", "Seguros Bolívar"),
+  ...opciones([["otro", "int.otherF"]]),
 ];
 
 export const AFP_OPTIONS = [
-  { value: "colpensiones", label: "Colpensiones" },
-  { value: "porvenir", label: "Porvenir" },
-  { value: "proteccion", label: "Protección" },
-  { value: "colfondos", label: "Colfondos" },
-  { value: "old_mutual", label: "Old Mutual" },
+  marca("colpensiones", "Colpensiones"),
+  marca("porvenir", "Porvenir"),
+  marca("proteccion", "Protección"),
+  marca("colfondos", "Colfondos"),
+  marca("old_mutual", "Old Mutual"),
 ];
 
-export const DEDUCTION_TYPES = [
-  { value: "salud", label: "Salud" },
-  { value: "pension", label: "Pensión" },
-  { value: "fondo_solidaridad", label: "Fondo de Solidaridad" },
-  { value: "retencion_fuente", label: "Retención en la Fuente" },
-  { value: "libranza", label: "Libranza" },
-  { value: "embargo", label: "Embargo" },
-  { value: "otro", label: "Otro" },
-];
+export const DEDUCTION_TYPES = opciones([
+  ["salud", "int.hr.deduction.salud"],
+  ["pension", "int.hr.deduction.pension"],
+  ["fondo_solidaridad", "int.hr.deduction.solidaridad"],
+  ["retencion_fuente", "int.hr.deduction.retencion"],
+  ["libranza", "int.hr.deduction.libranza"],
+  ["embargo", "int.hr.deduction.embargo"],
+  ["otro", "int.other"],
+]);
 
 export const PERFORMANCE_RATINGS = [
-  { value: 5, label: "Excelente" },
-  { value: 4, label: "Bueno" },
-  { value: 3, label: "Aceptable" },
-  { value: 2, label: "Regular" },
-  { value: 1, label: "Deficiente" },
+  conEtiqueta({ value: 5 }, "int.hr.rating.5"),
+  conEtiqueta({ value: 4 }, "int.hr.rating.4"),
+  conEtiqueta({ value: 3 }, "int.hr.rating.3"),
+  conEtiqueta({ value: 2 }, "int.hr.rating.2"),
+  conEtiqueta({ value: 1 }, "int.hr.rating.1"),
 ];
 
-export const OVERTIME_TYPES = [
-  { value: "diurno", label: "Diurno" },
-  { value: "nocturno", label: "Nocturno" },
-  { value: "dominical_diurno", label: "Dominical Diurno" },
-  { value: "dominical_nocturno", label: "Dominical Nocturno" },
-  { value: "festivo_diurno", label: "Festivo Diurno" },
-  { value: "festivo_nocturno", label: "Festivo Nocturno" },
-];
+export const OVERTIME_TYPES = opciones([
+  ["diurno", "int.hr.overtime.diurno"],
+  ["nocturno", "int.hr.overtime.nocturno"],
+  ["dominical_diurno", "int.hr.overtime.dominicalDiurno"],
+  ["dominical_nocturno", "int.hr.overtime.dominicalNocturno"],
+  ["festivo_diurno", "int.hr.overtime.festivoDiurno"],
+  ["festivo_nocturno", "int.hr.overtime.festivoNocturno"],
+]);
 
-export const LEAVE_TYPES = [
-  { value: "vacaciones", label: "Vacaciones" },
-  { value: "licencia_no_remunerada", label: "Licencia No Remunerada" },
-  { value: "licencia_estudio", label: "Licencia de Estudio" },
-  { value: "licencia_maternidad", label: "Licencia de Maternidad" },
-  { value: "licencia_paternidad", label: "Licencia de Paternidad" },
-  { value: "incapacidad", label: "Incapacidad" },
-];
+export const LEAVE_TYPES = opciones([
+  ["vacaciones", "int.hr.leave.vacaciones"],
+  ["licencia_no_remunerada", "int.hr.leave.noRemunerada"],
+  ["licencia_estudio", "int.hr.leave.estudio"],
+  ["licencia_maternidad", "int.hr.leave.maternidad"],
+  ["licencia_paternidad", "int.hr.leave.paternidad"],
+  ["incapacidad", "int.hr.leave.incapacidad"],
+]);
 
-export const DOCUMENT_TYPES_EMPLOYEE = [
-  { value: "cedula", label: "Cédula de Ciudadanía" },
-  { value: "contrato", label: "Contrato de Trabajo" },
-  { value: "hoja_vida", label: "Hoja de Vida" },
-  { value: "certificado_estudio", label: "Certificado de Estudio" },
-  { value: "certificado_eps", label: "Certificado EPS" },
-  { value: "certificado_afp", label: "Certificado AFP" },
-  { value: "foto", label: "Fotografía" },
-  { value: "otro", label: "Otro" },
-];
+export const DOCUMENT_TYPES_EMPLOYEE = opciones([
+  ["cedula", "int.hr.doc.cedula"],
+  ["contrato", "int.hr.doc.contrato"],
+  ["hoja_vida", "int.hr.doc.hojaVida"],
+  ["certificado_estudio", "int.hr.doc.certificadoEstudio"],
+  ["certificado_eps", "int.hr.doc.certificadoEps"],
+  ["certificado_afp", "int.hr.doc.certificadoAfp"],
+  ["foto", "int.hr.doc.foto"],
+  ["otro", "int.other"],
+]);
 
-export const NATIONAL_ID_TYPES = [
-  { value: "CC", label: "Cédula de Ciudadanía" },
-  { value: "CE", label: "Cédula de Extranjería" },
-  { value: "PA", label: "Pasaporte" },
-  { value: "TI", label: "Tarjeta de Identidad" },
-  { value: "NIT", label: "NIT" },
-];
+export const NATIONAL_ID_TYPES = opciones([
+  ["CC", "int.hr.id.cc"],
+  ["CE", "int.hr.id.ce"],
+  ["PA", "int.hr.id.pa"],
+  ["TI", "int.hr.id.ti"],
+  ["NIT", "int.hr.id.nit"],
+]);
 
-export const BANK_ACCOUNT_TYPES = [
-  { value: "ahorros", label: "Cuenta de Ahorros" },
-  { value: "corriente", label: "Cuenta Corriente" },
-];
+export const BANK_ACCOUNT_TYPES = opciones([
+  ["ahorros", "int.hr.bank.ahorros"],
+  ["corriente", "int.hr.bank.corriente"],
+]);
 
-export const SALARY_FREQUENCIES = [
-  { value: "mensual", label: "Mensual" },
-  { value: "quincenal", label: "Quincenal" },
-  { value: "semanal", label: "Semanal" },
-  { value: "hora", label: "Por Hora" },
-];
+export const SALARY_FREQUENCIES = opciones([
+  ["mensual", "int.hr.salary.mensual"],
+  ["quincenal", "int.hr.salary.quincenal"],
+  ["semanal", "int.hr.salary.semanal"],
+  ["hora", "int.hr.salary.hora"],
+]);
 
-export const TRAINING_MODALITIES = [
-  { value: "presencial", label: "Presencial" },
-  { value: "virtual", label: "Virtual" },
-  { value: "hibrido", label: "Híbrido" },
-  { value: "elearning", label: "E-Learning" },
-];
+export const TRAINING_MODALITIES = opciones([
+  ["presencial", "int.hr.training.inPerson"],
+  ["virtual", "int.hr.training.virtual"],
+  ["hibrido", "int.hr.hybrid"],
+  ["elearning", "int.hr.training.elearning"],
+]);
 
-export const TRAINING_STATUSES = [
-  { value: "assigned", label: "Asignado" },
-  { value: "in_progress", label: "En Progreso" },
-  { value: "completed", label: "Completado" },
-  { value: "failed", label: "No Aprobado" },
-  { value: "cancelled", label: "Cancelado" },
-];
+export const TRAINING_STATUSES = opciones([
+  ["assigned", "int.hr.training.assigned"],
+  ["in_progress", "int.hr.training.inProgress"],
+  ["completed", "common.completed"],
+  ["failed", "int.hr.training.failed"],
+  ["cancelled", "int.hr.training.cancelled"],
+]);
 
-export const PERFORMANCE_EVALUATION_STATUSES = [
-  { value: "draft", label: "Borrador" },
-  { value: "pending", label: "Pendiente" },
-  { value: "completed", label: "Completado" },
-  { value: "reviewed", label: "Revisado" },
-];
+export const PERFORMANCE_EVALUATION_STATUSES = opciones([
+  ["draft", "int.hr.review.draft"],
+  ["pending", "common.pending"],
+  ["completed", "common.completed"],
+  ["reviewed", "int.hr.review.reviewed"],
+]);
 
-export const TERMINATION_TYPES = [
-  { value: "voluntary", label: "Renuncia Voluntaria" },
-  { value: "dismissal", label: "Despido con Justa Causa" },
-  { value: "dismissal_no_cause", label: "Despido sin Justa Causa" },
-  { value: "mutual", label: "Mutuo Acuerdo" },
-  { value: "contract_end", label: "Vencimiento de Contrato" },
-  { value: "retirement", label: "Jubilación" },
-];
+export const TERMINATION_TYPES = opciones([
+  ["voluntary", "int.hr.termination.voluntary"],
+  ["dismissal", "int.hr.termination.dismissal"],
+  ["dismissal_no_cause", "int.hr.termination.dismissalNoCause"],
+  ["mutual", "int.hr.termination.mutual"],
+  ["contract_end", "int.hr.termination.contractEnd"],
+  ["retirement", "int.hr.termination.retirement"],
+]);
 
-export const ABSENCE_STATUSES = [
-  { value: "pending", label: "Pendiente" },
-  { value: "approved", label: "Aprobada" },
-  { value: "rejected", label: "Rechazada" },
-];
+export const ABSENCE_STATUSES = opciones([
+  ["pending", "common.pending"],
+  ["approved", "int.hr.approvedF"],
+  ["rejected", "int.hr.rejectedF"],
+]);
 
-export const GENDER_OPTIONS = [
-  { value: "masculino", label: "Masculino" },
-  { value: "femenino", label: "Femenino" },
-  { value: "no_binario", label: "No Binario" },
-  { value: "prefiero_no_decir", label: "Prefiero no decir" },
-];
+export const GENDER_OPTIONS = opciones([
+  ["masculino", "int.hr.gender.masculino"],
+  ["femenino", "int.hr.gender.femenino"],
+  ["no_binario", "int.hr.gender.noBinario"],
+  ["prefiero_no_decir", "int.hr.gender.prefieroNoDecir"],
+]);
 
-export const INCIDENT_CATEGORIES = [
-  { value: "leve", label: "Leve" },
-  { value: "moderada", label: "Moderada" },
-  { value: "grave", label: "Grave" },
-  { value: "muy_grave", label: "Muy Grave" },
-];
+export const INCIDENT_CATEGORIES = opciones([
+  ["leve", "int.hr.incidentCategory.leve"],
+  ["moderada", "int.hr.incidentCategory.moderada"],
+  ["grave", "int.hr.incidentCategory.grave"],
+  ["muy_grave", "int.hr.incidentCategory.muyGrave"],
+]);
 
-export const INCIDENT_IMPACTS = [
-  { value: "bajo", label: "Bajo" },
-  { value: "medio", label: "Medio" },
-  { value: "alto", label: "Alto" },
-  { value: "critico", label: "Crítico" },
-];
+export const INCIDENT_IMPACTS = opciones([
+  ["bajo", "int.hr.impact.bajo"],
+  ["medio", "int.hr.impact.medio"],
+  ["alto", "int.hr.impact.alto"],
+  ["critico", "common.critical"],
+]);
 
-export const TRAINING_TARGET_ROLES = [
-  { value: "general", label: "General" },
-  { value: "chatter", label: "Chatter" },
-  { value: "closer", label: "Closer" },
-  { value: "leadgen", label: "Lead Gen" },
-  { value: "content", label: "Contenido" },
-  { value: "manager", label: "Manager" },
-  { value: "technology", label: "Tecnología" },
-];
+export const TRAINING_TARGET_ROLES = opciones([
+  ["general", "int.hr.role.general"],
+  ["chatter", "int.hr.role.chatter"],
+  ["closer", "int.hr.role.closer"],
+  ["leadgen", "int.hr.role.leadgen"],
+  ["content", "int.hr.role.content"],
+  ["manager", "int.hr.role.manager"],
+  ["technology", "int.hr.role.technology"],
+]);
 
-export const TRAINING_CONTENT_TYPES = [
-  { value: "video", label: "Video" },
-  { value: "documento", label: "Documento" },
-  { value: "quiz", label: "Quiz" },
-  { value: "practica", label: "Práctica" },
-];
+export const TRAINING_CONTENT_TYPES = opciones([
+  ["video", "int.hr.content.video"],
+  ["documento", "int.hr.content.documento"],
+  ["quiz", "int.hr.content.quiz"],
+  ["practica", "int.hr.content.practica"],
+]);
 
 // ── Deducciones Operativas ──
 
-export const DEDUCTION_DISPLAY_TYPES = [
-  { value: "adelanto", label: "Adelanto de Nómina" },
-  { value: "infraccion", label: "Infracción" },
-];
+export const DEDUCTION_DISPLAY_TYPES = opciones([
+  ["adelanto", "int.hr.deductionType.adelanto"],
+  ["infraccion", "int.hr.deductionType.infraccion"],
+]);
 
-export const DEDUCTION_STATUSES = [
-  { value: "pending", label: "Pendiente" },
-  { value: "applied", label: "Aplicada" },
-  { value: "rejected", label: "Rechazada" },
-];
+export const DEDUCTION_STATUSES = opciones([
+  ["pending", "common.pending"],
+  ["applied", "int.hr.appliedF"],
+  ["rejected", "int.hr.rejectedF"],
+]);
 
-export const INFRACTION_CATEGORIES = [
-  { value: "redes_sociales", label: "Uso de redes sociales" },
-  { value: "violacion_politicas", label: "Violación de políticas" },
-  { value: "productividad", label: "Productividad" },
-  { value: "ausencia_injustificada", label: "Ausencia injustificada" },
-  { value: "otra", label: "Otra" },
-];
+export const INFRACTION_CATEGORIES = opciones([
+  ["redes_sociales", "int.hr.infraction.redes"],
+  ["violacion_politicas", "int.hr.infraction.politicas"],
+  ["productividad", "int.hr.infraction.productividad"],
+  ["ausencia_injustificada", "int.hr.infraction.ausencia"],
+  ["otra", "int.otherF"],
+]);
 
 // ── Employee History ──
 
-export const HISTORY_CHANGE_TYPES = [
-  { value: "promotion", label: "Promoción" },
-  { value: "transfer", label: "Transferencia" },
-  { value: "contract_change", label: "Cambio Contractual" },
-  { value: "salary_adjustment", label: "Ajuste Salarial" },
-  { value: "status_change", label: "Cambio de Estado" },
-  { value: "modality_change", label: "Cambio de Modalidad" },
-  { value: "other", label: "Otro" },
-];
+export const HISTORY_CHANGE_TYPES = opciones([
+  ["promotion", "int.hr.history.promotion"],
+  ["transfer", "int.hr.history.transfer"],
+  ["contract_change", "int.hr.history.contractChange"],
+  ["salary_adjustment", "int.hr.history.salaryAdjustment"],
+  ["status_change", "int.hr.history.statusChange"],
+  ["modality_change", "int.hr.history.modalityChange"],
+  ["other", "int.other"],
+]);
 
-export const HISTORY_FIELD_LABELS: Record<string, string> = {
-  position_id: "Cargo",
-  department_id: "Departamento",
-  contract_type: "Tipo de Contrato",
-  work_modality: "Modalidad de Trabajo",
-  status: "Estado",
-  base_salary: "Salario Base",
-  reports_to: "Supervisor",
-};
+// Clave = la columna de employee_history.field_changed (dato); valor = el nombre
+// que se muestra, traducido al leerlo.
+export const HISTORY_FIELD_LABELS: Record<string, string> = etiquetasPorClave({
+  position_id: "int.hr.field.position",
+  department_id: "int.hr.field.department",
+  contract_type: "int.hr.field.contractType",
+  work_modality: "int.hr.field.workModality",
+  status: "common.status",
+  base_salary: "int.hr.field.baseSalary",
+  reports_to: "int.hr.field.reportsTo",
+});

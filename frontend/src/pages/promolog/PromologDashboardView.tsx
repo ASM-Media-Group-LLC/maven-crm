@@ -20,7 +20,6 @@ import {
   Sparkles,
 } from "lucide-react";
 import { format, eachDayOfInterval, isSameDay, differenceInCalendarDays } from "date-fns";
-import { es } from "date-fns/locale";
 import StatChip from "@/components/StatChip";
 import { Card, CardContent } from "@/components/ui/card";
 import { UserAvatar } from "@/components/UserAvatar";
@@ -28,6 +27,8 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { ListRowButton } from "@/components/ui/list-row";
 import { CATEGORY_ORDER } from "@/hooks/useOperationsDashboard";
+import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
 import PromoScoreLeaderboard from "./PromoScoreLeaderboard";
 import { categoryTone } from "@/components/dashboard/categoryTones";
 import { type PromologEntry } from "./PromologEntryCard";
@@ -93,6 +94,8 @@ const PromologDashboardView = ({
   prevMetrics,
   activeCreators,
 }: Props) => {
+  const f = useFormato();
+  const { t } = useLanguage();
   const navigate = useNavigate();
 
   // ── Agregados por creador (alimenta KPI, podios, insights, acción) ──
@@ -220,7 +223,7 @@ const PromologDashboardView = ({
   const topCategory = useMemo(() => {
     const byCat = new Map<string, { total: number; promoted: number }>();
     for (const c of creatorsAgg) {
-      const key = c.category ?? "Sin categoría";
+      const key = c.category ?? t("promolog.noCategory");
       const slot = byCat.get(key) ?? { total: 0, promoted: 0 };
       slot.total += 1;
       if (c.promoCount > 0) slot.promoted += 1;
@@ -232,7 +235,7 @@ const PromologDashboardView = ({
       .map(([k, v]) => ({ cat: k, pct: Math.round((v.promoted / v.total) * 100), total: v.total }))
       .sort((a, b) => b.pct - a.pct || (CATEGORY_ORDER[a.cat] ?? 999) - (CATEGORY_ORDER[b.cat] ?? 999));
     return ranked[0] ?? null;
-  }, [creatorsAgg]);
+  }, [creatorsAgg, t]);
 
   // (3) Red más usada — count de entries promoted por network.
   const topNetwork = useMemo(() => {
@@ -250,12 +253,12 @@ const PromologDashboardView = ({
     const counts = new Map<string, number>();
     for (const e of filteredEntries.filter(x => x.result === "Sí")) {
       // displayPlatform normaliza OnlyFans/Unlok/etc. (o "Sin plataforma" si no se identificó).
-      const k = displayPlatform(e) ?? "Sin plataforma";
+      const k = displayPlatform(e) ?? t("promolog.noPlatform");
       counts.set(k, (counts.get(k) ?? 0) + 1);
     }
     const sorted = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
     return sorted[0] ?? null;
-  }, [filteredEntries]);
+  }, [filteredEntries, t]);
 
   // ── Trend chart — últimos 14 días (Sí / No por día) ─────────────────
   const trendData = useMemo(() => {
@@ -313,18 +316,18 @@ const PromologDashboardView = ({
       const base = { id: c.id, name: c.name ?? "—", handle: c.instagram_handle, photo: c.profile_photo_url, category: c.category };
       if (!st || !st.promoted) {
         // No promocionó: solo lo accionamos si es tier alto (el resto ya sale en "Menos Promoción").
-        if (tierHigh) recs.push({ ...base, kind: "tier_sin_promo", priority: 1, reason: "Tier alto sin promocionar — empujar promo" });
+        if (tierHigh) recs.push({ ...base, kind: "tier_sin_promo", priority: 1, reason: t("promolog.recTierNoPromo") });
         continue;
       }
       if (st.bestScore > 0 && st.bestScore < 0.4) {
-        recs.push({ ...base, kind: "baja_calidad", priority: 2, reason: `Promo floja (${Math.round(st.bestScore * 100)}%) — pedir link de compra` });
+        recs.push({ ...base, kind: "baja_calidad", priority: 2, reason: t("promolog.recLowQuality", { pct: Math.round(st.bestScore * 100) }) });
       } else if (st.nets.size === 1 && st.nets.has("instagram")) {
-        recs.push({ ...base, kind: "solo_ig", priority: 3, reason: "Solo promociona en IG — empujar otra red (sube el score)" });
+        recs.push({ ...base, kind: "solo_ig", priority: 3, reason: t("promolog.recOnlyIg") });
       }
     }
     recs.sort((a, b) => a.priority - b.priority || a.name.localeCompare(b.name));
     return recs;
-  }, [filteredEntries, activeCreators]);
+  }, [filteredEntries, activeCreators, t]);
   // (2) Cola de revisión: la AI la marcó para revisión manual (needs_review) o la
   // lectura no se pudo confirmar (is_pending). El resultado ya es binario Sí/No, así
   // que la cola se arma con esas señales, no con un result "Pendiente" (ya no existe).
@@ -351,7 +354,7 @@ const PromologDashboardView = ({
       {/* ═══ Row 1: KPI cards ═══════════════════════════════════════ */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatChip
-          label="Creadores Escaneados"
+          label={t("promolog.kpiCreatorsScanned")}
           value={String(creatorsScannedCount)}
           icon={<Users className="h-3.5 w-3.5" />}
           color="bg-primary"
@@ -360,50 +363,50 @@ const PromologDashboardView = ({
             <div className="space-y-1">
               {activeCreatorsCount ? (
                 <p className={`text-[10px] ${coverGap > 0 ? "text-warning" : "text-muted-foreground"}`}>
-                  de {activeCreatorsCount} activas{coverGap > 0 ? ` · ${coverGap} sin escanear` : " · cobertura completa"}
+                  {t("promolog.ofNActive", { count: activeCreatorsCount })}{coverGap > 0 ? ` · ${t("promolog.notScanned", { count: coverGap })}` : ` · ${t("promolog.fullCoverage")}`}
                 </p>
               ) : null}
               <div className="flex flex-wrap items-center gap-1.5">
                 <span className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2 py-0.5 text-[10px] font-semibold text-success ring-1 ring-success/30">
                   <CheckCircle2 className="h-3 w-3" />
-                  Promocionaron: <span className="tabular-nums">{creatorsPromotedCount}</span>
+                  {t("promolog.promotedLabel")} <span className="tabular-nums">{creatorsPromotedCount}</span>
                 </span>
                 <span className="inline-flex items-center gap-1 rounded-full bg-destructive/15 px-2 py-0.5 text-[10px] font-semibold text-destructive ring-1 ring-destructive/30">
                   <XCircle className="h-3 w-3" />
-                  No promocionaron: <span className="tabular-nums">{creatorsNotPromotedCount}</span>
+                  {t("promolog.notPromotedLabel")} <span className="tabular-nums">{creatorsNotPromotedCount}</span>
                 </span>
               </div>
             </div>
           }
         />
         <StatChip
-          label="Tasa de éxito"
+          label={t("promolog.successRate")}
           value={`${successRate}%`}
           icon={<TrendingUp className="h-3.5 w-3.5" />}
           color="bg-success"
           onClick={() => onOpenKpiModal("completadas")}
           hint={
             <span className="text-[10px] text-muted-foreground">
-              promos ÷ escaneadas{prevMetrics ? <> · <DeltaSpan diff={successRate - prevMetrics.successRate} suffix="pp" /> vs ant.</> : null}
+              {t("promolog.promosOverScanned")}{prevMetrics ? <> · <DeltaSpan diff={successRate - prevMetrics.successRate} suffix="pp" /> {t("promolog.vsPrev")}</> : null}
             </span>
           }
         />
         <StatChip
-          label="Sin revisar"
+          label={t("promolog.unreviewed")}
           value={String(pendingCount)}
           icon={<AlertTriangle className="h-3.5 w-3.5" />}
           color="bg-destructive"
           onClick={() => onOpenKpiModal("no_chequeadas")}
         />
         <StatChip
-          label="Promos (Sí)"
+          label={t("promolog.promosYes")}
           value={String(promosCount)}
           icon={<Table2 className="h-3.5 w-3.5" />}
           color="bg-primary"
           onClick={() => onOpenKpiModal("ingresados")}
           hint={
             <span className="text-[10px] text-muted-foreground">
-              de {totalEntries} escaneadas{prevMetrics ? <> · <DeltaSpan diff={promosCount - prevMetrics.promos} /> vs ant.</> : null}
+              {t("promolog.ofNScanned", { count: totalEntries })}{prevMetrics ? <> · <DeltaSpan diff={promosCount - prevMetrics.promos} /> {t("promolog.vsPrev")}</> : null}
             </span>
           }
         />
@@ -417,8 +420,8 @@ const PromologDashboardView = ({
       {/* ═══ Row 2: Dos podios Top 3 paralelos ═════════════════════ */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         <PodioCard
-          title="Top 3 — Más Promocionaron"
-          subtitle="Por # de promos en el rango"
+          title={t("promolog.top3Most")}
+          subtitle={t("promolog.byPromoCount")}
           icon={<Trophy className="h-4 w-4 text-amber-400" />}
           items={topByVolume.map((c, i) => ({
             position: i,
@@ -428,7 +431,7 @@ const PromologDashboardView = ({
             photo: c.photo,
             category: c.category,
             primaryValue: `${c.promoCount} promo${c.promoCount === 1 ? "" : "s"}`,
-            secondaryValue: `${Math.round((c.promoCount / Math.max(1, c.totalCount)) * 100)}% éxito`,
+            secondaryValue: t("promolog.pctSuccess", { pct: Math.round((c.promoCount / Math.max(1, c.totalCount)) * 100) }),
           }))}
           onClick={goToCreator}
         />
@@ -437,8 +440,8 @@ const PromologDashboardView = ({
             las usa para identificar a quién hacerle seguimiento prioritario.
             Las 3 que aparecen son las que necesitan refuerzo del chatter. */}
         <PodioCard
-          title="Top 3 — Menos Promoción"
-          subtitle="Las que necesitan refuerzo del chatter"
+          title={t("promolog.top3Least")}
+          subtitle={t("promolog.needChatterBoost")}
           icon={<AlertCircle className="h-4 w-4 text-destructive" />}
           items={bottomByVolume.map((c, i) => ({
             position: i,
@@ -448,7 +451,7 @@ const PromologDashboardView = ({
             photo: c.photo,
             category: c.category,
             primaryValue: `${c.promoCount} promo${c.promoCount === 1 ? "" : "s"}`,
-            secondaryValue: c.pct > 0 ? `${c.pct}% cumplimiento` : "Sin actividad",
+            secondaryValue: c.pct > 0 ? t("promolog.pctCompliance", { pct: c.pct }) : t("promolog.noActivity"),
           }))}
           onClick={goToCreator}
         />
@@ -458,27 +461,27 @@ const PromologDashboardView = ({
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <InsightCard
           icon={<Flame className="h-4 w-4 text-orange-400" />}
-          label="Streak más larga"
-          value={longestStreak.streak > 0 ? `${longestStreak.streak} día${longestStreak.streak === 1 ? "" : "s"}` : "—"}
-          subtitle={longestStreak.streak > 0 ? longestStreak.name : "Sin promos en rango"}
+          label={t("promolog.longestStreak")}
+          value={longestStreak.streak > 0 ? t(longestStreak.streak === 1 ? "promolog.daysCountOne" : "promolog.daysCount", { count: longestStreak.streak }) : "—"}
+          subtitle={longestStreak.streak > 0 ? longestStreak.name : t("promolog.noPromosInRange")}
         />
         <InsightCard
           icon={<Award className="h-4 w-4 text-amber-400" />}
-          label="Categoría top"
+          label={t("promolog.topCategory")}
           value={topCategory ? topCategory.cat : "—"}
-          subtitle={topCategory ? `${topCategory.pct}% promo rate (${topCategory.total})` : "Sin datos"}
+          subtitle={topCategory ? `${topCategory.pct}% promo rate (${topCategory.total})` : t("common.noData")}
         />
         <InsightCard
           icon={topNetwork ? (networkLabel[topNetwork[0]]?.icon ?? <Send className="h-4 w-4" />) : <Send className="h-4 w-4" />}
-          label="Red más usada"
+          label={t("promolog.topNetwork")}
           value={topNetwork ? (networkLabel[topNetwork[0]]?.label ?? topNetwork[0]) : "—"}
-          subtitle={topNetwork ? `${topNetwork[1]} promos` : "Sin promos"}
+          subtitle={topNetwork ? `${topNetwork[1]} promos` : t("promolog.noPromos")}
         />
         <InsightCard
           icon={<span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-blue-500 text-white text-[9px] font-bold">OF</span>}
-          label="Plataforma destino"
+          label={t("promolog.targetPlatform")}
           value={topPlatform ? topPlatform[0] : "—"}
-          subtitle={topPlatform ? `${topPlatform[1]} promos` : "Sin promos"}
+          subtitle={topPlatform ? `${topPlatform[1]} promos` : t("promolog.noPromos")}
         />
       </div>
 
@@ -490,8 +493,8 @@ const PromologDashboardView = ({
           <div className="mb-2 flex items-center gap-2">
             <Gauge className="h-4 w-4 text-emerald-400" />
             <div>
-              <h3 className="text-sm font-semibold">Calidad de promo</h3>
-              <p className="text-xs text-muted-foreground">Promedio (peso×calidad, IG 60% + multi-red) de las que sumaron</p>
+              <h3 className="text-sm font-semibold">{t("promolog.promoQuality")}</h3>
+              <p className="text-xs text-muted-foreground">{t("promolog.promoQualityDesc")}</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -509,26 +512,26 @@ const PromologDashboardView = ({
             <div className="flex items-center gap-2">
               <Link2 className="h-4 w-4 text-sky-400" />
               <div>
-                <h3 className="text-sm font-semibold">Tipo de promo</h3>
-                <p className="text-xs text-muted-foreground">Directa (link de compra visible) vs indirecta (CTA sin link)</p>
+                <h3 className="text-sm font-semibold">{t("promolog.promoType")}</h3>
+                <p className="text-xs text-muted-foreground">{t("promolog.promoTypeDesc")}</p>
               </div>
             </div>
             <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{promosCount} promos</span>
           </div>
           {promosCount === 0 ? (
-            <p className="py-2 text-center text-xs text-muted-foreground">Sin promos en el rango.</p>
+            <p className="py-2 text-center text-xs text-muted-foreground">{t("promolog.noPromosInRangeDot")}</p>
           ) : (
             <>
               <div className="flex h-3 w-full overflow-hidden rounded-full bg-muted/40 ring-1 ring-border/50">
-                <div className="bg-emerald-500" style={{ width: `${directPct}%` }} title={`Directa: ${directas}`} />
-                <div className="bg-sky-500/60" style={{ width: `${100 - directPct}%` }} title={`Indirecta: ${indirectas}`} />
+                <div className="bg-emerald-500" style={{ width: `${directPct}%` }} title={t("promolog.directCount", { count: directas })} />
+                <div className="bg-sky-500/60" style={{ width: `${100 - directPct}%` }} title={t("promolog.indirectCount", { count: indirectas })} />
               </div>
               <div className="mt-2 flex items-center justify-between text-xs">
                 <span className="inline-flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-sm bg-emerald-500" /> Directa <b className="tabular-nums">{directas}</b> ({directPct}%)
+                  <span className="h-2 w-2 rounded-sm bg-emerald-500" /> {t("promolog.direct")} <b className="tabular-nums">{directas}</b> ({directPct}%)
                 </span>
                 <span className="inline-flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-sm bg-sky-500/60" /> Indirecta <b className="tabular-nums">{indirectas}</b> ({100 - directPct}%)
+                  <span className="h-2 w-2 rounded-sm bg-sky-500/60" /> {t("promolog.indirect")} <b className="tabular-nums">{indirectas}</b> ({100 - directPct}%)
                 </span>
               </div>
             </>
@@ -542,20 +545,20 @@ const PromologDashboardView = ({
         <CardContent className="p-4">
           <div className="flex items-center justify-between mb-3">
             <div>
-              <h3 className="text-sm font-semibold">Tendencia · {trendData.length} días</h3>
-              <p className="text-xs text-muted-foreground">Promos por día (verde = sí · rojo = no)</p>
+              <h3 className="text-sm font-semibold">{t("promolog.trendDays", { count: trendData.length })}</h3>
+              <p className="text-xs text-muted-foreground">{t("promolog.trendDesc")}</p>
             </div>
             <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
               <span className="inline-flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-sm bg-success" /> Sí
+                <span className="h-2 w-2 rounded-sm bg-success" /> {t("promolog.yes")}
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-sm bg-destructive" /> No
+                <span className="h-2 w-2 rounded-sm bg-destructive" /> {t("promolog.no")}
               </span>
             </div>
           </div>
           {trendData.length === 0 ? (
-            <p className="text-center text-sm text-muted-foreground py-6">Sin datos en el rango.</p>
+            <p className="text-center text-sm text-muted-foreground py-6">{t("common.noDataInRange")}</p>
           ) : (
             <div className="flex items-end gap-1.5 h-32">
               {trendData.map((d, i) => {
@@ -568,7 +571,7 @@ const PromologDashboardView = ({
                   <div
                     key={i}
                     className="flex-1 flex flex-col items-center gap-1 group"
-                    title={`${format(d.day, "d 'de' MMMM", { locale: es })}\nSí: ${d.si} · No: ${d.no}`}
+                    title={`${format(d.day, f.idioma === "en" ? "MMMM d" : "d 'de' MMMM", { locale: f.fechas })}\n${t("promolog.yes")}: ${d.si} · ${t("promolog.no")}: ${d.no}`}
                   >
                     <div className="w-full flex-1 flex flex-col justify-end gap-px">
                       {d.no > 0 && (
@@ -585,7 +588,7 @@ const PromologDashboardView = ({
                       )}
                     </div>
                     <span className={`text-[9px] tabular-nums ${isToday ? "text-primary font-bold" : "text-muted-foreground"}`}>
-                      {format(d.day, "d", { locale: es })}
+                      {format(d.day, "d", { locale: f.fechas })}
                     </span>
                   </div>
                 );
@@ -604,8 +607,8 @@ const PromologDashboardView = ({
               <div className="flex items-center gap-2">
                 <Sparkles className={`h-4 w-4 ${recommendations.length > 0 ? "text-warning" : "text-muted-foreground"}`} />
                 <div>
-                  <h3 className="text-sm font-semibold">Acciones recomendadas</h3>
-                  <p className="text-xs text-muted-foreground">Qué pedirle al chatter — priorizado</p>
+                  <h3 className="text-sm font-semibold">{t("promolog.recommendedActions")}</h3>
+                  <p className="text-xs text-muted-foreground">{t("promolog.recommendedActionsDesc")}</p>
                 </div>
               </div>
               <Badge variant={recommendations.length > 0 ? "warning-soft" : "secondary-soft"} className="text-[10px]">
@@ -615,7 +618,7 @@ const PromologDashboardView = ({
             {recommendations.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-4 text-center">
                 <CheckCircle2 className="h-6 w-6 text-success mb-1" />
-                <p className="text-xs text-success font-medium">Nada urgente 🎉</p>
+                <p className="text-xs text-success font-medium">{t("promolog.nothingUrgent")}</p>
               </div>
             ) : (
               <div className="space-y-1.5 max-h-48 overflow-y-auto">
@@ -645,8 +648,8 @@ const PromologDashboardView = ({
               <div className="flex items-center gap-2">
                 <Eye className={`h-4 w-4 ${pendingEntries.length > 0 ? "text-warning" : "text-muted-foreground"}`} />
                 <div>
-                  <h3 className="text-sm font-semibold">Pendientes de revisar</h3>
-                  <p className="text-xs text-muted-foreground">Stories que necesitan validación manual</p>
+                  <h3 className="text-sm font-semibold">{t("promolog.pendingReview")}</h3>
+                  <p className="text-xs text-muted-foreground">{t("promolog.pendingReviewDesc")}</p>
                 </div>
               </div>
               <Badge variant={pendingEntries.length > 0 ? "warning-soft" : "secondary-soft"} className="text-[10px]">
@@ -656,7 +659,7 @@ const PromologDashboardView = ({
             {pendingEntries.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-4 text-center">
                 <CheckCircle2 className="h-6 w-6 text-success mb-1" />
-                <p className="text-xs text-success font-medium">Sin pendientes 👌</p>
+                <p className="text-xs text-success font-medium">{t("promolog.noPending")}</p>
               </div>
             ) : (
               <div className="space-y-1.5 max-h-48 overflow-y-auto">
@@ -719,7 +722,9 @@ interface PodioCardProps {
   onClick: (creatorId: string) => void;
 }
 
-const PodioCard = ({ title, subtitle, icon, items, onClick }: PodioCardProps) => (
+const PodioCard = ({ title, subtitle, icon, items, onClick }: PodioCardProps) => {
+  const { t } = useLanguage();
+  return (
   <Card>
     <CardContent className="p-4">
       <div className="flex items-center gap-2 mb-3">
@@ -730,7 +735,7 @@ const PodioCard = ({ title, subtitle, icon, items, onClick }: PodioCardProps) =>
         </div>
       </div>
       {items.length === 0 ? (
-        <p className="text-center text-xs text-muted-foreground py-6">Sin datos en el rango.</p>
+        <p className="text-center text-xs text-muted-foreground py-6">{t("common.noDataInRange")}</p>
       ) : (
         <div className="space-y-2">
           {items.map((item) => {
@@ -769,7 +774,8 @@ const PodioCard = ({ title, subtitle, icon, items, onClick }: PodioCardProps) =>
       )}
     </CardContent>
   </Card>
-);
+  );
+};
 
 // Delta ▲/▼ contra el período anterior (verde = subió, rojo = bajó, gris = igual).
 const DeltaSpan = ({ diff, suffix = "" }: { diff: number; suffix?: string }) => {

@@ -585,24 +585,80 @@ export class ImapClient {
   /** Mueve varios mensajes a otra carpeta. UID MOVE (RFC 6851) si el servidor
    *  lo soporta (Zoho sí); si no, COPY + \Deleted + UID EXPUNGE. */
   async moveUids(uids: number[], dest: string): Promise<boolean> {
-    if (!uids.length) return true;
+    return (await this.moveUidsConDestino(uids, dest)).ok;
+  }
+
+  /** Mueve y cuenta ADÓNDE fue a parar cada uno: el uid que recibió en la
+   *  carpeta de destino.
+   *
+   *  ⚠️ Sin esto, la caché no sabe dónde quedó el correo: el uid es POR
+   *  CARPETA, así que la fila vieja no sirve y había que borrarla y esperar
+   *  al barrido (30 min en las carpetas frías). Mientras tanto una etiqueta
+   *  que apuntaba a ese correo mostraba vacío — «los moví y desaparecieron»
+   *  (Jhon, 28/09).
+   *
+   *  El servidor lo dice en `[COPYUID <uidvalidity> <origen> <destino>]`
+   *  (UIDPLUS, RFC 4315; con MOVE va en una línea `* OK`, con COPY en el
+   *  cierre). Si no lo dice, `mapa` queda vacío y quien llama lo busca. */
+  async moveUidsConDestino(
+    uids: number[],
+    dest: string,
+  ): Promise<{ ok: boolean; uidvalidity?: number; mapa: Map<number, number> }> {
+    const mapa = new Map<number, number>();
+    if (!uids.length) return { ok: true, mapa };
     // ⚠️ Un CR o un LF en el nombre CIERRA la línea del comando y lo que venga
     // después se ejecuta como un comando IMAP propio. Hoy el destino sale de
     // un mapa fijo, pero desde que "Mover a" acepta el de la persona esto es
     // la diferencia entre escapar comillas y no tener un agujero. La edge
     // además valida contra la lista real de carpetas; esto es el segundo
     // cerrojo, acá abajo, donde se arma el comando.
-    if (/[\r\n\x00]/.test(dest)) return false;
+    if (/[\r\n\x00]/.test(dest)) return { ok: false, mapa };
     const d = `"${dest.replace(/"/g, '\\"')}"`;
     const set = uids.join(",");
+    const leer = (raw: string) => {
+      const m = raw.match(/COPYUID (\d+) ([\d:,]+) ([\d:,]+)/i);
+      if (!m) return undefined;
+      const origen = expandirSetUid(m[2]);
+      const destino = expandirSetUid(m[3]);
+      // Los dos sets vienen en el MISMO orden (RFC 4315 §3): el n-ésimo de
+      // origen fue a parar al n-ésimo de destino. Si no miden lo mismo, la
+      // respuesta está rota y es mejor no usarla que atar mal.
+      if (origen.length !== destino.length) return undefined;
+      origen.forEach((u, i) => mapa.set(u, destino[i]));
+      return Number(m[1]);
+    };
     const mv = await this.command(`UID MOVE ${set} ${d}`);
-    if (mv.ok) return true;
+    if (mv.ok) return { ok: true, uidvalidity: leer(mv.raw), mapa };
     const cp = await this.command(`UID COPY ${set} ${d}`);
-    if (!cp.ok) return false;
+    if (!cp.ok) return { ok: false, mapa };
+    const uidvalidity = leer(cp.raw);
     const del = await this.command(`UID STORE ${set} +FLAGS (\\Deleted)`);
-    if (!del.ok) return false;
+    if (!del.ok) return { ok: false, mapa };
     const ex = await this.command(`UID EXPUNGE ${set}`);
-    return ex.ok;
+    return { ok: ex.ok, uidvalidity, mapa };
+  }
+
+  /** El UIDVALIDITY de una carpeta SIN seleccionarla (STATUS). Hace falta
+   *  junto con el uid: la caché tiene clave (folder, uidvalidity, uid). */
+  async uidValidityDe(folder: string): Promise<number | null> {
+    if (/[\r\n\x00]/.test(folder)) return null;
+    const res = await this.command(`STATUS "${folder.replace(/"/g, '\\"')}" (UIDVALIDITY)`);
+    if (!res.ok) return null;
+    const m = res.raw.match(/UIDVALIDITY (\d+)/i);
+    return m ? Number(m[1]) : null;
+  }
+
+  /** El uid de un correo por su Message-ID, en la carpeta SELECCIONADA. Para
+   *  cuando el servidor no contestó COPYUID.
+   *
+   *  ⚠️ El Message-ID viene del correo (lo escribe quien lo mandó): va entre
+   *  comillas y sin CR/LF ni comillas, o sería un comando inyectado. */
+  async uidPorMessageId(messageId: string): Promise<number | null> {
+    if (!messageId || /[\r\n\x00"\\]/.test(messageId) || messageId.length > 500) return null;
+    const r = await this.searchUids(`HEADER Message-ID "${messageId}"`);
+    // Si hay más de uno (el mismo correo dos veces en la carpeta), el más
+    // nuevo es el que se acaba de mover.
+    return r.ok && r.uids.length ? Math.max(...r.uids) : null;
   }
 
   /** Borra DEFINITIVAMENTE varios mensajes (se usa dentro de la Papelera). */
@@ -732,4 +788,20 @@ export interface MailSummary {
   messageId: string;
   /** Sin la bandera \Seen = sin leer. */
   unread: boolean;
+}
+
+/** «3:5,9» → [3, 4, 5, 9]. Los sets de COPYUID vienen así. Con tope: un
+ *  rango absurdo («1:999999999») no puede colgar la función. */
+export function expandirSetUid(set: string): number[] {
+  const salida: number[] = [];
+  for (const parte of set.split(",")) {
+    const [a, b] = parte.split(":").map(Number);
+    if (!Number.isInteger(a) || a <= 0) return [];
+    if (b === undefined) { salida.push(a); continue; }
+    if (!Number.isInteger(b) || b <= 0) return [];
+    const [desde, hasta] = a <= b ? [a, b] : [b, a];
+    if (hasta - desde > 1000) return [];
+    for (let u = desde; u <= hasta; u++) salida.push(u);
+  }
+  return salida;
 }

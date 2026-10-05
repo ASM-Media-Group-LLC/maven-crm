@@ -8,6 +8,7 @@ import {
 } from "@/hooks/useTypingInbox";
 import { useAuth } from "@/hooks/useAuth";
 import { useReanudarAlVolver } from "@/hooks/useReanudarAlVolver";
+import { registrarEnElCanalDelChat } from "@/hooks/canalDelChat";
 import { cerrarNotificacionesDeChat } from "@/lib/insigniaDeLaApp";
 import {
   ChatConversation,
@@ -21,7 +22,12 @@ import { markMessagesDelivered } from "@/hooks/useReadReceipts";
 import { addPending, removePending, pendingForConversation } from "@/pages/messenger/pendingQueue";
 import { perfilesGarantizados } from "@/hooks/perfilesGarantizados";
 import { queHacerConLaCarga, esperaDeReintento } from "@/hooks/queHacerConLaCarga";
+import { abrirDirecto, pasosDeSupabase, type ClienteParaDirecto } from "@/hooks/abrirDirecto";
 import { toast } from "sonner";
+// Los avisos van por traducir(): salen de callbacks y promesas, no del JSX.
+// Los mensajes de sistema que se INSERTAN en chat_messages no pasan por acá: son
+// dato y los lee cada miembro del chat.
+import { traducir } from "@/lib/i18n";
 
 // Cada cuánto se recarga la lista entera aunque no haya pasado nada. Es solo la
 // red de seguridad: los mensajes nuevos se aplican en memoria por realtime y los
@@ -29,6 +35,10 @@ import { toast } from "sonner";
 // de esas dos cosas era cierta; cada recarga son 4 peticiones, y en prod una
 // persona llegaba a 5 recargas/min (~1.200 peticiones/hora solo en esto).
 export const POLL_LISTA_MS = 60_000;
+
+// Un mensaje de una conversación que la lista no conoce recarga la lista, pero a
+// lo sumo una vez por conversación en este lapso (ver recargarPorDesconocida).
+export const RECARGA_DESCONOCIDA_MS = 60_000;
 
 export function useChat() {
   const { user } = useAuth();
@@ -39,13 +49,6 @@ export function useChat() {
   profilesRef.current = profiles;
   const conversationsRef = useRef(conversations);
   conversationsRef.current = conversations;
-  const [chatRealtimeVersion, setChatRealtimeVersion] = useState(0);
-  // Al volver a primer plano tras >30 s oculto (teléfono bloqueado, otra app), el
-  // socket suele estar muerto y el canal en CLOSED: se recrea (topic con versión
-  // nueva) y SUBSCRIBED vuelve a cargar la lista.
-  useReanudarAlVolver(() => setChatRealtimeVersion((v) => v + 1));
-  const chatRealtimeRetryRef = useRef(0);
-  const chatRealtimeReconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Para quién ya se cargó la lista: distingue la primera carga (que sí muestra
   // "Cargando…") de las recargas de fondo. Guarda el id y no un booleano para
   // que al cambiar de cuenta vuelva a considerarse primera vez.
@@ -263,6 +266,22 @@ export function useChat() {
       return conversationsRef.current.some((c) => c.id === conversationId);
     };
 
+    // Un mensaje de una conversación que la lista no tiene: un directo que alguien
+    // (o una integración, que lo abre con el primer mensaje en la misma
+    // transacción) acaba de abrir conmigo, o uno que la lista escondía por no
+    // tener mensajes. Realtime solo manda los de conversaciones donde estoy, así
+    // que vale recargar. Una vez por conversación cada RECARGA_DESCONOCIDA_MS: si
+    // la recarga no la trae (no debería), los mensajes siguientes no disparan una
+    // recarga cada uno; el poll de la lista sigue de red.
+    const recargasPorDesconocida = new Map<string, number>();
+    const recargarPorDesconocida = (conversationId: string) => {
+      const ahora = Date.now();
+      const ultima = recargasPorDesconocida.get(conversationId);
+      if (ultima !== undefined && ahora - ultima < RECARGA_DESCONOCIDA_MS) return;
+      recargasPorDesconocida.set(conversationId, ahora);
+      scheduleConversationsReload();
+    };
+
     // Inline update: when a new message arrives, update the sidebar without full reload
     const updateConversationWithMessage = (msg: any) => {
       if (!msg?.conversation_id || msg.is_deleted) return;
@@ -287,40 +306,29 @@ export function useChat() {
       });
     };
 
-    const scheduleChannelReconnect = () => {
-      if (chatRealtimeReconnectTimerRef.current) return;
-
-      chatRealtimeRetryRef.current += 1;
-      const delay = Math.min(1000 * Math.pow(2, chatRealtimeRetryRef.current), 15000);
-      chatRealtimeReconnectTimerRef.current = setTimeout(() => {
-        chatRealtimeReconnectTimerRef.current = null;
-        setChatRealtimeVersion((v) => v + 1);
-      }, delay);
-    };
-
-    // El removeChannel del cleanup dispara CLOSED: sin este guard programaría
-    // un reconnect zombi del canal que acabamos de cerrar a propósito.
-    let cancelado = false;
-    const channel = supabase
-      .channel(`chat-realtime-${user.id}-${chatRealtimeVersion}`)
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "chat_messages" },
-        (payload) => {
+    // Las escuchas van por el CANAL DEL CHAT (canalDelChat.ts), UNO por pestaña
+    // para la lista, los avisos, el globito y las menciones. Antes esta lista
+    // abría su propio canal con ocho escuchas y los otros tres hooks
+    // repetían las del INSERT de chat_messages y el UPDATE de chat_participants:
+    // Realtime corre la RLS una vez por escucha por cada fila que cambia, así que
+    // cada mensaje costaba el triple. Ese canal revive solo (espera creciente y
+    // canal nuevo al volver del segundo plano) y avisa `alSuscribir` cada vez que
+    // queda conectado: ahí se recarga la lista, como antes con el canal propio.
+    const dejarDeEscuchar = registrarEnElCanalDelChat(user.id, {
+      current: {
+        "chat_messages:INSERT": (payload) => {
           const msg = payload.new as any;
-          if (!isKnownConversation(msg?.conversation_id)) return;
-          updateConversationWithMessage(msg);
-          // Ack "entregado": llegó un mensaje de otro por el canal global (aunque el chat no
-          // esté abierto) → marcar entregado para que el remitente vea ✓✓ gris.
-          if (msg?.id && msg.sender_id !== user.id) {
-            void markMessagesDelivered(user.id, [msg.id]);
+          if (!isKnownConversation(msg?.conversation_id)) {
+            if (msg?.conversation_id && !msg.is_deleted) recargarPorDesconocida(msg.conversation_id);
+            return;
           }
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "chat_messages" },
-        (payload) => {
+          updateConversationWithMessage(msg);
+          // El "entregado" (✓✓ gris) ya NO se marca aquí: useMessengerNotifications
+          // recibe este mismo evento en esta misma pestaña y lo marca SIEMPRE,
+          // también en conversaciones que la lista todavía no cargó. Eran dos
+          // upserts idénticos por cada mensaje ajeno y por pestaña.
+        },
+        "chat_messages:UPDATE": (payload) => {
           const msg = payload.new as any;
           if (!isKnownConversation(msg?.conversation_id)) return;
 
@@ -343,28 +351,8 @@ export function useChat() {
             }
             return prev;
           });
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "DELETE", schema: "public", table: "chat_messages" },
-        (payload) => {
-          const old = payload.old as any;
-          if (!isKnownConversation(old?.conversation_id)) return;
-
-          setConversations((prev) => {
-            const affected = prev.find((c) => c.lastMessage?.id === old.id);
-            if (affected) {
-              scheduleConversationsReload();
-            }
-            return prev;
-          });
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "chat_participants" },
-        (payload) => {
+        },
+        "chat_participants:INSERT": (payload) => {
           const newRow = payload.new as any;
           if (!newRow?.conversation_id) return;
 
@@ -393,76 +381,52 @@ export function useChat() {
               };
             })
           );
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "DELETE", schema: "public", table: "chat_participants" },
-        (payload) => {
-          const old = payload.old as any;
-          if (!old?.conversation_id) return;
-
-          if (old.user_id === user.id) {
-            scheduleConversationsReload(true);
-            return;
+        },
+        // Llega SOLO la baja de MI fila (filtro user_id=eq.<yo>): me sacaron de
+        // un grupo, salí desde otra pestaña o borraron la conversación entera
+        // (delete_conversation_cascade borra las participaciones una por una).
+        // De un borrado Realtime manda solo la llave (`old.id`): con la RLS
+        // prendida recorta el resto. Por eso se busca por el id de la fila y se
+        // recarga igual, que es lo que manda. Esto reemplaza las tres escuchas de
+        // DELETE sin filtro que había (mensajes, participantes, conversaciones):
+        // le traían a cada pestaña los borrados de toda la base y dos de ellas
+        // leían `old.conversation_id`, que en prod nunca llega (canalDelChat.ts).
+        "chat_participants:DELETE": (payload) => {
+          const idFila = (payload.old as { id?: string } | null)?.id;
+          if (idFila) {
+            setConversations((prev) =>
+              prev.filter(
+                (conv) => !conv.participants.some((p) => p.id === idFila && p.user_id === user.id),
+              ),
+            );
           }
-
-          if (!isKnownConversation(old.conversation_id)) return;
-
-          setConversations((prev) =>
-            prev.map((conv) =>
-              conv.id === old.conversation_id
-                ? {
-                    ...conv,
-                    participants: conv.participants.filter((p) => p.user_id !== old.user_id),
-                  }
-                : conv
-            )
-          );
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "chat_participants" },
-        (payload) => {
+          scheduleConversationsReload(true);
+        },
+        // Llega SOLO mi fila: el canal la filtra por user_id en el servidor. La
+        // de los demás cambia cada vez que alguien lee (~534 veces por hora en
+        // prod) y a esta lista solo le servía para el rol que muestra el panel de
+        // miembros, que ahora la escucha él mismo, filtrada por su conversación y
+        // solo mientras está abierto (GroupMembersPanel.tsx).
+        "chat_participants:UPDATE": (payload) => {
           const row = payload.new as any;
-          if (!row?.conversation_id) return;
+          if (!row?.conversation_id || row.user_id !== user.id) return;
 
-          if (row.user_id === user.id) {
-            const old = payload.old as any;
-            if (
-              old &&
-              row.last_read_at !== old.last_read_at &&
-              row.is_muted === old.is_muted &&
-              row.notifications_mode === old.notifications_mode &&
-              row.role === old.role
-            ) {
-              return; // Skip read-receipt-only updates
-            }
-            scheduleConversationsReload(true);
-            return;
+          const old = payload.old as any;
+          if (
+            old &&
+            row.last_read_at !== old.last_read_at &&
+            row.is_muted === old.is_muted &&
+            row.notifications_mode === old.notifications_mode &&
+            row.role === old.role
+          ) {
+            return; // Skip read-receipt-only updates
           }
-
-          if (!isKnownConversation(row.conversation_id)) return;
-
-          setConversations((prev) =>
-            prev.map((conv) => {
-              if (conv.id !== row.conversation_id) return conv;
-
-              return {
-                ...conv,
-                participants: conv.participants.map((p) =>
-                  p.user_id === row.user_id ? { ...p, ...row } : p
-                ),
-              };
-            })
-          );
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "chat_conversations" },
-        (payload) => {
+          scheduleConversationsReload(true);
+        },
+        // Llegan SOLO las de grupos (filtro type=eq.group): de aquí se copian
+        // nombre, foto y descripción, que un directo no tiene. Con cada mensaje
+        // se toca `updated_at` de su conversación, y el 75 % son de directos.
+        "chat_conversations:UPDATE": (payload) => {
           const updated = payload.new as any;
           if (!isKnownConversation(updated?.id)) return;
 
@@ -480,42 +444,20 @@ export function useChat() {
             next[idx] = patched;
             return next;
           });
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "DELETE", schema: "public", table: "chat_conversations" },
-        (payload) => {
-          const old = payload.old as any;
-          setConversations((prev) => prev.filter((c) => c.id !== old.id));
-        }
-      )
-      .subscribe((status) => {
-        if (cancelado) return;
-        if (status === "SUBSCRIBED") {
-          chatRealtimeRetryRef.current = 0;
-          if (chatRealtimeReconnectTimerRef.current) {
-            clearTimeout(chatRealtimeReconnectTimerRef.current);
-            chatRealtimeReconnectTimerRef.current = null;
-          }
-          void loadConversations();
-        }
-
-        // CLOSED también: es terminal (el socket murió en segundo plano y nadie lo
-        // vuelve a levantar); antes solo se atendían ERROR y TIMED_OUT.
-        // Acá NO se recarga: el canal nuevo recarga al quedar SUBSCRIBED (arriba),
-        // que es cuando de verdad sirve. Recargar en los dos daba pares de recargas
-        // con <1 s de diferencia en cada reconexión (medido en prod, 10/09).
-        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
-          scheduleChannelReconnect();
-        }
-      });
+        },
+        // Cada SUBSCRIBED recarga, la primera conexión también. Solo ahí: el canal
+        // del chat no recarga al caerse, recarga al volver, que es cuando sirve
+        // (recargar en los dos daba pares de recargas con <1 s de diferencia en
+        // cada reconexión, medido en prod el 10/09).
+        alSuscribir: () => { void loadConversations(); },
+      },
+    });
 
     // Volver a la pestaña ya NO recarga por sí solo. Si estuvo oculta poco, el
     // canal siguió vivo y la lista está al día; si estuvo oculta ≥30 s (o se cayó
-    // la red), useReanudarAlVolver levanta un canal nuevo y ESE recarga al quedar
-    // SUBSCRIBED. Recargar también acá duplicaba cada vuelta, y con Cowork y
-    // WhatsApp al lado la gente alterna pestañas cada pocos segundos.
+    // la red), el canal del chat se rearma y ESE recarga al quedar SUBSCRIBED.
+    // Recargar también aquí duplicaba cada vuelta, y con Cowork y WhatsApp al lado
+    // la gente alterna pestañas cada pocos segundos.
 
     // Fallback sync por si el websocket se cae. El realtime ya trae los cambios en
     // vivo, así que esto es solo red de seguridad → 20s (antes 5s recargaba toda la
@@ -528,15 +470,10 @@ export function useChat() {
 
     return () => {
       if (pendingReloadRef.timer) clearTimeout(pendingReloadRef.timer);
-      if (chatRealtimeReconnectTimerRef.current) {
-        clearTimeout(chatRealtimeReconnectTimerRef.current);
-        chatRealtimeReconnectTimerRef.current = null;
-      }
       clearInterval(pollInterval);
-      cancelado = true;
-      supabase.removeChannel(channel);
+      dejarDeEscuchar();
     };
-  }, [user, loadConversations, chatRealtimeVersion]);
+  }, [user, loadConversations]);
 
   const createDirectChat = useCallback(
     (otherUserId: string, onResolved?: (realId: string) => void): string | null => {
@@ -595,90 +532,41 @@ export function useChat() {
       setConversations((prev) => [optimisticConv, ...prev]);
 
       (async () => {
-        // Check server-side for existing direct chat with this user.
-        // ⚠️ Si la comprobación FALLA, NO se crea nada. Antes un fallo de red se
-        // leía como "no existe" y se creaba un segundo DM con la misma persona
-        // — y la base no tiene candado para eso (solo la clave primaria).
-        const abortarApertura = (motivo: string) => {
-          console.error("[startDirectChat] no pude comprobar si el DM existía:", motivo);
-          setConversations((prev) => prev.filter((c) => c.id !== newConvId));
-          toast.error("Sin conexión: no pude abrir el chat. Inténtalo de nuevo.");
-        };
-        const participacionesMias = await supabase
-          .from("chat_participants")
-          .select("conversation_id")
-          .eq("user_id", user.id);
-        if (queHacerConLaCarga(participacionesMias) === "abortar") {
-          abortarApertura(participacionesMias.error?.message ?? "sin datos");
+        // La búsqueda, la creación y la carrera (directo_duplicado) viven en
+        // hooks/abrirDirecto.ts. Si no se pudo averiguar si el DM existía, NO se
+        // crea nada: un fallo de red leído como "no existe" creaba un segundo DM.
+        const r = await abrirDirecto(
+          pasosDeSupabase(supabase as unknown as ClienteParaDirecto, user.id),
+          user.id,
+          otherUserId,
+          newConvId,
+        );
+        if (r.tipo === "creado") return;
+        if (r.tipo === "existente") {
+          // El DM ya existía en el server (a veces oculto: un directo sin mensajes creado
+          // por el otro no aparece en mi lista), o lo acaba de crear el otro. Reapuntamos
+          // al id real y reseleccionamos: si ya está en la lista quitamos la optimista;
+          // si no, reusamos la optimista con el id real (queda visible: created_by = yo).
+          const existingConvId = r.id;
+          setConversations((prev) =>
+            prev.some((c) => c.id === existingConvId)
+              ? prev.filter((c) => c.id !== newConvId)
+              : prev.map((c) => (c.id === newConvId ? { ...c, id: existingConvId } : c))
+          );
+          onResolved?.(existingConvId);
           return;
         }
-        const myParticipations = participacionesMias.data;
-
-        if (myParticipations && myParticipations.length > 0) {
-          const myConvIds = myParticipations.map((p: any) => p.conversation_id);
-          
-          // Find if otherUserId is in any of my direct conversations
-          const otros = await supabase
-            .from("chat_participants")
-            .select("conversation_id, chat_conversations!inner(type)")
-            .eq("user_id", otherUserId)
-            .eq("chat_conversations.type", "direct")
-            .in("conversation_id", myConvIds)
-            .limit(1);
-          if (queHacerConLaCarga(otros) === "abortar") {
-            abortarApertura(otros.error?.message ?? "sin datos");
-            return;
-          }
-          const otherP = otros.data;
-
-          if (otherP && otherP.length > 0) {
-            // El DM ya existía en el server (a veces oculto: un directo sin mensajes creado
-            // por el otro no aparece en mi lista). Antes solo borrábamos la conv optimista
-            // → el chat abierto se cerraba solo y NUNCA se podía reabrir. Ahora reapuntamos
-            // al id real y reseleccionamos: si ya está en la lista quitamos la optimista;
-            // si no, reusamos la optimista con el id real (queda visible: created_by = yo).
-            const existingConvId = otherP[0].conversation_id;
-            setConversations((prev) =>
-              prev.some((c) => c.id === existingConvId)
-                ? prev.filter((c) => c.id !== newConvId)
-                : prev.map((c) => (c.id === newConvId ? { ...c, id: existingConvId } : c))
-            );
-            onResolved?.(existingConvId);
-            return;
-          }
-        }
-
-        const { error: createConvError } = await supabase
-          .from("chat_conversations")
-          .insert({ id: newConvId, type: "direct", created_by: user.id });
-
-        if (createConvError) {
-          setConversations((prev) => prev.filter((c) => c.id !== newConvId));
-          toast.error("Error al crear conversación");
-          return;
-        }
-
-        const { error: addCreatorError } = await supabase
-          .from("chat_participants")
-          .insert({ conversation_id: newConvId, user_id: user.id, role: "admin" });
-
-        if (addCreatorError) {
-          await supabase.from("chat_conversations").delete().eq("id", newConvId);
-          setConversations((prev) => prev.filter((c) => c.id !== newConvId));
-          toast.error("Error al crear conversación");
-          return;
-        }
-
-        const { error: addOtherError } = await supabase
-          .from("chat_participants")
-          .insert({ conversation_id: newConvId, user_id: otherUserId, role: "member" });
-
-        if (addOtherError) {
-          await supabase.from("chat_participants").delete().eq("conversation_id", newConvId);
-          await supabase.from("chat_conversations").delete().eq("id", newConvId);
-          setConversations((prev) => prev.filter((c) => c.id !== newConvId));
-          toast.error("Error al crear conversación");
-          return;
+        setConversations((prev) => prev.filter((c) => c.id !== newConvId));
+        if (r.tipo === "sin_saber") {
+          console.error("[startDirectChat] no pude comprobar si el DM existía:", r.motivo);
+          toast.error(traducir("shared.chat.offlineOpen"));
+        } else {
+          // La base corta en 100 directos nuevos por persona en 24 horas (20260930230000).
+          toast.error(traducir(
+            r.motivo.includes("chat_tope_directos")
+              ? "shared.chat.directDailyLimit"
+              : "shared.chat.errorCreatingConversation",
+          ));
         }
       })();
 
@@ -723,7 +611,12 @@ export function useChat() {
 
         if (createConvError) {
           setConversations(prev => prev.filter(c => c.id !== newConvId));
-          toast.error("Error al crear grupo");
+          // La base corta en 30 grupos nuevos por persona en 24 horas (20260930230000).
+          toast.error(traducir(
+            createConvError.message?.includes("chat_tope_grupos")
+              ? "shared.chat.groupDailyLimit"
+              : "shared.chat.errorCreatingGroup",
+          ));
           return;
         }
 
@@ -734,7 +627,7 @@ export function useChat() {
         if (addCreatorError) {
           await supabase.from("chat_conversations").delete().eq("id", newConvId);
           setConversations(prev => prev.filter(c => c.id !== newConvId));
-          toast.error("Error al crear grupo");
+          toast.error(traducir("shared.chat.errorCreatingGroup"));
           return;
         }
 
@@ -748,15 +641,20 @@ export function useChat() {
           );
 
           if (addMembersError) {
-            await supabase.from("chat_participants").delete().eq("conversation_id", newConvId);
+            // Se borra la CONVERSACIÓN mientras quien la creó todavía es participante
+            // (la cascada se lleva su participación). Antes se borraba primero la
+            // participación: sin ella la política SELECT ya no deja ver la
+            // conversación, el DELETE borraba 0 filas sin error y quedaba huérfana.
+            // Desde 20260930230000 la base también rechaza aquí a alguien de otra
+            // agencia (chat_otra_agencia).
             await supabase.from("chat_conversations").delete().eq("id", newConvId);
             setConversations(prev => prev.filter(c => c.id !== newConvId));
-            toast.error("Error al crear grupo");
+            toast.error(traducir("shared.chat.errorCreatingGroup"));
             return;
           }
         }
 
-        toast.success(`Grupo "${name}" creado`);
+        toast.success(traducir("shared.chat.groupCreated", { name }));
       })();
 
       return newConvId;
@@ -781,11 +679,11 @@ export function useChat() {
 
         if (error) throw error;
 
-        toast.success("Conversación eliminada");
+        toast.success(traducir("shared.chat.conversationDeleted"));
         return true;
       } catch (err) {
         console.error("Error deleting conversation:", err);
-        toast.error("Error al eliminar conversación");
+        toast.error(traducir("shared.chat.errorDeletingConversation"));
         // Rollback: restore previous state
         setConversations(prevConversations);
         return false;
@@ -888,7 +786,7 @@ export function useChat() {
 
     if (error || !data || data.length === 0) {
       applyMuted(!muted); // revertir
-      toast.error(muted ? "No se pudo silenciar" : "No se pudo reactivar");
+      toast.error(traducir(muted ? "shared.chat.couldNotMute" : "shared.chat.couldNotUnmute"));
     }
   }, [user]);
 
@@ -1009,6 +907,8 @@ export function useMessages(
           file_name: p.fileName || null, file_size: null, reply_to_id: p.replyToId || null,
           album_id: p.albumId || null, is_thread_reply: !!p.isThreadReply,
           content_rich: (p.contentRich as ChatMessage["content_rich"]) ?? null,
+          // Lo escribí yo desde la app: sin marca de API.
+          api_key_id: null, api_display_name: null,
           is_edited: false, is_deleted: false, created_at: p.createdAt, updated_at: p.createdAt,
           _localStatus: "failed",
         }));
@@ -1152,7 +1052,11 @@ export function useMessages(
           setMessages((prev) => {
             if (prev.find((m) => m.id === newMsg.id)) return prev;
 
-            const optimisticMatch = prev.find(
+            // El optimista solo lo puede reemplazar la fila que escribí desde la
+            // app: un mensaje que mandó MI integración en el mismo instante y con
+            // el mismo texto también trae mi sender_id, y si lo tomara, el mío
+            // quedaría pintado como «BLU» y el de la integración desaparecería.
+            const optimisticMatch = newMsg.api_key_id != null ? undefined : prev.find(
               (m) =>
                 optimisticIdsRef.current.has(m.id) &&
                 m.sender_id === newMsg.sender_id &&
@@ -1434,6 +1338,8 @@ export function useMessages(
         content, type, file_url: fileUrl || null, file_name: fileName || null, file_size: null,
         reply_to_id: replyToId || null, album_id: albumId || null, is_thread_reply: !!isThreadReply,
         content_rich: (contentRich as ChatMessage["content_rich"]) ?? null,
+        // Lo escribo yo desde la app: sin marca de API.
+        api_key_id: null, api_display_name: null,
         is_edited: false, is_deleted: false,
         created_at: now, updated_at: now, _localStatus: "sending",
       };
@@ -1511,7 +1417,7 @@ export function useMessages(
       // Si el mensaje todavía se está enviando (id optimista), el UPDATE no matchearía
       // ninguna fila real y la edición se perdería en silencio → bloquear hasta que persista.
       if (optimisticIdsRef.current.has(messageId)) {
-        toast.info("Espera a que el mensaje termine de enviarse");
+        toast.info(traducir("shared.chat.waitUntilSent"));
         return;
       }
       // La caja de edición es texto plano, así que el texto rico (negritas,
@@ -1526,7 +1432,7 @@ export function useMessages(
         .update({ content: newContent, is_edited: true, content_rich: null })
         .eq("id", messageId);
       if (error) {
-        toast.error("Error al editar mensaje");
+        toast.error(traducir("shared.chat.errorEditingMessage"));
         void loadMessagesRef.current?.();
       }
     },
@@ -1546,7 +1452,7 @@ export function useMessages(
     // Igual que editMessage: si el id es optimista (aún enviándose), el UPDATE no
     // matchearía nada y el borrado se perdería en silencio → bloquear hasta que persista.
     if (optimisticIdsRef.current.has(messageId)) {
-      toast.info("Espera a que el mensaje termine de enviarse");
+      toast.info(traducir("shared.chat.waitUntilSent"));
       return;
     }
     // Optimistic soft delete (también el adjunto: la RPC vacía content y file_url)
@@ -1559,7 +1465,7 @@ export function useMessages(
     const { data, error } = await supabase.rpc("delete_chat_message" as never, { p_message_id: messageId } as never);
     const res = data as unknown as { ok?: boolean } | null;
     if (error || (res && res.ok === false)) {
-      toast.error("Error al eliminar mensaje");
+      toast.error(traducir("shared.chat.errorDeletingMessage"));
       void loadMessagesRef.current?.();
     }
   }, [user]);

@@ -403,7 +403,7 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
 
   const handleNext = () => {
     if (!validateCurrentStep()) return;
-    toast({ title: `Paso ${step} completado` });
+    toast({ title: t("creadores.wiz.stepDone", { n: step }) });
     setStep((s) => Math.min(s + 1, 4));
     // Autosave on step change
     if (isDirty.current) autoSave();
@@ -416,6 +416,7 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
 
   const buildPayload = (isDraft: boolean) => {
     const creatorPayload = buildCreatorPayload(isDraft);
+    // La descripción se GUARDA en creator_documents y la ven todos: queda en español.
     const documents = [
       ...step3Doc.idDocumentFront.map((f) => ({ file_name: f.name, file_url: f.url, file_type: f.type, description: "Documento de identidad (frente)" })),
       ...step3Doc.idDocumentBack.map((f) => ({ file_name: f.name, file_url: f.url, file_type: f.type, description: "Documento de identidad (reverso)" })),
@@ -445,7 +446,7 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
       }
     } else {
       if (!step1.name.trim()) {
-        setStep1Errors({ name: "Nombre es requerido para guardar borrador" });
+        setStep1Errors({ name: "creadores.wiz.nameForDraft" });
         setStep(1);
         return;
       }
@@ -506,10 +507,10 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
         }
 
         queryClient.invalidateQueries({ queryKey: ["onboarding-creators"] });
-        toast({ title: isDraft ? "Borrador actualizado" : "Onboarding actualizado exitosamente" });
+        toast({ title: isDraft ? t("creadores.wiz.draftUpdated") : t("creadores.wiz.onbUpdated") });
         resetAndClose();
       } catch (err: any) {
-        toast({ title: "Error", description: err.message, variant: "destructive" });
+        toast({ title: t("common.error"), description: err.message, variant: "destructive" });
       }
       return;
     }
@@ -520,8 +521,8 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
       const { data: existingName } = await supabase.rpc("find_creator_name_by_email", { p_email: step1.email.trim() } as never);
       if (existingName) {
         toast({
-          title: "Duplicado detectado",
-          description: `Ya existe un creador con este email: ${existingName}`,
+          title: t("creadores.add.duplicate"),
+          description: t("creadores.wiz.duplicateEmail", { name: String(existingName) }),
           variant: "destructive",
         });
         setStep(1);
@@ -550,10 +551,10 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
           required_permission_module: "Creadores",
         });
       }
-      toast({ title: isDraft ? "Borrador guardado" : "Onboarding completado exitosamente" });
+      toast({ title: isDraft ? t("creadores.wiz.draftSaved") : t("creadores.wiz.onbCompleted") });
       resetAndClose();
     } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      toast({ title: t("common.error"), description: err.message, variant: "destructive" });
     }
   };
 
@@ -622,7 +623,7 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
         creatorId = await addCreador.mutateAsync(payload);
       }
 
-      if (!creatorId) throw new Error("No se pudo obtener el ID del creador");
+      if (!creatorId) throw new Error(t("creadores.wiz.noCreatorId"));
 
       // Insert creator_assignments record only if manager selected
       if (managerId) {
@@ -656,6 +657,7 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
         const adminNotifications = adminRoles.map((ar) => ({
           user_id: ar.user_id,
           type: "onboarding_step4_complete",
+          // Se guarda y la leen los admins: queda en español.
           title: "Onboarding Paso 4 completado",
           message: `${step1.name} ha completado la configuración comercial y está pendiente de verificación.`,
           reference_id: creatorId,
@@ -665,11 +667,11 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
       }
 
       queryClient.invalidateQueries({ queryKey: ["onboarding-creators"] });
-      toast({ title: "Onboarding completado exitosamente" });
+      toast({ title: t("creadores.wiz.onbCompleted") });
       setShowAssignmentModal(false);
       resetAndClose();
     } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      toast({ title: t("common.error"), description: err.message, variant: "destructive" });
     } finally {
       setAssignmentSubmitting(false);
     }
@@ -677,13 +679,13 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
 
   // Autosave indicator text
   const autoSaveText = useMemo(() => {
-    if (isSavingAuto) return "Guardando...";
+    if (isSavingAuto) return t("creadores.saving");
     if (!lastSavedAt) return null;
     const seconds = Math.round((Date.now() - lastSavedAt.getTime()) / 1000);
-    if (seconds < 5) return "Guardado automáticamente";
-    if (seconds < 60) return `Guardado hace ${seconds}s`;
-    return `Guardado hace ${Math.round(seconds / 60)}m`;
-  }, [isSavingAuto, lastSavedAt, step]); // step dependency to re-render on step change
+    if (seconds < 5) return t("creadores.wiz.autoSaved");
+    if (seconds < 60) return t("creadores.wiz.savedSecondsAgo", { n: seconds });
+    return t("creadores.wiz.savedMinutesAgo", { n: Math.round(seconds / 60) });
+  }, [isSavingAuto, lastSavedAt, step, t]); // step dependency to re-render on step change
 
   if (loadingCreator) {
     return (
@@ -701,7 +703,7 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
       <CardHeader className="flex flex-row items-start justify-between gap-4">
         <div className="flex items-center gap-3">
           <h2 className="text-lg font-semibold leading-none tracking-tight">
-            {editCreatorId ? "Continuar Onboarding" : "Iniciar Onboarding"}
+            {editCreatorId ? t("creadores.onb.continue") : t("creadores.onb.start")}
           </h2>
           <Badge
             variant={
@@ -714,17 +716,17 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
             }
             className="text-xs"
           >
-            {!editCreatorId ? "Nuevo" :
-             creatorStatus === "borrador" ? "Borrador" :
-             creatorStatus === "onboarding" ? "Onboarding" :
-             creatorStatus === "pendiente_verificacion" ? "En Revisión" :
-             creatorStatus === "verificado" || creatorStatus === "activo" ? "Verificado" :
-             creatorStatus || "Nuevo"}
+            {!editCreatorId ? t("common.new") :
+             creatorStatus === "borrador" ? t("creadores.status.draft") :
+             creatorStatus === "onboarding" ? t("creadores.status.onboarding") :
+             creatorStatus === "pendiente_verificacion" ? t("creadores.status.pendingVerification") :
+             creatorStatus === "verificado" || creatorStatus === "activo" ? t("creadores.wiz.badgeVerified") :
+             creatorStatus || t("common.new")}
           </Badge>
         </div>
         <Button variant="ghost" size="sm" onClick={resetAndClose} disabled={isSubmitting}>
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Volver a la lista
+          {t("creadores.wiz.backToList")}
         </Button>
       </CardHeader>
 
@@ -792,7 +794,7 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
       <CardFooter className="flex items-center justify-between border-t pt-4">
         <div className="flex items-center gap-3">
           <Button variant="outline" size="sm" onClick={() => handleSubmit(true)} disabled={isSubmitting}>
-            Guardar Borrador
+            {t("creadores.wiz.saveDraft")}
           </Button>
           {autoSaveText && (
             <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -810,7 +812,7 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
           ) : (
             <Button onClick={handleFinalize} disabled={isSubmitting}>
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Finalizar
+              {t("creadores.wiz.finish")}
             </Button>
           )}
         </div>

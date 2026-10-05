@@ -1,4 +1,4 @@
-import { forwardRef, useState, useMemo, memo, useRef, useEffect } from "react";
+import { forwardRef, useState, useMemo, memo, useRef, useEffect, useContext } from "react";
 import {
   MoreVertical, File, Reply, Copy, Edit2, Trash2, MessageSquareText, Mic, Play, Clock, RotateCw, Check, Download,
 } from "lucide-react";
@@ -10,18 +10,21 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ChatMessage, UserProfile } from "../types";
 import type { DeletedMessageArchive } from "../useDeletedMessages";
-import { profileName, safeFileUrl } from "../utils";
+import { remitenteVisible, safeFileUrl } from "../utils";
+import EtiquetaApi from "./EtiquetaApi";
 import { ReactionGroup } from "@/hooks/useReactions";
 import { cn } from "@/lib/utils";
 import ReactionPicker from "./ReactionPicker";
 import ReactionsDisplay from "./ReactionsDisplay";
 import ReadReceiptIndicator from "./ReadReceiptIndicator";
 import ImageLightbox from "./ImageLightbox";
+import { GaleriaDelChat, clasificarMedia } from "../galeriaDelChat";
 import { renderTextWithMentions } from "./MentionAutocomplete";
 import RichText from "./RichText";
 import { formatTime as formatMsgTime } from "../utils";
 import { useNavigate } from "react-router-dom";
 import NotaDeVoz from "./NotaDeVoz";
+import { useLanguage } from "@/hooks/useLanguage";
 
 const MAX_GRID_IMAGES = 9;
 
@@ -40,6 +43,8 @@ interface MessageBubbleProps {
   onDelete: () => void;
   onRetry?: () => void;
   replyMessage?: ChatMessage;
+  /** Clic en la cita: lleva al mensaje original en la conversación. */
+  onIrALaCita?: () => void;
   showAvatar: boolean;
   showSender: boolean;
   isLastInGroup: boolean;
@@ -58,18 +63,26 @@ interface MessageBubbleProps {
 
 const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
   message, isMe, chatType, profiles, highlight, onReply, onOpenProfile, deletedArchive, onCopy, onEdit, onDelete, onRetry,
-  replyMessage, showAvatar, showSender, isLastInGroup,
+  replyMessage, onIrALaCita, showAvatar, showSender, isLastInGroup,
   reactions, onToggleReaction, readByUsers, deliveredByUsers, totalParticipants,
   threadCount = 0, unreadThreadCount = 0, onOpenThread,
   adjacentImages, isGridLeader, isPartOfGrid,
 }, ref) => {
-  const senderName = profileName(profiles[message.sender_id]);
+  const { t, language } = useLanguage();
+  // Quién aparece como autor: «BLU» si vino por API (nunca la persona de la key).
+  const remitente = remitenteVisible(message, profiles, t);
+  const senderName = remitente.nombre;
+  const esApi = remitente.esApi;
   const [lightboxOpen, setLightboxOpen] = useState(false);
   // Táctil: las acciones (reaccionar, ⋮) salen al tocar la burbuja. Siempre
   // visibles ocupaban 64 px al lado de CADA mensaje y el chat se veía atiborrado.
   const [accionesTactiles, setAccionesTactiles] = useState(false);
+  // «Responder» se eligió en el menú: al cerrarse no le devuelve el foco al ⋮.
+  const respondiendoRef = useRef(false);
   const [lightboxSrc, setLightboxSrc] = useState("");
   const [lightboxType, setLightboxType] = useState<"image" | "video">("image");
+  // Todas las fotos y videos del chat, para las flechas del visor.
+  const galeria = useContext(GaleriaDelChat);
   const [showAllImages, setShowAllImages] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState("");
@@ -124,20 +137,26 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
              eliminado, mismo criterio que Chatter Evaluator. */
           <div className="max-w-[70%] rounded-3xl px-3 py-2 bg-destructive/10 border border-destructive/25">
             {deletedArchive.type === "image" && deletedArchive.file_url ? (
-              <img src={deletedArchive.file_url} alt={deletedArchive.file_name || "imagen"} decoding="async" className="rounded-lg max-w-full max-h-48 object-cover" />
+              <img src={deletedArchive.file_url} alt={deletedArchive.file_name || t("messenger.bubble.imagen")} decoding="async" className="rounded-lg max-w-full max-h-48 object-cover" />
             ) : deletedArchive.file_url ? (
               <a href={deletedArchive.file_url} target="_blank" rel="noopener noreferrer" className="text-xs underline break-all">
-                {deletedArchive.file_name || "Archivo"}
+                {deletedArchive.file_name || t("common.file")}
               </a>
             ) : null}
+            {deletedArchive.api_key_id != null && (
+              // Lo había mandado una integración: el archivo lo dice con su nombre.
+              <p className="text-[11px] font-semibold text-destructive/90">
+                {deletedArchive.api_display_name || t("messenger.api.etiqueta")} · {t("messenger.api.etiqueta")}
+              </p>
+            )}
             {deletedArchive.content && (
               <p className="text-sm whitespace-pre-wrap break-words mt-1">{deletedArchive.content}</p>
             )}
-            <div className="mt-0.5 text-[10px] italic text-destructive/90">Eliminado por el autor · solo admins</div>
+            <div className="mt-0.5 text-[10px] italic text-destructive/90">{t("messenger.bubble.eliminadoSoloAdmins")}</div>
           </div>
         ) : (
           <div className="max-w-[70%] rounded-3xl px-3 py-1.5 bg-primary/5">
-            <p className="text-xs text-muted-foreground italic">Eliminado por el autor</p>
+            <p className="text-xs text-muted-foreground italic">{t("messenger.bubble.eliminadoPorAutor")}</p>
           </div>
         )}
       </div>
@@ -175,7 +194,7 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
   const highlightText = (text: string) => {
     if (!highlight) {
       if (chatType === "group") {
-        return renderTextWithMentions(text, participantNames, abrirDmDeMencion);
+        return renderTextWithMentions(text, participantNames, abrirDmDeMencion, (nombre) => t("messenger.mention.abrirChatCon", { name: nombre }));
       }
       return linkifyText(text);
     }
@@ -194,21 +213,11 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
     ? cn("rounded-3xl rounded-tr-xl", isLastInGroup ? "rounded-br-md" : "rounded-br-3xl")
     : cn("rounded-3xl rounded-tl-xl", isLastInGroup ? "rounded-bl-md" : "rounded-bl-3xl");
 
-  const isVoiceNote = message.type === "file" && message.file_name?.startsWith("voice-note");
-  const audioExtPattern = /\.(webm|ogg|mp3|m4a|wav)(\?|$)/i;
-  const isAudioFile = message.file_url && audioExtPattern.test(message.file_url);
-  const isImage = message.type === "image" && message.file_url;
-  // GIF: Giphy los manda como .mp4 con file_name "gif.mp4". Se muestran en chico y
-  // reproduciéndose SOLOS (autoplay+loop+muted), como en WhatsApp — no como video con
-  // botón de play (que obligaba a hacer zoom para verlo animado).
-  const isGif = !!message.file_url && (
-    /\.gif(\?|$)/i.test(message.file_url) ||
-    (message.file_name || "").toLowerCase().startsWith("gif") ||
-    /(giphy|tenor)\.com/i.test(message.file_url)
-  );
-  // OJO: los .webm de nota de voz y los gifs .mp4 también matchean este regex →
-  // excluirlos para que NO se dibujen como player de video con botón de play.
-  const isVideo = !isVoiceNote && !isAudioFile && !isGif && message.file_url && (message.file_url.match(/\.(mp4|webm|mov)(\?|$)/i));
+  // Qué es este archivo: la regla vive en galeriaDelChat para que la burbuja y
+  // el visor (que pasa de una foto a otra) digan lo mismo.
+  const {
+    esNotaDeVoz: isVoiceNote, esAudio: isAudioFile, esImagen: isImage, esGif: isGif, esVideo: isVideo,
+  } = clasificarMedia(message);
 
   const openLightbox = (src: string, type: "image" | "video") => {
     setLightboxSrc(src);
@@ -227,10 +236,14 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
             className="rounded-2xl max-w-full max-h-60 object-cover cursor-pointer hover:opacity-90 transition-opacity"
             onClick={() => openLightbox(message.file_url!, "image")}
           />
+          {/* El texto que acompaña a una imagen o archivo respeta sus saltos de
+              línea, como el de un mensaje de solo texto (Keila, 02/10: un mensaje
+              largo con 12 puntos se veía como un solo párrafo). Es un div y no
+              un <p>: el texto con formato trae sus propios párrafos. */}
           {message.content && message.content !== message.file_name && (
-            <p className="text-[13px] mt-1.5 leading-relaxed">{message.content_rich
+            <div className="text-[13px] mt-1.5 leading-relaxed whitespace-pre-wrap break-words">{message.content_rich
               ? <RichText doc={message.content_rich} renderText={highlightText} />
-              : highlightText(message.content)}</p>
+              : highlightText(message.content)}</div>
           )}
         </div>
       );
@@ -282,9 +295,9 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
           })}
         </div>
         {message.content && message.content !== message.file_name && (
-          <p className="text-[13px] mt-1.5 leading-relaxed">{message.content_rich
+          <div className="text-[13px] mt-1.5 leading-relaxed whitespace-pre-wrap break-words">{message.content_rich
               ? <RichText doc={message.content_rich} renderText={highlightText} />
-              : highlightText(message.content)}</p>
+              : highlightText(message.content)}</div>
         )}
       </div>
     );
@@ -343,9 +356,9 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
             </div>
           </div>
           {message.content && message.content !== message.file_name && (
-            <p className="text-[13px] mt-1.5 leading-relaxed">{message.content_rich
+            <div className="text-[13px] mt-1.5 leading-relaxed whitespace-pre-wrap break-words">{message.content_rich
               ? <RichText doc={message.content_rich} renderText={highlightText} />
-              : highlightText(message.content)}</p>
+              : highlightText(message.content)}</div>
           )}
         </div>
       );
@@ -370,7 +383,7 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
             <File className="h-4 w-4" />
           </div>
           <div className="min-w-0">
-            <span className="text-[13px] truncate block">{message.file_name || "Archivo"}</span>
+            <span className="text-[13px] truncate block">{message.file_name || t("common.file")}</span>
             {ext && <span className="text-[10px] text-muted-foreground uppercase">{ext}</span>}
           </div>
         </a>
@@ -402,17 +415,17 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
               onClick={cancelEdit}
               className={cn("text-[11px] px-2 py-0.5 rounded-lg transition-colors", isMe ? "text-white/70 hover:text-white hover:bg-primary-foreground/10" : "text-muted-foreground hover:bg-muted")}
             >
-              Cancelar
+              {t("common.cancel")}
             </button>
             <button
               type="button"
               onClick={saveEdit}
               className={cn("text-[11px] font-medium px-2 py-0.5 rounded-lg flex items-center gap-1 transition-colors", isMe ? "bg-primary-foreground/20 text-white hover:bg-primary-foreground/30" : "bg-primary text-primary-foreground hover:opacity-90")}
             >
-              <Check className="h-3 w-3" /> Guardar
+              <Check className="h-3 w-3" /> {t("common.save")}
             </button>
           </div>
-          <p className={cn("text-[10px] mt-0.5", isMe ? "text-white/40" : "text-muted-foreground")}>Enter para guardar · Esc para cancelar</p>
+          <p className={cn("text-[10px] mt-0.5", isMe ? "text-white/40" : "text-muted-foreground")}>{t("messenger.bubble.enterParaGuardar")}</p>
         </div>
       );
     }
@@ -438,11 +451,15 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
       >
         {!isMe && (
           <div className="w-8 shrink-0 flex justify-center">
-            {showAvatar ? (
+            {showAvatar && esApi ? (
+              // Una integración no tiene cara ni ficha: iniciales de su nombre
+              // visible, nunca la foto de la persona dueña de la key.
+              <UserAvatar name={senderName} size="sm" className="h-7 w-7" />
+            ) : showAvatar ? (
               <button
                 type="button"
                 onClick={() => onOpenProfile?.(message.sender_id)}
-                title="Ver ficha"
+                title={t("messenger.header.verFicha")}
                 className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-primary"
               >
                 <UserAvatar
@@ -487,34 +504,47 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
                   <MoreVertical className="h-3 w-3" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align={isMe ? "end" : "start"} className="min-w-[140px] rounded-2xl">
-                <DropdownMenuItem onClick={onReply}>
-                  <Reply className="h-3.5 w-3.5 mr-2" /> Responder
+              <DropdownMenuContent
+                align={isMe ? "end" : "start"}
+                className="min-w-[140px] rounded-2xl"
+                // Al cerrar, el menú le devuelve el foco al ⋮ y se lo quitaba al
+                // cuadro de escritura: había que hacer clic 2 o 3 veces para
+                // responder (Keila, 02/10). Con «Responder», el foco va al cuadro.
+                onCloseAutoFocus={(e) => {
+                  if (!respondiendoRef.current) return;
+                  respondiendoRef.current = false;
+                  e.preventDefault();
+                }}
+              >
+                <DropdownMenuItem onClick={() => { respondiendoRef.current = true; onReply(); }}>
+                  <Reply className="h-3.5 w-3.5 mr-2" /> {t("common.reply")}
                 </DropdownMenuItem>
                 {onOpenThread && (
                   <DropdownMenuItem onClick={onOpenThread}>
-                    <MessageSquareText className="h-3.5 w-3.5 mr-2" /> Abrir hilo
+                    <MessageSquareText className="h-3.5 w-3.5 mr-2" /> {t("messenger.bubble.abrirHilo")}
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuItem onClick={onCopy}>
-                  <Copy className="h-3.5 w-3.5 mr-2" /> Copiar
+                  <Copy className="h-3.5 w-3.5 mr-2" /> {t("common.copy")}
                 </DropdownMenuItem>
                 {/* Todo mensaje con archivo (imagen, video, audio, documento) se
-                    puede descargar desde acá, además del botón del zoom. */}
+                    puede descargar desde aquí, además del botón del zoom. */}
                 {message.file_url && (
                   <DropdownMenuItem onClick={() => void descargarArchivo(message.file_url!, message.file_name)}>
-                    <Download className="h-3.5 w-3.5 mr-2" /> Descargar
+                    <Download className="h-3.5 w-3.5 mr-2" /> {t("common.download")}
                   </DropdownMenuItem>
                 )}
                 {isMe && (
                   <>
-                    {message.type === "text" && (
+                    {/* Lo que mandó una integración no se edita desde la app (la
+                        base tampoco lo deja); borrarlo sí. */}
+                    {message.type === "text" && !esApi && (
                       <DropdownMenuItem onClick={startEdit}>
-                        <Edit2 className="h-3.5 w-3.5 mr-2" /> Editar
+                        <Edit2 className="h-3.5 w-3.5 mr-2" /> {t("common.edit")}
                       </DropdownMenuItem>
                     )}
                     <DropdownMenuItem className="text-destructive" onClick={onDelete}>
-                      <Trash2 className="h-3.5 w-3.5 mr-2" /> Eliminar
+                      <Trash2 className="h-3.5 w-3.5 mr-2" /> {t("common.delete")}
                     </DropdownMenuItem>
                   </>
                 )}
@@ -528,42 +558,56 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
             reactions.length > 0 && "mb-3",
             isMe ? "bg-gradient-to-br from-accent to-primary text-white shadow-sm" : "bg-muted"
           )}>
+            {/* La cita lleva al mensaje original, como en WhatsApp (Keila, 02/10). */}
             {replyMessage && (
-              <div className={cn(
-                "text-[11px] mb-1.5 px-2.5 py-1.5 rounded-xl",
-                isMe ? "bg-primary-foreground/10" : "bg-background/60"
-              )}>
-                <p className="font-semibold opacity-80">{profileName(profiles[replyMessage.sender_id])}</p>
+              <button
+                type="button"
+                disabled={!onIrALaCita}
+                onClick={(e) => { e.stopPropagation(); onIrALaCita?.(); }}
+                title={onIrALaCita ? t("messenger.bubble.irALaCita") : undefined}
+                className={cn(
+                  "block w-full min-w-0 text-left text-[11px] mb-1.5 px-2.5 py-1.5 rounded-xl disabled:cursor-default",
+                  isMe ? "bg-primary-foreground/10" : "bg-background/60",
+                  onIrALaCita && (isMe ? "hover:bg-primary-foreground/20" : "hover:bg-background/90"),
+                )}
+              >
+                <p className="font-semibold opacity-80">{remitenteVisible(replyMessage, profiles, t).nombre}</p>
                 <p className="truncate opacity-70">{replyMessage.content}</p>
-              </div>
+              </button>
             )}
 
-            {chatType === "group" && !isMe && showSender && (
-              <p className="text-[11px] font-semibold text-primary mb-0.5">{senderName}</p>
+            {/* El nombre va en los grupos (de los demás) y en TODO mensaje por API,
+                también en los directos y en los míos: es lo que separa a «BLU»
+                de la persona. */}
+            {showSender && (esApi || (chatType === "group" && !isMe)) && (
+              <p className={cn("text-[11px] font-semibold mb-0.5", isMe ? "text-white/90" : "text-primary")}>{senderName}</p>
             )}
 
             {renderContent()}
 
             <div className="flex items-center gap-1 mt-1 justify-end">
+              {esApi && (
+                <EtiquetaApi nombre={senderName} persona={remitente.personaReal} esMio={isMe} sobreColor={isMe} />
+              )}
               {message.is_edited && (
-                <span className={cn("text-[10px]", isMe ? "text-primary-foreground/50" : "text-muted-foreground")}>editado</span>
+                <span className={cn("text-[10px]", isMe ? "text-primary-foreground/50" : "text-muted-foreground")}>{t("messenger.bubble.editado")}</span>
               )}
               <span className={cn("text-[10px]", isMe ? "text-primary-foreground/60" : "text-muted-foreground")}>
-                {formatMsgTime(message.created_at)}
+                {formatMsgTime(message.created_at, language)}
               </span>
               {isMe && message._localStatus === "sending" ? (
                 // Aún en vuelo: reloj (como el "reloj" de WhatsApp antes de la palomita).
-                <Clock className="h-3 w-3 text-primary-foreground/50" aria-label="Enviando" />
+                <Clock className="h-3 w-3 text-primary-foreground/50" aria-label={t("messenger.bubble.enviando")} />
               ) : isMe && message._localStatus === "failed" ? (
                 // No se pudo enviar → botón para reintentar (antes el mensaje desaparecía sin avisar).
                 <button
                   type="button"
                   onClick={onRetry}
                   className="flex items-center gap-0.5 text-[10px] font-medium text-destructive hover:text-white transition-colors"
-                  title="No se envió · toca para reintentar"
+                  title={t("messenger.bubble.noSeEnvio")}
                 >
                   <RotateCw className="h-3 w-3" />
-                  Reintentar
+                  {t("common.retry")}
                 </button>
               ) : (
                 <ReadReceiptIndicator
@@ -587,7 +631,7 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
               )}
             >
               <MessageSquareText className="h-3 w-3" />
-              <span>{threadCount} {threadCount === 1 ? "respuesta" : "respuestas"}</span>
+              <span>{threadCount === 1 ? t("messenger.bubble.unaRespuesta") : t("messenger.bubble.respuestas", { n: threadCount })}</span>
               {unreadThreadCount > 0 && (
                 <span className="bg-primary text-primary-foreground text-[10px] font-bold rounded-full min-w-[16px] h-4 px-1 flex items-center justify-center">
                   {unreadThreadCount}
@@ -606,6 +650,7 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
         isOpen={lightboxOpen}
         onClose={() => setLightboxOpen(false)}
         type={lightboxType}
+        galeria={galeria}
       />
     </>
   );

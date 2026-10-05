@@ -21,6 +21,8 @@ import {
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
 import {
   useChatterSessions,
   useChatterProfiles,
@@ -40,9 +42,9 @@ import type { ChatterSession, ChatterProfile } from "./types";
 //     siempre via canAccess; otros roles dependen del toggle en
 //     Settings → Usuarios → Roles.
 
-const fmtDate = (iso: string): string => {
+const fmtDate = (iso: string, locale: string): string => {
   try {
-    return new Date(iso).toLocaleString("es-ES", {
+    return new Date(iso).toLocaleString(locale, {
       day: "2-digit",
       month: "short",
       year: "numeric",
@@ -55,6 +57,8 @@ const fmtDate = (iso: string): string => {
 };
 
 const HistoryContent = () => {
+  const f = useFormato();
+  const { t } = useLanguage();
   // scope='global' → admin/role con data_scope='all' ve sesiones de TODOS
   // los examiners. Roles con data_scope='self' siguen viendo sólo las
   // propias (el RLS aplica el filtro por examiner_user_id).
@@ -71,7 +75,7 @@ const HistoryContent = () => {
       await resendMut.mutateAsync(sessionId);
       // El toast de éxito/fallo lo emite fireWebhookInBackground.
     } catch (e) {
-      toast.error("No se pudo reenviar", {
+      toast.error(t("chatters.hist.couldNotResend"), {
         description: (e as Error).message,
       });
     } finally {
@@ -186,10 +190,10 @@ const HistoryContent = () => {
     if (!deleteTarget) return;
     try {
       await deleteMut.mutateAsync(deleteTarget.id);
-      toast.success("Sesión eliminada");
+      toast.success(t("chatters.hist.sessionDeleted"));
       setDeleteTarget(null);
     } catch (e) {
-      toast.error("No se pudo eliminar", { description: (e as Error).message });
+      toast.error(t("common.couldNotDelete"), { description: (e as Error).message });
     }
   };
 
@@ -205,23 +209,23 @@ const HistoryContent = () => {
       setBulkConfirmOpen(false);
       setSelectedIds(new Set());
       if (deleted === requested) {
-        toast.success(`${deleted} sesion${deleted > 1 ? "es" : ""} eliminada${deleted > 1 ? "s" : ""}`);
+        toast.success(t(deleted > 1 ? "chatters.hist.deletedMany" : "chatters.hist.deletedOne", { n: deleted }));
       } else if (deleted === 0) {
         // RLS rechazó todo: la policy de DELETE pide examiner_user_id =
         // auth.uid(), así que un admin que ve sesiones de otros en el
         // History no las puede borrar (esa policy no acompañó al global
         // read scope todavía).
-        toast.error("No se pudo eliminar ninguna sesión", {
-          description: "Sólo puedes borrar tus propias sesiones. Las que creaste otros examiners requieren un permiso que todavía no está habilitado.",
+        toast.error(t("chatters.hist.noneDeleted"), {
+          description: t("chatters.hist.noneDeletedDesc"),
         });
       } else {
-        toast.warning(`${deleted} de ${requested} eliminadas`, {
-          description: `${requested - deleted} no se pudieron borrar (probablemente eran de otros examiners).`,
+        toast.warning(t("chatters.hist.partialDeleted", { n: deleted, total: requested }), {
+          description: t("chatters.hist.partialDeletedDesc", { n: requested - deleted }),
         });
       }
     } catch (e) {
       setBulkDeleting(false);
-      toast.error("Error al eliminar", { description: (e as Error).message });
+      toast.error(t("common.errorDeleting"), { description: (e as Error).message });
     }
   };
 
@@ -233,7 +237,7 @@ const HistoryContent = () => {
           <div className="relative max-w-sm flex-1">
             <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar por chatter o personaje…"
+              placeholder={t("chatters.hist.searchPh")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-8"
@@ -246,7 +250,7 @@ const HistoryContent = () => {
           {canDelete && selectedIds.size > 0 && (
             <div className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-1.5 text-xs">
               <span className="font-medium">
-                {selectedIds.size} seleccionada{selectedIds.size > 1 ? "s" : ""}
+                {t(selectedIds.size > 1 ? "chatters.hist.selectedMany" : "chatters.hist.selectedOne", { n: selectedIds.size })}
               </span>
               <Button
                 variant="ghost"
@@ -254,7 +258,7 @@ const HistoryContent = () => {
                 onClick={clearSelection}
                 className="h-7 px-2 text-xs"
               >
-                Limpiar
+                {t("chatters.hist.clear")}
               </Button>
               <Button
                 variant="destructive"
@@ -263,7 +267,7 @@ const HistoryContent = () => {
                 className="h-7 px-2 text-xs"
               >
                 <Trash2 className="mr-1.5 h-3 w-3" />
-                Eliminar selección
+                {t("chatters.hist.deleteSelection")}
               </Button>
             </div>
           )}
@@ -274,13 +278,13 @@ const HistoryContent = () => {
             {sessionsQ.isLoading ? (
               <div className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Cargando…
+                {t("common.loading")}
               </div>
             ) : filtered.length === 0 ? (
               <div className="p-10 text-center text-sm text-muted-foreground">
                 {search.trim()
-                  ? "Ninguna sesión coincide con la búsqueda."
-                  : "Aún no hay sesiones cerradas."}
+                  ? t("chatters.hist.noMatch")
+                  : t("chatters.hist.noneClosed")}
               </div>
             ) : (
               <>
@@ -298,17 +302,17 @@ const HistoryContent = () => {
                             : false
                       }
                       onCheckedChange={toggleAllVisible}
-                      aria-label="Seleccionar todas"
+                      aria-label={t("chatters.hist.selectAll")}
                     />
                     <span>
                       {allVisibleSelected
-                        ? `Todas las ${filtered.length} visibles seleccionadas`
+                        ? t("chatters.hist.allVisibleSelected", { n: filtered.length })
                         : someVisibleSelected
-                          ? `${
-                              filtered.filter((s) => selectedIds.has(s.id))
-                                .length
-                            } de ${filtered.length} seleccionadas`
-                          : `Seleccionar las ${filtered.length} visibles`}
+                          ? t("chatters.hist.someSelected", {
+                              n: filtered.filter((s) => selectedIds.has(s.id)).length,
+                              total: filtered.length,
+                            })
+                          : t("chatters.hist.selectVisible", { n: filtered.length })}
                     </span>
                   </div>
                 )}
@@ -330,7 +334,7 @@ const HistoryContent = () => {
                           <Checkbox
                             checked={selected}
                             onCheckedChange={() => toggleOne(s.id)}
-                            aria-label="Seleccionar sesión"
+                            aria-label={t("chatters.hist.selectSession")}
                             className="shrink-0"
                           />
                         )}
@@ -361,15 +365,15 @@ const HistoryContent = () => {
                                 {s.chatter_name}
                               </span>
                               <Badge variant="outline" className="text-[10px]">
-                                cerrada
+                                {t("chatters.hist.closed")}
                               </Badge>
                             </div>
                             <div className="flex items-center gap-2 text-xs text-muted-foreground">
                               <span className="truncate">
-                                {profile?.name ?? "(sin perfil)"}
+                                {profile?.name ?? t("chatters.hist.noProfile")}
                               </span>
                               <span>·</span>
-                              <span>{fmtDate(s.created_at)}</span>
+                              <span>{fmtDate(s.created_at, f.intl("es-ES"))}</span>
                             </div>
                           </div>
                         </Link>
@@ -379,8 +383,8 @@ const HistoryContent = () => {
                           onClick={() => handleResend(s.id)}
                           disabled={resendingId === s.id}
                           className="h-8 w-8 text-muted-foreground hover:bg-primary/15 hover:text-primary"
-                          title="Reenviar email del reporte"
-                          aria-label="Reenviar email"
+                          title={t("chatters.hist.resendReportEmail")}
+                          aria-label={t("chatters.hist.resendEmail")}
                         >
                           {resendingId === s.id ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
@@ -394,8 +398,8 @@ const HistoryContent = () => {
                             size="icon"
                             onClick={() => setDeleteTarget(s)}
                             className="h-8 w-8 text-muted-foreground hover:bg-destructive/15 hover:text-destructive"
-                            title="Eliminar sesión"
-                            aria-label="Eliminar sesión"
+                            title={t("chatters.hist.deleteSession")}
+                            aria-label={t("chatters.hist.deleteSession")}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -416,11 +420,10 @@ const HistoryContent = () => {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Eliminar sesión</AlertDialogTitle>
+            <AlertDialogTitle>{t("chatters.hist.deleteSession")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Se borran permanentemente los mensajes y la evaluación de la
-              sesión de <strong>{deleteTarget?.chatter_name}</strong>. No se
-              puede deshacer.
+              {t("chatters.hist.deleteOnePre")}{" "}
+              <strong>{deleteTarget?.chatter_name}</strong>. {t("chatters.hist.cantUndo")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -436,7 +439,7 @@ const HistoryContent = () => {
               {deleteMut.isPending && (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               )}
-              Eliminar
+              {t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -449,13 +452,12 @@ const HistoryContent = () => {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Eliminar {selectedIds.size} sesión
-              {selectedIds.size > 1 ? "es" : ""}
+              {t(selectedIds.size > 1 ? "chatters.hist.deleteNMany" : "chatters.hist.deleteNOne", { n: selectedIds.size })}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Se borran permanentemente los mensajes y las evaluaciones de
-              las <strong>{selectedIds.size}</strong> sesiones seleccionadas.
-              No se puede deshacer.
+              {t("chatters.hist.deleteManyPre")}{" "}
+              <strong>{selectedIds.size}</strong> {t("chatters.hist.deleteManyPost")}{" "}
+              {t("chatters.hist.cantUndo")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -471,7 +473,7 @@ const HistoryContent = () => {
               {bulkDeleting && (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               )}
-              Eliminar {selectedIds.size}
+              {t("chatters.hist.deleteN", { n: selectedIds.size })}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

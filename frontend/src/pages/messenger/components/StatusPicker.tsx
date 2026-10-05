@@ -13,14 +13,30 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useOnlinePresence, UserStatus } from "@/hooks/useOnlinePresence";
 import { useUserRole } from "@/hooks/useUserRole";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
+import type { Traductor } from "../preview";
 
-const STATUS_CONFIG: Record<UserStatus, { label: string; color: string; icon: typeof Circle; soloAdmin?: boolean }> = {
-  available: { label: "Disponible", color: "text-success", icon: Circle },
-  busy: { label: "Ocupado", color: "text-destructive", icon: MinusCircle },
-  away: { label: "Ausente", color: "text-warning", icon: Clock },
+const STATUS_CONFIG: Record<UserStatus, { label: TranslationKey; color: string; icon: typeof Circle; soloAdmin?: boolean }> = {
+  available: { label: "messenger.status.disponible", color: "text-success", icon: Circle },
+  busy: { label: "messenger.status.ocupado", color: "text-destructive", icon: MinusCircle },
+  away: { label: "messenger.status.ausente", color: "text-warning", icon: Clock },
   // Aparecer como desconectado. Es de verdad: quien lo elige deja de contar en
   // "X en línea" (ver useOnlinePresence), no solo cambia de color.
-  offline: { label: "Desconectado", color: "text-muted-foreground", icon: CircleOff, soloAdmin: true },
+  offline: { label: "messenger.status.desconectado", color: "text-muted-foreground", icon: CircleOff, soloAdmin: true },
+};
+
+/** Cómo se lee cada color en voz alta (aria-label). La clave del color es DATO
+ *  (se guarda en la presencia); solo el nombre que se lee se traduce. */
+const NOMBRE_COLOR: Record<string, TranslationKey> = {
+  verde: "messenger.status.colorVerde",
+  amarillo: "messenger.status.colorAmarillo",
+  naranja: "messenger.status.colorNaranja",
+  rojo: "messenger.status.colorRojo",
+  rosa: "messenger.status.colorRosa",
+  morado: "messenger.status.colorMorado",
+  azul: "messenger.status.colorAzul",
+  turquesa: "messenger.status.colorTurquesa",
 };
 
 /** Paleta del estado personalizado. Sin nombres a propósito: el texto que
@@ -41,11 +57,11 @@ export const COLORES_ESTADO: Record<string, string> = {
 const MAX_LEN = 64;
 
 /** Opciones de caducidad del estado personalizado (como el "Clear status after" de Google). */
-const EXPIRY_OPTIONS: { key: string; label: string; resolve: () => string | null }[] = [
-  { key: "never", label: "No borrar", resolve: () => null },
-  { key: "1h", label: "En 1 hora", resolve: () => new Date(Date.now() + 3600_000).toISOString() },
-  { key: "today", label: "Hoy (fin del día)", resolve: () => { const d = new Date(); d.setHours(23, 59, 59, 999); return d.toISOString(); } },
-  { key: "week", label: "En una semana", resolve: () => new Date(Date.now() + 7 * 86400_000).toISOString() },
+const EXPIRY_OPTIONS: { key: string; label: TranslationKey; resolve: () => string | null }[] = [
+  { key: "never", label: "messenger.status.noBorrar", resolve: () => null },
+  { key: "1h", label: "messenger.status.en1Hora", resolve: () => new Date(Date.now() + 3600_000).toISOString() },
+  { key: "today", label: "messenger.status.hoyFinDelDia", resolve: () => { const d = new Date(); d.setHours(23, 59, 59, 999); return d.toISOString(); } },
+  { key: "week", label: "messenger.status.enUnaSemana", resolve: () => new Date(Date.now() + 7 * 86400_000).toISOString() },
 ];
 
 /** @param colorPersonal clave de COLORES_ESTADO elegida en el estado
@@ -65,14 +81,15 @@ export function getStatusColor(
   }
 }
 
-export function getStatusLabel(status: UserStatus | null, isOnline: boolean): string {
-  if (!isOnline) return "Desconectado";
-  return STATUS_CONFIG[status || "available"]?.label || "Disponible";
+export function getStatusLabel(status: UserStatus | null, isOnline: boolean, t: Traductor): string {
+  if (!isOnline) return t("messenger.status.desconectado");
+  return t(STATUS_CONFIG[status || "available"]?.label || "messenger.status.disponible");
 }
 
 export default function StatusPicker() {
   const { myStatus, setMyStatus, myStatusText, setMyStatusText, myStatusColor } = useOnlinePresence();
   const { isAdmin } = useUserRole();
+  const { t } = useLanguage();
   const config = STATUS_CONFIG[myStatus];
   const Icon = config.icon;
 
@@ -121,7 +138,7 @@ export default function StatusPicker() {
             )}
             {/* Con estado personalizado, el chip muestra ESE texto (como Google Chat)
                 y el puntito lleva la luz que se eligió junto al texto. */}
-            <span className="text-muted-foreground truncate">{myStatusText || config.label}</span>
+            <span className="text-muted-foreground truncate">{myStatusText || t(config.label)}</span>
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="min-w-[200px] rounded-2xl">
@@ -136,19 +153,19 @@ export default function StatusPicker() {
                 className={cn(myStatus === key && "bg-muted")}
               >
                 <ItemIcon className={cn("h-3.5 w-3.5 mr-2 fill-current", cfg.color)} />
-                {cfg.label}
+                {t(cfg.label)}
               </DropdownMenuItem>
             );
           })}
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={abrirDialogo}>
             <MessageSquareText className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
-            {myStatusText ? "Editar estado personalizado" : "Estado personalizado…"}
+            {myStatusText ? t("messenger.status.editarPersonalizado") : t("messenger.status.personalizado")}
           </DropdownMenuItem>
           {myStatusText && (
             <DropdownMenuItem onClick={quitar}>
               <X className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
-              Quitar estado
+              {t("messenger.status.quitar")}
             </DropdownMenuItem>
           )}
         </DropdownMenuContent>
@@ -157,7 +174,7 @@ export default function StatusPicker() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-[420px]">
           <DialogHeader>
-            <DialogTitle>Tu estado</DialogTitle>
+            <DialogTitle>{t("messenger.status.tuEstado")}</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4">
@@ -169,7 +186,7 @@ export default function StatusPicker() {
                   maxLength={MAX_LEN}
                   onChange={(e) => setDraft(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void guardar(); } }}
-                  placeholder="Ej: 10am-2pm / 4pm-8pm | MIA"
+                  placeholder={t("messenger.status.ejemplo")}
                   className="pr-14"
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] tabular-nums text-muted-foreground">
@@ -177,12 +194,12 @@ export default function StatusPicker() {
                 </span>
               </div>
               <p className="text-[11px] text-muted-foreground">
-                Lo ven los demás junto a tu nombre en el chat.
+                {t("messenger.status.loVenLosDemas")}
               </p>
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Color de tu estado</Label>
+              <Label className="text-xs text-muted-foreground">{t("messenger.status.colorDeTuEstado")}</Label>
               <div className="flex flex-wrap items-center gap-2">
                 {Object.entries(COLORES_ESTADO).map(([clave, clase]) => {
                   const activo = color === clave;
@@ -191,7 +208,7 @@ export default function StatusPicker() {
                       key={clave}
                       type="button"
                       onClick={() => setColor(clave)}
-                      aria-label={clave}
+                      aria-label={NOMBRE_COLOR[clave] ? t(NOMBRE_COLOR[clave]) : clave}
                       aria-pressed={activo}
                       className={cn(
                         "h-6 w-6 rounded-full transition-transform",
@@ -214,22 +231,21 @@ export default function StatusPicker() {
                       : "border-border text-muted-foreground hover:bg-muted",
                   )}
                 >
-                  Sin color
+                  {t("messenger.status.sinColor")}
                 </button>
               </div>
               <p className="text-[11px] text-muted-foreground">
-                Es el puntito que ven junto a tu foto. Sin color usa el de tu estado
-                ({STATUS_CONFIG[luz].label.toLowerCase()}).
+                {t("messenger.status.explicaColor", { estado: t(STATUS_CONFIG[luz].label).toLowerCase() })}
               </p>
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Borrar estado después de</Label>
+              <Label className="text-xs text-muted-foreground">{t("messenger.status.borrarDespues")}</Label>
               <Select value={expiry} onValueChange={setExpiry}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {EXPIRY_OPTIONS.map((o) => (
-                    <SelectItem key={o.key} value={o.key}>{o.label}</SelectItem>
+                    <SelectItem key={o.key} value={o.key}>{t(o.label)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -239,11 +255,11 @@ export default function StatusPicker() {
           <DialogFooter className="gap-2">
             {myStatusText && (
               <Button variant="ghost" onClick={quitar} disabled={saving} className="mr-auto">
-                Quitar estado
+                {t("messenger.status.quitar")}
               </Button>
             )}
-            <Button variant="ghost" onClick={() => setOpen(false)} disabled={saving}>Cancelar</Button>
-            <Button onClick={guardar} disabled={saving || !draft.trim()}>Guardar</Button>
+            <Button variant="ghost" onClick={() => setOpen(false)} disabled={saving}>{t("common.cancel")}</Button>
+            <Button onClick={guardar} disabled={saving || !draft.trim()}>{t("common.save")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

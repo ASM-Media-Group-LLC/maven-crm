@@ -18,6 +18,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { UserAvatar, type UserAvatarSize } from "@/components/UserAvatar";
 import { usePromoPeriodScores, type PromoPeriodScore } from "./usePromoPeriodScores";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 
 const NET_LABEL: Record<string, string> = { instagram: "IG", x: "X", telegram: "TG", facebook: "FB" };
 
@@ -28,26 +30,28 @@ function scoreColor(score: number): string {
 }
 
 function PartialBadge({ r }: { r: PromoPeriodScore }) {
+  const { t } = useLanguage();
   return (
-    <Badge variant="outline" className="h-4 px-1 text-[10px] text-warning border-warning/50" title={`Solo se leyó el ${r.coverage_pct ?? "?"}% de la ventana — score con poca evidencia, tomalo con pinzas`}>
-      parcial
+    <Badge variant="outline" className="h-4 px-1 text-[10px] text-warning border-warning/50" title={t("promolog.partialTitle", { pct: r.coverage_pct ?? "?" })}>
+      {t("promolog.partial")}
     </Badge>
   );
 }
 
 /** Desglose completo del score — mismo contenido en filas y podio (cero pérdida de datos). */
 function DetailLine({ r, center = false }: { r: PromoPeriodScore; center?: boolean }) {
+  const { t } = useLanguage();
   return (
     <div className={center ? "text-[10px] leading-snug text-muted-foreground text-center" : "text-[11px] text-muted-foreground truncate"}>
       {(r.target_networks || []).map((n) => NET_LABEL[n] ?? n).join("·") || "—"}
-      {" · "}frec {Math.round(r.freq_pts)} · calidad {Math.round(r.quality_pts)} · const {Math.round(r.consistency_pts)}
+      {" · "}{t("promolog.scoreBreakdown", { freq: Math.round(r.freq_pts), quality: Math.round(r.quality_pts), consistency: Math.round(r.consistency_pts) })}
       {r.lift_pct != null && (
-        <span className={r.lift_pct >= 0 ? "text-success" : "text-destructive"} title={`Ingreso del día siguiente a un día con promo vs sin promo, sobre ${r.lift_n_promo}v${r.lift_n_quiet} días liquidados`}>
-          {" "}· ${r.lift_pct >= 0 ? "+" : ""}{Math.round(r.lift_pct)}% con promo
+        <span className={r.lift_pct >= 0 ? "text-success" : "text-destructive"} title={t("promolog.liftTitle", { promo: r.lift_n_promo, quiet: r.lift_n_quiet })}>
+          {" "}· ${t("promolog.liftWithPromo", { pct: `${r.lift_pct >= 0 ? "+" : ""}${Math.round(r.lift_pct)}` })}
         </span>
       )}
       {(r.manual_share ?? 0) >= 50 && (
-        <span className="text-warning" title={`El ${Math.round(r.manual_share!)}% de sus promo-días viene SOLO de registros manuales (sin lectura del bot)`}> · ✍️ {Math.round(r.manual_share!)}% manual</span>
+        <span className="text-warning" title={t("promolog.manualTitle", { pct: Math.round(r.manual_share!) })}> · ✍️ {Math.round(r.manual_share!)}% manual</span>
       )}
     </div>
   );
@@ -55,16 +59,17 @@ function DetailLine({ r, center = false }: { r: PromoPeriodScore; center?: boole
 
 /** Delta vs la ventana de 7 días anterior. Solo se muestra si el dato previo existe. */
 function Delta({ now, prev }: { now: number; prev: number | undefined }) {
+  const { t } = useLanguage();
   if (prev == null) return null;
   const d = now - prev;
   if (d === 0) {
-    return <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground" title="Sin cambio vs los 7 días anteriores">=</span>;
+    return <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground" title={t("promolog.noChangeVsPrev7")}>=</span>;
   }
   const up = d > 0;
   return (
     <span
       className={`shrink-0 text-[10px] font-medium tabular-nums ${up ? "text-success" : "text-destructive"}`}
-      title={`${up ? "Subió" : "Bajó"} ${Math.abs(d)} pts vs los 7 días anteriores (${prev} → ${now})`}
+      title={t(up ? "promolog.upVsPrev7" : "promolog.downVsPrev7", { n: Math.abs(d), prev, now })}
     >
       {up ? "▲" : "▼"}{Math.abs(d)}
     </span>
@@ -73,13 +78,14 @@ function Delta({ now, prev }: { now: number; prev: number | undefined }) {
 
 // Estética del podio: tamaño descendente 1° > 2° > 3°, corona de oro para la 1ª
 // y medallas plata/bronce — tokens warning/muted/accent, sin animación.
-const PODIUM_STYLE: Array<{ size: UserAvatarSize; iconCls: string; label: string }> = [
-  { size: "xl", iconCls: "text-warning", label: "1°" },
-  { size: "lg", iconCls: "text-muted-foreground", label: "2°" },
-  { size: "md", iconCls: "text-accent", label: "3°" },
+const PODIUM_STYLE: Array<{ size: UserAvatarSize; iconCls: string; labelKey: TranslationKey }> = [
+  { size: "xl", iconCls: "text-warning", labelKey: "promolog.rank1" },
+  { size: "lg", iconCls: "text-muted-foreground", labelKey: "promolog.rank2" },
+  { size: "md", iconCls: "text-accent", labelKey: "promolog.rank3" },
 ];
 
 function PodiumSlot({ r, rank, photo, prev }: { r: PromoPeriodScore; rank: number; photo: string | null; prev: number | undefined }) {
+  const { t } = useLanguage();
   const st = PODIUM_STYLE[rank - 1];
   const MedalIcon = rank === 1 ? Crown : Medal;
   return (
@@ -87,7 +93,7 @@ function PodiumSlot({ r, rank, photo, prev }: { r: PromoPeriodScore; rank: numbe
       <MedalIcon className={`h-4 w-4 ${st.iconCls}`} aria-hidden />
       <UserAvatar name={r.name} src={photo} size={st.size} ring={rank === 1} />
       <div className="flex w-full min-w-0 items-center justify-center gap-1">
-        <span className={`shrink-0 text-[10px] font-semibold ${st.iconCls}`}>{st.label}</span>
+        <span className={`shrink-0 text-[10px] font-semibold ${st.iconCls}`}>{t(st.labelKey)}</span>
         <span className="truncate text-xs font-medium" title={r.name}>{r.name}</span>
       </div>
       {r.is_partial && <PartialBadge r={r} />}
@@ -124,6 +130,7 @@ interface Props {
 }
 
 export default function PromoScoreLeaderboard({ creators }: Props) {
+  const { t } = useLanguage();
   const { data: scores = [], isLoading } = usePromoPeriodScores(7);
   // Ventana ANTERIOR (los 7 días previos) para los deltas ▲/▼ del podio y filas.
   const { data: prevScores = [] } = usePromoPeriodScores(7, 7);
@@ -157,19 +164,19 @@ export default function PromoScoreLeaderboard({ creators }: Props) {
       <CardContent className="pt-4 px-4 pb-3">
         <div className="flex items-center justify-between mb-2">
           <div>
-            <h3 className="text-sm font-semibold">Score de promo — últimos 7 días</h3>
+            <h3 className="text-sm font-semibold">{t("promolog.scoreTitle")}</h3>
             <p className="text-[11px] text-muted-foreground">
-              0-100 sobre días leídos · frecuencia 40 · calidad 40 (= promedio de las barritas del día: mejor promo × creatividad IA + 2ª red + volumen) · constancia 20
+              {t("promolog.scoreDesc")}
             </p>
           </div>
-          <span title="El score mide el cumplimiento del plan de promo de CADA creadora (sus redes objetivo). Los días que el scan no pudo leer NO castigan. '$ con promo' compara el ingreso del día siguiente a un día con promo vs sin promo (BLU liquidado) — es señal aparte, no entra al score. ▲/▼ compara contra los 7 días anteriores.">
+          <span title={t("promolog.scoreInfo")}>
             <Info className="h-4 w-4 text-muted-foreground" />
           </span>
         </div>
         {isLoading ? (
-          <p className="text-xs text-muted-foreground py-4 text-center">Calculando…</p>
+          <p className="text-xs text-muted-foreground py-4 text-center">{t("promolog.calculating")}</p>
         ) : !ordered.length ? (
-          <p className="text-xs text-muted-foreground py-4 text-center">Sin lecturas en la ventana.</p>
+          <p className="text-xs text-muted-foreground py-4 text-center">{t("promolog.noReadsInWindow")}</p>
         ) : (
           <>
             {podium.length > 0 && (
@@ -200,11 +207,11 @@ export default function PromoScoreLeaderboard({ creators }: Props) {
                 className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
                 onClick={() => setExpanded((e) => !e)}
               >
-                {expanded ? <><ChevronUp className="h-3 w-3" /> Ver menos</> : <><ChevronDown className="h-3 w-3" /> Ver las {ordered.length}</>}
+                {expanded ? <><ChevronUp className="h-3 w-3" /> {t("promolog.showLess")}</> : <><ChevronDown className="h-3 w-3" /> {t("promolog.showAllN", { count: ordered.length })}</>}
               </button>
               {sinLectura > 0 && (
-                <span className="text-[11px] text-muted-foreground" title="Sin ninguna lectura del scan en la ventana — no puntúan (no se convierte 'no poder leer' en mal score)">
-                  {sinLectura} sin lectura (no puntúan)
+                <span className="text-[11px] text-muted-foreground" title={t("promolog.noReadTitle")}>
+                  {t("promolog.noReadCount", { count: sinLectura })}
                 </span>
               )}
             </div>

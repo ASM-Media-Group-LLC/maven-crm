@@ -82,6 +82,9 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { useCurrentTenantId } from "@/hooks/useAgencyQa";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/EmptyState";
+import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
+import { traducir, type TranslationKey } from "@/lib/i18n";
 
 // ─── Asistente conversacional via edge fn `scouter-company-fill` ─────
 // Reemplaza el one-shot Groq llama-3.1-8b que daba siempre la misma
@@ -91,8 +94,24 @@ import { EmptyState } from "@/components/EmptyState";
 
 interface AssistantTurn {
   role: "user" | "assistant";
+  // Lo que LEE LA IA. Se manda tal cual al edge fn, en el idioma en que se
+  // escribió (el prompt de "Llena igual" es español a propósito).
   content: string;
+  // Cómo se DIBUJA, cuando no es el `content` tal cual. Nunca viaja a la IA
+  // (callFillAssistant manda solo role + content):
+  //  - "llenaIgual": el prompt de "Llena igual"; se muestra traducido.
+  //  - "listo": el cierre del asistente; `content` es su resumen (o vacío).
+  //  - "error": el aviso de que la llamada falló. Es solo de pantalla (está en
+  //    el idioma de la interfaz y la IA nunca lo dijo), así que este turno
+  //    entero se queda fuera de lo que se le manda a la IA.
+  vista?: "llenaIgual" | "listo" | "error";
 }
+
+// El pedido de "Llena igual". Es un PROMPT (lo lee Gemini junto con el
+// SYSTEM_PROMPT en español del edge fn), así que no se traduce; en pantalla se
+// muestra `scouter.ai.bestEffortShown`.
+const PROMPT_LLENA_IGUAL =
+  "Llena la config con la mejor inferencia que tengas con la info actual; no preguntes más. Si dudas, deja las dudas en scoring_notes.";
 
 interface AssistantResponse {
   ready: boolean;
@@ -115,7 +134,9 @@ async function callFillAssistant(args: {
         name: args.name,
         description: args.description,
         current_config: args.current_config,
-        messages: args.messages,
+        messages: args.messages
+          .filter((m) => m.vista !== "error")
+          .map(({ role, content }) => ({ role, content })),
       },
     },
   );
@@ -125,9 +146,9 @@ async function callFillAssistant(args: {
           .text()
           .catch(() => null)
       : null;
-    throw new Error(detail || error.message || "Error invocando asistente");
+    throw new Error(detail || error.message || traducir("scouter.ai.invokeError"));
   }
-  if (!data) throw new Error("Respuesta vacía del asistente");
+  if (!data) throw new Error(traducir("scouter.ai.emptyResponse"));
   return data;
 }
 
@@ -213,7 +234,7 @@ const autoCropTransparent = async (file: File): Promise<File> => {
     const img = await new Promise<HTMLImageElement>((resolve, reject) => {
       const el = new Image();
       el.onload = () => resolve(el);
-      el.onerror = () => reject(new Error("No se pudo decodificar la imagen."));
+      el.onerror = () => reject(new Error(traducir("scouter.logo.decodeError")));
       el.src = objectUrl;
     });
     const w = img.naturalWidth;
@@ -283,6 +304,7 @@ const CompanyLogoUploader = ({
   label: string;
   variant?: "dark" | "light";
 }) => {
+  const { t } = useLanguage();
   const [uploading, setUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const MAX_BYTES = 500_000;
@@ -290,12 +312,12 @@ const CompanyLogoUploader = ({
 
   const handleFile = async (file: File) => {
     if (!file.type.startsWith("image/")) {
-      toast.error("Solo se permiten imágenes PNG, SVG o WebP.");
+      toast.error(t("scouter.logo.onlyImages"));
       return;
     }
     if (file.size > MAX_BYTES) {
-      toast.error("Archivo demasiado pesado", {
-        description: `Máximo 500KB — el tuyo pesa ${Math.round(file.size / 1024)}KB.`,
+      toast.error(t("scouter.logo.tooHeavy"), {
+        description: t("scouter.logo.tooHeavyHint", { kb: Math.round(file.size / 1024) }),
       });
       return;
     }
@@ -308,8 +330,8 @@ const CompanyLogoUploader = ({
         img.src = URL.createObjectURL(file);
       });
       if (!ok) {
-        toast.error("Imagen muy chica", {
-          description: `Mínimo ${MIN_DIM}×${MIN_DIM} px (PNG transparente recomendado).`,
+        toast.error(t("scouter.logo.tooSmall"), {
+          description: t("scouter.logo.tooSmallHint", { min: MIN_DIM }),
         });
         return;
       }
@@ -338,10 +360,10 @@ const CompanyLogoUploader = ({
       const { data: pub } = supabase.storage.from("company-logos").getPublicUrl(path);
       onChange(pub.publicUrl);
       toast.success(
-        wasCropped ? "Logo subido (auto-recortado el padding)" : "Logo subido",
+        wasCropped ? t("scouter.logo.uploadedCropped") : t("scouter.logo.uploaded"),
       );
     } catch (e) {
-      toast.error("No se pudo subir el logo", { description: (e as Error).message });
+      toast.error(t("scouter.logo.uploadError"), { description: (e as Error).message });
     } finally {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = "";
@@ -365,7 +387,7 @@ const CompanyLogoUploader = ({
         <div className="min-w-0 flex-1 space-y-1">
           <p className="text-xs font-medium">{label}</p>
           <p className="text-[11px] text-muted-foreground">
-            PNG transparente · mín {MIN_DIM}×{MIN_DIM}px · máx 500KB · auto-crop al subir
+            {t("scouter.logo.specs", { min: MIN_DIM })}
           </p>
           <div className="flex gap-2 pt-1">
             <Button
@@ -375,7 +397,7 @@ const CompanyLogoUploader = ({
               disabled={uploading}
               onClick={() => inputRef.current?.click()}
             >
-              {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : value ? "Cambiar" : "Subir logo"}
+              {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : value ? t("scouter.logo.change") : t("scouter.logo.upload")}
             </Button>
             {value && (
               <Button
@@ -385,7 +407,7 @@ const CompanyLogoUploader = ({
                 onClick={() => onChange(null)}
                 className="text-destructive"
               >
-                Quitar
+                {t("scouter.logo.remove")}
               </Button>
             )}
           </div>
@@ -408,7 +430,7 @@ const CompanyLogoUploader = ({
       {value && (
         <div className="space-y-1 pt-1 border-t border-border/40">
           <p className="text-xs text-muted-foreground">
-            Preview en el header
+            {t("scouter.logo.headerPreview")}
           </p>
           <div className={`rounded-md px-4 py-3 ${previewBg}`}>
             <img src={value} alt="Preview" className="h-12 w-auto object-contain" />
@@ -429,6 +451,7 @@ const CountriesPicker = ({
   value: string[];
   onChange: (next: string[]) => void;
 }) => {
+  const { t } = useLanguage();
   const [open, setOpen] = useState(false);
   const toggle = (country: string) => {
     onChange(
@@ -441,11 +464,10 @@ const CountriesPicker = ({
     <div>
       <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
         <MapPin className="inline h-3 w-3 mr-1" />
-        Países objetivo (opcional)
+        {t("scouter.company.targetCountries")}
       </label>
       <p className="text-[10px] text-muted-foreground mb-2">
-        Dejar vacío = sin restricción. Elige uno o varios países si la
-        compañía solo busca creadores de un país específico.
+        {t("scouter.company.targetCountriesHint")}
       </p>
 
       <Popover open={open} onOpenChange={setOpen}>
@@ -459,18 +481,20 @@ const CountriesPicker = ({
           >
             <span className="text-muted-foreground">
               {value.length === 0
-                ? "Buscar y agregar país…"
-                : `${value.length} país${value.length === 1 ? "" : "es"} seleccionado${value.length === 1 ? "" : "s"}`}
+                ? t("scouter.company.addCountry")
+                : t(value.length === 1 ? "scouter.company.countriesOne" : "scouter.company.countriesOther", {
+                    count: value.length,
+                  })}
             </span>
             <ChevronsUpDown className="h-3.5 w-3.5 opacity-60" />
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
           <Command>
-            <CommandInput placeholder="Filtra país…" className="h-9 text-xs" />
+            <CommandInput placeholder={t("scouter.company.filterCountry")} className="h-9 text-xs" />
             <CommandList>
               <CommandEmpty className="text-xs py-3 text-center text-muted-foreground">
-                No se encontró ningún país.
+                {t("scouter.company.noCountryFound")}
               </CommandEmpty>
               <CommandGroup>
                 {COUNTRIES_ALPHA.map((country) => {
@@ -512,7 +536,7 @@ const CountriesPicker = ({
                 type="button"
                 onClick={() => toggle(country)}
                 className="ml-0.5 text-emerald-300/70 hover:text-emerald-200"
-                aria-label={`Quitar ${country}`}
+                aria-label={t("scouter.company.removeCountry", { country })}
               >
                 <X className="h-3 w-3" />
               </button>
@@ -535,20 +559,21 @@ const GenderPicker = ({
   value: "male" | "female" | "any";
   onChange: (next: "male" | "female" | "any") => void;
 }) => {
-  const options: Array<{ key: "any" | "female" | "male"; label: string; emoji: string }> = [
-    { key: "any", label: "Ambos", emoji: "👥" },
-    { key: "female", label: "Mujeres", emoji: "👩" },
-    { key: "male", label: "Hombres", emoji: "👨" },
+  const { t } = useLanguage();
+  // `key` es lo que se guarda en search_config.target_gender: no se traduce.
+  const options: Array<{ key: "any" | "female" | "male"; labelKey: TranslationKey; emoji: string }> = [
+    { key: "any", labelKey: "scouter.company.genderBoth", emoji: "👥" },
+    { key: "female", labelKey: "scouter.company.genderFemale", emoji: "👩" },
+    { key: "male", labelKey: "scouter.company.genderMale", emoji: "👨" },
   ];
   return (
     <div>
       <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
         <Users className="inline h-3 w-3 mr-1" />
-        Sexo del creador (opcional)
+        {t("scouter.company.gender")}
       </label>
       <p className="text-[10px] text-muted-foreground mb-2">
-        Filtra en discovery por sexo detectado en bio/nombre/emojis. Si no
-        se puede detectar, el lead pasa igual — el scorer IA refina después.
+        {t("scouter.company.genderHint")}
       </p>
       <div className="flex flex-wrap gap-1.5">
         {options.map((opt) => {
@@ -565,7 +590,7 @@ const GenderPicker = ({
               }`}
             >
               <span>{opt.emoji}</span>
-              {opt.label}
+              {t(opt.labelKey)}
             </button>
           );
         })}
@@ -585,6 +610,8 @@ const CompanyFormModal = ({
   initial?: CompanyFormState;
   companyId?: string; // if editing
 }) => {
+  const { t } = useLanguage();
+  const formato = useFormato();
   const [form, setForm] = useState<CompanyFormState>(initial ?? emptyForm);
   const [aiLoading, setAiLoading] = useState(false);
   const [newTag, setNewTag] = useState("");
@@ -619,17 +646,13 @@ const CompanyFormModal = ({
             ai_generated_at: new Date().toISOString(),
           } as CompanySearchConfig,
         }));
-        setAiSummary(resp.summary || "Configuración generada.");
+        // aiSummary solo marca que el asistente terminó (esconde la respuesta).
+        setAiSummary(resp.summary || t("scouter.ai.configGenerated"));
         setChatMessages((m) => [
           ...m,
-          {
-            role: "assistant",
-            content: resp.summary
-              ? `✓ Listo. ${resp.summary}`
-              : "✓ Configuración generada.",
-          },
+          { role: "assistant", content: resp.summary ?? "", vista: "listo" },
         ]);
-        toast.success("Configuración generada por IA");
+        toast.success(t("scouter.ai.generatedByAi"));
       } else if (resp.question) {
         setChatMessages((m) => [
           ...m,
@@ -637,12 +660,12 @@ const CompanyFormModal = ({
         ]);
       }
     },
-    [],
+    [t],
   );
 
   const startAiChat = useCallback(async () => {
     if (!form.description.trim() && !form.name.trim()) {
-      toast.error("Escribe al menos el nombre o descripción de la compañía");
+      toast.error(t("scouter.ai.needNameOrDescription"));
       return;
     }
     setChatOpen(true);
@@ -658,14 +681,14 @@ const CompanyFormModal = ({
       });
       processAssistantResponse(resp);
     } catch (e) {
-      const msg = (e as Error).message || "Error invocando asistente";
+      const msg = (e as Error).message || t("scouter.ai.invokeError");
       console.error("AI assistant failed:", e);
       toast.error(msg);
-      setChatMessages([{ role: "assistant", content: `Error: ${msg}` }]);
+      setChatMessages([{ role: "assistant", content: `Error: ${msg}`, vista: "error" }]);
     } finally {
       setAiLoading(false);
     }
-  }, [form.name, form.description, form.search_config, processAssistantResponse]);
+  }, [form.name, form.description, form.search_config, processAssistantResponse, t]);
 
   const sendChatReply = useCallback(async () => {
     const reply = chatInput.trim();
@@ -686,23 +709,20 @@ const CompanyFormModal = ({
       });
       processAssistantResponse(resp);
     } catch (e) {
-      const msg = (e as Error).message || "Error invocando asistente";
+      const msg = (e as Error).message || t("scouter.ai.invokeError");
       console.error("AI assistant failed:", e);
       toast.error(msg);
-      setChatMessages((m) => [...m, { role: "assistant", content: `Error: ${msg}` }]);
+      setChatMessages((m) => [...m, { role: "assistant", content: `Error: ${msg}`, vista: "error" }]);
     } finally {
       setAiLoading(false);
     }
-  }, [chatInput, chatMessages, aiLoading, form.name, form.description, form.search_config, processAssistantResponse]);
+  }, [chatInput, chatMessages, aiLoading, form.name, form.description, form.search_config, processAssistantResponse, t]);
 
   const finalizeWithBestEffort = useCallback(async () => {
     if (aiLoading) return;
     const next: AssistantTurn[] = [
       ...chatMessages,
-      {
-        role: "user",
-        content: "Llena la config con la mejor inferencia que tengas con la info actual; no preguntes más. Si dudas, deja las dudas en scoring_notes.",
-      },
+      { role: "user", content: PROMPT_LLENA_IGUAL, vista: "llenaIgual" },
     ];
     setChatMessages(next);
     setAiLoading(true);
@@ -715,13 +735,13 @@ const CompanyFormModal = ({
       });
       processAssistantResponse(resp);
     } catch (e) {
-      const msg = (e as Error).message || "Error invocando asistente";
+      const msg = (e as Error).message || t("scouter.ai.invokeError");
       toast.error(msg);
-      setChatMessages((m) => [...m, { role: "assistant", content: `Error: ${msg}` }]);
+      setChatMessages((m) => [...m, { role: "assistant", content: `Error: ${msg}`, vista: "error" }]);
     } finally {
       setAiLoading(false);
     }
-  }, [aiLoading, chatMessages, form.name, form.description, form.search_config, processAssistantResponse]);
+  }, [aiLoading, chatMessages, form.name, form.description, form.search_config, processAssistantResponse, t]);
 
   const handleAiEnhance = startAiChat; // backward-compat para el botón existente
 
@@ -765,20 +785,32 @@ const CompanyFormModal = ({
     updateConfig({ [key]: list.filter((_, i) => i !== idx) });
   };
 
+  // `value` es lo que se guarda en search_config.content_type.
   const CONTENT_TYPES = [
-    { value: "adult", label: "Adulto" },
+    { value: "adult", label: t("scouter.niche.adult") },
     { value: "fitness", label: "Fitness" },
     { value: "lifestyle", label: "Lifestyle" },
-    { value: "mixed", label: "Mixto" },
+    { value: "mixed", label: t("scouter.niche.mixed") },
   ] as const;
+  const mejorarConIa = t("scouter.company.improveWithAi");
+
+  // Cómo se dibuja cada turno del chat (ver AssistantTurn.vista).
+  const textoDelTurno = (m: AssistantTurn): string =>
+    m.vista === "llenaIgual"
+      ? t("scouter.ai.bestEffortShown")
+      : m.vista === "listo"
+        ? m.content
+          ? `✓ ${t("scouter.ai.ready")} ${m.content}`
+          : `✓ ${t("scouter.ai.configGenerated")}`
+        : m.content;
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{isEditing ? "Editar compañía" : "Nueva compañía"}</DialogTitle>
+          <DialogTitle>{isEditing ? t("scouter.company.edit") : t("scouter.company.new")}</DialogTitle>
           <DialogDescription>
-            Describe tu compañía y usa "Mejorar con IA" para generar la configuración de búsqueda automáticamente.
+            {t("scouter.company.formDescription", { button: mejorarConIa })}
           </DialogDescription>
         </DialogHeader>
 
@@ -788,14 +820,14 @@ const CompanyFormModal = ({
           <div className="grid gap-3 sm:grid-cols-2">
             <CompanyLogoUploader
               variant="dark"
-              label="Logo para Dark Mode"
+              label={t("scouter.logo.forDark")}
               value={form.logo_dark_url}
               onChange={(url) => setForm((f) => ({ ...f, logo_dark_url: url }))}
               companyName={form.name}
             />
             <CompanyLogoUploader
               variant="light"
-              label="Logo para Light Mode"
+              label={t("scouter.logo.forLight")}
               value={form.logo_light_url}
               onChange={(url) => setForm((f) => ({ ...f, logo_light_url: url }))}
               companyName={form.name}
@@ -805,11 +837,11 @@ const CompanyFormModal = ({
           {/* Basic info */}
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <label className="text-xs font-medium text-muted-foreground">Nombre *</label>
+              <label className="text-xs font-medium text-muted-foreground">{t("scouter.company.nameRequired")}</label>
               <Input
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="Ej: ASM Tech"
+                placeholder={t("scouter.company.namePlaceholder")}
               />
             </div>
             <div>
@@ -817,7 +849,7 @@ const CompanyFormModal = ({
               <Input
                 value={form.slug}
                 onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
-                placeholder="asm_tech (auto si vacío)"
+                placeholder={t("scouter.company.slugPlaceholder")}
               />
             </div>
           </div>
@@ -826,7 +858,7 @@ const CompanyFormModal = ({
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="text-xs font-medium text-muted-foreground">
-                Descripción (qué busca esta compañía)
+                {t("scouter.company.descriptionLabel")}
               </label>
               <Button
                 size="sm"
@@ -840,13 +872,13 @@ const CompanyFormModal = ({
                 ) : (
                   <Sparkles className="h-3.5 w-3.5" />
                 )}
-                Mejorar con IA
+                {mejorarConIa}
               </Button>
             </div>
             <Textarea
               value={form.description}
               onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-              placeholder="Ej: Agencia de management de modelos de contenido para adultos. Buscamos creadoras emergentes de perfil bajo (10k-100k seguidores) en LATAM que ya tengan OnlyFans o similar..."
+              placeholder={t("scouter.company.descriptionPlaceholder")}
               className="min-h-[80px]"
             />
           </div>
@@ -858,7 +890,7 @@ const CompanyFormModal = ({
                 <div className="flex items-center gap-1.5">
                   <Sparkles className="h-3.5 w-3.5 text-amber-400" />
                   <span className="text-xs font-semibold text-amber-400">
-                    Asistente IA · Gemini 2.5 Flash
+                    {t("scouter.ai.assistant")}
                   </span>
                 </div>
                 <Button
@@ -868,7 +900,7 @@ const CompanyFormModal = ({
                   onClick={() => setChatOpen(false)}
                   disabled={aiLoading}
                 >
-                  Cerrar
+                  {t("common.close")}
                 </Button>
               </div>
 
@@ -883,15 +915,15 @@ const CompanyFormModal = ({
                     }`}
                   >
                     <span className="font-medium opacity-70 text-xs mr-2">
-                      {m.role === "assistant" ? "IA" : "Tú"}
+                      {m.role === "assistant" ? t("scouter.ai.speakerAi") : t("scouter.ai.speakerYou")}
                     </span>
-                    {m.content}
+                    {textoDelTurno(m)}
                   </div>
                 ))}
                 {aiLoading && (
                   <div className="text-xs px-3 py-2 rounded-md bg-card border border-border opacity-60">
                     <Loader2 className="h-3 w-3 animate-spin inline mr-2" />
-                    Pensando…
+                    {t("scouter.ai.thinking")}
                   </div>
                 )}
               </div>
@@ -907,7 +939,7 @@ const CompanyFormModal = ({
                         sendChatReply();
                       }
                     }}
-                    placeholder="Responde la pregunta…"
+                    placeholder={t("scouter.ai.replyPlaceholder")}
                     className="min-h-[40px] max-h-[120px] text-xs"
                     disabled={aiLoading}
                   />
@@ -918,7 +950,7 @@ const CompanyFormModal = ({
                       disabled={aiLoading || !chatInput.trim()}
                       className="h-7 text-xs"
                     >
-                      Enviar
+                      {t("common.send")}
                     </Button>
                     <Button
                       size="sm"
@@ -926,9 +958,9 @@ const CompanyFormModal = ({
                       onClick={finalizeWithBestEffort}
                       disabled={aiLoading || chatMessages.length === 0}
                       className="h-7 text-[11px]"
-                      title="Llenar con la mejor inferencia disponible"
+                      title={t("scouter.ai.bestEffortTitle")}
                     >
-                      Llena igual
+                      {t("scouter.ai.bestEffort")}
                     </Button>
                   </div>
                 </div>
@@ -942,10 +974,10 @@ const CompanyFormModal = ({
               <div className="flex items-center gap-1.5 px-3 py-1.5">
                 <Sparkles className="h-3.5 w-3.5 text-amber-400" />
                 <span className="text-[11px] font-semibold text-amber-400">
-                  Configuración generada por IA
+                  {t("scouter.ai.generatedByAi")}
                 </span>
                 <span className="text-[10px] text-muted-foreground ml-auto">
-                  {new Date(cfg.ai_generated_at).toLocaleString("es-CO")}
+                  {new Date(cfg.ai_generated_at).toLocaleString(formato.intl("es-CO"))}
                 </span>
               </div>
             </div>
@@ -956,7 +988,7 @@ const CompanyFormModal = ({
             <div>
               <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
                 <Target className="inline h-3 w-3 mr-1" />
-                Tipo de contenido
+                {t("scouter.company.contentType")}
               </label>
               <div className="flex flex-wrap gap-1.5">
                 {CONTENT_TYPES.map((ct) => (
@@ -978,16 +1010,16 @@ const CompanyFormModal = ({
             <div>
               <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
                 <Users className="inline h-3 w-3 mr-1" />
-                Tier / perfil objetivo (libre)
+                {t("scouter.company.tier")}
               </label>
               <Input
                 value={cfg.profile_tier ?? ""}
                 onChange={(e) => updateConfig({ profile_tier: e.target.value || null })}
-                placeholder="Ej: creators que reciben pagos en EUR, modelos emergentes LATAM, fitness premium, etc."
+                placeholder={t("scouter.company.tierPlaceholder")}
                 className="text-sm"
               />
               <p className="text-[10px] text-muted-foreground mt-1">
-                Describe en tus palabras qué perfil de creator buscas. Deja vacío si la compañía no segmenta por tipo.
+                {t("scouter.company.tierHint")}
               </p>
             </div>
           </div>
@@ -995,7 +1027,7 @@ const CompanyFormModal = ({
           {/* Followers range */}
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <label className="text-xs font-medium text-muted-foreground">Followers mín.</label>
+              <label className="text-xs font-medium text-muted-foreground">{t("scouter.company.followersMin")}</label>
               <Input
                 type="number"
                 value={cfg.followers_min ?? ""}
@@ -1004,7 +1036,7 @@ const CompanyFormModal = ({
               />
             </div>
             <div>
-              <label className="text-xs font-medium text-muted-foreground">Followers máx.</label>
+              <label className="text-xs font-medium text-muted-foreground">{t("scouter.company.followersMax")}</label>
               <Input
                 type="number"
                 value={cfg.followers_max ?? ""}
@@ -1018,7 +1050,7 @@ const CompanyFormModal = ({
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
               <Hash className="inline h-3 w-3 mr-1" />
-              Hashtags de búsqueda
+              {t("scouter.company.hashtags")}
             </label>
             <TagList
               tags={cfg.hashtags ?? []}
@@ -1036,7 +1068,7 @@ const CompanyFormModal = ({
                     setNewTag("");
                   }
                 }}
-                placeholder="Agregar hashtag…"
+                placeholder={t("scouter.company.addHashtag")}
                 className="text-xs"
               />
               <Button
@@ -1056,7 +1088,7 @@ const CompanyFormModal = ({
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
               <Users className="inline h-3 w-3 mr-1" />
-              Cuentas semilla
+              {t("scouter.company.seedAccounts")}
             </label>
             <TagList
               tags={cfg.seed_accounts ?? []}
@@ -1074,7 +1106,7 @@ const CompanyFormModal = ({
                     setNewSeed("");
                   }
                 }}
-                placeholder="@handle de referencia…"
+                placeholder={t("scouter.company.seedPlaceholder")}
                 className="text-xs"
               />
               <Button
@@ -1094,7 +1126,7 @@ const CompanyFormModal = ({
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
               <MapPin className="inline h-3 w-3 mr-1" />
-              Regiones objetivo
+              {t("scouter.company.regions")}
             </label>
             <div className="flex flex-wrap gap-1.5">
               {["LATAM", "US", "Europe", "Asia", "Global"].map((geo) => (
@@ -1136,12 +1168,12 @@ const CompanyFormModal = ({
           {/* Scoring notes */}
           <div>
             <label className="text-xs font-medium text-muted-foreground">
-              Notas para el scorer IA
+              {t("scouter.company.scoringNotes")}
             </label>
             <Textarea
               value={cfg.scoring_notes ?? ""}
               onChange={(e) => updateConfig({ scoring_notes: e.target.value })}
-              placeholder="Instrucciones adicionales para la IA al evaluar leads para esta compañía…"
+              placeholder={t("scouter.company.scoringNotesPlaceholder")}
               className="min-h-[60px] text-xs"
             />
           </div>
@@ -1154,13 +1186,13 @@ const CompanyFormModal = ({
               onChange={(e) => setForm((f) => ({ ...f, active: e.target.checked }))}
               className="rounded"
             />
-            <span className="text-sm">Compañía activa</span>
+            <span className="text-sm">{t("scouter.company.active")}</span>
           </label>
         </div>
 
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>
-            Cancelar
+            {t("common.cancel")}
           </Button>
           <Button onClick={handleSave} disabled={saving || !form.name.trim()}>
             {saving ? (
@@ -1168,7 +1200,7 @@ const CompanyFormModal = ({
             ) : (
               <Save className="h-4 w-4 mr-1.5" />
             )}
-            {isEditing ? "Guardar" : "Crear"}
+            {isEditing ? t("common.save") : t("common.create")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -1186,6 +1218,7 @@ const CompanyCard = ({
    *  controla el permiso "Editar Compañías" del rol del usuario. */
   onEdit?: () => void;
 }) => {
+  const { t } = useLanguage();
   const cfg = company.search_config ?? {};
   const hashtags = cfg.hashtags ?? [];
   const seeds = cfg.seed_accounts ?? [];
@@ -1201,7 +1234,7 @@ const CompanyCard = ({
             <CardTitle className="text-base">{company.name}</CardTitle>
             {!company.active && (
               <Badge variant="secondary" className="text-[10px]">
-                Inactiva
+                {t("scouter.inactiveF")}
               </Badge>
             )}
           </div>
@@ -1213,7 +1246,7 @@ const CompanyCard = ({
               className="opacity-60 group-hover:opacity-100 gap-1 text-xs"
             >
               <Pencil className="h-3 w-3" />
-              Editar
+              {t("common.edit")}
             </Button>
           )}
         </div>
@@ -1279,7 +1312,7 @@ const CompanyCard = ({
           <div className="flex items-center gap-1.5 rounded-md border border-dashed border-amber-400/30 bg-amber-400/5 px-3 py-2">
             <Sparkles className="h-3.5 w-3.5 text-amber-400" />
             <span className="text-[11px] text-amber-400">
-              Sin configuración IA — edita y usa "Mejorar con IA"
+              {t("scouter.company.noAiConfig", { button: t("scouter.company.improveWithAi") })}
             </span>
           </div>
         )}
@@ -1299,6 +1332,7 @@ const NICHE_COLORS: Record<string, string> = {
 
 // ─── Spammer Account row ─────────────────────────────────────────────
 const SpammerAccountRow = ({ account }: { account: SpammerAccount }) => {
+  const { t } = useLanguage();
   const [editing, setEditing] = useState(false);
   const [displayName, setDisplayName] = useState(account.display_name);
   const [niche, setNiche] = useState<AccountNiche>(account.account_niche as AccountNiche);
@@ -1389,7 +1423,7 @@ const SpammerAccountRow = ({ account }: { account: SpammerAccount }) => {
             </Badge>
             {!account.active && (
               <Badge variant="secondary" className="text-[10px]">
-                Inactiva
+                {t("scouter.inactiveF")}
               </Badge>
             )}
           </div>
@@ -1404,7 +1438,7 @@ const SpammerAccountRow = ({ account }: { account: SpammerAccount }) => {
             variant="ghost"
             className="h-7 px-2 text-xs opacity-60 hover:opacity-100"
             onClick={() => setEditing(true)}
-            title="Editar"
+            title={t("common.edit")}
           >
             <Pencil className="h-3 w-3" />
           </Button>
@@ -1413,7 +1447,7 @@ const SpammerAccountRow = ({ account }: { account: SpammerAccount }) => {
             onClick={handleToggleActive}
             disabled={updateAccount.isPending}
             className="text-muted-foreground hover:text-foreground transition-colors"
-            title={account.active ? "Desactivar" : "Activar"}
+            title={account.active ? t("scouter.accounts.deactivate") : t("scouter.accounts.activate")}
           >
             {account.active ? (
               <ToggleRight className="h-5 w-5 text-success" />
@@ -1426,7 +1460,7 @@ const SpammerAccountRow = ({ account }: { account: SpammerAccount }) => {
             variant="ghost"
             className="h-7 px-2 text-xs opacity-60 hover:opacity-100 hover:text-destructive"
             onClick={() => setConfirmDelete(true)}
-            title="Eliminar"
+            title={t("common.delete")}
           >
             <Trash2 className="h-3 w-3" />
           </Button>
@@ -1436,10 +1470,9 @@ const SpammerAccountRow = ({ account }: { account: SpammerAccount }) => {
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Eliminar cuenta @{account.instagram_handle}?</AlertDialogTitle>
+            <AlertDialogTitle>{t("scouter.accounts.deleteTitle", { handle: account.instagram_handle })}</AlertDialogTitle>
             <AlertDialogDescription>
-              Se borra la cuenta y todo su histórico (scan IA, asignaciones,
-              tareas asociadas). Esta acción no se puede deshacer.
+              {t("scouter.accounts.deleteBody")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1451,7 +1484,7 @@ const SpammerAccountRow = ({ account }: { account: SpammerAccount }) => {
               {deleteAccount.isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                "Eliminar"
+                t("common.delete")
               )}
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -1467,6 +1500,7 @@ const MAX_SPAMMER_ACCOUNTS = 4;
 const IG_HANDLE_REGEX = /^[a-zA-Z0-9_.]{1,30}$/;
 
 const SpammerAccountsSection = () => {
+  const { t } = useLanguage();
   const accountsQ = useSpammerAccounts();
   const accounts = accountsQ.data ?? [];
   const { isAdmin, isManager } = useUserRole();
@@ -1494,7 +1528,7 @@ const SpammerAccountsSection = () => {
   })();
   const handleError =
     cleanedHandle.length > 0 && !IG_HANDLE_REGEX.test(cleanedHandle)
-      ? "Solo letras, números, puntos y guiones bajos (máx 30)."
+      ? t("scouter.handleInvalid")
       : null;
   const canSave =
     cleanedHandle.length > 0 &&
@@ -1514,7 +1548,7 @@ const SpammerAccountsSection = () => {
       setNewDisplayName("");
       setNewNiche("");
       setShowAdd(false);
-      toast.success("Cuenta agregada correctamente");
+      toast.success(t("scouter.accounts.added"));
     } catch {
       // toast shown by mutation onError
     }
@@ -1529,12 +1563,12 @@ const SpammerAccountsSection = () => {
           <div>
             <div className="flex items-center gap-2">
               <Instagram className="h-4 w-4 text-muted-foreground" />
-              <CardTitle className="text-base">Cuentas Spammer</CardTitle>
+              <CardTitle className="text-base">{t("scouter.accounts.title")}</CardTitle>
             </div>
             <CardDescription className="text-xs mt-1">
               {isAdmin || isManager
-                ? "Todas las cuentas registradas en el tenant."
-                : "Tus cuentas spammer registradas."}
+                ? t("scouter.accounts.allInTenant")
+                : t("scouter.accounts.yours")}
             </CardDescription>
           </div>
           {canAddMore && !showAdd && !accountsQ.isLoading && (
@@ -1545,7 +1579,7 @@ const SpammerAccountsSection = () => {
               onClick={() => setShowAdd(true)}
             >
               <Plus className="h-3 w-3" />
-              Agregar cuenta
+              {t("scouter.accounts.add")}
             </Button>
           )}
         </div>
@@ -1561,8 +1595,11 @@ const SpammerAccountsSection = () => {
               <EmptyState
                 className="rounded-xl border border-dashed border-border bg-muted/20 py-8"
                 icon={<Instagram className="h-8 w-8 text-muted-foreground" />}
-                title="No hay cuentas registradas"
-                description={'Completa el asistente de bienvenida en "Mis Tareas" o usa el botón "Agregar cuenta".'}
+                title={t("scouter.accounts.empty")}
+                description={t("scouter.accounts.emptyHint", {
+                  tab: t("scouter.tab.myTasks"),
+                  button: t("scouter.accounts.add"),
+                })}
               />
             ) : (
               accounts.map((acc) => (
@@ -1573,7 +1610,7 @@ const SpammerAccountsSection = () => {
             {/* Inline add-account form */}
             {showAdd && (
               <div className="rounded-lg border border-dashed border-amber-400/40 bg-amber-400/5 p-3 space-y-2.5">
-                <p className="text-xs font-medium text-amber-400">Nueva cuenta</p>
+                <p className="text-xs font-medium text-amber-400">{t("scouter.accounts.new")}</p>
 
                 {/* Handle */}
                 <div>
@@ -1584,7 +1621,7 @@ const SpammerAccountsSection = () => {
                     <Input
                       value={newHandle}
                       onChange={(e) => setNewHandle(e.target.value)}
-                      placeholder="handle o link de IG"
+                      placeholder={t("scouter.accounts.handlePlaceholder")}
                       className={`h-8 text-xs rounded-l-none ${handleError ? "border-destructive" : ""}`}
                       autoCapitalize="none"
                       autoCorrect="off"
@@ -1596,7 +1633,7 @@ const SpammerAccountsSection = () => {
                   )}
                   {!handleError && cleanedHandle && cleanedHandle !== newHandle.trim().replace(/^@+/, "") && (
                     <p className="mt-0.5 text-[10px] text-success">
-                      Detectado: @{cleanedHandle}
+                      {t("scouter.accounts.detected", { handle: cleanedHandle })}
                     </p>
                   )}
                 </div>
@@ -1606,12 +1643,12 @@ const SpammerAccountsSection = () => {
                   <Input
                     value={newDisplayName}
                     onChange={(e) => setNewDisplayName(e.target.value)}
-                    placeholder="Nombre descriptivo"
+                    placeholder={t("scouter.accounts.displayName")}
                     className="h-8 text-xs flex-1"
                   />
                   <Select value={newNiche} onValueChange={(v) => setNewNiche(v as AccountNiche)}>
                     <SelectTrigger className="h-8 text-xs w-[120px]">
-                      <SelectValue placeholder="Nicho…" />
+                      <SelectValue placeholder={t("scouter.accounts.nichePlaceholder")} />
                     </SelectTrigger>
                     <SelectContent>
                       {(["lifestyle", "fitness", "adult", "business", "mixed"] as AccountNiche[]).map((n) => (
@@ -1637,7 +1674,7 @@ const SpammerAccountsSection = () => {
                     }}
                     disabled={insertAccount.isPending}
                   >
-                    Cancelar
+                    {t("common.cancel")}
                   </Button>
                   <Button
                     size="sm"
@@ -1650,7 +1687,7 @@ const SpammerAccountsSection = () => {
                     ) : (
                       <Plus className="h-3 w-3" />
                     )}
-                    Guardar
+                    {t("common.save")}
                   </Button>
                 </div>
               </div>
@@ -1659,7 +1696,7 @@ const SpammerAccountsSection = () => {
             {/* Capacity indicator */}
             {accounts.length > 0 && (
               <p className="text-[10px] text-muted-foreground pt-1">
-                {accounts.length}/{MAX_SPAMMER_ACCOUNTS} cuentas registradas
+                {t("scouter.accounts.capacity", { count: accounts.length, max: MAX_SPAMMER_ACCOUNTS })}
               </p>
             )}
           </div>
@@ -1671,6 +1708,8 @@ const SpammerAccountsSection = () => {
 
 // ─── Generación Diaria section ────────────────────────────────────────
 const DailyGenerationSection = () => {
+  // Arriba de todo: el componente sale antes (`return null`) si no es admin/manager.
+  const { t } = useLanguage();
   const { isAdmin, isManager } = useUserRole();
   const tenantQ = useCurrentTenantId();
   const tenantId = tenantQ.data ?? null;
@@ -1683,7 +1722,7 @@ const DailyGenerationSection = () => {
 
   const handleGenerate = async () => {
     if (!tenantId) {
-      toast.error("No se pudo obtener el tenant ID.");
+      toast.error(t("scouter.daily.noTenant"));
       return;
     }
     setGenerating(true);
@@ -1692,11 +1731,11 @@ const DailyGenerationSection = () => {
         body: { tenant_id: tenantId, cooldown_days: cooldownDays, batch_size: batchSize },
       });
       if (error) throw error;
-      toast.success("Generación iniciada correctamente", {
-        description: `Se procesarán hasta ${batchSize} leads con cooldown de ${cooldownDays} días.`,
+      toast.success(t("scouter.daily.started"), {
+        description: t("scouter.daily.startedHint", { batch: batchSize, days: cooldownDays }),
       });
     } catch (e) {
-      toast.error("Error al generar tareas", { description: (e as Error).message });
+      toast.error(t("scouter.daily.error"), { description: (e as Error).message });
     } finally {
       setGenerating(false);
     }
@@ -1707,17 +1746,17 @@ const DailyGenerationSection = () => {
       <CardHeader className="pb-3">
         <div className="flex items-center gap-2">
           <Zap className="h-4 w-4 text-muted-foreground" />
-          <CardTitle className="text-base">Generación Diaria</CardTitle>
+          <CardTitle className="text-base">{t("scouter.daily.title")}</CardTitle>
         </div>
         <CardDescription className="text-xs">
-          Genera tareas de interacción manualmente o ajusta los parámetros del cron diario.
+          {t("scouter.daily.subtitle")}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1 block">
-              Cooldown (días)
+              {t("scouter.daily.cooldown")}
             </label>
             <Input
               type="number"
@@ -1728,7 +1767,7 @@ const DailyGenerationSection = () => {
               className="text-sm"
             />
             <p className="text-[10px] text-muted-foreground mt-1">
-              Días sin reasignar el mismo lead. Default: 3.
+              {t("scouter.daily.cooldownHint")}
             </p>
           </div>
           <div>
@@ -1744,7 +1783,7 @@ const DailyGenerationSection = () => {
               className="text-sm"
             />
             <p className="text-[10px] text-muted-foreground mt-1">
-              Leads procesados por ejecución. Default: 50.
+              {t("scouter.daily.batchHint")}
             </p>
           </div>
         </div>
@@ -1759,12 +1798,12 @@ const DailyGenerationSection = () => {
           ) : (
             <Play className="h-4 w-4" />
           )}
-          {generating ? "Generando…" : "Generar tareas ahora"}
+          {generating ? t("scouter.daily.generating") : t("scouter.daily.generateNow")}
         </Button>
 
         {!tenantId && !tenantQ.isLoading && (
           <p className="text-[11px] text-destructive">
-            No se pudo resolver el tenant ID. Verifica tu sesión.
+            {t("scouter.daily.tenantUnresolved")}
           </p>
         )}
       </CardContent>
@@ -1773,7 +1812,13 @@ const DailyGenerationSection = () => {
 };
 
 // ─── Main ────────────────────────────────────────────────────────────
+// El submódulo de permisos que habilita crear/editar compañías. Es la LLAVE de
+// role_permissions: no se traduce, y el aviso de "pedile el permiso" la muestra
+// tal cual porque así se llama en Admin › Roles.
+const PERMISO_EDITAR_COMPANIAS = "Editar Compañías";
+
 const ScouterSettings = () => {
+  const { t } = useLanguage();
   const companiesQ = useScouterCompaniesAll();
   const companies = companiesQ.data ?? [];
   const [showForm, setShowForm] = useState(false);
@@ -1783,7 +1828,7 @@ const ScouterSettings = () => {
   // este permiso, la UI muestra las cards en read-only — el usuario
   // todavía ve la configuración pero no la puede modificar.
   const { canAccess } = usePermissions();
-  const canEditCompanies = canAccess("Scouter Assist", "Editar Compañías");
+  const canEditCompanies = canAccess("Scouter Assist", PERMISO_EDITAR_COMPANIAS);
   // Acciones de Settings que gastan créditos / disparan procesos
   // pesados — gated por permisos separados (default solo admin).
   const canRecomputeLookalike = canAccess("Scouter Assist", "Recomputar Lookalike");
@@ -1811,15 +1856,15 @@ const ScouterSettings = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold">Compañías</h2>
+          <h2 className="text-lg font-semibold">{t("scouter.company.title")}</h2>
           <p className="text-xs text-muted-foreground">
-            Configura qué busca cada compañía. Usa "Mejorar con IA" para generar filtros automáticamente.
+            {t("scouter.company.subtitle", { button: t("scouter.company.improveWithAi") })}
           </p>
         </div>
         {canEditCompanies && (
           <Button onClick={handleNew} className="gap-1.5">
             <Plus className="h-4 w-4" />
-            Nueva compañía
+            {t("scouter.company.new")}
           </Button>
         )}
       </div>
@@ -1833,17 +1878,17 @@ const ScouterSettings = () => {
         <EmptyState
           className="rounded-xl border border-dashed border-border bg-muted/20 py-10"
           seed="scouter-companias"
-          title="Sin compañías todavía"
+          title={t("scouter.company.empty")}
           description={
             canEditCompanies
-              ? "Crea tu primera compañía para empezar a configurar las búsquedas."
-              : 'Pídele a un admin que cree las compañías o que active tu permiso "Editar Compañías".'
+              ? t("scouter.company.emptyCanEdit")
+              : t("scouter.company.emptyNoEdit", { permission: PERMISO_EDITAR_COMPANIAS })
           }
           action={
             canEditCompanies ? (
               <Button onClick={handleNew} variant="outline" className="gap-1.5">
                 <Plus className="h-4 w-4" />
-                Crear compañía
+                {t("scouter.company.create")}
               </Button>
             ) : undefined
           }
@@ -1902,6 +1947,10 @@ const ScouterSettings = () => {
 // poblar el pool histórico la primera vez (la nueva data ya se embedea
 // automática post-scoring desde el worker).
 const LookalikeBackfillSection = () => {
+  const { t } = useLanguage();
+  const f = useFormato();
+  // "es" a secas (no "es-ES"): es el que ya usaba; en español no cambia nada.
+  const numeros = f.idioma === "en" ? "en-US" : "es";
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState<{
     done: number;
@@ -1923,7 +1972,7 @@ const LookalikeBackfillSection = () => {
       if (error) throw error;
       const ids = ((rows ?? []) as Array<{ id: string }>).map((r) => r.id);
       if (ids.length === 0) {
-        toast.success("No hay leads pendientes — todo embedded.");
+        toast.success(t("scouter.lookalike.nothingPending"));
         setRunning(false);
         return;
       }
@@ -1953,10 +2002,12 @@ const LookalikeBackfillSection = () => {
         setProgress({ done, total: ids.length, failures });
       }
       toast.success(
-        `Backfill completo — ${done} embedded${failures > 0 ? `, ${failures} fallidos` : ""}.`,
+        failures > 0
+          ? t("scouter.lookalike.doneWithFailures", { done, failures })
+          : t("scouter.lookalike.done", { done }),
       );
     } catch (e) {
-      toast.error("Backfill falló", { description: (e as Error).message });
+      toast.error(t("scouter.lookalike.failed"), { description: (e as Error).message });
     } finally {
       setRunning(false);
     }
@@ -1967,10 +2018,7 @@ const LookalikeBackfillSection = () => {
       <CardHeader>
         <CardTitle className="text-base">Lookalike / Embeddings</CardTitle>
         <CardDescription>
-          Embedea los leads sin vector para que el scouter calcule
-          similitud con las semillas de cada compañía. Los nuevos leads
-          se embedean automáticamente al ser scoreados — esto es solo
-          para el backfill histórico.
+          {t("scouter.lookalike.description")}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -1980,12 +2028,12 @@ const LookalikeBackfillSection = () => {
           ) : (
             <Sparkles className="h-4 w-4" />
           )}
-          {running ? "Procesando…" : "Recomputar lookalike (backfill)"}
+          {running ? t("scouter.lookalike.processing") : t("scouter.lookalike.run")}
         </Button>
         {progress && (
           <p className="text-xs text-muted-foreground mt-2 tabular-nums">
-            {progress.done.toLocaleString("es")} / {progress.total.toLocaleString("es")} embedded
-            {progress.failures > 0 && ` · ${progress.failures} fallidos`}
+            {progress.done.toLocaleString(numeros)} / {progress.total.toLocaleString(numeros)} embedded
+            {progress.failures > 0 && t("scouter.lookalike.failures", { count: progress.failures })}
           </p>
         )}
       </CardContent>

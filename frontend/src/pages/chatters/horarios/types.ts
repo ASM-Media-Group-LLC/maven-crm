@@ -2,6 +2,8 @@
 // en un turno, dentro de un grupo de una agencia, atiende una lista de
 // creadoras y descansa un día de la semana. Ver la migración chatter_horarios.
 
+import type { Language } from "@/lib/i18n";
+
 export type Agency = "plus" | "massive";
 export type Shift = "am" | "pm" | "mad";
 
@@ -17,9 +19,15 @@ export const TURNOS: Record<Shift, { label: string; horas: string; clase: string
   mad: { label: "MAD", horas: "00:00 – 08:00", clase: "bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-500/30" },
 };
 
-// 0 = lunes, como en la BD.
+// 0 = lunes, como en la BD. El índice es el dato (weekday); el nombre es solo
+// lo que se muestra, y por eso hay uno por idioma. Sin `lang` sale en español,
+// que es lo que ya devolvían (y lo que fija test/chatters/horarios.fechas).
 export const DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 export const DIAS_CORTOS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+const DIAS_EN = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const DIAS_CORTOS_EN = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+export const diasDe = (lang: Language = "es") => (lang === "en" ? DIAS_EN : DIAS);
+export const diasCortosDe = (lang: Language = "es") => (lang === "en" ? DIAS_CORTOS_EN : DIAS_CORTOS);
 
 export interface Grupo {
   id: string;
@@ -83,14 +91,19 @@ export function sumarDias(iso: string, n: number): string { const d = fechaDe(is
 export const diaSemanaDe = (d: Date) => (d.getDay() + 6) % 7;
 
 const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
-export function etiquetaSemana(weekStart: string): string {
+const MESES_EN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+export function etiquetaSemana(weekStart: string, lang: Language = "es"): string {
   const a = fechaDe(weekStart), b = fechaDe(sumarDias(weekStart, 6));
+  if (lang === "en") {
+    const ma = MESES_EN[a.getMonth()], mb = MESES_EN[b.getMonth()];
+    return ma === mb ? `${ma} ${a.getDate()} – ${b.getDate()}` : `${ma} ${a.getDate()} – ${mb} ${b.getDate()}`;
+  }
   const ma = MESES[a.getMonth()], mb = MESES[b.getMonth()];
   return ma === mb ? `${a.getDate()} al ${b.getDate()} de ${mb}` : `${a.getDate()} ${ma} al ${b.getDate()} ${mb}`;
 }
-export function etiquetaDia(weekStart: string, weekday: number): string {
+export function etiquetaDia(weekStart: string, weekday: number, lang: Language = "es"): string {
   const d = fechaDe(sumarDias(weekStart, weekday));
-  return `${DIAS[weekday]} ${d.getDate()}`;
+  return `${diasDe(lang)[weekday]} ${d.getDate()}`;
 }
 
 /** Perfil de la creadora en Maven (solo si está ligada a una creadora real). */

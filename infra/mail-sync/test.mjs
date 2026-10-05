@@ -10,6 +10,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { sanitizeEmailHtml } from "./sanitize.mjs";
 import { decidirSiAbrir, huellaDeStatus } from "./barrido.mjs";
+import { ancestrosDe, decidirHerencia, DIAS_PARA_ARCHIVAR } from "./hilos.mjs";
 
 const limpio = (html) => sanitizeEmailHtml(html).html;
 
@@ -185,4 +186,50 @@ test("sin STATUS (el servidor no contestó): se abre como siempre y no deja huel
   assert.equal(d.abrir, true);
   assert.equal(d.motivo, "sin-status");
   assert.equal(d.huella, null);
+});
+
+// ── Respuestas que heredan la etiqueta de su charla (Keila, 02/10) ──────────
+const AHORA = Date.parse("2026-10-02T20:00:00Z");
+const hace = (horas) => new Date(AHORA - horas * 3600_000).toISOString();
+
+test("ancestros: In-Reply-To + References sin repetir y sin vacíos", () => {
+  assert.deepEqual(ancestrosDe({ inReplyTo: "<b@x>", refs: ["<a@x>", "<b@x>", " "] }), ["<b@x>", "<a@x>"]);
+  assert.deepEqual(ancestrosDe({ inReplyTo: null, refs: "<a@x>" }), ["<a@x>"]);
+  assert.deepEqual(ancestrosDe({ inReplyTo: null, refs: null }), []);
+});
+
+test("charla etiquetada y ARCHIVADA: la respuesta hereda y se archiva", () => {
+  const d = decidirHerencia({ etiquetasDelHilo: ["porAprobar", "porAprobar"], yaTieneEtiquetas: false, etiquetadosEnRecibidos: false, fecha: hace(1), ahora: AHORA });
+  assert.deepEqual(d, { etiquetas: ["porAprobar"], archivar: true });
+});
+
+test("charla etiquetada pero en Recibidos: hereda y se queda en la bandeja", () => {
+  const d = decidirHerencia({ etiquetasDelHilo: ["rrhh"], yaTieneEtiquetas: false, etiquetadosEnRecibidos: true, fecha: hace(1), ahora: AHORA });
+  assert.deepEqual(d, { etiquetas: ["rrhh"], archivar: false });
+});
+
+test("si ya tiene etiquetas (alguien la ordenó o la devolvió a Recibidos) no se toca", () => {
+  const d = decidirHerencia({ etiquetasDelHilo: ["rrhh"], yaTieneEtiquetas: true, etiquetadosEnRecibidos: false, fecha: hace(1), ahora: AHORA });
+  assert.deepEqual(d, { etiquetas: [], archivar: false });
+});
+
+test("charla sin etiquetas: nada", () => {
+  assert.deepEqual(decidirHerencia({ etiquetasDelHilo: [], yaTieneEtiquetas: false, etiquetadosEnRecibidos: false, fecha: hace(1), ahora: AHORA }),
+    { etiquetas: [], archivar: false });
+});
+
+test("una respuesta vieja que recién se baja se etiqueta pero NO se archiva sola", () => {
+  const d = decidirHerencia({ etiquetasDelHilo: ["cripto"], yaTieneEtiquetas: false, etiquetadosEnRecibidos: false, fecha: hace(24 * (DIAS_PARA_ARCHIVAR + 1)), ahora: AHORA });
+  assert.deepEqual(d, { etiquetas: ["cripto"], archivar: false });
+  const sinFecha = decidirHerencia({ etiquetasDelHilo: ["cripto"], yaTieneEtiquetas: false, etiquetadosEnRecibidos: false, fecha: null, ahora: AHORA });
+  assert.equal(sinFecha.archivar, false);
+});
+
+test("SEGUNDA COPIA del mismo correo (Zoho entrega dos): se archiva con la primera", () => {
+  // uid 54 heredó y se archivó; uid 55 (mismo Message-ID) ya «tiene» la etiqueta.
+  const d = decidirHerencia({ etiquetasDelHilo: ["cxc"], yaTieneEtiquetas: true, etiquetadosEnRecibidos: false, fecha: hace(1), ahora: AHORA, otraCopiaArchivada: true });
+  assert.deepEqual(d, { etiquetas: [], archivar: true });
+  // Sin una copia archivada recién, «ya tiene etiquetas» sigue queriendo decir: no tocar.
+  const sinCopia = decidirHerencia({ etiquetasDelHilo: ["cxc"], yaTieneEtiquetas: true, etiquetadosEnRecibidos: false, fecha: hace(1), ahora: AHORA });
+  assert.deepEqual(sinCopia, { etiquetas: [], archivar: false });
 });

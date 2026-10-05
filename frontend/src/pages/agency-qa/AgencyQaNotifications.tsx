@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 import { ListRow } from "@/components/ui/list-row";
 import { useQaConfig, useUpdateQaConfig } from "@/hooks/useAgencyQa";
 import { useMavenUsers } from "@/hooks/useChatterEvaluator";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // AgencyQaNotifications — config de avisos cuando se completa una QA.
 // Dos bloques:
@@ -44,6 +45,7 @@ import { useMavenUsers } from "@/hooks/useChatterEvaluator";
 // en DB pero el frontend ya no la lee ni escribe.)
 
 const AgencyQaNotifications = () => {
+  const { t } = useLanguage();
   const cfgQ = useQaConfig();
   const usersQ = useMavenUsers();
   const update = useUpdateQaConfig();
@@ -79,7 +81,7 @@ const AgencyQaNotifications = () => {
     const e = newEmail.trim().toLowerCase();
     if (!e || emails.includes(e)) return;
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) {
-      toast.error("Email inválido");
+      toast.error(t("common.invalidEmail"));
       return;
     }
     setEmails([...emails, e]);
@@ -104,9 +106,9 @@ const AgencyQaNotifications = () => {
         notify_on_failed: notifyOnFailed,
         low_score_threshold: Math.max(0, Math.min(100, lowScoreThreshold)),
       });
-      toast.success("Configuración guardada");
+      toast.success(t("agencyQa.notif.saved"));
     } catch (err) {
-      toast.error("No se pudo guardar", {
+      toast.error(t("common.couldNotSave"), {
         description: (err as Error).message,
       });
     }
@@ -121,13 +123,8 @@ const AgencyQaNotifications = () => {
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-base font-semibold">Notificaciones</h2>
-        <p className="text-xs text-muted-foreground">
-          Cuando una QA se completa, las notificaciones salen por dos canales:
-          el Apps Script que arma el Drive doc + emails externos, y la
-          notificación interna en Maven (campana del header) para los
-          empleados que elijas.
-        </p>
+        <h2 className="text-base font-semibold">{t("agencyQa.tab.notifications")}</h2>
+        <p className="text-xs text-muted-foreground">{t("agencyQa.notif.intro")}</p>
       </div>
 
       {/* Disparos por evento */}
@@ -135,16 +132,14 @@ const AgencyQaNotifications = () => {
         <CardContent className="space-y-4 p-6">
           <h3 className="flex items-center gap-2 text-sm font-semibold">
             <Bell className="h-4 w-4" />
-            Disparos automáticos
+            {t("agencyQa.notif.triggers")}
           </h3>
 
           <div className="space-y-3">
             <ListRow className="items-start justify-between p-3">
               <div className="flex-1 space-y-0.5">
-                <Label htmlFor="notify-uploaded">QA cargada</Label>
-                <p className="text-[11px] text-muted-foreground">
-                  Aviso cuando alguien sube una llamada, antes del análisis IA.
-                </p>
+                <Label htmlFor="notify-uploaded">{t("agencyQa.notif.uploaded")}</Label>
+                <p className="text-[11px] text-muted-foreground">{t("agencyQa.notif.uploadedHint")}</p>
               </div>
               <Switch
                 id="notify-uploaded"
@@ -155,11 +150,8 @@ const AgencyQaNotifications = () => {
 
             <ListRow className="items-start justify-between p-3">
               <div className="flex-1 space-y-0.5">
-                <Label htmlFor="notify-analyzed">Análisis IA listo</Label>
-                <p className="text-[11px] text-muted-foreground">
-                  Aviso cuando Groq termina el análisis (incluye score y link
-                  al detalle).
-                </p>
+                <Label htmlFor="notify-analyzed">{t("agencyQa.notif.analyzed")}</Label>
+                <p className="text-[11px] text-muted-foreground">{t("agencyQa.notif.analyzedHint")}</p>
               </div>
               <Switch
                 id="notify-analyzed"
@@ -171,8 +163,8 @@ const AgencyQaNotifications = () => {
             <ListRow className="items-start justify-between p-3">
               <div className="flex-1 space-y-0.5">
                 <div className="flex items-center gap-2">
-                  <Label htmlFor="notify-low-score">Score bajo</Label>
-                  <span className="text-[11px] text-muted-foreground">si score &lt;</span>
+                  <Label htmlFor="notify-low-score">{t("agencyQa.notif.lowScore")}</Label>
+                  <span className="text-[11px] text-muted-foreground">{t("agencyQa.notif.ifScoreBelow")}</span>
                   <Input
                     type="number"
                     min={0}
@@ -182,10 +174,7 @@ const AgencyQaNotifications = () => {
                     className="h-7 w-16 text-xs"
                   />
                 </div>
-                <p className="text-[11px] text-muted-foreground">
-                  Aviso separado al supervisor para coachear antes de la
-                  próxima call.
-                </p>
+                <p className="text-[11px] text-muted-foreground">{t("agencyQa.notif.lowScoreHint")}</p>
               </div>
               <Switch
                 id="notify-low-score"
@@ -196,12 +185,8 @@ const AgencyQaNotifications = () => {
 
             <ListRow className="items-start justify-between p-3">
               <div className="flex-1 space-y-0.5">
-                <Label htmlFor="notify-failed">Análisis falló</Label>
-                <p className="text-[11px] text-muted-foreground">
-                  Aviso al evaluador cuando el dispatch a Groq falla
-                  (rate limit, JSON inválido) — la QA queda sin análisis y
-                  necesita re-dispararse manualmente.
-                </p>
+                <Label htmlFor="notify-failed">{t("agencyQa.notif.failed")}</Label>
+                <p className="text-[11px] text-muted-foreground">{t("agencyQa.notif.failedHint")}</p>
               </div>
               <Switch
                 id="notify-failed"
@@ -218,15 +203,15 @@ const AgencyQaNotifications = () => {
         <CardContent className="space-y-5 p-6">
           <h3 className="flex items-center gap-2 text-sm font-semibold">
             <Mail className="h-4 w-4" />
-            Emails externos
+            {t("agencyQa.notif.externalEmails")}
           </h3>
 
           <div className="space-y-1.5">
-            <Label>Destinatarios</Label>
+            <Label>{t("agencyQa.notif.recipients")}</Label>
             <div className="flex gap-2">
               <Input
                 value={newEmail}
-                placeholder="usuario@dominio.com"
+                placeholder={t("agencyQa.notif.emailPlaceholder")}
                 onChange={(e) => setNewEmail(e.target.value)}
                 onKeyDown={(e) =>
                   e.key === "Enter" && (e.preventDefault(), addEmail())
@@ -240,7 +225,7 @@ const AgencyQaNotifications = () => {
                 className="gap-1"
               >
                 <Plus className="h-4 w-4" />
-                Agregar
+                {t("common.add")}
               </Button>
             </div>
             <div className="flex flex-wrap gap-2 pt-1">
@@ -254,16 +239,14 @@ const AgencyQaNotifications = () => {
                     type="button"
                     onClick={() => removeEmail(e)}
                     className="text-muted-foreground hover:text-destructive"
-                    aria-label={`Eliminar ${e}`}
+                    aria-label={t("agencyQa.notif.removeEmail", { email: e })}
                   >
                     <X className="h-3 w-3" />
                   </button>
                 </div>
               ))}
               {emails.length === 0 && (
-                <p className="text-[11px] text-muted-foreground">
-                  Sin emails externos configurados.
-                </p>
+                <p className="text-[11px] text-muted-foreground">{t("agencyQa.notif.noEmails")}</p>
               )}
             </div>
           </div>
@@ -275,12 +258,9 @@ const AgencyQaNotifications = () => {
         <CardContent className="space-y-3 p-6">
           <h3 className="flex items-center gap-2 text-sm font-semibold">
             <Bell className="h-4 w-4" />
-            Notificaciones internas Maven
+            {t("agencyQa.notif.internal")}
           </h3>
-          <p className="text-[11px] text-muted-foreground">
-            Empleados que reciben una notificación dentro de Maven (campana
-            del header) cuando se completa una QA.
-          </p>
+          <p className="text-[11px] text-muted-foreground">{t("agencyQa.notif.internalHint")}</p>
 
           <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
             <PopoverTrigger asChild>
@@ -294,8 +274,8 @@ const AgencyQaNotifications = () => {
                   }}
                   placeholder={
                     notifyUserIds.length === 0
-                      ? "Seleccionar empleados…"
-                      : `${notifyUserIds.length} seleccionado(s) — escribe para filtrar`
+                      ? t("agencyQa.notif.pickEmployees")
+                      : t("agencyQa.notif.selectedFilter", { n: notifyUserIds.length })
                   }
                   className="w-full pr-8"
                 />
@@ -309,14 +289,10 @@ const AgencyQaNotifications = () => {
             >
               <div className="max-h-72 overflow-y-auto p-1">
                 {usersQ.isLoading && (
-                  <div className="p-3 text-xs text-muted-foreground">
-                    Cargando…
-                  </div>
+                  <div className="p-3 text-xs text-muted-foreground">{t("common.loading")}</div>
                 )}
                 {!usersQ.isLoading && filteredUsers.length === 0 && (
-                  <div className="p-3 text-xs text-muted-foreground">
-                    Sin resultados.
-                  </div>
+                  <div className="p-3 text-xs text-muted-foreground">{t("common.noResults")}</div>
                 )}
                 {filteredUsers.map((u) => {
                   const checked = notifyUserIds.includes(u.id);
@@ -332,7 +308,7 @@ const AgencyQaNotifications = () => {
                     >
                       <div className="flex min-w-0 items-center gap-2">
                         <span className="truncate">
-                          {u.full_name?.trim() || "(sin nombre)"}
+                          {u.full_name?.trim() || t("agencyQa.noName")}
                         </span>
                         {u.role && (
                           <span className="rounded-full border border-border/60 bg-background px-1.5 py-0.5 text-xs capitalize text-muted-foreground">
@@ -367,7 +343,7 @@ const AgencyQaNotifications = () => {
                       type="button"
                       onClick={() => toggleNotifyUser(id)}
                       className="hover:text-destructive"
-                      aria-label="Remover"
+                      aria-label={t("agencyQa.notif.remove")}
                     >
                       <X className="h-3 w-3" />
                     </button>
@@ -391,7 +367,7 @@ const AgencyQaNotifications = () => {
           ) : (
             <Save className="h-3.5 w-3.5" />
           )}
-          Guardar configuración
+          {t("agencyQa.notif.save")}
         </Button>
       </div>
     </div>

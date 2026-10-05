@@ -3,6 +3,7 @@ import { Square, Send, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import NotaDeVoz from "./NotaDeVoz";
+import { useLanguage } from "@/hooks/useLanguage";
 
 const MAX_DURATION_SEC = 300; // 5 minutes max
 
@@ -28,6 +29,7 @@ function getSupportedMimeType(): string {
 }
 
 export default function VoiceNoteRecorder({ onSend, onCancel, isRecording, onStartRecording }: VoiceNoteRecorderProps) {
+  const { t } = useLanguage();
   const [duration, setDuration] = useState(0);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -57,7 +59,7 @@ export default function VoiceNoteRecorder({ onSend, onCancel, isRecording, onSta
 
     const mimeType = getSupportedMimeType();
     if (!mimeType) {
-      toast.error("Tu navegador no soporta grabación de audio");
+      toast.error(t("messenger.voice.noSoporta"));
       onCancel();
       return;
     }
@@ -97,18 +99,18 @@ export default function VoiceNoteRecorder({ onSend, onCancel, isRecording, onSta
         if (durationRef.current >= MAX_DURATION_SEC) {
           clearInterval(timerRef.current);
           recorder.stop();
-          toast.info("Límite de grabación alcanzado (5 min)");
+          toast.info(t("messenger.voice.limite"));
         }
       }, 1000);
       onStartRecording();
     }).catch((err: any) => {
       if (cancelled) return;
       if (err?.name === "NotAllowedError" || err?.name === "PermissionDeniedError") {
-        toast.error("Permiso de micrófono denegado. Actívalo en la configuración del navegador.");
+        toast.error(t("messenger.voice.permisoDenegado"));
       } else if (err?.name === "NotFoundError") {
-        toast.error("No se encontró un micrófono conectado.");
+        toast.error(t("messenger.voice.sinMicrofono"));
       } else {
-        toast.error("Error al acceder al micrófono.");
+        toast.error(t("messenger.voice.errorMicrofono"));
       }
       onCancel();
     });
@@ -167,7 +169,7 @@ export default function VoiceNoteRecorder({ onSend, onCancel, isRecording, onSta
 
   return (
     <div className="flex items-center gap-2 flex-1 bg-destructive/5 rounded-2xl px-3 py-1.5 animate-fade-in">
-      <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-destructive" onClick={handleCancel}>
+      <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-destructive" onClick={handleCancel} aria-label={t("rec.cancelRecording")}>
         <X className="h-4 w-4" />
       </Button>
 
@@ -176,9 +178,9 @@ export default function VoiceNoteRecorder({ onSend, onCancel, isRecording, onSta
           <div className="flex items-center gap-2 flex-1">
             <div className="h-2.5 w-2.5 rounded-full bg-destructive animate-pulse" />
             <span className="text-sm font-mono text-destructive">{formatTime(duration)}</span>
-            <span className="text-xs text-muted-foreground">Grabando...</span>
+            <span className="text-xs text-muted-foreground">{t("messenger.voice.grabando")}</span>
           </div>
-          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 bg-destructive/10 text-destructive rounded-full" onClick={stopRecording}>
+          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 bg-destructive/10 text-destructive rounded-full" onClick={stopRecording} aria-label={t("messenger.voice.detener")}>
             <Square className="h-3.5 w-3.5 fill-current" />
           </Button>
         </>
@@ -191,7 +193,7 @@ export default function VoiceNoteRecorder({ onSend, onCancel, isRecording, onSta
                 clavada al final. */}
             {previewUrl && <NotaDeVoz src={previewUrl} />}
           </div>
-          <Button size="icon" className="h-8 w-8 shrink-0 rounded-full bg-primary text-primary-foreground" onClick={handleSend}>
+          <Button size="icon" className="h-8 w-8 shrink-0 rounded-full bg-primary text-primary-foreground" onClick={handleSend} aria-label={t("rec.sendVoice")}>
             <Send className="h-3.5 w-3.5" />
           </Button>
         </>

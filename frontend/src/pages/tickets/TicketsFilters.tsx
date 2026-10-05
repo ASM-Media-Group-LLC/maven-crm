@@ -10,10 +10,11 @@ import { Button } from "@/components/ui/button";
 import { Search, List, LayoutGrid, X } from "lucide-react";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { format } from "date-fns";
+import { useLanguage } from "@/hooks/useLanguage";
 import {
-  PRIORITY_LABELS,
-  STATUS_LABELS,
-  TYPE_LABELS,
+  PRIORITY_LABEL_KEYS,
+  STATUS_LABEL_KEYS,
+  TYPE_LABEL_KEYS,
   COMPANIES,
   TEAM_MEMBERS,
 } from "./useTickets";
@@ -53,13 +54,14 @@ const TicketsFilters = ({
   view, onViewChange,
   hasActiveFilters, onClear,
 }: Props) => {
+  const { t } = useLanguage();
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative flex-1 w-full sm:min-w-[220px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar por título, descripción, número de ticket..."
+            placeholder={t("tickets.filters.searchPlaceholder")}
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
             className="pl-9"
@@ -67,39 +69,39 @@ const TicketsFilters = ({
         </div>
 
         <Select value={priority || undefined} onValueChange={(v) => onPriorityChange(v === "__all__" ? "" : v)}>
-          <SelectTrigger className="w-full sm:w-[130px]"><SelectValue placeholder="Prioridad" /></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-[130px]"><SelectValue placeholder={t("tickets.priority")} /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="__all__">Todas</SelectItem>
-            {Object.entries(PRIORITY_LABELS).map(([k, v]) => (
-              <SelectItem key={k} value={k}>{v}</SelectItem>
+            <SelectItem value="__all__">{t("common.allF")}</SelectItem>
+            {Object.entries(PRIORITY_LABEL_KEYS).map(([k, clave]) => (
+              <SelectItem key={k} value={k}>{t(clave)}</SelectItem>
             ))}
           </SelectContent>
         </Select>
 
         <Select value={ticketType || undefined} onValueChange={(v) => onTicketTypeChange(v === "__all__" ? "" : v)}>
-          <SelectTrigger className="w-full sm:w-[130px]"><SelectValue placeholder="Tipo" /></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-[130px]"><SelectValue placeholder={t("common.type")} /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="__all__">Todos</SelectItem>
-            {Object.entries(TYPE_LABELS).map(([k, v]) => (
-              <SelectItem key={k} value={k}>{v}</SelectItem>
+            <SelectItem value="__all__">{t("common.all")}</SelectItem>
+            {Object.entries(TYPE_LABEL_KEYS).map(([k, clave]) => (
+              <SelectItem key={k} value={k}>{t(clave)}</SelectItem>
             ))}
           </SelectContent>
         </Select>
 
         <Select value={status || undefined} onValueChange={(v) => onStatusChange(v === "__all__" ? "" : v)}>
-          <SelectTrigger className="w-full sm:w-[130px]"><SelectValue placeholder="Estado" /></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-[130px]"><SelectValue placeholder={t("common.status")} /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="__all__">Todos</SelectItem>
-            {Object.entries(STATUS_LABELS).map(([k, v]) => (
-              <SelectItem key={k} value={k}>{v}</SelectItem>
+            <SelectItem value="__all__">{t("common.all")}</SelectItem>
+            {Object.entries(STATUS_LABEL_KEYS).map(([k, clave]) => (
+              <SelectItem key={k} value={k}>{t(clave)}</SelectItem>
             ))}
           </SelectContent>
         </Select>
 
         <Select value={company || undefined} onValueChange={(v) => onCompanyChange(v === "__all__" ? "" : v)}>
-          <SelectTrigger className="w-full sm:w-[140px]"><SelectValue placeholder="Compañía" /></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-[140px]"><SelectValue placeholder={t("common.company")} /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="__all__">Todas</SelectItem>
+            <SelectItem value="__all__">{t("common.allF")}</SelectItem>
             {COMPANIES.map((c) => (
               <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
             ))}
@@ -107,9 +109,9 @@ const TicketsFilters = ({
         </Select>
 
         <Select value={assignedTo || undefined} onValueChange={(v) => onAssignedToChange(v === "__all__" ? "" : v)}>
-          <SelectTrigger className="w-full sm:w-[150px]"><SelectValue placeholder="Asignado" /></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-[150px]"><SelectValue placeholder={t("tickets.assignee")} /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="__all__">Todos</SelectItem>
+            <SelectItem value="__all__">{t("common.all")}</SelectItem>
             {TEAM_MEMBERS.map((m) => (
               <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
             ))}
@@ -128,7 +130,7 @@ const TicketsFilters = ({
         {hasActiveFilters && onClear && (
           <Button variant="ghost" size="sm" onClick={onClear}>
             <X className="mr-1.5 h-4 w-4" />
-            Limpiar filtros
+            {t("tickets.filters.clear")}
           </Button>
         )}
 
@@ -138,6 +140,7 @@ const TicketsFilters = ({
             size="icon"
             className="h-9 w-9"
             onClick={() => onViewChange("list")}
+            aria-label={t("tickets.filters.listView")}
           >
             <List className="h-4 w-4" />
           </Button>
@@ -146,6 +149,7 @@ const TicketsFilters = ({
             size="icon"
             className="h-9 w-9"
             onClick={() => onViewChange("grid")}
+            aria-label={t("tickets.filters.gridView")}
           >
             <LayoutGrid className="h-4 w-4" />
           </Button>

@@ -1,10 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { format, isToday, isThisYear } from "date-fns";
-import { es } from "date-fns/locale";
 import {
-  FileText, FileSpreadsheet, Presentation, Plus, Search, Users, Lock,
-  Trash2, RotateCcw, Loader2, X,
+  FileText, FileSpreadsheet, FolderOpen, Presentation, Plus, Search, Users, Lock,
+  Trash2, RotateCcw, Loader2, X, MoreVertical, Pencil, Share2, ExternalLink,
 } from "lucide-react";
 import { Page } from "@/components/ui/page";
 import { PageHeader } from "@/components/ui/page-header";
@@ -15,23 +13,25 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import {
-  useDocumentos, usePapelera, useBorrarDocumento,
+  useDocumentos, usePapelera, useBorrarDocumento, useRenombrarDocumento, useDocumentosQuePuedoEditar,
+  puedoEditarDocumento, SIN_PERMISO_DOCUMENTO,
   type Documento, type FiltrosDocumentos,
 } from "@/hooks/useDocumentos";
 import { useCrearDocumentoOffice, type FormatoDeOficina } from "@/hooks/useOnlyOffice";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { TranslationKey } from "@/lib/i18n";
-
-function cuando(iso: string): string {
-  const d = new Date(iso);
-  if (isToday(d)) return format(d, "HH:mm");
-  if (isThisYear(d)) return format(d, "d 'de' MMM", { locale: es });
-  return format(d, "d MMM yyyy", { locale: es });
-}
+import { useFechasDeArchivos } from "@/hooks/useFechasDeArchivos";
+import DialogoAbrirArchivo from "@/components/oficina/DialogoAbrirArchivo";
+import DialogoDeNombre from "@/components/oficina/DialogoDeNombre";
+import DialogoDeCompartir from "@/components/oficina/DialogoDeCompartir";
+import { atajoDeAbrir } from "@/lib/drive/abrirEnLaOficina";
 
 /** Cada formato es su propia sección del menú, como en Google: la lista de
  *  hojas no se mezcla con la de documentos. Lo único que cambia es el formato
@@ -40,50 +40,59 @@ const FORMATOS: Record<FormatoDeOficina, {
   titulo: TranslationKey;
   nuevo: TranslationKey;
   icono: typeof FileText;
-  vacio: string;
-  ayuda: string;
+  vacio: TranslationKey;
+  ayuda: TranslationKey;
 }> = {
   docx: {
     titulo: "nav.office.docs", nuevo: "oficina.nuevoDoc", icono: FileText,
-    vacio: "Todavía no hay documentos",
-    ayuda: "Empezá por un procedimiento, un guion o un acta de reunión.",
+    vacio: "oficina.empty.docs",
+    ayuda: "oficina.emptyHint.docs",
   },
   xlsx: {
     titulo: "nav.office.sheets", nuevo: "oficina.nuevaHoja", icono: FileSpreadsheet,
-    vacio: "Todavía no hay hojas de cálculo",
-    ayuda: "Sirven para un presupuesto, un control de turnos o un listado.",
+    vacio: "oficina.empty.sheets",
+    ayuda: "oficina.emptyHint.sheets",
   },
   pptx: {
     titulo: "nav.office.slides", nuevo: "oficina.nuevaPresentacion", icono: Presentation,
-    vacio: "Todavía no hay presentaciones",
-    ayuda: "Para una inducción, una propuesta o un reporte al equipo.",
+    vacio: "oficina.empty.slides",
+    ayuda: "oficina.emptyHint.slides",
   },
 };
 
-const VISTAS: { id: FiltrosDocumentos["vista"]; label: string }[] = [
-  { id: "todos", label: "Todos" },
-  { id: "mios", label: "Míos" },
-  { id: "papelera", label: "Papelera" },
+// `id` es el filtro que se le pasa a la consulta (dato); lo que se ve es `label`.
+const VISTAS: { id: FiltrosDocumentos["vista"]; label: TranslationKey }[] = [
+  { id: "todos", label: "common.all" },
+  { id: "mios", label: "oficina.view.mine" },
+  { id: "papelera", label: "oficina.view.trash" },
 ];
 
 export default function OficinaPage({ formato = "docx" }: { formato?: FormatoDeOficina }) {
   const navigate = useNavigate();
   const { t } = useLanguage();
+  const fechas = useFechasDeArchivos();
   const cfg = FORMATOS[formato];
   const { user } = useAuth();
   const [q, setQ] = useState("");
   const [vista, setVista] = useState<FiltrosDocumentos["vista"]>("todos");
   const [confirmarBorrado, setConfirmarBorrado] = useState<Documento | null>(null);
+  /** «Abrir un archivo» (⌘O): uno del Drive o uno de la computadora. */
+  const [abriendoArchivo, setAbriendoArchivo] = useState(false);
+  /** «Cambiar nombre» y «Compartir» del menú ⋮ de una fila. */
+  const [renombrando, setRenombrando] = useState<Documento | null>(null);
+  const [compartiendo, setCompartiendo] = useState<Documento | null>(null);
 
   const docs = useDocumentos({ q, vista, extension: formato });
   const crear = useCrearDocumentoOffice();
   const papelera = usePapelera();
   const borrar = useBorrarDocumento();
+  const renombrar = useRenombrarDocumento();
+  const paraEditar = useDocumentosQuePuedoEditar();
 
   const nuevo = () => {
     crear.mutate({ extension: formato }, {
       onSuccess: ({ id }) => navigate(`/oficina/${id}`),
-      onError: (e) => toast.error((e as Error).message || "No se pudo crear el documento"),
+      onError: (e) => toast.error((e as Error).message || t("oficina.createError")),
     });
   };
 
@@ -91,12 +100,24 @@ export default function OficinaPage({ formato = "docx" }: { formato?: FormatoDeO
     papelera.mutate(
       { id: d.id, tirar },
       {
-        onSuccess: () =>
-          toast.success(tirar ? "Documento en la papelera" : "Documento restaurado"),
-        onError: (e) => toast.error((e as Error).message || "No se pudo mover"),
+        // Como Google: «Movido a la papelera · Deshacer».
+        onSuccess: () => (tirar
+          ? toast.success(t("oficina.trashed"), {
+            action: { label: t("drive.mover.deshacer"), onClick: () => mover(d, false) },
+          })
+          : toast.success(t("oficina.restored"))),
+        onError: (e) => toast.error((e as Error).message || t("oficina.moveError")),
       },
     );
   };
+
+  const cambiarNombre = (d: Documento, title: string) =>
+    renombrar.mutate({ id: d.id, title }, {
+      onSuccess: () => setRenombrando(null),
+      onError: (e) => toast.error((e as Error).message === SIN_PERMISO_DOCUMENTO
+        ? t("oficina.rename.sinPermiso")
+        : `${t("oficina.rename.error")}: ${(e as Error).message}`),
+    });
 
   const lista = docs.data ?? [];
 
@@ -108,17 +129,30 @@ export default function OficinaPage({ formato = "docx" }: { formato?: FormatoDeO
       <div className="flex w-full flex-col gap-5">
         <PageHeader
           title={t(cfg.titulo)}
-          subtitle="Del equipo, escritos en Maven"
+          subtitle={t("oficina.subtitle")}
           icon={<cfg.icono />}
           actions={
-            <Button onClick={nuevo} disabled={crear.isPending} className="rounded-full">
-              {crear.isPending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Plus className="mr-2 h-4 w-4" />
-              )}
-              {t(cfg.nuevo)}
-            </Button>
+            <>
+              {/* Como Archivo › Abrir de Google: para el Excel que alguien
+                  bajó y quiere seguir en Maven. */}
+              <Button
+                variant="outline"
+                onClick={() => setAbriendoArchivo(true)}
+                className="rounded-full"
+                title={t("oficina.abrir.botonAyuda", { atajo: atajoDeAbrir() })}
+              >
+                <FolderOpen className="mr-2 h-4 w-4" />
+                {t("oficina.abrir.boton")}
+              </Button>
+              <Button onClick={nuevo} disabled={crear.isPending} className="rounded-full">
+                {crear.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Plus className="mr-2 h-4 w-4" />
+                )}
+                {t(cfg.nuevo)}
+              </Button>
+            </>
           }
         />
 
@@ -128,14 +162,14 @@ export default function OficinaPage({ formato = "docx" }: { formato?: FormatoDeO
             <Input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Buscar por título…"
+              placeholder={t("oficina.searchPlaceholder")}
               className="rounded-full pl-9 pr-9"
             />
             {q && (
               <button
                 type="button"
                 onClick={() => setQ("")}
-                aria-label="Limpiar búsqueda"
+                aria-label={t("common.clearSearch")}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
               >
                 <X className="h-4 w-4" />
@@ -155,7 +189,7 @@ export default function OficinaPage({ formato = "docx" }: { formato?: FormatoDeO
                     : "text-muted-foreground hover:text-foreground",
                 )}
               >
-                {v.label}
+                {t(v.label)}
               </button>
             ))}
           </div>
@@ -169,13 +203,13 @@ export default function OficinaPage({ formato = "docx" }: { formato?: FormatoDeO
           </div>
         ) : docs.isError ? (
           <div className="rounded-panel border border-destructive/40 bg-destructive/5 p-6 text-center">
-            <p className="text-sm font-medium">No se pudieron cargar los documentos</p>
+            <p className="text-sm font-medium">{t("oficina.loadError")}</p>
             <p className="mt-1 text-xs text-muted-foreground">
               {(docs.error as Error)?.message}
             </p>
             <Button variant="outline" size="sm" className="mt-3 rounded-full"
               onClick={() => void docs.refetch()}>
-              Reintentar
+              {t("common.retry")}
             </Button>
           </div>
         ) : lista.length === 0 ? (
@@ -183,23 +217,29 @@ export default function OficinaPage({ formato = "docx" }: { formato?: FormatoDeO
             <FileText className="mx-auto h-8 w-8 text-muted-foreground" />
             <p className="mt-3 text-sm font-medium">
               {q
-                ? "Ningún documento coincide"
+                ? t("oficina.noMatch")
                 : vista === "papelera"
-                  ? "La papelera está vacía"
-                  : cfg.vacio}
+                  ? t("oficina.trashEmpty")
+                  : t(cfg.vacio)}
             </p>
             <p className="mx-auto mt-1 max-w-sm text-xs text-muted-foreground">
               {q
-                ? "Se busca por título. Probá con otra palabra."
+                ? t("oficina.noMatchHint")
                 : vista === "papelera"
-                  ? "Lo que mandes a la papelera aparece acá hasta que lo elimines."
-                  : cfg.ayuda}
+                  ? t("oficina.trashEmptyHint")
+                  : t(cfg.ayuda)}
             </p>
             {!q && vista !== "papelera" && (
-              <Button onClick={nuevo} variant="outline" size="sm" className="mt-4 rounded-full">
-                <Plus className="mr-2 h-4 w-4" />
-                {t(cfg.nuevo)}
-              </Button>
+              <div className="mt-4 flex flex-wrap justify-center gap-2">
+                <Button onClick={nuevo} variant="outline" size="sm" className="rounded-full">
+                  <Plus className="mr-2 h-4 w-4" />
+                  {t(cfg.nuevo)}
+                </Button>
+                <Button onClick={() => setAbriendoArchivo(true)} variant="ghost" size="sm" className="rounded-full">
+                  <FolderOpen className="mr-2 h-4 w-4" />
+                  {t("oficina.abrir.titulo")}
+                </Button>
+              </div>
             )}
           </div>
         ) : (
@@ -224,16 +264,16 @@ export default function OficinaPage({ formato = "docx" }: { formato?: FormatoDeO
                       <cfg.icono className="h-4 w-4 shrink-0 text-muted-foreground" />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-medium">
-                          {d.title || "Sin título"}
+                          {d.title || t("oficina.untitled")}
                         </span>
                         <span className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
                           {d.visibility === "equipo" ? (
-                            <><Users className="h-3 w-3" /> Equipo</>
+                            <><Users className="h-3 w-3" /> {t("common.team")}</>
                           ) : (
-                            <><Lock className="h-3 w-3" /> Privado</>
+                            <><Lock className="h-3 w-3" /> {t("oficina.private")}</>
                           )}
                           <span aria-hidden="true">·</span>
-                          <span>{cuando(d.updated_at)}</span>
+                          <time dateTime={d.updated_at} title={fechas.completa(d.updated_at)}>{fechas.corta(d.updated_at)}</time>
                         </span>
                       </span>
                     </button>
@@ -243,26 +283,57 @@ export default function OficinaPage({ formato = "docx" }: { formato?: FormatoDeO
                         <Button size="sm" variant="ghost" className="rounded-full"
                           onClick={() => mover(d, false)}>
                           <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
-                          Restaurar
+                          {t("oficina.restore")}
                         </Button>
                         <Button size="icon" variant="ghost"
                           className="h-8 w-8 rounded-full text-destructive hover:text-destructive"
-                          aria-label="Eliminar definitivamente"
+                          aria-label={t("oficina.deleteForever")}
                           onClick={() => setConfirmarBorrado(d)}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
-                    ) : esMio ? (
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8 shrink-0 rounded-full opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
-                        aria-label={`Mandar ${d.title} a la papelera`}
-                        onClick={() => mover(d, true)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    ) : null}
+                    ) : (
+                      // El menú ⋮ de Google Docs: abrir, abrir aparte, cambiar
+                      // el nombre, compartir y la papelera (esta, solo el
+                      // dueño: a los demás el trigger tocar_documento no los
+                      // deja esconderlo).
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 shrink-0 rounded-full text-muted-foreground"
+                            aria-label={t("oficina.menu.opciones", { name: d.title || t("oficina.untitled") })}
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-64">
+                          <DropdownMenuItem onSelect={() => navigate(`/oficina/${d.id}`)}>
+                            <cfg.icono className="mr-2 h-4 w-4" />{t("oficina.menu.abrir")}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => window.open(`/oficina/${d.id}`, "_blank", "noopener")}>
+                            <ExternalLink className="mr-2 h-4 w-4" />{t("oficina.menu.abrirPestana")}
+                          </DropdownMenuItem>
+                          {puedoEditarDocumento(d, user?.id, paraEditar.data) && (
+                            <DropdownMenuItem onSelect={() => setRenombrando(d)}>
+                              <Pencil className="mr-2 h-4 w-4" />{t("oficina.menu.renombrar")}
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuItem onSelect={() => setCompartiendo(d)}>
+                            <Share2 className="mr-2 h-4 w-4" />{t("oficina.menu.compartir")}
+                          </DropdownMenuItem>
+                          {esMio && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onSelect={() => mover(d, true)}>
+                                <Trash2 className="mr-2 h-4 w-4" />{t("oficina.menu.papelera")}
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
                   </div>
                 </li>
               );
@@ -270,6 +341,41 @@ export default function OficinaPage({ formato = "docx" }: { formato?: FormatoDeO
           </ul>
         )}
       </div>
+
+      <DialogoAbrirArchivo abierto={abriendoArchivo} onCambiar={setAbriendoArchivo} formato={formato} />
+
+      {renombrando && (
+        <DialogoDeNombre
+          titulo={t("oficina.rename.titulo")}
+          etiqueta={t("oficina.rename.etiqueta")}
+          inicial={renombrando.title}
+          boton={t("oficina.rename.guardar")}
+          ocupado={renombrar.isPending}
+          renombrando
+          maximo={200}
+          onCerrar={() => setRenombrando(null)}
+          onGuardar={(title) => cambiarNombre(renombrando, title)}
+        />
+      )}
+
+      {compartiendo && (
+        <DialogoDeCompartir
+          abierto
+          onCerrar={() => setCompartiendo(null)}
+          documentoId={compartiendo.id}
+          titulo={compartiendo.title || t("oficina.untitled")}
+          ownerId={compartiendo.owner_id}
+          visibilidad={compartiendo.visibility}
+          onVisibilidadCambiada={() => {
+            // La fila tiene que mostrar el acceso nuevo (Equipo / Privado).
+            void docs.refetch().then((r) => {
+              const nuevo = r.data?.find((x) => x.id === compartiendo.id);
+              if (nuevo) setCompartiendo(nuevo);
+            });
+          }}
+          soyDueno={compartiendo.owner_id === user?.id}
+        />
+      )}
 
       {/* Borrar de la papelera SÍ es definitivo, así que se pregunta — y con el
           diálogo de Maven, no el del navegador. */}
@@ -279,13 +385,13 @@ export default function OficinaPage({ formato = "docx" }: { formato?: FormatoDeO
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar «{confirmarBorrado?.title}»?</AlertDialogTitle>
+            <AlertDialogTitle>{t("oficina.deleteTitle", { name: confirmarBorrado?.title ?? "" })}</AlertDialogTitle>
             <AlertDialogDescription>
-              Se borra el documento y todas sus versiones. Esto no se puede deshacer.
+              {t("oficina.deleteDesc")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="rounded-full">Cancelar</AlertDialogCancel>
+            <AlertDialogCancel className="rounded-full" />
             <AlertDialogAction
               className="rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => {
@@ -293,13 +399,14 @@ export default function OficinaPage({ formato = "docx" }: { formato?: FormatoDeO
                 setConfirmarBorrado(null);
                 if (!d) return;
                 borrar.mutate(d.id, {
-                  onSuccess: () => toast.success("Documento eliminado"),
-                  onError: (e) => toast.error((e as Error).message || "No se pudo eliminar"),
+                  onSuccess: () => toast.success(t("oficina.deleted")),
+                  onError: (e) => toast.error((e as Error).message || t("common.couldNotDelete")),
                 });
               }}
             >
-              Eliminar
+              {t("common.delete")}
             </AlertDialogAction>
+
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

@@ -3,7 +3,9 @@ import DataTableShell from "@/components/ui/data-table-shell";
 import { MaskedPhone } from "@/components/MaskedPhone";
 import { ArrowLeft, Plus, UserPlus, Clock, Search, List, LayoutGrid, FileText, BarChart3, Target, TrendingUp, Star, ArrowUpRight, ArrowRight, ArrowDownRight, Eye, ClipboardCheck } from "lucide-react";
 import { format, isSameDay, differenceInMinutes, differenceInSeconds, startOfDay, endOfDay, subDays } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Button } from "@/components/ui/button";
@@ -45,21 +47,24 @@ const calidadVariant: Record<string, "success-soft" | "primary-soft" | "warning-
   c: "destructive-soft",
 };
 
-const QA_RATING_OPTIONS = [
-  { value: "bien", label: "Bien", variant: "success-soft" as const },
-  { value: "regular", label: "Regular", variant: "warning-soft" as const },
-  { value: "mal", label: "Mal", variant: "destructive-soft" as const },
+// `value` es el rating que se guarda en leadgen_qa; en pantalla va t(labelKey).
+const QA_RATING_OPTIONS: Array<{ value: string; labelKey: TranslationKey; variant: "success-soft" | "warning-soft" | "destructive-soft" }> = [
+  { value: "bien", labelKey: "leadgen.qa.good", variant: "success-soft" },
+  { value: "regular", labelKey: "leadgen.qa.fair", variant: "warning-soft" },
+  { value: "mal", labelKey: "leadgen.qa.poor", variant: "destructive-soft" },
 ];
 
-const tabs = [
+const tabs: Array<{ id: string; label?: string; labelKey?: TranslationKey }> = [
   { id: "leads", label: "Leads" },
-  { id: "rendimiento", label: "Rendimiento" },
-  { id: "qa", label: "QA / Retroalimentación" },
+  { id: "rendimiento", labelKey: "leadgen.tab.performance" },
+  { id: "qa", labelKey: "leadgen.detail.tabQa" },
 ];
 
 const OBJETIVO_POR_HORA = 20;
 
 const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: AgentDetailViewProps) => {
+  const f = useFormato();
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState("leads");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [searchTerm, setSearchTerm] = useState("");
@@ -176,7 +181,7 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
         <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3">
           <button onClick={onBack} className="hover:text-foreground transition-colors">LeadGen</button>
           <span>/</span>
-          <span className="text-foreground">Detalle Agente</span>
+          <span className="text-foreground">{t("leadgen.detail.breadcrumb")}</span>
         </div>
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-4">
@@ -190,13 +195,13 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
             <div className="flex items-center gap-4 ml-4">
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/50 border">
                 <span className="h-2 w-2 rounded-full bg-success animate-pulse" />
-                <span className="text-xs text-muted-foreground">Tiempo Activo</span>
+                <span className="text-xs text-muted-foreground">{t("leadgen.perf.activeTime")}</span>
                 <span className="text-sm font-mono font-semibold">
                   {String(activeHours).padStart(2, "0")}h {String(activeMinutes).padStart(2, "0")}min {String(activeSeconds).padStart(2, "0")}s
                 </span>
               </div>
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/50 border">
-                <span className="text-xs text-muted-foreground">Última Hora</span>
+                <span className="text-xs text-muted-foreground">{t("leadgen.perf.lastHour")}</span>
                 <span className="text-sm font-semibold">{lastHourLeads.length}</span>
                 <Badge className={`text-xs ${lastHourDelta >= 0 ? "bg-success/20 text-success border-success/30" : "bg-destructive/20 text-destructive border-destructive/30"}`}>
                   {lastHourDelta >= 0 ? `+${lastHourDelta}` : lastHourDelta}
@@ -206,7 +211,7 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
           </div>
           <div className="flex items-center gap-2">
             <Button variant="default" size="sm"><Plus className="h-4 w-4 mr-1" />Lead</Button>
-            <Button variant="outline" size="sm"><UserPlus className="h-4 w-4 mr-1" />Contacto</Button>
+            <Button variant="outline" size="sm"><UserPlus className="h-4 w-4 mr-1" />{t("leadgen.col.contact")}</Button>
           </div>
         </div>
       </header>
@@ -219,7 +224,7 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
             <Card className="cursor-default transition-all duration-200 hover:bg-gradient-to-br hover:from-primary/15 hover:to-transparent hover:border-primary/40">
               <CardContent className="p-4">
                 <div className="flex items-start justify-between">
-                  <p className="text-sm text-muted-foreground">Última Hora</p>
+                  <p className="text-sm text-muted-foreground">{t("leadgen.perf.lastHour")}</p>
                   <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/20">
                     <Clock className="h-4 w-4 text-primary" />
                   </div>
@@ -230,7 +235,7 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
             <Card className="cursor-default transition-all duration-200 hover:bg-gradient-to-br hover:from-success/15 hover:to-transparent hover:border-success/40">
               <CardContent className="p-4">
                 <div className="flex items-start justify-between">
-                  <p className="text-sm text-muted-foreground">Total Hoy</p>
+                  <p className="text-sm text-muted-foreground">{t("leadgen.perf.totalToday")}</p>
                   <div className="flex h-8 w-8 items-center justify-center rounded-md bg-success/20">
                     <Target className="h-4 w-4 text-success" />
                   </div>
@@ -242,8 +247,8 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
               <CardContent className="p-4">
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-sm text-muted-foreground">Promedio por Hora</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">Objetivo: {OBJETIVO_POR_HORA}/hora</p>
+                    <p className="text-sm text-muted-foreground">{t("leadgen.perf.avgPerHour")}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{t("leadgen.perf.target", { count: OBJETIVO_POR_HORA })}</p>
                   </div>
                   <div className="flex h-8 w-8 items-center justify-center rounded-md bg-warning/20">
                     <TrendingUp className="h-4 w-4 text-warning" />
@@ -251,7 +256,7 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
                 </div>
                 <p className="mt-2 text-2xl font-bold text-warning">{avgPerHour}</p>
                 <p className={`text-xs font-semibold mt-0.5 ${diferencia >= 0 ? "text-success" : "text-destructive"}`}>
-                  Esperados: {esperados} | {diferencia >= 0 ? `+${diferencia}` : diferencia}
+                  {t("leadgen.perf.expected", { expected: esperados, diff: diferencia >= 0 ? `+${diferencia}` : diferencia })}
                 </p>
               </CardContent>
             </Card>
@@ -286,7 +291,7 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
           <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1">
             {tabs.map((tab) => (
               <Button key={tab.id} variant={activeTab === tab.id ? "secondary" : "ghost"} size="sm" onClick={() => setActiveTab(tab.id)} className="text-xs">
-                {tab.label}
+                {tab.labelKey ? t(tab.labelKey) : tab.label}
               </Button>
             ))}
           </div>
@@ -298,24 +303,24 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
               <div className="flex items-center gap-3 flex-wrap">
                 <div className="relative flex-1 max-w-xs">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input placeholder="Buscar lead..." className="pl-9 h-9" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                  <Input placeholder={t("leadgen.searchLead")} className="pl-9 h-9" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                 </div>
-                <DateRangePicker from={dateFrom} to={dateTo} onApply={(f, t) => { setDateFrom(f); setDateTo(t); }} placeholder="Seleccionar fechas" className="h-9" />
+                <DateRangePicker from={dateFrom} to={dateTo} onApply={(from, to) => { setDateFrom(from); setDateTo(to); }} placeholder={t("leadgen.detail.selectDates")} className="h-9" />
                 <Select value={filterCalidad || undefined} onValueChange={(v) => setFilterCalidad(v === "__all__" ? "" : v)}>
-                  <SelectTrigger className="w-full sm:w-[120px] h-9"><SelectValue placeholder="Categoría" /></SelectTrigger>
+                  <SelectTrigger className="w-full sm:w-[120px] h-9"><SelectValue placeholder={t("common.category")} /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__all__">Todas</SelectItem>
+                    <SelectItem value="__all__">{t("common.allF")}</SelectItem>
                     <SelectItem value="a+">A+</SelectItem><SelectItem value="a">A</SelectItem>
                     <SelectItem value="b+">B+</SelectItem><SelectItem value="b">B</SelectItem>
                     <SelectItem value="c">C</SelectItem>
                   </SelectContent>
                 </Select>
                 <Select value={filterContacto || undefined} onValueChange={(v) => setFilterContacto(v === "__all__" ? "" : v)}>
-                  <SelectTrigger className="w-full sm:w-[120px] h-9"><SelectValue placeholder="Contacto" /></SelectTrigger>
+                  <SelectTrigger className="w-full sm:w-[120px] h-9"><SelectValue placeholder={t("leadgen.col.contact")} /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__all__">Todos</SelectItem>
-                    <SelectItem value="con_telefono">Con Teléfono</SelectItem>
-                    <SelectItem value="sin_telefono">Sin Teléfono</SelectItem>
+                    <SelectItem value="__all__">{t("common.all")}</SelectItem>
+                    <SelectItem value="con_telefono">{t("leadgen.status.withPhone")}</SelectItem>
+                    <SelectItem value="sin_telefono">{t("leadgen.status.withoutPhone")}</SelectItem>
                   </SelectContent>
                 </Select>
                 <div className="ml-auto flex gap-1">
@@ -325,13 +330,13 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
               </div>
 
               <p className="text-sm text-muted-foreground">
-                Leads Encontrados: <span className="font-semibold text-foreground">{filteredLeads.length}</span>
+                {t("leadgen.detail.leadsFound")} <span className="font-semibold text-foreground">{filteredLeads.length}</span>
               </p>
 
             {filteredLeads.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16">
                 <FileText className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                <p className="text-muted-foreground text-sm">No hay leads para este agente con estos filtros</p>
+                <p className="text-muted-foreground text-sm">{t("leadgen.detail.empty")}</p>
               </div>
             ) : viewMode === "list" ? (
               <DataTableShell
@@ -362,7 +367,7 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
                             </Badge>
                           </div>
                           <div className="flex items-center justify-end text-xs text-muted-foreground">
-                            <span>{format(new Date(lead.created_at), "d MMM", { locale: es })}</span>
+                            <span>{format(new Date(lead.created_at), f.idioma === "en" ? "MMM d" : "d MMM", { locale: f.fechas })}</span>
                           </div>
                           {lead.country_code && <p className="text-xs text-muted-foreground mt-1">{lead.country_code}</p>}
                         </CardContent>
@@ -378,7 +383,7 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
             const dailyData = Array.from({ length: 7 }, (_, i) => {
               const day = subDays(now, 6 - i);
               return {
-                label: format(day, "EEE dd", { locale: es }),
+                label: format(day, "EEE dd", { locale: f.fechas }),
                 count: agentLeads.filter(l => isSameDay(new Date(l.created_at), day)).length,
               };
             });
@@ -410,20 +415,20 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
                   <CardContent className="p-5">
                     <div className="flex items-center gap-2 mb-4">
                       <BarChart3 className="h-5 w-5 text-primary" />
-                      <h3 className="font-semibold">Resumen del Rango Seleccionado</h3>
+                      <h3 className="font-semibold">{t("leadgen.perf.summaryRange")}</h3>
                     </div>
                     <div className="grid grid-cols-3 gap-4">
                       <div className="rounded-lg border bg-muted/30 p-4 text-center">
                         <p className="text-2xl font-bold text-primary">{agentLeads.length}</p>
-                        <p className="text-xs text-muted-foreground mt-1">Total Leads</p>
+                        <p className="text-xs text-muted-foreground mt-1">{t("leadgen.perf.totalLeads")}</p>
                       </div>
                       <div className="rounded-lg border bg-muted/30 p-4 text-center">
                         <p className="text-2xl font-bold text-primary">{avgPerDay}</p>
-                        <p className="text-xs text-muted-foreground mt-1">Promedio/Día</p>
+                        <p className="text-xs text-muted-foreground mt-1">{t("leadgen.perf.avgPerDay")}</p>
                       </div>
                       <div className="rounded-lg border bg-muted/30 p-4 text-center">
                         <p className="text-2xl font-bold text-primary">{hoursWorked.toFixed(1)}h</p>
-                        <p className="text-xs text-muted-foreground mt-1">Horas Activas</p>
+                        <p className="text-xs text-muted-foreground mt-1">{t("leadgen.perf.activeHours")}</p>
                       </div>
                     </div>
                   </CardContent>
@@ -432,7 +437,7 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <Card>
                     <CardContent className="p-5">
-                      <h3 className="font-semibold mb-4">Leads por Día</h3>
+                      <h3 className="font-semibold mb-4">{t("leadgen.perf.leadsPerDay")}</h3>
                       <div className="h-[250px]">
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart data={dailyData}>
@@ -449,7 +454,7 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
 
                   <Card>
                     <CardContent className="p-5">
-                      <h3 className="font-semibold mb-4">Leads por Hora (Hoy)</h3>
+                      <h3 className="font-semibold mb-4">{t("leadgen.perf.leadsPerHourToday")}</h3>
                       <div className="h-[250px]">
                         <ResponsiveContainer width="100%" height="100%">
                           <LineChart data={filteredHourly}>
@@ -468,7 +473,7 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
                 {qualityDistData.length > 0 && (
                   <Card>
                     <CardContent className="p-5">
-                      <h3 className="font-semibold mb-4">Distribución por Categoría</h3>
+                      <h3 className="font-semibold mb-4">{t("leadgen.perf.byCategory")}</h3>
                       <div className="h-[220px]">
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart data={qualityDistData} layout="vertical" margin={{ left: 10 }}>
@@ -498,12 +503,12 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
           return (
             <div className="flex-1 flex flex-col min-h-0 px-6 pb-6 pt-4 gap-4">
               <p className="text-sm text-muted-foreground">
-                Leads con QA realizado: <span className="font-semibold text-foreground">{qaLeads.length}</span>
+                {t("leadgen.detail.qaDoneCount")} <span className="font-semibold text-foreground">{qaLeads.length}</span>
               </p>
               {qaLeads.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16">
                   <FileText className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                  <p className="text-muted-foreground text-sm">No hay leads con QA realizado</p>
+                  <p className="text-muted-foreground text-sm">{t("leadgen.detail.qaEmpty")}</p>
                 </div>
               ) : (
                 <DataTableShell
@@ -518,12 +523,12 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Fecha</TableHead>
+                        <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">{t("common.date")}</TableHead>
                         <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Handle</TableHead>
-                        <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Categoría</TableHead>
-                        <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">País</TableHead>
+                        <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">{t("common.category")}</TableHead>
+                        <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">{t("common.country")}</TableHead>
                         <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">QA</TableHead>
-                        <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] w-[80px]">Acciones</TableHead>
+                        <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] w-[80px]">{t("common.actions")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -534,7 +539,7 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
                         return (
                           <TableRow key={lead.id}>
                             <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                              {format(new Date(lead.created_at), "dd/MM/yyyy", { locale: es })}
+                              {format(new Date(lead.created_at), f.idioma === "en" ? "MM/dd/yyyy" : "dd/MM/yyyy", { locale: f.fechas })}
                             </TableCell>
                             <TableCell className="font-medium text-sm">@{lead.model_handle}</TableCell>
                             <TableCell>
@@ -546,7 +551,7 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
                             <TableCell>
                               {existingQa ? (
                                 <div className="flex flex-col gap-0.5">
-                                  <Badge variant={qaOpt?.variant ?? "secondary-soft"}>{qaOpt?.label ?? existingQa.rating}</Badge>
+                                  <Badge variant={qaOpt?.variant ?? "secondary-soft"}>{qaOpt ? t(qaOpt.labelKey) : existingQa.rating}</Badge>
                                   {existingQa.comment && <span className="text-xs text-muted-foreground truncate max-w-[150px]">{existingQa.comment}</span>}
                                 </div>
                               ) : canReview ? (
@@ -554,11 +559,11 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
                                   <PopoverTrigger asChild>
                                     <button className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
                                       <ClipboardCheck className="h-3.5 w-3.5" />
-                                      <span>Revisar</span>
+                                      <span>{t("leadgen.qa.review")}</span>
                                     </button>
                                   </PopoverTrigger>
                                   <PopoverContent className="w-64 p-3" align="start">
-                                    <p className="text-xs font-medium mb-2">Calificar lead</p>
+                                    <p className="text-xs font-medium mb-2">{t("leadgen.qa.rateLead")}</p>
                                     <div className="flex gap-1 mb-2">
                                       {QA_RATING_OPTIONS.map((opt) => (
                                         <Button
@@ -568,12 +573,12 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
                                           className="flex-1 h-7 text-xs"
                                           onClick={() => setQaRating(prev => ({...prev, [lead.id]: opt.value}))}
                                         >
-                                          {opt.label}
+                                          {t(opt.labelKey)}
                                         </Button>
                                       ))}
                                     </div>
                                     <Textarea
-                                      placeholder="Comentario (opcional)"
+                                      placeholder={t("leadgen.qa.commentOptional")}
                                       value={qaComment[lead.id] || ""}
                                       onChange={(e) => setQaComment(prev => ({...prev, [lead.id]: e.target.value}))}
                                       className="text-xs h-16 mb-2"
@@ -594,7 +599,7 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
                                         setQaOpenId(null);
                                       }}
                                     >
-                                      {createQA.isPending ? "Guardando..." : "Guardar"}
+                                      {createQA.isPending ? t("leadgen.saving") : t("common.save")}
                                     </Button>
                                   </PopoverContent>
                                 </Popover>
@@ -623,7 +628,7 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
       <Dialog open={!!selectedLead} onOpenChange={(open) => { if (!open) setSelectedLead(null); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Detalle del Lead</DialogTitle>
+            <DialogTitle>{t("leadgen.detail.leadDetail")}</DialogTitle>
           </DialogHeader>
           {selectedLead && (
             <div className="space-y-4">
@@ -637,31 +642,31 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
                   <p className="text-sm font-medium">#{selectedLead.ticket_number || "—"}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Categoría</p>
+                  <p className="text-xs text-muted-foreground">{t("common.category")}</p>
                   <p className="text-sm font-medium">{selectedLead.quality?.toUpperCase() || "—"}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">País</p>
+                  <p className="text-xs text-muted-foreground">{t("common.country")}</p>
                   <p className="text-sm font-medium">{selectedLead.country_code || "—"}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Teléfono</p>
+                  <p className="text-xs text-muted-foreground">{t("common.phone")}</p>
                   <p className="text-sm font-medium"><MaskedPhone phone={selectedLead.phone_e164 || selectedLead.phone_raw} /></p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Fecha</p>
-                  <p className="text-sm font-medium">{format(new Date(selectedLead.created_at), "dd/MM/yyyy hh:mm a", { locale: es })}</p>
+                  <p className="text-xs text-muted-foreground">{t("common.date")}</p>
+                  <p className="text-sm font-medium">{format(new Date(selectedLead.created_at), f.idioma === "en" ? "MM/dd/yyyy hh:mm a" : "dd/MM/yyyy hh:mm a", { locale: f.fechas })}</p>
                 </div>
               </div>
               {selectedLead.notes && (
                 <div>
-                  <p className="text-xs text-muted-foreground mb-1">Notas</p>
+                  <p className="text-xs text-muted-foreground mb-1">{t("leadgen.detail.notes")}</p>
                   <p className="text-sm bg-muted/50 rounded-md p-3">{selectedLead.notes}</p>
                 </div>
               )}
               {selectedLead.company && (
                 <div>
-                  <p className="text-xs text-muted-foreground">Agente</p>
+                  <p className="text-xs text-muted-foreground">{t("leadgen.col.agent")}</p>
                   <p className="text-sm font-medium">{selectedLead.company}</p>
                 </div>
               )}

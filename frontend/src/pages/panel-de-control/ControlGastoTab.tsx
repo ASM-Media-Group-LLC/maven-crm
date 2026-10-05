@@ -4,6 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Brain, Mic, Search, AlertTriangle, DollarSign } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
 import {
   ResponsiveContainer,
   LineChart,
@@ -147,6 +149,8 @@ interface ControlGastoTabProps {
 }
 
 const ControlGastoTab = ({ range }: ControlGastoTabProps = {}) => {
+  const f = useFormato();
+  const { t } = useLanguage();
   const capsQ = useCaps();
   const summaryQ = useUsageSummary(range?.from, range?.to);
   const caps = capsQ.data ?? [];
@@ -215,14 +219,14 @@ const ControlGastoTab = ({ range }: ControlGastoTabProps = {}) => {
       <Card className="p-5 border-2 border-indigo-500/30 relative overflow-hidden">
         <div className="relative">
           <p className="text-xs text-foreground/80 font-semibold">
-            Total en el rango
+            {t("panel.spend.total")}
           </p>
           <div className="flex items-end gap-3 mt-2">
             <p className="text-4xl font-bold tabular-nums leading-none">
               ${totalMonth.toFixed(2)}
             </p>
             <p className="text-xs text-muted-foreground pb-1">
-              de ${totalCap.toFixed(2)} caps combinados · {(totalPct * 100).toFixed(1)}%
+              {t("panel.spend.ofCaps", { cap: totalCap.toFixed(2), pct: (totalPct * 100).toFixed(1) })}
             </p>
           </div>
         </div>
@@ -263,7 +267,7 @@ const ControlGastoTab = ({ range }: ControlGastoTabProps = {}) => {
                     ${s.monthSpend.toFixed(2)}
                   </p>
                   <p className="text-[10px] text-muted-foreground mt-1 line-clamp-2">
-                    de ${s.cap.toFixed(2)} · {s.callsThisMonth.toLocaleString("es")} calls
+                    {t("panel.spend.ofCap", { cap: s.cap.toFixed(2), calls: s.callsThisMonth.toLocaleString(f.idioma === "en" ? "en-US" : "es") })}
                   </p>
                 </div>
                 {/* Progress bar — fina, status-coloreada. */}
@@ -275,13 +279,13 @@ const ControlGastoTab = ({ range }: ControlGastoTabProps = {}) => {
                     />
                   </div>
                   <p className="text-[10px] text-muted-foreground tabular-nums mt-1">
-                    {(s.pctOfCap * 100).toFixed(1)}% del cap
+                    {t("panel.spend.pctOfCap", { pct: (s.pctOfCap * 100).toFixed(1) })}
                   </p>
                 </div>
                 {s.status === "red" && (
                   <div className="flex items-center gap-1.5 text-[11px] text-destructive font-medium">
                     <AlertTriangle className="h-3 w-3" />
-                    Cerca del cap mensual
+                    {t("panel.spend.nearCap")}
                   </div>
                 )}
               </div>
@@ -298,7 +302,7 @@ const ControlGastoTab = ({ range }: ControlGastoTabProps = {}) => {
             </div>
             <div>
               <p className="text-xs text-foreground/80 font-semibold">
-                % del cap combinado
+                {t("panel.spend.combinedPct")}
               </p>
               <p className="text-3xl font-bold tabular-nums leading-tight">
                 {(totalPct * 100).toFixed(1)}
@@ -314,10 +318,10 @@ const ControlGastoTab = ({ range }: ControlGastoTabProps = {}) => {
 
       {/* Gráfico diario */}
       <Card className="p-4">
-        <h2 className="text-sm font-semibold mb-3">Gasto diario (rango seleccionado)</h2>
+        <h2 className="text-sm font-semibold mb-3">{t("panel.spend.daily")}</h2>
         {chartData.length === 0 ? (
           <p className="text-xs text-muted-foreground py-8 text-center">
-            Sin actividad en el rango seleccionado.
+            {t("panel.spend.noActivity")}
           </p>
         ) : (
           <div className="h-64">
@@ -346,28 +350,28 @@ const ControlGastoTab = ({ range }: ControlGastoTabProps = {}) => {
 
       {/* Actividad reciente */}
       <Card className="p-4">
-        <h2 className="text-sm font-semibold mb-3">Últimas 50 calls</h2>
+        <h2 className="text-sm font-semibold mb-3">{t("panel.spend.last50")}</h2>
         {recent.length === 0 ? (
           <p className="text-xs text-muted-foreground py-8 text-center">
-            Sin calls registradas todavía. El logging empieza después del próximo deploy de las edge functions / worker.
+            {t("panel.spend.noCalls")}
           </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="tabla-movil w-full text-sm">
               <thead>
                 <tr className="text-left text-xs text-muted-foreground border-b border-border">
-                  <th className="py-2 pr-3">Fecha</th>
-                  <th className="py-2 pr-3">Provider</th>
-                  <th className="py-2 pr-3">Operación</th>
-                  <th className="py-2 pr-3">Modelo</th>
-                  <th className="py-2 pr-3 text-right">Costo</th>
+                  <th className="py-2 pr-3">{t("common.date")}</th>
+                  <th className="py-2 pr-3">{t("panel.spend.provider")}</th>
+                  <th className="py-2 pr-3">{t("panel.spend.operation")}</th>
+                  <th className="py-2 pr-3">{t("panel.spend.model")}</th>
+                  <th className="py-2 pr-3 text-right">{t("panel.spend.cost")}</th>
                 </tr>
               </thead>
               <tbody>
                 {recent.map((r, i) => (
                   <tr key={i} className="border-b border-border/40">
                     <td className="py-1.5 pr-3 text-xs text-muted-foreground tabular-nums">
-                      {new Date(r.occurred_at).toLocaleString("es-CO", {
+                      {new Date(r.occurred_at).toLocaleString(f.intl("es-CO"), {
                         month: "short",
                         day: "2-digit",
                         hour: "2-digit",

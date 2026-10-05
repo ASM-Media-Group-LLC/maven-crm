@@ -3,9 +3,21 @@ import { ChatMessage, UserProfile } from "../types";
 import type { DeletedMessageArchive } from "../useDeletedMessages";
 import { ReactionGroup } from "@/hooks/useReactions";
 import MessageBubble from "./MessageBubble";
+import { GaleriaDelChat, mediaDelChat } from "../galeriaDelChat";
 import { cn } from "@/lib/utils";
 import { Loader2, ChevronDown } from "lucide-react";
 import { agruparEnAlbumes } from "@/lib/albumDeImagenes";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { Language } from "@/lib/i18n";
+import type { Traductor } from "../preview";
+import { isSameGroup } from "../utils";
+
+/** Dónde quedó cada conversación al salir de la página: el mensaje de arriba
+ *  de la pantalla y cuánto se veía de él. Vive mientras la app esté abierta;
+ *  al volver (del Correo, por ejemplo) se retoma ahí en vez de saltar al fondo
+ *  (Keila, 02/10). Si estaba al fondo no se guarda nada: abre al fondo, como
+ *  siempre. */
+const dondeQuedo = new Map<string, { ancla: string; desfase: number }>();
 
 interface MessageListProps {
   messages: ChatMessage[];
@@ -15,6 +27,8 @@ interface MessageListProps {
   searchQuery: string;
   loading: boolean;
   onReply: (msg: ChatMessage) => void;
+  /** Llevar la vista a un mensaje (el clic en una cita). */
+  onIrAlMensaje?: (messageId: string) => void;
   onOpenProfile?: (userId: string) => void;
   deletedArchive?: Record<string, DeletedMessageArchive>;
   onCopy: (content: string) => void;
@@ -39,14 +53,15 @@ interface MessageListProps {
   onLoadMore?: () => void;
 }
 
-function formatDateSeparator(dateStr: string): string {
+function formatDateSeparator(dateStr: string, t: Traductor, lang: Language): string {
   const date = new Date(dateStr);
   const now = new Date();
   const yesterday = new Date(now);
   yesterday.setDate(now.getDate() - 1);
-  if (date.toDateString() === now.toDateString()) return "Hoy";
-  if (date.toDateString() === yesterday.toDateString()) return "Ayer";
-  return date.toLocaleDateString("es", { day: "numeric", month: "long", year: "numeric" });
+  if (date.toDateString() === now.toDateString()) return t("common.today");
+  if (date.toDateString() === yesterday.toDateString()) return t("messenger.preview.ayer");
+  // En español, el "es" de siempre; solo en inglés pasa a en-US.
+  return date.toLocaleDateString(lang === "en" ? "en-US" : "es", { day: "numeric", month: "long", year: "numeric" });
 }
 
 function groupMessages(messages: ChatMessage[]) {
@@ -63,18 +78,14 @@ function groupMessages(messages: ChatMessage[]) {
   return groups;
 }
 
-function isSameGroup(a: ChatMessage, b: ChatMessage): boolean {
-  if (a.sender_id !== b.sender_id) return false;
-  return Math.abs(new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) < 120000;
-}
-
 export default function MessageList({
   messages, profiles, chatType, currentUserId, searchQuery,
-  loading, onReply, onOpenProfile, deletedArchive, onCopy, onEdit, onDelete, onRetry,
+  loading, onReply, onIrAlMensaje, onOpenProfile, deletedArchive, onCopy, onEdit, onDelete, onRetry,
   getReactionsForMessage, onToggleReaction, getReadByUsers, getDeliveredByUsers, totalParticipants,
   highlightedMsgId, onOpenThread, getThreadCount, getUnreadThreadCount,
   hasMore, loadingMore, onLoadMore, className,
 }: MessageListProps) {
+  const { t, language } = useLanguage();
   const scrollRef = useRef<HTMLDivElement>(null);
   const msgRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const prevMessagesLengthRef = useRef(0);
@@ -109,11 +120,23 @@ export default function MessageList({
     const lastId = lastMsg.id;
 
     if (conv !== currentConvRef.current) {
+      // Solo al VOLVER a la página (la lista recién montada): cambiar de chat
+      // dentro del Messenger sigue abriendo al fondo.
+      const alVolver = currentConvRef.current === null;
       currentConvRef.current = conv;
-      pinToBottomRef.current = true;
-      el.scrollTop = el.scrollHeight;
-      setNewCount(0);
-      setShowJump(false);
+      const quedo = alVolver && conv ? dondeQuedo.get(conv) : undefined;
+      const anclaEl = quedo ? msgRefs.current[quedo.ancla] : null;
+      if (quedo && anclaEl) {
+        pinToBottomRef.current = false;
+        el.scrollTop += anclaEl.getBoundingClientRect().top - el.getBoundingClientRect().top - quedo.desfase;
+        setNewCount(0);
+        setShowJump(true);
+      } else {
+        pinToBottomRef.current = true;
+        el.scrollTop = el.scrollHeight;
+        setNewCount(0);
+        setShowJump(false);
+      }
     } else if (messages.length > prevMessagesLengthRef.current) {
       // Distingue mensaje NUEVO al fondo de históricos prepend-eados arriba (mismo lastId).
       const isNewAtBottom = lastId !== prevLastIdRef.current;
@@ -166,12 +189,34 @@ export default function MessageList({
     }
   }, [messages, loadingMore]);
 
+  // Anotar dónde quedó (ver dondeQuedo), cuando el scroll se calma: medir cada
+  // burbuja en cada evento de scroll trabaría la lista.
+  const anotarRef = useRef<number | undefined>(undefined);
+  const anotarDondeQuedo = useCallback(() => {
+    window.clearTimeout(anotarRef.current);
+    anotarRef.current = window.setTimeout(() => {
+      const el = scrollRef.current;
+      const conv = currentConvRef.current;
+      if (!el || !conv) return;
+      if (pinToBottomRef.current) { dondeQuedo.delete(conv); return; }
+      const arriba = el.getBoundingClientRect().top;
+      for (const m of messages) {
+        const nodo = msgRefs.current[m.id];
+        if (!nodo) continue;
+        const r = nodo.getBoundingClientRect();
+        if (r.bottom > arriba) { dondeQuedo.set(conv, { ancla: m.id, desfase: r.top - arriba }); return; }
+      }
+    }, 150);
+  }, [messages]);
+  useEffect(() => () => window.clearTimeout(anotarRef.current), []);
+
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
     // ¿el usuario está pegado al fondo? Define si seguimos autoscrolleando.
     const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
     pinToBottomRef.current = atBottom;
+    anotarDondeQuedo();
     // Botón "↓": visible mientras esté scrolleado arriba; al volver al fondo se limpia.
     if (atBottom) { setNewCount(0); setShowJump(false); }
     else setShowJump(true);
@@ -181,7 +226,7 @@ export default function MessageList({
       wasLoadingMoreRef.current = true;
       onLoadMore();
     }
-  }, [hasMore, loadingMore, onLoadMore]);
+  }, [hasMore, loadingMore, onLoadMore, anotarDondeQuedo]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -200,6 +245,11 @@ export default function MessageList({
     return m;
   }, [messages]);
 
+  // Las fotos y videos del chat, en orden, para las flechas del visor. Memo:
+  // es el valor de un contexto, y uno nuevo por render repintaría TODAS las
+  // burbujas (que son memo) cada vez.
+  const galeria = useMemo(() => mediaDelChat(messages), [messages]);
+
   if (messages.length === 0) {
     return (
       // El mismo fondo (y el mismo className del que llama) que con mensajes:
@@ -209,14 +259,15 @@ export default function MessageList({
           <div className="h-14 w-14 rounded-3xl bg-primary/8 flex items-center justify-center mx-auto">
             <span className="text-2xl">💬</span>
           </div>
-          <p className="text-sm text-muted-foreground">Envía el primer mensaje</p>
+          <p className="text-sm text-muted-foreground">{t("messenger.list.primerMensaje")}</p>
         </div>
       </div>
     );
   }
 
   return (
-    // `fondo-de-chat`: resplandor + papel tapiz detrás del scroller (index.css).
+    <GaleriaDelChat.Provider value={galeria}>
+    {/* `fondo-de-chat`: resplandor + papel tapiz detrás del scroller (index.css). */}
     <div className={cn("fondo-de-chat flex-1 relative overflow-hidden", className)}>
     <div ref={scrollRef} className="absolute inset-0 overflow-y-auto overflow-x-hidden">
       <div ref={contentRef} className="w-full py-4 px-3 md:px-6 space-y-1">
@@ -231,7 +282,7 @@ export default function MessageList({
               onClick={onLoadMore}
               className="text-xs text-primary hover:bg-primary/8 rounded-full px-4 py-1.5 transition-colors"
             >
-              Cargar mensajes anteriores
+              {t("messenger.list.cargarAnteriores")}
             </button>
           </div>
         )}
@@ -240,7 +291,7 @@ export default function MessageList({
           <div key={gi}>
             <div className="flex justify-center my-4">
               <span className="text-[11px] text-muted-foreground bg-primary/8 px-4 py-1 rounded-full font-medium select-none">
-                {formatDateSeparator(group.date)}
+                {formatDateSeparator(group.date, t, language)}
               </span>
             </div>
 
@@ -255,6 +306,9 @@ export default function MessageList({
 
               return group.messages.map((msg, mi) => {
                 const isMe = msg.sender_id === currentUserId;
+                // Un mensaje por API lleva su nombre («BLU») también si es mío o
+                // es un directo: si no, quien tiene la key lo vería como suyo.
+                const esApi = msg.api_key_id != null;
                 const prevMsg = mi > 0 ? group.messages[mi - 1] : null;
                 const nextMsg = mi < group.messages.length - 1 ? group.messages[mi + 1] : null;
                 const isFirstInGroup = !prevMsg || !isSameGroup(prevMsg, msg);
@@ -285,8 +339,9 @@ export default function MessageList({
                       onDelete={() => onDelete(msg.id)}
                       onRetry={onRetry ? () => onRetry(msg.id) : undefined}
                       replyMessage={msg.reply_to_id ? msgById.get(msg.reply_to_id) : undefined}
+                      onIrALaCita={msg.reply_to_id && onIrAlMensaje ? () => onIrAlMensaje(msg.reply_to_id!) : undefined}
                       showAvatar={isLastInGroup && !isMe}
-                      showSender={isFirstInGroup && !isMe}
+                      showSender={isFirstInGroup && (!isMe || esApi)}
                       isLastInGroup={isLastInGroup}
                       reactions={getReactionsForMessage(msg.id)}
                       onToggleReaction={(emoji) => onToggleReaction(msg.id, emoji)}
@@ -312,15 +367,16 @@ export default function MessageList({
       {showJump && (
         <button
           onClick={scrollToBottom}
-          aria-label="Ir al último mensaje"
+          aria-label={t("messenger.list.irAlUltimo")}
           className="absolute bottom-4 right-4 z-10 flex items-center gap-1.5 rounded-full bg-card shadow-lg border border-border/60 pl-3 pr-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted transition-colors animate-fade-in"
         >
           {newCount > 0 && (
-            <span className="text-primary">{newCount} {newCount === 1 ? "nuevo" : "nuevos"}</span>
+            <span className="text-primary">{newCount === 1 ? t("messenger.list.unNuevo") : t("messenger.list.nuevos", { n: newCount })}</span>
           )}
           <ChevronDown className="h-4 w-4 text-primary" />
         </button>
       )}
     </div>
+    </GaleriaDelChat.Provider>
   );
 }

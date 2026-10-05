@@ -17,20 +17,25 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { PageHeader } from "@/components/ui/page-header";
+import { useLanguage } from "@/hooks/useLanguage";
+import { useFormato } from "@/hooks/useFormato";
+import type { TranslationKey } from "@/lib/i18n";
 
-const STEPS = [
-  { id: 1, label: "Empleado y Período", icon: Users },
-  { id: 2, label: "Categorías", icon: BarChart3 },
-  { id: 3, label: "Feedback", icon: MessageSquare },
-  { id: 4, label: "Objetivos", icon: Target },
+const STEPS: { id: number; label: TranslationKey; icon: typeof Users }[] = [
+  { id: 1, label: "hrg.perfNew.step.employee", icon: Users },
+  { id: 2, label: "hrg.perfNew.step.categories", icon: BarChart3 },
+  { id: 3, label: "hrg.perfNew.step.feedback", icon: MessageSquare },
+  { id: 4, label: "hrg.perfNew.step.goals", icon: Target },
 ];
 
-const CATEGORIES = [
-  { key: "punctuality", label: "Puntualidad", desc: "Evalúa la consistencia en horarios, entregas a tiempo y respeto por los plazos establecidos." },
-  { key: "quality", label: "Calidad del Trabajo", desc: "Evalúa la precisión, atención al detalle y estándar general del trabajo entregado." },
-  { key: "teamwork", label: "Trabajo en Equipo", desc: "Evalúa la colaboración, comunicación y contribución positiva al equipo." },
-  { key: "initiative", label: "Iniciativa", desc: "Evalúa la proactividad, propuestas de mejora y capacidad de resolver problemas de forma autónoma." },
+const CATEGORIES: { key: string; label: TranslationKey; desc: TranslationKey }[] = [
+  { key: "punctuality", label: "hrg.perf.punctuality", desc: "hrg.perfNew.punctualityDesc" },
+  { key: "quality", label: "hrg.perfNew.quality", desc: "hrg.perfNew.qualityDesc" },
+  { key: "teamwork", label: "hrg.perf.teamwork", desc: "hrg.perfNew.teamworkDesc" },
+  { key: "initiative", label: "hrg.perf.initiative", desc: "hrg.perfNew.initiativeDesc" },
 ];
+
+const ESCALA: TranslationKey[] = ["hrg.perfNew.scale1", "hrg.perfNew.scale2", "hrg.perfNew.scale3", "hrg.perfNew.scale4", "hrg.perfNew.scale5"];
 
 interface Objective {
   title: string;
@@ -41,6 +46,8 @@ export default function HRPerformanceNew() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { t } = useLanguage();
+  const f = useFormato();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -71,11 +78,24 @@ export default function HRPerformanceNew() {
     try {
       const s = new Date(periodStart + "T12:00:00");
       const e = new Date(periodEnd + "T12:00:00");
+      // Idioma fijo a propósito: este texto se guarda en la base como `period` de la evaluación.
       return `${format(s, "MMM yyyy", { locale: es })} - ${format(e, "MMM yyyy", { locale: es })}`;
     } catch {
       return "";
     }
   }, [periodStart, periodEnd]);
+
+  // El mismo período, en el idioma de quien mira (el de arriba es el que se GUARDA).
+  const periodoVisible = useMemo(() => {
+    if (!periodStart || !periodEnd) return "";
+    try {
+      const s = new Date(periodStart + "T12:00:00");
+      const e = new Date(periodEnd + "T12:00:00");
+      return `${format(s, "MMM yyyy", { locale: f.fechas })} - ${format(e, "MMM yyyy", { locale: f.fechas })}`;
+    } catch {
+      return "";
+    }
+  }, [periodStart, periodEnd, f.fechas]);
 
   const canProceed = () => {
     if (step === 1) return !!employeeId && !!periodStart && !!periodEnd;
@@ -111,10 +131,10 @@ export default function HRPerformanceNew() {
       });
       if (error) throw error;
       queryClient.invalidateQueries({ queryKey: ["performance-all"] });
-      toast({ title: "Evaluación creada exitosamente" });
+      toast({ title: t("hrg.perfNew.created") });
       navigate("/hr/desempeno");
     } catch {
-      toast({ title: "Error al crear la evaluación", variant: "destructive" });
+      toast({ title: t("hrg.perfNew.createError"), variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
@@ -124,12 +144,12 @@ export default function HRPerformanceNew() {
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="shrink-0 border-b border-white/10 bg-background/30 backdrop-blur-xl px-6 py-4">
-        <Button variant="ghost" size="icon" className="mb-2 -ml-2" onClick={() => navigate("/hr/desempeno")}>
+        <Button variant="ghost" size="icon" className="mb-2 -ml-2" onClick={() => navigate("/hr/desempeno")} aria-label={t("common.back")}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <PageHeader
-          title="Nueva Evaluación de Desempeño"
-          subtitle="Complete los 4 pasos para crear una evaluación guiada"
+          title={t("hrg.perfNew.title")}
+          subtitle={t("hrg.perfNew.subtitle")}
         />
       </div>
 
@@ -148,7 +168,7 @@ export default function HRPerformanceNew() {
                   <span className={cn("flex h-7 w-7 items-center justify-center rounded-full border-2 text-xs font-bold transition-all", step === s.id ? "border-transparent bg-gradient-to-r from-accent to-primary text-white ring-2 ring-accent/30" : step > s.id ? "border-transparent bg-gradient-to-r from-accent to-primary text-white" : "border-muted-foreground/30 text-muted-foreground")}>
                     {step > s.id ? <Check className="h-3.5 w-3.5" /> : <Icon className="h-3.5 w-3.5" />}
                   </span>
-                  <span className="hidden sm:inline">{s.label}</span>
+                  <span className="hidden sm:inline">{t(s.label)}</span>
                 </button>
                 {i < STEPS.length - 1 && <div className={cn("h-px flex-1 mx-2 transition-colors", step > s.id ? "bg-gradient-to-r from-accent to-primary" : "bg-border")} />}
               </div>
@@ -164,26 +184,26 @@ export default function HRPerformanceNew() {
         {step === 1 && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Empleado y Período</CardTitle>
-              <CardDescription>Selecciona al empleado a evaluar y define el período de la evaluación.</CardDescription>
+              <CardTitle className="text-base">{t("hrg.perfNew.step.employee")}</CardTitle>
+              <CardDescription>{t("hrg.perfNew.step1Hint")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-1.5">
-                <Label>Empleado <span className="text-destructive">*</span></Label>
+                <Label>{t("hrg.employee")} <span className="text-destructive">*</span></Label>
                 <EmployeeSearchCombobox value={employeeId} onChange={setEmployeeId} />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <Label>Inicio del período <span className="text-destructive">*</span></Label>
+                  <Label>{t("hrg.perfNew.periodStart")} <span className="text-destructive">*</span></Label>
                   <DateInput value={periodStart} onChange={setPeriodStart} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Fin del período <span className="text-destructive">*</span></Label>
+                  <Label>{t("hrg.perfNew.periodEnd")} <span className="text-destructive">*</span></Label>
                   <DateInput value={periodEnd} onChange={setPeriodEnd} />
                 </div>
               </div>
-              {periodString && (
-                <p className="text-sm text-muted-foreground">Período: <span className="font-medium text-foreground">{periodString}</span></p>
+              {periodoVisible && (
+                <p className="text-sm text-muted-foreground">{t("common.period")}: <span className="font-medium text-foreground">{periodoVisible}</span></p>
               )}
             </CardContent>
           </Card>
@@ -193,16 +213,16 @@ export default function HRPerformanceNew() {
         {step === 2 && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Categorías de Evaluación</CardTitle>
-              <CardDescription>Califica cada categoría del 1 al 5. El score general se calcula automáticamente.</CardDescription>
+              <CardTitle className="text-base">{t("hrg.perfNew.categoriesTitle")}</CardTitle>
+              <CardDescription>{t("hrg.perfNew.categoriesHint")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               {CATEGORIES.map((cat) => (
                 <div key={cat.key} className="space-y-2">
                   <div className="flex items-center justify-between">
                     <div>
-                      <Label className="text-sm font-medium">{cat.label}</Label>
-                      <p className="text-xs text-muted-foreground mt-0.5">{cat.desc}</p>
+                      <Label className="text-sm font-medium">{t(cat.label)}</Label>
+                      <p className="text-xs text-muted-foreground mt-0.5">{t(cat.desc)}</p>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
                       <span className="text-lg font-bold w-6 text-right">{scores[cat.key as keyof typeof scores]}</span>
@@ -216,12 +236,12 @@ export default function HRPerformanceNew() {
                     className="w-full"
                   />
                   <div className="flex justify-between text-[10px] text-muted-foreground px-1">
-                    <span>Deficiente</span><span>Regular</span><span>Bueno</span><span>Muy bueno</span><span>Excelente</span>
+                    {ESCALA.map((k) => <span key={k}>{t(k)}</span>)}
                   </div>
                 </div>
               ))}
               <div className="flex items-center gap-3 pt-4 border-t">
-                <span className="text-sm font-medium text-muted-foreground">Score General:</span>
+                <span className="text-sm font-medium text-muted-foreground">{t("hrg.perf.overallScore")}:</span>
                 <span className="text-2xl font-bold">{overallScore.toFixed(1)}</span>
                 <Star className="h-5 w-5 text-amber-500 fill-amber-500" />
               </div>
@@ -233,33 +253,33 @@ export default function HRPerformanceNew() {
         {step === 3 && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Feedback Cualitativo</CardTitle>
-              <CardDescription>Proporciona retroalimentación detallada sobre el desempeño del empleado.</CardDescription>
+              <CardTitle className="text-base">{t("hrg.perfNew.feedbackTitle")}</CardTitle>
+              <CardDescription>{t("hrg.perfNew.feedbackHint")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-1.5">
-                <Label>Fortalezas</Label>
+                <Label>{t("hrg.perf.strengths")}</Label>
                 <Textarea
                   rows={4}
-                  placeholder="Describe las principales fortalezas del empleado: habilidades destacadas, logros, actitudes positivas..."
+                  placeholder={t("hrg.perfNew.strengthsPlaceholder")}
                   value={strengths}
                   onChange={(e) => setStrengths(e.target.value)}
                 />
               </div>
               <div className="space-y-1.5">
-                <Label>Áreas de Mejora</Label>
+                <Label>{t("hrg.perf.improvements")}</Label>
                 <Textarea
                   rows={4}
-                  placeholder="Identifica las áreas donde el empleado puede mejorar: habilidades a desarrollar, comportamientos a ajustar..."
+                  placeholder={t("hrg.perfNew.improvementsPlaceholder")}
                   value={improvements}
                   onChange={(e) => setImprovements(e.target.value)}
                 />
               </div>
               <div className="space-y-1.5">
-                <Label>Comentarios Adicionales <span className="text-xs text-muted-foreground">(opcional)</span></Label>
+                <Label>{t("hrg.perfNew.comments")} <span className="text-xs text-muted-foreground">{t("hrg.perfNew.optional")}</span></Label>
                 <Textarea
                   rows={3}
-                  placeholder="Observaciones generales, contexto relevante o notas adicionales..."
+                  placeholder={t("hrg.perfNew.commentsPlaceholder")}
                   value={comments}
                   onChange={(e) => setComments(e.target.value)}
                 />
@@ -272,22 +292,22 @@ export default function HRPerformanceNew() {
         {step === 4 && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Objetivos del Próximo Período</CardTitle>
-              <CardDescription>Define metas claras y medibles para el siguiente período de evaluación.</CardDescription>
+              <CardTitle className="text-base">{t("hrg.perfNew.goalsTitle")}</CardTitle>
+              <CardDescription>{t("hrg.perfNew.goalsHint")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {objectives.length === 1 && !objectives[0].title && (
                 <div className="flex flex-col items-center justify-center py-6 text-center">
                   <Target className="h-10 w-10 text-muted-foreground/40 mb-3" />
-                  <p className="text-sm font-medium text-muted-foreground">Sin objetivos definidos aún</p>
-                  <p className="text-xs text-muted-foreground/70 mt-1 max-w-xs">Agrega objetivos específicos y medibles para guiar el crecimiento del empleado en el próximo período.</p>
+                  <p className="text-sm font-medium text-muted-foreground">{t("hrg.perfNew.noGoals")}</p>
+                  <p className="text-xs text-muted-foreground/70 mt-1 max-w-xs">{t("hrg.perfNew.noGoalsHint")}</p>
                 </div>
               )}
               {objectives.map((obj, idx) => (
                 <div key={idx} className="flex gap-3 items-start">
                   <div className="flex-1 space-y-2">
                     <Input
-                      placeholder={`Objetivo ${idx + 1}`}
+                      placeholder={t("hrg.perfNew.goalN", { n: idx + 1 })}
                       value={obj.title}
                       onChange={(e) => {
                         const next = [...objectives];
@@ -296,7 +316,7 @@ export default function HRPerformanceNew() {
                       }}
                     />
                     <Input
-                      placeholder="Descripción breve (opcional)"
+                      placeholder={t("hrg.perfNew.goalDescPlaceholder")}
                       value={obj.description}
                       className="text-sm"
                       onChange={(e) => {
@@ -307,14 +327,14 @@ export default function HRPerformanceNew() {
                     />
                   </div>
                   {objectives.length > 1 && (
-                    <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-destructive" onClick={() => setObjectives(objectives.filter((_, i) => i !== idx))}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-destructive" onClick={() => setObjectives(objectives.filter((_, i) => i !== idx))} aria-label={t("hrg.perfNew.removeGoal")}>
                       <X className="h-4 w-4" />
                     </Button>
                   )}
                 </div>
               ))}
               <Button variant="outline" size="sm" onClick={() => setObjectives([...objectives, { title: "", description: "" }])}>
-                <Plus className="h-4 w-4 mr-1" />Agregar Objetivo
+                <Plus className="h-4 w-4 mr-1" />{t("hrg.perfNew.addGoal")}
               </Button>
             </CardContent>
           </Card>
@@ -323,12 +343,12 @@ export default function HRPerformanceNew() {
 
       {/* Footer */}
       <div className="shrink-0 border-t bg-background px-6 py-3 flex items-center justify-between">
-        <Button variant="outline" disabled={step === 1} onClick={() => setStep(step - 1)}>Anterior</Button>
+        <Button variant="outline" disabled={step === 1} onClick={() => setStep(step - 1)}>{t("common.previous")}</Button>
         {step < STEPS.length ? (
-          <Button disabled={!canProceed()} onClick={() => setStep(step + 1)}>Siguiente</Button>
+          <Button disabled={!canProceed()} onClick={() => setStep(step + 1)}>{t("common.next")}</Button>
         ) : (
           <Button onClick={handleSubmit} disabled={isSubmitting}>
-            {isSubmitting ? "Guardando..." : "Crear Evaluación"}
+            {isSubmitting ? t("hrg.saving") : t("hrg.perfNew.create")}
           </Button>
         )}
       </div>

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useUserRole } from "@/hooks/useUserRole";
 import { displayPhone } from "@/lib/country-utils";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/hooks/useLanguage";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -21,6 +22,7 @@ interface Props {
 
 const ConvertContactoModal = ({ open, onOpenChange, contacto, onConverted }: Props) => {
   const { toast } = useToast();
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
   // OJO: este hook debe ir ANTES de cualquier return condicional. Estaba después del
   // `if (!contacto) return null` → al abrir el modal (contacto null→set) cambiaba el
@@ -29,7 +31,7 @@ const ConvertContactoModal = ({ open, onOpenChange, contacto, onConverted }: Pro
 
   const convert = useMutation({
     mutationFn: async () => {
-      if (!contacto) throw new Error("No contacto");
+      if (!contacto) throw new Error(t("contactos.noContact"));
       // Server-side: el RPC lee el teléfono/email REALES del contacto (que el cliente
       // ya no puede ver: están enmascarados/revocados) y crea la creadora + marca el
       // contacto como convertido en una sola transacción.
@@ -43,11 +45,11 @@ const ConvertContactoModal = ({ open, onOpenChange, contacto, onConverted }: Pro
       queryClient.invalidateQueries({ queryKey: ["creators"] });
       queryClient.invalidateQueries({ queryKey: ["closer-creators-list"] });
       queryClient.invalidateQueries({ queryKey: ["closer-creators-counts"] });
-      toast({ title: "Contacto convertido", description: "El creador fue creado exitosamente." });
+      toast({ title: t("contactos.convertedToast"), description: t("contactos.convertedToastDesc") });
       onConverted();
     },
     onError: (e: unknown) => {
-      toast({ title: "Error al convertir", description: (e as Error)?.message ?? undefined, variant: "destructive" });
+      toast({ title: t("contactos.convertError"), description: (e as Error)?.message ?? undefined, variant: "destructive" });
     },
   });
 
@@ -60,11 +62,11 @@ const ConvertContactoModal = ({ open, onOpenChange, contacto, onConverted }: Pro
   const missingHandle = !contacto.handle || !contacto.handle.trim();
 
   const items = [
-    { label: "Nombre", value: contacto.name },
+    { label: t("common.name"), value: contacto.name },
     { label: "Handle", value: contacto.handle || "—" },
-    { label: "País", value: contacto.country_code || "—" },
-    { label: "Categoría", value: contacto.physical_appearance || "—" },
-    { label: "Teléfono", value: contacto.phone ? displayPhone(`${contacto.country_code || ""}${contacto.phone}`, isAdmin) : "—" },
+    { label: t("common.country"), value: contacto.country_code || "—" },
+    { label: t("common.category"), value: contacto.physical_appearance || "—" },
+    { label: t("common.phone"), value: contacto.phone ? displayPhone(`${contacto.country_code || ""}${contacto.phone}`, isAdmin) : "—" },
     { label: "Email", value: contacto.email || "—" },
   ];
 
@@ -74,15 +76,15 @@ const ConvertContactoModal = ({ open, onOpenChange, contacto, onConverted }: Pro
         <DialogHeader>
           <div className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
-            <DialogTitle>Convertir Contacto a Creador</DialogTitle>
+            <DialogTitle>{t("contactos.convertTitle")}</DialogTitle>
           </div>
           <DialogDescription>
-            Este contacto será transferido al módulo de Creadoras como un nuevo perfil.
+            {t("contactos.convertDesc")}
           </DialogDescription>
         </DialogHeader>
 
         <div className="border rounded-lg p-4 space-y-3">
-          <p className="text-sm font-semibold">Datos que se transferirán</p>
+          <p className="text-sm font-semibold">{t("contactos.dataToTransfer")}</p>
           <ul className="space-y-1.5">
             {items.map((item) => (
               <li key={item.label} className="flex items-start gap-2 text-sm">
@@ -100,29 +102,28 @@ const ConvertContactoModal = ({ open, onOpenChange, contacto, onConverted }: Pro
           <div className="flex items-start gap-2.5 rounded-lg bg-warning/10 p-3">
             <AlertTriangle className="h-4 w-4 text-warning dark:text-warning shrink-0 mt-0.5" />
             <p className="text-xs text-warning dark:text-warning">
-              <span className="font-semibold">Falta el handle de Instagram.</span> Ningún
-              creador puede entrar al sistema sin handle. Cierra este modal, edita el contacto
-              para agregarlo y vuelve a intentar.
+              <span className="font-semibold">{t("contactos.missingHandleTitle")}</span>{" "}
+              {t("contactos.missingHandleBody")}
             </p>
           </div>
         ) : (
           <div className="flex items-start gap-2.5 rounded-lg bg-primary/10 p-3">
             <Lightbulb className="h-4 w-4 text-primary shrink-0 mt-0.5" />
             <p className="text-xs text-muted-foreground">
-              El contacto quedará marcado como "Convertido" y se creará un nuevo perfil en el módulo de Creadoras.
+              {t("contactos.convertHint")}
             </p>
           </div>
         )}
 
         <DialogFooter className="gap-2 sm:gap-0">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={convert.isPending}>
-            Cancelar
+            {t("common.cancel")}
           </Button>
           <Button
             onClick={() => convert.mutate()}
             disabled={convert.isPending || missingHandle}
           >
-            {convert.isPending ? "Convirtiendo..." : "Confirmar Conversión"}
+            {convert.isPending ? t("contactos.converting") : t("contactos.confirmConversion")}
           </Button>
         </DialogFooter>
       </DialogContent>

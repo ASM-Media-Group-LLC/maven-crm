@@ -6,6 +6,8 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useFormato } from "@/hooks/useFormato";
+import type { Formato } from "@/lib/formato";
 import { EmployeeSearchCombobox } from "@/components/hr/EmployeeSearchCombobox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,11 +29,12 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { ABSENCE_TYPES, ABSENCE_STATUSES } from "@/lib/hrConstants";
 import { format, startOfMonth, endOfMonth } from "date-fns";
-import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import { PageHeader } from "@/components/ui/page-header";
+import { useLanguage } from "@/hooks/useLanguage";
+import { etiqueta, deSiempreSalvoEnIngles, CUALQUIER_AUSENCIA, ESTADO_AUSENCIA } from "./etiquetasRrhh";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 interface AbsenceRecord {
@@ -60,12 +63,19 @@ function getInitials(first: string, last: string) {
   return `${first[0] ?? ""}${last[0] ?? ""}`.toUpperCase();
 }
 
-function getAbsenceTypeLabel(val: string) {
-  return ABSENCE_TYPES.find((t) => t.value === val)?.label ?? val;
+// absence_type y status son DATOS de la base; en pantalla se muestra su etiqueta.
+// La tabla `absences` la comparten faltas, permisos y vacaciones, y esta lista las
+// trae todas. En español se ve lo de siempre: la etiqueta del catálogo de faltas o,
+// si no está ahí ("permiso_medico", "vacaciones"), el value tal cual. En inglés
+// cualquier tipo de la tabla sale con su etiqueta (CUALQUIER_AUSENCIA).
+type T = ReturnType<typeof useLanguage>["t"];
+
+function getAbsenceTypeLabel(val: string, t: T, idioma: "es" | "en") {
+  return deSiempreSalvoEnIngles(idioma, t, CUALQUIER_AUSENCIA, val, ABSENCE_TYPES.find((o) => o.value === val)?.label ?? val);
 }
 
-function getStatusLabel(val: string) {
-  return ABSENCE_STATUSES.find((s) => s.value === val)?.label ?? val;
+function getStatusLabel(val: string, t: T) {
+  return etiqueta(t, ESTADO_AUSENCIA, val, ABSENCE_STATUSES.find((s) => s.value === val)?.label ?? val);
 }
 
 function getStatusVariant(status: string): "default" | "secondary" | "destructive" | "outline" {
@@ -74,14 +84,14 @@ function getStatusVariant(status: string): "default" | "secondary" | "destructiv
   return "secondary";
 }
 
-function formatDateRange(start: string, end: string) {
+function formatDateRange(start: string, end: string, f: Formato) {
   const s = new Date(start);
   const e = new Date(end);
   const sameMonth = s.getMonth() === e.getMonth() && s.getFullYear() === e.getFullYear();
   if (sameMonth) {
-    return `${format(s, "d")} - ${format(e, "d MMM", { locale: es })}`;
+    return `${format(s, "d")} - ${format(e, "d MMM", { locale: f.fechas })}`;
   }
-  return `${format(s, "d MMM", { locale: es })} - ${format(e, "d MMM", { locale: es })}`;
+  return `${format(s, "d MMM", { locale: f.fechas })} - ${format(e, "d MMM", { locale: f.fechas })}`;
 }
 
 // ─── Hooks ─────────────────────────────────────────────────────────────────────
@@ -126,6 +136,9 @@ interface RegisterModalProps {
 }
 
 function RegisterAbsenceModal({ open, onOpenChange }: RegisterModalProps) {
+  const { t } = useLanguage();
+  const f = useFormato();
+  const DMY = f.idioma === "en" ? "MM/dd/yyyy" : "dd/MM/yyyy";
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -159,7 +172,7 @@ function RegisterAbsenceModal({ open, onOpenChange }: RegisterModalProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["absences"] });
-      toast({ title: "Falta registrada correctamente" });
+      toast({ title: t("hr.abs.registered") });
       onOpenChange(false);
       setEmployeeId(null);
       setAbsenceType("");
@@ -167,7 +180,7 @@ function RegisterAbsenceModal({ open, onOpenChange }: RegisterModalProps) {
       setEndDate(undefined);
       setNotes("");
     },
-    onError: () => toast({ title: "Error al registrar la falta", variant: "destructive" }),
+    onError: () => toast({ title: t("hr.abs.errorRegistering"), variant: "destructive" }),
   });
 
   return (
@@ -176,26 +189,26 @@ function RegisterAbsenceModal({ open, onOpenChange }: RegisterModalProps) {
         <DialogHeader className="shrink-0 px-6 py-5 border-b">
           <div className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-destructive" />
-            <DialogTitle>Registrar Falta</DialogTitle>
+            <DialogTitle>{t("hr.abs.register")}</DialogTitle>
           </div>
           <DialogDescription>
-            Registra una falta injustificada o sin aviso previo
+            {t("hr.abs.registerDesc")}
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-4">
           <div className="space-y-1.5">
-            <Label>Empleado <span className="text-destructive">*</span></Label>
+            <Label>{t("hr.employee")} <span className="text-destructive">*</span></Label>
             <EmployeeSearchCombobox value={employeeId} onChange={setEmployeeId} />
           </div>
 
           <div className="space-y-1.5">
-            <Label>Tipo de Falta <span className="text-destructive">*</span></Label>
+            <Label>{t("hr.abs.type")} <span className="text-destructive">*</span></Label>
             <Select value={absenceType} onValueChange={setAbsenceType}>
-              <SelectTrigger><SelectValue placeholder="Seleccionar tipo..." /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder={t("hr.selectType")} /></SelectTrigger>
               <SelectContent>
-                {ABSENCE_TYPES.map((t) => (
-                  <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                {ABSENCE_TYPES.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>{getAbsenceTypeLabel(o.value, t, f.idioma)}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -203,45 +216,45 @@ function RegisterAbsenceModal({ open, onOpenChange }: RegisterModalProps) {
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label>Fecha Inicio <span className="text-destructive">*</span></Label>
+              <Label>{t("hr.startDate")} <span className="text-destructive">*</span></Label>
               <Popover open={startOpen} onOpenChange={setStartOpen}>
                 <PopoverTrigger asChild>
                   <Button variant="outline" className={cn("w-full justify-start font-normal", !startDate && "text-muted-foreground")}>
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {startDate ? format(startDate, "dd/MM/yyyy") : "Fecha inicio"}
+                    {startDate ? format(startDate, DMY) : t("hr.startDateLower")}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar mode="single" selected={startDate} onSelect={(d) => { setStartDate(d); setStartOpen(false); }} locale={es} initialFocus />
+                  <Calendar mode="single" selected={startDate} onSelect={(d) => { setStartDate(d); setStartOpen(false); }} locale={f.fechas} initialFocus />
                 </PopoverContent>
               </Popover>
             </div>
             <div className="space-y-1.5">
-              <Label>Fecha Fin <span className="text-destructive">*</span></Label>
+              <Label>{t("hr.endDate")} <span className="text-destructive">*</span></Label>
               <Popover open={endOpen} onOpenChange={setEndOpen}>
                 <PopoverTrigger asChild>
                   <Button variant="outline" className={cn("w-full justify-start font-normal", !endDate && "text-muted-foreground")}>
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {endDate ? format(endDate, "dd/MM/yyyy") : "Fecha fin"}
+                    {endDate ? format(endDate, DMY) : t("hr.endDateLower")}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar mode="single" selected={endDate} onSelect={(d) => { setEndDate(d); setEndOpen(false); }} locale={es} disabled={(d) => startDate ? d < startDate : false} initialFocus />
+                  <Calendar mode="single" selected={endDate} onSelect={(d) => { setEndDate(d); setEndOpen(false); }} locale={f.fechas} disabled={(d) => startDate ? d < startDate : false} initialFocus />
                 </PopoverContent>
               </Popover>
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <Label>Observaciones</Label>
-            <Textarea placeholder="Descripción o contexto de la falta..." rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
+            <Label>{t("hr.observations")}</Label>
+            <Textarea placeholder={t("hr.abs.notesPlaceholder")} rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
           </div>
         </div>
 
         <DialogFooter className="shrink-0 px-6 py-4 border-t flex gap-2">
-          <Button variant="outline" onClick={() => onOpenChange(false)} className="flex-1">Cancelar</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="flex-1">{t("common.cancel")}</Button>
           <Button variant="destructive" onClick={() => mutation.mutate()} disabled={!isValid || mutation.isPending} className="flex-1">
-            {mutation.isPending ? "Guardando..." : "+ Registrar Falta"}
+            {mutation.isPending ? t("hr.saving") : t("hr.abs.registerPlus")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -251,6 +264,9 @@ function RegisterAbsenceModal({ open, onOpenChange }: RegisterModalProps) {
 
 // ─── Edit Modal ─────────────────────────────────────────────────────────────────
 function EditAbsenceModal({ absence, onClose }: { absence: AbsenceRecord | null; onClose: () => void }) {
+  const { t } = useLanguage();
+  const f = useFormato();
+  const DMY = f.idioma === "en" ? "MM/dd/yyyy" : "dd/MM/yyyy";
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -275,10 +291,10 @@ function EditAbsenceModal({ absence, onClose }: { absence: AbsenceRecord | null;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["absences"] });
-      toast({ title: "Falta actualizada" });
+      toast({ title: t("hr.abs.updated") });
       onClose();
     },
-    onError: () => toast({ title: "Error al actualizar", variant: "destructive" }),
+    onError: () => toast({ title: t("common.errorUpdating"), variant: "destructive" }),
   });
 
   if (!absence) return null;
@@ -289,60 +305,60 @@ function EditAbsenceModal({ absence, onClose }: { absence: AbsenceRecord | null;
     <Dialog open={!!absence} onOpenChange={onClose}>
       <DialogContent className="!flex !flex-col gap-0 max-w-md p-0 overflow-hidden">
         <DialogHeader className="shrink-0 px-6 py-5 border-b">
-          <DialogTitle>Editar Falta</DialogTitle>
+          <DialogTitle>{t("hr.abs.edit")}</DialogTitle>
           <DialogDescription>{empName}</DialogDescription>
         </DialogHeader>
         <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-4">
           <div className="space-y-1.5">
-            <Label>Tipo de Falta</Label>
+            <Label>{t("hr.abs.type")}</Label>
             <Select value={absenceType} onValueChange={setAbsenceType}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {ABSENCE_TYPES.map((t) => (
-                  <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                {ABSENCE_TYPES.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>{getAbsenceTypeLabel(o.value, t, f.idioma)}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label>Fecha Inicio</Label>
+              <Label>{t("hr.startDate")}</Label>
               <Popover open={startOpen} onOpenChange={setStartOpen}>
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="w-full justify-start font-normal">
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {startDate ? format(startDate, "dd/MM/yyyy") : "—"}
+                    {startDate ? format(startDate, DMY) : "—"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar mode="single" selected={startDate} onSelect={(d) => { setStartDate(d); setStartOpen(false); }} locale={es} initialFocus />
+                  <Calendar mode="single" selected={startDate} onSelect={(d) => { setStartDate(d); setStartOpen(false); }} locale={f.fechas} initialFocus />
                 </PopoverContent>
               </Popover>
             </div>
             <div className="space-y-1.5">
-              <Label>Fecha Fin</Label>
+              <Label>{t("hr.endDate")}</Label>
               <Popover open={endOpen} onOpenChange={setEndOpen}>
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="w-full justify-start font-normal">
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {endDate ? format(endDate, "dd/MM/yyyy") : "—"}
+                    {endDate ? format(endDate, DMY) : "—"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar mode="single" selected={endDate} onSelect={(d) => { setEndDate(d); setEndOpen(false); }} locale={es} disabled={(d) => startDate ? d < startDate : false} initialFocus />
+                  <Calendar mode="single" selected={endDate} onSelect={(d) => { setEndDate(d); setEndOpen(false); }} locale={f.fechas} disabled={(d) => startDate ? d < startDate : false} initialFocus />
                 </PopoverContent>
               </Popover>
             </div>
           </div>
           <div className="space-y-1.5">
-            <Label>Observaciones</Label>
+            <Label>{t("hr.observations")}</Label>
             <Textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
           </div>
         </div>
         <DialogFooter className="shrink-0 px-6 py-4 border-t flex gap-2">
-          <Button variant="outline" onClick={onClose} className="flex-1">Cancelar</Button>
+          <Button variant="outline" onClick={onClose} className="flex-1">{t("common.cancel")}</Button>
           <Button onClick={() => mutation.mutate()} disabled={mutation.isPending} className="flex-1">
-            {mutation.isPending ? "Guardando..." : "Guardar Cambios"}
+            {mutation.isPending ? t("hr.saving") : t("hr.saveChanges")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -352,6 +368,8 @@ function EditAbsenceModal({ absence, onClose }: { absence: AbsenceRecord | null;
 
 // ─── View Modal ─────────────────────────────────────────────────────────────────
 function ViewAbsenceModal({ absence, onClose }: { absence: AbsenceRecord | null; onClose: () => void }) {
+  const { t } = useLanguage();
+  const f = useFormato();
   if (!absence) return null;
   const emp = absence.employees;
   const empName = emp ? `${emp.first_name} ${emp.last_name}` : "—";
@@ -360,7 +378,7 @@ function ViewAbsenceModal({ absence, onClose }: { absence: AbsenceRecord | null;
     <Dialog open={!!absence} onOpenChange={onClose}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Detalle de Ausencia</DialogTitle>
+          <DialogTitle>{t("hr.abs.detail")}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-2">
           <div className="flex items-center gap-3">
@@ -369,30 +387,30 @@ function ViewAbsenceModal({ absence, onClose }: { absence: AbsenceRecord | null;
             </div>
             <div>
               <p className="font-semibold text-sm">{empName}</p>
-              <p className="text-xs text-muted-foreground">{emp?.departments?.name ?? "Sin departamento"}</p>
+              <p className="text-xs text-muted-foreground">{emp?.departments?.name ?? t("hr.noDepartment")}</p>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div>
-              <p className="text-muted-foreground text-xs mb-0.5">Tipo de Falta</p>
-              <Badge variant="outline">{getAbsenceTypeLabel(absence.absence_type)}</Badge>
+              <p className="text-muted-foreground text-xs mb-0.5">{t("hr.abs.type")}</p>
+              <Badge variant="outline">{getAbsenceTypeLabel(absence.absence_type, t, f.idioma)}</Badge>
             </div>
             <div>
-              <p className="text-muted-foreground text-xs mb-0.5">Estado</p>
-              <Badge variant={getStatusVariant(absence.status)}>{getStatusLabel(absence.status)}</Badge>
+              <p className="text-muted-foreground text-xs mb-0.5">{t("common.status")}</p>
+              <Badge variant={getStatusVariant(absence.status)}>{getStatusLabel(absence.status, t)}</Badge>
             </div>
             <div>
-              <p className="text-muted-foreground text-xs mb-0.5">Fechas</p>
-              <p className="font-medium">{formatDateRange(absence.start_date, absence.end_date)}</p>
+              <p className="text-muted-foreground text-xs mb-0.5">{t("hr.abs.dates")}</p>
+              <p className="font-medium">{formatDateRange(absence.start_date, absence.end_date, f)}</p>
             </div>
             <div>
-              <p className="text-muted-foreground text-xs mb-0.5">Días</p>
+              <p className="text-muted-foreground text-xs mb-0.5">{t("common.days")}</p>
               <p className="font-medium">{absence.total_days ?? "—"}</p>
             </div>
           </div>
           {absence.notes && (
             <div>
-              <p className="text-muted-foreground text-xs mb-0.5">Observaciones</p>
+              <p className="text-muted-foreground text-xs mb-0.5">{t("hr.observations")}</p>
               <p className="text-sm">{absence.notes}</p>
             </div>
           )}
@@ -404,6 +422,8 @@ function ViewAbsenceModal({ absence, onClose }: { absence: AbsenceRecord | null;
 
 // ─── Main Component ─────────────────────────────────────────────────────────────
 export default function HRAbsences() {
+  const { t } = useLanguage();
+  const f = useFormato();
   const { data: absences = [], isLoading } = useAbsences();
   const { data: departments = [] } = useDepartments();
   const queryClient = useQueryClient();
@@ -432,9 +452,9 @@ export default function HRAbsences() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["absences"] });
-      toast({ title: "Estado actualizado" });
+      toast({ title: t("hr.statusUpdated") });
     },
-    onError: () => toast({ title: "Error al actualizar el estado", variant: "destructive" }),
+    onError: () => toast({ title: t("hr.errorUpdatingStatus"), variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
@@ -444,10 +464,10 @@ export default function HRAbsences() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["absences"] });
-      toast({ title: "Falta eliminada" });
+      toast({ title: t("hr.abs.deleted") });
       setDeleteId(null);
     },
-    onError: () => toast({ title: "Error al eliminar", variant: "destructive" }),
+    onError: () => toast({ title: t("common.errorDeleting"), variant: "destructive" }),
   });
 
   // KPIs
@@ -480,12 +500,12 @@ export default function HRAbsences() {
       {/* ── Header ──────────────────────────────────────────────────────────── */}
       <header className="shrink-0 border-b border-white/10 bg-background/30 backdrop-blur-xl px-6 py-4">
         <PageHeader
-          title="Ausencias / Faltas"
-          subtitle="Faltas injustificadas y sin aviso previo"
+          title={t("hr.abs.title")}
+          subtitle={t("hr.abs.subtitle")}
           actions={
             <Button onClick={() => setModalOpen(true)} size="sm">
               <Plus className="h-4 w-4 mr-1" />
-              Registrar Falta
+              {t("hr.abs.register")}
             </Button>
           }
         />
@@ -496,15 +516,15 @@ export default function HRAbsences() {
 
         {/* KPI Cards — clickeables, abren modal con la lista filtrada */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <StatChip label="Total Faltas" value={String(totalFaltas)} icon={<AlertTriangle className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("total")} />
-          <StatChip label="Pendientes" value={String(pendientes)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" onClick={() => setKpiPopup("pendientes")} />
-          <StatChip label="Este Mes" value={String(esteMes)} icon={<CalendarDays className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("esteMes")} />
+          <StatChip label={t("hr.abs.total")} value={String(totalFaltas)} icon={<AlertTriangle className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("total")} />
+          <StatChip label={t("common.pendingPl")} value={String(pendientes)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" onClick={() => setKpiPopup("pendientes")} />
+          <StatChip label={t("hr.thisMonth")} value={String(esteMes)} icon={<CalendarDays className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("esteMes")} />
         </div>
 
         {/* Department Tabs */}
         {departments.length > 0 && (
           <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1 flex-wrap">
-            <Button size="sm" variant={!deptFilter ? "secondary" : "ghost"} className="text-sm" onClick={() => setDeptFilter("")}>Todos</Button>
+            <Button size="sm" variant={!deptFilter ? "secondary" : "ghost"} className="text-sm" onClick={() => setDeptFilter("")}>{t("common.all")}</Button>
             {departments.map((d) => (
               <Button key={d.id} size="sm" variant={deptFilter === d.id ? "secondary" : "ghost"} className="text-sm" onClick={() => setDeptFilter(d.id)}>{d.name}</Button>
             ))}
@@ -515,23 +535,23 @@ export default function HRAbsences() {
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Buscar empleado u observaciones..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-9" />
+            <Input placeholder={t("hr.abs.searchPlaceholder")} value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-9" />
           </div>
           <Select value={typeFilter || undefined} onValueChange={(v) => setTypeFilter(v === "__all__" ? "" : v)}>
-            <SelectTrigger className="w-44 h-9"><SelectValue placeholder="Tipo de Falta" /></SelectTrigger>
+            <SelectTrigger className="w-44 h-9"><SelectValue placeholder={t("hr.abs.type")} /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="__all__">Todos los tipos</SelectItem>
-              {ABSENCE_TYPES.map((t) => (
-                <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+              <SelectItem value="__all__">{t("common.allTypes")}</SelectItem>
+              {ABSENCE_TYPES.map((o) => (
+                <SelectItem key={o.value} value={o.value}>{getAbsenceTypeLabel(o.value, t, f.idioma)}</SelectItem>
               ))}
             </SelectContent>
           </Select>
           <Select value={statusFilter || undefined} onValueChange={(v) => setStatusFilter(v === "__all__" ? "" : v)}>
-            <SelectTrigger className="w-36 h-9"><SelectValue placeholder="Estado" /></SelectTrigger>
+            <SelectTrigger className="w-36 h-9"><SelectValue placeholder={t("common.status")} /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="__all__">Todos</SelectItem>
+              <SelectItem value="__all__">{t("common.all")}</SelectItem>
               {ABSENCE_STATUSES.map((s) => (
-                <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                <SelectItem key={s.value} value={s.value}>{getStatusLabel(s.value, t)}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -541,7 +561,7 @@ export default function HRAbsences() {
           </div>
         </div>
 
-        <p className="text-xs text-muted-foreground">Mostrando {filtered.length} de {absences.length} registros</p>
+        <p className="text-xs text-muted-foreground">{t(absences.length === 1 ? "hr.showingOf.one" : "hr.showingOf.other", { shown: filtered.length, total: absences.length })}</p>
 
         {/* ── List View ─────────────────────────────────────────────────────── */}
         {viewMode === "list" && (
@@ -550,13 +570,13 @@ export default function HRAbsences() {
               <Table>
                 <TableHeader className="sticky top-0 z-10 bg-card">
                   <TableRow>
-                    <TableHead className="text-xs">Empleado</TableHead>
-                    <TableHead className="text-xs">Tipo de Falta</TableHead>
-                    <TableHead className="text-xs">Fechas</TableHead>
-                    <TableHead className="text-xs">Días</TableHead>
-                    <TableHead className="text-xs">Observaciones</TableHead>
-                    <TableHead className="text-xs">Estado</TableHead>
-                    <TableHead className="text-xs sticky right-0 bg-card">Acciones</TableHead>
+                    <TableHead className="text-xs">{t("hr.employee")}</TableHead>
+                    <TableHead className="text-xs">{t("hr.abs.type")}</TableHead>
+                    <TableHead className="text-xs">{t("hr.abs.dates")}</TableHead>
+                    <TableHead className="text-xs">{t("common.days")}</TableHead>
+                    <TableHead className="text-xs">{t("hr.observations")}</TableHead>
+                    <TableHead className="text-xs">{t("common.status")}</TableHead>
+                    <TableHead className="text-xs sticky right-0 bg-card">{t("common.actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -568,7 +588,7 @@ export default function HRAbsences() {
                     <TableRow>
                       <TableCell colSpan={7} className="text-center text-muted-foreground py-14">
                         <AlertTriangle className="h-8 w-8 mx-auto mb-2 opacity-30" />
-                        <p>Sin ausencias registradas</p>
+                        <p>{t("hr.abs.empty")}</p>
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -587,28 +607,28 @@ export default function HRAbsences() {
                               </div>
                             </div>
                           </TableCell>
-                          <TableCell><Badge variant="outline" className="text-xs">{getAbsenceTypeLabel(a.absence_type)}</Badge></TableCell>
-                          <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{formatDateRange(a.start_date, a.end_date)}</TableCell>
+                          <TableCell><Badge variant="outline" className="text-xs">{getAbsenceTypeLabel(a.absence_type, t, f.idioma)}</Badge></TableCell>
+                          <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{formatDateRange(a.start_date, a.end_date, f)}</TableCell>
                           <TableCell>
                             <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-muted text-xs font-semibold">{a.total_days ?? "—"}</span>
                           </TableCell>
                           <TableCell className="max-w-[180px]"><p className="text-xs text-muted-foreground truncate">{a.notes ?? "—"}</p></TableCell>
                           <TableCell>
                             <Badge variant={getStatusVariant(a.status)} className={cn("text-xs", a.status === "pending" && "border-warning/50 bg-warning/10 text-warning", a.status === "approved" && "border-primary/50 bg-primary/10 text-primary")}>
-                              {getStatusLabel(a.status)}
+                              {getStatusLabel(a.status, t)}
                             </Badge>
                           </TableCell>
                           <TableCell className="sticky right-0 bg-card">
                             <div className="flex items-center gap-1">
-                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground" onClick={() => setViewAbsence(a)} title="Ver detalle"><Eye className="h-3.5 w-3.5" /></Button>
-                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setEditAbsence(a)} title="Editar"><Pencil className="h-3.5 w-3.5" /></Button>
+                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground" onClick={() => setViewAbsence(a)} title={t("common.viewDetail")}><Eye className="h-3.5 w-3.5" /></Button>
+                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setEditAbsence(a)} title={t("common.edit")}><Pencil className="h-3.5 w-3.5" /></Button>
                               {a.status === "pending" && (
                                 <>
-                                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-primary hover:text-primary hover:bg-primary/10" onClick={() => updateStatus.mutate({ id: a.id, status: "approved" })} title="Aprobar"><Check className="h-3.5 w-3.5" /></Button>
-                                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => updateStatus.mutate({ id: a.id, status: "rejected" })} title="Rechazar"><X className="h-3.5 w-3.5" /></Button>
+                                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-primary hover:text-primary hover:bg-primary/10" onClick={() => updateStatus.mutate({ id: a.id, status: "approved" })} title={t("hr.approve")}><Check className="h-3.5 w-3.5" /></Button>
+                                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => updateStatus.mutate({ id: a.id, status: "rejected" })} title={t("hr.reject")}><X className="h-3.5 w-3.5" /></Button>
                                 </>
                               )}
-                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => setDeleteId(a.id)} title="Eliminar"><Trash2 className="h-3.5 w-3.5" /></Button>
+                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => setDeleteId(a.id)} title={t("common.delete")}><Trash2 className="h-3.5 w-3.5" /></Button>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -630,7 +650,7 @@ export default function HRAbsences() {
           ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
               <AlertTriangle className="h-10 w-10 mb-3 opacity-30" />
-              <p>Sin ausencias registradas</p>
+              <p>{t("hr.abs.empty")}</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -644,17 +664,17 @@ export default function HRAbsences() {
                       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold">{initials}</div>
                       <div className="min-w-0">
                         <p className="text-sm font-semibold leading-tight truncate">{empName}</p>
-                        <p className="text-xs text-muted-foreground truncate">{emp?.departments?.name ?? "Sin departamento"}</p>
+                        <p className="text-xs text-muted-foreground truncate">{emp?.departments?.name ?? t("hr.noDepartment")}</p>
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-1.5">
-                      <Badge variant="outline" className="text-xs">{getAbsenceTypeLabel(a.absence_type)}</Badge>
+                      <Badge variant="outline" className="text-xs">{getAbsenceTypeLabel(a.absence_type, t, f.idioma)}</Badge>
                       <Badge variant={getStatusVariant(a.status)} className={cn("text-xs", a.status === "pending" && "border-warning/50 bg-warning/10 text-warning", a.status === "approved" && "border-primary/50 bg-primary/10 text-primary")}>
-                        {getStatusLabel(a.status)}
+                        {getStatusLabel(a.status, t)}
                       </Badge>
                     </div>
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">{formatDateRange(a.start_date, a.end_date)}</span>
+                      <span className="text-muted-foreground">{formatDateRange(a.start_date, a.end_date, f)}</span>
                       <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-muted text-xs font-semibold">{a.total_days ?? "—"}</span>
                     </div>
                     {a.notes && <p className="text-xs text-muted-foreground line-clamp-2">{a.notes}</p>}
@@ -662,10 +682,10 @@ export default function HRAbsences() {
                       {a.status === "pending" && (
                         <>
                           <Button variant="ghost" size="sm" className="h-7 flex-1 text-xs text-primary hover:text-primary hover:bg-primary/10" onClick={() => updateStatus.mutate({ id: a.id, status: "approved" })}>
-                            <Check className="h-3.5 w-3.5 mr-1" /> Aprobar
+                            <Check className="h-3.5 w-3.5 mr-1" /> {t("hr.approve")}
                           </Button>
                           <Button variant="ghost" size="sm" className="h-7 flex-1 text-xs text-destructive hover:bg-destructive/10" onClick={() => updateStatus.mutate({ id: a.id, status: "rejected" })}>
-                            <X className="h-3.5 w-3.5 mr-1" /> Rechazar
+                            <X className="h-3.5 w-3.5 mr-1" /> {t("hr.reject")}
                           </Button>
                         </>
                       )}
@@ -689,12 +709,12 @@ export default function HRAbsences() {
       <AlertDialog open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar falta?</AlertDialogTitle>
-            <AlertDialogDescription>Esta acción no se puede deshacer. El registro será eliminado permanentemente.</AlertDialogDescription>
+            <AlertDialogTitle>{t("hr.abs.deleteTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("hr.abs.deleteDesc")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel />
-            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => deleteId && deleteMutation.mutate(deleteId)}>Eliminar</AlertDialogAction>
+            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => deleteId && deleteMutation.mutate(deleteId)}>{t("common.delete")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -704,9 +724,9 @@ export default function HRAbsences() {
         onOpenChange={(o) => !o && setKpiPopup(null)}
         title={(() => {
           switch (kpiPopup) {
-            case "total": return `Total Faltas — ${totalFaltas}`;
-            case "pendientes": return `Faltas Pendientes — ${pendientes}`;
-            case "esteMes": return `Faltas Este Mes — ${esteMes}`;
+            case "total": return `${t("hr.abs.total")} — ${totalFaltas}`;
+            case "pendientes": return `${t("hr.abs.pendingTitle")} — ${pendientes}`;
+            case "esteMes": return `${t("hr.abs.thisMonthTitle")} — ${esteMes}`;
             default: return "";
           }
         })()}
@@ -722,12 +742,13 @@ export default function HRAbsences() {
           const tone = (status: string): KpiRow["rightTone"] =>
             status === "approved" ? "success" : status === "rejected" ? "destructive" : "warning";
           return list.slice(0, 100).map((a: any): KpiRow => ({
-            primary: a.employee_name ?? `Empleado ${a.employee_id?.slice?.(0, 8) ?? "—"}`,
-            secondary: `${a.absence_type ?? ""} · ${a.start_date ? new Date(a.start_date).toLocaleDateString("es") : "—"}`,
-            right: a.status ?? "—",
+            primary: a.employee_name ?? t("hr.employeeWithId", { id: a.employee_id?.slice?.(0, 8) ?? "—" }),
+            secondary: `${deSiempreSalvoEnIngles(f.idioma, t, CUALQUIER_AUSENCIA, a.absence_type, a.absence_type ?? "")} · ${a.start_date ? new Date(a.start_date).toLocaleDateString(f.idioma === "en" ? "en-US" : "es") : "—"}`,
+            right: deSiempreSalvoEnIngles(f.idioma, t, ESTADO_AUSENCIA, a.status, a.status ?? "—"),
             rightTone: tone(a.status ?? ""),
           }));
         })()}
+        emptyText={t("hr.kpiEmpty")}
       />
     </div>
   );

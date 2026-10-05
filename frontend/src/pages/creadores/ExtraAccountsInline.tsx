@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { X, Plus, Phone } from "lucide-react";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useLanguage } from "@/hooks/useLanguage";
 
 const normalizeUsername = (raw: string): string => {
   let h = (raw || "").trim();
@@ -40,6 +41,7 @@ interface Props {
 }
 
 const ExtraAccountsInline = ({ creatorId, network, canManage, primaryFilled, onPromoteToPrimary }: Props) => {
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
   const { isAdmin } = useUserRole();
   const isWhatsapp = network === "whatsapp";
@@ -86,7 +88,7 @@ const ExtraAccountsInline = ({ creatorId, network, canManage, primaryFilled, onP
       .insert({ creator_id: creatorId, network, username: u });
     setBusy(false);
     if (error) {
-      toast.error(/duplicate|unique/i.test(error.message) ? "Ya está agregada" : "No se pudo agregar");
+      toast.error(/duplicate|unique/i.test(error.message) ? t("creadores.accounts.alreadyAdded") : t("creadores.accounts.couldNotAdd"));
       return;
     }
     setValue("");
@@ -95,7 +97,7 @@ const ExtraAccountsInline = ({ creatorId, network, canManage, primaryFilled, onP
   };
   const remove = async (id: string) => {
     const { error } = await supabase.from("creator_social_accounts").delete().eq("id", id);
-    if (error) { toast.error("No se pudo quitar"); return; }
+    if (error) { toast.error(t("creadores.accounts.couldNotRemove")); return; }
     refresh();
   };
   const toggle = async (id: string, active: boolean) => {
@@ -103,7 +105,7 @@ const ExtraAccountsInline = ({ creatorId, network, canManage, primaryFilled, onP
       .from("creator_social_accounts")
       .update({ active, updated_at: new Date().toISOString() })
       .eq("id", id);
-    if (error) { toast.error("No se pudo cambiar el estado"); return; }
+    if (error) { toast.error(t("creadores.accounts.couldNotToggle")); return; }
     refresh();
   };
 
@@ -121,13 +123,13 @@ const ExtraAccountsInline = ({ creatorId, network, canManage, primaryFilled, onP
           <button
             type="button"
             onClick={() => effectiveCanManage && toggle(a.id, !a.active)}
-            title={a.active ? `${a.username} — click para pausar` : `${a.username} — click para activar`}
+            title={a.active ? t("creadores.accounts.clickToPause", { name: a.username }) : t("creadores.accounts.clickToActivate", { name: a.username })}
             className={`${a.active ? "" : "line-through"} ${isOther ? "inline-block max-w-[160px] truncate align-bottom" : ""}`}
           >
             {isWhatsapp ? (showValue ? a.username : "WhatsApp") : isOther ? a.username : `@${a.username}`}
           </button>
           {effectiveCanManage && (
-            <button type="button" onClick={() => remove(a.id)} title="Quitar" className="text-muted-foreground hover:text-destructive">
+            <button type="button" onClick={() => remove(a.id)} title={t("creadores.accounts.remove")} aria-label={t("creadores.accounts.remove")} className="text-muted-foreground hover:text-destructive">
               <X className="h-3 w-3" />
             </button>
           )}
@@ -142,7 +144,7 @@ const ExtraAccountsInline = ({ creatorId, network, canManage, primaryFilled, onP
             onChange={(e) => setValue(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } if (e.key === "Escape") { setAdding(false); setValue(""); } }}
             onBlur={() => { if (!value.trim()) setAdding(false); }}
-            placeholder={isWhatsapp ? "+1 234 567 8900" : isOther ? "https://... (link)" : "@otra cuenta o link"}
+            placeholder={isWhatsapp ? "+1 234 567 8900" : isOther ? t("creadores.accounts.linkPh") : t("creadores.accounts.otherAccountPh")}
             className="h-7 w-44 text-xs"
           />
           <button type="button" onClick={add} disabled={busy || !value.trim()} className="rounded bg-primary px-2 py-1 text-[11px] font-medium text-primary-foreground disabled:opacity-50">
@@ -155,7 +157,7 @@ const ExtraAccountsInline = ({ creatorId, network, canManage, primaryFilled, onP
           onClick={() => setAdding(true)}
           className="inline-flex items-center gap-0.5 rounded-full border border-dashed border-border/70 px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:border-primary/50 hover:text-primary"
         >
-          <Plus className="h-3 w-3" /> {isWhatsapp ? "otro número" : isOther ? "otro link" : "otra cuenta"}
+          <Plus className="h-3 w-3" /> {isWhatsapp ? t("creadores.accounts.otherNumber") : isOther ? t("creadores.accounts.otherLink") : t("creadores.accounts.otherAccount")}
         </button>
       ))}
     </div>

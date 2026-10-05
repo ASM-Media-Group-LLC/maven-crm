@@ -17,7 +17,8 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Download, ImageIcon, Loader2, Paperclip } from "lucide-react";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface EvidenceFile {
   id: string;
@@ -36,6 +37,8 @@ interface Props {
 }
 
 const EvidenceViewer = ({ entityType, entityId, uploaderNameHint }: Props) => {
+  const formato = useFormato();
+  const { t } = useLanguage();
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   const tableName =
@@ -64,23 +67,26 @@ const EvidenceViewer = ({ entityType, entityId, uploaderNameHint }: Props) => {
 
   if (!entityId) return null;
 
+  // En inglés, mes antes que día ("Sep 5"); en español, como siempre ("5 sep").
+  const enIngles = formato.idioma === "en";
+
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2">
         <Paperclip className="h-4 w-4 text-muted-foreground" />
         <h3 className="text-sm font-semibold">
-          Evidencia {files.length > 0 ? `(${files.length})` : ""}
+          {t("leadgen.viewer.title")} {files.length > 0 ? `(${files.length})` : ""}
         </h3>
       </div>
 
       {isLoading ? (
         <div className="flex items-center gap-2 rounded-md border border-dashed p-4 text-xs text-muted-foreground">
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          Cargando evidencia…
+          {t("leadgen.viewer.loading")}
         </div>
       ) : files.length === 0 ? (
         <div className="rounded-md border border-dashed p-4 text-xs text-muted-foreground text-center">
-          Sin archivos adjuntos para este {entityType === "lead" ? "lead" : "contacto"}.
+          {entityType === "lead" ? t("leadgen.viewer.emptyLead") : t("leadgen.viewer.emptyContact")}
         </div>
       ) : (
         <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
@@ -94,7 +100,7 @@ const EvidenceViewer = ({ entityType, entityId, uploaderNameHint }: Props) => {
               {f.file_type?.startsWith("image/") || !f.file_type ? (
                 <img
                   src={f.file_url}
-                  alt={`evidencia ${idx + 1}`}
+                  alt={t("leadgen.viewer.thumbAlt", { n: idx + 1 })}
                   className="h-full w-full object-cover"
                   loading="lazy"
                 />
@@ -105,7 +111,7 @@ const EvidenceViewer = ({ entityType, entityId, uploaderNameHint }: Props) => {
                 </div>
               )}
               <div className="absolute bottom-0 left-0 right-0 truncate bg-black/60 px-1 py-0.5 text-[10px] text-white">
-                {format(new Date(f.uploaded_at), "d MMM HH:mm", { locale: es })}
+                {format(new Date(f.uploaded_at), enIngles ? "MMM d HH:mm" : "d MMM HH:mm", { locale: formato.fechas })}
               </div>
             </button>
           ))}
@@ -120,19 +126,20 @@ const EvidenceViewer = ({ entityType, entityId, uploaderNameHint }: Props) => {
               <div className="flex h-[70vh] items-center justify-center overflow-hidden rounded-md bg-black/80">
                 <img
                   src={files[openIndex].file_url}
-                  alt="evidencia"
+                  alt={t("leadgen.viewer.imageAlt")}
                   className="max-h-full max-w-full object-contain"
                 />
               </div>
               <div className="flex items-center justify-between text-xs text-muted-foreground">
                 <span>
-                  Imagen {openIndex + 1} de {files.length}
+                  {t("leadgen.viewer.imageOf", { index: openIndex + 1, total: files.length })}
                   {" · "}
-                  Subido{" "}
-                  {format(new Date(files[openIndex].uploaded_at), "d MMM yyyy HH:mm", {
-                    locale: es,
+                  {t("leadgen.viewer.uploaded", {
+                    date: format(new Date(files[openIndex].uploaded_at), enIngles ? "MMM d, yyyy HH:mm" : "d MMM yyyy HH:mm", {
+                      locale: formato.fechas,
+                    }),
                   })}
-                  {uploaderNameHint && ` · por ${uploaderNameHint}`}
+                  {uploaderNameHint && t("leadgen.viewer.by", { name: uploaderNameHint })}
                 </span>
                 <div className="flex items-center gap-2">
                   <Button
@@ -141,7 +148,7 @@ const EvidenceViewer = ({ entityType, entityId, uploaderNameHint }: Props) => {
                     onClick={() => setOpenIndex(openIndex === 0 ? files.length - 1 : openIndex - 1)}
                     disabled={files.length <= 1}
                   >
-                    ← Anterior
+                    ← {t("common.previous")}
                   </Button>
                   <Button
                     variant="ghost"
@@ -149,7 +156,7 @@ const EvidenceViewer = ({ entityType, entityId, uploaderNameHint }: Props) => {
                     onClick={() => setOpenIndex(openIndex === files.length - 1 ? 0 : openIndex + 1)}
                     disabled={files.length <= 1}
                   >
-                    Siguiente →
+                    {t("common.next")} →
                   </Button>
                   <Button asChild variant="outline" size="sm">
                     <a
@@ -159,7 +166,7 @@ const EvidenceViewer = ({ entityType, entityId, uploaderNameHint }: Props) => {
                       download
                     >
                       <Download className="mr-1.5 h-3.5 w-3.5" />
-                      Descargar
+                      {t("common.download")}
                     </a>
                   </Button>
                 </div>

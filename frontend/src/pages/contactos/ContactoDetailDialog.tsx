@@ -5,6 +5,8 @@ import { ExternalLink, Pencil, Sparkles, Trash2, ArrowRight, History, Phone } fr
 import ContactHistoryView from "./ContactHistoryView";
 import { useUserRole } from "@/hooks/useUserRole";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -13,7 +15,6 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { format, parseISO } from "date-fns";
-import { es } from "date-fns/locale";
 import { getCountryFlag, getCountryShortDisplay } from "@/lib/country-utils";
 import { WaChatButton } from "@/components/WaChatButton";
 import { TgChatButton } from "@/components/TgChatButton";
@@ -46,6 +47,8 @@ interface Props {
 // Mismo patrón que CreatorDetailDialog (Dashboard 2): foto + título + IG
 // + grid de stats + botones de acción.
 const ContactoDetailDialog = ({ open, onOpenChange, contacto, onEdit, onConvert, onDelete, canDelete, salesChannels = [], showSalesChannels }: Props) => {
+  const f = useFormato();
+  const { t } = useLanguage();
   const [historyOpen, setHistoryOpen] = useState(false);
   const { isAdmin } = useUserRole();
   const { permissions } = usePermissions();
@@ -95,7 +98,7 @@ const ContactoDetailDialog = ({ open, onOpenChange, contacto, onEdit, onConvert,
     .join("")
     .toUpperCase() || "?";
   const recordType = (c as unknown as { record_type?: string }).record_type;
-  const tipo = recordType === "reactivado" ? "Reactivado" : "Nuevo";
+  const tipo = recordType === "reactivado" ? t("contactos.reactivated") : t("common.new");
   // Número completo (país + teléfono). El "•" indica que la vista lo enmascaró
   // (no privilegiado) → no lo mostramos como si fuera el real.
   const phoneText = (c.whatsapp || c.phone || "").trim();
@@ -105,11 +108,11 @@ const ContactoDetailDialog = ({ open, onOpenChange, contacto, onEdit, onConvert,
   const hasPhone = !!phoneText;
   const phoneDigits = phoneText.replace(/[^0-9+]/g, "");
   const stats: { label: string; value: React.ReactNode; full?: boolean }[] = [
-    { label: "Creación", value: c.creacion || "—" },
-    { label: "Registro", value: c.ticket || "—" },
-    { label: "Agente", value: c.creadoPor || "No asignado" },
+    { label: t("contactos.created"), value: c.creacion || "—" },
+    { label: t("contactos.record"), value: c.ticket || "—" },
+    { label: t("contactos.agent"), value: c.creadoPor || t("contactos.notAssigned") },
     {
-      label: "Categoría",
+      label: t("common.category"),
       value: (
         <Badge variant={categoryVariant[c.categoria] ?? "secondary-soft"} className="font-normal">
           {c.categoria || "—"}
@@ -117,7 +120,7 @@ const ContactoDetailDialog = ({ open, onOpenChange, contacto, onEdit, onConvert,
       ),
     },
     {
-      label: "Tipo",
+      label: t("common.type"),
       value: (
         <Badge variant={recordType === "reactivado" ? "warning-soft" : "success-soft"} className="font-normal">
           {tipo}
@@ -125,7 +128,7 @@ const ContactoDetailDialog = ({ open, onOpenChange, contacto, onEdit, onConvert,
       ),
     },
     {
-      label: "País",
+      label: t("common.country"),
       value: c.pais ? (
         <span className="inline-flex items-center gap-1.5">
           <span className="text-base">{getCountryFlag(c.pais)}</span>
@@ -133,9 +136,9 @@ const ContactoDetailDialog = ({ open, onOpenChange, contacto, onEdit, onConvert,
         </span>
       ) : "—",
     },
-    { label: "Ciudad", value: c.city || "—" },
+    { label: t("common.city"), value: c.city || t("contactos.notApplicable") },
     {
-      label: "Contacto",
+      label: t("contactos.contact"),
       full: true,
       value: (
         <div className="space-y-1.5">
@@ -146,7 +149,7 @@ const ContactoDetailDialog = ({ open, onOpenChange, contacto, onEdit, onConvert,
             {hasPhone ? (
               <WaChatButton contactId={c.id} name={c.nombre} />
             ) : (
-              <span className="text-xs text-muted-foreground">Sin teléfono cargado</span>
+              <span className="text-xs text-muted-foreground">{t("contactos.noPhoneOnFile")}</span>
             )}
             <TgChatButton contactId={c.id} name={c.nombre} />
           </div>
@@ -154,7 +157,7 @@ const ContactoDetailDialog = ({ open, onOpenChange, contacto, onEdit, onConvert,
             <a
               href={`tel:${phoneDigits}`}
               className="inline-flex items-center gap-1.5 text-sm text-foreground hover:underline"
-              title="Llamar / copiar número"
+              title={t("contactos.callCopyNumber")}
             >
               <Phone className="h-3.5 w-3.5 text-muted-foreground" />
               <span className="tabular-nums select-all">{phoneText}</span>
@@ -179,7 +182,7 @@ const ContactoDetailDialog = ({ open, onOpenChange, contacto, onEdit, onConvert,
               <DialogTitle
                 className={`text-2xl mb-1 truncate ${igUrl ? "cursor-pointer hover:underline decoration-primary/50 underline-offset-4" : ""}`}
                 onClick={() => igUrl && window.open(igUrl, "_blank", "noopener,noreferrer")}
-                title={igUrl ? "Abrir Instagram" : undefined}
+                title={igUrl ? t("contactos.openInstagram") : undefined}
               >
                 {c.nombre}
               </DialogTitle>
@@ -189,7 +192,7 @@ const ContactoDetailDialog = ({ open, onOpenChange, contacto, onEdit, onConvert,
                   target="_blank"
                   rel="noopener noreferrer"
                   className="mt-1.5 inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/50 px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-muted"
-                  title="Abrir Instagram"
+                  title={t("contactos.openInstagram")}
                 >
                   <InstagramIcon className="h-3.5 w-3.5" />
                   @{cleanHandle}
@@ -230,10 +233,10 @@ const ContactoDetailDialog = ({ open, onOpenChange, contacto, onEdit, onConvert,
         {showSalesChannels && (
           <div className="mt-4 pt-4 border-t border-border">
             <p className="text-xs text-muted-foreground font-medium mb-2">
-              Canales de venta contactado
+              {t("contactos.salesChannelsContacted")}
             </p>
             {salesChannels.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Sin contacto por WhatsApp todavía.</p>
+              <p className="text-sm text-muted-foreground">{t("contactos.noWhatsappContactYet")}</p>
             ) : (
               <div className="space-y-1.5">
                 {salesChannels.map((ch) => (
@@ -244,7 +247,7 @@ const ContactoDetailDialog = ({ open, onOpenChange, contacto, onEdit, onConvert,
                     <Badge variant="secondary" className="font-normal">{ch.label}</Badge>
                     <span className="text-xs text-muted-foreground tabular-nums whitespace-nowrap">
                       {ch.lastAt
-                        ? format(parseISO(ch.lastAt), "dd MMM yy, HH:mm", { locale: es })
+                        ? format(parseISO(ch.lastAt), "dd MMM yy, HH:mm", { locale: f.fechas })
                         : "—"}
                     </span>
                   </div>
@@ -257,17 +260,17 @@ const ContactoDetailDialog = ({ open, onOpenChange, contacto, onEdit, onConvert,
         {notesWithText.length > 0 && (
           <div className="mt-4 pt-4 border-t border-border">
             <p className="text-xs text-muted-foreground font-medium mb-2">
-              Notas de contacto
+              {t("contactos.contactNotes")}
             </p>
             <div className="space-y-1.5">
               {notesWithText.map((n) => (
                 <div key={n.idx} className="rounded-lg border border-border bg-card px-3 py-2">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-xs font-medium">
-                      contacto {n.idx}{n.channel ? ` · ${n.channel}` : ""}
+                      {t("contactos.contactN", { n: n.idx })}{n.channel ? ` · ${n.channel}` : ""}
                     </span>
                     <span className="text-[10px] text-muted-foreground tabular-nums whitespace-nowrap">
-                      {n.contact_date ? format(parseISO(n.contact_date), "dd MMM yy", { locale: es }) : ""}
+                      {n.contact_date ? format(parseISO(n.contact_date), "dd MMM yy", { locale: f.fechas }) : ""}
                     </span>
                   </div>
                   <p className="text-sm text-muted-foreground mt-0.5 whitespace-pre-wrap">{n.notes}</p>
@@ -280,7 +283,7 @@ const ContactoDetailDialog = ({ open, onOpenChange, contacto, onEdit, onConvert,
         <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-border">
           <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setHistoryOpen(true)}>
             <History className="h-3.5 w-3.5" />
-            Historial
+            {t("contactos.history")}
           </Button>
           {ofUrl && (
             <Button
@@ -296,20 +299,20 @@ const ContactoDetailDialog = ({ open, onOpenChange, contacto, onEdit, onConvert,
           {onEdit && (
             <Button variant="outline" size="sm" className="gap-1.5" onClick={onEdit}>
               <Pencil className="h-3.5 w-3.5" />
-              Editar
+              {t("common.edit")}
             </Button>
           )}
           {onConvert && (
             <Button size="sm" className="gap-1.5" onClick={onConvert}>
               <Sparkles className="h-3.5 w-3.5" />
-              Convertir a Creador
+              {t("contactos.convertToCreator")}
               <ArrowRight className="h-3.5 w-3.5" />
             </Button>
           )}
           {onDelete && canDelete && (
             <Button variant="outline" size="sm" className="gap-1.5 ml-auto text-destructive hover:text-destructive" onClick={onDelete}>
               <Trash2 className="h-3.5 w-3.5" />
-              Eliminar
+              {t("common.delete")}
             </Button>
           )}
         </div>

@@ -3,6 +3,9 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import CallChatSidebar from "@/pages/messenger/videocall/CallChatSidebar";
 import { LKChatMessage } from "@/hooks/useLiveKit";
 
+vi.mock("@/hooks/useLanguage", (original) =>
+  import("@/test/messenger/espanolEnTests").then((m) => m.idiomaEnEspanol(original)));
+
 describe("CallChatSidebar", () => {
   const mockOnSend = vi.fn();
   const mockOnClose = vi.fn();

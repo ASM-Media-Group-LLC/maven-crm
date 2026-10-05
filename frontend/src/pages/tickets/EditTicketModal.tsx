@@ -19,10 +19,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/hooks/useLanguage";
 import {
-  PRIORITY_LABELS,
-  STATUS_LABELS,
-  TYPE_LABELS,
+  PRIORITY_LABEL_KEYS,
+  STATUS_LABEL_KEYS,
+  TYPE_LABEL_KEYS,
   COMPANIES,
   TEAM_MEMBERS,
   type TicketWithCreator,
@@ -37,6 +38,7 @@ interface Props {
 
 const EditTicketModal = ({ open, onOpenChange, ticket }: Props) => {
   const { toast } = useToast();
+  const { t } = useLanguage();
   const { updateTicket, creatorsQuery } = useTickets();
 
   const [title, setTitle] = useState("");
@@ -64,13 +66,13 @@ const EditTicketModal = ({ open, onOpenChange, ticket }: Props) => {
   }, [open, ticket]);
 
   const handleCancel = () => {
-    toast({ title: "Edición cancelada" });
+    toast({ title: t("tickets.edit.cancelled") });
     onOpenChange(false);
   };
 
   const handleSubmit = () => {
     if (!title.trim()) {
-      toast({ title: "El título es requerido", variant: "destructive" });
+      toast({ title: t("tickets.edit.titleRequired"), variant: "destructive" });
       return;
     }
 
@@ -97,27 +99,27 @@ const EditTicketModal = ({ open, onOpenChange, ticket }: Props) => {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg max-h-[90vh]">
         <DialogHeader className="pr-8">
-          <DialogTitle>Editar Ticket</DialogTitle>
+          <DialogTitle>{t("tickets.edit.title")}</DialogTitle>
           <DialogDescription>
-            Modifica los campos necesarios y guarda los cambios
+            {t("tickets.edit.description")}
           </DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-4 py-2 overflow-y-auto max-h-[60vh] pr-1">
           <div className="space-y-1.5">
-            <Label htmlFor="et-title">Título *</Label>
+            <Label htmlFor="et-title">{t("common.title")} *</Label>
             <Input id="et-title" value={title} onChange={(e) => setTitle(e.target.value)} />
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="et-desc">Descripción</Label>
+            <Label htmlFor="et-desc">{t("common.description")}</Label>
             <Textarea id="et-desc" value={description} onChange={(e) => setDescription(e.target.value)} rows={3} />
           </div>
 
           <div className="space-y-1.5">
-            <Label>Creador *</Label>
+            <Label>{t("tickets.creator")} *</Label>
             <Select value={creatorId} onValueChange={setCreatorId}>
-              <SelectTrigger><SelectValue placeholder="Seleccionar creador" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder={t("tickets.edit.selectCreator")} /></SelectTrigger>
               <SelectContent>
                 {creators.map((c) => (
                   <SelectItem key={c.id} value={c.id}>
@@ -130,34 +132,34 @@ const EditTicketModal = ({ open, onOpenChange, ticket }: Props) => {
 
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-1.5">
-              <Label>Prioridad</Label>
+              <Label>{t("tickets.priority")}</Label>
               <Select value={priority} onValueChange={setPriority}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {Object.entries(PRIORITY_LABELS).map(([k, v]) => (
-                    <SelectItem key={k} value={k}>{v}</SelectItem>
+                  {Object.entries(PRIORITY_LABEL_KEYS).map(([k, clave]) => (
+                    <SelectItem key={k} value={k}>{t(clave)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Tipo</Label>
+              <Label>{t("common.type")}</Label>
               <Select value={ticketType} onValueChange={setTicketType}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {Object.entries(TYPE_LABELS).map(([k, v]) => (
-                    <SelectItem key={k} value={k}>{v}</SelectItem>
+                  {Object.entries(TYPE_LABEL_KEYS).map(([k, clave]) => (
+                    <SelectItem key={k} value={k}>{t(clave)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Estado</Label>
+              <Label>{t("common.status")}</Label>
               <Select value={status} onValueChange={setStatus}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {Object.entries(STATUS_LABELS).map(([k, v]) => (
-                    <SelectItem key={k} value={k}>{v}</SelectItem>
+                  {Object.entries(STATUS_LABEL_KEYS).map(([k, clave]) => (
+                    <SelectItem key={k} value={k}>{t(clave)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -165,11 +167,11 @@ const EditTicketModal = ({ open, onOpenChange, ticket }: Props) => {
           </div>
 
           <div className="space-y-1.5">
-            <Label>Compañía / Cuenta de Origen</Label>
+            <Label>{t("tickets.edit.companyOrigin")}</Label>
             <Select value={company || undefined} onValueChange={(v) => setCompany(v === "__none__" ? "" : v)}>
-              <SelectTrigger><SelectValue placeholder="Seleccionar compañía" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder={t("tickets.edit.selectCompany")} /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="__none__">Sin compañía</SelectItem>
+                <SelectItem value="__none__">{t("tickets.edit.noCompany")}</SelectItem>
                 {COMPANIES.map((c) => (
                   <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
                 ))}
@@ -178,11 +180,11 @@ const EditTicketModal = ({ open, onOpenChange, ticket }: Props) => {
           </div>
 
           <div className="space-y-1.5">
-            <Label>Asignar a</Label>
+            <Label>{t("tickets.edit.assignTo")}</Label>
             <Select value={assignedTo || undefined} onValueChange={(v) => setAssignedTo(v === "__none__" ? "" : v)}>
-              <SelectTrigger><SelectValue placeholder="Sin asignar" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder={t("common.unassigned")} /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="__none__">Sin asignar</SelectItem>
+                <SelectItem value="__none__">{t("common.unassigned")}</SelectItem>
                 {TEAM_MEMBERS.map((m) => (
                   <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
                 ))}
@@ -191,15 +193,15 @@ const EditTicketModal = ({ open, onOpenChange, ticket }: Props) => {
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="et-notes">Notas sobre el creator</Label>
+            <Label htmlFor="et-notes">{t("tickets.creatorNotes")}</Label>
             <Input id="et-notes" value={creatorNotes} onChange={(e) => setCreatorNotes(e.target.value)} />
           </div>
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={handleCancel} disabled={updateTicket.isPending}>Cancelar</Button>
+          <Button variant="outline" onClick={handleCancel} disabled={updateTicket.isPending}>{t("common.cancel")}</Button>
           <Button onClick={handleSubmit} disabled={updateTicket.isPending}>
-            {updateTicket.isPending ? "Guardando..." : "Guardar Cambios"}
+            {updateTicket.isPending ? t("tickets.saving") : t("tickets.edit.saveChanges")}
           </Button>
         </DialogFooter>
       </DialogContent>

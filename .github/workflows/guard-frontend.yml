@@ -1,0 +1,133 @@
+name: Guard Frontend
+
+# El frontend se despliega solo al mergear a main (Dokploy arma la imagen con
+# `npm run build`) y hasta ahora ningún PR lo revisaba: un test roto, un error de
+# tipos nuevo o un build que no arma llegaban a main sin que nada avisara.
+# Solo lee el código: no despliega nada ni necesita secretos.
+#
+# Corre en el Mac mini de la oficina (runner «mini5», usuario aparte «maven-ci»
+# sin acceso a los discos del NAS ni a la carpeta de asm002: lo instaló
+# scripts/ci/instalar-runner-ci.sh con una prueba de aislamiento). Así no gasta
+# minutos de GitHub: en el plan gratis alcanzan ~2.000 al mes y, si se acaban, se
+# frenan TODOS los workflows, también el que despliega las edge functions (ese
+# sigue en las máquinas de GitHub, para no depender de que el Mac esté prendido).
+# Si el Mac está apagado, esta revisión espera en cola hasta que vuelva.
+#
+# Tres cosas, en un solo trabajo:
+#   1. vitest, la suite ENTERA, leyendo el resumen («Test Files»): un archivo de
+#      test que no carga no suma nada a «Tests» y solo se ve ahí (pasó el 16/09).
+#      Y la LISTA de archivos que corrió tiene que ser la de frontend/src.
+#   2. tsc contra main: main arrastra errores viejos, así que se falla solo si el PR
+#      trae uno NUEVO, comparando la lista (sin línea ni columna), no el número.
+#      Corre aunque vitest haya dado rojo: es otra señal.
+#   3. Que arme: `npm run build`. La imagen de prod entera (Dockerfile tal cual +
+#      `nginx -t`) la arma guard-imagen.yml en una máquina de GitHub, y solo cuando
+#      el PR cambia lo que la hace distinta del build de aquí.
+# Los borradores no corren: corre al pasar a «listo para revisar».
+# La lógica de 1 y 2 está en scripts/ci/ (guardas.mjs, con sus pruebas).
+#
+# `paths`: además del frontend, lo que sus tests LEEN o importan de afuera (edge
+# functions, migraciones, nginx.conf, el servidor del NAS). Si un PR toca solo uno
+# de esos archivos y rompe el test, la guarda tiene que correr igual.
+# scripts/ci/filtro-cubre-lecturas.mjs lo revisa en cada corrida: si un test nuevo
+# lee algo que la lista no cubre, falla y dice qué sumar.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "frontend/**"
+      - "vite.config.ts"
+      - "vitest.config.ts"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig*.json"
+      - "tailwind.config.ts"
+      - "postcss.config.js"
+      - "scripts/ci/**"
+      - ".github/workflows/guard-frontend.yml"
+      # Lo que lee `docker build` además de lo de arriba.
+      - "Dockerfile"
+      - ".dockerignore"
+      - "docker-entrypoint.sh"
+      # Lo que los tests de frontend/src leen de afuera (con fs o import.meta.glob).
+      - "supabase/functions/**"
+      - "supabase/migrations/**"
+      - "infra/nas-drive/**"
+      - "nginx.conf"
+
+permissions:
+  contents: read
+
+# Un push nuevo al PR cancela la corrida anterior: solo importa la última.
+concurrency:
+  group: guard-frontend-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: frontend (vitest, tsc contra main, build)
+    if: ${{ !github.event.pull_request.draft }}
+    runs-on: [self-hosted, macOS, ARM64, mini5]
+    timeout-minutes: 40
+    steps:
+      # fetch-depth 2: en un pull_request, HEAD es el merge que arma GitHub (el PR
+      # encima de main tal como está AHORA) y hace falta su primer padre, que es
+      # ese main. Contra él compara tsc, y de ahí sale qué tocó el PR.
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 2
+
+      # Node 24 y no el 20 de la imagen (Dockerfile: node:20-alpine, con
+      # `npm install`): el npm 10 que trae Node 20 rechaza este package-lock en
+      # `npm ci` («Missing: esbuild@0.28.2 from lock file», el peer opcional del
+      # vite 8 que usa vitest). El npm 11 de Node 24 lo acepta, igual que el de
+      # desarrollo. Lo que arma prod lo revisa guard-imagen.yml.
+      # Sin `cache: npm`: en el Mac el caché de npm (~/.npm) se queda entre corridas.
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - name: npm ci
+        id: npmci
+        run: npm ci --no-audit --no-fund
+
+      # Las pruebas de las propias guardas primero: si el lector del resumen de
+      # vitest se rompe, no tiene sentido confiar en lo que diga abajo. Las de
+      # corredores.test.mjs corren tsc y vitest de verdad sobre un proyecto chico
+      # (usan el node_modules de recién): van después de `npm ci`.
+      - name: Pruebas de las guardas
+        run: node --test scripts/ci/guardas.test.mjs scripts/ci/corredores.test.mjs
+
+      # Por qué el tiempo por test sube a 30 s: las pruebas que montan una página
+      # entera (las de «…EnIngles») se cortan por tiempo con los 5 s de siempre
+      # cuando la máquina está ocupada. Un test colgado de verdad falla igual, a los 30 s.
+      # --maxWorkers=4: el Mac tiene 12 núcleos, pero también sirve el NAS; el
+      # servicio corre con prioridad baja y 4 workers dejan aire.
+      - name: vitest — la suite entera, leyendo «Test Files»
+        run: node scripts/ci/vitest-completo.mjs --testTimeout=30000 --hookTimeout=30000 --maxWorkers=4
+
+      # Que el filtro `paths` de arriba cubra todo lo que la guarda lee. Corre
+      # aunque vitest haya dado rojo: es otra señal.
+      - name: El filtro paths cubre lo que leen los tests
+        if: ${{ !cancelled() && steps.npmci.outcome == 'success' }}
+        run: node scripts/ci/filtro-cubre-lecturas.mjs
+
+      - name: tsc — ningún error de tipos nuevo respecto de main
+        if: ${{ !cancelled() && steps.npmci.outcome == 'success' }}
+        run: |
+          set -euo pipefail
+          # Si HEAD no fuera el merge (dos padres), HEAD^1 sería el commit anterior
+          # del PR y la comparación no diría nada de main.
+          padres=$(git rev-list --parents -n 1 HEAD | wc -w)
+          if [ "$padres" -ne 3 ]; then
+            echo "::error::HEAD no es el merge del PR con main (tiene $((padres - 1)) padre(s)): no hay contra qué comparar."
+            exit 1
+          fi
+          node scripts/ci/tsc-sin-errores-nuevos.mjs --base=HEAD^1
+
+      - name: npm run build
+        if: ${{ !cancelled() && steps.npmci.outcome == 'success' }}
+        run: npm run build

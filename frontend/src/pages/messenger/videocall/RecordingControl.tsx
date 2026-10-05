@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2, Square } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // Control de grabación DENTRO de la llamada.
 //
@@ -63,6 +64,7 @@ export async function detenerAlSalir(roomName: string, recordingId: string): Pro
 }
 
 export default function RecordingControl({ room, roomName, source, title, canControl, compact }: Props) {
+  const { t } = useLanguage();
   const [isRecording, setIsRecording] = useState<boolean>(() => room?.isRecording ?? false);
   const [busy, setBusy] = useState(false);
   const [stopOpen, setStopOpen] = useState(false);
@@ -109,15 +111,15 @@ export default function RecordingControl({ room, roomName, source, title, canCon
       miGrabacionRef.current = { id, t: Date.now() };
       sessionStorage.setItem(claveSesion(roomName), JSON.stringify(miGrabacionRef.current));
       setIsRecording(true); // la señal de LiveKit tarda unos segundos; el punto rojo no
-      toast.success("Grabando la reunión", {
-        description: "Toda la sala ve el punto rojo. Al detener eliges con quién compartirla.",
+      toast.success(t("messenger.rec.grabando"), {
+        description: t("messenger.rec.grabandoDesc"),
       });
     } catch (e) {
-      toast.error((e as Error).message || "No se pudo iniciar la grabación");
+      toast.error((e as Error).message || t("messenger.rec.noSePudoIniciar"));
     } finally {
       setBusy(false);
     }
-  }, [roomName, source, title]);
+  }, [roomName, source, title, t]);
 
   const stop = useCallback(async (recipients: string[]) => {
     setBusy(true);
@@ -134,17 +136,17 @@ export default function RecordingControl({ room, roomName, source, title, canCon
       // y mientras tanto el pill seguia en REC con el cronometro corriendo.
       setIsRecording(false);
       const emails = (res.emails as number) ?? 0;
-      toast.success("Grabación guardada", {
+      toast.success(t("messenger.rec.guardada"), {
         description: emails > 0
-          ? `Quedó en Grabaciones y se avisó por correo a ${emails} ${emails === 1 ? "persona" : "personas"}.`
-          : "Quedó en Grabaciones (Maven → Grabaciones).",
+          ? (emails === 1 ? t("messenger.rec.avisoUnaPersona") : t("messenger.rec.avisoPersonas", { n: emails }))
+          : t("messenger.rec.quedoEnGrabaciones"),
       });
     } catch (e) {
-      toast.error((e as Error).message || "No se pudo detener la grabación");
+      toast.error((e as Error).message || t("messenger.rec.noSePudoDetener"));
     } finally {
       setBusy(false);
     }
-  }, [roomName]);
+  }, [roomName, t]);
 
   if (!isRecording && !canControl) return null;
 
@@ -159,7 +161,7 @@ export default function RecordingControl({ room, roomName, source, title, canCon
           type="button"
           disabled={!canControl || busy}
           onClick={() => canControl && setStopOpen(true)}
-          title={canControl ? "Detener grabación" : "Esta reunión se está grabando"}
+          title={canControl ? t("messenger.rec.detenerGrabacion") : t("messenger.rec.seEstaGrabando")}
           className={cn(
             "flex items-center gap-2 rounded-full border border-red-500/40 bg-[hsl(0_60%_22%/0.92)] px-3 py-1.5 text-xs font-semibold text-red-100 backdrop-blur-sm shadow-lg",
             canControl && "hover:bg-[hsl(0_60%_28%/0.95)] cursor-pointer",
@@ -173,7 +175,7 @@ export default function RecordingControl({ room, roomName, source, title, canCon
           {canControl && !compact && (
             <span className="flex items-center gap-1 border-l border-red-300/30 pl-2 text-red-200/90">
               {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Square className="h-3 w-3 fill-current" />}
-              Detener
+              {t("messenger.rec.detener")}
             </span>
           )}
         </button>
@@ -197,13 +199,13 @@ export default function RecordingControl({ room, roomName, source, title, canCon
           type="button"
           disabled={busy}
           onClick={() => void start()}
-          title="Grabar la reunión"
+          title={t("messenger.rec.grabarLaReunion")}
           className="flex items-center gap-2 rounded-full border-[1.5px] border-red-500 bg-[hsl(240_5%_9%)] px-3 py-1.5 text-xs font-semibold text-red-200 shadow-[0_0_0_1px_rgba(0,0,0,0.55),0_2px_10px_rgba(0,0,0,0.5)] hover:border-red-400 hover:bg-[hsl(0_50%_16%)] hover:text-white disabled:opacity-70"
         >
           {busy
             ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
             : <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-red-500" />}
-          Grabar
+          {t("messenger.rec.grabar")}
         </button>
       )}
 
@@ -222,22 +224,22 @@ function StopDialog({ open, onClose, onConfirm, busy }: {
   onConfirm: (recipients: string[]) => void;
   busy: boolean;
 }) {
+  const { t } = useLanguage();
   return (
     <Dialog open={open} onOpenChange={(o) => !o && !busy && onClose()}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Detener la grabación</DialogTitle>
+          <DialogTitle>{t("messenger.rec.detenerLaGrabacion")}</DialogTitle>
           <DialogDescription>
-            Queda guardada en <b>Grabaciones</b>; desde ahí la puedes compartir con
-            quien quieras. <b>Se borra a los 90 días, sin excepciones</b>: quien la
-            necesite más tiempo tiene que descargarla.
+            {t("messenger.rec.stopDescA")} <b>{t("messenger.rec.grabaciones")}</b>{t("messenger.rec.stopDescB")}{" "}
+            <b>{t("messenger.rec.stopDescNegrita")}</b>{t("messenger.rec.stopDescC")}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className="gap-2">
-          <Button variant="ghost" onClick={onClose} disabled={busy}>Seguir grabando</Button>
+          <Button variant="ghost" onClick={onClose} disabled={busy}>{t("messenger.rec.seguirGrabando")}</Button>
           <Button variant="destructive" onClick={() => onConfirm([])} disabled={busy} className="gap-1.5">
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Square className="h-3.5 w-3.5 fill-current" />}
-            Detener grabación
+            {t("messenger.rec.detenerGrabacion")}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -1,6 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
 import { format, subDays, isSameDay, subMonths } from "date-fns";
-import { es } from "date-fns/locale";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, LineChart, Line, ResponsiveContainer } from "recharts";
 import { CHART_AXIS, CHART_GRID } from "@/lib/chartTheme";
 import { BarChart3, Clock, ChevronsUpDown, Check, CheckCircle } from "lucide-react";
@@ -9,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandItem } from "@/components/ui/command";
 import { useAuth } from "@/hooks/useAuth";
+import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
 import { useUserRole } from "@/hooks/useUserRole";
 import { usePromologActiveAgents, usePromologAgentEntries } from "./usePromologAgentStats";
 
@@ -17,6 +18,8 @@ interface Props {
 }
 
 const PromologPerformanceView = ({ profiles }: Props) => {
+  const f = useFormato();
+  const { t } = useLanguage();
   const { user } = useAuth();
   const { role, isAgent, isEmployee } = useUserRole();
   const isCloser = role === "closer";
@@ -57,8 +60,8 @@ const PromologPerformanceView = ({ profiles }: Props) => {
   const isLoading = agentsLoading || entriesLoading;
 
   const selectedName = !effectiveAgent
-    ? "Seleccionar agente"
-    : (profiles.find(p => p.id === effectiveAgent)?.full_name || "Agente");
+    ? t("promolog.selectAgent")
+    : (profiles.find(p => p.id === effectiveAgent)?.full_name || t("promolog.agent"));
 
   const now = new Date();
 
@@ -70,29 +73,29 @@ const PromologPerformanceView = ({ profiles }: Props) => {
   const weeklyData = useMemo(() => Array.from({ length: 7 }, (_, i) => {
     const day = subDays(now, 6 - i);
     return {
-      label: format(day, "EEE dd", { locale: es }),
+      label: format(day, "EEE dd", { locale: f.fechas }),
       count: agentEntries.filter(l => isSameDay(new Date(l.created_at), day)).length,
     };
-  }), [agentEntries, now]);
+  }), [agentEntries, now, f]);
 
   const last30Data = useMemo(() => Array.from({ length: 30 }, (_, i) => {
     const day = subDays(now, 29 - i);
     return {
-      label: format(day, "d MMM", { locale: es }),
+      label: format(day, "d MMM", { locale: f.fechas }),
       count: agentEntries.filter(l => isSameDay(new Date(l.created_at), day)).length,
     };
-  }), [agentEntries, now]);
+  }), [agentEntries, now, f]);
 
   const yearlyData = useMemo(() => Array.from({ length: 12 }, (_, i) => {
     const month = subMonths(now, 11 - i);
     return {
-      label: format(month, "MMM yy", { locale: es }),
+      label: format(month, "MMM yy", { locale: f.fechas }),
       count: agentEntries.filter(l => {
         const d = new Date(l.created_at);
         return d.getMonth() === month.getMonth() && d.getFullYear() === month.getFullYear();
       }).length,
     };
-  }), [agentEntries, now]);
+  }), [agentEntries, now, f]);
 
   // Result distribution — BINARIO Sí/No. Sí = promocionó ('true'/'yes'/'partial');
   // No = todo lo demás (incl. 'false'/'pending'/null), para que si + no === total.
@@ -101,10 +104,10 @@ const PromologPerformanceView = ({ profiles }: Props) => {
     const no = agentEntries.filter(e => e.promoted !== "true" && e.promoted !== "yes" && e.promoted !== "partial").length;
     const total = agentEntries.length || 1;
     return [
-      { label: "Sí", count: si, pct: Math.round((si / total) * 100), color: "bg-success" },
-      { label: "No", count: no, pct: Math.round((no / total) * 100), color: "bg-destructive" },
+      { label: t("promolog.yes"), count: si, pct: Math.round((si / total) * 100), color: "bg-success" },
+      { label: t("promolog.no"), count: no, pct: Math.round((no / total) * 100), color: "bg-destructive" },
     ];
-  }, [agentEntries]);
+  }, [agentEntries, t]);
 
   const tooltipStyle = { backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' };
 
@@ -113,9 +116,9 @@ const PromologPerformanceView = ({ profiles }: Props) => {
       <CardContent className="pt-6">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h3 className="text-base font-semibold">Rendimiento por Agente</h3>
+            <h3 className="text-base font-semibold">{t("promolog.performanceByAgent")}</h3>
             <p className="text-sm text-muted-foreground">
-              {format(now, "dd 'de' MMMM, yyyy", { locale: es })} · {agents.length} agentes activos
+              {format(now, f.idioma === "en" ? "MMMM dd, yyyy" : "dd 'de' MMMM, yyyy", { locale: f.fechas })} · {t("promolog.activeAgents", { count: agents.length })}
             </p>
           </div>
           {!isOperational && (
@@ -128,9 +131,9 @@ const PromologPerformanceView = ({ profiles }: Props) => {
               </PopoverTrigger>
               <PopoverContent className="w-[220px] p-0">
                 <Command>
-                  <CommandInput placeholder="Buscar agente..." />
+                  <CommandInput placeholder={t("promolog.searchAgent")} />
                   <CommandList>
-                    <CommandEmpty>No encontrado</CommandEmpty>
+                    <CommandEmpty>{t("promolog.notFoundShort")}</CommandEmpty>
                     {agents.map(a => (
                       <CommandItem key={a.id} value={a.name} onSelect={() => { setSelectedAgent(a.id); setOpen(false); }}>
                         {a.name}
@@ -149,18 +152,18 @@ const PromologPerformanceView = ({ profiles }: Props) => {
             <div className="h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
               <BarChart3 className="h-8 w-8 text-muted-foreground/50" />
             </div>
-            <p className="text-muted-foreground text-sm">Selecciona un agente para ver su rendimiento</p>
+            <p className="text-muted-foreground text-sm">{t("promolog.selectAgentHint")}</p>
           </div>
         ) : isLoading ? (
           <div className="flex items-center justify-center py-20">
-            <p className="text-muted-foreground text-sm">Cargando datos del agente...</p>
+            <p className="text-muted-foreground text-sm">{t("promolog.loadingAgent")}</p>
           </div>
         ) : (
           <div className="space-y-6">
             <div className="rounded-lg border border-primary/30 bg-gradient-to-r from-primary/15 to-primary/5 p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">Total de Promos — {selectedName}</p>
+                  <p className="text-sm font-medium text-muted-foreground">{t("promolog.totalPromosFor", { name: selectedName })}</p>
                   <p className="text-4xl font-bold text-primary mt-1">{agentEntries.length}</p>
                 </div>
                 <p className="text-sm text-muted-foreground">{format(now, "dd/MM/yyyy")}</p>
@@ -171,7 +174,7 @@ const PromologPerformanceView = ({ profiles }: Props) => {
               <CardContent className="pt-6">
                 <h4 className="text-sm font-semibold mb-4 flex items-center gap-2">
                   <CheckCircle className="h-4 w-4 text-emerald-500" />
-                  Distribución por Resultado
+                  {t("promolog.distributionByResult")}
                 </h4>
                 <div className="space-y-3">
                   {resultDist.map(r => (
@@ -188,10 +191,10 @@ const PromologPerformanceView = ({ profiles }: Props) => {
             </Card>
 
             {[
-              { title: "Promos por Hora del Día", icon: Clock, iconColor: "text-primary", data: hourlyData, dataKey: "hour", type: "bar", color: "hsl(var(--primary))" },
-              { title: "Promos por Día (Última Semana)", icon: BarChart3, iconColor: "text-emerald-500", data: weeklyData, dataKey: "label", type: "bar", color: "#10b981" },
-              { title: "Promos por Día (Últimos 30 días)", icon: BarChart3, iconColor: "text-violet-500", data: last30Data, dataKey: "label", type: "line", color: "#8b5cf6" },
-              { title: "Promos por Mes (Últimos 12 meses)", icon: BarChart3, iconColor: "text-amber-500", data: yearlyData, dataKey: "label", type: "bar", color: "#f59e0b" },
+              { title: t("promolog.chartByHour"), icon: Clock, iconColor: "text-primary", data: hourlyData, dataKey: "hour", type: "bar", color: "hsl(var(--primary))" },
+              { title: t("promolog.chartLastWeek"), icon: BarChart3, iconColor: "text-emerald-500", data: weeklyData, dataKey: "label", type: "bar", color: "#10b981" },
+              { title: t("promolog.chartLast30"), icon: BarChart3, iconColor: "text-violet-500", data: last30Data, dataKey: "label", type: "line", color: "#8b5cf6" },
+              { title: t("promolog.chartLast12Months"), icon: BarChart3, iconColor: "text-amber-500", data: yearlyData, dataKey: "label", type: "bar", color: "#f59e0b" },
             ].map((chart, i) => (
               <Card key={i}>
                 <CardContent className="pt-6">

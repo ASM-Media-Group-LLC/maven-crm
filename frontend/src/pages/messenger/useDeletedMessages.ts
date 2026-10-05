@@ -11,6 +11,10 @@ export interface DeletedMessageArchive {
   sender_id: string;
   deleted_by: string;
   deleted_at: string;
+  /** Si lo había mandado una integración: la marca que copió delete_chat_message
+   *  (migración 20261001200000). Los dos null = lo escribió una persona. */
+  api_key_id: string | null;
+  api_display_name: string | null;
 }
 
 /**
@@ -38,7 +42,7 @@ export function useDeletedMessages(deletedIds: string[]): Record<string, Deleted
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error } = await (supabase as any)
         .from("chat_message_deletions")
-        .select("message_id, content, type, file_url, file_name, sender_id, deleted_by, deleted_at")
+        .select("message_id, content, type, file_url, file_name, sender_id, deleted_by, deleted_at, api_key_id, api_display_name")
         .in("message_id", ids);
       if (cancelled || error || !data) return;
       const map: Record<string, DeletedMessageArchive> = {};

@@ -7,6 +7,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { listRowBase, listRowInteractive } from "@/components/ui/list-row";
 import { cn } from "@/lib/utils";
+import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
+import { crudoEnEspanol, estadoNomina } from "../estados";
 
 interface Props {
   open: boolean;
@@ -16,11 +19,14 @@ interface Props {
   isPending?: boolean;
 }
 
-function fmt(n: number) {
-  return new Intl.NumberFormat("es-CO", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
+function fmtUsd(n: number, locale: string) {
+  return new Intl.NumberFormat(locale, { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
 }
 
 export default function CrearBatchModal({ open, onClose, periods, onSubmit, isPending }: Props) {
+  const f = useFormato();
+  const { t, language } = useLanguage();
+  const fmt = (n: number) => fmtUsd(n, f.intl("es-CO"));
   const [selected, setSelected] = useState<string[]>([]);
   const [reason, setReason] = useState("");
 
@@ -43,11 +49,11 @@ export default function CrearBatchModal({ open, onClose, periods, onSubmit, isPe
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-lg">
-        <DialogHeader><DialogTitle>Crear Batch de Cierre</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{t("finanzas.payroll.batch.title")}</DialogTitle></DialogHeader>
         <div className="space-y-4">
           <div className="max-h-48 overflow-auto space-y-2">
             {eligible.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">No hay periodos elegibles para cierre.</p>
+              <p className="text-sm text-muted-foreground text-center py-4">{t("finanzas.payroll.batch.noneEligible")}</p>
             ) : eligible.map(p => (
               <label key={p.id} className={cn(listRowBase, listRowInteractive, "p-3")}>
                 <Checkbox checked={selected.includes(p.id)} onCheckedChange={() => toggle(p.id)} />
@@ -55,23 +61,23 @@ export default function CrearBatchModal({ open, onClose, periods, onSubmit, isPe
                   <span className="text-sm font-medium">{p.period_name}</span>
                   <span className="text-xs text-muted-foreground ml-2">{fmt(Number(p.net_total) || 0)}</span>
                 </div>
-                <Badge variant="secondary">{p.status}</Badge>
+                <Badge variant="secondary">{crudoEnEspanol(language, estadoNomina, t, p.status)}</Badge>
               </label>
             ))}
           </div>
           <div>
-            <Label>Motivo del cierre *</Label>
-            <Textarea placeholder="Indique el motivo del cierre de batch..." value={reason} onChange={e => setReason(e.target.value)} />
+            <Label>{t("finanzas.payroll.batch.reason")}</Label>
+            <Textarea placeholder={t("finanzas.payroll.batch.reasonPlaceholder")} value={reason} onChange={e => setReason(e.target.value)} />
           </div>
           <div className="rounded-lg border border-border p-4 bg-muted/30">
-            <p className="text-sm font-medium">Impacto Financiero</p>
-            <p className="text-sm text-muted-foreground">Periodos seleccionados: <strong>{selected.length}</strong></p>
-            <p className="text-sm text-muted-foreground">Total neto a cerrar: <strong>{fmt(totalImpact)}</strong></p>
+            <p className="text-sm font-medium">{t("finanzas.payroll.batch.impact")}</p>
+            <p className="text-sm text-muted-foreground">{t("finanzas.payroll.batch.selected")}: <strong>{selected.length}</strong></p>
+            <p className="text-sm text-muted-foreground">{t("finanzas.payroll.batch.netToClose")}: <strong>{fmt(totalImpact)}</strong></p>
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancelar</Button>
-          <Button onClick={handleSubmit} disabled={selected.length === 0 || !reason.trim() || isPending}>Cerrar Batch</Button>
+          <Button variant="outline" onClick={onClose}>{t("common.cancel")}</Button>
+          <Button onClick={handleSubmit} disabled={selected.length === 0 || !reason.trim() || isPending}>{t("finanzas.payroll.batch.submit")}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

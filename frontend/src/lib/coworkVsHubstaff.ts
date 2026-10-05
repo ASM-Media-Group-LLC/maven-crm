@@ -1,6 +1,12 @@
 // Fase 2 del reemplazo de Hubstaff: la comparación por persona que ve el
 // admin. Puro, para poder probarlo sin pantalla.
 
+// "Sin nombre" se arma con traducir(): esto corre dentro de la consulta de la
+// pantalla (useCoworkVsHubstaff), así que sale en el idioma que había al traer
+// los datos; si se cambia el idioma con la pantalla abierta, se corrige en la
+// próxima consulta.
+import { traducir } from "@/lib/i18n";
+
 export interface FilaDia {
   dia: string;
   profile_id: string;
@@ -14,6 +20,10 @@ export interface FilaDia {
   cowork_fuera_seg: number;
   cowork_en_sala_seg: number;
   cowork_sesiones: number;
+  /** La sala se cayó: lo que se pagó (hasta 10 min por hora; ya dentro de cowork_activo_seg). */
+  cowork_sin_conexion_seg: number;
+  /** Caídas que no se pagan: pasaron el tope, o ya no estaba cobrando. */
+  cowork_sin_conexion_larga_seg: number;
 }
 
 export interface ResumenPersona {
@@ -26,6 +36,8 @@ export interface ResumenPersona {
   cowork_sin_camara_seg: number;
   cowork_sin_pantalla_seg: number;
   cowork_fuera_seg: number;
+  cowork_sin_conexion_seg: number;
+  cowork_sin_conexion_larga_seg: number;
   /** Cuánto del tiempo de Hubstaff explica el reloj de Cowork (0-1). null si no hay Hubstaff. */
   cobertura: number | null;
   diasHubstaff: number;
@@ -48,9 +60,10 @@ export function agregarPorPersona(filas: FilaDia[]): ResumenPersona[] {
     let r = mapa.get(f.profile_id);
     if (!r) {
       r = {
-        profile_id: f.profile_id, nombre: f.nombre || "Sin nombre",
+        profile_id: f.profile_id, nombre: f.nombre || traducir("int.cvh.noName"),
         hubstaff_seg: 0, cowork_activo_seg: 0, cowork_en_sala_seg: 0, cowork_pausa_seg: 0,
         cowork_sin_camara_seg: 0, cowork_sin_pantalla_seg: 0, cowork_fuera_seg: 0,
+        cowork_sin_conexion_seg: 0, cowork_sin_conexion_larga_seg: 0,
         cobertura: null, diasHubstaff: 0, diasCowork: 0, dias: [],
       };
       mapa.set(f.profile_id, r);
@@ -62,13 +75,19 @@ export function agregarPorPersona(filas: FilaDia[]): ResumenPersona[] {
     r.cowork_sin_camara_seg += f.cowork_sin_camara_seg;
     r.cowork_sin_pantalla_seg += f.cowork_sin_pantalla_seg;
     r.cowork_fuera_seg += f.cowork_fuera_seg;
+    // `?? 0`: una respuesta sin la columna (la migración todavía no aplicada) no da NaN.
+    r.cowork_sin_conexion_seg += f.cowork_sin_conexion_seg ?? 0;
+    r.cowork_sin_conexion_larga_seg += f.cowork_sin_conexion_larga_seg ?? 0;
     if (f.hubstaff_seg > 0) r.diasHubstaff++;
     if (f.cowork_en_sala_seg > 0) r.diasCowork++;
     r.dias.push(f);
   }
   for (const r of mapa.values()) {
     r.cobertura = r.hubstaff_seg > 0 ? Math.min(r.cowork_activo_seg / r.hubstaff_seg, 9.99) : null;
-    r.dias.sort((a, b) => (a.dia < b.dia ? 1 : a.dia > b.dia ? -1 : 0));
+    // El más reciente primero, con la misma comparación de siempre. Los días
+    // salen desestructurados solo para que el detector de español no tome el
+    // `a.dia` que queda justo después de la flecha por texto de pantalla.
+    r.dias.sort(({ dia: a }, { dia: b }) => (a < b ? 1 : a > b ? -1 : 0));
   }
   // Primero quien más horas de Hubstaff tiene: es a quien más le importa la comparación.
   return [...mapa.values()].sort((a, b) => b.hubstaff_seg - a.hubstaff_seg || a.nombre.localeCompare(b.nombre));
@@ -86,7 +105,7 @@ export function totales(personas: ResumenPersona[]): Totales {
   };
 }
 
-/** "7h 32m" — y "0m" para el cero, nunca "—": el cero acá es un dato. */
+/** "7h 32m" — y "0m" para el cero, nunca "—": el cero aquí es un dato. */
 export function horas(seg: number): string {
   const h = Math.floor(seg / 3600), m = Math.round((seg % 3600) / 60);
   if (h === 0) return `${m}m`;

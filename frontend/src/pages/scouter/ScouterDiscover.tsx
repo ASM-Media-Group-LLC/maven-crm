@@ -53,7 +53,12 @@ import {
 import { supabase as sb } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import { useFormato } from "@/hooks/useFormato";
+import type { Formato } from "@/lib/formato";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 import {
+  AI_QUALITY_OPTIONS,
   LeadDrawer,
   STATUS_META,
   STATUS_OPTIONS,
@@ -62,16 +67,8 @@ import {
   initialsBg,
   scoreColor,
   countryToFlag,
+  opcionesDePais,
 } from "./leadShared";
-
-// Mismas opciones de AI quality que Home — duplicadas acá para evitar
-// import cruzado pesado entre rutas. Si suman opciones, tocar ambos.
-const AI_QUALITY_OPTIONS: Array<{ value: AiQualityFilter; label: string }> = [
-  { value: "approved", label: "✅ Aprobadas IA" },
-  { value: "high_fit", label: "Solo high_fit" },
-  { value: "scored", label: "Evaluadas (incluye low_fit)" },
-  { value: "all", label: "Todas (sin filtro IA)" },
-];
 
 // ─── CSS Animations (injected once) ───────────────────────────────────
 const DISCOVER_STYLES = `
@@ -173,6 +170,7 @@ const DiscoverButton = ({
   onStart: () => void;
   onStop: () => void;
 }) => {
+  const { t } = useLanguage();
   const isScanning = state === "scanning";
   const isPaused = state === "paused";
 
@@ -222,15 +220,15 @@ const DiscoverButton = ({
           >
             {isScanning ? (
               <span className="flex items-center gap-0.5">
-                Escaneando
+                {t("scouter.discover.scanning")}
                 <span style={{ animation: "discover-dot 1.4s infinite 0s" }}>.</span>
                 <span style={{ animation: "discover-dot 1.4s infinite 0.2s" }}>.</span>
                 <span style={{ animation: "discover-dot 1.4s infinite 0.4s" }}>.</span>
               </span>
             ) : isPaused ? (
-              "Reanudar"
+              t("scouter.discover.resume")
             ) : (
-              "Descubrir"
+              t("scouter.discover.discover")
             )}
           </span>
         </button>
@@ -244,7 +242,7 @@ const DiscoverButton = ({
           className="flex items-center gap-1.5 rounded-full border border-destructive/40 bg-destructive/10 px-4 py-1.5 text-xs font-semibold text-destructive transition-colors hover:bg-destructive/20"
         >
           <StopCircle className="h-3.5 w-3.5" />
-          Detener
+          {t("scouter.discover.stop")}
         </button>
       )}
     </div>
@@ -296,6 +294,7 @@ const LeadFoundRow = ({ line }: { line: LeadFoundLine }) => {
 
 // ─── ScoutConsole ────────────────────────────────────────────────────
 const ScoutConsole = ({ lines }: { lines: ConsoleLine[] }) => {
+  const { t } = useLanguage();
   const scrollRef = useRef<HTMLDivElement>(null);
   const isAutoScroll = useRef(true);
 
@@ -320,7 +319,7 @@ const ScoutConsole = ({ lines }: { lines: ConsoleLine[] }) => {
         <Terminal className="h-3.5 w-3.5 text-emerald-400" />
         <span className="text-xs font-semibold text-emerald-400/90">Scout Console</span>
         <span className="text-[10px] text-muted-foreground ml-auto tabular-nums">
-          {lines.length} líneas
+          {t("scouter.discover.lines", { count: lines.length })}
         </span>
       </div>
       <div
@@ -334,7 +333,7 @@ const ScoutConsole = ({ lines }: { lines: ConsoleLine[] }) => {
               className="inline-block h-2 w-2 rounded-full bg-muted-foreground"
               style={{ animation: "discover-blink 1s step-end infinite" }}
             />
-            Esperando actividad del worker…
+            {t("scouter.discover.waitingWorker")}
           </div>
         ) : (
           lines.map((line) =>
@@ -364,32 +363,37 @@ const StopConfirmModal = ({
   onCancel: () => void;
   onConfirm: () => void;
   runningCount: number;
-}) => (
-  <Dialog open={open} onOpenChange={(v) => !v && onCancel()}>
-    <DialogContent className="sm:max-w-sm">
-      <DialogHeader>
-        <DialogTitle className="flex items-center gap-2">
-          <AlertTriangle className="h-5 w-5 text-warning" />
-          Detener escaneo
-        </DialogTitle>
-        <DialogDescription>
-          {runningCount > 0
-            ? `Hay ${runningCount} job${runningCount > 1 ? "s" : ""} en curso. ¿Cancelar todos?`
-            : "¿Detener el escaneo? Los jobs encolados se cancelarán."}
-        </DialogDescription>
-      </DialogHeader>
-      <DialogFooter className="gap-2">
-        <Button variant="ghost" onClick={onCancel}>
-          Volver
-        </Button>
-        <Button variant="destructive" onClick={onConfirm}>
-          <StopCircle className="h-4 w-4 mr-1.5" />
-          Detener
-        </Button>
-      </DialogFooter>
-    </DialogContent>
-  </Dialog>
-);
+}) => {
+  const { t } = useLanguage();
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onCancel()}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-warning" />
+            {t("scouter.discover.stopTitle")}
+          </DialogTitle>
+          <DialogDescription>
+            {runningCount > 0
+              ? t(runningCount > 1 ? "scouter.discover.stopRunningOther" : "scouter.discover.stopRunningOne", {
+                  count: runningCount,
+                })
+              : t("scouter.discover.stopIdle")}
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="gap-2">
+          <Button variant="ghost" onClick={onCancel}>
+            {t("common.back")}
+          </Button>
+          <Button variant="destructive" onClick={onConfirm}>
+            <StopCircle className="h-4 w-4 mr-1.5" />
+            {t("scouter.discover.stop")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
 
 // ─── NewSeedModal ────────────────────────────────────────────────────
 const NewSeedModal = ({
@@ -405,6 +409,7 @@ const NewSeedModal = ({
   onSubmitSeed: (seeds: string[], companyId: string | null) => void;
   onSubmitHashtag: (hashtag: string, companyId: string | null) => void;
 }) => {
+  const { t } = useLanguage();
   const [mode, setMode] = useState<"seed" | "hashtag">("seed");
   const [input, setInput] = useState("");
   const [companyId, setCompanyId] = useState<string>("none");
@@ -431,9 +436,9 @@ const NewSeedModal = ({
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Nuevo escaneo</DialogTitle>
+          <DialogTitle>{t("scouter.discover.newScan")}</DialogTitle>
           <DialogDescription>
-            Agrega semillas (handles IG) o un hashtag para que el bot descubra perfiles.
+            {t("scouter.discover.newScanHint")}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
@@ -445,7 +450,7 @@ const NewSeedModal = ({
               className="gap-1.5"
             >
               <Search className="h-3.5 w-3.5" />
-              Semillas
+              {t("scouter.discover.seeds")}
             </Button>
             <Button
               size="sm"
@@ -473,10 +478,10 @@ const NewSeedModal = ({
           )}
           <Select value={companyId} onValueChange={setCompanyId}>
             <SelectTrigger>
-              <SelectValue placeholder="Compañía (opcional)" />
+              <SelectValue placeholder={t("scouter.discover.companyOptional")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="none">Sin compañía</SelectItem>
+              <SelectItem value="none">{t("scouter.discover.noCompany")}</SelectItem>
               {companies.map((c) => (
                 <SelectItem key={c.id} value={c.id}>
                   {c.name}
@@ -487,11 +492,11 @@ const NewSeedModal = ({
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>
-            Cancelar
+            {t("common.cancel")}
           </Button>
           <Button onClick={handleSubmit}>
             <Plus className="h-4 w-4 mr-1.5" />
-            Encolar
+            {t("scouter.discover.enqueue")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -513,6 +518,7 @@ const LeadCard = ({
   onClick: () => void;
   onToggleFavorite: () => void;
 }) => {
+  const { t } = useLanguage();
   const statusCfg = STATUS_META[lead.status] ?? STATUS_META.discovery;
   const initial = (
     lead.name?.trim().charAt(0) ||
@@ -551,7 +557,7 @@ const LeadCard = ({
         <span
           className="absolute left-2 top-2 block h-[10px] w-[10px] rounded-full ring-1 ring-black/40"
           style={{ background: statusCfg.dot, boxShadow: "0 2px 6px rgba(0,0,0,0.3)" }}
-          title={statusCfg.label}
+          title={t(statusCfg.labelKey)}
         />
         {lead.verified && (
           <span className="absolute right-1.5 top-1.5 flex h-[22px] w-[22px] items-center justify-center rounded-full bg-black/55">
@@ -566,7 +572,7 @@ const LeadCard = ({
         <span
           role="button"
           tabIndex={0}
-          aria-label={isFavorite ? "Quitar de favoritos" : "Marcar como favorito"}
+          aria-label={isFavorite ? t("scouter.fav.remove") : t("scouter.fav.add")}
           onClick={(e) => {
             e.stopPropagation();
             onToggleFavorite();
@@ -638,6 +644,8 @@ const Pagination = ({
   totalPages: number;
   onPageChange: (p: number) => void;
 }) => {
+  // Arriba del `return null`: un hook no puede quedar después de una salida.
+  const { t } = useLanguage();
   if (totalPages <= 1) return null;
   const windowSize = 10;
   let start = Math.max(1, page - Math.floor(windowSize / 2));
@@ -652,10 +660,10 @@ const Pagination = ({
   return (
     <div className="flex flex-col items-center gap-2 pt-4">
       <div className="flex items-center gap-1">
-        <button type="button" className={btn} disabled={page === 1} onClick={() => onPageChange(1)}>
+        <button type="button" className={btn} disabled={page === 1} onClick={() => onPageChange(1)} aria-label={t("scouter.page.first")}>
           <ChevronsLeft className="h-3.5 w-3.5" />
         </button>
-        <button type="button" className={btn} disabled={page === 1} onClick={() => onPageChange(page - 1)}>
+        <button type="button" className={btn} disabled={page === 1} onClick={() => onPageChange(page - 1)} aria-label={t("scouter.page.previous")}>
           <ChevronLeft className="h-3.5 w-3.5" />
         </button>
         {pages.map((p) => (
@@ -668,30 +676,36 @@ const Pagination = ({
             {p}
           </button>
         ))}
-        <button type="button" className={btn} disabled={page === totalPages} onClick={() => onPageChange(page + 1)}>
+        <button type="button" className={btn} disabled={page === totalPages} onClick={() => onPageChange(page + 1)} aria-label={t("scouter.page.next")}>
           <ChevronRight className="h-3.5 w-3.5" />
         </button>
-        <button type="button" className={btn} disabled={page === totalPages} onClick={() => onPageChange(totalPages)}>
+        <button type="button" className={btn} disabled={page === totalPages} onClick={() => onPageChange(totalPages)} aria-label={t("scouter.page.last")}>
           <ChevronsRight className="h-3.5 w-3.5" />
         </button>
       </div>
       <span className="text-xs text-muted-foreground">
-        Página {page} de {totalPages}
+        {t("scouter.page.of", { page, total: totalPages })}
       </span>
     </div>
   );
 };
 
 // ─── Helper: jobs → console lines ────────────────────────────────────
-const fmtTs = (iso: string): string =>
-  new Date(iso).toLocaleTimeString("es-CO", {
+const fmtTs = (f: Formato, iso: string): string =>
+  new Date(iso).toLocaleTimeString(f.intl("es-CO"), {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
   });
 
-function jobToConsoleLines(job: ScouterJob): PlainLine[] {
-  const ts = fmtTs(job.created_at);
+// `t` llega de afuera: esto no es un componente. `job.last_error` lo escribe el
+// worker y se muestra tal cual (es dato); "Cancelado" es su texto al cancelar.
+function jobToConsoleLines(
+  job: ScouterJob,
+  f: Formato,
+  t: (key: TranslationKey, params?: Record<string, string | number>) => string,
+): PlainLine[] {
+  const ts = fmtTs(f, job.created_at);
   const tsKey = new Date(job.created_at).getTime();
   const lines: PlainLine[] = [];
 
@@ -721,7 +735,7 @@ function jobToConsoleLines(job: ScouterJob): PlainLine[] {
       tsKey,
       ts,
       level: "info",
-      text: `[${kind}] encolado — ${detail}`,
+      text: t("scouter.discover.log.queued", { kind, detail }),
     });
   } else if (job.status === "running") {
     const startTs = job.started_at ?? job.created_at;
@@ -729,9 +743,9 @@ function jobToConsoleLines(job: ScouterJob): PlainLine[] {
       id: `job-${job.id}-running`,
       kind: "plain",
       tsKey: new Date(startTs).getTime(),
-      ts: fmtTs(startTs),
+      ts: fmtTs(f, startTs),
       level: "ok",
-      text: `[${kind}] ejecutando… — ${detail}`,
+      text: t("scouter.discover.log.running", { kind, detail }),
     });
   } else if (job.status === "done") {
     const endTs = job.completed_at ?? job.created_at;
@@ -739,9 +753,9 @@ function jobToConsoleLines(job: ScouterJob): PlainLine[] {
       id: `job-${job.id}-done`,
       kind: "plain",
       tsKey: new Date(endTs).getTime(),
-      ts: fmtTs(endTs),
+      ts: fmtTs(f, endTs),
       level: "ok",
-      text: `[${kind}] ✔ completado — ${detail}`,
+      text: t("scouter.discover.log.done", { kind, detail }),
     });
   } else if (job.status === "failed") {
     const endTs = job.completed_at ?? job.created_at;
@@ -749,9 +763,9 @@ function jobToConsoleLines(job: ScouterJob): PlainLine[] {
       id: `job-${job.id}-failed`,
       kind: "plain",
       tsKey: new Date(endTs).getTime(),
-      ts: fmtTs(endTs),
+      ts: fmtTs(f, endTs),
       level: job.last_error?.includes("Cancelado") ? "warn" : "error",
-      text: `[${kind}] ✗ ${job.last_error ?? "error desconocido"}`,
+      text: `[${kind}] ✗ ${job.last_error ?? t("scouter.discover.log.unknownError")}`,
     });
   }
   return lines;
@@ -762,12 +776,13 @@ function jobToConsoleLines(job: ScouterJob): PlainLine[] {
 function leadToConsoleLine(
   lead: ConsoleLeadEvent,
   companySlug: string | null,
+  f: Formato,
 ): LeadFoundLine {
   return {
     id: `lead-${lead.id}`,
     kind: "lead_found",
     tsKey: new Date(lead.created_at).getTime(),
-    ts: fmtTs(lead.created_at),
+    ts: fmtTs(f, lead.created_at),
     handle: lead.instagram_handle,
     name: lead.name,
     country: lead.country,
@@ -781,6 +796,8 @@ function leadToConsoleLine(
 
 // ─── Main component ──────────────────────────────────────────────────
 const ScouterDiscover = () => {
+  const { t } = useLanguage();
+  const f = useFormato();
   useEffect(() => injectStyles(), []);
   const navigate = useNavigate();
 
@@ -935,15 +952,15 @@ const ScouterDiscover = () => {
   const consoleLines = useMemo(() => {
     const lines: ConsoleLine[] = [];
     const jobs = recentJobs.data ?? [];
-    for (const job of jobs) lines.push(...jobToConsoleLines(job));
+    for (const job of jobs) lines.push(...jobToConsoleLines(job, f, t));
     const leads = recentLeads.data ?? [];
     for (const lead of leads) {
       const slug = lead.company_id ? companyMap.get(lead.company_id) ?? null : null;
-      lines.push(leadToConsoleLine(lead, slug));
+      lines.push(leadToConsoleLine(lead, slug, f));
     }
     lines.sort((a, b) => a.tsKey - b.tsKey);
     return lines.slice(-MAX_CONSOLE_LINES);
-  }, [recentJobs.data, recentLeads.data, companyMap]);
+  }, [recentJobs.data, recentLeads.data, companyMap, f, t]);
 
   // ── Handlers
   const handleStart = useCallback(() => {
@@ -977,7 +994,7 @@ const ScouterDiscover = () => {
       const seeds: string[] = cfg.seed_accounts ?? [];
 
       if (hashtags.length === 0 && seeds.length === 0) {
-        companiesWithoutConfig.push(company.name ?? "(sin nombre)");
+        companiesWithoutConfig.push(company.name ?? t("scouter.noNameParens"));
         continue;
       }
 
@@ -1007,10 +1024,10 @@ const ScouterDiscover = () => {
     // porque eso traería leads random no alineados con la(s) compañía(s).
     if (!isAllScope && !enqueued && companyList.length > 0) {
       const names = companiesWithoutConfig.join(", ");
-      toast.error("Las compañías elegidas no tienen seeds ni hashtags configurados", {
-        description: `${names} — agrega al menos un @handle o #hashtag en Settings → Compañías → Editar.`,
+      toast.error(t("scouter.discover.noConfigTitle"), {
+        description: t("scouter.discover.noConfigBody", { names }),
         action: {
-          label: "Abrir Settings",
+          label: t("scouter.discover.openSettings"),
           onClick: () => navigate("/scouter/settings?sub=companies"),
         },
         duration: 10_000,
@@ -1022,7 +1039,7 @@ const ScouterDiscover = () => {
     // damos un warning informativo (no bloqueante).
     if (!isAllScope && enqueued && companiesWithoutConfig.length > 0) {
       toast.warning(
-        `Algunas compañías no se buscaron por falta de config: ${companiesWithoutConfig.join(", ")}`,
+        t("scouter.discover.someWithoutConfig", { names: companiesWithoutConfig.join(", ") }),
         { duration: 7_000 },
       );
     }
@@ -1067,7 +1084,7 @@ const ScouterDiscover = () => {
         });
       })();
     }
-  }, [companies.data, enqueueHashtag, enqueueSeed, selectedCompanyIds, navigate]);
+  }, [companies.data, enqueueHashtag, enqueueSeed, selectedCompanyIds, navigate, t]);
 
   const handleStop = useCallback(() => {
     setShowStopConfirm(true);
@@ -1133,7 +1150,7 @@ const ScouterDiscover = () => {
           <div className="text-center text-[11px] text-muted-foreground space-y-0.5">
             {(runningCount > 0 || queuedCount > 0) && (
               <div className="font-medium text-success">
-                {runningCount} ejecutando · {queuedCount} en cola
+                {t("scouter.discover.runningQueued", { running: runningCount, queued: queuedCount })}
                 {queuedCount > 0 && (
                   <div className="text-[10px] opacity-75 mt-0.5">
                     {queuedByKind.discover > 0 && `${queuedByKind.discover} discover`}
@@ -1145,16 +1162,16 @@ const ScouterDiscover = () => {
             )}
             {autopilotActive && !autopilotPaused && runningCount === 0 && queuedCount === 0 && (
               <div className="text-success/80">
-                Autopilot activo · esperando próxima ronda
+                {t("scouter.discover.autopilotWaiting")}
               </div>
             )}
             {autopilotPaused && (
               <div className="text-warning">
-                Autopilot pausado: budget agotado, vuelve mañana
+                {t("scouter.discover.autopilotPaused")}
               </div>
             )}
             {budgetText && (
-              <div className="text-[10px]">Apify hoy: {budgetText}</div>
+              <div className="text-[10px]">{t("scouter.discover.apifyToday", { budget: budgetText })}</div>
             )}
           </div>
           {/* Picker de compañías — reemplaza el botón "Agregar semilla
@@ -1168,9 +1185,9 @@ const ScouterDiscover = () => {
             className="gap-1.5 text-xs text-muted-foreground"
           >
             <SettingsIcon className="h-3.5 w-3.5" />
-            Compañías ({selectedCompanyIds === "all"
-              ? "todas"
-              : `${selectedCompanyIds.length}`})
+            {t("scouter.discover.companiesButton", {
+              count: selectedCompanyIds === "all" ? t("scouter.discover.allLower") : selectedCompanyIds.length,
+            })}
           </Button>
         </div>
 
@@ -1182,7 +1199,7 @@ const ScouterDiscover = () => {
       <div className="flex items-center gap-3">
         <div className="h-px flex-1 bg-border" />
         <span className="text-xs font-semibold text-muted-foreground">
-          Recién descubiertas
+          {t("scouter.discover.justDiscovered")}
         </span>
         <div className="h-px flex-1 bg-border" />
       </div>
@@ -1194,11 +1211,12 @@ const ScouterDiscover = () => {
         <SearchableSelect
           value={companyFilter}
           onValueChange={setCompanyFilter}
-          placeholder="Compañía"
-          searchPlaceholder="Buscar compañía…"
+          placeholder={t("common.company")}
+          searchPlaceholder={t("scouter.filter.searchCompany")}
+          emptyMessage={t("common.noResults")}
           triggerClassName="w-[180px] h-9 text-xs"
           options={[
-            { value: "all", label: `Todas (${companies.data?.length ?? 0})` },
+            { value: "all", label: t("scouter.filter.allCount", { count: companies.data?.length ?? 0 }) },
             ...(companies.data ?? []).map((c) => ({ value: c.id, label: c.name })),
           ]}
         />
@@ -1207,40 +1225,39 @@ const ScouterDiscover = () => {
           value={statusFilter}
           onValueChange={setStatusFilter}
           placeholder="Status"
-          searchPlaceholder="Buscar status…"
+          searchPlaceholder={t("scouter.filter.searchStatus")}
+          emptyMessage={t("common.noResults")}
           triggerClassName="w-[160px] h-9 text-xs"
-          options={STATUS_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+          options={STATUS_OPTIONS.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
         />
 
         <SearchableSelect
           value={countryFilter}
           onValueChange={setCountryFilter}
-          placeholder="País"
-          searchPlaceholder="Buscar país…"
+          placeholder={t("common.country")}
+          searchPlaceholder={t("scouter.filter.searchCountry")}
+          emptyMessage={t("common.noResults")}
           triggerClassName="w-[180px] h-9 text-xs"
           options={[
-            { value: "all", label: "Todos los países" },
-            ...(countriesQ.data ?? []).map((c) => ({
-              value: c.country,
-              label: `${countryToFlag(c.country)} ${c.country} (${c.count})`,
-              searchAdditional: c.country,
-            })),
+            { value: "all", label: t("scouter.filter.allCountries") },
+            ...opcionesDePais(countriesQ.data ?? [], t),
           ]}
         />
 
         <SearchableSelect
           value={aiQuality}
           onValueChange={(v) => setAiQuality(v as AiQualityFilter)}
-          placeholder="Calidad IA"
-          searchPlaceholder="Buscar calidad…"
+          placeholder={t("scouter.filter.aiQuality")}
+          searchPlaceholder={t("scouter.filter.searchQuality")}
+          emptyMessage={t("common.noResults")}
           triggerClassName="w-[220px] h-9 text-xs"
-          options={AI_QUALITY_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+          options={AI_QUALITY_OPTIONS.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
         />
 
         <div className="relative flex-1 min-w-[200px]">
           <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar por handle, nombre, país…"
+            placeholder={t("scouter.filter.searchLeads")}
             className="pl-8"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -1249,7 +1266,7 @@ const ScouterDiscover = () => {
 
         <span className="text-xs text-muted-foreground whitespace-nowrap">
           {leads.isLoading
-            ? "Cargando…"
+            ? t("common.loading")
             : `${totalLeads} lead${totalLeads === 1 ? "" : "s"}`}
         </span>
       </div>
@@ -1261,10 +1278,9 @@ const ScouterDiscover = () => {
         </div>
       ) : visibleLeads.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-muted/20 p-10 text-center">
-          <p className="text-sm font-medium">Sin descubrimientos recientes</p>
+          <p className="text-sm font-medium">{t("scouter.discover.empty")}</p>
           <p className="text-xs text-muted-foreground">
-            Cuando el bot descubra cuentas IG y la IA las apruebe, aparecerán aquí.
-            Presiona "Nueva semilla" o "Descubrir" para comenzar.
+            {t("scouter.discover.emptyHint")}
           </p>
         </div>
       ) : (
@@ -1336,6 +1352,7 @@ const CompanyPickerModal = ({
   selected: string[] | "all";
   onChange: (next: string[] | "all") => void;
 }) => {
+  const { t } = useLanguage();
   const allMode = selected === "all";
   // Cuando estamos en allMode, internamente todas las compañías están
   // marcadas — el set tiene que reflejarlo para que los checkmarks
@@ -1370,11 +1387,10 @@ const CompanyPickerModal = ({
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Compañías para el discovery</DialogTitle>
+          <DialogTitle>{t("scouter.discover.pickerTitle")}</DialogTitle>
         </DialogHeader>
         <p className="text-xs text-muted-foreground mb-3">
-          Marca las compañías para las que quieres que el scouter corra
-          búsquedas. Si dejas "Todas" marcado, corre para todas las activas.
+          {t("scouter.discover.pickerHint")}
         </p>
         <div className="space-y-1.5 max-h-80 overflow-y-auto pr-1">
           <button
@@ -1386,7 +1402,7 @@ const CompanyPickerModal = ({
                 : "border-border hover:border-primary/40"
             }`}
           >
-            <span className="font-semibold">Todas las compañías</span>
+            <span className="font-semibold">{t("scouter.discover.allCompanies")}</span>
             {allMode && <Check className="h-4 w-4 text-primary" />}
           </button>
           <div className="h-px bg-border/40 my-1" />
@@ -1410,7 +1426,7 @@ const CompanyPickerModal = ({
           })}
         </div>
         <DialogFooter>
-          <Button onClick={onClose}>Listo</Button>
+          <Button onClick={onClose}>{t("scouter.discover.done")}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

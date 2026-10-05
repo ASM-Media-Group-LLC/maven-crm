@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useFormato } from "@/hooks/useFormato";
 import { EmployeeSearchCombobox } from "@/components/hr/EmployeeSearchCombobox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,22 +27,27 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format, startOfMonth, endOfMonth } from "date-fns";
-import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/ui/page-header";
 import StatChip from "@/components/StatChip";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
+import { etiqueta, deSiempreSalvoEnIngles, ESTADO_PERMISO, TIPO_PERMISO } from "./etiquetasRrhh";
+
+type T = (key: TranslationKey, params?: Record<string, string | number>) => string;
 
 // ─── Constants ────────────────────────────────────────────────────────────────
+// `value` es el absence_type que se guarda (DATO); lo que se ve sale de TIPO_PERMISO.
 const PERMISSION_TYPES = [
-  { value: "permiso_remoto", label: "Trabajo Remoto", icon: Wifi, color: "bg-blue-500/10 text-blue-600 border-blue-500/30" },
-  { value: "salida_temprana", label: "Salida Temprana", icon: LogOut, color: "bg-amber-500/10 text-amber-600 border-amber-500/30" },
-  { value: "llegada_tarde", label: "Llegada Tarde", icon: LogIn, color: "bg-orange-500/10 text-orange-600 border-orange-500/30" },
-  { value: "permiso_personal", label: "Permiso Personal", icon: User, color: "bg-violet-500/10 text-violet-600 border-violet-500/30" },
-  { value: "permiso_medico", label: "Permiso Médico", icon: Stethoscope, color: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30" },
-  { value: "permiso_academico", label: "Permiso Académico", icon: GraduationCap, color: "bg-cyan-500/10 text-cyan-600 border-cyan-500/30" },
-  { value: "permiso_diligencia", label: "Diligencia Personal", icon: Briefcase, color: "bg-rose-500/10 text-rose-600 border-rose-500/30" },
-  { value: "incapacidad", label: "Incapacidad", icon: Stethoscope, color: "bg-red-500/10 text-red-600 border-red-500/30" },
+  { value: "permiso_remoto", icon: Wifi, color: "bg-blue-500/10 text-blue-600 border-blue-500/30" },
+  { value: "salida_temprana", icon: LogOut, color: "bg-amber-500/10 text-amber-600 border-amber-500/30" },
+  { value: "llegada_tarde", icon: LogIn, color: "bg-orange-500/10 text-orange-600 border-orange-500/30" },
+  { value: "permiso_personal", icon: User, color: "bg-violet-500/10 text-violet-600 border-violet-500/30" },
+  { value: "permiso_medico", icon: Stethoscope, color: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30" },
+  { value: "permiso_academico", icon: GraduationCap, color: "bg-cyan-500/10 text-cyan-600 border-cyan-500/30" },
+  { value: "permiso_diligencia", icon: Briefcase, color: "bg-rose-500/10 text-rose-600 border-rose-500/30" },
+  { value: "incapacidad", icon: Stethoscope, color: "bg-red-500/10 text-red-600 border-red-500/30" },
 ] as const;
 
 const PERMISSION_TYPE_VALUES = PERMISSION_TYPES.map((t) => t.value);
@@ -77,10 +83,10 @@ function getTypeConfig(val: string) {
   return PERMISSION_TYPES.find((t) => t.value === val);
 }
 
-function getStatusBadge(status: string) {
-  if (status === "approved") return <Badge variant="default" className="text-xs bg-success/10 text-success border-success/30">Aprobado</Badge>;
-  if (status === "rejected") return <Badge variant="destructive" className="text-xs">Rechazado</Badge>;
-  return <Badge variant="secondary" className="text-xs text-warning border-warning/30">Pendiente</Badge>;
+function getStatusBadge(status: string, t: T) {
+  if (status === "approved") return <Badge variant="default" className="text-xs bg-success/10 text-success border-success/30">{t("hr.opt.permStatus.approved")}</Badge>;
+  if (status === "rejected") return <Badge variant="destructive" className="text-xs">{t("hr.opt.permStatus.rejected")}</Badge>;
+  return <Badge variant="secondary" className="text-xs text-warning border-warning/30">{t("hr.opt.permStatus.pending")}</Badge>;
 }
 
 // ─── Hooks ────────────────────────────────────────────────────────────────────
@@ -112,6 +118,8 @@ function useDepartments() {
 
 // ─── Create Modal ─────────────────────────────────────────────────────────────
 function CreatePermisoModal({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+  const { t } = useLanguage();
+  const f = useFormato();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -143,7 +151,7 @@ function CreatePermisoModal({ open, onOpenChange }: { open: boolean; onOpenChang
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["permisos"] });
-      toast({ title: "Solicitud de permiso creada" });
+      toast({ title: t("hr.perm.created") });
       onOpenChange(false);
       setEmployeeId(null);
       setPermisoType("");
@@ -151,7 +159,7 @@ function CreatePermisoModal({ open, onOpenChange }: { open: boolean; onOpenChang
       setHorario("");
       setMotivo("");
     },
-    onError: () => toast({ title: "Error al crear la solicitud", variant: "destructive" }),
+    onError: () => toast({ title: t("hr.errorCreatingRequest"), variant: "destructive" }),
   });
 
   return (
@@ -160,33 +168,33 @@ function CreatePermisoModal({ open, onOpenChange }: { open: boolean; onOpenChang
         <DialogHeader className="shrink-0 px-6 py-5 border-b">
           <div className="flex items-center gap-2">
             <Clock className="h-5 w-5 text-primary" />
-            <DialogTitle>Solicitar Permiso</DialogTitle>
+            <DialogTitle>{t("hr.perm.request")}</DialogTitle>
           </div>
           <DialogDescription>
-            Registra una solicitud de permiso de horario para un empleado
+            {t("hr.perm.requestDesc")}
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-4">
           {/* Empleado */}
           <div className="space-y-1.5">
-            <Label>Empleado <span className="text-destructive">*</span></Label>
+            <Label>{t("hr.employee")} <span className="text-destructive">*</span></Label>
             <EmployeeSearchCombobox value={employeeId} onChange={setEmployeeId} />
           </div>
 
           {/* Tipo de Permiso */}
           <div className="space-y-1.5">
-            <Label>Tipo de Permiso <span className="text-destructive">*</span></Label>
+            <Label>{t("hr.perm.permType")} <span className="text-destructive">*</span></Label>
             <Select value={permisoType} onValueChange={setPermisoType}>
               <SelectTrigger>
-                <SelectValue placeholder="Seleccionar tipo de permiso..." />
+                <SelectValue placeholder={t("hr.perm.selectPermType")} />
               </SelectTrigger>
               <SelectContent>
-                {PERMISSION_TYPES.map((t) => (
-                  <SelectItem key={t.value} value={t.value}>
+                {PERMISSION_TYPES.map((tp) => (
+                  <SelectItem key={tp.value} value={tp.value}>
                     <span className="flex items-center gap-2">
-                      <t.icon className="h-3.5 w-3.5" />
-                      {t.label}
+                      <tp.icon className="h-3.5 w-3.5" />
+                      {etiqueta(t, TIPO_PERMISO, tp.value)}
                     </span>
                   </SelectItem>
                 ))}
@@ -196,7 +204,7 @@ function CreatePermisoModal({ open, onOpenChange }: { open: boolean; onOpenChang
 
           {/* Fecha */}
           <div className="space-y-1.5">
-            <Label>Fecha <span className="text-destructive">*</span></Label>
+            <Label>{t("common.date")} <span className="text-destructive">*</span></Label>
             <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
               <PopoverTrigger asChild>
                 <Button
@@ -204,7 +212,7 @@ function CreatePermisoModal({ open, onOpenChange }: { open: boolean; onOpenChang
                   className={cn("w-full justify-start font-normal", !date && "text-muted-foreground")}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
-                  {date ? format(date, "dd 'de' MMMM yyyy", { locale: es }) : "Seleccionar fecha"}
+                  {date ? format(date, f.idioma === "en" ? "MMMM dd, yyyy" : "dd 'de' MMMM yyyy", { locale: f.fechas }) : t("hr.selectDate")}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
@@ -212,7 +220,7 @@ function CreatePermisoModal({ open, onOpenChange }: { open: boolean; onOpenChang
                   mode="single"
                   selected={date}
                   onSelect={(d) => { setDate(d); setCalendarOpen(false); }}
-                  locale={es}
+                  locale={f.fechas}
                   initialFocus
                 />
               </PopoverContent>
@@ -221,9 +229,9 @@ function CreatePermisoModal({ open, onOpenChange }: { open: boolean; onOpenChang
 
           {/* Horario */}
           <div className="space-y-1.5">
-            <Label>Horario</Label>
+            <Label>{t("hr.schedule")}</Label>
             <Input
-              placeholder="Ej: 14:00 - 17:00"
+              placeholder={t("hr.scheduleExample")}
               value={horario}
               onChange={(e) => setHorario(e.target.value)}
             />
@@ -231,9 +239,9 @@ function CreatePermisoModal({ open, onOpenChange }: { open: boolean; onOpenChang
 
           {/* Motivo */}
           <div className="space-y-1.5">
-            <Label>Motivo</Label>
+            <Label>{t("hr.reasonLabel")}</Label>
             <Textarea
-              placeholder="Describa el motivo del permiso..."
+              placeholder={t("hr.perm.reasonPlaceholderShort")}
               rows={3}
               value={motivo}
               onChange={(e) => setMotivo(e.target.value)}
@@ -243,14 +251,14 @@ function CreatePermisoModal({ open, onOpenChange }: { open: boolean; onOpenChang
 
         <DialogFooter className="shrink-0 px-6 py-4 border-t flex gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)} className="flex-1">
-            Cancelar
+            {t("common.cancel")}
           </Button>
           <Button
             onClick={() => mutation.mutate()}
             disabled={!isValid || mutation.isPending}
             className="flex-1"
           >
-            {mutation.isPending ? "Guardando..." : "+ Crear Solicitud"}
+            {mutation.isPending ? t("hr.saving") : t("hr.createRequestPlus")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -260,6 +268,8 @@ function CreatePermisoModal({ open, onOpenChange }: { open: boolean; onOpenChang
 
 // ─── View Modal ───────────────────────────────────────────────────────────────
 function ViewPermisoModal({ permiso, onClose }: { permiso: PermisoRecord | null; onClose: () => void }) {
+  const { t } = useLanguage();
+  const f = useFormato();
   if (!permiso) return null;
   const emp = permiso.employees;
   const empName = emp ? `${emp.first_name} ${emp.last_name}` : "—";
@@ -269,7 +279,7 @@ function ViewPermisoModal({ permiso, onClose }: { permiso: PermisoRecord | null;
     <Dialog open={!!permiso} onOpenChange={onClose}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Detalle del Permiso</DialogTitle>
+          <DialogTitle>{t("hr.perm.detail")}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-2">
           <div className="flex items-center gap-3">
@@ -283,32 +293,32 @@ function ViewPermisoModal({ permiso, onClose }: { permiso: PermisoRecord | null;
           </div>
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div>
-              <p className="text-muted-foreground text-xs mb-1">Tipo</p>
+              <p className="text-muted-foreground text-xs mb-1">{t("common.type")}</p>
               {typeConfig ? (
                 <Badge variant="outline" className={cn("text-xs gap-1", typeConfig.color)}>
                   <typeConfig.icon className="h-3 w-3" />
-                  {typeConfig.label}
+                  {etiqueta(t, TIPO_PERMISO, typeConfig.value)}
                 </Badge>
               ) : <span>{permiso.absence_type}</span>}
             </div>
             <div>
-              <p className="text-muted-foreground text-xs mb-1">Estado</p>
-              {getStatusBadge(permiso.status)}
+              <p className="text-muted-foreground text-xs mb-1">{t("common.status")}</p>
+              {getStatusBadge(permiso.status, t)}
             </div>
             <div>
-              <p className="text-muted-foreground text-xs mb-1">Fecha</p>
-              <p className="font-medium">{format(new Date(permiso.start_date), "dd MMM yyyy", { locale: es })}</p>
+              <p className="text-muted-foreground text-xs mb-1">{t("common.date")}</p>
+              <p className="font-medium">{format(new Date(permiso.start_date), "dd MMM yyyy", { locale: f.fechas })}</p>
             </div>
             {permiso.notes && (
               <div>
-                <p className="text-muted-foreground text-xs mb-1">Horario</p>
+                <p className="text-muted-foreground text-xs mb-1">{t("hr.schedule")}</p>
                 <p className="font-medium">{permiso.notes}</p>
               </div>
             )}
           </div>
           {permiso.reason && (
             <div>
-              <p className="text-muted-foreground text-xs mb-1">Motivo</p>
+              <p className="text-muted-foreground text-xs mb-1">{t("hr.reasonLabel")}</p>
               <p className="text-sm">{permiso.reason}</p>
             </div>
           )}
@@ -320,6 +330,8 @@ function ViewPermisoModal({ permiso, onClose }: { permiso: PermisoRecord | null;
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function HRPermisos() {
+  const { t } = useLanguage();
+  const f = useFormato();
   const { data: permisos = [], isLoading } = usePermisos();
   const { data: departments = [] } = useDepartments();
   const queryClient = useQueryClient();
@@ -347,9 +359,9 @@ export default function HRPermisos() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["permisos"] });
-      toast({ title: "Estado actualizado" });
+      toast({ title: t("hr.statusUpdated") });
     },
-    onError: () => toast({ title: "Error al actualizar estado", variant: "destructive" }),
+    onError: () => toast({ title: t("hr.perm.errorUpdatingStatus"), variant: "destructive" }),
   });
 
   const editMutation = useMutation({
@@ -365,10 +377,10 @@ export default function HRPermisos() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["permisos"] });
-      toast({ title: "Permiso actualizado" });
+      toast({ title: t("hr.perm.updated") });
       setEditData(null);
     },
-    onError: () => toast({ title: "Error al actualizar", variant: "destructive" }),
+    onError: () => toast({ title: t("common.errorUpdating"), variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
@@ -378,10 +390,10 @@ export default function HRPermisos() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["permisos"] });
-      toast({ title: "Permiso eliminado" });
+      toast({ title: t("hr.perm.deleted") });
       setDeleteId(null);
     },
-    onError: () => toast({ title: "Error al eliminar", variant: "destructive" }),
+    onError: () => toast({ title: t("common.errorDeleting"), variant: "destructive" }),
   });
 
   // KPIs
@@ -421,12 +433,12 @@ export default function HRPermisos() {
       {/* Header */}
       <header className="shrink-0 border-b border-white/10 bg-background/30 backdrop-blur-xl px-6 py-4">
         <PageHeader
-          title="Permisos"
-          subtitle="Gestiona las solicitudes de permisos de horario"
+          title={t("hr.perm.title")}
+          subtitle={t("hr.perm.subtitle")}
           actions={
             <Button onClick={() => navigate("/hr/permisos/nuevo")} size="sm">
               <Plus className="h-4 w-4 mr-1" />
-              Solicitar Permiso
+              {t("hr.perm.request")}
             </Button>
           }
         />
@@ -441,10 +453,10 @@ export default function HRPermisos() {
             Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
           ) : (
             <>
-              <StatChip label="Total" value={String(total)} icon={<FileText className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("total")} />
-              <StatChip label="Pendientes" value={String(pendientes)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" onClick={() => setKpiPopup("pendientes")} />
-              <StatChip label="Aprobados" value={String(aprobados)} icon={<CheckCircle2 className="h-3.5 w-3.5" />} color="bg-success" onClick={() => setKpiPopup("aprobados")} />
-              <StatChip label="Este Mes" value={String(esteMes)} icon={<CalendarDays className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("esteMes")} />
+              <StatChip label={t("hr.ann.kpiTotal")} value={String(total)} icon={<FileText className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("total")} />
+              <StatChip label={t("common.pendingPl")} value={String(pendientes)} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" onClick={() => setKpiPopup("pendientes")} />
+              <StatChip label={t("hr.perm.kpiApproved")} value={String(aprobados)} icon={<CheckCircle2 className="h-3.5 w-3.5" />} color="bg-success" onClick={() => setKpiPopup("aprobados")} />
+              <StatChip label={t("hr.thisMonth")} value={String(esteMes)} icon={<CalendarDays className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("esteMes")} />
             </>
           )}
         </div>
@@ -457,7 +469,7 @@ export default function HRPermisos() {
               size="sm"
               onClick={() => setDeptFilter("")}
             >
-              Todos
+              {t("common.all")}
             </Button>
             {departments.map((d) => (
               <Button
@@ -477,7 +489,7 @@ export default function HRPermisos() {
           <div className="relative flex-1 min-w-[200px] max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar por nombre o motivo..."
+              placeholder={t("hr.searchByNameOrReason")}
               className="pl-9"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -486,25 +498,25 @@ export default function HRPermisos() {
 
           <Select value={typeFilter || undefined} onValueChange={(v) => setTypeFilter(v === "__all__" ? "" : v)}>
             <SelectTrigger className="w-44">
-              <SelectValue placeholder="Tipo de Permiso" />
+              <SelectValue placeholder={t("hr.perm.permType")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="__all__">Todos los tipos</SelectItem>
-              {PERMISSION_TYPES.map((t) => (
-                <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+              <SelectItem value="__all__">{t("common.allTypes")}</SelectItem>
+              {PERMISSION_TYPES.map((tp) => (
+                <SelectItem key={tp.value} value={tp.value}>{etiqueta(t, TIPO_PERMISO, tp.value)}</SelectItem>
               ))}
             </SelectContent>
           </Select>
 
           <Select value={statusFilter || undefined} onValueChange={(v) => setStatusFilter(v === "__all__" ? "" : v)}>
             <SelectTrigger className="w-36">
-              <SelectValue placeholder="Estado" />
+              <SelectValue placeholder={t("common.status")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="__all__">Todos</SelectItem>
-              <SelectItem value="pending">Pendiente</SelectItem>
-              <SelectItem value="approved">Aprobado</SelectItem>
-              <SelectItem value="rejected">Rechazado</SelectItem>
+              <SelectItem value="__all__">{t("common.all")}</SelectItem>
+              <SelectItem value="pending">{t("hr.opt.permStatus.pending")}</SelectItem>
+              <SelectItem value="approved">{t("hr.opt.permStatus.approved")}</SelectItem>
+              <SelectItem value="rejected">{t("hr.opt.permStatus.rejected")}</SelectItem>
             </SelectContent>
           </Select>
 
@@ -520,7 +532,7 @@ export default function HRPermisos() {
 
         {/* Count */}
         <p className="text-xs text-muted-foreground">
-          Mostrando {filtered.length} de {permisos.length} registros
+          {t(permisos.length === 1 ? "hr.showingOf.one" : "hr.showingOf.other", { shown: filtered.length, total: permisos.length })}
         </p>
 
         {/* Content */}
@@ -531,8 +543,8 @@ export default function HRPermisos() {
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <Clock className="h-12 w-12 text-muted-foreground/30 mb-4" />
-            <p className="font-medium text-muted-foreground">No hay permisos registrados</p>
-            <p className="text-sm text-muted-foreground/70 mt-1">Crea la primera solicitud de permiso</p>
+            <p className="font-medium text-muted-foreground">{t("hr.perm.empty")}</p>
+            <p className="text-sm text-muted-foreground/70 mt-1">{t("hr.perm.emptyHint")}</p>
           </div>
         ) : viewMode === "list" ? (
           /* ── Table View ── */
@@ -541,13 +553,13 @@ export default function HRPermisos() {
               <Table>
                 <TableHeader className="sticky top-0 z-10 bg-card">
                   <TableRow>
-                    <TableHead className="text-xs font-semibold w-52">Empleado</TableHead>
-                    <TableHead className="text-xs font-semibold w-40">Tipo</TableHead>
-                    <TableHead className="text-xs font-semibold w-32">Fecha</TableHead>
-                    <TableHead className="text-xs font-semibold w-28">Horario</TableHead>
-                    <TableHead className="text-xs font-semibold">Motivo</TableHead>
-                    <TableHead className="text-xs font-semibold w-28">Estado</TableHead>
-                    <TableHead className="text-xs font-semibold w-24 sticky right-0 bg-card">Acciones</TableHead>
+                    <TableHead className="text-xs font-semibold w-52">{t("hr.employee")}</TableHead>
+                    <TableHead className="text-xs font-semibold w-40">{t("common.type")}</TableHead>
+                    <TableHead className="text-xs font-semibold w-32">{t("common.date")}</TableHead>
+                    <TableHead className="text-xs font-semibold w-28">{t("hr.schedule")}</TableHead>
+                    <TableHead className="text-xs font-semibold">{t("hr.reasonLabel")}</TableHead>
+                    <TableHead className="text-xs font-semibold w-28">{t("common.status")}</TableHead>
+                    <TableHead className="text-xs font-semibold w-24 sticky right-0 bg-card">{t("common.actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -578,7 +590,7 @@ export default function HRPermisos() {
                           {typeConfig ? (
                             <Badge variant="outline" className={cn("text-xs gap-1 whitespace-nowrap", typeConfig.color)}>
                               <typeConfig.icon className="h-3 w-3" />
-                              {typeConfig.label}
+                              {etiqueta(t, TIPO_PERMISO, typeConfig.value)}
                             </Badge>
                           ) : (
                             <span className="text-sm">{p.absence_type}</span>
@@ -587,7 +599,7 @@ export default function HRPermisos() {
 
                         {/* Fecha */}
                         <TableCell className="text-sm whitespace-nowrap">
-                          {format(new Date(p.start_date), "dd MMM yyyy", { locale: es })}
+                          {format(new Date(p.start_date), "dd MMM yyyy", { locale: f.fechas })}
                         </TableCell>
 
                         {/* Horario */}
@@ -601,7 +613,7 @@ export default function HRPermisos() {
                         </TableCell>
 
                         {/* Estado */}
-                        <TableCell>{getStatusBadge(p.status)}</TableCell>
+                        <TableCell>{getStatusBadge(p.status, t)}</TableCell>
 
                         {/* Acciones */}
                         <TableCell className="sticky right-0 bg-card group-hover:bg-muted/30">
@@ -663,16 +675,16 @@ export default function HRPermisos() {
                       {typeConfig && (
                         <Badge variant="outline" className={cn("text-xs gap-1", typeConfig.color)}>
                           <typeConfig.icon className="h-3 w-3" />
-                          {typeConfig.label}
+                          {etiqueta(t, TIPO_PERMISO, typeConfig.value)}
                         </Badge>
                       )}
-                      {getStatusBadge(p.status)}
+                      {getStatusBadge(p.status, t)}
                     </div>
 
                     {/* Fecha + Horario */}
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <CalendarDays className="h-3.5 w-3.5 shrink-0" />
-                      <span>{format(new Date(p.start_date), "dd MMM yyyy", { locale: es })}</span>
+                      <span>{format(new Date(p.start_date), "dd MMM yyyy", { locale: f.fechas })}</span>
                       {p.notes && <span className="ml-1 font-medium text-foreground">{p.notes}</span>}
                     </div>
 
@@ -684,10 +696,10 @@ export default function HRPermisos() {
                     {/* Actions */}
                     <div className="flex items-center gap-1 pt-1 border-t border-border">
                       <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => setViewPermiso(p)}>
-                        <Eye className="h-3 w-3" /> Ver
+                        <Eye className="h-3 w-3" /> {t("common.view")}
                       </Button>
                       <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => setEditData(p)}>
-                        <Pencil className="h-3 w-3" /> Editar
+                        <Pencil className="h-3 w-3" /> {t("common.edit")}
                       </Button>
                       {p.status === "pending" && (
                         <>
@@ -729,9 +741,9 @@ export default function HRPermisos() {
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar permiso?</AlertDialogTitle>
+            <AlertDialogTitle>{t("hr.perm.deleteTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción no se puede deshacer. El registro del permiso será eliminado permanentemente.
+              {t("hr.perm.deleteDesc")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -740,7 +752,7 @@ export default function HRPermisos() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => deleteId && deleteMutation.mutate(deleteId)}
             >
-              {deleteMutation.isPending ? "Eliminando..." : "Eliminar"}
+              {deleteMutation.isPending ? t("hr.deleting") : t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -751,10 +763,10 @@ export default function HRPermisos() {
         onOpenChange={(o) => !o && setKpiPopup(null)}
         title={(() => {
           switch (kpiPopup) {
-            case "total": return `Total Permisos — ${total}`;
-            case "pendientes": return `Pendientes — ${pendientes}`;
-            case "aprobados": return `Aprobados — ${aprobados}`;
-            case "esteMes": return `Este Mes — ${esteMes}`;
+            case "total": return `${t("hr.perm.kpiTotalTitle")} — ${total}`;
+            case "pendientes": return `${t("common.pendingPl")} — ${pendientes}`;
+            case "aprobados": return `${t("hr.perm.kpiApproved")} — ${aprobados}`;
+            case "esteMes": return `${t("hr.thisMonth")} — ${esteMes}`;
             default: return "";
           }
         })()}
@@ -771,12 +783,13 @@ export default function HRPermisos() {
           const tone = (status: string): KpiRow["rightTone"] =>
             status === "approved" ? "success" : status === "rejected" ? "destructive" : "warning";
           return list.slice(0, 100).map((p: any): KpiRow => ({
-            primary: p.employee_name ?? `Empleado ${p.employee_id?.slice?.(0, 8) ?? "—"}`,
-            secondary: `${p.permission_type ?? ""} · ${p.permission_date ? format(new Date(p.permission_date), "dd MMM yyyy") : "—"}`,
-            right: p.status ?? "—",
+            primary: p.employee_name ?? t("hr.employeeWithId", { id: p.employee_id?.slice?.(0, 8) ?? "—" }),
+            secondary: `${deSiempreSalvoEnIngles(f.idioma, t, TIPO_PERMISO, p.permission_type, p.permission_type ?? "")} · ${p.permission_date ? format(new Date(p.permission_date), "dd MMM yyyy") : "—"}`,
+            right: deSiempreSalvoEnIngles(f.idioma, t, ESTADO_PERMISO, p.status, p.status ?? "—"),
             rightTone: tone(p.status ?? ""),
           }));
         })()}
+        emptyText={t("hr.kpiEmpty")}
       />
     </div>
   );
@@ -794,6 +807,8 @@ function EditPermisoModal({
   onSave: (vals: { id: string; absence_type: string; start_date: string; end_date: string; notes: string | null; reason: string | null }) => void;
   isPending: boolean;
 }) {
+  const { t } = useLanguage();
+  const f = useFormato();
   const emp = permiso.employees;
   const empName = emp ? `${emp.first_name} ${emp.last_name}` : "—";
 
@@ -822,31 +837,31 @@ function EditPermisoModal({
         <DialogHeader className="shrink-0 px-6 py-5 border-b">
           <div className="flex items-center gap-2">
             <Pencil className="h-5 w-5 text-primary" />
-            <DialogTitle>Editar Permiso</DialogTitle>
+            <DialogTitle>{t("hr.perm.edit")}</DialogTitle>
           </div>
-          <DialogDescription>Modifica los datos de la solicitud de permiso</DialogDescription>
+          <DialogDescription>{t("hr.perm.editDesc")}</DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-4">
           {/* Empleado (readonly) */}
           <div className="space-y-1.5">
-            <Label>Empleado</Label>
+            <Label>{t("hr.employee")}</Label>
             <Input value={empName} readOnly className="bg-muted" />
           </div>
 
           {/* Tipo */}
           <div className="space-y-1.5">
-            <Label>Tipo de Permiso</Label>
+            <Label>{t("hr.perm.permType")}</Label>
             <Select value={permisoType} onValueChange={setPermisoType}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {PERMISSION_TYPES.map((t) => (
-                  <SelectItem key={t.value} value={t.value}>
+                {PERMISSION_TYPES.map((tp) => (
+                  <SelectItem key={tp.value} value={tp.value}>
                     <span className="flex items-center gap-2">
-                      <t.icon className="h-3.5 w-3.5" />
-                      {t.label}
+                      <tp.icon className="h-3.5 w-3.5" />
+                      {etiqueta(t, TIPO_PERMISO, tp.value)}
                     </span>
                   </SelectItem>
                 ))}
@@ -856,12 +871,12 @@ function EditPermisoModal({
 
           {/* Fecha */}
           <div className="space-y-1.5">
-            <Label>Fecha</Label>
+            <Label>{t("common.date")}</Label>
             <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
               <PopoverTrigger asChild>
                 <Button variant="outline" className={cn("w-full justify-start font-normal", !date && "text-muted-foreground")}>
                   <CalendarIcon className="mr-2 h-4 w-4" />
-                  {date ? format(date, "dd 'de' MMMM yyyy", { locale: es }) : "Seleccionar fecha"}
+                  {date ? format(date, f.idioma === "en" ? "MMMM dd, yyyy" : "dd 'de' MMMM yyyy", { locale: f.fechas }) : t("hr.selectDate")}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
@@ -869,7 +884,7 @@ function EditPermisoModal({
                   mode="single"
                   selected={date}
                   onSelect={(d) => { setDate(d); setCalendarOpen(false); }}
-                  locale={es}
+                  locale={f.fechas}
                   initialFocus
                   className="pointer-events-auto"
                 />
@@ -879,21 +894,21 @@ function EditPermisoModal({
 
           {/* Horario */}
           <div className="space-y-1.5">
-            <Label>Horario</Label>
-            <Input placeholder="Ej: 14:00 - 17:00" value={horario} onChange={(e) => setHorario(e.target.value)} />
+            <Label>{t("hr.schedule")}</Label>
+            <Input placeholder={t("hr.scheduleExample")} value={horario} onChange={(e) => setHorario(e.target.value)} />
           </div>
 
           {/* Motivo */}
           <div className="space-y-1.5">
-            <Label>Motivo</Label>
-            <Textarea placeholder="Describa el motivo..." rows={3} value={motivo} onChange={(e) => setMotivo(e.target.value)} />
+            <Label>{t("hr.reasonLabel")}</Label>
+            <Textarea placeholder={t("hr.perm.reasonPlaceholderEdit")} rows={3} value={motivo} onChange={(e) => setMotivo(e.target.value)} />
           </div>
         </div>
 
         <DialogFooter className="shrink-0 px-6 py-4 border-t flex gap-2">
-          <Button variant="outline" onClick={onClose} className="flex-1">Cancelar</Button>
+          <Button variant="outline" onClick={onClose} className="flex-1">{t("common.cancel")}</Button>
           <Button onClick={handleSave} disabled={!date || isPending} className="flex-1">
-            {isPending ? "Guardando..." : "Guardar Cambios"}
+            {isPending ? t("hr.saving") : t("hr.saveChanges")}
           </Button>
         </DialogFooter>
       </DialogContent>

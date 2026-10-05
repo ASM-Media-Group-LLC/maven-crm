@@ -9,6 +9,7 @@ import { LlamadaEnVentanaFlotante } from "@/components/LlamadaEnVentanaFlotante"
 import { docPipSupported } from "@/pages/cowork/usePipWindow";
 import { useMeetGuest } from "@/hooks/useMeetGuest";
 import { normalizeRoomCode } from "@/lib/coworkRoomCode";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // Ruta PÚBLICA (/entrar/:code). Es el ÚNICO link que hace falta compartir de una
 // reunión, porque atiende los dos casos como el modo "Trusted" de Google Meet:
@@ -20,6 +21,7 @@ import { normalizeRoomCode } from "@/lib/coworkRoomCode";
 // El token de LiveKit del invitado lo emite la edge `meet-guest` recién cuando
 // alguien lo admitió — nunca antes.
 export default function MeetGuestPage() {
+  const { t } = useLanguage();
   const { code: rawCode } = useParams<{ code: string }>();
   const navigate = useNavigate();
   const code = normalizeRoomCode(rawCode || "");
@@ -88,9 +90,9 @@ export default function MeetGuestPage() {
   if (code.length !== 6) {
     return (
       <Shell>
-        <p className="text-foreground font-semibold text-center">Ese enlace no es válido</p>
+        <p className="text-foreground font-semibold text-center">{t("meet.guest.invalidLink")}</p>
         <p className="text-sm text-muted-foreground text-center">
-          Pide a quien te invitó que te comparta el enlace o el código de la reunión otra vez.
+          {t("meet.guest.invalidLinkHint")}
         </p>
       </Shell>
     );
@@ -107,8 +109,9 @@ export default function MeetGuestPage() {
           <LiveKitCallView
             autoPip={!docPipSupported()}
             roomName={call.room}
+            // Con este nombre lo ven los de adentro: no depende del idioma del invitado.
             displayName={guestName || "Invitado"}
-            callDisplayName={roomName || "Reunión"}
+            callDisplayName={roomName || t("meet.guest.meetingFallback")}
             isAdmin={false}
             getToken={getToken}
             initialMicOn={false}
@@ -126,9 +129,9 @@ export default function MeetGuestPage() {
         <div className="flex items-center justify-center h-14 w-14 rounded-full bg-destructive/10">
           <DoorClosed className="h-7 w-7 text-destructive" />
         </div>
-        <p className="text-foreground font-semibold text-center">No te dejaron entrar</p>
+        <p className="text-foreground font-semibold text-center">{t("meet.guest.denied")}</p>
         <p className="text-sm text-muted-foreground text-center">
-          Contacta a quien te invitó si crees que fue un error.
+          {t("meet.guest.deniedHint")}
         </p>
       </Shell>
     );
@@ -137,9 +140,9 @@ export default function MeetGuestPage() {
   if (status === "ended") {
     return (
       <Shell>
-        <p className="text-foreground font-semibold text-center">La reunión terminó</p>
+        <p className="text-foreground font-semibold text-center">{t("meet.guest.ended")}</p>
         <p className="text-sm text-muted-foreground text-center">
-          Ya no se puede entrar con este enlace.
+          {t("meet.guest.endedHint")}
         </p>
       </Shell>
     );
@@ -151,15 +154,14 @@ export default function MeetGuestPage() {
         <div className="flex items-center justify-center h-14 w-14 rounded-full bg-muted">
           <DoorClosed className="h-7 w-7 text-muted-foreground" />
         </div>
-        <p className="text-foreground font-semibold text-center">Saliste de la reunión</p>
+        <p className="text-foreground font-semibold text-center">{t("meet.guest.left")}</p>
         <p className="text-sm text-muted-foreground text-center">
-          Ya podés cerrar esta pestaña. Si querés volver, tenés que pedir
-          entrada otra vez.
+          {t("meet.guest.leftHint")}
         </p>
         {/* Vuelve al formulario, NO a la llamada: la admisión se terminó al
             salir y alguien de adentro tiene que aprobarlo de nuevo. */}
         <Button variant="outline" className="mt-1 w-full" onClick={() => setSali(false)}>
-          Pedir entrada de nuevo
+          {t("meet.guest.askAgain")}
         </Button>
       </Shell>
     );
@@ -171,10 +173,10 @@ export default function MeetGuestPage() {
         <div className="flex items-center justify-center h-14 w-14 rounded-full bg-primary/10">
           <Clock className="h-7 w-7 text-primary" />
         </div>
-        <p className="text-foreground font-semibold text-center">Esperando que te dejen entrar</p>
+        <p className="text-foreground font-semibold text-center">{t("meet.guest.waiting")}</p>
         <p className="text-sm text-muted-foreground text-center">
-          {roomName ? `Pediste entrar a "${roomName}".` : "Pediste entrar."} Alguien de la reunión
-          tiene que aceptarte. No cierres esta página.
+          {roomName ? t("meet.guest.askedToJoinRoom", { name: roomName }) : t("meet.guest.askedToJoin")}{" "}
+          {t("meet.guest.waitingHint")}
         </p>
         <Loader2 className="h-5 w-5 animate-spin text-primary/60 mt-1" />
       </Shell>
@@ -186,16 +188,16 @@ export default function MeetGuestPage() {
       <div className="flex items-center justify-center h-14 w-14 rounded-full bg-primary/10">
         <Video className="h-7 w-7 text-primary" />
       </div>
-      <p className="text-foreground font-semibold text-center">Pedir entrada a la reunión</p>
+      <p className="text-foreground font-semibold text-center">{t("meet.guest.askTitle")}</p>
       <p className="text-xs text-muted-foreground text-center">
-        Código <span className="font-mono tracking-[0.2em]">{code}</span>
+        {t("common.code")} <span className="font-mono tracking-[0.2em]">{code}</span>
       </p>
       <div className="w-full flex flex-col gap-2 mt-1">
         <Input
           value={name}
           onChange={(e) => setName(e.target.value.slice(0, 40))}
           onKeyDown={(e) => e.key === "Enter" && name.trim().length >= 2 && knock(name.trim())}
-          placeholder="Tu nombre"
+          placeholder={t("meet.guest.yourName")}
           className="rounded-full text-center"
         />
         <Button
@@ -203,10 +205,10 @@ export default function MeetGuestPage() {
           disabled={name.trim().length < 2}
           className="w-full rounded-full"
         >
-          Pedir entrada
+          {t("meet.guest.ask")}
         </Button>
         <p className="text-[11px] text-muted-foreground/70 text-center">
-          Tu nombre se muestra a quienes están en la reunión para que puedan aceptarte.
+          {t("meet.guest.nameHint")}
         </p>
         {/* Quien SÍ tiene cuenta no debería golpear como invitado: entra
             directo. El returnTo lo devuelve a ESTA página tras loguearse —
@@ -217,7 +219,8 @@ export default function MeetGuestPage() {
           className="w-full rounded-full text-muted-foreground"
           onClick={() => navigate(`/login?returnTo=${encodeURIComponent(`/entrar/${code}`)}`)}
         >
-          ¿Tienes cuenta en Maven? Inicia sesión
+          {t("meet.guest.haveAccount")}
+
         </Button>
       </div>
       {error && <p className="text-xs text-destructive text-center">{error}</p>}

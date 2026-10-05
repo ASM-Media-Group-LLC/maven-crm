@@ -27,6 +27,10 @@ import { type PromologEntry } from "./PromologEntryCard";
 import PromoQualityBar from "./PromoQualityBar";
 import { displayPlatform } from "./promoScore";
 import { streakCreatorKey, type PromoStreak } from "./promoStreaks";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
+
+type T = (key: TranslationKey, params?: Record<string, string | number>) => string;
 
 interface Props {
   entries: PromologEntry[];
@@ -111,30 +115,32 @@ const resultVariant: Record<string, "success-soft" | "destructive-soft"> = {
 // consecutivos de promo (umbral del juez, para no premiar lo trivial) y pasa
 // a dorado (token warning) desde los hitos de 7/14/30 días.
 const StreakBadge = ({ streak }: { streak: number }) => {
+  const { t } = useLanguage();
   if (streak < 3) return null;
   const gold = streak >= 7;
   return (
     <span
-      title={`Racha: ${streak} días consecutivos con promo (dentro del rango y filtros cargados)`}
+      title={t("promolog.streakTitle", { count: streak })}
       className={`inline-flex shrink-0 items-center gap-0.5 rounded-full border px-1.5 py-px text-[10px] font-medium tabular-nums ${
         gold ? "border-warning/40 text-warning" : "border-border text-muted-foreground"
       }`}
     >
       <Flame className="h-3 w-3" aria-hidden />
-      {streak} días
+      {t("promolog.daysCount", { count: streak })}
     </span>
   );
 };
 
 // Motivo legible del fallo de scan (para el tooltip de la fila "A revisar").
-const errorReasonLabel = (r?: string | null): string => {
-  const map: Record<string, string> = {
-    json_parse: "La IA devolvió un veredicto ilegible — revisa la evidencia a mano.",
-    openrouter_timeout: "La IA tardó demasiado (timeout) — revisa la evidencia a mano.",
-    refusal: "La IA no analizó la imagen — revisa la evidencia a mano.",
+// Las claves (json_parse…) son el error_reason que guarda el scanner.
+const errorReasonLabel = (t: T, r?: string | null): string => {
+  const map: Record<string, TranslationKey> = {
+    json_parse: "promolog.errJsonParse",
+    openrouter_timeout: "promolog.errTimeout",
+    refusal: "promolog.errRefusal",
   };
-  if (r && map[r]) return map[r];
-  return r ? `Necesita revisión manual (${r}).` : "Necesita revisión manual: la IA no pudo leer la evidencia.";
+  if (r && map[r]) return t(map[r]);
+  return r ? t("promolog.errNeedsReviewWithReason", { reason: r }) : t("promolog.errNeedsReview");
 };
 
 // Celda de notas. La versión vieja se volvía un input de UNA línea al click →
@@ -142,6 +148,7 @@ const errorReasonLabel = (r?: string | null): string => {
 // closers (InlineText de LeadTable): preview de hasta 2 líneas y al hacer clic
 // abre un Popover con un Textarea cómodo (⌘/Ctrl+Enter guarda, Esc cancela).
 const InlineNotes = ({ value, onSave }: { value: string; onSave: (v: string | null) => void }) => {
+  const { t } = useLanguage();
   const [open, setOpen] = useState(false);
   const [text, setText] = useState(value || "");
 
@@ -166,7 +173,7 @@ const InlineNotes = ({ value, onSave }: { value: string; onSave: (v: string | nu
             </>
           ) : (
             <span className="inline-flex items-center gap-1 text-xs text-muted-foreground/50 group-hover:text-muted-foreground">
-              <Plus className="h-3 w-3" /> Nota
+              <Plus className="h-3 w-3" /> {t("common.note")}
             </span>
           )}
         </button>
@@ -181,14 +188,14 @@ const InlineNotes = ({ value, onSave }: { value: string; onSave: (v: string | nu
           }}
           autoFocus
           rows={5}
-          placeholder="Escribe una nota…"
+          placeholder={t("promolog.writeNote")}
           className="resize-none text-sm"
         />
         <div className="mt-2 flex items-center justify-between">
-          <span className="text-[10px] text-muted-foreground">⌘/Ctrl+Enter para guardar · Esc para cancelar</span>
+          <span className="text-[10px] text-muted-foreground">{t("promolog.notesShortcut")}</span>
           <div className="flex gap-1.5">
-            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setOpen(false)}>Cancelar</Button>
-            <Button size="sm" className="h-7 px-2 text-xs" onClick={save}>Guardar</Button>
+            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setOpen(false)}>{t("common.cancel")}</Button>
+            <Button size="sm" className="h-7 px-2 text-xs" onClick={save}>{t("common.save")}</Button>
           </div>
         </div>
       </PopoverContent>
@@ -210,6 +217,7 @@ const PromologTable = ({
   onSort,
   streaks,
 }: Props) => {
+  const { t } = useLanguage();
   // Orden interno LEGACY (solo se usa si el padre no controla el orden via onSort).
   const [localSortKey, setLocalSortKey] = useState<SortKey>("date");
   const [localSortAsc, setLocalSortAsc] = useState(false);
@@ -260,8 +268,8 @@ const PromologTable = ({
           <TableHeader>
             <TableRow>
               <TableHead colSpan={10} className="text-center py-16 text-muted-foreground">
-                <p className="text-lg font-medium">No hay entradas</p>
-                <p className="text-sm">Registra una nueva entrada para comenzar</p>
+                <p className="text-lg font-medium">{t("promolog.noEntries")}</p>
+                <p className="text-sm">{t("promolog.noEntriesHint")}</p>
               </TableHead>
             </TableRow>
           </TableHeader>
@@ -275,15 +283,15 @@ const PromologTable = ({
       <TableHeader>
         <TableRow>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] w-[50px]">#</TableHead>
-          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Creación" sortKeyName="date" /></TableHead>
-          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Modelo" sortKeyName="model" /></TableHead>
-          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Red Social" sortKeyName="network" /></TableHead>
-          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Plataforma" sortKeyName="platform" /></TableHead>
-          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Resultado" sortKeyName="result" /></TableHead>
-          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]" title="Calidad de la promo del día (IG 60% · X/TG/FB ~13% c/u × calidad)">Calidad</TableHead>
-          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Agente" sortKeyName="agent" /></TableHead>
-          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Notas</TableHead>
-          <TableHead className="sticky top-0 right-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))] text-right">Acciones</TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label={t("promolog.createdAt")} sortKeyName="date" /></TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label={t("promolog.model")} sortKeyName="model" /></TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label={t("promolog.networkPlaceholder")} sortKeyName="network" /></TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label={t("promolog.platform")} sortKeyName="platform" /></TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label={t("promolog.result")} sortKeyName="result" /></TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]" title={t("promolog.qualityColumnTitle")}>{t("promolog.quality")}</TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label={t("promolog.agent")} sortKeyName="agent" /></TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">{t("promolog.notes")}</TableHead>
+          <TableHead className="sticky top-0 right-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))] text-right">{t("common.actions")}</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -317,7 +325,7 @@ const PromologTable = ({
                   return (
                     <span
                       key={n}
-                      title={`${networkLabel[n] || n}${promoted ? " · promocionó" : " · revisada, sin promo"}`}
+                      title={`${networkLabel[n] || n}${promoted ? t("promolog.netPromotedSuffix") : t("promolog.netReviewedSuffix")}`}
                       className={`inline-flex items-center justify-center ${promoted ? "text-foreground" : "text-muted-foreground/40"}`}
                     >
                       <NetworkIcon network={n} />
@@ -338,14 +346,14 @@ const PromologTable = ({
                   marcas AL LADO, nunca reemplazan el resultado. */}
               <div className="flex items-center gap-1">
                 <Badge variant={resultVariant[entry.result] || "destructive-soft"} className="text-xs">
-                  {entry.result === "Sí" ? "Sí" : "No"}
+                  {entry.result === "Sí" ? t("promolog.yes") : t("promolog.no")}
                 </Badge>
                 {entry.needs_review ? (
-                  <span title={errorReasonLabel(entry.error_reason)} className="text-warning" aria-label="Revisar manual">
+                  <span title={errorReasonLabel(t, entry.error_reason)} className="text-warning" aria-label={t("promolog.reviewManually")}>
                     <AlertTriangle className="h-3.5 w-3.5" />
                   </span>
                 ) : entry.is_pending ? (
-                  <span title="Lectura no confirmada — puede tener historias sin leer" className="text-[10px] text-muted-foreground">no verif.</span>
+                  <span title={t("promolog.unconfirmedRead")} className="text-[10px] text-muted-foreground">{t("promolog.notVerifiedShort")}</span>
                 ) : null}
               </div>
             </TableCell>
@@ -383,25 +391,25 @@ const PromologTable = ({
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem onClick={() => onView?.(entry)}>
                         <Eye className="mr-2 h-4 w-4" />
-                        Ver detalle
+                        {t("common.viewDetail")}
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => onEdit?.(entry)}>
                         <Pencil className="mr-2 h-4 w-4" />
-                        Editar
+                        {t("common.edit")}
                       </DropdownMenuItem>
                       {isManagement && (
                         <>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem onClick={() => onAssignAgent?.(entry)}>
                             <UserPlus className="mr-2 h-4 w-4" />
-                            Asignar agente
+                            {t("promolog.assignAgentMenu")}
                           </DropdownMenuItem>
                         </>
                       )}
                       <DropdownMenuSeparator />
                       <DropdownMenuItem className="text-destructive" onClick={() => onDelete?.(entry)}>
                         <Trash2 className="mr-2 h-4 w-4" />
-                        Eliminar
+                        {t("common.delete")}
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>

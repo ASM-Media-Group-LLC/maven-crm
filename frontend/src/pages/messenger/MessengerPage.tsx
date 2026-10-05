@@ -20,6 +20,7 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/EmptyState";
 import { toast } from "sonner";
+import { useLanguage } from "@/hooks/useLanguage";
 
 function openCallInNewTab(roomName: string, isAdmin: boolean, displayName?: string) {
   const params = new URLSearchParams();
@@ -38,6 +39,7 @@ export default function MessengerPage() {
   const { conversations, loading, profiles, createDirectChat, createGroupChat, deleteConversation, loadConversations, markConversationRead, markConversationUnread, toggleMute } = useChatShared();
   const { isOnline, onlineUsers, getStatus } = useOnlinePresence();
   const { user } = useAuth();
+  const { t } = useLanguage();
   const { initiateCall } = useCall();
   const { isPinned, togglePin, pinnedOrder, reorderPinned } = usePinnedChats();
   const { isArchived, toggleArchive } = useArchivedChats();
@@ -83,6 +85,32 @@ export default function MessengerPage() {
       setSearchParams(searchParams, { replace: true });
     }
   }, [searchParams, conversations, selectChat, setSearchParams]);
+
+  // VOLVER A LA MISMA CONVERSACIÓN. Ir al Correo y regresar desmonta esta
+  // página y el chat abierto se perdía: había que buscarlo de nuevo (Keila,
+  // 02/10). Se guarda por PESTAÑA (sessionStorage): dos pestañas no se pisan.
+  // Un enlace con ?c= / ?dm= manda sobre lo guardado.
+  const claveChatAbierto = user?.id ? `messenger.chatAbierto.${user.id}` : null;
+  const restauradoRef = useRef(false);
+  useEffect(() => {
+    if (restauradoRef.current || !claveChatAbierto) return;
+    if (searchParams.get("c") || searchParams.get("chat") || searchParams.get("dm")) {
+      restauradoRef.current = true;
+      return;
+    }
+    if (loading) return;
+    restauradoRef.current = true;
+    let guardado: string | null = null;
+    try { guardado = sessionStorage.getItem(claveChatAbierto); } catch { /* sin almacenamiento */ }
+    if (guardado && conversations.some((x) => x.id === guardado)) selectChat(guardado);
+  }, [claveChatAbierto, searchParams, loading, conversations, selectChat]);
+  useEffect(() => {
+    if (!restauradoRef.current || !claveChatAbierto) return;
+    try {
+      if (activeChatId) sessionStorage.setItem(claveChatAbierto, activeChatId);
+      else sessionStorage.removeItem(claveChatAbierto);
+    } catch { /* sin almacenamiento */ }
+  }, [activeChatId, claveChatAbierto]);
 
   // Abrir el modal de "Mensaje nuevo" al llegar desde el desplegable de mensajes
   // del topbar (/messenger?nuevo=1).
@@ -161,7 +189,7 @@ export default function MessengerPage() {
     searchParams.delete("backName");
     setSearchParams(searchParams, { replace: true });
     setVolverA(from && conversations.some((c) => c.id === from) ? from : null);
-    setVolverAPagina(rutaInterna(back) ? { ruta: back!, nombre: (backName || "atrás").slice(0, 40) } : null);
+    setVolverAPagina(rutaInterna(back) ? { ruta: back!, nombre: (backName || "").slice(0, 40) } : null);
     handleSelectUser(dm);
   }, [searchParams, loading, handleSelectUser, setSearchParams, conversations]);
 
@@ -169,7 +197,7 @@ export default function MessengerPage() {
   const returnTo = grupoDeOrigen
     ? { name: grupoDeOrigen.displayName, onBack: () => { const id = grupoDeOrigen.id; setVolverA(null); selectChat(id); } }
     : volverAPagina
-      ? { name: volverAPagina.nombre, onBack: () => { const r = volverAPagina.ruta; setVolverAPagina(null); navigate(r); } }
+      ? { name: volverAPagina.nombre || t("messenger.page.atras"), onBack: () => { const r = volverAPagina.ruta; setVolverAPagina(null); navigate(r); } }
       : null;
 
   const handleCreateGroup = (name: string, memberIds: string[]) => {
@@ -209,6 +237,8 @@ export default function MessengerPage() {
     const roomName = `call-${conv.id}`;
     openCallInNewTab(roomName, true, conv.displayName);
     const callLink = `${window.location.origin}/call/${encodeURIComponent(roomName)}`;
+    // Este texto es un MENSAJE que se guarda en chat_messages y lo leen todos los
+    // del grupo, cada uno en su idioma: es dato, no se traduce.
     await sendMessage(`📹 Videollamada iniciada\n${callLink}`, "text");
   };
 
@@ -245,7 +275,7 @@ export default function MessengerPage() {
     openCallInNewTab(roomName, false);
     joinedFromLinkRef.current = true;
     window.history.replaceState({}, "", window.location.pathname);
-    toast.success("Abriendo sala en nueva pestaña...");
+    toast.success(t("messenger.page.abriendoSala"));
   }, []);
 
   return (
@@ -332,15 +362,15 @@ export default function MessengerPage() {
           <div className="flex-1 flex items-center justify-center bg-primary/[0.02]">
             <EmptyState
               seed="empty-messenger"
-              title="Ninguna conversación abierta"
-              description="Selecciona un chat o contacto para comenzar a conversar"
+              title={t("messenger.page.ningunaAbierta")}
+              description={t("messenger.page.seleccionaChat")}
             />
           </div>
         )}
       </div>
 
       {/* El modal de llamada entrante ahora es GLOBAL (CallProvider), para que
-          suene estés en la sección de Maven que estés, no solo acá. */}
+          suene estés en la sección de Maven que estés, no solo aquí. */}
 
       <NewChatModal
         open={newChatOpen}

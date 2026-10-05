@@ -7,7 +7,10 @@ import {
 import { ArrowDown, ArrowUp, ChevronsUpDown, Filter } from "lucide-react";
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
+import type { Formato } from "@/lib/formato";
 import { DIAS_VENCIDO, agenciaDe, alertaDe, estadoDe, tipoDe, usd, type Pedido } from "./types";
 import { CLASE, TEXTOS, etiquetaValor, valoresDe, type ColumnaOrden, type Direccion, type Orden } from "./orden";
 
@@ -25,28 +28,30 @@ interface Props {
   onFiltrar: (col: ColumnaOrden, valor: string) => void;
 }
 
-const f = (d: string | null) => (d ? format(new Date(`${d}T12:00:00`), "d MMM yy", { locale: es }) : "—");
+const f = (d: string | null, fo: Formato) => (d ? format(new Date(`${d}T12:00:00`), "d MMM yy", { locale: fo.fechas }) : "—");
 
-const COLUMNAS: Array<{ col: ColumnaOrden; label: string; alinear?: "der" }> = [
-  { col: "creator_name", label: "Creadora" },
-  { col: "requested_on", label: "Pedido" },
-  { col: "status", label: "Estado" },
-  { col: "chatter_name", label: "Chatter" },
-  { col: "fan_handle", label: "Fan" },
-  { col: "content_type", label: "Tipo" },
-  { col: "price_usd", label: "Precio", alinear: "der" },
-  { col: "paid_usd", label: "Pagado", alinear: "der" },
-  { col: "sale_channel", label: "Canal" },
-  { col: "due_on", label: "Entrega" },
-  { col: "agency", label: "Agencia" },
+const COLUMNAS: Array<{ col: ColumnaOrden; label: TranslationKey; alinear?: "der" }> = [
+  { col: "creator_name", label: "sales.creator" },
+  { col: "requested_on", label: "custom.col.requested" },
+  { col: "status", label: "common.status" },
+  { col: "chatter_name", label: "custom.col.chatter" },
+  { col: "fan_handle", label: "custom.col.fan" },
+  { col: "content_type", label: "common.type" },
+  { col: "price_usd", label: "custom.col.price", alinear: "der" },
+  { col: "paid_usd", label: "custom.col.paid", alinear: "der" },
+  { col: "sale_channel", label: "custom.col.channel" },
+  { col: "due_on", label: "custom.col.due" },
+  { col: "agency", label: "custom.col.agency" },
 ];
 
 /* Encabezado con menú: cómo ordenar y —en las columnas de categoría— ver solo un
    valor. El clic abre el menú (en vez de alternar a ciegas) porque en "Precio"
    hay que poder decir mayor o menor sin adivinar qué hace el primer clic. */
 function Encabezado({ col, label, alinear, pedidos, orden, onOrdenar, filtroDe, onFiltrar }:
-  { col: ColumnaOrden; label: string; alinear?: "der" }
+  { col: ColumnaOrden; label: TranslationKey; alinear?: "der" }
   & Pick<Props, "pedidos" | "orden" | "onOrdenar" | "filtroDe" | "onFiltrar">) {
+  const { t } = useLanguage();
+  const nombre = t(label);
   const clase = CLASE[col];
   const activo = orden?.col === col;
   const filtro = filtroDe(col);
@@ -59,8 +64,8 @@ function Encabezado({ col, label, alinear, pedidos, orden, onOrdenar, filtroDe, 
         <DropdownMenuTrigger asChild>
           <button type="button"
             className={`group inline-flex items-center gap-1 rounded-md px-1 -mx-1 py-0.5 transition-colors hover:text-foreground ${activo || filtro ? "text-foreground" : ""}`}
-            title={`Ordenar o filtrar por ${label.toLowerCase()}`}>
-            <span>{label}</span>
+            title={t("custom.col.sortOrFilter", { col: nombre.toLowerCase() })}>
+            <span>{nombre}</span>
             {filtro && <Filter className="h-3 w-3 text-primary" />}
             {activo
               ? (orden!.dir === "desc" ? <ArrowDown className="h-3.5 w-3.5 text-primary" /> : <ArrowUp className="h-3.5 w-3.5 text-primary" />)
@@ -69,24 +74,24 @@ function Encabezado({ col, label, alinear, pedidos, orden, onOrdenar, filtroDe, 
         </DropdownMenuTrigger>
         <DropdownMenuContent align={alinear === "der" ? "end" : "start"} className="w-56 max-h-[70vh] overflow-y-auto">
           <DropdownMenuItem onClick={() => ordenar("desc")}>
-            <ArrowDown className="h-3.5 w-3.5 mr-2" /> {TEXTOS[clase].desc}
+            <ArrowDown className="h-3.5 w-3.5 mr-2" /> {t(TEXTOS[clase].desc)}
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => ordenar("asc")}>
-            <ArrowUp className="h-3.5 w-3.5 mr-2" /> {TEXTOS[clase].asc}
+            <ArrowUp className="h-3.5 w-3.5 mr-2" /> {t(TEXTOS[clase].asc)}
           </DropdownMenuItem>
           {activo && (
             <DropdownMenuItem onClick={() => onOrdenar(null)} className="text-muted-foreground">
-              Quitar el orden
+              {t("custom.sort.clear")}
             </DropdownMenuItem>
           )}
           {valores.length > 1 && (
             <>
               <DropdownMenuSeparator />
-              <DropdownMenuLabel className="text-xs font-semibold text-muted-foreground">Ver solo</DropdownMenuLabel>
+              <DropdownMenuLabel className="text-xs font-semibold text-muted-foreground">{t("custom.sort.onlyShow")}</DropdownMenuLabel>
               {valores.map((v) => (
                 <DropdownMenuCheckboxItem key={v} checked={filtro === v}
                   onCheckedChange={(marcado) => onFiltrar(col, marcado ? v : "")}>
-                  {etiquetaValor(col, v)}
+                  {etiquetaValor(col, v, t)}
                 </DropdownMenuCheckboxItem>
               ))}
             </>
@@ -100,6 +105,8 @@ function Encabezado({ col, label, alinear, pedidos, orden, onOrdenar, filtroDe, 
 // La vista "sheet": todo lo que la gente estaba acostumbrada a ver en columnas,
 // pero filtrable, ordenable por columna y con clic para abrir la ficha.
 export default function PedidoTabla({ pedidos, onAbrir, orden, onOrdenar, filtroDe, onFiltrar, onVerChatter, puedeVerCreadora }: Props) {
+  const formatoUI = useFormato();
+  const { t } = useLanguage();
   return (
     <div className="rounded-2xl border border-border/60 overflow-x-auto">
       <Table>
@@ -114,12 +121,12 @@ export default function PedidoTabla({ pedidos, onAbrir, orden, onOrdenar, filtro
           {pedidos.length === 0 && (
             <TableRow>
               <TableCell colSpan={COLUMNAS.length} className="text-center text-sm text-muted-foreground py-12">
-                No hay pedidos con esos filtros.
+                {t("custom.table.empty")}
               </TableCell>
             </TableRow>
           )}
           {pedidos.map((p) => {
-            const e = estadoDe(p.status); const ag = agenciaDe(p.agency); const t = tipoDe(p.content_type);
+            const e = estadoDe(p.status); const ag = agenciaDe(p.agency); const tipo = tipoDe(p.content_type);
             // Reloj del plazo: barrita de color a la izquierda de la fila y los
             // días a la vista junto a la fecha del pedido. Ver `alertaDe`.
             const a = alertaDe(p);
@@ -137,12 +144,10 @@ export default function PedidoTabla({ pedidos, onAbrir, orden, onOrdenar, filtro
                 </TableCell>
                 <TableCell className="whitespace-nowrap text-muted-foreground">
                   <span className="inline-flex items-center gap-1.5">
-                    {f(p.requested_on)}
+                    {f(p.requested_on, formatoUI)}
                     {a && (
                       <span
-                        title={a.nivel === "vencido"
-                          ? `Pasó el plazo de ${DIAS_VENCIDO} días: abierto hace ${a.dias}.`
-                          : `Abierto hace ${a.dias} días. El plazo es de ${DIAS_VENCIDO}.`}
+                        title={t(a.nivel === "vencido" ? "custom.alert.tipOverdue" : "custom.alert.tipAttention", { max: DIAS_VENCIDO, dias: a.dias })}
                         className={`rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-none ${a.tono}`}
                       >
                         {a.dias} d
@@ -150,7 +155,7 @@ export default function PedidoTabla({ pedidos, onAbrir, orden, onOrdenar, filtro
                     )}
                   </span>
                 </TableCell>
-                <TableCell><Badge variant="outline" className={`rounded-full ${e.tono}`}>{e.corto}</Badge></TableCell>
+                <TableCell><Badge variant="outline" className={`rounded-full ${e.tono}`}>{t(e.corto)}</Badge></TableCell>
                 <TableCell className="whitespace-nowrap">
                   {/* El chatter abre su ficha (la misma del Messenger), desde
                       donde se le puede mandar un mensaje o un correo. Los
@@ -159,16 +164,16 @@ export default function PedidoTabla({ pedidos, onAbrir, orden, onOrdenar, filtro
                     <button type="button"
                       onClick={(e) => { e.stopPropagation(); onVerChatter(p.chatter_id!); }}
                       className="hover:text-primary hover:underline decoration-dotted underline-offset-2">
-                      {p.chatter_name || "Ver ficha"}
+                      {p.chatter_name || t("custom.table.viewProfile")}
                     </button>
                   ) : (p.chatter_name || "—")}
                 </TableCell>
                 <TableCell className="whitespace-nowrap text-muted-foreground">@{p.fan_handle}</TableCell>
-                <TableCell className="whitespace-nowrap">{t ? `${t.emoji} ${t.label}` : "—"}</TableCell>
+                <TableCell className="whitespace-nowrap">{tipo ? `${tipo.emoji} ${t(tipo.label)}` : "—"}</TableCell>
                 <TableCell className="text-right font-medium">{usd(p.price_usd)}</TableCell>
                 <TableCell className="text-right text-muted-foreground">{usd(p.paid_usd)}</TableCell>
-                <TableCell>{p.sale_channel === "buster" ? "⚡ Buster" : p.sale_channel === "normal" ? "Normal" : "—"}</TableCell>
-                <TableCell className="whitespace-nowrap text-muted-foreground">{f(p.due_on)}</TableCell>
+                <TableCell>{p.sale_channel === "buster" ? "⚡ Buster" : p.sale_channel === "normal" ? t("custom.channel.normal") : "—"}</TableCell>
+                <TableCell className="whitespace-nowrap text-muted-foreground">{f(p.due_on, formatoUI)}</TableCell>
                 <TableCell><Badge variant="outline" className={`rounded-full ${ag.tono}`}>{ag.label}</Badge></TableCell>
               </TableRow>
             );

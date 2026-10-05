@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useLanguage } from "@/hooks/useLanguage";
-import { useSaveSkin, useSaveUiPrefs, saveUiPrefsRemote } from "@/hooks/useUserProfile";
+import { useLanguage, useIdiomaDelPerfil, reescribirUiPrefs, type UiPrefsGuardadas } from "@/hooks/useLanguage";
+import { useSaveSkin } from "@/hooks/useUserProfile";
 import { aaLightnessForHue, CUSTOM_SKIN_SATURATION } from "@/lib/wcag";
 import type { TranslationKey } from "@/lib/i18n";
+import { conEtiqueta } from "@/lib/etiquetaTraducida";
 
 // Skins de Maven — presets de ACENTO por usuario (Settings → Mi cuenta →
 // Apariencia). Un skin solo cambia primary/accent/ring/sidebar-primary/
@@ -24,12 +26,16 @@ export type SkinId =
   | "medianoche"
   | "dorado"
   | "kash"
+  | "diva"
   | "unlimited"
   | "unlok";
 
 export interface SkinDef {
   id: SkinId;
-  label: string;
+  /** Clave del nombre del skin: la pantalla hace t(s.labelKey). */
+  labelKey: TranslationKey;
+  /** El nombre, traducido al leerlo (ver lib/etiquetaTraducida.ts). */
+  readonly label: string;
   /** Colores LITERALES del preset para pintar su swatch en el picker (no
       pueden ser var(--primary): esas vars reflejan el skin ACTIVO). Deben
       quedar sincronizados con los bloques [data-skin] de index.css. */
@@ -40,19 +46,22 @@ export interface SkinDef {
   group?: "linea";
 }
 
+const definirSkin = (def: Omit<SkinDef, "labelKey" | "label">, labelKey: TranslationKey): SkinDef =>
+  conEtiqueta(def, labelKey);
+
 export const SKINS: SkinDef[] = [
-  { id: "maven", label: "Maven", primary: "hsl(211 100% 50%)", accent: "hsl(271 91% 50%)" },
-  { id: "atardecer", label: "Atardecer", primary: "hsl(25 95% 39%)", accent: "hsl(340 82% 59%)" },
-  { id: "esmeralda", label: "Esmeralda", primary: "hsl(160 84% 28%)", accent: "hsl(190 90% 45%)" },
-  { id: "orquidea", label: "Orquídea", primary: "hsl(290 84% 49%)", accent: "hsl(320 85% 55%)" },
-  { id: "medianoche", label: "Medianoche", primary: "hsl(217 91% 53%)", accent: "hsl(217 91% 53%)" },
-  { id: "dorado", label: "Dorado", primary: "hsl(43 80% 30%)", accent: "hsl(30 85% 45%)" },
-  { id: "kash", label: "Rojo Kash", primary: "hsl(350 80% 42%)", accent: "hsl(15 90% 50%)" },
-  { id: "diva", label: "Diva", primary: "hsl(330 85% 48%)", accent: "hsl(350 90% 60%)" },
+  definirSkin({ id: "maven", primary: "hsl(211 100% 50%)", accent: "hsl(271 91% 50%)" }, "int.skin.maven"),
+  definirSkin({ id: "atardecer", primary: "hsl(25 95% 39%)", accent: "hsl(340 82% 59%)" }, "int.skin.atardecer"),
+  definirSkin({ id: "esmeralda", primary: "hsl(160 84% 28%)", accent: "hsl(190 90% 45%)" }, "int.skin.esmeralda"),
+  definirSkin({ id: "orquidea", primary: "hsl(290 84% 49%)", accent: "hsl(320 85% 55%)" }, "int.skin.orquidea"),
+  definirSkin({ id: "medianoche", primary: "hsl(217 91% 53%)", accent: "hsl(217 91% 53%)" }, "int.skin.medianoche"),
+  definirSkin({ id: "dorado", primary: "hsl(43 80% 30%)", accent: "hsl(30 85% 45%)" }, "int.skin.dorado"),
+  definirSkin({ id: "kash", primary: "hsl(350 80% 42%)", accent: "hsl(15 90% 50%)" }, "int.skin.kash"),
+  definirSkin({ id: "diva", primary: "hsl(330 85% 48%)", accent: "hsl(350 90% 60%)" }, "int.skin.diva"),
   // Líneas de negocio — van después del separador "Líneas" del picker
   // (Kash ya tiene su preset propio arriba, "Rojo Kash").
-  { id: "unlimited", label: "Unlimited", primary: "hsl(150 56% 33%)", accent: "hsl(190 90% 45%)", group: "linea" },
-  { id: "unlok", label: "Unlok", primary: "hsl(211 100% 45%)", accent: "hsl(199 90% 48%)", group: "linea" },
+  definirSkin({ id: "unlimited", primary: "hsl(150 56% 33%)", accent: "hsl(190 90% 45%)", group: "linea" }, "int.skin.unlimited"),
+  definirSkin({ id: "unlok", primary: "hsl(211 100% 45%)", accent: "hsl(199 90% 48%)", group: "linea" }, "int.skin.unlok"),
 ];
 
 const STORAGE_KEY = "maven-skin";
@@ -149,6 +158,40 @@ const storePrefs = (prefs: UiPrefs) => {
     // localStorage bloqueado: las prefs igual aplican en vivo.
   }
   window.dispatchEvent(new Event(PREFS_EVENT));
+};
+
+// Las claves de ui_prefs que son de la apariencia. Record con TODAS las de
+// UiPrefs a propósito: si sumás una preferencia y no la anotás acá, no compila.
+// Sin eso, apagarla no la borraría del perfil (ver guardarAparienciaEnPerfil).
+const CLAVES_DE_APARIENCIA: Record<keyof UiPrefs, true> = {
+  oled: true,
+  contrast: true,
+  customHue: true,
+  seasonalOptOut: true,
+  density: true,
+};
+
+// Persiste la apariencia en profiles.ui_prefs SIN pisar lo que no es suyo: el
+// mismo jsonb guarda el idioma (hooks/useLanguage.tsx). Hasta acá se escribía
+// la columna entera con las prefs de apariencia (saveUiPrefsRemote, en
+// useUserProfile.ts): con el idioma adentro, tocar el modo OLED lo borraba.
+//
+// Reemplaza las claves de apariencia en bloque (no las mezcla una por una):
+// apagar la densidad compacta la saca del objeto local, y con un simple
+// {...guardado, ...prefs} el "compact" del perfil sobreviviría y volvería en
+// el próximo login.
+export const guardarAparienciaEnPerfil = (prefs: UiPrefs): Promise<void> => {
+  const nuevas = sanitizeUiPrefs(prefs);
+  return reescribirUiPrefs((actual) => {
+    if (JSON.stringify(sanitizeUiPrefs(actual)) === JSON.stringify(nuevas)) return null;
+    const ajenas: UiPrefsGuardadas = {};
+    for (const [clave, valor] of Object.entries(actual)) {
+      // hasOwnProperty y no `in`: con `in`, una clave "toString" contaría
+      // como de apariencia (viene del prototipo) y se perdería.
+      if (!Object.prototype.hasOwnProperty.call(CLAVES_DE_APARIENCIA, clave)) ajenas[clave] = valor;
+    }
+    return { ...ajenas, ...nuevas };
+  });
 };
 
 /* ---- Skins de temporada ---- */
@@ -253,7 +296,13 @@ export const applyStoredAppearance = () => applyAppearancePrefs();
 // instante, guarda en localStorage y persiste en profiles.ui_prefs.
 export const useUiPrefs = () => {
   const [prefs, setPrefsState] = useState<UiPrefs>(getStoredPrefs);
-  const save = useSaveUiPrefs();
+  const qc = useQueryClient();
+  const save = useMutation({
+    mutationFn: guardarAparienciaEnPerfil,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["my-profile"] });
+    },
+  });
 
   // Cambios hechos desde OTRO consumidor (ej: "Mantener el mío" del toast
   // con la card abierta) llegan por el evento y refrescan el estado local.
@@ -295,7 +344,7 @@ export const useSkin = () => {
         const prefs = { ...getStoredPrefs(), customHue: null };
         storePrefs(prefs);
         applyAppearancePrefs();
-        void saveUiPrefsRemote(prefs);
+        void guardarAparienciaEnPerfil(prefs);
       }
       // Persistencia remota fire-and-forget: si falla, el skin local igual
       // quedó aplicado y guardado; al próximo login el perfil (viejo) manda.
@@ -311,10 +360,12 @@ export const useSkin = () => {
 // al resolver la sesión, lee profiles.ui_skin — si difiere de localStorage el
 // perfil gana (es lo que el usuario eligió por última vez en ALGÚN
 // dispositivo; NULL o valor desconocido = default maven). localStorage manda
-// mientras la red no llega.
+// mientras la red no llega. La misma lectura trae el idioma guardado en
+// ui_prefs y se lo pasa al LanguageProvider (useIdiomaDelPerfil).
 export const useSkinSync = () => {
   const { user } = useAuth();
   const { t } = useLanguage();
+  const empezarLecturaDeIdioma = useIdiomaDelPerfil();
 
   useEffect(() => {
     applyStoredSkin();
@@ -350,7 +401,7 @@ export const useSkinSync = () => {
             const prefs = { ...getStoredPrefs(), seasonalOptOut: true };
             storePrefs(prefs);
             applyAppearancePrefs();
-            void saveUiPrefsRemote(prefs);
+            void guardarAparienciaEnPerfil(prefs);
           },
         },
       });
@@ -361,6 +412,7 @@ export const useSkinSync = () => {
   useEffect(() => {
     if (!user?.id) return;
     let cancelled = false;
+    const adoptarIdioma = empezarLecturaDeIdioma();
     void supabase
       .from("profiles")
       .select("ui_skin, ui_prefs")
@@ -381,9 +433,10 @@ export const useSkinSync = () => {
           storePrefs(remotePrefs);
           applyAppearancePrefs();
         }
+        adoptarIdioma(data?.ui_prefs);
       });
     return () => {
       cancelled = true;
     };
-  }, [user?.id]);
+  }, [user?.id, empezarLecturaDeIdioma]);
 };

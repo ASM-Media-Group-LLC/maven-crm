@@ -1,11 +1,12 @@
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
-import { faceStateLabel, type FaceWatch } from "@/hooks/useFaceWatch";
+import type { FaceWatch } from "@/hooks/useFaceWatch";
 import { playMessageNotification } from "@/lib/notificationSound";
 import { hablar } from "@/lib/voz";
 import { estaEnPausa } from "@/lib/coworkPausa";
 import { estaEnLlamadaDeMaven } from "@/lib/llamadaEnMaven";
 import { reglasActuales, reglaDeEstado } from "@/lib/coworkReglas";
+import { traducir, type TranslationKey } from "@/lib/i18n";
 
 // Avisarle a la PROPIA PERSONA que no se le ve.
 //
@@ -48,6 +49,12 @@ import { reglasActuales, reglaDeEstado } from "@/lib/coworkReglas";
 // Varias por caso y ROTAN: la misma frase repetida cada minuto y medio deja de
 // escucharse a los dos ciclos — se vuelve un ruido de fondo que el oído filtra.
 // Español neutro, sin voseo, como el resto de la interfaz.
+//
+// ⚠️ LAS FRASES HABLADAS SE QUEDAN EN ESPAÑOL, aunque la interfaz esté en inglés:
+// la voz de lib/voz.ts es española (`u.lang = "es-419"` y elige una voz "es"), y
+// una frase en inglés leída con esa voz no se entiende. El aviso ESCRITO (el
+// toast de abajo) sí va en el idioma de la interfaz. Si algún día la voz sigue
+// al idioma, estas frases pasan al diccionario.
 const FRASES: Record<string, string[]> = {
   no_face: [
     "Por favor, acomódate frente a la cámara.",
@@ -82,16 +89,19 @@ const FRASES: Record<string, string[]> = {
   ],
 };
 
-const TITULOS: Record<string, string> = {
-  cam_off: "Tienes la cámara apagada",
+// El aviso escrito, en el idioma de la interfaz (traducir() en el momento del
+// aviso: se arma y se muestra). Los tres primeros títulos dicen lo mismo que
+// `faceStateLabel()` de useFaceWatch; antes se leían de ahí.
+const TITULOS: Record<string, TranslationKey> = {
+  no_face: "int.face.noFace",
+  too_small: "int.face.tooSmall",
+  too_dark: "int.face.tooDark",
+  cam_off: "int.face.camOff",
 };
 
-const DESCRIPCIONES: Record<string, string> = {
-  cam_off: "Enciéndela, o márcate como Break o Baño para que quede registrado.",
+const DESCRIPCIONES: Record<string, TranslationKey> = {
+  cam_off: "int.face.camOffDesc",
 };
-
-const DESCRIPCION_POR_DEFECTO =
-  "Acomódate frente a la cámara. Si necesitas salir, usa el botón de pausa.";
 
 // El índice de rotación vive FUERA de React. Como `useRef` se reiniciaba cada
 // vez que el componente se volvía a montar —y la llamada se remonta al recargar
@@ -168,9 +178,9 @@ export function useFaceNudge(
       if (ahora - ultimoAviso.current >= regla.repetirSeg * 1000) {
         const conSonido = supervisorMs !== null && fuera >= supervisorMs;
         toast.warning(
-          TITULOS[watch.state] ?? faceStateLabel(watch.state) ?? "No se te ve la cara",
+          traducir(TITULOS[watch.state] ?? "int.face.noFace"),
           {
-            description: DESCRIPCIONES[watch.state] ?? DESCRIPCION_POR_DEFECTO,
+            description: traducir(DESCRIPCIONES[watch.state] ?? "int.face.defaultDesc"),
             duration: 10_000,
             id: "encuadre", // uno solo: no apilar avisos del mismo problema
           },
@@ -269,6 +279,7 @@ export function debeAvisarSinPantalla(
 // ninguna puede sonar a sugerencia. "Hazlo cuando puedas" decía exactamente lo
 // contrario de la norma y le daba permiso a cualquiera para dejarlo para nunca.
 // Educado sí; opcional no.
+// Son habladas: se quedan en español por lo mismo que FRASES (la voz es española).
 const FRASES_SIN_PANTALLA = [
   "No estás compartiendo pantalla. Por favor, actívala ahora.",
   "Recuerda que compartir pantalla es obligatorio durante tu turno.",
@@ -305,8 +316,8 @@ export function useScreenShareNudge(compartiendo: boolean, activo: boolean) {
       ultimo.current = ahora;
       playMessageNotification(0.5);
       hablar(FRASES_SIN_PANTALLA[idxSinPantalla++ % FRASES_SIN_PANTALLA.length]);
-      toast.warning("No estás compartiendo pantalla", {
-        description: "Compartir pantalla es obligatorio durante tu turno.",
+      toast.warning(traducir("int.face.noScreen"), {
+        description: traducir("int.face.noScreenDesc"),
         duration: 10_000,
         id: "sin-pantalla",
       });

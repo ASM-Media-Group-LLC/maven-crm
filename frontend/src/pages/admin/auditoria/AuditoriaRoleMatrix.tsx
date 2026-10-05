@@ -2,15 +2,19 @@ import { Check, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { RoleMatrixEntry } from "./useAuditoriaData";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
+import { etiquetaPermiso } from "../etiquetasPermisos";
 
 interface Props {
   matrix: Record<string, RoleMatrixEntry>;
 }
 
-const scopeLabels: Record<string, string> = {
-  all: "Global",
-  subordinates: "Subordinados",
-  self: "Propio",
+// La llave es el data_scope guardado en role_permissions; solo se traduce lo que se ve.
+const scopeLabels: Record<string, TranslationKey> = {
+  all: "admin.audit.scopeAll",
+  subordinates: "admin.audit.scopeSubordinates",
+  self: "admin.audit.scopeSelf",
 };
 
 const scopeColors: Record<string, string> = {
@@ -20,6 +24,7 @@ const scopeColors: Record<string, string> = {
 };
 
 const AuditoriaRoleMatrix = ({ matrix }: Props) => {
+  const { t } = useLanguage();
   const roleNames = Object.keys(matrix);
 
   // Collect all unique modules across all roles
@@ -34,7 +39,7 @@ const AuditoriaRoleMatrix = ({ matrix }: Props) => {
   if (roleNames.length === 0 || modules.length === 0) {
     return (
       <div className="rounded-lg border bg-card p-6 text-center text-muted-foreground">
-        No hay permisos configurados para mostrar la matriz.
+        {t("admin.audit.matrixEmpty")}
       </div>
     );
   }
@@ -44,7 +49,7 @@ const AuditoriaRoleMatrix = ({ matrix }: Props) => {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="sticky left-0 bg-card z-10 min-w-[140px]">Módulo</TableHead>
+            <TableHead className="sticky left-0 bg-card z-10 min-w-[140px]">{t("admin.audit.colModule")}</TableHead>
             {roleNames.map((role) => (
               <TableHead key={role} colSpan={2} className="text-center border-l capitalize">
                 {role}
@@ -56,10 +61,10 @@ const AuditoriaRoleMatrix = ({ matrix }: Props) => {
             {roleNames.map((role) => (
               <>
                 <TableHead key={`${role}-access`} className="text-center text-[10px] px-2 border-l min-w-[60px]">
-                  Acceso
+                  {t("admin.audit.colAccess")}
                 </TableHead>
                 <TableHead key={`${role}-scope`} className="text-center text-[10px] px-2 min-w-[80px]">
-                  Alcance
+                  {t("admin.audit.colScope")}
                 </TableHead>
               </>
             ))}
@@ -68,7 +73,7 @@ const AuditoriaRoleMatrix = ({ matrix }: Props) => {
         <TableBody>
           {modules.map((mod) => (
             <TableRow key={mod}>
-              <TableCell className="sticky left-0 bg-card z-10 font-medium capitalize text-xs">{mod}</TableCell>
+              <TableCell className="sticky left-0 bg-card z-10 font-medium capitalize text-xs">{etiquetaPermiso(t, mod)}</TableCell>
               {roleNames.map((role) => {
                 const perms = matrix[role]?.modules[mod];
                 const hasAccess = perms?.can_view || false;
@@ -85,7 +90,7 @@ const AuditoriaRoleMatrix = ({ matrix }: Props) => {
                     <TableCell key={`${role}-${mod}-scope`} className="text-center px-2">
                       {hasAccess ? (
                         <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${scopeColors[scope] || ""}`}>
-                          {scopeLabels[scope] || scope}
+                          {scopeLabels[scope] ? t(scopeLabels[scope]) : scope}
                         </Badge>
                       ) : (
                         <span className="text-muted-foreground/30 text-[10px]">—</span>

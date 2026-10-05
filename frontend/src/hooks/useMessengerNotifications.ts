@@ -16,22 +16,27 @@ import { tienePushEnEsteDispositivo } from "@/lib/pushDispositivo";
 import { esMovil } from "@/lib/plataformaPwa";
 import { avisarPersona } from "@/lib/avisoPersona";
 import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 import { useReanudarAlVolver } from "@/hooks/useReanudarAlVolver";
-import { useCanalQueRevive } from "@/hooks/useCanalQueRevive";
-import type { RealtimeChannel } from "@supabase/supabase-js";
+import { registrarEnElCanalDelChat } from "@/hooks/canalDelChat";
 
-// Etiqueta legible cuando el mensaje no trae texto.
-const MEDIA_LABEL: Record<string, string> = {
-  image: "📷 Foto",
-  file: "📎 Archivo",
-  system: "Mensaje",
+type Traductor = (key: TranslationKey, params?: Record<string, string | number>) => string;
+
+// Etiqueta legible cuando el mensaje no trae texto. La llave es el `type` del
+// mensaje (dato); lo que se lee sale del diccionario, en el idioma de quien
+// RECIBE el aviso.
+const MEDIA_LABEL: Record<string, TranslationKey> = {
+  image: "messenger.preview.foto",
+  file: "shared.msgNotif.file",
+  system: "shared.msgNotif.message",
 };
 
-function previewOf(content: string | null, type: string, fileName: string | null): string {
-  const t = (content ?? "").trim();
-  if (t) return t.length > 120 ? t.slice(0, 120) + "…" : t;
+function previewOf(content: string | null, type: string, fileName: string | null, t: Traductor): string {
+  const texto = (content ?? "").trim();
+  if (texto) return texto.length > 120 ? texto.slice(0, 120) + "…" : texto;
   if (type === "file" && fileName) return `📎 ${fileName}`;
-  return MEDIA_LABEL[type] ?? "Nuevo mensaje";
+  const clave = MEDIA_LABEL[type];
+  return clave ? t(clave) : t("shared.msgNotif.newMessage");
 }
 
 // No-molestar RESPETANDO el horario. Antes dnd_enabled apagaba TODO 24/7. Sin franja
@@ -83,7 +88,7 @@ export const LOTE_INCREMENTAL = 200;
  *  manipulado), no desfase normal entre el reloj del equipo y el del servidor. */
 export const TOLERANCIA_RELOJ_MS = 24 * 60 * 60 * 1000;
 /** Volver del segundo plano dispara DOS barridos (useReanudarAlVolver de este
- *  hook + alRevivir de useCanalQueRevive). El freno los junta en uno. */
+ *  hook + alRevivir del canal del chat). El freno los junta en uno. */
 export const FRENO_BARRIDO_MS = 10_000;
 /** La marca se guarda unos segundos ANTES del último mensaje visto: un mensaje
  *  que se confirma en la base justo después de nuestra consulta tiene fecha
@@ -250,9 +255,9 @@ export async function barridoDeEntregados(userId: string, ahoraMs = Date.now()):
  * La RLS de chat_messages (SELECT: is_chat_participant) limita el realtime a mis
  * conversaciones, así que todo INSERT que llega es de un chat propio.
  *
- * Canal con nombre ÚNICO + dependencia en user.id (no el objeto `user`): un nombre fijo se
- * dedupea por topic en supabase-js y la 2ª suscripción muere tras un refresh de token
- * (mismo criterio que useWaInboxNotifications).
+ * El evento llega por el CANAL DEL CHAT (canalDelChat.ts), el mismo de la lista, el globito
+ * y las menciones: UNA escucha del INSERT de chat_messages por pestaña en vez de una por
+ * hook. El registro va por user.id (no el objeto `user`): un refresh de token no re-registra.
  */
 export function useMessengerNotifications() {
   const { user } = useAuth();
@@ -284,17 +289,13 @@ export function useMessengerNotifications() {
   const myNameRef = useRef<string | null>(null);
 
   const userId = user?.id ?? null;
-  // Este canal no tenía reconexión de ningún tipo: al volver del segundo plano se
-  // recrea (el nombre ya es aleatorio, no hay zombi del mismo topic).
   // Textos del aviso de mención por t(); va por ref para que cambiar de idioma
-  // no re-suscriba el canal.
+  // no re-registre la escucha.
   const { t } = useLanguage();
   const tRef = useRef(t);
   tRef.current = t;
   const [version, setVersion] = useState(0);
   useReanudarAlVolver(() => setVersion((v) => v + 1));
-  // Declarado ARRIBA de los efectos a propósito: lo usan los dos.
-  const armarCanalRef = useRef<((canal: RealtimeChannel) => RealtimeChannel) | null>(null);
   const ultimoBarridoRef = useRef(0);
 
   // EFECTO 1 — se arma UNA vez por usuario. Nada acá depende de `version`: si
@@ -311,13 +312,11 @@ export function useMessengerNotifications() {
       .maybeSingle()
       .then(({ data }) => { myNameRef.current = data?.full_name ?? null; });
 
-    // El canal se arma acá (cierra sobre userId y los refs) pero VIVE en
-    // useCanalQueRevive, que lo levanta de nuevo si se muere.
-    armarCanalRef.current = (canal) => canal
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "chat_messages" },
-        async (payload) => {
+    // Qué hacer con cada mensaje se arma aquí (cierra sobre userId y los refs);
+    // el evento llega por el canal del chat, que revive solo.
+    return registrarEnElCanalDelChat(userId, {
+      current: {
+        "chat_messages:INSERT": async (payload) => {
           const m = payload.new as {
             id?: string;
             conversation_id?: string;
@@ -326,6 +325,8 @@ export function useMessengerNotifications() {
             type?: string;
             file_name?: string | null;
             is_deleted?: boolean;
+            api_key_id?: string | null;
+            api_display_name?: string | null;
           } | null;
           if (!m?.id || !m.conversation_id || !m.sender_id) return;
           if (m.sender_id === userId || m.is_deleted) return;
@@ -357,29 +358,41 @@ export function useMessengerNotifications() {
             .conversation ?? null;
           const isGroup = conv?.type === "group";
 
-          let senderName = "Alguien";
+          let senderName = tRef.current("shared.msgNotif.someone");
           let senderFoto: string | null = null;
           let senderSeed: string | null = null;
-          try {
-            const { data: prof } = await supabase
-              .from("profiles")
-              .select("full_name, avatar_url, avatar_seed")
-              .eq("id", m.sender_id)
-              .maybeSingle();
-            if (prof?.full_name) senderName = prof.full_name;
-            senderFoto = (prof as { avatar_url?: string | null } | null)?.avatar_url ?? null;
-            senderSeed = (prof as { avatar_seed?: string | null } | null)?.avatar_seed ?? null;
-          } catch {
-            /* nombre genérico */
+          if (m.api_key_id != null) {
+            // Lo mandó una integración: el nombre de la key viene en la fila
+            // («BLU (API)», igual que la campana y el push) y NO se pregunta a
+            // profiles, que diría el nombre y la foto de la persona dueña de la
+            // key. Sin foto: iniciales.
+            senderName = tRef.current("shared.msgNotif.viaApi", {
+              name: m.api_display_name?.trim() || tRef.current("messenger.api.etiqueta"),
+            });
+          } else {
+            try {
+              const { data: prof } = await supabase
+                .from("profiles")
+                .select("full_name, avatar_url, avatar_seed")
+                .eq("id", m.sender_id)
+                .maybeSingle();
+              if (prof?.full_name) senderName = prof.full_name;
+              senderFoto = (prof as { avatar_url?: string | null } | null)?.avatar_url ?? null;
+              senderSeed = (prof as { avatar_seed?: string | null } | null)?.avatar_seed ?? null;
+            } catch {
+              /* nombre genérico */
+            }
           }
 
-          const preview = previewOf(m.content ?? null, m.type ?? "text", m.file_name ?? null);
-          const title = isGroup ? conv?.name || "Grupo" : senderName;
+          const preview = previewOf(m.content ?? null, m.type ?? "text", m.file_name ?? null, tRef.current);
+          const title = isGroup ? conv?.name || tRef.current("shared.msgNotif.group") : senderName;
           const body = isGroup ? `${senderName}: ${preview}` : preview;
 
           // Título de la pestaña parpadeando mientras no estés mirando (Google Chat).
           alertTitleRef.current(
-            isGroup ? `💬 ${senderName} escribió en ${title}` : `💬 ${senderName} te escribió`
+            isGroup
+              ? tRef.current("shared.msgNotif.wroteIn", { name: senderName, title })
+              : tRef.current("shared.msgNotif.wroteYou", { name: senderName })
           );
 
           // Sonido: respeta el ajuste global, el mute PROPIO de bandejas/chats
@@ -441,8 +454,11 @@ export function useMessengerNotifications() {
             soundOk,
           );
         },
-      )
-;
+        // Mientras no hubo canal llegaron mensajes sin marcar "entregado": el
+        // efecto de abajo hace ese backfill al bumpear `version`.
+        alRevivir: () => setVersion((v) => v + 1),
+      },
+    });
   }, [userId]);
 
   // EFECTO 2 — el barrido, y SOLO el barrido. Sigue dependiendo de `version`
@@ -468,12 +484,4 @@ export function useMessengerNotifications() {
       clearTimeout(temporizador);
     };
   }, [userId, version]);
-
-  useCanalQueRevive({
-    topic: userId ? `chat-incoming-${userId}` : null,
-    armar: (canal) => armarCanalRef.current?.(canal) ?? canal,
-    // Mientras estuvo muerto llegaron mensajes sin marcar "entregado": el
-    // efecto de arriba hace ese backfill al bumpear `version`.
-    alRevivir: () => setVersion((v) => v + 1),
-  });
 }

@@ -1,6 +1,5 @@
 import * as React from "react";
 import { format, parse, isValid, setMonth, setYear, addMonths, subMonths } from "date-fns";
-import { es } from "date-fns/locale";
 import { CalendarIcon, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { DayPicker } from "react-day-picker";
 
@@ -9,7 +8,11 @@ import { Input } from "@/components/ui/input";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useFormato } from "@/hooks/useFormato";
+import { useTSiHay } from "@/hooks/useTSiHay";
 
+// En español, los de siempre (con mayúscula y sin punto). En inglés salen de
+// date-fns con el locale de la interfaz: Jan, Feb…
 const MONTH_NAMES_SHORT = [
   "Ene", "Feb", "Mar", "Abr", "May", "Jun",
   "Jul", "Ago", "Sep", "Oct", "Nov", "Dic",
@@ -38,12 +41,21 @@ export function anioTipeadoEnRango(texto: string, fromYear: number, toYear: numb
 export function DateInput({
   value,
   onChange,
-  placeholder = "Seleccionar fecha",
+  placeholder: placeholderProp,
   disabled = false,
   className,
   fromYear = 1940,
   toYear = new Date().getFullYear() + 5,
 }: DateInputProps) {
+  const f = useFormato();
+  const t = useTSiHay();
+  const placeholder = placeholderProp ?? t("shared.ui.selectDate");
+  const nombresDeMes = React.useMemo(
+    () => (f.idioma === "es"
+      ? MONTH_NAMES_SHORT
+      : MONTH_NAMES_SHORT.map((_, i) => format(new Date(2000, i, 1), "MMM", { locale: f.fechas }))),
+    [f],
+  );
   const [open, setOpen] = React.useState(false);
   const [draft, setDraft] = React.useState<Date | undefined>(undefined);
   const [textValue, setTextValue] = React.useState("");
@@ -133,10 +145,10 @@ export function DateInput({
   }, [value]);
 
   const triggerLabel = selectedDate
-    ? format(selectedDate, "d MMM yyyy", { locale: es })
+    ? format(selectedDate, "d MMM yyyy", { locale: f.fechas })
     : placeholder;
 
-  const currentMonthLabel = format(displayMonth, "MMMM", { locale: es });
+  const currentMonthLabel = format(displayMonth, "MMMM", { locale: f.fechas });
   const currentYear = displayMonth.getFullYear();
 
   const years = React.useMemo(() => {
@@ -186,7 +198,7 @@ export function DateInput({
                 </PopoverTrigger>
                 <PopoverContent className="w-[220px] p-2 pointer-events-auto z-[60]" align="center" sideOffset={4}>
                   <div className="grid grid-cols-4 gap-1">
-                    {MONTH_NAMES_SHORT.map((name, idx) => (
+                    {nombresDeMes.map((name, idx) => (
                       <Button
                         key={idx}
                         variant={displayMonth.getMonth() === idx ? "default" : "ghost"}
@@ -253,7 +265,7 @@ export function DateInput({
             onSelect={handleCalendarSelect}
             month={displayMonth}
             onMonthChange={setDisplayMonth}
-            locale={es}
+            locale={f.fechas}
             showOutsideDays
             className="pointer-events-auto"
             classNames={{
@@ -279,7 +291,7 @@ export function DateInput({
           {/* Manual date input */}
           <div className="flex items-center justify-center mt-3 px-1">
             <Input
-              placeholder="dd/mm/aaaa"
+              placeholder={t("shared.ui.dateFormatHint")}
               value={textValue}
               onChange={handleTextChange}
               onBlur={handleTextBlur}
@@ -291,10 +303,10 @@ export function DateInput({
           {/* Footer */}
           <div className="flex justify-end gap-2 mt-3 pt-3 border-t border-border">
             <Button variant="ghost" size="sm" onClick={handleCancel}>
-              Cancelar
+              {t("common.cancel")}
             </Button>
             <Button size="sm" onClick={handleApply}>
-              Aplicar
+              {t("shared.ui.apply")}
             </Button>
           </div>
         </div>

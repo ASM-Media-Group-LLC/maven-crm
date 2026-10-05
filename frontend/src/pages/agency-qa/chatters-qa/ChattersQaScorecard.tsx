@@ -18,6 +18,9 @@ import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
+import { useLanguage } from "@/hooks/useLanguage";
+import { traducir } from "@/lib/i18n";
+import { ConFormato } from "@/pages/admin/ConFormato";
 import {
   COMPANIES, CRITERIA, MAX_TOTAL, companyLabel, periodLabel, pct, pctTone,
   useScorecardPeriods, useScorecards, useUpdateScorecardCell, useAddChatter, useDeleteScorecard, useLatestScoredPeriod, useChatterRoster,
@@ -39,7 +42,7 @@ function ScoreCell({ row, field }: { row: Scorecard; field: CriterionKey }) {
     const cur = row[field];
     if (next === cur) return;
     update.mutate({ id: row.id, field, value: next },
-      { onError: (e) => { toast.error("No se pudo guardar: " + (e as Error).message); setVal(initial); } });
+      { onError: (e) => { toast.error(traducir("agencyQa.score.couldNotSave", { msg: (e as Error).message })); setVal(initial); } });
     setVal(next == null ? "" : String(next));
   };
 
@@ -82,6 +85,7 @@ function Trend({ cur, prev }: { cur: number; prev: number | null }) {
 function CompanyTable({ company, rows, prevByName }: {
   company: CompanyCode; rows: Scorecard[]; prevByName: Map<string, number>;
 }) {
+  const { t } = useLanguage();
   const del = useDeleteScorecard();
   const [toDelete, setToDelete] = useState<Scorecard | null>(null);
   if (rows.length === 0) return null;
@@ -94,7 +98,7 @@ function CompanyTable({ company, rows, prevByName }: {
           <span className="text-sm font-semibold">{companyLabel(company)}</span>
           <span className="text-[11px] font-normal text-muted-foreground">({company}) · {rows.length}</span>
         </div>
-        <span className={`inline-flex h-6 items-center rounded-md border px-2 text-xs font-semibold tabular-nums ${toneClass[pctTone(avg)]}`}>prom. {avg}%</span>
+        <span className={`inline-flex h-6 items-center rounded-md border px-2 text-xs font-semibold tabular-nums ${toneClass[pctTone(avg)]}`}>{t("agencyQa.score.avg", { pct: avg })}</span>
       </div>
       <div className="overflow-x-auto">
       <table className="tabla-movil w-full border-collapse text-sm">
@@ -105,15 +109,15 @@ function CompanyTable({ company, rows, prevByName }: {
               <th key={c.key} className="px-1 py-2 text-center font-medium">
                 <TooltipProvider><Tooltip>
                   <TooltipTrigger asChild>
-                    <span className={`cursor-help text-[11px] ${c.hubstaff ? "text-primary" : "text-muted-foreground"}`}>{c.short}</span>
+                    <span className={`cursor-help text-[11px] ${c.hubstaff ? "text-primary" : "text-muted-foreground"}`}>{t(c.shortKey)}</span>
                   </TooltipTrigger>
-                  <TooltipContent>{c.label}{c.hubstaff ? " · se auto-completará con Hubstaff" : ""}</TooltipContent>
+                  <TooltipContent>{t(c.labelKey)}{c.hubstaff ? t("agencyQa.score.autoHubstaff") : ""}</TooltipContent>
                 </Tooltip></TooltipProvider>
               </th>
             ))}
             <th className="px-2 py-2 text-center font-semibold">Total</th>
             <th className="px-2 py-2 text-center font-semibold">%</th>
-            <th className="px-2 py-2 text-center font-medium text-muted-foreground">vs mes ant.</th>
+            <th className="px-2 py-2 text-center font-medium text-muted-foreground">{t("agencyQa.score.vsPrevMonth")}</th>
             <th className="px-1 py-2"></th>
           </tr>
         </thead>
@@ -146,10 +150,10 @@ function CompanyTable({ company, rows, prevByName }: {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-destructive" /> Eliminar del scorecard
+              <AlertTriangle className="h-5 w-5 text-destructive" /> {t("agencyQa.score.deleteTitle")}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              ¿Sacar a <strong>{toDelete?.chatter_name}</strong> del scorecard de este mes ({companyLabel(company)})? Se pierden sus notas del mes. Esta acción no se puede deshacer.
+              <ConFormato texto={t("agencyQa.score.deleteBody", { name: toDelete?.chatter_name ?? "", company: companyLabel(company) })} />
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -161,11 +165,11 @@ function CompanyTable({ company, rows, prevByName }: {
                 e.preventDefault();
                 if (!toDelete) return;
                 del.mutate(toDelete.id, {
-                  onSuccess: () => { toast.success("Chatter eliminado del mes"); setToDelete(null); },
+                  onSuccess: () => { toast.success(t("agencyQa.score.deleted")); setToDelete(null); },
                   onError: (err) => toast.error((err as Error).message),
                 });
               }}>
-              {del.isPending ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Eliminando…</> : "Eliminar"}
+              {del.isPending ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> {t("agencyQa.eliminating")}</> : t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -186,6 +190,7 @@ function Stat({ icon: Icon, label, value, tone }: { icon: any; label: string; va
 
 // ── Pantalla principal ──────────────────────────────────────────────────────
 export default function ChattersQaScorecard() {
+  const { t, language } = useLanguage();
   const { data: periods = [], isLoading: periodsLoading } = useScorecardPeriods();
   const { data: latestScored, isLoading: scoredLoading } = useLatestScoredPeriod();
   const [period, setPeriod] = useState<string | null>(null);
@@ -238,7 +243,7 @@ export default function ChattersQaScorecard() {
     if (!newChatter || !period) return;
     addChatter.mutate(
       { chatter_name: newChatter.name, company: newCompany, period, blu_employee_id: newChatter.blu_employee_id },
-      { onSuccess: () => { toast.success(`${newChatter.name} agregado`); setNewChatter(null); },
+      { onSuccess: () => { toast.success(t("agencyQa.score.added", { name: newChatter.name })); setNewChatter(null); },
         onError: (e) => toast.error((e as Error).message) });
   };
 
@@ -248,7 +253,7 @@ export default function ChattersQaScorecard() {
   const createMonth = async () => {
     if (!newMonth) return;
     const periodDate = `${newMonth}-01`;
-    if (periods.includes(periodDate)) { toast.error("Ese mes ya existe"); setPeriod(periodDate); setCreatingMonth(false); return; }
+    if (periods.includes(periodDate)) { toast.error(t("agencyQa.score.monthExists")); setPeriod(periodDate); setCreatingMonth(false); return; }
     const base = periods[0] ? rows.length && period === periods[0] ? rows : null : null;
     // roster del mes más reciente (si el activo no es el más reciente, lo traemos)
     let roster = base;
@@ -257,10 +262,10 @@ export default function ChattersQaScorecard() {
       roster = (data ?? []) as Scorecard[];
     }
     const payload = (roster ?? []).map((r) => ({ chatter_name: r.chatter_name, company: r.company, period: periodDate, source: "manual", blu_employee_id: r.blu_employee_id ?? null }));
-    if (payload.length === 0) { toast.error("No hay roster para clonar; agrega chatters manualmente."); setPeriod(periodDate); setCreatingMonth(false); return; }
+    if (payload.length === 0) { toast.error(t("agencyQa.score.noRoster")); setPeriod(periodDate); setCreatingMonth(false); return; }
     const { error } = await (supabase as any).from("chatter_scorecards").insert(payload);
     if (error) { toast.error(error.message); return; }
-    toast.success(`${periodLabel(periodDate)} creado con ${payload.length} chatters`);
+    toast.success(t("agencyQa.score.monthCreated", { month: periodLabel(periodDate, language), n: payload.length }));
     setCreatingMonth(false); setNewMonth("");
     // refrescamos vía el dropdown; react-query se invalida en las mutaciones, pero acá insertamos directo
     setTimeout(() => window.location.reload(), 250);
@@ -274,48 +279,52 @@ export default function ChattersQaScorecard() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="flex items-center gap-2 text-lg font-bold tracking-tight"><ClipboardCheck className="h-5 w-5 text-primary" /> Scorecard</h3>
-            <p className="mt-0.5 text-xs text-muted-foreground">{period ? periodLabel(period) : "—"} · medición mensual · 8 criterios /40</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{t("agencyQa.score.subtitle", { period: period ? periodLabel(period, language) : "—" })}</p>
           </div>
           <div className="flex items-center gap-2">
             <Select value={period ?? ""} onValueChange={setPeriod}>
-              <SelectTrigger className="w-44 border-white/15 bg-background/40 backdrop-blur"><SelectValue placeholder={periodsLoading ? "Cargando…" : "Mes"} /></SelectTrigger>
-              <SelectContent>{periods.map((p) => <SelectItem key={p} value={p}>{periodLabel(p)}</SelectItem>)}</SelectContent>
+              <SelectTrigger className="w-44 border-white/15 bg-background/40 backdrop-blur"><SelectValue placeholder={periodsLoading ? t("common.loading") : t("agencyQa.score.month")} /></SelectTrigger>
+              <SelectContent>{periods.map((p) => <SelectItem key={p} value={p}>{periodLabel(p, language)}</SelectItem>)}</SelectContent>
             </Select>
             {!creatingMonth ? (
               <Button variant="outline" size="sm" className="gap-1.5 border-white/15 bg-background/40 backdrop-blur" onClick={() => setCreatingMonth(true)}>
-                <CalendarPlus className="h-4 w-4" /> Nuevo mes
+                <CalendarPlus className="h-4 w-4" /> {t("agencyQa.score.newMonth")}
               </Button>
             ) : (
               <div className="flex items-center gap-1.5">
                 <input type="month" value={newMonth} onChange={(e) => setNewMonth(e.target.value)}
                   className="h-9 rounded-md border border-border bg-background px-2 text-sm" />
-                <Button size="sm" onClick={createMonth} disabled={!newMonth}>Crear</Button>
-                <Button size="sm" variant="ghost" onClick={() => setCreatingMonth(false)}>Cancelar</Button>
+                <Button size="sm" onClick={createMonth} disabled={!newMonth}>{t("common.create")}</Button>
+                <Button size="sm" variant="ghost" onClick={() => setCreatingMonth(false)}>{t("common.cancel")}</Button>
               </div>
             )}
           </div>
         </div>
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Stat icon={Users} label="Chatters" value={summary.n} />
-          <Stat icon={Gauge} label="Promedio" value={`${summary.avg}%`}
+          <Stat icon={Gauge} label={t("common.average")} value={`${summary.avg}%`}
             tone={summary.n ? (summary.avg >= 80 ? "text-success" : summary.avg >= 70 ? "text-warning" : "text-destructive") : undefined} />
-          <Stat icon={TrendingUp} label="Subieron" value={summary.comparables ? summary.up : "—"} tone={summary.up ? "text-success" : undefined} />
-          <Stat icon={TrendingDown} label="Bajaron" value={summary.comparables ? summary.down : "—"} tone={summary.down ? "text-destructive" : undefined} />
+          <Stat icon={TrendingUp} label={t("agencyQa.score.wentUp")} value={summary.comparables ? summary.up : "—"} tone={summary.up ? "text-success" : undefined} />
+          <Stat icon={TrendingDown} label={t("agencyQa.score.wentDown")} value={summary.comparables ? summary.down : "—"} tone={summary.down ? "text-destructive" : undefined} />
         </div>
       </div>
 
       <p className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
         <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-        Edita una celda y se guarda solo (0-5 por criterio). Los criterios en <span className="text-primary">azul</span> se auto-completarán cuando conectemos Hubstaff (Fase 2). Abre en el último mes con notas.
+        {/* Sin envoltorio: los pedazos quedan como hijos directos del flex, igual que antes. */}
+        <ConFormato
+          texto={t("agencyQa.score.hint")}
+          piezas={{ blue: <span className="text-primary">{t("agencyQa.score.blue")}</span> }}
+        />
       </p>
 
-      {isLoading && <p className="text-sm text-muted-foreground">Cargando…</p>}
+      {isLoading && <p className="text-sm text-muted-foreground">{t("common.loading")}</p>}
       {!isLoading && rows.length === 0 && period && (
         <EmptyState
           className="py-8"
           seed="chatters-qa"
-          title={`No hay chatters cargados para ${periodLabel(period)}.`}
-          description="Agrega uno abajo o crea el mes desde el roster anterior."
+          title={t("agencyQa.score.emptyTitle", { period: periodLabel(period, language) })}
+          description={t("agencyQa.score.emptyHint")}
         />
       )}
 
@@ -329,21 +338,21 @@ export default function ChattersQaScorecard() {
       {period && (
         <div className="flex flex-wrap items-end gap-2 rounded-lg border border-dashed border-border p-3">
           <div className="flex flex-col gap-1">
-            <label className="text-[11px] font-medium text-muted-foreground">Nuevo chatter</label>
+            <label className="text-[11px] font-medium text-muted-foreground">{t("agencyQa.score.newChatter")}</label>
             {/* Selector del roster de BLU (no texto libre) → la fila queda VINCULADA por
                 blu_employee_id, así el chatter la ve en "datos propios" sin depender del nombre. */}
             <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
               <PopoverTrigger asChild>
                 <Button variant="outline" role="combobox" aria-expanded={pickerOpen} className="h-9 w-56 justify-between font-normal">
-                  <span className="truncate">{newChatter?.name ?? "Elige un chatter…"}</span>
+                  <span className="truncate">{newChatter?.name ?? t("agencyQa.score.pickChatter")}</span>
                   <ChevronsUpDown className="ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-64 p-0" align="start">
                 <Command>
-                  <CommandInput placeholder="Buscar chatter…" />
+                  <CommandInput placeholder={t("agencyQa.score.searchChatter")} />
                   <CommandList>
-                    <CommandEmpty>Sin resultados — ¿está cargado en BLU?</CommandEmpty>
+                    <CommandEmpty>{t("agencyQa.score.notInBlu")}</CommandEmpty>
                     <CommandGroup>
                       {chatterRoster.map((c) => {
                         const dup = alreadyInMonth.has(c.blu_employee_id);
@@ -352,7 +361,7 @@ export default function ChattersQaScorecard() {
                             onSelect={() => { setNewChatter(c); setPickerOpen(false); }}>
                             <Check className={cn("mr-2 h-4 w-4", newChatter?.blu_employee_id === c.blu_employee_id ? "opacity-100" : "opacity-0")} />
                             <span className="truncate">{c.name}</span>
-                            {dup && <span className="ml-1 text-[10px] text-muted-foreground">(ya está)</span>}
+                            {dup && <span className="ml-1 text-[10px] text-muted-foreground">{t("agencyQa.score.alreadyIn")}</span>}
                           </CommandItem>
                         );
                       })}
@@ -367,7 +376,7 @@ export default function ChattersQaScorecard() {
             <SelectContent>{COMPANIES.map((c) => <SelectItem key={c.code} value={c.code}>{c.label} ({c.code})</SelectItem>)}</SelectContent>
           </Select>
           <Button size="sm" className="gap-1.5" onClick={submitNew} disabled={!newChatter || addChatter.isPending}>
-            <Plus className="h-4 w-4" /> Agregar
+            <Plus className="h-4 w-4" /> {t("common.add")}
           </Button>
         </div>
       )}

@@ -1,4 +1,5 @@
 import type { CreatorDailyEarning } from "@/hooks/useCreatorDailyEarnings";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface Props {
   daily: CreatorDailyEarning[];
@@ -7,12 +8,14 @@ interface Props {
 }
 
 const money0 = (n: number) => "$" + Math.round(n || 0).toLocaleString("en-US");
-const WEEKDAYS = ["L", "M", "M", "J", "V", "S", "D"]; // semana arranca lunes
 
 // Calendario mensual del ingreso diario (BLU) de una creadora. Marca:
 //   🔥 el mejor día de ingresos de cada bloque de 5 (1-5, 6-10, 11-15, …)
 //   👑 el mejor día del mes (pisa el 🔥 de ese día)
 const CreatorEarningsCalendar = ({ daily, year, month }: Props) => {
+  const { t } = useLanguage();
+  // Iniciales de los días; la semana arranca el lunes.
+  const WEEKDAYS = t("creadores.cal.weekdays").split(",");
   const pad = (n: number) => String(n).padStart(2, "0");
   const lastDay = new Date(year, month + 1, 0).getDate();
   const dayKey = (d: number) => `${year}-${pad(month + 1)}-${pad(d)}`;
@@ -49,7 +52,7 @@ const CreatorEarningsCalendar = ({ daily, year, month }: Props) => {
   return (
     <div className="space-y-2">
       <div className="text-[11px] text-muted-foreground">
-        🔥 mejor día de cada 5 · 👑 mejor del mes
+        {t("creadores.cal.legend")}
       </div>
       <div className="grid grid-cols-7 gap-1">
         {WEEKDAYS.map((w, i) => (

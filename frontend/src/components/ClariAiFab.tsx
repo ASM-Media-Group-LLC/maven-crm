@@ -3,6 +3,7 @@ import { Bot, Minus, X } from "lucide-react";
 import ClariAiChat from "./ClariAiChat";
 import { useAiConversations } from "@/hooks/useAiConversations";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // ClariAvatar — círculo con la imagen del personaje en /clari-avatar.svg.
 // Si la imagen falla a cargar (404, network), cae a un Bot icon sobre
@@ -45,6 +46,7 @@ const ClariAvatar = ({
 // Facebook Messenger desktop. `anclarPanel` lo da el muelle: la ventana queda
 // pegada a él (arriba si hay lugar, sino abajo) y lo sigue cuando lo movés.
 const ClariAiFab = ({ anclarPanel }: { anclarPanel: (ancho: number, alto: number) => React.CSSProperties }) => {
+  const { t } = useLanguage();
   const [open, setOpen] = useState(false);
   const [hasActivity, setHasActivity] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -59,6 +61,7 @@ const ClariAiFab = ({ anclarPanel }: { anclarPanel: (ancho: number, alto: number
     if (m === mode) return;
     setMode(m);
     // Conversación fresca para el modo nuevo (no mezclar soporte con CRM).
+    // El título se GUARDA en la base (ai_conversations): va en español, no se traduce.
     setConversationId(null);
     createConversation
       .mutateAsync(m === "crm" ? "Clari · CRM" : "Clari · soporte")
@@ -95,12 +98,12 @@ const ClariAiFab = ({ anclarPanel }: { anclarPanel: (ancho: number, alto: number
   return (
     <>
       {/* Botón de Clari. El arrastre lo maneja el muelle que lo contiene, así
-          que acá alcanza con un onClick normal. */}
+          que aquí alcanza con un onClick normal. */}
       <button
         type="button"
         onClick={() => setOpen((o) => { if (!o) setHasActivity(true); return !o; })}
         className="relative flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary/80 text-primary-foreground shadow-lg ring-2 ring-primary/30 transition-[box-shadow,transform] duration-200 hover:shadow-xl hover:ring-primary/60"
-        aria-label={open ? "Minimizar Clari AI" : "Abrir Clari AI"}
+        aria-label={open ? t("shared.clari.minimize") : t("shared.clari.open")}
         title="Clari AI"
       >
         <Bot className="h-6 w-6" />
@@ -127,7 +130,7 @@ const ClariAiFab = ({ anclarPanel }: { anclarPanel: (ancho: number, alto: number
                 </div>
                 <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
                   <span className="h-1.5 w-1.5 rounded-full bg-success" />
-                  En línea
+                  {t("shared.clari.online")}
                 </div>
               </div>
             </div>
@@ -136,8 +139,8 @@ const ClariAiFab = ({ anclarPanel }: { anclarPanel: (ancho: number, alto: number
                 type="button"
                 onClick={() => setOpen(false)}
                 className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
-                aria-label="Minimizar"
-                title="Minimizar"
+                aria-label={t("shared.window.minimize")}
+                title={t("shared.window.minimize")}
               >
                 <Minus className="h-4 w-4" />
               </button>
@@ -145,8 +148,8 @@ const ClariAiFab = ({ anclarPanel }: { anclarPanel: (ancho: number, alto: number
                 type="button"
                 onClick={() => setOpen(false)}
                 className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                aria-label="Cerrar"
-                title="Cerrar"
+                aria-label={t("common.close")}
+                title={t("common.close")}
               >
                 <X className="h-4 w-4" />
               </button>
@@ -156,14 +159,14 @@ const ClariAiFab = ({ anclarPanel }: { anclarPanel: (ancho: number, alto: number
           {/* Toggle de modo (solo staff): Soporte (clari-help) vs CRM (orquestador). */}
           {isStaff && (
             <div className="flex shrink-0 gap-1 border-b border-border/60 bg-card px-3 py-1.5">
-              {([["help", "Soporte"], ["crm", "Preguntale al CRM"]] as const).map(([k, label]) => (
+              {([["help", "shared.clari.modeHelp"], ["crm", "shared.clari.modeCrm"]] as const).map(([k, label]) => (
                 <button
                   key={k}
                   type="button"
                   onClick={() => switchMode(k)}
                   className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors ${mode === k ? "bg-primary/15 text-primary ring-1 ring-primary/30" : "text-muted-foreground hover:text-foreground"}`}
                 >
-                  {label}
+                  {t(label)}
                 </button>
               ))}
             </div>

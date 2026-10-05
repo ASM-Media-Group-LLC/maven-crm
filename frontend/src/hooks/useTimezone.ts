@@ -9,7 +9,7 @@
 //
 // Bogotá no tiene horario de verano: GMT-5 todo el año, sin excepciones.
 
-/** La zona de Maven. Si algún día cambia, se cambia acá y en ningún otro lado. */
+/** La zona de Maven. Si algún día cambia, se cambia aquí y en ningún otro lado. */
 export const ZONA_MAVEN = "America/Bogota";
 
 export function useTimezone() {
@@ -19,7 +19,7 @@ export function useTimezone() {
 // ─── Format helpers ─────────────────────────────────────────────────
 
 interface FormatOptions {
-  /** Locale BCP47 — default "es-ES". */
+  /** Locale BCP47 — default "es-ES". Para lo que se dibuja, pasar `f.intl("es-ES")` (useFormato). */
   locale?: string;
   /** Intl.DateTimeFormat options. */
   options?: Intl.DateTimeFormatOptions;

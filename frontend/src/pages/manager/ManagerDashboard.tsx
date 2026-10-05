@@ -12,7 +12,9 @@ import { PRESET_CONFIG, diasEntre, rangeForPreset, type RangePreset } from "@/li
 import { cn } from "@/lib/utils";
 import SelectorDeTablero from "@/pages/dashboard/SelectorDeTablero";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 import { usePromoScoresRango } from "@/pages/promolog/usePromoPeriodScores";
 import { useDashboard2Summary } from "@/pages/sales-performance/useDashboard2Summary";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -46,12 +48,23 @@ const tonoNota = (n: number | null) =>
   : n >= 6 ? { texto: "text-warning", barra: "bg-warning", hero: "from-warning/20" }
   : { texto: "text-destructive", barra: "bg-destructive", hero: "from-destructive/20" };
 
-const OBJETIVOS: Record<string, string> = {
-  promo: "que tu roster promocione",
-  numeros: "traer números",
-  contenido: "subir contenido",
-  cierres: "firmar",
-  ninguna: "sin métrica automática",
+// La llave es `corte_objetivos.metrica` (dato); un valor que no esté acá se
+// muestra tal cual.
+const OBJETIVOS: Record<string, TranslationKey> = {
+  promo: "sales.mgr.goal.promo",
+  numeros: "sales.mgr.goal.numeros",
+  contenido: "sales.mgr.goal.contenido",
+  cierres: "sales.mgr.goal.cierres",
+  ninguna: "sales.mgr.goal.ninguna",
+};
+
+// Los botones de rango, por su llave: el texto sale del diccionario y no de
+// PRESET_CONFIG (que es compartido y lo traduce su dueño).
+const ETIQUETA_PRESET: Record<RangePreset, TranslationKey> = {
+  yesterday: "sales.yesterday",
+  today: "common.today",
+  this_week: "common.thisWeek",
+  this_month: "common.thisMonth",
 };
 
 function Kpi({ label, valor, pie, icono: Icono, color, tinte, barra, onClick }: {
@@ -87,6 +100,7 @@ function Kpi({ label, valor, pie, icono: Icono, color, tinte, barra, onClick }: 
 
 /** El desglose de la última nota: de dónde salió cada punto. */
 function PorQueEsaNota({ nota, meta }: { nota: NotaDelBot; meta: number | null }) {
+  const { t } = useLanguage();
   const c = nota.componentes ?? {};
   const franjas = c.franjas ?? 0;
   const franjasMax = c.franjas_max ?? 0;
@@ -98,22 +112,22 @@ function PorQueEsaNota({ nota, meta }: { nota: NotaDelBot; meta: number | null }
 
   const piezas: Array<{ label: string; valor: string; ok: boolean | null; ayuda: string }> = [
     {
-      label: "Reportes en franjas",
-      valor: franjasMax > 0 ? `${franjas} de ${franjasMax}` : "—",
+      label: t("sales.mgr.slotReports"),
+      valor: franjasMax > 0 ? t("sales.xOfY", { a: franjas, b: franjasMax }) : "—",
       ok: franjasMax > 0 ? franjas >= franjasMax : null,
-      ayuda: "Los avisos que el bot espera en el grupo a lo largo del día. Vale hasta 1,5 puntos de la nota.",
+      ayuda: t("sales.mgr.slotHelp"),
     },
     {
       label: "Hubstaff",
       valor: c.hub_h != null ? `${Number(c.hub_h).toFixed(1)} h · ${c.hub_act ?? "—"}%` : "—",
       ok: c.hub_act != null ? Number(c.hub_act) >= 60 : null,
-      ayuda: "Horas y actividad. Por debajo del 60% de actividad la nota tiene penalización.",
+      ayuda: t("sales.mgr.hubHelp"),
     },
     {
-      label: objetivo === "promo" ? "Promos de tu roster" : "Avance de tu objetivo",
-      valor: avance != null ? (meta != null ? `${avance} de ${meta}` : String(avance)) : "—",
+      label: objetivo === "promo" ? t("sales.mgr.rosterPromos") : t("sales.mgr.goalProgress"),
+      valor: avance != null ? (meta != null ? t("sales.xOfY", { a: avance, b: meta }) : String(avance)) : "—",
       ok: avance != null && meta != null ? avance >= meta : null,
-      ayuda: "Es el 60% de la nota: el resultado propio de tu rol.",
+      ayuda: t("sales.mgr.goalHelp"),
     },
   ];
 
@@ -130,7 +144,7 @@ function PorQueEsaNota({ nota, meta }: { nota: NotaDelBot; meta: number | null }
       {franjasMax > 0 && franjas === 0 && (
         <p className="flex items-start gap-1.5 rounded-lg bg-warning/10 px-2.5 py-2 text-[11px] text-warning">
           <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
-          Sin reportes en las franjas: ahí se van hasta 1,5 puntos de tu nota.
+          {t("sales.mgr.noSlotReports")}
         </p>
       )}
     </div>
@@ -143,6 +157,8 @@ export default function ManagerDashboard({ forzado = false }: {
    *  terminaba en el tablero genérico sin entender por qué). */
   forzado?: boolean;
 } = {}) {
+  const f = useFormato();
+  const { t } = useLanguage();
   const [rango, setRango] = useState<{ from: Date; to: Date }>(() => rangeForPreset("this_week", new Date()));
   const [preset, setPreset] = useState<RangePreset | null>("this_week");
   const desde = isoDia(rango.from);
@@ -192,7 +208,7 @@ export default function ManagerDashboard({ forzado = false }: {
       .filter((r) => r.creator_id && idsMios.has(r.creator_id))
       .map((r) => ({
         id: r.creator_id as string,
-        nombre: nombrePorId.get(r.creator_id as string) ?? r.artistic_name ?? r.blu_creator_name ?? "Sin nombre",
+        nombre: nombrePorId.get(r.creator_id as string) ?? r.artistic_name ?? r.blu_creator_name ?? t("sales.mgr.noName"),
         total: r.total,
         subs: r.subs,
         dias: r.days_with_data,
@@ -201,7 +217,7 @@ export default function ManagerDashboard({ forzado = false }: {
     const total = filas.reduce((s, r) => s + r.total, 0);
     const subs = filas.reduce((s, r) => s + r.subs, 0);
     return { filas, total, subs };
-  }, [ingresos.data, idsMios, creadoras]);
+  }, [ingresos.data, idsMios, creadoras, t]);
 
   const ultima = notas.length > 0 ? notas[notas.length - 1] : null;
   const promedio = notas.length > 0 ? notas.reduce((s, n) => s + n.nota, 0) / notas.length : null;
@@ -231,8 +247,8 @@ export default function ManagerDashboard({ forzado = false }: {
             <div>
               <SelectorDeTablero actual="roster" />
               <p className="text-[11px] text-muted-foreground">
-                {creadoras.length} creadora{creadoras.length === 1 ? "" : "s"} activa{creadoras.length === 1 ? "" : "s"}
-                {objetivo && <> · tu objetivo: {OBJETIVOS[objetivo.metrica] ?? objetivo.metrica}</>}
+                {t(creadoras.length === 1 ? "sales.mgr.activeCreators1" : "sales.mgr.activeCreatorsN", { n: creadoras.length })}
+                {objetivo && <> · {t("sales.mgr.yourGoal", { goal: OBJETIVOS[objetivo.metrica] ? t(OBJETIVOS[objetivo.metrica]) : objetivo.metrica })}</>}
               </p>
             </div>
           </div>
@@ -243,14 +259,14 @@ export default function ManagerDashboard({ forzado = false }: {
                   onClick={() => { setRango(rangeForPreset(p.key, new Date())); setPreset(p.key); }}
                   className={cn("rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
                     preset === p.key ? "bg-primary/15 text-primary ring-1 ring-primary/30" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground")}>
-                  {p.label}
+                  {t(ETIQUETA_PRESET[p.key])}
                 </button>
               ))}
             </div>
             <DateRangePicker
               from={rango.from} to={rango.to}
               onApply={(from, to) => { if (!from || !to) return; setRango({ from, to }); setPreset(null); }}
-              placeholder="Seleccionar rango"
+              placeholder={t("sales.mgr.pickRange")}
             />
           </div>
         </div>
@@ -265,42 +281,42 @@ export default function ManagerDashboard({ forzado = false }: {
         ) : (
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
             <Kpi
-              label="Tu nota (bot)"
+              label={t("sales.mgr.yourScore")}
               valor={ultima ? ultima.nota.toFixed(1) : "—"}
               pie={ultima
-                ? <>del {format(new Date(`${ultima.fecha}T12:00:00`), "d MMM", { locale: es })}{promedio != null && ` · promedio ${promedio.toFixed(1)}`}</>
-                : "sin nota en el rango"}
+                ? <>{t("sales.mgr.scoreOf", { date: format(new Date(`${ultima.fecha}T12:00:00`), "d MMM", { locale: f.fechas }) })}{promedio != null && ` · ${t("sales.mgr.average", { avg: promedio.toFixed(1) })}`}</>
+                : t("sales.mgr.noScore")}
               icono={Sparkles} color="bg-violet-500" tinte="from-violet-500/10"
               barra={ultima ? { pct: (ultima.nota / 10) * 100, clase: tonoNota(ultima.nota).barra } : undefined}
             />
             <Kpi
-              label="Tus creadoras"
+              label={t("sales.mgr.yourCreators")}
               valor={String(creadoras.length)}
-              pie="hoy · lo único que no sigue al calendario"
+              pie={t("sales.mgr.creatorsPie")}
               icono={Users} color="bg-sky-500" tinte="from-sky-500/10"
             />
             <Kpi
-              label="Promocionaron"
+              label={t("sales.mgr.promoted")}
               valor={pctPromo != null ? `${pctPromo}%` : "—"}
-              pie={promoMias.length > 0 ? `${promocionaron} de ${promoMias.length} en el rango` : promo.isLoading ? "cargando…" : "sin lectura de promolog en el rango"}
+              pie={promoMias.length > 0 ? t("sales.mgr.promotedPie", { a: promocionaron, b: promoMias.length }) : promo.isLoading ? t("sales.loadingLower") : t("sales.mgr.noPromolog")}
               icono={Megaphone} color="bg-amber-500" tinte="from-amber-500/10"
               barra={pctPromo != null ? { pct: pctPromo, clase: pctPromo >= 80 ? "bg-success" : "bg-warning" } : undefined}
             />
             <Kpi
-              label="Ingresos de tus modelos"
+              label={t("sales.mgr.revenue")}
               valor={money(aporte.total)}
               pie={ingresos.isLoading
-                ? "cargando…"
-                : <>{money(aporte.subs)} en suscripciones · <span className="text-primary">ver el aporte de cada una</span></>}
+                ? t("sales.loadingLower")
+                : <>{t("sales.mgr.subsIn", { amount: money(aporte.subs) })} · <span className="text-primary">{t("sales.mgr.seeEach")}</span></>}
               icono={DollarSign} color="bg-emerald-500" tinte="from-emerald-500/10"
               onClick={() => setVerIngresos(true)}
             />
             <Kpi
-              label="Tus horas"
+              label={t("sales.mgr.yourHours")}
               valor={horas.horas > 0 ? horas.horas.toFixed(1) : "—"}
               pie={horas.diasTrabajados > 0
-                ? `${horas.diasTrabajados} día${horas.diasTrabajados === 1 ? "" : "s"} con registro de Hubstaff`
-                : horasCargando ? "cargando…" : "sin registro en el rango"}
+                ? t(horas.diasTrabajados === 1 ? "sales.mgr.hubDays1" : "sales.mgr.hubDaysN", { n: horas.diasTrabajados })
+                : horasCargando ? t("sales.loadingLower") : t("sales.mgr.noHub")}
               icono={Clock} color="bg-sky-500" tinte="from-sky-500/10"
             />
             {/* El reloj de Cowork (cámara + pantalla, presente): va a reemplazar
@@ -308,13 +324,13 @@ export default function ManagerDashboard({ forzado = false }: {
             <Kpi
               label="Cowork"
               valor={cowork.horas > 0 ? cowork.horas.toFixed(1) : "—"}
-              pie={pieTiempoCowork(cowork, coworkCargando)}
+              pie={pieTiempoCowork(cowork, coworkCargando, t)}
               icono={Timer} color="bg-violet-500" tinte="from-violet-500/10"
             />
             <Kpi
-              label="Productividad"
+              label={t("sales.mgr.productivity")}
               valor={horas.actividad != null ? `${horas.actividad}%` : "—"}
-              pie="actividad de teclado y mouse"
+              pie={t("sales.mgr.productivityPie")}
               icono={MousePointerClick} color="bg-fuchsia-500" tinte="from-fuchsia-500/10"
               barra={horas.actividad != null ? { pct: horas.actividad, clase: horas.actividad >= 60 ? "bg-success" : "bg-warning" } : undefined}
             />
@@ -326,13 +342,13 @@ export default function ManagerDashboard({ forzado = false }: {
           <div className="overflow-hidden rounded-2xl border border-white/10 bg-card/60 ring-1 ring-white/5">
             <div className="flex items-center gap-2 border-b border-white/5 px-4 py-3">
               <CalendarClock className="h-4 w-4 text-muted-foreground" />
-              <h2 className="text-sm font-semibold">Por qué esa nota</h2>
+              <h2 className="text-sm font-semibold">{t("sales.mgr.whyScore")}</h2>
             </div>
             <div className="p-4">
               {notasCargando ? (
                 <Skeleton className="h-24 rounded-xl" />
               ) : !ultima ? (
-                <p className="text-xs text-muted-foreground">El bot no publicó nota tuya en este rango.</p>
+                <p className="text-xs text-muted-foreground">{t("sales.mgr.noBotScore")}</p>
               ) : (
                 <PorQueEsaNota nota={ultima} meta={objetivo?.meta_diaria ?? null} />
               )}
@@ -341,29 +357,29 @@ export default function ManagerDashboard({ forzado = false }: {
 
           <div className="overflow-hidden rounded-2xl border border-white/10 bg-card/60 ring-1 ring-white/5 lg:col-span-2">
             <div className="flex items-center gap-2 border-b border-white/5 px-4 py-3">
-              <h2 className="text-sm font-semibold">Tus notas del rango</h2>
-              {notas.length > 0 && <Badge variant="outline" className="rounded-full text-[10px]">{notas.length} día{notas.length === 1 ? "" : "s"} con nota</Badge>}
+              <h2 className="text-sm font-semibold">{t("sales.mgr.rangeScores")}</h2>
+              {notas.length > 0 && <Badge variant="outline" className="rounded-full text-[10px]">{t(notas.length === 1 ? "sales.mgr.scoreDays1" : "sales.mgr.scoreDaysN", { n: notas.length })}</Badge>}
             </div>
             <div className="p-4">
               {notasCargando ? (
                 <Skeleton className="h-24 rounded-xl" />
               ) : notas.length === 0 ? (
-                <p className="text-xs text-muted-foreground">Sin notas en el rango.</p>
+                <p className="text-xs text-muted-foreground">{t("sales.mgr.noScores")}</p>
               ) : (
                 // Una barra por día: la altura es la nota. Se lee la racha sin
                 // leer números.
                 <div className="flex h-28 items-end gap-1">
                   {barras.map((b) => {
-                    const t = tonoNota(b.nota);
-                    const dia = format(new Date(`${b.fecha}T12:00:00`), "EEEE d MMM", { locale: es });
+                    const tn = tonoNota(b.nota);
+                    const dia = format(new Date(`${b.fecha}T12:00:00`), "EEEE d MMM", { locale: f.fechas });
                     return (
                       <div key={b.fecha} className="flex min-w-0 max-w-[56px] flex-1 flex-col items-center gap-1"
-                        title={b.nota != null ? `${dia}: ${b.nota.toFixed(1)}` : `${dia}: sin nota`}>
-                        <span className={cn("text-[9px] tabular-nums", t.texto)}>{b.nota != null ? b.nota.toFixed(1) : ""}</span>
-                        <div className={cn("w-full rounded-t transition-[height] duration-700", b.nota != null ? t.barra : "bg-white/[0.07]")}
+                        title={b.nota != null ? `${dia}: ${b.nota.toFixed(1)}` : t("sales.mgr.noScoreDay", { day: dia })}>
+                        <span className={cn("text-[9px] tabular-nums", tn.texto)}>{b.nota != null ? b.nota.toFixed(1) : ""}</span>
+                        <div className={cn("w-full rounded-t transition-[height] duration-700", b.nota != null ? tn.barra : "bg-white/[0.07]")}
                           style={{ height: `${b.nota != null ? Math.max(4, (b.nota / 10) * 80) : 3}px` }} />
                         <span className="truncate text-[9px] text-muted-foreground">
-                          {format(new Date(`${b.fecha}T12:00:00`), "d", { locale: es })}
+                          {format(new Date(`${b.fecha}T12:00:00`), "d", { locale: f.fechas })}
                         </span>
                       </div>
                     );
@@ -377,15 +393,15 @@ export default function ManagerDashboard({ forzado = false }: {
         {/* ── TUS CREADORAS + PROMOLOG ── */}
         <section className="overflow-hidden rounded-2xl border border-white/10 bg-card/60 ring-1 ring-white/5">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/5 px-4 py-3">
-            <h2 className="text-sm font-semibold">Tus creadoras · promoción</h2>
+            <h2 className="text-sm font-semibold">{t("sales.mgr.creatorsPromo")}</h2>
             <Link to="/promolog" className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
-              Ver Promolog <ArrowRight className="h-3 w-3" />
+              {t("sales.mgr.viewPromolog")} <ArrowRight className="h-3 w-3" />
             </Link>
           </div>
           {creadorasCargando || promo.isLoading ? (
             <div className="space-y-2 p-4">{Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-11 rounded-lg" />)}</div>
           ) : creadoras.length === 0 ? (
-            <p className="px-4 py-8 text-center text-xs text-muted-foreground">No tienes creadoras asignadas.</p>
+            <p className="px-4 py-8 text-center text-xs text-muted-foreground">{t("sales.mgr.noCreators")}</p>
           ) : (
             <ul className="divide-y divide-white/5">
               {/* Primero las que llevan más sin promocionar: son las que hay
@@ -401,8 +417,8 @@ export default function ManagerDashboard({ forzado = false }: {
                         {c.nombre}
                       </Link>
                       <p className="truncate text-[11px] text-muted-foreground">
-                        {p ? `${p.promo_days} de ${p.covered_days} días leídos con promo` : "sin lectura de promolog en el rango"}
-                        {p?.is_partial && " · cobertura parcial"}
+                        {p ? t("sales.mgr.promoDays", { a: p.promo_days, b: p.covered_days }) : t("sales.mgr.noPromolog")}
+                        {p?.is_partial && ` · ${t("sales.mgr.partial")}`}
                       </p>
                     </div>
                     {p && (
@@ -425,7 +441,7 @@ export default function ManagerDashboard({ forzado = false }: {
             </ul>
           )}
           <footer className="border-t border-white/5 px-4 py-2 text-[11px] text-muted-foreground">
-            Score de promo 0-100: frecuencia, calidad del CTA, consistencia y diversificación. Los días que promolog no leyó no castigan.
+            {t("sales.mgr.promoFooter")}
           </footer>
         </section>
       </div>
@@ -436,15 +452,15 @@ export default function ManagerDashboard({ forzado = false }: {
       <Dialog open={verIngresos} onOpenChange={setVerIngresos}>
         <DialogContent className="max-h-[85vh] gap-0 overflow-y-auto p-0 sm:max-w-xl">
           <header className="border-b border-white/5 px-5 py-4">
-            <DialogTitle className="text-base leading-tight">Ingresos por modelo</DialogTitle>
+            <DialogTitle className="text-base leading-tight">{t("sales.mgr.revenueByModel")}</DialogTitle>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              {format(rango.from, "d MMM", { locale: es })} – {format(rango.to, "d MMM yyyy", { locale: es })} ·{" "}
-              {money(aporte.total)} en total, {money(aporte.subs)} en suscripciones
+              {format(rango.from, "d MMM", { locale: f.fechas })} – {format(rango.to, "d MMM yyyy", { locale: f.fechas })} ·{" "}
+              {t("sales.mgr.revenueSummary", { total: money(aporte.total), subs: money(aporte.subs) })}
             </p>
           </header>
           {aporte.filas.length === 0 ? (
             <p className="px-5 py-10 text-center text-xs text-muted-foreground">
-              Sin ingresos registrados de tus modelos en este rango.
+              {t("sales.mgr.noRevenue")}
             </p>
           ) : (
             <ul className="divide-y divide-white/5">
@@ -457,12 +473,12 @@ export default function ManagerDashboard({ forzado = false }: {
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium leading-tight">{r.nombre}</p>
                         <p className="text-[11px] text-muted-foreground">
-                          {money(r.subs)} en suscripciones · {r.dias} día{r.dias === 1 ? "" : "s"} con dato
+                          {t("sales.mgr.subsIn", { amount: money(r.subs) })} · {t(r.dias === 1 ? "sales.mgr.dataDays1" : "sales.mgr.dataDaysN", { n: r.dias })}
                         </p>
                       </div>
                       <div className="text-right">
                         <p className="font-display text-sm font-bold tabular-nums leading-tight">{money(r.total)}</p>
-                        <p className="text-[10px] tabular-nums text-muted-foreground">{pct.toFixed(1)}% del total</p>
+                        <p className="text-[10px] tabular-nums text-muted-foreground">{t("sales.mgr.ofTotal", { pct: pct.toFixed(1) })}</p>
                       </div>
                     </div>
                     <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/5">
@@ -474,7 +490,7 @@ export default function ManagerDashboard({ forzado = false }: {
             </ul>
           )}
           <footer className="border-t border-white/5 px-5 py-2.5 text-[11px] text-muted-foreground">
-            Bruto de OnlyFans del rango elegido, por creadora. Cambiá el rango arriba y este detalle cambia con él.
+            {t("sales.mgr.revenueFooter")}
           </footer>
         </DialogContent>
       </Dialog>

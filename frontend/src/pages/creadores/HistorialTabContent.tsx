@@ -2,17 +2,20 @@ import { useQuery } from "@tanstack/react-query";
 import { EmptyState } from "@/components/EmptyState";
 import { History } from "lucide-react";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface Props {
   creatorId: string;
 }
 
 const HistorialTabContent = ({ creatorId }: Props) => {
+  const f = useFormato();
+  const { t } = useLanguage();
   const { data: entries, isLoading } = useQuery({
     queryKey: ["creator_history", creatorId],
     queryFn: async () => {
@@ -28,13 +31,13 @@ const HistorialTabContent = ({ creatorId }: Props) => {
 
   const formatDate = (dateStr: string) => {
     try {
-      return format(new Date(dateStr), "d MMM yyyy, HH:mm", { locale: es });
+      return format(new Date(dateStr), "d MMM yyyy, HH:mm", { locale: f.fechas });
     } catch {
       return dateStr;
     }
   };
 
-  const shortId = (uuid: string) => uuid.split("-")[0] ?? "Usuario";
+  const shortId = (uuid: string) => uuid.split("-")[0] ?? t("common.user");
 
   if (isLoading) {
     return (
@@ -64,9 +67,9 @@ const HistorialTabContent = ({ creatorId }: Props) => {
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg">
           <History className="h-5 w-5" />
-          Historial de Cambios
+          {t("creadores.history.title")}
         </CardTitle>
-        <CardDescription>Auditoría completa de modificaciones</CardDescription>
+        <CardDescription>{t("creadores.history.subtitle")}</CardDescription>
       </CardHeader>
       <CardContent>
         {entries && entries.length > 0 ? (
@@ -86,7 +89,7 @@ const HistorialTabContent = ({ creatorId }: Props) => {
                     <div className="space-y-1">
                       <p className="text-sm font-semibold">{entry.action}</p>
                       <p className="text-xs text-muted-foreground">
-                        Modificado por{" "}
+                        {t("creadores.history.modifiedBy")}{" "}
                         <Badge variant="secondary-soft" className="ml-1 text-[10px] px-1.5 py-0">
                           {shortId(entry.user_id)}
                         </Badge>
@@ -101,13 +104,13 @@ const HistorialTabContent = ({ creatorId }: Props) => {
                     <div className="rounded-md bg-muted/50 p-3 text-sm space-y-1">
                       {entry.old_value && (
                         <p>
-                          <span className="text-destructive font-medium">Antes:</span>{" "}
+                          <span className="text-destructive font-medium">{t("creadores.history.before")}</span>{" "}
                           <span className="text-muted-foreground">{entry.old_value}</span>
                         </p>
                       )}
                       {entry.new_value && (
                         <p>
-                          <span className="font-medium" style={{ color: "hsl(var(--success))" }}>Después:</span>{" "}
+                          <span className="font-medium" style={{ color: "hsl(var(--success))" }}>{t("creadores.history.after")}</span>{" "}
                           <span className="text-muted-foreground">{entry.new_value}</span>
                         </p>
                       )}
@@ -120,8 +123,8 @@ const HistorialTabContent = ({ creatorId }: Props) => {
         ) : (
           <EmptyState
             icon={<History className="h-8 w-8 text-muted-foreground" />}
-            title="No hay registros de historial"
-            description="Los cambios se registrarán automáticamente"
+            title={t("creadores.history.empty")}
+            description={t("creadores.history.emptyDesc")}
           />
         )}
       </CardContent>

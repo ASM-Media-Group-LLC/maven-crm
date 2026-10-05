@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { CalendarDays } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/hooks/useLanguage";
 import MiSemana from "./MiSemana";
 import Equipo from "./Equipo";
 import { useMiIdentidad, usePermisosHorarios, useRoster } from "./useHorarios";
@@ -12,6 +13,7 @@ const VISTA_KEY = "maven.horarios.vista";
 // CHATTERS · HORARIOS: reemplaza el Excel de horarios. Una página, dos
 // audiencias: el chatter ve SOLO su semana; el supervisor arma la del equipo.
 export default function HorariosPage() {
+  const { t } = useLanguage();
   const { esSupervisor, puedeGestionar } = usePermisosHorarios();
   const identidad = useMiIdentidad();
   const [vista, setVista] = useState<Vista | null>(() => {
@@ -40,7 +42,7 @@ export default function HorariosPage() {
     : vista === "equipo" && !esSupervisor ? "mia"
     : vista === "mia" && !puedeMia ? "equipo"
     : (vista ?? (esSupervisor ? "equipo" : "mia"));
-  const pestanas = ([["mia", "Mi semana"], ["equipo", "Equipo"]] as Array<[Vista, string]>)
+  const pestanas = ([["mia", t("chatters.hor.myWeek")], ["equipo", t("common.team")]] as Array<[Vista, string]>)
     .filter(([v]) => (v === "mia" ? puedeMia : esSupervisor));
 
   return (
@@ -49,8 +51,8 @@ export default function HorariosPage() {
     <div className="flex-1 min-h-0 flex flex-col overflow-y-auto">
       <div className="px-4 md:px-6 pt-4 md:pt-6 pb-8 space-y-4">
         <PageHeader
-          title="Horarios"
-          subtitle="Quién atiende a quién, en qué turno y qué día descansa."
+          title={t("chatters.hor.title")}
+          subtitle={t("chatters.hor.subtitle")}
           icon={<CalendarDays className="h-5 w-5" />}
           actions={pestanas.length > 1 ? (
             <div className="inline-flex rounded-full border bg-muted/40 p-0.5" role="tablist">

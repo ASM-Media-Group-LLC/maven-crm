@@ -15,12 +15,17 @@ import {
   formatFollowers,
   initialsBg,
 } from "@/pages/scouter/leadShared";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 
 // ─── Strategy badge config ────────────────────────────────────────────────
+// La llave es el ai_strategy que guarda la IA; solo la etiqueta se traduce.
+// Las que se dicen igual en inglés quedan como texto (`label`). Mismas
+// etiquetas que el filtro de estrategia de MisTareas.
 
 const STRATEGY_META: Record<
   string,
-  { label: string; className: string }
+  { label?: string; labelKey?: TranslationKey; className: string }
 > = {
   warm_approach: {
     label: "Warm approach",
@@ -31,7 +36,7 @@ const STRATEGY_META: Record<
     className: "border-sky-500/40 bg-sky-500/10 text-sky-300",
   },
   multi_account: {
-    label: "Multi cuenta",
+    labelKey: "scouter.strategy.multiAccount",
     className: "border-purple-500/40 bg-purple-500/10 text-purple-300",
   },
   re_engage: {
@@ -50,6 +55,7 @@ interface TaskCardProps {
 // ─── Component ────────────────────────────────────────────────────────────
 
 export const TaskCard = ({ assignment, accounts }: TaskCardProps) => {
+  const { t } = useLanguage();
   const [reasoningOpen, setReasoningOpen] = useState(false);
   const skipMut = useSkipTask();
 
@@ -127,14 +133,14 @@ export const TaskCard = ({ assignment, accounts }: TaskCardProps) => {
           <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
             {lead.followers != null && (
               <span className="text-[11px] text-muted-foreground">
-                {formatFollowers(lead.followers)} seg.
+                {t("scouter.task.followersShort", { count: formatFollowers(lead.followers) })}
               </span>
             )}
             {strategyMeta && (
               <span
                 className={`inline-block rounded-full border px-1.5 py-0.5 text-xs font-bold ${strategyMeta.className}`}
               >
-                {strategyMeta.label}
+                {strategyMeta.labelKey ? t(strategyMeta.labelKey) : strategyMeta.label}
               </span>
             )}
           </div>
@@ -167,7 +173,7 @@ export const TaskCard = ({ assignment, accounts }: TaskCardProps) => {
               ) : (
                 <ChevronRight className="h-3.5 w-3.5 shrink-0" />
               )}
-              Por qué este lead
+              {t("scouter.task.whyThisLead")}
             </button>
           </CollapsibleTrigger>
           <CollapsibleContent>
@@ -204,7 +210,7 @@ export const TaskCard = ({ assignment, accounts }: TaskCardProps) => {
             disabled={skipMut.isPending}
           >
             <SkipForward className="h-3.5 w-3.5" />
-            Saltar todas
+            {t("scouter.task.skipAll")}
           </Button>
         </div>
       )}

@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { traducir } from "@/lib/i18n";
 
 export type ProfileOption = {
   id: string;
@@ -82,10 +83,10 @@ export function useDeleteEmployee() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
-      toast({ title: "Empleado eliminado correctamente" });
+      toast({ title: traducir("hrg.emp.deleted") });
     },
     onError: () => {
-      toast({ title: "Error al eliminar el empleado", variant: "destructive" });
+      toast({ title: traducir("hrg.emp.deleteError"), variant: "destructive" });
     },
   });
 }
@@ -172,10 +173,10 @@ export function useLinkEmployeeProfile() {
     onSuccess: (_data, { employeeId }) => {
       queryClient.invalidateQueries({ queryKey: ["employee", employeeId] });
       queryClient.invalidateQueries({ queryKey: ["employees"] });
-      toast({ title: "Usuario vinculado correctamente" });
+      toast({ title: traducir("hrg.emp.linked") });
     },
     onError: () => {
-      toast({ title: "Error al vincular el usuario", variant: "destructive" });
+      toast({ title: traducir("hrg.emp.linkError"), variant: "destructive" });
     },
   });
 }
@@ -195,10 +196,10 @@ export function useUnlinkEmployeeProfile() {
     onSuccess: (_data, employeeId) => {
       queryClient.invalidateQueries({ queryKey: ["employee", employeeId] });
       queryClient.invalidateQueries({ queryKey: ["employees"] });
-      toast({ title: "Vínculo de usuario eliminado" });
+      toast({ title: traducir("hrg.emp.unlinked") });
     },
     onError: () => {
-      toast({ title: "Error al desvincular el usuario", variant: "destructive" });
+      toast({ title: traducir("hrg.emp.unlinkError"), variant: "destructive" });
     },
   });
 }

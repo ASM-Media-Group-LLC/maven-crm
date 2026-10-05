@@ -6,7 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { CheckCircle2, Clock, Loader2, Settings2, ShieldAlert } from "lucide-react";
-import type { OnboardingCreator } from "./useOnboarding";
+import { ETIQUETA_ESTADO_ONBOARDING, type OnboardingCreator } from "./useOnboarding";
 import { useLanguage } from "@/hooks/useLanguage";
 
 interface Props {
@@ -30,7 +30,7 @@ const OnboardingGrid = ({ data, onManage }: Props) => {
     <TooltipProvider>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {data.map((item) => {
-          const displayName = item.name?.trim() || "Sin nombre";
+          const displayName = item.name?.trim() || t("creadores.sell.noName");
           const sc = statusConfig[item.status];
           const StatusIcon = sc.icon;
           const pending = item.dbStatus === "pendiente_verificacion";
@@ -57,23 +57,23 @@ const OnboardingGrid = ({ data, onManage }: Props) => {
                         </Tooltip>
                       )}
                     </div>
-                    <p className="text-xs text-muted-foreground">{item.company}</p>
+                    <p className="text-xs text-muted-foreground">{item.company || t("creadores.onb.noCompany")}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge variant="outline" className={`${sc.className} text-xs ${pending ? "badge-pending-verification" : ""}`}>
                     <StatusIcon className="h-3 w-3 mr-1" />
-                    {pending ? "En Revisión" : item.status}
+                    {pending ? t("creadores.status.pendingVerification") : t(ETIQUETA_ESTADO_ONBOARDING[item.status])}
                   </Badge>
                 </div>
                 <div className="space-y-1">
                   <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>Progreso</span>
+                    <span>{t("creadores.onb.progress")}</span>
                     <span>{item.progress}%</span>
                   </div>
                   <Progress value={item.progress} className="h-2" />
                 </div>
-                <Button variant="secondary" size="icon" className="h-8 w-8 ml-auto" onClick={() => onManage?.(item)}>
+                <Button variant="secondary" size="icon" className="h-8 w-8 ml-auto" onClick={() => onManage?.(item)} aria-label={t("creadores.onb.manage")} title={t("creadores.onb.manage")}>
                   <Settings2 className="h-4 w-4" />
                 </Button>
               </CardContent>

@@ -30,6 +30,7 @@ import {
 } from "@/hooks/useChatterEvaluator";
 import type { ChatterProfile } from "./types";
 import ChatterEvaluatorHeader from "./ChatterEvaluatorHeader";
+import { useLanguage } from "@/hooks/useLanguage";
 
 const ProfileCard = ({
   profile,
@@ -112,6 +113,7 @@ const StatCard = ({
 }) => <StatChip label={label} value={value} icon={icon} color={color} onClick={onClick} />;
 
 const ChatterEvaluatorContent = () => {
+  const { t } = useLanguage();
   const profilesQ = useChatterProfiles();
   const vaultCountsQ = useChatterVaultCounts();
   const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({});
@@ -156,34 +158,34 @@ const ChatterEvaluatorContent = () => {
                 if (from && to) setStatsRange("custom");
                 else setStatsRange("week");
               }}
-              placeholder="Seleccionar fechas"
+              placeholder={t("chatters.home.selectDates")}
             />
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <StatCard
               icon={<Users className="h-3.5 w-3.5" />}
-              label="Personas evaluadas"
+              label={t("chatters.home.peopleEvaluated")}
               value={statsQ.isLoading ? "…" : (counters?.total ?? 0)}
               color="bg-primary"
               onClick={() => setKpiPopup("total")}
             />
             <StatCard
               icon={<CheckCircle2 className="h-3.5 w-3.5" />}
-              label="Aprobados"
+              label={t("chatters.home.approved")}
               value={statsQ.isLoading ? "…" : (counters?.approved ?? 0)}
               color="bg-success"
               onClick={() => setKpiPopup("approved")}
             />
             <StatCard
               icon={<XCircle className="h-3.5 w-3.5" />}
-              label="Reprobados"
+              label={t("chatters.home.failed")}
               value={statsQ.isLoading ? "…" : (counters?.rejected ?? 0)}
               color="bg-destructive"
               onClick={() => setKpiPopup("rejected")}
             />
             <StatCard
               icon={<Percent className="h-3.5 w-3.5" />}
-              label="Promedio de éxito"
+              label={t("chatters.home.successAvg")}
               value={statsQ.isLoading ? "…" : `${counters?.successRatePct ?? 0}%`}
               color="bg-primary"
               onClick={() => setKpiPopup("rate")}
@@ -198,16 +200,16 @@ const ChatterEvaluatorContent = () => {
           <Card>
             <CardContent className="p-4">
               <h3 className="mb-3 text-sm font-semibold text-muted-foreground">
-                Evaluaciones últimos 30 días
+                {t("chatters.home.last30Days")}
               </h3>
               <div className="h-[220px]">
                 {statsQ.isLoading || !stats ? (
                   <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-                    Cargando…
+                    {t("common.loading")}
                   </div>
                 ) : stats.total === 0 ? (
                   <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-                    Sin evaluaciones todavía
+                    {t("chatters.home.noEvaluations")}
                   </div>
                 ) : (
                   <ResponsiveContainer width="100%" height="100%">
@@ -236,14 +238,14 @@ const ChatterEvaluatorContent = () => {
                       <Legend wrapperStyle={{ fontSize: 11 }} />
                       <Bar
                         dataKey="apto"
-                        name="Aprobados"
+                        name={t("chatters.home.approved")}
                         stackId="a"
                         fill="hsl(var(--primary))"
                         radius={[2, 2, 0, 0]}
                       />
                       <Bar
                         dataKey="noApto"
-                        name="Reprobados"
+                        name={t("chatters.home.failed")}
                         stackId="a"
                         fill="hsl(var(--destructive) / 0.7)"
                         radius={[2, 2, 0, 0]}
@@ -258,16 +260,16 @@ const ChatterEvaluatorContent = () => {
           <Card>
             <CardContent className="p-4">
               <h3 className="mb-3 text-sm font-semibold text-muted-foreground">
-                Personas evaluadas por mes
+                {t("chatters.home.perMonth")}
               </h3>
               <div className="h-[220px]">
                 {statsQ.isLoading || !stats ? (
                   <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-                    Cargando…
+                    {t("common.loading")}
                   </div>
                 ) : stats.total === 0 ? (
                   <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-                    Sin evaluaciones todavía
+                    {t("chatters.home.noEvaluations")}
                   </div>
                 ) : (
                   <ResponsiveContainer width="100%" height="100%">
@@ -292,14 +294,14 @@ const ChatterEvaluatorContent = () => {
                       <Legend wrapperStyle={{ fontSize: 11 }} />
                       <Bar
                         dataKey="apto"
-                        name="Aprobados"
+                        name={t("chatters.home.approved")}
                         stackId="a"
                         fill="hsl(var(--primary))"
                         radius={[2, 2, 0, 0]}
                       />
                       <Bar
                         dataKey="noApto"
-                        name="Reprobados"
+                        name={t("chatters.home.failed")}
                         stackId="a"
                         fill="hsl(var(--destructive) / 0.7)"
                         radius={[2, 2, 0, 0]}
@@ -314,22 +316,22 @@ const ChatterEvaluatorContent = () => {
 
         <section className="space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Perfiles</h2>
+            <h2 className="text-lg font-semibold">{t("chatters.profile.profiles")}</h2>
             <p className="text-sm text-muted-foreground">
               {profiles.length === 0
                 ? ""
-                : `${profiles.length} perfiles · ${totalImages} items totales`}
+                : t("chatters.home.profilesCount", { n: profiles.length, items: totalImages })}
             </p>
           </div>
 
           {profilesQ.isLoading && (
-            <p className="text-sm text-muted-foreground">Cargando…</p>
+            <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
           )}
 
           {profilesQ.error && (
             <Card>
               <CardContent className="p-4 text-sm text-destructive">
-                Error cargando perfiles: {(profilesQ.error as Error).message}
+                {t("chatters.home.errorLoadingProfiles", { msg: (profilesQ.error as Error).message })}
               </CardContent>
             </Card>
           )}
@@ -337,9 +339,8 @@ const ChatterEvaluatorContent = () => {
           {!profilesQ.isLoading && profiles.length === 0 && (
             <Card>
               <CardContent className="p-6 text-sm text-muted-foreground">
-                No hay perfiles aún. La migración inicial debería haberlos
-                cargado — corre <code>scripts/migrate-chatters</code> si la
-                lista está vacía después del setup inicial.
+                {t("chatters.home.noProfilesPre")} <code>scripts/migrate-chatters</code>{" "}
+                {t("chatters.home.noProfilesPost")}
               </CardContent>
             </Card>
           )}
@@ -363,16 +364,16 @@ const ChatterEvaluatorContent = () => {
         onOpenChange={(o) => !o && setKpiPopup(null)}
         title={(() => {
           switch (kpiPopup) {
-            case "total": return `Personas Evaluadas — ${counters?.total ?? 0}`;
-            case "approved": return `Aprobados — ${counters?.approved ?? 0}`;
-            case "rejected": return `Reprobados — ${counters?.rejected ?? 0}`;
-            case "rate": return `Tasa de éxito — ${counters?.successRatePct ?? 0}%`;
+            case "total": return `${t("chatters.home.peopleEvaluatedTitle")} — ${counters?.total ?? 0}`;
+            case "approved": return `${t("chatters.home.approved")} — ${counters?.approved ?? 0}`;
+            case "rejected": return `${t("chatters.home.failed")} — ${counters?.rejected ?? 0}`;
+            case "rate": return `${t("chatters.home.successRate")} — ${counters?.successRatePct ?? 0}%`;
             default: return "";
           }
         })()}
         subtitle={(() => {
-          if (kpiPopup === "rate") return `${counters?.approved ?? 0} aprobados de ${counters?.total ?? 0} totales`;
-          if (kpiPopup === "total") return "Total de evaluaciones registradas";
+          if (kpiPopup === "rate") return t("chatters.home.approvedOfTotal", { n: counters?.approved ?? 0, total: counters?.total ?? 0 });
+          if (kpiPopup === "total") return t("chatters.home.totalRecorded");
           return undefined;
         })()}
         rows={(() => {
@@ -380,10 +381,10 @@ const ChatterEvaluatorContent = () => {
           if (kpiPopup === "rate") {
             const rate = counters.successRatePct ?? 0;
             return [
-              { primary: "Total evaluados", right: String(counters.total) },
-              { primary: "Aprobados", right: String(counters.approved), rightTone: "success" as const },
-              { primary: "Reprobados", right: String(counters.rejected), rightTone: "destructive" as const },
-              { primary: "Tasa de éxito", right: `${rate}%`, rightTone: rate >= 50 ? "success" as const : "warning" as const },
+              { primary: t("chatters.home.totalEvaluated"), right: String(counters.total) },
+              { primary: t("chatters.home.approved"), right: String(counters.approved), rightTone: "success" as const },
+              { primary: t("chatters.home.failed"), right: String(counters.rejected), rightTone: "destructive" as const },
+              { primary: t("chatters.home.successRate"), right: `${rate}%`, rightTone: rate >= 50 ? "success" as const : "warning" as const },
             ];
           }
           const profiles = profilesQ.data ?? [];
@@ -393,7 +394,7 @@ const ChatterEvaluatorContent = () => {
           const tone = (status?: string): KpiRow["rightTone"] =>
             status === "apto" ? "success" : status === "no_apto" ? "destructive" : "default";
           return list.slice(0, 100).map((p: any): KpiRow => ({
-            primary: p.full_name ?? p.name ?? "Sin nombre",
+            primary: p.full_name ?? p.name ?? t("chatters.newSess.noName"),
             secondary: p.role ?? p.position ?? undefined,
             right: p.last_status ?? p.status ?? "—",
             rightTone: tone(p.last_status ?? p.status),

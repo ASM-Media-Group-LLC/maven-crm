@@ -35,7 +35,7 @@ CAMPOS DEL FORM (todos opcionales pero todos importan)
 - geo_targets: regiones objetivo (LATAM, US, ES, BR, etc.).
 - bio_keywords: 3-7 palabras a buscar en bios.
 - exclude_keywords: 2-5 palabras a excluir (bot, spam, etc.).
-- scoring_notes: 1-2 frases que el scorer IA debe priorizar al puntuar. Si dejaste tier/followers en null, MENCIÓNALO acá ("este producto no segmenta por seguidores", etc.).
+- scoring_notes: 1-2 frases que el scorer IA debe priorizar al puntuar. Si dejaste tier/followers en null, MENCIÓNALO aquí ("este producto no segmenta por seguidores", etc.).
 
 DECISIÓN: ¿estás listo para llenar o necesitas más info?
 

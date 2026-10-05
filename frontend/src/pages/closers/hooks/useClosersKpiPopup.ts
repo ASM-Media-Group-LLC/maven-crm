@@ -3,7 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/lib/supabasePaginate";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
-import { SALE_PLATFORMS } from "./useCloserLeads";
+import { SALE_PLATFORMS, stageLabel, platformLabel } from "./useCloserLeads";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // Datos para los popups de los KPI cards en closers/dashboard.
 //
@@ -59,7 +60,7 @@ const STAGE_ORDER: string[] = ["Asignada", "Confirmada", "Completada", "No inter
 // quedar desincronizado con el selector de ventas.
 const PLATFORM_KEYS: string[] = [...SALE_PLATFORMS, "Trafix"];
 
-const fmtMoney = (n: number) => `$${Number(n || 0).toLocaleString("es")}`;
+const fmtMoney = (n: number, locale: string) => `$${Number(n || 0).toLocaleString(locale)}`;
 
 type CreatorRow = {
   id: string;
@@ -76,6 +77,10 @@ export function useClosersKpiPopup(
 ) {
   const { user } = useAuth();
   const { isAdmin, isManager, isSupervisor, role } = useUserRole();
+  // El resultado trae TEXTO para mostrar (etiquetas de etapa, "Sin asignar"…),
+  // así que el idioma va en la queryKey: al cambiarlo se vuelve a armar.
+  const { t, language } = useLanguage();
+  const locale = language === "en" ? "en-US" : "es";
   const userId = user?.id;
 
   const { dateFrom, dateTo, dateField, viewAsCloserId } = opts ?? {};
@@ -119,11 +124,16 @@ export function useClosersKpiPopup(
       : "sc:none";
 
   return useQuery<ClosersKpiPopupResult>({
-    queryKey: ["closers-kpi-popup", state, userId, role, scopeKey, applyCreatorDate ? dateFrom?.toISOString() : null, applyCreatorDate ? dateTo?.toISOString() : null, applySalesDate ? "sales" : null, viewAsCloserId ?? null],
+    queryKey: ["closers-kpi-popup", state, language, userId, role, scopeKey, applyCreatorDate ? dateFrom?.toISOString() : null, applyCreatorDate ? dateTo?.toISOString() : null, applySalesDate ? "sales" : null, viewAsCloserId ?? null],
     enabled: !!state && !!userId && !!role,
     staleTime: 30_000,
     queryFn: async (): Promise<ClosersKpiPopupResult> => {
       if (!state) return { mode: "flat", groups: [], totalCount: 0 };
+      const sinAsignar = t("common.unassigned");
+      const sinHandle = t("closers.noHandle");
+      const etapa = (s: string | null | undefined) => (s ? stageLabel(t, s) : t("closers.stage.none"));
+      const plataformaYEtapa = (platform: string | null, stage: string | null) =>
+        [platform ? platformLabel(t, platform) : null, stage ? stageLabel(t, stage) : null].filter(Boolean).join(" · ");
 
       // ── PIPELINE ──
       if (state.kind === "pipeline") {
@@ -157,15 +167,15 @@ export function useClosersKpiPopup(
             .select("id, full_name")
             .in("id", agentIds);
           for (const p of (profs ?? []) as Array<{ id: string; full_name: string | null }>) {
-            nameMap[p.id] = p.full_name || "Sin nombre";
+            nameMap[p.id] = p.full_name || t("closers.noName");
           }
         }
 
         const toRow = (r: CreatorRow): ClosersKpiPopupRow => ({
           id: r.id,
-          primary: r.instagram_handle ? `@${r.instagram_handle}` : "Sin handle",
-          secondary: r.assigned_to ? nameMap[r.assigned_to] ?? "Sin asignar" : "Sin asignar",
-          badge: r.stage ?? undefined,
+          primary: r.instagram_handle ? `@${r.instagram_handle}` : sinHandle,
+          secondary: r.assigned_to ? nameMap[r.assigned_to] ?? sinAsignar : sinAsignar,
+          badge: r.stage ? stageLabel(t, r.stage) : undefined,
           date: r.created_at,
         });
 
@@ -173,7 +183,8 @@ export function useClosersKpiPopup(
         if (state.key === "total") {
           const byStage = new Map<string, CreatorRow[]>();
           for (const r of rows) {
-            const s = r.stage ?? "Sin stage";
+            // "" = sin etapa; se ordena al final igual que cualquier etapa desconocida.
+            const s = r.stage ?? "";
             const arr = byStage.get(s) ?? [];
             arr.push(r);
             byStage.set(s, arr);
@@ -189,7 +200,7 @@ export function useClosersKpiPopup(
             groups: sortedStages.map((stage) => {
               const stageRows = byStage.get(stage)!;
               return {
-                cat: stage,
+                cat: etapa(stage),
                 count: stageRows.length,
                 rows: stageRows.map(toRow),
               };
@@ -200,15 +211,15 @@ export function useClosersKpiPopup(
         // Resto del pipeline → agrupar por closer.
         const byCloser = new Map<string, CreatorRow[]>();
         for (const r of rows) {
-          const closer = r.assigned_to ? nameMap[r.assigned_to] ?? "Sin asignar" : "Sin asignar";
+          const closer = r.assigned_to ? nameMap[r.assigned_to] ?? sinAsignar : sinAsignar;
           const arr = byCloser.get(closer) ?? [];
           arr.push(r);
           byCloser.set(closer, arr);
         }
         // Ordenar por count desc; "Sin asignar" al final.
         const sortedClosers = Array.from(byCloser.keys()).sort((a, b) => {
-          if (a === "Sin asignar") return 1;
-          if (b === "Sin asignar") return -1;
+          if (a === sinAsignar) return 1;
+          if (b === sinAsignar) return -1;
           return byCloser.get(b)!.length - byCloser.get(a)!.length;
         });
         return {
@@ -222,7 +233,7 @@ export function useClosersKpiPopup(
               rows: closerRows.map((r) => ({
                 ...toRow(r),
                 // Dentro del grupo del closer, secondary muestra stage en vez del agente repetido.
-                secondary: r.stage ?? "Sin stage",
+                secondary: etapa(r.stage),
                 badge: undefined,
               })),
             };
@@ -257,9 +268,9 @@ export function useClosersKpiPopup(
         return (data ?? [])
           .map((r: any) => ({
             id: r.id,
-            primary: r.instagram_handle ? `@${r.instagram_handle}` : "Sin handle",
-            secondary: [r.main_platform, r.stage].filter(Boolean).join(" · "),
-            amount: fmtMoney(Number(r.subscription_amount || 0)),
+            primary: r.instagram_handle ? `@${r.instagram_handle}` : sinHandle,
+            secondary: plataformaYEtapa(r.main_platform, r.stage),
+            amount: fmtMoney(Number(r.subscription_amount || 0), locale),
             _sort: Number(r.subscription_amount || 0),
           }))
           .sort((a, b) => b._sort - a._sort)
@@ -287,9 +298,9 @@ export function useClosersKpiPopup(
         if (error) throw error;
         const rows: ClosersKpiPopupRow[] = (data ?? []).map((r: any) => ({
           id: r.id,
-          primary: r.instagram_handle ? `@${r.instagram_handle}` : "Sin handle",
-          secondary: r.stage,
-          amount: fmtMoney(Number(r.estimated_monetization)),
+          primary: r.instagram_handle ? `@${r.instagram_handle}` : sinHandle,
+          secondary: r.stage ? stageLabel(t, r.stage) : r.stage,
+          amount: fmtMoney(Number(r.estimated_monetization), locale),
         }));
         return { mode: "flat", totalCount: rows.length, groups: [{ cat: "", count: rows.length, rows }] };
       }
@@ -318,9 +329,9 @@ export function useClosersKpiPopup(
         if (error) throw error;
         const rows: ClosersKpiPopupRow[] = (data ?? []).map((r: any) => ({
           id: r.id,
-          primary: r.instagram_handle ? `@${r.instagram_handle}` : "Sin handle",
-          secondary: [r.main_platform, r.stage].filter(Boolean).join(" · "),
-          amount: fmtMoney(Number(r.subscription_amount || 0)),
+          primary: r.instagram_handle ? `@${r.instagram_handle}` : sinHandle,
+          secondary: plataformaYEtapa(r.main_platform, r.stage),
+          amount: fmtMoney(Number(r.subscription_amount || 0), locale),
         }));
         return { mode: "flat", totalCount: rows.length, groups: [{ cat: "", count: rows.length, rows }] };
       }
@@ -353,16 +364,16 @@ export function useClosersKpiPopup(
             .select("id, instagram_handle")
             .in("id", creatorIds);
           for (const c of (creators ?? []) as Array<{ id: string; instagram_handle: string | null }>) {
-            handleMap[c.id] = c.instagram_handle ? `@${c.instagram_handle}` : "Sin handle";
+            handleMap[c.id] = c.instagram_handle ? `@${c.instagram_handle}` : sinHandle;
           }
         }
         const rows: ClosersKpiPopupRow[] = Object.entries(byCreator)
           .sort((a, b) => b[1].total - a[1].total)
           .map(([cid, v]) => ({
             id: cid,
-            primary: handleMap[cid] ?? "Sin handle",
+            primary: handleMap[cid] ?? sinHandle,
             secondary: v.platforms.join(", "),
-            amount: fmtMoney(v.total),
+            amount: fmtMoney(v.total, locale),
           }));
         // Las ventas registradas por el CARRITO viven en el pipeline, no en
         // closer_platform_sales. La card las suma, así que el detalle también
@@ -424,7 +435,7 @@ export function useClosersKpiPopup(
                 ? 0
                 : Number(c.estimated_monetization || 0);
           byCreator[c.id] = (byCreator[c.id] || 0) + amount;
-          handleMap[c.id] = c.instagram_handle ? `@${c.instagram_handle}` : "Sin handle";
+          handleMap[c.id] = c.instagram_handle ? `@${c.instagram_handle}` : sinHandle;
         }
         const missingIds = Object.keys(byCreator).filter((id) => !(id in handleMap));
         if (missingIds.length > 0) {
@@ -433,7 +444,7 @@ export function useClosersKpiPopup(
             .select("id, instagram_handle")
             .in("id", missingIds);
           for (const c of (extra ?? []) as Array<{ id: string; instagram_handle: string | null }>) {
-            handleMap[c.id] = c.instagram_handle ? `@${c.instagram_handle}` : "Sin handle";
+            handleMap[c.id] = c.instagram_handle ? `@${c.instagram_handle}` : sinHandle;
           }
         }
         const rows: ClosersKpiPopupRow[] = Object.entries(byCreator)
@@ -441,8 +452,8 @@ export function useClosersKpiPopup(
           .sort((a, b) => b[1] - a[1])
           .map(([cid, total]) => ({
             id: cid,
-            primary: handleMap[cid] ?? "Sin handle",
-            amount: fmtMoney(total),
+            primary: handleMap[cid] ?? sinHandle,
+            amount: fmtMoney(total, locale),
           }));
         return { mode: "flat", totalCount: rows.length, groups: [{ cat: "", count: rows.length, rows }] };
       }
@@ -476,15 +487,15 @@ export function useClosersKpiPopup(
             .select("id, instagram_handle")
             .in("id", creatorIds);
           for (const c of (creators ?? []) as Array<{ id: string; instagram_handle: string | null }>) {
-            handleMap[c.id] = c.instagram_handle ? `@${c.instagram_handle}` : "Sin handle";
+            handleMap[c.id] = c.instagram_handle ? `@${c.instagram_handle}` : sinHandle;
           }
         }
         const sortedRows: ClosersKpiPopupRow[] = rows
           .sort((a, b) => Number(b.price || 0) - Number(a.price || 0))
           .map((r, idx) => ({
             id: `${r.creator_id}-${idx}`,
-            primary: handleMap[r.creator_id] ?? "Sin handle",
-            amount: fmtMoney(Number(r.price || 0)),
+            primary: handleMap[r.creator_id] ?? sinHandle,
+            amount: fmtMoney(Number(r.price || 0), locale),
           }));
         // + las ventas de esa misma plataforma hechas por el carrito.
         const pipelineRows = await fetchPipelinePlatformRows(platform);

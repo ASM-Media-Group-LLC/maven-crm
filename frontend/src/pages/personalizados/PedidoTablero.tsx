@@ -1,6 +1,7 @@
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { useLanguage } from "@/hooks/useLanguage";
 import { DIAS_VENCIDO, ESTADOS, SIGUIENTES, SOLO_SUPERVISOR, agenciaDe, alertaDe, estaCerrado, tipoDe, usd, type Estado, type Pedido } from "./types";
 import { useMutacionesPedidos, usePermisosPersonalizados } from "./usePersonalizados";
 
@@ -14,6 +15,7 @@ const dias = (d: string) => Math.ceil((new Date(`${d}T23:59:59`).getTime() - Dat
 // Tarjeta de pedido: lo mínimo para decidir sin abrirla — quién, para quién,
 // qué, cuánto y para cuándo.
 export function PedidoCard({ p, onClick }: { p: Pedido; onClick: () => void }) {
+  const { t } = useLanguage();
   const tipo = tipoDe(p.content_type);
   const ag = agenciaDe(p.agency);
   const cerrado = estaCerrado(p.status);
@@ -28,7 +30,7 @@ export function PedidoCard({ p, onClick }: { p: Pedido; onClick: () => void }) {
       <div className="flex items-center gap-1.5 flex-wrap">
         <span className="font-medium text-sm truncate flex-1">{p.creator_name}</span>
         <Badge variant="outline" className={`rounded-full text-[10px] px-1.5 ${ag.tono}`}>{ag.label}</Badge>
-        {p.sale_channel === "buster" && <span title="Hora Buster" className="text-xs">⚡</span>}
+        {p.sale_channel === "buster" && <span title={t("custom.channel.buster")} className="text-xs">⚡</span>}
       </div>
       <p className="text-xs text-muted-foreground line-clamp-2">{tipo ? `${tipo.emoji} ` : ""}{p.description}</p>
       <div className="flex items-center justify-between text-[11px] text-muted-foreground">
@@ -39,20 +41,18 @@ export function PedidoCard({ p, onClick }: { p: Pedido; onClick: () => void }) {
         <div className="flex flex-wrap gap-1">
           {alerta && (
             <span
-              title={alerta.nivel === "vencido"
-                ? `Pasó el plazo de ${DIAS_VENCIDO} días: abierto hace ${alerta.dias}.`
-                : `Abierto hace ${alerta.dias} días. El plazo es de ${DIAS_VENCIDO}.`}
+              title={t(alerta.nivel === "vencido" ? "custom.alert.tipOverdue" : "custom.alert.tipAttention", { max: DIAS_VENCIDO, dias: alerta.dias })}
               className={`rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${alerta.tono}`}
             >
-              {alerta.texto}
+              {t(alerta.texto, { dias: alerta.dias })}
             </span>
           )}
           {restan !== null && (
             <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${restan <= 2 ? "bg-warning/15 text-warning" : "bg-muted text-muted-foreground"}`}>
-              {restan === 0 ? "Vence hoy" : `${restan}d`}
+              {restan === 0 ? t("custom.card.dueToday") : `${restan}d`}
             </span>
           )}
-          {saldo > 0 && p.price_usd != null && p.paid_usd != null && <span className="rounded-full px-1.5 py-0.5 text-[10px] bg-warning/15 text-warning">Debe {usd(saldo)}</span>}
+          {saldo > 0 && p.price_usd != null && p.paid_usd != null && <span className="rounded-full px-1.5 py-0.5 text-[10px] bg-warning/15 text-warning">{t("custom.card.owes", { amount: usd(saldo) })}</span>}
           {p.flags.length > 0 && <span className="rounded-full px-1.5 py-0.5 text-[10px] bg-warning/15 text-warning">⚠ {p.flags.length}</span>}
         </div>
       )}
@@ -64,6 +64,7 @@ export function PedidoCard({ p, onClick }: { p: Pedido; onClick: () => void }) {
 // con las mismas reglas que los botones (solo transiciones válidas; aprobar y
 // denegar solo supervisor+ — y la BD lo vuelve a exigir).
 export default function PedidoTablero({ pedidos, onAbrir }: Props) {
+  const { t } = useLanguage();
   const { cambiarEstado } = useMutacionesPedidos();
   const { puedeAprobar } = usePermisosPersonalizados();
 
@@ -73,17 +74,18 @@ export default function PedidoTablero({ pedidos, onAbrir }: Props) {
     const p = pedidos.find((x) => x.id === r.draggableId);
     if (!p || p.status === destino) return;
     if (!SIGUIENTES[p.status].includes(destino)) {
-      toast.error(`De ${ESTADOS.find((e) => e.id === p.status)?.label} no se pasa a ${ESTADOS.find((e) => e.id === destino)?.label}`);
+      const etiqueta = (id: Estado) => { const e = ESTADOS.find((x) => x.id === id); return e ? t(e.label) : id; };
+      toast.error(t("custom.board.invalidMove", { from: etiqueta(p.status), to: etiqueta(destino) }));
       return;
     }
     if (SOLO_SUPERVISOR.includes(destino) && !puedeAprobar) {
-      toast.error("Solo un supervisor puede aprobar o denegar");
+      toast.error(t("custom.board.onlySupervisor"));
       return;
     }
     try {
       await cambiarEstado.mutateAsync({ id: p.id, estado: destino });
     } catch (e) {
-      toast.error("No se pudo mover el pedido", { description: (e as Error).message });
+      toast.error(t("custom.board.moveError"), { description: (e as Error).message });
     }
   };
 
@@ -100,7 +102,7 @@ export default function PedidoTablero({ pedidos, onAbrir }: Props) {
                   className={`shrink-0 w-[272px] rounded-2xl p-2 transition-colors ${snap.isDraggingOver ? "bg-primary/5 ring-1 ring-primary/30" : "bg-muted/30"} ${col.lateral ? "opacity-90" : ""}`}>
                   <div className="flex items-center justify-between px-1.5 pb-2">
                     <div className="flex items-center gap-1.5">
-                      <Badge variant="outline" className={`rounded-full ${col.tono}`}>{col.label}</Badge>
+                      <Badge variant="outline" className={`rounded-full ${col.tono}`}>{t(col.label)}</Badge>
                       <span className="text-xs text-muted-foreground">{items.length}</span>
                     </div>
                     {total > 0 && <span className="text-[11px] text-muted-foreground">{usd(total)}</span>}
@@ -117,7 +119,7 @@ export default function PedidoTablero({ pedidos, onAbrir }: Props) {
                     ))}
                     {prov.placeholder}
                     {items.length === 0 && !snap.isDraggingOver && (
-                      <p className="text-[11px] text-muted-foreground/60 text-center py-6">Nada acá</p>
+                      <p className="text-[11px] text-muted-foreground/60 text-center py-6">{t("custom.board.empty")}</p>
                     )}
                   </div>
                 </div>

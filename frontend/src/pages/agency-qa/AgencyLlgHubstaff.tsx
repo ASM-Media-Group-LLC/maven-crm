@@ -4,23 +4,17 @@ import { Activity, Clock, Users, Sparkles, TrendingUp } from "lucide-react";
 import { useLlgHubstaff } from "./useQaHubstaff";
 import { useHubstaffSyncStatus } from "./chatters-qa/useHubstaffEffort";
 import { periodLabel } from "./chatters-qa/useChatterScorecards";
+import { useLanguage } from "@/hooks/useLanguage";
+import { ConFormato } from "@/pages/admin/ConFormato";
+import { haceCuanto } from "./haceCuanto";
 
 // Productividad de LLG (lead gen): esfuerzo (horas/actividad de Hubstaff) × resultado (leads
 // generados, leadgen_entries del mes). Análogo a esfuerzo-vs-resultado de chatters/closers.
 
-const relativeTime = (iso: string | null): string => {
-  if (!iso) return "sin sincronizar";
-  const min = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
-  if (min < 1) return "recién";
-  if (min < 60) return `hace ${min} min`;
-  const h = Math.floor(min / 60);
-  if (h < 24) return `hace ${h}h`;
-  return `hace ${Math.floor(h / 24)}d`;
-};
-
 const n = (v: number | null | undefined) => Math.round(v ?? 0).toLocaleString("en-US");
 
 export default function AgencyLlgHubstaff() {
+  const { t, language } = useLanguage();
   const { data: rows = [], isLoading } = useLlgHubstaff();
   const { data: sync } = useHubstaffSyncStatus();
 
@@ -35,15 +29,15 @@ export default function AgencyLlgHubstaff() {
   }, [rows]);
 
   if (isLoading) {
-    return <Card><CardContent className="p-6 text-sm text-muted-foreground">Cargando datos de Hubstaff…</CardContent></Card>;
+    return <Card><CardContent className="p-6 text-sm text-muted-foreground">{t("agencyQa.hubstaff.loading")}</CardContent></Card>;
   }
 
   if (!rows.length) {
     return (
       <Card>
         <CardContent className="space-y-2 p-6 text-sm text-muted-foreground">
-          <div className="flex items-center gap-2 font-medium text-foreground"><Clock className="h-4 w-4" /> Productividad</div>
-          Todavía no hay actividad de LLG cruzada con leads. El micro <code>hubstaff-bridge</code> sincroniza cada 6h.
+          <div className="flex items-center gap-2 font-medium text-foreground"><Clock className="h-4 w-4" /> {t("agencyQa.tab.productivity")}</div>
+          <ConFormato texto={t("agencyQa.llg.empty")} piezas={{ code: <code>hubstaff-bridge</code> }} />
         </CardContent>
       </Card>
     );
@@ -54,20 +48,20 @@ export default function AgencyLlgHubstaff() {
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <h3 className="flex items-center gap-2 text-lg font-semibold">
-            <Activity className="h-4 w-4 text-emerald-500" /> Productividad · esfuerzo vs leads
+            <Activity className="h-4 w-4 text-emerald-500" /> {t("agencyQa.llg.title")}
           </h3>
           <p className="text-sm text-muted-foreground">
-            Horas de Hubstaff cruzadas con los leads generados — {stats && periodLabel(stats.period)}.
+            {t("agencyQa.llg.subtitle", { period: stats ? periodLabel(stats.period, language) : "" })}
           </p>
         </div>
-        <span className="text-xs text-muted-foreground">Sincronizado {relativeTime(sync?.last_sync_at ?? null)}</span>
+        <span className="text-xs text-muted-foreground">{t("agencyQa.sync.synced", { when: haceCuanto(sync?.last_sync_at ?? null, t) })}</span>
       </div>
 
       {stats && (
         <div className="grid grid-cols-3 gap-3">
           <StatCard icon={Users} label="LLGs" value={String(stats.count)} />
-          <StatCard icon={Clock} label="Horas totales" value={`${stats.totalHours}h`} />
-          <StatCard icon={Sparkles} label="Leads generados" value={n(stats.totalLeads)} />
+          <StatCard icon={Clock} label={t("common.totalHours")} value={`${stats.totalHours}h`} />
+          <StatCard icon={Sparkles} label={t("agencyQa.llg.leadsGenerated")} value={n(stats.totalLeads)} />
         </div>
       )}
 
@@ -78,11 +72,11 @@ export default function AgencyLlgHubstaff() {
               <thead>
                 <tr className="border-b border-border text-xs text-muted-foreground">
                   <th className="px-4 py-3 text-left font-semibold">LLG</th>
-                  <th className="px-3 py-3 text-right font-semibold">Días</th>
-                  <th className="px-3 py-3 text-right font-semibold">Horas</th>
-                  <th className="px-3 py-3 text-right font-semibold">Activ.</th>
+                  <th className="px-3 py-3 text-right font-semibold">{t("common.days")}</th>
+                  <th className="px-3 py-3 text-right font-semibold">{t("common.hours")}</th>
+                  <th className="px-3 py-3 text-right font-semibold">{t("agencyQa.activityShort")}</th>
                   <th className="px-3 py-3 text-right font-semibold"><Sparkles className="inline h-3 w-3" /> Leads</th>
-                  <th className="px-4 py-3 text-right font-semibold">Leads/hora</th>
+                  <th className="px-4 py-3 text-right font-semibold">{t("agencyQa.llg.leadsPerHour")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -109,8 +103,7 @@ export default function AgencyLlgHubstaff() {
       </Card>
 
       <p className="px-1 text-[11px] leading-relaxed text-muted-foreground">
-        <strong>Leads</strong> = entradas de Lead Gen generadas por la persona este mes. <strong>Leads/hora</strong> cruza el volumen con las horas de Hubstaff.
-        La actividad% es contexto. (Solo cuenta a quienes tienen el rol LLG; otros que generan leads aparecen en su propio rol.)
+        <ConFormato texto={t("agencyQa.llg.footnote")} />
       </p>
     </div>
   );

@@ -22,21 +22,42 @@ export function agregarEstilo(el: Element, css: string): void {
   el.setAttribute("style", previo ? `${previo};${css}` : css);
 }
 
+/** `rgb(220, 38, 38)` → `#dc2626`.
+ *
+ *  El editor escribe los estilos por el CSSOM (`style.cssText`) y el navegador
+ *  los guarda normalizados: el color elegido como `#ffff00` sale del editor como
+ *  `rgb(255, 255, 0)`. El hexadecimal es el formato que entiende cualquier
+ *  cliente de correo, también los de escritorio viejos, así que se vuelve a él.
+ *  `rgba()` se deja como está: con transparencia no hay hexadecimal de 6. */
+export function rgbAHex(css: string): string {
+  return css.replace(
+    /rgb\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)/gi,
+    (_, r: string, g: string, b: string) =>
+      "#" + [r, g, b].map((n) => Math.min(255, Number(n)).toString(16).padStart(2, "0")).join(""),
+  );
+}
+
 /** El HTML del editor, vestido para clientes de correo.
  *
  *  Se trabaja sobre el DOM PARSEADO, no con reemplazos de texto sobre el
  *  string. Con `replaceAll("<p>", ...)` pasaban cuatro cosas mal a la vez:
- *  el `<p>` que TipTap mete dentro de cada `<li>` recibía margen y las
- *  listas salían a doble espacio; `<ol start="3">` no matcheaba y esa lista
+ *  el `p` que TipTap mete dentro de cada `li` recibía margen y las
+ *  listas salían a doble espacio; `ol start="3"` no matcheaba y esa lista
  *  viajaba sin estilos; un `<` dentro de un href (que el serializador NO
  *  escapa) hacía matchear `"<a "` adentro del atributo e inyectaba estilos
- *  en medio de la URL; y no había forma de tratar distinto un `<p>` vacío.
+ *  en medio de la URL; y no había forma de tratar distinto un `p` vacío.
  *
  *  Los estilos van INLINE porque las hojas de estilo no viajan en un correo:
  *  Gmail y Outlook las descartan. */
 export function htmlParaCorreo(html: string): string {
   const doc = new DOMParser().parseFromString(`<body>${html}</body>`, "text/html");
   const body = doc.body;
+
+  // Los colores del editor (letra y resaltado) viajan EN LÍNEA en su <span>; aquí
+  // solo se pasan a hexadecimal (ver rgbAHex).
+  body.querySelectorAll("[style]").forEach((el) =>
+    el.setAttribute("style", rgbAHex(el.getAttribute("style") ?? "")),
+  );
 
   body.querySelectorAll("p").forEach((el) => {
     if (el.closest("li")) {
@@ -80,19 +101,19 @@ export function htmlParaCorreo(html: string): string {
 /** Versión en texto plano, armada del DOM y no con getText().
  *
  *  `editor.getText({ blockSeparator })` mete el separador entre TODOS los
- *  bloques — incluidos los `<p>` que viven dentro de cada `<li>` — así que
+ *  bloques — incluidos los `p` que viven dentro de cada `li` — así que
  *  una lista salía con un renglón en blanco entre ítems, la cita quedaba
  *  indistinguible de lo escrito (sin "> ") y los links perdían la URL.
  *
  *  Tres cosas que parecen detalle y no lo son:
- *  · cada línea lleva SU prefijo. Un `<p>` con saltos internos (los `<br>`
+ *  · cada línea lleva SU prefijo. Un `p` con saltos internos (los `br`
  *    de una cita) empujado como un solo string dejaba el "> " únicamente en
  *    el primer renglón y el resto del correo citado se mezclaba con lo
  *    recién escrito;
  *  · las sublistas se recorren recursivamente. TipTap las anida DENTRO del
- *    `<li>` padre, así que leer `li.textContent` devolvía "PadreHijoAHijoB"
+ *    `li` padre, así que leer `li.textContent` devolvía "PadreHijoAHijoB"
  *    todo pegado;
- *  · `<ol start="N">` respeta el número. El HTML sí lo conservaba, y las dos
+ *  · `ol start="N"` respeta el número. El HTML sí lo conservaba, y las dos
  *    mitades del mismo mensaje se contradecían. */
 export function textoParaCorreo(html: string): string {
   const doc = new DOMParser().parseFromString(`<body>${html}</body>`, "text/html");

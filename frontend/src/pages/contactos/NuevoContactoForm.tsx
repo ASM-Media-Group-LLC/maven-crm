@@ -24,20 +24,18 @@ import { useAuth } from "@/hooks/useAuth";
 import { useScouterCompanies } from "@/hooks/useScouterLeads";
 import FileUploadModal, { type UploadCategory, type UploadedFile } from "@/components/FileUploadModal";
 import { PageHeader } from "@/components/ui/page-header";
-
-const CATEGORIES = [
-  { value: "A+", label: "A+ (Premium)" },
-  { value: "A", label: "A (Alta)" },
-  { value: "B+", label: "B+ (Media Alta)" },
-  { value: "B", label: "B (Media)" },
-  { value: "C", label: "C (Básica)" },
-];
+import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
+import { CATEGORIAS, PRIORIDADES_AGENCIA, PLATAFORMA_OTRA } from "./etiquetas";
 
 const DEFAULT_COMPANIES = [
   "Kash", "Alvaro Letshoot", "Blue App", "PicLink", "Pagomundo", "Exchange", "Unlok", "Trafix",
 ];
 
-const PLATFORMS = ["Instagram", "TikTok", "Twitter/X", "OnlyFans", "Otra"];
+// El valor se guarda en closers_contacts.platform tal cual; "Otra" solo cambia de
+// etiqueta al dibujarse.
+const PLATFORMS = ["Instagram", "TikTok", "Twitter/X", "OnlyFans", PLATAFORMA_OTRA];
 
 
 interface FormData {
@@ -59,19 +57,16 @@ interface FormData {
 // B2B, y al asignarlo a un closer el RPC assign_closer_to_contact lo traduce a
 // un lead con lead_source='agencia' + deal_type='venta_plataforma' (cae en el tab
 // Agencias, no en el embudo de modelos).
-const CONTACT_KINDS = [
-  { value: "modelo", label: "Modelo / creadora" },
-  { value: "agencia", label: "Agencia (B2B)" },
-] as const;
+const CONTACT_KINDS: readonly { value: "modelo" | "agencia"; label: TranslationKey }[] = [
+  { value: "modelo", label: "contactos.kindModel" },
+  { value: "agencia", label: "contactos.kindAgency" },
+];
 
 // Para una agencia, el campo de categoría se usa como PRIORIDAD comercial (mismo
 // criterio que el import de la base: Alta/Media/Baja). Va en la misma columna
 // (physical_appearance) que la categoría de una modelo, así reusa filtros y orden.
-const AGENCY_PRIORITIES = [
-  { value: "Alta", label: "Alta" },
-  { value: "Media", label: "Media" },
-  { value: "Baja", label: "Baja" },
-] as const;
+// Las listas (CATEGORIAS, PRIORIDADES_AGENCIA) viven en ./etiquetas: el valor es
+// dato y queda en español; solo la etiqueta se traduce.
 
 const defaultForm: FormData = {
   nombre: "",
@@ -90,6 +85,8 @@ const defaultForm: FormData = {
 
 const NuevoContactoForm = () => {
   const navigate = useNavigate();
+  const f = useFormato();
+  const { t } = useLanguage();
   const { toast } = useToast();
   const { user } = useAuth();
   const [form, setForm] = useState<FormData>(defaultForm);
@@ -160,11 +157,11 @@ const NuevoContactoForm = () => {
 
   const handleSubmit = async () => {
     const e: Record<string, string> = {};
-    if (!form.nombre.trim()) e.nombre = "El nombre es obligatorio";
-    if (!form.accountLink.trim()) e.accountLink = "El link de la cuenta es obligatorio";
+    if (!form.nombre.trim()) e.nombre = t("contactos.nameRequired");
+    if (!form.accountLink.trim()) e.accountLink = t("contactos.accountLinkRequired");
     if (Object.keys(e).length > 0) {
       setErrors(e);
-      toast({ title: "Revisa los campos marcados", variant: "destructive" });
+      toast({ title: t("contactos.checkMarkedFields"), variant: "destructive" });
       return;
     }
 
@@ -183,8 +180,11 @@ const NuevoContactoForm = () => {
       if (creatorCheck.exists && !creatorCheck.isActive) {
         recordType = "reactivado";
         toast({
-          title: "⚠️ Creadora inactiva detectada",
-          description: `${creatorCheck.creatorName} tiene estado "${creatorCheck.creatorStatus}". Se registrará como contacto reactivado.`,
+          title: t("contactos.inactiveCreatorTitle"),
+          description: t("contactos.inactiveCreatorDesc", {
+            name: creatorCheck.creatorName ?? "",
+            status: creatorCheck.creatorStatus ?? "",
+          }),
         });
       }
 
@@ -207,11 +207,11 @@ const NuevoContactoForm = () => {
       if (form.onlyfansUrl?.trim()) {
         const ofCheck = await checkDuplicateOnlyFans(form.onlyfansUrl);
         if (ofCheck.existsInLeads || ofCheck.existsInContacts) {
-          const where = ofCheck.existsInLeads ? "leads" : "contactos";
-          const nameInfo = ofCheck.matchName ? ` para "${ofCheck.matchName}"` : "";
+          const where = ofCheck.existsInLeads ? t("contactos.whereLeads") : t("contactos.whereContacts");
+          const nameInfo = ofCheck.matchName ? t("contactos.forName", { name: ofCheck.matchName }) : "";
           toast({
-            title: "❌ OnlyFans duplicado",
-            description: `Esta URL ya está registrada en ${where}${nameInfo}. No se puede registrar.`,
+            title: t("contactos.ofDuplicateTitle"),
+            description: t("contactos.ofDuplicateDesc", { where, nameInfo }),
             variant: "destructive",
           });
           setIsSaving(false);
@@ -227,15 +227,15 @@ const NuevoContactoForm = () => {
         const { data: contactName } = await supabase.rpc("find_contact_name_by_phone", { p_phone: trimmedPhone } as never);
         if (contactName) {
           toast({
-            title: "⚠️ Teléfono ya registrado",
-            description: `Este número ya está registrado para ${contactName}. El contacto se guardará de todos modos.`,
+            title: t("contactos.phoneTakenTitle"),
+            description: t("contactos.phoneTakenDesc", { name: String(contactName) }),
           });
         }
         const { data: creatorName } = await supabase.rpc("find_creator_name_by_phone", { p_phone: fullPhone } as never);
         if (creatorName) {
           toast({
-            title: "⚠️ Teléfono en creators",
-            description: `Este número ya existe para la creadora ${creatorName}. El contacto se guardará de todos modos.`,
+            title: t("contactos.phoneInCreatorsTitle"),
+            description: t("contactos.phoneInCreatorsDesc", { name: String(creatorName) }),
           });
         }
       }
@@ -268,10 +268,10 @@ const NuevoContactoForm = () => {
       // models.avatar_url (idempotente). No bloqueamos el submit.
       if (handle) void enqueueAvatarFetch(handle);
 
-      toast({ title: "Contacto guardado exitosamente" });
+      toast({ title: t("contactos.savedToast") });
       navigate("/contactos");
     } catch (err: any) {
-      toast({ title: "Error al guardar contacto", description: err.message, variant: "destructive" });
+      toast({ title: t("contactos.saveError"), description: err.message, variant: "destructive" });
     } finally {
       setIsSaving(false);
     }
@@ -290,7 +290,7 @@ const NuevoContactoForm = () => {
       if (form.onlyfansUrl?.trim()) updates.onlyfans_url = form.onlyfansUrl.trim();
 
       if (Object.keys(updates).length === 0) {
-        toast({ title: "No hay datos nuevos para actualizar", variant: "destructive" });
+        toast({ title: t("contactos.nothingToUpdate"), variant: "destructive" });
         setIsUpdatingContact(false);
         return;
       }
@@ -302,11 +302,11 @@ const NuevoContactoForm = () => {
 
       if (error) throw error;
 
-      toast({ title: "Contacto actualizado exitosamente" });
+      toast({ title: t("contactos.updatedToast") });
       setExistingContactData(null);
       navigate("/contactos");
     } catch (err: any) {
-      toast({ title: "Error al actualizar", description: err.message, variant: "destructive" });
+      toast({ title: t("common.errorUpdating"), description: err.message, variant: "destructive" });
     } finally {
       setIsUpdatingContact(false);
     }
@@ -340,10 +340,10 @@ const NuevoContactoForm = () => {
       } as any);
       if (error) throw error;
       if (handle) void enqueueAvatarFetch(handle);
-      toast({ title: "Contacto guardado exitosamente" });
+      toast({ title: t("contactos.savedToast") });
       navigate("/contactos");
     } catch (err: any) {
-      toast({ title: "Error al guardar contacto", description: err.message, variant: "destructive" });
+      toast({ title: t("contactos.saveError"), description: err.message, variant: "destructive" });
     } finally {
       setIsSaving(false);
     }
@@ -353,20 +353,20 @@ const NuevoContactoForm = () => {
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
       <header className="bg-background/30 backdrop-blur-xl px-6 pt-6 pb-4 border-b border-white/10 shrink-0">
         <nav className="text-sm text-muted-foreground mb-2">
-          <button onClick={() => navigate("/contactos")} className="hover:text-foreground transition-colors">Contactos</button>
+          <button onClick={() => navigate("/contactos")} className="hover:text-foreground transition-colors">{t("contactos.breadcrumb")}</button>
           <span className="mx-2">›</span>
-          <span className="text-foreground font-medium">Nuevo Contacto</span>
+          <span className="text-foreground font-medium">{t("contactos.newContact")}</span>
         </nav>
         <button
           onClick={() => navigate("/contactos")}
           className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
         >
-          <ArrowLeft className="h-4 w-4" /> Volver
+          <ArrowLeft className="h-4 w-4" /> {t("common.back")}
         </button>
         <PageHeader
           icon={<UserPlus className="h-6 w-6" />}
-          title="Nuevo Contacto"
-          subtitle="Agrega un nuevo contacto al directorio de Closers"
+          title={t("contactos.newContact")}
+          subtitle={t("contactos.newContactSubtitle")}
         />
       </header>
 
@@ -376,7 +376,7 @@ const NuevoContactoForm = () => {
               form. Una agencia es un lead B2B: al asignarla a un closer entra al
               pipeline como venta de plataforma (tab Agencias), no como
               reclutamiento de una modelo. */}
-          <Field label="Tipo de contacto *">
+          <Field label={t("contactos.kindLabel")}>
             <div className="flex flex-wrap gap-1 rounded-xl border border-white/10 bg-white/5 p-1 w-fit">
               {CONTACT_KINDS.map((k) => (
                 <button
@@ -389,44 +389,43 @@ const NuevoContactoForm = () => {
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  {k.label}
+                  {t(k.label)}
                 </button>
               ))}
             </div>
             {esAgencia && (
               <p className="mt-1.5 text-xs text-muted-foreground">
-                Al asignarla a un closer entra al pipeline como <strong>venta de plataforma</strong> y
-                aparece en el tab <strong>Agencias</strong>. Usa la categoría como prioridad y el
-                website/Telegram en las notas.
+                {t("contactos.agencyHintA")} <strong>{t("contactos.agencyHintSale")}</strong>{" "}
+                {t("contactos.agencyHintB")} <strong>{t("contactos.agencyHintTab")}</strong>{t("contactos.agencyHintC")}
               </p>
             )}
           </Field>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Field label={esAgencia ? "Nombre de la agencia *" : "Nombre del Contacto *"} error={errors.nombre}>
-              <Input value={form.nombre} onChange={(e) => set("nombre", e.target.value)} placeholder={esAgencia ? "Ej. OnlyModelos" : "Nombre completo"} className={errors.nombre ? "border-destructive" : ""} />
+            <Field label={esAgencia ? t("contactos.agencyName") : t("contactos.contactName")} error={errors.nombre}>
+              <Input value={form.nombre} onChange={(e) => set("nombre", e.target.value)} placeholder={esAgencia ? t("contactos.agencyNamePlaceholder") : t("common.fullName")} className={errors.nombre ? "border-destructive" : ""} />
             </Field>
-            <Field label={esAgencia ? "Prioridad *" : "Categoría Física *"} error={errors.categoria}>
+            <Field label={esAgencia ? t("contactos.priority") : t("contactos.physicalCategory")} error={errors.categoria}>
               <Select value={form.categoria} onValueChange={(v) => set("categoria", v)}>
-                <SelectTrigger className={errors.categoria ? "border-destructive" : ""}><SelectValue placeholder={esAgencia ? "Alta / Media / Baja" : "Seleccionar categoría"} /></SelectTrigger>
+                <SelectTrigger className={errors.categoria ? "border-destructive" : ""}><SelectValue placeholder={esAgencia ? t("contactos.priorityPlaceholder") : t("contactos.selectCategory")} /></SelectTrigger>
                 <SelectContent>
-                  {(esAgencia ? AGENCY_PRIORITIES : CATEGORIES).map((c) => (
-                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                  {(esAgencia ? PRIORIDADES_AGENCIA : CATEGORIAS).map((c) => (
+                    <SelectItem key={c.value} value={c.value}>{t(c.label)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </Field>
           </div>
 
-          <Field label="Compañía / Cuenta de Origen">
+          <Field label={t("contactos.companySource")}>
             <CompanySelector value={form.compania} onChange={(v) => set("compania", v)} companies={companies} onAddCompany={(name) => setCompanies((prev) => [...prev, name])} />
           </Field>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field label="Email">
-              <Input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} placeholder="email@ejemplo.com" />
+              <Input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} placeholder={t("contactos.emailPlaceholder")} />
             </Field>
-            <Field label="Teléfono">
+            <Field label={t("common.phone")}>
               <PhoneInput
                 value={`${form.countryCode} ${form.phone}`.trim()}
                 onChange={(val) => {
@@ -444,44 +443,44 @@ const NuevoContactoForm = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Field label="Link de la Cuenta *" error={errors.accountLink}>
-              <Input value={form.accountLink} onChange={(e) => set("accountLink", e.target.value)} placeholder="https://instagram.com/usuario" className={errors.accountLink ? "border-destructive" : ""} />
+            <Field label={t("contactos.accountLink")} error={errors.accountLink}>
+              <Input value={form.accountLink} onChange={(e) => set("accountLink", e.target.value)} placeholder={t("contactos.accountLinkPlaceholder")} className={errors.accountLink ? "border-destructive" : ""} />
             </Field>
-            <Field label="Plataforma">
+            <Field label={t("contactos.platform")}>
               <Select value={form.plataforma} onValueChange={(v) => set("plataforma", v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{PLATFORMS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
+                <SelectContent>{PLATFORMS.map((p) => <SelectItem key={p} value={p}>{p === PLATAFORMA_OTRA ? t("contactos.platformOther") : p}</SelectItem>)}</SelectContent>
               </Select>
             </Field>
           </div>
 
-          <Field label="OnlyFans URL (opcional)">
-            <Input value={form.onlyfansUrl} onChange={(e) => set("onlyfansUrl", e.target.value)} placeholder="https://onlyfans.com/usuario" />
+          <Field label={t("contactos.onlyfansOptional")}>
+            <Input value={form.onlyfansUrl} onChange={(e) => set("onlyfansUrl", e.target.value)} placeholder={t("contactos.onlyfansPlaceholder")} />
           </Field>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Field label="Ciudad">
-              <Input value={form.ciudad} onChange={(e) => set("ciudad", e.target.value)} placeholder="Ej: Bogotá, Medellín..." />
+            <Field label={t("common.city")}>
+              <Input value={form.ciudad} onChange={(e) => set("ciudad", e.target.value)} placeholder={t("contactos.cityPlaceholder")} />
             </Field>
-            <Field label="Número de Ticket">
-              <Input value={form.ticket} onChange={(e) => set("ticket", e.target.value)} placeholder="Ej: CT586864" />
+            <Field label={t("contactos.ticketNumber")}>
+              <Input value={form.ticket} onChange={(e) => set("ticket", e.target.value)} placeholder={t("contactos.ticketPlaceholder")} />
             </Field>
           </div>
 
-          <Field label="Notas">
-            <Textarea value={form.notas} onChange={(e) => set("notas", e.target.value)} placeholder="Notas adicionales sobre el contacto..." rows={4} />
+          <Field label={t("contactos.notes")}>
+            <Textarea value={form.notas} onChange={(e) => set("notas", e.target.value)} placeholder={t("contactos.notesPlaceholder")} rows={4} />
           </Field>
 
           <div>
-            <Label className="text-sm font-medium">Foto de Perfil</Label>
+            <Label className="text-sm font-medium">{t("contactos.profilePhoto")}</Label>
             <div className="flex items-center gap-4 mt-2">
               <Avatar className="h-16 w-16">
-                {profilePhoto ? <AvatarImage src={profilePhoto.url} alt="Foto de perfil" /> : null}
+                {profilePhoto ? <AvatarImage src={profilePhoto.url} alt={t("contactos.profilePhotoAlt")} /> : null}
                 <AvatarFallback><UserPlus className="h-6 w-6 text-muted-foreground" /></AvatarFallback>
               </Avatar>
               <div className="flex items-center gap-2">
                 <Button variant="outline" size="sm" type="button" onClick={() => setUploadModal({ open: true, category: "piclink" })}>
-                  <Upload className="mr-2 h-4 w-4" /> Subir Foto
+                  <Upload className="mr-2 h-4 w-4" /> {t("contactos.uploadPhoto")}
                 </Button>
                 {profilePhoto && (
                   <Button variant="ghost" size="sm" type="button" onClick={() => setProfilePhoto(null)}>
@@ -495,11 +494,11 @@ const NuevoContactoForm = () => {
           <div>
             <div className="flex items-center justify-between">
               <div>
-                <Label className="text-sm font-medium">Fotos y Videos Extras</Label>
-                <p className="text-xs text-muted-foreground mt-1">Formatos: Imágenes y Videos. Máximo 20MB por archivo.</p>
+                <Label className="text-sm font-medium">{t("contactos.extraMedia")}</Label>
+                <p className="text-xs text-muted-foreground mt-1">{t("contactos.extraMediaHint")}</p>
               </div>
               <Button variant="outline" size="sm" type="button" onClick={() => setUploadModal({ open: true, category: "extras" })}>
-                <Upload className="mr-2 h-4 w-4" /> Subir Archivos
+                <Upload className="mr-2 h-4 w-4" /> {t("contactos.uploadFiles")}
               </Button>
             </div>
             {extraFiles.length > 0 && (
@@ -524,9 +523,9 @@ const NuevoContactoForm = () => {
 
       <footer className="border-t border-border bg-background px-6 py-4 shrink-0">
         <div className="flex justify-end gap-3">
-          <Button variant="outline" onClick={() => navigate("/contactos")}>Cancelar</Button>
+          <Button variant="outline" onClick={() => navigate("/contactos")}>{t("common.cancel")}</Button>
           <Button onClick={handleSubmit} disabled={isSaving}>
-            <Save className="mr-2 h-4 w-4" /> {isSaving ? "Guardando..." : "Guardar Contacto"}
+            <Save className="mr-2 h-4 w-4" /> {isSaving ? t("contactos.saving") : t("contactos.saveContact")}
           </Button>
         </div>
       </footer>
@@ -537,14 +536,14 @@ const NuevoContactoForm = () => {
       {creatorAlert && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-card rounded-lg border border-border p-6 max-w-sm shadow-lg">
-            <h3 className="text-lg font-semibold mb-2">Creadora existente</h3>
+            <h3 className="text-lg font-semibold mb-2">{t("contactos.existingCreator")}</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Esta creadora ya forma parte de la agencia: <strong>{creatorAlert.name}</strong>
+              {t("contactos.existingCreatorDesc")} <strong>{creatorAlert.name}</strong>
             </p>
             <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => setCreatorAlert(null)}>Cancelar</Button>
+              <Button variant="outline" onClick={() => setCreatorAlert(null)}>{t("common.cancel")}</Button>
               <Button onClick={() => { navigate(`/creadoras/${creatorAlert.id}`); setCreatorAlert(null); }}>
-                Ver perfil
+                {t("contactos.viewProfile")}
               </Button>
             </div>
           </div>
@@ -557,40 +556,40 @@ const NuevoContactoForm = () => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-warning" />
-              Contacto existente
+              {t("contactos.existingContact")}
             </DialogTitle>
             <DialogDescription>
-              Esta modelo ya está registrada como contacto. Puedes actualizar sus datos o crear un nuevo registro.
+              {t("contactos.existingContactDesc")}
             </DialogDescription>
           </DialogHeader>
           {existingContactData && (
             <div className="space-y-3 py-2">
               <div className="rounded-xl border border-border p-3 space-y-1 text-sm">
-                <p><span className="text-muted-foreground">Nombre:</span> <strong>{existingContactData.name}</strong></p>
+                <p><span className="text-muted-foreground">{t("contactos.nameColon")}</span> <strong>{existingContactData.name}</strong></p>
                 {existingContactData.agentName && (
-                  <p><span className="text-muted-foreground">Registrado por:</span> {existingContactData.agentName}</p>
+                  <p><span className="text-muted-foreground">{t("contactos.registeredBy")}</span> {existingContactData.agentName}</p>
                 )}
                 {existingContactData.createdAt && (
-                  <p><span className="text-muted-foreground">Fecha:</span> {new Date(existingContactData.createdAt).toLocaleDateString("es-CO")}</p>
+                  <p><span className="text-muted-foreground">{t("contactos.dateColon")}</span> {new Date(existingContactData.createdAt).toLocaleDateString(f.intl("es-CO"))}</p>
                 )}
                 {existingContactData.phone && (
-                  <p><span className="text-muted-foreground">Teléfono actual:</span> <MaskedPhone phone={existingContactData.phone} /></p>
+                  <p><span className="text-muted-foreground">{t("contactos.currentPhone")}</span> <MaskedPhone phone={existingContactData.phone} /></p>
                 )}
                 {existingContactData.email && (
-                  <p><span className="text-muted-foreground">Email actual:</span> {existingContactData.email}</p>
+                  <p><span className="text-muted-foreground">{t("contactos.currentEmail")}</span> {existingContactData.email}</p>
                 )}
               </div>
             </div>
           )}
           <DialogFooter className="flex-col gap-2 sm:flex-col">
             <Button onClick={handleUpdateExistingContact} disabled={isUpdatingContact} className="w-full">
-              {isUpdatingContact ? "Actualizando..." : "Actualizar contacto"}
+              {isUpdatingContact ? t("contactos.updating") : t("contactos.updateContact")}
             </Button>
             <Button variant="outline" onClick={handleCreateNewAnyway} disabled={isSaving} className="w-full">
-              Crear nuevo registro
+              {t("contactos.createNewRecord")}
             </Button>
             <Button variant="ghost" onClick={() => setExistingContactData(null)} className="w-full">
-              Cancelar
+              {t("common.cancel")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -617,6 +616,7 @@ interface CompanySelectorProps {
 }
 
 function CompanySelector({ value, onChange, companies, onAddCompany }: CompanySelectorProps) {
+  const { t } = useLanguage();
   const [open, setOpen] = useState(false);
   const [addingNew, setAddingNew] = useState(false);
   const [newName, setNewName] = useState("");
@@ -635,23 +635,23 @@ function CompanySelector({ value, onChange, companies, onAddCompany }: CompanySe
     <Popover open={open} onOpenChange={(o) => { setOpen(o); if (!o) setAddingNew(false); }}>
       <PopoverTrigger asChild>
         <Button variant="outline" role="combobox" aria-expanded={open} className="w-full justify-between font-normal">
-          {value || <span className="text-muted-foreground">Seleccionar compañía</span>}
+          {value || <span className="text-muted-foreground">{t("contactos.selectCompany")}</span>}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-full p-0" align="start">
         {addingNew ? (
           <div className="p-3 space-y-2">
-            <p className="text-xs text-muted-foreground font-medium">Nueva compañía</p>
-            <Input autoFocus value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Nombre de la compañía" onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); if (e.key === "Escape") { setAddingNew(false); setNewName(""); } }} />
+            <p className="text-xs text-muted-foreground font-medium">{t("contactos.newCompany")}</p>
+            <Input autoFocus value={newName} onChange={(e) => setNewName(e.target.value)} placeholder={t("contactos.companyName")} onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); if (e.key === "Escape") { setAddingNew(false); setNewName(""); } }} />
             <div className="flex gap-2">
-              <Button size="sm" className="flex-1" onClick={handleAdd} disabled={!newName.trim()}>Agregar</Button>
-              <Button size="sm" variant="outline" onClick={() => { setAddingNew(false); setNewName(""); }}>Cancelar</Button>
+              <Button size="sm" className="flex-1" onClick={handleAdd} disabled={!newName.trim()}>{t("common.add")}</Button>
+              <Button size="sm" variant="outline" onClick={() => { setAddingNew(false); setNewName(""); }}>{t("common.cancel")}</Button>
             </div>
           </div>
         ) : (
           <Command>
-            <CommandInput placeholder="Buscar compañía..." />
+            <CommandInput placeholder={t("contactos.searchCompany")} />
             <CommandList>
               <CommandEmpty />
               <CommandGroup>
@@ -664,7 +664,7 @@ function CompanySelector({ value, onChange, companies, onAddCompany }: CompanySe
               </CommandGroup>
               <CommandGroup>
                 <CommandItem onSelect={() => setAddingNew(true)} className="text-muted-foreground">
-                  <Plus className="mr-2 h-4 w-4" /> Agregar nueva compañía…
+                  <Plus className="mr-2 h-4 w-4" /> {t("contactos.addNewCompany")}
                 </CommandItem>
               </CommandGroup>
             </CommandList>

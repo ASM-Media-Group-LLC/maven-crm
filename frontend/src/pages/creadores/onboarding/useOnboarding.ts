@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import type { TranslationKey } from "@/lib/i18n";
 
 export interface OnboardingCreator {
   id: string;
@@ -12,6 +13,7 @@ export interface OnboardingCreator {
   startDate: string | null;
   manager: string;
   progress: number;
+  // Llave interna del estado del proceso (la usan los filtros); se muestra con ETIQUETA_ESTADO_ONBOARDING.
   status: "Pendiente" | "En Progreso" | "Completado";
   hasTeamAssigned: boolean;
   // Raw fields for step calculation
@@ -44,6 +46,13 @@ function calculateProgress(creator: any): number {
   return Math.round((count / total) * 100);
 }
 
+/** La etiqueta de cada estado del proceso de onboarding. */
+export const ETIQUETA_ESTADO_ONBOARDING: Record<OnboardingCreator["status"], TranslationKey> = {
+  Pendiente: "common.pending",
+  "En Progreso": "cr.inProgressCap",
+  Completado: "common.completed",
+};
+
 function deriveStatus(dbStatus: string | null): "Pendiente" | "En Progreso" | "Completado" {
   if (dbStatus === "borrador" || dbStatus === "pendiente") return "Pendiente";
   if (dbStatus === "onboarding" || dbStatus === "pendiente_verificacion") return "En Progreso";
@@ -65,14 +74,15 @@ export function calculateCurrentStep(creator: OnboardingCreator): number {
   return 4;
 }
 
-export function getStepLabel(step: number, dbStatus: string | null): string {
-  if (dbStatus === "pendiente_verificacion") return "En Revisión";
+/** La CLAVE de la etiqueta del paso: se traduce con t() al dibujarla. */
+export function getStepLabel(step: number, dbStatus: string | null): TranslationKey | null {
+  if (dbStatus === "pendiente_verificacion") return "creadores.status.pendingVerification";
   switch (step) {
-    case 1: return "Completando datos personales";
-    case 2: return "Completando perfil psicológico";
-    case 3: return "Esperando documentos";
-    case 4: return "Configurando precios";
-    default: return "";
+    case 1: return "creadores.onb.stepPersonal";
+    case 2: return "creadores.onb.stepPsych";
+    case 3: return "creadores.onb.stepDocs";
+    case 4: return "creadores.onb.stepPricing";
+    default: return null;
   }
 }
 
@@ -168,7 +178,8 @@ export function useOnboarding() {
           profile_photo_url: c.profile_photo_url,
           position: biz?.kash_type || "Otro",
           area: biz?.manager_type || "Otro",
-          company: biz?.assigned_agency || "Sin empresa",
+          // Vacío = sin empresa; la etiqueta se pone al mostrarla.
+          company: biz?.assigned_agency || "",
           startDate: biz?.start_date || null,
           manager: c.assigned_manager_profile_id ? (managerMap[c.assigned_manager_profile_id] || "Sin asignar") : "Sin asignar",
           progress,

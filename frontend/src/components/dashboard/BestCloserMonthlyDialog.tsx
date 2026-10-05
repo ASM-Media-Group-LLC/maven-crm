@@ -3,6 +3,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ListRow } from "@/components/ui/list-row";
 import { Crown } from "lucide-react";
 import { useBestCloserByMonth } from "@/hooks/useOperationsDashboard";
+import { useLanguage } from "@/hooks/useLanguage";
+import { useFormato } from "@/hooks/useFormato";
 
 // Popup que lista al mejor cerrador de cada mes desde que el ranking
 // arrancó (2026-05). Mismo composite que el card del hero — el hook ya
@@ -13,7 +15,18 @@ interface Props {
 }
 
 const BestCloserMonthlyDialog = ({ open, onOpenChange }: Props) => {
+  const { t } = useLanguage();
+  const f = useFormato();
   const { data, isLoading } = useBestCloserByMonth();
+
+  // El hook arma `monthLabel` en español ("Mayo 2026"). En español se usa tal
+  // cual; en inglés se vuelve a escribir desde `month` (YYYY-MM).
+  const nombreDelMes = (m: { month: string; monthLabel: string }) => {
+    if (f.idioma !== "en") return m.monthLabel;
+    const [anio, mes] = m.month.split("-").map(Number);
+    if (!anio || !mes) return m.monthLabel;
+    return new Date(anio, mes - 1, 1).toLocaleDateString(f.intl(), { month: "long", year: "numeric" });
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -21,7 +34,7 @@ const BestCloserMonthlyDialog = ({ open, onOpenChange }: Props) => {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Crown className="h-5 w-5 text-amber-500" />
-            Mejor cerrador por mes
+            {t("shared.bestCloser.title")}
           </DialogTitle>
         </DialogHeader>
 
@@ -34,8 +47,7 @@ const BestCloserMonthlyDialog = ({ open, onOpenChange }: Props) => {
             </>
           ) : !data || data.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-12">
-              Sin data todavía. El ranking arrancó este mes y va a empezar
-              a llenarse a medida que entren calls.
+              {t("shared.bestCloser.empty")}
             </p>
           ) : (
             data.map((m) => (
@@ -45,18 +57,20 @@ const BestCloserMonthlyDialog = ({ open, onOpenChange }: Props) => {
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-xs text-muted-foreground font-semibold">
-                    {m.monthLabel}
+                    {nombreDelMes(m)}
                   </p>
                   {m.winner ? (
                     <>
                       <p className="text-base font-bold truncate">{m.winner.name}</p>
                       <p className="text-[11px] text-muted-foreground tabular-nums">
-                        {m.winner.closes.toLocaleString("es")} cierres · calif promedio{" "}
-                        {Math.round(m.winner.avgScore)}/100
+                        {t("shared.bestCloser.stats", {
+                          closes: m.winner.closes.toLocaleString(f.idioma === "en" ? "en-US" : "es"),
+                          score: Math.round(m.winner.avgScore),
+                        })}
                       </p>
                     </>
                   ) : (
-                    <p className="text-sm text-muted-foreground">Sin ganador</p>
+                    <p className="text-sm text-muted-foreground">{t("shared.bestCloser.noWinner")}</p>
                   )}
                 </div>
               </ListRow>

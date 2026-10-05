@@ -1,16 +1,18 @@
 import { useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { UserAvatar } from "@/components/UserAvatar";
+import { useLanguage } from "@/hooks/useLanguage";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, RotateCcw, Trash2, Trash } from "lucide-react";
+import { Loader2, RotateCcw, Trash2, Trash, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import type { CuentaEnPapelera } from "./usePapelera";
+import { ConFormato } from "./ConFormato";
 
 interface Props {
   cuentas: CuentaEnPapelera[];
@@ -22,6 +24,9 @@ interface Props {
   onPurgar: (userId: string) => void;
   recuperando: boolean;
   purgando: boolean;
+  /** Mensaje si la lista no se pudo cargar: se muestra, no se disfraza de vacío. */
+  error?: string | null;
+  onReintentar?: () => void;
 }
 
 // Los últimos días en rojo: es el aviso de que se va a purgar sola.
@@ -33,9 +38,11 @@ export function tonoDelPlazo(dias: number): "secondary" | "outline" | "destructi
 
 export default function PapeleraTabla({
   cuentas, diasDePapelera, isLoading, puedePurgar,
-  onRecuperar, onPurgar, recuperando, purgando,
+  onRecuperar, onPurgar, recuperando, purgando, error, onReintentar,
 }: Props) {
   const [aPurgar, setAPurgar] = useState<CuentaEnPapelera | null>(null);
+  const { t } = useLanguage();
+  const f = useFormato();
 
   if (isLoading) {
     return (
@@ -45,13 +52,29 @@ export default function PapeleraTabla({
     );
   }
 
+  // Un fallo de la llamada NO es "no hay cuentas". Se dice, con reintento.
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+        <AlertTriangle className="h-12 w-12 mb-3 opacity-40" />
+        <p>{t("papelera.noCargo")}</p>
+        <p className="text-xs mt-1 max-w-md text-center">{error}</p>
+        {onReintentar && (
+          <Button variant="outline" size="sm" className="mt-4" onClick={onReintentar}>
+            {t("common.retry")}
+          </Button>
+        )}
+      </div>
+    );
+  }
+
   if (cuentas.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
         <Trash className="h-12 w-12 mb-3 opacity-40" />
-        <p>No hay cuentas eliminadas</p>
+        <p>{t("admin.trash.empty")}</p>
         <p className="text-xs mt-1">
-          Lo que se elimina se puede recuperar durante {diasDePapelera} días.
+          {t("admin.trash.emptyHint", { days: diasDePapelera })}
         </p>
       </div>
     );
@@ -60,20 +83,17 @@ export default function PapeleraTabla({
   return (
     <>
       <p className="text-xs text-muted-foreground">
-        Estas cuentas están suspendidas: no pueden entrar, pero no se borró
-        ningún dato. Pasados {diasDePapelera} días se eliminan de forma
-        definitiva. Al recuperar una, la casilla de correo <strong>no</strong>{" "}
-        vuelve: se dio de baja para liberar el puesto y hay que crearla de nuevo.
+        <ConFormato texto={t("admin.trash.intro", { days: diasDePapelera })} />
       </p>
 
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Persona</TableHead>
-            <TableHead>Eliminada</TableHead>
-            <TableHead>Por</TableHead>
-            <TableHead>Se borra en</TableHead>
-            <TableHead className="text-right">Acciones</TableHead>
+            <TableHead>{t("admin.person")}</TableHead>
+            <TableHead>{t("admin.trash.colDeleted")}</TableHead>
+            <TableHead>{t("admin.trash.colBy")}</TableHead>
+            <TableHead>{t("admin.trash.colTimeLeft")}</TableHead>
+            <TableHead className="text-right">{t("common.actions")}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -88,13 +108,13 @@ export default function PapeleraTabla({
                     size="sm"
                   />
                   <div className="min-w-0">
-                    <p className="font-medium truncate">{c.full_name || "Sin nombre"}</p>
+                    <p className="font-medium truncate">{c.full_name || t("admin.noName")}</p>
                     <p className="text-xs text-muted-foreground truncate">{c.email || "—"}</p>
                   </div>
                 </div>
               </TableCell>
               <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                {format(new Date(c.deleted_at), "d MMM yyyy, HH:mm", { locale: es })}
+                {format(new Date(c.deleted_at), "d MMM yyyy, HH:mm", { locale: f.fechas })}
               </TableCell>
               <TableCell className="text-sm text-muted-foreground">
                 {c.deleted_by_name || "—"}
@@ -102,10 +122,10 @@ export default function PapeleraTabla({
               <TableCell>
                 <Badge variant={tonoDelPlazo(c.dias_restantes)}>
                   {c.dias_restantes === 0
-                    ? "hoy"
+                    ? t("admin.trash.today")
                     : c.dias_restantes === 1
-                      ? "1 día"
-                      : `${c.dias_restantes} días`}
+                      ? t("admin.oneDay")
+                      : t("admin.nDays", { n: c.dias_restantes })}
                 </Badge>
               </TableCell>
               <TableCell className="text-right">
@@ -117,15 +137,15 @@ export default function PapeleraTabla({
                     onClick={() => onRecuperar(c.id)}
                   >
                     <RotateCcw className="h-3.5 w-3.5 mr-1" />
-                    Recuperar
+                    {t("admin.trash.restore")}
                   </Button>
                   {puedePurgar && (
                     <Button
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8 text-destructive hover:text-destructive"
-                      title="Borrar definitivamente"
-                      aria-label={`Borrar definitivamente a ${c.full_name || "esta persona"}`}
+                      title={t("admin.trash.purge")}
+                      aria-label={t("admin.trash.purgeName", { name: c.full_name || t("admin.thisPerson") })}
                       disabled={purgando}
                       onClick={() => setAPurgar(c)}
                     >
@@ -145,19 +165,13 @@ export default function PapeleraTabla({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              ¿Borrar definitivamente a {aPurgar?.full_name || "esta persona"}?
+              {t("admin.trash.purgeTitle", { name: aPurgar?.full_name || t("admin.thisPerson") })}
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-2">
-                <p>Esto no se puede deshacer, y no espera los {diasDePapelera} días.</p>
-                <p>
-                  Se van sus roles, su correo, sus horas de Cowork, las
-                  evaluaciones donde fue examinador y los espacios de chat o
-                  salas de Meet que haya creado (esos desaparecen para todos).
-                  Además, todo lo que creó en el CRM —creadoras, negocios,
-                  promos— queda sin autor.
-                </p>
-                <p>Sus mensajes en Messenger se quedan, pero sin nombre ni foto.</p>
+                <p>{t("admin.trash.purgeNoUndo", { days: diasDePapelera })}</p>
+                <p>{t("admin.trash.purgeWhat")}</p>
+                <p>{t("admin.trash.purgeMessages")}</p>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -170,7 +184,7 @@ export default function PapeleraTabla({
                 setAPurgar(null);
               }}
             >
-              Borrar definitivamente
+              {t("admin.trash.purge")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

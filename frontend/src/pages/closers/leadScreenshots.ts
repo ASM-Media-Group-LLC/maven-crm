@@ -7,6 +7,7 @@
 // bot de WhatsApp las ve por su camino ya existente (whatsapp-agent lee
 // closer_lead_files por creator_id y expone vision_text), sin tocar el bot.
 import { supabase } from "@/integrations/supabase/client";
+import { traducir } from "@/lib/i18n";
 
 export const SCREENSHOT_BUCKET = "closer-evidence";
 export const SCREENSHOT_MAX_BYTES = 5 * 1024 * 1024; // = file_size_limit del bucket
@@ -23,8 +24,9 @@ const TABLA = "closer_lead_files" as never;
 
 /** Rechaza lo que el bucket rechazaría, pero antes de gastar la subida. */
 export const validarScreenshot = (f: File): string | null => {
-  if (!SCREENSHOT_MIMES.includes(f.type)) return `${f.name}: solo PNG, JPG o WEBP`;
-  if (f.size > SCREENSHOT_MAX_BYTES) return `${f.name}: pesa más de 5 MB`;
+  // Mensaje para un toast (se arma una vez y se muestra): traducir() alcanza.
+  if (!SCREENSHOT_MIMES.includes(f.type)) return traducir("closers.shots.badType", { name: f.name });
+  if (f.size > SCREENSHOT_MAX_BYTES) return traducir("closers.shots.tooBig", { name: f.name });
   return null;
 };
 
@@ -39,10 +41,10 @@ export const soloImagenes = (files: Iterable<File>): File[] =>
  * si la subida/insert falla (limpia el objeto huérfano en ese caso).
  */
 export async function uploadLeadScreenshots(leadId: string, files: File[]): Promise<number> {
-  if (!leadId) throw new Error("Falta el lead para adjuntar la captura.");
+  if (!leadId) throw new Error(traducir("closers.shots.noLead"));
   const { data: auth } = await supabase.auth.getUser();
   const uid = auth.user?.id;
-  if (!uid) throw new Error("Sesión expirada, vuelve a entrar");
+  if (!uid) throw new Error(traducir("closers.shots.sessionExpired"));
 
   for (const f of files) {
     const problema = validarScreenshot(f);

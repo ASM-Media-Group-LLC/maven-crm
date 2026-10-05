@@ -9,7 +9,12 @@
 import { useId } from "react";
 import { Coffee, Video } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { fraseDePausa } from "@/lib/frasesDePausa";
+import { FRASES_DE_PAUSA } from "@/lib/frasesDePausa";
+import { formatoActual, type Formato } from "@/lib/formato";
+import { traducir, type TranslationKey } from "@/lib/i18n";
+import { useLanguageSiHay } from "@/hooks/useLanguage";
+import { useFormato } from "@/hooks/useFormato";
+import type { Traductor } from "./textosCowork";
 
 export interface PausaDeSala {
   /** "meet" = la sala entera está en un meet grupal del supervisor: no es una
@@ -31,8 +36,8 @@ const mmss = (seg: number) => {
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), r = s % 60;
   return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${String(r).padStart(2, "0")}` : `${m}:${String(r).padStart(2, "0")}`;
 };
-const horaCorta = (epoch: number | null) =>
-  epoch ? new Date(epoch).toLocaleTimeString("es-CO", { hour: "numeric", minute: "2-digit" }) : null;
+const horaCorta = (f: Formato, epoch: number | null) =>
+  epoch ? new Date(epoch).toLocaleTimeString(f.intl("es-CO"), { hour: "numeric", minute: "2-digit" }) : null;
 
 // El "paisaje" de fondo de las miniaturas en pausa del mock (Jhon, 10/09:
 // "tienen hasta una especie de paisaje detrás"). Dibujado en SVG —noche, luna,
@@ -81,13 +86,33 @@ export function PaisajeDePausa({ excedida }: { excedida: boolean }) {
   );
 }
 
-/** Textos y proporción del tope. Puro, para probarlo. */
-export function describirPausa(p: PausaDeSala): { titulo: string; detalle: string; pct: number; tono: "ok" | "poco" | "excedida" } {
+// Las frases del break, en el diccionario. Una por cada una de lib/frasesDePausa
+// (el español es el mismo, palabra por palabra) y elegida con la MISMA cuenta:
+// sale del minuto en que arrancó la pausa y no cambia mientras dure.
+const CLAVES_FRASE: readonly TranslationKey[] = [
+  "cowork.pauseTile.phrase1",
+  "cowork.pauseTile.phrase2",
+  "cowork.pauseTile.phrase3",
+  "cowork.pauseTile.phrase4",
+];
+const claveFraseDePausa = (desde: number | null): TranslationKey =>
+  CLAVES_FRASE[Math.floor((desde ?? 0) / 60_000) % FRASES_DE_PAUSA.length] ?? CLAVES_FRASE[0];
+
+/** Textos y proporción del tope. Puro, para probarlo.
+ *
+ *  Sin `f` ni `t` toma el idioma vigente (`formatoActual()`, `traducir()`): así
+ *  la prueban los tests sin proveedor. La miniatura le pasa los del hook, que
+ *  se vuelven a calcular si cambia el idioma. */
+export function describirPausa(
+  p: PausaDeSala,
+  f: Formato = formatoActual(),
+  t: Traductor = traducir,
+): { titulo: string; detalle: string; pct: number; tono: "ok" | "poco" | "excedida" } {
   const esBano = p.kind === "bano";
-  const titulo = p.kind === "meet" ? "En meet grupal" : esBano ? "En el baño" : "En break";
+  const titulo = p.kind === "meet" ? t("cowork.pauseTile.inMeet") : esBano ? t("cowork.pauseTile.inBathroom") : t("cowork.pauseTile.onBreak");
   const partes: string[] = [];
-  const desde = horaCorta(p.desde);
-  if (desde) partes.push(`Desde ${desde}`);
+  const desde = horaCorta(f, p.desde);
+  if (desde) partes.push(t("cowork.pauseTile.since", { time: desde }));
   // El meet no tiene tope ni se "pasa": solo desde cuándo.
   if (p.kind === "meet") return { titulo, detalle: partes.join(" · "), pct: 0, tono: "ok" };
   let pct = 0;
@@ -99,28 +124,34 @@ export function describirPausa(p: PausaDeSala): { titulo: string; detalle: strin
     const deMas = usado - topeSeg;
     if (deMas >= 0) {
       tono = "excedida";
-      partes.push(esBano ? `Pasó los ${p.limiteMin} min de baño de hoy` : `${Math.ceil(deMas / 60)} min de más`);
+      partes.push(esBano
+        ? t("cowork.pauseTile.bathroomOver", { limit: p.limiteMin })
+        : t("cowork.pauseTile.minOver", { min: Math.ceil(deMas / 60) }));
     } else {
       tono = pct >= 75 ? "poco" : "ok";
       partes.push(esBano
-        ? `Hoy lleva ${Math.round(usado / 60)} de ${p.limiteMin} min`
-        : `Quedan ${Math.ceil((topeSeg - usado) / 60)} min`);
+        ? t("cowork.pauseTile.bathroomUsed", { used: Math.round(usado / 60), limit: p.limiteMin })
+        : t("cowork.pauseTile.minLeft", { min: Math.ceil((topeSeg - usado) / 60) }));
     }
   } else {
-    partes.push("Sin tope");
+    partes.push(t("cowork.pauseTile.noLimit"));
   }
-  return { titulo: tono === "excedida" ? `${titulo} · pasado` : titulo, detalle: partes.join(" · "), pct, tono };
+  return { titulo: tono === "excedida" ? t("cowork.pauseTile.titleOver", { title: titulo }) : titulo, detalle: partes.join(" · "), pct, tono };
 }
 
 export default function SalaEnPausa({ pausa, className }: { pausa: PausaDeSala; className?: string }) {
-  const d = describirPausa(pausa);
+  // Sin proveedor de idioma (los tests la dibujan sola) cae al idioma vigente:
+  // la miniatura se vuelve a dibujar cada segundo con el reloj que corre.
+  const t = useLanguageSiHay()?.t ?? traducir;
+  const f = useFormato();
+  const d = describirPausa(pausa, f, t);
   const excedida = d.tono === "excedida";
   const esMeet = pausa.kind === "meet";
   // Ámbar es pausa; el meet grupal es trabajo y va en el color de la marca.
   const acento = excedida ? "text-destructive" : esMeet ? "text-primary" : "text-warning";
   // En la miniatura el título va en una línea al lado del anillo: "En break ·
   // pasado" no cabe en el teléfono, así que pasado el tope se acorta.
-  const etiqueta = excedida ? (pausa.kind === "bano" ? "Baño pasado" : "Break pasado") : d.titulo;
+  const etiqueta = excedida ? (pausa.kind === "bano" ? t("cowork.pauseTile.bathroomOverShort") : t("cowork.pauseTile.breakOverShort")) : d.titulo;
   // "Desde 1:51 p. m." y "Quedan 24 min": en el teléfono (163 px de ancho útil)
   // van en dos renglones limpios; en escritorio, en uno separados por el punto.
   const partes = d.detalle.split(" · ");
@@ -164,7 +195,7 @@ export default function SalaEnPausa({ pausa, className }: { pausa: PausaDeSala; 
       </div>
       {/* La frase es del break y de cuando va bien: pasado el tope, sobra. */}
       {pausa.kind === "break" && !excedida && (
-        <p className="relative line-clamp-2 max-w-[30ch] text-[10px] italic leading-snug text-white/60">{fraseDePausa(pausa.desde)}</p>
+        <p className="relative line-clamp-2 max-w-[30ch] text-[10px] italic leading-snug text-white/60">{t(claveFraseDePausa(pausa.desde))}</p>
       )}
     </div>
   );

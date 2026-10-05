@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import Logo from "@/components/Logo";
 import AnimatedGradientBackground from "@/components/auth/AnimatedGradientBackground";
 import AnimatedWaves from "@/components/auth/AnimatedWaves";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // SEGURIDAD: nunca hardcodear la contraseña (terminaba shippeada en el bundle).
 // Viene de una env var SOLO de desarrollo; en prod queda vacía (y la página ni
@@ -17,7 +18,7 @@ const TEST_PASSWORD = import.meta.env.VITE_TEST_PASSWORD ?? "";
 const roles = [
   {
     name: "Admin",
-    description: "Acceso total a todos los módulos del sistema",
+    description: "page.cred.adminDesc",
     email: "test-admin@maven.app",
     icon: Shield,
     gradient: "from-red-500/20 to-orange-500/20",
@@ -26,7 +27,7 @@ const roles = [
   },
   {
     name: "Manager",
-    description: "Gestión de creadores, ventas, HR y equipo",
+    description: "page.cred.managerDesc",
     email: "test-manager@maven.app",
     icon: Briefcase,
     gradient: "from-blue-500/20 to-cyan-500/20",
@@ -35,7 +36,7 @@ const roles = [
   },
   {
     name: "Supervisor",
-    description: "Supervisión de creadores, ventas y HR",
+    description: "page.cred.supervisorDesc",
     email: "test-supervisor@maven.app",
     icon: Eye,
     gradient: "from-purple-500/20 to-pink-500/20",
@@ -44,7 +45,7 @@ const roles = [
   },
   {
     name: "Agent",
-    description: "Insights, tareas y messenger",
+    description: "page.cred.agentDesc",
     email: "test-agent@maven.app",
     icon: UserCheck,
     gradient: "from-green-500/20 to-emerald-500/20",
@@ -53,7 +54,7 @@ const roles = [
   },
   {
     name: "Closer",
-    description: "Closers, ventas, contactos y LeadGen",
+    description: "page.cred.closerDesc",
     email: "test-closer@maven.app",
     icon: Phone,
     gradient: "from-amber-500/20 to-yellow-500/20",
@@ -62,16 +63,17 @@ const roles = [
   },
   {
     name: "Employee",
-    description: "Dashboard, tareas y messenger",
+    description: "page.cred.employeeDesc",
     email: "test-employee@maven.app",
     icon: Users,
     gradient: "from-slate-500/20 to-zinc-500/20",
     border: "border-slate-500/30",
     iconColor: "text-slate-400",
   },
-];
+] as const;
 
 const Credentials = () => {
+  const { t } = useLanguage();
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -96,12 +98,12 @@ const Credentials = () => {
 
     if (error) {
       toast({
-        title: "Error al acceder",
-        description: `No se pudo iniciar sesión como ${roleName}. Verifica que la cuenta de prueba exista.`,
+        title: t("page.cred.loginError"),
+        description: t("page.cred.loginErrorDesc", { role: roleName }),
         variant: "destructive",
       });
     } else {
-      toast({ title: `Sesión iniciada como ${roleName}` });
+      toast({ title: t("page.cred.signedInAs", { role: roleName }) });
       navigate("/dashboard");
     }
   };
@@ -113,7 +115,7 @@ const Credentials = () => {
       <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-4 py-12">
         <Logo size="md" />
         <p className="text-white/60 mt-2 mb-2 text-sm font-light tracking-wide text-center max-w-md">
-          Cuentas de prueba para acceso rápido
+          {t("page.cred.subtitle")}
         </p>
 
         {user && (
@@ -124,7 +126,7 @@ const Credentials = () => {
             onClick={() => signOut()}
           >
             <LogOut className="h-4 w-4 mr-2" />
-            Cerrar sesión actual
+            {t("page.cred.signOutCurrent")}
           </Button>
         )}
 
@@ -146,7 +148,7 @@ const Credentials = () => {
                   <div className="flex-1 min-w-0">
                     <h3 className="text-lg font-semibold text-white">{role.name}</h3>
                     <p className="text-xs text-white/50 mt-1 leading-relaxed">
-                      {role.description}
+                      {t(role.description)}
                     </p>
                     <p className="text-[10px] text-white/30 mt-2 font-mono truncate">
                       {role.email}
@@ -158,7 +160,7 @@ const Credentials = () => {
                     <Loader2 className="h-4 w-4 animate-spin text-white/60" />
                   ) : (
                     <span className="text-xs text-white/40 group-hover:text-white/70 transition-colors">
-                      Acceder →
+                      {t("page.cred.enter")} →
                     </span>
                   )}
                 </div>
@@ -168,7 +170,8 @@ const Credentials = () => {
         </div>
 
         <p className="text-white/20 text-[10px] mt-8 text-center">
-          Estas cuentas son exclusivamente para testing y desarrollo.
+          {t("page.cred.footer")}
+
         </p>
       </div>
     </div>

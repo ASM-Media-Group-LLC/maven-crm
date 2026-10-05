@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Upload, X, Image as ImageIcon } from "lucide-react";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface TemplateData {
   id?: string;
@@ -26,6 +27,7 @@ interface Props {
 }
 
 export default function CreateTemplateModal({ open, onOpenChange, template }: Props) {
+  const { t } = useLanguage();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const isEdit = !!template?.id;
@@ -46,7 +48,7 @@ export default function CreateTemplateModal({ open, onOpenChange, template }: Pr
 
   const handleFile = async (file: File) => {
     if (!file.type.startsWith("image/")) {
-      toast({ title: "Solo se permiten imágenes", variant: "destructive" });
+      toast({ title: t("finanzas.tpl.toast.imagesOnly"), variant: "destructive" });
       return;
     }
     setUploading(true);
@@ -54,7 +56,7 @@ export default function CreateTemplateModal({ open, onOpenChange, template }: Pr
     const path = `${crypto.randomUUID()}.${ext}`;
     const { error } = await supabase.storage.from("template-logos").upload(path, file);
     if (error) {
-      toast({ title: "Error al subir logo", variant: "destructive" });
+      toast({ title: t("finanzas.tpl.toast.logoError"), variant: "destructive" });
       setUploading(false);
       return;
     }
@@ -73,6 +75,8 @@ export default function CreateTemplateModal({ open, onOpenChange, template }: Pr
   const mutation = useMutation({
     mutationFn: async () => {
       const { data: user } = await supabase.auth.getUser();
+      // El nombre se GUARDA ("KASH AGENCY - Nota de pago") y lo ven todos: va en español
+      // siempre, sea cual sea el idioma de quien crea el template.
       const typeLabel = type === "invoice" ? "Invoice" : "Nota de pago";
       const payload: any = {
         name: `${companyName || "Template"} - ${typeLabel}`, type,
@@ -94,27 +98,27 @@ export default function CreateTemplateModal({ open, onOpenChange, template }: Pr
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["invoice-templates"] });
-      toast({ title: isEdit ? "Template actualizado" : "Template creado" });
+      toast({ title: isEdit ? t("finanzas.tpl.toast.updated") : t("finanzas.tpl.toast.created") });
       resetForm();
       onOpenChange(false);
     },
-    onError: () => toast({ title: "Error al guardar", variant: "destructive" }),
+    onError: () => toast({ title: t("common.errorSaving"), variant: "destructive" }),
   });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{isEdit ? "Editar Template" : "Crear Template"}</DialogTitle>
+          <DialogTitle>{isEdit ? t("finanzas.tpl.edit") : t("finanzas.tpl.create")}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div>
-            <Label>Tipo de template</Label>
+            <Label>{t("finanzas.tpl.type")}</Label>
             <Select value={type} onValueChange={setType}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="invoice">Invoice</SelectItem>
-                <SelectItem value="nota_pago">Nota de pago</SelectItem>
+                <SelectItem value="nota_pago">{t("finanzas.tpl.paymentNote")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -122,23 +126,23 @@ export default function CreateTemplateModal({ open, onOpenChange, template }: Pr
           {type === "invoice" && (
             <>
               <div>
-                <Label>Nombre de la compañía</Label>
-                <Input value={companyName} onChange={e => setCompanyName(e.target.value)} placeholder="Ej: KASH AGENCY" />
+                <Label>{t("finanzas.tpl.companyName")}</Label>
+                <Input value={companyName} onChange={e => setCompanyName(e.target.value)} placeholder={t("finanzas.tpl.example", { value: "KASH AGENCY" })} />
               </div>
               <div>
-                <Label>Dirección</Label>
-                <Input value={companyAddress} onChange={e => setCompanyAddress(e.target.value)} placeholder="Ej: 333 SE 2nd Ave, Miami, FL" />
+                <Label>{t("common.address")}</Label>
+                <Input value={companyAddress} onChange={e => setCompanyAddress(e.target.value)} placeholder={t("finanzas.tpl.addressPlaceholder")} />
               </div>
               <div>
-                <Label>Código postal</Label>
-                <Input value={companyZip} onChange={e => setCompanyZip(e.target.value)} placeholder="Ej: 33131" />
+                <Label>{t("finanzas.tpl.zip")}</Label>
+                <Input value={companyZip} onChange={e => setCompanyZip(e.target.value)} placeholder={t("finanzas.tpl.example", { value: "33131" })} />
               </div>
               <div>
-                <Label>Correo electrónico</Label>
-                <Input type="email" value={companyEmail} onChange={e => setCompanyEmail(e.target.value)} placeholder="Ej: billing@company.com" />
+                <Label>{t("finanzas.tpl.email")}</Label>
+                <Input type="email" value={companyEmail} onChange={e => setCompanyEmail(e.target.value)} placeholder={t("finanzas.tpl.example", { value: "billing@company.com" })} />
               </div>
               <div>
-                <Label>Logo de la compañía</Label>
+                <Label>{t("finanzas.tpl.logo")}</Label>
                 <div
                   onDragOver={e => { e.preventDefault(); setDragOver(true); }}
                   onDragLeave={() => setDragOver(false)}
@@ -159,15 +163,15 @@ export default function CreateTemplateModal({ open, onOpenChange, template }: Pr
                         className="text-xs text-destructive hover:underline"
                         onClick={e => { e.stopPropagation(); setLogoUrl(""); }}
                       >
-                        <X className="h-3 w-3 inline mr-1" />Eliminar
+                        <X className="h-3 w-3 inline mr-1" />{t("common.delete")}
                       </button>
                     </div>
                   ) : uploading ? (
-                    <p className="text-sm text-muted-foreground">Subiendo...</p>
+                    <p className="text-sm text-muted-foreground">{t("finanzas.tpl.uploading")}</p>
                   ) : (
                     <div className="flex flex-col items-center gap-2 text-muted-foreground">
                       <Upload className="h-8 w-8" />
-                      <p className="text-sm">Arrastra o haz clic para subir logo</p>
+                      <p className="text-sm">{t("finanzas.tpl.dropLogo")}</p>
                     </div>
                   )}
                 </div>
@@ -176,9 +180,9 @@ export default function CreateTemplateModal({ open, onOpenChange, template }: Pr
           )}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>{t("common.cancel")}</Button>
           <Button onClick={() => mutation.mutate()} disabled={!companyName || mutation.isPending}>
-            {isEdit ? "Guardar" : "Crear Template"}
+            {isEdit ? t("common.save") : t("finanzas.tpl.create")}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
 import {
   AlertCircle,
   Bot,
@@ -31,6 +30,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
 import { EmptyState } from "@/components/EmptyState";
 import {
   useAskWhatsappAgent,
@@ -84,6 +85,7 @@ import { Check, ChevronsUpDown, Link2, Link2Off } from "lucide-react";
 // más roles, agregar un guard explícito acá.
 
 export default function WhatsappAgentTab() {
+  const { t } = useLanguage();
   const { data: groups, isLoading } = useWhatsappGroups();
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
 
@@ -109,15 +111,14 @@ export default function WhatsappAgentTab() {
     return (
       <Card className="p-8 text-center space-y-3">
         <Bot className="h-10 w-10 text-muted-foreground mx-auto" />
-        <h3 className="text-lg font-semibold">No hay grupos de WhatsApp configurados</h3>
+        <h3 className="text-lg font-semibold">{t("panel.wa.noGroups")}</h3>
         <p className="text-sm text-muted-foreground max-w-md mx-auto">
-          Para empezar, conecta un provider (Evolution API o similar) y agrega el bot a un
-          grupo del equipo. El primer mensaje que reciba va a aparecer en los eventos como{" "}
-          <code className="text-xs bg-muted px-1 rounded">group_not_registered</code> y desde
-          ahí puedes activar el grupo.
+          {t("panel.wa.setup1")}{" "}
+          <code className="text-xs bg-muted px-1 rounded">group_not_registered</code>{" "}
+          {t("panel.wa.setup2")}
         </p>
         <p className="text-xs text-muted-foreground">
-          La doc del setup está en el repo, en{" "}
+          {t("panel.wa.setupDocs")}{" "}
           <code className="text-xs bg-muted px-1 rounded">supabase/functions/whatsapp-ingest</code>.
         </p>
       </Card>
@@ -148,6 +149,7 @@ function GroupsList({
   selectedId: string | null;
   onSelect: (id: string) => void;
 }) {
+  const f = useFormato();
   return (
     <div className="space-y-2">
       {groups.map((g) => (
@@ -167,7 +169,7 @@ function GroupsList({
               <div className="text-xs text-muted-foreground truncate">
                 {g.provider}
                 {g.last_message_at && (
-                  <> · {format(new Date(g.last_message_at), "d MMM HH:mm", { locale: es })}</>
+                  <> · {format(new Date(g.last_message_at), "d MMM HH:mm", { locale: f.fechas })}</>
                 )}
               </div>
             </div>
@@ -193,6 +195,7 @@ function GroupsList({
 // Group detail
 // ─────────────────────────────────────────────────────────────────────────
 function GroupDetail({ group }: { group: WhatsappGroup }) {
+  const { t } = useLanguage();
   const { data: summary } = useWhatsappGroupSummary(group.id);
   const toggleMut = useToggleWhatsappBot();
   const bots = useWaBots();
@@ -229,7 +232,7 @@ function GroupDetail({ group }: { group: WhatsappGroup }) {
               variant="outline"
               size="icon"
               onClick={() => setSettingsOpen(true)}
-              title="Configurar persona"
+              title={t("panel.wa.configPersona")}
             >
               <Settings className="h-4 w-4" />
             </Button>
@@ -239,7 +242,7 @@ function GroupDetail({ group }: { group: WhatsappGroup }) {
         {/* Bot asignado (Fase 6): qué bot (wa_bots) atiende este grupo. */}
         <div className="mt-3 flex items-center gap-2 border-t pt-3">
           <Bot className="h-4 w-4 text-muted-foreground shrink-0" />
-          <span className="text-xs text-muted-foreground shrink-0">Bot asignado:</span>
+          <span className="text-xs text-muted-foreground shrink-0">{t("panel.wa.assignedBot")}</span>
           <Select
             value={group.wa_bot_id ?? "none"}
             onValueChange={(v) => assignMut.mutate({ groupId: group.id, botId: v === "none" ? null : v })}
@@ -247,16 +250,16 @@ function GroupDetail({ group }: { group: WhatsappGroup }) {
           >
             <SelectTrigger className="h-8 w-72 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="none">Sin bot (motor + manual de Ventas por defecto)</SelectItem>
+              <SelectItem value="none">{t("panel.wa.noBot")}</SelectItem>
               {(bots.data ?? []).map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
 
         <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t">
-          <Stat label="Mensajes" value={summary?.message_count ?? 0} icon={MessageCircle} />
-          <Stat label="Pendientes" value={summary?.open_commitments ?? 0} icon={Clock} accent="overdue" />
-          <Stat label="Miembros" value={summary?.member_count ?? 0} icon={Users} />
+          <Stat label={t("panel.wa.messages")} value={summary?.message_count ?? 0} icon={MessageCircle} />
+          <Stat label={t("common.pendingPl")} value={summary?.open_commitments ?? 0} icon={Clock} accent="overdue" />
+          <Stat label={t("panel.wa.members")} value={summary?.member_count ?? 0} icon={Users} />
         </div>
       </Card>
 
@@ -266,11 +269,11 @@ function GroupDetail({ group }: { group: WhatsappGroup }) {
       {/* Tabs */}
       <Tabs defaultValue="commitments">
         <TabsList>
-          <TabsTrigger value="commitments">Compromisos</TabsTrigger>
-          <TabsTrigger value="reports">Reportes diarios</TabsTrigger>
-          <TabsTrigger value="messages">Mensajes</TabsTrigger>
-          <TabsTrigger value="members">Miembros</TabsTrigger>
-          <TabsTrigger value="events">Eventos</TabsTrigger>
+          <TabsTrigger value="commitments">{t("panel.wa.commitments")}</TabsTrigger>
+          <TabsTrigger value="reports">{t("panel.wa.dailyReports")}</TabsTrigger>
+          <TabsTrigger value="messages">{t("panel.wa.messages")}</TabsTrigger>
+          <TabsTrigger value="members">{t("panel.wa.members")}</TabsTrigger>
+          <TabsTrigger value="events">{t("panel.wa.events")}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="commitments" className="mt-3">
@@ -298,14 +301,13 @@ function GroupDetail({ group }: { group: WhatsappGroup }) {
       <Card className="p-4 border-dashed">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-medium">Preguntale al bot</p>
+            <p className="text-sm font-medium">{t("panel.wa.ask")}</p>
             <p className="text-xs text-muted-foreground">
-              Prueba una pregunta sin escribir en el grupo. La respuesta se manda igual al
-              grupo (si bot_enabled está on).
+              {t("panel.wa.askHint")}
             </p>
           </div>
           <Button onClick={() => setAskOpen(true)} className="shrink-0">
-            <Send className="h-4 w-4 mr-1.5" /> Preguntar
+            <Send className="h-4 w-4 mr-1.5" /> {t("panel.wa.askBtn")}
           </Button>
         </div>
       </Card>
@@ -349,6 +351,8 @@ function Stat({
 }
 
 function CommitmentsList({ groupId }: { groupId: string }) {
+  const f = useFormato();
+  const { t } = useLanguage();
   const [status, setStatus] = useState<WhatsappCommitment["status"] | "all">("pending");
   const { data: rows, isLoading } = useWhatsappCommitments(groupId, status);
   const resolveMut = useResolveCommitment();
@@ -370,14 +374,14 @@ function CommitmentsList({ groupId }: { groupId: string }) {
         ))}
       </div>
 
-      {isLoading && <div className="text-xs text-muted-foreground">cargando…</div>}
+      {isLoading && <div className="text-xs text-muted-foreground">{t("sales.loadingLower")}</div>}
       {rows && rows.length === 0 && (
         <Card>
           <EmptyState
             className="py-8"
             icon={<Bot className="h-8 w-8 text-muted-foreground" />}
-            title="No hay compromisos"
-            description={`No hay compromisos con status ${status}.`}
+            title={t("panel.wa.noCommitments")}
+            description={t("panel.wa.noCommitmentsStatus", { status })}
           />
         </Card>
       )}
@@ -388,16 +392,16 @@ function CommitmentsList({ groupId }: { groupId: string }) {
             <div className="min-w-0 flex-1">
               <div className="font-medium text-sm">{c.subject}</div>
               <div className="text-xs text-muted-foreground mt-0.5">
-                {c.committed_by_text && <span>por <strong>{c.committed_by_text}</strong></span>}
+                {c.committed_by_text && <span>{t("panel.wa.by")} <strong>{c.committed_by_text}</strong></span>}
                 {c.due_at && (
                   <>
                     {" · "}
                     <Calendar className="inline h-3 w-3 mr-0.5" />
-                    {format(new Date(c.due_at), "d MMM HH:mm", { locale: es })}
+                    {format(new Date(c.due_at), "d MMM HH:mm", { locale: f.fechas })}
                   </>
                 )}
                 {c.followup_count > 0 && (
-                  <> · {c.followup_count} recordatorio(s) enviado(s)</>
+                  <> · {t("panel.wa.reminders", { n: c.followup_count })}</>
                 )}
               </div>
               {c.resolution_note && (
@@ -416,7 +420,7 @@ function CommitmentsList({ groupId }: { groupId: string }) {
                     onClick={() => resolveMut.mutate({ id: c.id, outcome: "done" })}
                     className="h-7 text-xs gap-1"
                   >
-                    <CheckCircle2 className="h-3 w-3" /> hecho
+                    <CheckCircle2 className="h-3 w-3" /> {t("panel.wa.done")}
                   </Button>
                   <Button
                     size="sm"
@@ -424,7 +428,7 @@ function CommitmentsList({ groupId }: { groupId: string }) {
                     onClick={() => resolveMut.mutate({ id: c.id, outcome: "cancelled" })}
                     className="h-7 text-xs gap-1"
                   >
-                    <XCircle className="h-3 w-3" /> cancelar
+                    <XCircle className="h-3 w-3" /> {t("panel.wa.cancel")}
                   </Button>
                 </>
               )}
@@ -453,15 +457,16 @@ function StatusBadge({ status }: { status: WhatsappCommitment["status"] }) {
 }
 
 function MessagesList({ groupId }: { groupId: string }) {
+  const { t } = useLanguage();
   const { data: msgs, isLoading } = useWhatsappRecentMessages(groupId);
-  if (isLoading) return <div className="text-xs text-muted-foreground">cargando…</div>;
+  if (isLoading) return <div className="text-xs text-muted-foreground">{t("sales.loadingLower")}</div>;
   if (!msgs || msgs.length === 0) {
     return (
       <Card>
         <EmptyState
           className="py-8"
           icon={<Bot className="h-8 w-8 text-muted-foreground" />}
-          title="Sin mensajes todavía."
+          title={t("panel.wa.noMessages")}
         />
       </Card>
     );
@@ -476,6 +481,8 @@ function MessagesList({ groupId }: { groupId: string }) {
 }
 
 function MessageRow({ msg }: { msg: WhatsappMessage }) {
+  const f = useFormato();
+  const { t } = useLanguage();
   return (
     <div className={cn(
       "p-2 rounded-md text-sm",
@@ -486,16 +493,16 @@ function MessageRow({ msg }: { msg: WhatsappMessage }) {
           "text-xs font-medium",
           msg.is_from_bot && "text-primary",
         )}>
-          {msg.is_from_bot ? "🤖 Maven Asistente" : (msg.sender_display_name ?? "anon")}
+          {msg.is_from_bot ? t("panel.wa.botName") : (msg.sender_display_name ?? "anon")}
         </span>
         <span className="text-[10px] text-muted-foreground shrink-0">
-          {format(new Date(msg.sent_at), "d MMM HH:mm", { locale: es })}
+          {format(new Date(msg.sent_at), "d MMM HH:mm", { locale: f.fechas })}
         </span>
       </div>
       <div className="text-sm whitespace-pre-wrap break-words">{msg.body ?? <em className="text-muted-foreground">[{msg.msg_type}]</em>}</div>
       {msg.analysis && (msg.analysis as { commitments_extracted?: number }).commitments_extracted ? (
         <div className="text-[10px] text-muted-foreground mt-1">
-          → {(msg.analysis as { commitments_extracted?: number }).commitments_extracted} compromiso(s) extraído(s)
+          {t("panel.wa.extracted", { n: (msg.analysis as { commitments_extracted?: number }).commitments_extracted ?? 0 })}
         </div>
       ) : null}
     </div>
@@ -515,19 +522,20 @@ function MessageRow({ msg }: { msg: WhatsappMessage }) {
 // permite UPDATE solo a admins/managers — si un usuario sin esos roles
 // abre este tab y trata de linkear, la mutation falla con mensaje claro.
 function MembersList({ groupId }: { groupId: string }) {
+  const { t } = useLanguage();
   const { data: members, isLoading } = useWhatsappMembers(groupId);
   const { data: users } = useMavenUsersForLink();
   const linkMut = useLinkWhatsappMember();
 
-  if (isLoading) return <div className="text-xs text-muted-foreground">cargando…</div>;
+  if (isLoading) return <div className="text-xs text-muted-foreground">{t("sales.loadingLower")}</div>;
   if (!members || members.length === 0) {
     return (
       <Card>
         <EmptyState
           className="py-8"
           icon={<Users className="h-8 w-8 text-muted-foreground" />}
-          title="Todavía no hay miembros detectados."
-          description="Aparecen cuando alguien escribe en el grupo por primera vez."
+          title={t("panel.wa.noMembers")}
+          description={t("panel.wa.noMembersHint")}
         />
       </Card>
     );
@@ -539,8 +547,7 @@ function MembersList({ groupId }: { groupId: string }) {
       <div className="text-xs text-muted-foreground flex items-center gap-2">
         <Link2 className="h-3 w-3" />
         <span>
-          {linkedCount} de {members.length} miembros linkeados a un user de Maven. El bot solo
-          puede cruzar actividad real con los que estén mapeados.
+          {t("panel.wa.linked", { linked: linkedCount, total: members.length })}
         </span>
       </div>
       <Card className="divide-y">
@@ -569,8 +576,10 @@ function MemberRow({
   onLink: (userId: string | null) => void;
   isUpdating: boolean;
 }) {
+  const f = useFormato();
+  const { t } = useLanguage();
   const [open, setOpen] = useState(false);
-  const linkedName = member.linked_user?.full_name ?? (member.user_id ? "(usuario sin nombre)" : null);
+  const linkedName = member.linked_user?.full_name ?? (member.user_id ? t("panel.wa.unnamedUser") : null);
 
   return (
     <div className="flex items-center justify-between gap-3 p-3">
@@ -583,8 +592,8 @@ function MemberRow({
         </div>
         <div className="text-xs text-muted-foreground truncate mt-0.5">
           {member.last_seen_at
-            ? <>Activo {format(new Date(member.last_seen_at), "d MMM HH:mm", { locale: es })}</>
-            : "Sin actividad reciente"}
+            ? t("panel.wa.activeAt", { date: format(new Date(member.last_seen_at), "d MMM HH:mm", { locale: f.fechas }) })
+            : t("panel.wa.noRecent")}
         </div>
       </div>
 
@@ -595,7 +604,7 @@ function MemberRow({
           </Badge>
         ) : (
           <Badge variant="outline" className="text-[10px] gap-1">
-            <Link2Off className="h-2.5 w-2.5" /> sin link
+            <Link2Off className="h-2.5 w-2.5" /> {t("panel.wa.noLink")}
           </Badge>
         )}
         <Popover open={open} onOpenChange={setOpen} modal>
@@ -608,15 +617,15 @@ function MemberRow({
               className="h-7 text-xs gap-1 justify-between min-w-[180px]"
               disabled={isUpdating}
             >
-              {linkedName ? "cambiar" : "linkear a Maven"}
+              {linkedName ? t("panel.wa.change") : t("panel.wa.linkToMaven")}
               <ChevronsUpDown className="h-3 w-3 opacity-50" />
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-[300px] p-0" align="end">
             <Command>
-              <CommandInput placeholder="Buscar usuario..." className="h-8 text-xs" />
+              <CommandInput placeholder={t("panel.wa.searchUser")} className="h-8 text-xs" />
               <CommandList>
-                <CommandEmpty>No encontré ese usuario.</CommandEmpty>
+                <CommandEmpty>{t("panel.wa.userNotFound")}</CommandEmpty>
                 <CommandGroup>
                   {member.user_id && (
                     <CommandItem
@@ -625,7 +634,7 @@ function MemberRow({
                       className="text-xs text-destructive"
                     >
                       <Link2Off className="h-3 w-3 mr-2" />
-                      Quitar link
+                      {t("panel.wa.unlink")}
                     </CommandItem>
                   )}
                   {users.map((u) => (
@@ -642,7 +651,7 @@ function MemberRow({
                         )}
                       />
                       <div className="min-w-0 flex-1">
-                        <div className="truncate">{u.full_name ?? "(sin nombre)"}</div>
+                        <div className="truncate">{u.full_name ?? t("panel.wa.noName")}</div>
                         {u.roles.length > 0 && (
                           <div className="text-[10px] text-muted-foreground truncate">
                             {u.roles.join(", ")}
@@ -662,6 +671,8 @@ function MemberRow({
 }
 
 function CostsCard({ groupId }: { groupId: string }) {
+  const f = useFormato();
+  const { t } = useLanguage();
   const { data: rows } = useWhatsappGroupCosts(groupId, 3);
 
   // Mes actual = primera row porque la query viene ordenada desc
@@ -672,7 +683,7 @@ function CostsCard({ groupId }: { groupId: string }) {
     n == null ? "—" : n < 1 ? `$${n.toFixed(3)}` : `$${n.toFixed(2)}`;
 
   const monthLabel = current
-    ? format(new Date(`${current.month}T12:00:00Z`), "MMMM yyyy", { locale: es })
+    ? format(new Date(`${current.month}T12:00:00Z`), "MMMM yyyy", { locale: f.fechas })
     : "—";
 
   // Delta vs mes anterior
@@ -685,21 +696,21 @@ function CostsCard({ groupId }: { groupId: string }) {
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-amber-500" />
-          <p className="text-sm font-medium">Costos del bot — {monthLabel}</p>
+          <p className="text-sm font-medium">{t("panel.wa.costs", { month: monthLabel })}</p>
         </div>
         {delta !== null && (
           <Badge variant="outline" className={cn(
             "text-[10px]",
             delta > 20 ? "border-warning text-warning" : delta < -20 ? "border-success text-success" : "",
           )}>
-            {delta > 0 ? "+" : ""}{delta.toFixed(0)}% vs mes anterior
+            {t("panel.wa.vsPrev", { pct: `${delta > 0 ? "+" : ""}${delta.toFixed(0)}` })}
           </Badge>
         )}
       </div>
 
       {!current ? (
         <p className="text-xs text-muted-foreground">
-          Sin actividad pagada todavía este mes. Los costos aparecen aquí apenas el bot procese mensajes.
+          {t("panel.wa.noCosts")}
         </p>
       ) : (
         <div className="space-y-3">
@@ -714,7 +725,7 @@ function CostsCard({ groupId }: { groupId: string }) {
             <CostMetric label="Agent" value={current.agent_cost} />
             <CostMetric label="Extract" value={current.extract_cost} />
             <CostMetric label="Audio" value={current.audio_cost} />
-            <CostMetric label="Imagen" value={current.image_cost} />
+            <CostMetric label={t("panel.wa.image")} value={current.image_cost} />
           </div>
 
           {/* Breakdown del agent: auto (Haiku) vs mention (Sonnet) */}
@@ -748,16 +759,18 @@ function CostMetric({ label, value }: { label: string; value: number | null | un
 }
 
 function DailyReportsList({ groupId }: { groupId: string }) {
+  const f = useFormato();
+  const { t } = useLanguage();
   const { data: reports, isLoading } = useWhatsappDailyReports(groupId, 14);
   const [selected, setSelected] = useState<WhatsappDailyReport | null>(null);
 
   if (isLoading) {
-    return <Card className="p-4 text-center text-xs text-muted-foreground">Cargando reportes…</Card>;
+    return <Card className="p-4 text-center text-xs text-muted-foreground">{t("panel.wa.loadingReports")}</Card>;
   }
   if (!reports || reports.length === 0) {
     return (
       <Card className="p-4 text-center text-xs text-muted-foreground">
-        Sin reportes todavía. Cuando alguien mande un reporte de jornada en el grupo (contactados, respuestas, etc), el bot lo guarda aquí.
+        {t("panel.wa.noReports")}
       </Card>
     );
   }
@@ -778,9 +791,9 @@ function DailyReportsList({ groupId }: { groupId: string }) {
             <Card key={date} className="p-3">
               <div className="flex items-baseline justify-between mb-2">
                 <p className="text-sm font-medium">
-                  {format(new Date(`${date}T12:00:00Z`), "EEEE d 'de' MMMM", { locale: es })}
+                  {format(new Date(`${date}T12:00:00Z`), f.idioma === "en" ? "EEEE, MMMM d" : "EEEE d 'de' MMMM", { locale: f.fechas })}
                 </p>
-                <span className="text-[11px] text-muted-foreground">{dayReports.length} reporte{dayReports.length === 1 ? "" : "s"}</span>
+                <span className="text-[11px] text-muted-foreground">{t(dayReports.length === 1 ? "panel.wa.report1" : "panel.wa.reportN", { n: dayReports.length })}</span>
               </div>
               <div className="space-y-2">
                 {dayReports.map((r) => (
@@ -796,10 +809,10 @@ function DailyReportsList({ groupId }: { groupId: string }) {
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>
-              Reporte de {selected?.profile?.full_name ?? "—"}
+              {t("panel.wa.reportOf", { name: selected?.profile?.full_name ?? "—" })}
             </DialogTitle>
             <DialogDescription>
-              {selected && format(new Date(`${selected.report_date}T12:00:00Z`), "EEEE d 'de' MMMM yyyy", { locale: es })}
+              {selected && format(new Date(`${selected.report_date}T12:00:00Z`), f.idioma === "en" ? "EEEE, MMMM d, yyyy" : "EEEE d 'de' MMMM yyyy", { locale: f.fechas })}
               {" · "}
               <Badge variant="outline" className="text-[10px]">{selected?.role_kind === "llg" ? "LLG" : "Closer Sup."}</Badge>
             </DialogDescription>
@@ -809,18 +822,18 @@ function DailyReportsList({ groupId }: { groupId: string }) {
               <div className="grid grid-cols-3 gap-2 text-xs">
                 {selected.role_kind === "llg" ? (
                   <>
-                    <Metric label="Contactados" value={selected.contactados} />
-                    <Metric label="Respuestas" value={selected.respuestas} />
-                    <Metric label="Números" value={selected.numeros_obtenidos} accent="positive" />
+                    <Metric label={t("panel.wa.contacted")} value={selected.contactados} />
+                    <Metric label={t("panel.wa.replies")} value={selected.respuestas} />
+                    <Metric label={t("panel.wa.numbers")} value={selected.numeros_obtenidos} accent="positive" />
                   </>
                 ) : (
                   <>
-                    <Metric label="Contactados" value={selected.contactados} />
-                    <Metric label="Respuestas" value={selected.respuestas} />
-                    <Metric label="Confirmadas" value={selected.confirmadas} accent="positive" />
-                    <Metric label="Rechazadas" value={selected.rechazadas} />
-                    <Metric label="Cerradas" value={selected.cerradas} accent="positive" />
-                    <Metric label="Seguimientos" value={selected.seguimientos} />
+                    <Metric label={t("panel.wa.contacted")} value={selected.contactados} />
+                    <Metric label={t("panel.wa.replies")} value={selected.respuestas} />
+                    <Metric label={t("panel.wa.confirmed")} value={selected.confirmadas} accent="positive" />
+                    <Metric label={t("panel.wa.rejected")} value={selected.rechazadas} />
+                    <Metric label={t("panel.wa.closed")} value={selected.cerradas} accent="positive" />
+                    <Metric label={t("panel.wa.followUps")} value={selected.seguimientos} />
                   </>
                 )}
               </div>
@@ -845,14 +858,14 @@ function DailyReportsList({ groupId }: { groupId: string }) {
               )}
               {selected.raw_text && (
                 <div>
-                  <p className="text-xs font-medium mb-1">Texto original</p>
+                  <p className="text-xs font-medium mb-1">{t("panel.wa.rawText")}</p>
                   <Card className="p-2 bg-muted/30">
                     <p className="text-xs whitespace-pre-wrap text-muted-foreground">{selected.raw_text}</p>
                   </Card>
                 </div>
               )}
               <p className="text-[10px] text-muted-foreground">
-                Capturado {format(new Date(selected.created_at), "d MMM HH:mm", { locale: es })}
+                {t("panel.wa.captured", { date: format(new Date(selected.created_at), "d MMM HH:mm", { locale: f.fechas }) })}
               </p>
             </div>
           )}
@@ -863,13 +876,14 @@ function DailyReportsList({ groupId }: { groupId: string }) {
 }
 
 function ReportRow({ report, onClick }: { report: WhatsappDailyReport; onClick: () => void }) {
+  const { t } = useLanguage();
   const name = report.profile?.full_name ?? "—";
   const isLLG = report.role_kind === "llg";
 
   // Resumen 1-línea de las métricas clave según el rol.
   const summary = isLLG
-    ? `${report.contactados ?? "—"} contactados · ${report.respuestas ?? "—"} respuestas · ${report.numeros_obtenidos ?? "—"} números`
-    : `${report.contactados ?? "—"} contactados · ${report.confirmadas ?? 0} conf. · ${report.cerradas ?? 0} cerradas · ${report.rechazadas ?? 0} rech.`;
+    ? t("panel.wa.sumLlg", { contacted: report.contactados ?? "—", replies: report.respuestas ?? "—", numbers: report.numeros_obtenidos ?? "—" })
+    : t("panel.wa.sumCloser", { contacted: report.contactados ?? "—", confirmed: report.confirmadas ?? 0, closed: report.cerradas ?? 0, rejected: report.rechazadas ?? 0 });
 
   return (
     <button
@@ -905,11 +919,13 @@ function Metric({ label, value, accent }: { label: string; value: number | null;
 }
 
 function EventsList({ groupId }: { groupId: string }) {
+  const f = useFormato();
+  const { t } = useLanguage();
   const { data: events } = useWhatsappBotEvents(groupId);
   if (!events || events.length === 0) {
     return (
       <Card className="p-4 text-center text-xs text-muted-foreground">
-        Sin eventos.
+        {t("panel.wa.noEvents")}
       </Card>
     );
   }
@@ -918,7 +934,7 @@ function EventsList({ groupId }: { groupId: string }) {
       {events.map((e) => (
         <div key={e.id} className="text-xs flex items-baseline gap-2 py-1 border-b last:border-b-0">
           <span className="text-muted-foreground shrink-0 w-32">
-            {format(new Date(e.created_at), "d MMM HH:mm:ss", { locale: es })}
+            {format(new Date(e.created_at), "d MMM HH:mm:ss", { locale: f.fechas })}
           </span>
           <Badge variant="outline" className="text-[10px] shrink-0">{e.kind}</Badge>
           <span className="text-muted-foreground truncate">
@@ -942,6 +958,7 @@ function AskAgentDialog({
   onOpenChange: (v: boolean) => void;
   group: WhatsappGroup;
 }) {
+  const { t } = useLanguage();
   const [question, setQuestion] = useState("");
   const askMut = useAskWhatsappAgent();
 
@@ -949,12 +966,12 @@ function AskAgentDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Preguntale al bot</DialogTitle>
+          <DialogTitle>{t("panel.wa.ask")}</DialogTitle>
           <DialogDescription>
-            La respuesta se mandará al grupo <strong>{group.name}</strong>.
+            {t("panel.wa.askWillSend")} <strong>{group.name}</strong>.
             {!group.bot_enabled && (
               <span className="block mt-1 text-warning">
-                ⚠ El bot está OFF para este grupo — la respuesta se va a generar pero NO se va a enviar.
+                {t("panel.wa.botOff")}
               </span>
             )}
           </DialogDescription>
@@ -962,22 +979,22 @@ function AskAgentDialog({
         <Textarea
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
-          placeholder='Ej: "¿Qué pendientes tiene Miguel esta semana?" o "Pasame el estado del lead de Camila Pérez"'
+          placeholder={t("panel.wa.askPh")}
           rows={4}
         />
         {askMut.data?.final_reply && (
           <Card className="p-3 bg-primary/5">
-            <p className="text-xs font-medium mb-1">Respuesta del bot:</p>
+            <p className="text-xs font-medium mb-1">{t("panel.wa.botReply")}</p>
             <p className="text-sm whitespace-pre-wrap">{askMut.data.final_reply}</p>
           </Card>
         )}
         <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cerrar</Button>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>{t("common.close")}</Button>
           <Button
             onClick={() => askMut.mutate({ groupId: group.id, question })}
             disabled={!question.trim() || askMut.isPending}
           >
-            {askMut.isPending ? "Procesando..." : "Preguntar"}
+            {askMut.isPending ? t("panel.wa.processing") : t("panel.wa.askBtn")}
           </Button>
         </div>
       </DialogContent>
@@ -994,6 +1011,7 @@ function SettingsDialog({
   onOpenChange: (v: boolean) => void;
   group: WhatsappGroup;
 }) {
+  const { t } = useLanguage();
   const [persona, setPersona] = useState(group.bot_persona ?? "");
   const updateMut = useUpdateBotPersona();
 
@@ -1001,20 +1019,19 @@ function SettingsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Configurar persona del bot</DialogTitle>
+          <DialogTitle>{t("panel.wa.personaTitle")}</DialogTitle>
           <DialogDescription>
-            Instrucciones extra que se le pasan al bot para personalizar el tono o las
-            reglas específicas de este grupo. Vacío = usar el default.
+            {t("panel.wa.personaDesc")}
           </DialogDescription>
         </DialogHeader>
         <Textarea
           value={persona}
           onChange={(e) => setPersona(e.target.value)}
-          placeholder='Ej: "En este grupo, no respondas en menos de 30s — espera a que el equipo discuta. Llámale Sofí, no Sofía."'
+          placeholder={t("panel.wa.personaPh")}
           rows={6}
         />
         <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>{t("common.cancel")}</Button>
           <Button
             onClick={() =>
               updateMut.mutate(
@@ -1024,7 +1041,7 @@ function SettingsDialog({
             }
             disabled={updateMut.isPending}
           >
-            Guardar
+            {t("common.save")}
           </Button>
         </div>
       </DialogContent>

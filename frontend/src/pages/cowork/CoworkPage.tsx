@@ -21,11 +21,18 @@ import { normalizeRoomCode, isCompleteRoomCode, ROOM_CODE_LENGTH } from "@/lib/c
 import { Plus, Users2, ArrowRight, KeyRound, Loader2, VenetianMask, LogOut, History } from "lucide-react";
 import CoworkIncognitoView from "./CoworkIncognitoView";
 import { toast } from "sonner";
+import { useFormato } from "@/hooks/useFormato";
+import type { Formato } from "@/lib/formato";
+import { useLanguage } from "@/hooks/useLanguage";
+import { traducir } from "@/lib/i18n";
 
 export default function CoworkPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const sessionId = searchParams.get("session");
   const navigate = useNavigate();
+  // `f` ya es la variable de las filas de finalizadas; por eso este se llama `formato`.
+  const formato = useFormato();
+  const { t } = useLanguage();
   const [showCreate, setShowCreate] = useState(false);
   const [autoJoining, setAutoJoining] = useState(false);
   const [autoJoinFailed, setAutoJoinFailed] = useState(false);
@@ -152,7 +159,7 @@ export default function CoworkPage() {
       if (!s.my_role) await cowork.joinSession(s.id, "host");
       setSearchParams({ session: s.id });
     } catch (e) {
-      toast.error((e as Error).message || "No se pudo entrar a la sesión");
+      toast.error((e as Error).message || t("cowork.page.enterError"));
     } finally {
       setEnteringId(null);
     }
@@ -173,12 +180,12 @@ export default function CoworkPage() {
     try {
       await cowork.endSessionById(porFinalizar.id);
       setMySessions((prev) => prev.filter((s) => s.id !== porFinalizar.id));
-      toast.success("Sesión finalizada");
+      toast.success(t("cowork.page.ended"));
       setPorFinalizar(null);
       cowork.listMyEndedSessions().then(setFinalizadas).catch(() => {});
     } catch (e) {
       // El servidor ya dice por qué (por ejemplo, que solo el creador puede).
-      toast.error("No se pudo finalizar la sesión", { description: (e as Error).message });
+      toast.error(t("cowork.page.endError"), { description: (e as Error).message });
     } finally {
       setFinalizando(false);
     }
@@ -194,10 +201,10 @@ export default function CoworkPage() {
     try {
       await cowork.leaveSessionById(porSalir.id);
       setMySessions((prev) => prev.filter((s) => s.id !== porSalir.id));
-      toast.success(`Saliste de «${porSalir.name}»`);
+      toast.success(t("cowork.page.left", { name: porSalir.name }));
       setPorSalir(null);
     } catch (e) {
-      toast.error("No se pudo salir de la sesión", { description: (e as Error).message });
+      toast.error(t("cowork.page.leaveError"), { description: (e as Error).message });
     } finally {
       setSaliendo(false);
     }
@@ -214,7 +221,7 @@ export default function CoworkPage() {
       setRoomCode("");
       setSearchParams({ session: res.sessionId, room: res.roomId });
     } catch (e: any) {
-      toast.error(e.message || "No se pudo entrar con ese código");
+      toast.error(e.message || t("cowork.common.codeError"));
     } finally {
       setJoiningByCode(false);
     }
@@ -276,16 +283,16 @@ export default function CoworkPage() {
             </div>
             <div className="min-w-0 flex-1">
               <h1 className="text-xl font-bold tracking-tight text-foreground md:text-2xl">
-                Sala Cowork
+                {t("cowork.page.title")}
               </h1>
               <p className="mt-0.5 text-sm text-muted-foreground">
                 {canCreateSessions
                   ? mySessions.length > 0
-                    ? "Vuelve a una de tus salas activas o crea una nueva sesión."
-                    : "Crea una sesión cowork con múltiples salas y colabora en tiempo real."
+                    ? t("cowork.page.subtitleCreateBack")
+                    : t("cowork.page.subtitleCreate")
                   : mySessions.length > 0
-                    ? "Vuelve a una de tus salas activas."
-                    : "Abre el enlace que te compartió tu supervisor para entrar a tu sala."}
+                    ? t("cowork.page.subtitleBack")
+                    : t("cowork.page.subtitleLink")}
               </p>
             </div>
             {!permissionLoading && canCreateSessions && (
@@ -294,7 +301,7 @@ export default function CoworkPage() {
                 size="lg"
                 className="w-full gap-2 rounded-full px-7 shadow-md md:w-auto"
               >
-                <Plus className="h-5 w-5" /> Crear sesión
+                <Plus className="h-5 w-5" /> {t("cowork.page.createSession")}
               </Button>
             )}
           </div>
@@ -305,8 +312,8 @@ export default function CoworkPage() {
           <div className="mt-5 flex flex-col items-center gap-2 border-t border-border/40 pt-4 md:flex-row md:justify-between">
             <span className="text-xs text-muted-foreground">
               {permissionLoading || canCreateSessions
-                ? "Entrar con el código de tu sala"
-                : "Solo los coordinadores crean sesiones — entra con el código de tu sala"}
+                ? t("cowork.page.enterWithCode")
+                : t("cowork.page.enterWithCodeMember")}
             </span>
             <div className="flex w-full gap-2 md:w-auto">
               <Input
@@ -323,7 +330,7 @@ export default function CoworkPage() {
                 className="shrink-0 gap-1 rounded-full"
               >
                 {joiningByCode ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
-                Entrar
+                {t("cowork.common.enter")}
               </Button>
             </div>
           </div>
@@ -331,12 +338,12 @@ export default function CoworkPage() {
 
         {/* UNA sola lista (pedido de Jhon, 08/09): antes había "Tus sesiones" y
             aparte "Todas las sesiones" solo para admins, y daba la impresión de
-            que faltaban sesiones. Ahora los admins ven TODAS acá, con su rol en
+            que faltaban sesiones. Ahora los admins ven TODAS aquí, con su rol en
             cada una; el resto ve las suyas. Las finalizadas van al final. */}
         {!loadingSessions && filasActivas.length > 0 && (
           <div className="w-full flex flex-col gap-2">
             <h2 className="text-xs font-semibold text-muted-foreground px-1">
-              Sesiones activas{veTodasLasSesiones ? ` · ${filasActivas.length}` : ""}
+              {t("cowork.page.activeSessions")}{veTodasLasSesiones ? ` · ${filasActivas.length}` : ""}
             </h2>
             <div className="flex flex-col gap-2">
             {filasActivas.map((s) => (
@@ -351,16 +358,16 @@ export default function CoworkPage() {
                   <div className="flex-1 min-w-0">
                     <div className="font-semibold text-foreground truncate">{s.name}</div>
                     <div className="text-xs text-muted-foreground truncate">
-                      {s.role === "host" ? "Host" : s.role === "participant" ? "Participante" : "Sin unirte"}
-                      {s.hostName && s.createdBy !== userId ? ` · de ${s.hostName}` : ""}
-                      {" · "}{s.members} {s.members === 1 ? "miembro" : "miembros"}
+                      {s.role === "host" ? t("cowork.page.roleHost") : s.role === "participant" ? t("cowork.page.roleParticipant") : t("cowork.page.notJoined")}
+                      {s.hostName && s.createdBy !== userId ? ` · ${t("cowork.page.byHost", { name: s.hostName })}` : ""}
+                      {" · "}{s.members === 1 ? t("cowork.page.membersOne") : t("cowork.page.membersMany", { n: s.members })}
                       {s.online != null && (
                         <span className={s.online > 0 ? "text-success font-medium" : ""}>
-                          {" "}· {s.online} en línea
+                          {" "}· {t("cowork.common.online", { n: s.online })}
                         </span>
                       )}
                       {s.incognito.length > 0 && (
-                        <span className="text-violet-500" title="Solo los admins ven esto">
+                        <span className="text-violet-500" title={t("cowork.page.adminsOnly")}>
                           {" "}· 🕶 {s.incognito.join(", ")}
                         </span>
                       )}
@@ -378,7 +385,7 @@ export default function CoworkPage() {
                         className="text-destructive hover:text-destructive rounded-full"
                         onClick={() => setPorFinalizar({ id: s.id, name: s.name, members: s.members })}
                       >
-                        Finalizar
+                        {t("cowork.page.end")}
                       </Button>
                     )}
                     {s.role === "host" && s.createdBy !== userId && !isAdmin && (
@@ -386,10 +393,10 @@ export default function CoworkPage() {
                         variant="ghost"
                         size="sm"
                         className="text-muted-foreground hover:text-foreground rounded-full gap-1"
-                        title="Salir de esta sesión (sigue para los demás)"
+                        title={t("cowork.page.leaveHint")}
                         onClick={() => setPorSalir({ id: s.id, name: s.name })}
                       >
-                        <LogOut className="h-4 w-4" /> Salir
+                        <LogOut className="h-4 w-4" /> {t("cowork.page.leave")}
                       </Button>
                     )}
                     {/* Incógnito (solo admin): observar sin unirse ni aparecer. */}
@@ -398,10 +405,10 @@ export default function CoworkPage() {
                         variant="ghost"
                         size="sm"
                         className="rounded-full gap-1 shrink-0 text-violet-500 hover:text-violet-600"
-                        title="Entrar de incógnito: ver y escuchar sin que nadie te vea"
+                        title={t("cowork.page.incognitoHint")}
                         onClick={() => setSearchParams({ session: s.id, spy: "1" })}
                       >
-                        <VenetianMask className="h-4 w-4" /> Incógnito
+                        <VenetianMask className="h-4 w-4" /> {t("cowork.page.incognito")}
                       </Button>
                     )}
                     {s.role ? (
@@ -416,7 +423,7 @@ export default function CoworkPage() {
                             : { session: s.id }
                         )}
                       >
-                        Volver <ArrowRight className="h-4 w-4" />
+                        {t("common.back")} <ArrowRight className="h-4 w-4" />
                       </Button>
                     ) : (
                       /* No es miembro pero la ve: admin, o alcance de Cowork sobre
@@ -429,7 +436,7 @@ export default function CoworkPage() {
                         disabled={enteringId === s.id}
                         onClick={() => s.admin && handleAdminEnter(s.admin)}
                       >
-                        {enteringId === s.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <>Entrar <ArrowRight className="h-4 w-4" /></>}
+                        {enteringId === s.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <>{t("cowork.common.enter")} <ArrowRight className="h-4 w-4" /></>}
                       </Button>
                     )}
                   </div>
@@ -466,7 +473,7 @@ export default function CoworkPage() {
         {finalizadas.length > 0 && (
           <div className="w-full flex flex-col gap-2">
             <h2 className="text-xs font-semibold text-muted-foreground px-1 flex items-center gap-1.5">
-              <History className="h-3.5 w-3.5" /> Finalizadas recientemente <span className="font-normal normal-case tracking-normal">· últimos 10 días</span>
+              <History className="h-3.5 w-3.5" /> {t("cowork.page.recentlyEnded")} <span className="font-normal normal-case tracking-normal">· {t("cowork.page.last10Days")}</span>
             </h2>
             <div className="flex flex-col gap-2">
             {finalizadas.map((f) => (
@@ -474,11 +481,11 @@ export default function CoworkPage() {
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium text-foreground/80 truncate">
                     {f.name}
-                    {f.createdByName && <span className="font-normal text-muted-foreground"> · de {f.createdByName}</span>}
+                    {f.createdByName && <span className="font-normal text-muted-foreground"> · {t("cowork.page.byHost", { name: f.createdByName })}</span>}
                   </div>
                   <div className="text-xs text-muted-foreground truncate">
-                    La finalizó <span className="text-foreground/80 font-medium">{f.endedByName ?? "alguien (sin registro: anterior al 3/9)"}</span>
-                    {" · "}{fechaCorta(f.endedAt)} · {f.members} {f.members === 1 ? "miembro" : "miembros"}
+                    {t("cowork.page.endedBy")} <span className="text-foreground/80 font-medium">{f.endedByName ?? t("cowork.page.endedByUnknown")}</span>
+                    {" · "}{fechaCorta(f.endedAt, formato)} · {f.members === 1 ? t("cowork.page.membersOne") : t("cowork.page.membersMany", { n: f.members })}
                   </div>
                 </div>
               </div>
@@ -490,16 +497,13 @@ export default function CoworkPage() {
       <AlertDialog open={!!porSalir} onOpenChange={(o) => { if (!o && !saliendo) setPorSalir(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Salir de «{porSalir?.name}»?</AlertDialogTitle>
-            <AlertDialogDescription>
-              La sesión sigue para los demás; solo te vas tú. Para volver a entrar como host vas a necesitar
-              un enlace nuevo de quien la creó.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{t("cowork.page.leaveTitle", { name: porSalir?.name ?? "" })}</AlertDialogTitle>
+            <AlertDialogDescription>{t("cowork.page.leaveDesc")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={saliendo} />
             <AlertDialogAction disabled={saliendo} onClick={(e) => { e.preventDefault(); void confirmarSalir(); }}>
-              {saliendo ? "Saliendo…" : "Salir"}
+              {saliendo ? t("cowork.page.leaving") : t("cowork.page.leave")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -508,12 +512,12 @@ export default function CoworkPage() {
       <AlertDialog open={!!porFinalizar} onOpenChange={(o) => { if (!o) setPorFinalizar(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Finalizar «{porFinalizar?.name}»?</AlertDialogTitle>
+            <AlertDialogTitle>{t("cowork.page.endTitle", { name: porFinalizar?.name ?? "" })}</AlertDialogTitle>
             <AlertDialogDescription>
               {porFinalizar && porFinalizar.members > 0
-                ? `Se cierra para las ${porFinalizar.members} personas que están adentro: salen de sus salas y se corta lo que estén haciendo.`
-                : "Se cierra la sesión para todos los participantes."}
-              {" "}No se puede deshacer — para volver a usarla hay que crear una nueva.
+                ? t("cowork.page.endDescPeople", { n: porFinalizar.members })
+                : t("cowork.page.endDescAll")}
+              {" "}{t("cowork.page.endCannotUndo")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -523,7 +527,7 @@ export default function CoworkPage() {
               onClick={(e) => { e.preventDefault(); void confirmarFinalizar(); }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {finalizando ? "Finalizando…" : "Finalizar sesión"}
+              {finalizando ? t("cowork.page.ending") : t("cowork.page.endSession")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -597,14 +601,16 @@ export default function CoworkPage() {
 // Shown briefly while we redirect participants out of an ended Cowork session
 // back to the main Maven dashboard.
 /** dd/mm HH:MM en hora local, para las listas y la pantalla de finalizada. */
-function fechaCorta(iso: string | null | undefined): string {
+function fechaCorta(iso: string | null | undefined, formato: Formato): string {
   if (!iso) return "";
   const d = new Date(iso);
-  return d.toLocaleString("es-CO", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleString(formato.intl("es-CO"), { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
 
 function CoworkSessionEndedRedirect({ session }: { session: CoworkSessionRow | null }) {
   const navigate = useNavigate();
+  const formato = useFormato();
+  const { t } = useLanguage();
   const [quien, setQuien] = useState<{ nombre: string; foto: string | null; seed: string | null } | null>(null);
 
   // Quién la finalizó, con nombre. Antes esta pantalla decía "la finalizó el
@@ -628,13 +634,14 @@ function CoworkSessionEndedRedirect({ session }: { session: CoworkSessionRow | n
     // así que queda el aviso de sistema. Mismo id: el segundo reemplaza al
     // primero cuando llega el nombre, en vez de apilarse.
     if (quien) {
+      // traducir() y no el hook: el aviso se arma una vez, cuando llega el nombre.
       avisarPersona({
         nombre: quien.nombre, foto: quien.foto, seed: quien.seed,
-        titulo: "Sesión finalizada", detalle: `La finalizó ${quien.nombre}`,
+        titulo: traducir("cowork.page.ended"), detalle: traducir("cowork.ended.endedByName", { name: quien.nombre }),
         id: "sesion-finalizada",
       });
     } else {
-      toast.info("La sesión fue finalizada", { id: "sesion-finalizada" });
+      toast.info(traducir("cowork.ended.wasEnded"), { id: "sesion-finalizada" });
     }
   }, [quien]);
 
@@ -645,19 +652,19 @@ function CoworkSessionEndedRedirect({ session }: { session: CoworkSessionRow | n
         <div className="flex items-center justify-center h-14 w-14 rounded-full bg-muted">
           <Users2 className="h-7 w-7 text-muted-foreground" />
         </div>
-        <h2 className="text-lg font-semibold text-foreground">Esta sesión ha finalizado</h2>
+        <h2 className="text-lg font-semibold text-foreground">{t("cowork.ended.title")}</h2>
         <p className="text-sm text-muted-foreground">
           {session?.ended_by
-            ? <>La finalizó <span className="text-foreground font-medium">{quien?.nombre ?? "…"}</span>{session?.ended_at ? ` el ${fechaCorta(session.ended_at)}` : ""}.</>
-            : "La finalizó un supervisor."}
-          {" "}Los enlaces y códigos de esta sesión ya no sirven: pide el de la sesión nueva.
+            ? <>{t("cowork.page.endedBy")} <span className="text-foreground font-medium">{quien?.nombre ?? "…"}</span>{session?.ended_at ? ` ${t("cowork.ended.onDate", { date: fechaCorta(session.ended_at, formato) })}` : ""}.</>
+            : t("cowork.ended.bySupervisor")}
+          {" "}{t("cowork.ended.linksDead")}
         </p>
         <div className="flex flex-wrap justify-center gap-2 mt-1">
           <Button variant="secondary" className="rounded-full px-6" onClick={() => navigate("/dashboard", { replace: true })}>
-            Volver al dashboard
+            {t("cowork.common.backToDashboard")}
           </Button>
           <Button className="rounded-full px-6" onClick={() => navigate("/cowork", { replace: true })}>
-            Ir a Cowork
+            {t("cowork.ended.goToCowork")}
           </Button>
         </div>
       </div>

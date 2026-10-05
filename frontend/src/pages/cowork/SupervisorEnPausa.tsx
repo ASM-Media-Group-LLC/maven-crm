@@ -5,8 +5,10 @@
 // El tiempo que lleva lo ven solo los otros supervisores, en el tablero.
 import { Coffee, UtensilsCrossed, UserX, type LucideIcon } from "lucide-react";
 import { PaisajeDePausa } from "@/pages/cowork/SalaEnPausa";
-import { fraseDePausaSupervisor, subtituloDePausaSupervisor, type EstadoSupervisor } from "@/lib/pausaSupervisor";
+import type { EstadoSupervisor } from "@/lib/pausaSupervisor";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/hooks/useLanguage";
+import { FRASE_SUPERVISOR, SUBTITULO_SUPERVISOR } from "./textosCowork";
 
 const ICONO: Record<EstadoSupervisor, LucideIcon> = { break: Coffee, lunch: UtensilsCrossed, ausente: UserX };
 
@@ -17,6 +19,7 @@ export interface SupervisorEnPausaItem {
 }
 
 export default function SupervisorEnPausa({ supervisores, className }: { supervisores: SupervisorEnPausaItem[]; className?: string }) {
+  const { t } = useLanguage();
   if (!supervisores.length) return null;
   return (
     <div
@@ -33,8 +36,8 @@ export default function SupervisorEnPausa({ supervisores, className }: { supervi
                 <Icono className="h-5 w-5" />
               </div>
               <div className="min-w-0">
-                <div className="truncate font-display text-sm font-semibold">{s.nombre} {fraseDePausaSupervisor(s.estado)}</div>
-                <div className="truncate text-[11px] text-white/70">{subtituloDePausaSupervisor(s.estado)}</div>
+                <div className="truncate font-display text-sm font-semibold">{s.nombre} {t(FRASE_SUPERVISOR[s.estado])}</div>
+                <div className="truncate text-[11px] text-white/70">{t(SUBTITULO_SUPERVISOR[s.estado])}</div>
               </div>
             </div>
           );

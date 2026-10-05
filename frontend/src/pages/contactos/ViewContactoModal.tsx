@@ -1,7 +1,6 @@
 import { useState, useRef } from "react";
 import { ExternalLink, MessageCircle, Pencil, Plus, Sparkles, Trash2, Upload, X, Phone, FileText } from "lucide-react";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import { WhatsAppLink } from "@/components/MaskedPhone";
 import {
@@ -16,6 +15,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
+import { etiquetaEstado, etiquetaInteraccion } from "./etiquetas";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -33,6 +35,9 @@ const countryFlags: Record<string, string> = {
   CO: "🇨🇴", MX: "🇲🇽", AR: "🇦🇷", ES: "🇪🇸", CL: "🇨🇱", PE: "🇵🇪", UY: "🇺🇾", BR: "🇧🇷", US: "🇺🇸",
 };
 
+// ⚠️ DATO: estos valores se escriben tal cual en closers_contacts.status y en
+// contact_interactions.resulting_status ("Sin cambio" es el centinela de "no
+// tocar"). Se traduce solo la etiqueta, con etiquetaEstado().
 const estadoOptions = ["Sin cambio", "Nuevo", "Contactado", "Interesado", "Convertido", "Rechazado"];
 
 interface Props {
@@ -44,6 +49,8 @@ interface Props {
 }
 
 const ViewContactoModal = ({ open, onOpenChange, contacto, onEdit, onDelete }: Props) => {
+  const f = useFormato();
+  const { t } = useLanguage();
   const { toast } = useToast();
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -143,10 +150,10 @@ const ViewContactoModal = ({ open, onOpenChange, contacto, onEdit, onDelete }: P
       queryClient.invalidateQueries({ queryKey: ["contact_interactions", contacto.id] });
       queryClient.invalidateQueries({ queryKey: ["contact_interaction_counts"] });
       queryClient.invalidateQueries({ queryKey: ["closers_contacts"] });
-      toast({ title: "Interacción registrada" });
+      toast({ title: t("contactos.interactionLogged") });
       resetForm();
     } catch (err: any) {
-      toast({ title: "Error al guardar", description: err.message, variant: "destructive" });
+      toast({ title: t("common.errorSaving"), description: err.message, variant: "destructive" });
     } finally {
       setIsSaving(false);
     }
@@ -180,7 +187,7 @@ const ViewContactoModal = ({ open, onOpenChange, contacto, onEdit, onDelete }: P
                   <DialogDescription className="mt-1 space-x-2">
                     {contacto.ticket && <span className="font-mono">{contacto.ticket}</span>}
                     {flag && <span>{flag}</span>}
-                    {contacto.creadoPor && <span>· Ingresado por: <span className="text-primary">{contacto.creadoPor}</span></span>}
+                    {contacto.creadoPor && <span>{t("contactos.addedBy")} <span className="text-primary">{contacto.creadoPor}</span></span>}
                   </DialogDescription>
                 </div>
                 {contacto.categoria && (
@@ -193,26 +200,26 @@ const ViewContactoModal = ({ open, onOpenChange, contacto, onEdit, onDelete }: P
 
             {/* Metadata badges */}
             <div className="flex flex-wrap gap-2">
-              <Badge variant="outline">Creado: {contacto.creacion}</Badge>
-              <Badge variant="outline">{callCount} llamadas</Badge>
-              <Badge variant="outline">{noteCount} notas</Badge>
+              <Badge variant="outline">{t("contactos.createdColon", { date: contacto.creacion })}</Badge>
+              <Badge variant="outline">{t("contactos.nCalls", { count: callCount })}</Badge>
+              <Badge variant="outline">{t("contactos.nNotes", { count: noteCount })}</Badge>
               {contacto.company && <Badge variant="outline">{contacto.company}</Badge>}
             </div>
 
             {/* Action buttons */}
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" onClick={() => { onOpenChange(false); onEdit(); }}>
-                <Pencil className="mr-1.5 h-3.5 w-3.5" /> Editar
+                <Pencil className="mr-1.5 h-3.5 w-3.5" /> {t("common.edit")}
               </Button>
               <Button variant="destructive" size="sm" onClick={() => { onOpenChange(false); onDelete(); }}>
-                <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Eliminar
+                <Trash2 className="mr-1.5 h-3.5 w-3.5" /> {t("common.delete")}
               </Button>
               <div className="flex-1" />
               <Button variant="outline" size="sm" onClick={() => {
                 onOpenChange(false);
                 // Trigger convert via parent
               }}>
-                <Sparkles className="mr-1.5 h-3.5 w-3.5" /> Convertir a Creadora
+                <Sparkles className="mr-1.5 h-3.5 w-3.5" /> {t("contactos.convertToCreatorF")}
               </Button>
             </div>
 
@@ -248,7 +255,7 @@ const ViewContactoModal = ({ open, onOpenChange, contacto, onEdit, onDelete }: P
                     className="flex items-center gap-1.5 text-sm text-primary hover:underline"
                     hideForNonAdmin
                   >
-                    Abrir chat
+                    {t("contactos.openChat")}
                     <ExternalLink className="h-3 w-3" />
                   </WhatsAppLink>
                 </div>
@@ -260,16 +267,16 @@ const ViewContactoModal = ({ open, onOpenChange, contacto, onEdit, onDelete }: P
             {/* Historial de Interacciones */}
             <div>
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold">Historial de Interacciones</h3>
+                <h3 className="text-sm font-semibold">{t("contactos.interactionHistory")}</h3>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setShowForm(prev => !prev)}
                 >
                   {showForm ? (
-                    <><X className="mr-1.5 h-3.5 w-3.5" /> Cancelar</>
+                    <><X className="mr-1.5 h-3.5 w-3.5" /> {t("common.cancel")}</>
                   ) : (
-                    <><Plus className="mr-1.5 h-3.5 w-3.5" /> Registrar Interacción</>
+                    <><Plus className="mr-1.5 h-3.5 w-3.5" /> {t("contactos.logInteraction")}</>
                   )}
                 </Button>
               </div>
@@ -278,28 +285,28 @@ const ViewContactoModal = ({ open, onOpenChange, contacto, onEdit, onDelete }: P
               {showForm && (
                 <div className="border rounded-lg p-4 space-y-4 bg-muted/30 mb-4">
                   <div>
-                    <h4 className="text-sm font-semibold">Registrar {tipoContacto === "nota" ? "Nota" : "Llamada"}</h4>
-                    <p className="text-xs text-muted-foreground">Contacto: {contacto.nombre}</p>
+                    <h4 className="text-sm font-semibold">{tipoContacto === "nota" ? t("contactos.logNote") : t("contactos.logCall")}</h4>
+                    <p className="text-xs text-muted-foreground">{t("contactos.contactColon", { name: contacto.nombre })}</p>
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-xs">Tipo de Contacto</Label>
+                    <Label className="text-xs">{t("contactos.contactType")}</Label>
                     <RadioGroup value={tipoContacto} onValueChange={(v) => setTipoContacto(v as "nota" | "llamada")} className="flex gap-4">
                       <div className="flex items-center gap-2">
                         <RadioGroupItem value="nota" id="tipo-nota" />
-                        <Label htmlFor="tipo-nota" className="text-sm font-normal cursor-pointer">Nota / Mensaje Escrito</Label>
+                        <Label htmlFor="tipo-nota" className="text-sm font-normal cursor-pointer">{t("contactos.noteWritten")}</Label>
                       </div>
                       <div className="flex items-center gap-2">
                         <RadioGroupItem value="llamada" id="tipo-llamada" />
-                        <Label htmlFor="tipo-llamada" className="text-sm font-normal cursor-pointer">Llamada</Label>
+                        <Label htmlFor="tipo-llamada" className="text-sm font-normal cursor-pointer">{t("contactos.call")}</Label>
                       </div>
                     </RadioGroup>
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-xs">Notas</Label>
+                    <Label className="text-xs">{t("contactos.notes")}</Label>
                     <Textarea
-                      placeholder="Notas sobre esta interacción"
+                      placeholder={t("contactos.interactionNotesPlaceholder")}
                       value={notas}
                       onChange={(e) => setNotas(e.target.value)}
                       className="min-h-[80px]"
@@ -307,21 +314,21 @@ const ViewContactoModal = ({ open, onOpenChange, contacto, onEdit, onDelete }: P
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-xs">Estado del Contacto</Label>
+                    <Label className="text-xs">{t("contactos.contactStatus")}</Label>
                     <Select value={estadoContacto} onValueChange={setEstadoContacto}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
                         {estadoOptions.map(opt => (
-                          <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                          <SelectItem key={opt} value={opt}>{etiquetaEstado(t, opt)}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-xs">Adjuntar Archivos (Fotos/Videos - máx. 10)</Label>
+                    <Label className="text-xs">{t("contactos.attachFiles")}</Label>
                     <input
                       ref={fileInputRef}
                       type="file"
@@ -337,7 +344,7 @@ const ViewContactoModal = ({ open, onOpenChange, contacto, onEdit, onDelete }: P
                       onClick={() => fileInputRef.current?.click()}
                       disabled={archivos.length >= 10}
                     >
-                      <Upload className="mr-1.5 h-3.5 w-3.5" /> Seleccionar archivos
+                      <Upload className="mr-1.5 h-3.5 w-3.5" /> {t("contactos.selectFiles")}
                     </Button>
                     {archivos.length > 0 && (
                       <div className="flex flex-wrap gap-2 mt-2">
@@ -354,9 +361,9 @@ const ViewContactoModal = ({ open, onOpenChange, contacto, onEdit, onDelete }: P
                   </div>
 
                   <div className="flex justify-end gap-2 pt-2">
-                    <Button variant="outline" size="sm" onClick={resetForm}>Cancelar</Button>
+                    <Button variant="outline" size="sm" onClick={resetForm}>{t("common.cancel")}</Button>
                     <Button size="sm" disabled={!notas.trim() || isSaving} onClick={handleSave}>
-                      {isSaving ? "Guardando..." : "Guardar"}
+                      {isSaving ? t("contactos.saving") : t("common.save")}
                     </Button>
                   </div>
                 </div>
@@ -364,8 +371,8 @@ const ViewContactoModal = ({ open, onOpenChange, contacto, onEdit, onDelete }: P
 
               {interactions.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-6">
-                  No hay interacciones registradas para este contacto.<br />
-                  Puedes registrar llamadas, mensajes, emails, reuniones o notas.
+                  {t("contactos.noInteractions")}<br />
+                  {t("contactos.noInteractionsHint")}
                 </p>
               ) : (
                 <div className="space-y-3">
@@ -378,17 +385,17 @@ const ViewContactoModal = ({ open, onOpenChange, contacto, onEdit, onDelete }: P
                           ) : (
                             <FileText className="h-3.5 w-3.5 text-muted-foreground" />
                           )}
-                          <span className="text-sm font-medium capitalize">{inter.interaction_type}</span>
+                          <span className="text-sm font-medium capitalize">{etiquetaInteraccion(t, inter.interaction_type)}</span>
                           {inter.call_number && (
-                            <Badge variant="outline" className="text-[10px]">Llamada #{inter.call_number}</Badge>
+                            <Badge variant="outline" className="text-[10px]">{t("contactos.callNumber", { n: inter.call_number })}</Badge>
                           )}
                           {inter.resulting_status && (
-                            <Badge variant="secondary" className="text-[10px]">→ {inter.resulting_status}</Badge>
+                            <Badge variant="secondary" className="text-[10px]">→ {etiquetaEstado(t, inter.resulting_status)}</Badge>
                           )}
                         </div>
                         {inter.created_at && (
                           <span className="text-[10px] text-muted-foreground">
-                            {format(new Date(inter.created_at), "dd MMM yyyy, HH:mm", { locale: es })}
+                            {format(new Date(inter.created_at), "dd MMM yyyy, HH:mm", { locale: f.fechas })}
                           </span>
                         )}
                       </div>

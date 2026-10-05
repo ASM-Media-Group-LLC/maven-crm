@@ -7,6 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Progress } from "@/components/ui/progress";
 import { ChatMessage, UserProfile } from "../types";
 import { cn } from "@/lib/utils";
+import { remitenteVisible } from "../utils";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -15,18 +16,31 @@ import { EmojiBar, usePersistedEmojis } from "@/pages/chatter-evaluator/workspac
 import { GifPicker } from "@/pages/inbox/GifPicker";
 import { StickerPicker } from "@/pages/inbox/StickerPicker";
 import Expresiones from "./Expresiones";
+import SelectorDeEmojis from "@/components/chat/SelectorDeEmojis";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { ScriptsButton } from "@/components/chat/ScriptsButton";
 
 import { MAX_FILES, MAX_FILE_SIZE_MB, MAX_FILE_SIZE_BYTES, formatFileSize, uploadFileWithTUS } from "../uploadUtils";
 import { claveSeguraParaArchivo } from "@/lib/claveDeArchivo";
 import { contenidoDeAdjunto } from "@/lib/mensajeConAdjunto";
-import { getDraft, setDraft } from "../drafts";
+import { getDraft, getDraftDoc, setDraft, clearDraft } from "../drafts";
+import { adjuntosEnMemoria, cargarAdjuntos, guardarAdjuntos, olvidarAdjuntos } from "../adjuntosDelBorrador";
+import type { JSONContent } from "@tiptap/react";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface PendingFile {
   file: File;
   preview?: string;
   type: "image" | "file";
+}
+
+function aPendiente(file: File): PendingFile {
+  const isImg = file.type.startsWith("image/");
+  return {
+    file,
+    preview: isImg ? URL.createObjectURL(file) : undefined,
+    type: isImg ? "image" : "file",
+  };
 }
 
 // Cuánto sigue diciendo "está escribiendo" después de la última tecla.
@@ -71,22 +85,74 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
   participants, chatType, aCiegas, compacto = false,
 }, ref) => {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [cursorPosition, setCursorPosition] = useState(0);
   // El texto arranca desde el borrador guardado: si te fuiste a otro chat (o
   // recargaste) sin terminar el mensaje, al volver sigue acá.
   const [text, setText] = useState(() => getDraft(user?.id, conversationId));
-
-  // Persistir el borrador en CADA cambio de texto, venga de donde venga
-  // (tecleo, emoji, script pegado). Vaciarlo (p.ej. al enviar) lo borra.
-  useEffect(() => {
-    setDraft(user?.id, conversationId, text);
-  }, [text, user?.id, conversationId]);
+  // El borrador se guarda desde handleComposerUpdate, que trae el DOCUMENTO del
+  // editor (renglones, viñetas, formato). Ya no desde un efecto sobre `text`:
+  // `text` es plano, y guardar eso era justamente lo que aplastaba los renglones.
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState("");
   const [uploadPercent, setUploadPercent] = useState(0);
-  const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
+  // Los adjuntos sin mandar también son borrador: arrancan desde lo que quedó
+  // anotado (memoria de la pestaña, al instante) y, tras una recarga, desde el
+  // disco (abajo). Ver adjuntosDelBorrador.ts.
+  const [pendingFiles, setPendingFiles] = useState<PendingFile[]>(() =>
+    (adjuntosEnMemoria(user?.id, conversationId) ?? []).map(aPendiente)
+  );
+  // ⚠️ No se escribe NADA hasta haber leído lo guardado: el primer render trae
+  // la lista vacía y, sin esta guarda, el efecto de abajo borraba del disco la
+  // captura que se estaba por recuperar.
+  const [adjuntosLeidos, setAdjuntosLeidos] = useState(false);
+  // Mientras se suben, los adjuntos YA NO son borrador (ver handleSend).
+  const subiendoRef = useRef(false);
+  const montadoRef = useRef(true);
+  useEffect(() => {
+    montadoRef.current = true;
+    return () => { montadoRef.current = false; };
+  }, []);
+  useEffect(() => {
+    let vivo = true;
+    void cargarAdjuntos(user?.id, conversationId).then((guardados) => {
+      if (!vivo) return;
+      // Marcarlo SIEMPRE, haya o no algo guardado: si se pegó una captura mientras
+      // se leía el disco, el efecto de abajo tiene que guardarla ahora.
+      setAdjuntosLeidos(true);
+      if (guardados.length === 0) return;
+      setPendingFiles((prev) => {
+        // Lo que ya está en pantalla (memoria, o algo pegado mientras se leía el
+        // disco) no se duplica.
+        const yaEsta = new Set(prev.map((pf) => pf.file));
+        const nuevos = guardados.filter((f) => !yaEsta.has(f)).map(aPendiente);
+        return nuevos.length ? [...prev, ...nuevos] : prev;
+      });
+    });
+    return () => { vivo = false; };
+  }, [user?.id, conversationId]);
+  useEffect(() => {
+    if (!adjuntosLeidos || subiendoRef.current) return;
+    void guardarAdjuntos(user?.id, conversationId, pendingFiles.map((pf) => pf.file));
+  }, [pendingFiles, adjuntosLeidos, user?.id, conversationId]);
+  // Las miniaturas son URLs de objeto: se sueltan al salir (el File sigue vivo
+  // en la memoria del borrador; al volver se crean de nuevo).
+  const pendingFilesRef = useRef(pendingFiles);
+  pendingFilesRef.current = pendingFiles;
+  useEffect(() => () => {
+    pendingFilesRef.current.forEach((pf) => { if (pf.preview) URL.revokeObjectURL(pf.preview); });
+  }, []);
   const [isRecording, setIsRecording] = useState(false);
   const composerRef = useRef<RichComposerHandle>(null);
+  // Al elegir «Responder», el cursor queda listo en el cuadro (Keila, 02/10:
+  // había que hacer clic 2 o 3 veces). Va en el cuadro siguiente: el menú de
+  // donde vino todavía se está cerrando.
+  const respondiendoA = replyTo?.id;
+  useEffect(() => {
+    if (!respondiendoA) return;
+    const cuadro = requestAnimationFrame(() => composerRef.current?.focus());
+    return () => cancelAnimationFrame(cuadro);
+  }, [respondiendoA]);
   // Barra de formato plegada por defecto (como el botón "Opciones de formato" de Google).
   const [showToolbar, setShowToolbar] = useState(false);
   // Teléfono: fila única estilo WhatsApp (+ · cajón con expresiones · cámara · mic/enviar).
@@ -101,6 +167,9 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
 
   // GIF (Giphy mp4, URL externa estable) → se manda como archivo (Messenger no renderiza video
   // inline; el sticker sí porque es webp/imagen).
+  //
+  // "🎬 GIF", "sticker" y "🎤 Nota de voz (m:ss)" son el CONTENIDO del mensaje que
+  // se guarda en chat_messages y ven los demás: es dato, no se traduce.
   const sendGifUrl = (mp4Url: string) => {
     onSendMessage("🎬 GIF", "file" as ChatMessage["type"], mp4Url, "gif.mp4", replyTo?.id);
     onCancelReply();
@@ -111,7 +180,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
     if (!user) return;
     try {
       const resp = await fetch(signedUrl);
-      if (!resp.ok) throw new Error("no se pudo leer el sticker");
+      if (!resp.ok) throw new Error(t("messenger.input.noSePudoLeerSticker"));
       const blob = await resp.blob();
       const ext = blob.type.includes("gif") ? "gif" : "webp";
       const fileName = `sticker-${Date.now()}.${ext}`;
@@ -122,32 +191,25 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
       onSendMessage("sticker", "image" as ChatMessage["type"], urlData.publicUrl, fileName, replyTo?.id);
       onCancelReply();
     } catch (e) {
-      toast.error("No se pudo enviar el sticker", { description: (e as Error).message });
+      toast.error(t("messenger.input.noSePudoSticker"), { description: (e as Error).message });
     }
   };
 
   const addFilesInternal = useCallback((files: File[]) => {
     const totalFiles = pendingFiles.length + files.length;
     if (totalFiles > MAX_FILES) {
-      toast.error(`Máximo ${MAX_FILES} archivos adjuntos por envío`);
+      toast.error(t("messenger.input.maximoArchivos", { n: MAX_FILES }));
       return;
     }
     const oversized = files.filter(f => f.size > MAX_FILE_SIZE_BYTES);
     if (oversized.length > 0) {
       const names = oversized.map(f => f.name).join(", ");
-      toast.error(`Archivos demasiado grandes (máx ${MAX_FILE_SIZE_MB}MB): ${names}`);
+      toast.error(t("messenger.input.archivosGrandes", { mb: MAX_FILE_SIZE_MB, nombres: names }));
       return;
     }
-    const newPending: PendingFile[] = files.map(file => {
-      const isImg = file.type.startsWith("image/");
-      return {
-        file,
-        preview: isImg ? URL.createObjectURL(file) : undefined,
-        type: isImg ? "image" as const : "file" as const,
-      };
-    });
+    const newPending: PendingFile[] = files.map(aPendiente);
     setPendingFiles(prev => [...prev, ...newPending]);
-  }, [pendingFiles.length]);
+  }, [pendingFiles.length, t]);
 
   // Expose addFiles to parent via ref
   useImperativeHandle(ref, () => ({
@@ -175,6 +237,14 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
     if (uploading) return;
     if (pendingFiles.length > 0) {
       setUploading(true);
+      // Desde que arranca la subida, esto ya no es borrador: se va a mandar. Si
+      // no se olvida ACÁ (y se esperaba al final), irse del chat a mitad de la
+      // subida dejaba el borrador guardado y al volver aparecía de nuevo, listo
+      // para mandarse dos veces. Si se cancela, se vuelve a anotar.
+      subiendoRef.current = true;
+      const docAntes = composerRef.current?.getDoc() ?? null;
+      void olvidarAdjuntos(user?.id, conversationId);
+      clearDraft(user?.id, conversationId);
       // Álbum estilo WhatsApp: si van VARIAS imágenes, comparten un album_id y el
       // cliente las dibuja como UNA cuadrícula. Las imágenes se mandan primero y
       // juntas (sort estable) para que el álbum quede contiguo en el timeline;
@@ -191,7 +261,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
       let captionPending = !!caption;
       for (let i = 0; i < files.length; i++) {
         const pf = files[i];
-        setUploadProgress(`Subiendo ${i + 1}/${files.length}: ${pf.file.name} (${formatFileSize(pf.file.size)})`);
+        setUploadProgress(t("messenger.input.subiendo", { n: i + 1, total: files.length, name: pf.file.name, tamano: formatFileSize(pf.file.size) }));
         setUploadPercent(0);
         // La clave se SANEA; el nombre que ve la gente sigue siendo el original
         // (se manda aparte, más abajo). Meter el nombre crudo acá era el bug:
@@ -210,14 +280,17 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
         }
 
         if (uploadError === "cancelled") {
-          toast("Subida cancelada");
+          toast(t("messenger.input.subidaCancelada"));
+          subiendoRef.current = false;
+          void guardarAdjuntos(user?.id, conversationId, pendingFiles.map((f) => f.file));
+          if (docAntes) setDraft(user?.id, conversationId, text, docAntes);
           setUploading(false);
           setUploadProgress("");
           setUploadPercent(0);
           return;
         }
         if (uploadError) {
-          toast.error(`Error al subir ${pf.file.name}: ${uploadError}`);
+          toast.error(t("messenger.input.errorAlSubir", { name: pf.file.name, error: uploadError }));
           continue;
         }
         const { data: urlData } = supabase.storage.from("chat-files").getPublicUrl(path);
@@ -244,6 +317,10 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
         const msgContent = contenidoDeAdjunto(baseContent, pf.file.name);
         onSendMessage(msgContent, pf.type as ChatMessage["type"], urlData.publicUrl, pf.file.name, replyTo?.id, isImg ? albumId : undefined);
       }
+      subiendoRef.current = false;
+      // Si la persona ya se fue del chat, no se toca nada: lo guardado se olvidó
+      // al arrancar, y lo que haya ahora es un borrador NUEVO de otro cajón.
+      if (!montadoRef.current) return;
       setPendingFiles([]);
       setText("");
       composerRef.current?.clear();
@@ -264,6 +341,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
     // el formato va aparte en content_rich, y es null si el mensaje no tiene formato.
     const rich = composerRef.current?.getRich() ?? null;
     onSendMessage(text.trim(), "text", undefined, undefined, replyTo?.id, undefined, undefined, rich);
+    clearDraft(user?.id, conversationId);
     setText("");
     composerRef.current?.clear();
     onCancelReply();
@@ -272,20 +350,23 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
     clearTimeout(typingTimeout.current);
     onSendTyping(false);
     composerRef.current?.focus();
-  }, [text, replyTo, onSendMessage, onCancelReply, onSendTyping, pendingFiles, user, uploadFileWithProgress, uploading]);
+  }, [text, replyTo, onSendMessage, onCancelReply, onSendTyping, pendingFiles, user, uploadFileWithProgress, uploading, t, conversationId]);
 
   // El editor rico avisa el texto PLANO y dónde está el cursor dentro de ese texto;
   // con eso siguen andando el borrador, el indicador de "escribiendo" y las @menciones.
-  const handleComposerUpdate = useCallback((plain: string, cursorPlain: number, cambioDeTexto = true) => {
+  const handleComposerUpdate = useCallback((plain: string, cursorPlain: number, cambioDeTexto: boolean, doc: JSONContent) => {
     setText(plain);
     setCursorPosition(cursorPlain);
     // Mover el cursor NO es escribir: sin esta guarda, hacer clic en el cajón ya
     // le anunciaba "está escribiendo" a la otra persona.
     if (!cambioDeTexto) return;
+    // El borrador se guarda en CADA cambio de texto, venga de donde venga
+    // (tecleo, emoji, script, mención): todo pasa por el editor. Vacío lo borra.
+    setDraft(user?.id, conversationId, plain, doc);
     onSendTyping(true);
     clearTimeout(typingTimeout.current);
     typingTimeout.current = setTimeout(() => onSendTyping(false), APAGAR_ESCRIBIENDO_MS);
-  }, [onSendTyping]);
+  }, [onSendTyping, user?.id, conversationId]);
 
   // Con editor rico no se puede reemplazar TODO el texto (borraría el formato):
   // se borra solo el token "@algo" que está antes del cursor y se inserta la mención.
@@ -333,7 +414,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
       contentType: blob.type,
     });
     if (error) {
-      toast.error("Error al subir nota de voz");
+      toast.error(t("messenger.input.errorNotaDeVoz"));
       setUploading(false);
       return;
     }
@@ -343,7 +424,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
     onSendMessage(`🎤 Nota de voz (${mins}:${secs.toString().padStart(2, "0")})`, "file" as ChatMessage["type"], urlData.publicUrl, fileName);
     setIsRecording(false);
     setUploading(false);
-  }, [user, onSendMessage]);
+  }, [user, onSendMessage, t]);
 
   return (
     // Borde inferior en el iPhone instalado: el área segura son 34 pt, pero el
@@ -358,11 +439,13 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
           <div className="h-8 w-1 rounded-full bg-primary shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-[11px] font-semibold text-primary">
-              {replyTo.sender_id === user?.id ? "Tú" : profiles[replyTo.sender_id]?.full_name || "Usuario"}
+              {replyTo.sender_id === user?.id && replyTo.api_key_id == null
+                ? t("messenger.preview.tu")
+                : remitenteVisible(replyTo, profiles, t).nombre}
             </p>
             <p className="text-[11px] text-muted-foreground truncate">{replyTo.content}</p>
           </div>
-          <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={onCancelReply}>
+          <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={onCancelReply} aria-label={t("composer.cancelReply")}>
             <X className="h-3 w-3" />
           </Button>
         </div>
@@ -373,13 +456,13 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
         <div className="bg-primary/[0.03]">
           <div className="flex items-center justify-between px-4 pt-2 pb-1">
             <span className="text-[11px] text-muted-foreground font-medium">
-              {pendingFiles.length}/{MAX_FILES} archivos adjuntos
+              {t("messenger.input.adjuntos", { n: pendingFiles.length, max: MAX_FILES })}
             </span>
             <Button variant="ghost" size="sm" className="h-5 text-[10px] text-destructive hover:text-destructive" onClick={() => {
               pendingFiles.forEach(pf => { if (pf.preview) URL.revokeObjectURL(pf.preview); });
               setPendingFiles([]);
             }}>
-              Quitar todos
+              {t("messenger.input.quitarTodos")}
             </Button>
           </div>
           <div className="flex gap-2 px-4 pb-2 overflow-x-auto">
@@ -403,7 +486,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
                 )}
                 <button
                   onClick={() => removePendingFile(i)}
-                  aria-label={`Quitar ${pf.file.name}`}
+                  aria-label={t("messenger.input.quitarArchivo", { name: pf.file.name })}
                   className="absolute -top-1.5 -right-1.5 h-5 w-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/file:opacity-100 transition-opacity"
                 >
                   <X className="h-3 w-3" />
@@ -428,7 +511,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
               className="h-5 px-2 text-[10px] text-destructive hover:text-destructive"
               onClick={cancelUpload}
             >
-              Cancelar
+              {t("common.cancel")}
             </Button>
           </div>
           {uploadPercent > 0 && (
@@ -447,6 +530,17 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
             onPick={(e) => composerRef.current?.insertText(e)}
             onAdd={(e) => setMessengerEmojis((curr) => (curr.includes(e) ? curr : [...curr, e]))}
             onRemove={(e) => setMessengerEmojis((curr) => curr.filter((x) => x !== e))}
+            // Solo el CONTENIDO del popup del «+»: el selector de Google. La barra,
+            // su lugar y lo que hace elegir ahí (sumar a la barra) no cambian.
+            selector={({ enLaBarra, onAgregar }) => (
+              <SelectorDeEmojis
+                className="h-[min(26rem,60vh)]"
+                deshabilitados={enLaBarra}
+                motivoDeshabilitado={t("chatters.emoji.alreadyInBar")}
+                onElegir={onAgregar}
+                enfocarBusqueda
+              />
+            )}
           />
         </div>
       )}
@@ -478,8 +572,8 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
               className={cn("h-10 shrink-0 rounded-full text-foreground/90 hover:bg-primary/8", compacto ? "w-9" : "w-10")}
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
-              title="Adjuntar archivo"
-              aria-label="Adjuntar archivo"
+              title={t("messenger.input.adjuntarArchivo")}
+              aria-label={t("messenger.input.adjuntarArchivo")}
             >
               {uploading ? <Loader2 className="h-7 w-7 animate-spin" /> : <Plus className="h-7 w-7" strokeWidth={2.25} />}
             </Button>
@@ -503,8 +597,8 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
               )}>
                 <RichComposer
                   ref={composerRef}
-                  initialContent={getDraft(user?.id, conversationId)}
-                  placeholder={chatType === "group" ? "Escribe un mensaje... (usa @ para mencionar)" : "Escribe un mensaje..."}
+                  initialContent={getDraftDoc(user?.id, conversationId)}
+                  placeholder={chatType === "group" ? t("messenger.input.placeholderGrupo") : t("messenger.input.placeholder")}
                   showToolbar={showToolbar}
                   disabled={uploading}
                   onUpdate={handleComposerUpdate}
@@ -532,8 +626,8 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
                     showToolbar ? "bg-primary/15 text-primary" : "text-foreground/90",
                   )}
                   onClick={() => setShowToolbar((v) => !v)}
-                  title="Opciones de formato"
-                  aria-label="Opciones de formato"
+                  title={t("messenger.input.opcionesFormato")}
+                  aria-label={t("messenger.input.opcionesFormato")}
                 >
                   <Baseline className="h-[22px] w-[22px]" strokeWidth={2.1} />
                 </Button>
@@ -548,8 +642,8 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
                 className="h-10 w-9 shrink-0 rounded-full text-foreground/90 hover:bg-primary/8"
                 onClick={() => cameraInputRef.current?.click()}
                 disabled={uploading}
-                title="Cámara"
-                aria-label="Cámara"
+                title={t("messenger.input.camara")}
+                aria-label={t("messenger.input.camara")}
               >
                 <Camera className="h-[26px] w-[26px]" strokeWidth={2.1} />
               </Button>
@@ -560,8 +654,8 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
                 onClick={handleSend}
                 className="h-10 w-10 shrink-0 rounded-full bg-gradient-to-br from-accent to-primary text-white shadow-sm hover:opacity-90 transition-all"
                 disabled={uploading}
-                title="Enviar"
-                aria-label="Enviar"
+                title={t("common.send")}
+                aria-label={t("common.send")}
               >
                 {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
               </Button>
@@ -570,8 +664,8 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
                 variant="ghost" size="icon"
                 className="h-10 w-9 shrink-0 rounded-full text-foreground/90 hover:bg-primary/8"
                 onClick={() => setIsRecording(true)}
-                title="Grabar nota de voz"
-                aria-label="Grabar nota de voz"
+                title={t("messenger.input.grabarNotaDeVoz")}
+                aria-label={t("messenger.input.grabarNotaDeVoz")}
               >
                 <Mic className="h-[26px] w-[26px]" strokeWidth={2.1} />
               </Button>
@@ -595,8 +689,8 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
               <div className="msg-composer-wrap w-full min-w-0 overflow-hidden bg-primary/5 rounded-2xl px-4 py-2.5 pr-12 focus-within:ring-1 focus-within:ring-primary/30">
                 <RichComposer
                   ref={composerRef}
-                  initialContent={getDraft(user?.id, conversationId)}
-                  placeholder={chatType === "group" ? "Escribe un mensaje... (usa @ para mencionar)" : "Escribe un mensaje..."}
+                  initialContent={getDraftDoc(user?.id, conversationId)}
+                  placeholder={chatType === "group" ? t("messenger.input.placeholderGrupo") : t("messenger.input.placeholder")}
                   showToolbar={showToolbar}
                   disabled={uploading}
                   onUpdate={handleComposerUpdate}
@@ -609,7 +703,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
                 onClick={handleSend}
                 className="absolute bottom-[7px] right-2 h-7 w-7 shrink-0 rounded-full bg-gradient-to-br from-accent to-primary text-white shadow-sm hover:opacity-90 transition-all"
                 disabled={uploading || (!text.trim() && pendingFiles.length === 0)}
-                title="Enviar"
+                title={t("common.send")}
               >
                 {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
               </Button>
@@ -622,7 +716,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
                   showToolbar ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground",
                 )}
                 onClick={() => setShowToolbar((v) => !v)}
-                title="Opciones de formato"
+                title={t("messenger.input.opcionesFormato")}
               >
                 <Baseline className="h-5 w-5" />
               </Button>
@@ -631,7 +725,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
                 className="h-9 w-9 shrink-0 rounded-full text-muted-foreground hover:bg-primary/8 hover:text-foreground"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploading}
-                title="Adjuntar archivo"
+                title={t("messenger.input.adjuntarArchivo")}
               >
                 {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Paperclip className="h-5 w-5" />}
               </Button>
@@ -649,7 +743,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
                 variant="ghost" size="icon"
                 className="h-9 w-9 shrink-0 rounded-full text-muted-foreground hover:bg-primary/8 hover:text-foreground"
                 onClick={() => setIsRecording(true)}
-                title="Grabar nota de voz"
+                title={t("messenger.input.grabarNotaDeVoz")}
               >
                 <Mic className="h-5 w-5" />
               </Button>

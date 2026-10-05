@@ -16,12 +16,15 @@ import { EmployeeSearchCombobox } from "@/components/hr/EmployeeSearchCombobox";
 import { INCIDENT_TYPES, INCIDENT_SEVERITIES, INCIDENT_CATEGORIES, INCIDENT_IMPACTS } from "@/lib/hrConstants";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/ui/page-header";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
+import { etiquetaHrO } from "./etiquetasHr";
 
-const STEPS = [
-  { id: 1, label: "Clasificación", icon: ClipboardList },
-  { id: 2, label: "Evaluación Interna", icon: ShieldCheck },
-  { id: 3, label: "Detalle del Incidente", icon: FileText },
-  { id: 4, label: "Seguimiento", icon: Settings },
+const STEPS: { id: number; label: TranslationKey; icon: typeof ClipboardList }[] = [
+  { id: 1, label: "hrg.inc.step.classification", icon: ClipboardList },
+  { id: 2, label: "hrg.inc.step.review", icon: ShieldCheck },
+  { id: 3, label: "hrg.inc.step.detail", icon: FileText },
+  { id: 4, label: "hrg.inc.step.followUp", icon: Settings },
 ];
 
 interface FormState {
@@ -60,6 +63,7 @@ export default function HRIncidentNew() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [step, setStep] = useState(1);
   const [form, setForm] = useState<FormState>(initialForm);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -95,10 +99,10 @@ export default function HRIncidentNew() {
       });
       if (error) throw error;
       queryClient.invalidateQueries({ queryKey: ["employee-incidents-all"] });
-      toast({ title: "Incidente registrado correctamente" });
+      toast({ title: t("hrg.inc.created") });
       navigate("/hr/incidentes");
     } catch {
-      toast({ title: "Error al registrar el incidente", variant: "destructive" });
+      toast({ title: t("hrg.inc.createError"), variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
@@ -109,9 +113,9 @@ export default function HRIncidentNew() {
       {/* Header */}
       <div className="shrink-0 border-b border-white/10 bg-background/30 backdrop-blur-xl px-6 py-4">
         <Button variant="ghost" size="sm" className="mb-2 -ml-2 text-muted-foreground hover:text-foreground" onClick={() => navigate("/hr/incidentes")}>
-          <ArrowLeft className="h-4 w-4 mr-1" />Volver a Incidentes
+          <ArrowLeft className="h-4 w-4 mr-1" />{t("hrg.inc.back")}
         </Button>
-        <PageHeader title="Reportar Incidente" subtitle="Registra un nuevo incidente siguiendo el flujo de 4 pasos" />
+        <PageHeader title={t("hrg.inc.title")} subtitle={t("hrg.inc.subtitle")} />
       </div>
 
       {/* Stepper */}
@@ -129,7 +133,7 @@ export default function HRIncidentNew() {
                   <span className={cn("flex h-7 w-7 items-center justify-center rounded-full border-2 text-xs font-bold transition-all", step === s.id ? "border-transparent bg-gradient-to-r from-accent to-primary text-white ring-2 ring-accent/30" : step > s.id ? "border-transparent bg-gradient-to-r from-accent to-primary text-white" : "border-muted-foreground/30 text-muted-foreground")}>
                     {step > s.id ? <Check className="h-3.5 w-3.5" /> : <Icon className="h-3.5 w-3.5" />}
                   </span>
-                  <span className="hidden sm:inline">{s.label}</span>
+                  <span className="hidden sm:inline">{t(s.label)}</span>
                 </button>
                 {i < STEPS.length - 1 && <div className={cn("h-px flex-1 mx-2 transition-colors", step > s.id ? "bg-gradient-to-r from-accent to-primary" : "bg-border")} />}
               </div>
@@ -144,28 +148,28 @@ export default function HRIncidentNew() {
         {/* Step 1: Clasificación */}
         {step === 1 && (
           <Card>
-            <CardHeader><CardTitle className="text-base">Clasificación del Incidente</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-base">{t("hrg.inc.classificationTitle")}</CardTitle></CardHeader>
             <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5 sm:col-span-2">
-                <Label>Empleado <span className="text-destructive">*</span></Label>
+                <Label>{t("hrg.employee")} <span className="text-destructive">*</span></Label>
                 <EmployeeSearchCombobox value={form.employee_id || null} onChange={(v) => set("employee_id", v ?? "")} />
               </div>
               <div className="space-y-1.5">
-                <Label>Tipo de Incidente <span className="text-destructive">*</span></Label>
+                <Label>{t("hrg.inc.type")} <span className="text-destructive">*</span></Label>
                 <Select value={form.incident_type || undefined} onValueChange={(v) => set("incident_type", v)}>
-                  <SelectTrigger><SelectValue placeholder="Seleccionar tipo..." /></SelectTrigger>
-                  <SelectContent>{INCIDENT_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
+                  <SelectTrigger><SelectValue placeholder={t("hrg.selectType")} /></SelectTrigger>
+                  <SelectContent>{INCIDENT_TYPES.map((o) => <SelectItem key={o.value} value={o.value}>{etiquetaHrO(t, "incType", o.value)}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>Categoría <span className="text-destructive">*</span></Label>
+                <Label>{t("common.category")} <span className="text-destructive">*</span></Label>
                 <Select value={form.category || undefined} onValueChange={(v) => set("category", v)}>
-                  <SelectTrigger><SelectValue placeholder="Seleccionar categoría..." /></SelectTrigger>
-                  <SelectContent>{INCIDENT_CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
+                  <SelectTrigger><SelectValue placeholder={t("hrg.selectCategory")} /></SelectTrigger>
+                  <SelectContent>{INCIDENT_CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{etiquetaHrO(t, "incCategory", c.value)}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>Fecha del Incidente <span className="text-destructive">*</span></Label>
+                <Label>{t("hrg.inc.date")} <span className="text-destructive">*</span></Label>
                 <DateInput value={form.incident_date} onChange={(v) => set("incident_date", v)} />
               </div>
             </CardContent>
@@ -175,20 +179,20 @@ export default function HRIncidentNew() {
         {/* Step 2: Evaluación Interna */}
         {step === 2 && (
           <Card>
-            <CardHeader><CardTitle className="text-base">Evaluación Interna RRHH</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-base">{t("hrg.inc.reviewTitle")}</CardTitle></CardHeader>
             <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label>Severidad <span className="text-destructive">*</span></Label>
+                <Label>{t("hrg.inc.severity")} <span className="text-destructive">*</span></Label>
                 <Select value={form.severity || undefined} onValueChange={(v) => set("severity", v)}>
-                  <SelectTrigger><SelectValue placeholder="Seleccionar severidad..." /></SelectTrigger>
-                  <SelectContent>{INCIDENT_SEVERITIES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
+                  <SelectTrigger><SelectValue placeholder={t("hrg.inc.selectSeverity")} /></SelectTrigger>
+                  <SelectContent>{INCIDENT_SEVERITIES.map((s) => <SelectItem key={s.value} value={s.value}>{etiquetaHrO(t, "incSeverity", s.value)}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>Impacto <span className="text-destructive">*</span></Label>
+                <Label>{t("hrg.inc.impact")} <span className="text-destructive">*</span></Label>
                 <Select value={form.impact || undefined} onValueChange={(v) => set("impact", v)}>
-                  <SelectTrigger><SelectValue placeholder="Seleccionar impacto..." /></SelectTrigger>
-                  <SelectContent>{INCIDENT_IMPACTS.map((i) => <SelectItem key={i.value} value={i.value}>{i.label}</SelectItem>)}</SelectContent>
+                  <SelectTrigger><SelectValue placeholder={t("hrg.inc.selectImpact")} /></SelectTrigger>
+                  <SelectContent>{INCIDENT_IMPACTS.map((i) => <SelectItem key={i.value} value={i.value}>{etiquetaHrO(t, "incImpact", i.value)}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
             </CardContent>
@@ -198,35 +202,35 @@ export default function HRIncidentNew() {
         {/* Step 3: Detalle */}
         {step === 3 && (
           <Card>
-            <CardHeader><CardTitle className="text-base">Detalle del Incidente</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-base">{t("hrg.inc.step.detail")}</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <Label>Título <span className="text-destructive">*</span></Label>
+                  <Label>{t("common.title")} <span className="text-destructive">*</span></Label>
                   <span className="text-xs text-muted-foreground">{form.title.length}/100</span>
                 </div>
-                <Input maxLength={100} placeholder="Breve descripción del incidente (min. 5 caracteres)" value={form.title} onChange={(e) => set("title", e.target.value)} />
-                {form.title.length > 0 && form.title.length < 5 && <p className="text-xs text-destructive">Mínimo 5 caracteres</p>}
+                <Input maxLength={100} placeholder={t("hrg.inc.titlePlaceholder")} value={form.title} onChange={(e) => set("title", e.target.value)} />
+                {form.title.length > 0 && form.title.length < 5 && <p className="text-xs text-destructive">{t("hrg.inc.minChars", { n: 5 })}</p>}
               </div>
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <Label>Descripción <span className="text-destructive">*</span></Label>
+                  <Label>{t("common.description")} <span className="text-destructive">*</span></Label>
                   <span className="text-xs text-muted-foreground">{form.description.length}/2000</span>
                 </div>
-                <Textarea maxLength={2000} rows={5} placeholder="Detalle completo del incidente (min. 10 caracteres)" value={form.description} onChange={(e) => set("description", e.target.value)} />
-                {form.description.length > 0 && form.description.length < 10 && <p className="text-xs text-destructive">Mínimo 10 caracteres</p>}
+                <Textarea maxLength={2000} rows={5} placeholder={t("hrg.inc.descriptionPlaceholder")} value={form.description} onChange={(e) => set("description", e.target.value)} />
+                {form.description.length > 0 && form.description.length < 10 && <p className="text-xs text-destructive">{t("hrg.inc.minChars", { n: 10 })}</p>}
               </div>
               <div className="space-y-1.5">
-                <Label>Evidencias (opcional)</Label>
+                <Label>{t("hrg.inc.evidence")}</Label>
                 <div className="border-2 border-dashed rounded-lg p-6 text-center text-muted-foreground hover:border-primary/50 transition-colors cursor-default">
                   <Upload className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">Arrastra archivos aquí o haz clic para seleccionar</p>
-                  <p className="text-xs mt-1">Función disponible próximamente</p>
+                  <p className="text-sm">{t("hrg.inc.dropFiles")}</p>
+                  <p className="text-xs mt-1">{t("hrg.inc.comingSoon")}</p>
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label>Comentarios Internos (solo RRHH)</Label>
-                <Textarea rows={3} placeholder="Notas internas del equipo de RRHH..." value={form.internal_notes} onChange={(e) => set("internal_notes", e.target.value)} />
+                <Label>{t("hrg.inc.internalNotes")}</Label>
+                <Textarea rows={3} placeholder={t("hrg.inc.internalNotesPlaceholder")} value={form.internal_notes} onChange={(e) => set("internal_notes", e.target.value)} />
               </div>
             </CardContent>
           </Card>
@@ -235,25 +239,25 @@ export default function HRIncidentNew() {
         {/* Step 4: Seguimiento */}
         {step === 4 && (
           <Card>
-            <CardHeader><CardTitle className="text-base">Seguimiento</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-base">{t("hrg.inc.step.followUp")}</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-1.5">
-                <Label>Acción Correctiva <span className="text-destructive">*</span></Label>
-                <Textarea rows={4} placeholder="Medidas correctivas a implementar..." value={form.corrective_action} onChange={(e) => set("corrective_action", e.target.value)} />
+                <Label>{t("hrg.inc.correctiveAction")} <span className="text-destructive">*</span></Label>
+                <Textarea rows={4} placeholder={t("hrg.inc.correctivePlaceholder")} value={form.corrective_action} onChange={(e) => set("corrective_action", e.target.value)} />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <Label>Fecha de Seguimiento</Label>
+                  <Label>{t("hrg.inc.followUpDate")}</Label>
                   <DateInput value={form.follow_up_date} onChange={(v) => set("follow_up_date", v)} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Responsable del Seguimiento</Label>
-                  <EmployeeSearchCombobox value={form.follow_up_responsible} onChange={(v) => set("follow_up_responsible", v)} placeholder="Seleccionar responsable..." />
+                  <Label>{t("hrg.inc.followUpOwner")}</Label>
+                  <EmployeeSearchCombobox value={form.follow_up_responsible} onChange={(v) => set("follow_up_responsible", v)} placeholder={t("hrg.inc.selectOwner")} />
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label>Notas de Seguimiento</Label>
-                <Textarea rows={3} placeholder="Notas adicionales sobre el seguimiento..." value={form.follow_up_notes} onChange={(e) => set("follow_up_notes", e.target.value)} />
+                <Label>{t("hrg.inc.followUpNotes")}</Label>
+                <Textarea rows={3} placeholder={t("hrg.inc.followUpNotesPlaceholder")} value={form.follow_up_notes} onChange={(e) => set("follow_up_notes", e.target.value)} />
               </div>
             </CardContent>
           </Card>
@@ -264,17 +268,17 @@ export default function HRIncidentNew() {
       <div className="shrink-0 border-t bg-background px-6 py-3 flex items-center justify-between">
         <div>
           {step === 1 ? (
-            <Button variant="outline" onClick={() => navigate("/hr/incidentes")}>Cancelar</Button>
+            <Button variant="outline" onClick={() => navigate("/hr/incidentes")}>{t("common.cancel")}</Button>
           ) : (
-            <Button variant="outline" onClick={() => setStep((s) => s - 1)}>Atrás</Button>
+            <Button variant="outline" onClick={() => setStep((s) => s - 1)}>{t("hrg.back")}</Button>
           )}
         </div>
         <div>
           {step < 4 ? (
-            <Button onClick={() => setStep((s) => s + 1)} disabled={!canNext()}>Siguiente</Button>
+            <Button onClick={() => setStep((s) => s + 1)} disabled={!canNext()}>{t("common.next")}</Button>
           ) : (
             <Button onClick={handleSubmit} disabled={!canNext() || isSubmitting}>
-              {isSubmitting ? "Registrando..." : "Registrar Incidente"}
+              {isSubmitting ? t("hrg.registering") : t("hrg.inc.submit")}
             </Button>
           )}
         </div>

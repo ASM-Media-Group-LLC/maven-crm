@@ -3,9 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Clock, CalendarIcon, Upload, X, FileText, Image } from "lucide-react";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useFormato } from "@/hooks/useFormato";
 import { EmployeeSearchCombobox } from "@/components/hr/EmployeeSearchCombobox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,19 +19,24 @@ import {
   Wifi, LogOut, LogIn, User, Stethoscope, GraduationCap, Briefcase,
 } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
+import { useLanguage } from "@/hooks/useLanguage";
+import { etiqueta, TIPO_PERMISO } from "./etiquetasRrhh";
 
+// `value` es el absence_type que se guarda (DATO); lo que se ve sale de TIPO_PERMISO.
 const PERMISSION_TYPES = [
-  { value: "permiso_remoto", label: "Trabajo Remoto", icon: Wifi },
-  { value: "salida_temprana", label: "Salida Temprana", icon: LogOut },
-  { value: "llegada_tarde", label: "Llegada Tarde", icon: LogIn },
-  { value: "permiso_personal", label: "Permiso Personal", icon: User },
-  { value: "permiso_medico", label: "Permiso Médico", icon: Stethoscope },
-  { value: "permiso_academico", label: "Permiso Académico", icon: GraduationCap },
-  { value: "permiso_diligencia", label: "Diligencia Personal", icon: Briefcase },
-  { value: "incapacidad", label: "Incapacidad", icon: Stethoscope },
+  { value: "permiso_remoto", icon: Wifi },
+  { value: "salida_temprana", icon: LogOut },
+  { value: "llegada_tarde", icon: LogIn },
+  { value: "permiso_personal", icon: User },
+  { value: "permiso_medico", icon: Stethoscope },
+  { value: "permiso_academico", icon: GraduationCap },
+  { value: "permiso_diligencia", icon: Briefcase },
+  { value: "incapacidad", icon: Stethoscope },
 ];
 
 export default function HRPermisoNew() {
+  const { t } = useLanguage();
+  const f = useFormato();
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -53,11 +58,11 @@ export default function HRPermisoNew() {
     if (!selected) return;
     const allowed = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
     if (!allowed.includes(selected.type)) {
-      toast({ title: "Solo se permiten imágenes (JPG, PNG, WEBP) o PDF", variant: "destructive" });
+      toast({ title: t("hr.perm.onlyImagesPdf"), variant: "destructive" });
       return;
     }
     if (selected.size > 10 * 1024 * 1024) {
-      toast({ title: "El archivo no debe superar 10 MB", variant: "destructive" });
+      toast({ title: t("hr.perm.maxSize"), variant: "destructive" });
       return;
     }
     setFile(selected);
@@ -99,11 +104,11 @@ export default function HRPermisoNew() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["permisos"] });
-      toast({ title: "Solicitud de permiso creada" });
+      toast({ title: t("hr.perm.created") });
       navigate("/hr/permisos");
     },
     onError: () => {
-      toast({ title: "Error al crear la solicitud", variant: "destructive" });
+      toast({ title: t("hr.errorCreatingRequest"), variant: "destructive" });
     },
     onSettled: () => setUploading(false),
   });
@@ -112,19 +117,19 @@ export default function HRPermisoNew() {
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
       <header className="bg-background/30 backdrop-blur-xl px-6 pt-6 pb-4 border-b border-white/10 shrink-0">
         <nav className="text-sm text-muted-foreground mb-2">
-          <button onClick={() => navigate("/hr/permisos")} className="hover:text-foreground transition-colors">Permisos</button>
+          <button onClick={() => navigate("/hr/permisos")} className="hover:text-foreground transition-colors">{t("hr.perm.title")}</button>
           <span className="mx-2">›</span>
-          <span className="text-foreground font-medium">Nueva Solicitud</span>
+          <span className="text-foreground font-medium">{t("hr.newRequest")}</span>
         </nav>
         <button
           onClick={() => navigate("/hr/permisos")}
           className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
         >
-          <ArrowLeft className="h-4 w-4" /> Volver
+          <ArrowLeft className="h-4 w-4" /> {t("common.back")}
         </button>
         <PageHeader
-          title="Nueva Solicitud"
-          subtitle="Registra un permiso, ausencia o incapacidad"
+          title={t("hr.newRequest")}
+          subtitle={t("hr.perm.newSubtitle")}
           icon={<Clock className="h-6 w-6" />}
         />
       </header>
@@ -133,21 +138,21 @@ export default function HRPermisoNew() {
         <div className="space-y-6 rounded-lg border border-border p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label>Empleado <span className="text-destructive">*</span></Label>
+              <Label>{t("hr.employee")} <span className="text-destructive">*</span></Label>
               <EmployeeSearchCombobox value={employeeId} onChange={setEmployeeId} />
             </div>
             <div className="space-y-1.5">
-              <Label>Tipo de Solicitud <span className="text-destructive">*</span></Label>
+              <Label>{t("hr.perm.requestType")} <span className="text-destructive">*</span></Label>
               <Select value={permisoType} onValueChange={setPermisoType}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar tipo..." />
+                  <SelectValue placeholder={t("hr.selectType")} />
                 </SelectTrigger>
                 <SelectContent>
-                  {PERMISSION_TYPES.map((t) => (
-                    <SelectItem key={t.value} value={t.value}>
+                  {PERMISSION_TYPES.map((tp) => (
+                    <SelectItem key={tp.value} value={tp.value}>
                       <span className="flex items-center gap-2">
-                        <t.icon className="h-3.5 w-3.5" />
-                        {t.label}
+                        <tp.icon className="h-3.5 w-3.5" />
+                        {etiqueta(t, TIPO_PERMISO, tp.value)}
                       </span>
                     </SelectItem>
                   ))}
@@ -158,7 +163,7 @@ export default function HRPermisoNew() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label>Fecha <span className="text-destructive">*</span></Label>
+              <Label>{t("common.date")} <span className="text-destructive">*</span></Label>
               <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
                 <PopoverTrigger asChild>
                   <Button
@@ -166,7 +171,7 @@ export default function HRPermisoNew() {
                     className={cn("w-full justify-start font-normal", !date && "text-muted-foreground")}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {date ? format(date, "dd 'de' MMMM yyyy", { locale: es }) : "Seleccionar fecha"}
+                    {date ? format(date, f.idioma === "en" ? "MMMM dd, yyyy" : "dd 'de' MMMM yyyy", { locale: f.fechas }) : t("hr.selectDate")}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -174,16 +179,16 @@ export default function HRPermisoNew() {
                     mode="single"
                     selected={date}
                     onSelect={(d) => { setDate(d); setCalendarOpen(false); }}
-                    locale={es}
+                    locale={f.fechas}
                     initialFocus
                   />
                 </PopoverContent>
               </Popover>
             </div>
             <div className="space-y-1.5">
-              <Label>Horario</Label>
+              <Label>{t("hr.schedule")}</Label>
               <Input
-                placeholder="Ej: 14:00 - 17:00"
+                placeholder={t("hr.scheduleExample")}
                 value={horario}
                 onChange={(e) => setHorario(e.target.value)}
               />
@@ -191,9 +196,9 @@ export default function HRPermisoNew() {
           </div>
 
           <div className="space-y-1.5">
-            <Label>Motivo</Label>
+            <Label>{t("hr.reasonLabel")}</Label>
             <Textarea
-              placeholder="Describa el motivo de la solicitud..."
+              placeholder={t("hr.perm.reasonPlaceholder")}
               rows={3}
               value={motivo}
               onChange={(e) => setMotivo(e.target.value)}
@@ -201,8 +206,8 @@ export default function HRPermisoNew() {
           </div>
 
           <div className="space-y-1.5">
-            <Label>Documento de soporte</Label>
-            <p className="text-xs text-muted-foreground">Imagen o PDF (máx. 10 MB)</p>
+            <Label>{t("hr.perm.supportDoc")}</Label>
+            <p className="text-xs text-muted-foreground">{t("hr.perm.supportDocHint")}</p>
             {file ? (
               <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
                 {file.type.startsWith("image/") ? (
@@ -222,7 +227,7 @@ export default function HRPermisoNew() {
                 onClick={() => fileInputRef.current?.click()}
               >
                 <Upload className="mr-2 h-4 w-4" />
-                Seleccionar archivo
+                {t("hr.perm.selectFile")}
               </Button>
             )}
             <input
@@ -238,12 +243,12 @@ export default function HRPermisoNew() {
 
       <footer className="border-t border-border bg-background px-6 py-4 shrink-0">
         <div className="flex justify-end gap-3">
-          <Button variant="outline" onClick={() => navigate("/hr/permisos")}>Cancelar</Button>
+          <Button variant="outline" onClick={() => navigate("/hr/permisos")}>{t("common.cancel")}</Button>
           <Button
             onClick={() => mutation.mutate()}
             disabled={!isValid || mutation.isPending || uploading}
           >
-            {mutation.isPending ? "Guardando..." : "Crear Solicitud"}
+            {mutation.isPending ? t("hr.saving") : t("hr.createRequest")}
           </Button>
         </div>
       </footer>

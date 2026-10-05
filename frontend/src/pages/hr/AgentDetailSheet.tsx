@@ -13,6 +13,8 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useHubstaffAgentDetail } from "@/hooks/useHubstaffAgentDetail";
 import type { HubstaffAgent } from "@/hooks/useHubstaffData";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 
 interface AgentDetailViewProps {
   agent: HubstaffAgent;
@@ -28,11 +30,12 @@ const TIMELINE_CONFIG: Record<string, { icon: typeof Play; color: string }> = {
   end: { icon: LogOut, color: "text-muted-foreground" },
 };
 
-const STATUS_LABELS: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-  activo: { label: "Activo", variant: "default" },
-  inactivo: { label: "Inactivo", variant: "secondary" },
-  desconectado: { label: "Desconectado", variant: "outline" },
-  en_pausa: { label: "En Pausa", variant: "secondary" },
+// `agent.status` viene así de Hubstaff (valor, no texto): se traduce solo la etiqueta.
+const STATUS_LABELS: Record<string, { label: TranslationKey; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+  activo: { label: "common.active", variant: "default" },
+  inactivo: { label: "common.inactive", variant: "secondary" },
+  desconectado: { label: "hrg.agent.offline", variant: "outline" },
+  en_pausa: { label: "hrg.agent.paused", variant: "secondary" },
 };
 
 function MiniKPI({ label, value, icon: Icon }: { label: string; value: string; icon: typeof Clock }) {
@@ -52,6 +55,7 @@ function MiniKPI({ label, value, icon: Icon }: { label: string; value: string; i
 }
 
 export default function AgentDetailView({ agent, onBack }: AgentDetailViewProps) {
+  const { t } = useLanguage();
   const [period, setPeriod] = useState<"daily" | "weekly" | "monthly">("daily");
   const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null);
 
@@ -65,14 +69,14 @@ export default function AgentDetailView({ agent, onBack }: AgentDetailViewProps)
         {/* Header */}
         <div className="shrink-0 border-b border-border bg-background px-6 py-4">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={onBack}>
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={onBack} aria-label={t("common.back")}>
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <UserAvatar name={agent.name} size="md" />
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <h3 className="text-xl font-semibold text-foreground truncate">{agent.name}</h3>
-                <Badge variant={statusCfg.variant} className="text-xs">{statusCfg.label}</Badge>
+                <Badge variant={statusCfg.variant} className="text-xs">{t(statusCfg.label)}</Badge>
               </div>
             </div>
           </div>
@@ -88,29 +92,29 @@ export default function AgentDetailView({ agent, onBack }: AgentDetailViewProps)
             <div className="space-y-6">
               <Tabs value={period} onValueChange={(v) => setPeriod(v as typeof period)}>
                 <TabsList>
-                  <TabsTrigger value="daily">Diario</TabsTrigger>
-                  <TabsTrigger value="weekly">Semanal</TabsTrigger>
-                  <TabsTrigger value="monthly">Mensual</TabsTrigger>
+                  <TabsTrigger value="daily">{t("hrg.agent.daily")}</TabsTrigger>
+                  <TabsTrigger value="weekly">{t("hrg.ann.recurrence.weekly")}</TabsTrigger>
+                  <TabsTrigger value="monthly">{t("hrg.ann.recurrence.monthly")}</TabsTrigger>
                 </TabsList>
               </Tabs>
-              <EmptyState icon={<Monitor className="h-8 w-8 text-muted-foreground" />} title="Sin datos de actividad" description="No se encontraron registros de actividad para este agente en el periodo seleccionado. Los datos aparecerán automáticamente cuando Hubstaff esté sincronizando." />
+              <EmptyState icon={<Monitor className="h-8 w-8 text-muted-foreground" />} title={t("hrg.agent.noActivity")} description={t("hrg.agent.noActivityHint")} />
             </div>
           ) : (
             <div className="space-y-6">
               {/* Period Tabs */}
               <Tabs value={period} onValueChange={(v) => setPeriod(v as typeof period)}>
                 <TabsList>
-                  <TabsTrigger value="daily">Diario</TabsTrigger>
-                  <TabsTrigger value="weekly">Semanal</TabsTrigger>
-                  <TabsTrigger value="monthly">Mensual</TabsTrigger>
+                  <TabsTrigger value="daily">{t("hrg.agent.daily")}</TabsTrigger>
+                  <TabsTrigger value="weekly">{t("hrg.ann.recurrence.weekly")}</TabsTrigger>
+                  <TabsTrigger value="monthly">{t("hrg.ann.recurrence.monthly")}</TabsTrigger>
                 </TabsList>
 
                 {/* KPIs */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
-                  <MiniKPI label="Horas Totales" value={kpis.hours} icon={Clock} />
-                  <MiniKPI label="Productividad" value={kpis.productivity} icon={TrendingUp} />
-                  <MiniKPI label="Actividad Mouse" value={kpis.mouse} icon={Mouse} />
-                  <MiniKPI label="Actividad Teclado" value={kpis.keyboard} icon={Keyboard} />
+                  <MiniKPI label={t("hrg.agent.totalHours")} value={kpis.hours} icon={Clock} />
+                  <MiniKPI label={t("hrg.agent.productivity")} value={kpis.productivity} icon={TrendingUp} />
+                  <MiniKPI label={t("hrg.agent.mouseActivity")} value={kpis.mouse} icon={Mouse} />
+                  <MiniKPI label={t("hrg.agent.keyboardActivity")} value={kpis.keyboard} icon={Keyboard} />
                 </div>
 
                 {/* Chart */}
@@ -118,7 +122,7 @@ export default function AgentDetailView({ agent, onBack }: AgentDetailViewProps)
                   <Card>
                     <CardContent className="p-4">
                       <p className="text-xs font-medium text-muted-foreground mb-3">
-                        Rendimiento {period === "daily" ? "por hora" : period === "weekly" ? "por día" : "por día del mes"}
+                        {t(period === "daily" ? "hrg.agent.perfByHour" : period === "weekly" ? "hrg.agent.perfByDay" : "hrg.agent.perfByMonthDay")}
                       </p>
                       {chartData.length > 0 ? (
                         <>
@@ -146,7 +150,7 @@ export default function AgentDetailView({ agent, onBack }: AgentDetailViewProps)
                                 }}
                               />
                               <Area type="monotone" dataKey="mouse" name="Mouse" stroke="hsl(var(--primary))" fill="url(#fillMouse)" strokeWidth={2} />
-                              <Area type="monotone" dataKey="keyboard" name="Teclado" stroke="#6366f1" fill="url(#fillKeyboard)" strokeWidth={2} />
+                              <Area type="monotone" dataKey="keyboard" name={t("hrg.agent.keyboard")} stroke="#6366f1" fill="url(#fillKeyboard)" strokeWidth={2} />
                             </AreaChart>
                           </ResponsiveContainer>
                           <div className="flex items-center justify-center gap-4 mt-2">
@@ -156,13 +160,13 @@ export default function AgentDetailView({ agent, onBack }: AgentDetailViewProps)
                             </div>
                             <div className="flex items-center gap-1.5">
                               <span className="h-2.5 w-2.5 rounded-full" style={{ background: "#6366f1" }} />
-                              <span className="text-xs text-muted-foreground">Teclado</span>
+                              <span className="text-xs text-muted-foreground">{t("hrg.agent.keyboard")}</span>
                             </div>
                           </div>
                         </>
                       ) : (
                         <div className="flex items-center justify-center h-[250px] text-sm text-muted-foreground">
-                          Sin datos para este periodo
+                          {t("hrg.agent.noDataPeriod")}
                         </div>
                       )}
                     </CardContent>
@@ -172,7 +176,7 @@ export default function AgentDetailView({ agent, onBack }: AgentDetailViewProps)
 
               {/* Screenshots */}
               <div>
-                <h4 className="text-sm font-semibold text-foreground mb-3">Capturas de Pantalla</h4>
+                <h4 className="text-sm font-semibold text-foreground mb-3">{t("hrg.agent.screenshots")}</h4>
                 {screenshots.length > 0 ? (
                   <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-2">
                     {screenshots.map((ss) => (
@@ -182,7 +186,7 @@ export default function AgentDetailView({ agent, onBack }: AgentDetailViewProps)
                         className="group relative aspect-video rounded-lg border border-border bg-muted/50 flex flex-col items-center justify-center gap-1 hover:border-primary/50 hover:bg-muted transition-colors cursor-pointer overflow-hidden"
                       >
                         {ss.url ? (
-                          <img src={ss.url} alt={`Captura ${ss.timestamp}`} className="absolute inset-0 w-full h-full object-cover" />
+                          <img src={ss.url} alt={t("hrg.agent.screenshotAlt", { time: ss.timestamp })} className="absolute inset-0 w-full h-full object-cover" />
                         ) : (
                           <Monitor className="h-5 w-5 text-muted-foreground/50 group-hover:text-primary/60" />
                         )}
@@ -198,14 +202,14 @@ export default function AgentDetailView({ agent, onBack }: AgentDetailViewProps)
                 ) : (
                   <div className="flex items-center gap-3 rounded-xl border border-dashed border-border bg-muted/30 p-6 text-muted-foreground">
                     <ImageOff className="h-5 w-5 shrink-0" />
-                    <p className="text-sm">No hay capturas de pantalla disponibles para hoy. Se mostrarán automáticamente al sincronizar con Hubstaff.</p>
+                    <p className="text-sm">{t("hrg.agent.noScreenshots")}</p>
                   </div>
                 )}
               </div>
 
               {/* Timeline */}
               <div>
-                <h4 className="text-sm font-semibold text-foreground mb-3">Línea de Tiempo</h4>
+                <h4 className="text-sm font-semibold text-foreground mb-3">{t("hrg.agent.timeline")}</h4>
                 {timeline.length > 0 ? (
                   <div className="space-y-0">
                     {timeline.map((event, i) => {
@@ -230,7 +234,7 @@ export default function AgentDetailView({ agent, onBack }: AgentDetailViewProps)
                 ) : (
                   <div className="flex items-center gap-3 rounded-xl border border-dashed border-border bg-muted/30 p-6 text-muted-foreground">
                     <Clock className="h-5 w-5 shrink-0" />
-                    <p className="text-sm">No hay eventos de timeline registrados para hoy.</p>
+                    <p className="text-sm">{t("hrg.agent.noTimeline")}</p>
                   </div>
                 )}
               </div>
@@ -244,12 +248,12 @@ export default function AgentDetailView({ agent, onBack }: AgentDetailViewProps)
         <DialogContent className="sm:max-w-2xl">
           <div className="aspect-video rounded-lg bg-muted/50 border border-border flex flex-col items-center justify-center gap-3 overflow-hidden">
             {screenshotPreview?.startsWith("http") ? (
-              <img src={screenshotPreview} alt="Captura de pantalla" className="w-full h-full object-contain" />
+              <img src={screenshotPreview} alt={t("hrg.agent.screenshot")} className="w-full h-full object-contain" />
             ) : (
               <>
                 <Monitor className="h-12 w-12 text-muted-foreground/40" />
-                <p className="text-sm text-muted-foreground">Captura de {screenshotPreview}</p>
-                <p className="text-xs text-muted-foreground italic">Captura real disponible con integración Hubstaff</p>
+                <p className="text-sm text-muted-foreground">{t("hrg.agent.screenshotAt", { time: screenshotPreview ?? "" })}</p>
+                <p className="text-xs text-muted-foreground italic">{t("hrg.agent.realScreenshot")}</p>
               </>
             )}
           </div>

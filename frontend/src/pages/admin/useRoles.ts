@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { adminInvoke, SessionExpiredError } from "@/lib/adminInvoke";
+import { traducir, type TranslationKey } from "@/lib/i18n";
 
 // Nivel de capacidad de un rol → flags de role_groups (la capa de RLS). Un rol
 // DEBE tener su fila en role_groups o is_in_role_group() le da false a TODO (sin
@@ -23,11 +24,32 @@ export const ROLE_TIER_FLAGS: Record<RoleTier, {
   admin:      { is_admin: true,  is_manager_or_above: true,  is_supervisor_or_above: true,  is_member: true },
 };
 
-export const ROLE_TIER_LABELS: Record<RoleTier, string> = {
-  member: "Empleado — solo lo suyo",
-  supervisor: "Supervisor — ve a su equipo",
-  manager: "Management — gestión amplia",
-  admin: "Admin — acceso total",
+// Guarda el tipo de acceso de un rol en role_groups: UPDATE y, si no había fila,
+// INSERT. No es un upsert porque la clave cambió: desde 20261001211000_roles_por_agencia
+// es (tenant_id, role_name), así que «onConflict: role_name» ya no encaja. Esto anda
+// igual antes y después de la migración: la RLS deja ver y tocar solo la fila de la
+// propia agencia, y en un INSERT la agencia la pone la base.
+async function guardarTipoDeRol(nombre: string, campos: (typeof ROLE_TIER_FLAGS)[RoleTier] & { description?: string }) {
+  const ahora = new Date().toISOString();
+  const { data, error } = await supabase
+    .from("role_groups")
+    .update({ ...campos, updated_at: ahora })
+    .eq("role_name", nombre)
+    .select("role_name");
+  if (error) throw error;
+  if (data && data.length > 0) return;
+  const { error: insError } = await supabase
+    .from("role_groups")
+    .insert({ role_name: nombre, ...campos, updated_at: ahora });
+  if (insError) throw insError;
+}
+
+// Claves del diccionario: el texto se elige al dibujar, en el idioma de la interfaz.
+export const ROLE_TIER_LABELS: Record<RoleTier, TranslationKey> = {
+  member: "admin.tier.member",
+  supervisor: "admin.tier.supervisor",
+  manager: "admin.tier.manager",
+  admin: "admin.tier.admin",
 };
 
 // El TIPO define la FRANJA del nivel jerárquico y el número afina dentro de ella
@@ -41,11 +63,11 @@ export const FRANJA_POR_TIER: Record<RoleTier, [number, number]> = {
 };
 
 // Etiqueta corta para badges en la lista/grid.
-export const ROLE_TIER_SHORT: Record<RoleTier, string> = {
-  member: "Empleado",
-  supervisor: "Supervisor",
-  manager: "Management",
-  admin: "Admin",
+export const ROLE_TIER_SHORT: Record<RoleTier, TranslationKey> = {
+  member: "admin.tierShort.member",
+  supervisor: "admin.tierShort.supervisor",
+  manager: "admin.tierShort.manager",
+  admin: "admin.tierShort.admin",
 };
 
 function flagsToTier(
@@ -131,7 +153,8 @@ const def = (
 };
 
 // Nombre VISIBLE del módulo en la UI de permisos. La KEY (p.ej. "Creator Sales") se conserva en
-// role_permissions / PermissionRoute / canAccess; esto es solo cosmético.
+// role_permissions / PermissionRoute / canAccess; esto es solo cosmético. Cómo se dibuja cada
+// nombre (en los dos idiomas) vive en etiquetasPermisos.ts: acá solo la llave.
 //
 // "Creator Sales" se mostraba como "Ventas" y parecía una pestaña que ya no existe
 // (el tab Ventas se fusionó en el Dashboard, #1525) — Jhon la desactivó para varios
@@ -139,9 +162,7 @@ const def = (
 //   · RLS `cde_sales_read` sobre creator_daily_earnings (los ingresos de BLU)
 //   · /dashboard2 (Dashboard de ingresos, ex "v2") y quién aterriza ahí desde /dashboard
 //   · RPC `ventas_tops` (tops del equipo)
-// Se muestra "Ingresos ▸ Dashboard" para que se lea como lo que es.
-const MODULE_LABELS: Record<string, string> = { "Creator Sales": "Ingresos" };
-export const moduleLabel = (module: string): string => MODULE_LABELS[module] ?? module;
+// Se muestra "Ingresos ▸ Dashboard" para que se lea como lo que es (ETIQUETAS["Creator Sales"]).
 
 export const MODULES_CONFIG: ModuleConfig[] = [
   // === Menú principal ===
@@ -169,8 +190,8 @@ export const MODULES_CONFIG: ModuleConfig[] = [
   def("Menú", "Grabaciones"),
   // Oficina: la suite de la casa. Dejó de ser un módulo plano — cada formato es
   // su propia sección, y un admin puede quitarle a un rol solo las hojas sin
-  // tocar los documentos. Calendario y Drive se suman acá cuando existan.
-  def("Menú", "Oficina", ["Calendario", "Documentos", "Hojas de cálculo", "Presentaciones"]),
+  // tocar los documentos.
+  def("Menú", "Oficina", ["Calendario", "Documentos", "Hojas de cálculo", "Presentaciones", "Drive"]),
   // Contactos: subtabs de navegación + acciones de edición/borrado.
   def("Menú", "Contactos", ["Dashboard", "Contactos"], ["Crear Contacto", "Editar Contacto", "Eliminar Contacto", "Ver Teléfonos"]),
   // Creadores: subtabs del listado + tabs ANIDADOS del perfil (parent "Perfil") + acciones críticas.
@@ -295,7 +316,9 @@ export const useRoles = () => {
 
       const profilesMap = new Map<string, { full_name: string; avatar_url: string | null }>();
       profiles?.forEach((p) =>
-        profilesMap.set(p.id, { full_name: p.full_name || "Sin nombre", avatar_url: p.avatar_url ?? null })
+        // Sin nombre queda "" y la pantalla pone el "Sin nombre" en su idioma: si se
+        // escribiera acá, quedaría guardado en la caché en el idioma del momento.
+        profilesMap.set(p.id, { full_name: p.full_name || "", avatar_url: p.avatar_url ?? null })
       );
 
       return (rolesData || []).map((r) => {
@@ -304,7 +327,7 @@ export const useRoles = () => {
           const p = profilesMap.get(ur.user_id);
           return {
             id: ur.user_id,
-            full_name: p?.full_name || "Sin nombre",
+            full_name: p?.full_name || "",
             avatar_url: p?.avatar_url ?? null,
           };
         });
@@ -326,18 +349,14 @@ export const useRoles = () => {
       // Cablear role_groups (capacidades RLS) con el nivel elegido. SIN esto el
       // rol nacía sin acceso a nivel DB (bug histórico). El admin puede escribir
       // role_groups (policy "Only admins can modify role_groups"). El trigger ya
-      // garantiza una fila default; este upsert fija el nivel real.
-      const { error: rgError } = await supabase
-        .from("role_groups")
-        .upsert({ role_name: name, ...ROLE_TIER_FLAGS[tier], description, updated_at: new Date().toISOString() },
-          { onConflict: "role_name" });
-      if (rgError) throw rgError;
+      // garantiza una fila default; esto fija el nivel real.
+      await guardarTipoDeRol(name, { ...ROLE_TIER_FLAGS[tier], description });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["roles-config"] });
-      toast({ title: "Rol creado exitosamente" });
+      toast({ title: traducir("admin.toast.roleCreated") });
     },
-    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: Error) => toast({ title: traducir("common.error"), description: e.message, variant: "destructive" }),
   });
 
   const updateRole = useMutation({
@@ -351,19 +370,13 @@ export const useRoles = () => {
       if (error) throw error;
       // Si cambió el nombre, el trigger ya renombró role_groups + user_roles.
       // Acá fijamos el NIVEL (capacidades RLS) por el nombre actual.
-      if (tier) {
-        const { error: rgError } = await supabase
-          .from("role_groups")
-          .upsert({ role_name: name, ...ROLE_TIER_FLAGS[tier], updated_at: new Date().toISOString() },
-            { onConflict: "role_name" });
-        if (rgError) throw rgError;
-      }
+      if (tier) await guardarTipoDeRol(name, ROLE_TIER_FLAGS[tier]);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["roles-config"] });
-      toast({ title: "Rol actualizado" });
+      toast({ title: traducir("admin.toast.roleUpdated") });
     },
-    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: Error) => toast({ title: traducir("common.error"), description: e.message, variant: "destructive" }),
   });
 
   const deleteRole = useMutation({
@@ -373,9 +386,9 @@ export const useRoles = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["roles-config"] });
-      toast({ title: "Rol eliminado" });
+      toast({ title: traducir("admin.toast.roleDeleted") });
     },
-    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: Error) => toast({ title: traducir("common.error"), description: e.message, variant: "destructive" }),
   });
 
   const toggleActive = useMutation({
@@ -386,7 +399,7 @@ export const useRoles = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["roles-config"] });
     },
-    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: Error) => toast({ title: traducir("common.error"), description: e.message, variant: "destructive" }),
   });
 
   // Asignar un usuario a un rol. Backend usa "1 rol por usuario": si el user ya tenía otro rol, se reemplaza.
@@ -397,13 +410,13 @@ export const useRoles = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["roles-config"] });
       queryClient.invalidateQueries({ queryKey: ["admin-users"] });
-      toast({ title: "Usuario asignado" });
+      toast({ title: traducir("admin.toast.userAssigned") });
     },
     onError: (e: Error) => {
       if (e instanceof SessionExpiredError) {
-        toast({ title: "Sesión expirada", description: e.message, variant: "destructive" });
+        toast({ title: traducir("common.sessionExpired"), description: e.message, variant: "destructive" });
       } else {
-        toast({ title: "Error", description: e.message, variant: "destructive" });
+        toast({ title: traducir("common.error"), description: e.message, variant: "destructive" });
       }
     },
   });
@@ -416,13 +429,13 @@ export const useRoles = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["roles-config"] });
       queryClient.invalidateQueries({ queryKey: ["admin-users"] });
-      toast({ title: "Usuario removido del rol" });
+      toast({ title: traducir("admin.toast.userRemovedFromRole") });
     },
     onError: (e: Error) => {
       if (e instanceof SessionExpiredError) {
-        toast({ title: "Sesión expirada", description: e.message, variant: "destructive" });
+        toast({ title: traducir("common.sessionExpired"), description: e.message, variant: "destructive" });
       } else {
-        toast({ title: "Error", description: e.message, variant: "destructive" });
+        toast({ title: traducir("common.error"), description: e.message, variant: "destructive" });
       }
     },
   });
@@ -444,11 +457,18 @@ export const useRoles = () => {
   };
 };
 
+// Referencia FIJA para "todavía no hay permisos". Con `data: permissions = []`
+// cada render estrenaba un array, y el efecto de SetPermissionsModal (que depende
+// de `permissions` y hace setState) volvía a correr en cada vuelta mientras la
+// consulta cargaba: un bucle de renders hasta que llegaban los datos. En el test
+// de render, que corre los efectos sin soltar el hilo, no terminaba nunca.
+const SIN_PERMISOS: RolePermission[] = [];
+
 export const useRolePermissions = (roleId: string | null) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: permissions = [], isLoading } = useQuery({
+  const { data: permissions = SIN_PERMISOS, isLoading } = useQuery({
     queryKey: ["role-permissions", roleId],
     enabled: !!roleId,
     queryFn: async () => {
@@ -482,9 +502,9 @@ export const useRolePermissions = (roleId: string | null) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["role-permissions", roleId] });
-      toast({ title: "Permisos guardados exitosamente" });
+      toast({ title: traducir("admin.toast.permissionsSaved") });
     },
-    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: Error) => toast({ title: traducir("common.error"), description: e.message, variant: "destructive" }),
   });
 
   return { permissions, isLoading, savePermissions: savePermissions.mutate, isSaving: savePermissions.isPending };

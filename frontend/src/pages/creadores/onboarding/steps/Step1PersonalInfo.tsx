@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { Info } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 
 const COUNTRIES = [
   "Afganistán","Albania","Alemania","Andorra","Angola","Arabia Saudita","Argelia","Argentina",
@@ -36,6 +37,28 @@ const SIGNOS_ZODIACALES = [
 ];
 
 const NIVELES_IDIOMA = ["Básico", "Intermedio", "Avanzado", "Nativo"];
+
+// Signo y nivel se GUARDAN en español (el valor del select); esto es lo que se muestra.
+const ETIQUETA_SIGNO: Record<string, TranslationKey> = {
+  Aries: "creadores.sign.aries",
+  Tauro: "creadores.sign.taurus",
+  "Géminis": "creadores.sign.gemini",
+  "Cáncer": "creadores.sign.cancer",
+  Leo: "creadores.sign.leo",
+  Virgo: "creadores.sign.virgo",
+  Libra: "creadores.sign.libra",
+  Escorpio: "creadores.sign.scorpio",
+  Sagitario: "creadores.sign.sagittarius",
+  Capricornio: "creadores.sign.capricorn",
+  Acuario: "creadores.sign.aquarius",
+  Piscis: "creadores.sign.pisces",
+};
+const ETIQUETA_NIVEL: Record<string, TranslationKey> = {
+  "Básico": "creadores.level.basic",
+  "Intermedio": "creadores.level.intermediate",
+  "Avanzado": "creadores.level.advanced",
+  "Nativo": "creadores.level.native",
+};
 
 function formatMedidas(raw: string): string {
   const digits = raw.replace(/\D/g, "").slice(0, 6);
@@ -79,20 +102,22 @@ export interface Step1Data {
   ubicacionArtistica: string;
 }
 
+// Los errores se guardan como CLAVE del diccionario y se traducen al dibujarlos:
+// así, si alguien cambia el idioma con un error en pantalla, cambia también.
 export interface Step1Errors {
-  name?: string;
-  email?: string;
-  phone?: string;
-  age?: string;
+  name?: TranslationKey;
+  email?: TranslationKey;
+  phone?: TranslationKey;
+  age?: TranslationKey;
 }
 
 export function validateStep1(data: Step1Data): Step1Errors {
   const errors: Step1Errors = {};
-  if (!data.name.trim()) errors.name = "Nombre es requerido";
-  if (!data.email.trim()) errors.email = "Email es requerido";
-  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) errors.email = "Email no válido";
-  if (!data.phone.trim()) errors.phone = "Teléfono es requerido";
-  if (data.age && Number(data.age) < 18) errors.age = "Debe ser mayor de 18 años";
+  if (!data.name.trim()) errors.name = "creadores.step1.errName";
+  if (!data.email.trim()) errors.email = "creadores.step1.errEmail";
+  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) errors.email = "creadores.step1.errEmailInvalid";
+  if (!data.phone.trim()) errors.phone = "creadores.step1.errPhone";
+  if (data.age && Number(data.age) < 18) errors.age = "creadores.step1.errAge";
   return errors;
 }
 
@@ -131,7 +156,7 @@ export default function Step1PersonalInfo({ data, errors, onChange }: Props) {
       <div className="space-y-1.5">
         <Label>{t("cr.fullNameReq")}</Label>
         <Input value={data.name} onChange={(e) => onChange("name", e.target.value)} placeholder={t("common.fullName")} />
-        {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
+        {errors.name && <p className="text-xs text-destructive">{t(errors.name)}</p>}
       </div>
       <div className="space-y-1.5">
         <Label>{t("cr.middleName")}</Label>
@@ -142,19 +167,19 @@ export default function Step1PersonalInfo({ data, errors, onChange }: Props) {
         <Input value={data.artisticName} onChange={(e) => onChange("artisticName", e.target.value)} placeholder={t("cr.stageName")} />
       </div>
       <div className="space-y-1.5">
-        <Label>Email *</Label>
+        <Label>{t("creadores.step1.emailReq")}</Label>
         <Input type="email" value={data.email} onChange={(e) => onChange("email", e.target.value)} placeholder={t("cr.emailPh")} />
-        {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
+        {errors.email && <p className="text-xs text-destructive">{t(errors.email)}</p>}
       </div>
       <div className="space-y-1.5">
         <Label>{t("cr.phoneReq")}</Label>
         <PhoneInput value={data.phone} onChange={(v) => onChange("phone", v)} />
-        {errors.phone && <p className="text-xs text-destructive">{errors.phone}</p>}
+        {errors.phone && <p className="text-xs text-destructive">{t(errors.phone)}</p>}
       </div>
       <div className="space-y-1.5">
-        <Label>Edad</Label>
+        <Label>{t("creadores.step1.age")}</Label>
         <Input type="number" min={18} value={data.age} onChange={(e) => onChange("age", e.target.value)} placeholder="18" />
-        {errors.age && <p className="text-xs text-destructive">{errors.age}</p>}
+        {errors.age && <p className="text-xs text-destructive">{t(errors.age)}</p>}
       </div>
       <div className="space-y-1.5">
         <Label>{t("common.birthDate")}</Label>
@@ -165,16 +190,16 @@ export default function Step1PersonalInfo({ data, errors, onChange }: Props) {
         <Select value={data.country} onValueChange={(v) => onChange("country", v)}>
           <SelectTrigger><SelectValue placeholder={t("cr.selectCountry")} /></SelectTrigger>
           <SelectContent>
-            {COUNTRIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+            {COUNTRIES.map((c) => <SelectItem key={c} value={c}>{c === "Otro" ? t("cr.offCatOther") : c}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
       <div className="space-y-1.5">
-        <Label>Ciudad</Label>
-        <Input value={data.city} onChange={(e) => onChange("city", e.target.value)} placeholder="Ciudad" />
+        <Label>{t("common.city")}</Label>
+        <Input value={data.city} onChange={(e) => onChange("city", e.target.value)} placeholder={t("common.city")} />
       </div>
       <div className="space-y-1.5">
-        <Label>Zona horaria</Label>
+        <Label>{t("creadores.step1.timezone")}</Label>
         <Select value={data.timezone} onValueChange={(v) => onChange("timezone", v)}>
           <SelectTrigger><SelectValue placeholder={t("cr.selectTimezone")} /></SelectTrigger>
           <SelectContent>
@@ -187,7 +212,7 @@ export default function Step1PersonalInfo({ data, errors, onChange }: Props) {
         <Textarea value={data.direccion} onChange={(e) => onChange("direccion", e.target.value)} placeholder={t("cr.fullAddressPh")} rows={2} />
       </div>
       <div className="space-y-1.5">
-        <Label>Medidas (cm)</Label>
+        <Label>{t("creadores.step1.measurements")}</Label>
         <Input value={data.medidas} onChange={(e) => onChange("medidas", formatMedidas(e.target.value))} placeholder="90-60-90" maxLength={8} />
       </div>
       <div className="space-y-1.5">
@@ -198,11 +223,11 @@ export default function Step1PersonalInfo({ data, errors, onChange }: Props) {
       {/* ── Perfil Artístico ── */}
       <SectionLabel tooltip={t("cr.artisticProfileTip")}>{t("cr.artisticProfile")}</SectionLabel>
       <div className="space-y-1.5">
-        <Label>Apodos / Sobrenombres</Label>
+        <Label>{t("creadores.step1.nicknames")}</Label>
         <Input value={data.apodos} onChange={(e) => onChange("apodos", e.target.value)} placeholder={t("cr.nicknamesPh")} />
       </div>
       <div className="space-y-1.5">
-        <Label>Edad a mostrar</Label>
+        <Label>{t("creadores.step1.ageToShow")}</Label>
         <Input type="number" min={18} value={data.edadMostrar} onChange={(e) => onChange("edadMostrar", e.target.value)} placeholder="18" />
       </div>
       <div className="md:col-span-2 space-y-1.5">
@@ -211,31 +236,31 @@ export default function Step1PersonalInfo({ data, errors, onChange }: Props) {
       </div>
 
       {/* ── Identidad Visual ── */}
-      <SectionLabel>Identidad Visual</SectionLabel>
+      <SectionLabel>{t("creadores.step1.visualIdentity")}</SectionLabel>
       <div className="space-y-1.5">
-        <Label>Signo zodiacal</Label>
+        <Label>{t("creadores.step1.sign")}</Label>
         <Select value={data.signoZodiacal} onValueChange={(v) => onChange("signoZodiacal", v)}>
           <SelectTrigger><SelectValue placeholder={t("cr.selectSign")} /></SelectTrigger>
           <SelectContent>
-            {SIGNOS_ZODIACALES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+            {SIGNOS_ZODIACALES.map((s) => <SelectItem key={s} value={s}>{t(ETIQUETA_SIGNO[s])}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
       <div className="space-y-1.5">
-        <Label>Etnicidad / Nacionalidad</Label>
-        <Input value={data.etnicidad} onChange={(e) => onChange("etnicidad", e.target.value)} placeholder="Ej: Latina, Europea..." />
+        <Label>{t("creadores.step1.ethnicity")}</Label>
+        <Input value={data.etnicidad} onChange={(e) => onChange("etnicidad", e.target.value)} placeholder={t("creadores.step1.ethnicityPh")} />
       </div>
       <div className="md:col-span-2 space-y-1.5">
         <Label>{t("cr.tattoosPiercings")}</Label>
         <Textarea value={data.tatuajesPiercings} onChange={(e) => onChange("tatuajesPiercings", e.target.value)} placeholder={t("cr.tattoosPh")} rows={2} />
       </div>
       <div className="md:col-span-2 space-y-1.5">
-        <Label>Cicatrices</Label>
-        <Input value={data.cicatrices} onChange={(e) => onChange("cicatrices", e.target.value)} placeholder="Describir si aplica..." />
+        <Label>{t("creadores.step1.scars")}</Label>
+        <Input value={data.cicatrices} onChange={(e) => onChange("cicatrices", e.target.value)} placeholder={t("creadores.step1.scarsPh")} />
       </div>
 
       {/* ── Idiomas ── */}
-      <SectionLabel>Idiomas</SectionLabel>
+      <SectionLabel>{t("creadores.step1.languages")}</SectionLabel>
       <div className="space-y-1.5">
         <Label>{t("cr.languages")}</Label>
         <Input value={data.idiomas} onChange={(e) => onChange("idiomas", e.target.value)} placeholder={t("cr.languagesPh")} />
@@ -245,7 +270,7 @@ export default function Step1PersonalInfo({ data, errors, onChange }: Props) {
         <Select value={data.nivelLectura} onValueChange={(v) => onChange("nivelLectura", v)}>
           <SelectTrigger><SelectValue placeholder={t("cr.selectLevel")} /></SelectTrigger>
           <SelectContent>
-            {NIVELES_IDIOMA.map((n) => <SelectItem key={n} value={n}>{n}</SelectItem>)}
+            {NIVELES_IDIOMA.map((n) => <SelectItem key={n} value={n}>{t(ETIQUETA_NIVEL[n])}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>

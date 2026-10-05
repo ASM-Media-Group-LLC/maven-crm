@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useLanguage } from "@/hooks/useLanguage";
 import DynamicTicketForm from "./DynamicTicketForm";
 import TicketFormEditor from "./TicketFormEditor";
 import { useTicketForms, type TicketForm } from "./useTicketForms";
@@ -21,6 +22,7 @@ interface Props {
  * Google Form": el operario elige el tipo de ticket y llena ese formulario.
  */
 const NewTicketLauncher = ({ canCreate, canManageForms = false }: Props) => {
+  const { t } = useLanguage();
   const { formsQuery, fieldsByForm } = useTicketForms();
   const [active, setActive] = useState<TicketForm | null>(null);
   const [editing, setEditing] = useState<TicketForm | null>(null);
@@ -41,9 +43,9 @@ const NewTicketLauncher = ({ canCreate, canManageForms = false }: Props) => {
   if (!forms.length) {
     return (
       <div className="rounded-lg border border-dashed p-6 text-center">
-        <p className="text-sm font-medium">Todavia no hay plantillas publicadas</p>
+        <p className="text-sm font-medium">{t("tickets.launcher.noPublished")}</p>
         <p className="mt-1 text-sm text-muted-foreground">
-          Crea una desde la pestana Plantillas y publicala para que aparezca aca.
+          {t("tickets.launcher.noPublishedHint")}
         </p>
       </div>
     );
@@ -80,7 +82,7 @@ const NewTicketLauncher = ({ canCreate, canManageForms = false }: Props) => {
                 <Button
                   variant="ghost"
                   size="icon"
-                  aria-label={`Editar plantilla ${f.name}`}
+                  aria-label={t("tickets.launcher.editTemplate", { name: f.name })}
                   // stopPropagation: sin esto, el clic tambien abriria el
                   // formulario de ticket de la tarjeta.
                   onClick={(e) => {
@@ -110,11 +112,16 @@ const NewTicketLauncher = ({ canCreate, canManageForms = false }: Props) => {
                     <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{f.description}</p>
                   )}
                   <p className="mt-1 text-[11px] text-muted-foreground">
-                    {count} {count === 1 ? "campo" : "campos"}
-                    {f.creator_mode === "required" && " · requiere creadora"}
+                    {t(count === 1 ? "tickets.fieldCount.one" : "tickets.fieldCount.other", { count })}
+                    {f.creator_mode === "required" && ` · ${t("tickets.launcher.requiresCreator")}`}
                     {canManageForms &&
                       f.notify_enabled &&
-                      ` · ${(f.notify_emails || []).length} destinatarios`}
+                      ` · ${t(
+                        (f.notify_emails || []).length === 1
+                          ? "tickets.recipientCount.one"
+                          : "tickets.recipientCount.other",
+                        { count: (f.notify_emails || []).length },
+                      )}`}
                   </p>
                 </div>
               </div>

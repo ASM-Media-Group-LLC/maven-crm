@@ -7,6 +7,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import type { CategoryItem, FormType } from "./categoriesConfig";
 import type { Tables } from "@/integrations/supabase/types";
+import { etiquetaIdioma } from "../etiquetasCreadora";
+import { useLanguage } from "@/hooks/useLanguage";
 
 type Guideline = Tables<"creator_guidelines">;
 
@@ -63,6 +65,7 @@ const GuidelineItemRow = ({
   onInlineCancel,
   isSaving = false,
 }: Props) => {
+  const { t } = useLanguage();
   const Icon = item.icon;
   const isExpanded = expanded || inlineAdding;
   const [selectedLang, setSelectedLang] = useState<string | null>(null);
@@ -77,25 +80,25 @@ const GuidelineItemRow = ({
           <Icon className="h-4 w-4 text-muted-foreground" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium leading-tight">{item.title}</p>
-          <p className="text-xs text-muted-foreground truncate">{item.description}</p>
+          <p className="text-sm font-medium leading-tight">{t(item.label)}</p>
+          <p className="text-xs text-muted-foreground truncate">{t(item.description)}</p>
         </div>
         <div className="flex items-center gap-1 shrink-0">
           {guideline ? (
             <>
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(guideline)}>
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(guideline)} aria-label={t("common.edit")} title={t("common.edit")}>
                 <Pencil className="h-4 w-4" />
               </Button>
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => onDelete(guideline.id)}>
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => onDelete(guideline.id)} aria-label={t("common.delete")} title={t("common.delete")}>
                 <Trash2 className="h-4 w-4" />
               </Button>
             </>
           ) : (
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onAdd}>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onAdd} aria-label={t("common.add")} title={t("common.add")}>
               <Plus className="h-4 w-4" />
             </Button>
           )}
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onToggle}>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onToggle} aria-label={t("creadores.guide.expand")}>
             <ChevronDown className={cn("h-4 w-4 transition-transform duration-200", isExpanded && "rotate-180")} />
           </Button>
         </div>
@@ -108,7 +111,7 @@ const GuidelineItemRow = ({
             <div className="space-y-3">
               {formType === "language" && (
                 <div className="space-y-2">
-                  <Label>Idioma</Label>
+                  <Label>{t("creadores.guide.language")}</Label>
                   <div className="inline-flex flex-wrap items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
                     {PREDEFINED_LANGUAGES.map((lang) => (
                       <Button
@@ -123,7 +126,7 @@ const GuidelineItemRow = ({
                           onInlineTitleChange?.(lang);
                         }}
                       >
-                        {lang}
+                        {etiquetaIdioma(t, lang)}
                       </Button>
                     ))}
                     <Button
@@ -136,7 +139,7 @@ const GuidelineItemRow = ({
                         setSelectedLang(null);
                       }}
                     >
-                      + Otro
+                      {t("creadores.guide.otherLang")}
                     </Button>
                   </div>
                   {showCustomLang && (
@@ -146,7 +149,7 @@ const GuidelineItemRow = ({
                         setCustomLang(e.target.value);
                         onInlineTitleChange?.(e.target.value);
                       }}
-                      placeholder="Escribe el idioma..."
+                      placeholder={t("creadores.guide.langPh")}
                       className="max-w-xs"
                     />
                   )}
@@ -154,11 +157,11 @@ const GuidelineItemRow = ({
               )}
               {formType !== "language" && (
                 <div className="space-y-1.5">
-                  <Label>Título / Concepto</Label>
+                  <Label>{t("creadores.guide.titleConcept")}</Label>
                   <Input
                     value={inlineTitle}
                     onChange={(e) => onInlineTitleChange?.(e.target.value)}
-                    placeholder="Ej: Foto personalizada, Videollamada 15min, Pack semanal..."
+                    placeholder={t("creadores.guide.titleConceptPh")}
                   />
                 </div>
               )}
@@ -166,16 +169,16 @@ const GuidelineItemRow = ({
                 <>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
-                      <Label>Precio</Label>
+                      <Label>{t("creadores.ops.price")}</Label>
                       <Input
                         type="number"
                         value={inlinePrice}
                         onChange={(e) => onInlinePriceChange?.(e.target.value)}
-                        placeholder="Ej: 50"
+                        placeholder={t("creadores.sell.egPh", { n: 50 })}
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label>Moneda</Label>
+                      <Label>{t("creadores.guide.currency")}</Label>
                       <Input
                         value={inlineCurrency}
                         onChange={(e) => onInlineCurrencyChange?.(e.target.value)}
@@ -184,36 +187,36 @@ const GuidelineItemRow = ({
                     </div>
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Nota (opcional)</Label>
+                    <Label>{t("creadores.guide.noteOptional")}</Label>
                     <Textarea
                       value={inlineNote}
                       onChange={(e) => onInlineNoteChange?.(e.target.value)}
-                      placeholder="Ej: Incluye nombre del fan, entrega en 24h..."
+                      placeholder={t("creadores.guide.notePh")}
                       rows={3}
                     />
                   </div>
                 </>
               ) : (
                 <div className="space-y-1.5">
-                  <Label>{formType === "language" ? "Instrucciones del idioma" : "Descripción / Detalle"}</Label>
+                  <Label>{formType === "language" ? t("creadores.guide.langInstructions") : t("creadores.guide.descDetail")}</Label>
                   <Textarea
                     value={inlineContent}
                     onChange={(e) => onInlineContentChange?.(e.target.value)}
-                    placeholder={formType === "language" ? "Ej: Saludo cálido, usar emojis, tono amigable..." : "Describe el detalle de este lineamiento..."}
+                    placeholder={formType === "language" ? t("creadores.guide.langInstructionsPh") : t("creadores.guide.detailPh")}
                     rows={4}
                   />
                 </div>
               )}
               <div className="flex justify-end gap-2">
                 <Button variant="ghost" size="sm" onClick={onInlineCancel}>
-                  Cancelar
+                  {t("common.cancel")}
                 </Button>
                 <Button variant="outline" size="sm" onClick={onInlineSubmitAndAnother} disabled={!inlineTitle.trim() || isSaving}>
-                  Guardar y agregar otro
+                  {t("creadores.guide.saveAndAnother")}
                 </Button>
                 <Button size="sm" onClick={onInlineSubmit} disabled={!inlineTitle.trim() || isSaving}>
                   <Save className="h-4 w-4 mr-1" />
-                  {isSaving ? "Guardando…" : "Guardar"}
+                  {isSaving ? t("creadores.savingEllipsis") : t("common.save")}
                 </Button>
               </div>
             </div>
@@ -225,7 +228,7 @@ const GuidelineItemRow = ({
               onClick={onAdd}
             >
               <Plus className="h-4 w-4 mr-2 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Agregar a {item.title}</span>
+              <span className="text-sm text-muted-foreground">{t("creadores.guide.addTo", { name: t(item.label) })}</span>
             </div>
           )}
         </div>

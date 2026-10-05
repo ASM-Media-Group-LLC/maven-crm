@@ -4,6 +4,7 @@ import { Clock, CalendarClock, ShieldAlert } from "lucide-react";
 import QaAttendancePanel from "./QaAttendancePanel";
 import QaAnomaliesPanel from "./QaAnomaliesPanel";
 import type { QaRole } from "./useQaHubstaff";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // Sección QA estandarizada para roles cuya QA es SOLO la parte de Hubstaff (managers, LLG):
 // las mismas 3 subpestañas que chatters/closers — Productividad · Asistencia · Anomalías.
@@ -17,6 +18,7 @@ export default function RoleHubstaffSection({
   description: string;
   productividad: ReactNode;
 }) {
+  const { t } = useLanguage();
   const [tab, setTab] = useState("productividad");
   return (
     <div className="space-y-4">
@@ -26,9 +28,9 @@ export default function RoleHubstaffSection({
       </div>
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
-          <TabsTrigger value="productividad" className="gap-1.5"><Clock className="h-3.5 w-3.5" />Productividad</TabsTrigger>
-          <TabsTrigger value="asistencia" className="gap-1.5"><CalendarClock className="h-3.5 w-3.5" />Asistencia</TabsTrigger>
-          <TabsTrigger value="anomalias" className="gap-1.5"><ShieldAlert className="h-3.5 w-3.5" />Anomalías</TabsTrigger>
+          <TabsTrigger value="productividad" className="gap-1.5"><Clock className="h-3.5 w-3.5" />{t("agencyQa.tab.productivity")}</TabsTrigger>
+          <TabsTrigger value="asistencia" className="gap-1.5"><CalendarClock className="h-3.5 w-3.5" />{t("agencyQa.tab.attendance")}</TabsTrigger>
+          <TabsTrigger value="anomalias" className="gap-1.5"><ShieldAlert className="h-3.5 w-3.5" />{t("agencyQa.tab.anomalies")}</TabsTrigger>
         </TabsList>
         <TabsContent value="productividad" className="mt-4">{productividad}</TabsContent>
         <TabsContent value="asistencia" className="mt-4"><QaAttendancePanel role={role} /></TabsContent>

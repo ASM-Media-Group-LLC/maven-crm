@@ -13,6 +13,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface LinkCreatorModalProps {
   open: boolean;
@@ -31,6 +32,7 @@ interface CreatorWithAccounts {
 }
 
 const LinkCreatorModal = ({ open, onOpenChange, pendingCreator, earningsRowId }: LinkCreatorModalProps) => {
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [mode, setMode] = useState<"search" | "create" | "confirm">("search");
@@ -120,12 +122,12 @@ const LinkCreatorModal = ({ open, onOpenChange, pendingCreator, earningsRowId }:
       const isAdditional = creator && creator.accountCount > 0;
       toast.success(
         isAdditional
-          ? `"${pendingCreator}" vinculado como cuenta adicional de ${creator.name}`
-          : `"${pendingCreator}" vinculado exitosamente`
+          ? t("sales.link.linkedExtra", { handle: pendingCreator, name: creator.name })
+          : t("sales.link.linked", { handle: pendingCreator })
       );
       onOpenChange(false);
     },
-    onError: () => toast.error("Error al vincular creador"),
+    onError: () => toast.error(t("sales.link.linkError")),
   });
 
   const createAndLinkMutation = useMutation({
@@ -163,10 +165,10 @@ const LinkCreatorModal = ({ open, onOpenChange, pendingCreator, earningsRowId }:
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["of_gross_earnings_performance"] });
       queryClient.invalidateQueries({ queryKey: ["creators_for_linking_with_accounts"] });
-      toast.success(`Creador creado y vinculado exitosamente`);
+      toast.success(t("sales.link.createdLinked"));
       onOpenChange(false);
     },
-    onError: () => toast.error("Error al crear y vincular creador"),
+    onError: () => toast.error(t("sales.link.createError")),
   });
 
   const handleCreatorClick = (creator: CreatorWithAccounts) => {
@@ -195,10 +197,10 @@ const LinkCreatorModal = ({ open, onOpenChange, pendingCreator, earningsRowId }:
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Link2 className="h-5 w-5" />
-            Vincular Creador
+            {t("sales.link.title")}
           </DialogTitle>
           <DialogDescription>
-            Vincula <span className="font-medium">"{pendingCreator}"</span> a un creador existente o crea uno nuevo.
+            {t("sales.link.desc1")} <span className="font-medium">"{pendingCreator}"</span> {t("sales.link.desc2")}
           </DialogDescription>
         </DialogHeader>
 
@@ -207,7 +209,7 @@ const LinkCreatorModal = ({ open, onOpenChange, pendingCreator, earningsRowId }:
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Buscar creador por nombre…"
+                placeholder={t("sales.link.searchPh")}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-9"
@@ -217,7 +219,7 @@ const LinkCreatorModal = ({ open, onOpenChange, pendingCreator, earningsRowId }:
             <div className="flex-1 overflow-y-auto rounded-lg border border-border divide-y divide-border max-h-[300px]">
               {filtered.length === 0 ? (
                 <div className="p-4 text-center text-sm text-muted-foreground">
-                  Sin resultados
+                  {t("common.noResultsShort")}
                 </div>
               ) : (
                 filtered.map((c) => (
@@ -235,7 +237,7 @@ const LinkCreatorModal = ({ open, onOpenChange, pendingCreator, earningsRowId }:
                         <p className="text-sm font-medium truncate">{c.name}</p>
                         {c.accountCount > 0 && (
                           <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 shrink-0">
-                            {c.accountCount} {c.accountCount === 1 ? "cuenta" : "cuentas"}
+                            {t(c.accountCount === 1 ? "sales.link.account1" : "sales.link.accountN", { n: c.accountCount })}
                           </Badge>
                         )}
                       </div>
@@ -263,7 +265,7 @@ const LinkCreatorModal = ({ open, onOpenChange, pendingCreator, earningsRowId }:
               }}
             >
               <UserPlus className="h-4 w-4" />
-              Crear nuevo creador
+              {t("sales.link.createNew")}
             </Button>
           </div>
         ) : mode === "confirm" && selectedCreator ? (
@@ -271,11 +273,11 @@ const LinkCreatorModal = ({ open, onOpenChange, pendingCreator, earningsRowId }:
             <div className="rounded-lg border border-warning/30 bg-warning/10 p-4 space-y-2">
               <div className="flex items-center gap-2 text-warning">
                 <AlertTriangle className="h-4 w-4 shrink-0" />
-                <span className="text-sm font-medium">Cuenta adicional</span>
+                <span className="text-sm font-medium">{t("sales.link.extraAccount")}</span>
               </div>
               <p className="text-sm text-warning">
-                <span className="font-medium">{selectedCreator.name}</span> ya tiene{" "}
-                {selectedCreator.accountCount} {selectedCreator.accountCount === 1 ? "cuenta vinculada" : "cuentas vinculadas"}:
+                <span className="font-medium">{selectedCreator.name}</span>{" "}
+                {t(selectedCreator.accountCount === 1 ? "sales.link.alreadyHas1" : "sales.link.alreadyHasN", { n: selectedCreator.accountCount })}
               </p>
               <ul className="text-xs text-warning list-disc list-inside">
                 {selectedCreator.accounts.map((a) => (
@@ -283,7 +285,7 @@ const LinkCreatorModal = ({ open, onOpenChange, pendingCreator, earningsRowId }:
                 ))}
               </ul>
               <p className="text-sm text-warning">
-                ¿Vincular <span className="font-medium">"{pendingCreator}"</span> como cuenta adicional?
+                {t("sales.link.confirmQ1")} <span className="font-medium">"{pendingCreator}"</span> {t("sales.link.confirmQ2")}
               </p>
             </div>
 
@@ -292,7 +294,7 @@ const LinkCreatorModal = ({ open, onOpenChange, pendingCreator, earningsRowId }:
                 setSelectedCreator(null);
                 setMode("search");
               }}>
-                Volver
+                {t("common.back")}
               </Button>
               <Button
                 className="flex-1 gap-2"
@@ -300,31 +302,31 @@ const LinkCreatorModal = ({ open, onOpenChange, pendingCreator, earningsRowId }:
                 onClick={() => linkMutation.mutate(selectedCreator.id)}
               >
                 <Plus className="h-4 w-4" />
-                {linkMutation.isPending ? "Vinculando…" : "Vincular como adicional"}
+                {linkMutation.isPending ? t("sales.link.linking") : t("sales.link.linkExtra")}
               </Button>
             </div>
           </div>
         ) : (
           <div className="space-y-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Nombre completo *</label>
+              <label className="text-sm font-medium">{t("sales.link.fullNameReq")}</label>
               <Input
-                placeholder="Nombre del creador"
+                placeholder={t("sales.link.namePh")}
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Nombre artístico</label>
+              <label className="text-sm font-medium">{t("sales.link.artisticName")}</label>
               <Input
-                placeholder="Nombre artístico"
+                placeholder={t("sales.link.artisticName")}
                 value={newArtisticName}
                 onChange={(e) => setNewArtisticName(e.target.value)}
               />
             </div>
             <div className="flex gap-2">
               <Button variant="outline" className="flex-1" onClick={() => setMode("search")}>
-                Volver
+                {t("common.back")}
               </Button>
               <Button
                 className="flex-1 gap-2"
@@ -332,7 +334,7 @@ const LinkCreatorModal = ({ open, onOpenChange, pendingCreator, earningsRowId }:
                 onClick={() => createAndLinkMutation.mutate()}
               >
                 <Plus className="h-4 w-4" />
-                {createAndLinkMutation.isPending ? "Creando…" : "Crear y vincular"}
+                {createAndLinkMutation.isPending ? t("sales.link.creating") : t("sales.link.createAndLink")}
               </Button>
             </div>
           </div>

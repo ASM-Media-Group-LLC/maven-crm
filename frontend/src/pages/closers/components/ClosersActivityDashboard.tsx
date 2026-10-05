@@ -1,6 +1,5 @@
 import { useState, useMemo } from "react";
 import { startOfMonth, endOfDay, format } from "date-fns";
-import { es } from "date-fns/locale";
 import {
   Activity, Users, AlertTriangle, UserX, ChevronRight, ArrowLeft, MessageCircle,
   Instagram, Send, CalendarDays, ExternalLink, Bot,
@@ -15,6 +14,10 @@ import {
 } from "@/components/ui/table";
 import StatChip from "@/components/StatChip";
 import { cn } from "@/lib/utils";
+import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
+import { resultLabel, stageLabel } from "../hooks/useCloserLeads";
 import {
   useCloserActivity, useCloserActivityDetail,
   type CloserActivityRow, type CloserActivityDetailRow,
@@ -33,11 +36,11 @@ const estadoOf = (r: CloserActivityRow): Estado => {
   return "atrasado";
 };
 
-const ESTADO_META: Record<Estado, { label: string; variant: BadgeProps["variant"]; prio: number }> = {
-  sin_gestion: { label: "Sin gestión", variant: "destructive-soft", prio: 0 },
-  atrasado:    { label: "Atrasado",    variant: "warning-soft",     prio: 1 },
-  al_dia:      { label: "Al día",      variant: "success-soft",     prio: 2 },
-  sin_leads:   { label: "Sin leads",   variant: "secondary",        prio: 3 },
+const ESTADO_META: Record<Estado, { labelKey: TranslationKey; variant: BadgeProps["variant"]; prio: number }> = {
+  sin_gestion: { labelKey: "closers.activity.state.noMgmt",  variant: "destructive-soft", prio: 0 },
+  atrasado:    { labelKey: "closers.activity.state.late",    variant: "warning-soft",     prio: 1 },
+  al_dia:      { labelKey: "closers.activity.state.ok",      variant: "success-soft",     prio: 2 },
+  sin_leads:   { labelKey: "closers.activity.state.noLeads", variant: "secondary",        prio: 3 },
 };
 
 // ── Helpers de presentación ──────────────────────────────────────────────
@@ -70,15 +73,16 @@ const channelIcon = (channel: string | null) => {
   }
 };
 
-// Chips de conteo por categoría (canal o resultado): "WhatsApp 12".
-const CountChips = ({ data }: { data: Record<string, number> }) => {
+// Chips de conteo por categoría (canal o resultado): "WhatsApp 12". La llave es
+// el valor guardado (dato); `labelOf` decide cómo se muestra.
+const CountChips = ({ data, labelOf }: { data: Record<string, number>; labelOf?: (k: string) => string }) => {
   const entries = Object.entries(data ?? {}).sort((a, b) => b[1] - a[1]);
   if (entries.length === 0) return <span className="text-xs text-muted-foreground">—</span>;
   return (
     <div className="flex flex-wrap gap-1">
       {entries.map(([k, n]) => (
         <span key={k} className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-[11px] font-medium">
-          {k}
+          {labelOf ? labelOf(k) : k}
           <span className="tabular-nums text-muted-foreground">{n}</span>
         </span>
       ))}
@@ -93,6 +97,8 @@ interface Props {
 }
 
 const ClosersActivityDashboard = ({ isAdmin, isManager, viewAsCloserId }: Props) => {
+  const f = useFormato();
+  const { t } = useLanguage();
   // Default = mes en curso (hoy suele estar vacío → parecía roto).
   const [from, setFrom] = useState<Date>(() => startOfMonth(new Date()));
   const [to, setTo] = useState<Date>(() => endOfDay(new Date()));
@@ -125,23 +131,23 @@ const ClosersActivityDashboard = ({ isAdmin, isManager, viewAsCloserId }: Props)
 
   const rangeLabel =
     format(from, "yyyy-MM-dd") === format(to, "yyyy-MM-dd")
-      ? format(from, "EEEE d 'de' MMMM", { locale: es })
-      : `${format(from, "d MMM", { locale: es })} – ${format(to, "d MMM yyyy", { locale: es })}`;
+      ? format(from, f.idioma === "en" ? "EEEE, MMMM d" : "EEEE d 'de' MMMM", { locale: f.fechas })
+      : `${format(from, "d MMM", { locale: f.fechas })} – ${format(to, "d MMM yyyy", { locale: f.fechas })}`;
 
   const dateBar = (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div>
-        <h3 className="text-sm font-semibold">Actividad y gestión de closers</h3>
+        <h3 className="text-sm font-semibold">{t("closers.activity.title")}</h3>
         <p className="text-xs text-muted-foreground capitalize">{rangeLabel}</p>
       </div>
       <DateRangePicker
         from={from}
         to={to}
-        onApply={(f, t) => {
-          setFrom(f ?? startOfMonth(new Date()));
-          setTo(t ?? endOfDay(f ?? new Date()));
+        onApply={(desde, hasta) => {
+          setFrom(desde ?? startOfMonth(new Date()));
+          setTo(hasta ?? endOfDay(desde ?? new Date()));
         }}
-        placeholder="Seleccionar fechas"
+        placeholder={t("closers.selectDates")}
       />
     </div>
   );
@@ -161,19 +167,19 @@ const ClosersActivityDashboard = ({ isAdmin, isManager, viewAsCloserId }: Props)
 
       {/* KPIs de supervisión */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <StatChip label="Contactos" value={totals.contacts} icon={<Activity className="h-3.5 w-3.5" />} color="bg-primary" hint="Registrados en el rango" />
-        <StatChip label="Leads tocados" value={totals.touched} icon={<Users className="h-3.5 w-3.5" />} color="bg-primary" hint="Leads distintos contactados" />
-        <StatChip label="Leads vencidos" value={totals.overdue} icon={<AlertTriangle className="h-3.5 w-3.5" />} color="bg-destructive" hint="Contacto fuera de cadencia" />
-        <StatChip label="Closers sin gestión" value={totals.sinGestion} icon={<UserX className="h-3.5 w-3.5" />} color="bg-warning" hint="Todos sus leads vencidos" />
+        <StatChip label={t("closers.contacts")} value={totals.contacts} icon={<Activity className="h-3.5 w-3.5" />} color="bg-primary" hint={t("closers.activity.contactsHint")} />
+        <StatChip label={t("closers.activity.touched")} value={totals.touched} icon={<Users className="h-3.5 w-3.5" />} color="bg-primary" hint={t("closers.activity.touchedHint")} />
+        <StatChip label={t("closers.activity.overdueLeads")} value={totals.overdue} icon={<AlertTriangle className="h-3.5 w-3.5" />} color="bg-destructive" hint={t("closers.activity.overdueLeadsHint")} />
+        <StatChip label={t("closers.activity.noMgmtClosers")} value={totals.sinGestion} icon={<UserX className="h-3.5 w-3.5" />} color="bg-warning" hint={t("closers.activity.noMgmtClosersHint")} />
       </div>
 
       {/* Leyenda */}
       <p className="text-[11px] text-muted-foreground">
-        <span className="font-medium text-foreground/80">Estado:</span>{" "}
-        <span className="text-destructive">● Sin gestión</span> (≥75% de sus leads asignados vencidos) ·{" "}
-        <span className="text-warning">● Atrasado</span> (algunos leads con contacto vencido por cadencia) ·{" "}
-        <span className="text-success">● Al día</span> (sin vencidos).{"  "}
-        <span className="font-medium text-foreground/80">Auto</span> = contacto registrado solo al escribir desde la bandeja WA/TG.
+        <span className="font-medium text-foreground/80">{t("common.status")}:</span>{" "}
+        <span className="text-destructive">● {t("closers.activity.state.noMgmt")}</span> {t("closers.activity.legendNoMgmt")}{" "}
+        <span className="text-warning">● {t("closers.activity.state.late")}</span> {t("closers.activity.legendLate")}{" "}
+        <span className="text-success">● {t("closers.activity.state.ok")}</span> {t("closers.activity.legendOk")}{"  "}
+        <span className="font-medium text-foreground/80">Auto</span> {t("closers.activity.legendAuto")}
       </p>
 
       <Card className="overflow-hidden">
@@ -181,14 +187,14 @@ const ClosersActivityDashboard = ({ isAdmin, isManager, viewAsCloserId }: Props)
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Estado</TableHead>
-                <TableHead>Empleado</TableHead>
-                <TableHead className="text-right">Asignados</TableHead>
-                <TableHead className="text-right">Vencidos</TableHead>
-                <TableHead className="text-right">Tocados</TableHead>
-                <TableHead className="text-right">Contactos</TableHead>
-                <TableHead>Resultados</TableHead>
-                <TableHead>Última</TableHead>
+                <TableHead>{t("common.status")}</TableHead>
+                <TableHead>{t("closers.activity.employee")}</TableHead>
+                <TableHead className="text-right">{t("closers.activity.assigned")}</TableHead>
+                <TableHead className="text-right">{t("closers.activity.overdue")}</TableHead>
+                <TableHead className="text-right">{t("closers.activity.touchedShort")}</TableHead>
+                <TableHead className="text-right">{t("closers.contacts")}</TableHead>
+                <TableHead>{t("closers.results")}</TableHead>
+                <TableHead>{t("closers.activity.last")}</TableHead>
                 <TableHead className="w-8" />
               </TableRow>
             </TableHeader>
@@ -200,8 +206,8 @@ const ClosersActivityDashboard = ({ isAdmin, isManager, viewAsCloserId }: Props)
               ) : sorted.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={9} className="py-10 text-center text-sm text-muted-foreground">
-                    Sin closers ni actividad en este rango.
-                    <br /><span className="text-xs">Prueba ampliar las fechas arriba a la derecha.</span>
+                    {t("closers.activity.empty")}
+                    <br /><span className="text-xs">{t("closers.activity.emptyHint")}</span>
                   </TableCell>
                 </TableRow>
               ) : (
@@ -210,7 +216,7 @@ const ClosersActivityDashboard = ({ isAdmin, isManager, viewAsCloserId }: Props)
                   const meta = ESTADO_META[est];
                   return (
                     <TableRow key={r.employee_id} className="cursor-pointer hover:bg-muted/50" onClick={() => setSelectedEmp(r)}>
-                      <TableCell><Badge variant={meta.variant} className="whitespace-nowrap">{meta.label}</Badge></TableCell>
+                      <TableCell><Badge variant={meta.variant} className="whitespace-nowrap">{t(meta.labelKey)}</Badge></TableCell>
                       <TableCell className="font-medium">{r.employee_name}</TableCell>
                       <TableCell className="text-right tabular-nums text-muted-foreground">{r.leads_assigned}</TableCell>
                       <TableCell className={cn("text-right font-semibold tabular-nums", r.leads_overdue > 0 ? "text-destructive" : "text-muted-foreground")}>
@@ -225,9 +231,9 @@ const ClosersActivityDashboard = ({ isAdmin, isManager, viewAsCloserId }: Props)
                           </span>
                         )}
                       </TableCell>
-                      <TableCell><CountChips data={r.by_result} /></TableCell>
+                      <TableCell><CountChips data={r.by_result} labelOf={(k) => resultLabel(t, k)} /></TableCell>
                       <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
-                        {r.last_activity ? format(new Date(r.last_activity), "d MMM HH:mm", { locale: es }) : "—"}
+                        {r.last_activity ? format(new Date(r.last_activity), "d MMM HH:mm", { locale: f.fechas }) : "—"}
                       </TableCell>
                       <TableCell><ChevronRight className="h-4 w-4 text-muted-foreground" /></TableCell>
                     </TableRow>
@@ -251,6 +257,8 @@ const EmployeeActivityDetail = ({
   to: Date;
   onBack: () => void;
 }) => {
+  const f = useFormato();
+  const { t } = useLanguage();
   const { data: contacts = [], isLoading } = useCloserActivityDetail(from, to, emp.employee_id);
 
   const byDay = useMemo(() => {
@@ -265,18 +273,18 @@ const EmployeeActivityDetail = ({
   }, [contacts]);
 
   const stats = [
-    { label: "Asignados", value: emp.leads_assigned },
-    { label: "Vencidos", value: emp.leads_overdue, danger: emp.leads_overdue > 0 },
-    { label: "Contactos", value: emp.total_contacts },
-    { label: "Leads tocados", value: emp.leads_touched },
-    { label: "Días activos", value: byDay.length },
+    { label: t("closers.activity.assigned"), value: emp.leads_assigned },
+    { label: t("closers.activity.overdue"), value: emp.leads_overdue, danger: emp.leads_overdue > 0 },
+    { label: t("closers.contacts"), value: emp.total_contacts },
+    { label: t("closers.activity.touched"), value: emp.leads_touched },
+    { label: t("closers.activity.activeDays"), value: byDay.length },
   ];
 
   return (
     <div className="space-y-5">
       <div className="space-y-3">
         <Button variant="ghost" size="sm" className="-ml-2 h-8 text-muted-foreground" onClick={onBack}>
-          <ArrowLeft className="mr-1 h-4 w-4" /> Volver
+          <ArrowLeft className="mr-1 h-4 w-4" /> {t("common.back")}
         </Button>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h3 className="text-lg font-bold">{emp.employee_name}</h3>
@@ -291,12 +299,12 @@ const EmployeeActivityDetail = ({
         </div>
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
           <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">Canales</span>
+            <span className="text-xs text-muted-foreground">{t("closers.activity.channels")}</span>
             <CountChips data={emp.by_channel} />
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">Resultados</span>
-            <CountChips data={emp.by_result} />
+            <span className="text-xs text-muted-foreground">{t("closers.results")}</span>
+            <CountChips data={emp.by_result} labelOf={(k) => resultLabel(t, k)} />
           </div>
         </div>
       </div>
@@ -307,7 +315,7 @@ const EmployeeActivityDetail = ({
             {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-14 w-full rounded-lg" />)}
           </div>
         ) : contacts.length === 0 ? (
-          <p className="py-8 text-center text-sm text-muted-foreground">Sin contactos registrados en este rango.</p>
+          <p className="py-8 text-center text-sm text-muted-foreground">{t("closers.activity.noContacts")}</p>
         ) : (
           <div className="space-y-6">
             {byDay.map(([dayKey, dayRows]) => (
@@ -315,9 +323,9 @@ const EmployeeActivityDetail = ({
                 <div className="mb-2 flex items-center gap-2">
                   <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
                   <span className="text-xs font-semibold capitalize">
-                    {format(new Date(dayRows[0].contact_date), "EEEE d 'de' MMMM", { locale: es })}
+                    {format(new Date(dayRows[0].contact_date), f.idioma === "en" ? "EEEE, MMMM d" : "EEEE d 'de' MMMM", { locale: f.fechas })}
                   </span>
-                  <span className="text-[11px] text-muted-foreground">· {dayRows.length} contacto{dayRows.length === 1 ? "" : "s"}</span>
+                  <span className="text-[11px] text-muted-foreground">{t(dayRows.length === 1 ? "closers.activity.contactsOne" : "closers.activity.contactsMany", { n: dayRows.length })}</span>
                 </div>
                 <div className="space-y-0 pl-1">
                   {dayRows.map((c, idx) => {
@@ -344,7 +352,7 @@ const EmployeeActivityDetail = ({
                                 @{c.lead_handle} <ExternalLink className="h-3 w-3 opacity-60" />
                               </a>
                             ) : (
-                              <span className="text-sm font-medium">{c.lead_handle ?? "(sin handle)"}</span>
+                              <span className="text-sm font-medium">{c.lead_handle ?? t("closers.noHandleParen")}</span>
                             )}
                             {c.is_auto && (
                               <Badge variant="warning-soft" className="h-5 gap-1 text-[10px]"><Bot className="h-3 w-3" /> Auto</Badge>
@@ -352,8 +360,8 @@ const EmployeeActivityDetail = ({
                           </div>
                           <div className="mt-1 flex flex-wrap items-center gap-1.5">
                             {c.channel && <Badge variant="secondary" className="h-5 text-[11px]">{c.channel}</Badge>}
-                            {c.result && <Badge variant={resultVariant(c.result)} className="h-5 text-[11px]">{c.result}</Badge>}
-                            {c.lead_stage && c.lead_stage !== "Asignada" && <Badge variant="outline" className="h-5 text-[11px]">{c.lead_stage}</Badge>}
+                            {c.result && <Badge variant={resultVariant(c.result)} className="h-5 text-[11px]">{resultLabel(t, c.result)}</Badge>}
+                            {c.lead_stage && c.lead_stage !== "Asignada" && <Badge variant="outline" className="h-5 text-[11px]">{stageLabel(t, c.lead_stage)}</Badge>}
                             {c.lead_category && <span className="text-[11px] text-muted-foreground">cat. {c.lead_category}</span>}
                             {money && <span className="text-[11px] font-medium tabular-nums text-success">{money}</span>}
                           </div>

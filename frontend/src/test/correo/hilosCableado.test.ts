@@ -65,10 +65,17 @@ describe("⚠️ lo que SALE también encadena", () => {
     // sin el resto del hilo si le falta un eslabón del medio, y una
     // conversación larga se le parte en trozos. Gmail y Outlook mandan la
     // cadena completa (RFC 5322 §3.6.4).
-    const i = pagina.indexOf("const abrirRespuesta");
+    //
+    // Desde el ⋮ de cada mensaje (02/10) la respuesta se arma en
+    // lib/correo/accionesDelMensaje.ts, con la cadena del mensaje ELEGIDO (que
+    // no siempre es el abierto). El comportamiento está probado en
+    // test/correo/menuDelMensaje.test.tsx; acá, que la pantalla lo use.
+    const acciones = leer("frontend/src/lib/correo/accionesDelMensaje.ts");
+    const i = acciones.indexOf("export function borradorDeRespuesta");
     expect(i, "no está el armado de la respuesta").toBeGreaterThan(-1);
-    const fn = pagina.slice(i, i + 2500);
-    expect(fn).toMatch(/references:\s*\[\.\.\.\(sel\?\.refs \?\? \[\]\), messageId\]/);
+    const fn = acciones.slice(i, i + 2500);
+    expect(fn).toMatch(/references:\s*\[\.\.\.\(resumen\.refs \?\? \[\]\), messageId\]/);
+    expect(pagina).toMatch(/borradorDeRespuesta\(\{\s*resumen: m,/);
   });
 
   it("la copia sembrada en Enviados guarda in_reply_to y refs", () => {

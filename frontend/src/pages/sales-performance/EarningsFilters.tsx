@@ -1,6 +1,7 @@
 import { Filter, Search, CalendarIcon, ChevronDown } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/hooks/useLanguage";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -44,10 +45,11 @@ interface EarningsFiltersProps {
 const toggleItem = (arr: string[], item: string) =>
   arr.includes(item) ? arr.filter((v) => v !== item) : [...arr, item];
 
-const getDisplayLabel = (selected: string[], allLabel: string) => {
+/** `varias(n)` arma el texto de "n elegidas" en el idioma de la pantalla. */
+const getDisplayLabel = (selected: string[], allLabel: string, varias: (n: number) => string) => {
   if (selected.length === 0) return allLabel;
   if (selected.length === 1) return selected[0].length > 20 ? selected[0].slice(0, 20) + "…" : selected[0];
-  return `${selected.length} seleccionadas`;
+  return varias(selected.length);
 };
 
 const hasActiveFilters = (dateFrom: Date | undefined, dateTo: Date | undefined, otherFilter: string[]) =>
@@ -74,6 +76,8 @@ const EarningsFilters = ({
   pageSize,
   onPageSizeChange,
 }: EarningsFiltersProps) => {
+  const { t } = useLanguage();
+  const varias = (n: number) => t("sales.filters.selected", { n });
   const showCreatorHints = hasActiveFilters(dateFrom, dateTo, documentFilter);
   const showDocumentHints = hasActiveFilters(dateFrom, dateTo, creatorFilter);
 
@@ -86,7 +90,7 @@ const EarningsFilters = ({
       <div className="relative">
         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
         <Input
-          placeholder="Buscar creadora..."
+          placeholder={t("sales.filters.searchCreator")}
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
           className="w-52 h-8 text-xs pl-8"
@@ -95,11 +99,11 @@ const EarningsFilters = ({
 
       {/* Creator multi-select */}
       <div className="flex items-center gap-2">
-        <span className="text-sm text-muted-foreground">Creadora:</span>
+        <span className="text-sm text-muted-foreground">{t("sales.creatorColon")}</span>
         <Popover>
           <PopoverTrigger asChild>
             <Button variant="outline" size="sm" className="w-48 h-8 text-xs justify-between font-normal">
-              {getDisplayLabel(creatorFilter, "Todas")}
+              {getDisplayLabel(creatorFilter, t("common.allF"), varias)}
               <ChevronDown className="ml-1 h-3.5 w-3.5 opacity-50" />
             </Button>
           </PopoverTrigger>
@@ -107,7 +111,7 @@ const EarningsFilters = ({
             {creatorFilter.length > 0 && (
               <div className="p-2 border-b">
                 <Button variant="ghost" size="sm" className="h-7 text-xs w-full" onClick={() => onCreatorFilterChange([])}>
-                  Limpiar
+                  {t("sales.clear")}
                 </Button>
               </div>
             )}
@@ -142,7 +146,7 @@ const EarningsFilters = ({
         <Popover>
           <PopoverTrigger asChild>
             <Button variant="outline" size="sm" className="w-64 h-8 text-xs justify-between font-normal">
-              {getDisplayLabel(documentFilter.map((id) => id.slice(0, 8) + "…"), "Todos")}
+              {getDisplayLabel(documentFilter.map((id) => id.slice(0, 8) + "…"), t("common.all"), varias)}
               <ChevronDown className="ml-1 h-3.5 w-3.5 opacity-50" />
             </Button>
           </PopoverTrigger>
@@ -150,7 +154,7 @@ const EarningsFilters = ({
             {documentFilter.length > 0 && (
               <div className="p-2 border-b">
                 <Button variant="ghost" size="sm" className="h-7 text-xs w-full" onClick={() => onDocumentFilterChange([])}>
-                  Limpiar
+                  {t("sales.clear")}
                 </Button>
               </div>
             )}
@@ -193,7 +197,7 @@ const EarningsFilters = ({
             )}
           >
             <CalendarIcon className="mr-1.5 h-3.5 w-3.5" />
-            {dateFrom ? format(dateFrom, "dd/MM/yyyy") : "Desde"}
+            {dateFrom ? format(dateFrom, "dd/MM/yyyy") : t("sales.filters.from")}
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="start">
@@ -218,7 +222,7 @@ const EarningsFilters = ({
             )}
           >
             <CalendarIcon className="mr-1.5 h-3.5 w-3.5" />
-            {dateTo ? format(dateTo, "dd/MM/yyyy") : "Hasta"}
+            {dateTo ? format(dateTo, "dd/MM/yyyy") : t("sales.filters.to")}
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="start">
@@ -233,14 +237,14 @@ const EarningsFilters = ({
       </Popover>
 
       <Button variant="outline" size="sm" className="text-xs" onClick={onToday}>
-        Hoy
+        {t("common.today")}
       </Button>
       <Button variant="outline" size="sm" className="text-xs" onClick={onYesterday}>
-        Ayer
+        {t("sales.yesterday")}
       </Button>
 
       <div className="ml-auto flex items-center gap-2">
-        <span className="text-xs text-muted-foreground">Por página:</span>
+        <span className="text-xs text-muted-foreground">{t("sales.filters.perPage")}</span>
         <Select
           value={String(pageSize)}
           onValueChange={(v) => onPageSizeChange(v === "all" ? "all" : Number(v))}
@@ -252,12 +256,12 @@ const EarningsFilters = ({
             <SelectItem value="50">50</SelectItem>
             <SelectItem value="100">100</SelectItem>
             <SelectItem value="150">150</SelectItem>
-            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="all">{t("common.all")}</SelectItem>
           </SelectContent>
         </Select>
 
         <span className="text-xs text-muted-foreground">
-          {totalCount} registros
+          {t("sales.filters.records", { n: totalCount })}
         </span>
       </div>
     </div>

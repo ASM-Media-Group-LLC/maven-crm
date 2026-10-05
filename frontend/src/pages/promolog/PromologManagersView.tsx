@@ -17,7 +17,8 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format, differenceInCalendarDays } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
 import { ChevronDown, ChevronUp, TrendingDown, TrendingUp } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -65,16 +66,16 @@ interface GrowthRow {
 }
 
 const SILENT_DAYS = 3;
-const money = (n: number) => `$${Math.round(n).toLocaleString("es-CO")}`;
 const pct = (num: number, den: number) => (den > 0 ? Math.round((num / den) * 100) : 0);
 const deltaPct = (cur: number, prev: number) => (prev > 0 ? Math.round(((cur - prev) / prev) * 100) : null);
 
 const Delta = ({ cur, prev }: { cur: number; prev: number }) => {
+  const { t } = useLanguage();
   const d = deltaPct(cur, prev);
-  if (d == null) return <span className="text-[11px] text-muted-foreground">sin base previa</span>;
+  if (d == null) return <span className="text-[11px] text-muted-foreground">{t("promolog.noPrevBase")}</span>;
   const up = d >= 0;
   return (
-    <span className={cn("inline-flex items-center gap-0.5 text-[11px] font-medium", up ? "text-success" : "text-destructive")} title="vs el mismo tramo anterior">
+    <span className={cn("inline-flex items-center gap-0.5 text-[11px] font-medium", up ? "text-success" : "text-destructive")} title={t("promolog.vsSamePrevPeriod")}>
       {up ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
       {up ? "+" : ""}{d}%
     </span>
@@ -98,6 +99,9 @@ const Kpi = ({ label, value, sub, tone }: { label: string; value: React.ReactNod
 const COLS = "md:grid-cols-[minmax(200px,1.3fr)_repeat(5,minmax(0,1fr))_32px]";
 
 const PromologManagersView = ({ dateFrom, dateTo, creators }: Props) => {
+  const f = useFormato();
+  const { t } = useLanguage();
+  const money = (n: number) => `$${Math.round(n).toLocaleString(f.intl("es-CO"))}`;
   // El rango efectivo termina HOY como máximo: "Esta semana"/"Este mes" llegan al
   // domingo/fin de mes y el delta BLU compararía 2 días contra 7 del tramo anterior.
   const hoy = new Date();
@@ -209,22 +213,22 @@ const PromologManagersView = ({ dateFrom, dateTo, creators }: Props) => {
         <div>
           <h3 className="text-lg font-semibold">Managers</h3>
           <p className="text-xs text-muted-foreground">
-            {rangeDays === 1 ? format(fromDate, "d 'de' MMMM yyyy", { locale: es }) : `${format(fromDate, "d MMM", { locale: es })} – ${format(toDate, "d MMM yyyy", { locale: es })} · ${rangeDays} días`}
-            {recortado && <span className="text-warning"> · recortado a hoy</span>}
-            {" · "}creadoras activas, por la manager asignada en su ficha
+            {rangeDays === 1 ? format(fromDate, f.idioma === "en" ? "MMMM d, yyyy" : "d 'de' MMMM yyyy", { locale: f.fechas }) : `${format(fromDate, "d MMM", { locale: f.fechas })} – ${format(toDate, "d MMM yyyy", { locale: f.fechas })} · ${t("promolog.daysCount", { count: rangeDays })}`}
+            {recortado && <span className="text-warning">{t("promolog.trimmedToToday")}</span>}
+            {" · "}{t("promolog.managersScopeNote")}
           </p>
         </div>
-        {loading && <span className="text-xs text-muted-foreground">Cargando…</span>}
+        {loading && <span className="text-xs text-muted-foreground">{t("common.loading")}</span>}
       </div>
 
       {/* Encabezados de columna (desktop) */}
       <div className={cn("hidden md:grid gap-4 px-5 text-xs text-muted-foreground", COLS)}>
         <span>Manager</span>
-        <span>Promocionaron</span>
-        <span>Calidad promo</span>
-        <span>Contacto WhatsApp</span>
-        <span>Fans nuevos</span>
-        <span>Subs nuevas</span>
+        <span>{t("promolog.colPromoted")}</span>
+        <span>{t("promolog.colPromoQuality")}</span>
+        <span>{t("promolog.colWhatsappContact")}</span>
+        <span>{t("promolog.colNewFans")}</span>
+        <span>{t("promolog.colNewSubs")}</span>
         <span />
       </div>
 
@@ -247,24 +251,24 @@ const PromologManagersView = ({ dateFrom, dateTo, creators }: Props) => {
                     <UserAvatar name={name} src={r.manager.avatar_url} seed={r.manager.avatar_seed} size="lg" />
                     <div className="min-w-0">
                       <p className="text-base font-semibold truncate">{name}</p>
-                      <p className="text-xs text-muted-foreground">{r.roster} creadoras activas</p>
+                      <p className="text-xs text-muted-foreground">{t("promolog.activeCreatorsCount", { count: r.roster })}</p>
                     </div>
                   </div>
-                  <Kpi label="Promocionaron" value={`${promoPct}%`} sub={`${r.promotedCount} de ${r.roster}`} tone={promoPct >= 70 ? "good" : promoPct >= 40 ? "warn" : "bad"} />
-                  <Kpi label="Calidad promo" value={r.avgScore != null ? r.avgScore : "—"} sub={r.avgScore != null ? "promedio /100" : "sin lecturas"} tone={r.avgScore == null ? undefined : r.avgScore >= 70 ? "good" : r.avgScore >= 40 ? "warn" : "bad"} />
-                  <Kpi label="Contacto WhatsApp" value={`${contactPct}%`} sub={`${r.contacted} de ${r.contactable} contactadas`} tone={contactPct >= 80 ? "good" : contactPct >= 50 ? "warn" : "bad"} />
-                  <Kpi label="Fans nuevos" value={r.newFans.toLocaleString("es-CO")} sub={<Delta cur={r.newFans} prev={r.prevNewFans} />} />
-                  <Kpi label="Subs nuevas" value={money(r.newSub)} sub={<><Delta cur={r.newSub} prev={r.prevNewSub} /> <span className="text-muted-foreground">· rec. {money(r.recSub)}</span></>} />
+                  <Kpi label={t("promolog.colPromoted")} value={`${promoPct}%`} sub={t("promolog.aOfB", { a: r.promotedCount, b: r.roster })} tone={promoPct >= 70 ? "good" : promoPct >= 40 ? "warn" : "bad"} />
+                  <Kpi label={t("promolog.colPromoQuality")} value={r.avgScore != null ? r.avgScore : "—"} sub={r.avgScore != null ? t("promolog.avgOver100") : t("promolog.noReads")} tone={r.avgScore == null ? undefined : r.avgScore >= 70 ? "good" : r.avgScore >= 40 ? "warn" : "bad"} />
+                  <Kpi label={t("promolog.colWhatsappContact")} value={`${contactPct}%`} sub={t("promolog.aOfBContacted", { a: r.contacted, b: r.contactable })} tone={contactPct >= 80 ? "good" : contactPct >= 50 ? "warn" : "bad"} />
+                  <Kpi label={t("promolog.colNewFans")} value={r.newFans.toLocaleString(f.intl("es-CO"))} sub={<Delta cur={r.newFans} prev={r.prevNewFans} />} />
+                  <Kpi label={t("promolog.colNewSubs")} value={money(r.newSub)} sub={<><Delta cur={r.newSub} prev={r.prevNewSub} /> <span className="text-muted-foreground">{t("promolog.recurringShort", { amount: money(r.recSub) })}</span></>} />
                   <div className="hidden md:flex justify-end pt-1 text-muted-foreground">{open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</div>
                 </button>
 
                 {/* Alertas en chips (sin nombres: van en el drill-down) */}
                 <div className="flex flex-wrap items-center gap-2 px-5 pb-4 -mt-1">
-                  {r.rojas > 0 && <Badge variant="destructive-soft">🔴 {r.rojas} urgente{r.rojas > 1 ? "s" : ""}</Badge>}
-                  {r.noPromo > 0 && <Badge variant="destructive-soft">{r.noPromo} sin promo</Badge>}
-                  {r.silent > 0 ? <Badge variant="warning-soft">{r.silent} con {SILENT_DAYS}+ días sin contacto</Badge> : <Badge variant="success-soft">todas contactadas en {SILENT_DAYS} días</Badge>}
-                  {r.roster - r.contactable > 0 && <Badge variant="secondary-soft">{r.roster - r.contactable} sin teléfono</Badge>}
-                  <span className="ml-auto text-[11px] text-muted-foreground">{open ? "ocultar creadoras" : "ver creadoras"}</span>
+                  {r.rojas > 0 && <Badge variant="destructive-soft">{t(r.rojas > 1 ? "promolog.urgentMany" : "promolog.urgentOne", { count: r.rojas })}</Badge>}
+                  {r.noPromo > 0 && <Badge variant="destructive-soft">{t("promolog.noPromoCount", { count: r.noPromo })}</Badge>}
+                  {r.silent > 0 ? <Badge variant="warning-soft">{t("promolog.silentCount", { count: r.silent, days: SILENT_DAYS })}</Badge> : <Badge variant="success-soft">{t("promolog.allContacted", { days: SILENT_DAYS })}</Badge>}
+                  {r.roster - r.contactable > 0 && <Badge variant="secondary-soft">{t("promolog.noPhoneCount", { count: r.roster - r.contactable })}</Badge>}
+                  <span className="ml-auto text-[11px] text-muted-foreground">{open ? t("promolog.hideCreators") : t("promolog.showCreators")}</span>
                 </div>
 
                 {/* Drill-down: sus creadoras con semáforo */}
@@ -273,12 +277,12 @@ const PromologManagersView = ({ dateFrom, dateTo, creators }: Props) => {
                     <Table className="md:min-w-[760px]">
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Creadora</TableHead>
+                          <TableHead>{t("promolog.creator")}</TableHead>
                           <TableHead className="text-center">Promo</TableHead>
-                          <TableHead className="text-center">Calidad</TableHead>
-                          <TableHead className="text-center">Último contacto</TableHead>
-                          <TableHead className="text-right">Fans nuevos</TableHead>
-                          <TableHead className="text-right">Subs nuevas</TableHead>
+                          <TableHead className="text-center">{t("promolog.quality")}</TableHead>
+                          <TableHead className="text-center">{t("promolog.lastContact")}</TableHead>
+                          <TableHead className="text-right">{t("promolog.colNewFans")}</TableHead>
+                          <TableHead className="text-right">{t("promolog.colNewSubs")}</TableHead>
                           <TableHead className="text-right">Total BLU</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -287,7 +291,7 @@ const PromologManagersView = ({ dateFrom, dateTo, creators }: Props) => {
                           <TableRow key={d.creator.id}>
                             <TableCell>
                               <div className="flex items-center gap-2">
-                                <span className={cn("h-2.5 w-2.5 rounded-full shrink-0", d.semaforo === "rojo" ? "bg-destructive" : d.semaforo === "ambar" ? "bg-warning" : "bg-success")} title={d.semaforo === "rojo" ? "No promociona + sin contacto + sin fans nuevos" : d.semaforo === "ambar" ? "Dos señales en rojo" : "OK"} />
+                                <span className={cn("h-2.5 w-2.5 rounded-full shrink-0", d.semaforo === "rojo" ? "bg-destructive" : d.semaforo === "ambar" ? "bg-warning" : "bg-success")} title={d.semaforo === "rojo" ? t("promolog.semRed") : d.semaforo === "ambar" ? t("promolog.semAmber") : "OK"} />
                                 <div className="min-w-0">
                                   <p className="text-sm font-medium truncate">{d.name}</p>
                                   {d.creator.instagram_handle && <p className="text-[11px] text-muted-foreground">@{d.creator.instagram_handle}</p>}
@@ -295,17 +299,17 @@ const PromologManagersView = ({ dateFrom, dateTo, creators }: Props) => {
                               </div>
                             </TableCell>
                             <TableCell className="text-center text-sm">
-                              {d.covered > 0 ? <span className={cn(d.promoted ? "text-success" : "text-destructive", "font-medium")}>{d.promoDays}/{d.covered} días</span> : <span className="text-muted-foreground text-xs">sin lectura</span>}
+                              {d.covered > 0 ? <span className={cn(d.promoted ? "text-success" : "text-destructive", "font-medium")}>{t("promolog.promoDaysOf", { a: d.promoDays, b: d.covered })}</span> : <span className="text-muted-foreground text-xs">{t("promolog.noRead")}</span>}
                             </TableCell>
                             <TableCell className="text-center">
-                              {d.score != null && d.covered > 0 ? <Badge variant={d.score >= 70 ? "success-soft" : d.score >= 40 ? "warning-soft" : "destructive-soft"}>{d.score}{d.isPartial ? " · parcial" : ""}</Badge> : <span className="text-muted-foreground text-xs">—</span>}
+                              {d.score != null && d.covered > 0 ? <Badge variant={d.score >= 70 ? "success-soft" : d.score >= 40 ? "warning-soft" : "destructive-soft"}>{d.score}{d.isPartial ? t("promolog.partialSuffix") : ""}</Badge> : <span className="text-muted-foreground text-xs">—</span>}
                             </TableCell>
                             <TableCell className="text-center text-sm">
-                              {!d.phoneOk ? <span className="text-muted-foreground text-xs">sin teléfono</span>
-                                : d.lastDays == null ? <span className="text-destructive text-xs">nunca</span>
-                                : <span className={cn(d.silent ? "text-warning" : "text-success")}>{d.lastDays === 0 ? "hoy" : `hace ${d.lastDays}d`}</span>}
+                              {!d.phoneOk ? <span className="text-muted-foreground text-xs">{t("promolog.noPhone")}</span>
+                                : d.lastDays == null ? <span className="text-destructive text-xs">{t("promolog.never")}</span>
+                                : <span className={cn(d.silent ? "text-warning" : "text-success")}>{d.lastDays === 0 ? t("promolog.todayLower") : t("promolog.daysAgoShort", { count: d.lastDays })}</span>}
                             </TableCell>
-                            <TableCell className="text-right text-sm font-medium">{d.newFans.toLocaleString("es-CO")}</TableCell>
+                            <TableCell className="text-right text-sm font-medium">{d.newFans.toLocaleString(f.intl("es-CO"))}</TableCell>
                             <TableCell className="text-right text-sm">{money(d.newSub)}</TableCell>
                             <TableCell className="text-right text-sm text-muted-foreground">{money(d.total)}</TableCell>
                           </TableRow>
@@ -321,8 +325,8 @@ const PromologManagersView = ({ dateFrom, dateTo, creators }: Props) => {
       </div>
 
       <p className="text-[11px] text-muted-foreground">
-        🔴 urgente = no promociona + sin contacto reciente + sin fans nuevos · la línea de WhatsApp es compartida: el contacto se atribuye a la manager asignada en la ficha.
-        {rows.length > withRoster.length && ` · Sin creadoras asignadas: ${rows.filter((r) => r.roster === 0).map((r) => r.manager.full_name).join(", ")}.`}
+        {t("promolog.managersFooter")}
+        {rows.length > withRoster.length && t("promolog.noAssignedCreators", { names: rows.filter((r) => r.roster === 0).map((r) => r.manager.full_name).join(", ") })}
       </p>
     </div>
   );

@@ -1,7 +1,8 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { format, subDays, isToday } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
 import {
   ArrowLeft, Search, List, LayoutGrid, Eye, ChevronsUpDown, Check,
   Database, BarChart3,
@@ -43,6 +44,8 @@ const calidadColors: Record<string, string> = {
 
 const LeadGenBaseDatosContent = () => {
   const navigate = useNavigate();
+  const f = useFormato();
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<"leads" | "analisis">("leads");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [searchTerm, setSearchTerm] = useState("");
@@ -64,9 +67,9 @@ const LeadGenBaseDatosContent = () => {
 
   const profilesMap = useMemo(() => {
     const map: Record<string, string> = {};
-    profiles.forEach(p => { map[p.id] = p.full_name || "Sin nombre"; });
+    profiles.forEach(p => { map[p.id] = p.full_name || t("leadgen.noName"); });
     return map;
-  }, [profiles]);
+  }, [profiles, t]);
 
   const agentesUnicos = useMemo(() => {
     const names = new Set<string>();
@@ -125,7 +128,7 @@ const LeadGenBaseDatosContent = () => {
     for (let i = 6; i >= 0; i--) {
       const d = subDays(new Date(), i);
       const key = format(d, "yyyy-MM-dd");
-      days.push({ label: format(d, "EEE d", { locale: es }), date: key, leads: 0 });
+      days.push({ label: format(d, "EEE d", { locale: f.fechas }), date: key, leads: 0 });
     }
     filtered.forEach((l) => {
       const key = format(new Date(l.created_at), "yyyy-MM-dd");
@@ -133,14 +136,14 @@ const LeadGenBaseDatosContent = () => {
       if (found) found.leads++;
     });
     return days;
-  }, [filtered]);
+  }, [filtered, f]);
 
   const monthlyData = useMemo(() => {
     const days: { label: string; date: string; leads: number }[] = [];
     for (let i = 29; i >= 0; i--) {
       const d = subDays(new Date(), i);
       const key = format(d, "yyyy-MM-dd");
-      days.push({ label: format(d, "d MMM", { locale: es }), date: key, leads: 0 });
+      days.push({ label: format(d, f.idioma === "en" ? "MMM d" : "d MMM", { locale: f.fechas }), date: key, leads: 0 });
     }
     filtered.forEach((l) => {
       const key = format(new Date(l.created_at), "yyyy-MM-dd");
@@ -148,11 +151,11 @@ const LeadGenBaseDatosContent = () => {
       if (found) found.leads++;
     });
     return days;
-  }, [filtered]);
+  }, [filtered, f]);
 
   const tabs = [
     { id: "leads" as const, label: "Leads", icon: Database },
-    { id: "analisis" as const, label: "Análisis", icon: BarChart3 },
+    { id: "analisis" as const, label: t("leadgen.db.analysis"), icon: BarChart3 },
   ];
 
   return (
@@ -162,12 +165,12 @@ const LeadGenBaseDatosContent = () => {
           <ArrowLeft className="h-3 w-3" />LeadGen
         </button>
         <PageHeader
-          title="Base de Datos"
-          subtitle="Todos los leads registrados en el sistema"
+          title={t("leadgen.database")}
+          subtitle={t("leadgen.db.subtitle")}
           actions={
             <div className="text-right">
               <p className="text-3xl font-bold text-primary">{totalCount.toLocaleString()}</p>
-              <p className="text-xs text-muted-foreground">leads totales</p>
+              <p className="text-xs text-muted-foreground">{t("leadgen.db.totalLeads")}</p>
             </div>
           }
         />
@@ -177,10 +180,10 @@ const LeadGenBaseDatosContent = () => {
         {/* KPI Cards */}
         <div className="px-6 py-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground font-medium mb-1">PÁGINA ACTUAL</p><div className="flex items-baseline gap-4"><div><p className="text-2xl font-bold">{totalLeads.toLocaleString()}</p><p className="text-xs text-muted-foreground">Filtrados</p></div><div><p className="text-2xl font-bold text-primary">{conContacto.toLocaleString()}</p><p className="text-xs text-muted-foreground">Con Contacto</p></div></div></CardContent></Card>
-            <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground font-medium mb-1">CATEGORÍA ALTA</p><div className="flex items-baseline gap-4"><div><p className="text-2xl font-bold text-emerald-400">{aPlus.toLocaleString()}</p><p className="text-xs text-muted-foreground">A+</p></div><div><p className="text-2xl font-bold text-green-400">{aCount.toLocaleString()}</p><p className="text-xs text-muted-foreground">A</p></div></div></CardContent></Card>
-            <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground font-medium mb-1">CATEGORÍA MEDIA</p><div className="flex items-baseline gap-4"><div><p className="text-2xl font-bold text-yellow-400">{bPlus.toLocaleString()}</p><p className="text-xs text-muted-foreground">B+</p></div><div><p className="text-2xl font-bold text-orange-400">{bCount.toLocaleString()}</p><p className="text-xs text-muted-foreground">B</p></div></div></CardContent></Card>
-            <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground font-medium mb-1">CATEGORÍA BAJA</p><div className="flex items-baseline gap-4"><div><p className="text-2xl font-bold text-red-400">{cCount.toLocaleString()}</p><p className="text-xs text-muted-foreground">C</p></div></div></CardContent></Card>
+            <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground font-medium mb-1">{t("leadgen.db.currentPage")}</p><div className="flex items-baseline gap-4"><div><p className="text-2xl font-bold">{totalLeads.toLocaleString()}</p><p className="text-xs text-muted-foreground">{t("leadgen.db.filtered")}</p></div><div><p className="text-2xl font-bold text-primary">{conContacto.toLocaleString()}</p><p className="text-xs text-muted-foreground">{t("leadgen.db.withContact")}</p></div></div></CardContent></Card>
+            <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground font-medium mb-1">{t("leadgen.db.highCategory")}</p><div className="flex items-baseline gap-4"><div><p className="text-2xl font-bold text-emerald-400">{aPlus.toLocaleString()}</p><p className="text-xs text-muted-foreground">A+</p></div><div><p className="text-2xl font-bold text-green-400">{aCount.toLocaleString()}</p><p className="text-xs text-muted-foreground">A</p></div></div></CardContent></Card>
+            <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground font-medium mb-1">{t("leadgen.db.midCategory")}</p><div className="flex items-baseline gap-4"><div><p className="text-2xl font-bold text-yellow-400">{bPlus.toLocaleString()}</p><p className="text-xs text-muted-foreground">B+</p></div><div><p className="text-2xl font-bold text-orange-400">{bCount.toLocaleString()}</p><p className="text-xs text-muted-foreground">B</p></div></div></CardContent></Card>
+            <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground font-medium mb-1">{t("leadgen.db.lowCategory")}</p><div className="flex items-baseline gap-4"><div><p className="text-2xl font-bold text-red-400">{cCount.toLocaleString()}</p><p className="text-xs text-muted-foreground">C</p></div></div></CardContent></Card>
           </div>
         </div>
 
@@ -202,23 +205,23 @@ const LeadGenBaseDatosContent = () => {
         <div className="px-6 py-3 flex items-center gap-3 flex-wrap">
           <div className="relative flex-1 max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Buscar lead..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9 h-9" />
+            <Input placeholder={t("leadgen.searchLead")} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9 h-9" />
           </div>
 
           <Popover open={agenciaSelectOpen} onOpenChange={setAgenciaSelectOpen}>
             <PopoverTrigger asChild>
               <Button variant="outline" className="w-full sm:w-[180px] h-9 justify-between font-normal">
-                {filterAgencia || "Agencia"}
+                {filterAgencia || t("leadgen.filter.agency")}
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-[90vw] sm:w-[200px] p-0">
               <Command>
-                <CommandInput placeholder="Buscar agencia..." />
+                <CommandInput placeholder={t("leadgen.db.searchAgency")} />
                 <CommandList>
-                  <CommandEmpty>No encontrado</CommandEmpty>
+                  <CommandEmpty>{t("leadgen.notFound")}</CommandEmpty>
                   <CommandItem onSelect={() => { setFilterAgencia(""); setAgenciaSelectOpen(false); }}>
-                    Todas{!filterAgencia && <Check className="ml-auto h-4 w-4" />}
+                    {t("common.allF")}{!filterAgencia && <Check className="ml-auto h-4 w-4" />}
                   </CommandItem>
                   {LEADGEN_COMPANIES.map((a) => (
                     <CommandItem key={a} onSelect={() => { setFilterAgencia(a); setAgenciaSelectOpen(false); }}>
@@ -233,17 +236,17 @@ const LeadGenBaseDatosContent = () => {
           <Popover open={agenteSelectOpen} onOpenChange={setAgenteSelectOpen}>
             <PopoverTrigger asChild>
               <Button variant="outline" className="w-full sm:w-[180px] h-9 justify-between font-normal">
-                {filterAgente || "Agente"}
+                {filterAgente || t("leadgen.col.agent")}
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-[90vw] sm:w-[200px] p-0">
               <Command>
-                <CommandInput placeholder="Buscar agente..." />
+                <CommandInput placeholder={t("leadgen.searchAgent")} />
                 <CommandList>
-                  <CommandEmpty>No encontrado</CommandEmpty>
+                  <CommandEmpty>{t("leadgen.notFound")}</CommandEmpty>
                   <CommandItem onSelect={() => { setFilterAgente(""); setAgenteSelectOpen(false); }}>
-                    Todos{!filterAgente && <Check className="ml-auto h-4 w-4" />}
+                    {t("common.all")}{!filterAgente && <Check className="ml-auto h-4 w-4" />}
                   </CommandItem>
                   {agentesUnicos.map((a) => (
                     <CommandItem key={a} onSelect={() => { setFilterAgente(a); setAgenteSelectOpen(false); }}>
@@ -256,9 +259,9 @@ const LeadGenBaseDatosContent = () => {
           </Popover>
 
           <Select value={filterCalidad || undefined} onValueChange={(v) => setFilterCalidad(v === "__all__" ? "" : v)}>
-            <SelectTrigger className="w-[120px] h-9"><SelectValue placeholder="Categoría" /></SelectTrigger>
+            <SelectTrigger className="w-[120px] h-9"><SelectValue placeholder={t("common.category")} /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="__all__">Todas</SelectItem>
+              <SelectItem value="__all__">{t("common.allF")}</SelectItem>
               <SelectItem value="a+">A+</SelectItem><SelectItem value="a">A</SelectItem>
               <SelectItem value="b+">B+</SelectItem><SelectItem value="b">B</SelectItem>
               <SelectItem value="c">C</SelectItem>
@@ -266,7 +269,7 @@ const LeadGenBaseDatosContent = () => {
           </Select>
 
 
-          <DateRangePicker from={dateFrom} to={dateTo} onApply={(from, to) => { setDateFrom(from); setDateTo(to); }} placeholder="Filtrar por fecha" className="h-9" />
+          <DateRangePicker from={dateFrom} to={dateTo} onApply={(from, to) => { setDateFrom(from); setDateTo(to); }} placeholder={t("leadgen.db.filterByDate")} className="h-9" />
 
           {activeTab === "leads" && (
             <div className="ml-auto flex gap-1">
@@ -281,11 +284,11 @@ const LeadGenBaseDatosContent = () => {
           {activeTab === "leads" && (
             <>
               <p className="text-sm text-muted-foreground mb-4">
-                Mostrando: <span className="font-semibold text-foreground">{filtered.length}</span> de {totalCount.toLocaleString()} leads (página {page + 1} de {totalPages})
+                {t("leadgen.db.showing")} <span className="font-semibold text-foreground">{filtered.length}</span> {t("leadgen.db.showingRest", { total: totalCount.toLocaleString(), page: page + 1, pages: totalPages })}
               </p>
               {isLoading ? (
                 <div className="flex items-center justify-center py-16">
-                  <p className="text-muted-foreground text-sm">Cargando leads...</p>
+                  <p className="text-muted-foreground text-sm">{t("leadgen.loadingLeads")}</p>
                 </div>
               ) : viewMode === "grid" ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -302,7 +305,7 @@ const LeadGenBaseDatosContent = () => {
                         <p className="text-xs text-muted-foreground">{lead.company || "—"}</p>
                         <div className="flex items-center justify-end">
                           <span className="text-xs text-muted-foreground">
-                            {format(new Date(lead.created_at), "d MMM", { locale: es })}
+                            {format(new Date(lead.created_at), f.idioma === "en" ? "MMM d" : "d MMM", { locale: f.fechas })}
                           </span>
                         </div>
                       </CardContent>
@@ -318,13 +321,13 @@ const LeadGenBaseDatosContent = () => {
                           <TableRow>
                             <TableHead className="w-12">#</TableHead>
                             <TableHead>Handle</TableHead>
-                            <TableHead>Agente</TableHead>
-                            <TableHead>Agencia</TableHead>
-                            <TableHead>Categoría</TableHead>
+                            <TableHead>{t("leadgen.col.agent")}</TableHead>
+                            <TableHead>{t("leadgen.col.agency")}</TableHead>
+                            <TableHead>{t("common.category")}</TableHead>
                             
-                            <TableHead>País</TableHead>
-                            <TableHead>Fecha</TableHead>
-                            <TableHead className="text-center sticky right-0 bg-card z-20">Acciones</TableHead>
+                            <TableHead>{t("common.country")}</TableHead>
+                            <TableHead>{t("common.date")}</TableHead>
+                            <TableHead className="text-center sticky right-0 bg-card z-20">{t("common.actions")}</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -341,7 +344,7 @@ const LeadGenBaseDatosContent = () => {
                               </TableCell>
                               <TableCell className="text-sm">{lead.country_code || "—"}</TableCell>
                               <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                                {format(new Date(lead.created_at), "dd MMM yyyy", { locale: es })}
+                                {format(new Date(lead.created_at), f.idioma === "en" ? "MMM dd, yyyy" : "dd MMM yyyy", { locale: f.fechas })}
                               </TableCell>
                               <TableCell className="text-center sticky right-0 bg-card">
                                 <Button variant="ghost" size="sm" className="h-8 w-8 p-0"><Eye className="h-4 w-4" /></Button>
@@ -366,7 +369,7 @@ const LeadGenBaseDatosContent = () => {
             <div className="space-y-6">
               <Card>
                 <CardContent className="p-6">
-                  <h3 className="text-sm font-semibold mb-4">Leads por Hora (Hoy)</h3>
+                  <h3 className="text-sm font-semibold mb-4">{t("leadgen.perf.leadsPerHourToday")}</h3>
                   <ResponsiveContainer width="100%" height={200}>
                     <BarChart data={hourlyData}>
                       <XAxis dataKey="hour" tick={{ fontSize: 10 }} />
@@ -380,7 +383,7 @@ const LeadGenBaseDatosContent = () => {
 
               <Card>
                 <CardContent className="p-6">
-                  <h3 className="text-sm font-semibold mb-4">Leads Últimos 7 Días</h3>
+                  <h3 className="text-sm font-semibold mb-4">{t("leadgen.db.last7Days")}</h3>
                   <ResponsiveContainer width="100%" height={200}>
                     <BarChart data={weeklyData}>
                       <XAxis dataKey="label" tick={{ fontSize: 10 }} />
@@ -394,7 +397,7 @@ const LeadGenBaseDatosContent = () => {
 
               <Card>
                 <CardContent className="p-6">
-                  <h3 className="text-sm font-semibold mb-4">Tendencia Últimos 30 Días</h3>
+                  <h3 className="text-sm font-semibold mb-4">{t("leadgen.db.trend30Days")}</h3>
                   <ResponsiveContainer width="100%" height={200}>
                     <LineChart data={monthlyData}>
                       <CartesianGrid strokeDasharray="3 3" />

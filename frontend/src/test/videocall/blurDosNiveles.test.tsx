@@ -3,6 +3,9 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import CallControls from "@/pages/messenger/videocall/CallControls";
 import BackgroundSelector from "@/pages/messenger/videocall/BackgroundSelector";
 
+vi.mock("@/hooks/useLanguage", (original) =>
+  import("@/test/messenger/espanolEnTests").then((m) => m.idiomaEnEspanol(original)));
+
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), info: vi.fn(), error: vi.fn() } }));
 
 const props = {

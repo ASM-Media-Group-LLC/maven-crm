@@ -1,6 +1,7 @@
 import { corsFor } from "../_shared/cors.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { agenciaDePersona, revisarSala } from "../_shared/livekit-agencia.ts";
 
 const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
 
@@ -17,7 +18,7 @@ function base64UrlEncode(data: Uint8Array): string {
   return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-function strToBytes(s: string): Uint8Array {
+function strToBytes(s: string): Uint8Array<ArrayBuffer> {
   return new TextEncoder().encode(s);
 }
 
@@ -111,15 +112,40 @@ serve(async (req) => {
       );
     }
 
+    const adminClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
+    // ── La sala tiene que ser de la agencia de quien pide (entrega 3c) ──
+    // Antes esta función firmaba un token para CUALQUIER nombre de sala: con el
+    // nombre de una reunión, una llamada o una sala de Cowork de otra agencia (o
+    // sin agencia, desde el registro público) se entraba directo. Una sala de
+    // otra agencia contesta igual que una que no existe. Un invitado de afuera
+    // entra a un Meet por la sala de espera (meet-guest), no por acá.
+    const miAgencia = await agenciaDePersona(adminClient, userId);
+    const sala = await revisarSala(adminClient, miAgencia, roomName);
+    if (!sala.ok) {
+      return new Response(JSON.stringify({ error: sala.error }), {
+        status: sala.status,
+        headers: { ...corsHeaders(req), "Content-Type": "application/json" },
+      });
+    }
+    // Las salas de Cowork las da cowork-session, que sabe quién va a qué sala y
+    // con qué permisos (oculto, solo mirar, pantalla). Por acá se saltaban todas
+    // esas reglas.
+    if (sala.familia === "cowork") {
+      return new Response(JSON.stringify({ error: "Las salas de Cowork se abren desde Cowork" }), {
+        status: 403,
+        headers: { ...corsHeaders(req), "Content-Type": "application/json" },
+      });
+    }
+
     // ── Server-side admin verification ────────────────────────────
     // Only grant roomAdmin if the user actually has an admin/moderator role
+    // (de SU agencia: la sala ya se comprobó arriba).
     let verifiedAdmin = false;
     if (isAdmin) {
-      const adminClient = createClient(
-        Deno.env.get("SUPABASE_URL")!,
-        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-      );
-
       const { data: userRoles } = await adminClient
         .from("user_roles")
         .select("role")
@@ -137,7 +163,7 @@ serve(async (req) => {
           .eq("caller_id", userId)
           .limit(1);
 
-        verifiedAdmin = (callData && callData.length > 0);
+        verifiedAdmin = !!(callData && callData.length > 0);
       }
 
       // Meet: quien creó la reunión es su anfitrión (mutear, echar, terminar),

@@ -7,6 +7,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { getCountryFlag, getCountryShortDisplay } from "@/lib/country-utils";
+import { useLanguage } from "@/hooks/useLanguage";
 import type { Contacto } from "./ContactosContent";
 import type { ContactChannel } from "./useContactSalesChannels";
 import type { ContactStatus } from "./useContactStatuses";
@@ -43,10 +44,12 @@ const ROW_BG: Record<ContactStatus, string> = {
 // en Dashboard 2. Cada card muestra avatar IG, nombre, badge categoría,
 // fecha y links rápidos. Click abre popup detalle.
 const ContactosCardList = ({ contactos, onView, onEdit, onConvert, onSellPlatform, onDelete, channelsByContact, statuses }: Props) => {
+  // Antes del return temprano de la lista vacía (reglas de los hooks).
+  const { t } = useLanguage();
   if (contactos.length === 0) {
     return (
       <div className="rounded-xl border border-border bg-card p-12 text-center text-sm text-muted-foreground">
-        No se encontraron contactos.
+        {t("contactos.noContactsFound")}
       </div>
     );
   }
@@ -80,7 +83,7 @@ const ContactosCardList = ({ contactos, onView, onEdit, onConvert, onSellPlatfor
                   </Badge>
                   {recordType === "reactivado" && (
                     <Badge variant="warning-soft" className="font-normal text-[10px] px-1.5 py-0 shrink-0">
-                      Reactivado
+                      {t("contactos.reactivated")}
                     </Badge>
                   )}
                   {/* Lead B2B: distingue las agencias entre los contactos de
@@ -89,9 +92,9 @@ const ContactosCardList = ({ contactos, onView, onEdit, onConvert, onSellPlatfor
                     <Badge
                       variant="primary-soft"
                       className="font-normal text-[10px] px-1.5 py-0 shrink-0"
-                      title="Agencia (B2B) — al asignarla a un closer entra al pipeline como venta de plataforma"
+                      title={t("contactos.agencyBadgeTitle")}
                     >
-                      Agencia
+                      {t("contactos.agency")}
                     </Badge>
                   )}
                 </div>
@@ -121,15 +124,15 @@ const ContactosCardList = ({ contactos, onView, onEdit, onConvert, onSellPlatfor
 
               <div className="hidden md:flex items-center gap-4 text-right shrink-0">
                 <div>
-                  <p className="text-xs text-muted-foreground">Ciudad</p>
-                  <p className="text-xs font-medium truncate max-w-[100px]">{c.city || "—"}</p>
+                  <p className="text-xs text-muted-foreground">{t("common.city")}</p>
+                  <p className="text-xs font-medium truncate max-w-[100px]">{c.city || t("contactos.notApplicable")}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">País</p>
+                  <p className="text-xs text-muted-foreground">{t("common.country")}</p>
                   <p className="text-xs font-medium">{c.pais ? getCountryShortDisplay(c.pais) : "—"}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Creación</p>
+                  <p className="text-xs text-muted-foreground">{t("contactos.created")}</p>
                   <p className="text-xs font-medium whitespace-nowrap">{c.creacion}</p>
                 </div>
               </div>
@@ -145,27 +148,27 @@ const ContactosCardList = ({ contactos, onView, onEdit, onConvert, onSellPlatfor
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem onClick={() => onView?.(c)}>
-                      <Eye className="mr-2 h-4 w-4" /> Ver detalle
+                      <Eye className="mr-2 h-4 w-4" /> {t("common.viewDetail")}
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => onEdit?.(c)}>
-                      <Pencil className="mr-2 h-4 w-4" /> Editar
+                      <Pencil className="mr-2 h-4 w-4" /> {t("common.edit")}
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => onConvert?.(c)}>
-                      <Sparkles className="mr-2 h-4 w-4" /> Convertir a Creador
+                      <Sparkles className="mr-2 h-4 w-4" /> {t("contactos.convertToCreator")}
                     </DropdownMenuItem>
                     {onSellPlatform && (
                       <DropdownMenuItem onClick={() => onSellPlatform(c)}>
-                        <ShoppingCart className="mr-2 h-4 w-4" /> Vender plataforma
+                        <ShoppingCart className="mr-2 h-4 w-4" /> {t("contactos.sellPlatform")}
                       </DropdownMenuItem>
                     )}
                     {cleanHandle && (
                       <DropdownMenuItem onClick={() => window.open(`https://instagram.com/${cleanHandle}`, "_blank", "noopener,noreferrer")}>
-                        <ExternalLink className="mr-2 h-4 w-4" /> Abrir Instagram
+                        <ExternalLink className="mr-2 h-4 w-4" /> {t("contactos.openInstagram")}
                       </DropdownMenuItem>
                     )}
                     {onDelete && (
                       <DropdownMenuItem onClick={() => onDelete(c)} className="text-destructive focus:text-destructive">
-                        <Trash2 className="mr-2 h-4 w-4" /> Eliminar
+                        <Trash2 className="mr-2 h-4 w-4" /> {t("common.delete")}
                       </DropdownMenuItem>
                     )}
                   </DropdownMenuContent>

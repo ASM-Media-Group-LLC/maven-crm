@@ -35,9 +35,12 @@ describe("⚠️ el destino no puede inyectar comandos IMAP", () => {
   it("⚠️ el segundo cerrojo: moveUids rechaza CR, LF y NUL", () => {
     // Escapar comillas NO alcanza: un salto de línea cierra la línea del
     // comando y lo que siga se ejecuta como un comando IMAP propio.
-    const fn = entre(imap, "async moveUids(", "const d = `");
+    // El cerrojo vive en moveUidsConDestino (moveUids la llama), antes de
+    // armar el comando.
+    const fn = entre(imap, "async moveUidsConDestino(", "const d = `");
     expect(fn).toMatch(/\[\\r\\n\\x00\]/);
-    expect(fn).toMatch(/return false/);
+    expect(fn).toMatch(/return \{ ok: false/);
+    expect(entre(imap, "async moveUids(", "async moveUidsConDestino(")).toMatch(/this\.moveUidsConDestino\(/);
   });
 
   it("«move» está en la lista de operaciones permitidas", () => {
@@ -56,7 +59,34 @@ describe("la UI de Mover a", () => {
     expect(pagina).toMatch(/\(carpetas\.data \?\? \[\]\)/);
   });
 
-  it("no ofrece mover a la carpeta en la que ya estás", () => {
-    expect(pagina).toMatch(/\.filter\(\(f\) => f !== carpeta\)/);
+  it("no ofrece mover a la carpeta en la que ya estás (la de la lista, o la del correo abierto)", () => {
+    expect(pagina).toMatch(/\.filter\(\(f\) => f !== actual\)/);
+    expect(pagina).toMatch(/carpetasParaMover\(carpeta\)/);
+    expect(pagina).toMatch(/carpetasParaMover\(sel\.folder \?\? carpeta\)/);
+  });
+});
+
+describe("⚠️ lo movido se TRASLADA en la caché, no se borra (Jhon, 28/09)", () => {
+  // «Moví correos y desaparecen, pero luego no aparecen en la dirección que
+  // los moví»: la fila se borraba y el correo volvía recién con el barrido
+  // (30 min en las carpetas frías). Una etiqueta puesta con «Mover a»
+  // quedaba vacía mientras tanto.
+  it("el bulk traslada ANTES de borrar lo que no pudo ubicar", () => {
+    const i = edge.indexOf("const ubicacion = await trasladarEnCache(");
+    const j = edge.indexOf('await admin.from("mail_messages").delete()\n            .eq("user_id", user.id).eq("folder", box).in("uid", lista);');
+    expect(i, "no está el traslado").toBeGreaterThan(-1);
+    expect(j, "no está el borrado de lo no ubicado").toBeGreaterThan(i);
+  });
+
+  it("la fila queda con la MISMA clave con la que la va a buscar el barrido", () => {
+    // (user_id, folder, uidvalidity, uid): si faltara el uidvalidity, el
+    // barrido insertaría otra fila y el correo saldría dos veces.
+    expect(edge).toMatch(/\.update\(\{ folder: dest, uid, uidvalidity,/);
+  });
+
+  it("y la pantalla vuelve a leer la vista de la etiqueta después de mover", () => {
+    const hook = leer("frontend/src/hooks/useMailbox.ts");
+    const bulk = entre(hook, "export function useMailBulk", "export function useMailRealtime");
+    expect(bulk).toMatch(/invalidateQueries\(\{ queryKey: \["mail-por-etiqueta"\] \}\)/);
   });
 });

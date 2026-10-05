@@ -11,9 +11,18 @@
 //   historial            { id }              → { currentVersion, history[] }
 //   historial-version    { id, version }     → lo que come `setHistoryData`
 //   historial-restaurar  { id, version }     → { version } la nueva vigente
+//   adjunto      { url, nombre, hash, extension } → { servidor, config } (correo)
+//   ver_drive    { id, tema?, idioma? }     → { servidor, config } solo lectura
+//   editar_drive { id, tema?, idioma? }     → { servidor, config, modo, motivo, archivo }
+//                                             EL MISMO archivo, en modo edición
+//   desde_drive  { id }                     → { id, extension } copia editable
 //
-// Y una que NO lleva sesión, porque la llama el servidor de ONLYOFFICE:
+// (Las dos últimas son para archivos del DRIVE, que viven en el NAS: ver
+// drive.ts.)
+//
+// Y dos que NO llevan sesión, porque las llama el servidor de ONLYOFFICE:
 //   ?guardar=<token>               ← el aviso de "hay versión nueva"
+//   ?guardar_drive=<permiso>       ← lo mismo, para un archivo del Drive
 //
 // ⚠️ EL ARCHIVO NO PASA POR ACÁ AL ABRIR. A ONLYOFFICE se le entrega una URL
 // firmada de R2 que vence en una hora: bajar el documento es entre él y
@@ -26,7 +35,16 @@ import {
   type DocumentoParaHistorial, type FilaDeVersion,
 } from "./historial.ts";
 import { EN_BLANCO } from "./plantillas.ts";
+import { firmar, verificar } from "./jwt.ts";
+import {
+  adivinarDelimitador, codigoDePagina, comoSeAbre, configDeEdicion, configDeVista, errorDeConversion, esDelServidor,
+  esUuid, filasDeVersion, formatoDeOffice, nombreSinExtension, pedidoDeConversion, queHacerConElAviso, restauradaEl,
+  TAMANO_PARTE_NAS, textoDeMuestra, TOPE_COPIA, TOPE_VISTA,
+} from "./drive.ts";
 import { ALLOWED_ORIGINS } from "../_shared/cors.ts";
+import {
+  ahoraMas, firmar as firmarPermisoDelNas, verificar as verificarPermisoDelNas, VENCE,
+} from "../_shared/drive-firma.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -44,41 +62,6 @@ const TIPO_DE_EDITOR: Record<string, string> = {
   docx: "word", xlsx: "cell", pptx: "slide",
 };
 
-
-// ── Firma de ONLYOFFICE (JWT HS256, sin dependencias) ───────────────────────
-const b64url = (b: Uint8Array) =>
-  btoa(String.fromCharCode(...b)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-
-const textoAb64url = (s: string) => b64url(new TextEncoder().encode(s));
-
-async function clave(secreto: string): Promise<CryptoKey> {
-  return await crypto.subtle.importKey(
-    "raw", new TextEncoder().encode(secreto),
-    { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"],
-  );
-}
-
-/** ONLYOFFICE exige que la configuración venga firmada: sin esto contesta
- *  "The document security token is not correctly formed" y no abre nada. */
-async function firmar(payload: unknown, secreto: string): Promise<string> {
-  const cabecera = textoAb64url(JSON.stringify({ alg: "HS256", typ: "JWT" }));
-  const cuerpo = textoAb64url(JSON.stringify(payload));
-  const firma = await crypto.subtle.sign(
-    "HMAC", await clave(secreto), new TextEncoder().encode(`${cabecera}.${cuerpo}`),
-  );
-  return `${cabecera}.${cuerpo}.${b64url(new Uint8Array(firma))}`;
-}
-
-/** El aviso de guardado también viene firmado, y hay que comprobarlo: sin esta
- *  verificación cualquiera que adivine la URL podría reemplazar un documento. */
-async function verificar(jwt: string, secreto: string): Promise<boolean> {
-  const partes = jwt.split(".");
-  if (partes.length !== 3) return false;
-  const esperado = await crypto.subtle.sign(
-    "HMAC", await clave(secreto), new TextEncoder().encode(`${partes[0]}.${partes[1]}`),
-  );
-  return b64url(new Uint8Array(esperado)) === partes[2];
-}
 
 // ── R2 ──────────────────────────────────────────────────────────────────────
 function r2() {
@@ -133,6 +116,204 @@ const MIME: Record<string, string> = {
   xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
 };
+
+// ── El Drive (NAS) ──────────────────────────────────────────────────────────
+// Los archivos del Drive viven en el NAS, no en R2. Para que ONLYOFFICE (o esta
+// misma edge) los baje se firma un permiso de lectura con el mismo secreto que
+// usa la edge `drive` (ver _shared/drive-firma.ts e infra/nas-drive).
+
+interface FichaDelDrive {
+  id: string;
+  owner_id: string | null;
+  tipo: string;
+  nombre: string;
+  mime: string | null;
+  size: number | null;
+  sha256: string | null;
+  storage_key: string | null;
+  estado: string;
+  updated_at: string;
+  /** Si es una versión vieja restaurada, cuándo (para la llave de ONLYOFFICE). */
+  restaurada_at?: string | null;
+}
+
+/** La ficha, leída CON EL TOKEN DE LA PERSONA: si la RLS de drive_items no se
+ *  la muestra, no hay vista ni copia. Es el mismo control que la acción
+ *  `abrir` de la edge `drive`. */
+async function fichaDelDrive(comoLaPersona: SupabaseClient, id: string): Promise<FichaDelDrive> {
+  const { data, error } = await comoLaPersona.from("drive_items")
+    .select("id, owner_id, tipo, nombre, mime, size, sha256, storage_key, estado, updated_at")
+    .eq("id", id).maybeSingle();
+  if (error) throw new HttpError(error.message, 400);
+  const fila = data as FichaDelDrive | null;
+  if (!fila || fila.tipo !== "archivo" || !fila.storage_key) throw new HttpError("No existe o no tienes acceso", 404);
+  if (fila.estado !== "listo") throw new HttpError("El archivo todavía se está subiendo", 409);
+  // ¿Es una versión vieja restaurada? Entra en la llave de ONLYOFFICE (ver
+  // claveDeDrive). Sin la tabla (migración sin aplicar), no hay versiones.
+  const { data: mismas, error: eV } = await comoLaPersona.from("drive_versiones")
+    .select("created_at").eq("item_id", fila.id).eq("storage_key", fila.storage_key)
+    .order("created_at", { ascending: false }).limit(2);
+  if (eV && eV.code !== "42P01" && eV.code !== "PGRST205") throw new HttpError(eV.message, 500);
+  fila.restaurada_at = restauradaEl((mismas ?? []) as { created_at: string }[]);
+  return fila;
+}
+
+/** URL firmada para leer un archivo del NAS. */
+async function urlDelNas(fila: FichaDelDrive, segundos: number): Promise<string> {
+  const base = (Deno.env.get("DRIVE_NAS_URL") ?? "").replace(/\/+$/, "");
+  const secreto = Deno.env.get("DRIVE_SECRETO") ?? "";
+  if (!base || secreto.length < 32) throw new HttpError("El Drive todavía no está conectado al NAS", 503);
+  const permiso = await firmarPermisoDelNas(secreto, {
+    op: "get", k: fila.storage_key!, ct: fila.mime ?? "application/octet-stream", n: fila.nombre, dl: false,
+    e: ahoraMas(segundos),
+  });
+  return `${base}/o?t=${permiso}`;
+}
+
+/** El secreto del Drive (el mismo del NAS y de la edge `drive`). */
+function secretoDelDrive(): string {
+  const secreto = Deno.env.get("DRIVE_SECRETO") ?? "";
+  if (secreto.length < 32) throw new HttpError("El Drive todavía no está conectado al NAS", 503);
+  return secreto;
+}
+
+/** Guarda bytes en el NAS como un archivo NUEVO (`clave` nunca existió: el NAS
+ *  rechaza pisar uno) y devuelve lo que firmó el NAS al terminar de escribir.
+ *  Entero si entra en una parte; si no, por partes, como una subida del Drive. */
+async function guardarEnElNas(clave: string, bytes: Uint8Array): Promise<{ size: number; sha256: string }> {
+  const base = (Deno.env.get("DRIVE_NAS_URL") ?? "").replace(/\/+$/, "");
+  const secreto = secretoDelDrive();
+  if (!base) throw new HttpError("El Drive todavía no está conectado al NAS", 503);
+  const permiso = async (datos: Record<string, unknown>) =>
+    `${base}/o?t=${await firmarPermisoDelNas(secreto, { ...datos, e: ahoraMas(VENCE.subir) } as never)}`;
+  const enviar = async (url: string, metodo: string, cuerpo: Uint8Array | null) => {
+    const r = await fetch(url, { method: metodo, body: cuerpo as unknown as BodyInit, signal: AbortSignal.timeout(120_000) });
+    const j = await r.json().catch(() => null) as { recibo?: string; error?: string } | null;
+    if (!r.ok) throw new HttpError(`El NAS no pudo guardar (${r.status}${j?.error ? `: ${j.error}` : ""})`, 502);
+    return j;
+  };
+  let respuesta: { recibo?: string } | null;
+  if (bytes.length <= TAMANO_PARTE_NAS) {
+    respuesta = await enviar(await permiso({ op: "put", k: clave, max: bytes.length }), "PUT", bytes);
+  } else {
+    const up = crypto.randomUUID();
+    const n = Math.ceil(bytes.length / TAMANO_PARTE_NAS);
+    for (let i = 0; i < n; i++) {
+      const pedazo = bytes.subarray(i * TAMANO_PARTE_NAS, (i + 1) * TAMANO_PARTE_NAS);
+      await enviar(await permiso({ op: "parte", k: clave, up, i, max: TAMANO_PARTE_NAS, total: bytes.length }), "PUT", pedazo);
+    }
+    respuesta = await enviar(await permiso({ op: "completar", k: clave, up, n, max: bytes.length }), "POST", null);
+  }
+  const rec = await verificarPermisoDelNas(secreto, String(respuesta?.recibo ?? ""));
+  if (!rec || rec.op !== "recibo" || rec.k !== clave) throw new HttpError("El recibo del NAS no es válido", 502);
+  return { size: Number(rec.size), sha256: String(rec.sha256) };
+}
+
+/** Abrir un archivo cuenta para lo que se archiva (la fecha de la ficha, de
+ *  todos) y para MIS «Recientes» (drive_aperturas, de cada uno). Sin `throw`:
+ *  nunca impide abrir. */
+async function anotarApertura(admin: SupabaseClient, fila: { id: string }, user: { id: string }): Promise<void> {
+  const ahora = new Date().toISOString();
+  await admin.from("drive_items").update({ last_opened_at: ahora }).eq("id", fila.id);
+  await admin.from("drive_aperturas").upsert({ user_id: user.id, item_id: fila.id, abierto_at: ahora }, { onConflict: "user_id,item_id" });
+}
+
+const enHex = (b: ArrayBuffer) => [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
+
+/** ¿Hay lugar para guardar ediciones de este archivo? Como una subida: dentro
+ *  de una unidad compartida cuenta el espacio de la AGENCIA; si no, el cupo
+ *  del DUEÑO del archivo (no el de quien edita, como en Google). Lo importado
+ *  sin dueño fuera de una unidad no cuenta en el cupo de nadie.
+ *
+ *  Se mira al ABRIR, no al guardar: al guardar ya no hay a quién avisarle y
+ *  rechazarlo sería perder lo escrito. Con el espacio lleno se abre para ver. */
+async function hayEspacioParaEditar(
+  admin: SupabaseClient, comoLaPersona: SupabaseClient, fila: FichaDelDrive, yo: string,
+): Promise<boolean> {
+  const fila1 = (data: unknown) => (Array.isArray(data) ? data[0] : data) as { usado?: number; cupo?: number | null } | undefined;
+  const { data: unidad, error: eU } = await admin.rpc("drive_unidad_de", { p_item: fila.id });
+  if (eU) throw new HttpError(eU.message, 500);
+  if (unidad) {
+    // Como la persona: es de la misma agencia que el archivo (la RLS la dejó
+    // verlo), y la función mide la agencia de quien llama.
+    const { data, error } = await comoLaPersona.rpc("drive_uso_agencia");
+    if (error) throw new HttpError(error.message, 500);
+    const f = fila1(data);
+    return f?.cupo == null || Number(f.usado ?? 0) < Number(f.cupo);
+  }
+  if (!fila.owner_id) return true;
+  const { data, error } = fila.owner_id === yo
+    ? await comoLaPersona.rpc("drive_uso")
+    // El cupo del dueño: con el admin (drive_uso deja a service_role medir a
+    // cualquiera; a una persona, solo el suyo).
+    : await admin.rpc("drive_uso", { p_user: fila.owner_id });
+  if (error) throw new HttpError(error.message, 500);
+  const f = fila1(data);
+  const cupo = Number(f?.cupo ?? 0);
+  return cupo <= 0 || Number(f?.usado ?? 0) < cupo;
+}
+
+/** Baja una URL entera a memoria, cortando si pasa del tope: un archivo más
+ *  grande de lo que dice la ficha no puede tumbar la edge. */
+async function bajarConTope(url: string, tope: number, cabeceras: Record<string, string> = {}): Promise<Uint8Array> {
+  const r = await fetch(url, { headers: cabeceras, signal: AbortSignal.timeout(90_000) });
+  if (!r.ok || !r.body) throw new HttpError(`No se pudo leer el archivo (${r.status})`, 502);
+  const partes: Uint8Array[] = [];
+  let total = 0;
+  const lector = r.body.getReader();
+  for (;;) {
+    const { done, value } = await lector.read();
+    if (done) break;
+    total += value.length;
+    if (total > tope) {
+      await lector.cancel();
+      throw new HttpError("El archivo es demasiado grande para copiarlo a la Oficina", 413);
+    }
+    partes.push(value);
+  }
+  const bytes = new Uint8Array(total);
+  let i = 0;
+  for (const p of partes) { bytes.set(p, i); i += p.length; }
+  return bytes;
+}
+
+/** Convierte con el conversor de ONLYOFFICE (.doc → .docx, .csv → .xlsx…) y
+ *  devuelve el archivo convertido. ONLYOFFICE baja el original del NAS por su
+ *  cuenta; acá solo se baja el resultado.
+ *
+ *  La firma va en el cuerpo (`token`) y también en la cabecera: según la
+ *  configuración del servidor se mira una u otra, y mandar las dos no estorba. */
+async function convertirConOnlyOffice(
+  servidor: string, secreto: string, pedido: Record<string, unknown>,
+): Promise<Uint8Array> {
+  const cabeceras: Record<string, string> = { "Content-Type": "application/json", Accept: "application/json" };
+  const cuerpo: Record<string, unknown> = { ...pedido };
+  if (secreto) {
+    cuerpo.token = await firmar(pedido, secreto);
+    cabeceras.Authorization = `Bearer ${await firmar({ payload: pedido }, secreto)}`;
+  }
+  // Con `async: false` ONLYOFFICE contesta cuando termina o, si tarda, con el
+  // porcentaje: se vuelve a preguntar con la MISMA llave hasta que termine.
+  const hasta = Date.now() + 100_000;
+  for (;;) {
+    const r = await fetch(`${servidor}/converter`, {
+      method: "POST", headers: cabeceras, body: JSON.stringify(cuerpo), signal: AbortSignal.timeout(90_000),
+    });
+    if (!r.ok) throw new HttpError(`El servidor de Oficina no pudo convertir el archivo (${r.status})`, 502);
+    const res = await r.json().catch(() => null) as
+      { error?: number; endConvert?: boolean; fileUrl?: string } | null;
+    if (!res) throw new HttpError("El servidor de Oficina contestó algo inesperado al convertir", 502);
+    if (typeof res.error === "number" && res.error !== 0) throw new HttpError(errorDeConversion(res.error), 502);
+    if (res.endConvert && res.fileUrl) {
+      if (!esDelServidor(res.fileUrl, servidor)) throw new HttpError("La conversión devolvió una dirección inesperada", 502);
+      return await bajarConTope(res.fileUrl, TOPE_COPIA);
+    }
+    if (Date.now() > hasta) throw new HttpError(errorDeConversion(-2), 504);
+    await new Promise((listo) => setTimeout(listo, 2000));
+  }
+}
+
+const legibleMB = (b: number) => `${Math.round(b / (1024 * 1024))} MB`;
 
 // ── Servidor ────────────────────────────────────────────────────────────────
 Deno.serve(async (req) => {
@@ -232,6 +413,105 @@ Deno.serve(async (req) => {
 
       console.log(`[oficina-doc] ${doc.id} guardado v${nuevaVersion} (${bytes.length} bytes)`);
       return responder({ error: 0 });
+    }
+
+    // ── El aviso de ONLYOFFICE para un archivo del DRIVE ─────────────────
+    // Como el de arriba, sin sesión: lo manda el servidor de ONLYOFFICE con el
+    // permiso que se firmó al abrir (editar_drive). El archivo editado se guarda
+    // en el NAS como un archivo NUEVO; el anterior se queda donde está y entra
+    // al historial (drive_versiones). Nunca se pisa nada: lo importado de
+    // Google (<agencia>/google/<id>) el NAS ni siquiera lo deja tocar.
+    const permisoDrive = url.searchParams.get("guardar_drive");
+    if (permisoDrive) {
+      const cuerpo = await req.json().catch(() => ({} as Record<string, unknown>));
+      if (secretoOO) {
+        const jwt = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "") ||
+          String(cuerpo.token ?? "");
+        if (!jwt || !(await verificar(jwt, secretoOO))) {
+          console.error("[oficina-doc] aviso del Drive con firma inválida");
+          return responder({ error: 1 });
+        }
+      }
+      const secreto = Deno.env.get("DRIVE_SECRETO") ?? "";
+      const permiso = secreto.length >= 32 ? await verificarPermisoDelNas(secreto, permisoDrive) : null;
+      if (!permiso || permiso.op !== "oo-guardar" || !esUuid(permiso.k)) {
+        console.error("[oficina-doc] permiso de guardado del Drive inválido o vencido");
+        return responder({ error: 1 });
+      }
+      const servidorOO = (Deno.env.get("ONLYOFFICE_URL") ?? "").replace(/\/$/, "");
+
+      const { data: crudo } = await admin.from("drive_items")
+        .select("id, tenant_id, owner_id, tipo, nombre, mime, size, sha256, storage_key, updated_at")
+        .eq("id", permiso.k).maybeSingle();
+      const fila = crudo as {
+        id: string; tenant_id: string; owner_id: string | null; tipo: string; nombre: string; mime: string | null;
+        size: number | null; sha256: string | null; storage_key: string | null; updated_at: string;
+      } | null;
+      if (!fila || fila.tipo !== "archivo" || !fila.storage_key) {
+        // Lo borraron para siempre mientras estaba abierto: no hay dónde guardar.
+        console.error(`[oficina-doc] aviso para ${permiso.k}: el archivo ya no existe`);
+        return responder({ error: 0 });
+      }
+      const formato = formatoDeOffice(fila.nombre, fila.mime);
+      const que = formato
+        ? queHacerConElAviso(cuerpo, formato.ext, servidorOO)
+        : { accion: "rechazar" as const, motivo: "el archivo ya no es de Office" };
+      if (que.accion === "nada") {
+        if (/error/.test(que.motivo)) console.error(`[oficina-doc] ${fila.id}: ${que.motivo}`);
+        return responder({ error: 0 });
+      }
+      if (que.accion === "rechazar") {
+        // Con error, ONLYOFFICE se queda con lo editado (lista de «olvidados»)
+        // en vez de darlo por guardado.
+        console.error(`[oficina-doc] ${fila.id}: no se guardó: ${que.motivo}`);
+        return responder({ error: 1 });
+      }
+
+      try {
+        const bytes = await bajarConTope(que.url, TOPE_VISTA);
+        const huella = enHex(await crypto.subtle.digest("SHA-256", bytes as unknown as BufferSource));
+        if (huella === fila.sha256) return responder({ error: 0 }); // nada cambió de verdad
+
+        const llave = `${fila.tenant_id}/${crypto.randomUUID()}`;
+        const nas = await guardarEnElNas(llave, bytes);
+        if (nas.sha256 !== huella || nas.size !== bytes.length) {
+          throw new HttpError("El NAS guardó otra cosa de la que se mandó", 502);
+        }
+        const usuarios = Array.isArray(cuerpo.users) ? cuerpo.users : [];
+        const quien = esUuid(usuarios[0]) ? usuarios[0] : esUuid(permiso.u) ? permiso.u : null;
+        const ahora = new Date().toISOString();
+
+        // 1. El historial, ANTES de mover el puntero (como document_versions).
+        //    Si falla, se guarda igual: perder lo escrito es peor que un
+        //    archivo viejo sin anotar (queda en el log para encontrarlo).
+        const { count, error: eC } = await admin.from("drive_versiones")
+          .select("id", { count: "exact", head: true }).eq("item_id", fila.id);
+        const { error: eV } = eC ? { error: eC } : await admin.from("drive_versiones").insert(filasDeVersion({
+          itemId: fila.id,
+          anterior: { storage_key: fila.storage_key, size: fila.size, sha256: fila.sha256, updated_at: fila.updated_at, owner_id: fila.owner_id },
+          hayHistorial: (count ?? 0) > 0,
+          nueva: { storage_key: llave, size: bytes.length, sha256: huella },
+          quien,
+          ahora,
+        }));
+        if (eV) console.error(`[oficina-doc] ${fila.id}: sin historial (${eV.message}); la versión anterior sigue en el NAS en ${fila.storage_key}`);
+
+        // 2. El puntero, solo si nadie lo movió mientras tanto.
+        const { data: movida, error: eU } = await admin.from("drive_items")
+          .update({ storage_key: llave, size: bytes.length, sha256: huella, updated_at: ahora })
+          .eq("id", fila.id).eq("storage_key", fila.storage_key)
+          .select("id");
+        if (eU) throw new HttpError(eU.message, 500);
+        if (!movida?.length) {
+          console.error(`[oficina-doc] ${fila.id}: otro guardado llegó antes; esta edición quedó en ${llave} (historial)`);
+          return responder({ error: 0 });
+        }
+        console.log(`[oficina-doc] Drive ${fila.id} guardado en ${llave} (${bytes.length} bytes)`);
+        return responder({ error: 0 });
+      } catch (e) {
+        console.error(`[oficina-doc] ${fila.id}: no se pudo guardar:`, e instanceof Error ? e.message : e);
+        return responder({ error: 1 });
+      }
     }
 
     // ── De acá para abajo, todo lleva sesión de Maven ──────────────────────
@@ -357,6 +637,161 @@ Deno.serve(async (req) => {
       return responder({ servidor: servidorOO, config: configAdj });
     }
 
+    // ── Un archivo del DRIVE en ONLYOFFICE ────────────────────────────────
+    // `ver_drive`: el visor del Drive abre un Word, un Excel o un PowerPoint
+    // sin bajarlo, en modo lectura. `desde_drive`: «Editar en Documentos de
+    // Maven», una copia editable en la Oficina (el original sigue en el Drive,
+    // como cuando Google abre un .docx con Documentos de Google).
+    //
+    // ⚠️ La ficha se lee con el token de la persona (fichaDelDrive): la RLS de
+    // drive_items decide, igual que en la acción `abrir` de la edge `drive`.
+    // ── EDITAR un archivo del Drive en su lugar ─────────────────────────────
+    // Como el «modo de edición de Office» de Google: se abre EL MISMO archivo y
+    // lo guardado vuelve a él (con historial), así que abrirlo dos veces nunca
+    // crea dos copias. Se edita si la persona es dueña o editora, el formato
+    // vuelve igual de ONLYOFFICE (SE_EDITAN_EN_SU_LUGAR) y hay espacio; si no,
+    // se abre para ver y `motivo` dice por qué (la página ofrece la copia).
+    if (accion === "editar_drive") {
+      const servidorOO = (Deno.env.get("ONLYOFFICE_URL") ?? "").replace(/\/$/, "");
+      if (!servidorOO) throw new HttpError("ONLYOFFICE_URL sin configurar", 500);
+      const fila = await fichaDelDrive(comoLaPersona, String(body.id ?? ""));
+      const formato = formatoDeOffice(fila.nombre, fila.mime);
+      if (!formato) throw new HttpError("Este archivo no se abre con la Oficina", 400);
+      if (Number(fila.size ?? 0) > TOPE_VISTA) {
+        throw new HttpError(`El archivo pesa más de ${legibleMB(TOPE_VISTA)} y no se puede abrir aquí: descárgalo`, 413);
+      }
+      const idioma = body.idioma === "en" ? "en" : "es";
+      const tema = body.tema === "dark" ? "dark" : body.tema === "light" ? "light" : undefined;
+      const perfil = await comoLaPersona.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
+      const usuario = { id: user.id, nombre: (perfil.data?.full_name as string) || user.email || "Alguien" };
+      const archivo = { id: fila.id, nombre: fila.nombre, mime: fila.mime, size: fila.size, updated_at: fila.updated_at };
+
+      let motivo: "formato" | "permiso" | "espacio" | null = comoSeAbre(formato) === "editar" ? null : "formato";
+      if (!motivo) {
+        const { data: rol, error: eR } = await comoLaPersona.rpc("drive_mi_rol", { p_item: fila.id });
+        if (eR) throw new HttpError(eR.message, 500);
+        if (rol !== "dueno" && rol !== "editor") motivo = "permiso";
+      }
+      if (!motivo && !(await hayEspacioParaEditar(admin, comoLaPersona, fila, user.id))) motivo = "espacio";
+
+      await anotarApertura(admin, fila, user);
+      const urlArchivo = await urlDelNas(fila, VENCE.bajar);
+      if (motivo) {
+        const config = configDeVista({ archivo: fila, formato, url: urlArchivo, usuario, idioma, tema });
+        if (secretoOO) config.token = await firmar(config, secretoOO);
+        return responder({ servidor: servidorOO, config, modo: "ver", motivo, archivo });
+      }
+
+      // A dónde avisa ONLYOFFICE al guardar: un permiso firmado con el secreto
+      // del Drive, solo para ESTE archivo. Dura días y no horas: una hoja puede
+      // quedar abierta un fin de semana, y el aviso llega recién al cerrarla.
+      const permiso = await firmarPermisoDelNas(secretoDelDrive(), {
+        op: "oo-guardar", k: fila.id, u: user.id, e: ahoraMas(3 * 24 * 3600),
+      });
+      const origen = req.headers.get("origin") ?? "";
+      const config = configDeEdicion({
+        archivo: fila,
+        formato,
+        url: urlArchivo,
+        callbackUrl: `${supabaseUrl}/functions/v1/oficina-doc?guardar_drive=${encodeURIComponent(permiso)}`,
+        usuario,
+        idioma,
+        tema,
+        volverA: ALLOWED_ORIGINS.includes(origen) ? `${origen}/oficina/drive` : null,
+      });
+      if (secretoOO) config.token = await firmar(config, secretoOO);
+      return responder({ servidor: servidorOO, config, modo: "editar", motivo: null, archivo });
+    }
+
+    if (accion === "ver_drive" || accion === "desde_drive") {
+      const servidorOO = (Deno.env.get("ONLYOFFICE_URL") ?? "").replace(/\/$/, "");
+      if (!servidorOO) throw new HttpError("ONLYOFFICE_URL sin configurar", 500);
+      const fila = await fichaDelDrive(comoLaPersona, String(body.id ?? ""));
+      const formato = formatoDeOffice(fila.nombre, fila.mime);
+      if (!formato) throw new HttpError("Este archivo no se abre con la Oficina", 400);
+      const peso = Number(fila.size ?? 0);
+
+      if (accion === "ver_drive") {
+        if (peso > TOPE_VISTA) {
+          throw new HttpError(`El archivo pesa más de ${legibleMB(TOPE_VISTA)} y no se puede ver aquí: descárgalo`, 413);
+        }
+        const perfil = await comoLaPersona.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
+        const config = configDeVista({
+          archivo: fila,
+          formato,
+          // Dura lo mismo que un «abrir» del Drive: ONLYOFFICE lo baja al
+          // cargar, pero un documento grande puede quedar abierto horas.
+          url: await urlDelNas(fila, VENCE.bajar),
+          usuario: { id: user.id, nombre: (perfil.data?.full_name as string) || user.email || "Alguien" },
+          idioma: body.idioma === "en" ? "en" : "es",
+          tema: body.tema === "dark" ? "dark" : body.tema === "light" ? "light" : undefined,
+        });
+        if (secretoOO) config.token = await firmar(config, secretoOO);
+        // Verlo ES abrirlo: cuenta para lo que se archiva (la fecha de la
+        // ficha, de todos) y para MIS «Recientes» (la apertura de cada uno).
+        await anotarApertura(admin, fila, user);
+        return responder({ servidor: servidorOO, config });
+      }
+
+      // ── desde_drive: la copia editable ──────────────────────────────────
+      if (peso > TOPE_COPIA) {
+        throw new HttpError(`El archivo pesa más de ${legibleMB(TOPE_COPIA)}: es demasiado grande para copiarlo a la Oficina`, 413);
+      }
+      // Primero se consiguen los bytes y RECIÉN DESPUÉS se crea el documento:
+      // si el NAS o la conversión fallan, no queda un documento vacío en la
+      // lista de la persona.
+      let bytes: Uint8Array;
+      if (formato.ext === formato.destino) {
+        // Ya es .docx, .xlsx o .pptx: se copia tal cual.
+        bytes = await bajarConTope(await urlDelNas(fila, 10 * 60), TOPE_COPIA);
+      } else {
+        // Un CSV o un .txt no dicen su codificación (ni el CSV su
+        // separador): se mira el principio del archivo.
+        let delimitador: number | undefined;
+        let codePage: number | undefined;
+        if (formato.ext === "csv" || formato.ext === "txt") {
+          const muestra = await bajarConTope(await urlDelNas(fila, 10 * 60), 64 * 1024, { Range: "bytes=0-16383" })
+            .catch(() => new Uint8Array());
+          codePage = codigoDePagina(muestra);
+          if (formato.ext === "csv") delimitador = adivinarDelimitador(textoDeMuestra(muestra, codePage));
+        }
+        bytes = await convertirConOnlyOffice(servidorOO, secretoOO, pedidoDeConversion({
+          archivo: fila, formato, url: await urlDelNas(fila, 30 * 60), delimitador, codePage,
+        }));
+      }
+
+      const { data: nuevo, error: errNuevo } = await comoLaPersona
+        .from("documents")
+        .insert({
+          title: nombreSinExtension(fila.nombre).slice(0, 200),
+          visibility: "privado",
+          owner_id: user.id,
+          updated_by: user.id,
+          extension: formato.destino,
+        })
+        .select("id")
+        .single();
+      if (errNuevo) throw new HttpError(errNuevo.message, 400);
+      const docId = (nuevo as { id: string }).id;
+      const llave = `documentos/${docId}/v1.${formato.destino}`;
+      try {
+        await subir(llave, bytes, MIME[formato.destino]);
+        const { error: errLlave } = await admin.from("documents")
+          .update({ storage_key: llave, size_bytes: bytes.length }).eq("id", docId);
+        if (errLlave) throw new HttpError(errLlave.message, 500);
+      } catch (e) {
+        // Sin archivo, el documento no abre nunca: mejor que no exista.
+        await admin.from("documents").delete().eq("id", docId);
+        throw e;
+      }
+      console.log(`[oficina-doc] copia del Drive ${fila.id} → documento ${docId} (${bytes.length} bytes)`);
+      // Copiarlo a la Oficina TAMBIÉN es abrirlo: cuenta para lo que se
+      // archiva y para MIS «Recientes», como en `ver_drive`. Sin `throw`: la
+      // copia ya está hecha y es lo que la persona pidió.
+      await anotarApertura(admin, fila, user);
+      return responder({ id: docId, extension: formato.destino });
+    }
+
     // ── De acá para abajo, todas las acciones son SOBRE UN DOCUMENTO ──────
     // Comparten el mismo control de acceso a propósito: tenerlo escrito una
     // sola vez es lo que evita que el historial termine siendo la puerta de
@@ -455,7 +890,7 @@ Deno.serve(async (req) => {
       // ── Restaurar ───────────────────────────────────────────────────────
       // NO se pisa nada: la versión vieja se copia como una versión NUEVA, que
       // es lo que hace Google. Restaurar borrando sería perder lo que había.
-      if (!puedeEditar) throw new HttpError("No podés editar este documento", 403);
+      if (!puedeEditar) throw new HttpError("No puedes editar este documento", 403);
       if (version === doc.version) throw new HttpError("Esa ya es la versión vigente", 400);
 
       const origen = archivoDeLaVersion(paraHistorial, filas, version);

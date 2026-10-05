@@ -150,6 +150,70 @@ export function useGuardarDocumento() {
   });
 }
 
+/** Un cambio que la RLS no deja hacer no da error: toca cero filas. */
+export const SIN_PERMISO_DOCUMENTO = "sin_permiso";
+
+/** El título de un documento («Sin título» → «Acta de la reunión»), desde la
+ *  lista o desde el documento abierto, como en Google Docs.
+ *
+ *  Quién puede: lo dice la RLS de `documents` (el dueño, cualquiera si es del
+ *  equipo, o a quien se lo compartieron con permiso de editar; ver
+ *  20260917100000_oficina_compartir.sql). ⚠️ `.select("id")`: sin permiso, el
+ *  UPDATE toca cero filas SIN error; sin pedir la fila de vuelta se vería
+ *  como hecho.
+ *
+ *  Al terminar se pone el título nuevo en la consulta del documento abierto
+ *  (que no se vuelve a pedir sola: staleTime Infinity) y se refresca la lista.
+ *  El editor de ONLYOFFICE no se toca: no muestra el nombre (toolbarHideFileName
+ *  en la edge oficina-doc) y la próxima vez que se abre ya llega con el nuevo. */
+export function useRenombrarDocumento() {
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: async ({ id, title }: { id: string; title: string }) => {
+      const limpio = title.trim().slice(0, 200);
+      const { data, error } = await tabla("documents")
+        .update({ title: limpio, updated_by: user?.id ?? null } as never)
+        .eq("id", id)
+        .select("id");
+      if (error) throw error;
+      if (!(data as unknown[] | null)?.length) throw new Error(SIN_PERMISO_DOCUMENTO);
+      return limpio;
+    },
+    onSuccess: (title, { id }) => {
+      qc.setQueryData<Documento>(["documento", id], (d) => (d ? { ...d, title } : d));
+      return qc.invalidateQueries({ queryKey: ["documentos"] });
+    },
+  });
+}
+
+/** Los documentos que me compartieron CON permiso de editar: con esto la lista
+ *  sabe a cuáles ofrecerles «Cambiar nombre» sin tener que probar. */
+export function useDocumentosQuePuedoEditar() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["documentos", "puedo-editar", user?.id],
+    enabled: !!user,
+    staleTime: 60_000,
+    queryFn: async (): Promise<Set<string>> => {
+      const { data, error } = await tabla("document_shares").select("document_id")
+        .eq("user_id", user!.id).eq("puede_editar", true);
+      if (error) throw error;
+      return new Set(((data ?? []) as unknown as { document_id: string }[]).map((f) => f.document_id));
+    },
+  });
+}
+
+/** ¿Puedo cambiarle el nombre (escribirlo)? Lo mismo que la política de
+ *  UPDATE de `documents`: el dueño, cualquiera si es del equipo, o con el
+ *  permiso de editar compartido. En la papelera, solo el dueño. */
+export function puedoEditarDocumento(d: Pick<Documento, "id" | "owner_id" | "visibility" | "deleted_at">, yo: string | undefined, compartidosParaEditar?: Set<string>): boolean {
+  if (!yo) return false;
+  if (d.owner_id === yo) return true;
+  if (d.deleted_at) return false;
+  return d.visibility === "equipo" || !!compartidosParaEditar?.has(d.id);
+}
+
 /** A la papelera, o de vuelta. Borrar de verdad es otra cosa y solo lo puede
  *  hacer el dueño desde la papelera. */
 export function usePapelera() {

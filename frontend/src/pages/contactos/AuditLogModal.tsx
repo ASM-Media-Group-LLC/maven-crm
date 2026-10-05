@@ -2,7 +2,8 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,8 @@ interface Props {
 }
 
 const AuditLogModal = ({ open, onOpenChange }: Props) => {
+  const f = useFormato();
+  const { t } = useLanguage();
   const [search, setSearch] = useState("");
   const [agentFilter, setAgentFilter] = useState("all");
   const [riskFilter, setRiskFilter] = useState<"all" | "suspicious" | "normal">("all");
@@ -53,7 +56,9 @@ const AuditLogModal = ({ open, onOpenChange }: Props) => {
         .rpc("get_agent_names", { _user_ids: agentIds });
       if (error) throw error;
       const map: Record<string, string> = {};
-      (data ?? []).forEach((p: any) => { map[p.id] = p.full_name || "Desconocido"; });
+      // Sin nombre queda vacío: el "Desconocido" se pone al dibujar, en el idioma de
+      // la interfaz (este mapa queda en la caché de react-query).
+      (data ?? []).forEach((p: any) => { map[p.id] = p.full_name || ""; });
       return map;
     },
   });
@@ -145,13 +150,13 @@ const AuditLogModal = ({ open, onOpenChange }: Props) => {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Shield className="h-5 w-5 text-warning" />
-            Log de Auditoría — Cambios de Categoría
+            {t("contactos.auditLogTitle")}
           </DialogTitle>
         </DialogHeader>
 
         {isLoading ? (
           <div className="flex items-center justify-center py-16">
-            <p className="text-sm text-muted-foreground">Cargando registros…</p>
+            <p className="text-sm text-muted-foreground">{t("contactos.loadingRecords")}</p>
           </div>
         ) : (
           <TooltipProvider>
@@ -159,19 +164,19 @@ const AuditLogModal = ({ open, onOpenChange }: Props) => {
               {/* KPIs */}
               <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3 shrink-0">
                 <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                  <p className="text-xs text-muted-foreground">Total cambios</p>
+                  <p className="text-xs text-muted-foreground">{t("contactos.totalChanges")}</p>
                   <p className="text-2xl font-bold">{changes.length}</p>
                 </div>
                 <div className="rounded-lg border border-warning/30 bg-warning/5 p-3">
-                  <p className="text-xs text-warning">⚠ Sospechosos (&gt;24h)</p>
+                  <p className="text-xs text-warning">{t("contactos.suspiciousOver24h")}</p>
                   <p className="text-2xl font-bold text-warning">{suspicious.length}</p>
                 </div>
                 <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                  <p className="text-xs text-muted-foreground">Agentes involucrados</p>
+                  <p className="text-xs text-muted-foreground">{t("contactos.agentsInvolved")}</p>
                   <p className="text-2xl font-bold">{agentIds.length}</p>
                 </div>
                 <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                  <p className="text-xs text-muted-foreground">Mostrando</p>
+                  <p className="text-xs text-muted-foreground">{t("contactos.showing")}</p>
                   <p className="text-2xl font-bold">{filtered.length}</p>
                 </div>
               </div>
@@ -183,20 +188,20 @@ const AuditLogModal = ({ open, onOpenChange }: Props) => {
                   <Input
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Buscar nombre, handle, ticket, ciudad..."
+                    placeholder={t("contactos.auditSearchPlaceholder")}
                     className="pl-9"
                   />
                 </div>
 
                 <Select value={agentFilter} onValueChange={setAgentFilter}>
                   <SelectTrigger className="w-[160px]">
-                    <SelectValue placeholder="Agente" />
+                    <SelectValue placeholder={t("contactos.agent")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Todos los agentes</SelectItem>
+                    <SelectItem value="all">{t("contactos.allAgents")}</SelectItem>
                     {agentIds.map((id) => (
                       <SelectItem key={id} value={id}>
-                        {profiles[id] || "Desconocido"}
+                        {profiles[id] || t("contactos.unknown")}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -204,21 +209,21 @@ const AuditLogModal = ({ open, onOpenChange }: Props) => {
 
                 <Select value={riskFilter} onValueChange={(v) => setRiskFilter(v as any)}>
                   <SelectTrigger className="w-[150px]">
-                    <SelectValue placeholder="Riesgo" />
+                    <SelectValue placeholder={t("contactos.risk")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Todo riesgo</SelectItem>
-                    <SelectItem value="suspicious">⚠ Sospechosos</SelectItem>
-                    <SelectItem value="normal">Normales</SelectItem>
+                    <SelectItem value="all">{t("contactos.anyRisk")}</SelectItem>
+                    <SelectItem value="suspicious">{t("contactos.suspiciousPl")}</SelectItem>
+                    <SelectItem value="normal">{t("contactos.normalPl")}</SelectItem>
                   </SelectContent>
                 </Select>
 
                 <Select value={categoryFilter} onValueChange={setCategoryFilter}>
                   <SelectTrigger className="w-[130px]">
-                    <SelectValue placeholder="Categoría" />
+                    <SelectValue placeholder={t("common.category")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Todas</SelectItem>
+                    <SelectItem value="all">{t("common.allF")}</SelectItem>
                     {categories.map((cat) => (
                       <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                     ))}
@@ -227,7 +232,7 @@ const AuditLogModal = ({ open, onOpenChange }: Props) => {
 
                 {hasFilters && (
                   <Button variant="ghost" size="sm" onClick={clearFilters} className="text-muted-foreground">
-                    <X className="h-4 w-4 mr-1" /> Limpiar
+                    <X className="h-4 w-4 mr-1" /> {t("contactos.clear")}
                   </Button>
                 )}
               </div>
@@ -236,26 +241,26 @@ const AuditLogModal = ({ open, onOpenChange }: Props) => {
               {filtered.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 gap-2">
                   <Filter className="h-8 w-8 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">No se encontraron registros con estos filtros.</p>
+                  <p className="text-sm text-muted-foreground">{t("contactos.noRecordsForFilters")}</p>
                 </div>
               ) : (
                 <div className="rounded-lg border flex-1 min-h-0 overflow-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="sticky top-0 bg-card z-10">Fecha</TableHead>
+                        <TableHead className="sticky top-0 bg-card z-10">{t("common.date")}</TableHead>
                         <TableHead className="sticky top-0 bg-card z-10">Ticket</TableHead>
-                        <TableHead className="sticky top-0 bg-card z-10">Contacto</TableHead>
-                        <TableHead className="sticky top-0 bg-card z-10">Ciudad</TableHead>
-                        <TableHead className="sticky top-0 bg-card z-10">Cambio</TableHead>
-                        <TableHead className="sticky top-0 bg-card z-10">Agente</TableHead>
-                        <TableHead className="sticky top-0 bg-card z-10">Tiempo</TableHead>
-                        <TableHead className="sticky top-0 bg-card z-10">Riesgo</TableHead>
+                        <TableHead className="sticky top-0 bg-card z-10">{t("contactos.contact")}</TableHead>
+                        <TableHead className="sticky top-0 bg-card z-10">{t("common.city")}</TableHead>
+                        <TableHead className="sticky top-0 bg-card z-10">{t("contactos.change")}</TableHead>
+                        <TableHead className="sticky top-0 bg-card z-10">{t("contactos.agent")}</TableHead>
+                        <TableHead className="sticky top-0 bg-card z-10">{t("contactos.time")}</TableHead>
+                        <TableHead className="sticky top-0 bg-card z-10">{t("contactos.risk")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {filtered.map((c) => {
-                        const agentName = profiles[c.changed_by] || "Desconocido";
+                        const agentName = profiles[c.changed_by] || t("contactos.unknown");
                         const detail = contactDetails[c.contact_id];
                         const isSuspicious = (c.hours_since_creation ?? 0) > 24;
                         const hoursLabel = c.hours_since_creation != null
@@ -269,7 +274,7 @@ const AuditLogModal = ({ open, onOpenChange }: Props) => {
                           <TableRow key={c.id} className={isSuspicious ? "bg-warning/5" : ""}>
                             <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                               {c.changed_at
-                                ? format(new Date(c.changed_at), "dd MMM yy, HH:mm", { locale: es })
+                                ? format(new Date(c.changed_at), "dd MMM yy, HH:mm", { locale: f.fechas })
                                 : "—"}
                             </TableCell>
                             <TableCell className="text-xs font-mono text-muted-foreground">
@@ -322,10 +327,10 @@ const AuditLogModal = ({ open, onOpenChange }: Props) => {
                               {isSuspicious ? (
                                 <Badge variant="destructive" className="text-[10px] gap-1">
                                   <AlertTriangle className="h-3 w-3" />
-                                  Sospechoso
+                                  {t("contactos.suspicious")}
                                 </Badge>
                               ) : (
-                                <Badge variant="secondary" className="text-[10px]">Normal</Badge>
+                                <Badge variant="secondary" className="text-[10px]">{t("contactos.normal")}</Badge>
                               )}
                             </TableCell>
                           </TableRow>
@@ -337,7 +342,7 @@ const AuditLogModal = ({ open, onOpenChange }: Props) => {
               )}
 
               <p className="text-[10px] text-muted-foreground shrink-0">
-                Cambios de categoría registrados automáticamente. Los realizados &gt;24h después de la creación se marcan como sospechosos.
+                {t("contactos.auditModalFooter")}
               </p>
             </div>
           </TooltipProvider>

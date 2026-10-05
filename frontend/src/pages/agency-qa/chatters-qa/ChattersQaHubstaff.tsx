@@ -2,10 +2,14 @@ import { useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Clock, TrendingUp, AlertTriangle, Activity, DollarSign, Wallet, Scale, Info } from "lucide-react";
 import { format, startOfMonth, endOfMonth } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
+import type { Formato } from "@/lib/formato";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { useHubstaffEffort, useHubstaffSyncStatus, useChatterEffortRange, useChatterSalesRange } from "./useHubstaffEffort";
-import { periodLabel } from "./useChatterScorecards";
+import { useLanguage } from "@/hooks/useLanguage";
+import { ConFormato } from "@/pages/admin/ConFormato";
+import type { TranslationKey } from "@/lib/i18n";
+import { haceCuanto } from "../haceCuanto";
 
 // Subtab "Productividad" de Chatters QA. Cruza ESFUERZO (Hubstaff: horas + % actividad) ×
 // RESULTADO (BLU: ventas) y, para management, la RENTABILIDAD: ingreso de la agencia
@@ -14,23 +18,15 @@ import { periodLabel } from "./useChatterScorecards";
 // hubstaff_daily_data; las columnas de plata (venta/costo/ROI) son del SNAPSHOT MENSUAL de
 // BLU y no se recortan por día (se aclara en la UI). Costo/ROI solo visible para management.
 
-const relativeTime = (iso: string | null): string => {
-  if (!iso) return "sin sincronizar";
-  const min = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
-  if (min < 1) return "recién";
-  if (min < 60) return `hace ${min} min`;
-  const h = Math.floor(min / 60);
-  if (h < 24) return `hace ${h}h`;
-  return `hace ${Math.floor(h / 24)}d`;
-};
-
 const money = (n: number | null | undefined) =>
   (n != null && n < 0 ? "-$" : "$") + Math.abs(Math.round(n ?? 0)).toLocaleString("en-US");
 
 const ymd = (d: Date) => format(d, "yyyy-MM-dd");
-const dayLabel = (d: Date) => format(d, "d MMM", { locale: es });
+const dayLabel = (d: Date, f: Formato) => format(d, "d MMM", { locale: f.fechas });
 
 export default function ChattersQaHubstaff() {
+  const { t } = useLanguage();
+  const f = useFormato();
   const { data: rows = [], isLoading } = useHubstaffEffort();
   const { data: sync } = useHubstaffSyncStatus();
 
@@ -77,16 +73,15 @@ export default function ChattersQaHubstaff() {
   }, [rows, rangeRows, salesRows, salesMap, costPerRange]);
 
   if (isLoading) {
-    return <Card><CardContent className="p-6 text-sm text-muted-foreground">Cargando datos de Hubstaff…</CardContent></Card>;
+    return <Card><CardContent className="p-6 text-sm text-muted-foreground">{t("agencyQa.hubstaff.loading")}</CardContent></Card>;
   }
 
   if (!rows.length) {
     return (
       <Card>
         <CardContent className="space-y-2 p-6 text-sm text-muted-foreground">
-          <div className="flex items-center gap-2 font-medium text-foreground"><Clock className="h-4 w-4" /> Productividad</div>
-          Todavía no hay datos de actividad cruzados con ventas. El micro <code>hubstaff-bridge</code> sincroniza cada 6h;
-          los chatters aparecen aquí cuando su email de Hubstaff coincide con el de BLU.
+          <div className="flex items-center gap-2 font-medium text-foreground"><Clock className="h-4 w-4" /> {t("agencyQa.tab.productivity")}</div>
+          <ConFormato texto={t("agencyQa.chattersHs.empty")} piezas={{ code: <code>hubstaff-bridge</code> }} />
         </CardContent>
       </Card>
     );
@@ -98,27 +93,34 @@ export default function ChattersQaHubstaff() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h3 className="flex items-center gap-2 text-lg font-semibold">
-            <Activity className="h-4 w-4 text-emerald-500" /> Esfuerzo · Resultado · Rentabilidad
+            <Activity className="h-4 w-4 text-emerald-500" /> {t("agencyQa.chattersHs.title")}
           </h3>
           <p className="text-sm text-muted-foreground">
-            {stats?.chatters} chatters · {stats?.rangeAvgAct}% actividad · {stats?.rangeHours}h —{" "}
-            <strong>{dayLabel(from)}–{dayLabel(to)}</strong> (esfuerzo y venta por el rango elegido).
+            <ConFormato
+              texto={t("agencyQa.chattersHs.subtitle", {
+                chatters: stats?.chatters ?? 0,
+                act: stats?.rangeAvgAct ?? 0,
+                hours: stats?.rangeHours ?? 0,
+                from: dayLabel(from, f),
+                to: dayLabel(to, f),
+              })}
+            />
           </p>
         </div>
         <div className="flex flex-col items-end gap-1">
-          <DateRangePicker from={from} to={to} onApply={(f, t) => { if (f) setFrom(f); if (t) setTo(t); }} placeholder="Rango de fechas" />
-          <span className="text-xs text-muted-foreground">Sincronizado {relativeTime(sync?.last_sync_at ?? null)}</span>
+          <DateRangePicker from={from} to={to} onApply={(f, t) => { if (f) setFrom(f); if (t) setTo(t); }} placeholder={t("common.dateRange")} />
+          <span className="text-xs text-muted-foreground">{t("agencyQa.sync.synced", { when: haceCuanto(sync?.last_sync_at ?? null, t) })}</span>
         </div>
       </div>
 
       {/* Cards de rentabilidad (solo management). */}
       {stats?.hasCost && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatCard icon={Scale} label="Margen neto equipo" value={money(stats.totalMargin)}
+          <StatCard icon={Scale} label={t("agencyQa.chattersHs.teamMargin")} value={money(stats.totalMargin)}
             tone={stats.totalMargin >= 0 ? "ok" : "bad"} />
-          <StatCard icon={DollarSign} label="Ingreso agencia" value={money(stats.totalAgencyRev)} />
-          <StatCard icon={Wallet} label="Costo equipo" value={money(stats.totalCost)} />
-          <StatCard icon={AlertTriangle} label="No rentables" value={`${stats.noRentables}/${stats.chatters}`}
+          <StatCard icon={DollarSign} label={t("agencyQa.chattersHs.agencyRevenue")} value={money(stats.totalAgencyRev)} />
+          <StatCard icon={Wallet} label={t("agencyQa.chattersHs.teamCost")} value={money(stats.totalCost)} />
+          <StatCard icon={AlertTriangle} label={t("agencyQa.chattersHs.unprofitablePl")} value={`${stats.noRentables}/${stats.chatters}`}
             tone={stats.noRentables ? "warn" : "ok"} />
         </div>
       )}
@@ -131,15 +133,15 @@ export default function ChattersQaHubstaff() {
               <thead>
                 <tr className="border-b border-border text-xs text-muted-foreground">
                   <th className="px-4 py-3 text-left font-semibold">Chatter</th>
-                  <th className="px-3 py-3 text-right font-semibold">Días</th>
-                  <th className="px-3 py-3 text-right font-semibold">Horas</th>
-                  <th className="px-3 py-3 text-right font-semibold">Activ.</th>
-                  <th className="px-3 py-3 text-right font-semibold">Venta</th>
-                  {stats?.hasCost && <th className="px-3 py-3 text-right font-semibold">Ing. agencia</th>}
-                  {stats?.hasCost && <th className="px-3 py-3 text-right font-semibold">Margen</th>}
+                  <th className="px-3 py-3 text-right font-semibold">{t("common.days")}</th>
+                  <th className="px-3 py-3 text-right font-semibold">{t("common.hours")}</th>
+                  <th className="px-3 py-3 text-right font-semibold">{t("agencyQa.activityShort")}</th>
+                  <th className="px-3 py-3 text-right font-semibold">{t("agencyQa.chattersHs.sale")}</th>
+                  {stats?.hasCost && <th className="px-3 py-3 text-right font-semibold">{t("agencyQa.chattersHs.agencyRevenueShort")}</th>}
+                  {stats?.hasCost && <th className="px-3 py-3 text-right font-semibold">{t("agencyQa.chattersHs.margin")}</th>}
                   {stats?.hasCost && <th className="px-3 py-3 text-right font-semibold">ROI</th>}
-                  <th className="px-3 py-3 text-right font-semibold">Resp.</th>
-                  <th className="px-4 py-3 text-left font-semibold">Estado</th>
+                  <th className="px-3 py-3 text-right font-semibold">{t("agencyQa.chattersHs.response")}</th>
+                  <th className="px-4 py-3 text-left font-semibold">{t("common.status")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -176,7 +178,7 @@ export default function ChattersQaHubstaff() {
                       <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">
                         {r.avg_response_min != null ? `${r.avg_response_min}m` : "—"}
                       </td>
-                      <td className="px-4 py-2.5">{statusPill({ no_rentable: noRent, online_improductivo: r.online_improductivo, roi_x: roi, sin_venta_blu: sinVenta })}</td>
+                      <td className="px-4 py-2.5">{statusPill(t, { no_rentable: noRent, online_improductivo: r.online_improductivo, roi_x: roi, sin_venta_blu: sinVenta })}</td>
                     </tr>
                   );
                 })}
@@ -187,47 +189,53 @@ export default function ChattersQaHubstaff() {
       </Card>
 
       <p className="px-1 text-[11px] leading-relaxed text-muted-foreground">
-        <strong>Días/Horas/Actividad y Venta/Ingreso/Margen/ROI</strong> = del rango seleccionado ({dayLabel(from)}–{dayLabel(to)}){rangeLoading ? " (cargando…)" : ""} — venta diaria de BLU.
+        <ConFormato
+          texto={t("agencyQa.chattersHs.noteRange", {
+            from: dayLabel(from, f),
+            to: dayLabel(to, f),
+            loading: rangeLoading ? t("agencyQa.chattersHs.loadingSuffix") : "",
+          })}
+        />
+        {" "}
         {stats?.hasCost ? (
-          <>
-            {" "}Ingreso agencia = venta × 80% (neto OF) × {stats.rate}% (comisión efectiva ponderada).
-            Costo = salario base <em>prorrateado por los días del rango</em> ({money(stats.costPer)} en este rango) @ tipo de cambio en vivo.
-            ROI &lt; 1 (rojo) = la agencia recibe menos de lo que cuesta el chatter en el rango. "Sin venta BLU" = no hubo venta registrada en el rango.
-          </>
+          <ConFormato
+            texto={t("agencyQa.chattersHs.noteCost", { rate: stats.rate ?? "—", cost: money(stats.costPer) })}
+            piezas={{ prorated: <em>{t("agencyQa.chattersHs.prorated")}</em> }}
+          />
         ) : (
-          <> 🚩 "online, poca venta" = ≥25h y ≥50% actividad pero baja venta. Las notas de Puntualidad y Productividad del scorecard salen de estos mismos datos.</>
+          t("agencyQa.chattersHs.noteNoCost")
         )}
       </p>
     </div>
   );
 }
 
-function statusPill(r: { no_rentable: boolean | null; online_improductivo: boolean; roi_x: number | null; sin_venta_blu: boolean | null }) {
+function statusPill(t: (k: TranslationKey) => string, r: { no_rentable: boolean | null; online_improductivo: boolean; roi_x: number | null; sin_venta_blu: boolean | null }) {
   if (r.sin_venta_blu) {
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-sky-500/15 px-2 py-0.5 text-[11px] font-medium text-sky-600">
-        <Info className="h-3 w-3" /> sin venta BLU
+        <Info className="h-3 w-3" /> {t("agencyQa.chattersHs.noBluSales")}
       </span>
     );
   }
   if (r.no_rentable) {
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-destructive/15 px-2 py-0.5 text-[11px] font-medium text-destructive">
-        <AlertTriangle className="h-3 w-3" /> no rentable
+        <AlertTriangle className="h-3 w-3" /> {t("agencyQa.chattersHs.unprofitable")}
       </span>
     );
   }
   if (r.online_improductivo) {
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-warning/15 px-2 py-0.5 text-[11px] font-medium text-warning">
-        <AlertTriangle className="h-3 w-3" /> online, poca venta
+        <AlertTriangle className="h-3 w-3" /> {t("agencyQa.chattersHs.onlineLowSales")}
       </span>
     );
   }
   if ((r.roi_x ?? 0) >= 2) {
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-medium text-success">
-        <TrendingUp className="h-3 w-3" /> rinde
+        <TrendingUp className="h-3 w-3" /> {t("agencyQa.performs")}
       </span>
     );
   }

@@ -9,6 +9,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useLanguage } from "@/hooks/useLanguage";
 import { type TicketWithCreator, useTickets } from "./useTickets";
 
 interface Props {
@@ -18,6 +19,7 @@ interface Props {
 }
 
 const DeleteTicketDialog = ({ open, onOpenChange, ticket }: Props) => {
+  const { t } = useLanguage();
   const { deleteTicket } = useTickets();
 
   const handleDelete = () => {
@@ -32,11 +34,11 @@ const DeleteTicketDialog = ({ open, onOpenChange, ticket }: Props) => {
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-destructive" />
-            Eliminar ticket
+            {t("tickets.delete.title")}
           </AlertDialogTitle>
           <AlertDialogDescription>
-            ¿Estás seguro de que deseas eliminar el ticket <strong>"{ticket.title}"</strong>?
-            Esta acción no se puede deshacer.
+            {t("tickets.delete.confirmBefore")} <strong>"{ticket.title}"</strong>?{" "}
+            {t("common.cannotBeUndone")}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -45,7 +47,7 @@ const DeleteTicketDialog = ({ open, onOpenChange, ticket }: Props) => {
             onClick={handleDelete}
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
-            Eliminar
+            {t("common.delete")}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

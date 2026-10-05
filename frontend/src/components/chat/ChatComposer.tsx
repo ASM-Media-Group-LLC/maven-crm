@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Send, Loader2, Paperclip, X as XIcon, Play } from "lucide-react";
 import { EmojiBar } from "@/pages/chatter-evaluator/workspace/EmojiBar";
 import { useAutoGrowTextarea, MAX_TEXTAREA_PX } from "@/hooks/useAutoGrowTextarea";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // Composer unificado para los 3 chats de Maven (bandeja WhatsApp, Messenger, Chatter
 // Evaluator). Layout pedido por el owner: emojis ARRIBA · cajón de texto AL MEDIO (auto-crece)
@@ -62,6 +63,7 @@ export const ChatComposer = ({
   accept = "image/*,video/*",
   sendButtonClassName,
 }: ChatComposerProps) => {
+  const { t } = useLanguage();
   const taRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [pending, setPending] = useState<ComposerAttachment[]>([]);
@@ -181,8 +183,8 @@ export const ChatComposer = ({
                   type="button"
                   onClick={() => removeAttachment(a.id)}
                   className="absolute right-0 top-0 flex h-4 w-4 items-center justify-center rounded-bl bg-black/60 text-white hover:bg-black/80"
-                  title="Quitar"
-                  aria-label="Quitar adjunto"
+                  title={t("shared.composer.remove")}
+                  aria-label={t("composer.removeAttachment")}
                 >
                   <XIcon className="h-2.5 w-2.5" />
                 </button>
@@ -211,7 +213,7 @@ export const ChatComposer = ({
             disabled={!canSend}
             size="icon"
             className={`absolute bottom-[7px] right-2 h-7 w-7 rounded-full text-white shadow-sm hover:opacity-90 ${sendButtonClassName ?? "bg-gradient-to-br from-accent to-primary"}`}
-            title="Enviar"
+            title={t("composer.send")}
           >
             {spinning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </Button>
@@ -227,7 +229,7 @@ export const ChatComposer = ({
             variant="ghost"
             className="h-9 w-9 text-muted-foreground"
             disabled={disabled}
-            title="Adjuntar foto / video"
+            title={t("composer.attach")}
           >
             <Paperclip className="h-4 w-4" />
           </Button>

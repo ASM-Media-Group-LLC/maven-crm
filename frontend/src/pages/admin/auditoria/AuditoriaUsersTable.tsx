@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertTriangle } from "lucide-react";
 import type { AuditoriaUser } from "./useAuditoriaData";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface Props {
   users: AuditoriaUser[];
@@ -18,6 +19,7 @@ const roleBadgeColor: Record<string, string> = {
 };
 
 const AuditoriaUsersTable = ({ users, search }: Props) => {
+  const { t } = useLanguage();
   const filtered = search.trim()
     ? users.filter((u) => (u.full_name || "").toLowerCase().includes(search.toLowerCase()))
     : users;
@@ -27,15 +29,15 @@ const AuditoriaUsersTable = ({ users, search }: Props) => {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Nombre</TableHead>
-            <TableHead>Rol(es)</TableHead>
-            <TableHead>Estado</TableHead>
+            <TableHead>{t("common.name")}</TableHead>
+            <TableHead>{t("admin.audit.colRoles")}</TableHead>
+            <TableHead>{t("common.status")}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {filtered.map((user) => (
             <TableRow key={user.id}>
-              <TableCell className="font-medium">{user.full_name || "Sin nombre"}</TableCell>
+              <TableCell className="font-medium">{user.full_name || t("admin.noName")}</TableCell>
               <TableCell>
                 <div className="flex gap-1 flex-wrap">
                   {user.roles.length > 0 ? (
@@ -53,7 +55,7 @@ const AuditoriaUsersTable = ({ users, search }: Props) => {
                 {user.roles.length === 0 ? (
                   <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/30">
                     <AlertTriangle className="h-3 w-3 mr-1" />
-                    Sin rol
+                    {t("admin.noRole")}
                   </Badge>
                 ) : (
                   <Badge variant="outline" className="bg-success/10 text-success border-success/30">OK</Badge>

@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef } from "react";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
 import { Users } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ListRow } from "@/components/ui/list-row";
 import CategorySectionHeader from "@/components/dashboard/CategorySectionHeader";
+import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { Formato } from "@/lib/formato";
 import type { ClosersKpiPopupResult, ClosersKpiPopupRow } from "../hooks/useClosersKpiPopup";
 
 // Popup detalle de un KPI card de closers/dashboard. Sigue el layout
@@ -25,7 +27,7 @@ interface Props {
   popupKey: string | null; // identificador para inicializar collapsed state una sola vez
 }
 
-const renderRow = (row: ClosersKpiPopupRow) => (
+const renderRow = (row: ClosersKpiPopupRow, f: Formato) => (
   <ListRow key={row.id} className="justify-between">
     <div className="min-w-0 flex-1">
       <p className="font-medium truncate">{row.primary}</p>
@@ -46,7 +48,7 @@ const renderRow = (row: ClosersKpiPopupRow) => (
       )}
       {row.date && (
         <span className="text-[10px] text-muted-foreground tabular-nums">
-          {format(new Date(row.date), "d MMM", { locale: es })}
+          {format(new Date(row.date), "d MMM", { locale: f.fechas })}
         </span>
       )}
     </div>
@@ -62,6 +64,8 @@ const ClosersKpiDetailDialog = ({
   isLoading,
   popupKey,
 }: Props) => {
+  const f = useFormato();
+  const { t } = useLanguage();
   const groups = result?.groups ?? [];
   const totalCount = result?.totalCount ?? 0;
   const isGrouped = result?.mode === "grouped";
@@ -102,16 +106,18 @@ const ClosersKpiDetailDialog = ({
                 {title}
                 {!isLoading && (
                   <span className="inline-flex items-center rounded-full bg-primary/15 px-2.5 py-0.5 text-sm font-bold text-primary tabular-nums">
-                    {totalCount.toLocaleString("es")}
+                    {totalCount.toLocaleString(f.idioma === "en" ? "en-US" : "es")}
                   </span>
                 )}
               </DialogTitle>
               {!isLoading && totalCount > 0 && (
                 <p className="text-[11px] text-muted-foreground mt-1.5">
                   {subtitle ||
-                    `${totalCount.toLocaleString("es")} ${totalCount === 1 ? "registro" : "registros"}`}
+                    t(totalCount === 1 ? "closers.popup.recordOne" : "closers.popup.recordMany", {
+                      n: totalCount.toLocaleString(f.idioma === "en" ? "en-US" : "es"),
+                    })}
                   {isGrouped && groups.length > 0 &&
-                    ` · ${groups.length} ${groups.length === 1 ? "grupo" : "grupos"}`}
+                    ` · ${t(groups.length === 1 ? "closers.popup.groupOne" : "closers.popup.groupMany", { n: groups.length })}`}
                 </p>
               )}
             </div>
@@ -121,17 +127,17 @@ const ClosersKpiDetailDialog = ({
                   type="button"
                   onClick={() => setCollapsed(new Set())}
                   className="rounded-full bg-muted/40 px-2.5 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                  title="Expandir todas"
+                  title={t("closers.popup.expandAll")}
                 >
-                  Expandir
+                  {t("closers.popup.expand")}
                 </button>
                 <button
                   type="button"
                   onClick={() => setCollapsed(new Set(groups.map((g) => g.cat)))}
                   className="rounded-full bg-muted/40 px-2.5 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                  title="Colapsar todas"
+                  title={t("closers.popup.collapseAll")}
                 >
-                  Colapsar
+                  {t("closers.popup.collapse")}
                 </button>
               </div>
             )}
@@ -151,12 +157,12 @@ const ClosersKpiDetailDialog = ({
                 <Users className="h-6 w-6 text-muted-foreground" />
               </div>
               <p className="text-sm text-muted-foreground text-center">
-                Sin registros para mostrar.
+                {t("closers.popup.empty")}
               </p>
             </div>
           ) : !isGrouped ? (
             <div className="space-y-1.5">
-              {groups[0]?.rows.map(renderRow)}
+              {groups[0]?.rows.map((row) => renderRow(row, f))}
             </div>
           ) : (
             groups.map((g) => {
@@ -173,10 +179,10 @@ const ClosersKpiDetailDialog = ({
                     <div className="space-y-1.5 pl-1">
                       {g.rows.length === 0 ? (
                         <p className="text-xs text-muted-foreground italic pl-3 py-2">
-                          Sin registros visibles para esta categoría.
+                          {t("closers.popup.emptyGroup")}
                         </p>
                       ) : (
-                        g.rows.map(renderRow)
+                        g.rows.map((row) => renderRow(row, f))
                       )}
                     </div>
                   )}

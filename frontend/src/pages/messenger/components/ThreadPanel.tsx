@@ -23,12 +23,15 @@ import ReactionPicker from "./ReactionPicker";
 import ReactionsDisplay from "./ReactionsDisplay";
 import ReadReceiptIndicator from "./ReadReceiptIndicator";
 import ImageLightbox from "./ImageLightbox";
+import { mediaDelChat } from "../galeriaDelChat";
 import VoiceNoteRecorder from "./VoiceNoteRecorder";
-import { formatTime, formatDate, safeFileUrl } from "../utils";
+import { formatTime, formatDate, safeFileUrl, remitenteVisible } from "../utils";
+import EtiquetaApi from "./EtiquetaApi";
 
 import { EMOJIS, MAX_FILE_SIZE_BYTES, formatFileSize, uploadFileWithTUS } from "../uploadUtils";
 import { claveSeguraParaArchivo } from "@/lib/claveDeArchivo";
 import NotaDeVoz from "./NotaDeVoz";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface ThreadPanelProps {
   parentMessage: ChatMessage;
@@ -59,6 +62,7 @@ export default function ThreadPanel({
   getReadByUsers, getDeliveredByUsers, totalParticipants, deletedArchive, resaltada,
 }: ThreadPanelProps) {
   const { user } = useAuth();
+  const { t, language } = useLanguage();
   const [text, setText] = useState("");
   const [cursorPosition, setCursorPosition] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -119,8 +123,6 @@ export default function ThreadPanel({
     [participants]
   );
 
-  const parentSender = profiles[parentMessage.sender_id]?.full_name || "Usuario";
-
   // --- File upload (TUS) ---
   const uploadFileWithProgress = useCallback(async (file: File, path: string): Promise<{ error: string | null }> => {
     return uploadFileWithTUS(file, path, {
@@ -133,7 +135,7 @@ export default function ThreadPanel({
   // Sube UN archivo y devuelve su URL pública. NO envía nada.
   const uploadOne = useCallback(async (file: File): Promise<{ url: string; isImg: boolean } | null> => {
     if (!user) return null;
-    setUploadProgress(`Subiendo: ${file.name} (${formatFileSize(file.size)})`);
+    setUploadProgress(t("messenger.thread.subiendo", { name: file.name, tamano: formatFileSize(file.size) }));
     setUploadPercent(0);
     // Misma razón que en MessageInput: la clave se sanea, el nombre visible no.
     const path = `${user.id}/${Date.now()}-${claveSeguraParaArchivo(file.name)}`;
@@ -145,16 +147,16 @@ export default function ThreadPanel({
       const { error } = await supabase.storage.from("chat-files").upload(path, file);
       uploadError = error?.message || null;
     }
-    if (uploadError === "cancelled") { toast("Subida cancelada"); return null; }
-    if (uploadError) { toast.error(`Error: ${uploadError}`); return null; }
+    if (uploadError === "cancelled") { toast(t("messenger.input.subidaCancelada")); return null; }
+    if (uploadError) { toast.error(t("messenger.thread.error", { error: uploadError })); return null; }
     const { data: urlData } = supabase.storage.from("chat-files").getPublicUrl(path);
     return { url: urlData.publicUrl, isImg: file.type.startsWith("image/") };
-  }, [user, uploadFileWithProgress]);
+  }, [user, uploadFileWithProgress, t]);
 
   // Adjuntar = poner EN ESPERA con preview. Se envía al presionar Enviar.
   const stageFiles = useCallback((files: File[]) => {
     if (files.some((f) => f.size > MAX_FILE_SIZE_BYTES)) {
-      toast.error(`Archivo demasiado grande (máx ${formatFileSize(MAX_FILE_SIZE_BYTES)})`);
+      toast.error(t("messenger.thread.archivoGrande", { max: formatFileSize(MAX_FILE_SIZE_BYTES) }));
     }
     const ok = files.filter((f) => f.size <= MAX_FILE_SIZE_BYTES);
     if (!ok.length) return;
@@ -165,7 +167,7 @@ export default function ThreadPanel({
         return { file, isImg, preview: isImg ? URL.createObjectURL(file) : undefined };
       }),
     ]);
-  }, []);
+  }, [t]);
 
   const removePendingFile = useCallback((index: number) => {
     setPendingFiles((prev) => {
@@ -211,14 +213,15 @@ export default function ThreadPanel({
     const fileName = `voice-note-${Date.now()}.${ext}`;
     const path = `${user.id}/${fileName}`;
     const { error } = await supabase.storage.from("chat-files").upload(path, blob, { contentType: blob.type });
-    if (error) { toast.error("Error al subir nota de voz"); setUploading(false); return; }
+    if (error) { toast.error(t("messenger.input.errorNotaDeVoz")); setUploading(false); return; }
     const { data: urlData } = supabase.storage.from("chat-files").getPublicUrl(path);
     const mins = Math.floor(durationSec / 60);
     const secs = durationSec % 60;
+    // El contenido del mensaje se guarda y lo leen todos: es dato, no se traduce.
     onSendReply(`🎤 Nota de voz (${mins}:${secs.toString().padStart(2, "0")})`, "file", urlData.publicUrl, fileName);
     setIsRecording(false);
     setUploading(false);
-  }, [user, onSendReply]);
+  }, [user, onSendReply, t]);
 
   const handleSend = async () => {
     const body = text.trim();
@@ -274,18 +277,18 @@ export default function ThreadPanel({
         return (
           <div className="rounded-lg px-2 py-1.5 bg-destructive/10 border border-destructive/25">
             {arch.type === "image" && arch.file_url ? (
-              <img src={arch.file_url} alt={arch.file_name || "imagen"} decoding="async" className="rounded-lg max-w-full max-h-48 object-cover" />
+              <img src={arch.file_url} alt={arch.file_name || t("messenger.bubble.imagen")} decoding="async" className="rounded-lg max-w-full max-h-48 object-cover" />
             ) : arch.file_url ? (
               <a href={safeFileUrl(arch.file_url)} target="_blank" rel="noopener noreferrer" className="text-[12px] underline break-all">
-                {arch.file_name || "Archivo"}
+                {arch.file_name || t("common.file")}
               </a>
             ) : null}
             {arch.content && <p className="text-[13px] whitespace-pre-wrap break-words mt-1">{arch.content}</p>}
-            <div className="mt-0.5 text-[10px] italic text-destructive/90">Eliminado por el autor · solo admins</div>
+            <div className="mt-0.5 text-[10px] italic text-destructive/90">{t("messenger.bubble.eliminadoSoloAdmins")}</div>
           </div>
         );
       }
-      return <span className="italic text-muted-foreground text-[13px]">Eliminado por el autor</span>;
+      return <span className="italic text-muted-foreground text-[13px]">{t("messenger.bubble.eliminadoPorAutor")}</span>;
     }
 
     if (isImage) {
@@ -300,7 +303,7 @@ export default function ThreadPanel({
           />
           {msg.content && msg.content !== msg.file_name && (
             <p className="text-[13px] mt-1 whitespace-pre-wrap break-words">
-              {renderTextWithMentions(msg.content, participantNames, abrirDmDeMencion)}
+              {renderTextWithMentions(msg.content, participantNames, abrirDmDeMencion, (nombre) => t("messenger.mention.abrirChatCon", { name: nombre }))}
             </p>
           )}
         </div>
@@ -342,7 +345,7 @@ export default function ThreadPanel({
             <FileIcon className="h-3.5 w-3.5" />
           </div>
           <div className="min-w-0">
-            <span className="text-[13px] truncate block">{msg.file_name || "Archivo"}</span>
+            <span className="text-[13px] truncate block">{msg.file_name || t("common.file")}</span>
             {ext && <span className="text-[10px] text-muted-foreground uppercase">{ext}</span>}
           </div>
         </a>
@@ -365,10 +368,10 @@ export default function ThreadPanel({
           />
           <div className="flex items-center justify-end gap-1 mt-1">
             <button type="button" onClick={cancelEdit} className="text-[11px] px-2 py-0.5 rounded-lg text-muted-foreground hover:bg-muted transition-colors">
-              Cancelar
+              {t("common.cancel")}
             </button>
             <button type="button" onClick={() => saveEdit(msg)} className="text-[11px] font-medium px-2 py-0.5 rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-colors">
-              Guardar
+              {t("common.save")}
             </button>
           </div>
         </div>
@@ -377,7 +380,7 @@ export default function ThreadPanel({
 
     return (
       <p className="text-[13px] text-foreground/90 whitespace-pre-wrap break-words">
-        {renderTextWithMentions(msg.content || "", participantNames, abrirDmDeMencion)}
+        {renderTextWithMentions(msg.content || "", participantNames, abrirDmDeMencion, (nombre) => t("messenger.mention.abrirChatCon", { name: nombre }))}
       </p>
     );
   };
@@ -385,7 +388,10 @@ export default function ThreadPanel({
   // --- Render a single message row (parent or reply) ---
   const renderMessage = (msg: ChatMessage, isParent: boolean = false) => {
     const isMe = msg.sender_id === currentUserId;
-    const sender = profiles[msg.sender_id]?.full_name || "Usuario";
+    // «BLU» + pastilla si vino por API, también si es mío (no «Tú»): la key es mía,
+    // pero no lo escribí yo.
+    const remitente = remitenteVisible(msg, profiles, t);
+    const sender = remitente.nombre;
     const reactions = getReactionsForMessage(msg.id);
     const readBy = getReadByUsers(msg.id);
     const deliveredBy = getDeliveredByUsers(msg.id);
@@ -403,18 +409,22 @@ export default function ThreadPanel({
         <div className="flex items-start gap-2">
           <UserAvatar
             name={sender}
-            src={profiles[msg.sender_id]?.avatar_url}
-            seed={profiles[msg.sender_id]?.avatar_seed}
+            // Una integración no tiene cara: iniciales, nunca la foto de la persona.
+            src={remitente.esApi ? null : profiles[msg.sender_id]?.avatar_url}
+            seed={remitente.esApi ? null : profiles[msg.sender_id]?.avatar_seed}
             size="xs"
             className={cn("shrink-0 mt-0.5", isParent ? "h-7 w-7" : "h-6 w-6")}
           />
           <div className="min-w-0 flex-1">
             <div className="flex items-baseline gap-2">
-              <span className="text-xs font-semibold text-foreground">{isMe ? "Tú" : sender}</span>
+              <span className="text-xs font-semibold text-foreground">{isMe && !remitente.esApi ? t("messenger.preview.tu") : sender}</span>
+              {remitente.esApi && (
+                <EtiquetaApi nombre={sender} persona={remitente.personaReal} esMio={isMe} className="self-center" />
+              )}
               <span className="text-[10px] text-muted-foreground">
-                {isParent ? `${formatDate(msg.created_at)} ${formatTime(msg.created_at)}` : formatTime(msg.created_at)}
+                {isParent ? `${formatDate(msg.created_at, t, language)} ${formatTime(msg.created_at, language)}` : formatTime(msg.created_at, language)}
               </span>
-              {msg.is_edited && <span className="text-[10px] text-muted-foreground">(editado)</span>}
+              {msg.is_edited && <span className="text-[10px] text-muted-foreground">({t("messenger.bubble.editado")})</span>}
 
               {/* Hover actions */}
               {!isParent && !msg.is_deleted && (
@@ -430,18 +440,19 @@ export default function ThreadPanel({
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="min-w-[130px]">
-                      <DropdownMenuItem onClick={() => { navigator.clipboard.writeText(msg.content || ""); toast.success("Copiado"); }}>
-                        <Copy className="h-3.5 w-3.5 mr-2" /> Copiar
+                      <DropdownMenuItem onClick={() => { navigator.clipboard.writeText(msg.content || ""); toast.success(t("messenger.chat.copiado")); }}>
+                        <Copy className="h-3.5 w-3.5 mr-2" /> {t("common.copy")}
                       </DropdownMenuItem>
                       {isMe && (
                         <>
-                          {msg.type === "text" && (
+                          {/* Lo de una integración no se edita desde la app. */}
+                          {msg.type === "text" && !remitente.esApi && (
                             <DropdownMenuItem onClick={() => startEdit(msg)}>
-                              <Edit2 className="h-3.5 w-3.5 mr-2" /> Editar
+                              <Edit2 className="h-3.5 w-3.5 mr-2" /> {t("common.edit")}
                             </DropdownMenuItem>
                           )}
                           <DropdownMenuItem className="text-destructive" onClick={() => onDeleteMessage(msg.id)}>
-                            <Trash2 className="h-3.5 w-3.5 mr-2" /> Eliminar
+                            <Trash2 className="h-3.5 w-3.5 mr-2" /> {t("common.delete")}
                           </DropdownMenuItem>
                         </>
                       )}
@@ -487,9 +498,9 @@ export default function ThreadPanel({
       {/* Header */}
       <div className="flex items-center gap-2 px-4 py-3 bg-primary/[0.03]">
         <MessageSquareText className="h-4 w-4 text-primary" />
-        <h3 className="text-sm font-semibold flex-1">Hilo</h3>
-        <span className="text-xs text-muted-foreground">{replies.length} {replies.length === 1 ? "respuesta" : "respuestas"}</span>
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose}>
+        <h3 className="text-sm font-semibold flex-1">{t("messenger.thread.hilo")}</h3>
+        <span className="text-xs text-muted-foreground">{replies.length === 1 ? t("messenger.bubble.unaRespuesta") : t("messenger.bubble.respuestas", { n: replies.length })}</span>
+        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose} aria-label={t("common.close")}>
           <X className="h-4 w-4" />
         </Button>
       </div>
@@ -503,7 +514,7 @@ export default function ThreadPanel({
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
         {replies.length === 0 ? (
           <div className="flex items-center justify-center h-32">
-            <p className="text-xs text-muted-foreground">Sin respuestas aún</p>
+            <p className="text-xs text-muted-foreground">{t("messenger.thread.sinRespuestas")}</p>
           </div>
         ) : (
           <div className="py-2 space-y-0.5">
@@ -544,7 +555,7 @@ export default function ThreadPanel({
                 <button
                   type="button"
                   onClick={() => removePendingFile(i)}
-                  title="Quitar"
+                  title={t("messenger.thread.quitar")}
                   className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-background border border-border flex items-center justify-center shadow hover:bg-muted"
                 >
                   <X className="h-3 w-3" />
@@ -615,7 +626,7 @@ export default function ThreadPanel({
                 )}
                 <Textarea
                   ref={inputRef}
-                  placeholder="Responder en hilo..."
+                  placeholder={t("messenger.thread.responderEnHilo")}
                   className="min-h-[36px] max-h-[80px] resize-none bg-primary/5 border-0 focus-visible:ring-1 focus-visible:ring-primary/30 rounded-3xl px-3 py-2 text-sm"
                   rows={1}
                   value={text}
@@ -657,6 +668,8 @@ export default function ThreadPanel({
         isOpen={lightboxOpen}
         onClose={() => setLightboxOpen(false)}
         type={lightboxType}
+        // Las del hilo: el mensaje de arriba y sus respuestas, en orden.
+        galeria={mediaDelChat([parentMessage, ...replies])}
       />
     </div>
   );

@@ -25,6 +25,8 @@ import {
   type QaModelWithStats,
 } from "@/hooks/useAgencyQa";
 import { cn } from "@/lib/utils";
+import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
 import CallDetailPage from "./CallDetailPage";
 
 // Modelos subtab — catálogo de modelos con stats agregados (count de
@@ -38,10 +40,10 @@ import CallDetailPage from "./CallDetailPage";
 //   - Avatar upload editor
 //   - Filtro por categoría / país
 
-const fmtDate = (iso: string | null): string => {
+const fmtDate = (iso: string | null, locale: string): string => {
   if (!iso) return "—";
   const d = new Date(`${iso}T00:00:00`);
-  return d.toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" });
+  return d.toLocaleDateString(locale, { day: "2-digit", month: "short", year: "numeric" });
 };
 
 const Avatar = ({ name, dataUrl, size = 32 }: { name: string; dataUrl: string | null; size?: number }) => {
@@ -60,14 +62,17 @@ const Avatar = ({ name, dataUrl, size = 32 }: { name: string; dataUrl: string | 
 };
 
 const OutcomeMini = ({ outcome }: { outcome: CallOutcome }) => {
+  const { t } = useLanguage();
   // Compacto: "Sí / No / Espera" en lugar del badge completo.
-  if (outcome === "cerro") return <span className="font-bold text-success">Sí</span>;
-  if (outcome === "no_cerro") return <span className="font-bold text-destructive">No</span>;
-  if (outcome === "en_espera") return <span className="font-bold text-warning">Espera</span>;
+  if (outcome === "cerro") return <span className="font-bold text-success">{t("agencyQa.models.yes")}</span>;
+  if (outcome === "no_cerro") return <span className="font-bold text-destructive">{t("agencyQa.models.no")}</span>;
+  if (outcome === "en_espera") return <span className="font-bold text-warning">{t("agencyQa.models.wait")}</span>;
   return <span className="text-muted-foreground">—</span>;
 };
 
 const AgencyModels = () => {
+  const { t } = useLanguage();
+  const f = useFormato();
   const [search, setSearch] = useState("");
   // Detail embebido: cuando hay callId, ocultamos la tabla + stats y
   // mostramos CallDetailPage en su lugar con el botón "← Historial"
@@ -118,30 +123,30 @@ const AgencyModels = () => {
           uppercase, valor 3xl tabular-nums, hint debajo. */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          label="Modelos"
+          label={t("agencyQa.models")}
           value={summary.totalModels}
-          hint="en el catálogo"
+          hint={t("agencyQa.models.inCatalog")}
           icon={<Users className="h-5 w-5 text-white" />}
           gradient="bg-slate-500"
         />
         <StatCard
-          label="Activas"
+          label={t("agencyQa.models.active")}
           value={summary.activeModels}
-          hint={summary.totalModels > 0 ? `${activePct}% del catálogo` : ""}
+          hint={summary.totalModels > 0 ? t("agencyQa.models.pctOfCatalog", { pct: activePct }) : ""}
           icon={<UserCheck className="h-5 w-5 text-white" />}
           gradient="bg-emerald-500"
         />
         <StatCard
-          label="Análisis totales"
+          label={t("agencyQa.totalAnalyses")}
           value={summary.totalCalls}
-          hint="todas las QAs"
+          hint={t("agencyQa.models.allQas")}
           icon={<ClipboardCheck className="h-5 w-5 text-white" />}
           gradient="bg-violet-500"
         />
         <StatCard
-          label="Score promedio"
+          label={t("agencyQa.avgScore")}
           value={summary.overallAvg || "—"}
-          hint={summary.activeModels > 0 ? "/ 100 (modelos con llamadas)" : ""}
+          hint={summary.activeModels > 0 ? t("agencyQa.models.scoreHint") : ""}
           icon={<Award className="h-5 w-5 text-white" />}
           gradient="bg-amber-500"
         />
@@ -152,14 +157,16 @@ const AgencyModels = () => {
         <div className="relative min-w-[220px] flex-1">
           <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar por nombre, país, categoría…"
+            placeholder={t("agencyQa.models.search")}
             className="pl-8"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
         <span className="text-xs text-muted-foreground">
-          {modelsQ.isLoading ? "Cargando…" : `${filtered.length} modelo${filtered.length === 1 ? "" : "s"}`}
+          {modelsQ.isLoading
+            ? t("common.loading")
+            : t(filtered.length === 1 ? "agencyQa.models.count" : "agencyQa.models.countPl", { n: filtered.length })}
         </span>
       </div>
 
@@ -171,24 +178,22 @@ const AgencyModels = () => {
           </div>
         ) : filtered.length === 0 ? (
           <div className="p-10 text-center">
-            <p className="text-sm font-medium">Sin modelos para mostrar</p>
-            <p className="text-xs text-muted-foreground">
-              Cuando subas una nueva QA y elijas un modelo, aparecerá aquí.
-            </p>
+            <p className="text-sm font-medium">{t("agencyQa.models.empty")}</p>
+            <p className="text-xs text-muted-foreground">{t("agencyQa.models.emptyHint")}</p>
           </div>
         ) : (
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Modelo</TableHead>
-                <TableHead>Categoría</TableHead>
-                <TableHead>País</TableHead>
+                <TableHead>{t("agencyQa.model")}</TableHead>
+                <TableHead>{t("common.category")}</TableHead>
+                <TableHead>{t("common.country")}</TableHead>
                 <TableHead>IG</TableHead>
-                <TableHead className="text-right">Llamadas</TableHead>
-                <TableHead>Cierre último</TableHead>
-                <TableHead>Closer último</TableHead>
-                <TableHead className="text-right">Score avg</TableHead>
-                <TableHead className="text-right">Última</TableHead>
+                <TableHead className="text-right">{t("agencyQa.models.calls")}</TableHead>
+                <TableHead>{t("agencyQa.models.lastOutcome")}</TableHead>
+                <TableHead>{t("agencyQa.models.lastCloser")}</TableHead>
+                <TableHead className="text-right">{t("agencyQa.scoreAvg")}</TableHead>
+                <TableHead className="text-right">{t("agencyQa.models.last")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -232,7 +237,7 @@ const AgencyModels = () => {
                           onClick={(e) => e.stopPropagation()}
                           className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
                         >
-                          ver
+                          {t("agencyQa.models.view")}
                           <ExternalLink className="h-3 w-3" />
                         </a>
                       ) : (
@@ -259,7 +264,7 @@ const AgencyModels = () => {
                       )}
                     </TableCell>
                     <TableCell className="text-right text-xs text-muted-foreground tabular-nums">
-                      {fmtDate(m.last_call_date)}
+                      {fmtDate(m.last_call_date, f.intl("es-ES"))}
                     </TableCell>
                   </TableRow>
                 );

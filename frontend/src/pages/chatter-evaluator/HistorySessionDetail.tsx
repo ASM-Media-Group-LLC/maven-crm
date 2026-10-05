@@ -23,10 +23,13 @@ import {
   useChatterProfiles,
   useChatterConfig,
 } from "@/hooks/useChatterEvaluator";
+import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 
-const fmtDate = (iso: string): string => {
+const fmtDate = (iso: string, locale: string): string => {
   try {
-    return new Date(iso).toLocaleString("es-ES", {
+    return new Date(iso).toLocaleString(locale, {
       day: "2-digit",
       month: "short",
       year: "numeric",
@@ -38,8 +41,9 @@ const fmtDate = (iso: string): string => {
   }
 };
 
-const statusLabel = (s: "pass" | "partial" | "fail"): string =>
-  s === "pass" ? "Cumple" : s === "partial" ? "Parcial" : "No cumple";
+// `status` es el dato guardado en criteria_results; esto es solo la etiqueta.
+const statusLabel = (s: "pass" | "partial" | "fail"): TranslationKey =>
+  s === "pass" ? "chatters.histDetail.met" : s === "partial" ? "chatters.histDetail.partial" : "chatters.histDetail.notMet";
 
 const statusColors = (s: "pass" | "partial" | "fail") =>
   s === "pass"
@@ -49,6 +53,8 @@ const statusColors = (s: "pass" | "partial" | "fail") =>
       : "bg-destructive/10 text-destructive";
 
 const HistorySessionDetail = () => {
+  const f = useFormato();
+  const { t } = useLanguage();
   const { sessionId } = useParams<{ sessionId: string }>();
   const sessionQ = useChatterSession(sessionId);
   const messagesQ = useChatterMessages(sessionId);
@@ -78,12 +84,12 @@ const HistorySessionDetail = () => {
         <Card className="max-w-md">
           <CardContent className="space-y-3 p-6 text-center">
             <p className="text-sm text-muted-foreground">
-              Esta sesión no existe o fue eliminada.
+              {t("chatters.histDetail.notFound")}
             </p>
             <Button asChild variant="outline">
               <Link to="/chatter-evaluator/history">
                 <ArrowLeft className="mr-2 h-4 w-4" />
-                Volver al historial
+                {t("chatters.histDetail.backToHistory")}
               </Link>
             </Button>
           </CardContent>
@@ -99,12 +105,12 @@ const HistorySessionDetail = () => {
           <Button asChild variant="ghost" size="sm" className="gap-2">
             <Link to="/chatter-evaluator/history">
               <ArrowLeft className="h-4 w-4" />
-              Historial
+              {t("chatters.histDetail.history")}
             </Link>
           </Button>
           {session?.created_at && (
             <span className="text-xs text-muted-foreground">
-              Sesión del {fmtDate(session.created_at)}
+              {t("chatters.histDetail.sessionFrom", { date: fmtDate(session.created_at, f.intl("es-ES")) })}
             </span>
           )}
         </div>
@@ -131,15 +137,15 @@ const HistorySessionDetail = () => {
             </div>
             <div className="min-w-0 flex-1">
               <h1 className="truncate text-xl font-semibold">
-                {session?.chatter_name ?? "(sin chatter)"}
+                {session?.chatter_name ?? t("chatters.histDetail.noChatter")}
               </h1>
               <p className="text-sm text-muted-foreground">
-                Interpretó a <strong>{profile?.name ?? "(perfil eliminado)"}</strong>
+                {t("chatters.histDetail.played")} <strong>{profile?.name ?? t("chatters.histDetail.deletedProfile")}</strong>
                 {profile?.category ? ` · ${profile.category}` : ""}
               </p>
             </div>
             <Badge variant="outline" className="text-[10px]">
-              cerrada
+              {t("chatters.hist.closed")}
             </Badge>
           </CardContent>
         </Card>
@@ -166,13 +172,13 @@ const HistorySessionDetail = () => {
                           : "text-destructive"
                       }`}
                     >
-                      {evaluation.verdict === "apto" ? "APTO" : "NO APTO"}
+                      {evaluation.verdict === "apto" ? t("chatters.verdict.fit") : t("chatters.verdict.notFit")}
                     </div>
                   </div>
                 </div>
                 <div className="text-right">
                   <div className="text-xs text-muted-foreground">
-                    Puntuación
+                    {t("chatters.histDetail.score")}
                   </div>
                   <div className="text-xl font-bold">
                     {evaluation.score_pct ?? 0}%
@@ -182,14 +188,14 @@ const HistorySessionDetail = () => {
 
               {evaluation.examiner_name && (
                 <div className="text-xs text-muted-foreground">
-                  Evaluado por <strong>{evaluation.examiner_name}</strong>
+                  {t("chatters.histDetail.evaluatedBy")} <strong>{evaluation.examiner_name}</strong>
                 </div>
               )}
 
               {evaluation.criteria_results.length > 0 && (
                 <div className="space-y-2 border-t pt-3">
                   <div className="text-xs text-muted-foreground">
-                    Criterios
+                    {t("chatters.crit.title")}
                   </div>
                   <div className="grid gap-2 sm:grid-cols-2">
                     {evaluation.criteria_results.map((c) => (
@@ -201,7 +207,7 @@ const HistorySessionDetail = () => {
                         <span
                           className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusColors(c.status)}`}
                         >
-                          {statusLabel(c.status)}
+                          {t(statusLabel(c.status))}
                         </span>
                       </div>
                     ))}
@@ -229,18 +235,18 @@ const HistorySessionDetail = () => {
             <div className="mb-3 flex items-center gap-2">
               <MessageCircle className="h-4 w-4 text-muted-foreground" />
               <h2 className="text-sm font-semibold">
-                Transcripción ({messages.length} mensaje{messages.length === 1 ? "" : "s"})
+                {t(messages.length === 1 ? "chatters.histDetail.transcriptOne" : "chatters.histDetail.transcriptMany", { n: messages.length })}
               </h2>
             </div>
 
             {messagesQ.isLoading ? (
               <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Cargando transcripción…
+                {t("chatters.histDetail.loadingTranscript")}
               </div>
             ) : messages.length === 0 ? (
               <p className="py-6 text-center text-sm text-muted-foreground">
-                Sin mensajes en esta sesión.
+                {t("chatters.histDetail.noMessages")}
               </p>
             ) : (
               <div className="space-y-2">
@@ -279,14 +285,14 @@ const HistorySessionDetail = () => {
                           </div>
                         ) : m.msg_type === "purchase" && m.price ? (
                           <div className="font-medium">
-                            🛒 Compra: ${m.price.toFixed(2)}
+                            {t("chatters.histDetail.purchase", { precio: m.price.toFixed(2) })}
                             {m.content ? ` — ${m.content}` : ""}
                           </div>
                         ) : (
                           <div className="whitespace-pre-wrap">{m.content}</div>
                         )}
                         <div className="mt-1 text-right text-[9px] opacity-60">
-                          {new Date(m.created_at).toLocaleTimeString("es-ES", {
+                          {new Date(m.created_at).toLocaleTimeString(f.intl("es-ES"), {
                             hour: "2-digit",
                             minute: "2-digit",
                           })}

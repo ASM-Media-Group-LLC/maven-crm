@@ -31,7 +31,9 @@ import {
 
 interface UserOption {
   id: string;
-  full_name: string;
+  // null = la persona no tiene nombre cargado. El «Sin nombre» se pone al dibujar
+  // (no acá: esto queda 5 minutos en la caché de react-query y no cambiaría de idioma).
+  full_name: string | null;
 }
 
 interface AssignmentModalProps {
@@ -60,7 +62,7 @@ function useUsersByRole(role: string) {
       if (profError) throw profError;
       return (profiles || []).map((p) => ({
         id: p.id,
-        full_name: p.full_name || "Sin nombre",
+        full_name: p.full_name || null,
       })) as UserOption[];
     },
     staleTime: 5 * 60 * 1000,
@@ -83,7 +85,9 @@ export default function AssignmentModal({
   const { data: managers = [], isLoading: loadingManagers } = useUsersByRole("manager");
   const { data: chatters = [], isLoading: loadingChatters } = useUsersByRole("agent");
 
-  const selectedManagerName = managers.find((m) => m.id === selectedManager)?.full_name;
+  const nombre = (u: UserOption) => u.full_name || t("creadores.sell.noName");
+  const managerElegido = managers.find((m) => m.id === selectedManager);
+  const selectedManagerName = managerElegido ? nombre(managerElegido) : undefined;
 
   const toggleChatter = (id: string) => {
     setSelectedChatters((prev) => {
@@ -114,10 +118,10 @@ export default function AssignmentModal({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Users className="h-5 w-5 text-primary" />
-            Asignación Operativa
+            {t("creadores.assign.title")}
           </DialogTitle>
           <DialogDescription>
-            Asigna el equipo que gestionará esta cuenta antes de completar el onboarding.
+            {t("creadores.assign.desc")}
           </DialogDescription>
         </DialogHeader>
 
@@ -126,7 +130,7 @@ export default function AssignmentModal({
           <div className="space-y-2">
             <Label className="flex items-center gap-1.5">
               <UserCheck className="h-4 w-4 text-primary" />
-              Manager <span className="text-xs text-muted-foreground">(opcional)</span>
+              Manager <span className="text-xs text-muted-foreground">{t("creadores.assign.optional")}</span>
             </Label>
             <Popover open={managerOpen} onOpenChange={setManagerOpen}>
               <PopoverTrigger asChild>
@@ -140,7 +144,7 @@ export default function AssignmentModal({
                   {loadingManagers ? (
                     <span className="flex items-center gap-2 text-muted-foreground">
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      Cargando...
+                      {t("common.loading")}
                     </span>
                   ) : selectedManagerName ? (
                     selectedManagerName
@@ -158,7 +162,7 @@ export default function AssignmentModal({
                     {managers.map((m) => (
                       <CommandItem
                         key={m.id}
-                        value={m.full_name}
+                        value={nombre(m)}
                         onSelect={() => {
                           setSelectedManager(m.id);
                           setManagerOpen(false);
@@ -170,7 +174,7 @@ export default function AssignmentModal({
                             selectedManager === m.id ? "opacity-100" : "opacity-0"
                           )}
                         />
-                        {m.full_name}
+                        {nombre(m)}
                       </CommandItem>
                     ))}
                   </CommandGroup>
@@ -193,10 +197,11 @@ export default function AssignmentModal({
                   const chatter = chatters.find((c) => c.id === id);
                   return (
                     <Badge key={id} variant="secondary" className="gap-1 pr-1">
-                      {chatter?.full_name || "..."}
+                      {chatter ? nombre(chatter) : "..."}
                       <button
                         type="button"
                         onClick={() => removeChatter(id)}
+                        aria-label={t("creadores.assign.removeChatter")}
                         className="ml-0.5 rounded-full p-0.5 hover:bg-muted-foreground/20"
                       >
                         <X className="h-3 w-3" />
@@ -219,13 +224,13 @@ export default function AssignmentModal({
                   {loadingChatters ? (
                     <span className="flex items-center gap-2 text-muted-foreground">
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      Cargando...
+                      {t("common.loading")}
                     </span>
                   ) : (
                     <span className="text-muted-foreground">
                       {selectedChatters.length > 0
-                        ? `${selectedChatters.length} seleccionado(s)`
-                        : "Seleccionar chatters..."}
+                        ? t("creadores.assign.nSelected", { n: selectedChatters.length })
+                        : t("creadores.assign.selectChatters")}
                     </span>
                   )}
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -241,7 +246,7 @@ export default function AssignmentModal({
                       return (
                         <CommandItem
                           key={c.id}
-                          value={c.full_name}
+                          value={nombre(c)}
                           onSelect={() => toggleChatter(c.id)}
                         >
                           <Check
@@ -250,7 +255,7 @@ export default function AssignmentModal({
                               isSelected ? "opacity-100" : "opacity-0"
                             )}
                           />
-                          {c.full_name}
+                          {nombre(c)}
                         </CommandItem>
                       );
                     })}
@@ -262,16 +267,16 @@ export default function AssignmentModal({
         </div>
 
         <p className="text-xs text-muted-foreground">
-          Puedes omitir esta asignación y completarla después desde el perfil de la creadora.
+          {t("creadores.assign.skipHint")}
         </p>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
-            Cancelar
+            {t("common.cancel")}
           </Button>
           <Button onClick={handleConfirm} disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Completar Onboarding
+            {t("creadores.assign.complete")}
           </Button>
         </DialogFooter>
       </DialogContent>

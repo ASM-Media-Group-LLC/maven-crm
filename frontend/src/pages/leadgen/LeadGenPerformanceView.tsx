@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import { format, subDays, isSameDay, subMonths } from "date-fns";
-import { es } from "date-fns/locale";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, LineChart, Line, ResponsiveContainer } from "recharts";
 import { BarChart3, Clock, ChevronsUpDown, Check } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,6 +8,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandInput, CommandList, CommandEmpty, CommandItem } from "@/components/ui/command";
 import { useLeadGenAgentLeads } from "./useLeadGen";
 import type { LeadGenEntry } from "./useLeadGen";
+import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface Props {
   profiles: Array<{ id: string; full_name: string | null }>;
@@ -18,20 +19,22 @@ interface Props {
 }
 
 const LeadGenPerformanceView = ({ profiles, agentIds, dateFrom, dateTo }: Props) => {
+  const f = useFormato();
+  const { t } = useLanguage();
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
 
   const agents = useMemo(() => {
     return agentIds.map(id => {
       const p = profiles.find(pr => pr.id === id);
-      return { id, name: p?.full_name || `Agente ${id.slice(0, 6)}` };
+      return { id, name: p?.full_name || t("leadgen.agentWithId", { id: id.slice(0, 6) }) };
     }).sort((a, b) => a.name.localeCompare(b.name));
-  }, [agentIds, profiles]);
+  }, [agentIds, profiles, t]);
 
   // Fetch ALL leads for selected agent (no pagination limit)
   const { data: agentLeads = [], isLoading } = useLeadGenAgentLeads(selectedAgent, dateFrom, dateTo);
 
-  const selectedName = !selectedAgent ? "Seleccionar agente" : (agents.find(a => a.id === selectedAgent)?.name || "Agente");
+  const selectedName = !selectedAgent ? t("leadgen.perf.selectAgent") : (agents.find(a => a.id === selectedAgent)?.name || t("leadgen.agentFallback"));
 
   const now = new Date();
 
@@ -43,29 +46,29 @@ const LeadGenPerformanceView = ({ profiles, agentIds, dateFrom, dateTo }: Props)
   const weeklyData = useMemo(() => Array.from({ length: 7 }, (_, i) => {
     const day = subDays(now, 6 - i);
     return {
-      label: format(day, "EEE dd", { locale: es }),
+      label: format(day, "EEE dd", { locale: f.fechas }),
       count: agentLeads.filter(l => isSameDay(new Date(l.created_at), day)).length,
     };
-  }), [agentLeads, now]);
+  }), [agentLeads, now, f]);
 
   const last30Data = useMemo(() => Array.from({ length: 30 }, (_, i) => {
     const day = subDays(now, 29 - i);
     return {
-      label: format(day, "d MMM", { locale: es }),
+      label: format(day, f.idioma === "en" ? "MMM d" : "d MMM", { locale: f.fechas }),
       count: agentLeads.filter(l => isSameDay(new Date(l.created_at), day)).length,
     };
-  }), [agentLeads, now]);
+  }), [agentLeads, now, f]);
 
   const yearlyData = useMemo(() => Array.from({ length: 12 }, (_, i) => {
     const month = subMonths(now, 11 - i);
     return {
-      label: format(month, "MMM yy", { locale: es }),
+      label: format(month, "MMM yy", { locale: f.fechas }),
       count: agentLeads.filter(l => {
         const d = new Date(l.created_at);
         return d.getMonth() === month.getMonth() && d.getFullYear() === month.getFullYear();
       }).length,
     };
-  }), [agentLeads, now]);
+  }), [agentLeads, now, f]);
 
   const tooltipStyle = { backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' };
 
@@ -74,9 +77,9 @@ const LeadGenPerformanceView = ({ profiles, agentIds, dateFrom, dateTo }: Props)
       <CardContent className="pt-6">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h3 className="text-base font-semibold">Rendimiento por Agente</h3>
+            <h3 className="text-base font-semibold">{t("leadgen.perf.byAgentTitle")}</h3>
             <p className="text-sm text-muted-foreground">
-              Selecciona un agente para analizar su actividad
+              {t("leadgen.perf.byAgentSubtitle")}
             </p>
           </div>
           <Popover open={open} onOpenChange={setOpen}>
@@ -88,9 +91,9 @@ const LeadGenPerformanceView = ({ profiles, agentIds, dateFrom, dateTo }: Props)
             </PopoverTrigger>
             <PopoverContent className="w-[220px] p-0">
               <Command>
-                <CommandInput placeholder="Buscar agente..." />
+                <CommandInput placeholder={t("leadgen.searchAgent")} />
                 <CommandList>
-                  <CommandEmpty>No encontrado</CommandEmpty>
+                  <CommandEmpty>{t("leadgen.notFound")}</CommandEmpty>
                   {agents.map(a => (
                     <CommandItem key={a.id} value={a.name} onSelect={() => { setSelectedAgent(a.id); setOpen(false); }}>
                       {a.name}
@@ -108,29 +111,29 @@ const LeadGenPerformanceView = ({ profiles, agentIds, dateFrom, dateTo }: Props)
             <div className="h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
               <BarChart3 className="h-8 w-8 text-muted-foreground/50" />
             </div>
-            <p className="text-muted-foreground text-sm">Selecciona un agente para ver su rendimiento</p>
+            <p className="text-muted-foreground text-sm">{t("leadgen.perf.selectAgentEmpty")}</p>
           </div>
         ) : isLoading ? (
           <div className="flex items-center justify-center py-20">
-            <p className="text-muted-foreground text-sm">Cargando datos del agente...</p>
+            <p className="text-muted-foreground text-sm">{t("leadgen.perf.loadingAgent")}</p>
           </div>
         ) : (
           <div className="space-y-6">
             <div className="rounded-lg border border-primary/30 bg-gradient-to-r from-primary/15 to-primary/5 p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">Total de Leads — {selectedName}</p>
+                  <p className="text-sm font-medium text-muted-foreground">{t("leadgen.perf.totalLeadsOf", { name: selectedName })}</p>
                   <p className="text-4xl font-bold text-primary mt-1">{agentLeads.length}</p>
                 </div>
-                <p className="text-sm text-muted-foreground">{format(now, "dd/MM/yyyy")}</p>
+                <p className="text-sm text-muted-foreground">{format(now, f.idioma === "en" ? "MM/dd/yyyy" : "dd/MM/yyyy")}</p>
               </div>
             </div>
 
             {[
-              { title: "Leads por Hora del Día", icon: Clock, iconColor: "text-primary", data: hourlyData, dataKey: "hour", type: "bar", color: "hsl(var(--primary))" },
-              { title: "Leads por Día (Última Semana)", icon: BarChart3, iconColor: "text-emerald-500", data: weeklyData, dataKey: "label", type: "bar", color: "#10b981" },
-              { title: "Leads por Día (Últimos 30 días)", icon: BarChart3, iconColor: "text-violet-500", data: last30Data, dataKey: "label", type: "line", color: "#8b5cf6" },
-              { title: "Leads por Mes (Últimos 12 meses)", icon: BarChart3, iconColor: "text-amber-500", data: yearlyData, dataKey: "label", type: "bar", color: "#f59e0b" },
+              { title: t("leadgen.perf.chartByHourOfDay"), icon: Clock, iconColor: "text-primary", data: hourlyData, dataKey: "hour", type: "bar", color: "hsl(var(--primary))" },
+              { title: t("leadgen.perf.chartLastWeek"), icon: BarChart3, iconColor: "text-emerald-500", data: weeklyData, dataKey: "label", type: "bar", color: "#10b981" },
+              { title: t("leadgen.perf.chartLast30"), icon: BarChart3, iconColor: "text-violet-500", data: last30Data, dataKey: "label", type: "line", color: "#8b5cf6" },
+              { title: t("leadgen.perf.chartLast12Months"), icon: BarChart3, iconColor: "text-amber-500", data: yearlyData, dataKey: "label", type: "bar", color: "#f59e0b" },
             ].map((chart, i) => (
               <Card key={i}>
                 <CardContent className="pt-6">

@@ -15,7 +15,8 @@ const monitor = fuentes["/frontend/src/pages/cowork/CoworkRoomMonitor.tsx"];
 
 describe("el monitor de una sala sigue montado aunque la vea vacía", () => {
   it("la rama 'Sin participantes' monta el monitor mientras haya asignados", () => {
-    const i = tablero.indexOf("Sin participantes</span>");
+    // La rama se reconoce por su texto: "Sin participantes", hoy como clave del diccionario.
+    const i = tablero.indexOf('t("cowork.host.noParticipants")}</span>');
     expect(i).toBeGreaterThan(0);
     expect(tablero.slice(i, i + 1200)).toContain("asignados.length > 0 && monitor(false)");
   });

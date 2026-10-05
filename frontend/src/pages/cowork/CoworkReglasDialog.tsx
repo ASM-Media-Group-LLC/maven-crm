@@ -7,6 +7,10 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
+import { traducir, type TranslationKey } from "@/lib/i18n";
+import type { Traductor } from "./textosCowork";
 import {
   PRESETS, REGLAS_ESTANDAR, OPCIONES_SEG, OPCIONES_BANO_MIN, OPCIONES_BREAK_MIN, OPCIONES_RELOJ_SEG,
   detectarPreset, paraGuardar, textoSegundos, mismasReglas,
@@ -39,11 +43,12 @@ interface Props {
 
 type ClaveAviso = "camara" | "encuadre" | "pantalla";
 
-const OPCIONES_PRESET: { valor: Preset; texto: string }[] = [
-  { valor: "estricto", texto: "Estricto" },
-  { valor: "estandar", texto: "Estándar" },
-  { valor: "relajado", texto: "Relajado" },
-  { valor: "personalizado", texto: "Personalizado" },
+// `valor` es el preset que se guarda en la base (alert_rules.preset): no se traduce.
+const OPCIONES_PRESET: { valor: Preset; texto: TranslationKey }[] = [
+  { valor: "estricto", texto: "cowork.rules.preset.strict" },
+  { valor: "estandar", texto: "cowork.rules.preset.standard" },
+  { valor: "relajado", texto: "cowork.rules.preset.relaxed" },
+  { valor: "personalizado", texto: "cowork.rules.preset.custom" },
 ];
 
 /** Las opciones del menú más el valor actual si no está entre ellas: una fila
@@ -61,7 +66,7 @@ function opcionesSegundos(actual: number): Opcion[] {
   return conValorActual(OPCIONES_SEG, actual).map((s) => ({ valor: String(s), texto: textoSegundos(s) }));
 }
 
-function opcionesSupervisor(actual: number | null, sufijo?: string): Opcion[] {
+function opcionesSupervisor(t: Traductor, actual: number | null, sufijo?: string): Opcion[] {
   const base = actual === null ? [...OPCIONES_SEG] : conValorActual(OPCIONES_SEG, actual);
   return [
     ...base.map((s) => ({
@@ -69,47 +74,63 @@ function opcionesSupervisor(actual: number | null, sufijo?: string): Opcion[] {
       texto: sufijo ? `${textoSegundos(s)} ${sufijo}` : textoSegundos(s),
       textoCorto: textoSegundos(s),
     })),
-    { valor: NUNCA, texto: "Nunca" },
+    { valor: NUNCA, texto: t("cowork.rules.never") },
   ];
 }
 
 
-function resumenAviso(r: ReglaAviso): string {
-  if (!r.activa) return "Sin aviso en esta sesión.";
-  const supervisor = r.supervisorSeg === null ? "a ti nunca" : `te avisa a los ${textoSegundos(r.supervisorSeg)}`;
-  return `Se le avisa a la persona a ${textoSegundos(r.primerAvisoSeg)} y cada ${textoSegundos(r.repetirSeg)} · ${supervisor}`;
+function resumenAviso(r: ReglaAviso, t: Traductor): string {
+  if (!r.activa) return t("cowork.rules.noAlert");
+  const supervisor = r.supervisorSeg === null
+    ? t("cowork.rules.summary.neverToYou")
+    : t("cowork.rules.summary.alertsYouAt", { time: textoSegundos(r.supervisorSeg) });
+  return t("cowork.rules.summary.alert", {
+    first: textoSegundos(r.primerAvisoSeg), repeat: textoSegundos(r.repetirSeg), supervisor,
+  });
 }
 
-function resumenReloj(r: ReglaReloj, camara: boolean, pantalla: boolean): string {
-  const exige = camara && pantalla ? "cámara y pantalla" : camara ? "cámara (la pantalla no se exige acá)" : pantalla ? "pantalla (la cámara no se exige acá)" : "estar en la sala (ni cámara ni pantalla se exigen acá)";
+function resumenReloj(r: ReglaReloj, camara: boolean, pantalla: boolean, t: Traductor): string {
+  const exige = camara && pantalla ? t("cowork.rules.clock.requiresBoth")
+    : camara ? t("cowork.rules.clock.requiresCamera")
+    : pantalla ? t("cowork.rules.clock.requiresScreen")
+    : t("cowork.rules.clock.requiresNone");
   const paradas = [
-    "en pausa",
-    camara ? "sin cámara" : null,
-    pantalla ? "sin pantalla" : null,
-    camara ? `si no hay nadie ${textoSegundos(r.fueraDeCamaraSeg)} seguidos` : null,
+    t("cowork.rules.clock.stopPaused"),
+    camara ? t("cowork.rules.clock.stopNoCamera") : null,
+    pantalla ? t("cowork.rules.clock.stopNoScreen") : null,
+    camara ? t("cowork.rules.clock.stopNobody", { time: textoSegundos(r.fueraDeCamaraSeg) }) : null,
+    // Solo si exige algo: sin cámara ni pantalla, el reloj nunca dependió de la sala.
+    camara || pantalla ? t("cowork.rules.clock.stopNoConnection") : null,
   ].filter(Boolean).join(", ");
-  return `Corre con ${exige} · se detiene ${paradas}`;
+  return t("cowork.rules.clock.summary", { requires: exige, stops: paradas });
 }
 
-function resumenPausas(p: ReglaPausas): string {
+function resumenPausas(p: ReglaPausas, t: Traductor): string {
   const supervisor = p.supervisorSeg === null
-    ? "a ti nunca"
-    : `te avisa ${textoSegundos(p.supervisorSeg)} después de pasarse`;
-  return `Baño ${p.banoMin} min/día · Break ${p.breakMin} min · ${supervisor}`;
+    ? t("cowork.rules.summary.neverToYou")
+    : t("cowork.rules.summary.alertsYouAfter", { time: textoSegundos(p.supervisorSeg) });
+  return t("cowork.rules.summary.pauses", { bathroom: p.banoMin, break: p.breakMin, supervisor });
 }
 
-/** "por Yoselin Castillo · 8 de sept", o null si no hay nada que decir. */
-export function firmaDeLasReglas(autoria?: { quien: string | null; cuando: string | null }): string | null {
+/** "por Yoselin Castillo · 8 de sept", o null si no hay nada que decir.
+ *  Sin `t` sale en el idioma vigente (los tests la llaman sola). */
+export function firmaDeLasReglas(
+  autoria?: { quien: string | null; cuando: string | null },
+  locale: string = "es-CO",
+  t: Traductor = traducir,
+): string | null {
   if (!autoria?.quien && !autoria?.cuando) return null;
   const cuando = autoria.cuando
-    ? new Date(autoria.cuando).toLocaleDateString("es-CO", { day: "numeric", month: "short" })
+    ? new Date(autoria.cuando).toLocaleDateString(locale, { day: "numeric", month: "short" })
     : null;
-  if (autoria.quien && cuando) return `por ${autoria.quien} · ${cuando}`;
-  if (autoria.quien) return `por ${autoria.quien}`;
-  return `el ${cuando}`;
+  if (autoria.quien && cuando) return t("cowork.rules.signature.byOn", { name: autoria.quien, date: cuando });
+  if (autoria.quien) return t("cowork.rules.signature.by", { name: autoria.quien });
+  return t("cowork.rules.signature.on", { date: cuando ?? "" });
 }
 
 export default function CoworkReglasDialog({ open, onOpenChange, reglas, nombreSesion, autoria, onGuardar }: Props) {
+  const f = useFormato();
+  const { t } = useLanguage();
   const [borrador, setBorrador] = useState<ReglasCowork>(reglas);
   const [guardando, setGuardando] = useState(false);
   const [abiertas, setAbiertas] = useState<Record<string, boolean>>({});
@@ -149,10 +170,10 @@ export default function CoworkReglasDialog({ open, onOpenChange, reglas, nombreS
     setGuardando(true);
     try {
       await onGuardar(paraGuardar(borrador));
-      toast.success("Reglas guardadas", { description: "Aplican en vivo a quienes ya están en la sesión." });
+      toast.success(t("cowork.rules.saved"), { description: t("cowork.rules.savedDesc") });
       onOpenChange(false);
     } catch (e) {
-      toast.error("No se pudieron guardar las reglas", { description: (e as Error).message });
+      toast.error(t("cowork.rules.saveError"), { description: (e as Error).message });
     } finally {
       setGuardando(false);
     }
@@ -163,21 +184,21 @@ export default function CoworkReglasDialog({ open, onOpenChange, reglas, nombreS
     return (
       <>
         <CampoOpcion
-          etiqueta="Primer aviso"
+          etiqueta={t("cowork.rules.firstAlert")}
           valor={String(r.primerAvisoSeg)}
           opciones={opcionesSegundos(r.primerAvisoSeg)}
           onCambio={(v) => cambiarAviso(clave, { primerAvisoSeg: Number(v) })}
         />
         <CampoOpcion
-          etiqueta="Repetir cada"
+          etiqueta={t("cowork.rules.repeatEvery")}
           valor={String(r.repetirSeg)}
           opciones={opcionesSegundos(r.repetirSeg)}
           onCambio={(v) => cambiarAviso(clave, { repetirSeg: Number(v) })}
         />
         <CampoOpcion
-          etiqueta="Avisarte a los"
+          etiqueta={t("cowork.rules.alertYouAt")}
           valor={r.supervisorSeg === null ? NUNCA : String(r.supervisorSeg)}
-          opciones={opcionesSupervisor(r.supervisorSeg)}
+          opciones={opcionesSupervisor(t, r.supervisorSeg)}
           onCambio={(v) => cambiarAviso(clave, { supervisorSeg: v === NUNCA ? null : Number(v) })}
         />
       </>
@@ -190,15 +211,15 @@ export default function CoworkReglasDialog({ open, onOpenChange, reglas, nombreS
         {/* Cabecera: el nombre grande en la display, como los títulos del
             reskin. El degradado del acento del Dialog vive justo detrás. */}
         <DialogHeader className="px-7 pt-7 pb-5 text-left space-y-1.5">
-          <p className="text-xs font-semibold text-primary">Reglas de esta sesión</p>
-          <DialogTitle className="font-display text-[26px] leading-tight tracking-tight">{nombreSesion || "Esta sesión"}</DialogTitle>
-          <DialogDescription>Aplican a todas las personas que entren a esta sesión, hoy y en adelante.</DialogDescription>
+          <p className="text-xs font-semibold text-primary">{t("cowork.rules.eyebrow")}</p>
+          <DialogTitle className="font-display text-[26px] leading-tight tracking-tight">{nombreSesion || t("cowork.common.thisSession")}</DialogTitle>
+          <DialogDescription>{t("cowork.rules.desc")}</DialogDescription>
           {/* Quién las dejó así. Antes no quedaba registro: Jhon vio cuatro
               sesiones con las alertas apagadas y no había forma de saber quién
               lo había hecho (09/09/2026). */}
-          {firmaDeLasReglas(autoria) && (
+          {firmaDeLasReglas(autoria, f.intl("es-CO"), t) && (
             <p className="text-xs text-muted-foreground">
-              Personalizadas {firmaDeLasReglas(autoria)}
+              {t("cowork.rules.customized", { signature: firmaDeLasReglas(autoria, f.intl("es-CO"), t) ?? "" })}
             </p>
           )}
         </DialogHeader>
@@ -228,21 +249,19 @@ export default function CoworkReglasDialog({ open, onOpenChange, reglas, nombreS
                       : "text-muted-foreground hover:text-foreground hover:bg-white/[0.06]",
                   )}
                 >
-                  {op.texto}
+                  {t(op.texto)}
                 </button>
               );
             })}
           </div>
-          <p className="text-xs text-muted-foreground px-1">
-            Estándar es lo que Cowork hace hoy con los chatters. Personalizado abre las cuatro reglas para ajustarlas una por una.
-          </p>
+          <p className="text-xs text-muted-foreground px-1">{t("cowork.rules.presetsHint")}</p>
         </div>
 
         <div className="px-7 pt-5 grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
           <TarjetaRegla
             icono={VideoOff}
-            titulo="Cámara apagada"
-            resumen={resumenAviso(borrador.camara)}
+            titulo={t("cowork.rules.camera")}
+            resumen={resumenAviso(borrador.camara, t)}
             activa={borrador.camara.activa}
             onActiva={(v) => cambiarAviso("camara", { activa: v })}
             abierta={!!abiertas.camara}
@@ -253,11 +272,11 @@ export default function CoworkReglasDialog({ open, onOpenChange, reglas, nombreS
 
           <TarjetaRegla
             icono={ScanFace}
-            titulo="Encuadre y luz"
+            titulo={t("cowork.rules.framing")}
             resumen={
               <>
-                <span className="block">Sin rostro, fuera de cuadro o con poca luz.</span>
-                <span className="block">{resumenAviso(borrador.encuadre)}</span>
+                <span className="block">{t("cowork.rules.framingHint")}</span>
+                <span className="block">{resumenAviso(borrador.encuadre, t)}</span>
               </>
             }
             activa={borrador.encuadre.activa}
@@ -270,8 +289,8 @@ export default function CoworkReglasDialog({ open, onOpenChange, reglas, nombreS
 
           <TarjetaRegla
             icono={Monitor}
-            titulo="Compartir pantalla"
-            resumen={resumenAviso(borrador.pantalla)}
+            titulo={t("cowork.rules.screen")}
+            resumen={resumenAviso(borrador.pantalla, t)}
             activa={borrador.pantalla.activa}
             onActiva={(v) => cambiarAviso("pantalla", { activa: v })}
             abierta={!!abiertas.pantalla}
@@ -284,29 +303,29 @@ export default function CoworkReglasDialog({ open, onOpenChange, reglas, nombreS
               cuánto y si el supervisor se entera cuando alguien se pasa. */}
           <TarjetaRegla
             icono={Coffee}
-            titulo="Pausas"
-            resumen={resumenPausas(borrador.pausas)}
+            titulo={t("cowork.rules.pauses")}
+            resumen={resumenPausas(borrador.pausas, t)}
             abierta={!!abiertas.pausas}
             onAlternar={() => alternar("pausas")}
           >
             <CampoOpcion
-              etiqueta="Baño"
+              etiqueta={t("cowork.pause.bano")}
               valor={String(borrador.pausas.banoMin)}
               opciones={conValorActual(OPCIONES_BANO_MIN, borrador.pausas.banoMin)
-                .map((m) => ({ valor: String(m), texto: `${m} min/día` }))}
+                .map((m) => ({ valor: String(m), texto: t("cowork.rules.minPerDay", { n: m }) }))}
               onCambio={(v) => cambiarPausas({ banoMin: Number(v) })}
             />
             <CampoOpcion
-              etiqueta="Break"
+              etiqueta={t("cowork.pause.break")}
               valor={String(borrador.pausas.breakMin)}
               opciones={conValorActual(OPCIONES_BREAK_MIN, borrador.pausas.breakMin)
                 .map((m) => ({ valor: String(m), texto: `${m} min` }))}
               onCambio={(v) => cambiarPausas({ breakMin: Number(v) })}
             />
             <CampoOpcion
-              etiqueta="Avisarte"
+              etiqueta={t("cowork.rules.alertYou")}
               valor={borrador.pausas.supervisorSeg === null ? NUNCA : String(borrador.pausas.supervisorSeg)}
-              opciones={opcionesSupervisor(borrador.pausas.supervisorSeg, "después de pasarse")}
+              opciones={opcionesSupervisor(t, borrador.pausas.supervisorSeg, t("cowork.rules.afterGoingOver"))}
               onCambio={(v) => cambiarPausas({ supervisorSeg: v === NUNCA ? null : Number(v) })}
             />
           </TarjetaRegla>
@@ -317,33 +336,26 @@ export default function CoworkReglasDialog({ open, onOpenChange, reglas, nombreS
               tarjetas de arriba. */}
           <TarjetaRegla
             icono={Timer}
-            titulo="Reloj de tiempo trabajado"
-            resumen={resumenReloj(borrador.reloj, borrador.camara.activa, borrador.pantalla.activa)}
+            titulo={t("cowork.rules.clock")}
+            resumen={resumenReloj(borrador.reloj, borrador.camara.activa, borrador.pantalla.activa, t)}
             abierta={!!abiertas.reloj}
             onAlternar={() => alternar("reloj")}
           >
             <CampoOpcion
-              etiqueta="Nadie frente a la cámara"
+              etiqueta={t("cowork.rules.nobodyOnCamera")}
               valor={String(borrador.reloj.fueraDeCamaraSeg)}
               opciones={conValorActual(OPCIONES_RELOJ_SEG, borrador.reloj.fueraDeCamaraSeg)
-                .map((sg) => ({ valor: String(sg), texto: `${textoSegundos(sg)} y se detiene` }))}
+                .map((sg) => ({ valor: String(sg), texto: t("cowork.rules.andStops", { time: textoSegundos(sg) }) }))}
               onCambio={(v) => cambiarReloj({ fueraDeCamaraSeg: Number(v) })}
             />
-            <p className="text-xs text-muted-foreground sm:col-span-2">
-              El reloj exige lo mismo que las alertas de arriba: si apagas la de pantalla, no se detiene por pantalla;
-              si apagas la de cámara, tampoco por cámara. Agacharse un momento no descuenta: se detiene solo cuando
-              la ausencia dura más que esto. Muy lejos o con poca luz no lo detienen; eso va por las alertas de encuadre.
-            </p>
+            <p className="text-xs text-muted-foreground sm:col-span-2">{t("cowork.rules.clockHint")}</p>
           </TarjetaRegla>
         </div>
 
         <div className="mt-6 mx-7 mb-7 border-t border-white/10 pt-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="flex items-start gap-2 text-xs text-muted-foreground sm:max-w-[46%]">
             <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-            <span>
-              Los llamados de atención se registran con estas mismas reglas: si una alerta no existe acá,
-              no queda anotada en nadie.
-            </span>
+            <span>{t("cowork.rules.logHint")}</span>
           </p>
           <div className="flex items-center justify-end gap-2">
             <Button
@@ -352,11 +364,11 @@ export default function CoworkReglasDialog({ open, onOpenChange, reglas, nombreS
               disabled={guardando}
               onClick={() => setBorrador(REGLAS_ESTANDAR)}
             >
-              <RotateCcw className="h-3.5 w-3.5" /> Restablecer estándar
+              <RotateCcw className="h-3.5 w-3.5" /> {t("cowork.rules.reset")}
             </Button>
             <Button className="gap-1.5 tactil:h-10" disabled={sinCambios || guardando} onClick={() => void guardar()}>
               {guardando && <Loader2 className="h-4 w-4 animate-spin" />}
-              Guardar cambios
+              {t("cowork.rules.saveChanges")}
             </Button>
           </div>
         </div>
@@ -380,6 +392,7 @@ interface TarjetaProps {
 }
 
 function TarjetaRegla({ icono: Icono, titulo, resumen, activa, onActiva, abierta, onAlternar, children }: TarjetaProps) {
+  const { t } = useLanguage();
   const apagada = activa === false;
   return (
     <div className={cn("glass-card-subtle bg-white/[0.03] p-4 transition-all hover:bg-white/[0.05]", apagada && "opacity-60")}>
@@ -393,12 +406,12 @@ function TarjetaRegla({ icono: Icono, titulo, resumen, activa, onActiva, abierta
           </span>
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-medium text-foreground">{titulo}</span>
-            <span className="block text-xs text-muted-foreground">{apagada ? "Sin aviso en esta sesión." : resumen}</span>
+            <span className="block text-xs text-muted-foreground">{apagada ? t("cowork.rules.noAlert") : resumen}</span>
           </span>
           <ChevronDown className={cn("h-4 w-4 shrink-0 mt-2 text-muted-foreground/60 transition-transform", abierta && "rotate-180")} />
         </button>
         {activa !== undefined && onActiva && (
-          <Switch checked={activa} onCheckedChange={onActiva} aria-label={`${titulo}: activa en esta sesión`} />
+          <Switch checked={activa} onCheckedChange={onActiva} aria-label={t("cowork.rules.switchAria", { title: titulo })} />
         )}
       </div>
       {abierta && (

@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import {
   useAnnouncementsAdmin,
   useUpdateAnnouncement,
@@ -24,10 +24,13 @@ import CreateAnnouncementModal from "./announcements/CreateAnnouncementModal";
 import EditAnnouncementModal from "./announcements/EditAnnouncementModal";
 import DeleteAnnouncementDialog from "./announcements/DeleteAnnouncementDialog";
 import AnnouncementDetailModal from "./announcements/AnnouncementDetailModal";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 
-const TYPE_LABELS: Record<string, string> = {
-  general: "General", policy: "Política", celebration: "Celebración",
-  holiday: "Feriado", urgent: "Urgente", reminder: "Recordatorio", update: "Actualización",
+// announcement_type, priority y status son valores de la base: se traduce solo lo que se ve.
+const TYPE_LABELS: Record<string, TranslationKey> = {
+  general: "hr.ann.type.general", policy: "hr.ann.type.policy", celebration: "hr.ann.type.celebration",
+  holiday: "hr.ann.type.holiday", urgent: "hr.ann.type.urgent", reminder: "hr.ann.type.reminder", update: "hr.ann.type.update",
 };
 
 const PRIORITY_COLORS: Record<string, string> = {
@@ -36,26 +39,28 @@ const PRIORITY_COLORS: Record<string, string> = {
   high: "bg-destructive/10 text-destructive",
 };
 
-const PRIORITY_LABELS: Record<string, string> = { low: "Baja", normal: "Normal", high: "Alta" };
+const PRIORITY_LABELS: Record<string, TranslationKey> = { low: "hr.ann.prio.low", normal: "hr.ann.prio.normal", high: "hr.ann.prio.high" };
 
-const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
-  draft: { label: "Borrador", className: "bg-muted text-muted-foreground" },
-  scheduled: { label: "Programado", className: "bg-warning/10 text-warning" },
-  active: { label: "Activo", className: "bg-success/10 text-success" },
-  expired: { label: "Expirado", className: "bg-muted text-muted-foreground" },
-  archived: { label: "Archivado", className: "bg-muted text-muted-foreground" },
+const STATUS_CONFIG: Record<string, { label: TranslationKey; className: string }> = {
+  draft: { label: "hr.ann.status.draft", className: "bg-muted text-muted-foreground" },
+  scheduled: { label: "hr.ann.status.scheduled", className: "bg-warning/10 text-warning" },
+  active: { label: "hr.ann.status.active", className: "bg-success/10 text-success" },
+  expired: { label: "hr.ann.status.expired", className: "bg-muted text-muted-foreground" },
+  archived: { label: "hr.ann.status.archived", className: "bg-muted text-muted-foreground" },
 };
 
-const STATUS_TABS = [
-  { value: "all", label: "Todos" },
-  { value: "active", label: "Activos" },
-  { value: "scheduled", label: "Programados" },
-  { value: "draft", label: "Borradores" },
-  { value: "expired", label: "Expirados" },
-  { value: "archived", label: "Archivados" },
+const STATUS_TABS: { value: string; label: TranslationKey }[] = [
+  { value: "all", label: "common.all" },
+  { value: "active", label: "common.activePl" },
+  { value: "scheduled", label: "hr.ann.tab.scheduled" },
+  { value: "draft", label: "hr.ann.tab.drafts" },
+  { value: "expired", label: "hr.ann.tab.expired" },
+  { value: "archived", label: "hr.ann.tab.archived" },
 ];
 
 const HRAnnouncements = () => {
+  const { t } = useLanguage();
+  const f = useFormato();
   const { data: announcements = [], isLoading } = useAnnouncementsAdmin();
   const [searchParams, setSearchParams] = useSearchParams();
   const duplicateAnn = useDuplicateAnnouncement();
@@ -111,18 +116,18 @@ const HRAnnouncements = () => {
     const targets = a.audience ?? [];
     if (targets.length === 0) return "Global";
     if (targets.length === 1) return targets[0].target_label;
-    return `${targets.length} destinos`;
+    return t("hr.ann.targets", { count: targets.length });
   };
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <header className="shrink-0 bg-background/30 backdrop-blur-xl border-b border-white/10 px-6 py-4">
         <PageHeader
-          title="Comunicación Interna"
-          subtitle="Gestión avanzada de anuncios, avisos y comunicados"
+          title={t("hr.ann.title")}
+          subtitle={t("hr.ann.subtitle")}
           actions={
             <Button size="sm" className="gap-1.5" onClick={() => setCreateOpen(true)}>
-              <Plus className="h-3.5 w-3.5" /> Nuevo Anuncio
+              <Plus className="h-3.5 w-3.5" /> {t("hr.ann.new")}
             </Button>
           }
         />
@@ -131,18 +136,18 @@ const HRAnnouncements = () => {
       <main className="flex-1 overflow-auto p-6 space-y-5">
         {/* KPIs estilo estándar — clickeables (excepto Visualizaciones que es métrica agregada) */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-          <StatChip label="Total" value={stats.total} icon={<FileText className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("total")} />
-          <StatChip label="Activos" value={stats.active} icon={<CheckCircle className="h-3.5 w-3.5" />} color="bg-success" onClick={() => setKpiPopup("active")} />
-          <StatChip label="Programados" value={stats.scheduled} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" onClick={() => setKpiPopup("scheduled")} />
-          <StatChip label="Borradores" value={stats.draft} icon={<Edit3 className="h-3.5 w-3.5" />} color="bg-muted-foreground" onClick={() => setKpiPopup("draft")} />
-          <StatChip label="Visualizaciones" value={stats.totalViews} icon={<EyeIcon className="h-3.5 w-3.5" />} color="bg-primary" />
+          <StatChip label={t("hr.ann.kpiTotal")} value={stats.total} icon={<FileText className="h-3.5 w-3.5" />} color="bg-primary" onClick={() => setKpiPopup("total")} />
+          <StatChip label={t("common.activePl")} value={stats.active} icon={<CheckCircle className="h-3.5 w-3.5" />} color="bg-success" onClick={() => setKpiPopup("active")} />
+          <StatChip label={t("hr.ann.tab.scheduled")} value={stats.scheduled} icon={<Clock className="h-3.5 w-3.5" />} color="bg-warning" onClick={() => setKpiPopup("scheduled")} />
+          <StatChip label={t("hr.ann.tab.drafts")} value={stats.draft} icon={<Edit3 className="h-3.5 w-3.5" />} color="bg-muted-foreground" onClick={() => setKpiPopup("draft")} />
+          <StatChip label={t("hr.ann.views")} value={stats.totalViews} icon={<EyeIcon className="h-3.5 w-3.5" />} color="bg-primary" />
         </div>
 
         {/* Tabs */}
         <Tabs value={statusTab} onValueChange={setStatusTab}>
           <TabsList>
-            {STATUS_TABS.map((t) => (
-              <TabsTrigger key={t.value} value={t.value}>{t.label}</TabsTrigger>
+            {STATUS_TABS.map((tab) => (
+              <TabsTrigger key={tab.value} value={tab.value}>{t(tab.label)}</TabsTrigger>
             ))}
           </TabsList>
         </Tabs>
@@ -162,27 +167,27 @@ const HRAnnouncements = () => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Título</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Prioridad</TableHead>
-                <TableHead>Audiencia</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead>Alcance</TableHead>
-                <TableHead>Publicación</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
+                <TableHead>{t("common.title")}</TableHead>
+                <TableHead>{t("common.type")}</TableHead>
+                <TableHead>{t("hr.ann.priority")}</TableHead>
+                <TableHead>{t("hr.ann.audience")}</TableHead>
+                <TableHead>{t("common.status")}</TableHead>
+                <TableHead>{t("hr.ann.reach")}</TableHead>
+                <TableHead>{t("hr.ann.published")}</TableHead>
+                <TableHead className="text-right">{t("common.actions")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                    Cargando…
+                    {t("common.loading")}
                   </TableCell>
                 </TableRow>
               ) : filtered.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                    Sin anuncios
+                    {t("hr.ann.empty")}
                   </TableCell>
                 </TableRow>
               ) : (
@@ -197,14 +202,14 @@ const HRAnnouncements = () => {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline">{TYPE_LABELS[a.announcement_type] ?? a.announcement_type}</Badge>
+                        <Badge variant="outline">{TYPE_LABELS[a.announcement_type] ? t(TYPE_LABELS[a.announcement_type]) : a.announcement_type}</Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge className={PRIORITY_COLORS[a.priority]}>{PRIORITY_LABELS[a.priority]}</Badge>
+                        <Badge className={PRIORITY_COLORS[a.priority]}>{PRIORITY_LABELS[a.priority] ? t(PRIORITY_LABELS[a.priority]) : a.priority}</Badge>
                       </TableCell>
                       <TableCell className="text-sm">{audienceLabel(a)}</TableCell>
                       <TableCell>
-                        <Badge className={sc.className}>{sc.label}</Badge>
+                        <Badge className={sc.className}>{t(sc.label)}</Badge>
                       </TableCell>
                       <TableCell className="text-sm">
                         <span className="flex items-center gap-1">
@@ -213,7 +218,7 @@ const HRAnnouncements = () => {
                         </span>
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
-                        {format(new Date(a.starts_at), "d MMM yyyy", { locale: es })}
+                        {format(new Date(a.starts_at), "d MMM yyyy", { locale: f.fechas })}
                       </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end">
@@ -225,20 +230,20 @@ const HRAnnouncements = () => {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem onClick={() => setDetailTarget(a)}>
-                                <Eye className="mr-2 h-4 w-4" /> Ver detalle
+                                <Eye className="mr-2 h-4 w-4" /> {t("common.viewDetail")}
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => setEditTarget(a)}>
-                                <Pencil className="mr-2 h-4 w-4" /> Editar
+                                <Pencil className="mr-2 h-4 w-4" /> {t("common.edit")}
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => duplicateAnn.mutate(a)}>
-                                <Copy className="mr-2 h-4 w-4" /> Duplicar
+                                <Copy className="mr-2 h-4 w-4" /> {t("hr.ann.duplicate")}
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => archiveAnn.mutate(a.id)}>
-                                <Archive className="mr-2 h-4 w-4" /> Archivar
+                                <Archive className="mr-2 h-4 w-4" /> {t("hr.ann.archive")}
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem className="text-destructive" onClick={() => setDeleteId(a.id)}>
-                                <Trash2 className="mr-2 h-4 w-4" /> Eliminar
+                                <Trash2 className="mr-2 h-4 w-4" /> {t("common.delete")}
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -263,10 +268,10 @@ const HRAnnouncements = () => {
         onOpenChange={(o) => !o && setKpiPopup(null)}
         title={(() => {
           switch (kpiPopup) {
-            case "total": return `Total Anuncios — ${stats.total}`;
-            case "active": return `Activos — ${stats.active}`;
-            case "scheduled": return `Programados — ${stats.scheduled}`;
-            case "draft": return `Borradores — ${stats.draft}`;
+            case "total": return `${t("hr.ann.kpiTotalTitle")} — ${stats.total}`;
+            case "active": return `${t("common.activePl")} — ${stats.active}`;
+            case "scheduled": return `${t("hr.ann.tab.scheduled")} — ${stats.scheduled}`;
+            case "draft": return `${t("hr.ann.tab.drafts")} — ${stats.draft}`;
             default: return "";
           }
         })()}
@@ -279,12 +284,14 @@ const HRAnnouncements = () => {
           const tone = (status: string): KpiRow["rightTone"] =>
             status === "active" ? "success" : status === "scheduled" ? "warning" : "default";
           return list.slice(0, 100).map((a): KpiRow => ({
-            primary: a.title ?? "Sin título",
+            primary: a.title ?? t("hr.noTitle"),
             secondary: audienceLabel(a),
-            right: a.status ?? "—",
+            // En español, el value tal cual, como siempre; en inglés, su etiqueta.
+            right: f.idioma === "en" && STATUS_CONFIG[a.status] ? t(STATUS_CONFIG[a.status].label) : (a.status ?? "—"),
             rightTone: tone(a.status ?? ""),
           }));
         })()}
+        emptyText={t("hr.kpiEmpty")}
       />
     </div>
   );

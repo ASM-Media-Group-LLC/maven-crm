@@ -7,6 +7,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAssignableManagers } from "@/hooks/useAssignableManagers";
 import { format, isSameDay, addDays, startOfWeek, isToday, isFuture, startOfDay } from "date-fns";
 import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 import { computeDayScore, displayPlatform } from "./promoScore";
 import { promotedToResult, isUnverified } from "./promoResult";
 import {
@@ -105,12 +108,6 @@ const platformOptions = [
   { value: "otra", label: "Otra" },
 ] as const;
 
-const contactTypeOptions = [
-  { value: "hablaron", label: "Hablaron" },
-  { value: "textearon", label: "Textearon" },
-  { value: "mensaje_voz", label: "Mensaje de Voz" },
-] as const;
-
 // Resultado BINARIO Sí/No + marca "no verificado" (pending) → ./promoResult.
 
 const resultToBadgeVariant = (result: string): "success-soft" | "destructive-soft" =>
@@ -120,14 +117,19 @@ const resultToBadgeVariant = (result: string): "success-soft" | "destructive-sof
 // Subtabs visibles dentro de Promolog. Antes había Promos/Agentes/
 // Campañas/Rendimiento; el spec nuevo dejó Dashboard/Promos/Agentes
 // (Campañas se eliminó completo, Rendimiento ya estaba poco usado).
-const tabItems = [
-  { id: "dashboard" as const, label: "Dashboard", icon: BarChart3 },
-  { id: "promos" as const, label: "Promos", icon: Table2 },
-  { id: "calendario" as const, label: "Calendario", icon: CalendarIcon },
-  { id: "agentes" as const, label: "Managers", icon: Users },
-  { id: "promobot" as const, label: "Promobot", icon: Bot },
-  { id: "blu" as const, label: "Vincular BLU", icon: Link2 },
+// labelKey: el rótulo se traduce al dibujar; `id` es la clave interna (no se toca).
+const tabItems: Array<{ id: "dashboard" | "promos" | "calendario" | "agentes" | "promobot" | "blu"; labelKey: TranslationKey; icon: typeof BarChart3 }> = [
+  { id: "dashboard", labelKey: "promolog.tabDashboard", icon: BarChart3 },
+  { id: "promos", labelKey: "promolog.tabPromos", icon: Table2 },
+  { id: "calendario", labelKey: "promolog.tabCalendar", icon: CalendarIcon },
+  { id: "agentes", labelKey: "promolog.tabManagers", icon: Users },
+  { id: "promobot", labelKey: "promolog.tabPromobot", icon: Bot },
+  { id: "blu", labelKey: "promolog.tabLinkBlu", icon: Link2 },
 ];
+
+// Meses del selector de campaña. En español se conservan tal cual (con mayúscula);
+// en inglés salen de date-fns.
+const MONTHS_ES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 
 const DAY_LABELS_ES = ["LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB", "DOM"];
 
@@ -151,6 +153,8 @@ const selectedLocalDayKeys = (from?: Date, to?: Date): Set<string> | null => {
 };
 
 const PromologContent = () => {
+  const f = useFormato();
+  const { t } = useLanguage();
   const { user } = useAuth();
   // Timezone preferido del user — afecta cómo se agrupan/renderizan TODAS las
   // fechas de Promolog (el "día" es el día EN TU ZONA, no en UTC). Se lee acá arriba
@@ -321,7 +325,7 @@ const PromologContent = () => {
       return {
         id: pe.id,
         ticketNumber: pe.ticket_number || "",
-        name: creator?.artistic_name || creator?.name || "Sin nombre",
+        name: creator?.artistic_name || creator?.name || t("promolog.noName"),
         handle: creator?.instagram_handle || undefined,
         network: (pe.network || "").toLowerCase(),
         platform: pe.platform || "OnlyFans",
@@ -362,7 +366,7 @@ const PromologContent = () => {
     });
     if (!dayKeys) return mapped;
     return mapped.filter((e) => e.rawDate && dayKeys.has(dayKeyInTz(e.rawDate, userTz)));
-  }, [promologEntries, profilesMap, userTz, dateFrom, dateTo]);
+  }, [promologEntries, profilesMap, userTz, dateFrom, dateTo, t]);
 
   // 1 fila por MODELO + DÍA (no por resultado). El bot crea 1 entry por story; acá
   // las colapsamos: si la modelo promocionó en ALGUNA story ese día, la fila la
@@ -453,14 +457,6 @@ const PromologContent = () => {
       { name: "Otra", value: siEntries.length - countByPlatform("onlyfans") - countByPlatform("unlok"), bg: "bg-muted/50", icon: <span className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-muted-foreground"><Info className="h-4 w-4" /></span> },
     ];
   }, [dedupedEntries]);
-
-  const strategyOptions = [
-    { value: "incentivo_economico", label: "Incentivo económico" },
-    { value: "llamada_motivacional", label: "Llamada motivacional" },
-    { value: "mensaje_estrategico", label: "Mensaje estratégico" },
-    { value: "recordatorio_amable", label: "Recordatorio amable" },
-    { value: "otro", label: "Otro" },
-  ];
 
   // Default = "dashboard": al abrir Promolog la primera vista es el
   // dashboard con KPIs + podios + insights. El user navega a "Promos"
@@ -627,7 +623,7 @@ const PromologContent = () => {
   const handleNotesChange = async (entryId: string, notes: string | null) => {
     const { error } = await supabase.from("promolog_entries").update({ notes }).eq("id", entryId);
     if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({ title: t("common.error"), description: error.message, variant: "destructive" });
       return;
     }
     queryClient.invalidateQueries({ queryKey: ["promolog-entries", user?.id] });
@@ -660,7 +656,7 @@ const PromologContent = () => {
     setVerdictSavingId(null);
     if (error) {
       queryClient.setQueryData(listKey, prev); // rollback
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({ title: t("common.error"), description: error.message, variant: "destructive" });
       return;
     }
     // Reconciliar en background (la UI ya refleja el cambio).
@@ -677,7 +673,7 @@ const PromologContent = () => {
 
   const handleCreateCampaign = async () => {
     if (!campaignCreator || !campaignMonth || !campaignGoalMonthly) {
-      toast({ title: "Campos requeridos", description: "Completa todos los campos obligatorios.", variant: "destructive" });
+      toast({ title: t("promolog.requiredFields"), description: t("promolog.fillAllRequired"), variant: "destructive" });
       return;
     }
     const monthDate = new Date(campaignMonth.getFullYear(), campaignMonth.getMonth(), 1);
@@ -689,11 +685,11 @@ const PromologContent = () => {
       status: "activa",
     });
     if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({ title: t("common.error"), description: error.message, variant: "destructive" });
       return;
     }
     queryClient.invalidateQueries({ queryKey: ["promolog-campaigns"] });
-    toast({ title: "Campaña creada", description: "La campaña mensual se ha creado correctamente." });
+    toast({ title: t("promolog.campaignCreated"), description: t("promolog.campaignCreatedDesc") });
     setCampaignModalOpen(false);
     setCampaignCreator("");
     setCampaignMonth(undefined);
@@ -734,6 +730,7 @@ const PromologContent = () => {
   // pasarlo aquí — por ahora el caso simple alcanza.)
   const promotedTodayIds = useMemo(() => {
     const today = new Date();
+    // Idioma fijo a propósito: se compara con e.date, no se dibuja.
     const todayStr = today.toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" });
     const ids = new Set<string>();
     for (const e of dedupedEntries) {
@@ -808,10 +805,10 @@ const PromologContent = () => {
     if (kpiModalType === "completadas") return dedupedEntries.filter(e => e.result === "Sí");
     return dedupedEntries;
   }, [dedupedEntries, kpiModalType]);
-  const kpiModalTitle = kpiModalType === "ingresados" ? "Tickets Ingresados"
-    : kpiModalType === "no_chequeadas" ? "Tickets NO Chequeadas"
-    : kpiModalType === "completadas" ? "Tickets Completadas Hoy"
-    : "Creadores Escaneados";
+  const kpiModalTitle = kpiModalType === "ingresados" ? t("promolog.kpiTicketsEntered")
+    : kpiModalType === "no_chequeadas" ? t("promolog.kpiTicketsUnchecked")
+    : kpiModalType === "completadas" ? t("promolog.kpiTicketsCompletedToday")
+    : t("promolog.kpiCreatorsScanned");
 
   const navigate = useNavigate();
 
@@ -894,8 +891,8 @@ const PromologContent = () => {
   const creatorsPromotedCount = useMemo(() => creatorsScan.filter(c => c.promoted).length, [creatorsScan]);
   const creatorsNotPromotedCount = creatorsScannedCount - creatorsPromotedCount;
 
-  const formattedDate = dateFrom ? dateFrom.toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" }) : "Seleccionar fecha";
-  const shortDate = dateFrom ? dateFrom.toLocaleDateString("es-ES", { day: "numeric", month: "short" }) : "";
+  const formattedDate = dateFrom ? dateFrom.toLocaleDateString(f.intl("es-ES"), { day: "numeric", month: "long", year: "numeric" }) : "Seleccionar fecha";
+  const shortDate = dateFrom ? dateFrom.toLocaleDateString(f.intl("es-ES"), { day: "numeric", month: "short" }) : "";
 
   const clearFilters = () => {
     setSearchEntry(""); setSelectedStatus(""); setSelectedNetwork(""); setSelectedCardPlatform(""); setSelectedCreatorFilter(""); setSelectedManagerFilter("");
@@ -904,8 +901,10 @@ const PromologContent = () => {
   // ancho completo dentro del panel). `full` = variante de celular. La opción
   // "todos" lleva el nombre del filtro ("Estado: todos"): al estar siempre
   // controlados, el placeholder nunca se ve y cuatro "Todas" seguidos no dicen nada.
-  const STATUS_LABELS: Record<string, string> = { si_promociono: "Sí", no_promociono: "No", revisar: "A revisar", pendiente: "No verificado" };
-  const PLATFORM_LABELS: Record<string, string> = { onlyfans: "OnlyFans", unlok: "Unlok", otra: "Otra" };
+  // Claves (si_promociono, otra…) = valor del filtro; solo el rótulo se traduce.
+  const STATUS_LABELS: Record<string, string> = { si_promociono: t("promolog.yes"), no_promociono: t("promolog.no"), revisar: t("promolog.statusToReview"), pendiente: t("promolog.statusUnverified") };
+  const PLATFORM_LABELS: Record<string, string> = { onlyfans: "OnlyFans", unlok: "Unlok", otra: t("promolog.other") };
+  const monthName = (i: number) => (f.idioma === "en" ? format(new Date(2000, i, 1), "LLLL", { locale: f.fechas }) : MONTHS_ES[i]);
   const renderFilterSelects = (full: boolean) => {
     const trig = full ? "w-full h-10" : "h-9";
     return (
@@ -913,32 +912,32 @@ const PromologContent = () => {
         {/* value SIEMPRE controlado: con `|| undefined` Radix pasa a no-controlado al
             volver a "Todos" y deja pegado el rótulo anterior. */}
         <Select value={selectedStatus || "__all__"} onValueChange={(v) => setSelectedStatus(v === "__all__" ? "" : v)}>
-          <SelectTrigger className={full ? trig : `${trig} w-[150px]`}><SelectValue placeholder="Estado" /></SelectTrigger>
+          <SelectTrigger className={full ? trig : `${trig} w-[150px]`}><SelectValue placeholder={t("common.status")} /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="__all__">Estado: todos</SelectItem>
+            <SelectItem value="__all__">{t("promolog.statusAll")}</SelectItem>
             {Object.entries(STATUS_LABELS).map(([k, l]) => <SelectItem key={k} value={k}>{l}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={selectedNetwork || "__all__"} onValueChange={(v) => setSelectedNetwork(v === "__all__" ? "" : v)}>
-          <SelectTrigger className={full ? trig : `${trig} w-[170px]`}><SelectValue placeholder="Red Social" /></SelectTrigger>
+          <SelectTrigger className={full ? trig : `${trig} w-[170px]`}><SelectValue placeholder={t("promolog.networkPlaceholder")} /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="__all__">Red social: todas</SelectItem>
+            <SelectItem value="__all__">{t("promolog.networkAll")}</SelectItem>
             {networkOptions.map((n) => (
               <SelectItem key={n.value} value={n.value}>{n.label}</SelectItem>
             ))}
           </SelectContent>
         </Select>
         <Select value={selectedCardPlatform || "__all__"} onValueChange={(v) => setSelectedCardPlatform(v === "__all__" ? "" : v)}>
-          <SelectTrigger className={full ? trig : `${trig} w-[170px]`}><SelectValue placeholder="Plataforma" /></SelectTrigger>
+          <SelectTrigger className={full ? trig : `${trig} w-[170px]`}><SelectValue placeholder={t("promolog.platform")} /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="__all__">Plataforma: todas</SelectItem>
+            <SelectItem value="__all__">{t("promolog.platformAll")}</SelectItem>
             {Object.entries(PLATFORM_LABELS).map(([k, l]) => <SelectItem key={k} value={k}>{l}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={selectedManagerFilter || "__all__"} onValueChange={(v) => setSelectedManagerFilter(v === "__all__" ? "" : v)}>
           <SelectTrigger className={full ? trig : `${trig} w-[170px]`}><SelectValue placeholder="Managers" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="__all__">Manager: todas</SelectItem>
+            <SelectItem value="__all__">{t("promolog.managerAll")}</SelectItem>
             {assignableManagers.map((m) => (
               <SelectItem key={m.id} value={m.id}>{m.full_name ?? m.id}</SelectItem>
             ))}
@@ -953,19 +952,19 @@ const PromologContent = () => {
     selectedNetwork ? { label: networkOptions.find((n) => n.value === selectedNetwork)?.label ?? selectedNetwork, clear: () => setSelectedNetwork("") } : null,
     selectedCardPlatform ? { label: PLATFORM_LABELS[selectedCardPlatform] ?? selectedCardPlatform, clear: () => setSelectedCardPlatform("") } : null,
     selectedManagerFilter ? { label: assignableManagers.find((m) => m.id === selectedManagerFilter)?.full_name ?? "Manager", clear: () => setSelectedManagerFilter("") } : null,
-    selectedCreatorFilter ? { label: creators.find((c: any) => c.id === selectedCreatorFilter)?.name ?? "Creadora", clear: () => setSelectedCreatorFilter("") } : null,
+    selectedCreatorFilter ? { label: creators.find((c: any) => c.id === selectedCreatorFilter)?.name ?? t("promolog.creator"), clear: () => setSelectedCreatorFilter("") } : null,
   ].filter(Boolean) as Array<{ label: string; clear: () => void }>;
 
   return (
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
       {/* Header global — título a la izquierda, presets (Ayer/Hoy/...) +
           DateRangePicker a la derecha. Mismo patrón que PanelDeControl.
-          El date range que vive acá afecta a los 3 subtabs (Dashboard,
+          El date range que vive aquí afecta a los 3 subtabs (Dashboard,
           Promos, Agentes) — es la única fuente de verdad temporal. */}
       <header className="bg-background/30 backdrop-blur-xl px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b border-white/10 shrink-0">
         <PageHeader
           title="Promolog"
-          subtitle={isMobile ? undefined : "Seguimiento promocional diario"}
+          subtitle={isMobile ? undefined : t("promolog.subtitle")}
           actions={
             <>
               <DateRangePresets
@@ -1003,7 +1002,7 @@ const PromologContent = () => {
               className="gap-1.5"
             >
               <tab.icon className="h-4 w-4" />
-              {tab.label}
+              {t(tab.labelKey)}
             </SubtabNavItem>
           ))}
         </SubtabNav>
@@ -1043,10 +1042,10 @@ const PromologContent = () => {
                 <div className="flex items-center gap-2">
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input placeholder="Buscar…" className="pl-9 h-9" value={searchEntry} onChange={(e) => setSearchEntry(e.target.value)} />
+                    <Input placeholder={t("promolog.searchShort")} className="pl-9 h-9" value={searchEntry} onChange={(e) => setSearchEntry(e.target.value)} />
                   </div>
                   <Button variant="outline" size="sm" className="h-9 gap-1.5 shrink-0" onClick={() => setFiltersOpen(true)}>
-                    <SlidersHorizontal className="h-4 w-4" /> Filtros
+                    <SlidersHorizontal className="h-4 w-4" /> {t("promolog.filters")}
                     {activeChips.length > 0 && (
                       <Badge variant="primary-soft" className="h-5 min-w-5 justify-center px-1.5 text-[10px]">{activeChips.length}</Badge>
                     )}
@@ -1059,18 +1058,18 @@ const PromologContent = () => {
                         {c.label} <X className="h-3 w-3" />
                       </button>
                     ))}
-                    <button type="button" onClick={clearFilters} className="text-[11px] text-muted-foreground underline-offset-2 hover:underline">limpiar</button>
+                    <button type="button" onClick={clearFilters} className="text-[11px] text-muted-foreground underline-offset-2 hover:underline">{t("promolog.clearLower")}</button>
                   </div>
                 )}
                 <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
                   <SheetContent side="bottom" className="rounded-t-2xl">
                     <SheetHeader className="text-left">
-                      <SheetTitle>Filtros</SheetTitle>
+                      <SheetTitle>{t("promolog.filters")}</SheetTitle>
                     </SheetHeader>
                     <div className="mt-3 space-y-2">{renderFilterSelects(true)}</div>
                     <div className="mt-4 flex gap-2">
-                      <Button variant="ghost" className="flex-1" onClick={clearFilters} disabled={activeChips.length === 0 && !searchEntry}>Limpiar</Button>
-                      <Button className="flex-1" onClick={() => setFiltersOpen(false)}>Ver {filteredEntries.length} promos</Button>
+                      <Button variant="ghost" className="flex-1" onClick={clearFilters} disabled={activeChips.length === 0 && !searchEntry}>{t("promolog.clear")}</Button>
+                      <Button className="flex-1" onClick={() => setFiltersOpen(false)}>{t("promolog.showNPromos", { count: filteredEntries.length })}</Button>
                     </div>
                   </SheetContent>
                 </Sheet>
@@ -1079,7 +1078,7 @@ const PromologContent = () => {
               <div className="flex items-center gap-3 flex-wrap">
                 <div className="relative flex-1 max-w-xs">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input placeholder="Buscar entrada..." className="pl-9 h-9" value={searchEntry} onChange={(e) => setSearchEntry(e.target.value)} />
+                  <Input placeholder={t("promolog.searchEntry")} className="pl-9 h-9" value={searchEntry} onChange={(e) => setSearchEntry(e.target.value)} />
                 </div>
                 {renderFilterSelects(false)}
                 {/* DateRangePicker removido — ahora vive global en el header
@@ -1089,7 +1088,7 @@ const PromologContent = () => {
                 {(searchEntry || activeChips.length > 0) && (
                   <Button variant="ghost" size="sm" className="h-9" onClick={clearFilters}>
                     <X className="mr-1.5 h-4 w-4" />
-                    Limpiar filtros
+                    {t("promolog.clearFilters")}
                   </Button>
                 )}
                 <div className="ml-auto flex gap-1">
@@ -1156,24 +1155,24 @@ const PromologContent = () => {
         <Dialog open={creatorsModalOpen} onOpenChange={setCreatorsModalOpen}>
           <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
             <DialogHeader className="pr-8">
-              <DialogTitle>Selecciona una Creadora Activa</DialogTitle>
+              <DialogTitle>{t("promolog.selectActiveCreator")}</DialogTitle>
             </DialogHeader>
             <div className="grid grid-cols-3 gap-3">
               <Card className="border-t-[3px] border-t-primary">
                 <CardContent className="p-3 text-center">
-                  <p className="text-xs text-muted-foreground">Total Activas</p>
+                  <p className="text-xs text-muted-foreground">{t("promolog.totalActive")}</p>
                   <p className="text-xl font-bold text-primary">{totalActiveCreators}</p>
                 </CardContent>
               </Card>
               <Card className="border-t-[3px] border-t-warning">
                 <CardContent className="p-3 text-center">
-                  <p className="text-xs text-muted-foreground">Sin actividad hoy</p>
+                  <p className="text-xs text-muted-foreground">{t("promolog.noActivityToday")}</p>
                   <p className="text-xl font-bold text-warning">{pendingCreators}</p>
                 </CardContent>
               </Card>
               <Card className="border-t-[3px] border-t-success">
                 <CardContent className="p-3 text-center">
-                  <p className="text-xs text-muted-foreground">Promocionaron hoy</p>
+                  <p className="text-xs text-muted-foreground">{t("promolog.promotedToday")}</p>
                   <p className="text-xl font-bold text-success">{completedToday}</p>
                 </CardContent>
               </Card>
@@ -1184,7 +1183,7 @@ const PromologContent = () => {
                 el modal "Creadores Escaneados" del Dashboard. */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Buscar creadora..." value={searchCreator} onChange={(e) => setSearchCreator(e.target.value)} className="pl-9" />
+              <Input placeholder={t("promolog.searchCreator")} value={searchCreator} onChange={(e) => setSearchCreator(e.target.value)} className="pl-9" />
             </div>
             <ScrollArea className="flex-1 min-h-0 max-h-[55vh]">
               {(() => {
@@ -1199,7 +1198,7 @@ const PromologContent = () => {
                 const sorted = [...list].sort((a, b) => (a.artistic_name || a.name).localeCompare(b.artistic_name || b.name));
                 const buckets = new Map<string, typeof sorted>();
                 for (const c of sorted) {
-                  const key = c.category ?? "Sin categoría";
+                  const key = c.category ?? t("promolog.noCategory");
                   const arr = buckets.get(key) ?? [];
                   arr.push(c);
                   buckets.set(key, arr);
@@ -1228,8 +1227,8 @@ const PromologContent = () => {
                     <EmptyState
                       className="py-8"
                       icon={<Search className="h-8 w-8 text-muted-foreground" />}
-                      title="Sin resultados"
-                      description={`Sin resultados para "${searchCreator}"`}
+                      title={t("common.noResultsShort")}
+                      description={t("promolog.noResultsFor", { q: searchCreator })}
                     />
                   );
                 }
@@ -1253,7 +1252,7 @@ const PromologContent = () => {
                               {pendingInCat > 0 && (
                                 <p className="text-[10px] text-muted-foreground px-2 pb-1">
                                   <span className="inline-block h-1.5 w-1.5 rounded-full bg-destructive mr-1.5 align-middle" />
-                                  {pendingInCat} sin promo hoy
+                                  {t("promolog.noPromoTodayCount", { count: pendingInCat })}
                                 </p>
                               )}
                               {rows.map((creator) => (
@@ -1269,7 +1268,7 @@ const PromologContent = () => {
                                   <div className="relative shrink-0">
                                     <UserAvatar name={creator.name} src={creator.profile_photo_url} size="sm" className="border border-muted-foreground/30" />
                                     {!promotedTodayIds.has(creator.id) && (
-                                      <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-destructive border-2 border-background" title="Sin promo hoy" />
+                                      <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-destructive border-2 border-background" title={t("promolog.noPromoToday")} />
                                     )}
                                   </div>
                                   <div className="flex-1 min-w-0">
@@ -1344,24 +1343,24 @@ const PromologContent = () => {
           <Dialog open={deleteEntryOpen} onOpenChange={setDeleteEntryOpen}>
             <DialogContent className="max-w-sm">
               <DialogHeader>
-                <DialogTitle>Eliminar Entrada</DialogTitle>
-                <DialogDescription>¿Estás seguro de que deseas eliminar la entrada de <span className="font-semibold">{selectedEntry.name}</span>? Esta acción no se puede deshacer.</DialogDescription>
+                <DialogTitle>{t("promolog.deleteEntry")}</DialogTitle>
+                <DialogDescription>{t("promolog.deleteEntryConfirmBefore")}<span className="font-semibold">{selectedEntry.name}</span>{t("promolog.confirmCannotUndoAfter")}</DialogDescription>
               </DialogHeader>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setDeleteEntryOpen(false)}>Cancelar</Button>
+                <Button variant="outline" onClick={() => setDeleteEntryOpen(false)}>{t("common.cancel")}</Button>
                 <Button variant="destructive" onClick={async () => {
                   const { error } = await supabase
                     .from("promolog_entries")
                     .delete()
                     .eq("id", selectedEntry.id);
                   if (error) {
-                    toast({ title: "Error al eliminar", description: error.message, variant: "destructive" });
+                    toast({ title: t("common.errorDeleting"), description: error.message, variant: "destructive" });
                     return;
                   }
                   queryClient.invalidateQueries({ queryKey: ["promolog-entries", user?.id] });
                   setDeleteEntryOpen(false);
-                  toast({ title: "Entrada eliminada", description: `La entrada de ${selectedEntry.name} ha sido eliminada.` });
-                }}>Eliminar</Button>
+                  toast({ title: t("promolog.entryDeleted"), description: t("promolog.entryDeletedDesc", { name: selectedEntry.name }) });
+                }}>{t("common.delete")}</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -1371,25 +1370,25 @@ const PromologContent = () => {
         <Dialog open={campaignModalOpen} onOpenChange={setCampaignModalOpen}>
           <DialogContent className="sm:max-w-[500px]">
             <DialogHeader className="pr-8">
-              <DialogTitle>Nueva Campaña Mensual</DialogTitle>
+              <DialogTitle>{t("promolog.newMonthlyCampaign")}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label>Creador/a *</Label>
+                <Label>{t("promolog.creatorRequired")}</Label>
                 <Popover open={campaignCreatorOpen} onOpenChange={setCampaignCreatorOpen}>
                   <PopoverTrigger asChild>
                     <Button variant="outline" role="combobox" aria-expanded={campaignCreatorOpen} className="w-full justify-between font-normal">
                       {campaignCreator
-                        ? (creators.find(c => c.id === campaignCreator)?.artistic_name || creators.find(c => c.id === campaignCreator)?.name || "Seleccionar creador/a")
-                        : "Seleccionar creador/a"}
+                        ? (creators.find(c => c.id === campaignCreator)?.artistic_name || creators.find(c => c.id === campaignCreator)?.name || t("promolog.selectCreator"))
+                        : t("promolog.selectCreator")}
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                     <Command>
-                      <CommandInput placeholder="Buscar creador/a..." />
+                      <CommandInput placeholder={t("promolog.searchCreatorAlt")} />
                       <CommandList>
-                        <CommandEmpty>No se encontró.</CommandEmpty>
+                        <CommandEmpty>{t("promolog.notFound")}</CommandEmpty>
                         {creators.map((c) => (
                           <CommandItem key={c.id} value={c.artistic_name || c.name} onSelect={() => { setCampaignCreator(c.id); setCampaignCreatorOpen(false); }}>
                             <Check className={cn("mr-2 h-4 w-4", campaignCreator === c.id ? "opacity-100" : "opacity-0")} />
@@ -1402,12 +1401,12 @@ const PromologContent = () => {
                 </Popover>
               </div>
               <div className="space-y-2">
-                <Label>Mes/Año *</Label>
+                <Label>{t("promolog.monthYearRequired")}</Label>
                 <Popover open={campaignMonthOpen} onOpenChange={setCampaignMonthOpen}>
                   <PopoverTrigger asChild>
                     <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !campaignMonth && "text-muted-foreground")}>
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {campaignMonth ? format(campaignMonth, "MMMM yyyy") : "Seleccionar mes"}
+                      {campaignMonth ? format(campaignMonth, "MMMM yyyy") : t("promolog.selectMonth")}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-4" align="start">
@@ -1421,10 +1420,10 @@ const PromologContent = () => {
                           if (campaignMonth && campaignMonth.getFullYear()) setCampaignMonthOpen(false);
                         }}
                       >
-                        <SelectTrigger className="w-[130px]"><SelectValue placeholder="Mes" /></SelectTrigger>
+                        <SelectTrigger className="w-[130px]"><SelectValue placeholder={t("common.month")} /></SelectTrigger>
                         <SelectContent>
-                          {["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"].map((m, i) => (
-                            <SelectItem key={i} value={String(i)}>{m}</SelectItem>
+                          {MONTHS_ES.map((_, i) => (
+                            <SelectItem key={i} value={String(i)}>{monthName(i)}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -1437,7 +1436,7 @@ const PromologContent = () => {
                           if (campaignMonth && campaignMonth.getMonth() !== undefined) setCampaignMonthOpen(false);
                         }}
                       >
-                        <SelectTrigger className="w-[100px]"><SelectValue placeholder="Año" /></SelectTrigger>
+                        <SelectTrigger className="w-[100px]"><SelectValue placeholder={t("promolog.year")} /></SelectTrigger>
                         <SelectContent>
                           {Array.from({ length: 4 }, (_, i) => new Date().getFullYear() - 1 + i).map((y) => (
                             <SelectItem key={y} value={String(y)}>{y}</SelectItem>
@@ -1450,18 +1449,18 @@ const PromologContent = () => {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Objetivo Mensual *</Label>
-                  <Input type="number" placeholder="Ej: 20" value={campaignGoalMonthly} onChange={(e) => setCampaignGoalMonthly(e.target.value)} />
+                  <Label>{t("promolog.monthlyGoalRequired")}</Label>
+                  <Input type="number" placeholder={t("promolog.egNumber", { n: 20 })} value={campaignGoalMonthly} onChange={(e) => setCampaignGoalMonthly(e.target.value)} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Objetivo Semanal *</Label>
-                  <Input type="number" placeholder="Ej: 5" value={campaignGoalWeekly} onChange={(e) => setCampaignGoalWeekly(e.target.value)} />
+                  <Label>{t("promolog.weeklyGoalRequired")}</Label>
+                  <Input type="number" placeholder={t("promolog.egNumber", { n: 5 })} value={campaignGoalWeekly} onChange={(e) => setCampaignGoalWeekly(e.target.value)} />
                 </div>
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setCampaignModalOpen(false)}>Cancelar</Button>
-              <Button onClick={handleCreateCampaign}>Crear Campaña</Button>
+              <Button variant="outline" onClick={() => setCampaignModalOpen(false)}>{t("common.cancel")}</Button>
+              <Button onClick={handleCreateCampaign}>{t("promolog.createCampaign")}</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -1477,7 +1476,7 @@ const PromologContent = () => {
             <DialogDescription>
               {kpiModalType === "creadores_escaneados" ? (
                 <span className="inline-flex items-center gap-2">
-                  <span>{creatorsScannedCount} {creatorsScannedCount === 1 ? "creadora escaneada" : "creadoras escaneadas"}</span>
+                  <span>{t(creatorsScannedCount === 1 ? "promolog.creatorsScannedOne" : "promolog.creatorsScannedMany", { count: creatorsScannedCount })}</span>
                   <span className="inline-flex items-center gap-1 rounded-full bg-success/15 px-1.5 py-0.5 text-[10px] font-semibold text-success ring-1 ring-success/30">
                     <CheckCircle2 className="h-3 w-3" /> {creatorsPromotedCount}
                   </span>
@@ -1486,7 +1485,7 @@ const PromologContent = () => {
                   </span>
                 </span>
               ) : (
-                <>{kpiModalEntries.length} {kpiModalEntries.length === 1 ? "entrada" : "entradas"} encontradas</>
+                <>{t(kpiModalEntries.length === 1 ? "promolog.entriesFoundOne" : "promolog.entriesFoundMany", { count: kpiModalEntries.length })}</>
               )}
             </DialogDescription>
           </DialogHeader>
@@ -1502,13 +1501,13 @@ const PromologContent = () => {
               <EmptyState
                 className="py-12"
                 icon={<Info className="h-8 w-8 text-muted-foreground" />}
-                title="No hay creadoras escaneadas en este período."
+                title={t("promolog.noScannedCreatorsInPeriod")}
               />
             ) : (() => {
               const sorted = [...creatorsScan].sort((a, b) => a.name.localeCompare(b.name));
               const buckets = new Map<string, CreatorScanRow[]>();
               for (const c of sorted) {
-                const key = c.category ?? "Sin categoría";
+                const key = c.category ?? t("promolog.noCategory");
                 const arr = buckets.get(key) ?? [];
                 arr.push(c);
                 buckets.set(key, arr);
@@ -1579,12 +1578,12 @@ const PromologContent = () => {
                                   {c.promoted ? (
                                     <Badge variant="success-soft" className="text-[10px] gap-1">
                                       <CheckCircle2 className="h-3 w-3" />
-                                      Promocionó
+                                      {t("promolog.promoted")}
                                     </Badge>
                                   ) : (
                                     <Badge variant="destructive-soft" className="text-[10px] gap-1">
                                       <XCircle className="h-3 w-3" />
-                                      No promocionó
+                                      {t("promolog.notPromoted")}
                                     </Badge>
                                   )}
                                   <span className="text-[10px] text-muted-foreground tabular-nums w-14 text-right">
@@ -1606,7 +1605,7 @@ const PromologContent = () => {
             <EmptyState
               className="py-12"
               icon={<Info className="h-8 w-8 text-muted-foreground" />}
-              title="No hay entradas para mostrar"
+              title={t("promolog.noEntriesToShow")}
             />
           ) : (
             <div className="max-h-[500px] overflow-auto space-y-1.5">
@@ -1614,11 +1613,11 @@ const PromologContent = () => {
                   de cada ListRow. */}
               <div className="sticky top-0 z-[1] flex items-center gap-3 px-3 pt-1 pb-2 text-xs text-muted-foreground bg-card/40 backdrop-blur-md">
                 <span className="w-12">Ticket</span>
-                <span className="flex-1">Creadora</span>
-                <span className="w-20">Red</span>
-                <span className="w-24">Plataforma</span>
-                <span className="w-20">Resultado</span>
-                <span className="w-32 text-right">Fecha / Hora</span>
+                <span className="flex-1">{t("promolog.creator")}</span>
+                <span className="w-20">{t("promolog.networkShort")}</span>
+                <span className="w-24">{t("promolog.platform")}</span>
+                <span className="w-20">{t("promolog.result")}</span>
+                <span className="w-32 text-right">{t("promolog.dateTime")}</span>
               </div>
               {kpiModalEntries.map((entry) => (
                 <ListRow key={entry.id}>
@@ -1627,7 +1626,7 @@ const PromologContent = () => {
                   <span className="w-20 capitalize text-xs">{entry.network}</span>
                   <span className="w-24 text-xs">{displayPlatform(entry) ?? "—"}</span>
                   <span className="w-20">
-                    <Badge variant={resultToBadgeVariant(entry.result)} className="text-[10px]">{entry.result}</Badge>
+                    <Badge variant={resultToBadgeVariant(entry.result)} className="text-[10px]">{entry.result === "Sí" ? t("promolog.yes") : t("promolog.no")}</Badge>
                   </span>
                   <span className="w-32 text-[10px] text-muted-foreground tabular-nums whitespace-nowrap text-right">
                     {entry.date} {entry.time}
@@ -1643,14 +1642,14 @@ const PromologContent = () => {
       <Dialog open={assignAgentOpen} onOpenChange={setAssignAgentOpen}>
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
-            <DialogTitle>Asignar Agente</DialogTitle>
+            <DialogTitle>{t("promolog.assignAgent")}</DialogTitle>
             <DialogDescription>
-              Selecciona el agente para la entrada de <span className="font-semibold">{assignAgentTarget?.name}</span>
+              {t("promolog.assignAgentDescBefore")}<span className="font-semibold">{assignAgentTarget?.name}</span>
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <Input
-              placeholder="Buscar agente..."
+              placeholder={t("promolog.searchAgent")}
               value={assignAgentSearch}
               onChange={(e) => setAssignAgentSearch(e.target.value)}
               className="h-9"
@@ -1677,7 +1676,7 @@ const PromologContent = () => {
             </ScrollArea>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAssignAgentOpen(false)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => setAssignAgentOpen(false)}>{t("common.cancel")}</Button>
             <Button
               disabled={!assignAgentSelected}
               onClick={async () => {
@@ -1687,15 +1686,15 @@ const PromologContent = () => {
                   .update({ reviewed_by: assignAgentSelected })
                   .eq("id", assignAgentTarget.id);
                 if (error) {
-                  toast({ title: "Error", description: error.message, variant: "destructive" });
+                  toast({ title: t("common.error"), description: error.message, variant: "destructive" });
                   return;
                 }
                 queryClient.invalidateQueries({ queryKey: ["promolog-entries", user?.id] });
                 setAssignAgentOpen(false);
-                toast({ title: "Agente asignado", description: `Agente asignado a ${assignAgentTarget.name}.` });
+                toast({ title: t("promolog.agentAssigned"), description: t("promolog.agentAssignedDesc", { name: assignAgentTarget.name }) });
               }}
             >
-              Asignar
+              {t("promolog.assign")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1706,34 +1705,34 @@ const PromologContent = () => {
         <Dialog open={!!viewCampaign} onOpenChange={(open) => !open && setViewCampaign(null)}>
           <DialogContent className="sm:max-w-[450px]">
             <DialogHeader>
-              <DialogTitle>Detalle de Campaña</DialogTitle>
-              <DialogDescription>Información completa de la campaña</DialogDescription>
+              <DialogTitle>{t("promolog.campaignDetail")}</DialogTitle>
+              <DialogDescription>{t("promolog.campaignDetailDesc")}</DialogDescription>
             </DialogHeader>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <p className="text-xs text-muted-foreground">Creadora</p>
+                  <p className="text-xs text-muted-foreground">{t("promolog.creator")}</p>
                   <p className="text-sm font-medium">{(viewCampaign.creators as any)?.artistic_name || (viewCampaign.creators as any)?.name || "—"}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Mes</p>
-                  <p className="text-sm font-medium capitalize">{new Date(viewCampaign.month_year + "T00:00:00").toLocaleDateString("es-ES", { month: "long", year: "numeric" })}</p>
+                  <p className="text-xs text-muted-foreground">{t("common.month")}</p>
+                  <p className="text-sm font-medium capitalize">{new Date(viewCampaign.month_year + "T00:00:00").toLocaleDateString(f.intl("es-ES"), { month: "long", year: "numeric" })}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Obj. Mensual</p>
+                  <p className="text-xs text-muted-foreground">{t("promolog.monthlyGoalShort")}</p>
                   <p className="text-sm font-bold">{viewCampaign.goal_monthly}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Obj. Semanal</p>
+                  <p className="text-xs text-muted-foreground">{t("promolog.weeklyGoalShort")}</p>
                   <p className="text-sm font-bold">{viewCampaign.goal_weekly}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Estado</p>
+                  <p className="text-xs text-muted-foreground">{t("common.status")}</p>
                   <Badge variant={viewCampaign.status === "activa" ? "default" : "secondary"} className="capitalize mt-1">{viewCampaign.status}</Badge>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Creación</p>
-                  <p className="text-sm">{new Date(viewCampaign.created_at).toLocaleDateString("es-ES")}</p>
+                  <p className="text-xs text-muted-foreground">{t("promolog.createdAt")}</p>
+                  <p className="text-sm">{new Date(viewCampaign.created_at).toLocaleDateString(f.intl("es-ES"))}</p>
                 </div>
               </div>
             </div>
@@ -1746,34 +1745,34 @@ const PromologContent = () => {
         <Dialog open={!!editCampaign} onOpenChange={(open) => !open && setEditCampaign(null)}>
           <DialogContent className="sm:max-w-[400px]">
             <DialogHeader>
-              <DialogTitle>Editar Campaña</DialogTitle>
-              <DialogDescription>Modifica los objetivos o estado de la campaña</DialogDescription>
+              <DialogTitle>{t("promolog.editCampaign")}</DialogTitle>
+              <DialogDescription>{t("promolog.editCampaignDesc")}</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Obj. Mensual</Label>
+                  <Label>{t("promolog.monthlyGoalShort")}</Label>
                   <Input type="number" value={editCampGoalMonthly} onChange={(e) => setEditCampGoalMonthly(e.target.value)} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Obj. Semanal</Label>
+                  <Label>{t("promolog.weeklyGoalShort")}</Label>
                   <Input type="number" value={editCampGoalWeekly} onChange={(e) => setEditCampGoalWeekly(e.target.value)} />
                 </div>
               </div>
               <div className="space-y-2">
-                <Label>Estado</Label>
+                <Label>{t("common.status")}</Label>
                 <Select value={editCampStatus} onValueChange={setEditCampStatus}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="activa">Activa</SelectItem>
-                    <SelectItem value="finalizada">Finalizada</SelectItem>
-                    <SelectItem value="pendiente">Pendiente</SelectItem>
+                    <SelectItem value="activa">{t("common.activeF")}</SelectItem>
+                    <SelectItem value="finalizada">{t("promolog.campaignFinished")}</SelectItem>
+                    <SelectItem value="pendiente">{t("common.pending")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setEditCampaign(null)}>Cancelar</Button>
+              <Button variant="outline" onClick={() => setEditCampaign(null)}>{t("common.cancel")}</Button>
               <Button onClick={async () => {
                 const { error } = await supabase.from("promolog_campaigns").update({
                   goal_monthly: parseInt(editCampGoalMonthly) || 0,
@@ -1781,13 +1780,13 @@ const PromologContent = () => {
                   status: editCampStatus,
                 }).eq("id", editCampaign.id);
                 if (error) {
-                  toast({ title: "Error", description: error.message, variant: "destructive" });
+                  toast({ title: t("common.error"), description: error.message, variant: "destructive" });
                   return;
                 }
                 queryClient.invalidateQueries({ queryKey: ["promolog-campaigns"] });
                 setEditCampaign(null);
-                toast({ title: "Campaña actualizada" });
-              }}>Guardar</Button>
+                toast({ title: t("promolog.campaignUpdated") });
+              }}>{t("common.save")}</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -1798,23 +1797,23 @@ const PromologContent = () => {
         <Dialog open={!!deleteCampaign} onOpenChange={(open) => !open && setDeleteCampaign(null)}>
           <DialogContent className="max-w-sm">
             <DialogHeader>
-              <DialogTitle>Eliminar Campaña</DialogTitle>
+              <DialogTitle>{t("promolog.deleteCampaign")}</DialogTitle>
               <DialogDescription>
-                ¿Estás seguro de eliminar la campaña de <span className="font-semibold">{(deleteCampaign.creators as any)?.artistic_name || (deleteCampaign.creators as any)?.name}</span>? Esta acción no se puede deshacer.
+                {t("promolog.deleteCampaignConfirmBefore")}<span className="font-semibold">{(deleteCampaign.creators as any)?.artistic_name || (deleteCampaign.creators as any)?.name}</span>{t("promolog.confirmCannotUndoAfter")}
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setDeleteCampaign(null)}>Cancelar</Button>
+              <Button variant="outline" onClick={() => setDeleteCampaign(null)}>{t("common.cancel")}</Button>
               <Button variant="destructive" onClick={async () => {
                 const { error } = await supabase.from("promolog_campaigns").delete().eq("id", deleteCampaign.id);
                 if (error) {
-                  toast({ title: "Error", description: error.message, variant: "destructive" });
+                  toast({ title: t("common.error"), description: error.message, variant: "destructive" });
                   return;
                 }
                 queryClient.invalidateQueries({ queryKey: ["promolog-campaigns"] });
                 setDeleteCampaign(null);
-                toast({ title: "Campaña eliminada" });
-              }}>Eliminar</Button>
+                toast({ title: t("promolog.campaignDeleted") });
+              }}>{t("common.delete")}</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

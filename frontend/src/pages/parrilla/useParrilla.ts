@@ -5,6 +5,7 @@
 // para verificar cumplimiento (F4). Ver migración 20260827160000.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { traducir, type TranslationKey } from "@/lib/i18n";
 
 export interface GridTheme {
   foto: string;
@@ -72,15 +73,21 @@ export interface ContentGrid {
   updated_at: string;
 }
 
-export const EXTRA_TYPE_META: Record<ExtraType, { label: string; colorKey: keyof GridTheme }> = {
-  dinamica_lanzamiento: { label: "Dinámica de urgencia · Lanzamiento", colorKey: "urgencia" },
-  reel: { label: "Reel del día", colorKey: "video" },
-  tg_3pub: { label: "3 publicaciones del día", colorKey: "telegram" },
-  tg_audio: { label: "Audios de buenos días", colorKey: "telegram" },
-  dinamica_cierre: { label: "Dinámica de urgencia · Cierre", colorKey: "urgencia" },
-  custom: { label: "Acción extra", colorKey: "foto" },
+// ⚠️ `label` es DATO del documento, no de la pantalla: al elegir el tipo se
+// copia como título de la acción extra (extra_title), que se guarda, se imprime
+// en la lámina y se manda al grupo en el PDF. Por eso queda en español. Lo que
+// se muestra en el menú del editor es `clave`, que sí va por t().
+export const EXTRA_TYPE_META: Record<ExtraType, { label: string; clave: TranslationKey; colorKey: keyof GridTheme }> = {
+  dinamica_lanzamiento: { label: "Dinámica de urgencia · Lanzamiento", clave: "grid.extra.dinamica_lanzamiento", colorKey: "urgencia" },
+  reel: { label: "Reel del día", clave: "grid.extra.reel", colorKey: "video" },
+  tg_3pub: { label: "3 publicaciones del día", clave: "grid.extra.tg_3pub", colorKey: "telegram" },
+  tg_audio: { label: "Audios de buenos días", clave: "grid.extra.tg_audio", colorKey: "telegram" },
+  dinamica_cierre: { label: "Dinámica de urgencia · Cierre", clave: "grid.extra.dinamica_cierre", colorKey: "urgencia" },
+  custom: { label: "Acción extra", clave: "grid.extra.custom", colorKey: "foto" },
 };
 
+// Los días de la lámina, en español a propósito: son parte del documento que se
+// imprime y se manda (ver parrilla-weekly/html.ts, que usa la misma lista).
 const WEEKDAYS = ["DOMINGO", "LUNES", "MARTES", "MIÉRCOLES", "JUEVES", "VIERNES", "SÁBADO"];
 export const weekdayLabel = (iso: string) => WEEKDAYS[new Date(iso + "T12:00:00Z").getUTCDay()];
 
@@ -221,13 +228,14 @@ export function useCreateWeek() {
       const startD = new Date(start + "T12:00:00Z");
       const endD = new Date(end + "T12:00:00Z");
       const nDias = Math.round((endD.getTime() - startD.getTime()) / 86400000) + 1;
-      if (nDias < 2 || nDias > 10) throw new Error("Elige un rango de 2 a 10 días");
+      if (nDias < 2 || nDias > 10) throw new Error(traducir("grid.rangeError"));
 
       const { data: userData } = await supabase.auth.getUser();
       const { data: g, error } = await (supabase as any)
         .from("content_grids")
         .insert({
           week_start: start, week_end: end, status: "borrador",
+          // Título guardado de la parrilla: dato del documento, en español.
           title: from?.grid.title ?? "Parrilla de promoción",
           theme: from?.grid.theme ?? DEFAULT_THEME,
           created_by: userData?.user?.id ?? null,
@@ -382,7 +390,7 @@ export function useAddExemption() {
         .select("id");
       if (error) throw error;
       // RLS silenciosa: 0 filas sin error = sin permiso.
-      if (!data?.length) throw new Error("Sin permiso para editar la parrilla");
+      if (!data?.length) throw new Error(traducir("grid.noPermission"));
     },
     onSuccess: (_r, e) => qc.invalidateQueries({ queryKey: ["content-grid-exemptions", e.grid_id] }),
   });

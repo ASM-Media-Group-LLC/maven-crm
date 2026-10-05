@@ -16,6 +16,8 @@ import { corsFor } from "../_shared/cors.ts";
 //   imap_folders — carpetas vía IMAP con la credencial cifrada. Este es el
 //       camino DEFINITIVO: no requiere que la persona autorice nada, así que
 //       nunca ve la pantalla de Zoho. El de arriba queda como plan B.
+//   translate    — traduce el cuerpo de un correo con la IA (OpenRouter); ver
+//       traducir.ts. Necesita el secret OPENROUTER_API_KEY.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { listFolders, refreshUserToken } from "../_shared/zoho-mail.ts";
@@ -27,6 +29,10 @@ import { tamanoDeBase64 } from "../_shared/base64.ts";
 import { buildMessage, esDireccionSmtp, SmtpClient } from "../_shared/smtp.ts";
 import { unseal } from "../_shared/mail-crypto.ts";
 import { ocultarAvisosDelProveedor } from "../_shared/mail-notices.ts";
+import {
+  ErrorDeTraduccion, type Idioma, MODELO_ECONOMICO, pedirTraduccion, textoParaTraducir,
+} from "./traducir.ts";
+import { type DestinoDelMovimiento, destinoParaLaRespuesta } from "./destino.ts";
 
 const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
 
@@ -105,6 +111,45 @@ Deno.serve(async (req) => {
     };
     if (!action) return json(req, { error: "action is required" }, 400);
 
+    // ── Traducir un correo (el ⋮ de cada mensaje, Keila 02/10) ───────────
+    // No abre IMAP: el cuerpo sale de la caché, y SOLO de una fila de quien
+    // llama (por eso va con `user_id`: con service_role la RLS no filtra). Un
+    // correo del camino en vivo no tiene fila y manda su texto, recortado.
+    if (action === "translate") {
+      const apiKey = Deno.env.get("OPENROUTER_API_KEY");
+      // El código y no una frase: la pantalla lo muestra en el idioma de quien
+      // lee («la traducción no está activada»).
+      if (!apiKey) return json(req, { error: "sin_llave_ia" }, 503);
+      const { id: idFila, idioma } = body as { id?: unknown; idioma?: unknown };
+      const destino: Idioma = idioma === "en" ? "en" : "es";
+      let fuente: { text?: string | null; html?: string | null };
+      if (typeof idFila === "string" && idFila) {
+        const { data: fila, error: filaErr } = await admin.from("mail_messages")
+          .select("html, text_body")
+          .eq("id", idFila)
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (filaErr) return json(req, { error: "no se pudo leer el correo" }, 500);
+        if (!fila) return json(req, { error: "ese correo no está en tu casilla" }, 404);
+        fuente = { text: fila.text_body as string | null, html: fila.html as string | null };
+      } else {
+        fuente = {
+          text: typeof text === "string" ? text.slice(0, 20_000) : null,
+          html: typeof html === "string" ? html.slice(0, 100_000) : null,
+        };
+      }
+      const { texto, recortado } = textoParaTraducir(fuente);
+      if (!texto.trim()) return json(req, { error: "sin_texto" }, 400);
+      try {
+        const modelo = Deno.env.get("IA_MODELO_OPENROUTER") || MODELO_ECONOMICO;
+        const traduccion = await pedirTraduccion(fetch, apiKey, modelo, texto, destino);
+        return json(req, { traduccion, recortado, idioma: destino });
+      } catch (e) {
+        const status = e instanceof ErrorDeTraduccion ? e.status : 502;
+        return json(req, { error: (e as Error).message || "no se pudo traducir" }, status);
+      }
+    }
+
     // OJO: la búsqueda de la conexión OAuth va DENTRO de `folders`, no
     // antes del dispatch: `imap_folders` no necesita conexión OAuth, y
     // tenerla afuera lo bloqueaba pidiendo algo que no usa.
@@ -122,7 +167,7 @@ Deno.serve(async (req) => {
       }
       if (!conn) return json(req, { error: "no_connection" }, 409);
       if (!conn.zoho_account_id) {
-        return json(req, { error: "la conexión no tiene casilla asociada — reconectá" }, 409);
+        return json(req, { error: "la conexión no tiene casilla asociada — reconecta" }, 409);
       }
 
       const tok = await refreshUserToken(conn.refresh_token as string);
@@ -377,14 +422,20 @@ Deno.serve(async (req) => {
     // quien lo abre, no un efecto de que lo hayamos descargado.
     // === BULK === (Jhon, 09/09/2026: la barra de selección del correo, como
     // en Gmail, tiene que HACER algo). Una sola sesión IMAP para todo el lote.
-    //   op: seen | unseen | delete | archive | spam · uids: number[] (máx. 200)
+    //   op: seen | unseen | delete | archive | spam | move | snooze
+    //   uids: number[] (máx. 200)
     // Carpetas de Zoho: Papelera, Archive, "Correo no deseado". Eliminar mueve
     // a Papelera; dentro de la Papelera borra de verdad. La caché
     // (mail_messages / mail_folders) se ajusta al momento y el sincronizador
     // la termina de cuadrar en su próximo barrido.
+    // Lo que se MUEVE contesta además `destino` ({ folder, uidvalidity, mapa:
+    // [[uid viejo, uid nuevo]…] }): con eso la pantalla lo puede DESHACER
+    // moviéndolo de vuelta desde el destino, con el uid de allá.
+    //   cancelar_posponer: true (solo con op move desde Snoozed) — el
+    //   «Deshacer» de Posponer: además borra el despertador.
     if (action === "bulk") {
-      const { op, uids, dest: destPedido, volver_at: volverPedido } = body as
-        { op?: string; uids?: unknown; dest?: unknown; volver_at?: unknown };
+      const { op, uids, dest: destPedido, volver_at: volverPedido, cancelar_posponer: cancelarPosponer } = body as
+        { op?: string; uids?: unknown; dest?: unknown; volver_at?: unknown; cancelar_posponer?: unknown };
       const ops = new Set(["seen", "unseen", "delete", "archive", "spam", "move", "snooze"]);
       if (!op || !ops.has(op)) return json(req, { error: "op inválida" }, 400);
       const lista = (Array.isArray(uids) ? uids : [])
@@ -454,6 +505,10 @@ Deno.serve(async (req) => {
 
         let ok = false;
         let movidos = false;
+        // Adónde fue a parar cada uno, para trasladar la fila de la caché en
+        // vez de borrarla (ver `trasladados` más abajo).
+        let destFinal = "";
+        let movimiento: { uidvalidity?: number; mapa: Map<number, number> } | null = null;
         if (op === "seen" || op === "unseen") {
           ok = await client.storeFlagsUids(lista, op === "seen" ? "+FLAGS" : "-FLAGS", "\\Seen");
         } else if (op === "delete" && box === "Papelera") {
@@ -462,8 +517,11 @@ Deno.serve(async (req) => {
         } else {
           const dest = op === "move" ? destino : op === "snooze" ? "Snoozed" : DESTINO[op];
           if (dest === box) return json(req, { error: `ya están en ${box}` }, 409);
-          ok = await client.moveUids(lista, dest);
+          const r = await client.moveUidsConDestino(lista, dest);
+          ok = r.ok;
           movidos = true;
+          destFinal = dest;
+          movimiento = r;
         }
         if (!ok) return json(req, { error: `IMAP no pudo aplicar "${op}" en ${box}` }, 502);
 
@@ -492,8 +550,55 @@ Deno.serve(async (req) => {
           }
         }
 
+        // ── «Deshacer» de Posponer: deja de estar pospuesto ──────────────
+        // Mueve de Snoozed a la carpeta de la que salió Y borra su despertador.
+        // Sin esto la fila de `mail_snoozed` seguía viva: si lo volvías a
+        // posponer antes de esa hora quedaban DOS filas pendientes (la clave
+        // única no frena dos `devuelto_at` en NULL) y la vieja lo despertaba
+        // antes de tiempo.
+        // ⚠️ SOLO si se pide (`cancelar_posponer`), no en cualquier salida de
+        // Snoozed: archivar desde Pospuestos y deshacerlo lo DEVUELVE a Snoozed,
+        // y ahí tiene que seguir teniendo quién lo despierte.
+        // ⚠️ Antes de trasladar la caché: los message_id salen de las filas que
+        // todavía dicen Snoozed.
+        if (movidos && op === "move" && box === "Snoozed" && cancelarPosponer === true) {
+          const { data: dormidos } = await admin.from("mail_messages")
+            .select("message_id")
+            .eq("user_id", user.id).eq("folder", box).in("uid", lista);
+          const idsDormidos = ((dormidos ?? []) as { message_id: string | null }[])
+            .map((f) => f.message_id).filter(Boolean) as string[];
+          if (idsDormidos.length) {
+            await admin.from("mail_snoozed").delete()
+              .eq("user_id", user.id).is("devuelto_at", null).in("message_id", idsDormidos);
+          }
+        }
+
         // Caché al momento (la RLS del usuario no deja borrar filas: va con admin).
+        //
+        // ⚠️ LO MOVIDO SE TRASLADA, NO SE BORRA. Antes la fila se borraba y el
+        // correo reaparecía en su carpeta nueva recién con el barrido (30 min
+        // en las carpetas que no son Recibidos). Mientras tanto no estaba en
+        // NINGÚN lado para Maven: «moví correos y desaparecen, pero luego no
+        // aparecen en la dirección que los moví» (Jhon, 28/09) — y una
+        // etiqueta puesta con «Mover a» mostraba vacío, porque apunta a una
+        // fila que no existía. Ahora la fila pasa a (destino, uidvalidity,
+        // uid nuevo): la misma clave con la que el barrido la va a encontrar,
+        // así que cuando pase la actualiza en vez de duplicarla.
+        let trasladados = 0;
+        // Adónde fue a parar cada uno, para que la pantalla pueda DESHACER
+        // (mover de vuelta con el uid de ahora). Ver destino.ts.
+        let destinoRespuesta: DestinoDelMovimiento | undefined;
+        if (movidos && destFinal && movimiento) {
+          const ubicacion = await trasladarEnCache({
+            admin, client, userId: user.id, box, dest: destFinal, lista, movimiento,
+          });
+          trasladados = ubicacion.ubicadas;
+          destinoRespuesta = destinoParaLaRespuesta(destFinal, ubicacion.uidvalidity, ubicacion.mapa, lista);
+        }
         if (movidos) {
+          // Lo que no se pudo ubicar en el destino (sin Message-ID, o el
+          // servidor no lo encontró) queda como antes: fuera de la caché, y el
+          // barrido lo trae.
           await admin.from("mail_messages").delete()
             .eq("user_id", user.id).eq("folder", box).in("uid", lista);
         } else {
@@ -505,8 +610,21 @@ Deno.serve(async (req) => {
           .eq("user_id", user.id).eq("folder", box).eq("unread", true);
         await admin.from("mail_folders").update({ unread: count ?? 0 })
           .eq("user_id", user.id).eq("folder", box);
+        // Y el de la carpeta que los recibió: si no, Archivados diría 0 sin
+        // leer con un correo sin leer recién llegado.
+        if (trasladados > 0) {
+          const { count: enDestino } = await admin.from("mail_messages")
+            .select("id", { count: "exact", head: true })
+            .eq("user_id", user.id).eq("folder", destFinal).eq("unread", true);
+          await admin.from("mail_folders").update({ unread: enDestino ?? 0 })
+            .eq("user_id", user.id).eq("folder", destFinal);
+        }
 
-        return json(req, { ok: true, op, folder: box, afectados: lista.length });
+        // `destino` es NUEVO y opcional: quien no lo conoce lo ignora.
+        return json(req, {
+          ok: true, op, folder: box, afectados: lista.length, trasladados,
+          ...(destinoRespuesta ? { destino: destinoRespuesta } : {}),
+        });
       } catch (e) {
         return json(req, { error: (e as Error).message ?? "error de IMAP" }, 502);
       } finally {
@@ -808,7 +926,7 @@ Deno.serve(async (req) => {
               };
             } else if (trozo.ok && trozo.truncated) {
               return json(req, {
-                error: "ese archivo pesa más de 20 MB y no se puede descargar desde acá",
+                error: "ese archivo pesa más de 20 MB y no se puede descargar desde aquí",
               }, 413);
             }
           }
@@ -827,7 +945,7 @@ Deno.serve(async (req) => {
           // hizo creer que un CV de 37 KB era "demasiado grande".
           if (raw.truncated) {
             return json(req, {
-              error: "este correo es demasiado grande para abrirlo desde acá",
+              error: "este correo es demasiado grande para abrirlo desde aquí",
             }, 413);
           }
 
@@ -840,7 +958,7 @@ Deno.serve(async (req) => {
         // cortar claro (los adjuntos gigantes son casos raros).
         if (adj.bytes.length > 20 * 1024 * 1024) {
           return json(req, {
-            error: "ese archivo pesa más de 20 MB y no se puede descargar desde acá",
+            error: "ese archivo pesa más de 20 MB y no se puede descargar desde aquí",
           }, 413);
         }
 
@@ -1082,7 +1200,7 @@ Deno.serve(async (req) => {
           // con 13 hojas de vida a tres destinatarias.
           if (sent.incierto) {
             return json(req, {
-              error: "se envió pero el servidor tardó en confirmar: revisá Enviados ANTES de reintentar, puede haber salido",
+              error: "se envió pero el servidor tardó en confirmar: revisa Enviados ANTES de reintentar, puede haber salido",
               code: sent.code,
               incierto: true,
             }, 504);
@@ -1262,3 +1380,77 @@ Deno.serve(async (req) => {
     return json(req, { error: (e as Error).message ?? "unexpected error" }, 500);
   }
 });
+
+/** Pasa las filas de la caché de lo que se acaba de mover a su carpeta nueva.
+ *  Devuelve cuántas quedaron ubicadas (las demás las borra quien llama) y el
+ *  uid que recibió cada uno en el destino (`mapa`: uid viejo → uid nuevo), que
+ *  es lo que necesita «Deshacer» para mover de vuelta.
+ *
+ *  El uid nuevo sale de COPYUID si el servidor lo mandó. Si no, se busca cada
+ *  correo por su Message-ID en el destino (con tope: un lote de 200 no puede
+ *  convertirse en 200 búsquedas; lo que quede afuera lo trae el barrido). */
+async function trasladarEnCache({ admin, client, userId, box, dest, lista, movimiento }: {
+  // deno-lint-ignore no-explicit-any
+  admin: any;
+  client: ImapClient;
+  userId: string;
+  box: string;
+  dest: string;
+  lista: number[];
+  movimiento: { uidvalidity?: number; mapa: Map<number, number> };
+}): Promise<{ ubicadas: number; uidvalidity: number | null; mapa: Map<number, number> }> {
+  const TOPE_BUSQUEDAS = 40;
+  // Lo que dijo COPYUID vale aunque el correo no tenga fila en la caché.
+  const mapa = new Map(movimiento.mapa);
+  const { data } = await admin.from("mail_messages")
+    .select("id, uid, message_id")
+    .eq("user_id", userId).eq("folder", box).in("uid", lista);
+  const filas = (data ?? []) as { id: string; uid: number; message_id: string | null }[];
+  if (!filas.length) return { ubicadas: 0, uidvalidity: movimiento.uidvalidity ?? null, mapa };
+
+  let uidvalidity = movimiento.uidvalidity ?? null;
+  const nuevos = new Map<string, number>();
+  for (const f of filas) {
+    const u = movimiento.mapa.get(Number(f.uid));
+    if (u) nuevos.set(f.id, u);
+  }
+  const faltan = filas.filter((f) => !nuevos.has(f.id) && f.message_id).slice(0, TOPE_BUSQUEDAS);
+  if (faltan.length || uidvalidity == null) {
+    try {
+      // STATUS antes del SELECT: sobre la carpeta seleccionada no se debe.
+      uidvalidity ??= await client.uidValidityDe(dest);
+      if (faltan.length && uidvalidity != null) {
+        const sel = await client.selectFolder(dest);
+        if (sel.ok) {
+          for (const f of faltan) {
+            const u = await client.uidPorMessageId(f.message_id!);
+            if (u) {
+              nuevos.set(f.id, u);
+              mapa.set(Number(f.uid), u);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      // Ubicar es un extra: el correo YA se movió. Si esto falla, la fila se
+      // borra como antes y el barrido la trae; no puede tirar el pedido.
+      console.warn(`[mail-fetch] no se pudo ubicar en ${dest}: ${(e as Error).message}`);
+    }
+  }
+  // Sin UIDVALIDITY no se puede escribir la fila (es parte de su clave), pero
+  // el mapa de COPYUID sigue siendo cierto para deshacer.
+  if (uidvalidity == null) return { ubicadas: 0, uidvalidity: null, mapa };
+
+  let ubicadas = 0;
+  for (const [id, uid] of nuevos) {
+    const { error } = await admin.from("mail_messages")
+      .update({ folder: dest, uid, uidvalidity, synced_at: new Date().toISOString() })
+      .eq("id", id);
+    if (!error) { ubicadas++; continue; }
+    // ⚠️ Choca con la clave única si el barrido ya la trajo por su cuenta: la
+    // del destino ya existe y es la buena. Se borra la vieja.
+    await admin.from("mail_messages").delete().eq("id", id);
+    ubicadas++;
+  }
+  return { ubicadas, uidvalidity, mapa };
+}

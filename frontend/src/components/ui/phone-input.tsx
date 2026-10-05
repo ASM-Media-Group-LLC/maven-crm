@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/command";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useTSiHay } from "@/hooks/useTSiHay";
 import { COUNTRY_DIAL_CODES } from "@/lib/country-codes";
 
 // Lista COMPLETA de indicativos compartida (lib/country-codes). Mapeamos `iso`→`country`
@@ -45,6 +46,7 @@ export function PhoneInput({
   className,
   disabled = false,
 }: PhoneInputProps) {
+  const t = useTSiHay();
   const [open, setOpen] = React.useState(false);
   // Recuerda la selección EXPLÍCITA del usuario (por click en el dropdown).
   // El parser solo mira el string del value y para códigos compartidos
@@ -96,11 +98,11 @@ export function PhoneInput({
         </PopoverTrigger>
         <PopoverContent className="w-[260px] p-0" side="bottom" align="start">
           <Command>
-            <CommandInput placeholder="Buscar país..." />
+            <CommandInput placeholder={t("shared.ui.searchCountry")} />
             {/* Wheel: dentro de un <Dialog>, el scroll-lock de Radix bloquea la rueda
                 sobre el Popover portaleado → scrolleamos la lista a mano. */}
             <CommandList onWheel={(e) => { e.currentTarget.scrollTop += e.deltaY; }}>
-              <CommandEmpty>No encontrado</CommandEmpty>
+              <CommandEmpty>{t("shared.ui.notFound")}</CommandEmpty>
               <CommandGroup>
                 {COUNTRY_CODES.map((c) => (
                   <CommandItem

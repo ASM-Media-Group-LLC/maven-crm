@@ -12,7 +12,11 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import type { Contacto } from "./ContactosContent";
+import { useLanguage } from "@/hooks/useLanguage";
+import { etiquetaEstado } from "./etiquetas";
 
+// Las claves son el `estado` en español que arma ContactosContent (dato): solo
+// eligen el color. El texto del badge sale de etiquetaEstado().
 const statusVariant: Record<string, "success-soft" | "primary-soft" | "warning-soft" | "destructive-soft" | "secondary-soft"> = {
   Nuevo: "primary-soft",
   Contactado: "warning-soft",
@@ -46,11 +50,12 @@ const getAgentInitials = (name: string) => {
 };
 
 const ContactosGrid = ({ contactos, onView, onEdit, onConvert, onSellPlatform, onDelete }: Props) => {
+  const { t } = useLanguage();
   return (
     <TooltipProvider>
       <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
         {contactos.map((c) => {
-          const cityLabel = c.city || "No aplicable";
+          const cityLabel = c.city || t("contactos.notApplicable");
           const locationLabel = c.pais
             ? `${getCountryShortDisplay(c.pais)} · ${cityLabel}`
             : cityLabel;
@@ -73,7 +78,7 @@ const ContactosGrid = ({ contactos, onView, onEdit, onConvert, onSellPlatform, o
                     <p className="text-xs text-muted-foreground font-mono">{c.ticket}</p>
                     <div className="flex items-center gap-1.5 mt-1">
                       <Badge variant={statusVariant[c.estado] ?? "secondary-soft"} className="text-[10px] px-1.5 py-0">
-                        {c.estado}
+                        {etiquetaEstado(t, c.estado)}
                       </Badge>
                       <Badge variant={categoryVariant[c.categoria] ?? "secondary-soft"} className="text-[10px] px-1.5 py-0">
                         {c.categoria}
@@ -100,7 +105,7 @@ const ContactosGrid = ({ contactos, onView, onEdit, onConvert, onSellPlatform, o
                           <p>{c.creadoPor}</p>
                         </TooltipContent>
                       </Tooltip>
-                      <p className="text-xs text-muted-foreground">Agente</p>
+                      <p className="text-xs text-muted-foreground">{t("contactos.agent")}</p>
                     </div>
                   )}
                   <div className="flex items-center gap-3">
@@ -137,22 +142,22 @@ const ContactosGrid = ({ contactos, onView, onEdit, onConvert, onSellPlatform, o
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onView?.(c); }}>
-                        <Eye className="mr-2 h-4 w-4" /> Ver detalle
+                        <Eye className="mr-2 h-4 w-4" /> {t("common.viewDetail")}
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit?.(c); }}>
-                        <Pencil className="mr-2 h-4 w-4" /> Editar
+                        <Pencil className="mr-2 h-4 w-4" /> {t("common.edit")}
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onConvert?.(c); }}>
-                        <Sparkles className="mr-2 h-4 w-4" /> Convertir a Creador
+                        <Sparkles className="mr-2 h-4 w-4" /> {t("contactos.convertToCreator")}
                       </DropdownMenuItem>
                       {onSellPlatform && (
                         <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onSellPlatform(c); }}>
-                          <ShoppingCart className="mr-2 h-4 w-4" /> Vender plataforma
+                          <ShoppingCart className="mr-2 h-4 w-4" /> {t("contactos.sellPlatform")}
                         </DropdownMenuItem>
                       )}
                       {onDelete && (
                         <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onDelete(c); }} className="text-destructive focus:text-destructive">
-                          <Trash2 className="mr-2 h-4 w-4" /> Eliminar
+                          <Trash2 className="mr-2 h-4 w-4" /> {t("common.delete")}
                         </DropdownMenuItem>
                       )}
                     </DropdownMenuContent>
@@ -164,7 +169,7 @@ const ContactosGrid = ({ contactos, onView, onEdit, onConvert, onSellPlatform, o
         })}
         {contactos.length === 0 && (
           <p className="col-span-full py-12 text-center text-muted-foreground">
-            No se encontraron contactos.
+            {t("contactos.noContactsFound")}
           </p>
         )}
       </div>

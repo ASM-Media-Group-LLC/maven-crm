@@ -20,6 +20,8 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserRole } from "@/hooks/useUserRole";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
 import CategorySectionHeader from "@/components/dashboard/CategorySectionHeader";
 import { ListRowButton } from "@/components/ui/list-row";
 import { PageHeader } from "@/components/ui/page-header";
@@ -68,6 +70,9 @@ export interface Contacto {
   onlyfans_url: string;
 }
 
+// ⚠️ DATO, no texto: `estado` viaja con estos valores en español (el filtro los
+// vuelve a mapear a la base y las tarjetas los usan como clave de color). La
+// etiqueta que se muestra sale de etiquetaEstado() en ./etiquetas.
 const statusMap: Record<string, string> = {
   new: "Nuevo",
   contacted: "Contactado",
@@ -101,6 +106,8 @@ const loadViewState = (): { filters?: ContactoFilters; page?: number } => {
 };
 
 const ContactosContent = () => {
+  const f = useFormato();
+  const { t } = useLanguage();
   const restored = loadViewState();
   const [filters, setFilters] = useState<ContactoFilters>(restored.filters ?? emptyFilters);
   const [selectedContacto, setSelectedContacto] = useState<Contacto | null>(null);
@@ -409,13 +416,16 @@ const ContactosContent = () => {
     dbContactos.map((c) => {
       const normalizedHandle = normalizeHandleKey(c.handle);
       const fallbackCity = creatorsCityMap[normalizedHandle] || "";
-      const resolvedCity = (c.city || "").trim() || fallbackCity || "No aplicable";
+      // Sin ciudad queda vacío: el "No aplicable" lo pone cada pantalla al dibujar,
+      // en el idioma de la interfaz. Si se guardara acá, el modal de edición lo
+      // tomaría como una ciudad y lo escribiría en la base.
+      const resolvedCity = (c.city || "").trim() || fallbackCity || "";
 
       return {
         id: c.id,
         rawCreatedAt: c.created_at || "",
         creacion: c.created_at
-          ? new Date(c.created_at).toLocaleDateString("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })
+          ? new Date(c.created_at).toLocaleDateString(f.intl("es-ES"), { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })
           : "—",
         ticket: c.ticket_number || "",
         nombre: c.name,
@@ -441,7 +451,7 @@ const ContactosContent = () => {
         onlyfans_url: (c as any).onlyfans_url || "",
       };
     }),
-  [dbContactos, interactionCounts, profilesMap, creatorsCityMap]);
+  [dbContactos, interactionCounts, profilesMap, creatorsCityMap, f]);
 
   // Client-side filters for resolved fields
   // Ciudad y Agente ahora se filtran SERVER-SIDE (en el query) → `filtered` = la página ya filtrada.
@@ -470,11 +480,11 @@ const ContactosContent = () => {
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
       <header className="bg-background/30 backdrop-blur-xl px-6 pt-6 pb-4 border-b border-white/10 shrink-0">
         <PageHeader
-          title="Directorio de Contactos"
+          title={t("contactos.directoryTitle")}
           subtitle={
             <>
-              {funnelStats.pipelineVivo.toLocaleString("es")} en pipeline vivo
-              <span className="text-muted-foreground/60"> · {totalCount.toLocaleString("es")} en el directorio</span>
+              {t("contactos.livePipeline", { count: funnelStats.pipelineVivo.toLocaleString(f.idioma === "en" ? "en-US" : "es") })}
+              <span className="text-muted-foreground/60"> · {t("contactos.inDirectory", { count: totalCount.toLocaleString(f.idioma === "en" ? "en-US" : "es") })}</span>
             </>
           }
           actions={
@@ -489,7 +499,7 @@ const ContactosContent = () => {
                   onClick={() => setAuditOpen(true)}
                 >
                   <ShieldAlert className="mr-2 h-4 w-4" />
-                  Auditoría
+                  {t("contactos.audit")}
                 </Button>
               )}
               {/* El "calendario de movimiento" (rango de fechas) acota el listado. */}
@@ -502,13 +512,13 @@ const ContactosContent = () => {
                     dateTo: to ? format(to, "yyyy-MM-dd") : "",
                   })
                 }
-                placeholder="Fecha creación"
+                placeholder={t("contactos.createdDate")}
                 className="w-auto"
               />
               {/* Global en el header, como el calendario: visible en todos los subtabs. */}
               <Button onClick={() => navigate("/contactos/nuevo")}>
                 <Plus className="mr-2 h-4 w-4" />
-                Agregar Contacto
+                {t("contactos.addContact")}
               </Button>
             </>
           }
@@ -532,7 +542,7 @@ const ContactosContent = () => {
 
             {isLoading ? (
               <div className="flex-1 flex items-center justify-center">
-                <p className="text-sm text-muted-foreground">Cargando...</p>
+                <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
               </div>
             ) : (
               <DataTableShell
@@ -592,7 +602,7 @@ const ContactosContent = () => {
       <Dialog open={auditOpen} onOpenChange={setAuditOpen}>
         <DialogContent className="max-w-3xl max-h-[85vh] overflow-auto">
           <DialogHeader>
-            <DialogTitle>Auditoría de cambios</DialogTitle>
+            <DialogTitle>{t("contactos.auditTitle")}</DialogTitle>
           </DialogHeader>
           <CategoryAuditLog open={auditOpen} />
         </DialogContent>

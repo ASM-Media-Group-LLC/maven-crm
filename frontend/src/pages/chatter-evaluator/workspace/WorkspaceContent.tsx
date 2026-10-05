@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { ArrowLeft, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { toast } from "sonner";
+import { useLanguage } from "@/hooks/useLanguage";
 import {
   useChatterSessions,
   useChatterConfig,
@@ -46,6 +47,7 @@ const useIsNarrow = (): boolean => {
 };
 
 const WorkspaceContent = () => {
+  const { t } = useLanguage();
   const sessionsQ = useChatterSessions("all");
   const configQ = useChatterConfig();
   const criteriaQ = useChatterCriteria();
@@ -203,7 +205,7 @@ const WorkspaceContent = () => {
       0,
     );
     if (filled === 0) {
-      toast.error("No hay criterios calificados");
+      toast.error(t("chatters.verdict.noneScored"));
       return;
     }
     setVerdictOpen(true);
@@ -231,7 +233,7 @@ const WorkspaceContent = () => {
         <div className="flex items-center gap-1">
           <Button asChild variant="ghost" size="sm">
             <Link to="/chatter-evaluator">
-              <ArrowLeft className="mr-2 h-4 w-4" /> Volver
+              <ArrowLeft className="mr-2 h-4 w-4" /> {t("common.back")}
             </Link>
           </Button>
           {/* Toggle the criteria rail. */}
@@ -239,7 +241,7 @@ const WorkspaceContent = () => {
             variant="ghost"
             size="sm"
             onClick={() => setCriteriaHiddenByUser((v) => !v)}
-            title={criteriaHidden ? "Mostrar criterios" : "Ocultar criterios"}
+            title={criteriaHidden ? t("chatters.ws.showCriteria") : t("chatters.ws.hideCriteria")}
             className="gap-2"
           >
             {criteriaHidden ? (
@@ -247,12 +249,12 @@ const WorkspaceContent = () => {
             ) : (
               <PanelLeftClose className="h-4 w-4" />
             )}
-            <span className="hidden sm:inline text-xs">Criterios</span>
+            <span className="hidden sm:inline text-xs">{t("chatters.crit.title")}</span>
           </Button>
           {/* Toggle del rail de info personaje (derecha). 3-state:
               hidden por user / shown por user / auto-hide en narrow.
               Click siempre flippea, así el botón funciona aún en
-              narrow. History ya no vive acá — está en la página
+              narrow. History ya no vive aquí — está en la página
               principal del Chatter Evaluator. */}
           <Button
             variant="ghost"
@@ -264,7 +266,7 @@ const WorkspaceContent = () => {
                 return currentlyHidden ? "show" : "hide";
               })
             }
-            title={infoHidden ? "Mostrar info personaje" : "Ocultar info personaje"}
+            title={infoHidden ? t("chatters.ws.showCharacterInfo") : t("chatters.ws.hideCharacterInfo")}
             className="gap-2"
           >
             {infoHidden ? (
@@ -272,7 +274,7 @@ const WorkspaceContent = () => {
             ) : (
               <PanelRightClose className="h-4 w-4" />
             )}
-            <span className="hidden sm:inline text-xs">Info personaje</span>
+            <span className="hidden sm:inline text-xs">{t("chatters.ws.characterInfo")}</span>
           </Button>
         </div>
         <div className="text-xs text-muted-foreground">
@@ -327,7 +329,7 @@ const WorkspaceContent = () => {
               onClick={() => setSelectedId(null)}
               className="flex shrink-0 items-center gap-1.5 border-b border-border px-3 py-2 text-sm font-medium text-primary hover:bg-muted/50 md:hidden"
             >
-              <ArrowLeft className="h-4 w-4" /> Sesiones
+              <ArrowLeft className="h-4 w-4" /> {t("chatters.ws.sessions")}
             </button>
           )}
           <ChatPanel key={selectedSession?.id ?? "none"} session={selectedSession} />
@@ -358,6 +360,7 @@ const WorkspaceContent = () => {
 // Sidebar que muestra la info del personaje seleccionado. Compacto
 // para que quepa en la columna de 320px del rail derecho.
 const CharacterInfoSidebar = ({ profileId }: { profileId: string | null }) => {
+  const { t } = useLanguage();
   const profilesQ = useChatterProfiles();
   const [lang] = useChatterLang();
   const profile = profileId
@@ -370,7 +373,7 @@ const CharacterInfoSidebar = ({ profileId }: { profileId: string | null }) => {
         <CharacterInfoPanel profile={profile} lang={lang} compact />
       ) : (
         <div className="flex h-full items-center justify-center p-6 text-center text-xs text-muted-foreground">
-          Selecciona una sesión para ver la información del personaje.
+          {t("chatters.ws.pickSessionForInfo")}
         </div>
       )}
     </div>

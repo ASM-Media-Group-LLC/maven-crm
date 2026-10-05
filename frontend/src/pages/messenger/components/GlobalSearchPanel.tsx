@@ -6,8 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useGlobalSearch, type GlobalSearchResult } from "@/hooks/useGlobalSearch";
 import { formatDistanceToNow } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/hooks/useLanguage";
+import EtiquetaApi from "./EtiquetaApi";
 
 interface GlobalSearchPanelProps {
   open: boolean;
@@ -30,6 +32,8 @@ function highlightKeyword(text: string, keyword: string) {
 
 export default function GlobalSearchPanel({ open, onClose, onSelectResult }: GlobalSearchPanelProps) {
   const { results, searching, search, clearResults } = useGlobalSearch();
+  const f = useFormato();
+  const { t } = useLanguage();
   const [query, setQuery] = useState("");
 
   const handleSearch = useCallback((value: string) => {
@@ -66,13 +70,13 @@ export default function GlobalSearchPanel({ open, onClose, onSelectResult }: Glo
         <Search className="h-4 w-4 text-muted-foreground shrink-0" />
         <Input
           autoFocus
-          placeholder="Buscar palabra clave en todos los chats…"
+          placeholder={t("messenger.globalSearch.placeholder")}
           value={query}
           onChange={(e) => handleSearch(e.target.value)}
           onKeyDown={(e) => e.key === "Escape" && handleClose()}
           className="h-8 text-sm flex-1"
         />
-        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={handleClose}>
+        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={handleClose} aria-label={t("common.close")}>
           <X className="h-4 w-4" />
         </Button>
       </div>
@@ -81,7 +85,12 @@ export default function GlobalSearchPanel({ open, onClose, onSelectResult }: Glo
       {query.trim().length >= 2 && !searching && totalResults > 0 && (
         <div className="px-4 py-1 border-t border-border bg-muted/20">
           <span className="text-[11px] text-muted-foreground">
-            {totalResults} resultado{totalResults !== 1 ? "s" : ""} en {Object.keys(grouped).length} conversacion{Object.keys(grouped).length !== 1 ? "es" : ""}
+            {t("messenger.globalSearch.resumen", {
+              resultados: totalResults === 1 ? t("messenger.search.unResultado") : t("messenger.search.resultados", { n: totalResults }),
+              conversaciones: Object.keys(grouped).length === 1
+                ? t("messenger.globalSearch.unaConversacion")
+                : t("messenger.globalSearch.conversaciones", { n: Object.keys(grouped).length }),
+            })}
           </span>
         </div>
       )}
@@ -91,7 +100,7 @@ export default function GlobalSearchPanel({ open, onClose, onSelectResult }: Glo
           {searching && totalResults === 0 && (
             <div className="flex items-center justify-center gap-2 py-6">
               <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-              <p className="text-xs text-muted-foreground">Buscando en todos los chats…</p>
+              <p className="text-xs text-muted-foreground">{t("messenger.globalSearch.buscando")}</p>
             </div>
           )}
 
@@ -119,8 +128,9 @@ export default function GlobalSearchPanel({ open, onClose, onSelectResult }: Glo
                   <div className="flex items-center gap-1.5 mb-0.5">
                     <User className="h-3 w-3 text-muted-foreground shrink-0" />
                     <span className="text-[11px] font-medium text-foreground">{r.senderName}</span>
+                    {r.esApi && <EtiquetaApi nombre={r.senderName} persona={r.personaReal} esMio={false} />}
                     <span className="text-[10px] text-muted-foreground ml-auto shrink-0">
-                      {formatDistanceToNow(new Date(r.createdAt), { addSuffix: true, locale: es })}
+                      {formatDistanceToNow(new Date(r.createdAt), { addSuffix: true, locale: f.fechas })}
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground leading-relaxed">
@@ -134,8 +144,8 @@ export default function GlobalSearchPanel({ open, onClose, onSelectResult }: Glo
           {!searching && query.trim().length >= 2 && totalResults === 0 && (
             <div className="text-center py-6 space-y-1">
               <Search className="h-8 w-8 text-muted-foreground/30 mx-auto" />
-              <p className="text-xs text-muted-foreground">No se encontraron resultados para "{query}"</p>
-              <p className="text-[10px] text-muted-foreground/70">Intenta con otras palabras clave</p>
+              <p className="text-xs text-muted-foreground">{t("messenger.globalSearch.sinResultados", { query })}</p>
+              <p className="text-[10px] text-muted-foreground/70">{t("messenger.globalSearch.intentaOtras")}</p>
             </div>
           )}
         </ScrollArea>

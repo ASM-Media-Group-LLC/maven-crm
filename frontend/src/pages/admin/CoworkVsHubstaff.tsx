@@ -7,6 +7,10 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/ui/page-header";
 import { cn } from "@/lib/utils";
+import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
+import { ConFormato } from "./ConFormato";
+import type { Formato } from "@/lib/formato";
 import { horas, porcentaje, type ResumenPersona } from "@/lib/coworkVsHubstaff";
 import { useCoworkVsHubstaff, fechaBogota } from "./coworkVsHubstaff/useCoworkVsHubstaff";
 
@@ -15,14 +19,10 @@ import { useCoworkVsHubstaff, fechaBogota } from "./coworkVsHubstaff/useCoworkVs
 // pantalla, presente). Nadie más ve esto todavía: primero se calibra la regla
 // con datos, después se le muestra al empleado y al supervisor.
 
-const RANGOS = [
-  { label: "7 días", dias: 7 },
-  { label: "14 días", dias: 14 },
-  { label: "30 días", dias: 30 },
-];
+const RANGOS = [7, 14, 30];
 
-const fechaCorta = (iso: string) =>
-  new Date(`${iso}T12:00:00-05:00`).toLocaleDateString("es-CO", { weekday: "short", day: "numeric", month: "short" });
+const fechaCorta = (iso: string, f: Formato) =>
+  new Date(`${iso}T12:00:00-05:00`).toLocaleDateString(f.intl("es-CO"), { weekday: "short", day: "numeric", month: "short" });
 
 /** Colores de la cobertura: cuánto del Hubstaff lo explica Cowork. */
 function tonoCobertura(c: number | null): string {
@@ -33,6 +33,7 @@ function tonoCobertura(c: number | null): string {
 }
 
 export default function CoworkVsHubstaff() {
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [dias, setDias] = useState(7);
   const desde = fechaBogota(dias - 1), hasta = fechaBogota(0);
@@ -43,18 +44,18 @@ export default function CoworkVsHubstaff() {
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
       <header className="bg-background/30 backdrop-blur-xl px-6 pt-6 pb-4 border-b border-white/10 shrink-0">
         <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-          <button onClick={() => navigate("/admin/usuarios")} className="hover:text-foreground transition-colors">Administración</button>
+          <button onClick={() => navigate("/admin/usuarios")} className="hover:text-foreground transition-colors">{t("admin.administration")}</button>
           <ChevronRight className="h-3.5 w-3.5" />
           <span className="text-foreground">Cowork vs Hubstaff</span>
         </div>
         <PageHeader
           title="Cowork vs Hubstaff"
-          subtitle="Cuánto del tiempo que registra Hubstaff lo explica el reloj de Cowork (cámara + pantalla, presente). Solo admins, mientras se calibra la regla."
+          subtitle={t("admin.cvh.subtitle")}
           actions={
             <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1">
-              {RANGOS.map((r) => (
-                <Button key={r.dias} size="sm" variant={dias === r.dias ? "default" : "ghost"} className="h-8 rounded-lg" onClick={() => setDias(r.dias)}>
-                  {r.label}
+              {RANGOS.map((n) => (
+                <Button key={n} size="sm" variant={dias === n ? "default" : "ghost"} className="h-8 rounded-lg" onClick={() => setDias(n)}>
+                  {t("admin.nDays", { n })}
                 </Button>
               ))}
             </div>
@@ -68,25 +69,25 @@ export default function CoworkVsHubstaff() {
         ) : error ? (
           <div className="flex items-start gap-2 rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>No se pudo cargar la comparación: {error.message}</span>
+            <span>{t("admin.cvh.loadError", { error: error.message })}</span>
           </div>
         ) : !data || data.personas.length === 0 ? (
           <EmptyState
             className="rounded-3xl border border-dashed border-border/70"
             seed="empty-cowork-vs-hubstaff"
-            title="Todavía no hay nada que comparar"
-            description="El reloj de Cowork empieza a contar desde que alguien entra a una sala con esta versión. En cuanto haya latidos, acá aparecen las personas con sus horas de Hubstaff al lado."
+            title={t("admin.cvh.emptyTitle")}
+            description={t("admin.cvh.emptyBody")}
           />
         ) : (
           <>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <StatChip label="Personas" value={String(data.totales.personas)} icon={<Users2 className="h-3.5 w-3.5" />} color="bg-primary" />
-              <StatChip label="Horas Hubstaff" value={horas(data.totales.hubstaff_seg)} icon={<Hourglass className="h-3.5 w-3.5" />} color="bg-muted-foreground/60" />
-              <StatChip label="Horas Cowork (reloj)" value={horas(data.totales.cowork_activo_seg)} icon={<Timer className="h-3.5 w-3.5" />} color="bg-violet-500" />
+              <StatChip label={t("admin.cvh.people")} value={String(data.totales.personas)} icon={<Users2 className="h-3.5 w-3.5" />} color="bg-primary" />
+              <StatChip label={t("admin.cvh.hubstaffHours")} value={horas(data.totales.hubstaff_seg)} icon={<Hourglass className="h-3.5 w-3.5" />} color="bg-muted-foreground/60" />
+              <StatChip label={t("admin.cvh.coworkHours")} value={horas(data.totales.cowork_activo_seg)} icon={<Timer className="h-3.5 w-3.5" />} color="bg-violet-500" />
               <StatChip
-                label="Cobertura"
+                label={t("admin.cvh.coverage")}
                 value={<span className={tonoCobertura(data.totales.cobertura)}>{porcentaje(data.totales.cobertura)}</span>}
-                hint={data.totales.sinCowork > 0 ? `${data.totales.sinCowork} con Hubstaff y sin Cowork` : undefined}
+                hint={data.totales.sinCowork > 0 ? t("admin.cvh.withoutCowork", { n: data.totales.sinCowork }) : undefined}
                 icon={<Percent className="h-3.5 w-3.5" />}
                 color="bg-success"
               />
@@ -95,14 +96,13 @@ export default function CoworkVsHubstaff() {
             <div className="flex items-start gap-2 rounded-2xl border border-warning/25 bg-warning/10 px-4 py-3 text-[13px] leading-snug text-warning">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
               <span>
-                <b>Cobertura</b> = horas del reloj de Cowork ÷ horas de Hubstaff. Menos de 100 % no es "trabajó menos": es tiempo que Hubstaff registró
-                fuera de Cowork (reuniones, otras tareas, sala sin cámara o sin pantalla). Los motivos de detención están en cada persona.
+                <ConFormato texto={t("admin.cvh.coverageExplainer")} />
               </span>
             </div>
 
             <div className="overflow-hidden rounded-2xl border border-border bg-card">
               <div className="hidden sm:grid grid-cols-[minmax(0,2fr)_repeat(4,minmax(0,1fr))_2rem] gap-3 border-b border-border/60 px-4 py-2 text-xs font-semibold text-muted-foreground">
-                <span>Persona</span><span className="text-right">Hubstaff</span><span className="text-right">Cowork</span><span className="text-right">En sala</span><span className="text-right">Cobertura</span><span />
+                <span>{t("admin.person")}</span><span className="text-right">Hubstaff</span><span className="text-right">Cowork</span><span className="text-right">{t("admin.cvh.inRoom")}</span><span className="text-right">{t("admin.cvh.coverage")}</span><span />
               </div>
               {data.personas.map((p) => (
                 <FilaPersona key={p.profile_id} p={p} abierta={abierta === p.profile_id} onToggle={() => setAbierta(abierta === p.profile_id ? null : p.profile_id)} />
@@ -116,6 +116,8 @@ export default function CoworkVsHubstaff() {
 }
 
 function FilaPersona({ p, abierta, onToggle }: { p: ResumenPersona; abierta: boolean; onToggle: () => void }) {
+  const f = useFormato();
+  const { t } = useLanguage();
   const detenido = p.cowork_en_sala_seg - p.cowork_activo_seg;
   return (
     <div className="border-b border-border/40 last:border-b-0">
@@ -130,7 +132,10 @@ function FilaPersona({ p, abierta, onToggle }: { p: ResumenPersona; abierta: boo
           <span className="min-w-0">
             <span className="block truncate text-sm font-medium text-foreground">{p.nombre}</span>
             <span className="block text-[11px] text-muted-foreground">
-              {p.diasHubstaff} {p.diasHubstaff === 1 ? "día" : "días"} en Hubstaff · {p.diasCowork} en Cowork
+              {t("admin.cvh.daysLine", {
+                hubstaff: p.diasHubstaff === 1 ? t("admin.oneDay") : t("admin.nDays", { n: p.diasHubstaff }),
+                cowork: p.diasCowork,
+              })}
             </span>
           </span>
         </span>
@@ -145,47 +150,54 @@ function FilaPersona({ p, abierta, onToggle }: { p: ResumenPersona; abierta: boo
         <div className="space-y-3 border-t border-border/40 bg-muted/20 px-4 py-3">
           <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs sm:hidden">
             <span className="text-muted-foreground">Hubstaff</span><span className="text-right tabular-nums">{horas(p.hubstaff_seg)}</span>
-            <span className="text-muted-foreground">Cowork (reloj)</span><span className="text-right tabular-nums">{horas(p.cowork_activo_seg)}</span>
-            <span className="text-muted-foreground">En sala</span><span className="text-right tabular-nums">{horas(p.cowork_en_sala_seg)}</span>
-            <span className="text-muted-foreground">Cobertura</span><span className={cn("text-right tabular-nums", tonoCobertura(p.cobertura))}>{porcentaje(p.cobertura)}</span>
+            <span className="text-muted-foreground">{t("admin.cvh.coworkClock")}</span><span className="text-right tabular-nums">{horas(p.cowork_activo_seg)}</span>
+            <span className="text-muted-foreground">{t("admin.cvh.inRoom")}</span><span className="text-right tabular-nums">{horas(p.cowork_en_sala_seg)}</span>
+            <span className="text-muted-foreground">{t("admin.cvh.coverage")}</span><span className={cn("text-right tabular-nums", tonoCobertura(p.cobertura))}>{porcentaje(p.cobertura)}</span>
           </div>
 
           {detenido > 0 && (
             <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
-              <span className="text-muted-foreground">Reloj detenido {horas(detenido)}:</span>
-              {p.cowork_pausa_seg > 0 && <Chip>pausa {horas(p.cowork_pausa_seg)}</Chip>}
-              {p.cowork_sin_camara_seg > 0 && <Chip>sin cámara {horas(p.cowork_sin_camara_seg)}</Chip>}
-              {p.cowork_sin_pantalla_seg > 0 && <Chip>sin pantalla {horas(p.cowork_sin_pantalla_seg)}</Chip>}
-              {p.cowork_fuera_seg > 0 && <Chip>fuera de cámara {horas(p.cowork_fuera_seg)}</Chip>}
+              <span className="text-muted-foreground">{t("admin.cvh.clockStopped", { h: horas(detenido) })}</span>
+              {p.cowork_pausa_seg > 0 && <Chip>{t("admin.cvh.pause", { h: horas(p.cowork_pausa_seg) })}</Chip>}
+              {p.cowork_sin_camara_seg > 0 && <Chip>{t("admin.cvh.noCamera", { h: horas(p.cowork_sin_camara_seg) })}</Chip>}
+              {p.cowork_sin_pantalla_seg > 0 && <Chip>{t("admin.cvh.noScreen", { h: horas(p.cowork_sin_pantalla_seg) })}</Chip>}
+              {p.cowork_fuera_seg > 0 && <Chip>{t("admin.cvh.offCamera", { h: horas(p.cowork_fuera_seg) })}</Chip>}
+              {p.cowork_sin_conexion_larga_seg > 0 && <Chip>{t("admin.cvh.noConnection", { h: horas(p.cowork_sin_conexion_larga_seg) })}</Chip>}
             </div>
+          )}
+          {p.cowork_sin_conexion_seg > 0 && (
+            <p className="text-[11px] text-muted-foreground">{t("admin.cvh.includesDrops", { h: horas(p.cowork_sin_conexion_seg) })}</p>
           )}
 
           <div className="overflow-x-auto">
             <table className="tabla-movil w-full min-w-[420px] text-xs">
               <thead className="text-xs text-muted-foreground">
                 <tr>
-                  <th className="py-1 text-left font-semibold">Día</th>
+                  <th className="py-1 text-left font-semibold">{t("common.day")}</th>
                   <th className="py-1 text-right font-semibold">Hubstaff</th>
-                  <th className="py-1 text-right font-semibold">Actividad</th>
+                  <th className="py-1 text-right font-semibold">{t("admin.activity")}</th>
                   <th className="py-1 text-right font-semibold">Cowork</th>
-                  <th className="py-1 text-right font-semibold">En sala</th>
-                  <th className="py-1 text-right font-semibold">Detenido por</th>
+                  <th className="py-1 text-right font-semibold">{t("admin.cvh.inRoom")}</th>
+                  <th className="py-1 text-right font-semibold">{t("admin.cvh.stoppedBy")}</th>
                 </tr>
               </thead>
               <tbody>
                 {p.dias.map((d) => {
+                  // En las celdas, el guion va primero en el ternario (vacía ? guion : horas):
+                  // al revés, el detector de español lee la llamada a horas() como texto.
                   const motivos = [
-                    d.cowork_pausa_seg > 0 && `pausa ${horas(d.cowork_pausa_seg)}`,
-                    d.cowork_sin_camara_seg > 0 && `sin cámara ${horas(d.cowork_sin_camara_seg)}`,
-                    d.cowork_sin_pantalla_seg > 0 && `sin pantalla ${horas(d.cowork_sin_pantalla_seg)}`,
-                    d.cowork_fuera_seg > 0 && `fuera ${horas(d.cowork_fuera_seg)}`,
+                    d.cowork_pausa_seg > 0 && t("admin.cvh.pause", { h: horas(d.cowork_pausa_seg) }),
+                    d.cowork_sin_camara_seg > 0 && t("admin.cvh.noCamera", { h: horas(d.cowork_sin_camara_seg) }),
+                    d.cowork_sin_pantalla_seg > 0 && t("admin.cvh.noScreen", { h: horas(d.cowork_sin_pantalla_seg) }),
+                    d.cowork_fuera_seg > 0 && t("admin.cvh.away", { h: horas(d.cowork_fuera_seg) }),
+                    (d.cowork_sin_conexion_larga_seg ?? 0) > 0 && t("admin.cvh.noConnection", { h: horas(d.cowork_sin_conexion_larga_seg) }),
                   ].filter(Boolean).join(" · ");
                   return (
                     <tr key={d.dia} className="border-t border-border/30">
-                      <td className="py-1.5 capitalize">{fechaCorta(d.dia)}</td>
-                      <td className="py-1.5 text-right tabular-nums">{d.hubstaff_seg > 0 ? horas(d.hubstaff_seg) : <span className="text-muted-foreground">—</span>}</td>
+                      <td className="py-1.5 capitalize">{fechaCorta(d.dia, f)}</td>
+                      <td className="py-1.5 text-right tabular-nums">{d.hubstaff_seg <= 0 ? <span className="text-muted-foreground">—</span> : horas(d.hubstaff_seg)}</td>
                       <td className="py-1.5 text-right tabular-nums text-muted-foreground">{d.hubstaff_actividad != null ? `${d.hubstaff_actividad}%` : "—"}</td>
-                      <td className="py-1.5 text-right tabular-nums font-medium text-violet-600 dark:text-violet-400">{d.cowork_en_sala_seg > 0 ? horas(d.cowork_activo_seg) : <span className="font-normal text-muted-foreground">—</span>}</td>
+                      <td className="py-1.5 text-right tabular-nums font-medium text-violet-600 dark:text-violet-400">{d.cowork_en_sala_seg <= 0 ? <span className="font-normal text-muted-foreground">—</span> : horas(d.cowork_activo_seg)}</td>
                       <td className="py-1.5 text-right tabular-nums text-muted-foreground">{d.cowork_en_sala_seg > 0 ? horas(d.cowork_en_sala_seg) : "—"}</td>
                       <td className="py-1.5 text-right text-muted-foreground">{motivos || "—"}</td>
                     </tr>

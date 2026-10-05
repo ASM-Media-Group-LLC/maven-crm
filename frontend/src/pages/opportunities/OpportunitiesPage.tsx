@@ -28,26 +28,35 @@ import {
 import { TrendingUp, Plus, Loader2, Clock, AlertCircle } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/ui/page-header";
+import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { Formato } from "@/lib/formato";
+import type { TranslationKey } from "@/lib/i18n";
 
 // ── catálogo de productos y etapas ───────────────────────────────────────────
-const PRODUCTS: { value: string; label: string }[] = [
-  { value: "piclink", label: "Piclink" },
-  { value: "content_protector", label: "Content Protector" },
-  { value: "blu", label: "Blu" },
-  { value: "exchange", label: "Exchange" },
-  { value: "kash", label: "Kash" },
-  { value: "agency", label: "Agencia (OF)" },
-  { value: "other", label: "Otro" },
+// `value` es lo que se guarda en monetization_opportunities (y lo que escribe el
+// bot): no se traduce. `label` es la clave del diccionario que se muestra.
+const PRODUCTS: { value: string; label: TranslationKey }[] = [
+  { value: "piclink", label: "opp.product.piclink" },
+  { value: "content_protector", label: "opp.product.content_protector" },
+  { value: "blu", label: "opp.product.blu" },
+  { value: "exchange", label: "opp.product.exchange" },
+  { value: "kash", label: "opp.product.kash" },
+  { value: "agency", label: "opp.product.agency" },
+  { value: "other", label: "opp.product.other" },
 ];
-const productLabel = (v: string) => PRODUCTS.find((p) => p.value === v)?.label ?? v;
+const productLabel = (v: string, t: (k: TranslationKey) => string) => {
+  const p = PRODUCTS.find((x) => x.value === v);
+  return p ? t(p.label) : v;
+};
 
 type Stage = "interested" | "offered" | "negotiating" | "won" | "lost";
-const STAGES: { value: Stage; label: string; cls: string }[] = [
-  { value: "interested", label: "Interesada", cls: "bg-sky-500/15 text-sky-600 dark:text-sky-400" },
-  { value: "offered", label: "Ofrecida", cls: "bg-violet-500/15 text-violet-600 dark:text-violet-400" },
-  { value: "negotiating", label: "Negociando", cls: "bg-warning/15 text-warning" },
-  { value: "won", label: "Ganada", cls: "bg-success/15 text-success" },
-  { value: "lost", label: "Perdida", cls: "bg-muted text-muted-foreground" },
+const STAGES: { value: Stage; label: TranslationKey; cls: string }[] = [
+  { value: "interested", label: "opp.stage.interested", cls: "bg-sky-500/15 text-sky-600 dark:text-sky-400" },
+  { value: "offered", label: "opp.stage.offered", cls: "bg-violet-500/15 text-violet-600 dark:text-violet-400" },
+  { value: "negotiating", label: "opp.stage.negotiating", cls: "bg-warning/15 text-warning" },
+  { value: "won", label: "opp.stage.won", cls: "bg-success/15 text-success" },
+  { value: "lost", label: "opp.stage.lost", cls: "bg-muted text-muted-foreground" },
 ];
 const stageMeta = (v: string) => STAGES.find((s) => s.value === v) ?? STAGES[0];
 const OPEN_STAGES: Stage[] = ["interested", "offered", "negotiating"];
@@ -79,10 +88,10 @@ interface BigConfirmada {
   confirmed_date: string | null;
 }
 
-const fmtDate = (iso: string | null) => {
+const fmtDate = (f: Formato, iso: string | null) => {
   if (!iso) return "—";
   const d = new Date(iso);
-  return d.toLocaleDateString("es-CO", { day: "2-digit", month: "short" });
+  return d.toLocaleDateString(f.intl("es-CO"), { day: "2-digit", month: "short" });
 };
 const isOverdue = (iso: string | null) => !!iso && new Date(iso) < new Date();
 // Monto compacto en USD: $24k, $1.2k, $120, o "—" si no hay valor.
@@ -94,6 +103,8 @@ const fmtUsd = (n: number | null | undefined) => {
 const confValue = (c: BigConfirmada) => Number(c.monthly_monetization ?? 0) || Number(c.estimated_monetization ?? 0) || 0;
 
 const OpportunitiesPage = () => {
+  const f = useFormato();
+  const { t } = useLanguage();
   const qc = useQueryClient();
   const [filter, setFilter] = useState<"open" | "all" | Stage>("open");
   const [formOpen, setFormOpen] = useState(false);
@@ -164,31 +175,31 @@ const OpportunitiesPage = () => {
       <div className="space-y-4 px-6 py-5">
       <PageHeader
         icon={<TrendingUp />}
-        title="Oportunidades de monetización"
-        subtitle="Interés de las creadoras en productos (Piclink, CP, Blu…). El bot las registra y persigue; aquí las ves y manejas."
+        title={t("opp.title")}
+        subtitle={t("opp.subtitle")}
         actions={
           <Button size="sm" onClick={() => { setEditing(null); setFormOpen(true); }}>
-            <Plus className="h-4 w-4" /> Nueva oportunidad
+            <Plus className="h-4 w-4" /> {t("opp.new")}
           </Button>
         }
       />
 
       {/* Resumen — qué hay cerca de cerrar */}
       <div className="flex flex-wrap gap-2">
-        <SummaryChip label="Cerca de cerrar" value={nearClose} accent="bg-warning/15 text-warning" hint="en negociación" />
-        <SummaryChip label="Abiertas" value={openTotal} accent="bg-primary/10 text-primary" hint="interesada + ofrecida + negociando" />
-        <SummaryChip label="Ganadas" value={counts.won ?? 0} accent="bg-success/15 text-success" />
+        <SummaryChip label={t("opp.nearClose")} value={nearClose} accent="bg-warning/15 text-warning" hint={t("opp.nearCloseHint")} />
+        <SummaryChip label={t("opp.open")} value={openTotal} accent="bg-primary/10 text-primary" hint={t("opp.openHint")} />
+        <SummaryChip label={t("opp.won")} value={counts.won ?? 0} accent="bg-success/15 text-success" />
       </div>
 
       {/* #4 — Reclutamiento: confirmadas por firmar (del pipeline de Closers),
-          ordenadas por facturación. Acá aparecen los cierres grandes (ej. $24k)
+          ordenadas por facturación. Aquí aparecen los cierres grandes (ej. $24k)
           que antes solo se veían en Closers. */}
       {confirmadas.length > 0 && (
         <div className="rounded-md border bg-muted/20 p-3">
           <div className="mb-2 flex items-center gap-1.5">
             <span className="text-sm">🎯</span>
-            <h2 className="text-sm font-semibold">Reclutamiento — confirmadas por firmar</h2>
-            <span className="text-[11px] text-muted-foreground">(del pipeline de Closers · por facturación)</span>
+            <h2 className="text-sm font-semibold">{t("opp.recruit.title")}</h2>
+            <span className="text-[11px] text-muted-foreground">{t("opp.recruit.sub")}</span>
           </div>
           <div className="flex flex-col gap-1">
             {confirmadas.slice(0, 8).map((c) => {
@@ -196,13 +207,13 @@ const OpportunitiesPage = () => {
               const big = v >= 10000;
               return (
                 <div key={c.id} className="flex items-center gap-2 rounded px-2 py-1 text-sm hover:bg-muted/40">
-                  <span className="font-mono text-xs">{c.instagram_handle ?? "(sin handle)"}</span>
+                  <span className="font-mono text-xs">{c.instagram_handle ?? t("opp.noHandle")}</span>
                   <span className={`rounded px-1.5 py-0.5 text-xs font-semibold tabular-nums ${big ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"}`}>
-                    {fmtUsd(v)}/mes
+                    {t("opp.perMonth", { amount: fmtUsd(v) })}
                   </span>
-                  {big && <span className="text-xs" title="Cierre grande">🔥</span>}
+                  {big && <span className="text-xs" title={t("opp.bigClose")}>🔥</span>}
                   <span className="ml-auto text-xs text-muted-foreground">{userName(c.assigned_to)}</span>
-                  <span className="text-[11px] text-muted-foreground">{fmtDate(c.confirmed_date)}</span>
+                  <span className="text-[11px] text-muted-foreground">{fmtDate(f, c.confirmed_date)}</span>
                 </div>
               );
             })}
@@ -212,13 +223,13 @@ const OpportunitiesPage = () => {
 
       {/* Filtro por etapa */}
       <div className="flex items-center gap-2">
-        <span className="text-xs text-muted-foreground">Ver:</span>
+        <span className="text-xs text-muted-foreground">{t("opp.view")}</span>
         <Select value={filter} onValueChange={(v) => setFilter(v as typeof filter)}>
           <SelectTrigger className="h-8 w-44 text-xs"><SelectValue /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="open">Abiertas</SelectItem>
-            <SelectItem value="all">Todas</SelectItem>
-            {STAGES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+            <SelectItem value="open">{t("opp.open")}</SelectItem>
+            <SelectItem value="all">{t("common.allF")}</SelectItem>
+            {STAGES.map((s) => <SelectItem key={s.value} value={s.value}>{t(s.label)}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
@@ -226,25 +237,25 @@ const OpportunitiesPage = () => {
       <div className="rounded-md border">
         {isLoading ? (
           <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Cargando…
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> {t("common.loading")}
           </div>
         ) : filtered.length === 0 ? (
           <EmptyState
             className="py-10"
             seed="oportunidades"
-            title="No hay oportunidades en esta vista."
-            description="Crea una con “Nueva oportunidad”."
+            title={t("opp.empty")}
+            description={t("opp.emptyHint", { button: t("opp.new") })}
           />
         ) : (
           <table className="tabla-movil w-full text-sm">
             <thead>
               <tr className="border-b text-left text-xs text-muted-foreground">
-                <th className="px-3 py-2 font-medium">Creadora</th>
-                <th className="px-3 py-2 font-medium">Producto</th>
-                <th className="px-3 py-2 font-medium">Valor/mes</th>
-                <th className="px-3 py-2 font-medium">Etapa</th>
-                <th className="px-3 py-2 font-medium">Trabaja</th>
-                <th className="px-3 py-2 font-medium">Próx. seguimiento</th>
+                <th className="px-3 py-2 font-medium">{t("sales.creator")}</th>
+                <th className="px-3 py-2 font-medium">{t("opp.col.product")}</th>
+                <th className="px-3 py-2 font-medium">{t("opp.col.value")}</th>
+                <th className="px-3 py-2 font-medium">{t("opp.col.stage")}</th>
+                <th className="px-3 py-2 font-medium">{t("opp.col.owner")}</th>
+                <th className="px-3 py-2 font-medium">{t("opp.col.next")}</th>
               </tr>
             </thead>
             <tbody>
@@ -261,16 +272,16 @@ const OpportunitiesPage = () => {
                       {o.creator_handle}
                       {o.notes && <div className="truncate text-xs font-normal text-muted-foreground max-w-[22rem]">{o.notes}</div>}
                     </td>
-                    <td className="px-3 py-2 text-xs">{productLabel(o.product)}</td>
+                    <td className="px-3 py-2 text-xs">{productLabel(o.product, t)}</td>
                     <td className="px-3 py-2 text-xs font-medium tabular-nums">{fmtUsd(o.monthly_value_usd)}</td>
                     <td className="px-3 py-2">
-                      <Badge variant="secondary-soft" className={`text-[10px] ${sm.cls}`}>{sm.label}</Badge>
+                      <Badge variant="secondary-soft" className={`text-[10px] ${sm.cls}`}>{t(sm.label)}</Badge>
                     </td>
                     <td className="px-3 py-2 text-xs text-muted-foreground">{userName(o.assigned_to)}</td>
                     <td className="px-3 py-2 text-xs">
                       <span className={`inline-flex items-center gap-1 ${overdue ? "text-destructive" : "text-muted-foreground"}`}>
                         {overdue ? <AlertCircle className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
-                        {fmtDate(o.next_followup_at)}
+                        {fmtDate(f, o.next_followup_at)}
                       </span>
                     </td>
                   </tr>
@@ -319,6 +330,7 @@ const OpportunityFormDialog = ({
   onSaved: () => void;
 }) => {
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [form, setForm] = useState(EMPTY);
 
   // Sincroniza el form cuando se abre (alta vacía / edición con datos).
@@ -340,7 +352,7 @@ const OpportunityFormDialog = ({
   const save = useMutation({
     mutationFn: async () => {
       const handle = form.creator_handle.trim();
-      if (!handle) throw new Error("Falta el @handle de la creadora.");
+      if (!handle) throw new Error(t("opp.form.missingHandle"));
       const payload: Record<string, unknown> = {
         creator_handle: handle,
         product: form.product,
@@ -363,25 +375,25 @@ const OpportunityFormDialog = ({
       }
     },
     onSuccess: () => {
-      toast({ title: existing ? "Oportunidad actualizada" : "Oportunidad creada" });
+      toast({ title: existing ? t("opp.form.updated") : t("opp.form.created") });
       onOpenChange(false);
       onSaved();
     },
-    onError: (e: Error) => toast({ title: "No se pudo guardar", description: e.message, variant: "destructive" }),
+    onError: (e: Error) => toast({ title: t("common.couldNotSave"), description: e.message, variant: "destructive" }),
   });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{existing ? "Editar oportunidad" : "Nueva oportunidad"}</DialogTitle>
+          <DialogTitle>{existing ? t("opp.form.editTitle") : t("opp.new")}</DialogTitle>
           <DialogDescription>
-            Una creadora interesada en un producto. El @handle es la clave; el resto se va actualizando con el seguimiento.
+            {t("opp.form.desc")}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1">
-            <Label>@handle de la creadora *</Label>
+            <Label>{t("opp.form.handleReq")}</Label>
             <Input
               value={form.creator_handle}
               onChange={(e) => setForm({ ...form, creator_handle: e.target.value })}
@@ -392,70 +404,70 @@ const OpportunityFormDialog = ({
           </div>
           <div className="flex gap-3">
             <div className="flex-1 space-y-1">
-              <Label>Producto</Label>
+              <Label>{t("opp.col.product")}</Label>
               <Select value={form.product} onValueChange={(v) => setForm({ ...form, product: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {PRODUCTS.map((p) => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
+                  {PRODUCTS.map((p) => <SelectItem key={p.value} value={p.value}>{t(p.label)}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="flex-1 space-y-1">
-              <Label>Etapa</Label>
+              <Label>{t("opp.col.stage")}</Label>
               <Select value={form.stage} onValueChange={(v) => setForm({ ...form, stage: v as Stage })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {STAGES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                  {STAGES.map((s) => <SelectItem key={s.value} value={s.value}>{t(s.label)}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
           </div>
           <div className="space-y-1">
-            <Label>Facturación / valor mensual (USD)</Label>
+            <Label>{t("opp.form.value")}</Label>
             <Input
               type="number"
               min="0"
               value={form.monthly_value_usd}
               onChange={(e) => setForm({ ...form, monthly_value_usd: e.target.value })}
-              placeholder="Ej. 24000 — para priorizar por monto"
+              placeholder={t("opp.form.valuePh")}
             />
           </div>
           <div className="flex gap-3">
             <div className="flex-1 space-y-1">
-              <Label>Quién la trabaja</Label>
+              <Label>{t("opp.form.owner")}</Label>
               <Select value={form.assigned_to || "none"} onValueChange={(v) => setForm({ ...form, assigned_to: v === "none" ? "" : v })}>
-                <SelectTrigger><SelectValue placeholder="Sin asignar" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={t("common.unassigned")} /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">Sin asignar</SelectItem>
+                  <SelectItem value="none">{t("common.unassigned")}</SelectItem>
                   {users.map((u) => <SelectItem key={u.id} value={u.id}>{u.full_name || u.id.slice(0, 8)}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="flex-1 space-y-1">
-              <Label>Próximo seguimiento</Label>
+              <Label>{t("opp.form.next")}</Label>
               <Input type="date" value={form.next_followup_at} onChange={(e) => setForm({ ...form, next_followup_at: e.target.value })} />
             </div>
           </div>
           <div className="space-y-1">
-            <Label>Notas</Label>
+            <Label>{t("opp.form.notes")}</Label>
             <Textarea
               value={form.notes}
               onChange={(e) => setForm({ ...form, notes: e.target.value })}
-              placeholder="Ej. ofrecido Piclink gratis + CP con descuento de agencia; pidió pensarlo."
+              placeholder={t("opp.form.notesPh")}
               rows={3}
             />
           </div>
           {form.stage === "lost" && (
             <div className="space-y-1">
-              <Label>Motivo de la pérdida</Label>
-              <Input value={form.lost_reason} onChange={(e) => setForm({ ...form, lost_reason: e.target.value })} placeholder="Ej. no quiso crear OF, solo shootings" />
+              <Label>{t("opp.form.lostReason")}</Label>
+              <Input value={form.lost_reason} onChange={(e) => setForm({ ...form, lost_reason: e.target.value })} placeholder={t("opp.form.lostReasonPh")} />
             </div>
           )}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>{t("common.cancel")}</Button>
           <Button onClick={() => save.mutate()} disabled={save.isPending || !form.creator_handle.trim()}>
-            {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : (existing ? "Guardar" : "Crear")}
+            {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : (existing ? t("common.save") : t("common.create"))}
           </Button>
         </DialogFooter>
       </DialogContent>

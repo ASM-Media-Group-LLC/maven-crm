@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { traducir } from "@/lib/i18n";
 
 // ─── Interfaces ───────────────────────────────────────────────
 
@@ -64,9 +65,9 @@ export function useUpdateFinancialConfig() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["financial-config"] });
-      toast({ title: "Configuración guardada" });
+      toast({ title: traducir("finanzas.config.saved") });
     },
-    onError: () => toast({ title: "Error al guardar", variant: "destructive" }),
+    onError: () => toast({ title: traducir("common.errorSaving"), variant: "destructive" }),
   });
 }
 

@@ -1,6 +1,7 @@
 import { ExternalLink, Eye } from "lucide-react";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
+import { useLanguage } from "@/hooks/useLanguage";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
 import XIcon from "@/components/icons/XIcon";
@@ -40,6 +41,8 @@ interface Props {
 }
 
 const LeadGenGrid = ({ leads, onView }: Props) => {
+  const f = useFormato();
+  const { t } = useLanguage();
   const buildProfileUrl = (entry: LeadGenEntry) => {
     if (entry.source_link) return entry.source_link;
     const p = entry.platform.toLowerCase();
@@ -77,7 +80,7 @@ const LeadGenGrid = ({ leads, onView }: Props) => {
                       className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
                     >
                       {getPlatformIcon(lead.platform)}
-                      <span className="truncate max-w-[100px]">Ver Perfil</span>
+                      <span className="truncate max-w-[100px]">{t("leadgen.grid.viewProfile")}</span>
                       <ExternalLink className="h-3 w-3" />
                     </a>
                   </div>
@@ -88,21 +91,21 @@ const LeadGenGrid = ({ leads, onView }: Props) => {
 
                 <div className="space-y-1.5 text-sm">
                   <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Agente:</span>
+                    <span className="text-muted-foreground">{t("leadgen.col.agent")}:</span>
                     <span className="font-medium">{lead.agent_name || "—"}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Agencia:</span>
+                    <span className="text-muted-foreground">{t("leadgen.col.agency")}:</span>
                     <span className="font-medium">{lead.company || "—"}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Fecha:</span>
+                    <span className="text-muted-foreground">{t("common.date")}:</span>
                     <span className="font-medium">
-                      {format(createdAt, "d MMM yyyy", { locale: es })} · {format(createdAt, "hh:mm a")}
+                      {format(createdAt, f.idioma === "en" ? "MMM d, yyyy" : "d MMM yyyy", { locale: f.fechas })} · {format(createdAt, "hh:mm a")}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">País:</span>
+                    <span className="text-muted-foreground">{t("common.country")}:</span>
                     <span className="font-medium">
                       {countryToFlag(lead.country_code)} {lead.country_code || "—"}
                     </span>
@@ -111,7 +114,7 @@ const LeadGenGrid = ({ leads, onView }: Props) => {
 
                 <Button size="sm" className="w-full" onClick={(e) => { e.stopPropagation(); onView?.(lead); }}>
                   <Eye className="h-4 w-4 mr-1" />
-                  Ver Detalles
+                  {t("leadgen.grid.viewDetails")}
                 </Button>
               </CardContent>
             </Card>
@@ -120,7 +123,7 @@ const LeadGenGrid = ({ leads, onView }: Props) => {
       </div>
       {leads.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16">
-          <p className="text-muted-foreground text-sm">No hay leads para mostrar</p>
+          <p className="text-muted-foreground text-sm">{t("leadgen.grid.empty")}</p>
         </div>
       )}
     </div>

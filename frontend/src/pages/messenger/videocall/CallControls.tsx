@@ -10,6 +10,8 @@ import { puedeCompartirPantalla } from "@/lib/compartirPantalla";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { esBlur, type BackgroundEffect } from "@/lib/fondoDeLlamada";
+import { useLanguage } from "@/hooks/useLanguage";
+import { traducir, type TranslationKey } from "@/lib/i18n";
 
 interface DeviceInfo {
   deviceId: string;
@@ -143,8 +145,15 @@ function DevicePill({ icon: Icon, devices, selectedId, onSelect, onPedirPermiso,
   pidiendo?: boolean;
   tipo: "micrófono" | "altavoz" | "cámara";
 }) {
+  const { t } = useLanguage();
   const [open, setOpen] = useState(false);
   const selected = devices.find((d) => d.deviceId === selectedId);
+  // `tipo` es la clave interna del selector; lo que se lee sale del diccionario.
+  const sinPermiso: Record<typeof tipo, TranslationKey> = {
+    "micrófono": "messenger.call.sinPermisoMicrofono",
+    "altavoz": "messenger.call.sinPermisoAltavoz",
+    "cámara": "messenger.call.sinPermisoCamara",
+  };
 
   return (
     <div className="relative">
@@ -153,7 +162,7 @@ function DevicePill({ icon: Icon, devices, selectedId, onSelect, onPedirPermiso,
         className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-card border border-border text-xs text-foreground hover:bg-secondary transition-colors max-w-[200px]"
       >
         <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-        <span className="truncate">{selected?.label || "Seleccionar"}</span>
+        <span className="truncate">{selected?.label || t("common.select")}</span>
         <ChevronDown className={cn("h-3 w-3 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} />
       </button>
       {/* Se abre aunque la lista este vacia: un control que no responde no le
@@ -161,7 +170,7 @@ function DevicePill({ icon: Icon, devices, selectedId, onSelect, onPedirPermiso,
       {open && devices.length === 0 && (
         <div className="absolute bottom-full mb-1 left-0 z-50 rounded-lg bg-card border border-border shadow-xl p-3 w-[240px]">
           <p className="text-xs text-muted-foreground leading-relaxed">
-            El navegador no muestra tu {tipo} hasta que le des permiso.
+            {t(sinPermiso[tipo])}
           </p>
           {onPedirPermiso && (
             <button
@@ -169,7 +178,7 @@ function DevicePill({ icon: Icon, devices, selectedId, onSelect, onPedirPermiso,
               disabled={pidiendo}
               className="mt-2 w-full rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary/90 disabled:opacity-50"
             >
-              {pidiendo ? "Pidiendo permiso…" : "Permitir acceso"}
+              {pidiendo ? t("messenger.call.pidiendoPermiso") : t("messenger.call.permitirAcceso")}
             </button>
           )}
         </div>
@@ -205,6 +214,7 @@ function DevicePill({ icon: Icon, devices, selectedId, onSelect, onPedirPermiso,
 // mudo: hacia click y no pasaba nada, sin ninguna explicacion. Por eso el hook
 // ademas expone como PEDIR el permiso.
 function useDevices(open: boolean) {
+  const { t } = useLanguage();
   const [audioInputs, setAudioInputs] = useState<DeviceInfo[]>([]);
   const [audioOutputs, setAudioOutputs] = useState<DeviceInfo[]>([]);
   const [videoInputs, setVideoInputs] = useState<DeviceInfo[]>([]);
@@ -213,11 +223,11 @@ function useDevices(open: boolean) {
   const enumerate = useCallback(async () => {
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
-      setAudioInputs(devices.filter((d) => d.kind === "audioinput" && d.deviceId).map((d) => ({ deviceId: d.deviceId, label: d.label || `Micrófono ${d.deviceId.slice(0, 5)}` })));
-      setAudioOutputs(devices.filter((d) => d.kind === "audiooutput" && d.deviceId).map((d) => ({ deviceId: d.deviceId, label: d.label || `Altavoz ${d.deviceId.slice(0, 5)}` })));
-      setVideoInputs(devices.filter((d) => d.kind === "videoinput" && d.deviceId).map((d) => ({ deviceId: d.deviceId, label: d.label || `Cámara ${d.deviceId.slice(0, 5)}` })));
+      setAudioInputs(devices.filter((d) => d.kind === "audioinput" && d.deviceId).map((d) => ({ deviceId: d.deviceId, label: d.label || t("messenger.call.microfonoN", { id: d.deviceId.slice(0, 5) }) })));
+      setAudioOutputs(devices.filter((d) => d.kind === "audiooutput" && d.deviceId).map((d) => ({ deviceId: d.deviceId, label: d.label || t("messenger.call.altavozN", { id: d.deviceId.slice(0, 5) }) })));
+      setVideoInputs(devices.filter((d) => d.kind === "videoinput" && d.deviceId).map((d) => ({ deviceId: d.deviceId, label: d.label || t("messenger.call.camaraN", { id: d.deviceId.slice(0, 5) }) })));
     } catch {}
-  }, []);
+  }, [t]);
 
   // Un getUserMedia basta para que el navegador revele los dispositivos. El
   // track se corta enseguida: solo se queria el permiso, no capturar nada.
@@ -230,14 +240,14 @@ function useDevices(open: boolean) {
       stream.getTracks().forEach((t) => t.stop());
       await enumerate();
     } catch {
-      toast.error("El navegador bloqueó el acceso", {
-        description: "Hay que habilitarlo desde el candado de la barra de direcciones.",
+      toast.error(t("messenger.call.navegadorBloqueo"), {
+        description: t("messenger.call.navegadorBloqueoDesc"),
         duration: 8000,
       });
     } finally {
       setPidiendo(false);
     }
-  }, [enumerate]);
+  }, [enumerate, t]);
 
   useEffect(() => {
     if (open) enumerate();
@@ -268,16 +278,20 @@ function useDevices(open: boolean) {
 /** Lo que se le dice a la persona al cambiar la cancelación de ruido. El
  *  cambio es invisible (no hay nada que se vea distinto en la llamada), así que
  *  sin aviso nadie sabe si el toque hizo algo. */
+//
+// traducir() y no el hook: es un aviso que se arma y se muestra una vez, desde
+// un click.
 function avisarNC(activada: boolean) {
   if (activada) {
-    toast.success("Cancelación de ruido activada", { description: "Quita teclado, ventilador y voces de fondo mientras hablas.", id: "nc" });
+    toast.success(traducir("messenger.call.ncActivada"), { description: traducir("messenger.call.ncActivadaDesc"), id: "nc" });
   } else {
-    toast.info("Cancelación de ruido desactivada", { description: "Tu micrófono sale tal cual.", id: "nc" });
+    toast.info(traducir("messenger.call.ncDesactivada"), { description: traducir("messenger.call.ncDesactivadaDesc"), id: "nc" });
   }
 }
 
 /** Interruptor de la cancelación de ruido en el menú del micro (escritorio). */
 function FilaCancelacionRuido({ activa, onClick }: { activa: boolean; onClick: () => void }) {
+  const { t } = useLanguage();
   return (
     <button
       type="button"
@@ -290,9 +304,9 @@ function FilaCancelacionRuido({ activa, onClick }: { activa: boolean; onClick: (
       )}
     >
       <AudioLines className="h-4 w-4 shrink-0" />
-      <span className="flex-1 text-left">Cancelación de ruido</span>
+      <span className="flex-1 text-left">{t("messenger.call.cancelacionRuido")}</span>
       <span className={cn("text-[11px] font-medium rounded-full px-2 py-0.5", activa ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>
-        {activa ? "Activada" : "Desactivada"}
+        {activa ? t("messenger.call.activada") : t("messenger.call.desactivada")}
       </span>
     </button>
   );
@@ -359,6 +373,7 @@ export default function CallControls({
   onOpenVideoSettings, onOpenMetrics, onOpenAdjustView, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, compact, tactil, controlesExtra,
   backgroundEffect, onToggleBlurBackground,
 }: CallControlsProps) {
+  const { t } = useLanguage();
   const [audioPopoverOpen, setAudioPopoverOpen] = useState(false);
   const [videoPopoverOpen, setVideoPopoverOpen] = useState(false);
   // El menú del teléfono también tiene que disparar la consulta de
@@ -399,7 +414,7 @@ export default function CallControls({
         {compact ? (
           <button
             onClick={onToggleMic}
-            title="Micrófono"
+            title={t("messenger.call.microfono")}
             className={cn(
               btnSize, "rounded-full flex items-center justify-center transition-colors",
               isMicOn
@@ -428,7 +443,7 @@ export default function CallControls({
                   <DevicePill icon={Volume2} tipo="altavoz" devices={devices.audioOutputs} selectedId={currentAudioOutputId || ""} onSelect={onAudioOutputChange} onPedirPermiso={() => devices.pedirPermiso("audio")} pidiendo={devices.pidiendo} />
                 </div>
                 {/* La cancelación de ruido vivía en el hook pero NINGUNA pantalla la
-                    mostraba: Jhon la buscó en una llamada y no estaba. Va acá, junto
+                    mostraba: Jhon la buscó en una llamada y no estaba. Va aquí, junto
                     al micro, que es donde uno la busca. */}
                 {onToggleNoiseCancellation && (
                   <FilaCancelacionRuido activa={!!isNoiseCancellationOn} onClick={onToggleNoiseCancellation} />
@@ -437,7 +452,7 @@ export default function CallControls({
             </Popover>
             <button
               onClick={onToggleMic}
-              title="Micrófono"
+              title={t("messenger.call.microfono")}
               className={cn(
                 "h-11 w-11 rounded-r-lg flex items-center justify-center transition-colors",
                 isMicOn
@@ -454,7 +469,7 @@ export default function CallControls({
         {compact ? (
           <button
             onClick={onToggleCam}
-            title="Cámara"
+            title={t("messenger.input.camara")}
             className={cn(
               btnSize, "rounded-full flex items-center justify-center transition-colors",
               isCamOn
@@ -482,7 +497,7 @@ export default function CallControls({
                   <DevicePill icon={VideoIcon} tipo="cámara" devices={devices.videoInputs} selectedId={currentVideoInputId || ""} onSelect={onVideoInputChange} onPedirPermiso={() => devices.pedirPermiso("video")} pidiendo={devices.pidiendo} />
                   <button
                     onClick={() => { setVideoPopoverOpen(false); onToggleBlurBackground?.(); }}
-                    title="Difuminar fondo"
+                    title={t("messenger.call.difuminarFondo")}
                     className={cn(
                       "h-8 px-3 rounded-full flex items-center gap-1.5 text-xs transition-colors",
                       esBlur(backgroundEffect)
@@ -491,22 +506,22 @@ export default function CallControls({
                     )}
                   >
                     <Cloud className="h-3.5 w-3.5" />
-                    <span>Fondo difuminado</span>
+                    <span>{t("messenger.call.fondoDifuminado")}</span>
                   </button>
                   <button
                     onClick={() => { setVideoPopoverOpen(false); onOpenVideoSettings(); }}
-                    title="Fondos y efectos"
+                    title={t("messenger.call.fondosYEfectos")}
                     className="h-8 px-3 rounded-full flex items-center gap-1.5 text-xs bg-card text-foreground hover:bg-muted transition-colors"
                   >
                     <Sparkles className="h-3.5 w-3.5" />
-                    <span>Fondos y efectos</span>
+                    <span>{t("messenger.call.fondosYEfectos")}</span>
                   </button>
                 </div>
               </PopoverContent>
             </Popover>
             <button
               onClick={onToggleCam}
-              title="Cámara"
+              title={t("messenger.input.camara")}
               className={cn(
                 "h-11 w-11 rounded-r-lg flex items-center justify-center transition-colors",
                 isCamOn
@@ -535,7 +550,7 @@ export default function CallControls({
             // empezando por los tests, que fue donde se notó. Un control que
             // cambia de nombre accesible según una detección es peor que uno
             // que siempre se llama igual y explica al tocarlo.
-            label="Compartir pantalla"
+            label={t("messenger.call.compartirPantalla")}
             className={puedeCompartir ? undefined : "opacity-60"}
             compact={compact}
             tactil={tactil}
@@ -548,7 +563,7 @@ export default function CallControls({
             como se reportó. Lo mismo vale para los demás menús de la llamada. */}
         <Popover>
           <PopoverTrigger asChild>
-            <button title="Reacciones" className={cn(
+            <button title={t("messenger.call.reacciones")} className={cn(
               "rounded-full flex items-center justify-center bg-card text-foreground hover:bg-muted transition-colors",
               compact ? (tactil ? "h-9 w-9" : "h-8 w-8") : "h-11 w-11"
             )}>
@@ -566,7 +581,7 @@ export default function CallControls({
           </PopoverContent>
         </Popover>
 
-        <ControlBtn icon={Hand} active={isHandRaised ? true : undefined} onClick={onToggleHand} label="Levantar mano" badge={isHandRaised} compact={compact} tactil={tactil} />
+        <ControlBtn icon={Hand} active={isHandRaised ? true : undefined} onClick={onToggleHand} label={t("messenger.call.levantarMano")} badge={isHandRaised} compact={compact} tactil={tactil} />
 
         {/* Leave — en compacto va icon-only (pastilla roja estilo Google Meet) */}
         {!hideLeaveButton && (() => {
@@ -574,7 +589,7 @@ export default function CallControls({
           return (
             <button
               onClick={onLeave}
-              title={leaveLabel || "Colgar"}
+              title={leaveLabel || t("messenger.call.colgar")}
               className={cn(
                 "rounded-full bg-destructive text-white hover:bg-destructive/90 transition-colors flex items-center justify-center gap-2 font-medium",
                 compact ? (tactil ? "h-9 w-12 text-xs" : "h-8 w-12 text-xs") : "h-11 px-5 text-sm"
@@ -593,7 +608,7 @@ export default function CallControls({
               <Popover open={menuAbierto} onOpenChange={setMenuAbierto}>
                 <PopoverTrigger asChild>
                   <button
-                    title="Más opciones"
+                    title={t("messenger.call.masOpciones")}
                     className={cn(
                       "rounded-full flex items-center justify-center transition-colors",
                       "h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-card",
@@ -613,35 +628,35 @@ export default function CallControls({
                   className="z-[200] w-[min(320px,90vw)] max-h-[70vh] overflow-y-auto overscroll-contain p-1.5 bg-background border-border"
                 >
                   {camaras.length > 1 && (
-                    <FilaMenu icon={SwitchCamera} label="Girar cámara" onClick={cerrarY(girarCamara)} />
+                    <FilaMenu icon={SwitchCamera} label={t("messenger.call.girarCamara")} onClick={cerrarY(girarCamara)} />
                   )}
-                  <GrupoDispositivos titulo="Cámara" icon={VideoIcon} devices={camaras}
+                  <GrupoDispositivos titulo={t("messenger.input.camara")} icon={VideoIcon} devices={camaras}
                     selectedId={currentVideoInputId} onSelect={(id) => cerrarY(() => onVideoInputChange(id))()} />
-                  <GrupoDispositivos titulo="Micrófono" icon={Mic} devices={devices.audioInputs}
+                  <GrupoDispositivos titulo={t("messenger.call.microfono")} icon={Mic} devices={devices.audioInputs}
                     selectedId={currentAudioInputId} onSelect={(id) => cerrarY(() => onAudioInputChange(id))()} />
-                  <GrupoDispositivos titulo="Altavoz" icon={Volume2} devices={devices.audioOutputs}
+                  <GrupoDispositivos titulo={t("messenger.call.altavoz")} icon={Volume2} devices={devices.audioOutputs}
                     selectedId={currentAudioOutputId} onSelect={(id) => cerrarY(() => onAudioOutputChange(id))()} />
                   <div className="h-px bg-border my-1" />
                   {onToggleNoiseCancellation && (
-                    <FilaMenu icon={AudioLines} label={isNoiseCancellationOn ? "Cancelación de ruido: activada" : "Cancelación de ruido"}
+                    <FilaMenu icon={AudioLines} label={isNoiseCancellationOn ? t("messenger.call.cancelacionRuidoActivada") : t("messenger.call.cancelacionRuido")}
                       activa={!!isNoiseCancellationOn}
                       onClick={cerrarY(() => { onToggleNoiseCancellation(); avisarNC(!isNoiseCancellationOn); })} />
                   )}
-                  <FilaMenu icon={Cloud} label="Difuminar fondo"
+                  <FilaMenu icon={Cloud} label={t("messenger.call.difuminarFondo")}
                     activa={esBlur(backgroundEffect)}
                     onClick={cerrarY(onToggleBlurBackground)} />
-                  <FilaMenu icon={Sparkles} label="Fondos y efectos" onClick={cerrarY(onOpenVideoSettings)} />
+                  <FilaMenu icon={Sparkles} label={t("messenger.call.fondosYEfectos")} onClick={cerrarY(onOpenVideoSettings)} />
                   {onOpenAdjustView && (
-                    <FilaMenu icon={LayoutGrid} label="Ajustar vista" onClick={cerrarY(onOpenAdjustView)} />
+                    <FilaMenu icon={LayoutGrid} label={t("messenger.call.ajustarVista")} onClick={cerrarY(onOpenAdjustView)} />
                   )}
-                  <FilaMenu icon={Info} label="Métricas" onClick={cerrarY(onOpenMetrics)} />
+                  <FilaMenu icon={Info} label={t("messenger.call.metricas")} onClick={cerrarY(onOpenMetrics)} />
                 </PopoverContent>
               </Popover>
             ) : (
-              <PanelBtn icon={Info} onClick={onOpenMetrics} label="Métricas" compact tactil={tactil} />
+              <PanelBtn icon={Info} onClick={onOpenMetrics} label={t("messenger.call.metricas")} compact tactil={tactil} />
             )}
-            <PanelBtn icon={Users} active={isParticipantsOpen} onClick={onToggleParticipants} label="Participantes" compact tactil={tactil} />
-            <PanelBtn icon={MessageSquare} active={isChatOpen} onClick={onToggleChat} label="Chat" badge={!isChatOpen ? unreadChatCount : undefined} compact tactil={tactil} />
+            <PanelBtn icon={Users} active={isParticipantsOpen} onClick={onToggleParticipants} label={t("messenger.call.participantes")} compact tactil={tactil} />
+            <PanelBtn icon={MessageSquare} active={isChatOpen} onClick={onToggleChat} label={t("messenger.call.chat")} badge={!isChatOpen ? unreadChatCount : undefined} compact tactil={tactil} />
             {controlesExtra}
           </>
         )}
@@ -650,13 +665,13 @@ export default function CallControls({
       {/* Right panel toggles — full mode */}
       {!compact && (
         <div className="flex-1 flex items-center justify-end gap-1">
-          <PanelBtn icon={Info} onClick={onOpenMetrics} label="Métricas" />
-          <PanelBtn icon={Users} active={isParticipantsOpen} onClick={onToggleParticipants} label="Participantes" />
+          <PanelBtn icon={Info} onClick={onOpenMetrics} label={t("messenger.call.metricas")} />
+          <PanelBtn icon={Users} active={isParticipantsOpen} onClick={onToggleParticipants} label={t("messenger.call.participantes")} />
           <PanelBtn
             icon={MessageSquare}
             active={isChatOpen}
             onClick={onToggleChat}
-            label="Chat"
+            label={t("messenger.call.chat")}
             badge={!isChatOpen ? unreadChatCount : undefined}
           />
           {controlesExtra}

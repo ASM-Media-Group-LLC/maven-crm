@@ -41,6 +41,9 @@ vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "u1" } }) }));
 vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ explicitPermission: () => null, isLoading: false, canAccess: () => true }) }));
 vi.mock("@/hooks/useRoleTier", () => ({ useRoleTier: () => ({ isSupervisorOrAbove: true, isAdmin: true, tier: "admin" }) }));
 vi.mock("@/hooks/useUserRole", () => ({ useUserRole: () => ({ isAdmin: true, role: "admin" }) }));
+// La página monta la ficha del Messenger (ProfileCard), que ya habla por t().
+vi.mock("@/hooks/useLanguage", (original) =>
+  import("@/test/messenger/espanolEnTests").then((m) => m.idiomaEnEspanol(original)));
 
 import PersonalizadosPage from "@/pages/personalizados/PersonalizadosPage";
 

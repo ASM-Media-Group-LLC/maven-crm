@@ -1,5 +1,7 @@
 import { useState, useEffect, type Dispatch, type SetStateAction } from "react";
 import { Plus, Pencil, Check } from "lucide-react";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 import {
   Dialog,
   DialogContent,
@@ -56,6 +58,17 @@ export const EMOJI_CATALOG: Record<string, string[]> = {
   Otros:   ["⭐","✨","💫","🌟","⚡","☀️","🌙","🌈","🌸","🌺","🌷","🌻","🌹","🥀","🪷","🍀","🦋","🎀","🧿","🔮","🎉","🎊","💯","💢","💥","💤","🎶","🎵","♾️","❗","‼️","⁉️"],
 };
 
+// El nombre de la categoría es la LLAVE del catálogo (la usa también el
+// Messenger, en Expresiones); lo que se muestra sale de acá.
+export const NOMBRE_CATEGORIA: Record<string, TranslationKey> = {
+  Caras: "chatters.emoji.cat.caras",
+  Amor: "chatters.emoji.cat.amor",
+  Cuerpo: "chatters.emoji.cat.cuerpo",
+  Gestos: "chatters.emoji.cat.gestos",
+  Objetos: "chatters.emoji.cat.objetos",
+  Otros: "chatters.emoji.cat.otros",
+};
+
 interface EmojiBarProps {
   emojis: string[];
   onPick: (emoji: string) => void;
@@ -68,6 +81,12 @@ interface EmojiBarProps {
    *  Used to host the A−/A+ font zoom buttons in the same spot the
    *  original Roleplaychatters had them (.chat-zoom on the emoji row). */
   trailing?: React.ReactNode;
+  /** Lo que va DENTRO del popup del «+», en lugar del catálogo de siempre. Solo
+   *  cambia cómo se ve: el popup, su título y lo que pasa al elegir (se suma a la
+   *  barra, no se cierra, lo que ya está queda deshabilitado) son los mismos. Lo
+   *  usa el Messenger con el selector de Google; el Chatter, la bandeja y el
+   *  composer compartido siguen con EMOJI_CATALOG. */
+  selector?: (props: { enLaBarra: string[]; onAgregar: (emoji: string) => void }) => React.ReactNode;
 }
 
 export const EmojiBar = ({
@@ -77,7 +96,9 @@ export const EmojiBar = ({
   onRemove,
   editable = true,
   trailing,
+  selector,
 }: EmojiBarProps) => {
+  const { t } = useLanguage();
   const [editMode, setEditMode] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
 
@@ -113,7 +134,7 @@ export const EmojiBar = ({
             className={`relative shrink-0 rounded p-0.5 text-xl leading-none transition-colors hover:bg-muted ${
               editMode ? "ring-1 ring-destructive/40 hover:ring-destructive" : ""
             }`}
-            title={editMode ? "Click para eliminar" : `Insertar ${e}`}
+            title={editMode ? t("chatters.emoji.clickToRemove") : t("chatters.emoji.insertN", { emoji: e })}
           >
             {e}
             {editMode && (
@@ -129,7 +150,7 @@ export const EmojiBar = ({
               type="button"
               onClick={() => setPickerOpen(true)}
               className="rounded border border-dashed border-muted-foreground/40 p-1 text-xs text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
-              title="Agregar emoji"
+              title={t("chatters.emoji.add")}
             >
               <Plus className="h-3.5 w-3.5" />
             </button>
@@ -141,7 +162,7 @@ export const EmojiBar = ({
                   ? "border-success text-success hover:bg-success/10"
                   : "border-dashed border-muted-foreground/40 text-muted-foreground hover:border-foreground hover:text-foreground"
               }`}
-              title={editMode ? "Terminar edición" : "Editar emojis"}
+              title={editMode ? t("chatters.emoji.doneEditing") : t("chatters.emoji.edit")}
             >
               {editMode ? <Check className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
             </button>
@@ -154,13 +175,14 @@ export const EmojiBar = ({
         <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Agregar emoji</DialogTitle>
+              <DialogTitle>{t("chatters.emoji.add")}</DialogTitle>
             </DialogHeader>
+            {selector ? selector({ enLaBarra: emojis, onAgregar: handlePickFromCatalog }) : (
             <div className="max-h-[60vh] space-y-4 overflow-y-auto">
               {Object.entries(EMOJI_CATALOG).map(([category, list]) => (
                 <div key={category}>
                   <div className="mb-1.5 text-xs text-muted-foreground">
-                    {category}
+                    {NOMBRE_CATEGORIA[category] ? t(NOMBRE_CATEGORIA[category]) : category}
                   </div>
                   <div className="flex flex-wrap gap-0.5">
                     {list.map((e) => {
@@ -176,7 +198,7 @@ export const EmojiBar = ({
                               ? "opacity-30 cursor-not-allowed"
                               : "hover:bg-muted"
                           }`}
-                          title={already ? "Ya en la barra" : "Agregar"}
+                          title={already ? t("chatters.emoji.alreadyInBar") : t("common.add")}
                         >
                           {e}
                         </button>
@@ -186,6 +208,7 @@ export const EmojiBar = ({
                 </div>
               ))}
             </div>
+            )}
           </DialogContent>
         </Dialog>
       )}

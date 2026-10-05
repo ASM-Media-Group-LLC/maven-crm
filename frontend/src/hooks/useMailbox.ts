@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useMemo } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { describeFunctionError } from "@/hooks/useMailConnection";
 import { base64ABlob } from "@/lib/base64Blob";
 import { adjuntosIncrustados, incrustarCids } from "@/lib/mailCid";
+import {
+  reponerEnLista, uidDe, type DestinoDelMovimiento, type FilaEnCache,
+} from "@/lib/correo/deshacer";
 
 /**
  * Buzón del usuario: carpetas, mensajes, lectura y envío.
@@ -115,17 +118,21 @@ async function conTurno<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
-/** Llama a `mail-fetch` y devuelve el cuerpo ya tipado. */
+/** Llama a `mail-fetch` y devuelve el cuerpo ya tipado. SIN turno: solo para
+ *  acciones que no abren IMAP (traducir). */
+async function invocarMailFetch<T>(body: Record<string, unknown>): Promise<T> {
+  const { data, error } = await supabase.functions.invoke("mail-fetch", { body });
+  // supabase-js deja "non-2xx status code" y esconde el motivo real en la
+  // Response de `error.context`. Sin desenvolverlo el diagnóstico es a ciegas.
+  if (error) throw new Error(await describeFunctionError(error));
+  const payload = data as T & { error?: string };
+  if (payload?.error) throw new Error(payload.error);
+  return payload as T;
+}
+
+/** Llama a `mail-fetch` haciendo fila en el semáforo (máx. 2 a la vez). */
 function callMail<T>(body: Record<string, unknown>): Promise<T> {
-  return conTurno(async () => {
-    const { data, error } = await supabase.functions.invoke("mail-fetch", { body });
-    // supabase-js deja "non-2xx status code" y esconde el motivo real en la
-    // Response de `error.context`. Sin desenvolverlo el diagnóstico es a ciegas.
-    if (error) throw new Error(await describeFunctionError(error));
-    const payload = data as T & { error?: string };
-    if (payload?.error) throw new Error(payload.error);
-    return payload as T;
-  });
+  return conTurno(() => invocarMailFetch<T>(body));
 }
 
 /** Reglas de las consultas que PUEDEN abrir una sesión IMAP (el fallback).
@@ -202,26 +209,58 @@ export function useMailFolders(enabled: boolean) {
   });
 }
 
-export function useMailMessages(folder: string, enabled: boolean) {
+/** Correos por página, como Gmail («1–50 de 186»). */
+export const CORREOS_POR_PAGINA = 50;
+
+/** Una PÁGINA de la carpeta, de las más nuevas a las más viejas.
+ *
+ *  Grace (28/09): «¿cómo hago para ver el resto de los correos? Solo me salen
+ *  los 50 primeros y son 126 que tengo pendientes por leer». La caché tenía
+ *  los 186 de su bandeja, pero la lista pedía siempre los primeros 50 y no
+ *  había cómo pasar a los siguientes.
+ *
+ *  ⚠️ La página va en la CLAVE (["mail-messages", folder, pagina]): quien
+ *  toque la lista de una carpeta a mano tiene que usar setQueriesData con el
+ *  prefijo ["mail-messages", folder], o solo cambiaría la página 0. */
+export function useMailMessages(
+  folder: string, enabled: boolean, pagina = 0,
+  /** Solo los LEÍDOS: la sección «Todo lo demás» de «No leídos primero». Los
+   *  no leídos vienen aparte, de toda la carpeta (`useMailNoLeidos`). */
+  soloLeidos = false,
+) {
   const qc = useQueryClient();
   return useQuery({
-    queryKey: ["mail-messages", folder],
+    // ⚠️ Sin el filtro la clave queda IGUAL que siempre; con él se le suma
+    // "leidos" al final, así el prefijo ["mail-messages", folder] la sigue
+    // alcanzando (lo usan las actualizaciones optimistas).
+    queryKey: ["mail-messages", folder, pagina].concat(soloLeidos ? ["leidos"] : []),
     enabled: enabled && !!folder,
     ...SESION_IMAP,
     staleTime: 60 * 1000,
-    queryFn: async (): Promise<{ messages: MailSummary[] }> => {
+    // Al pasar de página se sigue viendo la anterior hasta que llega la nueva:
+    // sin esto la lista se vacía y parpadea con cada ‹ ›.
+    placeholderData: keepPreviousData,
+    queryFn: async (): Promise<{ messages: MailSummary[]; total?: number }> => {
       // Caché primero.
       // ⚠️ `as never` en la tabla: `types.ts` es generado y todavía no conoce
       // `in_reply_to` ni `refs`, así que el cliente tipado rechaza el select
       // entero. Mismo patrón que calendar_events y document_shares.
       const COLUMNAS_BASE =
         "id, uid, from_addr, to_addr, cc_addr, subject, date, snippet, unread, message_id";
-      const traer = (cols: string) =>
-        supabase.from("mail_messages" as never)
-          .select(cols)
-          .eq("folder", folder)
+      const desde = pagina * CORREOS_POR_PAGINA;
+      const traer = (cols: string) => {
+        let q = supabase.from("mail_messages" as never)
+          // El total viene en la MISMA consulta: es el «de 186» de Gmail.
+          .select(cols, { count: "exact" })
+          .eq("folder", folder);
+        if (soloLeidos) q = q.eq("unread", false);
+        return q
           .order("date", { ascending: false })
-          .limit(50);
+          // Desempate estable: con dos correos a la misma hora, sin esto uno
+          // podía salir en la página 1 Y en la 2 (o en ninguna).
+          .order("uid", { ascending: false })
+          .range(desde, desde + CORREOS_POR_PAGINA - 1);
+      };
 
       // ⚠️ SE DEGRADA EN VEZ DE CAERSE.
       //
@@ -234,31 +273,27 @@ export function useMailMessages(folder: string, enabled: boolean) {
       //
       // Si faltan, se reintenta sin ellas: los hilos se agrupan por asunto,
       // que es el camino de respaldo que ya existe, y la bandeja se ve.
-      let { data, error } = await traer(`${COLUMNAS_BASE}, in_reply_to, refs`);
+      let { data, error, count } = await traer(`${COLUMNAS_BASE}, in_reply_to, refs`);
       if (error && /in_reply_to|refs/.test(error.message ?? "")) {
-        ({ data, error } = await traer(COLUMNAS_BASE));
+        ({ data, error, count } = await traer(COLUMNAS_BASE));
       }
       if (error) throw error;
-      if (data && data.length > 0) {
+      // ⚠️ De la página 2 en adelante NUNCA se cae al camino en vivo: una
+      // página vacía (se borraron correos y la lista se achicó) es un vacío de
+      // verdad, no una caché sin sincronizar.
+      // Solo los leídos y no vino ninguno: puede ser que TODO esté sin leer
+      // (un vacío de verdad) o que la caché todavía no tenga esta carpeta. Se
+      // pregunta: en el segundo caso, el camino en vivo de siempre.
+      if (soloLeidos && !(data && data.length > 0) && pagina === 0) {
+        const { count: enLaCarpeta } = await supabase.from("mail_messages" as never)
+          .select("id", { count: "exact", head: true })
+          .eq("folder", folder);
+        if ((enLaCarpeta ?? 0) > 0) return { total: 0, messages: [] };
+      }
+      if ((data && data.length > 0) || pagina > 0) {
         return {
-          messages: (data as unknown as Record<string, unknown>[]).map((m) => ({
-            id: m.id as string,
-            uid: m.uid as number,
-            from: (m.from_addr as string) ?? "",
-            to: (m.to_addr as string) ?? "",
-            subject: (m.subject as string) ?? "(sin asunto)",
-            date: (m.date as string) ?? "",
-            snippet: (m.snippet as string) ?? "",
-            messageId: (m.message_id as string) ?? undefined,
-            // Las cabeceras que encadenan la conversación. Faltan en todo lo
-            // sincronizado antes del 18/09/2026: para esos, `agruparEnHilos`
-            // cae al camino por asunto.
-            inReplyTo: (m.in_reply_to as string) ?? undefined,
-            refs: (m.refs as string[]) ?? undefined,
-            cc: (m.cc_addr as string) ?? undefined,
-            unread: !!m.unread,
-            origen: "cache" as const,
-          })),
+          total: count ?? undefined,
+          messages: ((data ?? []) as unknown as Record<string, unknown>[]).map(resumenDeCache),
         };
       }
 
@@ -283,6 +318,68 @@ export function useMailMessages(folder: string, enabled: boolean) {
         messages: orden.map((m) => ({
           ...m, inReplyTo: undefined, refs: undefined, origen: "vivo" as const,
         })),
+      };
+    },
+  });
+}
+
+/** Una fila de `mail_messages` como resumen de la lista. */
+function resumenDeCache(m: Record<string, unknown>): MailSummary {
+  return {
+    id: m.id as string,
+    uid: m.uid as number,
+    from: (m.from_addr as string) ?? "",
+    to: (m.to_addr as string) ?? "",
+    subject: (m.subject as string) ?? "(sin asunto)",
+    date: (m.date as string) ?? "",
+    snippet: (m.snippet as string) ?? "",
+    messageId: (m.message_id as string) ?? undefined,
+    // Las cabeceras que encadenan la conversación. Faltan en todo lo
+    // sincronizado antes del 18/09/2026: para esos, `agruparEnHilos`
+    // cae al camino por asunto.
+    inReplyTo: (m.in_reply_to as string) ?? undefined,
+    refs: (m.refs as string[]) ?? undefined,
+    cc: (m.cc_addr as string) ?? undefined,
+    unread: !!m.unread,
+    origen: "cache" as const,
+  };
+}
+
+/** Cuántos no leídos trae la sección de arriba, como mucho. */
+export const TOPE_NO_LEIDOS = 200;
+
+/** TODOS los no leídos de la carpeta (hasta el tope), no los de una página: la
+ *  sección «No leídos» de «No leídos primero».
+ *
+ *  ⚠️ La clave empieza con ["mail-messages", folder] a propósito: así le llegan
+ *  solas las actualizaciones optimistas de leer, archivar o mover (que tocan
+ *  ese prefijo) y las invalidaciones del Realtime. */
+export function useMailNoLeidos(folder: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ["mail-messages", folder, "no-leidos"],
+    enabled: enabled && !!folder,
+    ...SESION_IMAP,
+    staleTime: 60 * 1000,
+    queryFn: async (): Promise<{ messages: MailSummary[]; total?: number }> => {
+      const COLUMNAS_BASE =
+        "id, uid, from_addr, to_addr, cc_addr, subject, date, snippet, unread, message_id";
+      const traer = (cols: string) =>
+        supabase.from("mail_messages" as never)
+          .select(cols, { count: "exact" })
+          .eq("folder", folder)
+          .eq("unread", true)
+          .order("date", { ascending: false })
+          .order("uid", { ascending: false })
+          .limit(TOPE_NO_LEIDOS);
+      // Mismo respaldo que la lista: sin las columnas del hilo, igual se ve.
+      let { data, error, count } = await traer(`${COLUMNAS_BASE}, in_reply_to, refs`);
+      if (error && /in_reply_to|refs/.test(error.message ?? "")) {
+        ({ data, error, count } = await traer(COLUMNAS_BASE));
+      }
+      if (error) throw error;
+      return {
+        total: count ?? undefined,
+        messages: ((data ?? []) as unknown as Record<string, unknown>[]).map(resumenDeCache),
       };
     },
   });
@@ -317,13 +414,26 @@ async function fetchMensajeCache(id: string): Promise<MailMessage> {
     html: (data.html as string | null) ?? null,
     text: (data.text_body as string | null) ?? null,
     remote_images: (data.remote_images as number) ?? 0,
-    attachments: (data.attachments as MailAttachment[]) ?? [],
+    attachments: (data.attachments as unknown as MailAttachment[]) ?? [],
     truncated: !!data.truncated,
   };
 }
 
 function fetchMensajeVivo(folder: string, seq: number): Promise<MailMessage> {
   return callMail<MailMessage>({ action: "imap_message", folder, seq, mark_read: false });
+}
+
+/** La consulta del cuerpo de UN mensaje: la comparten el lector, la precarga
+ *  y las acciones del ⋮ de cada mensaje. La misma llave = no se baja dos veces. */
+function mensajeQuery(folder: string, m: MailSummary) {
+  return {
+    queryKey: ["mail-message", folder, claveDe(m)],
+    ...MENSAJE_CACHE,
+    queryFn: () =>
+      m.origen === "cache"
+        ? fetchMensajeCache(m.id!)
+        : fetchMensajeVivo(folder, m.seq!),
+  };
 }
 
 export function useMailMessage(folder: string, sel: MailSummary | null) {
@@ -346,17 +456,74 @@ export function usePrefetchMailMessage() {
   const qc = useQueryClient();
   return useCallback(
     (folder: string, m: MailSummary) => {
-      void qc.prefetchQuery({
-        queryKey: ["mail-message", folder, claveDe(m)],
-        ...MENSAJE_CACHE,
-        queryFn: () =>
-          m.origen === "cache"
-            ? fetchMensajeCache(m.id!)
-            : fetchMensajeVivo(folder, m.seq!),
-      });
+      void qc.prefetchQuery(mensajeQuery(folder, m));
     },
     [qc],
   );
+}
+
+/** Trae el cuerpo de un mensaje que NO es el abierto: responder o reenviar
+ *  desde el ⋮ de otro mensaje de la conversación necesita su texto para la
+ *  cita. Si ya se miró (o se precargó), no vuelve a pedirlo. */
+export function useTraerMensaje() {
+  const qc = useQueryClient();
+  return useCallback(
+    (folder: string, m: MailSummary): Promise<MailMessage> => qc.fetchQuery(mensajeQuery(folder, m)),
+    [qc],
+  );
+}
+
+/** Busca MI copia de un correo por su Message-ID: es lo que abre el enlace
+ *  que llega por el chat (`/correo?mensaje=…`). Si está en varias carpetas,
+ *  se prefiere Recibidos y después cualquiera que no sea Papelera ni Spam. */
+export async function buscarCorreoPorMessageId(messageId: string): Promise<MailSummary | null> {
+  const { data, error } = await supabase.from("mail_messages" as never)
+    .select("id, uid, folder, from_addr, to_addr, cc_addr, subject, date, snippet, unread, message_id, in_reply_to, refs")
+    .eq("message_id", messageId)
+    .limit(10);
+  if (error) throw error;
+  const filas = (data ?? []) as unknown as Record<string, unknown>[];
+  const peso = (f: string) => (f === "INBOX" ? 0 : f === "Papelera" || f === "Correo no deseado" ? 2 : 1);
+  const elegida = [...filas].sort((a, b) => peso(a.folder as string) - peso(b.folder as string))[0];
+  return elegida ? { ...resumenDeCache(elegida), folder: elegida.folder as string } : null;
+}
+
+/** Traduce el cuerpo de un correo al idioma de la pantalla (Keila, 02/10).
+ *
+ *  Lo hace la edge con la IA (OpenRouter): de la caché lee el cuerpo ELLA, por
+ *  el id de la fila y solo si es de quien pide. Un correo del camino en vivo no
+ *  tiene fila, así que su texto viaja desde acá, recortado.
+ *
+ *  Una sola vez por correo e idioma (`staleTime: Infinity`): ir y volver entre
+ *  la traducción y el original no vuelve a pagar la IA. */
+export function useTraduccionCorreo(args: {
+  correo: MailSummary;
+  /** El cuerpo ya cargado, para los que no tienen fila en la caché. */
+  mensaje: Pick<MailMessage, "text" | "html"> | undefined;
+  idioma: "es" | "en";
+  habilitada: boolean;
+}) {
+  const { correo, mensaje, idioma, habilitada } = args;
+  return useQuery({
+    queryKey: ["mail-traduccion", claveDe(correo), idioma],
+    enabled: habilitada,
+    ...SESION_IMAP,
+    staleTime: Infinity,
+    // ⚠️ Sin el semáforo: traducir no abre IMAP, y la IA puede tardar decenas
+    // de segundos. Con turno, una traducción lenta dejaba en fila a la lista y
+    // a los adjuntos (el semáforo es de 2).
+    queryFn: () =>
+      invocarMailFetch<{ traduccion: string; recortado: boolean; idioma: string }>({
+        action: "translate",
+        idioma,
+        ...(correo.origen === "cache" && correo.id
+          ? { id: correo.id }
+          : {
+              text: (mensaje?.text ?? "").slice(0, 20_000),
+              html: mensaje?.text ? undefined : (mensaje?.html ?? "").slice(0, 100_000),
+            }),
+      }),
+  });
 }
 
 /** Marca leído: apaga el punto azul al instante y lleva la bandera al
@@ -379,8 +546,8 @@ export function useMarkSeen() {
       if (m.seq) await callMail({ action: "mark_seen", folder, seq: m.seq });
     },
     onMutate: ({ folder, m }) => {
-      qc.setQueryData(
-        ["mail-messages", folder],
+      qc.setQueriesData(
+        { queryKey: ["mail-messages", folder] },
         (prev: { messages?: MailSummary[] } | undefined) =>
           prev?.messages
             ? {
@@ -417,6 +584,17 @@ export function useMarkSeen() {
 export type OperacionMasiva =
   | "seen" | "unseen" | "delete" | "archive" | "spam" | "move" | "snooze";
 
+/** Lo que contesta la edge a una acción masiva. */
+export interface RespuestaMasiva {
+  ok: true;
+  afectados: number;
+  /** Los que no se mandaron por no tener uid. */
+  omitidos: number;
+  /** Solo si se MOVIERON: adónde fue a parar cada uno. Lo usa «Deshacer». Una
+   *  edge anterior no lo manda. */
+  destino?: DestinoDelMovimiento;
+}
+
 /** Acciones sobre VARIOS correos de una carpeta (la barra de selección).
  *  Optimista: la lista cambia al instante y se reconcilia con la respuesta.
  *  Solo aplica a mensajes con UID (los de la caché); los del camino en vivo
@@ -425,23 +603,29 @@ export function useMailBulk() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (
-      { folder, op, items, dest, volverAt }:
+      { folder, op, items, dest, volverAt, cancelarPosponer }:
       {
         folder: string; op: OperacionMasiva; items: MailSummary[];
         dest?: string;
         /** Para `snooze`: cuándo tiene que reaparecer, en ISO. */
         volverAt?: string;
+        /** «Deshacer» de Posponer (move desde Snoozed): borra también su
+         *  despertador. Una edge anterior lo ignora. */
+        cancelarPosponer?: boolean;
       },
-    ) => {
-      const uids = items.map((m) => Number(m.uid)).filter((u) => Number.isInteger(u) && u > 0);
+    ): Promise<RespuestaMasiva> => {
+      const uids = items.map(uidDe).filter((u): u is number => u != null);
       if (!uids.length) throw new Error("Estos correos no tienen identificador; abre la carpeta de nuevo e inténtalo.");
-      const r = await callMail<{ ok: true; afectados: number }>({ action: "bulk", folder, op, uids, dest, volver_at: volverAt });
+      const r = await callMail<{ ok: true; afectados: number; destino?: DestinoDelMovimiento }>({
+        action: "bulk", folder, op, uids, dest, volver_at: volverAt,
+        ...(cancelarPosponer ? { cancelar_posponer: true } : {}),
+      });
       return { ...r, omitidos: items.length - uids.length };
     },
     onMutate: ({ folder, op, items }) => {
       const claves = new Set(items.map(claveDe));
-      qc.setQueryData(
-        ["mail-messages", folder],
+      qc.setQueriesData(
+        { queryKey: ["mail-messages", folder] },
         (prev: { messages?: MailSummary[] } | undefined) => {
           if (!prev?.messages) return prev;
           const messages = op === "seen" || op === "unseen"
@@ -456,8 +640,58 @@ export function useMailBulk() {
       qc.invalidateQueries({ queryKey: ["mail-folders"] });
       qc.invalidateQueries({ queryKey: ["mail-search"] });
       qc.invalidateQueries({ queryKey: ["sidebar-badges"] });
+      // Y lo que se arma desde la caché CRUZANDO carpetas: la vista de una
+      // etiqueta y su contador. Un correo movido cambia de carpeta en la caché
+      // (el servidor traslada la fila); sin esto la etiqueta seguía mostrando
+      // la foto vieja durante su staleTime.
+      qc.invalidateQueries({ queryKey: ["mail-por-etiqueta"] });
+      qc.invalidateQueries({ queryKey: ["mail-labels-unread"] });
+      // Y la conversación abierta: eliminar o mover UN mensaje desde su ⋮ lo
+      // tiene que sacar del hilo que se está leyendo, no dentro de 30 s.
+      qc.invalidateQueries({ queryKey: ["mail-hilo"] });
     },
   });
+}
+
+/** Una foto de las listas de unas carpetas (todas sus páginas y la sección
+ *  «No leídos»), tomada ANTES de una acción. */
+export type FotoDeListas = Array<[readonly unknown[], { messages?: MailSummary[] } | undefined]>;
+
+/** Para «Deshacer»: la lista vuelve a mostrar lo que la acción sacó, AL
+ *  INSTANTE y en el mismo lugar, sin esperar al servidor. Después el servidor
+ *  confirma (o no) y la lista se vuelve a leer como siempre. */
+export function useListasDelCorreo() {
+  const qc = useQueryClient();
+  return useMemo(() => ({
+    /** ⚠️ Antes de lanzar la acción: su `onMutate` saca los correos al momento. */
+    foto: (carpetas: string[]): FotoDeListas =>
+      [...new Set(carpetas)].flatMap((f) =>
+        qc.getQueriesData<{ messages?: MailSummary[] }>({ queryKey: ["mail-messages", f] })),
+    reponer: (foto: FotoDeListas, claves: Set<string>) => {
+      for (const [queryKey, antes] of foto) {
+        if (!antes?.messages) continue;
+        qc.setQueryData(queryKey, (ahora: { messages?: MailSummary[] } | undefined) =>
+          ahora?.messages
+            ? { ...ahora, messages: reponerEnLista(ahora.messages, antes.messages!, claves, claveDe) }
+            : ahora);
+      }
+    },
+  }), [qc]);
+}
+
+/** El respaldo de «Deshacer» cuando la edge no dijo el uid nuevo: dónde está
+ *  HOY cada fila de la caché. La edge traslada la MISMA fila (mismo `id`) a la
+ *  carpeta nueva con el uid de allá, así que se busca por `id`. */
+export async function filasDeLaCache(ids: string[]): Promise<FilaEnCache[]> {
+  const unicos = [...new Set(ids.filter(Boolean))];
+  if (!unicos.length) return [];
+  const { data, error } = await supabase.from("mail_messages" as never)
+    .select("id, folder, uid")
+    .in("id", unicos);
+  if (error) throw error;
+  return ((data ?? []) as unknown as Record<string, unknown>[]).map((f) => ({
+    id: f.id as string, folder: f.folder as string, uid: Number(f.uid),
+  }));
 }
 
 /** La bandeja se actualiza SOLA: el sincronizador inserta en mail_messages

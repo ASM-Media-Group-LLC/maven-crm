@@ -3,7 +3,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Upload, FileText, Download } from "lucide-react";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { useFormato } from "@/hooks/useFormato";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { toast } from "@/hooks/use-toast";
 import FileUploadModal, { type UploadedFile } from "@/components/FileUploadModal";
 import { useUserRole } from "@/hooks/useUserRole";
 import { getSignedFileUrl } from "@/lib/storageHelpers";
+import { useLanguage } from "@/hooks/useLanguage";
 
 const IDENTITY_DOC_TERMS = ["cedula", "cédula", "selfie", "identidad", "dni", "pasaporte", "documento de identidad"];
 
@@ -29,6 +30,8 @@ function fileTypeLabel(type: string): string {
 }
 
 export default function DocumentosTabContent({ creatorId }: Props) {
+  const formatoUi = useFormato();
+  const { t } = useLanguage();
   const qc = useQueryClient();
   const { isAgent } = useUserRole();
   const [showUpload, setShowUpload] = useState(false);
@@ -58,15 +61,15 @@ export default function DocumentosTabContent({ creatorId }: Props) {
       });
       if (error) {
         errorCount++;
-        toast({ title: "Error al registrar documento", description: error.message, variant: "destructive" });
+        toast({ title: t("creadores.docs.registerError"), description: error.message, variant: "destructive" });
       } else {
         successCount++;
       }
     }
     if (successCount > 0) {
       toast({
-        title: "Documento(s) registrado(s)",
-        description: `${successCount} archivo(s) registrado(s) correctamente.`,
+        title: t("creadores.docs.registered"),
+        description: t("creadores.docs.registeredDesc", { n: successCount }),
       });
     }
     qc.invalidateQueries({ queryKey: ["creator_documents", creatorId] });
@@ -88,10 +91,10 @@ export default function DocumentosTabContent({ creatorId }: Props) {
     <>
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <CardTitle className="text-lg font-semibold">Documentos</CardTitle>
+          <CardTitle className="text-lg font-semibold">{t("creadores.profile.tabDocuments")}</CardTitle>
           {!isAgent && (
             <Button size="sm" onClick={() => setShowUpload(true)}>
-              <Upload className="mr-2 h-4 w-4" /> Subir Archivo
+              <Upload className="mr-2 h-4 w-4" /> {t("creadores.docs.upload")}
             </Button>
           )}
         </CardHeader>
@@ -105,10 +108,10 @@ export default function DocumentosTabContent({ creatorId }: Props) {
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-card">
                 <TableRow>
-                  <TableHead>Nombre</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Fecha</TableHead>
-                  <TableHead className="text-right">Acción</TableHead>
+                  <TableHead>{t("common.name")}</TableHead>
+                  <TableHead>{t("common.type")}</TableHead>
+                  <TableHead>{t("common.date")}</TableHead>
+                  <TableHead className="text-right">{t("creadores.docs.action")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -120,12 +123,14 @@ export default function DocumentosTabContent({ creatorId }: Props) {
                     </TableCell>
                     <TableCell>{fileTypeLabel(d.file_type)}</TableCell>
                     <TableCell>
-                      {d.uploaded_at ? format(new Date(d.uploaded_at), "dd MMM yyyy", { locale: es }) : "—"}
+                      {d.uploaded_at ? format(new Date(d.uploaded_at), "dd MMM yyyy", { locale: formatoUi.fechas }) : "—"}
                     </TableCell>
                     <TableCell className="text-right">
                       <Button
                         variant="ghost"
                         size="sm"
+                        aria-label={t("creadores.docs.download")}
+                        title={t("creadores.docs.download")}
                         onClick={async () => {
                           const url = await getSignedFileUrl(d.file_url);
                           window.open(url, "_blank", "noopener,noreferrer");
@@ -140,7 +145,7 @@ export default function DocumentosTabContent({ creatorId }: Props) {
             </Table>
             </div>
           ) : (
-            <EmptyState seed="creador-documentos" title="No hay documentos" />
+            <EmptyState seed="creador-documentos" title={t("creadores.docs.empty")} />
           );
           })()}
         </CardContent>

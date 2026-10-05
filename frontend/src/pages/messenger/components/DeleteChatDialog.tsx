@@ -8,6 +8,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface DeleteChatDialogProps {
   open: boolean;
@@ -26,17 +27,17 @@ export default function DeleteChatDialog({
   onConfirm,
   isLoading,
 }: DeleteChatDialogProps) {
+  const { t } = useLanguage();
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>
-            ¿Eliminar {isGroup ? "grupo" : "chat"}?
+            {isGroup ? t("messenger.delete.tituloGrupo") : t("messenger.delete.tituloChat")}
           </AlertDialogTitle>
           <AlertDialogDescription>
-            Estás a punto de eliminar{" "}
-            <span className="font-semibold">"{chatName}"</span>. Se borrarán
-            todos los mensajes y archivos. Esta acción no se puede deshacer.
+            {t("messenger.delete.descAntes")}{" "}
+            <span className="font-semibold">"{chatName}"</span>{t("messenger.delete.descDespues")}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -46,7 +47,7 @@ export default function DeleteChatDialog({
             disabled={isLoading}
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
-            {isLoading ? "Eliminando..." : "Eliminar"}
+            {isLoading ? t("messenger.delete.eliminando") : t("common.delete")}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

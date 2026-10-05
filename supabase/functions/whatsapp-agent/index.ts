@@ -215,7 +215,7 @@ CONFIANZA CALIBRADA — NO ALUCINAR (regla crítica):
 
 CONVERSIÓN DE ZONAS HORARIAS (cuidado, muy facil equivocarse):
 
-Si necesitas convertir una hora dicha en otra zona a Bogotá, USA esta tabla. Si la zona no está acá o dudas, NO conviertas — solo escribe la hora original ("9PM hora Miami") y deja que el equipo haga la cuenta. PROHIBIDO inventar conversiones.
+Si necesitas convertir una hora dicha en otra zona a Bogotá, USA esta tabla. Si la zona no está aquí o dudas, NO conviertas — solo escribe la hora original ("9PM hora Miami") y deja que el equipo haga la cuenta. PROHIBIDO inventar conversiones.
 
 Tabla (todos vs Bogotá, que es UTC-5 fijo, sin DST):
   · Miami / Nueva York / Boston / Atlanta — EE.UU. costa Este
@@ -688,7 +688,7 @@ En este contexto:
 - DEBE confirmar CADA reporte individualmente, no callar a algunos.
 - Cada confirmación es UNA LÍNEA breve: "✓ Daniel registrado: 22 contactos por Twitter (X), 0 números — siguiendo estrategia de @Luis."
 - El silencio en este contexto se interpreta como "el bot ignoró a [Nombre]" — peor que un mensaje confirmatorio breve. PROHIBIDO callar a alguien en ronda de cierre.
-- Esta regla OVERRIDEA todas las anteriores que sugieren "cállate si dudas" o "no spamees" o "0/0/0 con justificación = solo confirma brevemente". Acá brevemente SIGNIFICA CONFIRMAR, no silenciar.
+- Esta regla OVERRIDEA todas las anteriores que sugieren "cállate si dudas" o "no spamees" o "0/0/0 con justificación = solo confirma brevemente". Aquí brevemente SIGNIFICA CONFIRMAR, no silenciar.
 - Si vienen muy seguidos (ej. 2 reportes en menos de 3 segundos), procesarlos igual a ambos — el bot puede mandar 2 mensajes seguidos al grupo. Es válido en este contexto.
 
 Cómo formatear las confirmaciones en CIERRE:
@@ -927,7 +927,7 @@ Régimen pedido por Álvaro (03/08): en los cortes de cada 2 horas TÚ armas y p
 
 CORTE DE CIERRE (invoked_by="corte_cierre", 7pm):
 - Es el RESUMEN TOTAL del día: lo que cada quien COMUNICÓ, qué se logró, avances reales — y la *NOTA de 1 a 10 por persona* (con decimales). Una línea por persona: nota + razón corta — y NADIE se corta (si trabajó, tiene su línea). TOPE DURO: el cierre entero es titular + una línea por persona + el objetivo de mañana en una línea; PROHIBIDO un párrafo por persona o preámbulos largos.
-- Regla de Álvaro (03/08), inclúyela SIEMPRE textual en el cierre: "*Recuerden: lo que no se comunica por acá, no cuenta.*" — el resumen y la nota salen de lo comunicado.
+- Regla de Álvaro (03/08), inclúyela SIEMPRE textual en el cierre: "*Recuerden: lo que no se comunica por aquí, no cuenta.*" — el resumen y la nota salen de lo comunicado.
 - La nota sale de los INSUMOS OBJETIVOS que vienen en el initial_user_message (nota_sugerida = fórmula fija con participación + Hubstaff + avance real del rol). Para quien SÍ tiene métrica de tabla, ajuste máximo ±0.5 y siempre con la razón dicha.
 - ⚠️ CADA UNO SE MIDE POR SU ROL, NO POR EL DE OTRO. PROHIBIDO bajar o citar una nota por una métrica que no es de esa persona: NO le reproches '0 números' a quien no capta leads (el rol de captación/números es de los LLG tipo Daniel), ni '0 piezas' a quien no hace contenido. El 19/08 el bot le puso 2.5 a Brayan por '0 números' cuando su rol es INFRA (Granja/Content Protector/Veneno) — tuvo que reclamar para que lo subieran a 7.8.
 - ⚠️ A los marcados 'sin_metricas_tabla' (rol sin métrica en tablas: infra/sistemas como Brayan, o warming de cuentas) su nota_sugerida es solo un PISO, NO un techo, y NO le aplica el ±0.5: puntúalos por los ENTREGABLES REALES que reportaron en el grupo ese día (ej. Brayan: '170 DMCA récord + 38 bajadas + sistema de la granja listo' = nota alta, aunque la fórmula sugiera 2.5 por no tener tabla). Un entregable fuerte de infra vale como un buen día de números. Si NO reportó nada sustancial, ahí sí la nota es baja (el piso existe para que 'estar presente sin entregar' no pase de ~5).
@@ -963,8 +963,8 @@ RECONOCIMIENTO DE LOGROS (achievement detection):
   1. Llama lookup_lead_history para chequear si ya está en closer_creators
   2. Reconoce al closer calibrando el tono al stage REAL — NUNCA confundas un avance con un cierre:
      · CONFIRMADA (aceptó firmar, todavía NO firma) → sobrio, sin festejo: "✓ Anotada la confirmada de @handle (Modelo X)."
-     · FIRMÓ / Completada (firmó el contrato pero todavía no está activa) → reconoce el hito SIN llamarlo cierre: "✓ Firmó @handle (Modelo X · $monto). Falta agregarla a *Creadores* y activarla en Blu/Infloww para cerrarla." PROHIBIDO "¡buen cierre!", "cerraste", "cerramos el día", "una menos / una más" acá.
-     · CIERRE REAL (ya está en el tab *Creadores* de Maven Y activa en Blu/Infloww, y un humano lo confirmó) → recién ACÁ festeja: "🎉 ¡Buen cierre [Nombre]! @handle ya activa · $monto." Como el bot NO ve Blu/Infloww, solo trata algo como cerrado si alguien del equipo dijo que ya quedó activa — jamás lo asumas tú a partir de un "confirmada/firmó".
+     · FIRMÓ / Completada (firmó el contrato pero todavía no está activa) → reconoce el hito SIN llamarlo cierre: "✓ Firmó @handle (Modelo X · $monto). Falta agregarla a *Creadores* y activarla en Blu/Infloww para cerrarla." PROHIBIDO "¡buen cierre!", "cerraste", "cerramos el día", "una menos / una más" aquí.
+     · CIERRE REAL (ya está en el tab *Creadores* de Maven Y activa en Blu/Infloww, y un humano lo confirmó) → recién AQUÍ festeja: "🎉 ¡Buen cierre [Nombre]! @handle ya activa · $monto." Como el bot NO ve Blu/Infloww, solo trata algo como cerrado si alguien del equipo dijo que ya quedó activa — jamás lo asumas tú a partir de un "confirmada/firmó".
   3. Si NO está en closer_creators con stage CONFIRMADA, agrega UNA línea: "Recuerda marcarla CONFIRMADA en *Closers → @handle* para que entre al pipeline de Maven."
 - CALIBRA la euforia (estándar del equipo, lo pidió Alvaro): el equipo SOLO festeja las CERRADAS reales — las que ya están en *Creadores* + activas en Blu/Infloww (las que de verdad van a facturar) — no las confirmaciones ni las firmas. Confirmar o firmar se REGISTRA con un ✓ sobrio; un cierre real se festeja, siempre con dato (monto, ingreso real), nunca con hype.
 - CUANDO un LLG cumple su meta diaria (3+ números obtenidos en un día lun-vie, 2+ en sábado) según el reporte de jornada:
@@ -1075,7 +1075,7 @@ PIPELINE END-TO-END DEL EQUIPO (esto es central, mantenlo siempre presente):
 
   Fase 2 — Closer (toma la posta cuando el lead tiene número):
     a) NUEVO (entrada del pipeline): apenas el LLG carga el número, la modelo entra al pipeline de closers como closer_creators stage='Nuevo'. Son las "Nuevas" de *Closers → Operaciones*: el pool de leads CON número esperando que un closer las tome. Es el stage MÁS numeroso del pipeline; todavía NO están asignadas.
-    b) ASIGNADA: un closer (o supervisor) toma una Nueva (o se la asignan) desde *Closers → Asignar* → el stage pasa de 'Nuevo' a 'Asignada' (passed_date queda timestamp). Recién acá empieza a trabajarla.
+    b) ASIGNADA: un closer (o supervisor) toma una Nueva (o se la asignan) desde *Closers → Asignar* → el stage pasa de 'Nuevo' a 'Asignada' (passed_date queda timestamp). Recién aquí empieza a trabajarla.
     c) Ya asignada, tiene 6 OPORTUNIDADES de contacto, cadencia fija desde la asignación (passed_date):
        · Contacto 1 → día 1 · 2 → día 3 · 3 → día 5 · 4 → día 8 · 5 → día 15 · 6 → día 29
        Cada intento se registra en closer_contact_history. OJO: contactar NO cambia el stage — la lead sigue en 'Asignada' (NO existe stage 'Contactado'). El sistema notifica overdue automáticamente.
@@ -1269,7 +1269,7 @@ REGLAS DE ESTILO PARA LEAD INTELLIGENCE:
 - Sé conciso: "Daniel, larola_a ya estuvo: la rechazó Miguel el 25/5 porque quería ser cantante. Sáltala." es mejor que un párrafo.
 - Si todas las tools devolvieron datos → presenta hechos, no inferencias.
 - DATO DESAFIADO = RE-VERIFICAR, NUNCA PLEGARSE. Si alguien duda o corrige un número que leíste de tabla ("¿estás seguro?", "eso está mal"), NO aceptes por cortesía: re-consulta la tool y responde con el VALOR y la FECHA exactos ("figura won ayer 18:49"). Si la tool te da la razón, sostienes con esos datos — como el 04/08 con los $50.306 de Elizabeth: el jefe dudó, re-verificaste, tenías razón y la defendiste. Si la tool muestra que el humano tiene razón, corriges citando el dato nuevo. El 05/08 hiciste lo contrario: ante "¿seguro que ninguna venta hoy?" contaste como de HOY una venta ganada AYER a las 18:49 (solo el stage se movió hoy). Un dato de tabla se corrige con otro dato de tabla, jamás con presión social. Lo cualitativo (tono, estilo, lectura de negocio) sí se acepta sin pelear.
-- CONTAR ANTES DE PEDIR. Cuando te piden un análisis, un padrón o un diagnóstico ("¿cuántas agencias tocamos?", "arma el listado", "hay que analizar los textos"), tu PRIMERA respuesta lleva los NÚMEROS que ya puedes sacar solo — contactos por persona, intentos, fechas, resultados — y recién después pides lo que de verdad falta, nombrando a quién y qué. Pedirle al equipo que te pegue información que tú puedes contar es devolver la tarea. El 07/08 en Ventas pediste cuatro veces "peguen los textos acá" sin dar un solo número; Álvaro tuvo que exigirlo ("no nos han dicho ni los números... en estadística no tiene sentido") y recién ahí contaste 24 agencias / 0 reuniones. Ese conteo era el PRIMER mensaje, no el quinto.
+- CONTAR ANTES DE PEDIR. Cuando te piden un análisis, un padrón o un diagnóstico ("¿cuántas agencias tocamos?", "arma el listado", "hay que analizar los textos"), tu PRIMERA respuesta lleva los NÚMEROS que ya puedes sacar solo — contactos por persona, intentos, fechas, resultados — y recién después pides lo que de verdad falta, nombrando a quién y qué. Pedirle al equipo que te pegue información que tú puedes contar es devolver la tarea. El 07/08 en Ventas pediste cuatro veces "peguen los textos aquí" sin dar un solo número; Álvaro tuvo que exigirlo ("no nos han dicho ni los números... en estadística no tiene sentido") y recién ahí contaste 24 agencias / 0 reuniones. Ese conteo era el PRIMER mensaje, no el quinto.
 - FEEDBACK DEL JEFE = REGLA GUARDADA, NO "ENTENDIDO". Cuando Álvaro o Jhon corrigen cómo debes trabajar (qué exigir, a quién no apretar, con qué criterio decidir, qué revisar antes de actuar), eso es una norma permanente: guárdala con add_persistent_rule EN ESE MISMO TURNO y recién después confirma, citando en una línea qué quedó guardado. Un "Entendido 🙌" sin regla es contentillo: mañana arrancas en blanco y te lo van a reclamar. Si te corrigen varias cosas seguidas, guarda cada una por separado.
 - Si las tools devolvieron poco/nada → reconócelo y propón pasos concretos (cargar en Maven, esperar scrape, preguntar al equipo).`;
 
@@ -1473,7 +1473,7 @@ const TOOLS: Array<{
   {
     name: "lookup_lead_history",
     description:
-      "Dado un handle de Instagram (sin @, o URL completa), busca el historial completo de esa modelo en Maven: si pasó por LLG (leadgen_entries), si algún closer la trabajó (closer_creators con stage/rejection/no_interesada), si está como modelo activa (creators), historial de contacto (closer_contact_history), y si el scouter la encontró antes (scouter_leads). Úsalo ANTES de que el closer la llame para saber: (1) es lead nueva o repetida?, (2) ya la rechazaron por algo?, (3) qué quality le dio el LLG?, (4) qué monetización estimaron?, (5) DE QUÉ BASE viene y quién la cargó. Devuelve un summary estructurado. ⚠️ El bloque `procedencia` responde '¿de dónde salió esta lead?': `base_del_lead` (maven = entró por LeadGen/Contactos · ex_creadora = ya fue creadora de la agencia, hay historia previa y el cierre es una REACTIVACIÓN · agencia = lead B2B, se le VENDE producto, NO se la recluta ni cuenta como modelo captada), `origen_del_contacto` (leadgen / contacto_directo / el import del que salió), `cargado_por` + `cargado_el` (quién metió el contacto y cuándo) y `llg_de_leadgen` (el LLG que la trajo, que puede ser otra persona). Si te preguntan de qué base es una lead o quién la consiguió, la respuesta sale de acá — no la deduzcas.",
+      "Dado un handle de Instagram (sin @, o URL completa), busca el historial completo de esa modelo en Maven: si pasó por LLG (leadgen_entries), si algún closer la trabajó (closer_creators con stage/rejection/no_interesada), si está como modelo activa (creators), historial de contacto (closer_contact_history), y si el scouter la encontró antes (scouter_leads). Úsalo ANTES de que el closer la llame para saber: (1) es lead nueva o repetida?, (2) ya la rechazaron por algo?, (3) qué quality le dio el LLG?, (4) qué monetización estimaron?, (5) DE QUÉ BASE viene y quién la cargó. Devuelve un summary estructurado. ⚠️ El bloque `procedencia` responde '¿de dónde salió esta lead?': `base_del_lead` (maven = entró por LeadGen/Contactos · ex_creadora = ya fue creadora de la agencia, hay historia previa y el cierre es una REACTIVACIÓN · agencia = lead B2B, se le VENDE producto, NO se la recluta ni cuenta como modelo captada), `origen_del_contacto` (leadgen / contacto_directo / el import del que salió), `cargado_por` + `cargado_el` (quién metió el contacto y cuándo) y `llg_de_leadgen` (el LLG que la trajo, que puede ser otra persona). Si te preguntan de qué base es una lead o quién la consiguió, la respuesta sale de aquí — no la deduzcas.",
     input_schema: {
       type: "object",
       properties: {
@@ -1728,7 +1728,7 @@ const TOOLS: Array<{
   {
     name: "get_milestones",
     description:
-      "Consulta los hitos anotados (cierres, ventas de producto, meets, retenciones, accesos quitados, casos de éxito) — para reportes, o para responder '¿cuándo se le vendió X a fulana?', '¿qué pasó con ella?', '¿qué hitos hubo esta semana?'. Úsala también ANTES de afirmar el estado de una creadora: si está en retención o quitó accesos, acá aparece (y explica, por ejemplo, un $0 en BLU que NO es caída real). Filtrable por creadora, tipo y rango de fechas. Si devuelve vacío significa que nadie lo anotó, no que no pasó nada.",
+      "Consulta los hitos anotados (cierres, ventas de producto, meets, retenciones, accesos quitados, casos de éxito) — para reportes, o para responder '¿cuándo se le vendió X a fulana?', '¿qué pasó con ella?', '¿qué hitos hubo esta semana?'. Úsala también ANTES de afirmar el estado de una creadora: si está en retención o quitó accesos, aquí aparece (y explica, por ejemplo, un $0 en BLU que NO es caída real). Filtrable por creadora, tipo y rango de fechas. Si devuelve vacío significa que nadie lo anotó, no que no pasó nada.",
     input_schema: {
       type: "object",
       properties: {
@@ -1743,7 +1743,7 @@ const TOOLS: Array<{
   {
     name: "get_creator_scan_config",
     description:
-      "Muestra QUÉ redes/handles tiene cargada una creadora en el escaneo de promo y si están SANOS. Úsalo cuando pregunten '¿estás revisando su X/Telegram/IG secundaria?', '¿por qué no aparece promo de X?', '¿el handle que actualicé quedó bien?', '¿está privada?'. Devuelve por red: el handle cargado, últimos días leídos, promos en 14d, y el último error del scan (read_failed/privada/etc). También avisa si el Telegram apunta a un canal o a un usuario (mal). NO inventes que una red 'no se cuenta' — chequea acá primero.",
+      "Muestra QUÉ redes/handles tiene cargada una creadora en el escaneo de promo y si están SANOS. Úsalo cuando pregunten '¿estás revisando su X/Telegram/IG secundaria?', '¿por qué no aparece promo de X?', '¿el handle que actualicé quedó bien?', '¿está privada?'. Devuelve por red: el handle cargado, últimos días leídos, promos en 14d, y el último error del scan (read_failed/privada/etc). También avisa si el Telegram apunta a un canal o a un usuario (mal). NO inventes que una red 'no se cuenta' — chequea aquí primero.",
     input_schema: {
       type: "object",
       properties: {
@@ -1900,7 +1900,7 @@ const TOOLS: Array<{
     name: "cancel_reminder",
     description:
       "Cancela un recordatorio o una SERIE de este chat, por id (sale de list_reminders). Úsalo cuando pidan parar algo que mandas ('no me mandes más esto', 'ya no hace falta') o cuando REEMPLACES una serie por otra con distinta cadencia — en ese caso: crea la nueva con create_reminder y cancela la vieja EN LA MISMA CORRIDA, o quedan las dos y llegan duplicados. " +
-      "Cancelar una serie mata también sus próximas repeticiones. Solo alcanza recordatorios de ESTE chat: los de otros grupos no se tocan desde acá.",
+      "Cancelar una serie mata también sus próximas repeticiones. Solo alcanza recordatorios de ESTE chat: los de otros grupos no se tocan desde aquí.",
     input_schema: {
       type: "object",
       properties: {
@@ -2059,7 +2059,7 @@ const TOOLS: Array<{
   {
     name: "get_monetization_opportunities",
     description:
-      "Lee las OPORTUNIDADES DE MONETIZACIÓN (venta de productos a creadoras) de Maven, ordenadas con las MÁS CERCA DE CERRAR primero (negotiating > offered > interested) y luego por seguimiento más urgente. Úsala en la Apertura del día para el panorama, y cuando el owner/un manager pregunta '¿qué oportunidades hay?' / '¿qué ventas hay cerca de completar?'. Devuelve handle, producto, etapa, dueño, cuándo se tocó por última vez (last_touch_at), cuándo se GANÓ (won_at) y si el seguimiento ya vence. Por defecto trae las ABIERTAS (interested/offered/negotiating). Para VENTAS CERRADAS pasa stage='won' (ej. '¿cuántas ventas cerré hoy?' → filtra won y mira **won_at**, NUNCA last_touch_at: éste se mueve con cualquier toque, incluida la limpieza de duplicados y las correcciones de un closer, y convierte housekeeping en ventas nuevas); stage='all' trae todo. OJO: si un closer dice que cargó ventas y no aparecen, puede que las haya puesto FUERA de Maven (ej. un Google Sheet) — Maven solo tiene lo que registró el bot o lo que se cargó acá.",
+      "Lee las OPORTUNIDADES DE MONETIZACIÓN (venta de productos a creadoras) de Maven, ordenadas con las MÁS CERCA DE CERRAR primero (negotiating > offered > interested) y luego por seguimiento más urgente. Úsala en la Apertura del día para el panorama, y cuando el owner/un manager pregunta '¿qué oportunidades hay?' / '¿qué ventas hay cerca de completar?'. Devuelve handle, producto, etapa, dueño, cuándo se tocó por última vez (last_touch_at), cuándo se GANÓ (won_at) y si el seguimiento ya vence. Por defecto trae las ABIERTAS (interested/offered/negotiating). Para VENTAS CERRADAS pasa stage='won' (ej. '¿cuántas ventas cerré hoy?' → filtra won y mira **won_at**, NUNCA last_touch_at: éste se mueve con cualquier toque, incluida la limpieza de duplicados y las correcciones de un closer, y convierte housekeeping en ventas nuevas); stage='all' trae todo. OJO: si un closer dice que cargó ventas y no aparecen, puede que las haya puesto FUERA de Maven (ej. un Google Sheet) — Maven solo tiene lo que registró el bot o lo que se cargó aquí.",
     input_schema: {
       type: "object",
       properties: {
@@ -4451,7 +4451,7 @@ async function executeTool(
           nota: personas.length === 0
             ? "Nadie registró reportes en ese rango."
             : "`dias_reportados` es cuántos días esa persona REPORTÓ, no cuántos trabajó. " +
-              "Cítalo siempre junto al total. Un 0 acá significa 'no lo reportó', NUNCA " +
+              "Cítalo siempre junto al total. Un 0 aquí significa 'no lo reportó', NUNCA " +
               "'no produjo': quien no aparece en la lista simplemente no registró reportes.",
         };
       }
@@ -4880,7 +4880,7 @@ async function executeTool(
       if (rem.group_id !== ctx.groupId) {
         return {
           error: "otro_grupo",
-          message: "Ese recordatorio es de otro chat y desde acá no se toca. Pídelo en el grupo donde vive.",
+          message: "Ese recordatorio es de otro chat y desde aquí no se toca. Pídelo en el grupo donde vive.",
         };
       }
       if (rem.status !== "pending") {
@@ -6215,7 +6215,7 @@ async function executeTool(
           return {
             error: "no_autorizado",
             message:
-              "Esa información es de supervisión (horas/productividad del equipo). La ve un supervisor o el owner — por tu rol no está disponible acá.",
+              "Esa información es de supervisión (horas/productividad del equipo). La ve un supervisor o el owner — por tu rol no está disponible aquí.",
           };
         }
         try {
@@ -6851,7 +6851,7 @@ async function buildInitialUserMessage(args: {
         lines.push(`La pidió: ${pa.requested_by_display_name} — nómbrala al entregar.`);
       }
       lines.push("");
-      lines.push("LECTURA PRE-ARMADA — entrégala esencialmente tal cual (formato WhatsApp; puedes ajustar el saludo, PROHIBIDO inventar datos que no estén acá):");
+      lines.push("LECTURA PRE-ARMADA — entrégala esencialmente tal cual (formato WhatsApp; puedes ajustar el saludo, PROHIBIDO inventar datos que no estén aquí):");
       lines.push(String(pa.strategy ?? "(sin lectura generada)"));
       lines.push("");
       lines.push("Al final, ofrece el paso siguiente del playbook: cruzar esta lectura con sus números (get_creator_earnings_range, get_creator_top_fans, growth feed) para bajar el plan de 7 días. PROHIBIDO: openers de DM, recomendación de productos para 'abordarla', o mencionar closers — es una modelo de la casa, no un lead.");
@@ -7072,7 +7072,7 @@ async function buildInitialUserMessage(args: {
       lines.push(
         "NOTAS PERSISTIDAS de los últimos días (fecha → persona: nota — la fecha manda). Si citas " +
           "la nota, el resultado o 'cómo cerró' un día ANTERIOR de alguien, sale SOLO de este bloque " +
-          "— no de los mensajes de arriba ni de memoria. Si un dato de un día pasado no está acá, " +
+          "— no de los mensajes de arriba ni de memoria. Si un dato de un día pasado no está aquí, " +
           "no lo cites. Y ojo con qué día fue cada fecha: viernes ≠ sábado.",
       );
       for (const n of notasPrevias as Array<{ fecha: string; nombre: string; nota_sugerida: number }>) {
@@ -7173,12 +7173,12 @@ async function buildInitialUserMessage(args: {
         lines.push(
           "NOTAS DEL DÍA — CALCULADAS Y DEFINITIVAS (fórmula fija: el resultado del rol manda; " +
             "participación y Hubstaff acompañan; sin resultado medible el techo es ~5). Cada persona " +
-            "aparece SOLO en su grupo casa — acá vienen las de ESTE grupo. Las publicas TAL CUAL, " +
+            "aparece SOLO en su grupo casa — aquí vienen las de ESTE grupo. Las publicas TAL CUAL, " +
             "número por número: el 04/08 salieron TRES versiones distintas de la nota del mismo día " +
             "(grupo vs grupo vs DM) y el owner difundió promedios que no cuadraban. PROHIBIDO ajustar, " +
             "redondear o inventar una nota; si algo cualitativo no se refleja, dilo en la RAZÓN sin " +
             "tocar el número. 'sin_metricas_tabla' = su rol no deja rastro en tablas: explica su día " +
-            "por lo que contó en el grupo, la nota sigue siendo la de acá.\n" +
+            "por lo que contó en el grupo, la nota sigue siendo la de aquí.\n" +
             "CADA PERSONA SE JUZGA SOLO POR SU 'objetivo' — viene en sus insumos: numeros | contenido | " +
             "cierres | promo | ninguna. JAMÁS le reproches una métrica que no es la suya: una closer NO " +
             "trae números (su resultado es firmar), una manager NO trae números (el suyo es que su roster " +
@@ -7275,7 +7275,7 @@ async function buildInitialUserMessage(args: {
     const { data: hubBloque } = await sb.rpc("corte_hubstaff_bloque", { p_group_id: args.groupId });
     if (hubBloque) {
       lines.push("");
-      lines.push("ACTIVIDAD DEL EQUIPO HOY (regla de Álvaro: SIN horas en el grupo — solo el % con su déficit vs el mínimo 60%, tal como viene acá. Ponlo al lado de cada persona; usa SOLO estos números):");
+      lines.push("ACTIVIDAD DEL EQUIPO HOY (regla de Álvaro: SIN horas en el grupo — solo el % con su déficit vs el mínimo 60%, tal como viene aquí. Ponlo al lado de cada persona; usa SOLO estos números):");
       lines.push(String(hubBloque));
     }
     lines.push("");
@@ -7531,7 +7531,7 @@ async function buildInitialUserMessage(args: {
       lines.push(`[${horaLocal(msg.sent_at)}] ${sender}${renderCita(msg as unknown as Record<string, unknown>)}: ${effectiveText(msg)}`);
     }
     lines.push("");
-    lines.push("Nota sobre nombres: los senders mostrados acá ya son el PRIMER NOMBRE del miembro según su profile en Maven (Daniel, Yeison, Miguel, Julieth, etc). Úsalos así tal cual cuando te refieras a ellos en el grupo. NUNCA escribas '#21', 'Jeison.', 'Juli 💘💘' u otros display names crudos de WhatsApp — los humanos del grupo se conocen por su primer nombre real.");
+    lines.push("Nota sobre nombres: los senders mostrados aquí ya son el PRIMER NOMBRE del miembro según su profile en Maven (Daniel, Yeison, Miguel, Julieth, etc). Úsalos así tal cual cuando te refieras a ellos en el grupo. NUNCA escribas '#21', 'Jeison.', 'Juli 💘💘' u otros display names crudos de WhatsApp — los humanos del grupo se conocen por su primer nombre real.");
     lines.push("");
 
     // Inyectar tabla de miembros del grupo con sus LIDs — para que el
@@ -7907,7 +7907,7 @@ async function runAgent(req: AgentRequest): Promise<{
   if (personFacts.length > 0) {
     bloqueDinamico += `\n\nLO QUE EL EQUIPO TE CONTÓ (recuérdalo y RESPÉTALO; por persona):\n${
       personFacts.map((f) => `- ${f.name}: ${f.fact}`).join("\n")
-    }\n\nSi alguien te dice algo ESTABLE sobre cómo trabaja o qué puede/no puede hacer, guárdalo con remember_fact. Si te corrigen un hecho de acá, usa forget_fact. NUNCA contradigas estos hechos (ej. si dice que no maneja IG, no lo mandes a IG).`;
+    }\n\nSi alguien te dice algo ESTABLE sobre cómo trabaja o qué puede/no puede hacer, guárdalo con remember_fact. Si te corrigen un hecho de aquí, usa forget_fact. NUNCA contradigas estos hechos (ej. si dice que no maneja IG, no lo mandes a IG).`;
   }
 
   // ── GUARDA CONTRA EL "ANOTADO" FANTASMA ─────────────────────────────────────

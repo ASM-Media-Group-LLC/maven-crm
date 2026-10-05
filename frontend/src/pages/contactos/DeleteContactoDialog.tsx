@@ -5,6 +5,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/hooks/useLanguage";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Contacto } from "./ContactosContent";
@@ -17,6 +18,7 @@ interface Props {
 
 const DeleteContactoDialog = ({ open, onOpenChange, contacto }: Props) => {
   const { toast } = useToast();
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -33,10 +35,10 @@ const DeleteContactoDialog = ({ open, onOpenChange, contacto }: Props) => {
 
       queryClient.invalidateQueries({ queryKey: ["closers_contacts"] });
       queryClient.invalidateQueries({ queryKey: ["contact_interaction_counts"] });
-      toast({ title: `"${contacto.nombre}" eliminado` });
+      toast({ title: t("contactos.deletedToast", { name: contacto.nombre }) });
       onOpenChange(false);
     } catch (err: any) {
-      toast({ title: "Error al eliminar", description: err.message, variant: "destructive" });
+      toast({ title: t("common.errorDeleting"), description: err.message, variant: "destructive" });
     } finally {
       setIsDeleting(false);
     }
@@ -48,10 +50,10 @@ const DeleteContactoDialog = ({ open, onOpenChange, contacto }: Props) => {
         <AlertDialogHeader>
           <div className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-destructive" />
-            <AlertDialogTitle>Eliminar contacto</AlertDialogTitle>
+            <AlertDialogTitle>{t("contactos.deleteTitle")}</AlertDialogTitle>
           </div>
           <AlertDialogDescription>
-            Esta acción eliminará permanentemente a <strong>{contacto.nombre}</strong> y todas sus interacciones asociadas. Esta acción no se puede deshacer.
+            {t("contactos.deleteDescA")} <strong>{contacto.nombre}</strong> {t("contactos.deleteDescB")} {t("common.cannotBeUndone")}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -61,7 +63,7 @@ const DeleteContactoDialog = ({ open, onOpenChange, contacto }: Props) => {
             disabled={isDeleting}
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
-            {isDeleting ? "Eliminando..." : "Eliminar"}
+            {isDeleting ? t("contactos.deleting") : t("common.delete")}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

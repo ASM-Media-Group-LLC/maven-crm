@@ -8,6 +8,7 @@
 
 import { cn } from "@/lib/utils";
 import type { NetworkScore } from "./promoScore";
+import { useLanguage } from "@/hooks/useLanguage";
 
 const NET_LABEL: Record<string, string> = {
   instagram: "Instagram",
@@ -35,14 +36,15 @@ interface Props {
 }
 
 export default function PromoQualityBar({ networks, score, variant = "full", className }: Props) {
+  const { t } = useLanguage();
   const thin = variant === "thin";
 
   // Tooltip = desglose por red (el detalle "interno" sigue disponible al pasar el mouse).
   const promoted = networks.filter((n) => n.promoted && n.quality > 0);
   const breakdown = promoted.length
     ? promoted.map((n) => `${NET_LABEL[n.network] ?? n.network} ${pct(n.quality)}`).join(" · ")
-    : "sin promo que sume al score";
-  const tip = `Calidad de promo: ${pct(score)} — ${breakdown}`;
+    : t("promolog.noPromoForScore");
+  const tip = t("promolog.qualityTip", { pct: pct(score), breakdown });
 
   return (
     <div className={cn("flex items-center gap-2", className)}>

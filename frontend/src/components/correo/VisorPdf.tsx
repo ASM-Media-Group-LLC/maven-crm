@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Loader2, Maximize2, Minus, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // Tipos mínimos de pdf.js — se carga por `import()` dinámico (ver abajo), así
 // que no hay tipos estáticos disponibles en el punto de uso.
@@ -46,6 +47,10 @@ const PASOS_ZOOM = [0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4] as const;
  *  devuelve en blanco, sin error. */
 const LADO_MAXIMO = 6000;
 
+/** Marca de «falló sin un Error con mensaje»: en pantalla se ve el texto
+ *  traducido de «no se pudo leer el PDF», igual que antes se veía el literal. */
+const PDF_ILEGIBLE = "pdf-ilegible";
+
 /** Dibuja un PDF en un canvas propio.
  *
  *  ⚠️ NO se usa un <iframe> con el visor de Chrome, aunque sea una línea de
@@ -59,7 +64,16 @@ const LADO_MAXIMO = 6000;
  *  que el plugin se enganche, y un `resize` disparado demasiado pronto lo deja
  *  peor. Dibujarlo nosotros saca el problema de raíz y además evita la barra de
  *  herramientas de Chrome, que duplicaba nuestros botones de descarga. */
-export default function VisorPdf({ bytes, nombre }: { bytes: Uint8Array; nombre: string }) {
+export default function VisorPdf({ bytes, url, nombre }: {
+  /** Los bytes del PDF (adjuntos del correo, que llegan enteros por IMAP)… */
+  bytes?: Uint8Array;
+  /** …o su URL (el Drive). Con URL, pdf.js pide la página que hace falta por
+   *  Range en vez de bajar el archivo entero: un escaneo de 200 MB abre igual.
+   *  El NAS contesta 206 y expone Content-Range/Accept-Ranges por CORS. */
+  url?: string;
+  nombre: string;
+}) {
+  const { t } = useLanguage();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const hojaRef = useRef<HTMLDivElement | null>(null);
   const textoRef = useRef<HTMLDivElement | null>(null);
@@ -88,7 +102,8 @@ export default function VisorPdf({ bytes, nombre }: { bytes: Uint8Array; nombre:
         const pdfjs = await cargarPdfjs();
         // pdf.js se queda con el buffer que le pasan (lo deja vacío), así que va
         // una copia: el mismo Uint8Array puede volver a usarse al descargar.
-        const doc = (await pdfjs.getDocument({ data: bytes.slice() }).promise) as unknown as DocumentoPdf;
+        const fuente = bytes ? { data: bytes.slice() } : { url: url ?? "" };
+        const doc = (await pdfjs.getDocument(fuente).promise) as unknown as DocumentoPdf;
         if (!vivo) {
           void doc.destroy();
           return;
@@ -98,7 +113,7 @@ export default function VisorPdf({ bytes, nombre }: { bytes: Uint8Array; nombre:
         setCargando(false);
       } catch (e) {
         if (vivo) {
-          setError(e instanceof Error ? e.message : "No se pudo leer el PDF");
+          setError(e instanceof Error ? e.message : PDF_ILEGIBLE);
           setCargando(false);
         }
       }
@@ -108,7 +123,7 @@ export default function VisorPdf({ bytes, nombre }: { bytes: Uint8Array; nombre:
       void docRef.current?.destroy();
       docRef.current = null;
     };
-  }, [bytes]);
+  }, [bytes, url]);
 
   // El ancho disponible manda: la página se dibuja para llenarlo.
   useEffect(() => {
@@ -237,8 +252,10 @@ export default function VisorPdf({ bytes, nombre }: { bytes: Uint8Array; nombre:
     return (
       <div className="flex h-full items-center justify-center px-8 text-center">
         <div>
-          <p className="text-sm font-medium">No se pudo leer el PDF</p>
-          <p className="mt-1 text-xs text-muted-foreground">{error}</p>
+          <p className="text-sm font-medium">{t("mail.pdf.readError")}</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {error === PDF_ILEGIBLE ? t("mail.pdf.readError") : error}
+          </p>
         </div>
       </div>
     );
@@ -255,7 +272,7 @@ export default function VisorPdf({ bytes, nombre }: { bytes: Uint8Array; nombre:
           <div ref={hojaRef} className="relative mx-auto w-fit rounded-sm bg-white shadow-sm">
             <canvas
               ref={canvasRef}
-              aria-label={`${nombre}, página ${pagina} de ${paginas}`}
+              aria-label={t("mail.pdf.canvasAria", { name: nombre, page: pagina, pages: paginas })}
               className="block"
             />
             <div ref={textoRef} className="capa-texto-pdf" />
@@ -272,8 +289,8 @@ export default function VisorPdf({ bytes, nombre }: { bytes: Uint8Array; nombre:
               className="h-7 w-7 rounded-full"
               disabled={zoom <= PASOS_ZOOM[0]}
               onClick={() => cambiarZoom(-1)}
-              aria-label="Alejar"
-              title="Alejar (−)"
+              aria-label={t("mail.pdf.zoomOut")}
+              title={t("mail.pdf.zoomOutTitle")}
             >
               <Minus className="h-4 w-4" />
             </Button>
@@ -286,8 +303,8 @@ export default function VisorPdf({ bytes, nombre }: { bytes: Uint8Array; nombre:
               className="h-7 w-7 rounded-full"
               disabled={zoom >= PASOS_ZOOM[PASOS_ZOOM.length - 1]}
               onClick={() => cambiarZoom(1)}
-              aria-label="Acercar"
-              title="Acercar (+)"
+              aria-label={t("mail.pdf.zoomIn")}
+              title={t("mail.pdf.zoomInTitle")}
             >
               <Plus className="h-4 w-4" />
             </Button>
@@ -297,10 +314,10 @@ export default function VisorPdf({ bytes, nombre }: { bytes: Uint8Array; nombre:
                 variant="ghost"
                 className="ml-1 h-7 rounded-full px-2 text-xs"
                 onClick={() => setZoom(1)}
-                title="Ajustar al ancho (0)"
+                title={t("mail.pdf.fitTitle")}
               >
                 <Maximize2 className="mr-1 h-3.5 w-3.5" />
-                Ajustar
+                {t("mail.pdf.fit")}
               </Button>
             )}
           </div>
@@ -313,12 +330,12 @@ export default function VisorPdf({ bytes, nombre }: { bytes: Uint8Array; nombre:
                 className="h-7 w-7 rounded-full"
                 disabled={pagina <= 1}
                 onClick={() => irA(pagina - 1)}
-                aria-label="Página anterior"
+                aria-label={t("mail.pdf.prevPage")}
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               <span className="text-xs tabular-nums text-muted-foreground">
-                Página {pagina} de {paginas}
+                {t("mail.pdf.pageOf", { page: pagina, pages: paginas })}
               </span>
               <Button
                 size="icon"
@@ -326,7 +343,7 @@ export default function VisorPdf({ bytes, nombre }: { bytes: Uint8Array; nombre:
                 className="h-7 w-7 rounded-full"
                 disabled={pagina >= paginas}
                 onClick={() => irA(pagina + 1)}
-                aria-label="Página siguiente"
+                aria-label={t("mail.pdf.nextPage")}
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>

@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import { OUTCOME_META, type CallOutcome } from "@/hooks/useAgencyQa";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // Pill solid con color del outcome (verde / amber / rojo) + ícono +
 // label. Lenguaje visual estándar para mostrar el resultado de un QA
@@ -48,9 +49,11 @@ const OutcomeBadge = ({
   className,
   shadow = false,
 }: OutcomeBadgeProps) => {
+  // Antes del return temprano: un hook después cambia la cuenta entre renders.
+  const { t } = useLanguage();
   if (!outcome || !(outcome in OUTCOME_META)) return null;
   const meta = OUTCOME_META[outcome as keyof typeof OUTCOME_META];
-  const label = labelOverride?.[outcome] ?? meta.label;
+  const label = labelOverride?.[outcome] ?? t(meta.labelKey);
   return (
     <span
       className={cn(

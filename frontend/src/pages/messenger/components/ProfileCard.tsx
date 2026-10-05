@@ -11,21 +11,29 @@ import {
   KARMA_ORDER, KarmaStarKey, KarmaProfile,
   isKarmaLegend, useKarmaProfile, useSendKarma,
 } from "../useKarmaProfile";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { Language, TranslationKey } from "@/lib/i18n";
+import type { Traductor } from "../preview";
 
 /** Nombre de la pantalla actual para el botón "volver" del chat. Sale del
     catálogo de navegación, así cualquier pantalla que muestre la ficha queda
     con su nombre real sin tocar nada acá. */
-function nombreDeLaPantalla(ruta: string): string {
+//
+// Es solo el texto del botón (lo ve la misma persona al instante), no una clave:
+// en inglés sale del i18nKey del catálogo; en español, el título de siempre. Sin
+// pantalla conocida va vacío y MessengerPage pone "atrás" en el idioma de quien mira.
+function nombreDeLaPantalla(ruta: string, t: Traductor, lang: Language): string {
   const item = NAV_CATALOG
     .filter((n) => ruta === n.url || ruta.startsWith(`${n.url}/`))
     .sort((a, b) => b.url.length - a.url.length)[0];
-  return item ? item.title.split(" · ").pop()! : "atrás";
+  if (!item) return "";
+  return lang === "en" && item.i18nKey ? t(item.i18nKey) : item.title.split(" · ").pop()!;
 }
 
 const STAR_PATH = "M12 2.4l2.9 5.9 6.5.95-4.7 4.6 1.1 6.45L12 17.3 6.2 20.3l1.1-6.45L2.6 9.25l6.5-.95z";
-const STAR_LABEL: Record<KarmaStarKey, string> = {
-  rendimiento: "Rendimiento", actividad: "Actividad", constancia: "Constancia",
-  productividad: "Productividad", companerismo: "Compañerismo",
+const STAR_LABEL: Record<KarmaStarKey, TranslationKey> = {
+  rendimiento: "messenger.karma.rendimiento", actividad: "messenger.karma.actividad", constancia: "messenger.karma.constancia",
+  productividad: "messenger.karma.productividad", companerismo: "messenger.karma.companerismo",
 };
 const GOLD = "#e59321";
 
@@ -49,6 +57,7 @@ function Star({ filled, special, tip }: { filled: boolean; special?: boolean; ti
    (el chip la trunca), y al lado el lápiz para escribirle desde el correo de
    Maven — solo si quien mira tiene casilla y el módulo Correo. */
 function ContactoCorreo({ email, puedeEscribir, onEscribir, onMensaje }: { email: string; puedeEscribir: boolean; onEscribir: () => void; onMensaje?: () => void }) {
+  const { t } = useLanguage();
   const [copiado, setCopiado] = useState(false);
   const reloj = useRef<number | null>(null);
   useEffect(() => () => { if (reloj.current) window.clearTimeout(reloj.current); }, []);
@@ -59,10 +68,10 @@ function ContactoCorreo({ email, puedeEscribir, onEscribir, onMensaje }: { email
       setCopiado(true);
       if (reloj.current) window.clearTimeout(reloj.current);
       reloj.current = window.setTimeout(() => setCopiado(false), 1800);
-      toast.success("Correo copiado", { description: email });
+      toast.success(t("messenger.karma.correoCopiado"), { description: email });
     } catch {
       // Sin permiso de portapapeles (o contexto no seguro): que al menos vea la dirección.
-      toast.error("No se pudo copiar", { description: email });
+      toast.error(t("common.couldNotCopy"), { description: email });
     }
   };
 
@@ -72,8 +81,8 @@ function ContactoCorreo({ email, puedeEscribir, onEscribir, onMensaje }: { email
       <button
         type="button"
         onClick={copiar}
-        title={`${email} — clic para copiar`}
-        aria-label={`Copiar correo ${email}`}
+        title={t("messenger.karma.clicParaCopiar", { email })}
+        aria-label={t("messenger.karma.copiarCorreo", { email })}
         className={cn(
           "min-w-0 inline-flex items-center gap-1.5 max-w-full text-[11.5px] font-medium",
           "bg-muted border border-border rounded-full pl-2.5 pr-3 py-1.5 cursor-copy transition-colors",
@@ -81,15 +90,15 @@ function ContactoCorreo({ email, puedeEscribir, onEscribir, onMensaje }: { email
         )}
       >
         {copiado ? <Check className="h-3.5 w-3.5 shrink-0" /> : <Mail className="h-3.5 w-3.5 shrink-0" />}
-        <span className="truncate">{copiado ? "Correo copiado" : email}</span>
+        <span className="truncate">{copiado ? t("messenger.karma.correoCopiado") : email}</span>
       </button>
       )}
       {puedeEscribir && (
         <button
           type="button"
           onClick={onEscribir}
-          title="Escribirle un correo desde Maven"
-          aria-label="Escribirle un correo desde Maven"
+          title={t("messenger.karma.escribirCorreo")}
+          aria-label={t("messenger.karma.escribirCorreo")}
           className="shrink-0 h-[30px] w-[30px] inline-flex items-center justify-center rounded-full bg-muted border border-border text-muted-foreground hover:text-foreground hover:border-foreground/25 transition-colors"
         >
           <PenLine className="h-3.5 w-3.5" />
@@ -99,8 +108,8 @@ function ContactoCorreo({ email, puedeEscribir, onEscribir, onMensaje }: { email
         <button
           type="button"
           onClick={onMensaje}
-          title="Mandarle un mensaje por Messenger"
-          aria-label="Mandarle un mensaje por Messenger"
+          title={t("messenger.karma.mandarMensaje")}
+          aria-label={t("messenger.karma.mandarMensaje")}
           className="shrink-0 h-[30px] w-[30px] inline-flex items-center justify-center rounded-full bg-muted border border-border text-muted-foreground hover:text-foreground hover:border-foreground/25 transition-colors"
         >
           <MessageCircle className="h-3.5 w-3.5" />
@@ -111,16 +120,18 @@ function ContactoCorreo({ email, puedeEscribir, onEscribir, onMensaje }: { email
 }
 
 function Stat({ label, value, sub }: { label: string; value: number; sub: string }) {
+  const { language } = useLanguage();
   return (
     <div className="bg-muted/40 border border-border rounded-2xl p-3">
       <div className="text-[10.5px] text-muted-foreground font-semibold">{label}</div>
-      <div className="font-mono font-bold text-[22px] leading-tight mt-1 tabular-nums">{value.toLocaleString("es")}</div>
+      <div className="font-mono font-bold text-[22px] leading-tight mt-1 tabular-nums">{value.toLocaleString(language === "en" ? "en-US" : "es")}</div>
       <div className="text-[10px] text-muted-foreground/70 mt-0.5">{sub}</div>
     </div>
   );
 }
 
 function CardBody({ data, onSend, sending, onEscribirCorreo, onMensaje }: { data: KarmaProfile; onSend: () => void; sending: boolean; onEscribirCorreo: (email: string) => void; onMensaje?: () => void }) {
+  const { t } = useLanguage();
   const legend = isKarmaLegend(data);
   const admin = data.viewer_is_admin;
   // Las estrellas se rellenan EN ORDEN (izquierda→derecha): las ganadas primero,
@@ -129,7 +140,7 @@ function CardBody({ data, onSend, sending, onEscribirCorreo, onMensaje }: { data
   const earnedKeys = KARMA_ORDER.filter((k) => data.stars[k]);
   const pendingKeys = KARMA_ORDER.filter((k) => !data.stars[k]);
   const packed = [...earnedKeys, ...pendingKeys];
-  const earned = earnedKeys.map((k) => STAR_LABEL[k]);
+  const earned = earnedKeys.map((k) => t(STAR_LABEL[k]));
 
   return (
     <div className={cn("kp-card", legend && "kp-legend", !legend && admin && "kp-admin")}>
@@ -144,7 +155,7 @@ function CardBody({ data, onSend, sending, onEscribirCorreo, onMensaje }: { data
       </svg>
 
       {legend && (
-        <div className="kp-ribbon">🌟 Karma votado por el equipo · {data.vote_pct}%</div>
+        <div className="kp-ribbon">{t("messenger.karma.votadoPorEquipo", { pct: data.vote_pct })}</div>
       )}
       <div className="kp-banner" />
 
@@ -154,7 +165,7 @@ function CardBody({ data, onSend, sending, onEscribirCorreo, onMensaje }: { data
         </div>
 
         <h2 className="kp-name text-center text-2xl font-bold mt-3 leading-tight tracking-tight">
-          {data.name || "Usuario"}
+          {data.name || t("messenger.usuario")}
         </h2>
         <div className="flex justify-center mt-2">
           <span className="inline-flex items-center gap-2 text-xs font-semibold text-foreground/80 bg-muted border border-border px-3 py-1.5 rounded-full">
@@ -184,21 +195,21 @@ function CardBody({ data, onSend, sending, onEscribirCorreo, onMensaje }: { data
                 <Star
                   key={k}
                   filled={filled}
-                  tip={admin ? `<b>${STAR_LABEL[k]}</b>${filled ? "Conseguida" : "Bloqueada"} · ${data.admin?.criteria?.[k]?.rule ?? ""}` : undefined}
+                  tip={admin ? `<b>${t(STAR_LABEL[k])}</b>${filled ? t("messenger.karma.conseguida") : t("messenger.karma.bloqueada")} · ${data.admin?.criteria?.[k]?.rule ?? ""}` : undefined}
                 />
               );
             })}
             {data.special && (
               <>
                 <div className="kp-sep" />
-                <Star special filled tip={admin ? "<b>🌟 Karma Votado</b>Más del 70% del equipo le mandó karma" : undefined} />
+                <Star special filled tip={admin ? `<b>${t("messenger.karma.karmaVotado")}</b>${t("messenger.karma.karmaVotadoTip")}` : undefined} />
               </>
             )}
           </div>
           <div className="text-center text-[11.5px] text-muted-foreground mt-3 min-h-[16px]">
             {admin
-              ? (earned.length ? <b className="font-medium">{earned.join(" · ")}</b> : "Sin estrellas todavía")
-              : (data.stars_count ? `${data.stars_count} de 5 estrellas de karma` : "Todavía sin estrellas de karma")}
+              ? (earned.length ? <b className="font-medium">{earned.join(" · ")}</b> : t("messenger.karma.sinEstrellas"))
+              : (data.stars_count ? t("messenger.karma.estrellasDe5", { n: data.stars_count }) : t("messenger.karma.todaviaSinEstrellas"))}
           </div>
         </div>
 
@@ -216,10 +227,10 @@ function CardBody({ data, onSend, sending, onEscribirCorreo, onMensaje }: { data
                     : "kp-btn-primary hover:brightness-110",
               )}
             >
-              {legend ? <>👑 Ya es leyenda</>
-                : data.viewer_has_sent ? <><Check className="h-4 w-4" /> Le mandaste karma</>
+              {legend ? <>{t("messenger.karma.yaEsLeyenda")}</>
+                : data.viewer_has_sent ? <><Check className="h-4 w-4" /> {t("messenger.karma.leMandaste")}</>
                   : sending ? <Loader2 className="h-4 w-4 animate-spin" />
-                    : <><Heart className="h-[17px] w-[17px] fill-current" /> Mandar Karma</>}
+                    : <><Heart className="h-[17px] w-[17px] fill-current" /> {t("messenger.karma.mandarKarma")}</>}
             </button>
           </div>
         )}
@@ -228,11 +239,11 @@ function CardBody({ data, onSend, sending, onEscribirCorreo, onMensaje }: { data
         {!legend && (
           <div className={data.is_self ? "mt-5" : "mt-3"}>
             <div className="flex justify-between text-[11px] text-muted-foreground mb-1.5 font-semibold">
-              <span>Karma del equipo</span>
+              <span>{t("messenger.karma.karmaDelEquipo")}</span>
               <span className="font-mono" style={{ color: GOLD }}>{data.vote_pct}%</span>
             </div>
             <div className="kp-track"><div className="kp-fill" style={{ width: `${Math.min(100, data.vote_pct)}%` }} /><div className="kp-goal" /></div>
-            <div className="text-[10.5px] text-muted-foreground/70 mt-1.5 text-center">Al 70% se enciende la estrella dorada ✨</div>
+            <div className="text-[10.5px] text-muted-foreground/70 mt-1.5 text-center">{t("messenger.karma.al70")}</div>
           </div>
         )}
 
@@ -240,13 +251,13 @@ function CardBody({ data, onSend, sending, onEscribirCorreo, onMensaje }: { data
         {admin && data.admin && (
           <div className="mt-5 pt-4 border-t border-dashed border-border">
             <div className="flex items-center gap-2 text-xs font-bold mb-3" style={{ color: "#5b8cff" }}>
-              🔒 Vista admin
+              {t("messenger.karma.vistaAdmin")}
             </div>
             <div className="grid grid-cols-2 gap-2.5">
-              <Stat label="✉️ Enviados" value={data.admin.msgs_sent_30d} sub="últimos 30 días" />
-              <Stat label="📥 Recibidos" value={data.admin.msgs_recv_30d} sub="últimos 30 días" />
+              <Stat label={t("messenger.karma.enviados")} value={data.admin.msgs_sent_30d} sub={t("messenger.karma.ultimos30")} />
+              <Stat label={t("messenger.karma.recibidos")} value={data.admin.msgs_recv_30d} sub={t("messenger.karma.ultimos30")} />
               <div className="col-span-2 bg-muted/40 border border-border rounded-2xl p-3">
-                <div className="text-[10.5px] text-muted-foreground font-semibold">📊 Productividad · Hubstaff</div>
+                <div className="text-[10.5px] text-muted-foreground font-semibold">{t("messenger.karma.productividadHubstaff")}</div>
                 {data.admin.hub_activity_30d != null ? (
                   <>
                     <div className="flex items-center gap-3 mt-2">
@@ -254,11 +265,13 @@ function CardBody({ data, onSend, sending, onEscribirCorreo, onMensaje }: { data
                       <span className="font-mono font-bold text-[15px]" style={{ color: "#3ecf8e" }}>{data.admin.hub_activity_30d}%</span>
                     </div>
                     <div className="text-[10px] text-muted-foreground/70 mt-1">
-                      actividad promedio{data.admin.hub_hours_30d != null ? ` · ${data.admin.hub_hours_30d} h este mes` : ""}
+                      {data.admin.hub_hours_30d != null
+                        ? t("messenger.karma.actividadPromedioHoras", { h: data.admin.hub_hours_30d })
+                        : t("messenger.karma.actividadPromedio")}
                     </div>
                   </>
                 ) : (
-                  <div className="text-[11px] text-muted-foreground/70 mt-1.5">Sin datos de Hubstaff (cuenta no enlazada)</div>
+                  <div className="text-[11px] text-muted-foreground/70 mt-1.5">{t("messenger.karma.sinHubstaff")}</div>
                 )}
               </div>
             </div>
@@ -272,6 +285,7 @@ function CardBody({ data, onSend, sending, onEscribirCorreo, onMensaje }: { data
 export default function ProfileCard({ userId, onClose }: { userId: string | null; onClose: () => void }) {
   const open = !!userId;
   const location = useLocation();
+  const { t, language } = useLanguage();
   const { data, isLoading } = useKarmaProfile(userId);
   const sendKarma = useSendKarma();
   const navigate = useNavigate();
@@ -284,16 +298,16 @@ export default function ProfileCard({ userId, onClose }: { userId: string | null
       // recibió, que es lo que hace que se entienda sin leerlo.
       onSuccess: (nueva) => {
         const estrellas = nueva?.stars_count ?? data.stars_count;
-        const quien = data.name ?? "esta persona";
+        const quien = data.name ?? t("messenger.karma.estaPersona");
         avisarPersona({
           nombre: quien, foto: data.avatar_url, seed: data.avatar_seed,
-          titulo: `Le mandaste karma a ${quien}`,
-          detalle: estrellas ? `Ahora tiene ${estrellas} de 5 estrellas` : undefined,
+          titulo: t("messenger.karma.leMandasteA", { name: quien }),
+          detalle: estrellas ? t("messenger.karma.ahoraTiene", { n: estrellas }) : undefined,
           tono: "bien",
           id: `karma-${userId}`,
         });
       },
-      onError: () => toast.error("No se pudo mandar el karma"),
+      onError: () => toast.error(t("messenger.karma.noSePudoMandar")),
     });
   };
 
@@ -312,7 +326,7 @@ export default function ProfileCard({ userId, onClose }: { userId: string | null
     const p = new URLSearchParams({ dm: userId });
     if (!enMessenger) {
       p.set("back", location.pathname);
-      p.set("backName", nombreDeLaPantalla(location.pathname));
+      p.set("backName", nombreDeLaPantalla(location.pathname, t, language));
     }
     navigate(`/messenger?${p.toString()}`);
   };
@@ -320,7 +334,7 @@ export default function ProfileCard({ userId, onClose }: { userId: string | null
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent className="bg-none bg-transparent border-0 ring-0 shadow-none p-0 rounded-[26px] w-full max-w-[360px] overflow-visible">
-        <DialogTitle className="sr-only">Ficha de {data?.name ?? "usuario"}</DialogTitle>
+        <DialogTitle className="sr-only">{t("messenger.karma.fichaDe", { name: data?.name ?? t("messenger.usuario") })}</DialogTitle>
         {isLoading || !data ? (
           <div className="kp-card">
             <div className="kp-banner" />
@@ -334,7 +348,7 @@ export default function ProfileCard({ userId, onClose }: { userId: string | null
             </div>
           </div>
         ) : invalid ? (
-          <div className="kp-card"><div className="kp-banner" /><div className="px-5 py-10 text-center text-sm text-muted-foreground">No se pudo cargar la ficha.</div></div>
+          <div className="kp-card"><div className="kp-banner" /><div className="px-5 py-10 text-center text-sm text-muted-foreground">{t("messenger.karma.noSePudoCargar")}</div></div>
         ) : (
           <CardBody data={data} onSend={handleSend} sending={sendKarma.isPending} onEscribirCorreo={escribirCorreo} onMensaje={mandarMensaje} />
         )}

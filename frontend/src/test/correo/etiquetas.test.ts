@@ -29,7 +29,8 @@ describe("⚠️ la etiqueta se ata al message_id, NO al uid", () => {
   it("el hook etiqueta por messageId y avisa cuando falta", () => {
     expect(hook).toMatch(/messageIds/);
     expect(pagina).toMatch(/\.map\(\(m\) => m\.messageId\)\.filter\(Boolean\)/);
-    expect(pagina).toMatch(/no tienen identificador/);
+    // El aviso ya pasa por el diccionario (i18n, ola 3): «Estos correos no tienen identificador…».
+    expect(pagina).toMatch(/t\("mail\.noIdentifier"\)/);
   });
 });
 
@@ -46,15 +47,16 @@ describe("las etiquetas son de cada quien", () => {
   });
 });
 
-describe("el color no puede quedar ilegible", () => {
-  it("la base solo acepta tokens del tema, no hex sueltos", () => {
+describe("el color, como en Gmail", () => {
+  // #1893 usaba seis tokens del tema. Desde el 28/09 (Jhon: «igual que en
+  // gmail») son dos hex —fondo y texto— de la lista cerrada de Gmail; la
+  // guarda de eso vive en etiquetasComoGmail.test.ts.
+  it("la migración vieja sigue con su CHECK de tokens (la columna queda para el frontend anterior)", () => {
     expect(mig).toMatch(/CHECK \(color IN \('primary','accent','success','warning','destructive','muted'\)\)/);
   });
 
-  it("y el frontend ofrece exactamente esos", () => {
-    for (const c of ["primary", "accent", "success", "warning", "destructive", "muted"]) {
-      expect(hook, `falta el color ${c}`).toContain(`"${c}"`);
-    }
+  it("y el frontend ya no escribe la columna vieja", () => {
+    expect(hook).not.toMatch(/insert\(\{[^}]*\bcolor\b/);
   });
 });
 
@@ -64,7 +66,7 @@ describe("la UI", () => {
   });
 
   it("la etiqueta se ve en el renglón de la conversación", () => {
-    expect(pagina).toMatch(/etiquetas\?\.slice\(0, 3\)/);
+    expect(pagina).toMatch(/etiquetas\?\.slice\(0, 3\)\.map\(\(e\) => \(\s*<PastillaEtiqueta/);
   });
 
   it("⚠️ se toman las de CUALQUIER mensaje del hilo", () => {

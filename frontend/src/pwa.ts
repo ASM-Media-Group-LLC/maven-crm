@@ -1,6 +1,9 @@
 // This file is only imported dynamically in production (see main.tsx)
 import { toast } from "sonner";
 import { getTranslation, type Language } from "./lib/i18n";
+import { BUILD_PROPIO, crearVigiaDelMinimo } from "./lib/versionDelBundle";
+import { almacenDeLaPestana, forzarActualizacion, leerUiBuildMinimo } from "./lib/minimoDelBundle";
+import { hayLlamadaActiva } from "./lib/llamadaActiva";
 
 /** El aviso "Nueva versión disponible" como toast del design system (el mismo
  *  vidrio de todos los avisos), con `id` fijo para no duplicarse en el chequeo
@@ -67,11 +70,13 @@ export async function initPWA() {
     // to fetch as a URL and rejects with a CORS/scheme error.
     // @ts-expect-error - virtual module resolved by vite-plugin-pwa
     const { registerSW } = await import("virtual:pwa-register");
+    let registro: ServiceWorkerRegistration | undefined;
     const updateSW = registerSW({
       // Las pestañas de Maven viven abiertas por DÍAS (SPA, sin navegaciones) y el
       // navegador solo chequea el SW al navegar → el banner de update no aparecía
       // nunca en pestañas longevas. Chequeo explícito cada hora.
       onRegisteredSW(_swUrl: string, r: ServiceWorkerRegistration | undefined) {
+        registro = r;
         if (r) setInterval(() => { r.update().catch(() => {}); }, 60 * 60 * 1000);
       },
       onNeedRefresh() {
@@ -92,6 +97,26 @@ export async function initPWA() {
       },
       onOfflineReady() {},
     });
+
+    // EL MÍNIMO: si app_flags 'ui_build_minimo' dice que este build es viejo, se
+    // actualiza sin preguntar (el aviso de arriba espera un clic que en pestañas
+    // abiertas por días no llega). Al volver el foco y con freno de 10 min; una
+    // vez por pestaña y por build (ver crearVigiaDelMinimo: no puede haber bucle);
+    // nunca con una llamada conectada en la pestaña.
+    const alVolver = crearVigiaDelMinimo({
+      propio: BUILD_PROPIO,
+      leerMinimo: leerUiBuildMinimo,
+      // La llamada se vuelve a mirar justo antes de recargar: la búsqueda del SW
+      // nuevo tarda hasta 6,5 s y en ese rato alguien puede entrar a una.
+      forzar: () => forzarActualizacion(registro, updateSW, () => window.location.reload(), hayLlamadaActiva),
+      almacen: almacenDeLaPestana(),
+      ocupado: hayLlamadaActiva,
+      ahora: () => Date.now(),
+      desde: Date.now(),
+    });
+    const revisar = () => { if (document.visibilityState === "visible") void alVolver(); };
+    window.addEventListener("focus", revisar);
+    document.addEventListener("visibilitychange", revisar);
   } catch {
     // virtual:pwa-register not available (dev mode)
   }
