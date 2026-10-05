@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
-import { Navigate, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { Check, ChevronDown, House, IdCard, Images, Loader2, LogOut, Settings } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Link, Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { useTheme } from "next-themes";
+import { Check, ChevronDown, House, IdCard, Images, Loader2, LogOut, Moon, Settings, Sun } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { TranslationKey } from "@/lib/i18n";
@@ -14,7 +15,6 @@ import {
   useMisFichas,
   usePortalHola,
 } from "@/hooks/usePortal";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -23,14 +23,35 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MarcaM } from "@/components/MarcaM";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarTrigger,
+  useSidebar,
+} from "@/components/ui/sidebar";
+import Logo from "@/components/Logo";
+import { NavLink } from "@/components/NavLink";
+import { UserAvatar } from "@/components/UserAvatar";
+import NotificationBell from "@/components/notifications/NotificationBell";
+import SelectorDeIdioma from "@/components/dashboard/SelectorDeIdioma";
+import { BOTON_TOPBAR } from "@/components/dashboard/topbarStyles";
+import { ACTIVE_CLASS, LINK_CLASS } from "@/components/dashboard/estilosDelMenu";
 import { SubidasContext, useSubidasDelPortal } from "@/hooks/usePortalContenido";
 import AvisoDeSubidas from "./AvisoDeSubidas";
 import { cn } from "@/lib/utils";
 
 // EL ESPACIO DE LA CREADORA (portal de creadoras). Va FUERA del AppShell del
 // equipo: nada de menú del CRM, Messenger, Cowork, llamadas ni avisos del equipo.
-// Pensado primero para el celular (menú abajo); en el computador, menú al costado.
+// Pero se ve como Maven (Jhon, 06/10: «hazlo más apegado a lo que es Maven y su
+// diseño»): el mismo menú lateral (logo, ítems, la tarjeta de abajo con su foto,
+// claro/oscuro y Ajustes) y la misma barra de arriba (idioma y campana). En el
+// celular, el menú va abajo, al alcance del pulgar.
 //
 // Quién entra: solo una cuenta de creadora (app_metadata.tipo). Alguien del equipo
 // que llega aquí vuelve a /dashboard; sin sesión, a /portal/entrar.
@@ -41,8 +62,6 @@ const SECCIONES: { a: string; icono: typeof House; etiqueta: TranslationKey; exa
   { a: "/portal/ficha", icono: IdCard, etiqueta: "portal.nav.ficha" },
   { a: "/portal/ajustes", icono: Settings, etiqueta: "portal.nav.ajustes" },
 ];
-
-const inicial = (f: FichaDeAgencia) => nombreParaMostrar(f).slice(0, 1).toUpperCase();
 
 function Pantalla({ children }: { children: React.ReactNode }) {
   return (
@@ -120,100 +139,44 @@ export default function PortalLayout() {
     setElegida(id);
   };
 
-  const selectorDeAgencia = (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        disabled={lista.length < 2}
-        className="inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-full border border-border bg-card px-3 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default"
-        aria-label={t("portal.shell.cambiarAgencia")}
-      >
-        <span className="truncate">{activa.agencia}</span>
-        {lista.length > 1 && <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />}
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-56">
-        <DropdownMenuLabel>{t("portal.shell.cambiarAgencia")}</DropdownMenuLabel>
-        {lista.map((f) => (
-          <DropdownMenuItem key={f.creator_id} onSelect={() => elegir(f.creator_id)} className="min-h-11 gap-2">
-            <Check className={cn("h-4 w-4", f.creator_id === activa.creator_id ? "opacity-100" : "opacity-0")} aria-hidden="true" />
-            <span className="truncate">{f.agencia}</span>
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-
-  const avatar = (clase: string) => (
-    <Avatar className={clase}>
-      {activa.foto && <AvatarImage src={activa.foto} alt="" />}
-      <AvatarFallback className="bg-primary/15 font-semibold text-primary">{inicial(activa)}</AvatarFallback>
-    </Avatar>
-  );
+  const selectorDeAgencia = <SelectorDeAgencia lista={lista} activa={activa} elegir={elegir} />;
 
   return (
     <PortalContext.Provider value={{ fichas: lista, activa, elegir }}>
     <SubidasContext.Provider value={subidas}>
-      <div className="min-h-dvh bg-background text-foreground md:flex">
-        {/* Computador: menú al costado */}
-        <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r border-border bg-card/60 p-4 md:flex">
-          <div className="flex items-center gap-2.5 px-2 py-1">
-            <span className="flex h-9 w-9 items-center justify-center rounded-panel bg-primary">
-              <MarcaM alto="13px" />
-            </span>
-            <span className="font-semibold">{t("portal.shell.espacio")}</span>
-          </div>
-          <nav aria-label={t("portal.nav.menu")} className="mt-6 flex flex-col gap-1">
-            {SECCIONES.map(({ a, icono: Icono, etiqueta, exacta }) => (
-              <NavLink
-                key={a}
-                to={a}
-                end={exacta}
-                className={({ isActive }) =>
-                  cn(
-                    "flex min-h-11 items-center gap-3 rounded-control px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                    isActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                  )
-                }
-              >
-                <Icono className="h-5 w-5" aria-hidden="true" />
-                {t(etiqueta)}
-              </NavLink>
-            ))}
-          </nav>
-          <div className="mt-auto space-y-3 rounded-panel border border-border bg-background p-3">
-            <div className="flex items-center gap-3">
-              {avatar("h-10 w-10")}
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold">{nombreParaMostrar(activa)}</p>
-                <p className="truncate text-xs text-muted-foreground">{t("portal.shell.agencia", { agencia: activa.agencia })}</p>
-              </div>
-            </div>
-            {lista.length > 1 && selectorDeAgencia}
-            <Button variant="ghost" size="sm" className="w-full justify-start text-muted-foreground" onClick={salir}>
-              <LogOut className="mr-2 h-4 w-4" aria-hidden="true" />
-              {t("portal.shell.salir")}
-            </Button>
-          </div>
-        </aside>
+    <SidebarProvider>
+      <div className="flex alto-de-la-app w-full overflow-hidden bg-background text-foreground">
+        <MenuDelPortal activa={activa} selectorDeAgencia={lista.length > 1 ? selectorDeAgencia : null} />
 
-        <div className="flex min-w-0 flex-1 flex-col">
-          {/* Celular: arriba la marca y la agencia */}
-          <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-3 border-b border-border bg-background/90 px-4 backdrop-blur md:hidden">
-            <div className="flex min-w-0 items-center gap-2.5">
-              {avatar("h-9 w-9")}
+        <div className="relative flex min-w-0 flex-1 flex-col">
+          {/* La barra de arriba de Maven: en el computador, el botón del menú; en el
+              celular, su foto y su nombre (el menú va abajo). A la derecha, el idioma
+              y la campana; en el celular también claro/oscuro, que en el computador
+              está en la tarjeta del menú. */}
+          <header className="sticky top-0 z-30 box-content flex h-14 shrink-0 items-center gap-2 border-b border-white/10 bg-background/60 px-3 pt-safe backdrop-blur-xl sm:gap-4 sm:px-4">
+            <SidebarTrigger className="hidden md:inline-flex" />
+            <div className="flex min-w-0 flex-1 items-center gap-2.5 md:hidden">
+              <UserAvatar name={nombreParaMostrar(activa)} src={activa.foto} seed={activa.creator_id} size="sm" />
               <span className="truncate font-semibold">{nombreParaMostrar(activa)}</span>
             </div>
-            <div className="min-w-0 shrink">{selectorDeAgencia}</div>
+            <div className="hidden min-w-0 flex-1 md:block" />
+            <div className="flex shrink-0 items-center gap-1">
+              {lista.length > 1 && <div className="md:hidden">{selectorDeAgencia}</div>}
+              <SelectorDeIdioma />
+              <BotonDeTema className={cn(BOTON_TOPBAR, "md:hidden")} />
+              <NotificationBell verTodas={null} />
+            </div>
           </header>
 
-          {/* Cada página trae su <Page>; aquí solo el aire para el menú de abajo. */}
-          <div className="flex flex-1 flex-col pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-4">
+          {/* Cada página trae su <Page> (y su scroll); aquí solo el aire para el menú de abajo. */}
+          <div className="flex min-h-0 flex-1 flex-col pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0">
             <Outlet />
           </div>
 
-          {/* Celular: el menú abajo, al alcance del pulgar (y, si sube algo y ella
-              está en otra pantalla, el aviso justo arriba) */}
+          {/* Si sube algo y ella está en otra pantalla, el aviso abajo (en el
+              celular, justo arriba del menú). */}
           {!location.pathname.startsWith("/portal/contenido") && (
-            <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 md:bottom-0 md:left-64">
+            <div className="absolute inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 md:bottom-0">
               <AvisoDeSubidas />
             </div>
           )}
@@ -226,12 +189,8 @@ export default function PortalLayout() {
                 key={a}
                 to={a}
                 end={exacta}
-                className={({ isActive }) =>
-                  cn(
-                    "flex min-h-16 flex-1 flex-col items-center justify-center gap-1 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
-                    isActive ? "text-primary" : "text-muted-foreground",
-                  )
-                }
+                className="flex min-h-16 flex-1 flex-col items-center justify-center gap-1 text-xs font-medium text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                activeClassName="text-primary"
               >
                 <Icono className="h-6 w-6" aria-hidden="true" />
                 {t(etiqueta)}
@@ -240,7 +199,143 @@ export default function PortalLayout() {
           </nav>
         </div>
       </div>
+    </SidebarProvider>
     </SubidasContext.Provider>
     </PortalContext.Provider>
+  );
+}
+
+/** El menú lateral de Maven (computador): el logo, sus secciones con los ítems de
+ *  Maven y abajo la tarjeta con su foto, claro/oscuro y Ajustes. Plegado, queda
+ *  el riel de iconos, como en Maven. */
+function MenuDelPortal({ activa, selectorDeAgencia }: { activa: FichaDeAgencia; selectorDeAgencia: React.ReactNode }) {
+  const { t } = useLanguage();
+  const { state } = useSidebar();
+  const plegado = state === "collapsed";
+  return (
+    <Sidebar collapsible="icon">
+      <SidebarHeader className="flex h-20 shrink-0 flex-row items-center justify-center px-4">
+        <Link
+          to="/portal"
+          aria-label={t("portal.nav.inicio")}
+          className="rounded-md transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        >
+          <Logo size={plegado ? "sm" : "md"} collapsed={plegado} />
+        </Link>
+      </SidebarHeader>
+      <SidebarContent className="gap-0.5 overflow-x-hidden px-2 py-1">
+        <SidebarMenu aria-label={t("portal.nav.menu")}>
+          {SECCIONES.map(({ a, icono: Icono, etiqueta, exacta }) => (
+            <SidebarMenuItem key={a}>
+              <SidebarMenuButton asChild tooltip={t(etiqueta)}>
+                <NavLink to={a} end={exacta} className={LINK_CLASS} activeClassName={ACTIVE_CLASS}>
+                  <Icono className="h-4 w-4 shrink-0" />
+                  <span>{t(etiqueta)}</span>
+                </NavLink>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          ))}
+        </SidebarMenu>
+      </SidebarContent>
+      <SidebarFooter className="border-t border-border p-3">
+        <TarjetaDeLaCreadora activa={activa} plegado={plegado} selectorDeAgencia={selectorDeAgencia} />
+      </SidebarFooter>
+    </Sidebar>
+  );
+}
+
+/** La tarjeta de abajo del menú, como la del equipo en Maven: su foto (la de su
+ *  ficha; sin foto, su muñequito), su nombre y su agencia, claro/oscuro y el
+ *  engranaje de Ajustes (en Ajustes, el engranaje vuelve a donde estaba). */
+function TarjetaDeLaCreadora({ activa, plegado, selectorDeAgencia }: { activa: FichaDeAgencia; plegado: boolean; selectorDeAgencia: React.ReactNode }) {
+  const { t } = useLanguage();
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const enAjustes = pathname.startsWith("/portal/ajustes");
+  const [volverA, setVolverA] = useState("/portal");
+  const engranaje = () => {
+    if (enAjustes) return navigate(volverA);
+    setVolverA(pathname);
+    navigate("/portal/ajustes");
+  };
+  const nombre = nombreParaMostrar(activa);
+  const avatar = <UserAvatar name={nombre} src={activa.foto} seed={activa.creator_id} size={plegado ? "sm" : "md"} />;
+  const botonAjustes = (
+    <Button
+      variant="ghost"
+      size="icon"
+      className={cn("h-8 w-8 shrink-0 rounded-full", enAjustes ? "bg-primary/15 text-primary hover:bg-primary/20 hover:text-primary" : "text-muted-foreground")}
+      onClick={engranaje}
+      title={t("portal.nav.ajustes")}
+      aria-label={t("portal.nav.ajustes")}
+      aria-pressed={enAjustes}
+    >
+      <Settings className="h-4 w-4" />
+    </Button>
+  );
+
+  if (plegado) {
+    return (
+      <div className="flex flex-col items-center gap-2">
+        {avatar}
+        <BotonDeTema className="h-8 w-8 rounded-full text-muted-foreground" />
+        {botonAjustes}
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2 rounded-2xl border border-border bg-card/70 p-2">
+        <div className="shrink-0">{avatar}</div>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm font-semibold leading-tight">{nombre}</div>
+          <div className="truncate text-xs text-muted-foreground">{t("portal.shell.agencia", { agencia: activa.agencia })}</div>
+        </div>
+        <BotonDeTema className="h-8 w-8 shrink-0 rounded-full text-muted-foreground" />
+        {botonAjustes}
+      </div>
+      {selectorDeAgencia}
+    </div>
+  );
+}
+
+/** Sol o luna: claro y oscuro, como en Maven. */
+function BotonDeTema({ className }: { className?: string }) {
+  const { t } = useLanguage();
+  const { resolvedTheme, setTheme } = useTheme();
+  const [montado, setMontado] = useState(false);
+  useEffect(() => setMontado(true), []);
+  if (!montado) return null;
+  const oscuro = resolvedTheme === "dark";
+  const texto = t(oscuro ? "topbar.lightMode" : "topbar.darkMode");
+  return (
+    <Button variant="ghost" size="icon" className={className} onClick={() => setTheme(oscuro ? "light" : "dark")} title={texto} aria-label={texto}>
+      {oscuro ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+    </Button>
+  );
+}
+
+/** Con más de una agencia, para cambiar de una a otra. */
+function SelectorDeAgencia({ lista, activa, elegir }: { lista: FichaDeAgencia[]; activa: FichaDeAgencia; elegir: (id: string) => void }) {
+  const { t } = useLanguage();
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        className="inline-flex min-h-9 max-w-full items-center gap-1.5 rounded-full border border-border bg-card px-3 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        aria-label={t("portal.shell.cambiarAgencia")}
+      >
+        <span className="truncate">{activa.agencia}</span>
+        <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-56">
+        <DropdownMenuLabel>{t("portal.shell.cambiarAgencia")}</DropdownMenuLabel>
+        {lista.map((f) => (
+          <DropdownMenuItem key={f.creator_id} onSelect={() => elegir(f.creator_id)} className="min-h-11 gap-2">
+            <Check className={cn("h-4 w-4", f.creator_id === activa.creator_id ? "opacity-100" : "opacity-0")} aria-hidden="true" />
+            <span className="truncate">{f.agencia}</span>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

@@ -1,0 +1,60 @@
+import { describe, it, expect } from "vitest";
+
+// EL PORTAL SE VE COMO MAVEN (Jhon, 06/10: «hazlo más apegado a lo que es
+// Maven y su diseño… modo oscuro, light, inglés y español como en Maven,
+// campana de notificaciones»). Con las MISMAS piezas, no con copias: si Maven
+// cambia, el portal cambia con él.
+
+const fuentes = (import.meta as unknown as {
+  glob: (p: string[], o: Record<string, unknown>) => Record<string, string>;
+}).glob([
+  "/frontend/src/pages/portal/PortalLayout.tsx",
+  "/frontend/src/pages/portal/PortalAjustes.tsx",
+  "/frontend/src/pages/Settings.tsx",
+  "/frontend/src/components/dashboard/DashboardSidebar.tsx",
+  "/frontend/src/components/dashboard/DashboardTopbar.tsx",
+], { query: "?raw", import: "default", eager: true });
+const fuente = (n: string) => Object.entries(fuentes).find(([k]) => k.endsWith(n))?.[1] ?? "";
+
+describe("el portal usa las piezas de Maven", () => {
+  it("las fuentes cargaron", () => {
+    for (const n of ["PortalLayout.tsx", "PortalAjustes.tsx", "Settings.tsx", "DashboardSidebar.tsx", "DashboardTopbar.tsx"]) {
+      expect(fuente(n).length, n).toBeGreaterThan(500);
+    }
+  });
+
+  it("menú lateral: el Sidebar, el logo y los estilos de ítem de Maven; abajo su foto", () => {
+    const marco = fuente("PortalLayout.tsx");
+    expect(marco).toMatch(/<Sidebar collapsible="icon">/);
+    expect(marco).toMatch(/<Logo /);
+    expect(marco).toMatch(/className=\{LINK_CLASS\} activeClassName=\{ACTIVE_CLASS\}/);
+    expect(marco).toMatch(/<UserAvatar name=\{nombre\} src=\{activa\.foto\}/);
+    // Los mismos estilos de ítem que el menú del equipo.
+    expect(fuente("DashboardSidebar.tsx")).toMatch(/from "@\/components\/dashboard\/estilosDelMenu"/);
+  });
+
+  it("barra de arriba: el idioma y la campana de Maven (sin «Ver todas», que es del equipo); claro/oscuro", () => {
+    const marco = fuente("PortalLayout.tsx");
+    expect(marco).toMatch(/<SelectorDeIdioma \/>/);
+    expect(marco).toMatch(/<NotificationBell verTodas=\{null\} \/>/);
+    expect(marco).toMatch(/setTheme\(oscuro \? "light" : "dark"\)/);
+    expect(fuente("DashboardTopbar.tsx")).toMatch(/<SelectorDeIdioma \/>/);
+  });
+
+  it("Ajustes: la MISMA tarjeta de Apariencia del equipo", () => {
+    expect(fuente("PortalAjustes.tsx")).toMatch(/<TarjetaDeApariencia conDensidad=\{false\} \/>/);
+    expect(fuente("Settings.tsx")).toMatch(/<TarjetaDeApariencia \/>/);
+    expect(fuente("Settings.tsx")).not.toMatch(/const AppearanceCard/);
+  });
+});
+
+describe("Ajustes del portal", () => {
+  it("«Cerrar sesión» va siempre al final, después de Apariencia (Jhon, 06/10)", () => {
+    const ajustes = fuente("PortalAjustes.tsx");
+    const apariencia = ajustes.indexOf("<TarjetaDeApariencia");
+    const salir = ajustes.lastIndexOf('t("portal.shell.salir")');
+    expect(apariencia).toBeGreaterThan(0);
+    expect(salir).toBeGreaterThan(apariencia);
+    expect(ajustes.indexOf('t("portal.shell.salir")')).toBe(salir);
+  });
+});

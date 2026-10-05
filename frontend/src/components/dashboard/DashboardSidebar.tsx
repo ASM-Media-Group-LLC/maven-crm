@@ -28,11 +28,10 @@ import { CollapsibleSidebarGroup } from "@/components/dashboard/CollapsibleSideb
 import WhatsAppIcon from "@/components/icons/WhatsAppIcon";
 import TelegramIcon from "@/components/icons/TelegramIcon";
 import { cn } from "@/lib/utils";
+import { ACTIVE_CLASS, LINK_CLASS } from "@/components/dashboard/estilosDelMenu";
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
 import { getStatusColor } from "@/pages/messenger/components/StatusPicker";
 
-// Ítem dentro de un grupo: cuelga de la guía vertical del grupo, 40 px de alto.
-const LINK_CLASS = "flex items-center gap-2.5 rounded-xl px-2 py-2.5 text-sm sidebar-glass-hover";
 
 // Tinte del badge por módulo (mockup "Maven sin corbata"): cada contador con
 // el color de su módulo en vez de rojo genérico. El rojo queda reservado para
@@ -53,7 +52,6 @@ const badgeTint = (module: string | undefined): string =>
 // número va tal cual; el valor exacto queda en el title de la fila.
 const compactBadge = (n: number): string =>
   n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1).replace(/\.0$/, "")}k` : String(n);
-const ACTIVE_CLASS = "sidebar-glass-active font-medium";
 
 // Picks the URL with the LONGEST prefix match against `pathname`. Sin
 // esto, dos items hermanos cuyas URLs se solapan (ej: /hr/horarios y

@@ -42,6 +42,7 @@ export const navegacion = {
   "topbar.logoutSuccess": { es: "Sesión cerrada", en: "Logged out" },
   "topbar.logoutDesc": { es: "Has cerrado sesión correctamente.", en: "You have been logged out successfully." },
   "topbar.language": { es: "ES", en: "EN" },
+  "topbar.idioma": { es: "Idioma", en: "Language" },
 
   // Search command palette
   "search.pages": { es: "Páginas", en: "Pages" },

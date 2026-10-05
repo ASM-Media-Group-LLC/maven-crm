@@ -198,17 +198,12 @@ export const portal = {
 
   // ── Ajustes ─────────────────────────────────────────────────────────────────
   "portal.ajustes.titulo": { es: "Ajustes", en: "Settings" },
-  "portal.ajustes.apariencia": { es: "Apariencia", en: "Appearance" },
-  "portal.ajustes.claro": { es: "Claro", en: "Light" },
-  "portal.ajustes.oscuro": { es: "Oscuro", en: "Dark" },
-  "portal.ajustes.sistema": { es: "Como mi celular", en: "Match my device" },
-  "portal.ajustes.skin": { es: "Skin de Maven", en: "Maven skin" },
-  "portal.ajustes.skinTexto": { es: "Los mismos skins que usa el equipo en Maven.", en: "The same skins the team uses in Maven." },
   "portal.ajustes.cuenta": { es: "Tu cuenta", en: "Your account" },
   "portal.ajustes.correo": { es: "Correo", en: "Email" },
   "portal.ajustes.correoTexto": { es: "Para cambiarlo, pídeselo a tu agencia.", en: "To change it, ask your agency." },
   "portal.ajustes.cambiarContrasena": { es: "Cambiar contraseña", en: "Change password" },
   "portal.ajustes.agencias": { es: "Tus agencias", en: "Your agencies" },
+  "portal.ajustes.agenciasTexto": { es: "Las agencias con las que trabajas en Maven.", en: "The agencies you work with in Maven." },
   "portal.ajustes.agenciaActiva": { es: "Activa ahora", en: "Active now" },
   "portal.ajustes.usarAgencia": { es: "Usar esta", en: "Use this one" },
 

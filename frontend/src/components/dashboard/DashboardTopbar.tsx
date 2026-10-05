@@ -1,22 +1,19 @@
 import { useState } from "react";
-import { Search, Globe, Check } from "lucide-react";
+import { Search } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/hooks/useLanguage";
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import NotificationBell from "@/components/notifications/NotificationBell";
 import MessagesBell from "@/components/messenger/MessagesBell";
 import { BOTON_TOPBAR } from "./topbarStyles";
 import GlobalSearchCommand from "./GlobalSearchCommand";
+import SelectorDeIdioma from "./SelectorDeIdioma";
 
 // Topbar — search + timezone + language + notifications. El timezone
 // vive a la izquierda del globe icon; afecta cómo todos los pages
 // formatean fechas (ver useTimezone.ts).
 const DashboardTopbar = () => {
-  const { t, language, setLanguage } = useLanguage();
+  const { t } = useLanguage();
   const [searchOpen, setSearchOpen] = useState(false);
 
   return (
@@ -49,24 +46,7 @@ const DashboardTopbar = () => {
         </div>
 
         <div className="flex shrink-0 items-center gap-1">
-          {/* Language dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className={BOTON_TOPBAR}>
-                <Globe className="h-[18px] w-[18px]" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-40">
-              <DropdownMenuItem onClick={() => setLanguage("es")} className="flex items-center justify-between">
-                Español
-                {language === "es" && <Check className="h-4 w-4 text-primary" />}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setLanguage("en")} className="flex items-center justify-between">
-                English
-                {language === "en" && <Check className="h-4 w-4 text-primary" />}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <SelectorDeIdioma />
 
           {/* Mensajes (la nube) — a la izquierda de la campana, como Facebook */}
           <MessagesBell />
