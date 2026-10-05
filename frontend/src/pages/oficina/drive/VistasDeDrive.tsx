@@ -49,13 +49,17 @@ const MODOS: { id: ModoDeVista; clave: TranslationKey; icono: LucideIcon }[] = [
 
 /** Arriba a la derecha, como en Google Drive: Lista · Cuadrícula · Galería, y
  *  «Agrupar por fecha» (vale en las tres). */
-export function SelectorDeVista({ modo, agrupar, onModo, onAgrupar }: {
-  modo: ModoDeVista; agrupar: boolean; onModo: (m: ModoDeVista) => void; onAgrupar: (v: boolean) => void;
+export function SelectorDeVista({ modo, agrupar, onModo, onAgrupar, modos = ["lista", "cuadricula", "galeria"] }: {
+  modo: ModoDeVista; agrupar: boolean; onModo: (m: ModoDeVista) => void;
+  /** Sin esto, no se ofrece «Agrupar por fecha» (la pestaña Contenido de la ficha). */
+  onAgrupar?: (v: boolean) => void;
+  /** Qué vistas se ofrecen (la pestaña Contenido no tiene la lista con columnas). */
+  modos?: readonly ModoDeVista[];
 }) {
   const { t } = useLanguage();
   return (
     <div className="ml-auto flex shrink-0 items-center gap-2">
-      <button
+      {onAgrupar && <button
         type="button"
         aria-pressed={agrupar}
         onClick={() => onAgrupar(!agrupar)}
@@ -67,9 +71,9 @@ export function SelectorDeVista({ modo, agrupar, onModo, onAgrupar }: {
       >
         <CalendarDays className="h-4 w-4" />
         <span className="hidden sm:inline">{t("drive.agrupar")}</span>
-      </button>
+      </button>}
       <div role="group" aria-label={t("drive.modo.titulo")} className="inline-flex rounded-full border border-border/60 p-0.5">
-        {MODOS.map(({ id, clave, icono: Icono }) => (
+        {MODOS.filter((m) => modos.includes(m.id)).map(({ id, clave, icono: Icono }) => (
           <button
             key={id}
             type="button"
