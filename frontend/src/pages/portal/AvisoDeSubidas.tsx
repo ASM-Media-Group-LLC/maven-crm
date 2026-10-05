@@ -12,7 +12,7 @@ export default function AvisoDeSubidas() {
   return (
     <Link to="/portal/contenido" className="flex min-h-11 items-center justify-center gap-2 bg-primary px-4 text-sm font-medium text-primary-foreground">
       <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-      {t("portal.contenido.subiendoTitulo", { n })}
+      {t(n === 1 ? "portal.contenido.subiendoUno" : "portal.contenido.subiendoVarios", { n })}
     </Link>
   );
 }

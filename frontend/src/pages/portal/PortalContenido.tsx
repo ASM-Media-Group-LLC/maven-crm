@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
-  ChevronRight, Download, File as IconoArchivo, FileImage, FileVideo, Folder, FolderPlus, Loader2, MoreVertical, Pencil,
+  ChevronRight, Download, File as IconoArchivo, FileImage, FileVideo, Folder, FolderPlus, Loader2, MoreVertical, Pencil, Play,
   RotateCcw, Trash2, Upload, X,
 } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -179,9 +179,14 @@ function Contenido({ creatorId }: { creatorId: string }) {
                       onClick={() => a.estado === "listo" && setViendo(a)}
                       disabled={a.estado !== "listo"}
                       aria-label={t("portal.contenido.ver", { nombre: a.nombre })}
-                      className="block aspect-square w-full bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                      className="relative block aspect-square w-full bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                     >
                       <Miniatura url={miniaturas[a.id]} icono={iconoDe(a)} cubrir />
+                      {iconoDe(a) === FileVideo && (
+                        <span className="absolute bottom-2 left-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white" aria-hidden="true">
+                          <Play className="h-3.5 w-3.5 fill-current" />
+                        </span>
+                      )}
                     </button>
                     <div className="flex items-start gap-1 p-2">
                       <div className="min-w-0 flex-1">
@@ -298,7 +303,7 @@ export function PanelDeSubidas() {
     <section aria-live="polite" className="mt-4 rounded-card border border-border bg-card p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-base font-semibold">
-          {activas ? t("portal.contenido.subiendoTitulo", { n: enCurso.length }) : t("portal.contenido.subidasListas")}
+          {activas ? t(enCurso.length === 1 ? "portal.contenido.subiendoUno" : "portal.contenido.subiendoVarios", { n: enCurso.length }) : t("portal.contenido.subidasListas")}
         </h2>
         <span className="text-sm tabular-nums text-muted-foreground">{t("portal.contenido.progresoTotal", { enviado: tamano(enviado), total: tamano(total) })}</span>
       </div>

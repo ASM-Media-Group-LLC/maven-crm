@@ -150,7 +150,8 @@ export const portal = {
   "portal.contenido.ver": { es: "Ver «{nombre}»", en: "View “{nombre}”" },
   "portal.contenido.opciones": { es: "Opciones de «{nombre}»", en: "Options for “{nombre}”" },
   "portal.contenido.sinVistaPrevia": { es: "Este archivo no se puede ver aquí: descárgalo.", en: "This file can't be previewed here: download it." },
-  "portal.contenido.subiendoTitulo": { es: "Subiendo {n} archivo(s)", en: "Uploading {n} file(s)" },
+  "portal.contenido.subiendoUno": { es: "Subiendo 1 archivo", en: "Uploading 1 file" },
+  "portal.contenido.subiendoVarios": { es: "Subiendo {n} archivos", en: "Uploading {n} files" },
   "portal.contenido.subidasListas": { es: "Subidas terminadas", en: "Uploads finished" },
   "portal.contenido.progresoTotal": { es: "{enviado} de {total}", en: "{enviado} of {total}" },
   "portal.contenido.subiendoAviso": {
