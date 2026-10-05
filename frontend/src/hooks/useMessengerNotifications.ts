@@ -447,11 +447,16 @@ export function useMessengerNotifications() {
             return;
           }
 
+          // Con la ruta, la tarjeta la muestra el service worker y su clic abre
+          // la pestaña que YA está en el Messenger, no la que la armó (que es la
+          // oculta: puede ser el Correo). Ver useBrowserNotifications.
+          const ruta = `/messenger?c=${m.conversation_id}&m=${m.id}`;
           notifyRef.current(
             title,
             body,
-            () => navigateRef.current(`/messenger?c=${m.conversation_id}&m=${m.id}`),
+            () => navigateRef.current(ruta),
             soundOk,
+            ruta,
           );
         },
         // Mientras no hubo canal llegaron mensajes sin marcar "entregado": el

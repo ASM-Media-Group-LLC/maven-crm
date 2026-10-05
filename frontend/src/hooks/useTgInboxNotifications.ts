@@ -120,11 +120,15 @@ export function useTgInboxNotifications() {
             now - lastSoundRef.current > 1500;
           if (soundOk) lastSoundRef.current = now;
 
+          // La ruta hace que el clic abra la pestaña que ya está en la bandeja
+          // (ver useBrowserNotifications).
+          const ruta = `/telegram/bandeja?c=${m.conversation_id}`;
           notifyRef.current(
             title,
             body,
-            () => navigate(`/telegram/bandeja?c=${m.conversation_id}`),
+            () => navigate(ruta),
             soundOk,
+            ruta,
           );
         },
       )
