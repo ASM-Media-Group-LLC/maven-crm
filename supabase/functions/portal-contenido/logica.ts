@@ -16,7 +16,7 @@
 // sigue en el Drive, la agencia lo ve y sigue siendo de la agencia. Lo único que
 // se borra de verdad es una subida que quedó a medias, que no es contenido.
 
-import { extensionParaMiniatura, idsParaMiniaturas, venceMiniatura } from "../drive/logica.ts";
+import { extensionParaMiniatura, extensionParaVerComoJpg, idsParaMiniaturas, LADO_VISTA, venceMiniatura } from "../drive/logica.ts";
 
 export const ACCIONES = [
   "raiz", "listar", "crear_carpeta", "renombrar", "borrar", "subir_iniciar", "subir_confirmar", "abrir", "miniaturas",
@@ -310,8 +310,12 @@ export async function manejar(token: string, body: Record<string, unknown>, p: P
     const i = await suyo("id");
     if (!i || i.tipo !== "archivo" || !i.storage_key) return r(404, { error: "no_existe" });
     if (i.estado !== "listo") return r(409, { error: "todavia_subiendo" });
+    // Las fotos del iPhone (HEIC): para mirarlas, el JPG que convierte el NAS.
+    const comoJpg = body.descargar ? null : extensionParaVerComoJpg(i.nombre, i.mime);
     const url = await p.permiso(
-      { op: "get", k: i.storage_key, ct: i.mime ?? "application/octet-stream", n: i.nombre, dl: !!body.descargar },
+      comoJpg
+        ? { op: "mini", k: i.storage_key, x: comoJpg, l: LADO_VISTA }
+        : { op: "get", k: i.storage_key, ct: i.mime ?? "application/octet-stream", n: i.nombre, dl: !!body.descargar },
       VENCE_BAJAR,
     );
     return r(200, { url });

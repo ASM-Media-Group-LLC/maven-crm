@@ -269,7 +269,7 @@ export const VECTOR_ZIP = {
 };
 
 // ── Miniaturas ──────────────────────────────────────────────────────────────
-import { extensionParaMiniatura, idsParaMiniaturas, TOPE_MINIATURAS, TRAMO_MINIATURA, venceMiniatura } from "./logica.ts";
+import { extensionParaMiniatura, extensionParaVerComoJpg, idsParaMiniaturas, LADO_VISTA, TOPE_MINIATURAS, TRAMO_MINIATURA, venceMiniatura } from "./logica.ts";
 
 Deno.test("miniaturas: por la extensión; el tipo de la ficha solo si la extensión no dice", () => {
   const casos: [string, string | null, string | null][] = [
@@ -281,6 +281,19 @@ Deno.test("miniaturas: por la extensión; el tipo de la ficha solo si la extensi
   for (const [nombre, mime, esperada] of casos) {
     assert(extensionParaMiniatura(nombre, mime) === esperada, `${nombre} (${mime}) → ${extensionParaMiniatura(nombre, mime)}`);
   }
+});
+
+Deno.test("HEIC: para mirarla va el JPG del NAS; lo que el navegador ya dibuja, el original", async () => {
+  const casos: [string, string | null, string | null][] = [
+    ["IMG_1234.HEIC", null, "heic"], ["IMG_1234.heif", "image/heif", "heif"], ["IMG_1234", "image/heic", "heic"],
+    ["Foto.jpg", "image/jpeg", null], ["video.mov", null, null], ["cv.pdf", null, null], ["x", null, null],
+  ];
+  for (const [nombre, mime, esperada] of casos) {
+    assert(extensionParaVerComoJpg(nombre, mime) === esperada, `${nombre} (${mime}) → ${extensionParaVerComoJpg(nombre, mime)}`);
+  }
+  // ⚠️ El NAS solo acepta este lado (además de la miniatura).
+  const { LADO_VISTA: delNas } = await import("../../../infra/nas-drive/miniaturas.mjs");
+  assert(LADO_VISTA === delNas, `edge ${LADO_VISTA} ≠ NAS ${delNas}`);
 });
 
 Deno.test("miniaturas: hasta 200 ids por pedido, todos uuid", () => {

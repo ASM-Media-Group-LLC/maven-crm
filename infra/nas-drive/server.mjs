@@ -31,7 +31,7 @@ import { pipeline } from "node:stream/promises";
 import { Readable, Transform } from "node:stream";
 import { verificar, recibo } from "./firma.mjs";
 import { armarZip, tamanoDelZip } from "./zip.mjs";
-import { CARPETA_CACHE, crearCola, extensionValida, miniaturaDe, rutaEnCache, servirMiniatura } from "./miniaturas.mjs";
+import { CARPETA_CACHE, crearCola, extensionValida, LADO_MINIATURA, LADO_VISTA, LADOS, miniaturaDe, rutaEnCache, servirMiniatura } from "./miniaturas.mjs";
 
 export const MAX_POR_PEDIDO = 95 * 1024 * 1024; // el proxy de Cloudflare corta en 100 MB
 const CLAVE_OK = /^[0-9a-f-]{36}(\/[0-9a-f-]{36}){1,2}$/;
@@ -250,12 +250,15 @@ async function completar(conf, res, d) {
 
 async function borrar(conf, res, d) {
   for (const r of conf.raices) {
-    // Su miniatura también (antes de borrar: el nombre sale del tamaño).
+    // Su miniatura y su versión para mirar también (antes de borrar: el
+    // nombre sale del tamaño).
     const s = await fsp.stat(path.join(r, d.k)).catch(() => null);
     if (s) {
-      const mini = rutaEnCache(r, d.k, s.size);
-      await fsp.rm(mini, { force: true });
-      await fsp.rm(`${mini}.no`, { force: true });
+      for (const lado of LADOS) {
+        const mini = rutaEnCache(r, d.k, s.size, lado);
+        await fsp.rm(mini, { force: true });
+        await fsp.rm(`${mini}.no`, { force: true });
+      }
     }
     await fsp.rm(path.join(r, d.k), { force: true });
   }
@@ -345,14 +348,18 @@ async function ubicar(conf, rel) {
 
 /** La miniatura (op "mini"): de la caché del disco o hecha en el momento.
  *  Sin miniatura posible, 404 y la pantalla muestra el ícono del tipo. */
-async function servirMini(conf, req, res, d, cola, enCurso) {
+async function servirMini(conf, req, res, d, cola, enCurso, colaVista) {
   if (!extensionValida(d.x)) return json(res, 400, { error: "extensión inválida" });
+  // `l`: el lado. Sin él, la miniatura; LADO_VISTA, la foto para mirar (HEIC),
+  // con su propia cola: no espera detrás de las miniaturas de una carpeta.
+  const lado = d.l === undefined ? LADO_MINIATURA : Number(d.l);
+  if (!LADOS.has(lado)) return json(res, 400, { error: "lado inválido" });
   const a = await ubicar(conf, d.k);
   if (!a) return json(res, 404, { error: "no existe" });
   // Si la persona ya no la quiere (bajó la página), no se hace al llegarle el turno.
   let vivo = true;
   res.on("close", () => { vivo = false; });
-  const archivo = await miniaturaDe(conf, cola, enCurso, { raiz: a.raiz, ruta: a.ruta, clave: d.k, size: a.size, x: d.x }, () => vivo);
+  const archivo = await miniaturaDe(conf, lado === LADO_VISTA ? colaVista : cola, enCurso, { raiz: a.raiz, ruta: a.ruta, clave: d.k, size: a.size, x: d.x, lado }, () => vivo);
   if (!archivo) return json(res, 404, { error: "sin miniatura" });
   const s = await fsp.stat(archivo);
   return servirMiniatura(res, archivo, s.size);
@@ -443,6 +450,7 @@ export function crearServidor(conf) {
   // Las miniaturas se hacen de a pocas (sips y Quick Look usan CPU y disco) y un
   // mismo archivo pedido dos veces a la vez se hace una sola.
   const cola = crearCola(conf.miniaturasALaVez);
+  const colaVista = crearCola(conf.miniaturasALaVez);
   const enCurso = new Map();
   return http.createServer(async (req, res) => {
     try {
@@ -465,7 +473,7 @@ export function crearServidor(conf) {
       if (!esperado || !esperado.includes(req.method)) return json(res, 405, { error: "operación no permitida con este permiso" });
 
       if (d.op === "get") return await servirArchivo(conf, req, res, d);
-      if (d.op === "mini") return await servirMini(conf, req, res, d, cola, enCurso);
+      if (d.op === "mini") return await servirMini(conf, req, res, d, cola, enCurso, colaVista);
       if (d.op === "put") return await subirEntero(conf, req, res, d);
       if (d.op === "parte") return await subirParte(conf, req, res, d);
       if (d.op === "completar") return await completar(conf, res, d);

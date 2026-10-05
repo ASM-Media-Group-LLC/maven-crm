@@ -449,6 +449,19 @@ export function extensionParaMiniatura(nombre: string, mime: string | null): str
   return porTipo ?? null;
 }
 
+/** ⚠️ Igual que LADO_VISTA en infra/nas-drive/miniaturas.mjs: el NAS solo
+ *  acepta la miniatura (480) y este lado. */
+export const LADO_VISTA = 2048;
+
+/** Las fotos del iPhone (HEIC) que Chrome no dibuja (Jhon, 06/10: «el visor no
+ *  me deja previsualizar»). Para MIRARLAS, el NAS las convierte a JPG; para
+ *  descargarlas, va el archivo original. Devuelve la extensión con la que el
+ *  NAS hace la conversión, o null si el navegador ya la dibuja sola. */
+export function extensionParaVerComoJpg(nombre: string, mime: string | null): string | null {
+  const x = extensionParaMiniatura(nombre, mime);
+  return x === "heic" || x === "heif" ? x : null;
+}
+
 export function idsParaMiniaturas(ids: unknown): string[] {
   if (!Array.isArray(ids)) throw new HttpError("Faltan los ids");
   const unicos = [...new Set(ids.map(String))];

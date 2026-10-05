@@ -202,6 +202,13 @@ Deno.test("abrir y miniaturas: solo lo suyo y listo", async () => {
   assertEquals(a.log.permisos.at(-1)?.op, "get");
   assertEquals((await pedir("tok-sofi", { accion: "abrir", id: DE_OTRA }, a)).body.error, "no_existe");
   assertEquals((await pedir("tok-sofi", { accion: "abrir", id: TIRADA }, a)).body.error, "no_existe");
+  // Una foto del iPhone: para mirarla, el JPG que convierte el NAS; para bajarla, la original.
+  a.items.set(FOTO, { ...a.items.get(FOTO)!, nombre: "IMG_0001.HEIC", mime: "image/heic" });
+  await pedir("tok-sofi", { accion: "abrir", id: FOTO }, a);
+  assertEquals(a.log.permisos.at(-1), { op: "mini", k: `${T1}/${FOTO}`, x: "heic", l: 2048 });
+  await pedir("tok-sofi", { accion: "abrir", id: FOTO, descargar: true }, a);
+  assertEquals(a.log.permisos.at(-1)?.op, "get");
+  assertEquals(a.log.permisos.at(-1)?.dl, true);
   const m = await pedir("tok-sofi", { accion: "miniaturas", ids: [FOTO, VIEJA, DE_OTRA, TIRADA] }, a);
   assertEquals(Object.keys(m.body.urls as object).sort(), [FOTO, VIEJA].sort());
   assertEquals((await pedir("tok-sofi", { accion: "miniaturas", ids: [FOTO, "basura"] }, a)).body.error, "ids_invalidos");

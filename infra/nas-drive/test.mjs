@@ -12,7 +12,7 @@ import zlib from "node:zlib";
 import { crearServidor, MAX_ENTRADAS_ZIP, MAX_PERMISO_ZIP, MAX_POR_PEDIDO, rutaDelZipValida } from "./server.mjs";
 import { firmar, verificar } from "./firma.mjs";
 import { armarZip, cabeceraLocal, cierre, crc32, crc32Js, descriptor, entradaCentral, LIMITE_32, necesitaZip64, tamanoDelZip } from "./zip.mjs";
-import { crearCola, rutaEnCache } from "./miniaturas.mjs";
+import { crearCola, LADO_VISTA, rutaEnCache } from "./miniaturas.mjs";
 
 const SECRETO = "s".repeat(40);
 let dir, conf, srv, base;
@@ -504,7 +504,8 @@ async function crearHerramientas() {
   // Escribe un «JPEG» en --out y anota con qué lo llamaron.
   herramientas.sips = await script("sips", `
     const entrada = a[a.indexOf("--out") - 1];
-    fs.appendFileSync(process.env.MINI_REGISTRO, "sips " + path.basename(entrada) + "\\n");
+    const lado = a.includes("-Z") ? a[a.indexOf("-Z") + 1] : "480";
+    fs.appendFileSync(process.env.MINI_REGISTRO, "sips " + path.basename(entrada) + (lado === "480" ? "" : " " + lado) + "\\n");
     fs.writeFileSync(a[a.indexOf("--out") + 1], Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]));`);
   // Como Quick Look: <carpeta -o>/<nombre del archivo>.png. Anota el nombre (con
   // extensión) y cuántos bytes ve: tiene que ver el archivo de verdad.
@@ -596,14 +597,39 @@ test("mini: ⚠️ la clave con las mismas reglas que un get (y los importados t
   await g.arrayBuffer();
 });
 
-test("mini: borrar el archivo borra también su miniatura", async () => {
+test("mini: borrar el archivo borra también su miniatura y su versión para mirar", async () => {
   const k = await subir(Buffer.from("para borrar"));
   await (await pedirMini({ k, x: "jpg" })).arrayBuffer();
+  await (await pedirMini({ k, x: "heic", l: LADO_VISTA })).arrayBuffer();
   const raiz = (await Promise.all(conf.raices.map(async (r) => ((await fs.stat(path.join(r, k)).catch(() => null)) ? r : null)))).find(Boolean);
   const mini = rutaEnCache(raiz, k, "para borrar".length);
+  const grande = rutaEnCache(raiz, k, "para borrar".length, LADO_VISTA);
   await fs.access(mini);
+  await fs.access(grande);
   assert.equal((await fetch(url({ op: "borrar", k }), { method: "DELETE" })).status, 204);
   await assert.rejects(fs.access(mini));
+  await assert.rejects(fs.access(grande));
+});
+
+test("mini: una HEIC para MIRAR (l=2048) se convierte aparte de su miniatura; otro lado, no", async () => {
+  await fs.writeFile(registro, "");
+  const k = await subir(Buffer.from("una foto del iPhone"));
+  const chica = await pedirMini({ k, x: "heic" });
+  assert.equal(chica.status, 200);
+  await chica.arrayBuffer();
+  const grande = await pedirMini({ k, x: "heic", l: LADO_VISTA });
+  assert.equal(grande.status, 200);
+  assert.equal(grande.headers.get("content-type"), "image/jpeg");
+  await grande.arrayBuffer();
+  // Dos conversiones distintas: la miniatura no sirve para mirar ni al revés.
+  assert.deepEqual(await llamadas(), ["sips archivo.heic", "sips archivo.heic 2048"]);
+  await (await pedirMini({ k, x: "heic", l: LADO_VISTA })).arrayBuffer();
+  assert.deepEqual(await llamadas(), ["sips archivo.heic", "sips archivo.heic 2048"], "la segunda vez sale de la caché");
+  // La miniatura de siempre conserva su nombre en la caché (no se rehacen todas).
+  const raiz = (await Promise.all(conf.raices.map(async (r) => ((await fs.stat(path.join(r, k)).catch(() => null)) ? r : null)))).find(Boolean);
+  await fs.access(rutaEnCache(raiz, k, "una foto del iPhone".length));
+  // Solo esos dos lados: un permiso no puede pedir una conversión de 10.000 px.
+  for (const l of [10000, 0, "x"]) assert.equal((await pedirMini({ k, x: "heic", l })).status, 400, `l=${l}`);
 });
 
 test("mini: de a 2 a la vez, en fila; lo que ya nadie quiere se saltea; con la fila llena, «ahora no»", async () => {
