@@ -31,6 +31,7 @@ import ExtraAccountsInline from "./ExtraAccountsInline";
 import { useUserRole } from "@/hooks/useUserRole";
 import { ManagerSelect, managerAssignmentPatch } from "./ManagerSelect";
 import { useLanguage } from "@/hooks/useLanguage";
+import { cambioDeContacto, correoValido, estaEnmascarado, valorParaEditar } from "@/lib/creadoras/contacto";
 
 interface Props {
   open: boolean;
@@ -78,8 +79,9 @@ const EditCreadorModal = ({ open, onOpenChange, creator }: Props) => {
       setForm({
         name: creator.name ?? "",
         artistic_name: creator.artistic_name ?? "",
-        email: creator.email ?? "",
-        phone: creator.phone ?? "",
+        // Enmascarados (quien no es admin) → vacíos: ver contacto.ts.
+        email: valorParaEditar(creator.email),
+        phone: valorParaEditar(creator.phone),
         country: creator.country ?? "",
         city: creator.city ?? "",
         category: creator.category ?? "",
@@ -93,7 +95,7 @@ const EditCreadorModal = ({ open, onOpenChange, creator }: Props) => {
         facebook_handle: creator.facebook_handle ?? "",
         other_url: creator.other_url ?? "",
         onlyfans_url: creator.onlyfans_url ?? "",
-        whatsapp_number: creator.whatsapp_number ?? "",
+        whatsapp_number: valorParaEditar(creator.whatsapp_number),
         bio: creator.bio ?? "",
       });
       setNameError(false);
@@ -110,14 +112,23 @@ const EditCreadorModal = ({ open, onOpenChange, creator }: Props) => {
       setNameError(true);
       return;
     }
+    // Correo, teléfono y WhatsApp solo se escriben si se cambiaron, y nunca la
+    // máscara que ve quien no es admin (antes se guardaba lo que se mostraba).
+    const correo = cambioDeContacto(creator.email, form.email);
+    const telefono = cambioDeContacto(creator.phone, form.phone);
+    const whatsapp = cambioDeContacto(creator.whatsapp_number, form.whatsapp_number);
+    if (correo && !correoValido(correo)) {
+      toast({ title: t("creadores.info.emailInvalid"), variant: "destructive" });
+      return;
+    }
     updateMutation.mutate(
       {
         id: creator.id,
         data: {
           name: form.name.trim(),
           artistic_name: form.artistic_name.trim() || null,
-          email: form.email.trim() || null,
-          phone: form.phone.trim() || null,
+          ...(correo !== undefined ? { email: correo } : {}),
+          ...(telefono !== undefined ? { phone: telefono } : {}),
           country: form.country.trim() || null,
           city: form.city.trim() || null,
           category: form.category || null,
@@ -134,7 +145,7 @@ const EditCreadorModal = ({ open, onOpenChange, creator }: Props) => {
           facebook_handle: form.facebook_handle.trim() || null,
           other_url: form.other_url.trim() || null,
           onlyfans_url: form.onlyfans_url.trim() || null,
-          whatsapp_number: form.whatsapp_number.trim() || null,
+          ...(whatsapp !== undefined ? { whatsapp_number: whatsapp } : {}),
           bio: form.bio.trim() || null,
         },
       },
@@ -231,11 +242,11 @@ const EditCreadorModal = ({ open, onOpenChange, creator }: Props) => {
             </div>
             <div className="space-y-1.5">
               <Label>{t("common.email")}</Label>
-              <Input type="email" value={form.email} onChange={(e) => handleChange("email", e.target.value)} />
+              <Input type="email" value={form.email} onChange={(e) => handleChange("email", e.target.value)} placeholder={estaEnmascarado(creator?.email) ? creator.email : undefined} />
             </div>
             <div className="space-y-1.5">
               <Label>{t("common.phone")}</Label>
-              <Input value={form.phone} onChange={(e) => handleChange("phone", e.target.value)} />
+              <Input value={form.phone} onChange={(e) => handleChange("phone", e.target.value)} placeholder={estaEnmascarado(creator?.phone) ? creator.phone : undefined} />
             </div>
             <div className="space-y-1.5">
               <Label>{t("common.country")}</Label>
@@ -314,7 +325,7 @@ const EditCreadorModal = ({ open, onOpenChange, creator }: Props) => {
               </div>
               <div className="space-y-1.5">
                 <Label>WhatsApp</Label>
-                <Input value={form.whatsapp_number} onChange={(e) => handleChange("whatsapp_number", e.target.value)} placeholder="+1 234 567 8900" />
+                <Input value={form.whatsapp_number} onChange={(e) => handleChange("whatsapp_number", e.target.value)} placeholder={estaEnmascarado(creator?.whatsapp_number) ? creator.whatsapp_number : "+1 234 567 8900"} />
                 <ExtraAccountsInline creatorId={creator?.id} network="whatsapp" canManage={canManageAccounts} primaryFilled={!!(form.whatsapp_number || "").trim()} onPromoteToPrimary={(v) => handleChange("whatsapp_number", v)} />
               </div>
             </div>
