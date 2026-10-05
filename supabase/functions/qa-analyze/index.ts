@@ -10,7 +10,13 @@ import {
   UNSPECIFIED_SERVICE_NOTE,
 } from "./prompt.ts";
 import { costoDeUso, MODELO_ECONOMICO, pedirAnalisis } from "./openrouter.ts";
-import { buildQaEmailHtml, buildQaEmailSubject, labelForOutcome, type QaEmailPayload } from "./qaEmail.ts";
+import {
+  armarPayloadQaCloser,
+  buildQaEmailHtml,
+  buildQaEmailSubject,
+  debeAvisarQaCloser,
+  type QaEmailPayload,
+} from "../_shared/correo-qa-closer.ts";
 
 // qa-analyze — corre el análisis con IA (desde el 01/10/2026, un Gemini económico
 // por OpenRouter: Maven ya no tiene llave de Anthropic; ver openrouter.ts) de un
@@ -606,50 +612,21 @@ async function sendQaReportEmail(
     low_score_threshold?: number | null;
     notification_emails?: string[] | null;
   };
-  const shouldNotify =
-    config.notify_on_analyzed === true ||
-    (config.notify_on_low_score === true && score < (config.low_score_threshold ?? 60));
+  const shouldNotify = debeAvisarQaCloser(config, score);
   if (!shouldNotify) return;
 
   const recipients = config.notification_emails ?? [];
   const uploaderUserId = (call.uploaded_by as string | null) ?? null;
   if (recipients.length === 0 && !uploaderUserId) return;
 
-  const a = (analysis ?? {}) as {
-    summary?: string;
-    call_outcome?: string | null;
-    call_outcome_reason?: string | null;
-    dimensions?: Array<{ name: string; score: number; feedback: string }>;
-    red_flags?: Array<{ type: string; description: string; quote: string }>;
-    key_moments?: Array<{ kind: "positivo" | "negativo"; quote: string; why: string }>;
-    improvements?: string[];
-  };
-  const outcome = a.call_outcome ?? null;
-  const payload: QaEmailPayload = {
-    callId: call.id as string,
-    createdAt: (call.created_at as string) ?? "",
-    closerName: closer?.name ?? "(sin nombre)",
-    modelName: model?.name ?? "(sin nombre)",
-    modelCategory: model?.category ?? null,
-    modelIgUrl: model?.ig_url ?? null,
+  const payload: QaEmailPayload = armarPayloadQaCloser({
+    call: call as { id: string },
+    analysis,
+    score,
+    model,
+    closer,
     appUrl: Deno.env.get("APP_URL") || "https://maven.asmtech.ai",
-    callDate: (call.call_date as string) ?? "",
-    evaluatorName: (call.evaluator_name as string) ?? "",
-    overallScore: score,
-    summary: a.summary ?? "",
-    callOutcome: outcome,
-    callOutcomeLabel: labelForOutcome(outcome),
-    callOutcomeReason: a.call_outcome_reason ?? null,
-    serviceLabel:
-      (call.call_type as string | null) === "venta_servicio" ||
-      (call.call_type as string | null) === "venta_externa"
-        ? ((call.service_sold as string | null) || "servicio")
-        : null,
-    dimensions: (a.dimensions ?? []).map((d) => ({ name: d.name, score: d.score, feedback: d.feedback })),
-    redFlags: (a.red_flags ?? []).map((f) => ({ type: f.type, description: f.description, quote: f.quote })),
-    keyMoments: (a.key_moments ?? []).map((k) => ({ kind: k.kind, quote: k.quote, why: k.why })),
-    improvements: a.improvements ?? [],
-  };
+  });
 
   // ⚠️ Authorization EXPLÍCITO. `supabase.functions.invoke` NO hereda la
   // credencial del createClient(url, serviceKey) para las llamadas edge→edge:

@@ -1,14 +1,8 @@
-// Email body para el reporte de QA de Closer (Agency QA).
-//
-// Mismo patrón que chatter-evaluator/emailTemplate.ts: el HTML se
-// construye client-side (no en Apps Script) para que cualquier cambio
-// visual viaje con el deploy normal de Maven sin re-deploy del GAS.
-// El payload lleva `emailSubject` + `emailHtml` y el script los relayea
-// directo a MailApp.sendEmail.
-//
-// Pattern type-discriminated: agregamos `type: "qa_call_analysis"` para
-// que el AppScript pueda hacer dispatch — el mismo webhook sirve para
-// chatter (`chatter_evaluation`) y para QA.
+// Correo del reporte de QA de Closers (TS puro, sin React/DOM). Única copia:
+// la usan qa-analyze (al terminar el análisis) y send-notification-email (el
+// «Reenviar» del navegador, que desde el 05/10/2026 solo pide «manda el reporte
+// de esta llamada» y el correo se arma aquí, nunca en el navegador). Hasta esa
+// fecha el frontend tenía su propia copia (pages/agency-qa/qaEmailTemplate.ts).
 
 export interface QaEmailPayload {
   callId: string;
@@ -24,13 +18,13 @@ export interface QaEmailPayload {
   callOutcome: string | null;
   callOutcomeLabel: string;
   callOutcomeReason: string | null;
+  // No-null cuando la llamada fue venta de un servicio a una creadora existente
+  // (call_type='venta_servicio'): nombre del servicio ofrecido.
+  serviceLabel: string | null;
   dimensions: { name: string; score: number; feedback: string }[];
   redFlags: { type: string; description: string; quote: string }[];
   keyMoments: { kind: "positivo" | "negativo"; quote: string; why: string }[];
   improvements: string[];
-  /** Base URL del frontend (ej. https://maven.asmtech.ai) — para
-   *  construir el deeplink al detalle de la QA en el botón "Ver análisis
-   *  completo" del email. */
   appUrl: string;
 }
 
@@ -75,30 +69,21 @@ export const labelForOutcome = (outcome: string | null): string => {
   return "Sin dato";
 };
 
-// Helper: la rúbrica de Claude da overall_score y dimension.score en
-// 0-100, pero los reportes a closers son más intuitivos con escala /10
-// (8.5/10 vs 85/100). Convertimos al render solo, dejando los valores
-// crudos en DB para no romper análisis históricos.
 const fmtScore10 = (score0to100: number): string =>
   (Math.max(0, Math.min(100, score0to100)) / 10).toFixed(1);
 
 export const buildQaEmailSubject = (p: QaEmailPayload): string =>
-  `[Maven QA Closers] ${p.closerName} · ${p.modelName} · ${fmtScore10(p.overallScore)}/10 (${p.callOutcomeLabel})`;
+  `[Maven QA Closers] ${p.closerName} · ${p.modelName}${p.serviceLabel ? ` · Venta: ${p.serviceLabel}` : ""} · ${fmtScore10(p.overallScore)}/10 (${p.callOutcomeLabel})`;
 
 export const buildQaEmailHtml = (p: QaEmailPayload): string => {
   const scoreColor = scoreColorOf(p.overallScore);
   const outcomeColor = outcomeColorOf(p.callOutcome);
 
-  // Sección con título, envuelta en una "card" exterior coloreada (rounded).
   const sectionTitle = (label: string, accent: string = COLORS.primary): string =>
     `<div style="font-size:11px;color:${accent};text-transform:uppercase;letter-spacing:1.5px;font-weight:700;margin-bottom:10px;">${escape(label)}</div>`;
 
   const dimensionRows = p.dimensions
     .map((d, i) => {
-      // dimension.score es 0-100 (la rúbrica de Claude). Antes el comentario
-      // decía "0-10" y se multiplicaba × 10, lo que producía pills tipo
-      // "800/100". Ahora respetamos el rango real y mostramos en /10 con
-      // un decimal — más intuitivo para los closers.
       const dColor = scoreColorOf(d.score);
       const isLast = i === p.dimensions.length - 1;
       return (
@@ -117,9 +102,6 @@ export const buildQaEmailHtml = (p: QaEmailPayload): string => {
     })
     .join("");
 
-  // Bloques internos del white body — sin envoltorio externo (la card
-  // blanca ya está abierta cuando se renderean). El usuario los quería
-  // unidos en el cuadro principal y alineados a la izquierda.
   const redFlagsInner = p.redFlags.length
     ? sectionTitle(`⚠️  Red flags · ${p.redFlags.length}`, COLORS.red) +
       p.redFlags
@@ -173,17 +155,13 @@ export const buildQaEmailHtml = (p: QaEmailPayload): string => {
       `</ol>`
     : "";
 
-  // Espaciador entre bloques internos cuando ambos existen.
   const blockSpacer = `<div style="height:14px;"></div>`;
 
   return (
     `<!DOCTYPE html><html><body style="margin:0;padding:0;background:${COLORS.bg};font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;color:${COLORS.text};">` +
-      // Outer wrapper: align left con padding lateral. En mobile la tabla
-      // interna se estira a 100% y el padding mantiene un margen cómodo.
       `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${COLORS.bg};padding:24px 0;"><tr><td align="left" style="padding:0 24px;">` +
         `<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:${COLORS.bg};">` +
 
-          // Header — gradient con título + modelo
           `<tr><td style="background:linear-gradient(135deg,${COLORS.primary} 0%,${COLORS.primaryDark} 100%);padding:28px 28px;color:#ffffff;border-radius:18px 18px 0 0;">` +
             `<div style="font-size:11px;font-weight:700;letter-spacing:2px;opacity:0.8;text-transform:uppercase;">Maven CRM · Agency QA</div>` +
             `<div style="font-size:22px;font-weight:700;margin-top:6px;line-height:1.3;">QA de llamada — ${escape(p.closerName)}</div>` +
@@ -197,22 +175,17 @@ export const buildQaEmailHtml = (p: QaEmailPayload): string => {
             `</div>` +
           `</td></tr>` +
 
-          // Cuerpo blanco con borde redondeado abajo
           `<tr><td style="background:${COLORS.card};border-radius:0 0 18px 18px;padding:20px 24px 24px;">` +
 
-            // ▶ Score IA + Resultado en el MISMO cuadro (left + right)
             `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${COLORS.cardSoft};border:1px solid ${COLORS.borderSoft};border-radius:14px;margin-bottom:12px;">` +
               `<tr>` +
-                // Left: Score IA
                 `<td style="padding:18px 20px;vertical-align:middle;">` +
                   `<div style="font-size:11px;color:${COLORS.muted};text-transform:uppercase;letter-spacing:1.5px;font-weight:700;">Score IA</div>` +
                   `<div style="font-size:34px;font-weight:800;color:${scoreColor};margin-top:4px;line-height:1;">` +
                     `${fmtScore10(p.overallScore)}<span style="font-size:16px;color:${COLORS.muted};font-weight:500;margin-left:2px;">/10</span>` +
                   `</div>` +
                 `</td>` +
-                // Divider visual
                 `<td style="width:1px;background:${COLORS.borderSoft};"></td>` +
-                // Right: Resultado
                 `<td align="right" style="padding:18px 20px;vertical-align:middle;">` +
                   `<div style="font-size:11px;color:${COLORS.muted};text-transform:uppercase;letter-spacing:1.5px;font-weight:700;">Resultado</div>` +
                   `<div style="margin-top:6px;display:inline-block;padding:6px 14px;border-radius:9999px;background:${outcomeColor};color:#ffffff;font-size:13px;font-weight:700;">${escape(p.callOutcomeLabel)}</div>` +
@@ -220,7 +193,6 @@ export const buildQaEmailHtml = (p: QaEmailPayload): string => {
               `</tr>` +
             `</table>` +
 
-            // ▶ Fecha + Evaluador (con outcome reason debajo, a la izquierda)
             `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${COLORS.cardSoft};border:1px solid ${COLORS.borderSoft};border-radius:14px;margin-bottom:14px;">` +
               `<tr><td style="padding:14px 18px;">` +
                 `<div style="font-size:13px;color:${COLORS.text};line-height:1.6;">` +
@@ -238,7 +210,6 @@ export const buildQaEmailHtml = (p: QaEmailPayload): string => {
               `</td></tr>` +
             `</table>` +
 
-            // ▶ Resumen
             (p.summary
               ? `<div style="background:${COLORS.primarySoft};border:1px solid ${COLORS.primary}33;border-radius:14px;padding:16px 18px;margin-bottom:12px;">` +
                   sectionTitle("Resumen", COLORS.primary) +
@@ -246,7 +217,6 @@ export const buildQaEmailHtml = (p: QaEmailPayload): string => {
                 `</div>`
               : "") +
 
-            // ▶ Dimensiones
             (dimensionRows
               ? `<div style="background:${COLORS.card};border:1px solid ${COLORS.borderSoft};border-radius:14px;padding:18px;margin-bottom:12px;text-align:left;">` +
                   sectionTitle("Dimensiones", COLORS.primary) +
@@ -256,15 +226,10 @@ export const buildQaEmailHtml = (p: QaEmailPayload): string => {
                 `</div>`
               : "") +
 
-            // ▶ Red flags + Momentos clave + Mejoras sugeridas — TODO
-            //   dentro del MISMO cuadro blanco, cada uno como sub-sección
-            //   alineada a la izquierda (separados por espaciadores).
             ((redFlagsInner || keyMomentsInner || improvementsInner)
               ? `<div style="background:${COLORS.card};border:1px solid ${COLORS.borderSoft};border-radius:14px;padding:18px;margin-bottom:12px;text-align:left;">` +
                   redFlagsInner +
-                  (redFlagsInner && (keyMomentsInner || improvementsInner)
-                    ? blockSpacer
-                    : "") +
+                  (redFlagsInner && (keyMomentsInner || improvementsInner) ? blockSpacer : "") +
                   keyMomentsInner +
                   (keyMomentsInner && improvementsInner ? blockSpacer : "") +
                   improvementsInner +
@@ -273,7 +238,6 @@ export const buildQaEmailHtml = (p: QaEmailPayload): string => {
 
           `</td></tr>` +
 
-          // ▶ CTA — botón "Ver análisis completo" en Maven
           `<tr><td style="padding:18px 24px 8px;text-align:center;">` +
             `<a href="${escape(p.appUrl)}/agency-qa?callId=${escape(p.callId)}" ` +
               `style="display:inline-block;background:linear-gradient(135deg,${COLORS.primary} 0%,${COLORS.primaryDark} 100%);` +
@@ -285,7 +249,6 @@ export const buildQaEmailHtml = (p: QaEmailPayload): string => {
             `<div style="font-size:11px;color:${COLORS.muted};margin-top:10px;">Abre la QA completa en Maven CRM</div>` +
           `</td></tr>` +
 
-          // Footer
           `<tr><td style="padding:8px 24px 8px;text-align:center;">` +
             `<div style="font-size:11px;color:${COLORS.muted};">QA id: ${escape(p.callId.slice(0, 8))} · análisis automático generado por IA · Maven CRM</div>` +
           `</td></tr>` +
@@ -295,3 +258,70 @@ export const buildQaEmailHtml = (p: QaEmailPayload): string => {
     `</body></html>`
   );
 };
+
+/** Lo que deja la IA en qa_calls.claude_analysis (solo lo que va al correo). */
+export interface AnalisisQa {
+  summary?: string;
+  overall_score?: number;
+  call_outcome?: string | null;
+  call_outcome_reason?: string | null;
+  dimensions?: Array<{ name: string; score: number; feedback: string }>;
+  red_flags?: Array<{ type: string; description: string; quote: string }>;
+  key_moments?: Array<{ kind: "positivo" | "negativo"; quote: string; why: string }>;
+  improvements?: string[];
+}
+
+/** El payload del correo a partir de la fila de qa_calls (la misma forma en
+ *  qa-analyze y en send-notification-email). */
+export function armarPayloadQaCloser(args: {
+  call: {
+    id: string;
+    created_at?: string | null;
+    call_date?: string | null;
+    evaluator_name?: string | null;
+    call_type?: string | null;
+    service_sold?: string | null;
+  };
+  analysis: unknown;
+  score: number;
+  model: { name?: string | null; category?: string | null; ig_url?: string | null } | null;
+  closer: { name?: string | null } | null;
+  appUrl: string;
+}): QaEmailPayload {
+  const { call, score, model, closer } = args;
+  const a = (args.analysis ?? {}) as AnalisisQa;
+  const outcome = a.call_outcome ?? null;
+  return {
+    callId: call.id,
+    createdAt: call.created_at ?? "",
+    closerName: closer?.name ?? "(sin nombre)",
+    modelName: model?.name ?? "(sin nombre)",
+    modelCategory: model?.category ?? null,
+    modelIgUrl: model?.ig_url ?? null,
+    appUrl: args.appUrl,
+    callDate: call.call_date ?? "",
+    evaluatorName: call.evaluator_name ?? "",
+    overallScore: score,
+    summary: a.summary ?? "",
+    callOutcome: outcome,
+    callOutcomeLabel: labelForOutcome(outcome),
+    callOutcomeReason: a.call_outcome_reason ?? null,
+    serviceLabel: call.call_type === "venta_servicio" || call.call_type === "venta_externa"
+      ? (call.service_sold || "servicio")
+      : null,
+    dimensions: (a.dimensions ?? []).map((d) => ({ name: d.name, score: d.score, feedback: d.feedback })),
+    redFlags: (a.red_flags ?? []).map((f) => ({ type: f.type, description: f.description, quote: f.quote })),
+    keyMoments: (a.key_moments ?? []).map((k) => ({ kind: k.kind, quote: k.quote, why: k.why })),
+    improvements: a.improvements ?? [],
+  };
+}
+
+/** ¿Hay que avisar? Los interruptores de qa_config: todos los análisis, o solo
+ *  los que quedan por debajo del umbral. */
+export function debeAvisarQaCloser(
+  config: { notify_on_analyzed?: boolean | null; notify_on_low_score?: boolean | null; low_score_threshold?: number | null },
+  score: number,
+): boolean {
+  return config.notify_on_analyzed === true ||
+    (config.notify_on_low_score === true && score < (config.low_score_threshold ?? 60));
+}

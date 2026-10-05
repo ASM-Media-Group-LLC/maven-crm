@@ -1,6 +1,9 @@
-// Builder del email del QA cualitativo de chatters (espeja el correo del supervisor).
-// HTML inline (email-safe, NO CSS vars). Auto-contenido: NO importa de useChatterQaReports
-// para no crear ciclos de import. La edge send-notification-email recibe el HTML ya armado.
+// Correo del QA cualitativo de chatters (espeja el correo del supervisor). HTML
+// inline (email-safe, sin variables CSS). Se arma en el SERVIDOR
+// (send-notification-email, plantilla «qa_chatter») con la fila de
+// chatter_qa_reports que la persona puede leer: desde el 05/10/2026 el navegador
+// ya no manda HTML. Hasta esa fecha vivía en
+// frontend/src/pages/agency-qa/chatters-qa/chatterQaEmailTemplate.ts.
 
 export interface EmailReportBody {
   intro?: string;
@@ -103,7 +106,7 @@ export function buildChatterQaEmailHtml(p: ChatterQaEmailPayload): string {
     </div>`;
   const vmHtml = !vmHas ? "" : `${sectionTitle("Venta masiva")}
     ${vm!.resumen ? `<p style="color:${C.text};font-size:14px;line-height:1.55;margin:0 0 8px">${escape(vm!.resumen)}</p>` : ""}
-    ${vm!.stats && vm!.stats.count > 0 ? `<div style="font-size:13px;color:${C.muted};margin:0 0 8px">${vm!.stats.count} masivos · ${vm!.stats.sent.toLocaleString()} enviados · ${vm!.stats.viewed.toLocaleString()} vistos · ${vm!.stats.purchased.toLocaleString()} ventas · <strong style="color:${C.good}">$${vm!.stats.earnings.toLocaleString()}</strong></div>` : ""}
+    ${vm!.stats && vm!.stats.count > 0 ? `<div style="font-size:13px;color:${C.muted};margin:0 0 8px">${vm!.stats.count} masivos · ${vm!.stats.sent.toLocaleString("es-CO")} enviados · ${vm!.stats.viewed.toLocaleString("es-CO")} vistos · ${vm!.stats.purchased.toLocaleString("es-CO")} ventas · <strong style="color:${C.good}">$${vm!.stats.earnings.toLocaleString("es-CO")}</strong></div>` : ""}
     ${vm!.mejores?.length ? `<div style="font-size:12px;font-weight:700;color:${C.good};margin:6px 0 2px">Más efectivos</div>${vm!.mejores.map((it) => vmItem(it, C.good)).join("")}` : ""}
     ${vm!.peores?.length ? `<div style="font-size:12px;font-weight:700;color:${C.bad};margin:6px 0 2px">Menos efectivos</div>${vm!.peores.map((it) => vmItem(it, C.bad)).join("")}` : ""}
     ${vm!.patrones?.length ? `<div style="font-size:12px;font-weight:700;color:${C.text};margin:8px 0 2px">Patrones</div><ul style="margin:0;padding-left:18px">${li(vm!.patrones)}</ul>` : ""}
@@ -140,3 +143,52 @@ export function buildChatterQaEmailHtml(p: ChatterQaEmailPayload): string {
     </td></tr>
   </table></body></html>`;
 }
+
+// ─── Las etiquetas del correo, en español (lo lee el chatter) ──────────────
+// Copia de lo que usaba el navegador: COMPANIES de useChatterScorecards.ts, el
+// `es` de agencyQa.verdict.* y los meses de periodLabel.
+const EMPRESAS: Record<string, string> = { CP: "Kash Plus", CM: "Kash Massive", CU: "Unlok" };
+export const etiquetaEmpresa = (c: string) => EMPRESAS[c] ?? c;
+
+const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+/** "2026-02-01" → "Febrero 2026". */
+export const etiquetaPeriodo = (period: string) => {
+  const [y, m] = String(period ?? "").split("-").map(Number);
+  return `${MESES[(m || 1) - 1] ?? ""} ${y || ""}`.trim();
+};
+
+const VEREDICTOS: Record<string, { label: string; tone: "good" | "warn" | "bad" }> = {
+  excelente: { label: "Excelente", tone: "good" },
+  bueno: { label: "Bueno", tone: "good" },
+  requiere_mejora: { label: "Requiere Mejora", tone: "warn" },
+  critico: { label: "Crítico", tone: "bad" },
+};
+export const etiquetaVeredicto = (v?: string | null) => (v && VEREDICTOS[v]?.label) || "—";
+export const tonoVeredicto = (v?: string | null) => (v && VEREDICTOS[v]?.tone) || "warn";
+
+/** La fila de chatter_qa_reports (lo que va al correo). */
+export interface FilaQaChatter {
+  id: string;
+  chatter_name: string | null;
+  company: string | null;
+  period: string | null;
+  evaluator_name: string | null;
+  veredicto: string | null;
+  report: EmailReportBody | null;
+  evaluated_models: { model_name: string }[] | null;
+  sampling: { fan_index?: ChatterQaEmailPayload["fanIndex"] } | null;
+  created_by: string | null;
+}
+
+export const armarPayloadQaChatter = (row: FilaQaChatter, appUrl: string): ChatterQaEmailPayload => ({
+  chatterName: row.chatter_name ?? "",
+  companyLabel: `${etiquetaEmpresa(row.company ?? "")} (${row.company ?? ""})`,
+  periodLabel: etiquetaPeriodo(row.period ?? ""),
+  evaluatorName: row.evaluator_name ?? "",
+  veredictoLabel: etiquetaVeredicto(row.veredicto),
+  tone: tonoVeredicto(row.veredicto),
+  report: row.report ?? {},
+  evaluatedModels: row.evaluated_models ?? [],
+  fanIndex: row.sampling?.fan_index ?? {},
+  appUrl,
+});

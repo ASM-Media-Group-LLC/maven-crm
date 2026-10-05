@@ -1,13 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getPublicBaseUrl } from "@/lib/getPublicUrl";
 import { supabase } from "@/integrations/supabase/client";
 import { traducir, type TranslationKey } from "@/lib/i18n";
-import {
-  buildQaEmailHtml,
-  buildQaEmailSubject,
-  labelForOutcome,
-  type QaEmailPayload,
-} from "@/pages/agency-qa/qaEmailTemplate";
+import { mandarReportePorCorreo } from "@/lib/correoDeReporte";
 
 // Types for the qa_* tables (Agency QA area). Kept inline since the
 // generated Supabase types haven't been regenerated post-migration.
@@ -1354,114 +1348,20 @@ export const useUpdateQaConfig = () => {
 };
 
 // ─── QA Notification Email (vía Resend) ─────────────────────────────
-// Mismo pattern que useChatterEvaluator: armamos subject + HTML en el
-// cliente y lo mandamos por la edge function `send-notification-email`,
-// que relayea a Resend con sender = Maven CRM <noreply@mail.maven-ai.me>.
-// Antes pasaba por un Apps Script (docs/Sheets/email); migramos a Resend
-// para que el remitente sea de Maven y no la cuenta personal del owner
-// del GAS. La columna `apps_script_url` en qa_config ya no se usa.
+// El «Reenviar» del reporte de QA. Desde el 05/10/2026 el navegador solo pide
+// «manda el reporte de esta llamada»: send-notification-email lee la llamada con
+// la RLS de quien pide, respeta los interruptores de qa_config, arma el correo
+// (la misma plantilla que usa qa-analyze al terminar el análisis) y lo manda a
+// los destinatarios de la configuración y al closer que la subió, solo si son
+// cuentas de la agencia. El navegador ya no arma HTML ni elige direcciones.
 
 interface FireInput {
   callId: string;
 }
 
 const fireQaWebhookInBackground = async ({ callId }: FireInput): Promise<void> => {
-  const [{ data: cfg }, { data: row }] = await Promise.all([
-    sb.from("qa_config").select("*").eq("id", 1).maybeSingle(),
-    sb
-      .from("qa_calls")
-      .select(
-        "*, model:qa_models(name, category, ig_url), closer:profiles!closer_id(name:full_name)",
-      )
-      .eq("id", callId)
-      .maybeSingle(),
-  ]);
-
-  const config = cfg as QaConfig | null;
-  const call = row as (QaCall & {
-    model: { name: string; category: string | null; ig_url: string | null } | null;
-    closer: { name: string } | null;
-  }) | null;
-
-  if (!call) throw new Error(traducir("agencyQa.err.callNotFound"));
-  if (!config) return;
-
-  const score = call.claude_score ?? call.claude_analysis?.overall_score ?? 0;
-
-  // Toggle gating: si nadie pidió notificar este evento, no disparamos.
-  // notify_on_analyzed cubre el caso "todos los análisis nuevos".
-  // notify_on_low_score cubre solo cuando bajó del threshold.
-  const shouldNotify =
-    config.notify_on_analyzed === true ||
-    (config.notify_on_low_score === true &&
-      score < (config.low_score_threshold ?? 60));
-  if (!shouldNotify) return;
-  const recipients = config.notification_emails ?? [];
-  // El closer que subió la QA (call.uploaded_by) recibe el reporte
-  // automáticamente — sin tener que agregarse a Destinatarios. La edge
-  // function resuelve su email via service role.
-  const uploaderUserId = (call as { uploaded_by?: string | null }).uploaded_by ?? null;
-  // Si no hay destinatarios configurados Y no hay uploader, no hay
-  // forma de mandar el email — abortamos.
-  if (recipients.length === 0 && !uploaderUserId) return;
-
-  // El correo sale en español siempre (qaEmailTemplate.ts): lo lee el closer y los
-  // destinatarios, no quien apretó "Reenviar". Por eso los "(sin nombre)" de aquí.
-  const a = call.claude_analysis ?? {};
-  const outcome = (a.call_outcome as string | null) ?? null;
-  const emailPayload: QaEmailPayload = {
-    callId: call.id,
-    createdAt: call.created_at,
-    closerName: call.closer?.name ?? "(sin nombre)",
-    modelName: call.model?.name ?? "(sin nombre)",
-    modelCategory: call.model?.category ?? null,
-    modelIgUrl: call.model?.ig_url ?? null,
-    appUrl: getPublicBaseUrl(),
-    callDate: call.call_date,
-    evaluatorName: call.evaluator_name ?? "",
-    overallScore: score,
-    summary: a.summary ?? "",
-    callOutcome: outcome,
-    callOutcomeLabel: labelForOutcome(outcome),
-    callOutcomeReason: a.call_outcome_reason ?? null,
-    dimensions: (a.dimensions ?? []).map((d) => ({
-      name: d.name,
-      score: d.score,
-      feedback: d.feedback,
-    })),
-    redFlags: (a.red_flags ?? []).map((f) => ({
-      type: f.type,
-      description: f.description,
-      quote: f.quote,
-    })),
-    keyMoments: (a.key_moments ?? []).map((k) => ({
-      kind: k.kind,
-      quote: k.quote,
-      why: k.why,
-    })),
-    improvements: a.improvements ?? [],
-  };
-
-  const subject = buildQaEmailSubject(emailPayload);
-  const html = buildQaEmailHtml(emailPayload);
-
-  const { error: mailError } = await supabase.functions.invoke(
-    "send-notification-email",
-    {
-      body: {
-        to: recipients,
-        subject,
-        html,
-        tag: "qa",
-        also_include_user_ids: uploaderUserId ? [uploaderUserId] : undefined,
-      },
-    },
-  );
-  if (mailError) {
-    throw new Error(
-      (mailError as Error).message ?? traducir("agencyQa.err.sendFailed"),
-    );
-  }
+  // Avisos apagados o sin destinatarios: no es un error (como antes).
+  await mandarReportePorCorreo("qa_closer", callId);
 };
 
 /** Dispara el envío del email de notificación de QA via Resend.
