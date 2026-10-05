@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { describeFunctionError } from "@/hooks/useMailConnection";
 import {
-  decodificarTexto, pareceBinario, TOPE_TEXTO, type DestinoDeOficina,
+  decodificarTexto, pareceBinario, TOPE_TEXTO, tipoPorFirma, type DestinoDeOficina,
 } from "@/lib/drive/tipoDeArchivo";
 
 // El visor de archivos del Drive (pages/oficina/drive/VisorArchivo.tsx).
@@ -36,6 +36,29 @@ export function useUrlDelArchivo(id: string | null, habilitado: boolean) {
     refetchOnReconnect: false,
     retry: 1,
     queryFn: async () => (await llamar<{ url: string }>("drive", { action: "abrir", id, descargar: false })).url,
+  });
+}
+
+/** Los primeros 64 bytes del archivo, para saber qué es cuando ni el nombre
+ *  ni la ficha lo dicen (ver tipoPorFirma). El NAS responde los pedidos por
+ *  rango (los videos ya los usan), así que no se baja el archivo entero. */
+export function useFirmaDelArchivo(url: string | undefined) {
+  return useQuery({
+    queryKey: ["drive-visor-firma", url],
+    enabled: !!url,
+    staleTime: VIGENCIA_URL,
+    gcTime: VIGENCIA_URL,
+    refetchOnWindowFocus: false,
+    retry: 1,
+    queryFn: async () => {
+      const r = await fetch(url!, { headers: { Range: "bytes=0-63" } });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      // Si el servidor ignora el rango y manda todo, se leen solo los primeros bytes.
+      const lector = r.body?.getReader();
+      const trozo = lector ? (await lector.read()).value ?? new Uint8Array() : new Uint8Array(await r.arrayBuffer());
+      void lector?.cancel();
+      return tipoPorFirma(trozo.subarray(0, 64));
+    },
   });
 }
 

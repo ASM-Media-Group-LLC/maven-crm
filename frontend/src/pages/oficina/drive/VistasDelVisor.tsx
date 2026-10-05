@@ -6,11 +6,11 @@ import VisorPdf from "@/components/correo/VisorPdf";
 import { useEditorDeOffice } from "@/hooks/useOnlyOffice";
 import { useLanguage } from "@/hooks/useLanguage";
 import {
-  useSvgComoImagen, useTextoDelArchivo, useUrlDelArchivo, useVistaEnOffice,
+  useFirmaDelArchivo, useSvgComoImagen, useTextoDelArchivo, useUrlDelArchivo, useVistaEnOffice,
 } from "@/hooks/useVisorDrive";
 import { cn } from "@/lib/utils";
 import { tamano } from "@/lib/drive/formato";
-import { TOPE_OFFICE, TOPE_TEXTO, vistaDeArchivo } from "@/lib/drive/tipoDeArchivo";
+import { hayQueMirarAdentro, TOPE_OFFICE, TOPE_TEXTO, vistaConFirma, vistaDeArchivo } from "@/lib/drive/tipoDeArchivo";
 import type { DriveItem } from "@/hooks/useDrive";
 
 // Lo que se ve en el medio del visor, según el tipo de archivo. Cada vista se
@@ -24,8 +24,13 @@ const CON_URL = new Set(["imagen", "video", "audio", "pdf", "texto"]);
 
 export function ContenidoDelVisor({ archivo, onDescargar }: { archivo: DriveItem; onDescargar: () => void }) {
   const { t } = useLanguage();
-  const vista = vistaDeArchivo(archivo);
-  const url = useUrlDelArchivo(archivo.id, CON_URL.has(vista.tipo));
+  // Sin extensión y con un tipo genérico (lo importado de Google): se mira la
+  // firma de los primeros bytes antes de decidir cómo se ve (Jhon, 06/10).
+  const mirar = hayQueMirarAdentro(archivo);
+  const url = useUrlDelArchivo(archivo.id, mirar || CON_URL.has(vistaDeArchivo(archivo).tipo));
+  const firma = useFirmaDelArchivo(mirar ? url.data : undefined);
+  const vista = mirar && firma.data ? vistaConFirma(archivo, firma.data) : vistaDeArchivo(archivo);
+  const mirando = mirar && !firma.isError && (url.isPending || firma.isPending);
   // El navegador no supo dibujarlo (un HEIC en Chrome, un video con un códec
   // raro): se ofrece bajarlo en vez de dejar un recuadro negro.
   const [noPudo, setNoPudo] = useState(false);
@@ -34,6 +39,8 @@ export function ContenidoDelVisor({ archivo, onDescargar }: { archivo: DriveItem
   const descargar = (
     <BotonDescargar onClick={onDescargar} etiqueta={t("drive.accion.descargar")} />
   );
+
+  if (mirando) return <Cargando texto={t("drive.visor.cargando")} />;
 
   if (vista.tipo === "ninguno") {
     return vista.motivo === "grande" ? (
