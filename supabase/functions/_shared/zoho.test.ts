@@ -14,7 +14,7 @@
 // a una respuesta a medias.
 
 import { assert, assertEquals } from "jsr:@std/assert";
-import { listAccounts, type ZohoAccount, type ZohoResult } from "./zoho.ts";
+import { hayPuestoDeCorreo, licenciasDelPlan, listAccounts, type ZohoAccount, type ZohoResult } from "./zoho.ts";
 
 /** Fabrica N cuentas con emails distintos a partir de un desplazamiento. */
 function cuentas(desde: number, cantidad: number): ZohoAccount[] {
@@ -95,4 +95,46 @@ Deno.test("una organización que entra en una sola página hace una sola llamada
   assert(res.ok);
   assertEquals(res.data?.length, 68);
   assertEquals(llamadas, 1);
+});
+
+// ─── Licencias (Jhon, 06/10) ──────────────────────────────────────────────────
+// El alta de Ana Escobar frenó con «No quedan puestos de correo en Zoho
+// (63/10)»: el tope estaba fijo en 10 y el plan ya tenía 70 licencias. Ahora
+// el tope lo dice Zoho (subscriptionInfo).
+
+Deno.test("licencias: las del plan base; los extras de almacenamiento no son puestos (ejemplo de la doc de Zoho)", () => {
+  assertEquals(licenciasDelPlan([
+    { PLANNAME: "Mail Lite", PROPVALUE: 291, ALLOTEDUSER: 285 },
+    { ADDONNAME: "10 gb", PROPVALUE: 1000, ALLOTEDUSER: 3 },
+    { ADDONNAME: "15 gb", PROPVALUE: 1000, ALLOTEDUSER: 4 },
+  ]), { compradas: 291, usadas: 285 });
+});
+
+Deno.test("licencias: números como texto, y un plan mixto suma sus planes base", () => {
+  assertEquals(licenciasDelPlan([
+    { PLANNAME: "Mail Lite", PROPVALUE: "60", ALLOTEDUSER: "55" },
+    { PLANNAME: "Mail Premium", PROPVALUE: "10", ALLOTEDUSER: "8" },
+  ]), { compradas: 70, usadas: 63 });
+});
+
+Deno.test("licencias: sin plan base, o con números ilegibles, no se sabe (null), no se inventa", () => {
+  assertEquals(licenciasDelPlan([]), null);
+  assertEquals(licenciasDelPlan(undefined), null);
+  assertEquals(licenciasDelPlan([{ ADDONNAME: "10 gb", PROPVALUE: 1000, ALLOTEDUSER: 3 }]), null);
+  assertEquals(licenciasDelPlan([{ PLANNAME: "Mail Lite", PROPVALUE: "muchas", ALLOTEDUSER: 3 }]), null);
+  assertEquals(licenciasDelPlan([{ PLANNAME: "Mail Lite", ALLOTEDUSER: 3 }]), null);
+});
+
+Deno.test("hay puesto: 63 de 70 sí (el caso de Ana), 70 de 70 no, y si Zoho no lo dijo, no se frena", () => {
+  assertEquals(hayPuestoDeCorreo({ compradas: 70, usadas: 63 }), true);
+  assertEquals(hayPuestoDeCorreo({ compradas: 70, usadas: 70 }), false);
+  assertEquals(hayPuestoDeCorreo({ compradas: 70, usadas: 71 }), false);
+  assertEquals(hayPuestoDeCorreo(null), true);
+});
+
+Deno.test("⚠️ el alta ya no trae un tope fijo: los puestos salen de Zoho", () => {
+  const alta = Deno.readTextFileSync(new URL("../admin-user-actions/index.ts", import.meta.url));
+  assert(!/ZOHO_SEAT_LIMIT"\)\s*\?\?/.test(alta), "volvió el tope fijo (ZOHO_SEAT_LIMIT con un valor por defecto)");
+  assert(!/Deno\.env\.get\("ZOHO_SEAT_LIMIT"\)/.test(alta), "volvió a leer ZOHO_SEAT_LIMIT");
+  assert(/licenciasDeZoho\(\)/.test(alta) && /hayPuestoDeCorreo\(/.test(alta), "la guarda no consulta las licencias de Zoho");
 });

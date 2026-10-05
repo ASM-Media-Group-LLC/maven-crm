@@ -8,7 +8,7 @@ import {
   provisioningConfigured,
   type ProvisionResult,
 } from "../_shared/mail-provision.ts";
-import { listAccounts, zohoConfigured } from "../_shared/zoho.ts";
+import { hayPuestoDeCorreo, licenciasDeZoho, listAccounts, zohoConfigured } from "../_shared/zoho.ts";
 // DIAS_DE_PAPELERA: días que una cuenta eliminada queda recuperable, como en
 // Google Workspace. Pasado ese plazo, el cron la purga de verdad (borrado
 // destructivo de siempre) y recién ahí se borra su buzón de Zoho.
@@ -238,30 +238,29 @@ Deno.serve(async (req) => {
 
       // === Guarda de cupos de correo (Zoho) ===
       // Si este alta va a CREAR una casilla nueva y ya no quedan puestos en
-      // Zoho, frenamos ACÁ con un mensaje claro — en vez de crear un usuario a
-      // medias (sin correo). Fail-open: si Zoho no responde, no bloqueamos el
-      // alta (un hiccup del proveedor no puede impedir dar de alta a nadie).
-      // Límite configurable con ZOHO_SEAT_LIMIT (default 10 = plan actual).
+      // Zoho, frenamos aquí con un mensaje claro, en vez de crear un usuario a
+      // medias (sin correo). Los puestos los dice Zoho (licencias compradas y
+      // asignadas del plan): el tope fijo de 10 (ZOHO_SEAT_LIMIT) frenaba
+      // altas con 63 de 70 usadas (Jhon, 06/10). Fail-open: si Zoho no lo dice
+      // (falta el scope de suscripciones, o no responde), no se bloquea el alta.
       {
-        const seatLimit = Number(Deno.env.get("ZOHO_SEAT_LIMIT") ?? "10");
         const explicitMailbox = (mailbox_email as string | undefined)?.trim().toLowerCase() || "";
         // Se crea casilla cuando hay mailbox_email explícito, o cuando el login
         // se genera del nombre (sin `email`) → identidad = casilla.
         const creaCasilla = provisioningConfigured() && (!!explicitMailbox || !email);
-        if (creaCasilla && seatLimit > 0) {
-          const cuentas = await listAccounts();
-          if (cuentas.ok && cuentas.data) {
-            // Contamos solo BUZONES REALES: la cuenta super-admin de la org
-            // (ej. corp@unlok.me) figura en /accounts pero SIN accountId — no
-            // tiene buzón ("Crear cuenta de correo") y Zoho NO la cobra. Contarla
-            // nos frenaba un buzón antes de tiempo (Maven decía 10/10 cuando Zoho
-            // mostraba 9/10). Filtrar por accountId iguala el conteo al de Zoho.
-            const usados = cuentas.data.filter((a) => a.accountId).length;
-            const reusa = !!explicitMailbox &&
-              cuentas.data.some((a) => (a.primaryEmailAddress ?? "").toLowerCase() === explicitMailbox);
-            if (!reusa && usados >= seatLimit) {
+        if (creaCasilla) {
+          const licencias = await licenciasDeZoho();
+          if (!licencias.ok && !licencias.skipped) {
+            console.warn(`[admin-user-actions] Zoho no dijo las licencias (${licencias.error}); el alta no frena por puestos`);
+          }
+          const datos = licencias.ok ? licencias.data ?? null : null;
+          if (datos && !hayPuestoDeCorreo(datos)) {
+            // Reusar una casilla que ya existe no gasta puesto.
+            const cuentas = explicitMailbox ? await listAccounts() : null;
+            const reusa = !!cuentas?.data?.some((a) => (a.primaryEmailAddress ?? "").toLowerCase() === explicitMailbox);
+            if (!reusa) {
               return new Response(JSON.stringify({
-                error: `No quedan puestos de correo en Zoho (${usados}/${seatLimit}). Libera uno desde el panel de Zoho o amplía el plan. Eliminar a alguien en Maven no libera su puesto en el acto: su casilla se conserva ${DIAS_DE_PAPELERA} días por si se recupera la cuenta, y se borra después.`,
+                error: `No quedan puestos de correo en Zoho (${datos.usadas}/${datos.compradas}). Libera uno desde el panel de Zoho o amplía el plan. Eliminar a alguien en Maven no libera su puesto en el acto: su casilla se conserva ${DIAS_DE_PAPELERA} días por si se recupera la cuenta, y se borra después.`,
                 reason: "zoho_seats_full",
               }), { status: 409, headers: { ...corsHeaders(req), "Content-Type": "application/json" } });
             }
