@@ -987,7 +987,9 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
       });
       // Enviado: el borrador ya cumplió, se borra para que no reaparezca.
       borrarBorrador(remitente, firma);
-      // Si venía de un borrador del servidor, se saca también de la carpeta.
+      // Si venía de un borrador del servidor, se saca también de la carpeta:
+      // de la lista al instante; si el servidor no puede, vuelve y se avisa
+      // (ver useDeleteServerDraft).
       if (serverUid) borrarServidor.mutate({ uid: serverUid });
       toast.success(t("mail.comp.sent"));
       onCerrar();

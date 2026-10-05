@@ -17,9 +17,14 @@ const fuentes = (import.meta as unknown as {
 }).glob("/frontend/src/**/*.{ts,tsx}", { query: "?raw", import: "default", eager: true });
 
 // Qué cuenta como Messenger: sus hooks y sus dos carpetas de pantallas.
+//
+// Y el CORREO (05/10): su lista se entera de lo nuevo SOLO por Realtime, y el
+// canal de useMailbox suscribía a ciegas. Tras un corte quedaba muerto: el
+// número del menú (que se relee cada 60 s por su cuenta) seguía subiendo y la
+// lista no mostraba el correo (Keila, «llega el aviso pero no aparece»).
 const esDeMessenger = (ruta: string) =>
-  /\/frontend\/src\/(pages|components)\/messenger\//.test(ruta) ||
-  /\/frontend\/src\/hooks\/(useChat|useReactions|useReadReceipts|useMentionedConversations|useMessengerNotifications|useUnreadChatCount|usePinnedChats|useArchivedChats|useTypingInbox|useOnlinePresence|useCanalQueRevive|canalDelChat)\./.test(ruta);
+  /\/frontend\/src\/(pages|components)\/(messenger|correo)\//.test(ruta) ||
+  /\/frontend\/src\/hooks\/(useChat|useReactions|useReadReceipts|useMentionedConversations|useMessengerNotifications|useUnreadChatCount|usePinnedChats|useArchivedChats|useTypingInbox|useOnlinePresence|useCanalQueRevive|canalDelChat|useMailbox|useEtiquetasCorreo|useHiloCompleto)\./.test(ruta);
 
 // Deuda anotada a propósito, no olvido. Cada entrada lleva su porqué.
 const EXCEPCIONES: Record<string, string> = {

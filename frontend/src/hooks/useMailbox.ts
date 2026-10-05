@@ -1,7 +1,10 @@
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useCanalQueRevive } from "@/hooks/useCanalQueRevive";
+import { toast } from "sonner";
+import { traducir } from "@/lib/i18n";
 import { describeFunctionError } from "@/hooks/useMailConnection";
 import { base64ABlob } from "@/lib/base64Blob";
 import { adjuntosIncrustados, incrustarCids } from "@/lib/mailCid";
@@ -595,13 +598,27 @@ export interface RespuestaMasiva {
   destino?: DestinoDelMovimiento;
 }
 
+/** La clave de las acciones masivas: para saber si hay alguna en vuelo. */
+export const CLAVE_MASIVA = ["mail-bulk"] as const;
+
 /** Acciones sobre VARIOS correos de una carpeta (la barra de selección).
  *  Optimista: la lista cambia al instante y se reconcilia con la respuesta.
  *  Solo aplica a mensajes con UID (los de la caché); los del camino en vivo
- *  no tienen un identificador estable. */
+ *  no tienen un identificador estable.
+ *
+ *  ⚠️ VARIAS A LA VEZ. Zoho tarda en contestar (medido el 02/10 con los
+ *  borradores de Keila: 5,2 s, 6,6 s y 6,2 s por eliminar, contra ~1,2 s de un
+ *  archivar normal), y la barra quedaba deshabilitada todo ese rato: eliminar
+ *  el siguiente borrador era esperar al anterior. Ahora la barra no espera, y
+ *  para que una acción no le devuelva a la pantalla los correos que otra ya
+ *  sacó: (1) se cancela la lectura en vuelo de esa carpeta antes de sacarlos,
+ *  (2) mientras quede alguna en vuelo no se relee la lista (ni acá ni desde
+ *  Realtime) y (3) relee la ÚLTIMA en terminar — o cualquiera que falle, para
+ *  que lo suyo vuelva a la lista junto con el aviso del error. */
 export function useMailBulk() {
   const qc = useQueryClient();
   return useMutation({
+    mutationKey: CLAVE_MASIVA,
     mutationFn: async (
       { folder, op, items, dest, volverAt, cancelarPosponer }:
       {
@@ -622,8 +639,11 @@ export function useMailBulk() {
       });
       return { ...r, omitidos: items.length - uids.length };
     },
-    onMutate: ({ folder, op, items }) => {
+    onMutate: async ({ folder, op, items }) => {
       const claves = new Set(items.map(claveDe));
+      // Una lectura de esta carpeta que salió ANTES de la acción traería los
+      // correos de vuelta al llegar.
+      await qc.cancelQueries({ queryKey: ["mail-messages", folder] });
       qc.setQueriesData(
         { queryKey: ["mail-messages", folder] },
         (prev: { messages?: MailSummary[] } | undefined) => {
@@ -635,7 +655,10 @@ export function useMailBulk() {
         },
       );
     },
-    onSettled: () => {
+    onSettled: (_r, error) => {
+      // En `onSettled` esta acción todavía cuenta como en vuelo: 1 = soy la
+      // última. Si quedan otras, relee la que termine después (salvo error).
+      if (!error && qc.isMutating({ mutationKey: CLAVE_MASIVA }) > 1) return;
       qc.invalidateQueries({ queryKey: ["mail-messages"] });
       qc.invalidateQueries({ queryKey: ["mail-folders"] });
       qc.invalidateQueries({ queryKey: ["mail-search"] });
@@ -694,34 +717,84 @@ export async function filasDeLaCache(ids: string[]): Promise<FilaEnCache[]> {
   }));
 }
 
+/** Cuánto se espera después de un aviso de Realtime antes de releer: una
+ *  tanda de correos llega como una ráfaga de INSERT, y la etiqueta heredada
+ *  (mail-sync, heredarDelHilo) se escribe un momento DESPUÉS de la fila. */
+export const ESPERA_REALTIME_MS = 1_000;
+
+/** Lo que se relee cuando el sincronizador escribe: la lista de cada carpeta,
+ *  sus contadores, el número del menú, las vistas por etiqueta (cruzan
+ *  carpetas) y la conversación abierta. Todo sale de Postgres: nada de esto
+ *  abre una sesión IMAP (la búsqueda sí, y por eso no está). */
+export const CLAVES_QUE_ESCRIBE_EL_SINCRONIZADOR = [
+  ["mail-messages"],
+  ["mail-folders"],
+  ["sidebar-badges"],
+  ["mail-por-etiqueta"],
+  ["mail-labels-unread"],
+  ["mail-message-labels"],
+  ["mail-hilo"],
+] as const;
+
 /** La bandeja se actualiza SOLA: el sincronizador inserta en mail_messages
  *  y Realtime lo empuja hasta acá — el mismo mecanismo de los ✓✓ del chat.
- *  RLS aplica también en Realtime: cada quien recibe solo sus filas. */
+ *  RLS aplica también en Realtime: cada quien recibe solo sus filas.
+ *
+ *  ⚠️ «LLEGA EL AVISO PERO EL CORREO NO APARECE» (Keila, 02/10). La lista se
+ *  entera de lo nuevo SOLO por este canal (sus consultas no se releen al
+ *  volver a la pestaña ni cada tanto: pueden abrir IMAP), mientras que el
+ *  número del Correo en el menú se relee solo cada 60 s. El canal se
+ *  suscribía a ciegas, y en realtime-js un canal que queda CLOSED (el socket
+ *  se cae: la computadora se suspende, se va la red un momento) no vuelve
+ *  nunca: el número seguía subiendo y la lista quedaba congelada hasta
+ *  recargar o cambiar de carpeta. Ahora pasa por useCanalQueRevive (el mismo
+ *  de Messenger) y, al revivir —también al volver de un rato en segundo
+ *  plano—, relee lo que se perdió mientras estuvo muerto. */
 export function useMailRealtime(enabled: boolean) {
   const { user } = useAuth();
   const qc = useQueryClient();
-  useEffect(() => {
-    if (!enabled || !user?.id) return;
-    const canal = supabase
-      .channel(`mail-${user.id}`)
-      .on(
+  const uid = user?.id ?? null;
+  const temporizador = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const releer = useCallback(() => {
+    // Con una acción masiva en vuelo no se relee: la lista traería del
+    // servidor los correos que la acción ya sacó de la pantalla y todavía no
+    // terminó de mover. La acción relee todo al terminar.
+    if (qc.isMutating({ mutationKey: CLAVE_MASIVA }) > 0) return;
+    for (const queryKey of CLAVES_QUE_ESCRIBE_EL_SINCRONIZADOR) {
+      void qc.invalidateQueries({ queryKey: [...queryKey] });
+    }
+  }, [qc]);
+
+  const releerEnUnMomento = useCallback(() => {
+    if (temporizador.current) return;
+    temporizador.current = setTimeout(() => {
+      temporizador.current = null;
+      releer();
+    }, ESPERA_REALTIME_MS);
+  }, [releer]);
+
+  useEffect(() => () => {
+    if (temporizador.current) clearTimeout(temporizador.current);
+    temporizador.current = null;
+  }, []);
+
+  useCanalQueRevive({
+    topic: enabled && uid ? `mail-${uid}` : null,
+    armar: (canal) =>
+      canal.on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
           table: "mail_messages",
-          filter: `user_id=eq.${user.id}`,
+          filter: `user_id=eq.${uid}`,
         },
-        () => {
-          qc.invalidateQueries({ queryKey: ["mail-messages"] });
-          qc.invalidateQueries({ queryKey: ["mail-folders"] });
-        },
-      )
-      .subscribe();
-    return () => {
-      void supabase.removeChannel(canal);
-    };
-  }, [enabled, user?.id, qc]);
+        releerEnUnMomento,
+      ),
+    // Lo que llegó mientras el canal estuvo muerto no avisó: se relee ya.
+    alRevivir: releer,
+  });
 }
 
 export interface OutgoingMail {
@@ -1074,13 +1147,38 @@ export function useSaveServerDraft() {
   });
 }
 
-/** Borra un borrador del servidor por UID (al enviarlo o al reemplazarlo). */
+/** Borra un borrador del servidor por UID (al enviarlo o al reemplazarlo).
+ *
+ *  Optimista: sale de la lista de Borradores AL INSTANTE. Antes se esperaba a
+ *  Zoho (segundos) y, peor, la edge no lo sacaba de la caché: el borrador ya
+ *  enviado seguía en Borradores hasta el barrido de esa carpeta (30 min). Si el
+ *  servidor falla (o contesta que no pudo), la lista se vuelve a leer, el
+ *  borrador reaparece y se avisa.
+ *
+ *  ⚠️ El aviso va ACÁ y no en el `mutate` de quien llama: el compositor se
+ *  cierra apenas sale el correo, y react-query no corre los callbacks del
+ *  `mutate` de un componente que ya se desmontó. */
 export function useDeleteServerDraft() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (args: { uid: number; folder?: string }) =>
-      callMail<{ ok: boolean }>({ action: "delete_draft", ...args }),
-    onSuccess: () => {
+    mutationFn: async (args: { uid: number; folder?: string }) => {
+      const r = await callMail<{ ok: boolean }>({ action: "delete_draft", ...args });
+      if (!r?.ok) throw new Error(traducir("mail.draft.deleteFailed"));
+      return r;
+    },
+    onError: (e) => {
+      toast.error(traducir("mail.comp.draftNotRemoved", { error: (e as Error).message }));
+    },
+    onMutate: async ({ uid, folder }) => {
+      const carpeta = folder ?? "Borrador";
+      await qc.cancelQueries({ queryKey: ["mail-messages", carpeta] });
+      qc.setQueriesData(
+        { queryKey: ["mail-messages", carpeta] },
+        (prev: { messages?: MailSummary[] } | undefined) =>
+          prev?.messages ? { ...prev, messages: prev.messages.filter((x) => uidDe(x) !== uid) } : prev,
+      );
+    },
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: ["mail-messages", "Borrador"] });
       qc.invalidateQueries({ queryKey: ["mail-folders"] });
     },
