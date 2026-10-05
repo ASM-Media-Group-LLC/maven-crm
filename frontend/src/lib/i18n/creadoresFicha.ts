@@ -573,6 +573,8 @@ export const creadoresFicha = {
   "creadores.new.selectAgency": { es: "Seleccionar agencia", en: "Select agency" },
   "creadores.new.fullNameReq": { es: "Nombre Completo *", en: "Full name *" },
   "creadores.new.ageReq": { es: "Edad *", en: "Age *" },
+  "creadores.new.ageAuto": { es: "Edad", en: "Age" },
+  "creadores.new.ageHint": { es: "Se calcula con la fecha de nacimiento", en: "Calculated from the date of birth" },
   "creadores.new.birthDateReq": { es: "Fecha de Nacimiento *", en: "Date of birth *" },
   "creadores.new.countryReq": { es: "País *", en: "Country *" },
   "creadores.new.cityReq": { es: "Ciudad *", en: "City *" },

@@ -31,6 +31,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import type { TranslationKey } from "@/lib/i18n";
 import { etiquetaIdioma } from "./etiquetasCreadora";
 import { useLanguage } from "@/hooks/useLanguage";
+import { edadDesde } from "@/lib/creadoras/edad";
 
 // Fallback estático sólo si scouter_companies todavía no cargó. La
 // fuente real son las compañías canónicas de la DB.
@@ -99,7 +100,6 @@ interface FormData {
   status: string;
   name: string;
   artistic_name: string;
-  age: number;
   birth_date: string;
   country: string;
   city: string;
@@ -136,7 +136,6 @@ const defaultForm: FormData = {
   status: "onboarding",
   name: "",
   artistic_name: "",
-  age: 0,
   birth_date: "",
   country: "",
   city: "",
@@ -236,8 +235,10 @@ const NuevoCreadorForm = () => {
     if (s === 1) {
       if (!form.assigned_agency) e.assigned_agency = t("creadores.new.errAgency");
       if (!form.name.trim()) e.name = t("creadores.new.errName");
-      if (!form.age || form.age < 18) e.age = t("creadores.new.errAge");
+      // La edad sale de la fecha: sin fecha, el error va en la fecha.
+      const edad = edadDesde(form.birth_date);
       if (!form.birth_date) e.birth_date = t("creadores.new.errBirthDate");
+      else if (edad === null || edad < 18) e.age = t("creadores.new.errAge");
       if (!form.country) e.country = t("creadores.new.errCountry");
       if (!form.city.trim()) e.city = t("creadores.new.errCity");
       if (form.languages.length === 0) e.languages = t("creadores.new.errLanguages");
@@ -298,7 +299,7 @@ const NuevoCreadorForm = () => {
           country: form.country || null,
           city: form.city || null,
           status: form.status || "onboarding",
-          age: form.age || null,
+          age: edadDesde(form.birth_date),
           birth_date: form.birth_date || null,
           languages: form.languages.length > 0 ? form.languages : null,
           // Handles normalizados a username pelado (cleanHandle saca @ y URLs) para
@@ -427,8 +428,17 @@ const NuevoCreadorForm = () => {
                 <Field label={t("creadores.edit.stageName")}>
                   <Input value={form.artistic_name} onChange={(e) => set("artistic_name", e.target.value)} placeholder={t("cr.stageName")} />
                 </Field>
-                <Field label={t("creadores.new.ageReq")} error={errors.age} fieldKey="age">
-                  <Input type="number" value={form.age || ""} onChange={(e) => set("age", Number(e.target.value))} min={18} className={errors.age ? "border-destructive" : ""} />
+                {/* La edad no se escribe: sale de la fecha de nacimiento (Jhon, 06/10). */}
+                <Field label={t("creadores.new.ageAuto")} error={errors.age} fieldKey="age">
+                  <Input
+                    readOnly
+                    tabIndex={-1}
+                    value={edadDesde(form.birth_date) ?? ""}
+                    placeholder="—"
+                    aria-describedby="edad-automatica"
+                    className={cn("cursor-default bg-muted/40 tabular-nums focus-visible:ring-0", errors.age && "border-destructive")}
+                  />
+                  <p id="edad-automatica" className="text-xs text-muted-foreground">{t("creadores.new.ageHint")}</p>
                 </Field>
                 <Field label={t("creadores.new.birthDateReq")} error={errors.birth_date} fieldKey="birth_date">
                   <DateInput value={form.birth_date} onChange={(v) => set("birth_date", v)} toYear={new Date().getFullYear()} className={errors.birth_date ? "[&_input]:border-destructive" : ""} />

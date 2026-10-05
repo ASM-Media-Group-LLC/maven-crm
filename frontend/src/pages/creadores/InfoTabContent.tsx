@@ -26,6 +26,7 @@ import { useFormato } from "@/hooks/useFormato";
 import { ExternalLink } from "lucide-react";
 import { etiquetaEstado } from "./etiquetasCreadora";
 import { useLanguage } from "@/hooks/useLanguage";
+import { edadDesde } from "@/lib/creadoras/edad";
 
 const statusVariant: Record<string, "success-soft" | "primary-soft" | "warning-soft" | "destructive-soft" | "secondary-soft"> = {
   active: "success-soft",
@@ -166,6 +167,8 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
           country_code: countryCode,
           city: editData.city || null,
           birth_date: editData.birth_date || null,
+          // La edad sigue a la fecha (Jhon, 06/10): sin fecha, la edad que hubiera queda.
+          ...(edadDesde(editData.birth_date) !== null ? { age: edadDesde(editData.birth_date) } : {}),
           internal_notes: editData.internal_notes || null,
           ...managerAssignmentPatch(editData.manager_profile_id),
         } as any)
