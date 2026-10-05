@@ -13,7 +13,9 @@ import NotificationItem from "./NotificationItem";
 import { BOTON_TOPBAR } from "@/components/dashboard/topbarStyles";
 import type { Notification } from "@/hooks/useNotifications";
 
-export default function NotificationBell() {
+/** `verTodas`: a dónde lleva «Ver todas» (la página completa del equipo). En el
+ *  portal de creadoras no hay esa página: null lo esconde. */
+export default function NotificationBell({ verTodas = "/notificaciones" }: { verTodas?: string | null } = {}) {
   const navigate = useNavigate();
   // El popover va CONTROLADO para poder cerrarlo al navegar. Radix no lo cierra
   // por su cuenta cuando el clic ocurre DENTRO del panel, así que al ir a
@@ -105,16 +107,18 @@ export default function NotificationBell() {
             </div>
           )}
         </ScrollArea>
-        <div className="border-t p-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full text-xs"
-            onClick={() => { setAbierta(false); navigate("/notificaciones"); }}
-          >
-            {t("shared.notif.seeAll")}
-          </Button>
-        </div>
+        {verTodas && (
+          <div className="border-t p-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full text-xs"
+              onClick={() => { setAbierta(false); navigate(verTodas); }}
+            >
+              {t("shared.notif.seeAll")}
+            </Button>
+          </div>
+        )}
       </PopoverContent>
     </Popover>
   );

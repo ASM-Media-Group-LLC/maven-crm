@@ -11,6 +11,8 @@ import { esCuentaDeCreadora } from "@/lib/portal/cuenta";
 // creadora vea un CRM vacío con Messenger, Cowork y Correo.
 
 const sesion = vi.hoisted(() => ({ user: null as null | { id: string; app_metadata: Record<string, unknown> } }));
+// La campana (notificaciones en tiempo real) no es parte de las puertas.
+vi.mock("@/components/notifications/NotificationBell", () => ({ default: () => null }));
 vi.mock("@/hooks/useAuth", () => ({
   useAuth: () => ({ user: sesion.user, loading: false, signOut: vi.fn() }),
 }));
