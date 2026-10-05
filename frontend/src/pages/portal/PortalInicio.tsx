@@ -12,12 +12,6 @@ import { PageHeader } from "@/components/ui/page-header";
 // Inicio del portal: el saludo, cuánto le falta de su ficha y lo que viene
 // (contenido y personalizados llegan en las fases 2 y 3).
 
-function saludo(h: number): "portal.inicio.manana" | "portal.inicio.tarde" | "portal.inicio.noche" {
-  if (h >= 5 && h < 12) return "portal.inicio.manana";
-  if (h >= 12 && h < 19) return "portal.inicio.tarde";
-  return "portal.inicio.noche";
-}
-
 export default function PortalInicio() {
   const { t } = useLanguage();
   const { activa } = usePortal();
@@ -31,8 +25,10 @@ export default function PortalInicio() {
   return (
     <Page>
       <PageHeader
-        title={t("portal.inicio.hola", { nombre: nombreParaMostrar(activa) })}
-        subtitle={`${t(saludo(new Date().getHours()))} · ${t("portal.inicio.agencia", { agencia: activa.agencia })}`}
+        // «Bienvenida a tu portal de Kash» (Jhon, 06/10: el «Buenas tardes ·
+        // Trabajas con Kash» sonaba a robot).
+        title={t("portal.inicio.bienvenida", { agencia: activa.agencia })}
+        subtitle={t("portal.inicio.hola", { nombre: nombreParaMostrar(activa) })}
       />
 
       <div className="mt-6 grid gap-4 lg:grid-cols-[3fr_2fr]">

@@ -27,11 +27,8 @@ export const portal = {
   "portal.shell.salir": { es: "Cerrar sesión", en: "Sign out" },
 
   // ── Inicio ──────────────────────────────────────────────────────────────────
-  "portal.inicio.manana": { es: "Buenos días", en: "Good morning" },
-  "portal.inicio.tarde": { es: "Buenas tardes", en: "Good afternoon" },
-  "portal.inicio.noche": { es: "Buenas noches", en: "Good evening" },
+  "portal.inicio.bienvenida": { es: "Bienvenida a tu portal de {agencia}", en: "Welcome to your {agencia} portal" },
   "portal.inicio.hola": { es: "Hola, {nombre}", en: "Hi, {nombre}" },
-  "portal.inicio.agencia": { es: "Trabajas con {agencia}", en: "You work with {agencia}" },
   "portal.inicio.fichaTitulo": { es: "Completa tu ficha", en: "Complete your profile" },
   "portal.inicio.fichaTituloLista": { es: "Tu ficha está completa", en: "Your profile is complete" },
   "portal.inicio.fichaTexto": {
