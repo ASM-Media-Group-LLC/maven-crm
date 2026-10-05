@@ -178,6 +178,12 @@ export const creadoresFicha = {
   "creadores.info.tieredCommission": { es: "Comisión por Rangos", en: "Tiered commission" },
   "creadores.info.internalNotes": { es: "Notas Internas", en: "Internal notes" },
   "creadores.info.internalNotesPh": { es: "Notas internas…", en: "Internal notes…" },
+  "creadores.info.emailMasked": {
+    es: "Por privacidad no ves el correo completo. Escribe uno nuevo solo si quieres cambiarlo.",
+    en: "For privacy you can't see the full email. Type a new one only if you want to change it.",
+  },
+  "creadores.info.emailInvalid": { es: "Ese correo no es válido", en: "That email isn't valid" },
+  "creadores.info.emailPh": { es: "correo@ejemplo.com", en: "name@example.com" },
 
   // Manager de la creadora (ManagerSelect)
   "creadores.manager.none": { es: "Sin manager", en: "No manager" },

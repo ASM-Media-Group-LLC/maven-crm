@@ -27,6 +27,8 @@ import { ExternalLink } from "lucide-react";
 import { etiquetaEstado } from "./etiquetasCreadora";
 import { useLanguage } from "@/hooks/useLanguage";
 import { edadDesde } from "@/lib/creadoras/edad";
+import { cambioDeContacto, correoValido, estaEnmascarado, valorParaEditar } from "@/lib/creadoras/contacto";
+import { toast } from "@/hooks/use-toast";
 
 const statusVariant: Record<string, "success-soft" | "primary-soft" | "warning-soft" | "destructive-soft" | "secondary-soft"> = {
   active: "success-soft",
@@ -80,6 +82,7 @@ interface EditData {
   country: string;
   city: string;
   birth_date: string;
+  email: string;
   internal_notes: string;
 }
 
@@ -131,6 +134,7 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
     country: "",
     city: "",
     birth_date: "",
+    email: "",
     internal_notes: "",
   });
 
@@ -145,6 +149,8 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
       country: c.country ?? "",
       city: c.city ?? "",
       birth_date: c.birth_date ?? "",
+      // Enmascarado (quien no es admin) → vacío: se escribe uno nuevo para cambiarlo.
+      email: valorParaEditar(c.email),
       internal_notes: c.internal_notes ?? "",
     });
     setIsEditing(true);
@@ -155,6 +161,12 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
   };
 
   const handleSave = async () => {
+    // El correo solo se escribe si se cambió, y nunca la máscara (ver contacto.ts).
+    const correo = cambioDeContacto(c.email, editData.email);
+    if (correo && !correoValido(correo)) {
+      toast({ title: t("creadores.info.emailInvalid"), variant: "destructive" });
+      return;
+    }
     setSaving(true);
     try {
       const countryCode = countryToCode[editData.country] ?? null;
@@ -169,6 +181,7 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
           birth_date: editData.birth_date || null,
           // La edad sigue a la fecha (Jhon, 06/10): sin fecha, la edad que hubiera queda.
           ...(edadDesde(editData.birth_date) !== null ? { age: edadDesde(editData.birth_date) } : {}),
+          ...(correo !== undefined ? { email: correo } : {}),
           internal_notes: editData.internal_notes || null,
           ...managerAssignmentPatch(editData.manager_profile_id),
         } as any)
@@ -348,6 +361,25 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
           </div>
         ) : (
           <InfoField label={t("creadores.info.agencyPct")} value={biz?.agency_percentage != null ? `${biz.agency_percentage}%` : null} />
+        )}
+
+        {/* Correo de contacto (Jhon, 06/10: «no veo dónde ingreso el correo»).
+            No es el de entrar al portal: ese se cambia en la pestaña Portal. */}
+        {isEditing ? (
+          <EditField label={t("common.email")}>
+            <Input
+              className="h-9 text-sm"
+              type="email"
+              inputMode="email"
+              autoComplete="off"
+              value={editData.email}
+              onChange={(e) => updateField("email", e.target.value)}
+              placeholder={estaEnmascarado(c.email) ? c.email : t("creadores.info.emailPh")}
+            />
+            {estaEnmascarado(c.email) && <p className="mt-1 text-xs text-muted-foreground">{t("creadores.info.emailMasked")}</p>}
+          </EditField>
+        ) : (
+          <InfoField label={t("common.email")} value={c.email} />
         )}
 
         {/* WhatsApp: abre el chat en la bandeja de Maven (sin exponer el número) */}
