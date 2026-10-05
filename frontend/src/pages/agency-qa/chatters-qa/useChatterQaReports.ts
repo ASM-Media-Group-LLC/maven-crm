@@ -1,11 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getPublicBaseUrl } from "@/lib/getPublicUrl";
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { getTranslation, idioma, traducir, type Language, type TranslationKey } from "@/lib/i18n";
-import { companyLabel, periodLabel, type CompanyCode } from "./useChatterScorecards";
-import { buildChatterQaEmailSubject, buildChatterQaEmailHtml, type ChatterQaEmailPayload } from "./chatterQaEmailTemplate";
+import { type CompanyCode } from "./useChatterScorecards";
+import { mandarReportePorCorreo } from "@/lib/correoDeReporte";
 
 // QA cualitativo de chatters (QA-B): reporte estructurado que reemplaza el correo del supervisor.
 // Tabla chatter_qa_reports. Tabla nueva → (supabase as any), igual que el resto de hooks BLU.
@@ -306,38 +305,17 @@ export const useUpdateChatterQaConfig = () => {
   });
 };
 
-// ── Enviar / reenviar el reporte por email (client-side). Manual = manda siempre que haya
-// destinatarios; arma el HTML con el template, llama a send-notification-email, marca email_sent_at.
-const buildPayload = (row: ChatterQaReport): ChatterQaEmailPayload => ({
-  chatterName: row.chatter_name,
-  companyLabel: `${companyLabel(row.company)} (${row.company})`,
-  // El correo sale en español siempre: lo lee el chatter, no quien apretó "Enviar".
-  periodLabel: periodLabel(row.period, "es"),
-  evaluatorName: row.evaluator_name,
-  veredictoLabel: veredictoLabel(row.veredicto, "es"),
-  tone: veredictoTone(row.veredicto) as "good" | "warn" | "bad",
-  report: (row.report ?? {}) as ChatterQaEmailPayload["report"],
-  evaluatedModels: row.evaluated_models ?? [],
-  fanIndex: ((row.sampling as any)?.fan_index ?? {}) as ChatterQaEmailPayload["fanIndex"],
-  appUrl: getPublicBaseUrl(),
-});
+// ── Enviar / reenviar el reporte por email. El navegador solo pide «manda este
+// reporte»: send-notification-email lo lee con la RLS de quien pide, arma el
+// correo en el servidor (en español: lo lee el chatter) y lo manda a la
+// configuración (notification_emails, notify_user_ids) y a quien creó el QA,
+// solo si son cuentas de la agencia. Después se marca email_sent_at.
 export const useSendChatterQaEmail = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (row: ChatterQaReport) => {
-      const { data: cfg } = await (supabase as any).from("chatter_qa_config")
-        .select("notification_emails, notify_user_ids").eq("id", 1).maybeSingle();
-      const to: string[] = cfg?.notification_emails ?? [];
-      const alsoIds: string[] = [...(cfg?.notify_user_ids ?? [])];
-      if (row.created_by && !alsoIds.includes(row.created_by)) alsoIds.push(row.created_by);
-      if (to.length === 0 && alsoIds.length === 0)
-        throw new Error(traducir("agencyQa.email.noRecipients"));
-      const p = buildPayload(row);
-      const { data, error } = await supabase.functions.invoke("send-notification-email", {
-        body: { to, subject: buildChatterQaEmailSubject(p), html: buildChatterQaEmailHtml(p), tag: "chatter-qa", also_include_user_ids: alsoIds.length ? alsoIds : undefined },
-      });
-      if (error) throw new Error(error.message);
-      if (data?.error) throw new Error(String(data.error));
+      const r = await mandarReportePorCorreo("qa_chatter", row.id);
+      if (r.enviados === 0) throw new Error(traducir("agencyQa.email.noRecipients"));
       await (supabase as any).from("chatter_qa_reports").update({ email_sent_at: new Date().toISOString() }).eq("id", row.id);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["chatter-qa"] }),

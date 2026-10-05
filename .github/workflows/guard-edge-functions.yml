@@ -252,6 +252,29 @@ jobs:
       - name: Banco — creadoras por agencia, cuentas externas y avisos (PGlite)
         run: deno run -A --node-modules-dir=none --no-lock supabase/tests/creadoras_por_agencia.ts
 
+      # Antes del portal de creadoras (05/10): creator-video (quién ve, sube,
+      # confirma y borra videos de onboarding: la creadora es la de la fila,
+      # nunca la del cuerpo) y send-notification-email (desde el navegador solo
+      # { plantilla, id }, a cuentas de la misma agencia, con tope y sin devolver
+      # correos; el modo servidor igual que siempre). Con tipos.
+      - name: Guard — creator-video y send-notification-email
+        run: deno test --allow-read supabase/functions/creator-video/logica.test.ts supabase/functions/send-notification-email/logica.test.ts
+
+      - name: Tipos — creator-video y send-notification-email
+        run: >-
+          deno check
+          supabase/functions/creator-video/index.ts
+          supabase/functions/send-notification-email/index.ts
+
+      # Las tres migraciones de esos huecos sobre los roles de PROD: la edición de
+      # una creadora con la política de UPDATE de creators (FOR KEY SHARE, sin
+      # copiarla), el bucket custom-requests por pedido (leer si lo ves, subir si
+      # lo editas) con el flujo de Personalizados, y las RPC del correo (misma
+      # agencia, 5 por minuto). Cada hueco abierto sin la migración y cerrado con
+      # ella; la vuelta atrás; con una política distinta de la revisada, no corre.
+      - name: Banco — videos de creadoras, archivos de Personalizados y correos (PGlite)
+        run: deno run -A --node-modules-dir=none --no-lock supabase/tests/seguridad_archivos.ts
+
       # `deno test --no-check` no mira tipos: sin este paso, el tipo de msg() (clave que
       # existe, variables exactas) y los @ts-expect-error de mensajes.test.ts nunca
       # podrían fallar en CI. messenger.test.ts queda afuera: arrastra un error de tipos
