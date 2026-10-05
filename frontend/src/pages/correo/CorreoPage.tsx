@@ -1420,19 +1420,18 @@ export default function CorreoPage() {
                   <>
                     <span className="ml-1 text-xs font-medium text-foreground">{t(n === 1 ? "mail.sel.selectedOne" : "mail.sel.selectedMany", { n })}</span>
                     <div className="ml-1 flex items-center gap-0.5">
-                      <AccionBarra icono={MailOpen} etiqueta={t("mail.act.markRead")} onClick={() => ejecutarMasiva("seen", items)} disabled={!hayNoLeidos || masiva.isPending} />
-                      <AccionBarra icono={Mail} etiqueta={t("mail.act.markUnread")} onClick={() => ejecutarMasiva("unseen", items)} disabled={masiva.isPending} />
+                      <AccionBarra icono={MailOpen} etiqueta={t("mail.act.markRead")} onClick={() => ejecutarMasiva("seen", items)} disabled={!hayNoLeidos} />
+                      <AccionBarra icono={Mail} etiqueta={t("mail.act.markUnread")} onClick={() => ejecutarMasiva("unseen", items)} />
                       <span className="mx-1 h-4 w-px bg-border/70" />
-                      <AccionBarra icono={Archive} etiqueta={t("mail.act.archive")} onClick={() => ejecutarMasiva("archive", items)} disabled={masiva.isPending || carpeta === "Archive"} />
-                      <AccionBarra icono={ShieldAlert} etiqueta={t("mail.act.markSpam")} onClick={() => ejecutarMasiva("spam", items)} disabled={masiva.isPending || carpeta === "Correo no deseado"} />
-                      <AccionBarra icono={Trash2} etiqueta={carpeta === "Papelera" ? t("mail.deleteForever") : t("common.delete")} onClick={() => ejecutarMasiva("delete", items)} disabled={masiva.isPending} />
+                      <AccionBarra icono={Archive} etiqueta={t("mail.act.archive")} onClick={() => ejecutarMasiva("archive", items)} disabled={carpeta === "Archive"} />
+                      <AccionBarra icono={ShieldAlert} etiqueta={t("mail.act.markSpam")} onClick={() => ejecutarMasiva("spam", items)} disabled={carpeta === "Correo no deseado"} />
+                      <AccionBarra icono={Trash2} etiqueta={carpeta === "Papelera" ? t("mail.deleteForever") : t("common.delete")} onClick={() => ejecutarMasiva("delete", items)} />
                       <span className="mx-1 h-4 w-px bg-border/70" />
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <button
                             type="button"
                             title={t("mail.act.snooze")}
-                            disabled={masiva.isPending}
                             className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
                           >
                             <Clock className="h-4 w-4" />
@@ -1465,7 +1464,6 @@ export default function CorreoPage() {
                           <button
                             type="button"
                             title={t("mail.act.moveTo")}
-                            disabled={masiva.isPending}
                             className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
                           >
                             <FolderInput className="h-4 w-4" />
@@ -1647,7 +1645,7 @@ export default function CorreoPage() {
                       <button
                         type="button"
                         title={t("mail.act.moveTo")}
-                        disabled={masiva.isPending || etiquetar.isPending}
+                        disabled={etiquetar.isPending}
                         className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
                       >
                         <FolderInput className="h-4 w-4" />

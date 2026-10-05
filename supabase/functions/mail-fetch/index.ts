@@ -1030,6 +1030,13 @@ Deno.serve(async (req) => {
         if (action === "delete_draft") {
           if (typeof uid !== "number") return json(req, { error: "uid es requerido" }, 400);
           const ok = await client.deleteByUid(uid);
+          // Y de la caché, como hace `bulk`: la lista de Borradores sale de
+          // mail_messages, y sin esto el borrador ya enviado seguía ahí hasta
+          // el barrido de esa carpeta (30 min en las frías).
+          if (ok) {
+            await admin.from("mail_messages").delete()
+              .eq("user_id", user.id).eq("folder", box).eq("uid", uid);
+          }
           return json(req, { ok });
         }
 

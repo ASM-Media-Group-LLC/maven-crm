@@ -343,6 +343,8 @@ export const correo = {
   "mail.comp.sent": { es: "Correo enviado", en: "Email sent" },
   "mail.comp.draftSaved": { es: "Borrador guardado", en: "Draft saved" },
   "mail.comp.draftLocalOnly": { es: "Guardado en este equipo (no en el servidor): {error}", en: "Saved on this device (not on the server): {error}" },
+  "mail.comp.draftNotRemoved": { es: "El correo salió, pero el borrador sigue en Borradores: {error}", en: "The email was sent, but the draft is still in Drafts: {error}" },
+  "mail.draft.deleteFailed": { es: "El servidor de correo no pudo eliminar el borrador.", en: "The mail server couldn't delete the draft." },
   "mail.comp.newEmail": { es: "Nuevo correo", en: "New email" },
   "mail.comp.fromAddress": { es: "Desde {email}", en: "From {email}" },
   "mail.comp.resumedDraft": { es: "Retomaste un borrador que habías empezado.", en: "You picked up a draft you had started." },
