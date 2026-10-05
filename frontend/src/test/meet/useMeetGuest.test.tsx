@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { renderHook, waitFor, act } from "@testing-library/react";
-import { useMeetGuest } from "@/hooks/useMeetGuest";
+import { useMeetGuest, SIN_RESPUESTA_MS } from "@/hooks/useMeetGuest";
+import { traducir } from "@/lib/i18n";
 
 // La garantía que importa acá: el invitado NO tiene token hasta que alguien lo
 // admite. La decisión real es del servidor (la edge no lo emite antes), pero el
@@ -118,5 +119,96 @@ describe("useMeetGuest", () => {
 
     await waitFor(() => expect(result.current.status).toBe("idle"));
     expect(window.localStorage.getItem(`meet.guest.${CODE}`)).toBeNull();
+  });
+
+  // ── Las salidas de los caminos infelices (auditoría 05/10/2026) ────────────
+
+  it("tras un rechazo puede volver a pedir entrada, y el secreto viejo se olvida", async () => {
+    window.localStorage.setItem(`meet.guest.${CODE}`, "g".repeat(64));
+    mockFetchOnce({ status: "denied" });
+
+    const { result } = renderHook(() => useMeetGuest(CODE));
+    await waitFor(() => expect(result.current.status).toBe("denied"));
+
+    act(() => { result.current.reiniciar(); });
+
+    expect(result.current.status).toBe("idle");
+    expect(result.current.error).toBeNull();
+    expect(window.localStorage.getItem(`meet.guest.${CODE}`)).toBeNull();
+  });
+
+  it("una recarga SIN red no borra la solicitud: sigue esperando y vuelve a preguntar", async () => {
+    vi.useFakeTimers();
+    try {
+      window.localStorage.setItem(`meet.guest.${CODE}`, "g".repeat(64));
+      const fetchMock = globalThis.fetch as ReturnType<typeof vi.fn>;
+      fetchMock.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+      fetchMock.mockImplementation(async () => ({ ok: true, status: 200, json: async () => ({ status: "pending" }) }));
+
+      const { result } = renderHook(() => useMeetGuest(CODE));
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+
+      expect(result.current.status).toBe("pending");
+      expect(window.localStorage.getItem(`meet.guest.${CODE}`)).toBe("g".repeat(64));
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(3100); });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(result.current.status).toBe("pending");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("un error del servidor que no es JSON se muestra como texto entendible, no como jerga", async () => {
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockImplementationOnce(async () => ({
+      ok: false, status: 502, json: async () => { throw new SyntaxError("Unexpected token '<'"); },
+    }));
+
+    const { result } = renderHook(() => useMeetGuest(CODE));
+    await act(async () => { await result.current.knock("Ana"); });
+
+    expect(result.current.status).toBe("error");
+    expect(result.current.error).toBe(traducir("meet.guest.serverError"));
+    expect(result.current.error).not.toMatch(/unexpected token/i);
+  });
+
+  it("a los diez minutos sin respuesta lo dice, y antes no; la espera sigue", async () => {
+    vi.useFakeTimers();
+    try {
+      const fetchMock = globalThis.fetch as ReturnType<typeof vi.fn>;
+      fetchMock.mockImplementationOnce(async () => ({
+        ok: true, status: 200,
+        json: async () => ({ guestToken: "g".repeat(64), roomName: "Reunión", status: "pending" }),
+      }));
+      fetchMock.mockImplementation(async () => ({ ok: true, status: 200, json: async () => ({ status: "pending" }) }));
+
+      const { result } = renderHook(() => useMeetGuest(CODE));
+      await act(async () => { await result.current.knock("Ana"); });
+      expect(result.current.sinRespuesta).toBe(false);
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(SIN_RESPUESTA_MS - 1000); });
+      expect(result.current.sinRespuesta).toBe(false);
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+      expect(result.current.sinRespuesta).toBe(true);
+      expect(result.current.status).toBe("pending");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("cancelar la espera avisa al servidor y vuelve al formulario", async () => {
+    const fetchMock = globalThis.fetch as ReturnType<typeof vi.fn>;
+    mockFetchOnce({ guestToken: "g".repeat(64), roomName: "Reunión", status: "pending" });
+    mockFetchOnce({ ok: true });
+
+    const { result } = renderHook(() => useMeetGuest(CODE));
+    await act(async () => { await result.current.knock("Ana"); });
+    await act(async () => { await result.current.leave(); });
+
+    expect(result.current.status).toBe("idle");
+    expect(window.localStorage.getItem(`meet.guest.${CODE}`)).toBeNull();
+    const cuerpos = fetchMock.mock.calls.map((c) => JSON.parse((c[1] as RequestInit).body as string));
+    expect(cuerpos.some((b) => b.action === "leave" && b.guestToken === "g".repeat(64))).toBe(true);
   });
 });

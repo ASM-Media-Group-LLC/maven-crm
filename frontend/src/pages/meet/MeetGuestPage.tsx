@@ -25,7 +25,7 @@ export default function MeetGuestPage() {
   const { code: rawCode } = useParams<{ code: string }>();
   const navigate = useNavigate();
   const code = normalizeRoomCode(rawCode || "");
-  const { status, error, roomName, guestName, call, knock, getToken, leave } = useMeetGuest(code);
+  const { status, error, roomName, guestName, call, sinRespuesta, knock, getToken, leave, reiniciar } = useMeetGuest(code);
   const [name, setName] = useState("");
   const [checkingSession, setCheckingSession] = useState(true);
   // El invitado colgó. Antes esto era `window.location.reload()`: la página se
@@ -116,6 +116,10 @@ export default function MeetGuestPage() {
             getToken={getToken}
             initialMicOn={false}
             initialCamOn={false}
+            // "Copiar enlace" comparte el PÚBLICO. Sin esto la vista armaba
+            // /call/<sala>, que exige cuenta: el acompañante del invitado caía
+            // en el login.
+            shareLink={`${window.location.origin}/entrar/${code}`}
             onLeave={() => { setSali(true); void leave(); }}
           />
         </LlamadaEnVentanaFlotante>
@@ -133,6 +137,12 @@ export default function MeetGuestPage() {
         <p className="text-sm text-muted-foreground text-center">
           {t("meet.guest.deniedHint")}
         </p>
+        {/* Admitir y Rechazar son dos iconos pegados en el panel del anfitrión:
+            un rechazo por error era definitivo, porque esta pantalla no tenía
+            salida y el secreto guardado la volvía a mostrar en cada recarga. */}
+        <Button variant="outline" className="mt-1 w-full" onClick={reiniciar}>
+          {t("meet.guest.askAgain")}
+        </Button>
       </Shell>
     );
   }
@@ -173,12 +183,25 @@ export default function MeetGuestPage() {
         <div className="flex items-center justify-center h-14 w-14 rounded-full bg-primary/10">
           <Clock className="h-7 w-7 text-primary" />
         </div>
-        <p className="text-foreground font-semibold text-center">{t("meet.guest.waiting")}</p>
+        <p className="text-foreground font-semibold text-center">
+          {sinRespuesta ? t("meet.guest.noAnswerYet") : t("meet.guest.waiting")}
+        </p>
         <p className="text-sm text-muted-foreground text-center">
           {roomName ? t("meet.guest.askedToJoinRoom", { name: roomName }) : t("meet.guest.askedToJoin")}{" "}
-          {t("meet.guest.waitingHint")}
+          {sinRespuesta ? t("meet.guest.noAnswerHint") : t("meet.guest.waitingHint")}
         </p>
         <Loader2 className="h-5 w-5 animate-spin text-primary/60 mt-1" />
+        {/* La espera tiene salida. Antes el spinner era eterno: si nadie estaba
+            en la llamada o la reunión se había cerrado, la persona se quedaba
+            mirándolo hasta cerrar la pestaña. Cancelar avisa al servidor para
+            que el anfitrión deje de ver la solicitud. */}
+        <Button
+          variant="ghost"
+          className="mt-1 w-full rounded-full text-muted-foreground"
+          onClick={() => { void leave(); }}
+        >
+          {t("common.cancel")}
+        </Button>
       </Shell>
     );
   }

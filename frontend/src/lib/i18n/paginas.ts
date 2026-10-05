@@ -171,6 +171,11 @@ export const paginas = {
   "meet.guest.ask": { es: "Pedir entrada", en: "Ask to join" },
   "meet.guest.nameHint": { es: "Tu nombre se muestra a quienes están en la reunión para que puedan aceptarte.", en: "Your name is shown to the people in the meeting so they can let you in." },
   "meet.guest.haveAccount": { es: "¿Tienes cuenta en Maven? Inicia sesión", en: "Have a Maven account? Sign in" },
+  "meet.guest.noAnswerYet": { es: "Nadie ha respondido todavía", en: "No one has answered yet" },
+  "meet.guest.noAnswerHint": { es: "Puede que quien te invitó aún no haya entrado a la reunión. Avísale por otro medio, o cancela y pide entrada más tarde.", en: "The person who invited you may not have joined yet. Let them know another way, or cancel and ask again later." },
+  "meet.guest.networkError": { es: "No hay conexión con el servidor. Revisa tu internet e inténtalo de nuevo.", en: "Can't reach the server. Check your internet connection and try again." },
+  "meet.guest.serverError": { es: "El servidor no respondió bien. Inténtalo de nuevo en un momento.", en: "The server didn't respond properly. Try again in a moment." },
+  "meet.guest.knockFailed": { es: "No se pudo pedir entrada. Inténtalo de nuevo.", en: "Couldn't ask to join. Try again." },
 
   // ── Meet · la portada ───────────────────────────────────────────────────────
   "meet.created": { es: "Reunión creada · código {code}", en: "Meeting created · code {code}" },

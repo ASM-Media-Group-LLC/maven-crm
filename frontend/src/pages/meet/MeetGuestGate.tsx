@@ -73,6 +73,10 @@ export default function MeetGuestGate({ livekitRoom }: { livekitRoom: string }) 
       .from("meet_guest_requests")
       .select("id, guest_name, status, created_at")
       .eq("meet_room_id", roomId).eq("status", "pending")
+      // Quien canceló la espera (o colgó) ya no quiere entrar: su solicitud
+      // sigue `pending` en la base, pero con `left_at`. Mostrarla era admitir
+      // a un fantasma: el anfitrión aceptaba y no pasaba nada.
+      .is("left_at", null)
       .order("created_at", { ascending: true });
 
     // ⚠️ supabase-js NO lanza: ante un 5xx, la red caída o un hipo de
