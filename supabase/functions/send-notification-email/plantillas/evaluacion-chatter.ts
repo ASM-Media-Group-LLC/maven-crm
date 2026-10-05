@@ -1,10 +1,8 @@
-// Email body for the Chatter Evaluator report.
-//
-// We build the full HTML on the client (instead of letting Apps Script
-// do it) so that any visual tweak ships with the next Maven deploy —
-// no Apps Script redeploy needed. The webhook payload carries
-// `emailSubject` and `emailHtml` and the script just relays them to
-// MailApp.sendEmail.
+// Correo del reporte del Chatter Evaluator (TS puro). Se arma en el SERVIDOR
+// (send-notification-email, plantilla «evaluacion_chatter») con lo que la
+// persona puede leer de la evaluación: desde el 05/10/2026 el navegador ya no
+// manda HTML, solo «manda el reporte de esta evaluación». Hasta esa fecha vivía
+// en frontend/src/pages/chatter-evaluator/emailTemplate.ts.
 
 export interface EmailPayload {
   evaluationId: string;
@@ -19,7 +17,8 @@ export interface EmailPayload {
   badge: string;
   criteria: { label: string; status: "pass" | "partial" | "fail"; statusLabel: string }[];
   feedback: string;
-  chatHistory: { role: string; type: string; content: string | null; price: number | null; timestamp: string; from: string }[];
+  /** Cuántos mensajes tuvo la sesión (el correo no lleva el chat). */
+  mensajes: number;
   /** Base URL del frontend (ej. https://maven.asmtech.ai) — para
    *  construir el deeplink al workspace en el botón "Ver transcript" del
    *  email. El correo ya no incluye el chat completo; el receptor abre
@@ -137,7 +136,7 @@ export const buildEmailHtml = (p: EmailPayload): string => {
 
           // Footer
           `<tr><td style="padding:18px 32px 26px;border-top:1px solid ${COLORS.border};margin-top:8px;">` +
-            `<div style="font-size:12px;color:${COLORS.muted};">${p.chatHistory.length} mensaje(s) intercambiados durante la sesión.</div>` +
+            `<div style="font-size:12px;color:${COLORS.muted};">${p.mensajes} mensaje(s) intercambiados durante la sesión.</div>` +
           `</td></tr>` +
 
         `</table>` +
@@ -145,3 +144,49 @@ export const buildEmailHtml = (p: EmailPayload): string => {
     `</body></html>`
   );
 };
+
+// ─── De las filas al payload (lo que antes armaba useChatterEvaluator.ts) ───
+export interface DatosEvaluacionChatter {
+  evaluacion: {
+    id: string;
+    created_at: string;
+    examiner_name: string | null;
+    verdict: string;
+    score_pct: number | null;
+    feedback: string | null;
+    criteria_results: { label: string; status: string }[] | null;
+  };
+  sesion: { id: string; chatter_name: string | null; profile_id: string | null };
+  perfil: { name: string | null } | null;
+  mensajes: number;
+}
+
+const estadoCriterio = (s: string): "pass" | "partial" | "fail" =>
+  s === "pass" ? "pass" : s === "partial" ? "partial" : "fail";
+
+export function armarPayloadEvaluacionChatter(d: DatosEvaluacionChatter, appUrl: string): EmailPayload {
+  const pct = Number(d.evaluacion.score_pct ?? 0);
+  return {
+    evaluationId: d.evaluacion.id,
+    sessionId: d.sesion.id,
+    createdAt: d.evaluacion.created_at,
+    chatterName: d.sesion.chatter_name ?? "",
+    modelName: d.perfil?.name ?? d.sesion.profile_id ?? "",
+    examinerName: d.evaluacion.examiner_name ?? "(unnamed)",
+    verdict: d.evaluacion.verdict === "apto" ? "apto" : "no_apto",
+    verdictLabel: d.evaluacion.verdict === "apto" ? "APTO" : "NO APTO",
+    scorePct: pct,
+    badge: pct >= 80 ? "APROBADO" : pct >= 50 ? "A CRITERIO" : "NO APTO",
+    criteria: (d.evaluacion.criteria_results ?? []).map((c) => {
+      const status = estadoCriterio(c.status);
+      return {
+        label: c.label,
+        status,
+        statusLabel: status === "pass" ? "Cumple" : status === "partial" ? "Parcial" : "No cumple",
+      };
+    }),
+    feedback: d.evaluacion.feedback ?? "",
+    mensajes: d.mensajes,
+    appUrl,
+  };
+}

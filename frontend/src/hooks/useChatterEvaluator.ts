@@ -1,5 +1,4 @@
 import { useEffect } from "react";
-import { getPublicBaseUrl } from "@/lib/getPublicUrl";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 // Avisos y errores de pantalla por traducir() (salen de mutaciones y promesas).
@@ -9,7 +8,7 @@ import { traducir } from "@/lib/i18n";
 import { useFormato } from "@/hooks/useFormato";
 import type { Formato } from "@/lib/formato";
 import { supabase } from "@/integrations/supabase/client";
-import { buildEmailHtml, buildEmailSubject } from "@/pages/chatter-evaluator/emailTemplate";
+import { mandarReportePorCorreo } from "@/lib/correoDeReporte";
 import type {
   ChatterProfile,
   ChatterVaultItem,
@@ -1357,94 +1356,26 @@ export type SubmitEvaluationInput = {
 };
 
 // Email del reporte vía Resend (sender = Maven CRM <noreply@mail.maven-ai.me>).
-// Antes lo mandaba un Apps Script que también generaba Drive doc + Sheet,
-// pero migramos a Resend para que el remitente sea de Maven y no la cuenta
-// personal del owner del GAS. La columna `apps_script_url` ya no se usa.
-// Fire-and-forget: la mutación principal resuelve apenas guardamos en DB,
-// el correo viaja en background y se anuncia con un toast cuando termina.
-const fireWebhookInBackground = async (
-  evaluation: ChatterEvaluation,
-  sessionId: string,
-): Promise<void> => {
+// Desde el 05/10/2026 el navegador solo pide «manda el reporte de esta
+// evaluación»: send-notification-email la lee con la RLS de quien pide, arma el
+// correo en el servidor y lo manda a los notification_emails de chatter_config
+// que son cuentas de la agencia. El navegador ya no arma HTML ni elige
+// direcciones. Fire-and-forget: la mutación principal resuelve apenas guardamos
+// en DB, el correo viaja en background y se anuncia con un toast cuando termina.
+const fireWebhookInBackground = async (evaluation: ChatterEvaluation): Promise<void> => {
   try {
-    const [{ data: cfg }, { data: ses }, { data: msgs }] = await Promise.all([
-      sb.from("chatter_config").select("*").eq("id", 1).maybeSingle(),
-      sb.from("chatter_sessions").select("*").eq("id", sessionId).maybeSingle(),
-      sb
-        .from("chatter_messages")
-        .select("*")
-        .eq("session_id", sessionId)
-        .order("created_at", { ascending: true }),
-    ]);
-    const session = ses as ChatterSession | null;
-    const config = cfg as ChatterConfig | null;
-    const messages = (msgs ?? []) as ChatterMessage[];
-    if (!session) throw new Error("session disappeared mid-submit");
-
-    const { data: prof } = await sb
-      .from("chatter_profiles")
-      .select("*")
-      .eq("id", session.profile_id)
-      .maybeSingle();
-    const profile = (prof as ChatterProfile | null) ?? null;
-
-    const corePayload = {
-      evaluationId: evaluation.id,
-      sessionId: session.id,
-      createdAt: evaluation.created_at,
-      chatterName: session.chatter_name,
-      modelName: profile?.name ?? session.profile_id,
-      examinerName: evaluation.examiner_name ?? "(unnamed)",
-      appUrl: getPublicBaseUrl(),
-      verdict: evaluation.verdict as "apto" | "no_apto",
-      verdictLabel: evaluation.verdict === "apto" ? "APTO" : "NO APTO",
-      scorePct: evaluation.score_pct ?? 0,
-      badge:
-        (evaluation.score_pct ?? 0) >= 80 ? "APROBADO" :
-        (evaluation.score_pct ?? 0) >= 50 ? "A CRITERIO" : "NO APTO",
-      criteria: evaluation.criteria_results.map((c) => ({
-        label: c.label,
-        status: c.status,
-        statusLabel:
-          c.status === "pass" ? "Cumple" :
-          c.status === "partial" ? "Parcial" : "No cumple",
-      })),
-      feedback: evaluation.feedback ?? "",
-      chatHistory: messages.map((m) => ({
-        role: m.role,
-        type: m.msg_type,
-        content: m.content,
-        price: m.price,
-        timestamp: m.created_at,
-        from:
-          m.role === "fan" ? (config?.fan_name ?? "JavixBuster") :
-          m.role === "chatter" ? session.chatter_name : "system",
-      })),
-    };
-
-    // El HTML + subject del correo se arman client-side: cualquier ajuste
-    // visual viaja con el deploy normal de Maven, sin tocar nada server-side.
-    const recipients = config?.notification_emails ?? [];
-    if (recipients.length === 0) {
-      toast.warning(traducir("shared.evaluator.noRecipients"), {
-        description: traducir("shared.evaluator.noRecipientsDesc"),
+    let enviados = 0;
+    try {
+      enviados = (await mandarReportePorCorreo("evaluacion_chatter", evaluation.id)).enviados;
+    } catch (mailError) {
+      toast.warning(traducir("shared.evaluator.emailNotSent"), {
+        description: (mailError as Error).message || traducir("shared.evaluator.emailNotSentDesc"),
       });
       return;
     }
-    const emailSubject = buildEmailSubject(corePayload);
-    const emailHtml = buildEmailHtml(corePayload);
-
-    const { error: mailError } = await supabase.functions.invoke(
-      "send-notification-email",
-      {
-        body: { to: recipients, subject: emailSubject, html: emailHtml, tag: "chatter" },
-      },
-    );
-    if (mailError) {
-      toast.warning(traducir("shared.evaluator.emailNotSent"), {
-        description:
-          (mailError as Error).message ??
-          traducir("shared.evaluator.emailNotSentDesc"),
+    if (enviados === 0) {
+      toast.warning(traducir("shared.evaluator.noRecipients"), {
+        description: traducir("shared.evaluator.noRecipientsDesc"),
       });
       return;
     }
@@ -1456,7 +1387,7 @@ const fireWebhookInBackground = async (
       })
       .eq("id", evaluation.id);
     toast.success(traducir("shared.evaluator.reportSent"), {
-      description: traducir("shared.evaluator.reportSentDesc", { count: recipients.length }),
+      description: traducir("shared.evaluator.reportSentDesc", { count: enviados }),
     });
   } catch (e) {
     toast.warning(traducir("shared.evaluator.webhookFailed"), {
@@ -1540,7 +1471,7 @@ export const useSubmitEvaluation = () => {
       //    so the dialog can close and the examiner moves on; the toast
       //    inside fireWebhookInBackground announces the result whenever
       //    Resend returns (typically 1-3s later).
-      void fireWebhookInBackground(evaluation, input.sessionId);
+      void fireWebhookInBackground(evaluation);
 
       return { evaluation };
     },
@@ -1568,7 +1499,7 @@ export const useResendChatterEmail = () =>
         .maybeSingle();
       if (error) throw error;
       if (!data) throw new Error(traducir("shared.evaluator.noEvaluation"));
-      await fireWebhookInBackground(data as ChatterEvaluation, sessionId);
+      await fireWebhookInBackground(data as ChatterEvaluation);
     },
   });
 

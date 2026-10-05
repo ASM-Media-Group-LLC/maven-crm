@@ -1,30 +1,31 @@
+// send-notification-email — el relé de correos transaccionales de Maven
+// (Resend, desde noreply@mail.maven-ai.me).
+//
+// Quién puede qué y por qué: ver logica.ts. En corto:
+//   · Servidor (service_role o X-Cron-Token): { to, subject, html, tag?,
+//     also_include_user_ids? }, como siempre. qa-analyze, ticket-notify y
+//     email_notify_enqueue (pg_net).
+//   · Navegador (JWT de una persona): solo { plantilla, id }. El reporte se lee
+//     con la RLS de la persona, el correo se arma aquí y se manda solo a cuentas
+//     de su agencia (y a los dominios de NOTIFICATION_ALLOWED_DOMAINS), con tope
+//     por minuto, sin devolver direcciones.
+
+import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsFor } from "../_shared/cors.ts";
-// Generic transactional email relay via Resend. Lo usan los flujos de
-// Chatter Evaluator y Agency QA para mandar el reporte por correo desde
-// `noreply@mail.maven-ai.me` en lugar de la dirección personal del owner
-// del Apps Script. Apps Script sigue haciendo docs/Sheets pero el mail
-// sale por acá — ver `skipEmail: true` en el payload del webhook GAS.
-//
-// Auth: cualquier usuario autenticado de Maven puede dispararla. La
-// validación está en el resto del flujo (sólo el flow de QA/Chatter
-// expone esta llamada con un email pre-renderizado).
-//
-// Body: { to: string[]; subject: string; html: string; tag?: string;
-//         also_include_user_ids?: string[] }
-//   - to:                     lista de destinatarios (filtra strings vacíos)
-//   - subject:                asunto del correo
-//   - html:                   HTML completo del cuerpo
-//   - tag:                    opcional, tag de Resend para tracking
-//   - also_include_user_ids:  opcional, lista de auth.users.id; el server
-//                             resuelve sus emails con service role y los
-//                             agrega a recipients (dedup). Caso típico:
-//                             el closer que subió la QA — su email NO está
-//                             en la config de "Destinatarios" pero queremos
-//                             que reciba SU propio reporte.
+import {
+  type DatosEvaluacion,
+  type DatosQaChatter,
+  type DatosQaCloser,
+  type LectorComoPersona,
+  manejar,
+  type Puertos,
+} from "./logica.ts";
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
+const corsHeaders = (req: Request) =>
+  corsFor(req, {
+    "Access-Control-Allow-Headers":
+      "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  });
 
 const json = (req: Request, status: number, body: unknown) =>
   new Response(JSON.stringify(body), {
@@ -32,168 +33,146 @@ const json = (req: Request, status: number, body: unknown) =>
     headers: { ...corsHeaders(req), "Content-Type": "application/json" },
   });
 
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders(req) });
-  }
+const env = (n: string) => Deno.env.get(n);
+const sinSesion = { auth: { persistSession: false, autoRefreshToken: false } };
 
-  try {
-    // Auth — exige bearer válido. Igual que admin-user-actions.
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return json(req, 401, { error: "Unauthorized", reason: "missing_auth_header" });
-    }
-    const token = authHeader.replace("Bearer ", "");
+/** Lanza si la lectura falló (un 500 es mejor que un correo a medias). */
+function leido<T>(r: { data: T; error: { message: string } | null }, que: string): T {
+  if (r.error) throw new Error(`no se pudo leer ${que}: ${r.error.message}`);
+  return r.data;
+}
 
-    // Server-to-server: otras edge functions (qa-analyze manda el reporte de
-    // Closers QA desde el server) invocan con la SERVICE KEY. auth.getUser()
-    // no valida ese token (no es un user) → todos esos mails morían en 401
-    // silencioso desde que el envío se movió al server (reporte de Jhon
-    // 2026-07-27: no llegaban los correos de QA).
-    //
-    // Detección por CLAIM, no por igualdad de string: existen variantes
-    // firmadas del mismo rol (el env del runtime ≠ la key del dashboard) y
-    // `token === env` daba falso negativo. Es seguro: esta función corre con
-    // verify_jwt=true → el gateway YA validó la firma del JWT antes de llegar
-    // acá; un token con role=service_role no se puede falsificar. El portador
-    // de la service key ya puede todo en el proyecto, no abre nada nuevo.
-    // Se aceptan los DOS formatos de credencial de servidor, porque conviven:
-    //   · JWT legacy (eyJ...) → se valida por el claim role=service_role.
-    //   · Key nueva (sb_secret_...) → NO es un JWT, así que sólo se puede
-    //     validar por igualdad contra el env del proyecto.
-    // Chequear sólo uno de los dos falla en silencio: el intento anterior
-    // (#961) validaba nada más el claim, y la llamada real edge→edge —que usa
-    // la key del runtime— seguía muriendo en 401 (caso del 29-jul: el correo
-    // del QA nunca salió aunque el análisis sí terminó).
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-    let isServiceCall = serviceKey.length > 0 && token === serviceKey;
-    if (!isServiceCall) {
-      try {
-        const b64 = token.split(".")[1]?.replace(/-/g, "+").replace(/_/g, "/") ?? "";
-        const claims = JSON.parse(atob(b64)) as { role?: string };
-        isServiceCall = claims?.role === "service_role";
-      } catch {
-        // No es un JWT decodificable — lo frena el getUser de abajo.
-      }
-    }
-    // Triggers de Postgres (pg_net, avisos por correo de Ajustes → Eventos): no
-    // tienen JWT propio. Llegan con el anon key de Bearer —para pasar el
-    // verify_jwt del gateway— y el token interno en X-Cron-Token, igual que
-    // los crons de la bandeja llaman a sus edges.
-    const cronToken = Deno.env.get("CRON_INTERNAL_TOKEN") ?? "";
-    if (!isServiceCall && cronToken && req.headers.get("X-Cron-Token") === cronToken) {
-      isServiceCall = true;
-    }
-    if (!isServiceCall) {
-      const authClient = createClient(
-        Deno.env.get("SUPABASE_URL")!,
-        Deno.env.get("SUPABASE_ANON_KEY")!,
-        { global: { headers: { Authorization: authHeader } } },
+/** Una relación embebida de PostgREST (a uno) llega como objeto; sin tipos
+ *  generados, el cliente la tipa como arreglo. */
+const uno = <T>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? v[0] ?? null : v ?? null);
+
+// deno-lint-ignore no-explicit-any
+function lectorComoPersona(db: SupabaseClient<any, any, any>): LectorComoPersona {
+  return {
+    async evaluacionChatter(id): Promise<DatosEvaluacion | null> {
+      const ev = leido(
+        await db.from("chatter_evaluations")
+          .select("id, created_at, examiner_name, verdict, score_pct, feedback, criteria_results, session_id")
+          .eq("id", id).maybeSingle(),
+        "la evaluación",
       );
-      const { data: { user }, error: userError } = await authClient.auth.getUser(token);
-      if (userError || !user?.id) {
-        // Log diagnóstico sin exponer el token: forma de la credencial recibida.
-        // Sirve para distinguir "JWT de usuario expirado" de "credencial de
-        // servidor no reconocida", que fue justo el bug del 29-jul.
-        console.warn(
-          `[send-notification-email] 401 — token no válido (len=${token.length}, jwt_like=${token.startsWith("ey")}, sb_key_like=${token.startsWith("sb_")}, env_service_key_len=${serviceKey.length})`,
-        );
-        return json(req, 401, { error: "Unauthorized", reason: "invalid_token" });
-      }
-    }
-
-    const body = await req.json().catch(() => null) as
-      | {
-          to?: unknown;
-          subject?: unknown;
-          html?: unknown;
-          tag?: unknown;
-          also_include_user_ids?: unknown;
-        }
-      | null;
-    if (!body) return json(req, 400, { error: "Body inválido (JSON requerido)" });
-
-    const toList = Array.isArray(body.to)
-      ? (body.to as unknown[])
-          .filter((s): s is string => typeof s === "string" && s.trim().length > 0)
-          .map((s) => s.trim())
-      : [];
-    const subject = typeof body.subject === "string" ? body.subject : "";
-    const html = typeof body.html === "string" ? body.html : "";
-    const tag = typeof body.tag === "string" ? body.tag : null;
-    const alsoIncludeUserIds = Array.isArray(body.also_include_user_ids)
-      ? (body.also_include_user_ids as unknown[]).filter(
-          (s): s is string => typeof s === "string" && s.trim().length > 0,
-        )
-      : [];
-
-    // Resolver emails de usuarios extra (ej. closer que subió la QA).
-    // Usa service role para leer auth.users — el authClient con anon key
-    // del caller no tiene permiso para listar usuarios.
-    if (alsoIncludeUserIds.length > 0) {
-      const adminClient = createClient(
-        Deno.env.get("SUPABASE_URL")!,
-        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      if (!ev) return null;
+      const [ses, mensajes, cfg] = await Promise.all([
+        db.from("chatter_sessions").select("id, chatter_name, profile_id").eq("id", ev.session_id).maybeSingle(),
+        db.from("chatter_messages").select("id", { count: "exact", head: true }).eq("session_id", ev.session_id),
+        db.from("chatter_config").select("notification_emails").eq("id", 1).maybeSingle(),
+      ]);
+      const sesion = leido(ses, "la sesión");
+      if (!sesion) return null;
+      const perfil = sesion.profile_id
+        ? leido(await db.from("chatter_profiles").select("name").eq("id", sesion.profile_id).maybeSingle(), "el perfil")
+        : null;
+      if (mensajes.error) throw new Error(`no se pudieron contar los mensajes: ${mensajes.error.message}`);
+      return {
+        evaluacion: ev,
+        sesion,
+        perfil,
+        mensajes: mensajes.count ?? 0,
+        config: leido(cfg, "la configuración del evaluador"),
+      };
+    },
+    async qaCloser(id): Promise<DatosQaCloser | null> {
+      const call = leido(
+        await db.from("qa_calls")
+          .select(
+            "id, created_at, call_date, evaluator_name, call_type, service_sold, claude_score, claude_analysis, uploaded_by, model:qa_models(name, category, ig_url), closer:profiles!closer_id(name:full_name)",
+          )
+          .eq("id", id).maybeSingle(),
+        "la llamada",
       );
-      for (const uid of alsoIncludeUserIds) {
-        try {
-          const { data: u } = await adminClient.auth.admin.getUserById(uid);
-          const email = u?.user?.email;
-          if (email && !toList.includes(email)) toList.push(email);
-        } catch (e) {
-          console.warn(
-            "[send-notification-email] failed to resolve email for user",
-            uid,
-            (e as Error).message,
-          );
-        }
-      }
-    }
+      if (!call) return null;
+      const config = leido(
+        await db.from("qa_config")
+          .select("notification_emails, notify_on_analyzed, notify_on_low_score, low_score_threshold")
+          .eq("id", 1).maybeSingle(),
+        "la configuración de QA",
+      );
+      const { model, closer, ...resto } = call;
+      return { call: resto, model: uno(model), closer: uno(closer), config };
+    },
+    async qaChatter(id): Promise<DatosQaChatter | null> {
+      const report = leido(
+        await db.from("chatter_qa_reports")
+          .select("id, chatter_name, company, period, evaluator_name, veredicto, report, evaluated_models, sampling, created_by")
+          .eq("id", id).maybeSingle(),
+        "el reporte",
+      );
+      if (!report) return null;
+      const config = leido(
+        await db.from("chatter_qa_config").select("notification_emails, notify_user_ids").eq("id", 1).maybeSingle(),
+        "la configuración del QA de chatters",
+      );
+      return { report, config };
+    },
+  };
+}
 
-    if (toList.length === 0) return json(req, 400, { error: "to[] vacío" });
-    if (!subject) return json(req, 400, { error: "subject requerido" });
-    if (!html) return json(req, 400, { error: "html requerido" });
-
-    const resendKey = Deno.env.get("RESEND_API_KEY");
-    if (!resendKey) {
-      return json(req, 500, { error: "RESEND_API_KEY no configurada" });
-    }
-
-    // Normaliza el "from": si el env var viene como email pelado
-    // (`noreply@mail.maven-ai.me`), le anteponemos "Maven CRM <...>" para
-    // que Gmail muestre el display name en vez de "noreply". Si el admin
-    // ya configuró un name (formato `Display <email>`), se respeta.
-    const rawFrom =
-      Deno.env.get("NOTIFICATION_FROM_EMAIL") || "noreply@mail.maven-ai.me";
-    const fromEmail = rawFrom.includes("<") ? rawFrom : `Maven CRM <${rawFrom}>`;
-
-    const resp = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${resendKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from: fromEmail,
-        to: toList,
-        subject,
-        html,
-        tags: tag ? [{ name: "type", value: tag }] : undefined,
-      }),
-    });
-
-    if (!resp.ok) {
-      const text = await resp.text().catch(() => "");
-      console.error("[send-notification-email] Resend failed", resp.status, text);
-      return json(req, 502, {
-        error: `Resend ${resp.status}`,
-        detail: text.slice(0, 400),
+function puertosReales(): Puertos {
+  const url = env("SUPABASE_URL")!;
+  const anon = env("SUPABASE_ANON_KEY")!;
+  const admin = createClient(url, env("SUPABASE_SERVICE_ROLE_KEY")!, sinSesion);
+  return {
+    env,
+    persona: async (token) => {
+      const { data: { user }, error } = await createClient(url, anon, sinSesion).auth.getUser(token);
+      return error || !user?.id ? null : { id: user.id };
+    },
+    comoPersona: (token) =>
+      lectorComoPersona(createClient(url, anon, { ...sinSesion, global: { headers: { Authorization: `Bearer ${token}` } } })),
+    destinatariosDeAgencia: async (quien, userIds, correos) => {
+      const { data, error } = await admin.rpc("correo_destinatarios_de_agencia", {
+        p_quien: quien,
+        p_user_ids: userIds,
+        p_correos: correos,
       });
-    }
+      if (error) throw new Error(`no se pudieron elegir los destinatarios: ${error.message}`);
+      return (data ?? []) as { user_id: string; email: string }[];
+    },
+    turno: async (quien, plantilla, ref) => {
+      const { data, error } = await admin.rpc("correo_navegador_turno", { p_user: quien, p_plantilla: plantilla, p_ref: ref });
+      if (error) throw new Error(`no se pudo anotar el envío: ${error.message}`);
+      return data === true;
+    },
+    correoDeUsuario: async (userId) => {
+      const { data } = await admin.auth.admin.getUserById(userId);
+      return data?.user?.email ?? null;
+    },
+    enviar: async (e) => {
+      const resp = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${env("RESEND_API_KEY")}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          from: e.from,
+          to: e.to,
+          subject: e.subject,
+          html: e.html,
+          tags: e.tag ? [{ name: "type", value: e.tag }] : undefined,
+        }),
+      });
+      if (!resp.ok) return { ok: false, status: resp.status, id: null, detalle: await resp.text().catch(() => "") };
+      const data = await resp.json().catch(() => ({})) as { id?: string };
+      return { ok: true, status: resp.status, id: data?.id ?? null, detalle: "" };
+    },
+    log: (...a) => console.warn(...a),
+  };
+}
 
-    const data = await resp.json().catch(() => ({}));
-    return json(req, 200, { success: true, id: data?.id ?? null });
-  } catch (err: unknown) {
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders(req) });
+  try {
+    const body = await req.json().catch(() => null);
+    const res = await manejar(
+      { authorization: req.headers.get("Authorization"), cronToken: req.headers.get("X-Cron-Token") },
+      body && typeof body === "object" && !Array.isArray(body) ? body as Record<string, unknown> : null,
+      puertosReales(),
+    );
+    return json(req, res.status, res.body);
+  } catch (err) {
     console.error("[send-notification-email] Internal error:", err);
     return json(req, 500, { error: "Internal server error" });
   }

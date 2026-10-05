@@ -29,15 +29,8 @@ export const LEGADO_EN_ESPANOL: string[] = [
   "pages/agency-qa/AgencyCalls.tsx",
   // Código muerto: nadie lo importa (el detalle vive en CallDetailPage.tsx, ya traducido). Se traduce o se borra aparte.
   "pages/agency-qa/CallDetailDrawer.tsx",
-  // El correo del QA de chatters: lo lee el chatter en español, no quien aprieta Enviar. No se traduce.
-  "pages/agency-qa/chatters-qa/chatterQaEmailTemplate.ts",
   // Traducido; queda el error_message que se guarda en chatter_qa_reports cuando la edge no responde: es dato, lo lee cualquiera.
   "pages/agency-qa/chatters-qa/useChatterQaReports.ts",
-  // El correo del QA de closers: sale en español a los destinatarios y al closer. No se traduce.
-  "pages/agency-qa/qaEmailTemplate.ts",
-  // El correo del reporte (va a los emails de notificación de Admin): se arma
-  // acá y Apps Script lo manda tal cual. Es DATO que lee otra persona, no pantalla.
-  "pages/chatter-evaluator/emailTemplate.ts",
   // Traducido; queda un nombre propio con ñ en la lista de asignables («Castaño»), que no es texto de pantalla.
   "pages/creadores/CreateTicketModal.tsx",
   // Traducido; quedan el título de la notificación y la acción del historial, que se guardan y los leen otras personas.

@@ -174,8 +174,8 @@ export const compartido = {
   "shared.evaluator.noEvaluation": { es: "No hay evaluación para esta sesión", en: "There's no evaluation for this session" },
   "shared.evaluator.noRecipients": { es: "Reporte sin destinatarios", en: "The report has no recipients" },
   "shared.evaluator.noRecipientsDesc": {
-    es: "Configura emails en Admin → Notificaciones.",
-    en: "Set up emails in Admin → Notifications.",
+    es: "Configura en Admin → Notificaciones los correos de cuentas de tu agencia.",
+    en: "In Admin → Notifications, add the emails of accounts in your agency.",
   },
   "shared.evaluator.emailNotSent": { es: "Email no enviado", en: "Email not sent" },
   "shared.evaluator.emailNotSentDesc": {
