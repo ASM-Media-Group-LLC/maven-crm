@@ -228,26 +228,32 @@ function visibles(data: unknown, yo: string): DriveItem[] {
 /** La ruta hasta una carpeta, para las «migas»: Mi unidad › Contabilidad › 2026.
  *  Se corta donde la persona deja de tener acceso (una carpeta compartida no
  *  muestra de quién es hija). */
+export type PasoDeRuta = { id: string; nombre: string; owner_id: string | null };
+
+/** La ruta de una carpeta, de la raíz a ella (incluida). Aparte del hook para
+ *  pedirla antes de entrar (el buscador: en qué sección se abre). */
+export async function leerRutaDrive(carpeta: string): Promise<PasoDeRuta[]> {
+  const ruta: PasoDeRuta[] = [];
+  // Una unidad es el principio de su ruta, como en Google.
+  const raices = new Set((await unidadesQueVeo()).map((u) => u.item_id));
+  let actual: string | null = carpeta;
+  for (let i = 0; actual && i < 30; i++) {
+    const { data } = await tabla("drive_items").select("id, nombre, parent_id, owner_id").eq("id", actual).maybeSingle();
+    const f = data as unknown as { id: string; nombre: string; parent_id: string | null; owner_id: string | null } | null;
+    if (!f) break;
+    ruta.unshift({ id: f.id, nombre: f.nombre, owner_id: f.owner_id });
+    if (raices.has(f.id)) break;
+    actual = f.parent_id;
+  }
+  return ruta;
+}
+
 export function useRutaDrive(carpeta: string | null) {
   return useQuery({
     queryKey: ["drive-ruta", carpeta],
     enabled: !!carpeta,
     staleTime: 60_000,
-    queryFn: async () => {
-      const ruta: { id: string; nombre: string; owner_id: string | null }[] = [];
-      // Una unidad es el principio de su ruta, como en Google.
-      const raices = new Set((await unidadesQueVeo()).map((u) => u.item_id));
-      let actual: string | null = carpeta;
-      for (let i = 0; actual && i < 30; i++) {
-        const { data } = await tabla("drive_items").select("id, nombre, parent_id, owner_id").eq("id", actual).maybeSingle();
-        const f = data as unknown as { id: string; nombre: string; parent_id: string | null; owner_id: string | null } | null;
-        if (!f) break;
-        ruta.unshift({ id: f.id, nombre: f.nombre, owner_id: f.owner_id });
-        if (raices.has(f.id)) break;
-        actual = f.parent_id;
-      }
-      return ruta;
-    },
+    queryFn: () => leerRutaDrive(carpeta!),
   });
 }
 
