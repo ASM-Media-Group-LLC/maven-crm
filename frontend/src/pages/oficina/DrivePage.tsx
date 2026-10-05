@@ -743,8 +743,6 @@ export default function DrivePage() {
       />
 
       <div className="mt-5 flex flex-col gap-5">
-        <BuscadorDelDrive icono={iconoDe} onAbrir={(i, todos) => void abrirEncontrado(i, todos)} className="w-full max-w-2xl" />
-
         {/* Pestañas a la izquierda; el espacio usado, a la derecha. */}
         <div className="flex flex-wrap items-start justify-between gap-4">
           {/* Las vistas, con las mismas pestañas que el resto del CRM. */}
@@ -765,61 +763,69 @@ export default function DrivePage() {
           {vista === "unidades" ? <BarraDeUsoAgencia /> : <BarraDeUso />}
         </div>
 
-        {/* Migas a la izquierda; cómo se ve (Lista · Cuadrícula · Galería) y
-            «Agrupar por fecha», a la derecha, como en Google Drive. */}
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
-          {carpeta && (
-            <nav aria-label={t("drive.ruta")} className="flex min-w-0 flex-wrap items-center gap-0.5 text-sm">
-              {/* Las migas también reciben lo que se arrastra (como en Google):
-                  la de «Mi unidad» es la raíz; las de las otras vistas no son
-                  una carpeta. */}
-              <button
-                type="button"
-                onClick={() => ir(vista)}
-                {...(vista === "mia" ? recibeArrastre(null, "__raiz__", t("drive.vista.mia")) : {})}
-                className={cn("rounded-full px-2 py-1 text-muted-foreground hover:bg-muted hover:text-foreground", sobre === "__raiz__" && "bg-primary/15 text-primary ring-2 ring-primary/40")}
-              >
-                {t(VISTAS.find((v) => v.id === vista)!.clave)}
-              </button>
-              {(ruta.data ?? []).map((r, n, todo) => (
-                <span key={r.id} className="flex min-w-0 items-center gap-0.5">
-                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  {n === todo.length - 1 ? (
-                    <span className="truncate px-2 py-1 font-medium">{r.nombre}</span>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => ir(vista, r.id)}
-                      {...recibeArrastre(r.id, `miga:${r.id}`, r.nombre)}
-                      className={cn("truncate rounded-full px-2 py-1 text-muted-foreground hover:bg-muted hover:text-foreground", sobre === `miga:${r.id}` && "bg-primary/15 text-primary ring-2 ring-primary/40")}
-                    >
-                      {r.nombre}
-                    </button>
-                  )}
-                </span>
-              ))}
-            </nav>
-          )}
-          <SelectorDeVista
-            modo={prefs.modo}
-            agrupar={prefs.agrupar}
-            onModo={(modo) => cambiarPrefs({ modo })}
-            onAgrupar={(agrupar) => cambiarPrefs({ agrupar })}
-          />
-          {/* ⓘ de Google Drive: abre y cierra el panel de Detalles. */}
-          <button
-            type="button"
-            aria-pressed={detallesAbiertos}
-            onClick={() => (detallesAbiertos ? cerrarDetalles() : setDetallesAbiertos(true))}
-            aria-label={t(detallesAbiertos ? "drive.detalles.ocultar" : "drive.detalles.boton")}
-            title={t(detallesAbiertos ? "drive.detalles.ocultar" : "drive.detalles.boton")}
-            className={cn(
-              "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition-colors",
-              detallesAbiertos ? "border-primary/40 bg-primary/15 text-primary" : "border-border/60 text-muted-foreground hover:bg-muted hover:text-foreground",
+        {/* El buscador a la izquierda (Jhon, 06/10: «donde te marco en rojo»);
+            cómo se ve (Lista · Cuadrícula · Galería), «Agrupar por fecha» y ⓘ a
+            la derecha. Dentro de una carpeta, las migas van en su línea, debajo. */}
+        <div className="flex flex-col gap-3">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <BuscadorDelDrive
+              icono={iconoDe}
+              onAbrir={(i, todos) => void abrirEncontrado(i, todos)}
+              className="w-full sm:w-auto sm:min-w-[16rem] sm:max-w-xl sm:flex-1"
+            />
+            <SelectorDeVista
+              modo={prefs.modo}
+              agrupar={prefs.agrupar}
+              onModo={(modo) => cambiarPrefs({ modo })}
+              onAgrupar={(agrupar) => cambiarPrefs({ agrupar })}
+            />
+            {/* ⓘ de Google Drive: abre y cierra el panel de Detalles. */}
+            <button
+              type="button"
+              aria-pressed={detallesAbiertos}
+              onClick={() => (detallesAbiertos ? cerrarDetalles() : setDetallesAbiertos(true))}
+              aria-label={t(detallesAbiertos ? "drive.detalles.ocultar" : "drive.detalles.boton")}
+              title={t(detallesAbiertos ? "drive.detalles.ocultar" : "drive.detalles.boton")}
+              className={cn(
+                "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition-colors",
+                detallesAbiertos ? "border-primary/40 bg-primary/15 text-primary" : "border-border/60 text-muted-foreground hover:bg-muted hover:text-foreground",
+              )}
+            >
+              <Info className="h-4 w-4" />
+            </button>
+          </div>
+            {carpeta && (
+              <nav aria-label={t("drive.ruta")} className="flex min-w-0 flex-wrap items-center gap-0.5 text-sm">
+                {/* Las migas también reciben lo que se arrastra (como en Google):
+                    la de «Mi unidad» es la raíz; las de las otras vistas no son
+                    una carpeta. */}
+                <button
+                  type="button"
+                  onClick={() => ir(vista)}
+                  {...(vista === "mia" ? recibeArrastre(null, "__raiz__", t("drive.vista.mia")) : {})}
+                  className={cn("rounded-full px-2 py-1 text-muted-foreground hover:bg-muted hover:text-foreground", sobre === "__raiz__" && "bg-primary/15 text-primary ring-2 ring-primary/40")}
+                >
+                  {t(VISTAS.find((v) => v.id === vista)!.clave)}
+                </button>
+                {(ruta.data ?? []).map((r, n, todo) => (
+                  <span key={r.id} className="flex min-w-0 items-center gap-0.5">
+                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    {n === todo.length - 1 ? (
+                      <span className="truncate px-2 py-1 font-medium">{r.nombre}</span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => ir(vista, r.id)}
+                        {...recibeArrastre(r.id, `miga:${r.id}`, r.nombre)}
+                        className={cn("truncate rounded-full px-2 py-1 text-muted-foreground hover:bg-muted hover:text-foreground", sobre === `miga:${r.id}` && "bg-primary/15 text-primary ring-2 ring-primary/40")}
+                      >
+                        {r.nombre}
+                      </button>
+                    )}
+                  </span>
+                ))}
+              </nav>
             )}
-          >
-            <Info className="h-4 w-4" />
-          </button>
         </div>
 
         {enPapelera && (

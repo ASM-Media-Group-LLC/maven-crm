@@ -84,6 +84,14 @@ describe("la página del Drive tiene el buscador", () => {
     // La carpeta encontrada se abre en la sección de su raíz.
     expect(drivePage).toMatch(/vistaDeLaRaiz\(/);
   });
+
+  it("en la fila de «Agrupar por fecha» y la vista, a la izquierda (Jhon, 06/10: «donde te marco en rojo»)", () => {
+    const buscador = drivePage.indexOf("<BuscadorDelDrive");
+    expect(buscador).toBeGreaterThan(drivePage.indexOf("<SubtabNav>"));
+    expect(buscador).toBeLessThan(drivePage.indexOf("<SelectorDeVista"));
+    // Las migas, en su línea debajo de esa fila.
+    expect(drivePage.indexOf('aria-label={t("drive.ruta")}')).toBeGreaterThan(drivePage.indexOf("<SelectorDeVista"));
+  });
 });
 
 describe("qué se busca", () => {
