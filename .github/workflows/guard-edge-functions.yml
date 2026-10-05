@@ -92,6 +92,13 @@ jobs:
       - name: Guard — Meet y LiveKit por agencia (livekit-agencia)
         run: deno test --allow-read supabase/functions/_shared/livekit-agencia.test.ts
 
+      # La puerta de invitados: qué se le contesta a quien pregunta «¿ya me
+      # admitieron?» (la reunión terminada gana al pendiente, el que colgó recibe
+      # `left`, una solicitud de más de dos horas venció) y los topes del endpoint
+      # público. Puro, sin base.
+      - name: Guard — reglas de la puerta de invitados (meet-guest)
+        run: deno test supabase/functions/meet-guest/reglas.test.ts
+
       # Las cinco edges de llamadas, con tipos (antes ninguna corría deno check).
       - name: Tipos — edges de llamadas (LiveKit, Meet, grabaciones)
         run: >-

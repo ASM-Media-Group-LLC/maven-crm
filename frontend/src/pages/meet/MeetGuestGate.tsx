@@ -15,6 +15,10 @@ interface GuestRequest {
   created_at: string;
 }
 
+// Copia de SOLICITUD_VENCE_MS de supabase/functions/meet-guest/reglas.ts (el
+// front no puede importar de supabase/). Cambiar una = cambiar la otra.
+const SOLICITUD_VENCE_MS = 2 * 60 * 60 * 1000;
+
 // Panel flotante dentro de una llamada de Meet: muestra a los invitados SIN
 // cuenta que están golpeando, para que alguien de adentro los deje entrar.
 //
@@ -73,6 +77,12 @@ export default function MeetGuestGate({ livekitRoom }: { livekitRoom: string }) 
       .from("meet_guest_requests")
       .select("id, guest_name, status, created_at")
       .eq("meet_room_id", roomId).eq("status", "pending")
+      // Quien canceló la espera ya no quiere entrar, y una solicitud de hace
+      // más de dos horas es de alguien que cerró la pestaña hace rato. Mostrar
+      // cualquiera de las dos era admitir a un fantasma. La edge marca las
+      // vencidas al golpear; este filtro cubre el rato hasta que lo haga.
+      .is("left_at", null)
+      .gte("created_at", new Date(Date.now() - SOLICITUD_VENCE_MS).toISOString())
       .order("created_at", { ascending: true });
 
     // ⚠️ supabase-js NO lanza: ante un 5xx, la red caída o un hipo de

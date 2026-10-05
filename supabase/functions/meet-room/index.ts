@@ -11,6 +11,7 @@ import { corsFor } from "../_shared/cors.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { agenciaDePersona, agenciaDeReunion, SIN_AGENCIA } from "../_shared/livekit-agencia.ts";
+import { borrarSala } from "../_shared/livekit-sala.ts";
 
 const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
 
@@ -220,9 +221,11 @@ serve(async (req) => {
       if (!requestId) return err(req, "requestId required");
 
       const { data: request } = await admin.from("meet_guest_requests")
-        .select("id, status, meet_room_id").eq("id", requestId).maybeSingle();
+        .select("id, status, meet_room_id, left_at").eq("id", requestId).maybeSingle();
       if (!request) return err(req, "Solicitud no encontrada", 404);
       if (request.status !== "pending") return err(req, "Esa solicitud ya fue resuelta", 409);
+      // Canceló la espera (o venció): admitir a quien ya no está no sirve de nada.
+      if (request.left_at) return err(req, "Esa persona ya no está esperando", 409);
 
       const { data: room } = await admin.from("meet_rooms")
         .select("*").eq("id", request.meet_room_id).maybeSingle();
@@ -260,7 +263,16 @@ serve(async (req) => {
         .eq("id", id);
       if (upErr) return err(req, upErr.message, 500);
 
-      return json(req, { ok: true });
+      // Terminar es terminar: se borra la sala de LiveKit (los que siguen adentro
+      // reciben ROOM_DELETED) y los que esperaban en la puerta dejan de esperar.
+      // Antes solo cambiaba el estado en la base: tres personas seguían hablando
+      // en una reunión «terminada» y el invitado seguía mirando el reloj.
+      const sala = await borrarSala(room.livekit_room_name);
+      await admin.from("meet_guest_requests")
+        .update({ left_at: new Date().toISOString() })
+        .eq("meet_room_id", id).eq("status", "pending").is("left_at", null);
+
+      return json(req, { ok: true, livekitRoomExisted: sala.existia, livekitOk: sala.ok });
     }
 
     return err(req, "Unknown action: " + action);
