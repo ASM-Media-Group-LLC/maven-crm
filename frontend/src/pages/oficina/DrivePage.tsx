@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
   Building2, ChevronRight, Clock, Download, File, FileArchive, FileImage, FileSpreadsheet, FileText, FileVideo,
@@ -29,8 +30,8 @@ import { useFormato } from "@/hooks/useFormato";
 import { useFechasDeArchivos } from "@/hooks/useFechasDeArchivos";
 import { useDirectorioCorreo } from "@/hooks/useDirectorioCorreo";
 import {
-  abrirArchivo, SIN_PERMISO_DRIVE, useBorrarParaSiempre, useCrearCarpeta, useCrearUnidad, useDriveVista, useFichaDrive,
-  useRenombrar, useRutaDrive, useSubidasDrive, useTamanosDeCarpetas, useUnidadesConNombre, type DriveItem, type VistaDrive,
+  abrirArchivo, leerRutaDrive, SIN_PERMISO_DRIVE, useBorrarParaSiempre, useCrearCarpeta, useCrearUnidad, useDriveVista, useFichaDrive,
+  useRenombrar, useRutaDrive, useSubidasDrive, useTamanosDeCarpetas, useUnidadesConNombre, type DriveItem, type ResultadoDelDrive, type VistaDrive,
 } from "@/hooks/useDrive";
 import DialogoDeNombre from "@/components/oficina/DialogoDeNombre";
 import PanelDeDetalles, { type ObjetivoDeDetalles } from "@/pages/oficina/drive/PanelDeDetalles";
@@ -40,6 +41,8 @@ import DriveCompartirDialog from "@/components/oficina/DriveCompartirDialog";
 import { BarraDeUso, BarraDeUsoAgencia, CuposDialog } from "@/components/oficina/DriveCupos";
 import { useUserRole } from "@/hooks/useUserRole";
 import VisorArchivo from "@/pages/oficina/drive/VisorArchivo";
+import BuscadorDelDrive from "@/pages/oficina/drive/BuscadorDelDrive";
+import { vistaDeLaRaiz } from "@/lib/drive/buscador";
 import { soloUnClic } from "@/pages/oficina/drive/gestos";
 import BarraDeSeleccion, { type AccionesDeSeleccion } from "@/pages/oficina/drive/BarraDeSeleccion";
 import DriveMoverDialog, { type LugarMover } from "@/components/oficina/DriveMoverDialog";
@@ -176,6 +179,26 @@ export default function DrivePage() {
     if (i.estado !== "listo") return;
     // En el visor, no en otra pestaña (ver drive/VisorArchivo.tsx).
     setViendo(i.id);
+  };
+
+  // ── El buscador (Jhon, 06/10: «ponle buscador»). Un archivo encontrado se
+  // abre en su propio visor, que pasa por los resultados (no por la carpeta
+  // que se está viendo). Una carpeta se abre en la sección de su raíz, para
+  // que las migas digan dónde está; la ruta queda en caché y las migas no la
+  // vuelven a pedir.
+  const queryClient = useQueryClient();
+  const [encontrados, setEncontrados] = useState<ResultadoDelDrive[]>([]);
+  const [viendoEncontrado, setViendoEncontrado] = useState<string | null>(null);
+  const abrirEncontrado = async (i: ResultadoDelDrive, todos: ResultadoDelDrive[]) => {
+    if (i.tipo === "archivo") {
+      setEncontrados(todos);
+      setViendoEncontrado(i.id);
+      return;
+    }
+    const pasos = await queryClient
+      .fetchQuery({ queryKey: ["drive-ruta", i.id], queryFn: () => leerRutaDrive(i.id), staleTime: 60_000 })
+      .catch(() => []);
+    ir(vistaDeLaRaiz(pasos[0] ?? i, unidadesConNombre.data, user?.id), i.id);
   };
 
   const soltar = (e: React.DragEvent) => {
@@ -720,6 +743,8 @@ export default function DrivePage() {
       />
 
       <div className="mt-5 flex flex-col gap-5">
+        <BuscadorDelDrive icono={iconoDe} onAbrir={(i, todos) => void abrirEncontrado(i, todos)} className="w-full max-w-2xl" />
+
         {/* Pestañas a la izquierda; el espacio usado, a la derecha. */}
         <div className="flex flex-wrap items-start justify-between gap-4">
           {/* Las vistas, con las mismas pestañas que el resto del CRM. */}
@@ -1032,6 +1057,8 @@ export default function DrivePage() {
       {espacio.dialogo}
       {viendoCupos && <CuposDialog onCerrar={() => setViendoCupos(false)} />}
       <VisorArchivo items={ordenados} abierto={viendo} onAbierto={setViendo} />
+      {/* Recién al abrir algo desde el buscador; después se queda (el cierre anima). */}
+      {encontrados.length > 0 && <VisorArchivo items={encontrados} abierto={viendoEncontrado} onAbierto={setViendoEncontrado} />}
     </Page>
   );
 }

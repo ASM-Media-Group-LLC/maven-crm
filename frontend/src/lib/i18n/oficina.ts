@@ -57,6 +57,22 @@ export const oficina = {
   "drive.nuevo": { es: "Nuevo", en: "New" },
   "drive.nuevaCarpeta": { es: "Carpeta nueva", en: "New folder" },
   "drive.subirArchivos": { es: "Subir archivos", en: "Upload files" },
+  // El buscador de arriba (BuscadorDelDrive)
+  "drive.buscar.placeholder": { es: "Buscar en el Drive", en: "Search in Drive" },
+  "drive.buscar.atajo": { es: "Pulsa / para buscar", en: "Press / to search" },
+  "drive.buscar.minimo": {
+    es: "Escribe {n} letras o más para buscar en todo el Drive.",
+    en: "Type {n} or more letters to search all of Drive.",
+  },
+  "drive.buscar.buscando": { es: "Buscando…", en: "Searching…" },
+  "drive.buscar.error": { es: "No se pudo buscar en el Drive. Vuelve a intentarlo.", en: "Couldn’t search Drive. Try again." },
+  "drive.buscar.nada": { es: "Nada con «{q}» en el Drive", en: "Nothing matching “{q}” in Drive" },
+  "drive.buscar.resultados": { es: "Resultados de la búsqueda", en: "Search results" },
+  "drive.buscar.en": { es: "En «{carpeta}»", en: "In “{carpeta}”" },
+  "drive.buscar.tope": {
+    es: "Se muestran los {n} primeros. Escribe algo más preciso para afinar.",
+    en: "Showing the first {n}. Type something more specific to narrow it down.",
+  },
   "drive.vista.mia": { es: "Mi unidad", en: "My Drive" },
   "drive.vista.compartido": { es: "Compartido conmigo", en: "Shared with me" },
   "drive.vista.recientes": { es: "Recientes", en: "Recent" },

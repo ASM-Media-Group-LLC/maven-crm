@@ -25,3 +25,13 @@ export function lasFlechasSonDeOtro(e: KeyboardEvent): boolean {
   if (el.isContentEditable) return true;
   return /^(INPUT|TEXTAREA|SELECT|VIDEO|AUDIO)$/.test(el.tagName);
 }
+
+/** «/» lleva al buscador del Drive, como en Google. No si se está escribiendo
+ *  en otro campo, ni con Ctrl/⌘/Alt (son atajos del navegador). Shift sí: en
+ *  el teclado español la barra es Shift+7. */
+export function esAtajoDeBuscar(e: KeyboardEvent): boolean {
+  if (e.key !== "/" || e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey) return false;
+  const el = e.target;
+  if (!(el instanceof HTMLElement)) return true;
+  return !el.isContentEditable && !/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName);
+}
