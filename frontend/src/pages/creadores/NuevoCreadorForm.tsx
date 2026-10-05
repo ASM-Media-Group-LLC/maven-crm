@@ -22,7 +22,9 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useAddCreadorWithBusiness } from "./useCreadores";
 import BufferedAccountsInline from "./BufferedAccountsInline";
-import { useScouterCompanies } from "@/hooks/useScouterLeads";
+import { useAgenciaDeCreadoras } from "@/hooks/useAgenciaDeCreadoras";
+import { negocioDeLaOpcion } from "@/lib/creadoras/agencia";
+import SelectorDeAgencia from "@/components/creadoras/SelectorDeAgencia";
 import { useModelCategories } from "@/hooks/useModelCategories";
 import CommissionTiersEditor, { type CommissionTier } from "@/components/commission/CommissionTiersEditor";
 import { PageHeader } from "@/components/ui/page-header";
@@ -32,7 +34,6 @@ import { useLanguage } from "@/hooks/useLanguage";
 
 // Fallback estático sólo si scouter_companies todavía no cargó. La
 // fuente real son las compañías canónicas de la DB.
-const AGENCIES_FALLBACK = ["Kash", "Atomick", "Unlok", "Ora", "Exchange", "PicLink", "Content Protector", "Trafix", "Proyecto Medellín", "Pagomundo", "BLU"];
 const LANGUAGES = ["Español", "English", "Italiano", "Português", "Français", "Deutsch", "Русский"];
 // En estas listas `value` es lo que se GUARDA; `label` es la clave de lo que se muestra.
 const STATUSES: Array<{ value: string; label: TranslationKey }> = [
@@ -184,12 +185,10 @@ const NuevoCreadorForm = () => {
   const [extraAccts, setExtraAccts] = useState<Record<string, string[]>>({});
   const [step, setStep] = useState(1);
   const mutation = useAddCreadorWithBusiness();
-  const { data: scouterCompanies = [] } = useScouterCompanies();
-  // AGENCIES = compañías canónicas. Si todavía no cargaron, fallback al
-  // listado estático (no se debería usar — solo cubre el primer render).
-  const AGENCIES = scouterCompanies.length > 0
-    ? scouterCompanies.map((c) => c.name)
-    : AGENCIES_FALLBACK;
+  // La agencia: las opciones de MI agencia (Kash: Kash Plus, Kash Massive,
+  // Atomick) o, si no tiene, su nombre fijo. Antes era el directorio de empresas
+  // del Scouter (Pagomundo, Price Shoes…). Ver lib/creadoras/agencia.ts.
+  const agencia = useAgenciaDeCreadoras();
   // Categorías canónicas — fuente única model_categories.
   const { data: modelCats = [] } = useModelCategories();
   const CATEGORIES = modelCats.length > 0
@@ -322,11 +321,8 @@ const NuevoCreadorForm = () => {
           internal_notes: form.internal_notes || null,
         },
         business: {
-          assigned_agency: form.assigned_agency || null,
-          // Dual-write: derivamos company_id desde el name elegido.
-          // Si no matchea (caso raro), queda NULL — el trigger podría
-          // recuperarlo después por name match.
-          company_id: scouterCompanies.find((sc) => sc.name === form.assigned_agency)?.id ?? null,
+          // El texto, la compañía y (si la línea lo dice) el tier, juntos.
+          ...negocioDeLaOpcion(form.assigned_agency, agencia.lineas, agencia.propia),
           agency_percentage: form.commission_type === "fixed" ? (form.agency_percentage || null) : null,
           commission_type: form.commission_type,
           commission_tiers: form.commission_type === "tiered" ? (form.commission_tiers as any) : [],
@@ -415,12 +411,7 @@ const NuevoCreadorForm = () => {
               </CardHeader>
               <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field label={t("creadores.new.agencyReq")} error={errors.assigned_agency} fieldKey="assigned_agency">
-                  <Select value={form.assigned_agency} onValueChange={(v) => set("assigned_agency", v)}>
-                    <SelectTrigger className={errors.assigned_agency ? "border-destructive" : ""}><SelectValue placeholder={t("creadores.new.selectAgency")} /></SelectTrigger>
-                    <SelectContent>
-                      {AGENCIES.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <SelectorDeAgencia value={form.assigned_agency} onChange={(v) => set("assigned_agency", v)} invalido={!!errors.assigned_agency} />
                 </Field>
                 <Field label={t("common.status")}>
                   <Select value={form.status} onValueChange={(v) => set("status", v)}>

@@ -301,6 +301,12 @@ jobs:
       - name: Banco — portal de creadoras, su contenido en el Drive (PGlite)
         run: deno run -A --node-modules-dir=none --no-lock supabase/tests/portal_contenido.ts
 
+      # La agencia de cada creadora, por agencia (06/10): Kash se llama Kash y elige entre
+      # Kash Plus, Kash Massive y Atomick (con su compañía y su tier); otra agencia no ve
+      # ninguna (su nombre fijo); nadie las escribe desde el navegador; vuelta atrás. ~5 s.
+      - name: Banco — la agencia de cada creadora (PGlite)
+        run: deno run -A --node-modules-dir=none --no-lock supabase/tests/agencia_lineas.ts
+
       # portal-contenido (ella y su carpeta): solo su ficha y lo de SU carpeta; borrar lo
       # suyo hasta 24 h, primero en el NAS; partes de 8 MB firmadas; el recibo del NAS.
       - name: Guard — portal-contenido

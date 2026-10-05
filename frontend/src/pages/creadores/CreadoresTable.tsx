@@ -47,6 +47,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useAgenciaDeCreadoras } from "@/hooks/useAgenciaDeCreadoras";
 
 const statusVariant: Record<string, "success-soft" | "primary-soft" | "warning-soft" | "destructive-soft" | "secondary-soft"> = {
   active: "success-soft",
@@ -79,24 +80,14 @@ const getFlagEmoji = (countryCode: string | null) => {
 
 type SortKey = "name" | "category" | "status" | "country" | "agency";
 
-// Agencia CANÓNICA — solo 3 valores: "Kash Plus" / "Kash Massive" (OnlyFans; el tier
-// lo setea BLU vía kash_type) y "Atomick" (Unlok). "Kash" = Kash sin tier aún (se
-// completa solo cuando el micro lo tagea). "" = sin agencia cargada (a asignar).
-function canonicalAgency(cb: any): string {
-  const kt = cb?.kash_type;
-  if (kt === "Plus" || kt === "Massive") return `Kash ${kt}`;
-  const raw = `${cb?.company?.name ?? ""} ${cb?.assigned_agency ?? ""}`.toLowerCase();
-  if (/atomick|unlok/.test(raw)) return "Atomick";
-  if (/kash/.test(raw)) return "Kash";
-  return "";
-}
-
 interface Props {
   creators: CreatorWithBusiness[];
 }
 
 const CreadoresTable = ({ creators }: Props) => {
   const { t } = useLanguage();
+  // La agencia de cada una: la regla única (lib/creadoras/agencia.ts).
+  const { agenciaDe: canonicalAgency } = useAgenciaDeCreadoras();
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortAsc, setSortAsc] = useState(true);
   const [editingCreator, setEditingCreator] = useState<CreatorWithBusiness | null>(null);

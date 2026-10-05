@@ -17,7 +17,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { WaChatButton, toE164 } from "@/components/WaChatButton";
 import { TgChatButton } from "@/components/TgChatButton";
-import { useScouterCompanies } from "@/hooks/useScouterLeads";
+import { useAgenciaDeCreadoras } from "@/hooks/useAgenciaDeCreadoras";
+import { negocioDeLaOpcion } from "@/lib/creadoras/agencia";
+import SelectorDeAgencia from "@/components/creadoras/SelectorDeAgencia";
 import { ManagerSelect, managerAssignmentPatch, useManagerName } from "./ManagerSelect";
 import { useModelCategories } from "@/hooks/useModelCategories";
 import { useFormato } from "@/hooks/useFormato";
@@ -59,7 +61,6 @@ const countryOptions = Object.keys(countryToCode).sort((a, b) => a.localeCompare
 
 // Agencias: lista fija pedida por dirección (07/09). Kash Plus/Massive son las
 // cuentas BLU; Unlok la casa. El manager de la creadora es un campo APARTE.
-const AGENCY_OPTIONS = ["Kash Massive", "Kash Plus", "Unlok"];
 const CATEGORY_OPTIONS_FALLBACK = ["Elite", "A+", "A", "B+", "B", "C+", "C"];
 
 const getFlagEmoji = (code: string | null) => {
@@ -106,8 +107,10 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
   const queryClient = useQueryClient();
   const c = creator;
   const biz = c.creator_business;
-  // scouter_companies solo para resolver company_id si el nombre matchea.
-  const { data: scouterCompanies = [] } = useScouterCompanies();
+  // La agencia: las opciones de MI agencia (Kash: Kash Plus, Kash Massive,
+  // Atomick) o, si no tiene, su nombre fijo. Ver lib/creadoras/agencia.ts.
+  const agencia = useAgenciaDeCreadoras();
+  const agenciaActual = agencia.agenciaDe(biz);
   // Manager: misma pieza que el lápiz del Listado (ManagerSelect) — un solo
   // pool, un solo payload, un solo historial.
   const managerName = useManagerName(c.assigned_manager_profile_id);
@@ -134,8 +137,7 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
 
   const startEditing = () => {
     setEditData({
-      // Lee del FK joined; fallback al texto si la FK no está poblada.
-      assigned_agency: (biz as any)?.company?.name ?? biz?.assigned_agency ?? "",
+      assigned_agency: agenciaActual,
       category: c.category ?? "",
       manager_profile_id: c.assigned_manager_profile_id ?? "",
       agency_percentage: biz?.agency_percentage != null ? String(biz.agency_percentage) : "",
@@ -169,22 +171,21 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
         } as any)
         .eq("id", creatorId);
 
-      // Dual-write: resolvemos company_id desde el name elegido y guardamos
-      // AMBOS — la FK canónica y el texto por backwards-compat. El porcentaje
-      // se acota a 0-100 (vacío = null).
-      const matchedCompany = scouterCompanies.find(
-        (sc) => sc.name === editData.assigned_agency,
-      );
+      // La agencia solo se escribe si se cambió: una ficha vieja («Kash» sin
+      // tier, Unlok…) que se guarda sin tocarla no pierde su compañía. Al
+      // elegir una opción, el texto, la compañía y (si la línea lo dice) el
+      // tier, juntos. El porcentaje se acota a 0-100 (vacío = null).
       const pctRaw = editData.agency_percentage.trim();
       const pctNum = pctRaw === "" ? null : Math.min(100, Math.max(0, Number(pctRaw)));
       const bizPayload = {
-        assigned_agency: editData.assigned_agency || null,
-        company_id: matchedCompany?.id ?? null,
+        ...(editData.assigned_agency && editData.assigned_agency !== agenciaActual
+          ? negocioDeLaOpcion(editData.assigned_agency, agencia.lineas, agencia.propia)
+          : {}),
         agency_percentage: pctNum != null && Number.isFinite(pctNum) ? pctNum : null,
       };
       if (biz?.id) {
         await supabase.from("creator_business").update(bizPayload as any).eq("id", biz.id);
-      } else if (bizPayload.assigned_agency || bizPayload.agency_percentage != null) {
+      } else if ("assigned_agency" in bizPayload || bizPayload.agency_percentage != null) {
         // La creadora aún no tiene fila de negocio: crearla en vez de perder
         // el dato en silencio.
         await supabase.from("creator_business").insert({ creator_id: creatorId, ...bizPayload } as any);
@@ -226,22 +227,11 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
         {/* Agencia Asignada */}
         {isEditing ? (
           <EditField label={t("creadores.info.agency")}>
-            <Select value={editData.assigned_agency} onValueChange={(v) => updateField("assigned_agency", v)}>
-              <SelectTrigger className="h-9 text-sm"><SelectValue placeholder={t("common.select")} /></SelectTrigger>
-              <SelectContent>
-                {/* Un valor guardado fuera de la lista fija sigue visible/elegible. */}
-                {(editData.assigned_agency && !AGENCY_OPTIONS.includes(editData.assigned_agency)
-                  ? [editData.assigned_agency, ...AGENCY_OPTIONS]
-                  : AGENCY_OPTIONS
-                ).map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <SelectorDeAgencia value={editData.assigned_agency} onChange={(v) => updateField("assigned_agency", v)} />
           </EditField>
         ) : (
           <InfoField label={t("creadores.info.agency")} value={
-            ((biz as any)?.company?.name || biz?.assigned_agency) ? (
-              <span className="text-primary cursor-pointer hover:underline">{(biz as any)?.company?.name ?? biz?.assigned_agency}</span>
-            ) : null
+            agenciaActual ? <span className="text-primary">{agenciaActual}</span> : null
           } />
         )}
 

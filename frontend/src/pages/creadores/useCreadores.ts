@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables, TablesInsert } from "@/integrations/supabase/types";
+import { useAgenciaDeCreadoras } from "@/hooks/useAgenciaDeCreadoras";
+import { type LineaDeAgencia, opcionesDelFiltro } from "@/lib/creadoras/agencia";
 
 export type CreatorWithBusiness = Tables<"creators"> & {
   creator_business: {
@@ -60,21 +62,11 @@ function uniqueValues(creators: CreatorWithBusiness[], key: keyof Tables<"creato
   return Array.from(set).sort();
 }
 
-const AGENCY_ORDER = [
-  "Atomic Agency", "Elite Models", "Kash Agency",
-  "Unlok Platform", "Trafix", "Otra",
-];
-
-function uniqueAgencies(creators: CreatorWithBusiness[]): string[] {
-  // Lee del FK joined; fallback al texto sólo si la FK no está poblada.
-  const set = new Set<string>();
-  for (const c of creators) {
-    const agency = c.creator_business?.company?.name ?? c.creator_business?.assigned_agency;
-    if (agency) set.add(agency);
-  }
-  const known = AGENCY_ORDER.filter((a) => set.has(a));
-  const others = Array.from(set).filter((a) => !AGENCY_ORDER.includes(a)).sort();
-  return [...known, ...others];
+// Las opciones del filtro «Agencia»: las de mi agencia en su orden (Kash Plus,
+// Kash Massive, Atomick) y después lo que haya en fichas viejas. Una sola regla
+// para todas las pantallas: lib/creadoras/agencia.ts.
+function uniqueAgencies(creators: CreatorWithBusiness[], agenciaDe: (cb: CreatorWithBusiness["creator_business"]) => string, lineas: LineaDeAgencia[]): string[] {
+  return opcionesDelFiltro(creators.map((c) => agenciaDe(c.creator_business)), lineas);
 }
 
 // Filtro Managers = PERSONAS con rol manager (mismo pool que el select de la
@@ -116,15 +108,12 @@ function applyFilters(
   filters: CreadorFilters,
   // creator_ids que alguna vez tuvieron a la manager del filtro (bitácora).
   managerCreatorIds: Set<string> | null,
+  agenciaDe: (cb: CreatorWithBusiness["creator_business"]) => string,
 ): CreatorWithBusiness[] {
   let result = creators;
 
   if (filters.agency) {
-    // Match contra el name del FK joined, con fallback al texto.
-    result = result.filter((c) => {
-      const name = c.creator_business?.company?.name ?? c.creator_business?.assigned_agency;
-      return name === filters.agency;
-    });
+    result = result.filter((c) => agenciaDe(c.creator_business) === filters.agency);
   }
   if (filters.status) {
     result = result.filter((c) => c.status === filters.status);
@@ -163,6 +152,7 @@ function applyFilters(
 }
 
 export function useCreadores(filters: CreadorFilters, page = 1, pageSize = 25) {
+  const agencia = useAgenciaDeCreadoras();
   const query = useQuery({
     queryKey: ["creators"],
     queryFn: fetchCreators,
@@ -186,7 +176,7 @@ export function useCreadores(filters: CreadorFilters, page = 1, pageSize = 25) {
           .map((h) => h.creator_id),
       )
     : null;
-  const filtered = applyFilters(allCreators, filters, managerCreatorIds);
+  const filtered = applyFilters(allCreators, filters, managerCreatorIds, agencia.agenciaDe);
   const totalCount = filtered.length;
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
@@ -198,7 +188,7 @@ export function useCreadores(filters: CreadorFilters, page = 1, pageSize = 25) {
     totalPages,
     isLoading: query.isLoading,
     statusCounts: computeStatusCounts(filtered),
-    agencies: uniqueAgencies(allCreators),
+    agencies: uniqueAgencies(allCreators, agencia.agenciaDe, agencia.lineas),
     categories: uniqueValues(allCreators, "category"),
     countries: uniqueValues(allCreators, "country"),
     cities: uniqueValues(allCreators, "city"),
