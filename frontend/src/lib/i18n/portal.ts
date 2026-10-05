@@ -264,7 +264,7 @@ export const portal = {
     es: "Editar su ficha (Operaciones): su personaje, lo que jamás haría y cómo responder",
     en: "Edit her profile (Operations): her persona, her limits and how to answer",
   },
-  "portal.acceso.puedeContenido": { es: "Subir su contenido (muy pronto)", en: "Upload her content (coming soon)" },
+  "portal.acceso.puedeContenido": { es: "Subir sus fotos y videos (los ves en la pestaña Contenido)", en: "Upload her photos and videos (you'll see them in the Content tab)" },
   "portal.acceso.puedePedidos": { es: "Ver y entregar sus personalizados (muy pronto)", en: "See and deliver her custom requests (coming soon)" },
   "portal.acceso.nuncaVe": { es: "Nunca ve chatters, ventas ni nada de otras creadoras.", en: "She never sees chatters, sales or anything about other creators." },
   "portal.acceso.ultimo": { es: "Lo último que hizo", en: "Her latest activity" },

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { format, formatDistanceToNow } from "date-fns";
-import { CircleCheck, Clapperboard, FolderUp, History, KeyRound, Loader2, Mail, Send, UserX } from "lucide-react";
+import { CircleCheck, Clapperboard, History, KeyRound, Loader2, Mail, Send, UserX } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useFormato } from "@/hooks/useFormato";
 import { useToast } from "@/hooks/use-toast";
@@ -166,7 +166,8 @@ export default function PortalTabContent({ creatorId, correoFicha, onVerHistoria
             <h3 className="text-sm font-semibold">{t("portal.acceso.queHace")}</h3>
             <ul className="mt-2 space-y-2 text-sm">
               <li className="flex items-start gap-2"><CircleCheck className="mt-0.5 h-4 w-4 shrink-0 text-success" aria-hidden="true" />{t("portal.acceso.puedeFicha")}</li>
-              <li className="flex items-start gap-2 text-muted-foreground"><FolderUp className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />{t("portal.acceso.puedeContenido")}</li>
+              {/* Ya funciona desde la fase 2 (#2029): se ve en la pestaña Contenido. */}
+              <li className="flex items-start gap-2"><CircleCheck className="mt-0.5 h-4 w-4 shrink-0 text-success" aria-hidden="true" />{t("portal.acceso.puedeContenido")}</li>
               <li className="flex items-start gap-2 text-muted-foreground"><Clapperboard className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />{t("portal.acceso.puedePedidos")}</li>
             </ul>
             <p className="mt-3 text-xs text-muted-foreground">{t("portal.acceso.nuncaVe")}</p>

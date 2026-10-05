@@ -11,6 +11,11 @@
 // —el "está escribiendo" del fan y el "leído por el examinador"— que llevaban
 // tiempo muertas en silencio por lo mismo.
 //
+// Lo mismo con `supabase.rpc(...)` (06/10): el portal de creadoras nunca anotaba
+// que la creadora había entrado —`void supabase.rpc("portal_hola", …)`— y la
+// ficha decía «Invitada · todavía no entra» con la creadora adentro. Su prueba
+// simulaba `rpc` con una promesa que corre sola y no lo vio.
+//
 // Cómo se cumple: si de verdad es fire-and-forget, cerrar con
 // `.then(() => {}, () => {})`. Si importa el resultado, `await`.
 
@@ -20,16 +25,17 @@ const fuentes = (import.meta as unknown as {
   glob: (p: string, o: Record<string, unknown>) => Record<string, string>;
 }).glob("/frontend/src/**/*.{ts,tsx}", { query: "?raw", import: "default", eager: true });
 
-/** Statements `void supabase ... ;` que tocan una tabla. Los `void
+/** Statements `void supabase ... ;` que tocan una tabla o llaman a una función
+ *  de la base (`.rpc(`). Los `void
  *  supabase.functions.invoke(...)` y `void supabase.removeChannel(...)` quedan
  *  fuera: esos SÍ devuelven una promesa de verdad y se ejecutan solos. */
 function escriturasMudas(src: string): number {
   const statements: string[] = src.match(/void supabase[\s\S]*?;/g) ?? [];
-  return statements.filter((s) => s.includes(".from(") && !s.includes(".then(")).length;
+  return statements.filter((s) => (s.includes(".from(") || s.includes(".rpc(")) && !s.includes(".then(")).length;
 }
 
 describe("las escrituras a Supabase de verdad salen", () => {
-  it("ningún `void supabase.from(...)` se queda sin consumir", () => {
+  it("ningún `void supabase.from(...)` ni `void supabase.rpc(...)` se queda sin consumir", () => {
     const culpables: string[] = [];
     for (const [ruta, src] of Object.entries(fuentes)) {
       if (ruta.includes("/test/")) continue;
@@ -47,6 +53,8 @@ describe("las escrituras a Supabase de verdad salen", () => {
   it("el guard reconoce el patrón (si esto falla, la detección dejó de servir)", () => {
     expect(escriturasMudas('void supabase.from("t").update({a:1}).eq("id", x);')).toBe(1);
     expect(escriturasMudas('void supabase.from("t").update({a:1}).eq("id", x).then(() => {});')).toBe(0);
+    expect(escriturasMudas('void supabase.rpc("portal_hola", { p_creator: id });')).toBe(1);
+    expect(escriturasMudas('void supabase.rpc("portal_hola", { p_creator: id }).then(() => {}, () => {});')).toBe(0);
     // Estos se ejecutan solos: no son el bicho.
     expect(escriturasMudas('void supabase.functions.invoke("f", { body });')).toBe(0);
     expect(escriturasMudas("void supabase.removeChannel(canal);")).toBe(0);

@@ -112,6 +112,8 @@ export function useGuardarFicha(creatorId: string | undefined) {
 export function usePortalHola(creatorId: string | undefined) {
   useEffect(() => {
     if (!creatorId) return;
-    void supabase.rpc("portal_hola" as never, { p_creator: creatorId } as never);
+    // ⚠️ `.then(...)`: el builder de supabase-js es perezoso; con un `void` solo
+    // nunca salía y la ficha decía «todavía no entra» (ver escriturasQueSalen).
+    void supabase.rpc("portal_hola" as never, { p_creator: creatorId } as never).then(() => {}, () => {});
   }, [creatorId]);
 }
