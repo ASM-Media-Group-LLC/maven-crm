@@ -293,6 +293,22 @@ jobs:
       - name: Tipos — portal-creadoras
         run: deno check supabase/functions/portal-creadoras/index.ts
 
+      # Portal de creadoras, fase 2 (06/10): la carpeta de contenido de cada creadora es
+      # una unidad del Drive de su agencia. Quién del equipo la abre (drive_mi_rol: ve a la
+      # creadora y tiene «Ver y descargar su contenido»; en prod nadie la abría), el Drive
+      # de siempre igual para todos (64 casos contra prod), lector sin escritura, el
+      # espacio de la agencia y la vuelta atrás. ~10 s.
+      - name: Banco — portal de creadoras, su contenido en el Drive (PGlite)
+        run: deno run -A --node-modules-dir=none --no-lock supabase/tests/portal_contenido.ts
+
+      # portal-contenido (ella y su carpeta): solo su ficha y lo de SU carpeta; borrar lo
+      # suyo hasta 24 h, primero en el NAS; partes de 8 MB firmadas; el recibo del NAS.
+      - name: Guard — portal-contenido
+        run: deno test --allow-read supabase/functions/portal-contenido/logica.test.ts
+
+      - name: Tipos — portal-contenido
+        run: deno check supabase/functions/portal-contenido/index.ts
+
       # `deno test --no-check` no mira tipos: sin este paso, el tipo de msg() (clave que
       # existe, variables exactas) y los @ts-expect-error de mensajes.test.ts nunca
       # podrían fallar en CI. messenger.test.ts queda afuera: arrastra un error de tipos
