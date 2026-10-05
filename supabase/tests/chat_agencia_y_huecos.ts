@@ -109,6 +109,10 @@ const NO_TOCAN_EL_MESSENGER: Record<string, string> = {
     "reescribe is_in_role_group y le suma tenant_id a user_roles, pero necesita las tablas de roles (roles_config, " +
     "role_permissions, role_base_grants y sus triggers) que este fixture no trae. Con una sola agencia da lo mismo que " +
     "prod persona por persona, y con dos se prueba en su propio banco sobre el catálogo de prod: roles_por_agencia.ts.",
+  "20261006130000_agencia_lineas.sql":
+    "crea agencia_lineas (con FK a scouter_companies, que este fixture no trae) y le cambia el NOMBRE a una agencia " +
+    "(ASM Tech → Kash): el Messenger usa el id de la agencia, nunca el nombre. Los candados sobre tenants (ninguno " +
+    "más fuerte que SHARE ROW EXCLUSIVE, que deja leer) los mira su propio banco: agencia_lineas.ts.",
 };
 // Si una migración posterior cambia a propósito algo que creó A (el PR 2 suma el
 // esqueleto del nombre visible a profiles_nombre_lo_cambia_un_admin), se anota

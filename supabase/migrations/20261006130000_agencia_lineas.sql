@@ -18,7 +18,11 @@
 -- Sin líneas, la agencia de la creadora es la propia. La escribe solo un admin
 -- de plataforma (service_role): no hay pantalla para editarlas todavía.
 --
--- Vuelta atrás (las líneas «--|»; el banco las corre):
+-- Vuelta atrás (las líneas «--|»; el banco las corre). Borrar la tabla quita su
+-- clave foránea, y eso toma ACCESS EXCLUSIVE sobre tenants (que se lee en casi
+-- todo pedido): con el tope de 2 s, si hay lecturas largas falla enseguida en
+-- vez de quedar en la cola trabando a toda la app; se reintenta.
+--| set local lock_timeout = '2s';
 --| drop table public.agencia_lineas;
 --| update public.tenants set name = 'ASM Tech' where slug = 'asm-tech' and name = 'Kash';
 

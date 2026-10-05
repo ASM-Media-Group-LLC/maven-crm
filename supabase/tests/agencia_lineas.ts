@@ -6,6 +6,7 @@
 //   1. Kash se llama Kash (no ASM Tech) y tiene sus tres líneas, con su compañía y su tier.
 //   2. Cada uno ve las de su agencia: la otra agencia, ninguna; nadie las escribe.
 //   3. La vuelta atrás deja todo como estaba y se puede volver a aplicar.
+//   4. Ninguna de las dos traba las lecturas de tenants.
 import { PGlite } from "npm:@electric-sql/pglite@0.3";
 
 const leer = (rel: string) => Deno.readTextFileSync(new URL(rel, import.meta.url));
@@ -118,6 +119,32 @@ const con = await nueva(true);
   let r2 = "anduvo";
   try { await aplicar(db, N, M); } catch (e) { r2 = msg(e); }
   check(r2 === "anduvo", "y se puede volver a aplicar");
+}
+
+// ════ 4. Los candados ════════════════════════════════════════════════════════
+// tenants se lee en casi todo pedido de la app: la migración no la toma más
+// fuerte que SHARE ROW EXCLUSIVE, que deja leer (la misma regla de
+// chat_agencia_y_huecos.ts, que a esta migración la salta). La vuelta atrás sí
+// (quitar una clave foránea toma ACCESS EXCLUSIVE sobre la tabla a la que
+// apunta, como en cada *_por_agencia): por eso pone antes un tope de espera.
+{
+  const DEJAN_LEER = ["AccessShareLock", "RowShareLock", "RowExclusiveLock", "ShareUpdateExclusiveLock", "ShareLock", "ShareRowExclusiveLock"];
+  const candados = async (db: PGlite, sql: string) => {
+    await db.exec("begin");
+    try {
+      await db.exec(sql);
+      const modos = (await q(db, `select l.mode from pg_locks l join pg_class c on c.oid = l.relation
+        where l.locktype = 'relation' and c.relname = 'tenants'`)).map((x) => String(x.mode));
+      const tope = String((await q(db, `select current_setting('lock_timeout') t`))[0].t);
+      return { modos, tope };
+    } finally { await db.exec("rollback"); }
+  };
+  const ida = await candados(await nueva(false), M);
+  check(ida.modos.length > 0 && ida.modos.every((m) => DEJAN_LEER.includes(m)), `la migración no traba las lecturas de tenants (${json(ida.modos)})`);
+  const vuelve = await candados(await nueva(true), vuelta(M));
+  const fuerte = vuelve.modos.some((m) => !DEJAN_LEER.includes(m));
+  check(!fuerte || vuelve.tope === "2s", `la vuelta atrás, si traba tenants, espera como mucho 2 s (${json(vuelve)})`);
+  check(/set local lock_timeout[^;]*;[\s\S]*drop table/.test(vuelta(M)), "el tope va ANTES del drop");
 }
 
 for (const m of ok) console.log(`✓ ${m}`);
