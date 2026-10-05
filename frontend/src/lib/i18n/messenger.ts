@@ -485,6 +485,8 @@ export const messenger = {
   "messenger.callView.volvisteDeLaPausa": { es: "Volviste de la pausa. Tu cámara y tu micrófono ya están encendidos; la pantalla hay que retomarla.", en: "You're back from your break. Your camera and microphone are on again; you need to share your screen again." },
   "messenger.callView.volverACompartir": { es: "Volver a compartir pantalla", en: "Share screen again" },
   "messenger.callView.salaCaida": { es: "Se perdió la conexión con la sala.", en: "Lost connection to the room." },
+  "messenger.callView.audioBloqueado": { es: "Tu navegador bloqueó el sonido de la llamada.", en: "Your browser blocked the call audio." },
+  "messenger.callView.activarSonido": { es: "Activar sonido", en: "Turn on sound" },
   "messenger.callView.reconectarAhora": { es: "Reconectar", en: "Reconnect" },
   "messenger.callView.volviendoALaSala": { es: "Volviendo a la sala…", en: "Rejoining the room…" },
   "messenger.callView.volvisteALaSala": { es: "Volviste a la sala. Tu cámara y tu micrófono quedaron apagados: préndelos y vuelve a compartir tu pantalla.", en: "You're back in the room. Your camera and microphone are off: turn them on and share your screen again." },

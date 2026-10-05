@@ -171,11 +171,52 @@ function correrDesbloqueos(): void {
 let esperandoGesto = false;
 let soltarGesto: (() => void) | null = null;
 
+// Quién quiere enterarse de que el audio quedó esperando un gesto. Hasta ahora
+// esto solo dejaba un console.warn: la persona no oía a nadie y nada en la
+// pantalla se lo decía (en un iPhone, el invitado admitido con todo apagado se
+// quedaba sin sonido hasta tocar por casualidad). La vista se suscribe y dibuja
+// un aviso con botón; el botón es el gesto.
+const oyentesDeEspera = new Set<(esperando: boolean) => void>();
+
+function avisarEspera(esperando: boolean): void {
+  for (const fn of oyentesDeEspera) {
+    try { fn(esperando); } catch { /* un oyente roto no frena a los demás */ }
+  }
+}
+
+/** ¿El audio está esperando un gesto del usuario para sonar? */
+export function estaEsperandoGesto(): boolean {
+  return esperandoGesto;
+}
+
+/** Avisa cada vez que empieza o termina la espera de gesto. Llama enseguida
+ *  con el estado actual. Devuelve la función para darse de baja. */
+export function suscribirEsperaDeGesto(fn: (esperando: boolean) => void): () => void {
+  oyentesDeEspera.add(fn);
+  try { fn(esperandoGesto); } catch { /* noop */ }
+  return () => { oyentesDeEspera.delete(fn); };
+}
+
 /** Deja de esperar el gesto (y limpia los listeners). */
 export function dejarDeEsperarGesto(): void {
   soltarGesto?.();
   soltarGesto = null;
+  const estaba = esperandoGesto;
   esperandoGesto = false;
+  if (estaba) avisarEspera(false);
+}
+
+/** Lo que hace un gesto del usuario: primero el contexto de LiveKit, después los
+ *  elementos (si el contexto sigue suspendido, el `play()` del elemento no
+ *  produce sonido igual). Público para que el botón "Activar sonido" lo llame
+ *  directo, sin depender de que su clic burbujee hasta el documento. */
+export function reintentarAudioPorGesto(): void {
+  correrDesbloqueos();
+  const quedan = reproducirAudiosPausados();
+  if (quedan > 0) return;              // sigue trabado: se mantiene la espera
+  if (!esperandoGesto) return;
+  console.info("[Audio] Audio reanudado tras el gesto del usuario.");
+  dejarDeEsperarGesto();
 }
 
 /**
@@ -202,16 +243,9 @@ export function reanudarAudioConGesto(motivo: string): void {
 
   if (esperandoGesto) return;
   esperandoGesto = true;
+  avisarEspera(true);
 
-  const alGesto = () => {
-    // Primero el contexto de LiveKit, después los elementos: si el contexto
-    // sigue suspendido, el `play()` del elemento no produce sonido igual.
-    correrDesbloqueos();
-    const quedan = reproducirAudiosPausados();
-    if (quedan > 0) return;              // sigue trabado: se mantiene la espera
-    console.info("[Audio] Audio reanudado tras el gesto del usuario.");
-    dejarDeEsperarGesto();
-  };
+  const alGesto = () => reintentarAudioPorGesto();
 
   const enganchados: Array<{ doc: Document }> = [];
   const engancharDoc = (doc: Document) => {

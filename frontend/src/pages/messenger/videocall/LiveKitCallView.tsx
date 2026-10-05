@@ -14,7 +14,8 @@ import RoomAudioSink from "./RoomAudioSink";
 import { useAutoPiP } from "./useAutoPiP";
 import { suscribirOrdenesDePausa } from "@/lib/ordenesDePausa";
 
-import { Loader2, WifiOff, Copy, ChevronLeft, ChevronRight, DoorOpen, Check } from "lucide-react";
+import { Loader2, WifiOff, Copy, ChevronLeft, ChevronRight, DoorOpen, Check, VolumeX } from "lucide-react";
+import { suscribirEsperaDeGesto, reintentarAudioPorGesto } from "@/lib/audioDeLaLlamada";
 import { CLAVES_OTRA_PESTANA } from "@/lib/sesionDuplicada";
 import { caidaEnCurso, conexionDeSala, marcarCaida, olvidarCaida } from "@/lib/conexionSala";
 import type { ConexionSala } from "@/lib/coworkTiempoRegla";
@@ -558,6 +559,11 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   // teléfono que la persona sí estaba usando. Con el botón, vuelve quien está.
   // El botón solo aparece sin un intento en curso (ver el cartel).
   const puedeReconectar = salaCaida && lk.connectionState === ConnectionState.Disconnected;
+  // El navegador bloqueó el audio hasta un gesto (autoplay). Se dibuja ACÁ, en la
+  // vista, y no como toast: la vista viaja con la llamada a la ventana flotante;
+  // el toast se queda en la pestaña que la persona dejó atrás.
+  const [audioEsperaGesto, setAudioEsperaGesto] = useState(false);
+  useEffect(() => suscribirEsperaDeGesto(setAudioEsperaGesto), []);
   const onMediaStateChangeRef = useRef(onMediaStateChange);
   onMediaStateChangeRef.current = onMediaStateChange;
   // Vigilancia de encuadre sobre la cámara local. El track sale del room de
@@ -817,6 +823,22 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
           ) : (
             <span>{t("messenger.callView.volviendoALaSala")}</span>
           )}
+        </div>
+      )}
+
+      {/* Sin sonido hasta que la persona toque algo. Antes solo quedaba un
+          console.warn: no oía a nadie y nada se lo decía. El botón ES el gesto. */}
+      {audioEsperaGesto && (
+        <div role="status" className="shrink-0 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 py-2 px-3 bg-warning/15 text-warning text-xs font-medium text-center">
+          <VolumeX className="h-3.5 w-3.5 shrink-0" />
+          <span>{t("messenger.callView.audioBloqueado")}</span>
+          <button
+            type="button"
+            onClick={reintentarAudioPorGesto}
+            className="rounded-full bg-warning px-3 py-1 text-warning-foreground font-semibold hover:bg-warning/90"
+          >
+            {t("messenger.callView.activarSonido")}
+          </button>
         </div>
       )}
 
