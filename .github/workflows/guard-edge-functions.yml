@@ -242,6 +242,16 @@ jobs:
       - name: Banco — Drive, buscador y fecha de la papelera (PGlite)
         run: deno run -A --node-modules-dir=none --no-lock supabase/tests/drive_buscar_y_fecha.ts
 
+      # Creadoras por agencia, cuentas externas y avisos (05/10), sobre el catálogo de
+      # PROD (roles 01/10 + fixtures/prod_creadoras_20261005.sql, con las huellas de sus
+      # 42 funciones y 3 vistas): con una agencia cada persona ve lo mismo que en prod
+      # (tabla, v_creators y 10 funciones); con dos, cada hueco se prueba abierto en prod
+      # y cerrado con las migraciones (tabla, vistas, funciones, escrituras por las
+      # vistas, la cuenta de creadora sin rol, los avisos a otra agencia o con enlaces de
+      # afuera); la vuelta atrás deja todo como en prod. ~5 s.
+      - name: Banco — creadoras por agencia, cuentas externas y avisos (PGlite)
+        run: deno run -A --node-modules-dir=none --no-lock supabase/tests/creadoras_por_agencia.ts
+
       # `deno test --no-check` no mira tipos: sin este paso, el tipo de msg() (clave que
       # existe, variables exactas) y los @ts-expect-error de mensajes.test.ts nunca
       # podrían fallar en CI. messenger.test.ts queda afuera: arrastra un error de tipos
