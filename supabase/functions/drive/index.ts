@@ -34,7 +34,7 @@ import {
   armarListaDelZip, CuentaDelZip, entraEnElZip, idsParaZip, nombreDelZip, PROFUNDIDAD_ZIP, TOPE_ZIP_ENTRADAS, TOPE_ZIP_PERMISO,
   type FichaZip,
 } from "./logica.ts";
-import { extensionParaMiniatura, idsParaMiniaturas, venceMiniatura } from "./logica.ts";
+import { extensionParaMiniatura, extensionParaVerComoJpg, idsParaMiniaturas, LADO_VISTA, venceMiniatura } from "./logica.ts";
 
 Deno.serve(async (req) => {
   const CORS = corsFor(req, { "Access-Control-Allow-Methods": "POST, OPTIONS" });
@@ -257,8 +257,13 @@ Deno.serve(async (req) => {
       if (!fila || fila.tipo !== "archivo") throw new HttpError("No existe o no tienes acceso", 404);
       if (fila.estado !== "listo") throw new HttpError("El archivo todavía se está subiendo", 409);
       const descargar = !!body.descargar;
+      // Una HEIC para mirar: el JPG que el NAS convierte (el navegador no la
+      // dibuja). Para descargar, siempre el original.
+      const comoJpg = descargar ? null : extensionParaVerComoJpg(fila.nombre, fila.mime);
       const u = await permisoNas(
-        { op: "get", k: fila.storage_key, ct: fila.mime ?? "application/octet-stream", n: fila.nombre, dl: descargar },
+        comoJpg
+          ? { op: "mini", k: fila.storage_key, x: comoJpg, l: LADO_VISTA }
+          : { op: "get", k: fila.storage_key, ct: fila.mime ?? "application/octet-stream", n: fila.nombre, dl: descargar },
         VENCE.bajar,
       );
       // «Abierto por última vez»: lo que después decide qué se archiva. Una

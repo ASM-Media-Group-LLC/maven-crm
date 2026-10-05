@@ -28,6 +28,10 @@ import { createHash, randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
 
 export const LADO_MINIATURA = 480;
+/** Para MIRAR una foto que el navegador no dibuja (HEIC del iPhone; Jhon, 06/10):
+ *  el visor pide la conversión a JPG de este lado, no la miniatura. */
+export const LADO_VISTA = 2048;
+export const LADOS = new Set([LADO_MINIATURA, LADO_VISTA]);
 export const TIEMPO_MINIATURA = 15_000;
 export const MINIATURAS_A_LA_VEZ = 2;
 /** Más que esto esperando: se contesta «ahora no» en vez de acumular. */
@@ -78,14 +82,16 @@ async function existe(p) {
 }
 
 /** Dónde queda la miniatura de un archivo en la caché de su disco. */
-export function rutaEnCache(raiz, clave, size) {
-  const h = createHash("sha256").update(`${clave}:${size}`).digest("hex");
+export function rutaEnCache(raiz, clave, size, lado = LADO_MINIATURA) {
+  // La miniatura de siempre conserva su clave (la caché que ya está en el disco
+  // sigue sirviendo); otro lado lleva el lado en la clave.
+  const h = createHash("sha256").update(lado === LADO_MINIATURA ? `${clave}:${size}` : `${clave}:${size}:${lado}`).digest("hex");
   return path.join(raiz, CARPETA_CACHE, h.slice(0, 2), `${h}.jpg`);
 }
 
 /** Arma la miniatura en una carpeta temporal del mismo disco y la deja en la
  *  caché. Devuelve la ruta, o null si no se pudo. */
-async function generar(conf, { raiz, ruta, x, destino }) {
+async function generar(conf, { raiz, ruta, x, destino, lado = LADO_MINIATURA }) {
   const tiempo = conf.tiempoMiniatura ?? TIEMPO_MINIATURA;
   const sips = conf.sips ?? "/usr/bin/sips";
   const qlmanage = conf.qlmanage ?? "/usr/bin/qlmanage";
@@ -97,9 +103,10 @@ async function generar(conf, { raiz, ruta, x, destino }) {
     // symlink: a sips le alcanza; a Quick Look no, y queda sin miniatura.
     try { await fsp.link(ruta, conNombre); } catch { await fsp.symlink(ruta, conNombre); }
     const jpg = path.join(tmp, "mini.jpg");
-    const aJpeg = ["-s", "format", "jpeg", "-s", "formatOptions", "75"];
+    // Para mirar, más calidad que para la miniatura.
+    const aJpeg = ["-s", "format", "jpeg", "-s", "formatOptions", lado === LADO_MINIATURA ? "75" : "85"];
     if (POR_SIPS.has(x)) {
-      await correr(sips, ["-Z", String(LADO_MINIATURA), ...aJpeg, conNombre, "--out", jpg], tiempo);
+      await correr(sips, ["-Z", String(lado), ...aJpeg, conNombre, "--out", jpg], tiempo);
     } else {
       await correr(qlmanage, ["-t", "-s", String(LADO_MINIATURA), "-o", tmp, conNombre], tiempo);
       const png = path.join(tmp, `archivo.${x}.png`);
@@ -122,9 +129,10 @@ async function generar(conf, { raiz, ruta, x, destino }) {
 
 /** La miniatura de un archivo ya ubicado: de la caché o recién hecha.
  *  `enCurso` junta los pedidos simultáneos del mismo archivo en uno solo. */
-export async function miniaturaDe(conf, cola, enCurso, { raiz, ruta, clave, size, x }, sigueViva = () => true) {
+export async function miniaturaDe(conf, cola, enCurso, { raiz, ruta, clave, size, x, lado = LADO_MINIATURA }, sigueViva = () => true) {
   if (!extensionValida(x)) throw error("extensión inválida", 400);
-  const destino = rutaEnCache(raiz, clave, size);
+  if (!LADOS.has(lado)) throw error("lado inválido", 400);
+  const destino = rutaEnCache(raiz, clave, size, lado);
   if (await existe(destino)) return destino;
   const marca = `${destino}.no`;
   try {
@@ -141,7 +149,7 @@ export async function miniaturaDe(conf, cola, enCurso, { raiz, ruta, clave, size
     pedido = { interesados };
     pedido.p = cola(async () => {
       if (await existe(destino)) return destino; // la hizo otro mientras esperaba
-      const hecha = await generar(conf, { raiz, ruta, x, destino });
+      const hecha = await generar(conf, { raiz, ruta, x, destino, lado });
       if (!hecha) {
         await fsp.mkdir(path.dirname(marca), { recursive: true }).catch(() => {});
         await fsp.writeFile(marca, "").catch(() => {});
