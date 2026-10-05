@@ -211,3 +211,60 @@ export function tipoDeFicha(
   if (COMPRIMIDOS.includes(ext) || /zip|rar|7z|tar|gzip/.test(mimeBase(a.mime))) return { clave: "drive.tipo.comprimido", ext };
   return { clave: ext ? "drive.tipo.otro" : "drive.tipo.archivo", ext };
 }
+
+// ── El tipo por los primeros bytes (Jhon, 06/10: «el visor no me deja
+// previsualizar») ────────────────────────────────────────────────────────────
+// 13.593 archivos importados de Google no tienen extensión en el nombre y
+// llegaron como application/octet-stream: grabaciones de Meet y de pantalla
+// («EXPLICACIÓN DE HUBSTAFF», todo «ENTREGA DE CARGO»). Por el nombre y el
+// tipo de la ficha no se sabe qué son; por los primeros bytes, sí.
+
+const GENERICOS = new Set(["", "application/octet-stream", "binary/octet-stream", "application/x-binary", "application/unknown"]);
+
+/** ¿Hay que mirar adentro para saber qué es? Solo cuando ni el nombre ni la
+ *  ficha lo dicen (sin una extensión conocida y con un tipo genérico). */
+export function hayQueMirarAdentro(a: { nombre: string; mime: string | null; size: number | null }): boolean {
+  const v = vistaDeArchivo(a);
+  return v.tipo === "ninguno" && v.motivo === "formato" && GENERICOS.has(mimeBase(a.mime));
+}
+
+const ascii = (b: Uint8Array, desde: number, largo: number) =>
+  String.fromCharCode(...Array.from(b.subarray(desde, desde + largo)));
+
+/** El tipo real por la firma de los primeros bytes (con 16 alcanza; se leen
+ *  64). null si no se reconoce: un .zip puede ser un Word o un Excel y desde
+ *  aquí no se sabe cuál. */
+export function tipoPorFirma(b: Uint8Array): { mime: string; ext: string } | null {
+  if (b.length < 4) return null;
+  // ISO BMFF (mp4, mov, heic, m4a, avif): «ftyp» en el byte 4 y la marca después.
+  if (b.length >= 12 && ascii(b, 4, 4) === "ftyp") {
+    const marca = ascii(b, 8, 4);
+    if (marca === "qt  ") return { mime: "video/quicktime", ext: "mov" };
+    if (["heic", "heix", "heim", "heis", "hevc", "hevx", "mif1", "msf1"].includes(marca)) return { mime: "image/heic", ext: "heic" };
+    if (marca === "avif" || marca === "avis") return { mime: "image/avif", ext: "avif" };
+    if (marca === "M4A " || marca === "M4B ") return { mime: "audio/mp4", ext: "m4a" };
+    return { mime: "video/mp4", ext: "mp4" };
+  }
+  if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return { mime: "image/jpeg", ext: "jpg" };
+  if (b[0] === 0x89 && ascii(b, 1, 3) === "PNG") return { mime: "image/png", ext: "png" };
+  if (ascii(b, 0, 4) === "GIF8") return { mime: "image/gif", ext: "gif" };
+  if (ascii(b, 0, 4) === "%PDF") return { mime: "application/pdf", ext: "pdf" };
+  if (b.length >= 12 && ascii(b, 0, 4) === "RIFF") {
+    const tipo = ascii(b, 8, 4);
+    if (tipo === "WEBP") return { mime: "image/webp", ext: "webp" };
+    if (tipo === "WAVE") return { mime: "audio/wav", ext: "wav" };
+    return null;
+  }
+  if (b[0] === 0x1a && b[1] === 0x45 && b[2] === 0xdf && b[3] === 0xa3) return { mime: "video/webm", ext: "webm" };
+  if (ascii(b, 0, 4) === "OggS") return { mime: "audio/ogg", ext: "ogg" };
+  if (ascii(b, 0, 3) === "ID3" || (b[0] === 0xff && (b[1] & 0xe0) === 0xe0)) return { mime: "audio/mpeg", ext: "mp3" };
+  return null;
+}
+
+/** La vista con lo que dijo la firma: como si el nombre trajera la extensión. */
+export function vistaConFirma(
+  a: { nombre: string; mime: string | null; size: number | null },
+  firma: { mime: string; ext: string } | null,
+): VistaDeArchivo {
+  return firma ? vistaDeArchivo({ nombre: `${a.nombre}.${firma.ext}`, mime: firma.mime, size: a.size }) : vistaDeArchivo(a);
+}

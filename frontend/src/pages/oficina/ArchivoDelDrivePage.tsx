@@ -11,12 +11,13 @@ import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useEditorDeOffice } from "@/hooks/useOnlyOffice";
 import { useEdicionDelDrive, useEditarEnOficina } from "@/hooks/useVisorDrive";
-import { SIN_PERMISO_DRIVE, useMiRolDrive, useRenombrar } from "@/hooks/useDrive";
+import { SIN_PERMISO_DRIVE, useFichaDrive, useMiRolDrive, useRenombrar } from "@/hooks/useDrive";
+import VisorArchivo from "@/pages/oficina/drive/VisorArchivo";
 import DialogoAbrirArchivo from "@/components/oficina/DialogoAbrirArchivo";
 import NombreEditable from "@/components/oficina/NombreEditable";
 import { atajoDeAbrir } from "@/lib/drive/abrirEnLaOficina";
 import { conLaExtension, finDelNombreSinExtension } from "@/lib/drive/nombres";
-import { destinoEnLaOficina, extensionDe, type DestinoDeOficina } from "@/lib/drive/tipoDeArchivo";
+import { comoSeAbreEnLaOficina, destinoEnLaOficina, extensionDe, type DestinoDeOficina } from "@/lib/drive/tipoDeArchivo";
 import type { TranslationKey } from "@/lib/i18n";
 
 // UN ARCHIVO DEL DRIVE ABIERTO EN LA OFICINA (Jhon, 02/10: «que sea exactamente
@@ -47,6 +48,26 @@ const SOLO_VER: Record<"formato" | "permiso" | "espacio", TranslationKey> = {
  *  y el editor anterior no puede quedar montado (ver DocumentoPage). */
 export default function ArchivoDelDrivePage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  // Lo que no es de Oficina (una foto, un video, un PDF) se abre en el visor del
+  // Drive: antes caía aquí y decía «Este archivo no se abre con la Oficina»
+  // (Jhon, 06/10). Al cerrarlo se vuelve a su carpeta.
+  const ficha = useFichaDrive(id ?? null);
+  if (ficha.isPending && id) {
+    return (
+      <Page>
+        <div className="flex flex-1 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+      </Page>
+    );
+  }
+  if (ficha.data && ficha.data.tipo === "archivo" && !comoSeAbreEnLaOficina(ficha.data)) {
+    const volver = () => navigate(ficha.data?.parent_id ? `/oficina/drive?carpeta=${ficha.data.parent_id}` : "/oficina/drive", { replace: true });
+    return (
+      <Page>
+        <VisorArchivo items={[ficha.data]} abierto={ficha.data.id} onAbierto={(v) => { if (!v) volver(); }} />
+      </Page>
+    );
+  }
   return <ArchivoAbierto key={id} id={id} />;
 }
 
