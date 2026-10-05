@@ -38,7 +38,7 @@ export const portal = {
     en: "So your team writes like you: your tone, your nicknames and what you'd never do.",
   },
   "portal.inicio.fichaProgreso": { es: "{hechas} de {total} respuestas", en: "{hechas} of {total} answers" },
-  "portal.inicio.fichaFaltan": { es: "Te falta: {secciones}.", en: "Still missing: {secciones}." },
+  "portal.inicio.fichaFaltan": { es: "Te falta: {secciones}", en: "Still missing: {secciones}" },
   "portal.inicio.completar": { es: "Completar mi ficha", en: "Complete my profile" },
   "portal.inicio.revisar": { es: "Revisar mi ficha", en: "Review my profile" },
   "portal.inicio.prontoTitulo": { es: "Muy pronto, aquí mismo", en: "Coming soon, right here" },
