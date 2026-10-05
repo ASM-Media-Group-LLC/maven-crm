@@ -25,6 +25,7 @@ import TicketsTabContent from "./TicketsTabContent";
 import HistorialTabContent from "./HistorialTabContent";
 import OperacionesTabContent from "./OperacionesTabContent";
 import PortalTabContent from "./PortalTabContent";
+import ContenidoTabContent from "./ContenidoTabContent";
 // generateCreatorPdf pulls jspdf — loaded on demand below.
 import ChangeStatusModal from "./ChangeStatusModal";
 import VerificationSection from "./VerificationSection";
@@ -295,6 +296,7 @@ const CreadorProfileContent = () => {
                 <TabsTrigger value="documentos">{t("creadores.profile.tabDocuments")}</TabsTrigger>
                 <TabsTrigger value="notas">{t("creadores.profile.tabNotes")}</TabsTrigger>
                 <TabsTrigger value="tickets">{t("creadores.profile.tabTickets")}</TabsTrigger>
+                <TabsTrigger value="contenido">{t("portal.agencia.contenido.tab")}</TabsTrigger>
                 <TabsTrigger value="portal">{t("portal.acceso.tab")}</TabsTrigger>
                 <TabsTrigger value="historial">{t("creadores.profile.tabHistory")}</TabsTrigger>
               </>
@@ -345,6 +347,10 @@ const CreadorProfileContent = () => {
 
               <TabsContent value="tickets">
                 <TicketsTabContent creatorId={id!} />
+              </TabsContent>
+
+              <TabsContent value="contenido">
+                <ContenidoTabContent creatorId={id!} />
               </TabsContent>
 
               <TabsContent value="portal">

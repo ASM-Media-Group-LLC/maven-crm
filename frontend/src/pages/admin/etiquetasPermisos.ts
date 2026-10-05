@@ -113,6 +113,7 @@ export const ETIQUETAS: Record<string, TranslationKey> = {
   "Editar Banking": "admin.perm.editBanking",
   "Cambiar Plataforma": "admin.perm.changePlatform",
   "Invitar al portal": "admin.perm.invitePortal",
+  "Ver y descargar su contenido": "admin.perm.viewCreatorContent",
   "Editar": "admin.perm.edit",
   "Enviar al grupo": "admin.perm.sendToGroup",
   "Crear pedido": "admin.perm.createRequest",
