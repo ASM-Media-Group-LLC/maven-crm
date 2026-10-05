@@ -115,6 +115,8 @@ async function getAccessToken(env: ZohoEnv): Promise<ZohoResult<string>> {
 async function zohoFetch<T>(
   path: string,
   init: RequestInit & { method: string },
+  /** La consola de administración (subscriptionInfo) vive en mailadmin.zoho.*. */
+  servidor: "mail" | "mailadmin" = "mail",
 ): Promise<ZohoResult<T>> {
   const env = readEnv();
   if (!env) return { ok: false, skipped: true, error: "Zoho no configurado" };
@@ -122,7 +124,7 @@ async function zohoFetch<T>(
   const tokenRes = await getAccessToken(env);
   if (!tokenRes.ok) return { ok: false, error: tokenRes.error, status: tokenRes.status };
 
-  const url = `https://mail.zoho.${env.dc}/api/organization/${env.zoid}${path}`;
+  const url = `https://${servidor}.zoho.${env.dc}/api/organization/${env.zoid}${path}`;
 
   let resp: Response;
   try {
@@ -249,6 +251,71 @@ export async function listAccounts(
   }
 
   return { ok: true, data: todas };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LICENCIAS: cuántos puestos tiene el plan, según Zoho (Jhon, 06/10).
+// El alta frenaba con «63/10»: el tope estaba fijo en 10 (el plan de cuando se
+// escribió) y la organización ya tenía 70 licencias. Ahora el tope lo dice
+// Zoho: GET mailadmin…/subscriptionInfo trae, por cada plan, las licencias
+// compradas (PROPVALUE) y las asignadas (ALLOTEDUSER).
+// https://www.zoho.com/mail/help/api/get-org-subscription-info.html
+// ⚠️ SCOPE: necesita `ZohoMail.organization.subscriptions.READ` en el refresh
+// token. Sin él Zoho responde OAUTH_SCOPE_MISMATCH y el alta no frena por
+// puestos (ver hayPuestoDeCorreo): mejor eso que un tope inventado.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Una fila de `addOns` en subscriptionInfo: un plan base (PLANNAME) o un
+ *  extra de almacenamiento (ADDONNAME). Zoho manda los números a veces como
+ *  texto. */
+export interface FilaDeSuscripcion {
+  PLANNAME?: string;
+  ADDONNAME?: string;
+  PROPVALUE?: number | string;
+  ALLOTEDUSER?: number | string;
+}
+export interface Licencias {
+  compradas: number;
+  usadas: number;
+}
+
+const numero = (v: number | string | undefined): number | null => {
+  const n = typeof v === "string" ? Number(v.trim()) : v;
+  return typeof n === "number" && Number.isFinite(n) && n >= 0 ? n : null;
+};
+
+/** Las licencias de usuario: las de los planes base (con PLANNAME), sumadas
+ *  si hay más de uno (plan mixto). Los extras de almacenamiento (ADDONNAME)
+ *  no son puestos: se le dan a quien ya tiene licencia. Sin un plan base
+ *  legible, null (no se sabe, no se inventa). */
+export function licenciasDelPlan(addOns: readonly FilaDeSuscripcion[] | null | undefined): Licencias | null {
+  let compradas = 0, usadas = 0, planes = 0;
+  for (const f of addOns ?? []) {
+    if (!f?.PLANNAME || f.ADDONNAME) continue;
+    const c = numero(f.PROPVALUE), u = numero(f.ALLOTEDUSER);
+    if (c === null || u === null) return null;
+    compradas += c;
+    usadas += u;
+    planes++;
+  }
+  return planes ? { compradas, usadas } : null;
+}
+
+export async function licenciasDeZoho(): Promise<ZohoResult<Licencias>> {
+  const res = await zohoFetch<{ addOns?: FilaDeSuscripcion[] }>("/subscriptionInfo", { method: "GET" }, "mailadmin");
+  if (!res.ok) return { ok: false, skipped: res.skipped, status: res.status, error: res.error };
+  const licencias = licenciasDelPlan(res.data?.addOns);
+  return licencias
+    ? { ok: true, data: licencias }
+    : { ok: false, error: "subscriptionInfo sin un plan base con licencias" };
+}
+
+/** ¿Hay puesto para una casilla nueva? Lo dice Zoho: si las licencias
+ *  asignadas ya llegan a las compradas, no. Si Zoho no lo dijo (null: falta el
+ *  scope, no responde), sí: no se frena el alta por un número inventado; si de
+ *  verdad no hay puesto, Zoho rechaza la casilla y el alta lo informa. */
+export function hayPuestoDeCorreo(licencias: Licencias | null): boolean {
+  return !licencias || licencias.usadas < licencias.compradas;
 }
 
 export interface CreateMailboxInput {
