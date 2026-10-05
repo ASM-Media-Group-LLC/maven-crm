@@ -67,6 +67,9 @@ verify_jwt = false
 [functions.forgot-password]
 verify_jwt = false  # público — el user todavía no está logueado
 
+[functions.portal-creadoras]
+verify_jwt = false  # valida la sesión adentro (getUser) y contesta 401 con un código que la app lee
+
 [functions.send-report]
 verify_jwt = false  # auth via X-Cron-Token (propagado por dispatch-reports)
 
