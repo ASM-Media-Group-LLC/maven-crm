@@ -32,6 +32,7 @@ import fsp from "node:fs/promises";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { firmar } from "./firma.mjs";
+import { mimePorFirma } from "./tipos.mjs";
 
 // ── Ids estables ────────────────────────────────────────────────────────────
 const NS = "6f4b6a52-2f3e-5c1d-9a7e-3b1f0c2d4e5a"; // espacio de nombres de «importado de Google»
@@ -231,8 +232,12 @@ export async function importarCarpeta({ carpeta, grupoId, conf, prueba = false, 
     if (e === "nuevo") stats.enlacesNuevos++; else if (e === "ya") stats.enlacesYa++; else stats.enlacesRenovados++;
     const nom = nombreParaMaven(path.posix.basename(rel));
     const madre = path.posix.dirname(rel);
+    // Sin extensión conocida, el tipo por la firma de los primeros bytes (Jhon,
+    // 06/10: 13.593 grabaciones de Google entraron sin tipo y no se veían).
+    const porNombre = mimeDe(nom);
+    const mime = porNombre === "application/octet-stream" ? (await mimePorFirma(arch.abs)) ?? porNombre : porNombre;
     lote.push({
-      id, parent_id: idCarpeta(clave, madre === "." ? "" : madre), tipo: "archivo", nombre: nom, mime: mimeDe(nom),
+      id, parent_id: idCarpeta(clave, madre === "." ? "" : madre), tipo: "archivo", nombre: nom, mime,
       size: arch.size, storage_key: `${tenant}/google/${id}`, created_at: arch.mtime.toISOString(),
     });
     if (lote.length >= TAMANO_LOTE) { await enviar(lote); log(`  ${clave}: ${stats.enlacesNuevos + stats.enlacesYa}/${stats.archivos}`); lote = []; }

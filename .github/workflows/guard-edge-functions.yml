@@ -65,7 +65,7 @@ jobs:
       # (paginado: arma el árbol en la mini) y el importador del archivo de Google
       # (enlaces duros en el mismo disco, ids estables, nombres del Mac a NFC).
       - name: Guard — Drive del NAS (servidor, índice e importador)
-        run: node --test infra/nas-drive/test.mjs infra/nas-drive/indice.test.mjs infra/nas-drive/importar.test.mjs
+        run: node --test infra/nas-drive/test.mjs infra/nas-drive/indice.test.mjs infra/nas-drive/importar.test.mjs infra/nas-drive/tipos.test.mjs
 
       # La IA por OpenRouter (desde el 01/10/2026 no hay llave de Anthropic): el bucle de
       # herramientas de Clari, el catálogo sin additionalProperties (Gemini lo rechaza),
@@ -306,6 +306,12 @@ jobs:
       # ninguna (su nombre fijo); nadie las escribe desde el navegador; vuelta atrás. ~5 s.
       - name: Banco — la agencia de cada creadora (PGlite)
         run: deno run -A --node-modules-dir=none --no-lock supabase/tests/agencia_lineas.ts
+
+      # El tipo real de los archivos sin extensión (06/10): la mini pide los que faltan y les
+      # pone el tipo por la firma; solo si siguen genéricos, sin tocar la fecha (el disparador
+      # la respeta), solo tipos de la lista y solo service_role; vuelta atrás. ~5 s.
+      - name: Banco — el tipo real de los archivos sin extensión (PGlite)
+        run: deno run -A --node-modules-dir=none --no-lock supabase/tests/drive_tipos_por_firma.ts
 
       # portal-contenido (ella y su carpeta): solo su ficha y lo de SU carpeta; borrar lo
       # suyo hasta 24 h, primero en el NAS; partes de 8 MB firmadas; el recibo del NAS.

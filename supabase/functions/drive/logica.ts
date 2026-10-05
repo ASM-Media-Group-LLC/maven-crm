@@ -470,3 +470,31 @@ export function nombreDelZip(elegidos: FichaZip[], ahora = new Date()): string {
   const base = visibles.length === 1 && visibles[0].tipo === "carpeta" ? nombreParaElZip(visibles[0].nombre).slice(0, 150) : "Maven";
   return `${base}-${fecha}.zip`;
 }
+
+// ── Los tipos por la firma (Jhon, 06/10) ─────────────────────────────────────
+// La mini lee los primeros bytes de los archivos sin extensión (13.593 del
+// archivo de Google, como application/octet-stream) y manda el tipo real.
+// Solo uno de esta lista (lo que reconoce la firma; la base la repite).
+export const MIMES_POR_FIRMA = [
+  "video/mp4", "video/quicktime", "video/webm", "image/heic", "image/avif", "image/jpeg", "image/png",
+  "image/gif", "image/webp", "application/pdf", "audio/mp4", "audio/mpeg", "audio/wav", "audio/ogg",
+] as const;
+export const TOPE_TIPOS = 2000;
+
+/** {id, mime}[] → mime → ids, validado (uuid, mime de la lista, sin repetir). */
+export function validarTipos(raw: unknown): Map<string, string[]> {
+  const lista = Array.isArray(raw) ? raw : [];
+  if (!lista.length) throw new HttpError("Sin tipos");
+  if (lista.length > TOPE_TIPOS) throw new HttpError(`Hasta ${TOPE_TIPOS} por lote`);
+  const grupos = new Map<string, string[]>();
+  const vistos = new Set<string>();
+  for (const x of lista) {
+    const id = (x as { id?: unknown })?.id, mime = (x as { mime?: unknown })?.mime;
+    if (typeof id !== "string" || !UUID.test(id)) throw new HttpError("id inválido");
+    if (typeof mime !== "string" || !(MIMES_POR_FIRMA as readonly string[]).includes(mime)) throw new HttpError(`Tipo no permitido: ${String(mime)}`);
+    if (vistos.has(id)) continue;
+    vistos.add(id);
+    grupos.set(mime, [...(grupos.get(mime) ?? []), id]);
+  }
+  return grupos;
+}
