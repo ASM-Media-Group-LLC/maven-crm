@@ -35,7 +35,7 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
-import Logo from "@/components/Logo";
+import { MarcaM } from "@/components/MarcaM";
 import { NavLink } from "@/components/NavLink";
 import { UserAvatar } from "@/components/UserAvatar";
 import NotificationBell from "@/components/notifications/NotificationBell";
@@ -214,13 +214,18 @@ function MenuDelPortal({ activa, selectorDeAgencia }: { activa: FichaDeAgencia; 
   const plegado = state === "collapsed";
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="flex h-20 shrink-0 flex-row items-center justify-center px-4">
+      {/* La marca chica con «Mi espacio» al lado (Jhon, 06/10: el logo grande de
+          Maven le quitaba aire; plegado, queda la baldosa). */}
+      <SidebarHeader className={cn("flex h-16 shrink-0 flex-row items-center", plegado ? "justify-center px-2" : "px-4")}>
         <Link
           to="/portal"
           aria-label={t("portal.nav.inicio")}
-          className="rounded-md transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          className="flex min-w-0 items-center gap-2.5 rounded-control transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
-          <Logo size={plegado ? "sm" : "md"} collapsed={plegado} />
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-panel bg-primary">
+            <MarcaM alto="13px" />
+          </span>
+          {!plegado && <span className="truncate font-semibold">{t("portal.shell.espacio")}</span>}
         </Link>
       </SidebarHeader>
       <SidebarContent className="gap-0.5 overflow-x-hidden px-2 py-1">
@@ -228,8 +233,10 @@ function MenuDelPortal({ activa, selectorDeAgencia }: { activa: FichaDeAgencia; 
           {SECCIONES.map(({ a, icono: Icono, etiqueta, exacta }) => (
             <SidebarMenuItem key={a}>
               <SidebarMenuButton asChild tooltip={t(etiqueta)}>
-                <NavLink to={a} end={exacta} className={LINK_CLASS} activeClassName={ACTIVE_CLASS}>
-                  <Icono className="h-4 w-4 shrink-0" />
+                {/* El iluminado de Maven (ACTIVE_CLASS) con el tamaño de antes: ítems de
+                    44 px e íconos más grandes, cómodos también con el dedo. */}
+                <NavLink to={a} end={exacta} className={cn(LINK_CLASS, "min-h-11 gap-3 px-3 font-medium")} activeClassName={ACTIVE_CLASS}>
+                  <Icono className="h-5 w-5 shrink-0" />
                   <span>{t(etiqueta)}</span>
                 </NavLink>
               </SidebarMenuButton>

@@ -23,11 +23,14 @@ describe("el portal usa las piezas de Maven", () => {
     }
   });
 
-  it("menú lateral: el Sidebar, el logo y los estilos de ítem de Maven; abajo su foto", () => {
+  it("menú lateral: el Sidebar y el iluminado de ítem de Maven, la marca con «Mi espacio»; abajo su foto", () => {
     const marco = fuente("PortalLayout.tsx");
     expect(marco).toMatch(/<Sidebar collapsible="icon">/);
-    expect(marco).toMatch(/<Logo /);
-    expect(marco).toMatch(/className=\{LINK_CLASS\} activeClassName=\{ACTIVE_CLASS\}/);
+    // La marca chica con «Mi espacio» (Jhon, 06/10), no el logo grande.
+    expect(marco).toMatch(/<MarcaM /);
+    expect(marco).toMatch(/t\("portal\.shell\.espacio"\)/);
+    // El iluminado de Maven en el ítem activo, con el tamaño de antes.
+    expect(marco).toMatch(/className=\{cn\(LINK_CLASS, "min-h-11[^"]*"\)\} activeClassName=\{ACTIVE_CLASS\}/);
     expect(marco).toMatch(/<UserAvatar name=\{nombre\} src=\{activa\.foto\}/);
     // Los mismos estilos de ítem que el menú del equipo.
     expect(fuente("DashboardSidebar.tsx")).toMatch(/from "@\/components\/dashboard\/estilosDelMenu"/);
