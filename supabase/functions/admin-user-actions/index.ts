@@ -8,13 +8,20 @@ import {
   provisioningConfigured,
   type ProvisionResult,
 } from "../_shared/mail-provision.ts";
-import { deleteMailbox, listAccounts, zohoConfigured } from "../_shared/zoho.ts";
+import { listAccounts, zohoConfigured } from "../_shared/zoho.ts";
+// DIAS_DE_PAPELERA: días que una cuenta eliminada queda recuperable, como en
+// Google Workspace. Pasado ese plazo, el cron la purga de verdad (borrado
+// destructivo de siempre) y recién ahí se borra su buzón de Zoho.
+import {
+  DIAS_DE_PAPELERA,
+  datosDeSupabase,
+  fechaDeBorrado,
+  procesarBuzon,
+  type ResultadoBuzon,
+  zohoDeVerdad,
+} from "../_shared/buzon-por-borrar.ts";
 
 const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
-
-// Días que una cuenta eliminada queda recuperable, como en Google Workspace.
-// Pasado ese plazo, el cron la purga de verdad (borrado destructivo de siempre).
-const DIAS_DE_PAPELERA = 30;
 
 // Deja constancia en public.cuenta_eventos. Guarda nombre y correo COMO COPIA
 // porque la bitácora tiene que seguir legible después de la purga, que es justo
@@ -34,8 +41,13 @@ async function anotarEvento(
   destino: { id: string; email?: string | null; full_name?: string | null },
   actor: { id: string; email?: string | null },
   detalle?: Record<string, unknown>,
+  // El id se puede fijar desde afuera: la purga lo anota en la cola del buzón
+  // ANTES de escribir el evento, para que quien borre el buzón después (en el
+  // acto o el cron) complete ESE evento con el resultado.
+  id: string = crypto.randomUUID(),
 ) {
   const { error } = await adminClient.from("cuenta_eventos").insert({
+    id,
     user_id: destino.id,
     user_email: destino.email ?? null,
     user_full_name: destino.full_name ?? null,
@@ -47,6 +59,29 @@ async function anotarEvento(
   // La bitácora no puede tumbar la operación, pero que quede ruidoso en los logs:
   // una baja sin registro es exactamente el agujero que esto viene a tapar.
   if (error) console.error(`[${accion}] no pude anotar el evento:`, error.message);
+}
+
+type ClienteRpc = {
+  rpc: (fn: string, args: Record<string, unknown>) => PromiseLike<
+    { data: unknown; error: { message: string } | null }
+  >;
+};
+
+/** La casilla de Zoho de una cuenta: la credencial vigente (o la que se revocó
+ *  con la baja) y, si no tiene, su acceso cuando es del dominio del equipo.
+ *  La regla vive en la base (app_casilla_de_la_cuenta) porque la purga del cron
+ *  necesita exactamente la misma, y dos copias terminan diciendo cosas distintas.
+ *  Hay que preguntarla ANTES de purgar: app_purge_user_refs borra mail_credentials. */
+async function casillaDeLaCuenta(
+  adminClient: ClienteRpc,
+  userId: string,
+): Promise<{ ok: true; direccion: string | null } | { ok: false; error: string }> {
+  const { data, error } = await adminClient.rpc("app_casilla_de_la_cuenta", {
+    p_user_id: userId,
+    p_dominio: DOMINIO_CASILLA,
+  });
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, direccion: typeof data === "string" && data ? data : null };
 }
 
 function generateTempPassword(): string {
@@ -226,7 +261,7 @@ Deno.serve(async (req) => {
               cuentas.data.some((a) => (a.primaryEmailAddress ?? "").toLowerCase() === explicitMailbox);
             if (!reusa && usados >= seatLimit) {
               return new Response(JSON.stringify({
-                error: `No quedan puestos de correo en Zoho (${usados}/${seatLimit}). Libera uno borrando un usuario de Maven —ahora eso también da de baja su casilla y libera el puesto— o desde el panel de Zoho, o amplía el plan.`,
+                error: `No quedan puestos de correo en Zoho (${usados}/${seatLimit}). Libera uno desde el panel de Zoho o amplía el plan. Eliminar a alguien en Maven no libera su puesto en el acto: su casilla se conserva ${DIAS_DE_PAPELERA} días por si se recupera la cuenta, y se borra después.`,
                 reason: "zoho_seats_full",
               }), { status: 409, headers: { ...corsHeaders(req), "Content-Type": "application/json" } });
             }
@@ -824,10 +859,13 @@ Deno.serve(async (req) => {
     }
 
     // === ELIMINAR (suspender): la cuenta se va a la papelera 30 días ===
-    // No se borra NADA. Se le cierra la sesión, se le bloquea la entrada y se
-    // marca el perfil. Lo único irreversible es la casilla de Zoho, que se da de
-    // baja para liberar el puesto del plan — decisión tomada a sabiendas: al
-    // restaurar, el buzón vuelve a crearse vacío.
+    // No se borra NADA, tampoco el buzón de Zoho. Se le cierra la sesión, se le
+    // bloquea la entrada y se marca el perfil. El buzón se borra recién al
+    // PURGAR (a los 30 días, o antes si un admin purga a mano): decisión de
+    // Jhon del 05/10/2026, para que recuperar a alguien le devuelva su correo.
+    // Hasta el 05/10 se borraba aquí mismo, y recuperar devolvía la cuenta sin
+    // correo. La credencial la revoca el trigger profiles_baja_revoca_correo al
+    // marcar deleted_at, así que el worker deja de sincronizar ese buzón.
     if (action === "delete_user") {
       const gDelete = await assertCanManage(adminClient, callerId, user_id, "delete_user");
       if (!gDelete.ok) {
@@ -849,51 +887,12 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Antes de purgar (app_purge_user_refs borra mail_credentials): averiguar
-      // la casilla Zoho de este usuario para darla de baja y LIBERAR el puesto.
-      let zohoMailbox: string | null = null;
-      try {
-        const { data: cred } = await adminClient
-          .from("mail_credentials")
-          .select("email_address")
-          .eq("user_id", user_id)
-          .maybeSingle();
-        zohoMailbox = (cred as { email_address?: string } | null)?.email_address ?? null;
-        // Fallback: si no hay fila en mail_credentials (buzón creado fuera del flujo
-        // de Maven o credencial nunca guardada — el caso de brenda), usamos el email
-        // de LOGIN: para los @maven-ai.me la identidad ES la casilla. liberarPuestoZoho
-        // solo borra si ese email matchea una cuenta REAL en Zoho, así que un usuario
-        // con correo externo no se ve afectado.
-        if (!zohoMailbox) {
-          const { data: au } = await adminClient.auth.admin.getUserById(user_id);
-          zohoMailbox = (au?.user?.email as string | undefined) ?? null;
-        }
-      } catch { /* noop */ }
-
-      // Da de baja (ELIMINA) la casilla en Zoho para liberar el puesto. Best-effort
-      // y se llama recién con el usuario ya borrado OK: si el borrado falla, no
-      // dejamos una casilla huérfana. deleteMailbox es irreversible (borra el
-      // buzón) — que es justo lo que libera el cupo del plan.
-      const liberarPuestoZoho = async (): Promise<string | null> => {
-        if (!zohoMailbox || !zohoConfigured()) return null;
-        try {
-          // Confirmamos que ese email existe como cuenta en Zoho (así un usuario
-          // con correo EXTERNO no dispara nada). Después borramos POR EMAIL.
-          const cuentas = await listAccounts();
-          const existe = (cuentas.data ?? []).some(
-            (a) => (a.primaryEmailAddress ?? "").toLowerCase() === zohoMailbox!.toLowerCase(),
-          );
-          if (!existe) return null;
-          const del = await deleteMailbox(zohoMailbox);
-          if (!del.ok) { console.error("[delete_user] no pude borrar la casilla Zoho:", del.error); return null; }
-          console.log(`[delete_user] casilla Zoho liberada: ${zohoMailbox}`);
-          return zohoMailbox;
-        } catch (e) {
-          console.error("[delete_user] baja de casilla explotó:", (e as Error).message);
-          return null;
-        }
-      };
-
+      // La casilla que se va a borrar al purgar. Se pregunta ANTES de marcar la
+      // baja, con la credencial todavía vigente. Solo informa (queda en la
+      // bitácora y en la respuesta): si falla, la baja sigue igual, y la purga
+      // la vuelve a averiguar con la misma regla.
+      const casilla = await casillaDeLaCuenta(adminClient, user_id);
+      if (!casilla.ok) console.error("[delete_user] no pude averiguar la casilla:", casilla.error);
 
       // 1. Fuera de la sesión YA. Banear frena el refresh del token, pero el
       // access token que ya tiene en el navegador le sirve hasta que vence.
@@ -914,9 +913,10 @@ Deno.serve(async (req) => {
       }
 
       // 3. Marcar el perfil. Esto es lo que la esconde de los listados.
+      const eliminadaEl = new Date();
       const { error: markErr } = await adminClient
         .from("profiles")
-        .update({ deleted_at: new Date().toISOString(), deleted_by: callerId })
+        .update({ deleted_at: eliminadaEl.toISOString(), deleted_by: callerId })
         .eq("id", user_id)
         .select("id");
       if (markErr) {
@@ -929,32 +929,42 @@ Deno.serve(async (req) => {
         });
       }
 
-      // 4. Liberar el puesto de Zoho (irreversible, best-effort).
-      const mbRemoved = await liberarPuestoZoho();
-
-      // 5. Con la casilla dada de baja, la credencial guardada quedó muerta: si
-      // se deja, el worker de correo sigue intentando sincronizar un buzón que
-      // ya no existe. Los mensajes ya cacheados NO se tocan.
-      if (mbRemoved) {
-        await adminClient.from("mail_credentials").delete().eq("user_id", user_id);
-        await adminClient.from("mail_sync_state").delete().eq("user_id", user_id);
-      }
-
+      // 4. El buzón de Zoho NO se toca: se conserva con todo su correo y se
+      // borra al purgar la cuenta. Queda dicho en la bitácora, con la fecha.
+      const direccion = casilla.ok ? casilla.direccion : null;
+      const seBorraEl = fechaDeBorrado(eliminadaEl).toISOString();
       await anotarEvento(adminClient, "eliminada",
         { id: user_id, email: auDel?.user?.email ?? null, full_name: (perfilDel as { full_name?: string } | null)?.full_name ?? null },
         { id: callerId, email: callerEmail },
-        { casilla_zoho_liberada: mbRemoved, dias_de_papelera: DIAS_DE_PAPELERA });
+        {
+          casilla_zoho: direccion,
+          casilla_zoho_liberada: null,
+          casilla_zoho_se_borra_el: direccion ? seBorraEl : null,
+          // Un null sin motivo fue lo que dejó el bug escondido nueve bajas.
+          casilla_zoho_motivo: !casilla.ok
+            ? `no se pudo averiguar la casilla: ${casilla.error}`
+            : direccion
+            ? `se conserva en la papelera y se borra al purgar la cuenta (desde el ${seBorraEl.slice(0, 10)})`
+            : "la cuenta no tenía casilla de correo de Maven",
+          dias_de_papelera: DIAS_DE_PAPELERA,
+        });
 
       console.log(`[delete_user] suspendida user_id=${user_id}, recuperable ${DIAS_DE_PAPELERA} días`);
       return new Response(JSON.stringify({
         success: true,
-        mailbox_removed: mbRemoved,
+        // Ya no se borra al suspender: siempre null. Se deja el campo para no
+        // romper a quien lo lea.
+        mailbox_removed: null,
+        mailbox_kept: direccion,
+        mailbox_delete_after: direccion ? seBorraEl : null,
         recuperable_hasta_dias: DIAS_DE_PAPELERA,
       }), { headers: { ...corsHeaders(req), "Content-Type": "application/json" } });
     }
 
     // === RESTAURAR: sacar de la papelera ===
-    // Mismo permiso que eliminar. No devuelve la casilla de correo.
+    // Mismo permiso que eliminar. El buzón de Zoho sigue vivo mientras la cuenta
+    // esté en la papelera (se borra al purgar), así que recuperar le devuelve
+    // también su correo: se reactiva la credencial que revocó la baja.
     if (action === "restore_user") {
       const gRestore = await assertCanManage(adminClient, callerId, user_id, "delete_user");
       if (!gRestore.ok) {
@@ -980,6 +990,10 @@ Deno.serve(async (req) => {
         });
       }
 
+      // La casilla, con la MISMA regla que la purga. Antes de limpiar deleted_at:
+      // la regla reconoce la credencial que revocó la baja comparando con esa fecha.
+      const casillaRes = await casillaDeLaCuenta(adminClient, user_id);
+
       const { error: unbanErr } = await adminClient.auth.admin.updateUserById(user_id, {
         ban_duration: "none",
       });
@@ -1003,18 +1017,76 @@ Deno.serve(async (req) => {
         });
       }
 
+      // Devolverle el correo: reactivar la credencial que revocó la baja
+      // (trigger profiles_baja_revoca_correo), para que el worker vuelva a
+      // sincronizar. Solo si el buzón sigue existiendo en Zoho: una credencial
+      // viva contra un buzón que ya no está son logins fallidos cada pocos
+      // minutos, y Zoho castiga eso con tarpit a TODAS las casillas. Lo que no
+      // se pueda reactivar queda dicho en la bitácora; se arregla vinculándola
+      // desde «Cambiar correo / crear casilla».
+      const direccionRes = casillaRes.ok ? casillaRes.direccion : null;
+      let casillaReactivada = false;
+      let motivoCasilla: string | null = null;
+      if (!casillaRes.ok) {
+        motivoCasilla = `no se pudo averiguar la casilla: ${casillaRes.error}`;
+      } else if (!direccionRes) {
+        motivoCasilla = "la cuenta no tenía casilla de correo de Maven";
+      } else {
+        try {
+          const { data: credRes } = await adminClient
+            .from("mail_credentials")
+            .select("id, revoked_at")
+            .eq("user_id", user_id)
+            .eq("email_address", direccionRes)
+            .maybeSingle();
+          const cred = credRes as { id: string; revoked_at: string | null } | null;
+          if (!cred) {
+            motivoCasilla = `${direccionRes} no tiene credencial guardada en Maven`;
+          } else if (!cred.revoked_at) {
+            casillaReactivada = true; // nunca se revocó: nada que hacer
+          } else if (!zohoConfigured()) {
+            motivoCasilla = "Zoho no está configurado: no se pudo confirmar que el buzón siga existiendo";
+          } else {
+            const cuentas = await listAccounts();
+            const existe = cuentas.ok && (cuentas.data ?? []).some(
+              (a) => (a.primaryEmailAddress ?? "").toLowerCase() === direccionRes.toLowerCase(),
+            );
+            if (!cuentas.ok) {
+              motivoCasilla = `no se pudo listar la organización: ${cuentas.error ?? "error desconocido"}`;
+            } else if (!existe) {
+              motivoCasilla = `${direccionRes} ya no existe en Zoho`;
+            } else {
+              const { error: reErr } = await adminClient
+                .from("mail_credentials")
+                .update({ revoked_at: null, last_error: null })
+                .eq("id", cred.id);
+              if (reErr) motivoCasilla = `no se pudo reactivar la credencial: ${reErr.message}`;
+              else casillaReactivada = true;
+            }
+          }
+        } catch (e) {
+          motivoCasilla = `reactivar la casilla explotó: ${(e as Error).message}`;
+        }
+        if (motivoCasilla) console.warn(`[restore_user] ${motivoCasilla}`);
+      }
+
       const { data: auRes } = await adminClient.auth.admin.getUserById(user_id);
       await anotarEvento(adminClient, "restaurada",
         { id: user_id, email: auRes?.user?.email ?? null, full_name: marcado.full_name ?? null },
         { id: callerId, email: callerEmail },
-        { eliminada_el: marcado.deleted_at });
+        {
+          eliminada_el: marcado.deleted_at,
+          casilla_zoho: direccionRes,
+          casilla_zoho_reactivada: casillaReactivada,
+          casilla_zoho_motivo: motivoCasilla,
+        });
 
       console.log(`[restore_user] recuperada user_id=${user_id}`);
       return new Response(JSON.stringify({
         success: true,
-        // La casilla de Zoho no vuelve: se dio de baja al eliminar para liberar
-        // el puesto. Hay que crearla de nuevo si esta persona necesita correo.
-        mailbox_restored: false,
+        mailbox_restored: casillaReactivada,
+        mailbox: direccionRes,
+        mailbox_reason: motivoCasilla,
       }), { headers: { ...corsHeaders(req), "Content-Type": "application/json" } });
     }
 
@@ -1075,6 +1147,13 @@ Deno.serve(async (req) => {
     // correo, las horas de Cowork, los espacios que la persona creó, y deja sin
     // autor ~50 columnas created_by/assigned_to por todo el CRM. Irreversible.
     // Exige que la cuenta ya esté en la papelera: nadie destruye de un clic.
+    //
+    // Y aquí se borra el buzón de Zoho (desde el 05/10/2026; antes se borraba al
+    // suspender). Igual que la purga automática del cron: el buzón se anota en
+    // la cola buzones_por_borrar ANTES de destruir nada, y con la cuenta ya
+    // purgada se procesa esa fila en el acto. procesarBuzon vuelve a confirmar
+    // todo antes de borrar; en particular, que pasaron los 30 días: si un admin
+    // purga antes, el buzón queda en la cola y lo borra el cron ese día.
     if (action === "purge_user") {
       const { data: esAdmin } = await adminClient.rpc("has_role", {
         _user_id: callerId,
@@ -1099,12 +1178,82 @@ Deno.serve(async (req) => {
       console.log(`[purge_user] purgando for user_id=${user_id}`);
       const { data: auPur } = await adminClient.auth.admin.getUserById(user_id);
 
+      // El buzón, ANTES de destruir: app_purge_user_refs borra mail_credentials,
+      // que es de donde sale la dirección. Si no se puede averiguar o anotar, no
+      // se purga: una cuenta purgada con el buzón sin anotar es un buzón que ya
+      // nadie va a borrar (y un puesto de Zoho pagado para siempre).
+      const casillaPur = await casillaDeLaCuenta(adminClient, user_id);
+      if (!casillaPur.ok) {
+        console.error("[purge_user] no pude averiguar la casilla:", casillaPur.error);
+        return new Response(JSON.stringify({
+          error: `No se purgó nada: no pude averiguar la casilla de correo (${casillaPur.error})`,
+        }), { status: 500, headers: { ...corsHeaders(req), "Content-Type": "application/json" } });
+      }
+      const eventoId = crypto.randomUUID();
+      let colaId: string | null = null;
+      if (casillaPur.direccion) {
+        const { data: idCola, error: colaErr } = await adminClient.rpc("app_encolar_buzon", {
+          p_user_id: user_id,
+          p_direccion: casillaPur.direccion,
+          p_eliminada_el: aPurgar.deleted_at,
+          p_dias: DIAS_DE_PAPELERA,
+          p_origen: "purga_manual",
+          p_evento_id: eventoId,
+        });
+        if (colaErr || typeof idCola !== "string") {
+          const err = colaErr?.message ?? "sin id";
+          console.error("[purge_user] no pude anotar el buzón en la cola:", err);
+          return new Response(JSON.stringify({
+            error: `No se purgó nada: no pude anotar el buzón ${casillaPur.direccion} para borrarlo (${err})`,
+          }), { status: 500, headers: { ...corsHeaders(req), "Content-Type": "application/json" } });
+        }
+        colaId = idCola;
+      }
+
       // La constancia va ANTES de destruir: después no queda de dónde copiar el
-      // nombre ni el correo.
+      // nombre ni el correo. El resultado del buzón lo completa
+      // app_buzon_por_borrar_resultado sobre ESTE evento (por eso el id fijo).
       await anotarEvento(adminClient, "purgada",
         { id: user_id, email: auPur?.user?.email ?? null, full_name: aPurgar.full_name ?? null },
         { id: callerId, email: callerEmail },
-        { eliminada_el: aPurgar.deleted_at });
+        {
+          eliminada_el: aPurgar.deleted_at,
+          casilla_zoho: casillaPur.direccion,
+          casilla_zoho_liberada: null,
+          casilla_zoho_estado: casillaPur.direccion ? "pendiente" : null,
+          casilla_zoho_motivo: casillaPur.direccion
+            ? "en cola: se borra al terminar la purga"
+            : "la cuenta no tenía casilla de correo de Maven",
+        },
+        eventoId);
+
+      // Con la cuenta ya purgada: el buzón, con todas las comprobaciones. Lo que
+      // no se pueda ahora (Zoho caído, plazo sin cumplir) lo retoma el cron.
+      const rematarBuzon = async (): Promise<ResultadoBuzon | null> => {
+        if (!colaId) return null;
+        try {
+          const datos = datosDeSupabase(adminClient);
+          const entrada = await datos.uno(colaId);
+          if (!entrada) {
+            console.error(`[purge_user] la fila ${colaId} de la cola no apareció: la retoma el cron`);
+            return null;
+          }
+          return await procesarBuzon(entrada, datos, zohoDeVerdad, new Date());
+        } catch (e) {
+          console.error("[purge_user] el buzón explotó (lo retoma el cron):", (e as Error).message);
+          return null;
+        }
+      };
+      const respuestaPurgada = (buzon: ResultadoBuzon | null) =>
+        new Response(JSON.stringify({
+          success: true,
+          purged: true,
+          mailbox: buzon
+            ? { address: buzon.direccion, status: buzon.estado, reason: buzon.motivo }
+            : casillaPur.direccion
+            ? { address: casillaPur.direccion, status: "pendiente", reason: "lo retoma el cron" }
+            : null,
+        }), { headers: { ...corsHeaders(req), "Content-Type": "application/json" } });
 
       // 1. Limpia TODAS las refs en public.* a este user_id usando la
       // función SQL app_purge_user_refs. Antes esto era una lista
@@ -1162,10 +1311,7 @@ Deno.serve(async (req) => {
             // El DELETE directo funcionó — gotrue habrá fallado por
             // razones de su propio side (sesiones colgadas, etc.).
             console.log(`[purge_user] purgada por DELETE directo user_id=${user_id}`);
-            // La casilla de Zoho ya se dio de baja cuando se eliminó la cuenta.
-            return new Response(JSON.stringify({ success: true, purged: true }), {
-              headers: { ...corsHeaders(req), "Content-Type": "application/json" },
-            });
+            return respuestaPurgada(await rematarBuzon());
           }
         } catch (e) {
           console.warn(
@@ -1186,9 +1332,7 @@ Deno.serve(async (req) => {
       }
 
       console.log(`[purge_user] purgada user_id=${user_id}`);
-      return new Response(JSON.stringify({ success: true, purged: true }), {
-        headers: { ...corsHeaders(req), "Content-Type": "application/json" },
-      });
+      return respuestaPurgada(await rematarBuzon());
     }
 
     if (action === "update_profile") {

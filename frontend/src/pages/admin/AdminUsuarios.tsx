@@ -363,11 +363,15 @@ const AdminUsuarios = () => {
                           { action: "delete_user", user_id: selectedUser.id },
                           { onSuccess: (res) => {
                             setDeleteOpen(false);
-                            const freed = (res as { mailbox_removed?: string | null } | undefined)?.mailbox_removed;
+                            // El buzón ya no se borra al eliminar: se conserva mientras la
+                            // cuenta está en la papelera y se borra al purgarla.
+                            const r = res as { mailbox_kept?: string | null; recuperable_hasta_dias?: number } | undefined;
                             avisarPersona({
                               nombre: selectedUser.full_name || t("admin.noName"), foto: selectedUser.avatar_url, seed: selectedUser.avatar_seed,
                               titulo: t("admin.users.deletedTitle", { name: selectedUser.full_name || t("admin.users.theUser") }),
-                              detalle: freed ? t("admin.users.mailboxFreed", { mailbox: freed }) : undefined,
+                              detalle: r?.mailbox_kept
+                                ? t("admin.users.mailboxKept", { mailbox: r.mailbox_kept, days: r.recuperable_hasta_dias ?? 30 })
+                                : undefined,
                               tono: "ojo",
                             });
                           } }

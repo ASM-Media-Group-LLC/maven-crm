@@ -169,10 +169,86 @@ async function zohoFetch<T>(
   return { ok: true, status: resp.status, data: body.data as T };
 }
 
-/** Lista las casillas de la organización. Sirve de smoke test: si esto
- *  anda, las credenciales y el zoid están bien. */
-export function listAccounts(): Promise<ZohoResult<ZohoAccount[]>> {
-  return zohoFetch<ZohoAccount[]>("/accounts", { method: "GET" });
+/** Una página de /accounts. Extraído para poder testear la paginación sin
+ *  red: el bug que esto arregla vivió meses porque no había forma de
+ *  ejercitar el recorrido. */
+export type PaginaDeCuentas = (
+  start: number,
+  limit: number,
+) => Promise<ZohoResult<ZohoAccount[]>>;
+
+const pedirPaginaDeCuentas: PaginaDeCuentas = (start, limit) =>
+  zohoFetch<ZohoAccount[]>(`/accounts?start=${start}&limit=${limit}`, { method: "GET" });
+
+/** Lista TODAS las casillas de la organización. Sirve de smoke test: si esto
+ *  anda, las credenciales y el zoid están bien.
+ *
+ *  ⚠️ PAGINA, y esa es la razón de ser de esta función. El default de Zoho
+ *  para /accounts es **10** — verificado el 21/09/2026 contra la organización
+ *  real: sin parámetros devolvía 10 de 68. Y el resto del módulo usa esta
+ *  lista para DECIDIR: si una casilla existe antes de borrarla, cuántos
+ *  puestos quedan libres, si una dirección ya está ocupada. Una lista corta
+ *  no da una respuesta corta, da una respuesta EQUIVOCADA y en silencio: de
+ *  las 9 bajas de usuario que hubo hasta esa fecha, las 9 dejaron la casilla
+ *  viva porque la persona no entraba en las primeras 10 filas.
+ *
+ *  `listGroups()` ya traía `limit=200` por exactamente este motivo; a
+ *  /accounts nunca se le aplicó.
+ *
+ *  `start` y `limit` son los parámetros que usa la propia consola de Zoho
+ *  (se la ve pedir `?start=50&limit=50` al pasar de página).
+ *
+ *  Si una página falla, falla TODO: devolver la lista a medias es el bug
+ *  que esto viene a arreglar, no una degradación aceptable. */
+export async function listAccounts(
+  pedirPagina: PaginaDeCuentas = pedirPaginaDeCuentas,
+): Promise<ZohoResult<ZohoAccount[]>> {
+  const TAMANO_PAGINA = 200;
+  // 10.000 casillas. Es un freno contra un bucle infinito si Zoho devuelve
+  // siempre la misma página, no un límite de negocio.
+  const TOPE_PAGINAS = 50;
+
+  const todas: ZohoAccount[] = [];
+  const vistas = new Set<string>();
+  let completa = false;
+
+  for (let pagina = 0; pagina < TOPE_PAGINAS; pagina++) {
+    const res = await pedirPagina(pagina * TAMANO_PAGINA, TAMANO_PAGINA);
+    if (!res.ok) return res;
+
+    const lote = res.data ?? [];
+
+    // Deduplicar a propósito: la doc de Zoho no aclara si `start` es un
+    // desplazamiento (0-based) o un índice (1-based). Con lo segundo las
+    // páginas se solapan en una fila. Deduplicar no cuesta nada y deja el
+    // recorrido correcto en los dos casos.
+    let nuevas = 0;
+    for (const a of lote) {
+      const clave = String(
+        a.accountId ?? a.zuid ?? (a.primaryEmailAddress ?? "").toLowerCase(),
+      );
+      if (!clave || vistas.has(clave)) continue;
+      vistas.add(clave);
+      todas.push(a);
+      nuevas++;
+    }
+
+    // Se acabó: la página vino incompleta, o vino llena pero sin nada nuevo
+    // (que es el solape del caso 1-based).
+    if (lote.length < TAMANO_PAGINA || nuevas === 0) {
+      completa = true;
+      break;
+    }
+  }
+
+  if (!completa) {
+    // Truncar en silencio es justo lo que veníamos a eliminar.
+    console.error(
+      `[zoho] listAccounts cortó en ${todas.length} casillas al llegar al tope de ${TOPE_PAGINAS} páginas`,
+    );
+  }
+
+  return { ok: true, data: todas };
 }
 
 export interface CreateMailboxInput {
@@ -222,12 +298,34 @@ export function enableMailbox(accountId: string): Promise<ZohoResult> {
   });
 }
 
+/** Casillas que Maven NO borra nunca, pase lo que pase.
+ *
+ *  corp@unlok.me es el Superadministrador de la organización de Zoho: si se
+ *  borra, nadie puede volver a administrar Zoho (ni crear casillas, ni
+ *  liberar puestos, ni recuperar el correo de nadie). Que alguien la use
+ *  como acceso a Maven y después la den de baja no puede llevarse puesta a
+ *  la organización entera. */
+export const CASILLAS_INTOCABLES: readonly string[] = ["corp@unlok.me"];
+
+export function esCasillaIntocable(email: string): boolean {
+  return CASILLAS_INTOCABLES.includes(email.trim().toLowerCase());
+}
+
 /** Borra la casilla (y da de baja al usuario de la org) POR EMAIL. Zoho espera
  *  `emailList` (o `accountList` de zuids) en el body — mandar `{accountId}` no
  *  hacía nada. Es la misma operación que "Eliminar usuario" del panel de Zoho,
  *  que libera el puesto. Irreversible — preferir disableMailbox si solo se
- *  quiere suspender. */
+ *  quiere suspender.
+ *
+ *  ⚠️ La guarda de CASILLAS_INTOCABLES vive AQUÍ, en el último paso antes de
+ *  Zoho, además de en quien llama: así ningún camino nuevo puede saltársela. */
 export function deleteMailbox(email: string): Promise<ZohoResult> {
+  if (esCasillaIntocable(email)) {
+    return Promise.resolve({
+      ok: false,
+      error: `${email.trim()} es el Superadministrador de Zoho: Maven nunca la borra`,
+    });
+  }
   return zohoFetch(`/accounts`, {
     method: "DELETE",
     body: JSON.stringify({ emailList: [email] }),

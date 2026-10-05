@@ -137,7 +137,7 @@ const RESPUESTAS: Record<string, unknown> = {
   create_user: { email: "new.person@maven-ai.me", temp_password: "Tmp-123", hand_delivery: true, mailbox: { ok: false, error: "quota" } },
   reset_password: { temp_password: "Tmp-456", email_sent: false, email_error: "RESEND_API_KEY no configurada" },
   migrate_email: { success: true, email: "jane@maven-ai.me", mailbox: { ok: true, email_address: "jane@maven-ai.me", outcome: "created", error: null } },
-  delete_user: { mailbox_removed: "jane@maven-ai.me" },
+  delete_user: { mailbox_removed: null, mailbox_kept: "jane@maven-ai.me", recuperable_hasta_dias: 30 },
 };
 vi.mock("@/lib/adminInvoke", async () => {
   const real = await vi.importActual<typeof import("@/lib/adminInvoke")>("@/lib/adminInvoke");
