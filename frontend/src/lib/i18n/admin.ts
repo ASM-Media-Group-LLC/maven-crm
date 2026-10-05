@@ -436,6 +436,7 @@ export const admin = {
   "admin.perm.editBanking": { es: "Editar Banking", en: "Edit banking" },
   "admin.perm.changePlatform": { es: "Cambiar Plataforma", en: "Change platform" },
   "admin.perm.invitePortal": { es: "Invitar al portal", en: "Invite to portal" },
+  "admin.perm.viewCreatorContent": { es: "Ver y descargar su contenido", en: "View and download her content" },
   "admin.perm.edit": { es: "Editar", en: "Edit" },
   "admin.perm.sendToGroup": { es: "Enviar al grupo", en: "Send to group" },
   "admin.perm.createRequest": { es: "Crear pedido", en: "Create request" },

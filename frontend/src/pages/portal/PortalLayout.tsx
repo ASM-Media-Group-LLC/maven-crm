@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Navigate, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { Check, ChevronDown, House, IdCard, Loader2, LogOut, Settings } from "lucide-react";
+import { Check, ChevronDown, House, IdCard, Images, Loader2, LogOut, Settings } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { TranslationKey } from "@/lib/i18n";
@@ -24,6 +24,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MarcaM } from "@/components/MarcaM";
+import { SubidasContext, useSubidasDelPortal } from "@/hooks/usePortalContenido";
+import AvisoDeSubidas from "./AvisoDeSubidas";
 import { cn } from "@/lib/utils";
 
 // EL ESPACIO DE LA CREADORA (portal de creadoras). Va FUERA del AppShell del
@@ -35,6 +37,7 @@ import { cn } from "@/lib/utils";
 
 const SECCIONES: { a: string; icono: typeof House; etiqueta: TranslationKey; exacta?: boolean }[] = [
   { a: "/portal", icono: House, etiqueta: "portal.nav.inicio", exacta: true },
+  { a: "/portal/contenido", icono: Images, etiqueta: "portal.nav.contenido" },
   { a: "/portal/ficha", icono: IdCard, etiqueta: "portal.nav.ficha" },
   { a: "/portal/ajustes", icono: Settings, etiqueta: "portal.nav.ajustes" },
 ];
@@ -63,6 +66,8 @@ export default function PortalLayout() {
     return lista.find((f) => f.creator_id === elegida) ?? lista[0];
   }, [fichas.data, elegida]);
   usePortalHola(activa?.creator_id);
+  // Las subidas viven aquí y no en «Mi contenido»: si ella va a su ficha, siguen.
+  const subidas = useSubidasDelPortal();
 
   const salir = async () => {
     await signOut();
@@ -146,6 +151,7 @@ export default function PortalLayout() {
 
   return (
     <PortalContext.Provider value={{ fichas: lista, activa, elegir }}>
+    <SubidasContext.Provider value={subidas}>
       <div className="min-h-dvh bg-background text-foreground md:flex">
         {/* Computador: menú al costado */}
         <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r border-border bg-card/60 p-4 md:flex">
@@ -204,7 +210,13 @@ export default function PortalLayout() {
             <Outlet />
           </div>
 
-          {/* Celular: el menú abajo, al alcance del pulgar */}
+          {/* Celular: el menú abajo, al alcance del pulgar (y, si sube algo y ella
+              está en otra pantalla, el aviso justo arriba) */}
+          {!location.pathname.startsWith("/portal/contenido") && (
+            <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 md:bottom-0 md:left-64">
+              <AvisoDeSubidas />
+            </div>
+          )}
           <nav
             aria-label={t("portal.nav.menu")}
             className="fixed inset-x-0 bottom-0 z-30 flex border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
@@ -228,6 +240,7 @@ export default function PortalLayout() {
           </nav>
         </div>
       </div>
+    </SubidasContext.Provider>
     </PortalContext.Provider>
   );
 }

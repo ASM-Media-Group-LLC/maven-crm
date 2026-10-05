@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { ArrowRight, Clapperboard, FolderUp, Gift } from "lucide-react";
+import { ArrowRight, Clapperboard, Gift, Images } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { nombreParaMostrar, useMiFicha, usePortal } from "@/hooks/usePortal";
 import { CAMPOS_FICHA, respondidas, SECCIONES } from "@/lib/portal/ficha";
@@ -70,24 +70,33 @@ export default function PortalInicio() {
           )}
         </section>
 
-        {/* Lo que viene: dicho con honestidad, sin botones que no hacen nada */}
-        <section className="rounded-card border border-dashed border-border p-5 md:p-6">
-          <div className="flex items-center gap-2 text-sm font-semibold">
-            <Gift className="h-4 w-4 text-primary" aria-hidden="true" />
-            {t("portal.inicio.prontoTitulo")}
-          </div>
-          <p className="mt-2 text-sm text-muted-foreground">{t("portal.inicio.prontoTexto")}</p>
-          <ul className="mt-4 space-y-2 text-sm">
-            <li className="flex items-center gap-3 rounded-control bg-muted/60 px-3 py-2.5 text-muted-foreground">
-              <FolderUp className="h-4 w-4" aria-hidden="true" />
-              {t("portal.inicio.prontoContenido")}
-            </li>
-            <li className="flex items-center gap-3 rounded-control bg-muted/60 px-3 py-2.5 text-muted-foreground">
-              <Clapperboard className="h-4 w-4" aria-hidden="true" />
-              {t("portal.inicio.prontoPedidos")}
-            </li>
-          </ul>
-        </section>
+        <div className="space-y-4">
+          {/* Su contenido: subir desde aquí mismo */}
+          <section className="rounded-card border border-border bg-card p-5 md:p-6">
+            <div className="flex items-center gap-2 text-base font-semibold">
+              <Images className="h-5 w-5 text-primary" aria-hidden="true" />
+              {t("portal.inicio.contenidoTitulo")}
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">{t("portal.inicio.contenidoTexto")}</p>
+            <Button asChild variant="outline" className="mt-4 min-h-11 w-full sm:w-auto">
+              <Link to="/portal/contenido">
+                {t("portal.inicio.contenidoBoton")}
+                <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
+              </Link>
+            </Button>
+          </section>
+          {/* Lo que viene: dicho con honestidad, sin botones que no hacen nada */}
+          <section className="rounded-card border border-dashed border-border p-5 md:p-6">
+            <div className="flex items-center gap-2 text-sm font-semibold">
+              <Gift className="h-4 w-4 text-primary" aria-hidden="true" />
+              {t("portal.inicio.prontoTitulo")}
+            </div>
+            <p className="mt-2 flex items-start gap-2 text-sm text-muted-foreground">
+              <Clapperboard className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+              {t("portal.inicio.prontoPedidosTexto")}
+            </p>
+          </section>
+        </div>
       </div>
     </Page>
   );

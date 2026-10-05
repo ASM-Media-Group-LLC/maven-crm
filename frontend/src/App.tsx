@@ -50,6 +50,7 @@ const MeetGuestPage = lazy(() => import("./pages/meet/MeetGuestPage"));
 const PortalLayout = lazy(() => import("./pages/portal/PortalLayout"));
 const PortalInicio = lazy(() => import("./pages/portal/PortalInicio"));
 const PortalFicha = lazy(() => import("./pages/portal/PortalFicha"));
+const PortalContenido = lazy(() => import("./pages/portal/PortalContenido"));
 const PortalAjustes = lazy(() => import("./pages/portal/PortalAjustes"));
 const PortalEntrar = lazy(() => import("./pages/portal/PortalEntrar"));
 const PortalContrasena = lazy(() => import("./pages/portal/PortalContrasena"));
@@ -292,6 +293,7 @@ const App = () => (
               <Route path="/portal/contrasena" element={<PortalContrasena />} />
               <Route path="/portal" element={<PortalLayout />}>
                 <Route index element={<PortalInicio />} />
+                <Route path="contenido" element={<PortalContenido />} />
                 <Route path="ficha" element={<PortalFicha />} />
                 <Route path="ajustes" element={<PortalAjustes />} />
                 <Route path="*" element={<Navigate to="/portal" replace />} />

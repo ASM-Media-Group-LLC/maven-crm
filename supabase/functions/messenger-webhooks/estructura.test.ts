@@ -180,10 +180,11 @@ Deno.test("imports cruzados: la tabla fija, y el deploy tiene la regla de cada u
   for (const d of Deno.readDirSync(new URL("supabase/functions/", RAIZ))) {
     if (d.isDirectory) recorrer(new URL(`supabase/functions/${d.name}/`, RAIZ), d.name);
   }
-  assertEquals([...pares].sort(), ["_shared → public-api", "messenger-webhooks → public-api", "parrilla-weekly → parrilla-generate"].sort());
+  assertEquals([...pares].sort(), ["_shared → public-api", "messenger-webhooks → public-api", "parrilla-weekly → parrilla-generate", "portal-contenido → drive"].sort());
   const yml = Deno.readTextFileSync(new URL(".github/workflows/deploy-edge-functions.yml", RAIZ));
   assert(/grep -q '\^supabase\/functions\/public-api\/' <<< "\$CHANGED"; then FUNCS="\$FUNCS messenger-webhooks manage-api-keys"/.test(yml), "public-api → messenger-webhooks y manage-api-keys (que la lleva por _shared/webhook-salida.ts)");
   assert(/grep -q '\^supabase\/functions\/parrilla-generate\/' <<< "\$CHANGED"; then FUNCS="\$FUNCS parrilla-weekly"/.test(yml));
+  assert(/grep -q '\^supabase\/functions\/drive\/' <<< "\$CHANGED"; then FUNCS="\$FUNCS portal-contenido"/.test(yml), "drive → portal-contenido (las miniaturas)");
 });
 
 /** Todo lo que alcanza un archivo por imports relativos (transitivo). */
@@ -200,9 +201,9 @@ function alcanza(e: URL, v = new Set<string>()): Set<string> {
   return v;
 }
 
-Deno.test("imports cruzados TRANSITIVOS (también por _shared): quién lleva public-api y parrilla-generate en su bundle", () => {
+Deno.test("imports cruzados TRANSITIVOS (también por _shared): quién lleva public-api, parrilla-generate y drive en su bundle", () => {
   const FUNCS = new URL("supabase/functions/", RAIZ);
-  const llevan: Record<string, string[]> = { "public-api": [], "parrilla-generate": [] };
+  const llevan: Record<string, string[]> = { "public-api": [], "parrilla-generate": [], "drive": [] };
   for (const d of Deno.readDirSync(FUNCS)) {
     if (!d.isDirectory || d.name.startsWith("_")) continue;
     const idx = new URL(`${d.name}/index.ts`, FUNCS);
@@ -221,6 +222,7 @@ Deno.test("imports cruzados TRANSITIVOS (también por _shared): quién lleva pub
   }
   assertEquals(llevan["public-api"].sort(), ["manage-api-keys", "messenger-webhooks"], "las que el deploy redespliega cuando cambia public-api/");
   assertEquals(llevan["parrilla-generate"].sort(), ["parrilla-weekly"]);
+  assertEquals(llevan["drive"].sort(), ["portal-contenido"], "las que el deploy redespliega cuando cambia drive/");
 });
 
 Deno.test("el guard corre los tests del despachador y el banco PGlite", () => {
