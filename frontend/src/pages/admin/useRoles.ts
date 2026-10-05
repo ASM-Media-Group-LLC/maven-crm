@@ -203,7 +203,7 @@ export const MODULES_CONFIG: ModuleConfig[] = [
       { name: "Perfil: Documentos", parent: "Perfil" }, { name: "Perfil: Notas", parent: "Perfil" },
       { name: "Perfil: Tickets", parent: "Perfil" }, { name: "Perfil: Historial", parent: "Perfil" },
     ],
-    ["Nuevo", "Editar Creator", "Eliminar Creator", "Editar Blu CRM", "Editar Banking", "Cambiar Plataforma"],
+    ["Nuevo", "Editar Creator", "Eliminar Creator", "Editar Blu CRM", "Editar Banking", "Cambiar Plataforma", "Invitar al portal"],
   ),
   // Ventas quedó con UNA pantalla: el Dashboard Ventas (/dashboard2). Reportes,
   // IA Ventas y Auditoría se retiraron en 09/2026 — sus números viven ahí.

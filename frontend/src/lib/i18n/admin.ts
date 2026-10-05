@@ -435,6 +435,7 @@ export const admin = {
   "admin.perm.editBluCrm": { es: "Editar Blu CRM", en: "Edit BLU CRM" },
   "admin.perm.editBanking": { es: "Editar Banking", en: "Edit banking" },
   "admin.perm.changePlatform": { es: "Cambiar Plataforma", en: "Change platform" },
+  "admin.perm.invitePortal": { es: "Invitar al portal", en: "Invite to portal" },
   "admin.perm.edit": { es: "Editar", en: "Edit" },
   "admin.perm.sendToGroup": { es: "Enviar al grupo", en: "Send to group" },
   "admin.perm.createRequest": { es: "Crear pedido", en: "Create request" },

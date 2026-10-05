@@ -275,6 +275,24 @@ jobs:
       - name: Banco — videos de creadoras, archivos de Personalizados y correos (PGlite)
         run: deno run -A --node-modules-dir=none --no-lock supabase/tests/seguridad_archivos.ts
 
+      # Portal de creadoras, fase 1 (06/10): creadora_cuentas (solo cuentas de creadora,
+      # la agencia sale de la ficha, el correo solo enmascarado, nadie la escribe desde
+      # el navegador), la ficha que ella edita (las 22 columnas y nada más, solo texto,
+      # solo la suya) y el historial (cada columna anota quién y qué; cada agencia ve el
+      # suyo y desde el navegador no se cambia ni se borra: en prod, sí). ~5 s.
+      - name: Banco — portal de creadoras, cuentas y ficha (PGlite)
+        run: deno run -A --node-modules-dir=none --no-lock supabase/tests/portal_creadoras.ts
+
+      # portal-creadoras (la agencia da y quita el acceso): solo alguien del equipo que
+      # ve a la creadora y tiene «Invitar al portal»; nunca ata el correo de alguien del
+      # equipo; la misma cuenta en dos agencias; quitar bloquea sin borrar; los correos,
+      # escapados y de tú. Con tipos.
+      - name: Guard — portal-creadoras
+        run: deno test --allow-read supabase/functions/portal-creadoras/logica.test.ts
+
+      - name: Tipos — portal-creadoras
+        run: deno check supabase/functions/portal-creadoras/index.ts
+
       # `deno test --no-check` no mira tipos: sin este paso, el tipo de msg() (clave que
       # existe, variables exactas) y los @ts-expect-error de mensajes.test.ts nunca
       # podrían fallar en CI. messenger.test.ts queda afuera: arrastra un error de tipos

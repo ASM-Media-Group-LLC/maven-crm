@@ -73,7 +73,9 @@ const ChangeStatusModal = ({
   };
 
   const handleSubmit = async () => {
-    if (!isValid) return;
+    // Sin sesión no hay a quién anotar: el historial y la nota llevan quién hizo
+    // el cambio (antes llevaban el id de la creadora, como si lo hubiera hecho ella).
+    if (!isValid || !user) return;
     setSaving(true);
 
     try {
@@ -94,14 +96,14 @@ const ChangeStatusModal = ({
         action: "Cambio de estado",
         old_value: oldLabel,
         new_value: newLabel,
-        user_id: creatorId,
+        user_id: user.id,
       });
       if (histErr) throw histErr;
 
       const { error: noteErr } = await supabase.from("creator_notes").insert({
         creator_id: creatorId,
         note_text: `[Cambio de estado: ${oldLabel} → ${newLabel}] ${note}`,
-        created_by: creatorId,
+        created_by: user.id,
       });
       if (noteErr) throw noteErr;
 

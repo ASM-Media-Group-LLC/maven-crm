@@ -42,6 +42,10 @@ const FUERA_DEL_SHELL = new Set([
   "Portada", "Concepto", "Privacidad", "Login", "NotFound", "ForgotPassword", "ResetPassword",
   "VideoCallPage", "MeetGuestPage", "ChatterPublicSession", "ChatterPublicView", "DiagnosticoPantalla",
   "DesignSystem", "Docs", 
+  // Portal de creadoras: entrar y elegir contraseña son públicas (como Login y
+  // ResetPassword), y PortalLayout es su marco (monta un <Outlet>). Sus páginas
+  // (PortalInicio, PortalFicha, PortalAjustes) sí cumplen el contrato.
+  "PortalEntrar", "PortalContrasena", "PortalLayout",
 ]);
 
 /**

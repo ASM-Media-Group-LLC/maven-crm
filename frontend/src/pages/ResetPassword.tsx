@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,6 +7,8 @@ import AuthLayout from "@/components/auth/AuthLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useAuth } from "@/hooks/useAuth";
+import { esCuentaDeCreadora } from "@/lib/portal/cuenta";
 import { Eye, EyeOff, Loader2, ArrowLeft, Check, X } from "lucide-react";
 
 const ResetPassword = () => {
@@ -20,6 +22,7 @@ const ResetPassword = () => {
   const [loading, setLoading] = useState(false);
   const [recoveryReady, setRecoveryReady] = useState(false);
   const [checking, setChecking] = useState(true);
+  const { user } = useAuth();
 
   useEffect(() => {
     let isMounted = true;
@@ -120,6 +123,13 @@ const ResetPassword = () => {
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
+  }
+
+  // El enlace de la invitación (y el de «olvidé mi contraseña») de una creadora
+  // pasa por aquí porque es la dirección que Supabase ya acepta; con la sesión
+  // abierta, ella sigue en su portal, que la deja adentro al terminar.
+  if (recoveryReady && esCuentaDeCreadora(user)) {
+    return <Navigate to="/portal/contrasena" replace />;
   }
 
   return (

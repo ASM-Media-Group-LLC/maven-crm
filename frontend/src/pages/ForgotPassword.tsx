@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,6 +11,9 @@ import { Loader2, ArrowLeft } from "lucide-react";
 
 const ForgotPassword = () => {
   const { t } = useLanguage();
+  // Desde el portal de creadoras (?desde=portal) se vuelve a su pantalla de entrar.
+  const [params] = useSearchParams();
+  const volverA = params.get("desde") === "portal" ? "/portal/entrar" : "/login";
   const { toast } = useToast();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
@@ -61,7 +64,7 @@ const ForgotPassword = () => {
             <p className="text-sm text-white/70">
               {t("auth.forgotSent")}
             </p>
-            <Link to="/login" className="inline-flex items-center gap-2 text-sm text-white/60 hover:text-white hover:underline">
+            <Link to={volverA} className="inline-flex items-center gap-2 text-sm text-white/60 hover:text-white hover:underline">
               <ArrowLeft className="h-4 w-4" />
               {t("auth.backToLogin")}
             </Link>
@@ -82,7 +85,7 @@ const ForgotPassword = () => {
               </Button>
             </form>
             <div className="flex flex-col items-center gap-2 text-sm">
-              <Link to="/login" className="inline-flex items-center gap-2 text-white/60 hover:text-white hover:underline">
+              <Link to={volverA} className="inline-flex items-center gap-2 text-white/60 hover:text-white hover:underline">
                 <ArrowLeft className="h-4 w-4" />
                 {t("auth.backToLogin")}
               </Link>

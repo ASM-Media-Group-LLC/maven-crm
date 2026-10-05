@@ -24,6 +24,7 @@ import DocumentosTabContent from "./DocumentosTabContent";
 import TicketsTabContent from "./TicketsTabContent";
 import HistorialTabContent from "./HistorialTabContent";
 import OperacionesTabContent from "./OperacionesTabContent";
+import PortalTabContent from "./PortalTabContent";
 // generateCreatorPdf pulls jspdf — loaded on demand below.
 import ChangeStatusModal from "./ChangeStatusModal";
 import VerificationSection from "./VerificationSection";
@@ -115,6 +116,7 @@ const CreadorProfileContent = () => {
   // trabajo, sin datos de contacto ni gestión. Ver `vistaTrabajo.ts`.
   const { vistaTrabajo, cargando: permisosCargando } = useVistaTrabajo();
   const [statusModalOpen, setStatusModalOpen] = useState(false);
+  const [tab, setTab] = useState("operaciones");
 
   const goBack = () => {
     if (location.key !== "default") navigate(-1);
@@ -271,7 +273,7 @@ const CreadorProfileContent = () => {
       )}
 
       <div className="px-6 mt-4 pb-6">
-        <Tabs defaultValue="operaciones">
+        <Tabs value={tab} onValueChange={setTab}>
           <TabsList className="w-full justify-start overflow-x-auto">
             <TabsTrigger value="operaciones">{vistaTrabajo ? t("creadores.profile.tabHowToWrite") : t("creadores.profile.tabOperations")}</TabsTrigger>
             {/* Vista de trabajo: además de la operativa, los lineamientos y las
@@ -293,6 +295,7 @@ const CreadorProfileContent = () => {
                 <TabsTrigger value="documentos">{t("creadores.profile.tabDocuments")}</TabsTrigger>
                 <TabsTrigger value="notas">{t("creadores.profile.tabNotes")}</TabsTrigger>
                 <TabsTrigger value="tickets">{t("creadores.profile.tabTickets")}</TabsTrigger>
+                <TabsTrigger value="portal">{t("portal.acceso.tab")}</TabsTrigger>
                 <TabsTrigger value="historial">{t("creadores.profile.tabHistory")}</TabsTrigger>
               </>
             )}
@@ -344,8 +347,12 @@ const CreadorProfileContent = () => {
                 <TicketsTabContent creatorId={id!} />
               </TabsContent>
 
+              <TabsContent value="portal">
+                <PortalTabContent creatorId={id!} correoFicha={c.email ?? null} onVerHistorial={() => setTab("historial")} />
+              </TabsContent>
+
               <TabsContent value="historial">
-                <HistorialTabContent creatorId={id!} />
+                <HistorialTabContent creatorId={id!} creatorName={c.artistic_name || c.name} />
               </TabsContent>
             </>
           )}

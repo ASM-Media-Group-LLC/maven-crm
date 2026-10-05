@@ -46,6 +46,13 @@ const VideoCallPage = lazy(() => import("./pages/VideoCallPage"));
 const CoworkPage = lazy(() => import("./pages/cowork/CoworkPage"));
 const MeetPage = lazy(() => import("./pages/meet/MeetPage"));
 const MeetGuestPage = lazy(() => import("./pages/meet/MeetGuestPage"));
+// Portal de creadoras: su espacio, fuera del AppShell del equipo.
+const PortalLayout = lazy(() => import("./pages/portal/PortalLayout"));
+const PortalInicio = lazy(() => import("./pages/portal/PortalInicio"));
+const PortalFicha = lazy(() => import("./pages/portal/PortalFicha"));
+const PortalAjustes = lazy(() => import("./pages/portal/PortalAjustes"));
+const PortalEntrar = lazy(() => import("./pages/portal/PortalEntrar"));
+const PortalContrasena = lazy(() => import("./pages/portal/PortalContrasena"));
 const GrabacionesPage = lazy(() => import("./pages/grabaciones/GrabacionesPage"));
 const OficinaPage = lazy(() => import("./pages/oficina/OficinaPage"));
 const CalendarioPage = lazy(() => import("./pages/calendario/CalendarioPage"));
@@ -278,6 +285,17 @@ const App = () => (
               {/* Invitado a un Meet sin cuenta en Maven: pide entrada y espera que
                   alguien de adentro lo admita. Pública a propósito. */}
               <Route path="/entrar/:code" element={<MeetGuestPage />} />
+
+              {/* Portal de creadoras: entrar y elegir contraseña son públicas; su
+                  espacio lo cuida PortalLayout (solo cuentas de creadora). */}
+              <Route path="/portal/entrar" element={<PortalEntrar />} />
+              <Route path="/portal/contrasena" element={<PortalContrasena />} />
+              <Route path="/portal" element={<PortalLayout />}>
+                <Route index element={<PortalInicio />} />
+                <Route path="ficha" element={<PortalFicha />} />
+                <Route path="ajustes" element={<PortalAjustes />} />
+                <Route path="*" element={<Navigate to="/portal" replace />} />
+              </Route>
 
               {/* Protected routes that share the AppShell — Sidebar +
                   Topbar mount once and persist across nav between these
