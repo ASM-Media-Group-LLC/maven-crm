@@ -11,6 +11,7 @@ import { tamano } from "@/lib/drive/formato";
 import { vistaDeArchivo } from "@/lib/drive/tipoDeArchivo";
 import { Miniatura } from "@/pages/oficina/drive/VistasDeDrive";
 import VisorArchivo from "@/pages/oficina/drive/VisorArchivo";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -19,7 +20,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 // sube desde su portal. Es su carpeta del Drive de la agencia (una unidad, ver
 // 20261006120000_portal_contenido.sql): se lee con la RLS del Drive, y
 // drive_mi_rol deja entrar como lector a quien ve a esa creadora y tiene «Ver y
-// descargar su contenido». Para ver un archivo, el visor del Drive.
+// descargar su contenido». Para ver un archivo, el visor del Drive. Lo que ella
+// «borró» desde el portal sigue aquí, marcado: solo salió de SU vista.
 
 const iconoDe = (i: DriveItem) => {
   if (i.tipo === "carpeta") return Folder;
@@ -66,7 +68,7 @@ export default function ContenidoTabContent({ creatorId }: { creatorId: string }
       </div>
     );
   } else {
-    cuerpo = <Navegador raiz={carpeta.data} />;
+    cuerpo = <Navegador raiz={carpeta.data} creatorId={creatorId} />;
   }
 
   return (
@@ -83,9 +85,19 @@ export default function ContenidoTabContent({ creatorId }: { creatorId: string }
   );
 }
 
-function Navegador({ raiz }: { raiz: string }) {
+function Navegador({ raiz, creatorId }: { raiz: string; creatorId: string }) {
   const { t } = useLanguage();
   const { canAccess } = usePermissions();
+  const ocultos = useQuery({
+    queryKey: ["creadora-ocultos", creatorId],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("creadora_ocultos" as never).select("item_id").eq("creator_id", creatorId);
+      if (error) throw error;
+      return new Set(((data ?? []) as { item_id: string }[]).map((x) => x.item_id));
+    },
+  }).data ?? new Set<string>();
+  const marca = (id: string) =>
+    ocultos.has(id) ? <Badge variant="outline" className="mt-1 text-[10px]">{t("portal.agencia.contenido.oculto")}</Badge> : null;
   const [carpeta, setCarpeta] = useState(raiz);
   const [abierto, setAbierto] = useState<string | null>(null);
   const lista = useDriveVista("unidades", carpeta);
@@ -137,7 +149,10 @@ function Navegador({ raiz }: { raiz: string }) {
                 <li key={c.id}>
                   <button type="button" onClick={() => setCarpeta(c.id)} className="flex min-h-12 w-full items-center gap-3 rounded-panel border border-border px-3 text-left hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                     <Folder className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
-                    <span className="truncate font-medium">{c.nombre}</span>
+                    <span className="min-w-0">
+                      <span className="block truncate font-medium">{c.nombre}</span>
+                      {marca(c.id)}
+                    </span>
                   </button>
                 </li>
               ))}
@@ -158,6 +173,7 @@ function Navegador({ raiz }: { raiz: string }) {
                   <div className="p-2">
                     <p className="truncate text-sm font-medium">{a.nombre}</p>
                     <p className="text-xs text-muted-foreground">{tamano(a.size)}</p>
+                    {marca(a.id)}
                   </div>
                 </li>
               ))}

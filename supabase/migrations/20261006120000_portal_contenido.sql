@@ -21,10 +21,16 @@
 --    carpeta.
 -- 4. drive_espacio_de_la_agencia(agencia): el espacio usado y el tope, para la
 --    edge (drive_uso_agencia lee la agencia de quien llama, y ella no tiene).
+-- 5. creadora_ocultos: lo que ella «borra» desde el portal. Decisión de Jhon
+--    (06/10): que pueda borrar, pero solo en SU vista. No se borra nada: el
+--    archivo sigue en el Drive, la agencia lo sigue viendo (marcado como que ella
+--    lo sacó de su vista) y sigue ocupando el espacio de la agencia. Lo único que
+--    sí se borra de verdad es una subida que quedó a medias (no es contenido).
 --
 -- Vuelta atrás (las líneas «--|»; el banco las corre):
 --| do $$ declare r record; begin for r in select def from public.portal_contenido_respaldo order by fn loop execute r.def; end loop; end $$;
 --| drop table public.portal_contenido_respaldo;
+--| drop table public.creadora_ocultos;
 --| drop function public.drive_espacio_de_la_agencia(uuid);
 --| drop table public.creadora_carpetas;
 --| drop function public.creadora_carpetas_revisar();
@@ -192,3 +198,23 @@ end;
 $function$;
 revoke all on function public.drive_espacio_de_la_agencia(uuid) from public, anon, authenticated;
 grant execute on function public.drive_espacio_de_la_agencia(uuid) to service_role;
+
+-- ─── 4. Lo que ella saca de su vista ────────────────────────────────────────
+create table public.creadora_ocultos (
+  item_id uuid primary key references public.drive_items (id) on delete cascade,
+  creator_id uuid not null references public.creators (id) on delete cascade,
+  ocultado_en timestamptz not null default now()
+);
+create index creadora_ocultos_creadora_idx on public.creadora_ocultos (creator_id);
+comment on table public.creadora_ocultos is
+  'Lo que la creadora borró de SU vista en el portal. No se borra nada: la agencia lo sigue viendo y el archivo sigue en el Drive. La escribe solo la edge portal-contenido. Ver 20261006120000.';
+
+alter table public.creadora_ocultos enable row level security;
+revoke all on table public.creadora_ocultos from public, anon, authenticated;
+grant select on table public.creadora_ocultos to authenticated;
+grant select, insert, update, delete on table public.creadora_ocultos to service_role;
+
+-- Lo ve quien ve a la creadora (para marcarlo en la pestaña Contenido del perfil).
+create policy creadora_ocultos_quien_lo_ve on public.creadora_ocultos
+  for select to authenticated
+  using (exists (select 1 from public.creators c where c.id = creadora_ocultos.creator_id));

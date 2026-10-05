@@ -17,7 +17,9 @@
 //   5. Lector de verdad: ve y no escribe (ni carpetas, ni nombres, ni papelera).
 //   6. drive_espacio_de_la_agencia: lo de la carpeta gasta el espacio de la
 //      agencia; solo la llama el servidor.
-//   7. La vuelta atrás deja todo como estaba y se puede volver a aplicar.
+//   7. Lo que ella «borra» (creadora_ocultos): no toca el Drive; lo ve quien ve a
+//      la creadora, nadie lo escribe desde el navegador.
+//   8. La vuelta atrás deja todo como estaba y se puede volver a aplicar.
 //
 // Sale con código 1 si algo falla. Corre en el guard de cada PR.
 import { PGlite } from "npm:@electric-sql/pglite@0.3";
@@ -334,12 +336,26 @@ check(true, "la migración carga sobre prod (el Drive, creadoras por agencia y l
   check(esError(navegador, /permission denied/), "solo la llama el servidor");
 }
 
-// ════ 7. La vuelta atrás ══════════════════════════════════════════════════════
+// ════ 7. Lo que ella borra de su vista ═══════════════════════════════════════
+{
+  await comoServicio(con, `insert into public.creadora_ocultos (item_id, creator_id) values ('${VIDEO}', '${C1}')`);
+  const sigue = await uno(con, `select count(*)::int n from public.drive_items where id = '${VIDEO}'`);
+  check(sigue?.n === 1, "«borrar» desde el portal no toca el Drive: el archivo sigue");
+  check(await rol(con, JHON, VIDEO) === "lector", "y la agencia lo sigue abriendo");
+  const ve = async (quien: Quien) => filas(await probar(con, quien, `select item_id from public.creadora_ocultos`)).length;
+  check(await ve(JHON) === 1 && await ve(MARIO) === 1, "la agencia ve qué sacó de su vista (para marcarlo)");
+  check(await ve(OLGA) === 0 && await ve(LUNA) === 0, "la otra agencia y otra creadora, no");
+  const escribe = await probar(con, JHON, `insert into public.creadora_ocultos (item_id, creator_id) values ('${FOTO}', '${C1}')`);
+  const destapa = await probar(con, JHON, `delete from public.creadora_ocultos returning 1`);
+  check(esError(escribe, /permission denied/) && esError(destapa, /permission denied/), "nadie lo escribe ni lo borra desde el navegador");
+}
+
+// ════ 8. La vuelta atrás ══════════════════════════════════════════════════════
 {
   const db = await nueva(true);
   const r = await intento(() => aplicar(db, "vuelta atrás", vuelta(M)));
   check(r === "anduvo", `la vuelta atrás corre (${r.slice(0, 80)})`);
-  const quedan = await uno(db, `select to_regclass('public.creadora_carpetas') t,
+  const quedan = await uno(db, `select coalesce(to_regclass('public.creadora_carpetas')::text, to_regclass('public.creadora_ocultos')::text) t,
     (select count(*)::int from pg_proc where proname in ('puedo_ver_contenido_de','drive_espacio_de_la_agencia','creadora_carpetas_revisar')) f,
     (select md5(prosrc) from pg_proc where proname = 'drive_mi_rol') h`);
   check(quedan?.t === null && quedan?.f === 0 && quedan?.h === "dbfc25b5f58c1fbcf1e329839d931d2d", `y deja todo como en prod (${json(quedan)})`);

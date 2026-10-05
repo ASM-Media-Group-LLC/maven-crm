@@ -21,7 +21,7 @@ import { vistaDeArchivo } from "@/lib/drive/tipoDeArchivo";
 import DialogoDeNombre from "@/components/oficina/DialogoDeNombre";
 import { Miniatura } from "@/pages/oficina/drive/VistasDeDrive";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter,
   AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
@@ -34,12 +34,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 // MI CONTENIDO: su carpeta en el Drive de su agencia. Carpetas, fotos y videos;
-// subir desde el celular (por partes, aguanta cortes); ver y bajar; borrar lo
-// que subió en las últimas 24 horas. Lo ve su agencia (quien tiene el permiso).
+// subir desde el celular (por partes, aguanta cortes); ver y bajar. «Borrar» lo
+// saca de SU vista (decisión de Jhon, 06/10): el archivo sigue en el Drive de la
+// agencia. Lo ve su agencia (quien tiene el permiso).
 
 const ERRORES = [
-  "sin_espacio_en_la_agencia", "nas_no_responde", "nas_sin_lugar", "demasiado_grande", "ya_no_se_borra",
-  "carpeta_con_cosas", "nombre_invalido", "nas_rechazo", "sin_red", "sin_recibo",
+  "sin_espacio_en_la_agencia", "nas_no_responde", "nas_sin_lugar", "demasiado_grande",
+  "nombre_invalido", "nas_rechazo", "sin_red", "sin_recibo",
 ] as const;
 const textoDeError = (codigo: unknown): TranslationKey =>
   (ERRORES as readonly string[]).includes(String(codigo)) ? (`portal.contenido.error.${codigo}` as TranslationKey) : "portal.contenido.error.generico";
@@ -230,12 +231,9 @@ function Contenido({ creatorId }: { creatorId: string }) {
         />
       )}
       <AlertDialog open={dialogo?.tipo === "borrar"} onOpenChange={(o) => !o && setDialogo(null)}>
-        <AlertDialogContent>
+        <AlertDialogContent aria-describedby={undefined}>
           <AlertDialogHeader>
             <AlertDialogTitle>{dialogo?.tipo === "borrar" ? t("portal.contenido.borrarTitulo", { nombre: dialogo.item.nombre }) : ""}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t(dialogo?.tipo === "borrar" && dialogo.item.tipo === "carpeta" ? "portal.contenido.borrarCarpetaTexto" : "portal.contenido.borrarTexto")}
-            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t("portal.contenido.cancelar")}</AlertDialogCancel>
@@ -244,7 +242,14 @@ function Contenido({ creatorId }: { creatorId: string }) {
               onClick={(e) => {
                 e.preventDefault();
                 if (dialogo?.tipo !== "borrar") return;
-                acciones.borrar.mutate(dialogo.item.id, { onSuccess: () => setDialogo(null), onError: (er) => { setDialogo(null); fallo(er); } });
+                const esCarpeta = dialogo.item.tipo === "carpeta";
+                acciones.borrar.mutate(dialogo.item.id, {
+                  onSuccess: () => {
+                    setDialogo(null);
+                    toast({ title: t(esCarpeta ? "portal.contenido.carpetaBorrada" : "portal.contenido.archivoBorrado") });
+                  },
+                  onError: (er) => { setDialogo(null); fallo(er); },
+                });
               }}
             >
               {acciones.borrar.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}

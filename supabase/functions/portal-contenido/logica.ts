@@ -11,9 +11,10 @@
 //   · que la ficha (creator_id) es suya (creadora_cuentas);
 //   · que lo que toca es de SU carpeta (unidad_id = su carpeta, o la carpeta misma),
 //     de su agencia y no está en la papelera.
-// Borrar: solo lo que subió ella, y solo hasta 24 horas después (para arreglar
-// un error). Pasado eso el archivo es de la agencia: se lo pide a su manager.
-// Una carpeta, solo si es suya y está vacía.
+// Borrar (decisión de Jhon, 06/10): ella puede «borrar» cualquier cosa de su
+// carpeta, pero SOLO de su vista (creadora_ocultos). No se borra nada: el archivo
+// sigue en el Drive, la agencia lo ve y sigue siendo de la agencia. Lo único que
+// se borra de verdad es una subida que quedó a medias, que no es contenido.
 
 import { extensionParaMiniatura, idsParaMiniaturas, venceMiniatura } from "../drive/logica.ts";
 
@@ -21,9 +22,6 @@ export const ACCIONES = [
   "raiz", "listar", "crear_carpeta", "renombrar", "borrar", "subir_iniciar", "subir_confirmar", "abrir", "miniaturas",
 ] as const;
 export type Accion = typeof ACCIONES[number];
-
-/** Lo que se puede borrar después de subirlo: 24 horas. */
-export const HORAS_PARA_BORRAR = 24;
 
 /** Partes más chicas que las del Drive (32 MB): la puerta al NAS corta cada
  *  pedido a los ~60 s, y desde un celular se sube a 2–5 Mbps. 8 MB a 2 Mbps son
@@ -84,7 +82,9 @@ export interface Puertos {
   itemsPorId(ids: string[]): Promise<Item[]>;
   /** Lo de adentro de una carpeta, sin lo que está en la papelera. */
   hijos(carpetaId: string): Promise<Item[]>;
-  tieneHijos(carpetaId: string): Promise<boolean>;
+  /** Lo que ella sacó de su vista (ids). */
+  ocultos(creatorId: string): Promise<Set<string>>;
+  ocultar(itemId: string, creatorId: string): Promise<void>;
   insertar(fila: Omit<Item, "unidad_id" | "created_at" | "updated_at" | "trashed_at">): Promise<{ error: string | null }>;
   renombrar(id: string, nombre: string): Promise<{ error: string | null }>;
   borrarFila(id: string): Promise<void>;
@@ -136,18 +136,26 @@ export function esDeSuCarpeta(i: Item | null, carpeta: string, tenant: string): 
   return !!i && i.tenant_id === tenant && !i.trashed_at && (i.id === carpeta || i.unidad_id === carpeta);
 }
 
-export function sePuedeBorrar(i: Item, yo: string, carpeta: string, ahora: number): boolean {
-  if (i.id === carpeta || i.owner_id !== yo) return false;
-  if (i.tipo === "carpeta") return true; // vacía: se mira al borrar
-  if (i.estado === "subiendo") return true; // una subida que quedó a medias
-  return ahora - new Date(i.created_at).getTime() <= HORAS_PARA_BORRAR * 3600 * 1000;
+/** Todo lo de su carpeta se puede «borrar» (de su vista), menos la carpeta de arriba. */
+export const sePuedeBorrar = (i: Item, carpeta: string): boolean => i.id !== carpeta;
+
+/** ¿Lo borró de su vista, o está adentro de algo que borró? */
+async function estaOculto(i: Item, ocultos: Set<string>, carpeta: string, p: Puertos): Promise<boolean> {
+  if (!ocultos.size) return false;
+  let actual: Item | null = i;
+  for (let n = 0; actual && n < 50; n++) {
+    if (ocultos.has(actual.id)) return true;
+    if (actual.id === carpeta || !actual.parent_id) return false;
+    actual = await p.item(actual.parent_id);
+  }
+  return false;
 }
 
-function visible(i: Item, yo: string, carpeta: string, ahora: number): ItemVisible {
+function visible(i: Item, yo: string, carpeta: string): ItemVisible {
   return {
     id: i.id, tipo: i.tipo, nombre: i.nombre, mime: i.mime, size: i.size, estado: i.estado,
     created_at: i.created_at, updated_at: i.updated_at,
-    mio: i.owner_id === yo, se_puede_borrar: sePuedeBorrar(i, yo, carpeta, ahora),
+    mio: i.owner_id === yo, se_puede_borrar: sePuedeBorrar(i, carpeta),
   };
 }
 
@@ -170,18 +178,21 @@ export async function manejar(token: string, body: Record<string, unknown>, p: P
   if (!ficha) return r(403, { error: "no_es_tu_ficha" });
   const carpeta = await p.carpetaDe(ficha);
   const ahora = p.ahora();
+  const ocultos = await p.ocultos(ficha.creator_id);
 
-  // Una carpeta de las suyas (por defecto, la de arriba).
+  // Una carpeta de las suyas (por defecto, la de arriba), que no haya borrado.
   const carpetaPedida = async (campo: string): Promise<Item | null> => {
     const id = body[campo] == null || body[campo] === "" ? carpeta : body[campo];
     if (!esUuid(id)) return null;
     const i = await p.item(id);
-    return esDeSuCarpeta(i, carpeta, ficha.tenant_id) && i.tipo === "carpeta" ? i : null;
+    if (!esDeSuCarpeta(i, carpeta, ficha.tenant_id) || i.tipo !== "carpeta") return null;
+    return (await estaOculto(i, ocultos, carpeta, p)) ? null : i;
   };
   const suyo = async (campo: string): Promise<Item | null> => {
     if (!esUuid(body[campo])) return null;
     const i = await p.item(body[campo] as string);
-    return esDeSuCarpeta(i, carpeta, ficha.tenant_id) ? i : null;
+    if (!esDeSuCarpeta(i, carpeta, ficha.tenant_id)) return null;
+    return (await estaOculto(i, ocultos, carpeta, p)) ? null : i;
   };
 
   if (accion === "raiz") return r(200, { raiz: carpeta });
@@ -200,8 +211,8 @@ export async function manejar(token: string, body: Record<string, unknown>, p: P
     }
     // Lo que está subiendo solo se ve si lo sube ella (lo de otra subida no está listo).
     const items = (await p.hijos(c.id))
-      .filter((i) => i.estado === "listo" || i.owner_id === yo.id)
-      .map((i) => visible(i, yo.id, carpeta, ahora));
+      .filter((i) => !ocultos.has(i.id) && (i.estado === "listo" || i.owner_id === yo.id))
+      .map((i) => visible(i, yo.id, carpeta));
     return r(200, { carpeta: c.id, raiz: carpeta, ruta, items });
   }
 
@@ -231,17 +242,17 @@ export async function manejar(token: string, body: Record<string, unknown>, p: P
 
   if (accion === "borrar") {
     const i = await suyo("id");
-    if (!i || i.id === carpeta) return r(404, { error: "no_existe" });
-    if (!sePuedeBorrar(i, yo.id, carpeta, ahora)) return r(403, { error: "ya_no_se_borra" });
-    if (i.tipo === "carpeta") {
-      if (await p.tieneHijos(i.id)) return r(409, { error: "carpeta_con_cosas" });
+    if (!i || !sePuedeBorrar(i, carpeta)) return r(404, { error: "no_existe" });
+    // Una subida suya que quedó a medias no es contenido: se borra de verdad.
+    // ⚠️ PRIMERO el NAS, después la ficha (como la edge del Drive): al revés, si
+    // el NAS no contesta queda un archivo que nadie ve ocupando lugar.
+    if (i.tipo === "archivo" && i.estado === "subiendo" && i.owner_id === yo.id) {
+      if (i.storage_key && !(await p.borrarEnNas(i.storage_key))) return r(502, { error: "nas_no_borro" });
       await p.borrarFila(i.id);
       return r(200, { ok: true });
     }
-    // ⚠️ PRIMERO el NAS, después la ficha (como la edge del Drive): al revés, si
-    // el NAS no contesta queda un archivo que nadie ve ocupando lugar.
-    if (i.storage_key && !(await p.borrarEnNas(i.storage_key))) return r(502, { error: "nas_no_borro" });
-    await p.borrarFila(i.id);
+    // Lo demás sale de SU vista y nada más: sigue en el Drive de la agencia.
+    await p.ocultar(i.id, ficha.creator_id);
     return r(200, { ok: true });
   }
 
@@ -317,6 +328,7 @@ export async function manejar(token: string, body: Record<string, unknown>, p: P
   const urls: Record<string, string> = {};
   for (const i of ids.length ? await p.itemsPorId(ids) : []) {
     if (!esDeSuCarpeta(i, carpeta, ficha.tenant_id) || i.tipo !== "archivo" || i.estado !== "listo" || !i.storage_key) continue;
+    if (ocultos.has(i.id) || (i.parent_id && ocultos.has(i.parent_id))) continue;
     const x = extensionParaMiniatura(i.nombre, i.mime);
     if (x) urls[i.id] = await p.permiso({ op: "mini", k: i.storage_key, x, e }, 0);
   }

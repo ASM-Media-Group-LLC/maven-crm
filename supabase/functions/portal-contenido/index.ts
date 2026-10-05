@@ -1,5 +1,6 @@
 // portal-contenido — la creadora y su carpeta de contenido en el Drive de su
-// agencia (portal de creadoras, fase 2). QUIÉN y QUÉ: ver logica.ts. La base:
+// agencia (portal de creadoras, fase 2). QUIÉN y QUÉ: ver logica.ts. «Borrar»,
+// para ella, saca de su vista y nada más (creadora_ocultos). La base:
 // migrations/20261006120000_portal_contenido.sql.
 //
 // verify_jwt = false (config.toml): la sesión se valida aquí con getUser, como
@@ -90,9 +91,15 @@ function puertosReales(nas: string, secreto: string): Puertos {
       if (error) throw new Error(`no se pudo listar: ${error.message}`);
       return (data ?? []) as Item[];
     },
-    tieneHijos: async (carpetaId) => {
-      const { data } = await admin.from("drive_items").select("id").eq("parent_id", carpetaId).limit(1);
-      return (data ?? []).length > 0;
+    ocultos: async (creatorId) => {
+      const { data, error } = await admin.from("creadora_ocultos").select("item_id").eq("creator_id", creatorId);
+      if (error) throw new Error(`no se pudo leer lo oculto: ${error.message}`);
+      return new Set(((data ?? []) as { item_id: string }[]).map((x) => x.item_id));
+    },
+    ocultar: async (itemId, creatorId) => {
+      const { error } = await admin.from("creadora_ocultos")
+        .upsert({ item_id: itemId, creator_id: creatorId }, { onConflict: "item_id", ignoreDuplicates: true });
+      if (error) throw new Error(`no se pudo ocultar: ${error.message}`);
     },
     insertar: async (fila) => {
       const { error } = await admin.from("drive_items").insert(fila);

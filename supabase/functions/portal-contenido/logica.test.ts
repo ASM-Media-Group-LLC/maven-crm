@@ -40,7 +40,8 @@ function armar(o: { sinCarpeta?: boolean; espacio?: { usado: number; cupo: numbe
     [OTRA_RAIZ, item({ id: OTRA_RAIZ, parent_id: null, unidad_id: OTRA_RAIZ, owner_id: null, tipo: "carpeta", nombre: "Contenido · Otra", storage_key: null })],
     [DE_OTRA, item({ id: DE_OTRA, parent_id: OTRA_RAIZ, unidad_id: OTRA_RAIZ, owner_id: "u-otra", nombre: "suya.jpg" })],
   ]);
-  const log = { creadas: 0, insertadas: [] as Item[], borradas: [] as string[], enNas: [] as string[], permisos: [] as Record<string, unknown>[], confirmadas: [] as string[] };
+  const log = { creadas: 0, insertadas: [] as Item[], borradas: [] as string[], enNas: [] as string[], permisos: [] as Record<string, unknown>[], confirmadas: [] as string[], ocultadas: [] as string[] };
+  const ocultos = new Set<string>();
   let n = 100;
   const p: Puertos = {
     persona: (t) => Promise.resolve(GENTE[t] ?? null),
@@ -52,7 +53,8 @@ function armar(o: { sinCarpeta?: boolean; espacio?: { usado: number; cupo: numbe
     item: (i) => Promise.resolve(items.get(i) ?? null),
     itemsPorId: (ids) => Promise.resolve(ids.map((i) => items.get(i)).filter(Boolean) as Item[]),
     hijos: (c) => Promise.resolve([...items.values()].filter((i) => i.parent_id === c && !i.trashed_at)),
-    tieneHijos: (c) => Promise.resolve([...items.values()].some((i) => i.parent_id === c)),
+    ocultos: () => Promise.resolve(new Set(ocultos)),
+    ocultar: (i) => { ocultos.add(i); log.ocultadas.push(i); return Promise.resolve(); },
     insertar: (f) => {
       const nuevo = { ...f, unidad_id: RAIZ, created_at: new Date(AHORA).toISOString(), updated_at: new Date(AHORA).toISOString(), trashed_at: null } as Item;
       items.set(f.id, nuevo); log.insertadas.push(nuevo);
@@ -98,7 +100,7 @@ Deno.test("listar: lo suyo, sin la papelera, con las migas; nada de otra carpeta
   assertEquals((sesion.body.ruta as { id: string }[]).map((x) => x.id), [RAIZ, SESION]);
   const it = sesion.body.items as { nombre: string; se_puede_borrar: boolean; mio: boolean }[];
   assertEquals(it.find((x) => x.nombre === "foto.jpg")?.se_puede_borrar, true);
-  assertEquals(it.find((x) => x.nombre === "vieja.mp4")?.se_puede_borrar, false);
+  assertEquals(it.find((x) => x.nombre === "vieja.mp4")?.se_puede_borrar, true, "sin el límite de 24 horas");
   assert(!JSON.stringify(sesion.body).includes("storage_key"), "la ruta física del NAS no sale");
   assertEquals((await pedir("tok-sofi", { accion: "listar", carpeta: OTRA_RAIZ })).body.error, "no_existe");
   assertEquals((await pedir("tok-sofi", { accion: "listar", carpeta: FOTO })).body.error, "no_existe");
@@ -120,17 +122,38 @@ Deno.test("crear carpeta y renombrar: solo adentro de la suya, con un nombre vá
   assertEquals((await pedir("tok-sofi", { accion: "renombrar", id: TIRADA, nombre: "x" }, a)).body.error, "no_existe");
 });
 
-Deno.test("borrar: lo suyo hasta 24 horas, primero en el NAS; carpetas vacías", async () => {
+Deno.test("borrar: sale de SU vista y nada más (el archivo sigue en el Drive de la agencia)", async () => {
   const a = armar();
-  assertEquals((await pedir("tok-sofi", { accion: "borrar", id: FOTO }, a)).status, 200);
-  assertEquals(a.log.enNas, [`${T1}/${FOTO}`]);
-  assertEquals(a.log.borradas, [FOTO]);
-  assertEquals((await pedir("tok-sofi", { accion: "borrar", id: VIEJA }, a)).body.error, "ya_no_se_borra");
-  assertEquals((await pedir("tok-sofi", { accion: "borrar", id: AJENA }, a)).body.error, "ya_no_se_borra");
-  assertEquals((await pedir("tok-sofi", { accion: "borrar", id: SESION }, a)).body.error, "carpeta_con_cosas");
-  assertEquals((await pedir("tok-sofi", { accion: "borrar", id: RAIZ }, a)).body.error, "no_existe");
+  assertEquals((await pedir("tok-sofi", { accion: "borrar", id: VIEJA }, a)).status, 200);
+  assertEquals(a.log.ocultadas, [VIEJA]);
+  assertEquals([a.log.enNas, a.log.borradas], [[], []], "ni en el NAS ni en la base");
+  assert(a.items.has(VIEJA), "la ficha sigue");
+  const sesion = await pedir("tok-sofi", { accion: "listar", carpeta: SESION }, a);
+  assert(!(sesion.body.items as { id: string }[]).some((i) => i.id === VIEJA), "y ella ya no lo ve");
+  assertEquals((await pedir("tok-sofi", { accion: "abrir", id: VIEJA }, a)).body.error, "no_existe");
+  assertEquals((await pedir("tok-sofi", { accion: "renombrar", id: VIEJA, nombre: "otra" }, a)).body.error, "no_existe");
+
+  // Una carpeta con cosas: también, y lo de adentro desaparece con ella.
+  assertEquals((await pedir("tok-sofi", { accion: "borrar", id: SESION }, a)).status, 200);
+  assert(!((await pedir("tok-sofi", { accion: "listar" }, a)).body.items as { id: string }[]).some((i) => i.id === SESION));
+  assertEquals((await pedir("tok-sofi", { accion: "listar", carpeta: SESION }, a)).body.error, "no_existe");
+  assertEquals((await pedir("tok-sofi", { accion: "abrir", id: FOTO }, a)).body.error, "no_existe", "lo de adentro de lo borrado, tampoco");
+  const m = await pedir("tok-sofi", { accion: "miniaturas", ids: [FOTO] }, a);
+  assertEquals(Object.keys(m.body.urls as object), []);
+  assertEquals((await pedir("tok-sofi", { accion: "borrar", id: RAIZ }, a)).body.error, "no_existe", "la carpeta de arriba, nunca");
+  assertEquals((await pedir("tok-sofi", { accion: "borrar", id: DE_OTRA }, a)).body.error, "no_existe");
+});
+
+Deno.test("borrar una subida suya que quedó a medias: esa sí, de verdad (primero el NAS)", async () => {
+  const a = armar();
+  const id = String((await pedir("tok-sofi", { accion: "subir_iniciar", nombre: "cortado.mov", size: 5000 }, a)).body.id);
+  assertEquals((await pedir("tok-sofi", { accion: "borrar", id }, a)).status, 200);
+  assertEquals(a.log.enNas, [`${T1}/${id}`]);
+  assertEquals(a.log.borradas, [id]);
+  assertEquals(a.log.ocultadas, []);
   const b = armar({ nasBorra: false });
-  assertEquals((await pedir("tok-sofi", { accion: "borrar", id: FOTO }, b)).body.error, "nas_no_borro");
+  const id2 = String((await pedir("tok-sofi", { accion: "subir_iniciar", nombre: "cortado.mov", size: 5000 }, b)).body.id);
+  assertEquals((await pedir("tok-sofi", { accion: "borrar", id: id2 }, b)).body.error, "nas_no_borro");
   assertEquals(b.log.borradas, [], "si el NAS no borra, la ficha queda");
 });
 
