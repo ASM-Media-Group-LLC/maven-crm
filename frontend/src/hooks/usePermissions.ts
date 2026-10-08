@@ -20,7 +20,7 @@ interface Permission {
 export const UNIVERSAL_MODULES = ["Dashboard", "Messenger", "Cowork", "Meet", "Correo", "Grabaciones", "Oficina"];
 
 export const usePermissions = () => {
-  const { role, isAdmin, isLoading: roleLoading, isError: roleError, recargarRol } = useUserRole();
+  const { role, isAdmin, isLoading: roleLoading, isError: roleError, roleConocido, recargarRol } = useUserRole();
 
   const {
     data: permissionsData, isLoading: permsLoading, isError: permsError, refetch: recargarPermisos,
@@ -30,13 +30,19 @@ export const usePermissions = () => {
       if (!role) return [];
 
       // Find the roles_config entry matching the user's role name
-      const { data: roleConfig } = await supabase
+      const { data: roleConfig, error: rcError } = await supabase
         .from("roles_config")
         .select("id")
         .eq("name", role)
         .eq("is_active", true)
         .maybeSingle();
 
+      // ⚠️ Un fallo NO es "rol sin configurar". Tragarse el error devolvía []
+      // y la app concluía "solo módulos universales": menú recortado y
+      // PermissionRoute sacando a la persona del evaluador en pleno roleplay
+      // (John Idrobo, 07/10: "se cerró el roleplay solo"). Con throw,
+      // react-query conserva los permisos anteriores y marca el error.
+      if (rcError) throw rcError;
       if (!roleConfig) return [];
 
       const { data, error } = await supabase
@@ -148,7 +154,11 @@ export const usePermissions = () => {
      * está deshabilitada mientras no haya rol, así que si el rol falla NINGUNA
      * de las dos queda "cargando" y sin esto la app se cree lista.
      */
-    hayError: roleError || permsError,
+    // Solo cuenta como error si NO tenemos nada que usar: con permisos ya
+    // cargados, un refetch fallido (foco de ventana, bache de red) se queda
+    // con los anteriores y la pantalla no se desmonta. Antes, un fallo en
+    // segundo plano reemplazaba el evaluador por "No pudimos verificar".
+    hayError: (roleError && !roleConocido) || (permsError && permissionsData === undefined),
     reintentar: () => { void recargarRol(); void recargarPermisos(); },
     permissions,
   };

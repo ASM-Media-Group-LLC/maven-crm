@@ -59,11 +59,14 @@ export const useUserRole = () => {
       // dejó a Miguel/María tratados como miembros rasos en el front (sin la tab
       // "Todas", pipeline filtrado a 0 asignados). Leyéndolo del grupo, cualquier
       // rol nuevo o renombrado de nivel supervisor funciona sin tocar código.
-      const { data: rg } = await supabase
+      const { data: rg, error: rgError } = await supabase
         .from("role_groups")
         .select("is_supervisor_or_above")
         .eq("role_name", roleName)
         .maybeSingle();
+      // Igual que arriba: un fallo no es "no es supervisor"; se reintenta y,
+      // si ya había dato, se conserva.
+      if (rgError) throw rgError;
 
       return { role: roleName, isSupervisorGroup: !!(rg as { is_supervisor_or_above?: boolean } | null)?.is_supervisor_or_above };
     },
@@ -94,6 +97,8 @@ export const useUserRole = () => {
     isLoading,
     /** La consulta falló: NO sabemos el rol. Distinto de "no tiene rol". */
     isError,
+    /** Hubo al menos una respuesta buena: aunque un refetch falle, `role` sirve. */
+    roleConocido: roleData !== undefined,
     recargarRol: refetch,
   };
 };
