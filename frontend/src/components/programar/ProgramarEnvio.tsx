@@ -9,7 +9,7 @@
 // su fecha concreta al lado («vie, 9 oct») —«mañana» a las 11:58 de la noche es
 // ambiguo— y el diálogo repite lo elegido en palabras antes de confirmar.
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { CalendarClock, Clock3, Sunrise, Sun } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
@@ -45,6 +45,10 @@ interface Props {
   /** Del lado en que se abre el menú (en el Messenger el cajón está abajo). */
   lado?: "top" | "bottom";
   alineado?: "start" | "end";
+  /** Abrirlo desde afuera (en el teléfono: mantener apretado «Enviar»). Sin
+   *  esto, lo abre tocar el disparador. */
+  abierto?: boolean;
+  onAbiertoCambia?: (abierto: boolean) => void;
 }
 
 const ICONO: Record<OpcionDeProgramar["clave"], typeof Sun> = {
@@ -59,13 +63,24 @@ const ROTULO: Record<OpcionDeProgramar["clave"], TranslationKey> = {
   lunes: "shared.schedule.nextMonday",
 };
 
-export function ProgramarEnvio({ children, onProgramar, lado = "top", alineado = "start" }: Props) {
+export function ProgramarEnvio({
+  children, onProgramar, lado = "top", alineado = "start", abierto: abiertoAfuera, onAbiertoCambia,
+}: Props) {
   const { t, language } = useLanguage();
-  const [abierto, setAbierto] = useState(false);
+  const [abiertoAdentro, setAbiertoAdentro] = useState(false);
+  const abierto = abiertoAfuera ?? abiertoAdentro;
+  const setAbierto = (v: boolean) => {
+    setAbiertoAdentro(v);
+    onAbiertoCambia?.(v);
+  };
   const [eligiendo, setEligiendo] = useState(false);
   // Se recalculan al ABRIR: un menú armado a las 23:59 y abierto a las 00:01
   // ofrecería «mañana» con el día de ayer.
   const [opciones, setOpciones] = useState<OpcionDeProgramar[]>(() => opcionesDeProgramar());
+  // Abierto desde afuera también se recalculan.
+  useEffect(() => {
+    if (abiertoAfuera) setOpciones(opcionesDeProgramar());
+  }, [abiertoAfuera]);
 
   return (
     <>

@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { useLanguage } from "@/hooks/useLanguage";
 import ChatHeader from "./components/ChatHeader";
 import MessageList from "./components/MessageList";
+import { ProgramadosDelChat, useProgramarEnChat } from "./components/ProgramadosDelChat";
 import MessageInput, { MessageInputHandle } from "./components/MessageInput";
 import ThreadPanel from "./components/ThreadPanel";
 import SearchResultsPanel from "./components/SearchResultsPanel";
@@ -82,6 +83,8 @@ export default function ChatView({
   const [isDragging, setIsDragging] = useState(false);
   const dragCounterRef = useRef(0);
   const messageInputRef = useRef<MessageInputHandle>(null);
+  // «Programar envío» (como Google Chat): la flechita del cajón.
+  const programarEnChat = useProgramarEnChat(conversation.id);
 
   const closeSidePanels = useCallback((except?: "search" | "thread" | "files" | "members") => {
     if (except !== "search") { setSearchOpen(false); setSearchQuery(""); }
@@ -329,9 +332,16 @@ export default function ChatView({
           </p>
         </div>
       ) : (
+        <>
+        <ProgramadosDelChat
+          conversationId={conversation.id}
+          onEnviar={onSendMessage}
+          onEditar={(doc) => messageInputRef.current?.ponerParaEditar(doc)}
+        />
         <MessageInput
           ref={messageInputRef}
           conversationId={conversation.id}
+          onProgramar={programarEnChat}
           onSendMessage={onSendMessage}
           onSendTyping={onSendTyping}
           replyTo={replyTo}
@@ -341,6 +351,7 @@ export default function ChatView({
           chatType={conversation.type}
           aCiegas={mencionesACiegas}
         />
+        </>
       )}
 
       {/* Side panel overlay — all panels render as absolute overlays */}

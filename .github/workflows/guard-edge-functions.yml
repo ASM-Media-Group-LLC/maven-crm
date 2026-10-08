@@ -73,6 +73,13 @@ jobs:
       - name: Banco — correos programados (PGlite)
         run: deno run -A --node-modules-dir=none --no-lock supabase/tests/correo_programados.ts
 
+      # Los mensajes programados del Messenger (como Google Chat): solo quien está en la
+      # conversación (y admin en un grupo de anuncios), nada de afuera, nunca por API;
+      # el cron los inserta a nombre de la persona, en orden y con los avisos de
+      # siempre; si dejó el grupo antes de la hora, NO salen y se le avisa. ~10 s.
+      - name: Banco — mensajes programados del Messenger (PGlite)
+        run: deno run -A --node-modules-dir=none --no-lock supabase/tests/chat_programados.ts
+
       # Drive: Maven y el NAS tienen que firmar IGUAL (vector compartido con
       # infra/nas-drive), y las reglas de subida (tope, partes, nombres).
       - name: Guard — Drive (firma y subidas)

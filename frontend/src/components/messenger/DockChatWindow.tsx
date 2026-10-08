@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { Minus, X, Maximize2, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -12,7 +12,8 @@ import { useReadReceipts } from "@/hooks/useReadReceipts";
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
 import { getStatusColor, getStatusLabel } from "@/pages/messenger/components/StatusPicker";
 import MessageList from "@/pages/messenger/components/MessageList";
-import MessageInput from "@/pages/messenger/components/MessageInput";
+import MessageInput, { type MessageInputHandle } from "@/pages/messenger/components/MessageInput";
+import { ProgramadosDelChat, useProgramarEnChat } from "@/pages/messenger/components/ProgramadosDelChat";
 import type { ChatMessage, ConversationWithDetails } from "@/pages/messenger/types";
 import { puedeVerLaListaDeMiembros } from "@/pages/messenger/utils";
 import { cn } from "@/lib/utils";
@@ -41,6 +42,9 @@ export default function DockChatWindow({
   llenar?: boolean;
 }) {
   const navigate = useNavigate();
+  const inputRef = useRef<MessageInputHandle>(null);
+  // «Programar envío» (como Google Chat), también en la ventanita.
+  const programarEnChat = useProgramarEnChat(conversation.id);
   const { user } = useAuth();
   const { t } = useLanguage();
   const { profiles, markConversationRead } = useChatShared();
@@ -196,9 +200,17 @@ export default function DockChatWindow({
         onLoadMore={loadOlderMessages}
       />
 
+      <ProgramadosDelChat
+        conversationId={conversation.id}
+        onEnviar={sendMessage}
+        onEditar={(doc) => inputRef.current?.ponerParaEditar(doc)}
+        compacto
+      />
       <div className="shrink-0 border-t border-border/60">
         <MessageInput
+          ref={inputRef}
           conversationId={conversation.id}
+          onProgramar={programarEnChat}
           onSendMessage={sendMessage}
           onSendTyping={sendTyping}
           replyTo={replyTo}
