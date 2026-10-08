@@ -74,6 +74,9 @@ const FIXTURE_HASTA = "20260929180000";
 // Migraciones que tocan objetos de este banco pero necesitan tablas que sus fixtures no traen.
 // Se prueban en su propio banco, con el motivo al lado.
 const NO_CARGAN_AQUI: Record<string, string> = {
+  "20261009100000_portal_pedidos.sql":
+    "solo toca el Messenger porque inserta avisos en notifications (los Personalizados del portal), pero necesita " +
+    "custom_requests, creadora_cuentas y drive_items, que este fixture no trae. Se prueba en portal_pedidos.ts.",
   "20261001211000_roles_por_agencia.sql":
     "reescribe is_in_role_group y le suma tenant_id a user_roles, pero necesita roles_config, role_permissions, " +
     "role_base_grants y sus triggers. Con una agencia da lo mismo que prod persona por persona; se prueba en " +
@@ -88,7 +91,7 @@ const CADENA: { n: string; sql: string }[] = [...Deno.readDirSync(DIR_MIG)].map(
   .map((n) => ({ n, sql: Deno.readTextFileSync(new URL(n, DIR_MIG)) }))
   .filter((m) => objetivos(m.sql).length > 0);
 
-check(CADENA.at(-1)?.n === N, `esta migración entra a la cadena del chat, la última (${CADENA.at(-1)?.n})`);
+check(CADENA.some((m) => m.n === N), "esta migración entra a la cadena del chat");
 
 // ─── Gente y conversaciones ──────────────────────────────────────────────────
 const T1 = "10000000-0000-4000-8000-000000000001";

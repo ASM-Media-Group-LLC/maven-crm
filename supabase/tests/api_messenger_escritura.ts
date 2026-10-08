@@ -84,6 +84,9 @@ function objetivos(sql: string): string[] {
 // Migraciones que tocan objetos de este banco pero necesitan tablas que sus fixtures no traen.
 // Se prueban en su propio banco, con el motivo al lado.
 const NO_CARGAN_AQUI: Record<string, string> = {
+  "20261009100000_portal_pedidos.sql":
+    "solo toca el Messenger porque inserta avisos en notifications (los Personalizados del portal), pero necesita " +
+    "custom_requests, creadora_cuentas y drive_items, que este fixture no trae. Se prueba en portal_pedidos.ts.",
   "20261001211000_roles_por_agencia.sql":
     "reescribe is_in_role_group y le suma tenant_id a user_roles, pero necesita roles_config, role_permissions, " +
     "role_base_grants y sus triggers. Con una agencia da lo mismo que prod persona por persona; se prueba en " +

@@ -105,6 +105,9 @@ const FIXTURE_HASTA = "20260929180000";
 // el motivo. Si SÍ cambia el Messenger, lo que hay que hacer es sumar al fixture
 // lo que le falta.
 const NO_TOCAN_EL_MESSENGER: Record<string, string> = {
+  "20261009100000_portal_pedidos.sql":
+    "solo toca el Messenger porque inserta avisos en notifications (los Personalizados del portal), pero necesita " +
+    "custom_requests, creadora_cuentas y drive_items, que este fixture no trae. Se prueba en portal_pedidos.ts.",
   "20261001211000_roles_por_agencia.sql":
     "reescribe is_in_role_group y le suma tenant_id a user_roles, pero necesita las tablas de roles (roles_config, " +
     "role_permissions, role_base_grants y sus triggers) que este fixture no trae. Con una sola agencia da lo mismo que " +
