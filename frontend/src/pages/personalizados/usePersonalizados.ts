@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useRoleTier } from "@/hooks/useRoleTier";
 import { useUserRole } from "@/hooks/useUserRole";
+import { llamarDrive } from "@/hooks/useDrive";
 import type { Agency, Estado, Pedido, PedidoAdjunto, PedidoEvento } from "./types";
 
 // Las tablas son nuevas y los tipos generados de Supabase no las conocen todavía:
@@ -49,6 +50,21 @@ export function usePedidos(filtros: FiltrosPedidos) {
       const { data, error } = await q;
       if (error) throw error;
       return (data ?? []) as Pedido[];
+    },
+  });
+}
+
+/** Un pedido suelto, por id (el aviso de la campana trae ?pedido=, y puede no
+ *  estar en la lista por los filtros). Bajo «personalizados»: al cambiarlo, se
+ *  refresca con el resto. */
+export function usePedido(id: string | null) {
+  return useQuery({
+    queryKey: ["personalizados", "uno", id],
+    enabled: !!id,
+    queryFn: async (): Promise<Pedido | null> => {
+      const { data, error } = await db.from("custom_requests").select("*").eq("id", id).maybeSingle();
+      if (error) throw error;
+      return (data ?? null) as Pedido | null;
     },
   });
 }
@@ -141,7 +157,8 @@ export function usePermisosPersonalizados() {
   return { puedeAprobar, puedeGestionar, puedeCrear, cargando: isLoading };
 }
 
-export type PedidoInput = Omit<Pedido, "id" | "created_at" | "updated_at" | "created_by" | "approved_by" | "approved_at" | "delivered_at" | "source" | "source_ref" | "status"> & { status?: Estado };
+// creadora_motivo lo escribe solo ella, desde su portal (portal_pedido).
+export type PedidoInput = Omit<Pedido, "id" | "created_at" | "updated_at" | "created_by" | "approved_by" | "approved_at" | "delivered_at" | "source" | "source_ref" | "status" | "creadora_motivo"> & { status?: Estado };
 
 export function useMutacionesPedidos() {
   const qc = useQueryClient();
@@ -209,8 +226,11 @@ export function useMutacionesPedidos() {
     onSuccess: (_d, v) => qc.invalidateQueries({ queryKey: ["personalizados-adjuntos", v.requestId] }),
   });
 
+  // Solo lo del equipo (bucket). Lo que entregó la creadora vive en SU Drive: no
+  // se borra desde acá.
   const borrarAdjunto = useMutation({
     mutationFn: async (a: PedidoAdjunto) => {
+      if (!a.storage_path) throw new Error("La entrega de la creadora vive en su Drive");
       await supabase.storage.from("custom-requests").remove([a.storage_path]);
       const { error } = await db.from("custom_request_attachments").delete().eq("id", a.id);
       if (error) throw error;
@@ -225,4 +245,10 @@ export function useMutacionesPedidos() {
 export async function urlFirmada(path: string): Promise<string | null> {
   const { data } = await supabase.storage.from("custom-requests").createSignedUrl(path, 3600);
   return data?.signedUrl ?? null;
+}
+
+/** Una entrega que la creadora subió desde su portal (está en SU Drive): la edge
+ *  drive la firma si la persona ve el pedido. Se pide al abrirla, no al dibujar. */
+export async function urlDeEntregaDelPortal(adjuntoId: string, descargar = false): Promise<string> {
+  return (await llamarDrive<{ url: string }>("abrir_entrega_pedido", { adjunto: adjuntoId, descargar })).url;
 }

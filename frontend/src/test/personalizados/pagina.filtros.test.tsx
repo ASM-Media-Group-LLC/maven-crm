@@ -35,6 +35,7 @@ vi.mock("@/integrations/supabase/client", () => {
 vi.mock("react-router-dom", () => ({
   useNavigate: () => () => {},
   useLocation: () => ({ pathname: "/personalizados", search: "" }),
+  useSearchParams: () => [new URLSearchParams(), () => {}],
   Link: ({ children }: { children: React.ReactNode }) => children,
 }));
 vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "u1" } }) }));

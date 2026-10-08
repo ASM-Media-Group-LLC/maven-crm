@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { PageHeader } from "@/components/ui/page-header";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -9,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { Gift, Plus, LayoutGrid, List, Search, X, Loader2 } from "lucide-react";
 import { AGENCIAS, CAMINO, DIAS_ATENCION, DIAS_VENCIDO, ESTADOS, agenciaDe, alertaDe, estaCerrado, estadoDe, usd, type Agency, type Estado, type Pedido } from "./types";
-import { FILTROS_VACIOS, useCatalogos, usePedidos, usePermisosPersonalizados, type FiltrosPedidos } from "./usePersonalizados";
+import { FILTROS_VACIOS, useCatalogos, usePedido, usePedidos, usePermisosPersonalizados, type FiltrosPedidos } from "./usePersonalizados";
 import PedidoTablero from "./PedidoTablero";
 import PedidoTabla from "./PedidoTabla";
 import PedidoFormDialog from "./PedidoFormDialog";
@@ -82,6 +83,16 @@ export default function PersonalizadosPage() {
   const [chatterEnFicha, setChatterEnFicha] = useState<string | null>(null);
 
   const { data: pedidos = SIN_PEDIDOS, isLoading } = usePedidos(filtros);
+
+  // El aviso de la campana (la creadora entregó o no puede) trae ?pedido=: se
+  // abre esa ficha, esté o no en la lista con los filtros de ahora.
+  const [params, setParams] = useSearchParams();
+  const { data: delAviso } = usePedido(params.get("pedido"));
+  useEffect(() => {
+    if (!delAviso) return;
+    setAbierto(delAviso);
+    setParams((p) => { p.delete("pedido"); return p; }, { replace: true });
+  }, [delAviso, setParams]);
   const { creadoras } = useCatalogos();
   const { puedeCrear } = usePermisosPersonalizados();
   const { canAccess } = usePermissions();
@@ -138,7 +149,11 @@ export default function PersonalizadosPage() {
   const pedidosOrdenados = useMemo(() => ordenarPedidos(pedidos, orden), [pedidos, orden]);
 
   // La ficha muestra siempre la versión fresca del pedido abierto.
-  const abiertoFresco = abierto ? pedidos.find((p) => p.id === abierto.id) ?? abierto : null;
+  // Si la ficha abierta no está en la lista (llegó por un aviso), se lee sola
+  // para que un cambio de estado se vea.
+  const enLaLista = abierto ? pedidos.find((p) => p.id === abierto.id) : undefined;
+  const { data: suelto } = usePedido(abierto && !enLaLista ? abierto.id : null);
+  const abiertoFresco = abierto ? enLaLista ?? suelto ?? abierto : null;
 
   // Resumen arriba: cuánto hay en juego y qué se está por caer del plazo.
   // Vencidos = pasados los 12 días (o la fecha de entrega); por vencer = 7 o

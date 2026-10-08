@@ -2,7 +2,7 @@ import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-p
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { useLanguage } from "@/hooks/useLanguage";
-import { DIAS_VENCIDO, ESTADOS, SIGUIENTES, SOLO_SUPERVISOR, agenciaDe, alertaDe, estaCerrado, tipoDe, usd, type Estado, type Pedido } from "./types";
+import { DIAS_VENCIDO, ESTADOS, SIGUIENTES, agenciaDe, alertaDe, estaCerrado, soloSupervisor, tipoDe, usd, type Estado, type Pedido } from "./types";
 import { useMutacionesPedidos, usePermisosPersonalizados } from "./usePersonalizados";
 
 interface Props {
@@ -78,7 +78,7 @@ export default function PedidoTablero({ pedidos, onAbrir }: Props) {
       toast.error(t("custom.board.invalidMove", { from: etiqueta(p.status), to: etiqueta(destino) }));
       return;
     }
-    if (SOLO_SUPERVISOR.includes(destino) && !puedeAprobar) {
+    if (soloSupervisor(p.status, destino) && !puedeAprobar) {
       toast.error(t("custom.board.onlySupervisor"));
       return;
     }
