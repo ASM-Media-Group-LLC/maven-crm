@@ -26,6 +26,8 @@ export interface CorreoParaEnviar {
   adjuntos: AdjuntoEntrante[];
   /** A quién se mencionó con @ (ids de usuario). */
   menciones: string[];
+  /** Una reacción con emoji (reacciones.ts): el correo lleva la parte de Gmail. */
+  reaccion?: string | null;
 }
 
 export type RevisionDelCorreo =
@@ -148,6 +150,7 @@ export async function enviarCorreo(admin: Admin, userId: string, c: CorreoParaEn
     inReplyTo: c.inReplyTo ?? undefined,
     references: c.references ?? undefined,
     attachments: c.adjuntos,
+    reaccion: c.reaccion ?? undefined,
   });
 
   let smtp: SmtpClient | null = null;
@@ -230,6 +233,7 @@ export async function enviarCorreo(admin: Admin, userId: string, c: CorreoParaEn
               rfc822,
               inReplyTo: c.inReplyTo,
               references: c.references,
+              reaccion: c.reaccion ?? null,
             }), { onConflict: "user_id,folder,uidvalidity,uid" });
           }
         }

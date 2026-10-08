@@ -30,6 +30,10 @@ const VENTANA_DIAS = 30;
 
 const COLUMNAS =
   "id, uid, folder, from_addr, to_addr, cc_addr, subject, date, snippet, unread, message_id, in_reply_to, refs";
+/** Con el emoji de las reacciones (como Gmail): esas filas no se muestran como
+ *  mensajes sino como chips debajo del suyo. ⚠️ Si la columna todavía no existe
+ *  (migración 20261008180000), se pide sin ella: la conversación se ve igual. */
+const COLUMNAS_CON_REACCION = `${COLUMNAS}, reaccion`;
 
 /** `%` y `_` son comodines de LIKE: un asunto que los traiga buscaría de más. */
 function escaparLike(s: string): string {
@@ -53,6 +57,7 @@ function aResumen(m: Record<string, unknown>): MailSummary {
     inReplyTo: (m.in_reply_to as string) ?? undefined,
     refs: (m.refs as string[]) ?? undefined,
     unread: !!m.unread,
+    reaccion: (m.reaccion as string | null) ?? undefined,
     origen: "cache" as const,
   };
 }
@@ -98,8 +103,18 @@ export function useHiloCompleto(args: {
     enabled: args.habilitado && !!user && (unicos.length > 0 || norm.length >= 4),
     staleTime: 30_000,
     queryFn: async () => {
+      try {
+        return await traerHilo(COLUMNAS_CON_REACCION);
+      } catch (e) {
+        if (/reaccion/.test((e as Error)?.message ?? "")) return traerHilo(COLUMNAS);
+        throw e;
+      }
+    },
+  });
+
+  async function traerHilo(columnas: string) {
       const base = () =>
-        supabase.from("mail_messages" as never).select(COLUMNAS)
+        supabase.from("mail_messages" as never).select(columnas)
           .not("folder", "in", `(${FUERA_DEL_HILO.join(",")})`)
           .limit(100);
 
@@ -123,8 +138,7 @@ export function useHiloCompleto(args: {
         filas.push(...((r.data ?? []) as unknown as Record<string, unknown>[]));
       }
       return filas;
-    },
-  });
+  }
 
   // El armado está en `lib/mailHiloCruzado.ts`, puro y probado: es donde
   // viven las dos trampas (juntar por fila, mostrar uno por mensaje).

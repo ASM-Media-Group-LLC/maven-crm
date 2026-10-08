@@ -69,6 +69,8 @@ export interface MailSummary {
   inReplyTo: string | undefined;
   /** `References`, del más viejo al más nuevo. Ídem. */
   refs: string[] | undefined;
+  /** El emoji si este correo es una REACCIÓN (como Gmail) al de su `inReplyTo`. */
+  reaccion?: string;
   cc?: string;
   unread: boolean;
   /** De dónde salió: decide cómo abrirlo y cómo marcarlo leído. */
@@ -251,12 +253,15 @@ export function useMailMessages(
       const COLUMNAS_BASE =
         "id, uid, from_addr, to_addr, cc_addr, subject, date, snippet, unread, message_id";
       const desde = pagina * CORREOS_POR_PAGINA;
-      const traer = (cols: string) => {
+      const traer = (cols: string, sinReacciones = true) => {
         let q = supabase.from("mail_messages" as never)
           // El total viene en la MISMA consulta: es el «de 186» de Gmail.
           .select(cols, { count: "exact" })
           .eq("folder", folder);
         if (soloLeidos) q = q.eq("unread", false);
+        // Una reacción con emoji (como Gmail) no es un correo de la lista: se ve
+        // debajo del mensaje al que responde.
+        if (sinReacciones) q = q.is("reaccion" as never, null);
         return q
           .order("date", { ascending: false })
           // Desempate estable: con dos correos a la misma hora, sin esto uno
@@ -277,8 +282,13 @@ export function useMailMessages(
       // Si faltan, se reintenta sin ellas: los hilos se agrupan por asunto,
       // que es el camino de respaldo que ya existe, y la bandeja se ve.
       let { data, error, count } = await traer(`${COLUMNAS_BASE}, in_reply_to, refs`);
+      // Lo mismo con `reaccion` (migración 20261008180000): sin la columna, la
+      // lista sale como antes, con las reacciones mezcladas.
+      if (error && /reaccion/.test(error.message ?? "")) {
+        ({ data, error, count } = await traer(`${COLUMNAS_BASE}, in_reply_to, refs`, false));
+      }
       if (error && /in_reply_to|refs/.test(error.message ?? "")) {
-        ({ data, error, count } = await traer(COLUMNAS_BASE));
+        ({ data, error, count } = await traer(COLUMNAS_BASE, false));
       }
       if (error) throw error;
       // ⚠️ De la página 2 en adelante NUNCA se cae al camino en vivo: una
@@ -865,6 +875,20 @@ export function useSendMail() {
       // acá ya está en la base — solo falta volver a preguntar.
       qc.invalidateQueries({ queryKey: ["mail-hilo"] });
     },
+  });
+}
+
+// ── Reaccionar con un emoji (Keila, 08/10: como Gmail) ─────────────────────
+// Sale un correo corto con el formato de Gmail (mail-fetch/reacciones.ts). A
+// quién va lo decide la edge con la fila de la caché, no la pantalla.
+export function useReaccionarCorreo() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ messageId, emoji }: { messageId: string; emoji: string }) =>
+      callMail<{ ok: true; yaEstaba?: boolean }>({ action: "react", message_id: messageId, emoji }),
+    // La copia en Enviados (con su emoji) la siembra la edge: volver a pedir el
+    // hilo la trae y el chip queda con su dato de verdad.
+    onSettled: () => qc.invalidateQueries({ queryKey: ["mail-hilo"] }),
   });
 }
 

@@ -34,6 +34,8 @@ export interface DatosDeLaFila {
   rfc822: string;
   inReplyTo: string | null;
   references: string | null;
+  /** El emoji, si el correo es una reacción (reacciones.ts). */
+  reaccion?: string | null;
 }
 
 export function filaSembrada(d: DatosDeLaFila) {
@@ -77,5 +79,8 @@ export function filaSembrada(d: DatosDeLaFila) {
     // La misma forma que guarda el sync: un arreglo de ids con sus picos. La
     // cabecera viaja como UNA línea separada por espacios, así que acá se parte.
     refs: d.references?.match(/<[^>]+>/g) ?? null,
+    // Solo si ES una reacción: así la fila de un correo común no nombra la
+    // columna y la siembra no depende de que la migración ya esté aplicada.
+    ...(d.reaccion ? { reaccion: d.reaccion } : {}),
   };
 }

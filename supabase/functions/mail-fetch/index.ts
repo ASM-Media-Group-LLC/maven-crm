@@ -36,6 +36,10 @@ import { revisarAdjuntos } from "./adjuntos.ts";
 import { filaSembrada } from "./sembrar.ts";
 import { enviarCorreo, revisarCorreo } from "./enviar.ts";
 import { mandarLosVencidos, programarCorreo } from "./programados.ts";
+import {
+  asuntoDeLaReaccion, destinatariosDeLaReaccion, direccionesDe, esUnEmoji, referenciasDeLaReaccion,
+  respaldoDeLaReaccion, TOPE_REACCIONES,
+} from "./reacciones.ts";
 
 const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
 
@@ -1137,6 +1141,72 @@ Deno.serve(async (req) => {
           client.close();
         }
       }
+    }
+
+    // === REACCIONAR CON UN EMOJI (como Gmail, Keila 08/10) ===
+    // A quién va y el asunto salen de la CACHÉ (la fila del mensaje, de quien
+    // llama), nunca del pedido: si no, «reaccionar» sería mandar un correo
+    // corto a cualquiera. Reglas y formato: reacciones.ts y buildMessage.
+    if (action === "react") {
+      const { message_id: objetivoId, emoji } = body as { message_id?: unknown; emoji?: unknown };
+      if (typeof objetivoId !== "string" || !/^<[^<>\s]{1,900}>$/.test(objetivoId)) {
+        return json(req, { error: "falta el correo al que se reacciona" }, 400);
+      }
+      if (!esUnEmoji(emoji)) return json(req, { error: "una reacción es UN emoji" }, 400);
+
+      const { data: cred } = await admin.from("mail_credentials")
+        .select("email_address").eq("user_id", user.id).is("revoked_at", null).maybeSingle();
+      if (!cred) return json(req, { error: "no_credential" }, 409);
+      const yo = (cred.email_address as string).toLowerCase();
+
+      const { data: objetivo } = await admin.from("mail_messages")
+        .select("from_addr, to_addr, cc_addr, subject, refs, message_id")
+        .eq("user_id", user.id).eq("message_id", objetivoId)
+        .limit(1).maybeSingle();
+      if (!objetivo) return json(req, { error: "no encontré ese correo en tu buzón" }, 404);
+
+      const dest = destinatariosDeLaReaccion(
+        { from: objetivo.from_addr as string, to: objetivo.to_addr as string, cc: objetivo.cc_addr as string },
+        yo,
+      );
+      if (!dest.ok) {
+        const error = dest.motivo === "muchos"
+          ? "no se reacciona a un correo con más de 20 personas"
+          : dest.motivo === "no_estas"
+            ? "no estás en Para ni en Cc de ese correo"
+            : "no hay a quién mandarle la reacción";
+        return json(req, { error, motivo: dest.motivo }, 422);
+      }
+
+      // Las mías a ese mensaje: el mismo emoji dos veces no se manda de nuevo,
+      // y más de 20 no (lo recomienda Google).
+      const { data: mias } = await admin.from("mail_messages")
+        .select("reaccion, from_addr")
+        .eq("user_id", user.id).eq("in_reply_to", objetivoId).not("reaccion", "is", null);
+      const propias = ((mias ?? []) as { reaccion: string; from_addr: string }[])
+        .filter((r) => direccionesDe(r.from_addr).includes(yo));
+      if (propias.some((r) => r.reaccion === emoji)) return json(req, { ok: true, yaEstaba: true });
+      if (propias.length >= TOPE_REACCIONES) {
+        return json(req, { error: "ya reaccionaste 20 veces a este correo" }, 429);
+      }
+
+      const { data: perfil } = await admin.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
+      const respaldo = respaldoDeLaReaccion((perfil?.full_name as string) ?? yo, emoji);
+      const r = await enviarCorreo(admin, user.id, {
+        to: dest.to,
+        cc: dest.cc,
+        bcc: [],
+        subject: asuntoDeLaReaccion(objetivo.subject as string),
+        text: respaldo.text,
+        html: respaldo.html,
+        inReplyTo: objetivoId,
+        references: referenciasDeLaReaccion(objetivo.refs as string[] | null, objetivoId),
+        adjuntos: [],
+        menciones: [],
+        reaccion: emoji,
+      });
+      if (!r.ok) return json(req, { error: r.error, code: r.code, incierto: r.incierto }, r.status);
+      return json(req, { ok: true });
     }
 
     // === PROGRAMAR ENVÍO ===

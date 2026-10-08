@@ -64,8 +64,14 @@ jobs:
       - name: Guard — correos programados
         run: deno test --no-check supabase/functions/mail-fetch/programados.test.ts
 
+      # Reacciones con emoji, como Gmail (Keila, 08/10): un solo emoji, a quién va
+      # (responder a todos, sin uno mismo), nunca con copia oculta ni a más de 20.
+      # El formato (la parte de Gmail entre el texto y el HTML) lo prueba smtp.test.ts.
+      - name: Guard — reacciones del correo
+        run: deno test --no-check supabase/functions/mail-fetch/reacciones.test.ts supabase/functions/_shared/smtp.test.ts
+
       - name: Tipos — mail-fetch
-        run: deno check supabase/functions/mail-fetch/index.ts supabase/functions/mail-fetch/programados.test.ts
+        run: deno check supabase/functions/mail-fetch/index.ts supabase/functions/mail-fetch/programados.test.ts supabase/functions/mail-fetch/reacciones.test.ts
 
       # La tabla de los programados: cada persona ve los suyos y solo la lista (el
       # correo entero no viaja a la pantalla), el cron toma lo vencido sin tomarlo

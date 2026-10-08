@@ -374,6 +374,12 @@ export interface OutgoingMessage {
   inReplyTo?: string;
   references?: string;
   attachments?: OutgoingAttachment[];
+  /** Una REACCIÓN con emoji, como las de Gmail (Keila, 08/10): va como parte
+   *  `text/vnd.google.email-reaction+json` ENTRE el texto y el HTML (el orden
+   *  que pide Google: hay clientes que muestran la primera parte y otros la
+   *  última, y los dos tienen que ver el texto de respaldo). Necesita `html` e
+   *  `inReplyTo`. Ver developers.google.com/workspace/gmail/reactions/format. */
+  reaccion?: string;
 }
 
 /** Quoted-printable (RFC 2045): UTF-8 → ASCII de 7 bits con líneas de máximo
@@ -488,6 +494,17 @@ function parteCuerpo(msg: OutgoingMessage): { header: string; cuerpo: string } {
   // Con HTML van las dos versiones: quien no pueda mostrarlo lee el texto.
   if (msg.html) {
     const b = boundary();
+    // La reacción: `version` NÚMERO 1 (un string la invalida) y un solo emoji.
+    const reaccion = msg.reaccion
+      ? [
+        `--${b}`,
+        'Content-Type: text/vnd.google.email-reaction+json; charset="utf-8"',
+        "Content-Transfer-Encoding: quoted-printable",
+        "",
+        quotedPrintable(JSON.stringify({ emoji: msg.reaccion, version: 1 })),
+        "",
+      ]
+      : [];
     return {
       header: `Content-Type: multipart/alternative; boundary="${b}"`,
       cuerpo: [
@@ -497,6 +514,7 @@ function parteCuerpo(msg: OutgoingMessage): { header: string; cuerpo: string } {
         "",
         quotedPrintable(text),
         "",
+        ...reaccion,
         `--${b}`,
         'Content-Type: text/html; charset="utf-8"',
         "Content-Transfer-Encoding: quoted-printable",
