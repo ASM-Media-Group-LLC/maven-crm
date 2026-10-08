@@ -34,7 +34,7 @@ import {
   armarListaDelZip, CuentaDelZip, entraEnElZip, idsParaZip, nombreDelZip, PROFUNDIDAD_ZIP, TOPE_ZIP_ENTRADAS, TOPE_ZIP_PERMISO,
   type FichaZip,
 } from "./logica.ts";
-import { extensionParaMiniatura, extensionParaVerComoJpg, idsParaMiniaturas, LADO_VISTA, venceMiniatura } from "./logica.ts";
+import { conExtension, extensionParaMiniatura, extensionParaVerComoJpg, idsParaMiniaturas, LADO_VISTA, venceMiniatura } from "./logica.ts";
 
 Deno.serve(async (req) => {
   const CORS = corsFor(req, { "Access-Control-Allow-Methods": "POST, OPTIONS" });
@@ -263,7 +263,8 @@ Deno.serve(async (req) => {
       const u = await permisoNas(
         comoJpg
           ? { op: "mini", k: fila.storage_key, x: comoJpg, l: LADO_VISTA }
-          : { op: "get", k: fila.storage_key, ct: fila.mime ?? "application/octet-stream", n: fila.nombre, dl: descargar },
+          // Con su extensión aunque haya llegado de Google sin ella (Daniel, 08/10).
+          : { op: "get", k: fila.storage_key, ct: fila.mime ?? "application/octet-stream", n: conExtension(fila.nombre, fila.mime), dl: descargar },
         VENCE.bajar,
       );
       // «Abierto por última vez»: lo que después decide qué se archiva. Una
@@ -288,7 +289,7 @@ Deno.serve(async (req) => {
       if (!fila || fila.tipo !== "archivo") throw new HttpError("No existe o no tienes acceso", 404);
       // Con el nombre del archivo, como «Descargar» en «Administrar versiones» de Google.
       const u = await permisoNas(
-        { op: "get", k: v.storage_key, ct: fila.mime ?? "application/octet-stream", n: fila.nombre, dl: true },
+        { op: "get", k: v.storage_key, ct: fila.mime ?? "application/octet-stream", n: conExtension(fila.nombre, fila.mime), dl: true },
         VENCE.bajar,
       );
       return responder({ url: u });
@@ -469,7 +470,7 @@ async function versionesGuardadas(admin: SupabaseClient, ids: string[]): Promise
   return claves;
 }
 
-const COLUMNAS_ZIP = "id, parent_id, tipo, nombre, size, storage_key, estado, trashed_at";
+const COLUMNAS_ZIP = "id, parent_id, tipo, nombre, mime, size, storage_key, estado, trashed_at";
 /** El permiso del .zip se usa enseguida (el navegador lo manda al NAS apenas
  *  llega); la descarga en sí puede durar horas: el NAS lo mira solo al empezar. */
 const VENCE_ZIP = 15 * 60;
