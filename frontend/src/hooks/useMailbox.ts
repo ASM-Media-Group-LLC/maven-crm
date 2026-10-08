@@ -1162,6 +1162,11 @@ export function useSaveServerDraft() {
         /** UID del borrador anterior a reemplazar. */
         uid?: number;
         folder?: string;
+        /** Los archivos y las imágenes pegadas (con `contentId`). Sin esto el
+         *  borrador se guardaba pelado y retomarlo los perdía (Keila, 08/10). */
+        attachments?: Array<{
+          filename: string; contentType: string; contentBase64: string; contentId?: string;
+        }>;
       },
     ) => callMail<{ ok: true; uid: number | null }>({ action: "save_draft", ...d }),
     onSuccess: () => {

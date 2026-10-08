@@ -60,6 +60,7 @@ import { MailBody } from "@/components/correo/MailBody";
 import {
   MailComposer, TOPE_ADJUNTOS, type BorradorInicial,
 } from "@/components/correo/MailComposer";
+import { repartirBorradorRetomado } from "@/lib/correo/borradorRetomado";
 import EtiquetasDialog from "@/components/correo/EtiquetasDialog";
 import EtiquetasColumna from "@/components/correo/etiquetas/EtiquetasColumna";
 import EtiquetaFormDialog from "@/components/correo/etiquetas/EtiquetaFormDialog";
@@ -1115,17 +1116,45 @@ export default function CorreoPage() {
     />
   );
 
-  // Retomar un borrador del servidor en el compositor: se cargan sus campos y
-  // su UID, para reemplazarlo al re-guardar o borrarlo al enviar.
-  const editarBorrador = () => {
+  // Retomar un borrador del servidor en el compositor: se cargan sus campos,
+  // su UID (para reemplazarlo al re-guardar o borrarlo al enviar) y LO QUE
+  // TENÍA ADJUNTO, que antes se perdía (Keila, 08/10): las imágenes pegadas
+  // vuelven al cuerpo y los archivos a la lista (ver borradorRetomado.ts).
+  //
+  // ⚠️ Si los adjuntos no se pueden traer, el borrador NO se abre. Abrirlo sin
+  // ellos y re-guardarlo los borraría del servidor para siempre.
+  const editarBorrador = async () => {
     const m = mensaje.data;
     if (!m || !sel) return;
+    const uid = sel.uid != null ? Number(sel.uid) : undefined;
+    const metas = m.attachments ?? [];
+    let cuerpoHtml = m.html;
+    let adjuntosIniciales: BorradorInicial["adjuntosIniciales"];
+    if (metas.length > 0 && uid != null) {
+      const pesa = metas.reduce((n, a) => n + (a.sizeBytes ?? 0), 0);
+      if (pesa > TOPE_ADJUNTOS) {
+        toast.error(t("mail.draft.tooBig", { mb: (pesa / 1024 / 1024).toFixed(1) }));
+        return;
+      }
+      try {
+        const bajados = await bajarParaReenviar.mutateAsync({ folder: carpetaDelAbierto, uid, adjuntos: metas });
+        ({ html: cuerpoHtml, adjuntos: adjuntosIniciales } = repartirBorradorRetomado(m.html, metas, bajados));
+      } catch (e) {
+        toast.error(t("mail.draft.fetchError", { error: (e as Error).message }));
+        return;
+      }
+    }
     setRedactar({
       to: direccionesDe(m.to).join(", "),
       cc: m.cc ? direccionesDe(m.cc).join(", ") || undefined : undefined,
       subject: m.subject === SIN_ASUNTO ? "" : m.subject,
-      cuerpoHtml: m.html ?? undefined,
-      serverDraftUid: sel.uid != null ? Number(sel.uid) : undefined,
+      cuerpoHtml: cuerpoHtml ?? undefined,
+      serverDraftUid: uid,
+      // Un borrador de RESPUESTA sigue colgado de su conversación: sin esto,
+      // re-guardarlo o mandarlo cortaba el hilo.
+      inReplyTo: sel.inReplyTo,
+      references: sel.refs?.join(" "),
+      adjuntosIniciales,
     });
   };
 
@@ -1903,10 +1932,15 @@ export default function CorreoPage() {
                       size="sm"
                       variant="outline"
                       className="rounded-full"
-                      onClick={editarBorrador}
+                      onClick={() => void editarBorrador()}
+                      disabled={bajarParaReenviar.isPending}
                     >
-                      <PenLine className="mr-2 h-4 w-4" />
-                      {t("mail.editDraft")}
+                      {bajarParaReenviar.isPending ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <PenLine className="mr-2 h-4 w-4" />
+                      )}
+                      {bajarParaReenviar.isPending ? t("mail.fwd.fetching") : t("mail.editDraft")}
                     </Button>
                   ) : (
                     <>
