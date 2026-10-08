@@ -363,14 +363,21 @@ jobs:
       - name: Banco — accesos de OnlyFans de las creadoras (PGlite)
         run: deno run -A --node-modules-dir=none --no-lock supabase/tests/creadora_accesos.ts
 
-      # creadora-accesos: la contraseña solo para admin (y anotada), la creadora solo lo
-      # suyo y sin leerla; el importador nunca devuelve credenciales en la vista previa,
-      # empareja solo si UNA coincide, la respuesta más nueva gana y no pisa sin pedirlo.
+      # creadora-accesos: TODO lo del equipo solo para admin (la contraseña, además,
+      # anotada), la creadora solo lo suyo y sin leerla; el importador nunca devuelve
+      # credenciales en la vista previa, empareja solo si UNA coincide, la respuesta más
+      # nueva gana y no pisa sin pedirlo.
       - name: Guard — creadora-accesos
         run: deno test --allow-read supabase/functions/creadora-accesos/logica.test.ts
 
       - name: Tipos — creadora-accesos
         run: deno check supabase/functions/creadora-accesos/index.ts supabase/functions/creadora-accesos/logica.test.ts
+
+      # ¿Es admin? desde una edge (08/10): rpc("has_role") contesta 300 porque hay dos
+      # has_role (text y app_role), y daba «no es admin» a todos. esAdmin lo resuelve
+      # sin esa ambigüedad, lanza si la base falla, y ninguna edge vuelve a usar el rpc.
+      - name: Guard — esAdmin y nada de rpc("has_role")
+        run: deno test --no-check --allow-read supabase/functions/_shared/es-admin.test.ts && deno check supabase/functions/_shared/es-admin.ts
 
       # `deno test --no-check` no mira tipos: sin este paso, el tipo de msg() (clave que
       # existe, variables exactas) y los @ts-expect-error de mensajes.test.ts nunca

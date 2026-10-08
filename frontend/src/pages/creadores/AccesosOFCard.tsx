@@ -26,10 +26,10 @@ import ImportarAccesosDialog from "./ImportarAccesosDialog";
 
 // ACCESOS DE ONLYFANS en la pestaña Portal (Jhon, 08/10): lo que antes llegaba
 // por el Formulario de accesos de Google. Los datos de contacto salen de la
-// ficha (enmascarados como en el resto del perfil para quien no es admin); los
-// de OnlyFans, de la edge creadora-accesos. La contraseña SOLO la ve y la copia
-// un admin, y cada vez queda anotado; acá vive en el estado del componente
-// unos segundos y nunca en la caché.
+// ficha; los de OnlyFans, de la edge creadora-accesos. TODA la tarjeta es solo
+// para admins (PortalTabContent ni la monta para el resto, y la edge contesta
+// solo_admin). La contraseña se pide al verla o copiarla, y cada vez queda
+// anotado; acá vive en el estado del componente unos segundos y nunca en la caché.
 
 const MOSTRAR_CLAVE_MS = 30_000;
 
@@ -142,7 +142,6 @@ export default function AccesosOFCard({ creatorId, ficha }: { creatorId: string;
   }
 
   const a: AccesosOF | null = q.data?.accesos ?? null;
-  const admin = !!q.data?.es_admin;
   const actualizado = a?.actualizado_en
     ? t(
         a.actualizado_desde === "creadora" ? "portal.accesos.actualizadoCreadora"
@@ -160,18 +159,16 @@ export default function AccesosOFCard({ creatorId, ficha }: { creatorId: string;
             <KeyRound className="h-5 w-5" aria-hidden="true" />
             {t("portal.accesos.titulo")}
           </CardTitle>
-          {admin && (
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" className="min-h-9 border-border" onClick={() => setImportando(true)}>
-                <FileSpreadsheet className="mr-2 h-4 w-4" aria-hidden="true" />
-                {t("portal.accesos.importar")}
-              </Button>
-              <Button variant="outline" size="sm" className="min-h-9 border-border" onClick={() => setEditando(true)}>
-                <Pencil className="mr-2 h-4 w-4" aria-hidden="true" />
-                {t("portal.accesos.editar")}
-              </Button>
-            </div>
-          )}
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" className="min-h-9 border-border" onClick={() => setImportando(true)}>
+              <FileSpreadsheet className="mr-2 h-4 w-4" aria-hidden="true" />
+              {t("portal.accesos.importar")}
+            </Button>
+            <Button variant="outline" size="sm" className="min-h-9 border-border" onClick={() => setEditando(true)}>
+              <Pencil className="mr-2 h-4 w-4" aria-hidden="true" />
+              {t("portal.accesos.editar")}
+            </Button>
+          </div>
         </div>
         <CardDescription>{t("portal.accesos.descripcion")}</CardDescription>
       </CardHeader>
@@ -205,24 +202,22 @@ export default function AccesosOFCard({ creatorId, ficha }: { creatorId: string;
                 <Dato idCopia="of_usuario" etiqueta={t("portal.accesos.ofUsuario")} valor={a.of_usuario} copiable
                   copiado={copiado} onCopiar={() => a.of_usuario && void copiar("of_usuario", a.of_usuario)} />
 
-                {/* La contraseña: solo admin, y cada vez queda anotado. */}
+                {/* La contraseña: se pide al verla o copiarla, y cada vez queda anotado. */}
                 <div className="flex min-h-11 items-center justify-between gap-3 border-b border-border/60 py-2">
                   <div className="min-w-0">
                     <dt className="text-xs text-muted-foreground">{t("portal.accesos.clave")}</dt>
                     <dd className="mt-0.5 truncate font-medium">
                       {!a.tiene_clave ? (
                         <span className="font-normal text-muted-foreground">{t("portal.accesos.sinClave")}</span>
-                      ) : admin ? (
-                        <span className="font-mono">{clave ?? "••••••••••"}</span>
                       ) : (
-                        <span className="font-normal text-muted-foreground">{t("portal.accesos.claveGuardada")} · {t("portal.accesos.claveSoloAdmin")}</span>
+                        <span className="font-mono">{clave ?? "••••••••••"}</span>
                       )}
                     </dd>
                     {a.tiene_clave && a.clave_cambiada_en && (
                       <p className="mt-0.5 text-xs text-muted-foreground">{t("portal.accesos.claveCambiada", { cuando: hace(a.clave_cambiada_en) })}</p>
                     )}
                   </div>
-                  {admin && a.tiene_clave && (
+                  {a.tiene_clave && (
                     <div className="flex shrink-0 items-center">
                       <Button type="button" variant="ghost" size="icon" className="h-9 w-9" disabled={!!pidiendo}
                         onClick={() => (clave ? setClave(null) : void traerClave("ver"))}
@@ -258,7 +253,7 @@ export default function AccesosOFCard({ creatorId, ficha }: { creatorId: string;
 
         {actualizado && <p className="text-xs text-muted-foreground">{actualizado}</p>}
 
-        {admin && (q.data?.eventos.length ?? 0) > 0 && (
+        {(q.data?.eventos.length ?? 0) > 0 && (
           <div className="border-t border-border pt-4">
             <h3 className="flex items-center gap-2 text-sm font-semibold">
               <ShieldCheck className="h-4 w-4" aria-hidden="true" />

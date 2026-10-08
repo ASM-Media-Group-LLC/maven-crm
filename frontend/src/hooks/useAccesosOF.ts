@@ -36,13 +36,14 @@ export interface CambiosAccesos {
 const llamar = <T,>(accion: string, cuerpo: Record<string, unknown>) =>
   adminInvoke<T>("creadora-accesos", { accion, ...cuerpo });
 
-// ── Equipo (pestaña Portal de la ficha) ──────────────────────────────────────
+// ── Equipo (pestaña Portal de la ficha): SOLO admins ─────────────────────────
 
+/** Solo admins: a cualquier otro la edge le contesta solo_admin. */
 export function useAccesosOF(creatorId: string) {
   return useQuery({
     queryKey: ["accesos-of", creatorId],
     queryFn: () =>
-      llamar<{ accesos: AccesosOF | null; es_admin: boolean; eventos: EventoAcceso[] }>("ver", { creator_id: creatorId }),
+      llamar<{ accesos: AccesosOF | null; eventos: EventoAcceso[] }>("ver", { creator_id: creatorId }),
   });
 }
 

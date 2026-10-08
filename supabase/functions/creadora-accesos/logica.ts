@@ -7,13 +7,13 @@
 // Formulario de accesos de Google.
 //
 // QUIÉN PUEDE QUÉ
-//   Equipo (cuenta de empleado que VE a la creadora: lo decide la RLS de
-//   creators con su JWT, agencia y alcance):
-//     ver            — todos: usuario y doble verificación; el correo, enmascarado
-//                      salvo para un admin. Si hay contraseña, solo que la hay.
-//     ver_clave      — SOLO admin. Queda anotado (ver o copiar), con quién y cuándo.
-//     guardar        — SOLO admin.
-//     importar_*     — SOLO admin: la carga desde la hoja de la Oficina.
+//   Equipo: SOLO admin, todo (Jhon, 08/10: «esta parte de accesos de OnlyFans,
+//   solo admin»; antes el resto del equipo veía usuario y correo enmascarado).
+//   Y además tiene que VER a la creadora (la RLS de creators con su JWT).
+//     ver            — correo, usuario, doble verificación y si hay contraseña.
+//     ver_clave      — la contraseña. Queda anotado (ver o copiar), con quién y cuándo.
+//     guardar        — los cambia.
+//     importar_*     — la carga desde la hoja de la Oficina.
 //   La creadora (cuenta de creadora atada a ESA ficha, es_mi_ficha):
 //     mis_accesos    — lo suyo, sin la contraseña (solo si está y desde cuándo).
 //     guardar_mios   — los llena o los cambia. Puede poner una contraseña nueva,
@@ -101,17 +101,10 @@ export const TOPE_FILAS = 2000;
 // ─── Mostrar ────────────────────────────────────────────────────────────────
 
 /** «s•••@gmail.com», como mask_email de la base (lo que ve en la ficha quien no es admin). */
-export function enmascararCorreo(correo: string | null): string | null {
-  if (!correo) return null;
-  const [usuario, dominio] = correo.split("@");
-  if (!dominio) return "•••";
-  return `${usuario.slice(0, 1)}•••@${dominio}`;
-}
-
-function paraElEquipo(f: Fila | null, admin: boolean) {
+function paraElEquipo(f: Fila | null) {
   if (!f) return null;
   return {
-    of_correo: admin ? f.of_correo : enmascararCorreo(f.of_correo),
+    of_correo: f.of_correo,
     of_usuario: f.of_usuario,
     doble_verificacion: f.doble_verificacion,
     tiene_clave: !!f.of_clave_cifrada,
@@ -339,12 +332,11 @@ export async function manejar(token: string | null, raw: unknown, p: Puertos): P
     return r(200, { accesos: paraElla(await p.leer(creatorId)) });
   }
 
-  // ── El equipo ──
+  // ── El equipo: solo admin ──
   if (yo.esCreadora) return r(403, { error: "solo_equipo" });
-  const admin = await p.esAdmin(yo.id);
+  if (!(await p.esAdmin(yo.id))) return r(403, { error: "solo_admin" });
 
   if (accion === "importar_previa" || accion === "importar") {
-    if (!admin) return r(403, { error: "solo_admin" });
     return await importar(token, yo.id, accion, body, p);
   }
 
@@ -354,14 +346,8 @@ export async function manejar(token: string | null, raw: unknown, p: Puertos): P
 
   if (accion === "ver") {
     const fila = await p.leer(creatorId);
-    return r(200, {
-      accesos: paraElEquipo(fila, admin),
-      es_admin: admin,
-      eventos: admin ? await p.ultimosEventos(creatorId, 10) : [],
-    });
+    return r(200, { accesos: paraElEquipo(fila), eventos: await p.ultimosEventos(creatorId, 10) });
   }
-
-  if (!admin) return r(403, { error: "solo_admin" });
 
   if (accion === "ver_clave") {
     const fila = await p.leer(creatorId);
@@ -379,7 +365,7 @@ export async function manejar(token: string | null, raw: unknown, p: Puertos): P
   if ("error" in c) return r(503, { error: c.error });
   await p.escribir(creatorId, c.columnas, yo.id, "equipo");
   await p.anotar({ creator_id: creatorId, user_id: yo.id, accion: "guardar", desde: "equipo", campos: c.campos });
-  return r(200, { accesos: paraElEquipo(await p.leer(creatorId), true) });
+  return r(200, { accesos: paraElEquipo(await p.leer(creatorId)) });
 }
 
 async function importar(token: string, yo: string, accion: "importar_previa" | "importar", body: Record<string, unknown>, p: Puertos): Promise<Respuesta> {
