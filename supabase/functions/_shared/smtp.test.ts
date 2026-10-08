@@ -481,3 +481,31 @@ Deno.test("⚠️ un Content-ID no puede inyectar cabeceras", () => {
   });
   assert(!/^Bcc:/m.test(rfc), "se coló un Bcc por el Content-ID");
 });
+
+// ── Reacciones con emoji, como Gmail (Keila, 08/10) ────────────────────────
+Deno.test("reacción: la parte de Gmail va ENTRE el texto y el HTML, con version número 1", () => {
+  const raw = buildMessage({
+    from: "keila@maven-ai.me", to: ["ana@gmail.com"], subject: "Re: Cotización",
+    text: "Keila reaccionó con 👍", html: "<p>Keila reaccionó con 👍</p>",
+    inReplyTo: "<orig@gmail.com>", reaccion: "👍",
+  });
+  const iTexto = raw.indexOf("Content-Type: text/plain");
+  const iReaccion = raw.indexOf("Content-Type: text/vnd.google.email-reaction+json");
+  const iHtml = raw.indexOf("Content-Type: text/html");
+  if (!(iTexto > -1 && iTexto < iReaccion && iReaccion < iHtml)) {
+    throw new Error(`orden: texto ${iTexto}, reacción ${iReaccion}, html ${iHtml}`);
+  }
+  // El JSON, decodificado: exactamente lo que pide Google.
+  const desde = raw.indexOf("\r\n\r\n", iReaccion) + 4;
+  const hasta = raw.indexOf("\r\n--", desde);
+  const json = JSON.parse(decodeQP(raw.slice(desde, hasta).trim()));
+  if (json.emoji !== "👍" || json.version !== 1) throw new Error(JSON.stringify(json));
+  // Sin «attachment»: un adjunto no cuenta como reacción.
+  if (/Content-Disposition: attachment/.test(raw)) throw new Error("la reacción no puede ir como adjunto");
+  if (!/^In-Reply-To: <orig@gmail\.com>$/m.test(raw)) throw new Error("falta In-Reply-To");
+});
+
+Deno.test("sin reacción, el correo es el de siempre (sin la parte de Gmail)", () => {
+  const raw = buildMessage({ from: "a@b.co", to: ["c@d.co"], subject: "x", html: "<p>x</p>" });
+  if (raw.includes("email-reaction")) throw new Error("se coló la parte de reacción");
+});

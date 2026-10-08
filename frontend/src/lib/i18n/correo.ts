@@ -349,6 +349,21 @@ export const correo = {
   "mail.comp.sent": { es: "Correo enviado", en: "Email sent" },
   "mail.comp.scheduled": { es: "Envío programado: {cuando}", en: "Send scheduled: {cuando}" },
   "mail.comp.scheduledSee": { es: "Ver", en: "View" },
+  // ─── Reacciones con emoji (components/correo/ReaccionesDelCorreo.tsx) ──────
+  "mail.react.add": { es: "Reaccionar con un emoji", en: "React with an emoji" },
+  "mail.react.sinId": { es: "A este correo no se le puede reaccionar", en: "You can't react to this email" },
+  "mail.react.noEstas": {
+    es: "No se puede reaccionar: no estás en Para ni en Cc de este correo",
+    en: "You can't react: you're not in To or Cc of this email",
+  },
+  "mail.react.muchos": {
+    es: "No se puede reaccionar a un correo con más de 20 personas",
+    en: "You can't react to an email with more than 20 people",
+  },
+  "mail.react.error": { es: "No se pudo enviar la reacción: {error}", en: "Couldn't send the reaction: {error}" },
+  "mail.react.lista": { es: "Reacciones", en: "Reactions" },
+  "mail.react.tu": { es: "tú", en: "you" },
+  "mail.react.reaccionaste": { es: "{quienes} (ya reaccionaste con {emoji})", en: "{quienes} (you reacted with {emoji})" },
   // ─── La carpeta «Programados» (components/correo/VistaProgramados.tsx) ─────
   "mail.sched.title": { es: "Programados", en: "Scheduled" },
   "mail.sched.subtitle": {

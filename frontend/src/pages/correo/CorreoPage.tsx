@@ -64,6 +64,8 @@ import {
 import { repartirBorradorRetomado } from "@/lib/correo/borradorRetomado";
 import { CARPETA_PROGRAMADOS, conProgramados } from "@/lib/correo/programados";
 import { VistaProgramados } from "@/components/correo/VistaProgramados";
+import { BotonReaccionar, ChipsDeReacciones } from "@/components/correo/ReaccionesDelCorreo";
+import { chipsDeReacciones, puedeReaccionar } from "@/lib/correo/reacciones";
 import EtiquetasDialog from "@/components/correo/EtiquetasDialog";
 import EtiquetasColumna from "@/components/correo/etiquetas/EtiquetasColumna";
 import EtiquetaFormDialog from "@/components/correo/etiquetas/EtiquetaFormDialog";
@@ -74,6 +76,7 @@ import {
   useMailbox,
   useMailFolders,
   useCorreosProgramados,
+  useReaccionarCorreo,
   useMailMessage,
   useImagenesIncrustadas,
   useMailMessages,
@@ -816,14 +819,35 @@ export default function CorreoPage() {
   const { antes: hiloAntes, despues: hiloDespues } = useMemo(() => {
     if (!sel) return { antes: [], despues: [] as MailSummary[] };
     const cuando = Date.parse(sel.date) || 0;
+    // Las reacciones (como Gmail) no son mensajes de la charla: van como chips.
     const otros = hiloCompleto.filter((m) =>
-      m.messageId ? m.messageId !== sel.messageId : claveDe(m) !== claveDe(sel)
+      !m.reaccion && (m.messageId ? m.messageId !== sel.messageId : claveDe(m) !== claveDe(sel))
     );
     return {
       antes: otros.filter((m) => (Date.parse(m.date) || 0) <= cuando),
       despues: otros.filter((m) => (Date.parse(m.date) || 0) > cuando),
     };
   }, [hiloCompleto, sel]);
+  // ── Reacciones con emoji (Keila, 08/10: como Gmail) ─────────────────────
+  const reaccionar = useReaccionarCorreo();
+  // Las que acabo de mandar, por mensaje: se ven al instante y se juntan con
+  // las de la base cuando vuelven (una persona cuenta una vez por emoji).
+  const [reaccionesMias, setReaccionesMias] = useState<Record<string, string[]>>({});
+  const reaccionesDelHilo = useMemo(() => hiloCompleto.filter((m) => m.reaccion), [hiloCompleto]);
+  const miCorreo = buzon?.email_address ?? "";
+  const reaccionarA = (m: MailSummary, emoji: string) => {
+    const id = m.messageId;
+    if (!id) return;
+    const quitar = () => setReaccionesMias((r) => ({ ...r, [id]: (r[id] ?? []).filter((e) => e !== emoji) }));
+    setReaccionesMias((r) => ({ ...r, [id]: [...new Set([...(r[id] ?? []), emoji])] }));
+    reaccionar.mutate({ messageId: id, emoji }, {
+      onError: (e) => {
+        quitar();
+        toast.error(t("mail.react.error", { error: (e as Error).message }));
+      },
+    });
+  };
+
   /** La conversación ABIERTA entera: a eso se le pone o saca la etiqueta desde
    *  la barra del correo, como en Gmail (se etiqueta la charla, no un
    *  mensaje suelto). */
@@ -1842,6 +1866,15 @@ export default function CorreoPage() {
                   </span>
                   {/* El ⋮ del mensaje abierto, como en Gmail: el mismo de cada
                       mensaje de la conversación. */}
+                  {/* La carita de Gmail, al lado del ⋮: reaccionar con un emoji. */}
+                  {!(carpeta === "Borrador" && !etiquetaVista) && (
+                    <BotonReaccionar
+                      variante="icono"
+                      puede={puedeReaccionar(sel, miCorreo)}
+                      enviando={reaccionar.isPending}
+                      onElegir={(emoji) => reaccionarA(sel, emoji)}
+                    />
+                  )}
                   {menuDe(sel, "-mt-1")}
                 </div>
 
@@ -1939,6 +1972,13 @@ export default function CorreoPage() {
                   )}
                 </div>
 
+                {/* Las reacciones a este mensaje, como chips (Gmail). */}
+                <ChipsDeReacciones
+                  chips={chipsDeReacciones(reaccionesDelHilo, sel.messageId, miCorreo, reaccionesMias[sel.messageId ?? ""])}
+                  puede={puedeReaccionar(sel, miCorreo)}
+                  onSumar={(emoji) => reaccionarA(sel, emoji)}
+                />
+
                 {/* ── Lo POSTERIOR ────────────────────────────────────────
                     Casi siempre son las respuestas propias, que viven en
                     Enviados: el motivo por el que el hilo se veía a medias. */}
@@ -2008,6 +2048,13 @@ export default function CorreoPage() {
                         )}
                         {bajarParaReenviar.isPending ? t("mail.fwd.fetching") : t("mail.forward")}
                       </Button>
+                      {/* La carita de la barra, como Gmail: después de Reenviar. */}
+                      <BotonReaccionar
+                        variante="pildora"
+                        puede={puedeReaccionar(sel, miCorreo)}
+                        enviando={reaccionar.isPending}
+                        onElegir={(emoji) => reaccionarA(sel, emoji)}
+                      />
                     </>
                   )}
                 </div>

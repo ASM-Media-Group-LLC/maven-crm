@@ -11,6 +11,7 @@ import { test } from "node:test";
 import { sanitizeEmailHtml } from "./sanitize.mjs";
 import { decidirSiAbrir, huellaDeStatus } from "./barrido.mjs";
 import { ancestrosDe, decidirHerencia, DIAS_PARA_ARCHIVAR } from "./hilos.mjs";
+import { reaccionDe, sinLaReaccion, TIPO_REACCION } from "./reaccion.mjs";
 
 const limpio = (html) => sanitizeEmailHtml(html).html;
 
@@ -232,4 +233,30 @@ test("SEGUNDA COPIA del mismo correo (Zoho entrega dos): se archiva con la prime
   // Sin una copia archivada recién, «ya tiene etiquetas» sigue queriendo decir: no tocar.
   const sinCopia = decidirHerencia({ etiquetasDelHilo: ["cxc"], yaTieneEtiquetas: true, etiquetadosEnRecibidos: false, fecha: hace(1), ahora: AHORA });
   assert.deepEqual(sinCopia, { etiquetas: [], archivar: false });
+});
+
+// ── Reacciones con emoji (como Gmail; Keila, 08/10) ───────────────────────
+const parteReaccion = (json, extra = {}) => ({ contentType: TIPO_REACCION, content: Buffer.from(json, "utf8"), ...extra });
+
+test("una reacción de Gmail se reconoce: su emoji", () => {
+  assert.equal(reaccionDe({ inReplyTo: "<o@x>", attachments: [parteReaccion('{"emoji":"👍","version":1}')] }), "👍");
+  assert.equal(reaccionDe({ inReplyTo: "<o@x>", attachments: [parteReaccion('{"emoji":"👍🏽","version":1}')] }), "👍🏽");
+});
+
+test("lo que no cumple las reglas de Google es un correo común", () => {
+  const casos = [
+    { inReplyTo: null, attachments: [parteReaccion('{"emoji":"👍","version":1}')] }, // sin In-Reply-To
+    { inReplyTo: "<o@x>", attachments: [parteReaccion('{"emoji":"👍","version":"1"}')] }, // version string
+    { inReplyTo: "<o@x>", attachments: [parteReaccion('{"emoji":"👍👍","version":1}')] }, // dos emojis
+    { inReplyTo: "<o@x>", attachments: [parteReaccion('{"emoji":"ok","version":1}')] },
+    { inReplyTo: "<o@x>", attachments: [parteReaccion("no es json")] },
+    { inReplyTo: "<o@x>", attachments: [parteReaccion('{"emoji":"👍","version":1}', { contentDisposition: "attachment" })] },
+    { inReplyTo: "<o@x>", attachments: [] },
+  ];
+  for (const c of casos) assert.equal(reaccionDe(c), null);
+});
+
+test("la parte de la reacción no se muestra como adjunto", () => {
+  const pdf = { contentType: "application/pdf", filename: "a.pdf" };
+  assert.deepEqual(sinLaReaccion([parteReaccion("{}"), pdf]), [pdf]);
 });

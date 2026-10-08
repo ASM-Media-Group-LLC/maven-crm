@@ -17,6 +17,7 @@
 // Mismo molde que infra/hubstaff-bridge y blu-bridge: un index.mjs, env
 // vars, Dockerfile alpine, endpoint /health para Dokploy.
 
+import { reaccionDe, sinLaReaccion } from "./reaccion.mjs";
 import http from "node:http";
 import { webcrypto } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
@@ -441,6 +442,10 @@ class CuentaSync {
       // Lo nuevo de Recibidos que responde a algo: candidatos a heredar las
       // etiquetas de su conversación (ver heredarDelHilo).
       const respuestas = [];
+      // Las reacciones que llegaron sin leer: una reacción no es correo nuevo
+      // (Gmail tampoco la cuenta), así que se marcan leídas en el servidor.
+      // Sin esto, el barrido de banderas las volvía a marcar sin leer.
+      const reaccionesPorLeer = [];
 
       if (exists > 0 && uidNext - 1 > desdeUid) {
         // Primera vez: solo los últimos N (nadie necesita el 2019 entero
@@ -458,12 +463,18 @@ class CuentaSync {
           const uid = Number(msg.uid);
           if (uid <= desdeUid) continue; // '*' puede devolver el último igual
           const guardado = await this.guardarMensaje(clave, uidValidity, uid, msg);
+          if (guardado?.reaccionSinLeer) reaccionesPorLeer.push(uid);
           // Solo lo incremental: en la primera carga de una casilla llegan los
           // últimos 50 de golpe, y archivar en masa lo viejo no es heredar.
-          if (guardado && porUid && clave === "INBOX" && HEREDAR_DEL_HILO) respuestas.push({ uid, ...guardado });
+          // Una reacción no se mueve: se ve debajo del mensaje, esté donde esté.
+          if (guardado && !guardado.reaccion && porUid && clave === "INBOX" && HEREDAR_DEL_HILO) respuestas.push({ uid, ...guardado });
           nuevos++;
           if (uid > maxUid) maxUid = uid;
         }
+      }
+      if (reaccionesPorLeer.length) {
+        try { await this.client.messageFlagsAdd(reaccionesPorLeer.join(","), ["\\Seen"], { uid: true }); }
+        catch (e) { this.log("marcar reacciones leídas falló:", e?.message); }
       }
       if (respuestas.length) {
         // Nunca puede tirar el barrido: lo peor que pasa si falla es lo de
@@ -589,7 +600,11 @@ class CuentaSync {
 
     const snippet = texto.replace(/\s+/g, " ").trim().slice(0, 160);
 
-    const attachments = (parsed.attachments ?? []).map((a) => ({
+    // Una reacción con emoji (como Gmail): se guarda con su emoji y leída, y
+    // la pantalla la muestra debajo del mensaje que responde (reaccion.mjs).
+    const reaccion = reaccionDe(parsed);
+
+    const attachments = sinLaReaccion(parsed.attachments).map((a) => ({
       filename: a.filename ?? "adjunto",
       contentType: a.contentType ?? "application/octet-stream",
       sizeBytes: a.size ?? 0,
@@ -626,6 +641,9 @@ class CuentaSync {
       truncated,
       unread: !msg.flags?.has("\\Seen"),
       synced_at: new Date().toISOString(),
+      // Solo si ES una reacción: un correo común no nombra la columna, así el
+      // guardado no depende de que la migración ya esté aplicada.
+      ...(reaccion ? { reaccion, unread: false } : {}),
     }, { onConflict: "user_id,folder,uidvalidity,uid" });
 
     if (error) {
@@ -637,6 +655,10 @@ class CuentaSync {
       inReplyTo: parsed.inReplyTo ?? null,
       refs: parsed.references ?? null,
       date: parsed.date ? parsed.date.toISOString() : null,
+      reaccion,
+      // Una reacción que llegó sin leer: se marca leída también en el servidor
+      // (al terminar el FETCH; adentro no se puede mandar otro comando).
+      reaccionSinLeer: !!reaccion && !msg.flags?.has("\\Seen"),
     };
   }
 
