@@ -291,10 +291,37 @@ export interface FichaZip {
   parent_id: string | null;
   tipo: "carpeta" | "archivo";
   nombre: string;
+  /** El tipo, para ponerle la extensión a lo que llegó de Google sin ella. */
+  mime?: string | null;
   size: number | null;
   storage_key: string | null;
   estado: string;
   trashed_at: string | null;
+}
+
+/** La extensión de cada tipo, para nombrar lo que se descarga. */
+const EXTENSION_POR_MIME: Record<string, string> = {
+  "video/quicktime": "mov", "video/mp4": "mp4", "video/webm": "webm", "video/x-m4v": "m4v",
+  "image/jpeg": "jpg", "image/png": "png", "image/gif": "gif", "image/webp": "webp", "image/heic": "heic", "image/heif": "heif", "image/avif": "avif",
+  "audio/mp4": "m4a", "audio/mpeg": "mp3", "audio/wav": "wav", "audio/ogg": "ogg",
+  "application/pdf": "pdf", "application/zip": "zip", "text/plain": "txt", "text/csv": "csv",
+  "application/msword": "doc", "application/vnd.ms-excel": "xls", "application/vnd.ms-powerpoint": "ppt",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
+};
+
+/** «Letshoot Ingles ／ Video 7» (video/quicktime) → «Letshoot Ingles ／ Video 7.mov».
+ *
+ *  Daniel (08/10): «archivos que puedo ver en línea pero al descargar quedan
+ *  sin formato». 13.593 archivos llegaron de Google sin extensión en el nombre;
+ *  desde el 06/10 la ficha tiene el tipo real (#2040) y por eso se VEN, pero se
+ *  bajaban con el nombre pelado y el computador no sabía con qué abrirlos. Si el
+ *  nombre ya trae extensión, o el tipo no se conoce, queda como está. */
+export function conExtension(nombre: string, mime: string | null | undefined): string {
+  if (/\.[A-Za-z0-9]{1,5}$/.test(nombre)) return nombre;
+  const ext = EXTENSION_POR_MIME[(mime ?? "").split(";")[0].trim().toLowerCase()];
+  return ext ? `${nombre}.${ext}` : nombre;
 }
 /** Una entrada del permiso: un archivo ({ k, n }) o una carpeta ({ n: "…/" }). */
 export interface EntradaZip { k?: string; n: string }
@@ -375,7 +402,7 @@ export function armarListaDelZip(elegidos: FichaZip[], hijos: Map<string, FichaZ
       if (!entraEnElZip(f)) continue;
       const carpeta = f.tipo === "carpeta";
       if (carpeta && (visitadas.has(f.id) || nivel > PROFUNDIDAD_ZIP)) continue;
-      const limpio = nombreParaElZip(f.nombre);
+      const limpio = nombreParaElZip(carpeta ? f.nombre : conExtension(f.nombre, f.mime));
       let nombre = limpio;
       for (let n = 2; usados.has(nombre.toLocaleLowerCase("es")); n++) nombre = conNumero(limpio, n, carpeta);
       usados.add(nombre.toLocaleLowerCase("es"));

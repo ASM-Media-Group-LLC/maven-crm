@@ -16,7 +16,7 @@
 // sigue en el Drive, la agencia lo ve y sigue siendo de la agencia. Lo único que
 // se borra de verdad es una subida que quedó a medias, que no es contenido.
 
-import { extensionParaMiniatura, extensionParaVerComoJpg, idsParaMiniaturas, LADO_VISTA, venceMiniatura } from "../drive/logica.ts";
+import { conExtension, extensionParaMiniatura, extensionParaVerComoJpg, idsParaMiniaturas, LADO_VISTA, venceMiniatura } from "../drive/logica.ts";
 
 export const ACCIONES = [
   "raiz", "listar", "crear_carpeta", "renombrar", "borrar", "subir_iniciar", "subir_confirmar", "abrir", "miniaturas",
@@ -315,7 +315,7 @@ export async function manejar(token: string, body: Record<string, unknown>, p: P
     const url = await p.permiso(
       comoJpg
         ? { op: "mini", k: i.storage_key, x: comoJpg, l: LADO_VISTA }
-        : { op: "get", k: i.storage_key, ct: i.mime ?? "application/octet-stream", n: i.nombre, dl: !!body.descargar },
+        : { op: "get", k: i.storage_key, ct: i.mime ?? "application/octet-stream", n: conExtension(i.nombre, i.mime), dl: !!body.descargar },
       VENCE_BAJAR,
     );
     return r(200, { url });

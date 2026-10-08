@@ -326,3 +326,25 @@ Deno.test("validarTipos: agrupa por tipo, sin repetir; solo uuid y tipos de la l
   if (!falla([{ id: a, mime: "text/html" }])) throw new Error("un tipo fuera de la lista (html) no entra");
   if (!falla(Array.from({ length: TOPE_TIPOS + 1 }, () => ({ id: a, mime: "video/mp4" })))) throw new Error("tope");
 });
+
+// ── Descargar con extensión (Daniel, 08/10: «al descargar quedan sin formato») ──
+import { conExtension } from "./logica.ts";
+
+Deno.test("descargar: lo que llegó de Google sin extensión baja con la de su tipo", () => {
+  assert(conExtension("Letshoot Ingles ／ Video 7", "video/quicktime") === "Letshoot Ingles ／ Video 7.mov", "conExtension(Letshoot Ingles ／ Video 7, video/quicktime)");
+  assert(conExtension("IMG_0332", "image/heic") === "IMG_0332.heic", "conExtension(IMG_0332, image/heic) === IMG_0332.heic");
+  assert(conExtension("Balance", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") === "Balance.xlsx", "conExtension(Balance, application/vnd.openxmlformats-offi");
+  assert(conExtension("escaneo", "application/pdf; charset=binary") === "escaneo.pdf", "el tipo con parámetros");
+  // Ya con extensión, o sin tipo conocido: igual.
+  assert(conExtension("video.MOV", "video/quicktime") === "video.MOV", "conExtension(video.MOV, video/quicktime) === video.MOV");
+  assert(conExtension("HEAD", "application/octet-stream") === "HEAD", "conExtension(HEAD, application/octet-stream) === HEAD");
+  assert(conExtension("notas", null) === "notas", "conExtension(notas, null) === notas");
+});
+
+Deno.test("descargar: en el .zip también, y las carpetas no cambian", () => {
+  const f = (o: Partial<FichaZip>): FichaZip => ({ id: crypto.randomUUID(), parent_id: null, tipo: "archivo", nombre: "x", mime: null, size: 1, storage_key: "t/k", estado: "listo", trashed_at: null, ...o });
+  const carpeta = f({ tipo: "carpeta", nombre: "REELS", storage_key: null });
+  const hijos = new Map([[carpeta.id, [f({ nombre: "Video 7", mime: "video/quicktime" }), f({ nombre: "Video 7", mime: "video/mp4" })]]]);
+  const { l } = armarListaDelZip([carpeta], hijos);
+  assert(JSON.stringify(l.map((e) => e.n)) === JSON.stringify(["REELS/", "REELS/Video 7.mov", "REELS/Video 7.mp4"]), JSON.stringify(l));
+});
