@@ -51,7 +51,6 @@ const MeetGuestPage = lazy(() => import("./pages/meet/MeetGuestPage"));
 const PortalLayout = lazy(() => import("./pages/portal/PortalLayout"));
 const PortalInicio = lazy(() => import("./pages/portal/PortalInicio"));
 const PortalFicha = lazy(() => import("./pages/portal/PortalFicha"));
-const PortalAccesos = lazy(() => import("./pages/portal/PortalAccesos"));
 const PortalContenido = lazy(() => import("./pages/portal/PortalContenido"));
 const PortalAjustes = lazy(() => import("./pages/portal/PortalAjustes"));
 const PortalEntrar = lazy(() => import("./pages/portal/PortalEntrar"));
@@ -299,7 +298,8 @@ const App = () => (
                 <Route index element={<PortalInicio />} />
                 <Route path="contenido" element={<PortalContenido />} />
                 <Route path="ficha" element={<PortalFicha />} />
-                <Route path="accesos" element={<PortalAccesos />} />
+                {/* «Mis accesos» ahora es la primera parte de «Mi ficha» (Jhon, 08/10). */}
+                <Route path="accesos" element={<Navigate to="/portal/ficha?seccion=accesos" replace />} />
                 <Route path="ajustes" element={<PortalAjustes />} />
                 <Route path="*" element={<Navigate to="/portal" replace />} />
               </Route>

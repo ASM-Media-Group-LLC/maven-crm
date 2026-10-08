@@ -11,7 +11,6 @@ export const portal = {
   "portal.nav.contenido": { es: "Contenido", en: "Content" },
   "portal.nav.ficha": { es: "Mi ficha", en: "My profile" },
   "portal.nav.ajustes": { es: "Ajustes", en: "Settings" },
-  "portal.nav.accesos": { es: "Mis accesos", en: "My access" },
   "portal.nav.menu": { es: "Menú de tu espacio", en: "Your space menu" },
   "portal.shell.espacio": { es: "Mi espacio", en: "My space" },
   "portal.shell.agencia": { es: "Agencia: {agencia}", en: "Agency: {agencia}" },
@@ -454,8 +453,8 @@ export const portal = {
     en: "Your OnlyFans account details, so your agency can work on it. If you change your password on OnlyFans, update it here.",
   },
   "portal.misAccesos.seguridad": {
-    es: "Tu contraseña se guarda cifrada. En tu agencia solo la ven los administradores, y queda anotado cada vez que alguien la mira.",
-    en: "Your password is stored encrypted. At your agency only administrators can see it, and every view is logged.",
+    es: "Tu contraseña se guarda cifrada. En tu agencia solo la ven los administradores.",
+    en: "Your password is stored encrypted. At your agency only administrators can see it.",
   },
   "portal.misAccesos.ofCorreo": { es: "Correo de tu OnlyFans", en: "Your OnlyFans email" },
   "portal.misAccesos.ofUsuario": { es: "Tu usuario de OnlyFans", en: "Your OnlyFans username" },
