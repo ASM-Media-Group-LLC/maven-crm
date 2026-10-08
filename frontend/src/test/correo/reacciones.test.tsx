@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import fuenteDelBuzon from "@/hooks/useMailbox.ts?raw";
+import fuenteDelHilo from "@/hooks/useHiloCompleto.ts?raw";
+import fuenteDelLector from "@/pages/correo/CorreoPage.tsx?raw";
 
 // REACCIONES CON EMOJI EN EL CORREO (Keila, 08/10: como Gmail).
 //   · Debajo del mensaje, chips «👍 2» juntando por emoji; una persona cuenta
@@ -36,7 +37,7 @@ afterEach(() => cleanup());
 
 const r = (from: string, emoji: string, date: string, inReplyTo = "<orig@x>"): MailSummary => ({
   id: `${from}-${emoji}-${date}`, uid: 1, from, to: "", subject: "Re: x", date, snippet: "", unread: false,
-  messageId: `<${date}@x>`, inReplyTo, refs: undefined, reaccion: emoji,
+  messageId: `<${date}@x>`, inReplyTo, refs: undefined, reaccion: emoji, origen: "cache",
 });
 const YO = "keila@maven-ai.me";
 
@@ -117,18 +118,17 @@ describe("la carita y los chips", () => {
 });
 
 describe("las reacciones no son correos de la lista ni de la charla", () => {
-  const leer = (rel: string) => readFileSync(resolve(process.cwd(), rel), "utf8");
   it("la lista de la carpeta las saca, y sin la columna se sigue viendo (se degrada)", () => {
-    const hook = leer("frontend/src/hooks/useMailbox.ts");
+    const hook = fuenteDelBuzon;
     expect(hook).toMatch(/if \(sinReacciones\) q = q\.is\("reaccion" as never, null\)/);
     expect(hook).toMatch(/if \(error && \/reaccion\/\.test\(error\.message/);
   });
   it("la conversación las pide y sin la columna también se degrada", () => {
-    const hilo = leer("frontend/src/hooks/useHiloCompleto.ts");
+    const hilo = fuenteDelHilo;
     expect(hilo).toMatch(/COLUMNAS_CON_REACCION/);
     expect(hilo).toMatch(/\/reaccion\/\.test\(/);
   });
   it("el lector no las apila como mensajes", () => {
-    expect(leer("frontend/src/pages/correo/CorreoPage.tsx")).toMatch(/!m\.reaccion && \(m\.messageId/);
+    expect(fuenteDelLector).toMatch(/!m\.reaccion && \(m\.messageId/);
   });
 });
