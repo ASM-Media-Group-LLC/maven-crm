@@ -7,6 +7,7 @@
 // the production literals kick in and prod keeps working.
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
+import { conSesionRenovada, crearRenovador } from '@/lib/sesionVencida';
 
 const PROD_URL =
   "https://lsagslbkliprespbyhts.supabase.co";
@@ -36,8 +37,17 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
-  }
+  },
+  // Si una consulta vuelve con 401 por la sesión vencida, se renueva y se
+  // repite una vez, sin depender del reloj del computador (07/10/2026: un
+  // reloj atrasado dejó a una persona 2 h y media con el spinner). Ver
+  // lib/sesionVencida.ts. `supabase` se lee recién al renovar, ya creado.
+  global: {
+    fetch: conSesionRenovada((input, init) => fetch(input, init), (viejo) => renovarSesion(viejo)),
+  },
 });
+
+const renovarSesion = crearRenovador(supabase.auth);
 
 // Cliente paralelo, SIN sesión, para páginas públicas (link de chatter,
 // invitaciones, etc) que deben consultar la DB como anon aunque el

@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import AvisoMudanzaDominio from "@/components/AvisoMudanzaDominio";
+import AvisoRelojDesfasado from "@/components/AvisoRelojDesfasado";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -262,6 +263,8 @@ const App = () => (
           <Toaster />
           {/* Solo aparece si la persona entró por el dominio anterior. */}
           <AvisoMudanzaDominio />
+          {/* Solo con sesión y si la hora del computador va 5 min o más mal. */}
+          <AvisoRelojDesfasado />
           <Sonner />
           <BrowserRouter>
             <Suspense fallback={<LoadingFallback />}>
