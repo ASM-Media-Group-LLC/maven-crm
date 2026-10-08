@@ -10,8 +10,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Page } from "@/components/ui/page";
-import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
@@ -20,8 +18,18 @@ import { cn } from "@/lib/utils";
 // su OnlyFans y si tiene doble verificación. La contraseña nunca se le devuelve:
 // ve que está guardada y desde cuándo, y escribe una nueva si la cambió. En su
 // agencia solo la ven los admins (edge creadora-accesos).
+//
+// Es la PRIMERA parte de «Mi ficha», no una pestaña aparte (Jhon, 08/10).
+// ⚠️ Cada vez que alguien de la agencia ve la contraseña queda anotado, pero eso
+// es para la agencia: a ella no se le dice (Jhon, 08/10).
 
-export default function PortalAccesos() {
+/** Cuántas de las cuatro respuestas de accesos están puestas (para la pestaña). */
+export function accesosListos(d: { of_correo: string | null; of_usuario: string | null; tiene_clave: boolean; doble_verificacion: boolean | null } | undefined): number {
+  if (!d) return 0;
+  return [!!d.of_correo, !!d.of_usuario, d.tiene_clave, d.doble_verificacion !== null].filter(Boolean).length;
+}
+
+export function SeccionDeAccesos() {
   const { t } = useLanguage();
   const f = useFormato();
   const { toast } = useToast();
@@ -64,9 +72,9 @@ export default function PortalAccesos() {
   };
 
   return (
-    <Page>
-      <PageHeader title={t("portal.misAccesos.titulo")} subtitle={t("portal.misAccesos.texto")} />
-      <div className="mt-6 grid items-start gap-4 xl:grid-cols-[2fr_1fr]">
+    <div>
+      <p className="text-sm text-muted-foreground">{t("portal.misAccesos.texto")}</p>
+      <div className="mt-4 max-w-3xl">
         <Card>
           <CardContent className="p-6">
             {q.isLoading ? (
@@ -129,16 +137,11 @@ export default function PortalAccesos() {
             )}
           </CardContent>
         </Card>
-
-        <Card>
-          <CardContent className="flex items-start gap-3 p-6">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-primary/10 text-primary">
-              <ShieldCheck className="h-4 w-4" aria-hidden="true" />
-            </span>
-            <p className="text-sm text-muted-foreground">{t("portal.misAccesos.seguridad")}</p>
-          </CardContent>
-        </Card>
+        <p className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
+          <ShieldCheck className="h-4 w-4 shrink-0" aria-hidden="true" />
+          {t("portal.misAccesos.seguridad")}
+        </p>
       </div>
-    </Page>
+    </div>
   );
 }

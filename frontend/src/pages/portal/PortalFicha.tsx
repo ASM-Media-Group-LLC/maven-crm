@@ -3,6 +3,9 @@ import { Loader2, Plus, ShieldCheck, X } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useToast } from "@/hooks/use-toast";
 import { useGuardarFicha, useMiFicha, usePortal } from "@/hooks/usePortal";
+import { useMisAccesos } from "@/hooks/useAccesosOF";
+import { useSearchParams } from "react-router-dom";
+import { accesosListos, SeccionDeAccesos } from "./PortalAccesos";
 import {
   CAMPOS_FICHA,
   type CampoFicha,
@@ -39,12 +42,21 @@ export default function PortalFicha() {
   return <FormularioFicha key={activa.creator_id} creatorId={activa.creator_id} />;
 }
 
+/** «Mis accesos» va PRIMERO, antes de las secciones de la ficha (Jhon, 08/10). */
+type Pestana = "accesos" | IdSeccion;
+
 function FormularioFicha({ creatorId }: { creatorId: string }) {
   const { t } = useLanguage();
   const { toast } = useToast();
   const ficha = useMiFicha(creatorId);
   const guardar = useGuardarFicha(creatorId);
-  const [seccion, setSeccion] = useState<IdSeccion>("personaje");
+  const accesos = useMisAccesos(creatorId);
+  const [params] = useSearchParams();
+  // `?seccion=` (los enlaces viejos a /portal/accesos llegan con accesos).
+  const pedida = params.get("seccion");
+  const [seccion, setSeccion] = useState<Pestana>(
+    pedida && (pedida === "accesos" || SECCIONES.some((s) => s.id === pedida)) ? (pedida as Pestana) : "accesos",
+  );
   const [borrador, setBorrador] = useState<Partial<Record<CampoFicha, string>>>({});
 
   const guardada = ficha.data;
@@ -94,6 +106,10 @@ function FormularioFicha({ creatorId }: { creatorId: string }) {
   const total = CAMPOS_FICHA.length;
   const hechas = respondidas(actual);
   const activaSec = SECCIONES.find((s) => s.id === seccion) ?? SECCIONES[0];
+  const pestanaClase = (elegida: boolean) => cn(
+    "flex min-h-14 min-w-0 flex-1 flex-col items-start justify-center rounded-panel border px-3 py-2 text-left lg:flex-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+    elegida ? "border-primary bg-primary/10" : "border-border bg-card hover:bg-muted",
+  );
 
   return (
     <Page>
@@ -106,7 +122,17 @@ function FormularioFicha({ creatorId }: { creatorId: string }) {
 
       <div className="mt-6 lg:grid lg:grid-cols-[14rem_1fr] lg:gap-8">
         {/* Las tres secciones: arriba en el celular, al costado en el computador */}
-        <div role="tablist" aria-label={t("portal.ficha.titulo")} className="flex gap-2 lg:sticky lg:top-6 lg:h-fit lg:flex-col">
+        <div role="tablist" aria-label={t("portal.ficha.titulo")} className="flex gap-2 overflow-x-auto lg:sticky lg:top-6 lg:h-fit lg:flex-col lg:overflow-visible">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={seccion === "accesos"}
+            onClick={() => setSeccion("accesos")}
+            className={pestanaClase(seccion === "accesos")}
+          >
+            <span className={cn("text-sm font-semibold leading-tight", seccion === "accesos" && "text-primary")}>{t("portal.misAccesos.titulo")}</span>
+            <span className="mt-0.5 text-xs tabular-nums text-muted-foreground">{accesosListos(accesos.data ?? undefined)}/4</span>
+          </button>
           {SECCIONES.map((s) => {
             const n = respondidas(actual, s.campos.map((c) => c.clave));
             const elegida = s.id === seccion;
@@ -117,10 +143,7 @@ function FormularioFicha({ creatorId }: { creatorId: string }) {
                 role="tab"
                 aria-selected={elegida}
                 onClick={() => setSeccion(s.id)}
-                className={cn(
-                  "flex min-h-14 min-w-0 flex-1 flex-col items-start justify-center rounded-panel border px-3 py-2 text-left lg:flex-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                  elegida ? "border-primary bg-primary/10" : "border-border bg-card hover:bg-muted",
-                )}
+                className={pestanaClase(elegida)}
               >
                 <span className={cn("text-sm font-semibold leading-tight", elegida && "text-primary")}>{t(s.titulo)}</span>
                 <span className="mt-0.5 text-xs tabular-nums text-muted-foreground">{n}/{s.campos.length}</span>
@@ -129,6 +152,11 @@ function FormularioFicha({ creatorId }: { creatorId: string }) {
           })}
         </div>
 
+        {seccion === "accesos" ? (
+          <section role="tabpanel" aria-label={t("portal.misAccesos.titulo")} className="mt-6 lg:mt-0">
+            <SeccionDeAccesos />
+          </section>
+        ) : (
         <section role="tabpanel" aria-label={t(activaSec.titulo)} className="mt-6 lg:mt-0">
           <p className="text-sm text-muted-foreground">{t(activaSec.descripcion)}</p>
           <div className="mt-4 grid gap-4 2xl:grid-cols-2">
@@ -141,6 +169,7 @@ function FormularioFicha({ creatorId }: { creatorId: string }) {
             {t("portal.ficha.aviso")}
           </p>
         </section>
+        )}
       </div>
 
       {/* Cambios sin guardar: la barra aparece encima del menú de abajo */}
