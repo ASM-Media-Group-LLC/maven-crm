@@ -316,6 +316,33 @@ export const compartido = {
   "shared.domainMove.goTo": { es: "Ir a {domain}", en: "Go to {domain}" },
   "shared.domainMove.stayHere": { es: "Seguir aquí por ahora", en: "Stay here for now" },
 
+  // Reloj del computador desfasado (components/AvisoRelojDesfasado.tsx)
+  "shared.clock.title": { es: "La hora de este computador está mal", en: "This computer's clock is wrong" },
+  "shared.clock.behind": { es: "Va {amount} atrasada.", en: "It's {amount} behind." },
+  "shared.clock.ahead": { es: "Va {amount} adelantada.", en: "It's {amount} ahead." },
+  "shared.clock.why": {
+    es: "Maven usa la hora para tu sesión, el reloj de Cowork y tus horarios.",
+    en: "Maven uses it for your session, the Cowork clock and your schedules.",
+  },
+  "shared.clock.howWindows": {
+    es: "Para corregirla: Configuración → Hora e idioma → Fecha y hora, y activa «Establecer la hora automáticamente» y «Establecer la zona horaria automáticamente».",
+    en: "To fix it: Settings → Time & language → Date & time, and turn on “Set time automatically” and “Set time zone automatically”.",
+  },
+  "shared.clock.howMac": {
+    es: "Para corregirla: Ajustes del Sistema → General → Fecha y hora, y activa «Ajustar fecha y hora automáticamente» y la zona horaria automática.",
+    en: "To fix it: System Settings → General → Date & Time, and turn on “Set time and date automatically” and the automatic time zone.",
+  },
+  "shared.clock.howOther": {
+    es: "Para corregirla: en los ajustes de fecha y hora del equipo, activa la hora y la zona horaria automáticas.",
+    en: "To fix it: in the device's date and time settings, turn on automatic time and time zone.",
+  },
+  "shared.clock.fixed": { es: "Ya la corregí", en: "I fixed it" },
+  "shared.clock.stillWrong": {
+    es: "Todavía está mal. Revisa también la zona horaria.",
+    en: "Still wrong. Check the time zone too.",
+  },
+  "shared.clock.close": { es: "Cerrar aviso", en: "Close notice" },
+
   // Pantallas de entrar / recuperar contraseña (components/auth/AuthLayout.tsx)
   "shared.authLayout.backHome": { es: "Volver al inicio", en: "Back to home" },
   "shared.authLayout.tagline": {
