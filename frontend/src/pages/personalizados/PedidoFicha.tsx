@@ -18,13 +18,13 @@ import { format, formatDistanceToNow } from "date-fns";
 import { useFormato } from "@/hooks/useFormato";
 import { useLanguage } from "@/hooks/useLanguage";
 import {
-  CAMINO, DIAS_VENCIDO, SIGUIENTES, SOLO_SUPERVISOR, acentoDe, agenciaDe, alertaDe,
+  CAMINO, DIAS_VENCIDO, SIGUIENTES, acentoDe, agenciaDe, alertaDe, soloSupervisor,
   estadoDe, flagDe, tipoDe, usd,
   type Estado, type Pedido, type PedidoAdjunto, type PedidoEvento,
 } from "./types";
 import {
   useCatalogos, useFotoCreadora, useMutacionesPedidos, usePedidoAdjuntos,
-  usePedidoEventos, usePermisosPersonalizados, urlFirmada,
+  usePedidoEventos, usePermisosPersonalizados, urlDeEntregaDelPortal, urlFirmada,
 } from "./usePersonalizados";
 
 interface Props {
@@ -107,15 +107,17 @@ export default function PedidoFicha({ pedido, onClose, onEditar }: Props) {
 
   useEffect(() => { setNotas(pedido?.notes ?? ""); setDenegando(false); setMotivo(""); }, [pedido?.id, pedido?.notes]);
 
-  // URLs firmadas (1h) para los adjuntos: el bucket es privado a propósito.
+  // URLs firmadas (1h) para los adjuntos: el bucket es privado a propósito. Las
+  // entregas de la creadora (su Drive) no: esas se piden al abrirlas.
   useEffect(() => {
-    if (adjuntos.length === 0) {
+    const delBucket = adjuntos.filter((a): a is PedidoAdjunto & { storage_path: string } => !!a.storage_path);
+    if (delBucket.length === 0) {
       setUrls((u) => (Object.keys(u).length ? {} : u));
       return;
     }
     let vivo = true;
     (async () => {
-      const pares = await Promise.all(adjuntos.map(async (a) => [a.id, await urlFirmada(a.storage_path)] as const));
+      const pares = await Promise.all(delBucket.map(async (a) => [a.id, await urlFirmada(a.storage_path)] as const));
       if (vivo) setUrls(Object.fromEntries(pares.filter(([, u]) => u) as Array<[string, string]>));
     })();
     return () => { vivo = false; };
@@ -169,11 +171,15 @@ export default function PedidoFicha({ pedido, onClose, onEditar }: Props) {
     }
     if (fileRef.current) fileRef.current.value = "";
   };
+  const abrirEntregaDelPortal = async (a: PedidoAdjunto) => {
+    try { window.open(await urlDeEntregaDelPortal(a.id), "_blank", "noopener"); }
+    catch (e) { toast.error(t("custom.attach.openError"), { description: (e as Error).message }); }
+  };
   const quitarAdjunto = async (a: PedidoAdjunto) => {
     try { await borrarAdjunto.mutateAsync(a); } catch (e) { toast.error(t("custom.detail.removeError"), { description: (e as Error).message }); }
   };
 
-  const siguientes = SIGUIENTES[pedido.status].filter((s) => !SOLO_SUPERVISOR.includes(s) || puedeAprobar);
+  const siguientes = SIGUIENTES[pedido.status].filter((s) => !soloSupervisor(pedido.status, s) || puedeAprobar);
   const lateral = !!est.lateral;
 
   return (
@@ -222,12 +228,26 @@ export default function PedidoFicha({ pedido, onClose, onEditar }: Props) {
           {/* Salida lateral: por qué se cortó el pedido, con su color. */}
           {lateral && (
             <div className={`flex items-start gap-3 rounded-2xl border border-white/5 px-4 py-3 ${ac.tinte}`}>
-              {pedido.status === "denegado" ? <Ban className={`h-5 w-5 shrink-0 ${ac.texto}`} /> : <RotateCcw className={`h-5 w-5 shrink-0 ${ac.texto}`} />}
+              {pedido.status === "denegado" ? <Ban className={`h-5 w-5 shrink-0 ${ac.texto}`} />
+                : pedido.status === "no_puede" ? <AlertTriangle className={`h-5 w-5 shrink-0 ${ac.texto}`} />
+                : <RotateCcw className={`h-5 w-5 shrink-0 ${ac.texto}`} />}
               <div className="min-w-0">
                 <p className={`text-sm font-semibold ${ac.texto}`}>{t(est.label)}</p>
-                <p className="text-sm text-muted-foreground">
-                  {pedido.denied_reason || (pedido.status === "reembolsado" ? t("custom.detail.refunded") : t("custom.detail.noReason"))}
-                </p>
+                {pedido.status === "no_puede" ? (
+                  <>
+                    {/* Lo que escribió ella en su portal, y qué hacer ahora. */}
+                    <p className="whitespace-pre-wrap break-words text-sm text-foreground">
+                      {pedido.creadora_motivo ? t("custom.detail.cantReason", { motivo: pedido.creadora_motivo }) : t("custom.detail.noReason")}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {t(puedeAprobar ? "custom.detail.cantWhatNow" : "custom.detail.cantAwaitSupervisor")}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    {pedido.denied_reason || (pedido.status === "reembolsado" ? t("custom.detail.refunded") : t("custom.detail.noReason"))}
+                  </p>
+                )}
               </div>
             </div>
           )}
@@ -341,6 +361,20 @@ export default function PedidoFicha({ pedido, onClose, onEditar }: Props) {
                 {adjuntos.map((a) => {
                   const u = urls[a.id];
                   const esImg = a.mime_type?.startsWith("image/");
+                  // La entrega que subió ella desde su portal: está en SU Drive. Se
+                  // abre tocándola (la edge firma el archivo) y no se borra desde acá.
+                  if (a.drive_item_id) {
+                    return (
+                      <button key={a.id} type="button" onClick={() => void abrirEntregaDelPortal(a)} title={t("custom.attach.open")}
+                        className="relative flex aspect-square flex-col items-center justify-center gap-1 overflow-hidden rounded-xl border border-success/30 bg-success/5 p-2 text-center transition-colors hover:bg-success/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                        <ExternalLink className="h-4 w-4 text-success" />
+                        <span className="max-w-full truncate text-[10px] text-foreground">{a.file_name}</span>
+                        <span className="absolute left-1.5 top-1.5 rounded-full bg-success/80 px-1.5 py-0.5 text-[9px] font-medium text-success-foreground">
+                          {t("custom.attach.fromPortal")}
+                        </span>
+                      </button>
+                    );
+                  }
                   return (
                     <div key={a.id} className="group relative aspect-square overflow-hidden rounded-xl border border-white/5 bg-background/40">
                       {esImg && u ? (
@@ -423,6 +457,9 @@ export default function PedidoFicha({ pedido, onClose, onEditar }: Props) {
             {!puedeAprobar && pedido.status === "solicitado" && (
               <p className="text-[11px] text-muted-foreground">{t("custom.detail.awaitingApproval")}</p>
             )}
+            {!puedeAprobar && pedido.status === "no_puede" && (
+              <p className="text-[11px] text-muted-foreground">{t("custom.detail.cantAwaitSupervisor")}</p>
+            )}
             {siguientes.map((s) => {
               const e = estadoDe(s);
               const destructivo = s === "denegado" || s === "reembolsado";
@@ -431,7 +468,9 @@ export default function PedidoFicha({ pedido, onClose, onEditar }: Props) {
                   className={`rounded-full ${destructivo ? "border-destructive/40 text-destructive hover:bg-destructive/10" : ""}`}
                   disabled={cambiarEstado.isPending} onClick={() => void mover(s)}>
                   {cambiarEstado.isPending ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : null}
-                  {s === "denegado" ? t("custom.detail.deny") : s === "reembolsado" ? t("custom.detail.markRefund") : t("custom.detail.moveTo", { status: t(e.label) })}
+                  {s === "denegado" ? t("custom.detail.deny") : s === "reembolsado" ? t("custom.detail.markRefund")
+                    : pedido.status === "no_puede" && s === "solicitado" ? t("custom.detail.renegotiate")
+                    : t("custom.detail.moveTo", { status: t(e.label) })}
                 </Button>
               );
             })}

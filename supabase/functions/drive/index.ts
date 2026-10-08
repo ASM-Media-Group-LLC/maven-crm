@@ -11,6 +11,7 @@
 //   subir_confirmar  { id, recibo }                    → el archivo queda listo
 //   abrir            { id, descargar? }                → URL para verlo/bajarlo
 //   abrir_version    { version }                       → URL para bajar una versión vieja
+//   abrir_entrega_pedido { adjunto, descargar? }        → URL de una entrega que subió la creadora
 //   restaurar_version { version }                      → (dueño o editor) la vuelve a dejar vigente
 //   bajar_varios     { ids }                           → permiso para UN .zip (POST /zip del NAS)
 //   miniaturas       { ids }  (hasta 200)              → { urls: { id: URL de la miniatura } }
@@ -273,6 +274,31 @@ Deno.serve(async (req) => {
       const ahora = new Date().toISOString();
       await admin.from("drive_items").update({ last_opened_at: ahora }).eq("id", id);
       await admin.from("drive_aperturas").upsert({ user_id: yo, item_id: id, abierto_at: ahora }, { onConflict: "user_id,item_id" });
+      return responder({ url: u });
+    }
+
+    // Una ENTREGA de un personalizado que la creadora subió desde su portal (fase 3,
+    // 08/10): el archivo vive en SU carpeta, que el equipo no ve por la RLS de
+    // drive_items. El juez es el pedido: si la RLS de custom_request_attachments le
+    // muestra el adjunto a la persona (ve ese pedido: el chatter que lo vendió, su
+    // manager, los supervisores), lo puede abrir. Y solo ese archivo.
+    if (accion === "abrir_entrega_pedido") {
+      const { data: adj } = await comoLaPersona.from("custom_request_attachments")
+        .select("drive_item_id").eq("id", String(body.adjunto ?? "")).maybeSingle();
+      const itemId = (adj as { drive_item_id: string | null } | null)?.drive_item_id;
+      if (!itemId) throw new HttpError("No existe o no tienes acceso", 404);
+      const { data: fila } = await admin.from("drive_items")
+        .select("id, tipo, nombre, mime, storage_key, estado, trashed_at").eq("id", itemId).maybeSingle();
+      if (!fila || fila.tipo !== "archivo" || fila.trashed_at || !fila.storage_key) throw new HttpError("La creadora borró ese archivo", 404);
+      if (fila.estado !== "listo") throw new HttpError("El archivo todavía se está subiendo", 409);
+      const descargar = !!body.descargar;
+      const comoJpg = descargar ? null : extensionParaVerComoJpg(fila.nombre, fila.mime);
+      const u = await permisoNas(
+        comoJpg
+          ? { op: "mini", k: fila.storage_key, x: comoJpg, l: LADO_VISTA }
+          : { op: "get", k: fila.storage_key, ct: fila.mime ?? "application/octet-stream", n: conExtension(fila.nombre, fila.mime), dl: descargar },
+        VENCE.bajar,
+      );
       return responder({ url: u });
     }
 

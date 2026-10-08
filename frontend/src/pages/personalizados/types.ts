@@ -11,7 +11,10 @@ import type { TranslationKey } from "@/lib/i18n";
 export type Agency = "plus" | "massive";
 export type Estado =
   | "solicitado" | "aprobado" | "en_produccion" | "listo" | "entregado"
-  | "denegado" | "reembolsado";
+  | "denegado" | "reembolsado"
+  // La creadora dijo desde su portal que no puede (con su motivo). Lo resuelve
+  // un supervisor: renegociar (vuelve a solicitado), denegar o reembolsar.
+  | "no_puede";
 export type TipoContenido = "foto" | "video" | "audio" | "articulo";
 export type CanalVenta = "normal" | "buster";
 
@@ -36,6 +39,8 @@ export interface Pedido {
   flags: string[];
   notes: string | null;
   denied_reason: string | null;
+  /** Por qué no puede, escrito por ella en su portal (estado no_puede). */
+  creadora_motivo: string | null;
   approved_by: string | null;
   approved_at: string | null;
   delivered_at: string | null;
@@ -59,7 +64,11 @@ export interface PedidoEvento {
 export interface PedidoAdjunto {
   id: string;
   request_id: string;
-  storage_path: string;
+  /** Lo que sube el equipo: un archivo del bucket custom-requests. */
+  storage_path: string | null;
+  /** Lo que entrega la creadora desde su portal: un archivo de SU Drive (se
+   *  abre con la edge drive, abrir_entrega_pedido). Uno de los dos, nunca ambos. */
+  drive_item_id: string | null;
   file_name: string;
   mime_type: string | null;
   size_bytes: number | null;
@@ -76,6 +85,7 @@ export const ESTADOS: Array<{ id: Estado; label: TranslationKey; corto: Translat
   { id: "en_produccion", label: "custom.status.en_produccion", corto: "custom.status.en_produccion.short", tono: "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30" },
   { id: "listo",         label: "custom.status.listo",         corto: "custom.status.listo",               tono: "bg-teal-500/15 text-teal-600 dark:text-teal-400 border-teal-500/30" },
   { id: "entregado",     label: "custom.status.entregado",     corto: "custom.status.entregado",           tono: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30" },
+  { id: "no_puede",      label: "custom.status.no_puede",      corto: "custom.status.no_puede.short",      tono: "bg-orange-500/15 text-orange-600 dark:text-orange-400 border-orange-500/30", lateral: true },
   { id: "denegado",      label: "custom.status.denegado",      corto: "custom.status.denegado",            tono: "bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/30", lateral: true },
   { id: "reembolsado",   label: "custom.status.reembolsado",   corto: "custom.status.reembolsado.short",   tono: "bg-zinc-500/15 text-zinc-600 dark:text-zinc-300 border-zinc-500/30", lateral: true },
 ];
@@ -91,6 +101,7 @@ export const ACENTO: Record<Estado, { hero: string; punto: string; texto: string
   en_produccion: { hero: "from-amber-500/25",   punto: "bg-amber-500",   texto: "text-amber-500",   tinte: "bg-amber-500/10" },
   listo:         { hero: "from-teal-500/25",    punto: "bg-teal-500",    texto: "text-teal-500",    tinte: "bg-teal-500/10" },
   entregado:     { hero: "from-emerald-500/25", punto: "bg-emerald-500", texto: "text-emerald-500", tinte: "bg-emerald-500/10" },
+  no_puede:      { hero: "from-orange-500/25",  punto: "bg-orange-500",  texto: "text-orange-500",  tinte: "bg-orange-500/10" },
   denegado:      { hero: "from-red-500/25",     punto: "bg-red-500",     texto: "text-red-500",     tinte: "bg-red-500/10" },
   reembolsado:   { hero: "from-zinc-500/25",    punto: "bg-zinc-500",    texto: "text-zinc-400",    tinte: "bg-zinc-500/10" },
 };
@@ -110,8 +121,13 @@ export const SIGUIENTES: Record<Estado, Estado[]> = {
   entregado:     ["reembolsado"],
   denegado:      ["solicitado"],
   reembolsado:   [],
+  // Nadie del equipo pasa un pedido A no_puede: eso lo dice ella desde su portal.
+  no_puede:      ["solicitado", "denegado", "reembolsado"],
 };
 export const SOLO_SUPERVISOR: Estado[] = ["aprobado", "denegado"];
+/** ¿Hace falta ser supervisor para este paso? Aprobar y denegar, siempre; y todo
+ *  lo que sale de no_puede (lo exige el trigger de la base). */
+export const soloSupervisor = (desde: Estado, hacia: Estado) => desde === "no_puede" || SOLO_SUPERVISOR.includes(hacia);
 
 // ─── Reloj del pedido ───────────────────────────────────────────────────────
 // Regla del negocio (Jhon, 03/09/2026): un personalizado no puede tardar más

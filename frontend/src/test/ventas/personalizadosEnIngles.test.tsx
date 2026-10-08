@@ -27,7 +27,7 @@ const base: Pedido = {
   id: "p1", agency: "plus", creator_id: "c1", creator_name: "Sofia Model", chatter_id: "u1", chatter_name: "Laura Gomez",
   fan_handle: "u85422765", requested_on: diaHace(15), due_on: null, status: "en_produccion", content_type: "video",
   sale_channel: "buster", description: "Red dress video, 8 minutes", duration_or_qty: "8 min", fan_total_spent_usd: 5850,
-  price_usd: 200, paid_usd: 120, flags: ["pago_parcial", "urgente", "bandera_vieja"], notes: null, denied_reason: null,
+  price_usd: 200, paid_usd: 120, flags: ["pago_parcial", "urgente", "bandera_vieja"], notes: null, denied_reason: null, creadora_motivo: null,
   approved_by: null, approved_at: null, delivered_at: null, source: "sheet", source_ref: "SEP-12", created_by: "u1",
   created_at: "2026-09-01T12:00:00Z", updated_at: "2026-09-01T12:00:00Z",
 };
@@ -46,8 +46,8 @@ const EVENTOS: PedidoEvento[] = [
   { id: "e3", request_id: "p1", actor_id: null, from_status: "aprobado", to_status: "en_produccion", note: null, created_at: "2026-09-03T12:00:00Z" },
 ];
 const ADJUNTOS: PedidoAdjunto[] = [
-  { id: "a1", request_id: "p1", storage_path: "p1/ref.png", file_name: "ref.png", mime_type: "image/png", size_bytes: 10, kind: "referencia", created_by: "u1", created_at: "2026-09-01T12:00:00Z" },
-  { id: "a2", request_id: "p1", storage_path: "p1/final.mp4", file_name: "final.mp4", mime_type: "video/mp4", size_bytes: 10, kind: "entrega", created_by: "u1", created_at: "2026-09-01T12:00:00Z" },
+  { id: "a1", request_id: "p1", storage_path: "p1/ref.png", drive_item_id: null, file_name: "ref.png", mime_type: "image/png", size_bytes: 10, kind: "referencia", created_by: "u1", created_at: "2026-09-01T12:00:00Z" },
+  { id: "a2", request_id: "p1", storage_path: "p1/final.mp4", drive_item_id: null, file_name: "final.mp4", mime_type: "video/mp4", size_bytes: 10, kind: "entrega", created_by: "u1", created_at: "2026-09-01T12:00:00Z" },
 ];
 const SIN: never[] = [];
 const CREADORAS = [{ id: "c1", nombre: "Sofia Model", status: "active" }];
@@ -76,6 +76,8 @@ vi.mock("@/pages/personalizados/usePersonalizados", async () => {
     usePermisosPersonalizados: () => ({ puedeAprobar, puedeGestionar: true, puedeCrear: true, cargando: false }),
     useMutacionesPedidos: () => mutaciones,
     urlFirmada: async (p: string) => `https://files.test/${p}`,
+    usePedido: () => ({ data: null }),
+    urlDeEntregaDelPortal: async () => "https://nas.test/entrega",
   };
 });
 vi.mock("@/pages/messenger/components/ProfileCard", () => ({ default: () => null }));
@@ -84,6 +86,7 @@ vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: yo } }) }));
 vi.mock("react-router-dom", () => ({
   Link: ({ children }: { children: React.ReactNode }) => children,
   useNavigate: () => () => {},
+  useSearchParams: () => [new URLSearchParams(), () => {}],
 }));
 
 import PersonalizadosPage from "@/pages/personalizados/PersonalizadosPage";

@@ -87,6 +87,14 @@ export interface Subida {
   enviado: number;
   estado: EstadoDeSubida;
   error?: string;
+  /** La entrega de un personalizado: el pedido al que se ata al terminar. */
+  pedido?: string;
+}
+
+/** Qué hacer con el archivo apenas quedó subido (atar la entrega a su pedido). */
+export interface AlTerminar {
+  pedido: string;
+  hacer: (itemId: string) => Promise<unknown>;
 }
 
 interface Pendiente {
@@ -94,6 +102,9 @@ interface Pendiente {
   archivo: File;
   carpeta: string;
   creatorId: string;
+  alTerminar?: AlTerminar;
+  /** Ya subido y confirmado, pero atarlo falló: reintentar solo vuelve a atar. */
+  subido?: string;
 }
 
 /** La cola de subidas del portal: de a una, con reintentos, y la pantalla
@@ -128,18 +139,34 @@ export function useSubidasDelPortal() {
         actual.current = { clave: p.clave, control, id: null };
         cambiar(p.clave, { estado: "subiendo" });
         try {
-          const plan = await llamarContenido<PlanDeSubida & { id: string }>(p.creatorId, "subir_iniciar", {
-            carpeta: p.carpeta, nombre: p.archivo.name, size: p.archivo.size, mime: p.archivo.type || null,
-          });
-          actual.current.id = plan.id;
-          const recibo = await subirPorPartes(p.archivo, plan, {
-            signal: control.signal,
-            onProgreso: (n) => cambiar(p.clave, { enviado: n }),
-            onEstado: (e) => cambiar(p.clave, {
-              estado: "reintento" in e ? "reintentando" : "sinInternet" in e ? "sin_internet" : "subiendo",
-            }),
-          });
-          await llamarContenido(p.creatorId, "subir_confirmar", { id: plan.id, recibo });
+          if (!p.subido) {
+            const plan = await llamarContenido<PlanDeSubida & { id: string }>(p.creatorId, "subir_iniciar", {
+              carpeta: p.carpeta, nombre: p.archivo.name, size: p.archivo.size, mime: p.archivo.type || null,
+            });
+            actual.current.id = plan.id;
+            const recibo = await subirPorPartes(p.archivo, plan, {
+              signal: control.signal,
+              onProgreso: (n) => cambiar(p.clave, { enviado: n }),
+              onEstado: (e) => cambiar(p.clave, {
+                estado: "reintento" in e ? "reintentando" : "sinInternet" in e ? "sin_internet" : "subiendo",
+              }),
+            });
+            await llamarContenido(p.creatorId, "subir_confirmar", { id: plan.id, recibo });
+            p.subido = plan.id;
+            // Ya está en su Drive: si lo que sigue falla, NO se borra.
+            actual.current.id = null;
+          }
+          // La entrega de un pedido: se ata al terminar. Si falla, el archivo
+          // queda en su Drive y «Reintentar» vuelve a atarlo sin volver a subirlo.
+          if (p.alTerminar) {
+            try {
+              await p.alTerminar.hacer(p.subido);
+            } catch (e) {
+              fallidas.current.set(p.clave, p);
+              cambiar(p.clave, { estado: "error", enviado: p.archivo.size, error: (e as Error)?.message || "no_se_ato_al_pedido" });
+              continue;
+            }
+          }
           cambiar(p.clave, { estado: "lista", enviado: p.archivo.size });
         } catch (e) {
           const id = actual.current?.id;
@@ -161,10 +188,12 @@ export function useSubidasDelPortal() {
     }
   }, [qc]);
 
-  const agregar = useCallback((archivos: File[], carpeta: string, creatorId: string) => {
-    const nuevas = archivos.map((archivo) => ({ clave: `${Date.now()}-${Math.random().toString(36).slice(2)}`, archivo, carpeta, creatorId }));
+  const agregar = useCallback((archivos: File[], carpeta: string, creatorId: string, alTerminar?: AlTerminar) => {
+    const nuevas = archivos.map((archivo) => ({ clave: `${Date.now()}-${Math.random().toString(36).slice(2)}`, archivo, carpeta, creatorId, alTerminar }));
     cola.current.push(...nuevas);
-    setSubidas((ss) => [...ss, ...nuevas.map((n) => ({ clave: n.clave, nombre: n.archivo.name, size: n.archivo.size, enviado: 0, estado: "esperando" as const }))]);
+    setSubidas((ss) => [...ss, ...nuevas.map((n) => ({
+      clave: n.clave, nombre: n.archivo.name, size: n.archivo.size, enviado: 0, estado: "esperando" as const, pedido: alTerminar?.pedido,
+    }))]);
     void procesar();
   }, [procesar]);
 
@@ -180,7 +209,7 @@ export function useSubidasDelPortal() {
     if (!p) return;
     fallidas.current.delete(c);
     cola.current.push(p);
-    cambiar(c, { estado: "esperando", enviado: 0, error: undefined });
+    cambiar(c, { estado: "esperando", enviado: p.subido ? p.archivo.size : 0, error: undefined });
     void procesar();
   }, [procesar]);
 
