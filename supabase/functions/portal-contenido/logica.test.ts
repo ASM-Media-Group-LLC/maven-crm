@@ -7,6 +7,7 @@
 // supabase/tests/portal_contenido.ts.
 import { assert, assertEquals } from "jsr:@std/assert@1";
 import { type Item, manejar, nombreValido, partesDe, type Puertos, TAMANO_PARTE } from "./logica.ts";
+import { type FilaPedido, motivoValido, NOMBRE_CARPETA, SE_PUEDE } from "./pedidos.ts";
 
 const T1 = "t-asm";
 const C1 = "c0000000-0000-4000-8000-000000000001"; // la ficha de Sofi
@@ -22,6 +23,27 @@ const GENTE: Record<string, { id: string; esCreadora: boolean }> = {
   "tok-jhon": { id: "u-jhon", esCreadora: false },
 };
 
+// Sus pedidos (lo que trae la base con service_role, con lo que NO debe viajar).
+const PED = (n: number) => `d0000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+const ADJ = (n: number) => `a1000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+const base = {
+  fan_handle: "fan_01", description: "Video bailando", price_usd: 120, content_type: "video", duration_or_qty: "3 min",
+  requested_on: "2026-10-06", creadora_motivo: null, fan_total_spent_usd: 900, paid_usd: 120, notes: "nota interna", chatter_name: "Ana",
+};
+const PEDIDOS: FilaPedido[] = [
+  { ...base, id: PED(1), status: "entregado", due_on: null, created_at: "2026-10-01T10:00:00Z" },
+  { ...base, id: PED(2), status: "aprobado", due_on: "2026-10-10", created_at: "2026-10-05T10:00:00Z",
+    custom_request_attachments: [
+      { id: ADJ(1), kind: "referencia", file_name: "idea.jpg", mime_type: "image/jpeg", size_bytes: 10, drive_item_id: null, storage_path: `${PED(2)}/1-idea.jpg`, created_at: "2026-10-05T10:00:00Z" },
+      { id: ADJ(2), kind: "entrega", file_name: "del equipo.mp4", mime_type: "video/mp4", size_bytes: 10, drive_item_id: null, storage_path: `${PED(2)}/2-x.mp4`, created_at: "2026-10-05T11:00:00Z" },
+    ] },
+  { ...base, id: PED(3), status: "solicitado", due_on: "2026-10-08", created_at: "2026-10-06T10:00:00Z" },
+];
+const ADJUNTOS: Record<string, { kind: string; storage_path: string | null; creator_id: string | null }> = {
+  [ADJ(1)]: { kind: "referencia", storage_path: `${PED(2)}/1-idea.jpg`, creator_id: C1 },
+  [ADJ(3)]: { kind: "referencia", storage_path: "otro/1-ajena.jpg", creator_id: C2 },
+};
+
 function item(over: Partial<Item> & Pick<Item, "id">): Item {
   return {
     tenant_id: T1, parent_id: RAIZ, unidad_id: RAIZ, owner_id: "u-sofi", tipo: "archivo", nombre: "x.jpg", mime: "image/jpeg",
@@ -29,7 +51,10 @@ function item(over: Partial<Item> & Pick<Item, "id">): Item {
   };
 }
 
-function armar(o: { sinCarpeta?: boolean; espacio?: { usado: number; cupo: number | null }; nas?: { ok: boolean; libre: number; total: number }[] | null; nasBorra?: boolean } = {}) {
+function armar(o: {
+  sinCarpeta?: boolean; espacio?: { usado: number; cupo: number | null }; nas?: { ok: boolean; libre: number; total: number }[] | null;
+  nasBorra?: boolean; respuestaPedido?: Record<string, unknown>;
+} = {}) {
   const items = new Map<string, Item>([
     [RAIZ, item({ id: RAIZ, parent_id: null, owner_id: null, tipo: "carpeta", nombre: "Contenido · Sofi", mime: null, size: null, storage_key: null })],
     [SESION, item({ id: SESION, tipo: "carpeta", nombre: "Sesión cocina", mime: null, size: null, storage_key: null })],
@@ -40,7 +65,10 @@ function armar(o: { sinCarpeta?: boolean; espacio?: { usado: number; cupo: numbe
     [OTRA_RAIZ, item({ id: OTRA_RAIZ, parent_id: null, unidad_id: OTRA_RAIZ, owner_id: null, tipo: "carpeta", nombre: "Contenido · Otra", storage_key: null })],
     [DE_OTRA, item({ id: DE_OTRA, parent_id: OTRA_RAIZ, unidad_id: OTRA_RAIZ, owner_id: "u-otra", nombre: "suya.jpg" })],
   ]);
-  const log = { creadas: 0, insertadas: [] as Item[], borradas: [] as string[], enNas: [] as string[], permisos: [] as Record<string, unknown>[], confirmadas: [] as string[], ocultadas: [] as string[] };
+  const log = {
+    creadas: 0, insertadas: [] as Item[], borradas: [] as string[], enNas: [] as string[], permisos: [] as Record<string, unknown>[],
+    confirmadas: [] as string[], ocultadas: [] as string[], acciones: [] as Record<string, unknown>[],
+  };
   const ocultos = new Set<string>();
   let n = 100;
   const p: Puertos = {
@@ -70,6 +98,13 @@ function armar(o: { sinCarpeta?: boolean; espacio?: { usado: number; cupo: numbe
     borrarEnNas: (k) => { log.enNas.push(k); return Promise.resolve(o.nasBorra ?? true); },
     uuid: () => id(n++),
     ahora: () => AHORA,
+    pedidosDe: (cid) => Promise.resolve(cid === C1 ? PEDIDOS : []),
+    accionPedido: (uid, pid, accion, motivo, item) => {
+      log.acciones.push({ uid, pid, accion, motivo, item });
+      return Promise.resolve(o.respuestaPedido ?? { ok: true, estado: "listo" });
+    },
+    adjunto: (aid) => Promise.resolve(ADJUNTOS[aid] ?? null),
+    firmarReferencia: (ruta) => Promise.resolve(`https://storage.test/${ruta}`),
   };
   return { p, log, items };
 }
@@ -222,4 +257,76 @@ Deno.test("nombres y partes", () => {
   assertEquals(nombreValido("ok\u0000"), "ok");
   assertEquals(partesDe(TAMANO_PARTE), 0);
   assertEquals(partesDe(TAMANO_PARTE + 1), 2);
+});
+
+// ── Los personalizados (fase 3) ─────────────────────────────────────────────
+Deno.test("sus pedidos: los por hacer primero (el que vence antes arriba), y solo lo que ella ve", async () => {
+  const res = await pedir("tok-sofi", { accion: "pedidos" });
+  const ps = res.body.pedidos as Record<string, unknown>[];
+  assertEquals(ps.map((x) => x.id), [PED(3), PED(2), PED(1)]);
+  const p2 = ps[1];
+  assertEquals([p2.fan, p2.precio_usd, p2.descripcion, p2.para_el], ["fan_01", 120, "Video bailando", "2026-10-10"]);
+  // NO viaja: lo que gastó el fan en total, lo cobrado, las notas, quién lo vendió.
+  for (const x of ps) for (const k of ["fan_total_spent_usd", "paid_usd", "notes", "chatter_name"]) assertEquals(k in x, false, k);
+  assertEquals((p2.referencias as unknown[]).length, 1);
+  assertEquals((p2.entregas as unknown[]).length, 0, "las entregas del bucket (del equipo) no son suyas");
+  assertEquals([ps[0].por_aprobar, ps[0].se_puede_empezar, p2.se_puede_empezar], [true, false, true]);
+});
+
+Deno.test("otra creadora (o la misma cuenta con otra ficha) no ve estos pedidos", async () => {
+  assertEquals((await pedir("tok-luna", { accion: "pedidos" })).status, 403);
+  assertEquals((await manejar("tok-sofi", { accion: "pedidos", creator_id: C2 }, armar().p)).status, 403);
+});
+
+Deno.test("su carpeta «Personalizados»: la crea una vez, después la reusa", async () => {
+  const a = armar();
+  const r1 = await pedir("tok-sofi", { accion: "pedido_carpeta" }, a);
+  assertEquals(a.log.insertadas.length, 1);
+  assertEquals([a.log.insertadas[0].nombre, a.log.insertadas[0].parent_id, a.log.insertadas[0].tipo], [NOMBRE_CARPETA, RAIZ, "carpeta"]);
+  const r2 = await pedir("tok-sofi", { accion: "pedido_carpeta" }, a);
+  assertEquals(r2.body.carpeta, r1.body.carpeta);
+  assertEquals(a.log.insertadas.length, 1);
+});
+
+Deno.test("«No puedo hacerlo» exige motivo; las acciones van a la base con SU usuario", async () => {
+  const a = armar();
+  assertEquals((await pedir("tok-sofi", { accion: "pedido_no_puede", pedido: PED(2), motivo: "  " }, a)).body.error, "falta_motivo");
+  assertEquals(a.log.acciones.length, 0);
+  await pedir("tok-sofi", { accion: "pedido_no_puede", pedido: PED(2), motivo: "No grabo en exteriores" }, a);
+  await pedir("tok-sofi", { accion: "pedido_empezar", pedido: PED(2) }, a);
+  assertEquals(a.log.acciones.map((x) => [x.uid, x.accion, x.motivo]), [["u-sofi", "no_puede", "No grabo en exteriores"], ["u-sofi", "empezar", null]]);
+  assertEquals((await pedir("tok-sofi", { accion: "pedido_empezar", pedido: "x" }, a)).status, 400);
+});
+
+Deno.test("la entrega: solo un archivo SUYO terminado (ni de la agencia, ni de otra, ni a medio subir)", async () => {
+  const a = armar();
+  for (const f of [AJENA, DE_OTRA, TIRADA]) {
+    const r = await pedir("tok-sofi", { accion: "pedido_entregar", pedido: PED(2), archivo: f }, a);
+    // AJENA es de su carpeta aunque la subió la agencia: la base decide; lo de otra o en la papelera, no llega.
+    if (f !== AJENA) assertEquals(r.body.error, "archivo_invalido", f);
+  }
+  a.items.set(id(90), item({ id: id(90), estado: "subiendo", nombre: "a medias.mp4" }));
+  assertEquals((await pedir("tok-sofi", { accion: "pedido_entregar", pedido: PED(2), archivo: id(90) }, a)).body.error, "archivo_invalido");
+  const ok = await pedir("tok-sofi", { accion: "pedido_entregar", pedido: PED(2), archivo: FOTO }, a);
+  assertEquals([ok.status, a.log.acciones.at(-1)?.item], [200, FOTO]);
+});
+
+Deno.test("lo que dice la base se traduce a un status: no es tuyo 404, por aprobar 409", async () => {
+  assertEquals((await pedir("tok-sofi", { accion: "pedido_empezar", pedido: PED(3) }, armar({ respuestaPedido: { error: "por_aprobar" } }))).status, 409);
+  assertEquals((await pedir("tok-sofi", { accion: "pedido_empezar", pedido: PED(3) }, armar({ respuestaPedido: { error: "no_es_tuyo" } }))).status, 404);
+});
+
+Deno.test("las referencias: solo las de SUS pedidos se firman", async () => {
+  const ok = await pedir("tok-sofi", { accion: "pedido_referencia", id: ADJ(1) });
+  assertEquals(ok.body.url, `https://storage.test/${PED(2)}/1-idea.jpg`);
+  assertEquals((await pedir("tok-sofi", { accion: "pedido_referencia", id: ADJ(3) })).status, 404, "la de otra creadora");
+  assertEquals((await pedir("tok-sofi", { accion: "pedido_referencia", id: ADJ(2) })).status, 404, "una entrega no es una referencia");
+});
+
+Deno.test("los botones que se ofrecen son los que la base acepta", () => {
+  assertEquals(SE_PUEDE.empezar("solicitado"), false);
+  assertEquals(SE_PUEDE.entregar("solicitado"), true);
+  assertEquals(SE_PUEDE.rechazar("listo"), false);
+  assertEquals(motivoValido("ok"), null);
+  assert(motivoValido("No grabo en exteriores"));
 });

@@ -14,6 +14,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
 import { corsFor } from "../_shared/cors.ts";
 import { ahoraMas, firmar, verificar } from "../_shared/drive-firma.ts";
 import { type Item, manejar, type Puertos, VENCE_BORRAR } from "./logica.ts";
+import type { FilaPedido } from "./pedidos.ts";
 
 const corsHeaders = (req: Request) =>
   corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" });
@@ -136,6 +137,34 @@ function puertosReales(nas: string, secreto: string): Puertos {
     },
     uuid: () => crypto.randomUUID(),
     ahora: () => Date.now(),
+    // ── Los personalizados (fase 3) ──
+    pedidosDe: async (creatorId) => {
+      const { data, error } = await admin.from("custom_requests")
+        .select("id, status, fan_handle, description, price_usd, content_type, duration_or_qty, requested_on, due_on, creadora_motivo, created_at, " +
+          "custom_request_attachments(id, kind, file_name, mime_type, size_bytes, drive_item_id, storage_path, created_at)")
+        .eq("creator_id", creatorId).order("created_at", { ascending: false }).limit(200);
+      if (error) throw new Error(`no se pudieron leer los pedidos: ${error.message}`);
+      return (data ?? []) as unknown as FilaPedido[];
+    },
+    accionPedido: async (userId, pedidoId, accion, motivo, item) => {
+      const { data, error } = await admin.rpc("portal_pedido", {
+        p_user: userId, p_request: pedidoId, p_accion: accion, p_motivo: motivo, p_item: item,
+      });
+      if (error) throw new Error(`portal_pedido: ${error.message}`);
+      return (data ?? {}) as Record<string, unknown>;
+    },
+    adjunto: async (id) => {
+      const { data, error } = await admin.from("custom_request_attachments")
+        .select("kind, storage_path, custom_requests!inner(creator_id)").eq("id", id).maybeSingle();
+      if (error) throw new Error(`no se pudo leer el adjunto: ${error.message}`);
+      if (!data) return null;
+      const f = data as unknown as { kind: string; storage_path: string | null; custom_requests: { creator_id: string | null } };
+      return { kind: f.kind, storage_path: f.storage_path, creator_id: f.custom_requests?.creator_id ?? null };
+    },
+    firmarReferencia: async (ruta) => {
+      const { data, error } = await admin.storage.from("custom-requests").createSignedUrl(ruta, 3600);
+      return error ? null : data.signedUrl;
+    },
   };
 }
 

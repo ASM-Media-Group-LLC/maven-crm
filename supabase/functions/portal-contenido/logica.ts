@@ -17,9 +17,14 @@
 // se borra de verdad es una subida que quedó a medias, que no es contenido.
 
 import { conExtension, extensionParaMiniatura, extensionParaVerComoJpg, idsParaMiniaturas, LADO_VISTA, venceMiniatura } from "../drive/logica.ts";
+import {
+  ACCIONES_PEDIDOS, type FilaPedido, motivoValido, NOMBRE_CARPETA, ordenarPedidos, pedidoVisible, statusDelError,
+} from "./pedidos.ts";
 
 export const ACCIONES = [
   "raiz", "listar", "crear_carpeta", "renombrar", "borrar", "subir_iniciar", "subir_confirmar", "abrir", "miniaturas",
+  // Los personalizados (fase 3): pedidos.ts.
+  ...ACCIONES_PEDIDOS,
 ] as const;
 export type Accion = typeof ACCIONES[number];
 
@@ -102,6 +107,15 @@ export interface Puertos {
   borrarEnNas(storageKey: string): Promise<boolean>;
   uuid(): string;
   ahora(): number;
+  // ── Los personalizados (fase 3, pedidos.ts) ──
+  /** Sus pedidos (custom_requests de su ficha), con sus adjuntos. */
+  pedidosDe(creatorId: string): Promise<FilaPedido[]>;
+  /** portal_pedido() de la base: {ok, estado} o {error}. */
+  accionPedido(userId: string, pedidoId: string, accion: "empezar" | "no_puede" | "entregar", motivo: string | null, item: string | null): Promise<Record<string, unknown>>;
+  /** Un adjunto, con la ficha de su pedido (para no firmar el de otra). */
+  adjunto(id: string): Promise<{ kind: string; storage_path: string | null; creator_id: string | null } | null>;
+  /** Una URL firmada del bucket custom-requests (1 hora), o null. */
+  firmarReferencia(storagePath: string): Promise<string | null>;
 }
 
 export interface Respuesta {
@@ -194,6 +208,60 @@ export async function manejar(token: string, body: Record<string, unknown>, p: P
     if (!esDeSuCarpeta(i, carpeta, ficha.tenant_id)) return null;
     return (await estaOculto(i, ocultos, carpeta, p)) ? null : i;
   };
+
+  // ── Los personalizados (fase 3) ─────────────────────────────────────────
+  if (accion === "pedidos") {
+    return r(200, { pedidos: ordenarPedidos((await p.pedidosDe(ficha.creator_id)).map(pedidoVisible)) });
+  }
+
+  if (accion === "pedido_carpeta") {
+    // Su carpeta «Personalizados», adentro de la de arriba: la que está, o una
+    // nueva (si la había «borrado» de su vista, se hace otra).
+    const buscar = async () =>
+      (await p.hijos(carpeta)).find((i) => i.tipo === "carpeta" && i.nombre === NOMBRE_CARPETA && !ocultos.has(i.id) && !i.trashed_at);
+    const ya = await buscar();
+    if (ya) return r(200, { carpeta: ya.id });
+    const id = p.uuid();
+    const res = await p.insertar({
+      id, tenant_id: ficha.tenant_id, owner_id: yo.id, parent_id: carpeta, tipo: "carpeta", nombre: NOMBRE_CARPETA,
+      mime: null, size: null, estado: "listo", storage_key: null,
+    });
+    if (res.error) {
+      // Dos pestañas a la vez: si la otra ya la creó, esa sirve.
+      const otra = await buscar();
+      return otra ? r(200, { carpeta: otra.id }) : r(400, { error: "no_se_creo" });
+    }
+    return r(200, { carpeta: id });
+  }
+
+  if (accion === "pedido_empezar" || accion === "pedido_no_puede" || accion === "pedido_entregar") {
+    if (!esUuid(body.pedido)) return r(400, { error: "pedido_invalido" });
+    let motivo: string | null = null;
+    let archivo: string | null = null;
+    if (accion === "pedido_no_puede") {
+      motivo = motivoValido(body.motivo);
+      if (!motivo) return r(400, { error: "falta_motivo" });
+    }
+    if (accion === "pedido_entregar") {
+      // Un archivo SUYO, terminado de subir (la base lo vuelve a revisar).
+      const i = await suyo("archivo");
+      if (!i || i.tipo !== "archivo" || i.estado !== "listo") return r(400, { error: "archivo_invalido" });
+      archivo = i.id;
+    }
+    const que = accion === "pedido_empezar" ? "empezar" : accion === "pedido_no_puede" ? "no_puede" : "entregar";
+    const res = await p.accionPedido(yo.id, body.pedido as string, que, motivo, archivo);
+    if (typeof res.error === "string") return r(statusDelError(res.error), res);
+    return r(200, res);
+  }
+
+  if (accion === "pedido_referencia") {
+    // Las referencias que subió el equipo a SU pedido (bucket custom-requests).
+    if (!esUuid(body.id)) return r(400, { error: "id_invalido" });
+    const a = await p.adjunto(body.id);
+    if (!a || a.kind !== "referencia" || !a.storage_path || a.creator_id !== ficha.creator_id) return r(404, { error: "no_existe" });
+    const url = await p.firmarReferencia(a.storage_path);
+    return url ? r(200, { url }) : r(502, { error: "no_se_firmo" });
+  }
 
   if (accion === "raiz") return r(200, { raiz: carpeta });
 

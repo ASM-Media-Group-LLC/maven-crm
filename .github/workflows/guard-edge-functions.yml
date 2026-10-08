@@ -337,6 +337,14 @@ jobs:
       - name: Banco — portal de creadoras, su contenido en el Drive (PGlite)
         run: deno run -A --node-modules-dir=none --no-lock supabase/tests/portal_contenido.ts
 
+      # Portal fase 3, los personalizados (08/10): a ella le llega el pedido apenas se
+      # crea; «Lo empiezo» solo aprobado; la entrega, solo un archivo de SU carpeta (por
+      # aprobar espera y al aprobar pasa a listo); «no puede» con motivo, solo ella lo
+      # pone y solo un supervisor lo resuelve; avisos al chatter, su manager y los
+      # supervisores de SU agencia; el historial la nombra a ella. ~20 s.
+      - name: Banco — los personalizados del portal (PGlite)
+        run: deno run -A --node-modules-dir=none --no-lock supabase/tests/portal_pedidos.ts
+
       # La agencia de cada creadora, por agencia (06/10): Kash se llama Kash y elige entre
       # Kash Plus, Kash Massive y Atomick (con su compañía y su tier); otra agencia no ve
       # ninguna (su nombre fijo); nadie las escribe desde el navegador; vuelta atrás. ~5 s.
