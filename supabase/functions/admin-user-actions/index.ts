@@ -1,5 +1,6 @@
 import { corsFor } from "../_shared/cors.ts";
 import { assertCanManage } from "../_shared/user-hierarchy.ts";
+import { type ClienteParaRoles, esAdmin } from "../_shared/es-admin.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   DOMINIO_CASILLA,
@@ -1154,11 +1155,9 @@ Deno.serve(async (req) => {
     // todo antes de borrar; en particular, que pasaron los 30 días: si un admin
     // purga antes, el buzón queda en la cola y lo borra el cron ese día.
     if (action === "purge_user") {
-      const { data: esAdmin } = await adminClient.rpc("has_role", {
-        _user_id: callerId,
-        _role: "admin",
-      });
-      if (!esAdmin) {
+      // No rpc("has_role"): hay dos y PostgREST no elige; daba «no es admin»
+      // a todos (ver _shared/es-admin.ts).
+      if (!(await esAdmin(adminClient as unknown as ClienteParaRoles, callerId))) {
         return new Response(JSON.stringify({ error: "Solo un admin puede purgar una cuenta" }), {
           status: 403,
           headers: { ...corsHeaders(req), "Content-Type": "application/json" },

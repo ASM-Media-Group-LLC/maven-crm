@@ -30,6 +30,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useUserRole } from "@/hooks/useUserRole";
 import AccesosOFCard, { type DatosDeFicha } from "./AccesosOFCard";
 
 // PESTAÑA PORTAL del perfil de la creadora (lado de la agencia): si tiene acceso
@@ -53,6 +54,7 @@ export default function PortalTabContent({ creatorId, correoFicha, ficha, onVerH
   const acceso = useAccesoPortal(creatorId);
   const actividad = useActividadPortal(creatorId);
   const puede = usePuedeInvitarAlPortal();
+  const { isAdmin } = useUserRole();
   const accion = useAccionPortal(creatorId);
   const [dialogo, setDialogo] = useState<"invitar" | "correo" | "quitar" | null>(null);
   const [correo, setCorreo] = useState("");
@@ -208,8 +210,9 @@ export default function PortalTabContent({ creatorId, correoFicha, ficha, onVerH
         </CardContent>
       </Card>
 
-      {/* Los accesos de OnlyFans (08/10): a todo el ancho, debajo. */}
-      <AccesosOFCard creatorId={creatorId} ficha={ficha} />
+      {/* Los accesos de OnlyFans (08/10): a todo el ancho, debajo, y SOLO para
+          admins (Jhon, 08/10). La edge también lo exige. */}
+      {isAdmin && <AccesosOFCard creatorId={creatorId} ficha={ficha} />}
 
       {/* Darle acceso / cambiar el correo */}
       <Dialog open={dialogo === "invitar" || dialogo === "correo"} onOpenChange={(o) => !o && setDialogo(null)}>

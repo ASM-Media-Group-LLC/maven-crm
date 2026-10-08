@@ -373,8 +373,6 @@ export const portal = {
     es: "Contraseña copiada. Queda anotado que la copiaste.",
     en: "Password copied. It's logged that you copied it.",
   },
-  "portal.accesos.claveSoloAdmin": { es: "Solo la ven los admins.", en: "Only admins can see it." },
-  "portal.accesos.claveGuardada": { es: "Guardada", en: "Saved" },
   "portal.accesos.sinClave": { es: "Todavía no la cargó.", en: "Not added yet." },
   "portal.accesos.claveCambiada": { es: "Cambiada {cuando}", en: "Changed {cuando}" },
   "portal.accesos.actualizadoCreadora": { es: "Ella los actualizó {cuando}, desde su portal.", en: "She updated them {cuando}, from her portal." },

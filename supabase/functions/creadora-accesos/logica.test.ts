@@ -8,7 +8,7 @@
 import { assert, assertEquals } from "jsr:@std/assert@1";
 import { sellador } from "../_shared/sellado.ts";
 import {
-  columnaDe, type CreadoraParaEmparejar, emparejar, enmascararCorreo, type Fila, leerHoja, manejar, type Puertos, siONo,
+  columnaDe, type CreadoraParaEmparejar, emparejar, type Fila, leerHoja, manejar, type Puertos, siONo,
   validarCambios,
 } from "./logica.ts";
 
@@ -86,28 +86,28 @@ Deno.test("la contraseña: solo un admin la ve, y queda anotado (ver o copiar)",
   assertEquals(guardada.of_correo, "sofi.of@x.test");
   assertEquals(guardada.of_usuario, "sofi_of");
 
-  // Mario (manager, ve a Sofi): usuario y doble sí; correo enmascarado; contraseña no.
+  // Mario (manager, ve a Sofi): NADA de los accesos, ni el usuario (Jhon, 08/10:
+  // toda esta parte es solo admin). Ni ver, ni la contraseña, ni guardar.
   const mario = await pedir("tok-mario", { accion: "ver", creator_id: SOFI }, a);
-  const vm = mario.body.accesos as Record<string, unknown>;
-  assertEquals(vm.of_usuario, "sofi_of");
-  assertEquals(vm.of_correo, "s•••@x.test");
-  assertEquals(vm.tiene_clave, true);
-  assertEquals(mario.body.es_admin, false);
-  assertEquals(mario.body.eventos, []);
-  assert(!JSON.stringify(mario.body).includes("espacios"), "ni rastro de la contraseña");
+  assertEquals(mario.status, 403);
+  assertEquals(mario.body, { error: "solo_admin" });
   assertEquals((await pedir("tok-mario", { accion: "ver_clave", creator_id: SOFI }, a)).body.error, "solo_admin");
   assertEquals((await pedir("tok-mario", { accion: "guardar", creator_id: SOFI, cambios: { of_usuario: "x" } }, a)).body.error, "solo_admin");
 
-  // Jhon (admin): el correo entero y la contraseña tal cual (sin recortar).
+  // Jhon (admin): todo, y la contraseña tal cual (sin recortar), solo cuando la pide.
   const jhon = await pedir("tok-jhon", { accion: "ver", creator_id: SOFI }, a);
-  assertEquals((jhon.body.accesos as Record<string, unknown>).of_correo, "sofi.of@x.test");
+  const vj = jhon.body.accesos as Record<string, unknown>;
+  assertEquals(vj.of_correo, "sofi.of@x.test");
+  assertEquals(vj.of_usuario, "sofi_of");
+  assertEquals(vj.tiene_clave, true);
+  assert(!JSON.stringify(jhon.body).includes("espacios"), "ver no trae la contraseña");
   assertEquals((await pedir("tok-jhon", { accion: "ver_clave", creator_id: SOFI }, a)).body.clave, "  con espacios ");
   await pedir("tok-jhon", { accion: "ver_clave", creator_id: SOFI, para: "copiar" }, a);
   assertEquals(a.eventos.map((e) => e.accion), ["guardar", "ver_clave", "copiar_clave"]);
   assertEquals(a.eventos[0].campos, ["of_correo", "of_usuario", "doble_verificacion", "clave"]);
 
   // A quien no ve la creadora, nada (ni que existe).
-  assertEquals((await pedir("tok-mario", { accion: "ver", creator_id: LUNA }, a)).status, 404);
+  assertEquals((await pedir("tok-mario", { accion: "ver", creator_id: LUNA }, a)).status, 403);
   assertEquals((await pedir("tok-jhon", { accion: "ver", creator_id: ESCONDIDA }, a)).status, 404);
   assertEquals((await pedir("tok-jhon", { accion: "ver_clave", creator_id: LUNA }, a)).body.error, "sin_clave");
 });
@@ -154,11 +154,6 @@ Deno.test("qué se puede escribir", () => {
   const v = validarCambios({ of_correo: "  ", of_usuario: " @ana ", clave: " a b " }, true);
   assert("cambios" in v);
   assertEquals(v.cambios, { of_correo: null, of_usuario: "ana", clave: " a b " });
-});
-
-Deno.test("enmascarar el correo como la base", () => {
-  assertEquals(enmascararCorreo("sofi.of@gmail.com"), "s•••@gmail.com");
-  assertEquals(enmascararCorreo(null), null);
 });
 
 Deno.test("las columnas del formulario de Google, en español y en inglés", () => {

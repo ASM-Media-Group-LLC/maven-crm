@@ -13,6 +13,7 @@ import { AwsClient } from "https://esm.sh/aws4fetch@1.0.20";
 import * as XLSX from "https://esm.sh/xlsx@0.18.5";
 import { corsFor } from "../_shared/cors.ts";
 import { sellador } from "../_shared/sellado.ts";
+import { type ClienteParaRoles, esAdmin } from "../_shared/es-admin.ts";
 import { type Columnas, type CreadoraParaEmparejar, type Evento, type Fila, manejar, type Puertos } from "./logica.ts";
 
 const corsHeaders = (req: Request) =>
@@ -63,10 +64,8 @@ function puertosReales(): Puertos {
       const { data } = await comoPersona(token).from("creators").select("id").eq("id", creatorId).maybeSingle();
       return !!data;
     },
-    esAdmin: async (userId) => {
-      const { data } = await admin.rpc("has_role", { _user_id: userId, _role: "admin" });
-      return data === true;
-    },
+    // No rpc("has_role"): hay dos y PostgREST no elige (ver _shared/es-admin.ts).
+    esAdmin: (userId) => esAdmin(admin as unknown as ClienteParaRoles, userId),
     esMiFicha: async (userId, creatorId) => {
       const { data } = await admin.from("creadora_cuentas").select("creator_id").eq("user_id", userId).eq("creator_id", creatorId).maybeSingle();
       return !!data;
