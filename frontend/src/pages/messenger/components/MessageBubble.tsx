@@ -378,15 +378,27 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
     if (message.type === "file") {
       const ext = message.file_name?.split(".").pop()?.toLowerCase() || "";
       return (
-        <a href={safeFileUrl(message.file_url)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:underline">
-          <div className={cn("h-8 w-8 rounded-2xl flex items-center justify-center shrink-0", isMe ? "bg-primary-foreground/15" : "bg-primary/8")}>
-            <File className="h-4 w-4" />
-          </div>
-          <div className="min-w-0">
-            <span className="text-[13px] truncate block">{message.file_name || t("common.file")}</span>
-            {ext && <span className="text-[10px] text-muted-foreground uppercase">{ext}</span>}
-          </div>
-        </a>
+        <div>
+          <a href={safeFileUrl(message.file_url)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:underline">
+            <div className={cn("h-8 w-8 rounded-2xl flex items-center justify-center shrink-0", isMe ? "bg-primary-foreground/15" : "bg-primary/8")}>
+              <File className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <span className="text-[13px] truncate block">{message.file_name || t("common.file")}</span>
+              {ext && <span className="text-[10px] text-muted-foreground uppercase">{ext}</span>}
+            </div>
+          </a>
+          {/* ⚠️ El texto que va con el documento (Keila, 08/10: «el texto que se
+              escribe para enviarlo con los documentos no sale»). El compositor lo
+              guardaba en el primer archivo, pero esta burbuja dibujaba solo la
+              tarjeta: 219 documentos de 26 personas con el texto escondido en 60 días. Igual que
+              el pie de una imagen. */}
+          {message.content && message.content !== message.file_name && (
+            <div className="text-[13px] mt-1.5 leading-relaxed whitespace-pre-wrap break-words">{message.content_rich
+              ? <RichText doc={message.content_rich} renderText={highlightText} />
+              : highlightText(message.content)}</div>
+          )}
+        </div>
       );
     }
 

@@ -89,6 +89,12 @@ export function htmlParaCorreo(html: string): string {
     agregarEstilo(el, "text-decoration:line-through"),
   );
   body.querySelectorAll("u").forEach((el) => agregarEstilo(el, "text-decoration:underline"));
+  // Las imágenes, sin pasarse del ancho de la pantalla de quien lee y sin
+  // deformarse (Keila, 06/10: en tamaño real desarmaban el mensaje). El ancho
+  // elegido viaja en el atributo `width`, que es lo que respeta Outlook.
+  body.querySelectorAll("img").forEach((el) => {
+    if (!/max-width/.test(el.getAttribute("style") ?? "")) agregarEstilo(el, "max-width:100%;height:auto");
+  });
 
   // background explícito: hay clientes (Outlook.com y Apple Mail en oscuro)
   // que pintan el fondo oscuro y dejarían texto gris sobre negro.

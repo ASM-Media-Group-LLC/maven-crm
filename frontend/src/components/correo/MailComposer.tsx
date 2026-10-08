@@ -63,7 +63,8 @@ import {
 import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
-import Image from "@tiptap/extension-image";
+import { ImagenConTamano } from "./ImagenConTamano";
+import { prepararImagen, TAMANOS as TAMANOS_DE_IMAGEN } from "@/lib/correo/imagenesDelCorreo";
 import Link from "@tiptap/extension-link";
 import TextStyle from "@tiptap/extension-text-style";
 import { Color } from "@tiptap/extension-color";
@@ -741,7 +742,10 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
         acumulado += f.size;
         try {
           const dataUrl = await leerDataUrl(f);
-          editorRef.current?.chain().focus().setImage({ src: dataUrl }).run();
+          // Entra ajustada al ancho de un correo (y achicada si era enorme):
+          // en tamaño real desarmaba el mensaje en Gmail y Outlook (Keila, 06/10).
+          const { src, ancho } = await prepararImagen(dataUrl, f.type);
+          editorRef.current?.chain().focus().insertContent({ type: "image", attrs: { src, width: ancho } }).run();
         } catch {
           toast.error(t("mail.comp.readImageError", { name: f.name || t("mail.comp.theImage") }));
         }
@@ -800,7 +804,8 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
       // `allowBase64`: al pegar, la imagen entra como `data:` y recién al
       // ENVIAR se convierte en una parte MIME con `cid:`. Sin esto el editor
       // descarta el src y la imagen pegada desaparece sin decir nada.
-      Image.configure({ allowBase64: true, inline: false }),
+      // Con su ANCHO (ImagenConTamano): el menú de tamaño lo cambia.
+      ImagenConTamano.configure({ allowBase64: true, inline: false }),
     ],
     content: recuperado?.html ?? inicial?.cuerpoHtml ?? contenidoInicial,
     autofocus: inicial?.citar ? "start" : false,
@@ -1203,6 +1208,7 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
               negro dejaba el texto invisible al escribir. */}
           <div className="mail-composer-row flex-1 bg-white px-5 py-4">
             <div
+              data-ancla-del-cuerpo
               className={cn(
                 // `relative`: es el ancla de la lista de menciones, que se abre
                 // hacia arriba desde el cuerpo.
@@ -1214,10 +1220,14 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
                 "[&_a]:text-[#4f46e5] [&_a]:underline",
                 "[&_p]:my-1",
                 "[&_.is-editor-empty]:before:text-neutral-400",
+                // La imagen elegida (la del menú de tamaño), marcada.
+                "[&_img]:max-w-full [&_img.ProseMirror-selectednode]:outline [&_img.ProseMirror-selectednode]:outline-2 [&_img.ProseMirror-selectednode]:outline-offset-2 [&_img.ProseMirror-selectednode]:outline-primary",
               )}
               onClick={() => editor?.chain().focus().run()}
             >
               <EditorContent editor={editor} />
+              {/* El tamaño de la imagen elegida, como Gmail: aparece al tocarla. */}
+              {editor && <MenuDeTamanoDeImagen editor={editor} />}
               {/* `relative` en el contenedor de arriba: la lista se ancla al
                   cuerpo y se abre HACIA ARRIBA, para no quedar tapada por la
                   barra de envío ni empujar el editor. */}
@@ -1361,5 +1371,62 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
         </AlertDialogContent>
       </AlertDialog>
     </Dialog>
+  );
+}
+
+/** El menú de tamaño de la imagen elegida (Keila, 06/10), arriba de la imagen.
+ *  Propio y no el BubbleMenu de TipTap: aquel trae tippy.js, una librería entera
+ *  para cuatro botones. Se ancla al contenedor del cuerpo (que es `relative`) y
+ *  se recalcula con cada cambio del editor. */
+function MenuDeTamanoDeImagen({ editor }: { editor: Editor }) {
+  const { t } = useLanguage();
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const [ancho, setAncho] = useState<number | null>(null);
+
+  useEffect(() => {
+    const actualizar = () => {
+      if (!editor.isActive("image")) return setPos(null);
+      const img = editor.view.nodeDOM(editor.state.selection.from) as HTMLElement | null;
+      const ancla = editor.view.dom.closest("[data-ancla-del-cuerpo]") as HTMLElement | null;
+      if (!img?.getBoundingClientRect || !ancla) return setPos(null);
+      const r = img.getBoundingClientRect();
+      const c = ancla.getBoundingClientRect();
+      setPos({ top: Math.max(0, r.top - c.top - 40), left: Math.max(0, r.left - c.left) });
+      setAncho((editor.getAttributes("image").width as number | null | undefined) ?? null);
+    };
+    actualizar();
+    editor.on("selectionUpdate", actualizar);
+    editor.on("transaction", actualizar);
+    return () => {
+      editor.off("selectionUpdate", actualizar);
+      editor.off("transaction", actualizar);
+    };
+  }, [editor]);
+
+  if (!pos) return null;
+  return (
+    <div
+      role="group"
+      aria-label={t("mail.comp.imgSize.label")}
+      className="absolute z-20 flex items-center gap-0.5 rounded-control border border-border bg-popover p-1 text-popover-foreground shadow-md"
+      style={{ top: pos.top, left: pos.left }}
+    >
+      {TAMANOS_DE_IMAGEN.map(({ clave, ancho: valor }) => (
+        <button
+          key={clave}
+          type="button"
+          aria-pressed={ancho === valor}
+          // Sin robarle el foco al editor: si no, la imagen deja de estar elegida.
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => editor.chain().focus().updateAttributes("image", { width: valor }).run()}
+          className={cn(
+            "min-h-8 rounded-control px-2.5 text-xs font-medium transition-colors hover:bg-muted",
+            ancho === valor && "bg-primary/10 text-primary hover:bg-primary/15",
+          )}
+        >
+          {t(`mail.comp.imgSize.${clave}` as const)}
+        </button>
+      ))}
+    </div>
   );
 }

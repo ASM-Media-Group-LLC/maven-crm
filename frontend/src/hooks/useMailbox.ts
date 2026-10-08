@@ -544,6 +544,25 @@ export function useMarkSeen() {
         if (m.uid) {
           void callMail({ action: "mark_seen", folder, uid: Number(m.uid) }).catch(() => {});
         }
+        // ⚠️ LAS OTRAS COPIAS DEL MISMO CORREO en tu buzón (Keila, 08/10): la
+        // que enviaste y la que recibiste, archivadas juntas, son dos filas con
+        // el mismo Message-ID. Leías una y la otra dejaba la etiqueta marcando
+        // «sin leer» para siempre. Se marcan todas, acá y en el proveedor.
+        if (m.messageId) {
+          const { data: otras } = await supabase
+            .from("mail_messages")
+            .select("id, folder, uid")
+            .eq("message_id", m.messageId)
+            .eq("unread", true)
+            .neq("id", m.id);
+          const filas = (otras ?? []) as { id: string; folder: string; uid: number | null }[];
+          if (filas.length) {
+            await supabase.from("mail_messages").update({ unread: false }).in("id", filas.map((o) => o.id));
+            for (const o of filas) {
+              if (o.uid) void callMail({ action: "mark_seen", folder: o.folder, uid: Number(o.uid) }).catch(() => {});
+            }
+          }
+        }
         return;
       }
       if (m.seq) await callMail({ action: "mark_seen", folder, seq: m.seq });
@@ -580,6 +599,11 @@ export function useMarkSeen() {
             c.folder === folder ? { ...c, unread: Math.max(0, c.unread - 1) } : c,
           ) ?? prev,
       );
+    },
+    // Y el número de las ETIQUETAS: antes esperaba un minuto (su staleTime) o
+    // al sincronizador. Ya con la fila escrita, se vuelve a contar.
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ["mail-labels-unread"] });
     },
   });
 }
