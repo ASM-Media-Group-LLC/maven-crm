@@ -354,7 +354,12 @@ const CreadorProfileContent = () => {
               </TabsContent>
 
               <TabsContent value="portal">
-                <PortalTabContent creatorId={id!} correoFicha={c.email ?? null} onVerHistorial={() => setTab("historial")} />
+                <PortalTabContent
+                  creatorId={id!}
+                  correoFicha={c.email ?? null}
+                  ficha={{ correo: c.email ?? null, nombre: c.name ?? null, instagram: c.instagram_handle ?? null, whatsapp: c.whatsapp_number ?? null }}
+                  onVerHistorial={() => setTab("historial")}
+                />
               </TabsContent>
 
               <TabsContent value="historial">

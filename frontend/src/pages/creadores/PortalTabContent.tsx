@@ -30,6 +30,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import AccesosOFCard, { type DatosDeFicha } from "./AccesosOFCard";
 
 // PESTAÑA PORTAL del perfil de la creadora (lado de la agencia): si tiene acceso
 // a su espacio, desde cuándo entra, quién la invitó y lo último que cambió. Dar,
@@ -40,10 +41,12 @@ interface Props {
   creatorId: string;
   /** El correo de su ficha como lo devuelve v_creators (enmascarado si no eres admin). */
   correoFicha: string | null;
+  /** Correo, nombre, Instagram y WhatsApp de su ficha (v_creators: enmascarados si no eres admin). */
+  ficha: DatosDeFicha;
   onVerHistorial: () => void;
 }
 
-export default function PortalTabContent({ creatorId, correoFicha, onVerHistorial }: Props) {
+export default function PortalTabContent({ creatorId, correoFicha, ficha, onVerHistorial }: Props) {
   const { t } = useLanguage();
   const f = useFormato();
   const { toast } = useToast();
@@ -204,6 +207,9 @@ export default function PortalTabContent({ creatorId, correoFicha, onVerHistoria
           <Button variant="link" className="mt-3 h-auto px-0" onClick={onVerHistorial}>{t("portal.acceso.verHistorial")}</Button>
         </CardContent>
       </Card>
+
+      {/* Los accesos de OnlyFans (08/10): a todo el ancho, debajo. */}
+      <AccesosOFCard creatorId={creatorId} ficha={ficha} />
 
       {/* Darle acceso / cambiar el correo */}
       <Dialog open={dialogo === "invitar" || dialogo === "correo"} onOpenChange={(o) => !o && setDialogo(null)}>
