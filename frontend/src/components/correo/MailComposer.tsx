@@ -21,6 +21,7 @@ import {
 import {
   AtSign,
   Bold,
+  ChevronDown,
   Italic,
   Link2,
   List,
@@ -41,7 +42,9 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useSendMail, useSaveServerDraft, useDeleteServerDraft } from "@/hooks/useMailbox";
+import { useSendMail, useSaveServerDraft, useDeleteServerDraft, useProgramarCorreo } from "@/hooks/useMailbox";
+import { ProgramarEnvio } from "@/components/programar/ProgramarEnvio";
+import { fechaCorta, horaCorta } from "@/lib/programarEnvio";
 import { cn } from "@/lib/utils";
 import { escapar, escaparAtributo, htmlParaCorreo, textoParaCorreo } from "./mailHtml";
 import { correoDe } from "@/lib/mailAddr";
@@ -93,6 +96,8 @@ import { traducir, type TranslationKey } from "@/lib/i18n";
 export interface BorradorInicial {
   to?: string;
   cc?: string;
+  /** Copia oculta: la trae un programado cancelado (vuelve a ser borrador). */
+  bcc?: string;
   subject?: string;
   /** Cuerpo del correo al que se responde (o que se reenvía), para citarlo
    *  abajo. Con `reenvio`, la cita lleva encabezado completo —De, Para,
@@ -124,6 +129,8 @@ export interface BorradorInicial {
 interface Props {
   abierto: boolean;
   onCerrar: () => void;
+  /** «Ver» en el aviso de «Envío programado»: lleva a la carpeta Programados. */
+  onVerProgramados?: () => void;
   inicial?: BorradorInicial;
   /** Casilla desde la que sale, solo para mostrarla. */
   remitente: string;
@@ -644,8 +651,8 @@ function BarraFormato({ editor }: { editor: Editor }) {
 
 /* ── El compositor ──────────────────────────────────────────────────────── */
 
-export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: firmaHtml }: Props) {
-  const { t } = useLanguage();
+export function MailComposer({ abierto, onCerrar, onVerProgramados, inicial, remitente, firma: firmaHtml }: Props) {
+  const { t, language } = useLanguage();
   // Firma del contexto (nuevo vs. responder a tal hilo) y borrador guardado
   // para ese contexto. Se lee UNA vez al montar: el compositor se monta de
   // cero en cada apertura, así que no hace falta re-leer.
@@ -684,9 +691,9 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
   const sugerencias = useSugerenciasDestinatarios();
   const [to, setTo] = useState(recuperado?.to ?? inicial?.to ?? "");
   const [cc, setCc] = useState(recuperado?.cc ?? inicial?.cc ?? "");
-  const [bcc, setBcc] = useState(recuperado?.bcc ?? "");
+  const [bcc, setBcc] = useState(recuperado?.bcc ?? inicial?.bcc ?? "");
   const [verCc, setVerCc] = useState(!!(recuperado?.cc ?? inicial?.cc));
-  const [verBcc, setVerBcc] = useState(!!recuperado?.bcc);
+  const [verBcc, setVerBcc] = useState(!!(recuperado?.bcc ?? inicial?.bcc));
   const [subject, setSubject] = useState(recuperado?.subject ?? inicial?.subject ?? "");
   const [avisoRecuperado, setAvisoRecuperado] = useState(!!recuperado);
   // Los adjuntos vuelven con el borrador recuperado (de la memoria o, después
@@ -699,6 +706,7 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
   const adjuntosAlAbrir = useRef(adjuntos);
   const inputArchivo = useRef<HTMLInputElement>(null);
   const enviar = useSendMail();
+  const programar = useProgramarCorreo();
 
   // Suma los archivos elegidos, leídos a base64. Se valida el tamaño ANTES de
   // leer: un archivo gigante colgaría el navegador cargándolo a memoria solo
@@ -898,7 +906,8 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
     invalidos.length === 0 &&
     // Un correo con solo un adjunto (sin cuerpo ni asunto) es válido.
     (!cuerpoVacio || subject.trim().length > 0 || adjuntos.length > 0) &&
-    !enviar.isPending;
+    !enviar.isPending &&
+    !programar.isPending;
 
   // ── Autoguardado del borrador ──────────────────────────────────────────
   // Baseline para saber si el usuario escribió algo encima. Mientras se está
@@ -909,7 +918,7 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
   const base = {
     to: fuente?.to ?? inicial?.to ?? "",
     cc: fuente?.cc ?? inicial?.cc ?? "",
-    bcc: fuente?.bcc ?? "",
+    bcc: fuente?.bcc ?? inicial?.bcc ?? "",
     subject: fuente?.subject ?? inicial?.subject ?? "",
     html: fuente && htmlRecuperado !== null ? htmlRecuperado : (inicial?.cuerpoHtml ?? contenidoInicial),
   };
@@ -1011,51 +1020,76 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
     void olvidarPesado(remitente, firma);
   };
 
+  /** El correo tal como sale, para mandarlo ya o programarlo. */
+  const armarCorreo = (ed: Editor) => {
+    // ⚠️ Las imágenes PEGADAS salen del cuerpo y se vuelven partes MIME con
+    // `cid:`. Mandarlas como `data:` adentro del HTML funciona en Gmail y en
+    // poco más: Outlook, varios clientes de escritorio y algunos filtros
+    // antispam las descartan, y el correo llega con un hueco.
+    const conCid = extraerImagenesEmbebidas(htmlParaCorreo(ed.getHTML()));
+    return {
+      to: destinatarios,
+      cc: copias,
+      bcc: ocultas,
+      subject: subject.trim() || "(sin asunto)",
+      html: conCid.html,
+      // El texto alternativo sale del HTML ORIGINAL: da igual, las imágenes
+      // no aportan texto, pero así no depende del orden de los reemplazos.
+      text: textoParaCorreo(ed.getHTML()),
+      in_reply_to: inicial?.inReplyTo,
+      references: inicial?.references,
+      attachments: [
+        ...adjuntos.map(({ filename, contentType, contentBase64 }) => ({
+          filename,
+          contentType,
+          contentBase64,
+        })),
+        ...conCid.imagenes,
+      ],
+      // Solo los que SIGUEN en el correo: si alguien se mencionó y después se
+      // borró su dirección a mano del campo Para, no corresponde avisarle.
+      menciones: mencionados
+        .filter((m) =>
+          [destinatarios, copias, ocultas]
+            .flat()
+            .some((d) => correoDe(d).toLowerCase() === m.email_address.toLowerCase()),
+        )
+        .map((m) => m.user_id),
+    };
+  };
+
+  /** Ya salió (o quedó programado): el borrador cumplió. */
+  const terminarBorrador = () => {
+    tirarBorradorLocal();
+    // Si venía de un borrador del servidor, se saca también de la carpeta: de
+    // la lista al instante; si el servidor no puede, vuelve y se avisa (ver
+    // useDeleteServerDraft).
+    if (serverUid) borrarServidor.mutate({ uid: serverUid });
+  };
+
   const handleEnviar = async () => {
     if (!editor) return;
     try {
-      // ⚠️ Las imágenes PEGADAS salen del cuerpo y se vuelven partes MIME con
-      // `cid:`. Mandarlas como `data:` adentro del HTML funciona en Gmail y en
-      // poco más: Outlook, varios clientes de escritorio y algunos filtros
-      // antispam las descartan, y el correo llega con un hueco.
-      const conCid = extraerImagenesEmbebidas(htmlParaCorreo(editor.getHTML()));
-
-      await enviar.mutateAsync({
-        to: destinatarios,
-        cc: copias,
-        bcc: ocultas,
-        subject: subject.trim() || "(sin asunto)",
-        html: conCid.html,
-        // El texto alternativo sale del HTML ORIGINAL: da igual, las imágenes
-        // no aportan texto, pero así no depende del orden de los reemplazos.
-        text: textoParaCorreo(editor.getHTML()),
-        in_reply_to: inicial?.inReplyTo,
-        references: inicial?.references,
-        attachments: [
-          ...adjuntos.map(({ filename, contentType, contentBase64 }) => ({
-            filename,
-            contentType,
-            contentBase64,
-          })),
-          ...conCid.imagenes,
-        ],
-        // Solo los que SIGUEN en el correo: si alguien se mencionó y después se
-        // borró su dirección a mano del campo Para, no corresponde avisarle.
-        menciones: mencionados
-          .filter((m) =>
-            [destinatarios, copias, ocultas]
-              .flat()
-              .some((d) => correoDe(d).toLowerCase() === m.email_address.toLowerCase()),
-          )
-          .map((m) => m.user_id),
-      });
-      // Enviado: el borrador ya cumplió, se borra para que no reaparezca.
-      tirarBorradorLocal();
-      // Si venía de un borrador del servidor, se saca también de la carpeta:
-      // de la lista al instante; si el servidor no puede, vuelve y se avisa
-      // (ver useDeleteServerDraft).
-      if (serverUid) borrarServidor.mutate({ uid: serverUid });
+      await enviar.mutateAsync(armarCorreo(editor));
+      terminarBorrador();
       toast.success(t("mail.comp.sent"));
+      onCerrar();
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
+
+  // «Programar envío» (Keila, 08/10): el mismo correo, con su hora. Se cierra
+  // como al enviar: queda en la carpeta Programados, donde se puede cancelar.
+  const handleProgramar = async (cuando: Date) => {
+    if (!editor || !puedeEnviar) return;
+    try {
+      await programar.mutateAsync({ ...armarCorreo(editor), cuando });
+      terminarBorrador();
+      toast.success(
+        t("mail.comp.scheduled", { cuando: `${fechaCorta(cuando, language)}, ${horaCorta(cuando, language)}` }),
+        onVerProgramados ? { action: { label: t("mail.comp.scheduledSee"), onClick: onVerProgramados } } : undefined,
+      );
       onCerrar();
     } catch (e) {
       toast.error((e as Error).message);
@@ -1070,7 +1104,7 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
   const cerrarConCuidado = () => {
     // Mientras el envío está en vuelo, cerrar desmonta el composer y el
     // toast de error caería sobre un borrador que ya no existe.
-    if (enviar.isPending) return;
+    if (enviar.isPending || programar.isPending) return;
     // Diálogo propio y no window.confirm: el nativo congela la pestaña
     // entera mientras está abierto y desentona con el resto de Maven.
     if (huboCambios) {
@@ -1136,9 +1170,9 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
   const empezarDeCero = () => {
     setTo(inicial?.to ?? "");
     setCc(inicial?.cc ?? "");
-    setBcc("");
+    setBcc(inicial?.bcc ?? "");
     setVerCc(!!inicial?.cc);
-    setVerBcc(false);
+    setVerBcc(!!inicial?.bcc);
     setSubject(inicial?.subject ?? "");
     editor?.commands.setContent(contenidoInicial || "<p></p>");
     // Copia nueva: si fuera el mismo arreglo, lo pesado que llegue del disco
@@ -1361,25 +1395,50 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
             un scroll sin ninguna señal de que estaba ahí. */}
         <div className="flex flex-col gap-1.5 border-t border-border/60 px-4 py-2.5 sm:flex-row sm:items-center sm:gap-2">
           <div className="flex items-center gap-2 sm:contents">
-            <Button
-              onClick={handleEnviar}
-              disabled={!puedeEnviar}
-              title={
-                destinatarios.length === 0
-                  ? t("mail.comp.missingRecipient")
-                  : invalidos.length > 0
-                    ? t("mail.comp.hasInvalid")
-                    : t("common.send")
-              }
-              className="shrink-0 rounded-full bg-gradient-to-r from-accent to-primary px-5 text-white transition-opacity hover:opacity-90"
-            >
-              {enviar.isPending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="mr-2 h-4 w-4" />
+            {/* Enviar y su flechita de «Programar envío», una sola píldora
+                como en Gmail: la flecha es parte del botón, no otro botón. */}
+            <div
+              className={cn(
+                "flex h-10 shrink-0 items-stretch overflow-hidden rounded-full bg-gradient-to-r from-accent to-primary text-white shadow-sm",
+                !puedeEnviar && "opacity-50",
               )}
-              {t("common.send")}
-            </Button>
+            >
+              <button
+                type="button"
+                onClick={handleEnviar}
+                disabled={!puedeEnviar}
+                title={
+                  destinatarios.length === 0
+                    ? t("mail.comp.missingRecipient")
+                    : invalidos.length > 0
+                      ? t("mail.comp.hasInvalid")
+                      : t("common.send")
+                }
+                className="inline-flex items-center pl-5 pr-4 text-sm font-medium transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/80 disabled:pointer-events-none"
+              >
+                {enviar.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="mr-2 h-4 w-4" />
+                )}
+                {t("common.send")}
+              </button>
+              <ProgramarEnvio onProgramar={handleProgramar}>
+                <button
+                  type="button"
+                  disabled={!puedeEnviar}
+                  title={t("shared.schedule.title")}
+                  aria-label={t("shared.schedule.title")}
+                  className="inline-flex w-9 items-center justify-center border-l border-white/30 transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/80 disabled:pointer-events-none data-[state=open]:bg-white/15"
+                >
+                  {programar.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4" />
+                  )}
+                </button>
+              </ProgramarEnvio>
+            </div>
 
             <input
               ref={inputArchivo}

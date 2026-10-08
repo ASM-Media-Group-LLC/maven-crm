@@ -58,6 +58,21 @@ jobs:
       - name: Guard — adjuntos del correo y del borrador
         run: deno test --no-check supabase/functions/mail-fetch/adjuntos.test.ts supabase/functions/mail-fetch/sembrar.test.ts
 
+      # «Programar envío» (Keila, 08/10): la hora que se acepta, la fila que se
+      # guarda, y que el cron arma EXACTAMENTE el correo que se programó. El envío
+      # es el mismo del botón Enviar (mail-fetch/enviar.ts).
+      - name: Guard — correos programados
+        run: deno test --no-check supabase/functions/mail-fetch/programados.test.ts
+
+      - name: Tipos — mail-fetch
+        run: deno check supabase/functions/mail-fetch/index.ts supabase/functions/mail-fetch/programados.test.ts
+
+      # La tabla de los programados: cada persona ve los suyos y solo la lista (el
+      # correo entero no viaja a la pantalla), el cron toma lo vencido sin tomarlo
+      # dos veces, un colgado NO se reintenta, cancelar devuelve el correo. ~3 s.
+      - name: Banco — correos programados (PGlite)
+        run: deno run -A --node-modules-dir=none --no-lock supabase/tests/correo_programados.ts
+
       # Drive: Maven y el NAS tienen que firmar IGUAL (vector compartido con
       # infra/nas-drive), y las reglas de subida (tope, partes, nombres).
       - name: Guard — Drive (firma y subidas)

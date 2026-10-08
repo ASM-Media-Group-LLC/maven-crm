@@ -25,7 +25,7 @@ import { ImapClient } from "../_shared/imap.ts";
 import { decodeBodyToBytes, extraerAdjunto, parseMessage } from "../_shared/mime.ts";
 import { parsearBodyStructure, parteDelAdjunto } from "../_shared/bodystructure.ts";
 import { sanitizeEmailHtml } from "../_shared/html-sanitize.ts";
-import { buildMessage, esDireccionSmtp, SmtpClient } from "../_shared/smtp.ts";
+import { buildMessage } from "../_shared/smtp.ts";
 import { unseal } from "../_shared/mail-crypto.ts";
 import { ocultarAvisosDelProveedor } from "../_shared/mail-notices.ts";
 import {
@@ -34,6 +34,8 @@ import {
 import { type DestinoDelMovimiento, destinoParaLaRespuesta } from "./destino.ts";
 import { revisarAdjuntos } from "./adjuntos.ts";
 import { filaSembrada } from "./sembrar.ts";
+import { enviarCorreo, revisarCorreo } from "./enviar.ts";
+import { mandarLosVencidos, programarCorreo } from "./programados.ts";
 
 const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
 
@@ -48,6 +50,21 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders(req) });
 
   try {
+    // === CORREOS PROGRAMADOS: el cron de cada minuto ===
+    // Entra con X-Cron-Token (el mismo secreto que mail-despertador) y sin
+    // sesión de nadie: manda los vencidos de todos (programados.ts). Solo lo
+    // llama el cron cuando HAY algo vencido (ver la migración del cron).
+    const tokenCron = req.headers.get("X-Cron-Token");
+    if (tokenCron !== null) {
+      const esperado = Deno.env.get("CRON_INTERNAL_TOKEN") ?? "";
+      if (!esperado || tokenCron !== esperado) return json(req, { error: "Unauthorized" }, 401);
+      const servicio = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      );
+      return json(req, await mandarLosVencidos(servicio));
+    }
+
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return json(req, { error: "Unauthorized", reason: "missing_auth_header" }, 401);
@@ -72,7 +89,7 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const {
       action, folder, limit, seq, mark_read, with_bodies, uid, attachment_index,
-      to, cc, bcc, subject, text, html, in_reply_to, references, attachments, query,
+      to, cc, subject, text, html, in_reply_to, references, attachments, query,
     } = body as {
       action?: string;
       folder?: string;
@@ -1122,243 +1139,26 @@ Deno.serve(async (req) => {
       }
     }
 
+    // === PROGRAMAR ENVÍO ===
+    // La flecha al lado de «Enviar» (como Gmail): se revisa como si saliera
+    // ahora y se guarda con su hora. Lo manda el cron (programados.ts).
+    if (action === "schedule_send") {
+      const r = await programarCorreo(admin, user.id, body as Record<string, unknown>);
+      return json(req, r.cuerpo, r.status);
+    }
+
     // === SEND ===
+    // La revisión y el envío viven en enviar.ts: los usa también el cron de
+    // los correos programados (programados.ts), que tienen que salir igual.
     if (action === "send") {
-      if (!to?.length) return json(req, { error: "hace falta al menos un destinatario" }, 400);
-      if (!subject && !text && !html) {
-        return json(req, { error: "el correo está vacío" }, 400);
-      }
-
-      // Validación en el SERVIDOR de cada dirección. La del composer es
-      // ayuda de UI: quien llame a esta función con el JWT y un cuerpo
-      // armado a mano se la saltea. Sin esto, un \r\n en un destinatario
-      // inyecta comandos en la sesión SMTP (ver esDireccionSmtp).
-      const sospechosas = [...to, ...(cc ?? []), ...(bcc ?? [])]
-        .filter((d) => !esDireccionSmtp(d));
-      if (sospechosas.length) {
-        return json(req, {
-          error: "hay direcciones inválidas",
-          direcciones: sospechosas.map((d) => String(d).replace(/[\r\n]/g, "\\n").slice(0, 60)),
-        }, 400);
-      }
-
-      // Adjuntos: forma correcta y tamaño total acotado (ver adjuntos.ts). El
-      // saneo del nombre y del tipo (contra inyección de encabezados) lo hace
-      // buildMessage.
-      const revision = revisarAdjuntos(attachments);
-      if (!revision.ok) return json(req, { error: revision.error }, revision.status);
-      const adjuntos = revision.adjuntos;
-
-      const { data: cred, error: credErr } = await admin
-        .from("mail_credentials")
-        // imap_host/port van acá además de los de SMTP: después de enviar hay
-        // que abrir IMAP para dejar la copia en Enviados.
-        .select("id, email_address, secret_cipher, secret_nonce, key_version, smtp_host, smtp_port, imap_host, imap_port")
-        .eq("user_id", user.id)
-        .is("revoked_at", null)
-        .maybeSingle();
-
-      if (credErr) return json(req, { error: "no se pudo leer tu credencial de correo" }, 500);
-      if (!cred) return json(req, { error: "no_credential" }, 409);
-
-      const password = await unseal({
-        cipher: cred.secret_cipher as string,
-        nonce: cred.secret_nonce as string,
-        keyVersion: cred.key_version as number,
+      const revision = revisarCorreo(body as Record<string, unknown>);
+      if (!revision.ok) return json(req, revision.cuerpo, revision.status);
+      const r = await enviarCorreo(admin, user.id, revision.correo);
+      if (!r.ok) return json(req, { error: r.error, code: r.code, incierto: r.incierto }, r.status);
+      return json(req, {
+        ok: true, from: r.from, to, cc: cc ?? [], subject,
+        guardadoEnEnviados: r.guardadoEnEnviados, avisados: r.avisados,
       });
-      if (!password) {
-        return json(req, {
-          error: "no se pudo descifrar la credencial — hay que re-provisionarla",
-        }, 500);
-      }
-
-      // El remitente SIEMPRE es la casilla del usuario, nunca lo que venga
-      // en el cuerpo del request: si no, cualquiera podría mandar correo
-      // haciéndose pasar por otra persona de la empresa.
-      const fromAddress = cred.email_address as string;
-
-      // Nombre para mostrar: el del perfil de Maven.
-      const { data: perfil } = await admin
-        .from("profiles")
-        .select("full_name")
-        .eq("id", user.id)
-        .maybeSingle();
-
-      const rfc822 = buildMessage({
-        from: fromAddress,
-        fromName: (perfil?.full_name as string) ?? undefined,
-        to,
-        cc,
-        subject: subject ?? "(sin asunto)",
-        text,
-        html,
-        inReplyTo: in_reply_to,
-        references,
-        attachments: adjuntos,
-      });
-
-      let smtp: SmtpClient | null = null;
-      try {
-        smtp = await SmtpClient.connect(
-          cred.smtp_host as string,
-          cred.smtp_port as number,
-        );
-        const auth = await smtp.login(fromAddress, password);
-        if (!auth.ok) {
-          await admin.from("mail_credentials")
-            .update({ last_error: `SMTP login: ${auth.message}` })
-            .eq("id", cred.id);
-          return json(req, { error: `SMTP rechazó la credencial: ${auth.message}` }, 502);
-        }
-
-        // Cco va SOLO como destinatario SMTP (RCPT TO): buildMessage no
-        // escribe ningún header Bcc, que es exactamente lo que lo hace
-        // "oculto" — los demás destinatarios nunca lo ven.
-        const all = [...to, ...(cc ?? []), ...(bcc ?? [])];
-        const sent = await smtp.sendMessage(fromAddress, all, rfc822);
-        if (!sent.ok) {
-          // ⚠️ DOS FRACASOS DISTINTOS, Y CONFUNDIRLOS DUPLICA CORREOS.
-          // `incierto` = el mensaje entero ya viajó y se cortó esperando la
-          // confirmación. Puede haberse enviado. Decir "no se pudo enviar"
-          // hace que la persona reintente y salga dos veces: pasó el 17/09
-          // con 13 hojas de vida a tres destinatarias.
-          if (sent.incierto) {
-            return json(req, {
-              error: "se envió pero el servidor tardó en confirmar: revisa Enviados ANTES de reintentar, puede haber salido",
-              code: sent.code,
-              incierto: true,
-            }, 504);
-          }
-          return json(req, { error: `no se pudo enviar: ${sent.message}`, code: sent.code }, 502);
-        }
-
-        await admin.from("mail_credentials")
-          .update({ last_used_at: new Date().toISOString(), last_error: null })
-          .eq("id", cred.id);
-
-        // ── Copia en ENVIADOS ──────────────────────────────────────────
-        // SMTP entrega al destinatario y nada más: guardar una copia en
-        // Enviados es trabajo del CLIENTE, con un APPEND por IMAP. Sin esto,
-        // el correo salía bien pero no quedaba rastro en la carpeta —
-        // exactamente lo que reportó Jhon.
-        //
-        // ⚠️ NUNCA falla el envío por esto. El correo YA salió: devolver
-        // error acá haría que la persona lo mandara de nuevo y el
-        // destinatario lo recibiera dos veces. Si la copia no se pudo
-        // guardar, se avisa aparte y el barrido del worker la levanta igual
-        // en cuanto pase por la carpeta.
-        let guardadoEnEnviados = false;
-        let imapCopia: ImapClient | null = null;
-        try {
-          imapCopia = await ImapClient.connect(
-            cred.imap_host as string,
-            cred.imap_port as number,
-          );
-          const authImap = await imapCopia.login(fromAddress, password);
-          if (authImap.ok) {
-            const carpeta = await imapCopia.carpetaDeEnviados();
-            if (carpeta) {
-              const ap = await imapCopia.appendMessage(carpeta, "\\Seen", rfc822);
-              guardadoEnEnviados = ap.ok;
-
-              // Se siembra la caché para que aparezca YA en la pantalla. El
-              // barrido completo pasa cada 30 min y sin esto la persona
-              // manda un correo y sigue sin verlo en Enviados: concluye que
-              // no se arregló nada.
-              if (ap.ok && ap.uid != null && ap.uidvalidity != null) {
-                const limpio = html ? sanitizeEmailHtml(html) : null;
-                await admin.from("mail_messages").upsert(filaSembrada({
-                  userId: user.id,
-                  folder: carpeta,
-                  uidvalidity: ap.uidvalidity,
-                  uid: ap.uid,
-                  fromAddress,
-                  nombre: (perfil?.full_name as string) ?? "",
-                  to: to ?? [],
-                  cc: cc ?? [],
-                  subject: subject ?? "(sin asunto)",
-                  text: text ?? null,
-                  html: html ?? null,
-                  limpio: limpio ? { html: limpio.html, remoteImages: limpio.remoteImages } : null,
-                  adjuntos,
-                  rfc822,
-                  inReplyTo: in_reply_to ?? null,
-                  references: references ?? null,
-                }), { onConflict: "user_id,folder,uidvalidity,uid" });
-              }
-            }
-          }
-        } catch (e) {
-          console.error("[mail-fetch] no se pudo guardar la copia en Enviados", e);
-        } finally {
-          if (imapCopia) {
-            await imapCopia.logout();
-            imapCopia.close();
-          }
-        }
-
-        // ── Menciones ────────────────────────────────────────────────────
-        // A quien lo mencionaron con @ le llega, además del correo, un aviso
-        // dentro de Maven. Va DESPUÉS del envío y envuelto en su propio
-        // try/catch: el correo ya salió, y fallar acá no puede convertir un
-        // envío exitoso en un error para quien escribió.
-        let avisados = 0;
-        try {
-          const ids = Array.isArray(body.menciones)
-            ? [...new Set((body.menciones as unknown[]).map(String))].filter((x) =>
-                /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(x),
-              )
-            : [];
-          // Nunca avisarse a uno mismo: mencionarse es raro pero posible, y
-          // recibir "te mencionaste" es ruido puro.
-          const destinos = ids.filter((id) => id !== user.id);
-          if (destinos.length) {
-            // Se confirma contra el directorio en vez de confiar en el navegador:
-            // un id inventado no puede generar una notificación.
-            const { data: reales } = await admin
-              .from("v_directorio_correo")
-              .select("user_id")
-              .in("user_id", destinos);
-            const validos = ((reales ?? []) as { user_id: string }[]).map((r) => r.user_id);
-            if (validos.length) {
-              const quien = (perfil?.full_name as string) || fromAddress;
-              const { error: errNotif } = await admin.from("notifications").insert(
-                validos.map((uid) => ({
-                  user_id: uid,
-                  type: "correo_mencion",
-                  title: `${quien} te mencionó en un correo`,
-                  message: subject,
-                  module_origin: "Correo",
-                  required_permission_module: "Correo",
-                  // validate_notification_fields solo acepta high/medium/low:
-                  // con "normal" la base rechazaba el aviso y nunca llegó uno.
-                  // high = como una mención del Messenger (también va al teléfono).
-                  priority: "high",
-                  deep_link_url: "/correo",
-                })),
-              );
-              if (errNotif) console.error("[mail-fetch] menciones:", errNotif.message);
-              else avisados = validos.length;
-            }
-          }
-        } catch (e) {
-          console.error("[mail-fetch] menciones:", (e as Error).message);
-        }
-
-        return json(req, {
-          ok: true, from: fromAddress, to, cc: cc ?? [], subject,
-          guardadoEnEnviados, avisados,
-        });
-      } catch (e) {
-        const msg = (e as Error).message ?? "error de SMTP";
-        await admin.from("mail_credentials").update({ last_error: msg }).eq("id", cred.id);
-        return json(req, { error: msg }, 502);
-      } finally {
-        if (smtp) {
-          await smtp.quit();
-          smtp.close();
-        }
-      }
     }
 
     return json(req, { error: `Acción desconocida: ${action}` }, 400);

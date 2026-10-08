@@ -14,7 +14,9 @@ const leer = (rel: string) => readFileSync(resolve(process.cwd(), rel), "utf8");
 // recibieron dos veces. En prod quedaron las dos copias, 15:37:00 y 15:37:39.
 describe("un correo pesado no se puede reportar como fallido a los 20 s", () => {
   const smtp = leer("supabase/functions/_shared/smtp.ts");
-  const mailFetch = leer("supabase/functions/mail-fetch/index.ts");
+  // El envío vive en enviar.ts desde «Programar envío» (08/10): lo usan el
+  // botón Enviar y el cron de los programados.
+  const mailFetch = leer("supabase/functions/mail-fetch/enviar.ts");
 
   it("la respuesta al punto final NO usa el timeout de un comando común", () => {
     const i = smtp.indexOf('escribirTodo(this.conn, cuerpo');
@@ -51,5 +53,12 @@ describe("un correo pesado no se puede reportar como fallido a los 20 s", () => 
     expect(texto).toMatch(/reintentar/i);
     // Y NO puede empezar diciendo que no se pudo: eso es lo que invita a repetir.
     expect(texto).not.toMatch(/error: `no se pudo enviar/);
+  });
+
+  it("⚠️ un PROGRAMADO incierto tampoco se reintenta solo", () => {
+    // Nadie está mirando cuando sale: reintentarlo lo mandaría dos veces.
+    const prog = leer("supabase/functions/mail-fetch/programados.ts");
+    expect(prog).toMatch(/estado: "fallido"/);
+    expect(prog).not.toMatch(/estado: "pendiente"/);
   });
 });

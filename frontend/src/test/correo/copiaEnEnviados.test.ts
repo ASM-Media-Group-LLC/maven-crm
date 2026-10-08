@@ -52,9 +52,14 @@ describe("la copia sembrada en Enviados trae el correo entero", () => {
    *  aparecía, o aparecía el viejo sin sus adjuntos). */
   const siembra = leer("supabase/functions/mail-fetch/sembrar.ts");
 
+  // El envío (y su copia en Enviados) vive en enviar.ts desde «Programar envío».
+  const envio = leer("supabase/functions/mail-fetch/enviar.ts");
+
   it("Enviados y el borrador siembran con la MISMA fila, con el html saneado", () => {
-    expect(edge.match(/upsert\(filaSembrada\(/g)?.length, "Enviados y Borradores").toBe(2);
-    expect(edge.match(/limpio = html \? sanitizeEmailHtml\(html\) : null/g)?.length).toBe(2);
+    expect(envio.match(/upsert\(filaSembrada\(/g)?.length, "Enviados").toBe(1);
+    expect(edge.match(/upsert\(filaSembrada\(/g)?.length, "Borradores").toBe(1);
+    expect(envio).toMatch(/limpio = c\.html \? sanitizeEmailHtml\(c\.html\) : null/);
+    expect(edge).toMatch(/limpio = html \? sanitizeEmailHtml\(html\) : null/);
   });
 
   it("⚠️ escribe el CUERPO, que es lo que faltaba", () => {

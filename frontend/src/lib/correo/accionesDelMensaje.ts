@@ -7,6 +7,7 @@
 // nada a la vista: la respuesta sale igual, pero le cuelga al otro de un punto
 // equivocado de la conversación, o a otra persona.
 
+import { CARPETA_PROGRAMADOS } from "@/lib/correo/programados";
 import type { MailMessage, MailSummary } from "@/hooks/useMailbox";
 import type { BorradorInicial } from "@/components/correo/MailComposer";
 import { asuntoDeReenvio, destinatariosRespuesta, nombreDe } from "@/lib/mailAddr";
@@ -131,8 +132,9 @@ export function agruparPorCarpeta(
  *  - Pospuestos: posponer necesita un CUÁNDO; soltarlo ahí lo escondería sin
  *    despertador.
  *  - Borradores y Plantillas: no son correos recibidos.
- *  - Enviados: Gmail tampoco deja; lo enviado no se fabrica moviendo. */
-export const NO_SE_SUELTA = new Set(["Snoozed", "Borrador", "Enviado", "Plantillas"]);
+ *  - Enviados: Gmail tampoco deja; lo enviado no se fabrica moviendo.
+ *  - Programados: no es una carpeta del servidor (vive en Maven). */
+export const NO_SE_SUELTA = new Set(["Snoozed", "Borrador", "Enviado", "Plantillas", CARPETA_PROGRAMADOS]);
 
 /** Qué se mueve al soltar lo arrastrado sobre una carpeta: lo que no está ya
  *  en ella. Es lo mismo que «Mover a» esa carpeta. */

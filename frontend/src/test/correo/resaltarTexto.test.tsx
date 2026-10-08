@@ -30,6 +30,7 @@ vi.mock("@/hooks/useMailbox", () => ({
   useSendMail: () => envio,
   useSaveServerDraft: () => ({ mutate: vi.fn() }),
   useDeleteServerDraft: () => ({ mutate: vi.fn() }),
+  useProgramarCorreo: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 vi.mock("@/hooks/useSugerenciasDestinatarios", async (original) => ({
   ...(await original<typeof import("@/hooks/useSugerenciasDestinatarios")>()),
