@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { Check, Copy, Eye, EyeOff, FileSpreadsheet, KeyRound, Loader2, Pencil, ShieldCheck } from "lucide-react";
+import { Check, Copy, Eye, EyeOff, KeyRound, Loader2, Pencil, ShieldCheck } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useFormato } from "@/hooks/useFormato";
 import { useToast } from "@/hooks/use-toast";
@@ -22,7 +22,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import ImportarAccesosDialog from "./ImportarAccesosDialog";
 
 // ACCESOS DE ONLYFANS en la pestaña Portal (Jhon, 08/10): lo que antes llegaba
 // por el Formulario de accesos de Google. Los datos de contacto salen de la
@@ -96,7 +95,6 @@ export default function AccesosOFCard({ creatorId, ficha }: { creatorId: string;
   const [clave, setClave] = useState<string | null>(null);
   const [pidiendo, setPidiendo] = useState<"ver" | "copiar" | null>(null);
   const [editando, setEditando] = useState(false);
-  const [importando, setImportando] = useState(false);
 
   // La contraseña a la vista se esconde sola.
   useEffect(() => {
@@ -159,16 +157,12 @@ export default function AccesosOFCard({ creatorId, ficha }: { creatorId: string;
             <KeyRound className="h-5 w-5" aria-hidden="true" />
             {t("portal.accesos.titulo")}
           </CardTitle>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" className="min-h-9 border-border" onClick={() => setImportando(true)}>
-              <FileSpreadsheet className="mr-2 h-4 w-4" aria-hidden="true" />
-              {t("portal.accesos.importar")}
-            </Button>
-            <Button variant="outline" size="sm" className="min-h-9 border-border" onClick={() => setEditando(true)}>
-              <Pencil className="mr-2 h-4 w-4" aria-hidden="true" />
-              {t("portal.accesos.editar")}
-            </Button>
-          </div>
+          {/* «Importar desde una hoja» se quitó (Jhon, 08/10) después de la carga
+              inicial: lo que falta lo llena ella desde su portal o un admin aquí. */}
+          <Button variant="outline" size="sm" className="min-h-9 border-border" onClick={() => setEditando(true)}>
+            <Pencil className="mr-2 h-4 w-4" aria-hidden="true" />
+            {t("portal.accesos.editar")}
+          </Button>
         </div>
         <CardDescription>{t("portal.accesos.descripcion")}</CardDescription>
       </CardHeader>
@@ -275,7 +269,6 @@ export default function AccesosOFCard({ creatorId, ficha }: { creatorId: string;
       {editando && a !== undefined && (
         <EditarAccesosDialog creatorId={creatorId} accesos={a} onCerrar={() => setEditando(false)} />
       )}
-      {importando && <ImportarAccesosDialog onCerrar={() => setImportando(false)} />}
     </Card>
   );
 }

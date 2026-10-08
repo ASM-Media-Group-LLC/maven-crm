@@ -1,4 +1,5 @@
-// Portal de creadoras, fase 3 (migración 20261009100000_portal_pedidos): los
+// Portal de creadoras, fase 3 (migraciones 20261009100000_portal_pedidos y
+// 20261009110000_portal_pedidos_solo_nuevos): los
 // PERSONALIZADOS desde el portal, probados contra un Postgres de verdad (PGlite)
 // con el catálogo de PROD, el Drive, las fases 1 y 2 del portal (la misma
 // preparación que portal_contenido.ts) y las migraciones de Personalizados.
@@ -21,6 +22,7 @@
 //
 // Sale con código 1 si algo falla. Corre en el guard de cada PR.
 import { PGlite } from "npm:@electric-sql/pglite@0.3";
+import { PEDIDOS_DESDE } from "../functions/portal-contenido/pedidos.ts";
 
 const leer = (rel: string) => Deno.readTextFileSync(new URL(rel, import.meta.url));
 const FX_ROLES = leer("./fixtures/prod_roles_20261001.sql");
@@ -228,6 +230,8 @@ const PERSONALIZADOS = [
 ].map((n) => ({ n, sql: leer(`../migrations/${n}`) }));
 const N = "20261009100000_portal_pedidos.sql";
 const M = leer(`../migrations/${N}`);
+const N2 = "20261009110000_portal_pedidos_solo_nuevos.sql";
+const M2 = leer(`../migrations/${N2}`);
 
 // Un supervisor de Personalizados (de verdad) y los permisos del módulo.
 const SUSI = P(7);
@@ -369,6 +373,39 @@ await falla(ANA, `insert into public.custom_request_attachments (request_id, dri
   /row-level security|violates/, "el equipo no ata un archivo del Drive (cra_insert pide la ruta del bucket)");
 await falla("postgres", `insert into public.custom_request_attachments (request_id, file_name, kind) values ('${R4}', 'x', 'entrega')`,
   /custom_request_attachments_origen/, "un adjunto es del bucket o del Drive, uno de los dos");
+
+// ════ 7b. Solo los pedidos nuevos (20261009110000; Jhon, 08/10) ══════════════
+// Los de antes del portal (la hoja, septiembre) no existen para ella: si el
+// equipo los mueve, no le llega nada. La fecha es la misma que la de la edge.
+{
+  await aplicar(db, N2, M2);
+  const [d] = await q(db, `select public.portal_pedidos_desde() as d`);
+  check(new Date(d.d).toISOString() === new Date(PEDIDOS_DESDE).toISOString(),
+    `la base y la edge cuentan desde la misma fecha (${new Date(d.d).toISOString()} / ${PEDIDOS_DESDE})`);
+
+  const [R5, R6] = [5, 6].map(R);
+  const antes = (await avisos(SOFI, "portal_pedido")).length;
+  // Uno de la hoja (creado en septiembre), como los 612 de prod.
+  await db.exec(`insert into public.custom_requests (id, creator_id, creator_name, chatter_id, fan_handle, description, price_usd, source, created_at)
+    values ('${R5}', '${C1}', 'Sofi', '${ANA}', 'fan_viejo', 'De la hoja', 80, 'sheet', '2026-09-02 12:00:00-05')`);
+  await como(SUSI, `update public.custom_requests set status = 'aprobado' where id = '${R5}'`);
+  await como(SUSI, `update public.custom_requests set status = 'en_produccion' where id = '${R5}'`);
+  check((await avisos(SOFI, "portal_pedido")).length === antes, "un pedido de antes del portal: ni al crearlo ni al moverlo le llega nada");
+
+  await como(ANA, pedido(R6));
+  const a = await avisos(SOFI, "portal_pedido");
+  check(a.length === antes + 1 && a.at(-1)?.title === "Te llegó un pedido personalizado", "uno nuevo sí le llega");
+
+  await aplicar(db, "vuelta atrás (solo nuevos)", vuelta(M2));
+  const [f] = await q(db, `select to_regprocedure('public.portal_pedidos_desde()') as f`);
+  // Sin la fecha, el de la hoja vuelve a avisar (así se ve que lo cortaba ella).
+  await como(SUSI, `update public.custom_requests set status = 'denegado' where id = '${R5}'`);
+  const tras = await avisos(SOFI, "portal_pedido");
+  check(f.f === null && tras.length === antes + 2 && tras.at(-1)?.title === "Se canceló un pedido",
+    `la vuelta atrás saca la fecha y el aviso vuelve a ser para todos (${tras.length - antes})`);
+  await aplicar(db, N2 + " (otra vez)", M2);
+  check(true, "y se puede volver a aplicar");
+}
 
 // ════ 8. La vuelta atrás ═════════════════════════════════════════════════════
 {

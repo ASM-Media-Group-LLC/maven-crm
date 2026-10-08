@@ -7,7 +7,7 @@
 // supabase/tests/portal_contenido.ts.
 import { assert, assertEquals } from "jsr:@std/assert@1";
 import { type Item, manejar, nombreValido, partesDe, type Puertos, TAMANO_PARTE } from "./logica.ts";
-import { type FilaPedido, motivoValido, NOMBRE_CARPETA, SE_PUEDE } from "./pedidos.ts";
+import { type FilaPedido, motivoValido, NOMBRE_CARPETA, PEDIDOS_DESDE, SE_PUEDE } from "./pedidos.ts";
 
 const T1 = "t-asm";
 const C1 = "c0000000-0000-4000-8000-000000000001"; // la ficha de Sofi
@@ -329,4 +329,14 @@ Deno.test("los botones que se ofrecen son los que la base acepta", () => {
   assertEquals(SE_PUEDE.rechazar("listo"), false);
   assertEquals(motivoValido("ok"), null);
   assert(motivoValido("No grabo en exteriores"));
+});
+
+// Jhon, 08/10: «solo nuevas peticiones». La lista sale de la base con el filtro de
+// fecha (index.ts); los avisos los corta el trigger con la misma fecha (el banco
+// portal_pedidos.ts compara las dos).
+Deno.test("al portal solo llegan los pedidos nuevos: desde el 08/10 a las 00:00 de Bogotá", async () => {
+  assertEquals(new Date(PEDIDOS_DESDE).toISOString(), "2026-10-08T05:00:00.000Z");
+  const index = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
+  const consulta = index.slice(index.indexOf("pedidosDe:"), index.indexOf("accionPedido:"));
+  assert(/\.eq\("creator_id", creatorId\)\.gte\("created_at", PEDIDOS_DESDE\)/.test(consulta), "pedidosDe no filtra por PEDIDOS_DESDE");
 });
