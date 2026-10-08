@@ -1,7 +1,8 @@
+import { porHacer, usePedidosDelPortal } from "@/hooks/usePortalPedidos";
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useTheme } from "next-themes";
-import { Check, ChevronDown, House, IdCard, Images, Loader2, LogOut, Moon, Settings, Sun } from "lucide-react";
+import { Check, ChevronDown, House, IdCard, Images, Loader2, LogOut, Moon, Settings, ShoppingBag, Sun } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { TranslationKey } from "@/lib/i18n";
@@ -56,10 +57,14 @@ import { cn } from "@/lib/utils";
 // Quién entra: solo una cuenta de creadora (app_metadata.tipo). Alguien del equipo
 // que llega aquí vuelve a /dashboard; sin sesión, a /portal/entrar.
 
+// Los personalizados (fase 3): con el número de los que le toca hacer.
+const RUTA_PEDIDOS = "/portal/pedidos";
+
 const SECCIONES: { a: string; icono: typeof House; etiqueta: TranslationKey; exacta?: boolean }[] = [
   { a: "/portal", icono: House, etiqueta: "portal.nav.inicio", exacta: true },
   { a: "/portal/contenido", icono: Images, etiqueta: "portal.nav.contenido" },
   { a: "/portal/ficha", icono: IdCard, etiqueta: "portal.nav.ficha" },
+  { a: RUTA_PEDIDOS, icono: ShoppingBag, etiqueta: "portal.nav.pedidos" },
   { a: "/portal/ajustes", icono: Settings, etiqueta: "portal.nav.ajustes" },
 ];
 
@@ -93,6 +98,9 @@ export default function PortalLayout() {
   usePortalHola(activa?.creator_id);
   // Las subidas viven aquí y no en «Mi contenido»: si ella va a su ficha, siguen.
   const subidas = useSubidasDelPortal();
+  // Cuántos pedidos le toca hacer: el número al lado de «Pedidos».
+  const pedidos = usePedidosDelPortal(activa?.creator_id ?? "");
+  const pedidosPorHacer = porHacer(pedidos.data).length;
 
   const salir = async () => {
     await signOut();
@@ -152,7 +160,7 @@ export default function PortalLayout() {
     <SubidasContext.Provider value={subidas}>
     <SidebarProvider>
       <div className="flex alto-de-la-app w-full overflow-hidden bg-background text-foreground">
-        <MenuDelPortal activa={activa} selectorDeAgencia={lista.length > 1 ? selectorDeAgencia : null} />
+        <MenuDelPortal activa={activa} selectorDeAgencia={lista.length > 1 ? selectorDeAgencia : null} pedidosPorHacer={pedidosPorHacer} />
 
         <div className="relative flex min-w-0 flex-1 flex-col">
           {/* La barra de arriba de Maven: en el computador, el botón del menú; en el
@@ -198,7 +206,14 @@ export default function PortalLayout() {
                 className="flex min-h-16 flex-1 flex-col items-center justify-center gap-1 text-xs font-medium text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                 activeClassName="text-primary"
               >
-                <Icono className="h-6 w-6" aria-hidden="true" />
+                <span className="relative">
+                  <Icono className="h-6 w-6" aria-hidden="true" />
+                  {a === RUTA_PEDIDOS && pedidosPorHacer > 0 && (
+                    <span className="absolute -right-2.5 -top-1.5 min-w-[18px] rounded-full bg-primary px-1 text-center text-[10px] font-bold leading-[18px] text-primary-foreground">
+                      {pedidosPorHacer > 9 ? "9+" : pedidosPorHacer}
+                    </span>
+                  )}
+                </span>
                 {t(etiqueta)}
               </NavLink>
             ))}
@@ -214,7 +229,7 @@ export default function PortalLayout() {
 /** El menú lateral de Maven (computador): el logo, sus secciones con los ítems de
  *  Maven y abajo la tarjeta con su foto, claro/oscuro y Ajustes. Plegado, queda
  *  el riel de iconos, como en Maven. */
-function MenuDelPortal({ activa, selectorDeAgencia }: { activa: FichaDeAgencia; selectorDeAgencia: React.ReactNode }) {
+function MenuDelPortal({ activa, selectorDeAgencia, pedidosPorHacer }: { activa: FichaDeAgencia; selectorDeAgencia: React.ReactNode; pedidosPorHacer: number }) {
   const { t } = useLanguage();
   const { state } = useSidebar();
   const plegado = state === "collapsed";
@@ -243,7 +258,12 @@ function MenuDelPortal({ activa, selectorDeAgencia }: { activa: FichaDeAgencia; 
                     44 px e íconos más grandes, cómodos también con el dedo. */}
                 <NavLink to={a} end={exacta} className={cn(LINK_CLASS, "min-h-11 gap-3 px-3 font-medium")} activeClassName={ACTIVE_CLASS}>
                   <Icono className="h-5 w-5 shrink-0" />
-                  <span>{t(etiqueta)}</span>
+                  <span className="flex-1">{t(etiqueta)}</span>
+                  {a === RUTA_PEDIDOS && pedidosPorHacer > 0 && !plegado && (
+                    <span className="rounded-full bg-primary px-1.5 text-[11px] font-bold leading-5 tabular-nums text-primary-foreground">
+                      {pedidosPorHacer > 99 ? "99+" : pedidosPorHacer}
+                    </span>
+                  )}
                 </NavLink>
               </SidebarMenuButton>
             </SidebarMenuItem>

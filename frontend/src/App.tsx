@@ -50,6 +50,7 @@ const MeetGuestPage = lazy(() => import("./pages/meet/MeetGuestPage"));
 // Portal de creadoras: su espacio, fuera del AppShell del equipo.
 const PortalLayout = lazy(() => import("./pages/portal/PortalLayout"));
 const PortalInicio = lazy(() => import("./pages/portal/PortalInicio"));
+const PortalPedidos = lazy(() => import("./pages/portal/PortalPedidos"));
 const PortalFicha = lazy(() => import("./pages/portal/PortalFicha"));
 const PortalContenido = lazy(() => import("./pages/portal/PortalContenido"));
 const PortalAjustes = lazy(() => import("./pages/portal/PortalAjustes"));
@@ -300,6 +301,7 @@ const App = () => (
                 <Route path="ficha" element={<PortalFicha />} />
                 {/* «Mis accesos» ahora es la primera parte de «Mi ficha» (Jhon, 08/10). */}
                 <Route path="accesos" element={<Navigate to="/portal/ficha?seccion=accesos" replace />} />
+                <Route path="pedidos" element={<PortalPedidos />} />
                 <Route path="ajustes" element={<PortalAjustes />} />
                 <Route path="*" element={<Navigate to="/portal" replace />} />
               </Route>
