@@ -203,6 +203,13 @@ export const portal = {
   "portal.ajustes.agenciasTexto": { es: "Las agencias con las que trabajas en Maven.", en: "The agencies you work with in Maven." },
   "portal.ajustes.agenciaActiva": { es: "Activa ahora", en: "Active now" },
   "portal.ajustes.usarAgencia": { es: "Usar esta", en: "Use this one" },
+  "portal.ajustes.conectada": { es: "Conectada como creadora", en: "Signed in as a creator" },
+  "portal.ajustes.tabCuenta": { es: "Mi cuenta", en: "My account" },
+  "portal.ajustes.tabAgencias": { es: "Agencias", en: "Agencies" },
+  "portal.ajustes.cuentaTexto": { es: "Tu perfil, tu contraseña y cómo se ve tu espacio.", en: "Your profile, your password and how your space looks." },
+  "portal.ajustes.fotoTexto": { es: "Tu foto es la de tu ficha en la agencia.", en: "Your photo is the one on your agency profile." },
+  "portal.ajustes.seguridad": { es: "Seguridad", en: "Security" },
+  "portal.ajustes.seguridadTexto": { es: "La contraseña con la que entras a tu espacio.", en: "The password you use to get into your space." },
 
   // ── Contraseña (la primera vez, al recuperarla y desde Ajustes) ─────────────
   "portal.contrasena.titulo": { es: "Elige tu contraseña", en: "Choose your password" },

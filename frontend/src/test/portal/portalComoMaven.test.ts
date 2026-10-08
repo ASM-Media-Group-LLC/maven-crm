@@ -52,12 +52,32 @@ describe("el portal usa las piezas de Maven", () => {
 });
 
 describe("Ajustes del portal", () => {
-  it("«Cerrar sesión» va siempre al final, después de Apariencia (Jhon, 06/10)", () => {
+  // 08/10 (Jhon: «esta parte se ve bien fea»): el mismo esquema que Ajustes de
+  // Maven, con riel de secciones y la sección ocupando el ancho. «Cerrar sesión»
+  // sigue siendo siempre lo último (06/10): la última opción del riel.
+  it("riel como en Maven: secciones y, al final, «Cerrar sesión»", () => {
     const ajustes = fuente("PortalAjustes.tsx");
-    const apariencia = ajustes.indexOf("<TarjetaDeApariencia");
-    const salir = ajustes.lastIndexOf('t("portal.shell.salir")');
-    expect(apariencia).toBeGreaterThan(0);
-    expect(salir).toBeGreaterThan(apariencia);
-    expect(ajustes.indexOf('t("portal.shell.salir")')).toBe(salir);
+    const maven = fuente("Settings.tsx");
+    for (const clase of ["sub-rail", "sidebar-glass-hover", "sidebar-glass-active"]) {
+      expect(maven, `Maven usa ${clase}`).toContain(clase);
+      expect(ajustes, `el portal usa ${clase}`).toContain(clase);
+    }
+    const riel = ajustes.slice(ajustes.indexOf("<aside"), ajustes.indexOf("</aside>"));
+    expect(riel.indexOf("<nav")).toBeGreaterThan(0);
+    // En el computador, la última opción del riel…
+    expect(riel.indexOf("<BotonSalir"), "cerrar sesión va en el riel, después de las secciones").toBeGreaterThan(riel.indexOf("</nav>"));
+    expect(riel).toMatch(/hidden border-t[^"]*md:block">\s*<BotonSalir/);
+    // …y en el celular (el riel queda arriba), lo último de la página.
+    const seccion = ajustes.slice(ajustes.indexOf("<section"), ajustes.indexOf("</section>"));
+    expect(seccion.trimEnd()).toMatch(/md:hidden">\s*<BotonSalir onClick=\{salir\} \/>\s*<\/div>$/);
+    expect(ajustes.match(/t\("portal\.shell\.salir"\)/g)?.length, "un solo botón, usado en los dos lugares").toBe(1);
+  });
+
+  it("«Mi cuenta» lleva perfil, contraseña y la MISMA Apariencia de Maven", () => {
+    const ajustes = fuente("PortalAjustes.tsx");
+    const cuenta = ajustes.slice(ajustes.indexOf("function MiCuenta"), ajustes.indexOf("function Agencias"));
+    expect(cuenta).toMatch(/<UserAvatar name=\{nombre\} src=\{activa\.foto\}/);
+    expect(cuenta).toMatch(/<FormContrasena/);
+    expect(cuenta).toMatch(/<TarjetaDeApariencia conDensidad=\{false\} \/>/);
   });
 });
