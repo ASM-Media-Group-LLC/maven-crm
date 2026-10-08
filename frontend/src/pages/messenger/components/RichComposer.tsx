@@ -31,6 +31,9 @@ export interface RichComposerHandle {
   getRich: () => RichNode | null;
   /** Documento completo tal cual (con o sin formato), para guardar el borrador. */
   getDoc: () => JSONContent | null;
+  /** Reemplaza todo por este documento (un mensaje programado que se vuelve a
+   *  editar). Avisa el cambio como si se hubiera escrito: el borrador se guarda. */
+  ponerDoc: (doc: JSONContent) => void;
 }
 
 interface Props {
@@ -183,6 +186,7 @@ const RichComposer = forwardRef<RichComposerHandle, Props>(({
       return richTieneFormato(doc) ? doc : null;
     },
     getDoc: () => editor?.getJSON() ?? null,
+    ponerDoc: (doc: JSONContent) => editor?.chain().setContent(doc, true).focus("end").run(),
   }), [editor]);
 
   const btn = (active: boolean) =>

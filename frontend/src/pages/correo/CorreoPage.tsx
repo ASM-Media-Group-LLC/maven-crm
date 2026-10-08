@@ -7,6 +7,7 @@ import {
   Archive,
   ArrowLeft,
   Bell,
+  CalendarClock,
   Clock,
   Download,
   FileText,
@@ -61,6 +62,8 @@ import {
   MailComposer, TOPE_ADJUNTOS, type BorradorInicial,
 } from "@/components/correo/MailComposer";
 import { repartirBorradorRetomado } from "@/lib/correo/borradorRetomado";
+import { CARPETA_PROGRAMADOS, conProgramados } from "@/lib/correo/programados";
+import { VistaProgramados } from "@/components/correo/VistaProgramados";
 import EtiquetasDialog from "@/components/correo/EtiquetasDialog";
 import EtiquetasColumna from "@/components/correo/etiquetas/EtiquetasColumna";
 import EtiquetaFormDialog from "@/components/correo/etiquetas/EtiquetaFormDialog";
@@ -70,6 +73,7 @@ import { MailSignatureDialog } from "@/components/correo/MailSignatureDialog";
 import {
   useMailbox,
   useMailFolders,
+  useCorreosProgramados,
   useMailMessage,
   useImagenesIncrustadas,
   useMailMessages,
@@ -161,6 +165,8 @@ const CARPETAS: Record<string, { nombre: TranslationKey; icono: LucideIcon }> = 
   Newsletter: { nombre: "mail.folder.newsletters", icono: Newspaper },
   Plantillas: { nombre: "mail.folder.templates", icono: FileText },
   Snoozed: { nombre: "mail.folder.snoozed", icono: Clock },
+  // No es del servidor: los programados viven en Maven (lib/correo/programados.ts).
+  [CARPETA_PROGRAMADOS]: { nombre: "mail.folder.scheduled", icono: CalendarClock },
 };
 
 /** El asunto que se guarda cuando un correo no trae ninguno (lo pone el
@@ -292,6 +298,11 @@ export default function CorreoPage() {
   const enBusqueda = queryActiva.trim().length > 0;
 
   const carpetas = useMailFolders(hayBuzon);
+  // «Programados» (Keila, 08/10): aparece en la columna solo si hay alguno, como
+  // en Gmail. No es una carpeta del servidor: nada de IMAP para ella.
+  const enProgramados = carpeta === CARPETA_PROGRAMADOS;
+  const programadosQ = useCorreosProgramados(hayBuzon);
+  const listaCarpetas = conProgramados(carpetas.data ?? [], programadosQ.data?.length ?? 0, enProgramados);
   // La página de la carpeta, como Gmail: «1–50 de 186» con ‹ ›. Grace no
   // podía llegar a sus correos 51 al 126 (28/09).
   const [pagina, setPagina] = useState(0);
@@ -304,10 +315,10 @@ export default function CorreoPage() {
   const modoNoLeidos = prefs.noLeidosPrimero && carpeta === "INBOX" && !etiquetaVista && !enBusqueda;
   // En ese modo la página trae solo los LEÍDOS («Todo lo demás») y los no
   // leídos vienen de TODA la carpeta: uno sin leer de la página 3 va arriba.
-  const lista = useMailMessages(carpeta, hayBuzon, pagina, modoNoLeidos);
+  const lista = useMailMessages(carpeta, hayBuzon && !enProgramados, pagina, modoNoLeidos);
   const noLeidosQ = useMailNoLeidos(carpeta, hayBuzon && modoNoLeidos);
   const totalCarpeta = lista.data?.total;
-  const resultados = useMailSearch(carpeta, queryActiva, hayBuzon);
+  const resultados = useMailSearch(carpeta, queryActiva, hayBuzon && !enProgramados);
   // ⚠️ La carpeta del correo ABIERTO, que no siempre es la seleccionada: en la
   // vista por etiqueta conviven correos de Recibidos, Archivados y Enviados.
   // Pedirlos todos a `carpeta` sería buscarlos donde no están.
@@ -384,6 +395,17 @@ export default function CorreoPage() {
     window.addEventListener("keydown", alPulsar);
     return () => window.removeEventListener("keydown", alPulsar);
   }, [sinDivision, sel]);
+
+  // `?carpeta=programados`: el aviso de «No se pudo enviar tu correo
+  // programado» lleva directo a la carpeta, donde se ve el motivo.
+  useEffect(() => {
+    if (params.get("carpeta") !== "programados") return;
+    irACarpeta(CARPETA_PROGRAMADOS);
+    const limpio = new URLSearchParams(params);
+    limpio.delete("carpeta");
+    setParams(limpio, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params, setParams]);
 
   // `?to=` (y opcional `?asunto=`): abrir el compositor con el destinatario
   // puesto. Lo usa la ficha de perfil del Messenger ("escribirle"). La URL se
@@ -1260,7 +1282,7 @@ export default function CorreoPage() {
                 {carpetasAbiertas && <Skeleton className="h-3.5 w-24" />}
               </div>
             ))}
-          {(carpetas.data ?? []).map(({ folder: f, unread }) => {
+          {listaCarpetas.map(({ folder: f, unread }) => {
             const Icono = iconoCarpeta(f);
             // Mirando una etiqueta, ninguna carpeta se marca: la vista es UNA sola.
             const activa = !etiquetaVista && f === carpeta;
@@ -1282,7 +1304,7 @@ export default function CorreoPage() {
                 } : undefined}
                 onDrop={recibe ? (e) => { e.preventDefault(); soltarEnCarpeta(f); } : undefined}
                 data-soltable={recibe ? "" : undefined}
-                title={carpetasAbiertas ? undefined : `${nombreCarpeta(f)}${unread > 0 ? ` · ${t("mail.nUnread", { n: unread })}` : ""}`}
+                title={carpetasAbiertas ? undefined : `${nombreCarpeta(f)}${unread > 0 && f !== CARPETA_PROGRAMADOS ? ` · ${t("mail.nUnread", { n: unread })}` : ""}`}
                 aria-label={nombreCarpeta(f)}
                 aria-current={activa ? "page" : undefined}
                 className={cn(
@@ -1331,11 +1353,19 @@ export default function CorreoPage() {
           />
         </nav>
 
+        {enProgramados && (
+          <VistaProgramados
+            onEditar={(inicial) => setRedactar(inicial)}
+            onVolver={() => irACarpeta("INBOX")}
+          />
+        )}
+
         {/* Lista */}
         <div
           data-testid="columna-lista"
           className={cn(
             "min-w-0 flex-col border-border/60",
+            enProgramados && "!hidden",
             sinDivision
               // «Sin división»: la lista ocupa todo el ancho, y con un correo
               // abierto se esconde (el correo ocupa su lugar), como en Gmail.
@@ -1350,7 +1380,7 @@ export default function CorreoPage() {
               gesto táctil no existe y la rueda scrollea vertical). La
               barra finita es el asa. */}
           <div className="flex gap-1.5 overflow-x-auto border-b border-border/60 px-3 py-2 pb-1.5 lg:hidden">
-            {(carpetas.data ?? [{ folder: carpeta, unread: 0 }]).map(({ folder: f }) => {
+            {(carpetas.data ? listaCarpetas : [{ folder: carpeta, unread: 0 }]).map(({ folder: f }) => {
               const Icono = iconoCarpeta(f);
               const activa = !etiquetaVista && f === carpeta;
               return (
@@ -1640,7 +1670,7 @@ export default function CorreoPage() {
         </div>
 
         {/* Lectura */}
-        <div className={cn("min-w-0 flex-1", enLista ? (sinDivision ? "hidden" : "hidden md:block") : "block")}>
+        <div className={cn("min-w-0 flex-1", enLista ? (sinDivision ? "hidden" : "hidden md:block") : "block", enProgramados && "!hidden")}>
           {sel === null ? (
             <div className="hidden h-full flex-col items-center justify-center gap-3 md:flex">
               <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-accent/10 to-primary/10">
@@ -2009,6 +2039,7 @@ export default function CorreoPage() {
         <MailComposer
           abierto
           onCerrar={() => setRedactar(null)}
+          onVerProgramados={() => irACarpeta(CARPETA_PROGRAMADOS)}
           inicial={redactar}
           remitente={buzon.email_address}
           firma={firmaHtml}

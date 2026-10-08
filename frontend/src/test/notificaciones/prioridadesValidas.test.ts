@@ -20,7 +20,7 @@ describe("los avisos de las edge functions usan una prioridad que la base acepta
 
   it("encuentra las edge functions (si no, la guarda no revisa nada)", () => {
     expect(archivos.length).toBeGreaterThan(20);
-    expect(archivos.some((k) => k.endsWith("/mail-fetch/index.ts"))).toBe(true);
+    expect(archivos.some((k) => k.endsWith("/mail-fetch/enviar.ts"))).toBe(true);
   });
 
   it("ninguna escribe una prioridad fuera de high/medium/low", () => {
@@ -34,7 +34,8 @@ describe("los avisos de las edge functions usan una prioridad que la base acepta
   });
 
   it("la mención del Correo va como la del Messenger (high)", () => {
-    const fuente = Object.entries(fuentes).find(([k]) => k.endsWith("/mail-fetch/index.ts"))?.[1] ?? "";
+    // El envío (y su aviso de mención) vive en enviar.ts desde «Programar envío».
+    const fuente = Object.entries(fuentes).find(([k]) => k.endsWith("/mail-fetch/enviar.ts"))?.[1] ?? "";
     const i = fuente.indexOf('type: "correo_mencion"');
     expect(i, "no está el aviso de mención").toBeGreaterThan(-1);
     expect(fuente.slice(i, i + 600)).toMatch(/priority:\s*"high"/);

@@ -199,6 +199,22 @@ export const messenger = {
   "messenger.input.placeholder": { es: "Escribe un mensaje...", en: "Type a message..." },
   "messenger.input.opcionesFormato": { es: "Opciones de formato", en: "Formatting options" },
   "messenger.input.camara": { es: "Cámara", en: "Camera" },
+  // ─── Mensajes programados (pages/messenger/components/ProgramadosDelChat.tsx) ──
+  "messenger.prog.programado": { es: "Mensaje programado: {cuando}", en: "Message scheduled: {cuando}" },
+  "messenger.prog.uno": { es: "1 mensaje programado: {cuando}", en: "1 scheduled message: {cuando}" },
+  "messenger.prog.varios": { es: "{n} mensajes programados; el próximo, {cuando}", en: "{n} scheduled messages; next, {cuando}" },
+  "messenger.prog.hayFallidos": { es: "Uno no se envió", en: "One wasn't sent" },
+  "messenger.prog.ver": { es: "Ver", en: "View" },
+  "messenger.prog.titulo": { es: "Programados en este chat", en: "Scheduled in this chat" },
+  "messenger.prog.unArchivo": { es: "1 archivo", en: "1 file" },
+  "messenger.prog.archivos": { es: "{n} archivos", en: "{n} files" },
+  "messenger.prog.noSeEnvio": { es: "No se envió", en: "Not sent" },
+  "messenger.prog.enviarAhora": { es: "Enviar ahora", en: "Send now" },
+  "messenger.prog.editar": { es: "Editar", en: "Edit" },
+  "messenger.prog.eliminar": { es: "Eliminar", en: "Delete" },
+  "messenger.prog.yaSalio": { es: "Ya salió: no se puede cambiar.", en: "It already went out: it can't be changed." },
+  "messenger.prog.eliminado": { es: "Mensaje programado eliminado", en: "Scheduled message deleted" },
+  "messenger.prog.enElCajon": { es: "Quedó en el cuadro de texto para que lo edites.", en: "It's back in the text box for you to edit." },
   "messenger.input.grabarNotaDeVoz": { es: "Grabar nota de voz", en: "Record voice note" },
 
   // Lista de mensajes (MessageList).

@@ -317,6 +317,33 @@ export const compartido = {
   "shared.domainMove.stayHere": { es: "Seguir aquí por ahora", en: "Stay here for now" },
 
   // Reloj del computador desfasado (components/AvisoRelojDesfasado.tsx)
+  // ─── «Programar envío» (components/programar/ProgramarEnvio.tsx) ───────────
+  // Correo y Messenger. Siempre en hora de Colombia (lib/programarEnvio.ts).
+  "shared.schedule.title": { es: "Programar envío", en: "Schedule send" },
+  "shared.schedule.zone": { es: "Hora estándar de Colombia", en: "Colombia standard time" },
+  "shared.schedule.tomorrowMorning": { es: "Mañana a las 8:00 a. m.", en: "Tomorrow at 8:00 AM" },
+  "shared.schedule.tomorrowAfternoon": { es: "Mañana a la 1:00 p. m.", en: "Tomorrow at 1:00 PM" },
+  "shared.schedule.nextMonday": { es: "El lunes a las 8:00 a. m.", en: "Monday at 8:00 AM" },
+  "shared.schedule.custom": { es: "Elegir fecha y hora", en: "Pick date and time" },
+  "shared.schedule.customTitle": { es: "Elegir fecha y hora", en: "Pick date and time" },
+  "shared.schedule.date": { es: "Fecha", en: "Date" },
+  "shared.schedule.datePlaceholder": { es: "DD/MM/AAAA", en: "DD/MM/YYYY" },
+  "shared.schedule.time": { es: "Hora", en: "Time" },
+  // Sin punto final: la hora ya termina en «a. m.» y quedaba «a. m..».
+  "shared.schedule.summary": { es: "Se envía el {fecha} a las {hora}", en: "Sends on {fecha} at {hora}" },
+  "shared.schedule.summaryAtOne": { es: "Se envía el {fecha} a la {hora}", en: "Sends on {fecha} at {hora}" },
+  "shared.schedule.localTime": { es: "En la hora de tu equipo: {hora}", en: "On your device's clock: {hora}" },
+  "shared.schedule.pickHint": {
+    es: "Elige el día en el calendario o escríbelo, y la hora.",
+    en: "Pick the day on the calendar or type it, and the time.",
+  },
+  "shared.schedule.error.fecha": { es: "Escribe la fecha como DD/MM/AAAA.", en: "Type the date as DD/MM/YYYY." },
+  "shared.schedule.error.hora": { es: "Elige una hora válida.", en: "Pick a valid time." },
+  "shared.schedule.error.pasado": { es: "Esa hora ya pasó: elige una más adelante.", en: "That time has passed: pick a later one." },
+  "shared.schedule.error.lejos": { es: "Se puede programar hasta un año adelante.", en: "You can schedule up to a year ahead." },
+  "shared.schedule.cancel": { es: "Cancelar", en: "Cancel" },
+  "shared.schedule.confirm": { es: "Programar envío", en: "Schedule send" },
+
   "shared.clock.title": { es: "La hora de este computador está mal", en: "This computer's clock is wrong" },
   "shared.clock.behind": { es: "Va {amount} atrasada.", en: "It's {amount} behind." },
   "shared.clock.ahead": { es: "Va {amount} adelantada.", en: "It's {amount} ahead." },

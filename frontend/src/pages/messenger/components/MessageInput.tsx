@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect, useImperativeHandle, forwardRef } from "react";
 import MentionAutocomplete from "./MentionAutocomplete";
-import { Paperclip, Send, X, Loader2, FileText, Mic, Baseline, Plus, Camera } from "lucide-react";
+import { Paperclip, Send, X, Loader2, FileText, Mic, Baseline, Plus, Camera, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import RichComposer, { RichComposerHandle } from "./RichComposer";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -26,6 +26,8 @@ import { contenidoDeAdjunto } from "@/lib/mensajeConAdjunto";
 import { getDraft, getDraftDoc, setDraft, clearDraft } from "../drafts";
 import { adjuntosEnMemoria, cargarAdjuntos, guardarAdjuntos, olvidarAdjuntos } from "../adjuntosDelBorrador";
 import type { JSONContent } from "@tiptap/react";
+import { ProgramarEnvio } from "@/components/programar/ProgramarEnvio";
+import { mensajeDeArgs, type MensajeAProgramar } from "../programados";
 import { useLanguage } from "@/hooks/useLanguage";
 
 interface PendingFile {
@@ -60,6 +62,8 @@ const APAGAR_ESCRIBIENDO_MS = 3000;
 
 export interface MessageInputHandle {
   addFiles: (files: File[]) => void;
+  /** Vuelve a poner un mensaje en el cajón (un programado que se edita). */
+  ponerParaEditar: (doc: JSONContent) => void;
 }
 
 interface MessageInputProps {
@@ -78,11 +82,15 @@ interface MessageInputProps {
    *  la ventanita flotante del Messenger, donde la barra no entraba y tapaba
    *  el chat (Jhon, 10/09/2026). */
   compacto?: boolean;
+  /** «Programar envío» (como Google Chat, Jhon 08/10). Recibe los MISMOS
+   *  mensajes que se habrían mandado y su hora; devuelve si quedó programado.
+   *  Sin esto, no hay flechita (el panel de un hilo no la tiene). */
+  onProgramar?: (mensajes: MensajeAProgramar[], cuando: Date) => Promise<boolean>;
 }
 
 const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
   conversationId, onSendMessage, onSendTyping, replyTo, profiles, onCancelReply,
-  participants, chatType, aCiegas, compacto = false,
+  participants, chatType, aCiegas, compacto = false, onProgramar,
 }, ref) => {
   const { user } = useAuth();
   const { t } = useLanguage();
@@ -214,6 +222,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
   // Expose addFiles to parent via ref
   useImperativeHandle(ref, () => ({
     addFiles: addFilesInternal,
+    ponerParaEditar: (doc: JSONContent) => composerRef.current?.ponerDoc(doc),
   }), [addFilesInternal]);
 
   // TUS resumable upload using shared utility
@@ -231,10 +240,17 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
     }
   }, []);
 
-  const handleSend = useCallback(async () => {
+  // Mandar YA, o programar para `cuando` (la flechita). Los mensajes se arman
+  // con el MISMO código en los dos casos: `emitir` los manda o los anota.
+  const enviarOProgramar = useCallback(async (cuando?: Date) => {
     // Guard: si ya hay una subida en curso, Enter no debe re-disparar el envío
     // (re-subía y duplicaba los archivos porque pendingFiles sigue poblado hasta el final).
     if (uploading) return;
+    if (cuando && !onProgramar) return;
+    const anotados: MensajeAProgramar[] = [];
+    const emitir: MessageInputProps["onSendMessage"] = cuando
+      ? (...args) => { anotados.push(mensajeDeArgs(...args)); }
+      : onSendMessage;
     if (pendingFiles.length > 0) {
       setUploading(true);
       // Desde que arranca la subida, esto ya no es borrador: se va a mandar. Si
@@ -315,9 +331,19 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
         // sola (`content !== file_name`) y la búsqueda y las vistas previas
         // siguen teniendo algo que mostrar.
         const msgContent = contenidoDeAdjunto(baseContent, pf.file.name);
-        onSendMessage(msgContent, pf.type as ChatMessage["type"], urlData.publicUrl, pf.file.name, replyTo?.id, isImg ? albumId : undefined);
+        emitir(msgContent, pf.type as ChatMessage["type"], urlData.publicUrl, pf.file.name, replyTo?.id, isImg ? albumId : undefined);
       }
       subiendoRef.current = false;
+      // Programar: si no quedó (la base dijo que no), el borrador vuelve tal
+      // cual —texto y archivos—, como cuando se cancela una subida.
+      if (cuando && (anotados.length === 0 || !(await onProgramar!(anotados, cuando)))) {
+        void guardarAdjuntos(user?.id, conversationId, pendingFiles.map((f) => f.file));
+        if (docAntes) setDraft(user?.id, conversationId, text, docAntes);
+        setUploading(false);
+        setUploadProgress("");
+        setUploadPercent(0);
+        return;
+      }
       // Si la persona ya se fue del chat, no se toca nada: lo guardado se olvidó
       // al arrancar, y lo que haya ahora es un borrador NUEVO de otro cajón.
       if (!montadoRef.current) return;
@@ -340,7 +366,8 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
     // El texto plano SIEMPRE viaja en `content` (vista previa, búsqueda, menciones);
     // el formato va aparte en content_rich, y es null si el mensaje no tiene formato.
     const rich = composerRef.current?.getRich() ?? null;
-    onSendMessage(text.trim(), "text", undefined, undefined, replyTo?.id, undefined, undefined, rich);
+    emitir(text.trim(), "text", undefined, undefined, replyTo?.id, undefined, undefined, rich);
+    if (cuando && !(await onProgramar!(anotados, cuando))) return;
     clearDraft(user?.id, conversationId);
     setText("");
     composerRef.current?.clear();
@@ -350,7 +377,31 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
     clearTimeout(typingTimeout.current);
     onSendTyping(false);
     composerRef.current?.focus();
-  }, [text, replyTo, onSendMessage, onCancelReply, onSendTyping, pendingFiles, user, uploadFileWithProgress, uploading, t, conversationId]);
+  }, [text, replyTo, onSendMessage, onCancelReply, onSendTyping, pendingFiles, user, uploadFileWithProgress, uploading, t, conversationId, onProgramar]);
+
+  // Ojo: NO pasarle el evento. `onClick={enviarOProgramar}` le daría el clic
+  // como «cuando» y programaría en vez de mandar.
+  const handleSend = useCallback(() => { void enviarOProgramar(); }, [enviarOProgramar]);
+  const programarPara = useCallback((cuando: Date) => { void enviarOProgramar(cuando); }, [enviarOProgramar]);
+  const hayQueMandar = !!text.trim() || pendingFiles.length > 0;
+
+  // En el TELÉFONO no hay lugar para la flechita: se programa manteniendo
+  // apretado «Enviar», como en Google Chat. El toque corto manda.
+  const [menuProgramar, setMenuProgramar] = useState(false);
+  const apretado = useRef<number | null>(null);
+  const fueLargo = useRef(false);
+  const alApretar = () => {
+    if (!onProgramar) return;
+    fueLargo.current = false;
+    apretado.current = window.setTimeout(() => {
+      fueLargo.current = true;
+      setMenuProgramar(true);
+    }, 500);
+  };
+  const alSoltar = () => {
+    if (apretado.current) window.clearTimeout(apretado.current);
+    apretado.current = null;
+  };
 
   // El editor rico avisa el texto PLANO y dónde está el cursor dentro de ese texto;
   // con eso siguen andando el borrador, el indicador de "escribiendo" y las @menciones.
@@ -649,16 +700,38 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
               </Button>
             )}
             {text.trim() || pendingFiles.length > 0 ? (
-              <Button
-                size="icon"
-                onClick={handleSend}
-                className="h-10 w-10 shrink-0 rounded-full bg-gradient-to-br from-accent to-primary text-white shadow-sm hover:opacity-90 transition-all"
-                disabled={uploading}
-                title={t("common.send")}
-                aria-label={t("common.send")}
-              >
-                {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
-              </Button>
+              <div className="relative shrink-0">
+                <Button
+                  size="icon"
+                  // Toque corto: manda. Mantener apretado: «Programar envío».
+                  onClick={() => {
+                    if (fueLargo.current) { fueLargo.current = false; return; }
+                    handleSend();
+                  }}
+                  onPointerDown={alApretar}
+                  onPointerUp={alSoltar}
+                  onPointerLeave={alSoltar}
+                  onContextMenu={onProgramar ? (e) => e.preventDefault() : undefined}
+                  className="h-10 w-10 shrink-0 rounded-full bg-gradient-to-br from-accent to-primary text-white shadow-sm hover:opacity-90 transition-all"
+                  disabled={uploading}
+                  title={t("common.send")}
+                  aria-label={t("common.send")}
+                >
+                  {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+                </Button>
+                {onProgramar && (
+                  <ProgramarEnvio
+                    onProgramar={programarPara}
+                    alineado="end"
+                    abierto={menuProgramar}
+                    onAbiertoCambia={setMenuProgramar}
+                  >
+                    {/* Solo para ubicar el menú encima de «Enviar»: lo abre el
+                        apretón largo, no un toque. */}
+                    <span aria-hidden className="pointer-events-none absolute right-0 top-0 h-px w-px" />
+                  </ProgramarEnvio>
+                )}
+              </div>
             ) : (
               <Button
                 variant="ghost" size="icon"
@@ -686,7 +759,10 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
                   aCiegas={aCiegas}
                 />
               )}
-              <div className="msg-composer-wrap w-full min-w-0 overflow-hidden bg-primary/5 rounded-2xl px-4 py-2.5 pr-12 focus-within:ring-1 focus-within:ring-primary/30">
+              <div className={cn(
+                "msg-composer-wrap w-full min-w-0 overflow-hidden bg-primary/5 rounded-2xl px-4 py-2.5 focus-within:ring-1 focus-within:ring-primary/30",
+                onProgramar ? "pr-[4.5rem]" : "pr-12",
+              )}>
                 <RichComposer
                   ref={composerRef}
                   initialContent={getDraftDoc(user?.id, conversationId)}
@@ -698,15 +774,46 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
                   onPasteFiles={addFilesInternal}
                 />
               </div>
-              <Button
-                size="icon"
-                onClick={handleSend}
-                className="absolute bottom-[7px] right-2 h-7 w-7 shrink-0 rounded-full bg-gradient-to-br from-accent to-primary text-white shadow-sm hover:opacity-90 transition-all"
-                disabled={uploading || (!text.trim() && pendingFiles.length === 0)}
-                title={t("common.send")}
-              >
-                {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              </Button>
+              {onProgramar ? (
+                // Enviar y su pestañita de «Programar envío», una sola píldora
+                // como en Google Chat: la flecha es parte del botón.
+                <div className={cn(
+                  "absolute bottom-[7px] right-2 flex h-7 overflow-hidden rounded-full bg-gradient-to-br from-accent to-primary text-white shadow-sm",
+                  (uploading || !hayQueMandar) && "opacity-50",
+                )}>
+                  <button
+                    type="button"
+                    onClick={handleSend}
+                    disabled={uploading || !hayQueMandar}
+                    title={t("common.send")}
+                    aria-label={t("common.send")}
+                    className="inline-flex w-7 items-center justify-center transition-colors hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/80 disabled:pointer-events-none"
+                  >
+                    {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                  </button>
+                  <ProgramarEnvio onProgramar={programarPara} alineado="end">
+                    <button
+                      type="button"
+                      disabled={uploading || !hayQueMandar}
+                      title={t("shared.schedule.title")}
+                      aria-label={t("shared.schedule.title")}
+                      className="inline-flex w-5 items-center justify-center border-l border-white/30 transition-colors hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/80 disabled:pointer-events-none data-[state=open]:bg-white/20"
+                    >
+                      <ChevronDown className="h-3.5 w-3.5" />
+                    </button>
+                  </ProgramarEnvio>
+                </div>
+              ) : (
+                <Button
+                  size="icon"
+                  onClick={handleSend}
+                  className="absolute bottom-[7px] right-2 h-7 w-7 shrink-0 rounded-full bg-gradient-to-br from-accent to-primary text-white shadow-sm hover:opacity-90 transition-all"
+                  disabled={uploading || !hayQueMandar}
+                  title={t("common.send")}
+                >
+                  {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                </Button>
+              )}
             </div>
             <div className="flex items-center gap-1">
               <Button

@@ -868,6 +868,92 @@ export function useSendMail() {
   });
 }
 
+// ── Programar envío (Keila, 08/10: como Gmail) ─────────────────────────────
+// El correo se guarda en Maven con su hora y lo manda un cron por el MISMO
+// camino que el botón Enviar (mail-fetch/programados.ts y enviar.ts).
+
+/** El mismo correo que `useSendMail`, con su hora. La edge lo revisa como si
+ *  saliera ahora: una dirección mala se dice mientras la persona mira. */
+export function useProgramarCorreo() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ cuando, ...mail }: OutgoingMail & { cuando: Date }) =>
+      callMail<{ ok: true; id: string; enviar_en: string }>({
+        action: "schedule_send",
+        ...mail,
+        enviar_en: cuando.toISOString(),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["mail-programados"] }),
+  });
+}
+
+/** Una fila de la carpeta «Programados»: lo que se ve en la lista. El correo
+ *  entero no viaja por acá (ni la base lo deja): para editarlo se cancela. */
+export interface CorreoProgramado {
+  id: string;
+  enviar_en: string;
+  estado: "pendiente" | "enviando" | "fallido";
+  para: string[];
+  cc: string[];
+  cco: string[];
+  asunto: string;
+  resumen: string;
+  adjuntos_meta: { filename: string; contentType: string; sizeBytes: number }[];
+  ultimo_error: string | null;
+}
+
+export function useCorreosProgramados(enabled: boolean) {
+  return useQuery({
+    queryKey: ["mail-programados"],
+    enabled,
+    staleTime: 30_000,
+    // Salen solos: con alguno esperando, la lista se pone al día cada minuto.
+    // Sin ninguno, no se pregunta de más.
+    refetchInterval: (q) => ((q.state.data as CorreoProgramado[] | undefined)?.length ? 60_000 : false),
+    retry: false,
+    queryFn: async (): Promise<CorreoProgramado[]> => {
+      // ⚠️ `as never`: types.ts es generado y todavía no conoce la tabla.
+      const { data, error } = await supabase.from("mail_programados" as never)
+        .select("id, enviar_en, estado, para, cc, cco, asunto, resumen, adjuntos_meta, ultimo_error")
+        .in("estado", ["pendiente", "enviando", "fallido"])
+        .order("enviar_en", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as unknown as CorreoProgramado[];
+    },
+  });
+}
+
+/** Lo que devuelve cancelar: el correo ENTERO, para seguir editándolo. */
+export interface ProgramadoCancelado {
+  id: string;
+  para: string[];
+  cc: string[];
+  cco: string[];
+  asunto: string;
+  enviar_en: string;
+  correo: {
+    text?: string | null;
+    html?: string | null;
+    in_reply_to?: string | null;
+    references?: string | null;
+    attachments?: Array<{ filename: string; contentType: string; contentBase64: string; contentId?: string }>;
+  };
+}
+
+/** «Cancelar envío», como Gmail: no sale y vuelve a ser un borrador. Devuelve
+ *  null si ya no se puede (salió o está saliendo). */
+export function useCancelarProgramado() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string): Promise<ProgramadoCancelado | null> => {
+      const { data, error } = await supabase.rpc("mail_programado_cancelar" as never, { p_id: id } as never);
+      if (error) throw error;
+      return (data ?? null) as unknown as ProgramadoCancelado | null;
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["mail-programados"] }),
+  });
+}
+
 // El parseo de direcciones vive en un módulo puro (sin Supabase encima) para
 // poder testearlo; se re-exporta acá para que el resto lo siga importando
 // desde `useMailbox` como siempre.
