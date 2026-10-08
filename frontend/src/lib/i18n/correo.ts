@@ -350,6 +350,8 @@ export const correo = {
   "mail.comp.draftLocalOnly": { es: "Guardado en este equipo (no en el servidor): {error}", en: "Saved on this device (not on the server): {error}" },
   "mail.comp.draftNotRemoved": { es: "El correo salió, pero el borrador sigue en Borradores: {error}", en: "The email was sent, but the draft is still in Drafts: {error}" },
   "mail.draft.deleteFailed": { es: "El servidor de correo no pudo eliminar el borrador.", en: "The mail server couldn't delete the draft." },
+  "mail.draft.fetchError": { es: "No se pudieron traer los adjuntos del borrador: {error}. Inténtalo de nuevo; sin ellos no se abre, para no perderlos al guardar.", en: "Couldn't fetch the draft's attachments: {error}. Try again; it doesn't open without them, so they aren't lost when saving." },
+  "mail.draft.tooBig": { es: "Los adjuntos de este borrador pesan {mb} MB y Maven acepta hasta 20 MB.", en: "This draft's attachments weigh {mb} MB and Maven accepts up to 20 MB." },
   "mail.comp.newEmail": { es: "Nuevo correo", en: "New email" },
   "mail.comp.fromAddress": { es: "Desde {email}", en: "From {email}" },
   "mail.comp.resumedDraft": { es: "Retomaste un borrador que habías empezado.", en: "You picked up a draft you had started." },

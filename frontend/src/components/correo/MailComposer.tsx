@@ -48,9 +48,7 @@ import { correoDe } from "@/lib/mailAddr";
 import RecipientsField from "./RecipientsField";
 import MencionesEnElCuerpo from "./MencionesEnElCuerpo";
 import { useAuth } from "@/hooks/useAuth";
-import {
-  extraerImagenesEmbebidas, htmlParaBorrador, pesoDeBase64,
-} from "@/lib/mailInline";
+import { extraerImagenesEmbebidas, pesoDeBase64 } from "@/lib/mailInline";
 import type { PersonaDelDirectorio } from "@/hooks/useDirectorioCorreo";
 import { useSugerenciasDestinatarios } from "@/hooks/useSugerenciasDestinatarios";
 import {
@@ -59,6 +57,14 @@ import {
   guardarBorrador,
   leerBorrador,
 } from "@/lib/mailDraft";
+import {
+  cargarPesado,
+  devolverImagenes,
+  guardarPesado,
+  olvidarPesado,
+  pesadoEnMemoria,
+  separarImagenes,
+} from "@/lib/correo/pesadoDelBorrador";
 
 import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
@@ -650,6 +656,21 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
     () => (inicial?.cuerpoHtml ? null : leerBorrador(remitente, firma)),
     [remitente, firma, inicial?.cuerpoHtml],
   );
+  // Lo PESADO del borrador recuperado —adjuntos e imágenes pegadas—, que no
+  // entra en localStorage (ver pesadoDelBorrador.ts). De esta pestaña llega al
+  // instante; después de recargar, del disco un momento más tarde (efecto de
+  // más abajo). null = todavía no se sabe.
+  const pesadoInicial = useMemo(
+    () => (recuperado ? pesadoEnMemoria(remitente, firma) : null),
+    [recuperado, remitente, firma],
+  );
+  // El cuerpo recuperado con sus imágenes en su lugar. En estado porque es el
+  // punto de partida de `huboCambios`, y cambia si las imágenes llegan del disco.
+  const [htmlRecuperado, setHtmlRecuperado] = useState<string | null>(() =>
+    recuperado
+      ? devolverImagenes(recuperado.html, pesadoInicial?.imagenes ?? {}, MARCA_IMAGEN_PERDIDA)
+      : null,
+  );
   // UID del borrador del servidor que se está editando (si se retomó uno): al
   // re-guardar se reemplaza, al enviar se borra.
   const serverUid = inicial?.serverDraftUid;
@@ -668,11 +689,14 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
   const [verBcc, setVerBcc] = useState(!!recuperado?.bcc);
   const [subject, setSubject] = useState(recuperado?.subject ?? inicial?.subject ?? "");
   const [avisoRecuperado, setAvisoRecuperado] = useState(!!recuperado);
-  // Los adjuntos NO se guardan en el borrador (el base64 es pesado para
-  // localStorage): recuperar un borrador no los trae de vuelta.
+  // Los adjuntos vuelven con el borrador recuperado (de la memoria o, después
+  // de recargar, del disco: ver el efecto de lo pesado). Antes se perdían.
   const [adjuntos, setAdjuntos] = useState<
     Array<{ filename: string; contentType: string; sizeBytes: number; contentBase64: string }>
-  >(() => inicial?.adjuntosIniciales ?? []);
+  >(() => pesadoInicial?.adjuntos ?? inicial?.adjuntosIniciales ?? []);
+  // Con qué arrancó: si lo pesado llega del disco y la persona ya adjuntó o
+  // quitó algo, manda lo suyo.
+  const adjuntosAlAbrir = useRef(adjuntos);
   const inputArchivo = useRef<HTMLInputElement>(null);
   const enviar = useSendMail();
 
@@ -807,7 +831,7 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
       // Con su ANCHO (ImagenConTamano): el menú de tamaño lo cambia.
       ImagenConTamano.configure({ allowBase64: true, inline: false }),
     ],
-    content: recuperado?.html ?? inicial?.cuerpoHtml ?? contenidoInicial,
+    content: htmlRecuperado ?? inicial?.cuerpoHtml ?? contenidoInicial,
     autofocus: inicial?.citar ? "start" : false,
     editorProps: {
       // ── Pegar y soltar imágenes ──────────────────────────────────────────
@@ -887,15 +911,14 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
     cc: fuente?.cc ?? inicial?.cc ?? "",
     bcc: fuente?.bcc ?? "",
     subject: fuente?.subject ?? inicial?.subject ?? "",
-    html: fuente?.html ?? inicial?.cuerpoHtml ?? contenidoInicial,
+    html: fuente && htmlRecuperado !== null ? htmlRecuperado : (inicial?.cuerpoHtml ?? contenidoInicial),
   };
   const huboCambios =
     to !== base.to ||
     cc !== base.cc ||
     bcc !== base.bcc ||
     subject !== base.subject ||
-    // Adjuntar un archivo es trabajo que no se puede tirar sin avisar (no se
-    // guarda en el borrador, así que cerrar y perderlo dolería más todavía).
+    // Adjuntar un archivo es trabajo que no se puede tirar sin avisar.
     adjuntos.length > 0 ||
     // Editor vacío = "<p></p>", que no es el "" de un correo nuevo sin cita.
     (base.html === "" ? !cuerpoVacio : (editor?.getHTML() ?? "") !== base.html);
@@ -906,19 +929,25 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
   // Guardado con el contenido actual. En un ref para que el autosave y el
   // `beforeunload` siempre vean el estado más nuevo sin re-registrarse.
   const guardarRef = useRef(() => {});
+  // Mientras lo pesado del borrador recuperado viene del disco, NO se guarda:
+  // el cuerpo todavía tiene la marca donde van las imágenes y los adjuntos no
+  // llegaron, y guardar eso pisaría lo bueno que está por llegar.
+  const pesadoListo = useRef(!recuperado || pesadoInicial !== null);
   guardarRef.current = () => {
-    if (!editor || !huboCambios) return;
+    if (!editor || !huboCambios || !pesadoListo.current) return;
+    // Lo liviano a localStorage (las imágenes, nombradas por su huella) y lo
+    // pesado a IndexedDB. Una captura son megas de base64 y localStorage ronda
+    // los 5 MB: guardarla ahí reventaba la cuota y el autoguardado dejaba de
+    // funcionar EN SILENCIO, perdiendo hasta el texto.
+    const { html: liviano, imagenes } = separarImagenes(editor.getHTML());
+    void guardarPesado(remitente, firma, { adjuntos, imagenes });
     guardarBorrador(remitente, {
       firma,
       to,
       cc,
       bcc,
       subject,
-      // ⚠️ SIN las imágenes pegadas: una captura son megas de base64 y el cupo
-      // de localStorage ronda los 5 MB. Guardarlas revienta la cuota y el
-      // autoguardado deja de funcionar EN SILENCIO (está en try/catch): se
-      // perdería el TEXTO del correo por querer guardar una foto.
-      html: htmlParaBorrador(editor.getHTML(), MARCA_IMAGEN_PERDIDA),
+      html: liviano,
       inReplyTo: inicial?.inReplyTo,
       references: inicial?.references,
       ts: Date.now(),
@@ -926,7 +955,7 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
   };
 
   // Autosave con debounce ~1s. Dos fuentes de cambio: el cuerpo (suscripción
-  // a `update` del editor) y los campos de dirección/asunto (deps del efecto).
+  // a `update` del editor) y los campos de dirección/asunto/adjuntos (deps).
   // Suscribirse al editor en vez de confiar en el re-render evita perder
   // cambios del cuerpo si TipTap deja de re-renderizar en cada tecla.
   useEffect(() => {
@@ -937,12 +966,36 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
       t = window.setTimeout(() => guardarRef.current(), 900);
     };
     editor.on("update", programar);
-    programar(); // cambió un campo (to/cc/bcc/subject)
+    programar(); // cambió un campo (to/cc/bcc/subject/adjuntos)
     return () => {
       window.clearTimeout(t);
       editor.off("update", programar);
     };
-  }, [editor, to, cc, bcc, subject]);
+  }, [editor, to, cc, bcc, subject, adjuntos]);
+
+  // Lo pesado del borrador recuperado que viene del DISCO (se recargó la
+  // página). Las imágenes se ponen solo si el cuerpo sigue como se abrió, y los
+  // adjuntos solo si no se tocaron: si la persona ya empezó, manda lo suyo.
+  useEffect(() => {
+    if (!editor || pesadoListo.current || !recuperado) return;
+    const htmlAlAbrir = editor.getHTML();
+    let vivo = true;
+    void cargarPesado(remitente, firma).then((p) => {
+      if (!vivo || editor.isDestroyed) return;
+      if (p && Object.keys(p.imagenes).length > 0 && editor.getHTML() === htmlAlAbrir) {
+        editor.commands.setContent(devolverImagenes(recuperado.html, p.imagenes, MARCA_IMAGEN_PERDIDA));
+        setHtmlRecuperado(editor.getHTML());
+      }
+      if (p) setAdjuntos((actual) => (actual === adjuntosAlAbrir.current ? p.adjuntos : actual));
+      pesadoListo.current = true;
+      // Lo que se escribió mientras se esperaba no se guardó: ahora sí.
+      window.setTimeout(() => guardarRef.current(), 0);
+    });
+    return () => { vivo = false; };
+    // Una vez, cuando hay editor: `recuperado` y la firma no cambian en la vida
+    // del compositor (se monta de cero en cada apertura).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor]);
 
   // Refrescar o cerrar la pestaña no pasa por el diálogo: un guardado
   // sincrónico en `beforeunload` cierra ese hueco.
@@ -951,6 +1004,12 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
     window.addEventListener("beforeunload", alSalir);
     return () => window.removeEventListener("beforeunload", alSalir);
   }, []);
+
+  // El borrador local entero: el texto (localStorage) y lo pesado (IndexedDB).
+  const tirarBorradorLocal = () => {
+    borrarBorrador(remitente, firma);
+    void olvidarPesado(remitente, firma);
+  };
 
   const handleEnviar = async () => {
     if (!editor) return;
@@ -991,7 +1050,7 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
           .map((m) => m.user_id),
       });
       // Enviado: el borrador ya cumplió, se borra para que no reaparezca.
-      borrarBorrador(remitente, firma);
+      tirarBorradorLocal();
       // Si venía de un borrador del servidor, se saca también de la carpeta:
       // de la lista al instante; si el servidor no puede, vuelve y se avisa
       // (ver useDeleteServerDraft).
@@ -1029,16 +1088,29 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
     guardarRef.current();
     setConfirmarDescarte(false);
     if (editor) {
+      // Igual que al enviar: las imágenes pegadas salen del cuerpo como partes
+      // con `cid:` y los archivos viajan con él. Antes el borrador subía solo el
+      // texto y retomarlo perdía los adjuntos (Keila, 08/10); y una captura
+      // en `data:` dentro del HTML lo inflaba hasta que el servidor lo recortaba.
+      const conCid = extraerImagenesEmbebidas(htmlParaCorreo(editor.getHTML()));
       guardarServidor.mutate(
         {
           to: destinatarios,
           cc: copias,
           subject: subject.trim() || "(sin asunto)",
-          html: htmlParaCorreo(editor.getHTML()),
+          html: conCid.html,
           text: textoParaCorreo(editor.getHTML()),
           in_reply_to: inicial?.inReplyTo,
           references: inicial?.references,
           uid: serverUid,
+          attachments: [
+            ...adjuntos.map(({ filename, contentType, contentBase64 }) => ({
+              filename,
+              contentType,
+              contentBase64,
+            })),
+            ...conCid.imagenes,
+          ],
         },
         {
           onSuccess: () => toast.success(t("mail.comp.draftSaved")),
@@ -1054,7 +1126,7 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
 
   // Tirar el borrador de este contexto y cerrar.
   const descartar = () => {
-    borrarBorrador(remitente, firma);
+    tirarBorradorLocal();
     setConfirmarDescarte(false);
     onCerrar();
   };
@@ -1069,7 +1141,10 @@ export function MailComposer({ abierto, onCerrar, inicial, remitente, firma: fir
     setVerBcc(false);
     setSubject(inicial?.subject ?? "");
     editor?.commands.setContent(contenidoInicial || "<p></p>");
-    borrarBorrador(remitente, firma);
+    // Copia nueva: si fuera el mismo arreglo, lo pesado que llegue del disco
+    // creería que nadie tocó los adjuntos y los volvería a poner.
+    setAdjuntos([...(inicial?.adjuntosIniciales ?? [])]);
+    tirarBorradorLocal();
     setAvisoRecuperado(false);
   };
 

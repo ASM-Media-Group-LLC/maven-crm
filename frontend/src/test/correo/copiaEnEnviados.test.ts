@@ -47,14 +47,15 @@ describe("tamanoDeBase64", () => {
 describe("la copia sembrada en Enviados trae el correo entero", () => {
   const edge = leer("supabase/functions/mail-fetch/index.ts");
 
-  /** El bloque del upsert que siembra la copia, acotado por sus dos extremos. */
-  const siembra = (() => {
-    const a = edge.indexOf('await admin.from("mail_messages").upsert({');
-    const b = edge.indexOf('onConflict: "user_id,folder,uidvalidity,uid"', a);
-    expect(a, "no está la siembra de Enviados").toBeGreaterThan(-1);
-    expect(b, "no está el cierre del upsert").toBeGreaterThan(a);
-    return edge.slice(a, b);
-  })();
+  /** La fila sembrada la arma `filaSembrada` (sembrar.ts), la misma para
+   *  Enviados y para Borradores (Keila, 08/10: el borrador recién guardado no
+   *  aparecía, o aparecía el viejo sin sus adjuntos). */
+  const siembra = leer("supabase/functions/mail-fetch/sembrar.ts");
+
+  it("Enviados y el borrador siembran con la MISMA fila, con el html saneado", () => {
+    expect(edge.match(/upsert\(filaSembrada\(/g)?.length, "Enviados y Borradores").toBe(2);
+    expect(edge.match(/limpio = html \? sanitizeEmailHtml\(html\) : null/g)?.length).toBe(2);
+  });
 
   it("⚠️ escribe el CUERPO, que es lo que faltaba", () => {
     expect(siembra).toMatch(/\bhtml:/);
@@ -63,7 +64,7 @@ describe("la copia sembrada en Enviados trae el correo entero", () => {
 
   it("guarda el html SANEADO y no el crudo", () => {
     // El crudo dejaría pasar imágenes remotas que el resto del Correo bloquea.
-    expect(siembra).toMatch(/html:\s*limpio\?\.html/);
+    expect(siembra).toMatch(/html:\s*d\.limpio\?\.html/);
     expect(siembra).toMatch(/remote_images:/);
   });
 

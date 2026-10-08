@@ -50,6 +50,14 @@ jobs:
       - name: Guard — mover correos (IMAP)
         run: deno test --no-check supabase/functions/_shared/imap-mover.test.ts supabase/functions/mail-fetch/destino.test.ts
 
+      # Los adjuntos que se mandan Y los de un borrador pasan por la misma
+      # revisión (mail-fetch/adjuntos.ts): forma, Content-ID sin saltos de línea
+      # y 20 MB. Antes el borrador no los aceptaba y se perdían (Keila, 08/10).
+      # Y los dos se siembran en la caché igual (sembrar.ts), con sus adjuntos y
+      # el Content-ID de las imágenes pegadas.
+      - name: Guard — adjuntos del correo y del borrador
+        run: deno test --no-check supabase/functions/mail-fetch/adjuntos.test.ts supabase/functions/mail-fetch/sembrar.test.ts
+
       # Drive: Maven y el NAS tienen que firmar IGUAL (vector compartido con
       # infra/nas-drive), y las reglas de subida (tope, partes, nombres).
       - name: Guard — Drive (firma y subidas)

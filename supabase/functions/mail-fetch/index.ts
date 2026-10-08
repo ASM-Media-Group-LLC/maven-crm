@@ -25,7 +25,6 @@ import { ImapClient } from "../_shared/imap.ts";
 import { decodeBodyToBytes, extraerAdjunto, parseMessage } from "../_shared/mime.ts";
 import { parsearBodyStructure, parteDelAdjunto } from "../_shared/bodystructure.ts";
 import { sanitizeEmailHtml } from "../_shared/html-sanitize.ts";
-import { tamanoDeBase64 } from "../_shared/base64.ts";
 import { buildMessage, esDireccionSmtp, SmtpClient } from "../_shared/smtp.ts";
 import { unseal } from "../_shared/mail-crypto.ts";
 import { ocultarAvisosDelProveedor } from "../_shared/mail-notices.ts";
@@ -33,6 +32,8 @@ import {
   ErrorDeTraduccion, type Idioma, MODELO_ECONOMICO, pedirTraduccion, textoParaTraducir,
 } from "./traducir.ts";
 import { type DestinoDelMovimiento, destinoParaLaRespuesta } from "./destino.ts";
+import { revisarAdjuntos } from "./adjuntos.ts";
+import { filaSembrada } from "./sembrar.ts";
 
 const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
 
@@ -1041,6 +1042,11 @@ Deno.serve(async (req) => {
         }
 
         // save_draft: armar el MIME con el remitente del usuario y subirlo.
+        // CON los adjuntos y las imágenes pegadas: sin ellos, retomar el
+        // borrador los perdía (Keila, 08/10).
+        const revision = revisarAdjuntos(attachments);
+        if (!revision.ok) return json(req, { error: revision.error }, revision.status);
+
         const { data: perfil } = await admin
           .from("profiles")
           .select("full_name")
@@ -1057,14 +1063,47 @@ Deno.serve(async (req) => {
           html,
           inReplyTo: in_reply_to,
           references,
+          attachments: revision.adjuntos,
         });
 
         const ap = await client.appendMessage(box, "\\Draft \\Seen", rfc822);
         if (!ap.ok) return json(req, { error: `no se pudo guardar el borrador: ${ap.error}` }, 502);
 
+        // A la caché YA, como la copia en Enviados (ver sembrar.ts): Borradores
+        // se barre cada 30 min y sin esto el borrador recién guardado no
+        // aparecía, o aparecía el de antes, sin lo que se le agregó.
+        if (ap.uid != null && ap.uidvalidity != null) {
+          const limpio = html ? sanitizeEmailHtml(html) : null;
+          await admin.from("mail_messages").upsert(filaSembrada({
+            userId: user.id,
+            folder: box,
+            uidvalidity: ap.uidvalidity,
+            uid: ap.uid,
+            fromAddress: cred.email_address as string,
+            nombre: (perfil?.full_name as string) ?? "",
+            to: to ?? [],
+            cc: cc ?? [],
+            subject: subject ?? "(sin asunto)",
+            text: text ?? null,
+            html: html ?? null,
+            limpio: limpio ? { html: limpio.html, remoteImages: limpio.remoteImages } : null,
+            adjuntos: revision.adjuntos,
+            rfc822,
+            inReplyTo: in_reply_to ?? null,
+            references: references ?? null,
+          }), { onConflict: "user_id,folder,uidvalidity,uid" });
+        }
+
         // Recién ahora (subido el nuevo) se borra el anterior, si lo había: así
-        // un fallo del APPEND nunca deja sin borrador.
-        if (typeof uid === "number") await client.deleteByUid(uid);
+        // un fallo del APPEND nunca deja sin borrador. Y de la caché, como
+        // `delete_draft`: si no, la lista mostraba los dos.
+        if (typeof uid === "number" && uid !== ap.uid) {
+          const borrado = await client.deleteByUid(uid);
+          if (borrado) {
+            await admin.from("mail_messages").delete()
+              .eq("user_id", user.id).eq("folder", box).eq("uid", uid);
+          }
+        }
 
         await admin.from("mail_credentials")
           .update({ last_used_at: new Date().toISOString(), last_error: null })
@@ -1103,34 +1142,12 @@ Deno.serve(async (req) => {
         }, 400);
       }
 
-      // Adjuntos: forma correcta y tamaño total acotado. El saneo del nombre y
-      // del tipo (contra inyección de encabezados) lo hace buildMessage.
-      const adjuntos = Array.isArray(attachments) ? attachments : [];
-      for (const a of adjuntos) {
-        if (
-          !a || typeof a.filename !== "string" ||
-          typeof a.contentType !== "string" || typeof a.contentBase64 !== "string"
-        ) {
-          return json(req, { error: "un adjunto viene con formato inválido" }, 400);
-        }
-        // ⚠️ El `contentId` termina en una cabecera `Content-ID: <…>`. Se
-        // acota acá —y no solo se sanea al armar— para que un valor con
-        // CRLF ni siquiera llegue a `buildMessage`.
-        if (a.contentId !== undefined &&
-            (typeof a.contentId !== "string" || !/^[\w.+-]+@[\w.-]+$/.test(a.contentId))) {
-          return json(req, { error: "un adjunto trae un contentId inválido" }, 400);
-        }
-      }
-      // El base64 pesa ~4/3 del archivo; se acota el ARCHIVO a 20 MB (igual que
-      // la descarga). De más, revienta la memoria de la edge (256 MB) o el
-      // SIZE que anuncia Zoho (31 MB en el cable ≈ 23 MB de archivo).
-      const bytesAdjuntos = adjuntos.reduce(
-        (n, a) => n + Math.floor((a.contentBase64.replace(/\s/g, "").length * 3) / 4),
-        0,
-      );
-      if (bytesAdjuntos > 20 * 1024 * 1024) {
-        return json(req, { error: "los adjuntos superan el límite de 20 MB" }, 413);
-      }
+      // Adjuntos: forma correcta y tamaño total acotado (ver adjuntos.ts). El
+      // saneo del nombre y del tipo (contra inyección de encabezados) lo hace
+      // buildMessage.
+      const revision = revisarAdjuntos(attachments);
+      if (!revision.ok) return json(req, { error: revision.error }, revision.status);
+      const adjuntos = revision.adjuntos;
 
       const { data: cred, error: credErr } = await admin
         .from("mail_credentials")
@@ -1249,65 +1266,25 @@ Deno.serve(async (req) => {
               // manda un correo y sigue sin verlo en Enviados: concluye que
               // no se arregló nada.
               if (ap.ok && ap.uid != null && ap.uidvalidity != null) {
-                const messageId = rfc822.match(/^Message-ID:\s*(.+)$/im)?.[1]?.trim() ?? null;
-                const nombre = (perfil?.full_name as string) ?? "";
-                // ⚠️ EL CUERPO TAMBIÉN. Sembrar solo el `snippet` deja la fila
-                // con asunto y resumen pero sin `html` ni `text_body`: en la
-                // lista el correo se ve bien y al abrirlo dice "(sin
-                // contenido)", hasta que el barrido completo pasa por Enviados
-                // y lo corrige. Enviados NO está en HOT_FOLDERS, así que esa
-                // ventana es de hasta 30 minutos para CADA correo que se manda.
-                //
-                // Se guarda el html SANEADO, el mismo que guardaría el sync:
-                // sembrar el crudo dejaría pasar imágenes remotas que el resto
-                // del Correo bloquea y cuenta.
                 const limpio = html ? sanitizeEmailHtml(html) : null;
-                await admin.from("mail_messages").upsert({
-                  user_id: user.id,
+                await admin.from("mail_messages").upsert(filaSembrada({
+                  userId: user.id,
                   folder: carpeta,
                   uidvalidity: ap.uidvalidity,
                   uid: ap.uid,
-                  from_addr: nombre ? `"${nombre}" <${fromAddress}>` : fromAddress,
-                  to_addr: (to ?? []).join(", "),
-                  cc_addr: (cc ?? []).join(", "),
+                  fromAddress,
+                  nombre: (perfil?.full_name as string) ?? "",
+                  to: to ?? [],
+                  cc: cc ?? [],
                   subject: subject ?? "(sin asunto)",
-                  date: new Date().toISOString(),
-                  snippet: (text ?? html?.replace(/<[^>]+>/g, " ") ?? "")
-                    .replace(/\s+/g, " ").trim().slice(0, 200),
-                  html: limpio?.html ?? null,
-                  text_body: text ?? null,
-                  remote_images: limpio?.remoteImages ?? 0,
-                  // La misma forma que escribe el sync ({filename, contentType,
-                  // sizeBytes, contentId}), porque el visor y la descarga
-                  // buscan la parte por NOMBRE y usan el tamaño de desempate.
-                  // Sin esto, tu propio correo recién enviado se ve sin
-                  // adjuntos durante media hora.
-                  attachments: adjuntos.map((a) => ({
-                    filename: a.filename,
-                    contentType: a.contentType,
-                    sizeBytes: tamanoDeBase64(a.contentBase64),
-                    // ⚠️ EL Content-ID, NO `null`. Es lo que ata la imagen
-                    // PEGADA en el cuerpo con la parte que la lleva: el HTML
-                    // dice `src="cid:ese-id"` y el lector lo busca acá. Con
-                    // `null` no hay con qué emparejar, así que tu propia
-                    // imagen se veía rota en Enviados hasta que el barrido
-                    // completo pasara por ahí — media hora, cada vez.
-                    contentId: a.contentId ?? null,
-                  })),
-                  unread: false,
-                  message_id: messageId,
-                  // ⚠️ LAS CABECERAS DEL HILO TAMBIÉN, por lo mismo que el
-                  // cuerpo: sin ellas la fila queda sembrada pero suelta, y
-                  // la respuesta que acabás de mandar se ve como un correo
-                  // aparte al lado de su conversación hasta que el barrido
-                  // completo pase por Enviados. Enviados no está en
-                  // HOT_FOLDERS: son hasta 30 minutos, cada vez.
-                  in_reply_to: in_reply_to ?? null,
-                  // La misma forma que guarda el sync: un arreglo de ids con
-                  // sus picos. La cabecera viaja como UNA línea separada por
-                  // espacios, así que acá se parte.
-                  refs: references?.match(/<[^>]+>/g) ?? null,
-                }, { onConflict: "user_id,folder,uidvalidity,uid" });
+                  text: text ?? null,
+                  html: html ?? null,
+                  limpio: limpio ? { html: limpio.html, remoteImages: limpio.remoteImages } : null,
+                  adjuntos,
+                  rfc822,
+                  inReplyTo: in_reply_to ?? null,
+                  references: references ?? null,
+                }), { onConflict: "user_id,folder,uidvalidity,uid" });
               }
             }
           }

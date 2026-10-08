@@ -86,22 +86,3 @@ export function pesoDeBase64(b64: string): number {
   const relleno = limpio.match(/=+$/)?.[0].length ?? 0;
   return Math.max(0, Math.floor((limpio.length * 3) / 4) - relleno);
 }
-
-/** El HTML que se guarda como borrador en `localStorage`.
- *
- *  ⚠️ SIN las imágenes pegadas. Una captura son megas de base64 y el cupo de
- *  localStorage ronda los 5 MB: guardarla ahí revienta la cuota y el
- *  autoguardado deja de funcionar EN SILENCIO (está envuelto en try/catch),
- *  así que se perdería el texto del correo por querer guardar una imagen.
- *
- *  `marca` es lo que queda en su lugar, para que el hueco se entienda. Lo pone
- *  quien llama y no esto: acá no hay forma de traducirlo. */
-export function htmlParaBorrador(html: string, marca: string): string {
-  const escapada = marca.replace(/[<>&]/g, (ch) => (
-    ch === "<" ? "&lt;" : ch === ">" ? "&gt;" : "&amp;"
-  ));
-  return html.replace(
-    /<img[^>]*src\s*=\s*"data:[^"]*"[^>]*>/gi,
-    `<p><em>${escapada}</em></p>`,
-  );
-}

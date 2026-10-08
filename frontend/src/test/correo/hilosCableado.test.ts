@@ -78,15 +78,17 @@ describe("⚠️ lo que SALE también encadena", () => {
     expect(pagina).toMatch(/borradorDeRespuesta\(\{\s*resumen: m,/);
   });
 
-  it("la copia sembrada en Enviados guarda in_reply_to y refs", () => {
+  it("la copia sembrada en Enviados (y el borrador) guarda in_reply_to y refs", () => {
     // Sembrar la fila sin las cabeceras deja el correo que acabás de mandar
-    // suelto al lado de su propia conversación, hasta media hora.
+    // suelto al lado de su propia conversación, hasta media hora. La fila la
+    // arma `filaSembrada` (sembrar.ts) para los dos.
     const edge = leer("supabase/functions/mail-fetch/index.ts");
-    const i = edge.indexOf('await admin.from("mail_messages").upsert({');
-    expect(i, "no está la siembra de Enviados").toBeGreaterThan(-1);
-    const bloque = edge.slice(i, i + 3000).replace(/\/\/.*$/gm, "");
-    expect(bloque).toMatch(/in_reply_to:/);
-    expect(bloque).toMatch(/refs:/);
+    expect(edge, "no está la siembra de Enviados").toMatch(/upsert\(filaSembrada\(/);
+    expect(edge).toMatch(/inReplyTo:\s*in_reply_to \?\? null/);
+    expect(edge).toMatch(/references:\s*references \?\? null/);
+    const fila = leer("supabase/functions/mail-fetch/sembrar.ts").replace(/\/\/.*$/gm, "");
+    expect(fila).toMatch(/in_reply_to:/);
+    expect(fila).toMatch(/refs:/);
   });
 });
 

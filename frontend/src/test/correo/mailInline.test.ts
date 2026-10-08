@@ -1,9 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  extraerImagenesEmbebidas, htmlParaBorrador, pesoDeBase64,
-} from "@/lib/mailInline";
-
-const MARCA = "[imagen pegada]";
+import { extraerImagenesEmbebidas, pesoDeBase64 } from "@/lib/mailInline";
 
 // Un PNG de 1×1 de verdad, para que el base64 sea decodificable.
 const PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
@@ -71,24 +67,5 @@ describe("pesoDeBase64", () => {
   it("devuelve los bytes reales y no el largo del base64", () => {
     expect(pesoDeBase64("aG9sYQ==")).toBe(4);
     expect(pesoDeBase64(PNG)).toBeLessThan(PNG.length);
-  });
-});
-
-describe("htmlParaBorrador", () => {
-  it("⚠️ NO guarda la imagen: reventaría la cuota de localStorage", () => {
-    // El autoguardado está envuelto en try/catch: si la cuota explota, deja de
-    // funcionar EN SILENCIO y se pierde el texto por querer guardar una foto.
-    const r = htmlParaBorrador("<p>Hola</p>" + img(), MARCA);
-    expect(r).not.toContain("data:image");
-    expect(r).toContain("Hola");
-  });
-
-  it("deja una marca donde estaba, para que el hueco se entienda", () => {
-    expect(htmlParaBorrador(img(), MARCA)).toContain(MARCA);
-  });
-
-  it("no toca un cuerpo sin imágenes", () => {
-    const html = "<p>Solo texto</p>";
-    expect(htmlParaBorrador(html, MARCA)).toBe(html);
   });
 });

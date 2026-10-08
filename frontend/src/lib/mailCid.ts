@@ -88,6 +88,9 @@ export const TOPE_INCRUSTADO_BYTES = 12 * 1024 * 1024;
 export function incrustarCids(
   html: string,
   porCid: Map<string, { contentType: string; contentBase64: string }>,
+  /** Para el LECTOR (srcDoc). El compositor pasa `Infinity`: una imagen que
+   *  quedara como `cid:` en un borrador retomado se perdería al re-guardarlo. */
+  tope: number = TOPE_INCRUSTADO_BYTES,
 ): string {
   if (!porCid.size) return html;
   let usados = 0;
@@ -96,7 +99,7 @@ export function incrustarCids(
     if (!bytes) return entero;
     // base64 → bytes reales: 4 caracteres por cada 3.
     const peso = Math.ceil((bytes.contentBase64.length * 3) / 4);
-    if (usados + peso > TOPE_INCRUSTADO_BYTES) return entero;
+    if (usados + peso > tope) return entero;
     usados += peso;
     const tipo = /^image\//i.test(bytes.contentType) ? bytes.contentType : "image/png";
     return `${antes}${comilla}data:${tipo};base64,${bytes.contentBase64}${comilla}`;
