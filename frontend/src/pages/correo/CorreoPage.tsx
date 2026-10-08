@@ -861,6 +861,16 @@ export default function CorreoPage() {
     if (m.unread) marcarLeido.mutate({ folder: m.folder ?? carpeta, m });
   };
 
+  /** Abrir una conversación la deja leída ENTERA, como Gmail. Antes se marcaba
+   *  solo el último mensaje y los anteriores sin leer seguían contando en la
+   *  carpeta y en sus etiquetas (Keila, 08/10). */
+  const abrirHilo = (h: Hilo<MailSummary>) => {
+    abrir(h.ultimo);
+    for (const m of h.mensajes) {
+      if (m.unread && claveDe(m) !== claveDe(h.ultimo)) marcarLeido.mutate({ folder: m.folder ?? carpeta, m });
+    }
+  };
+
   /** El cuerpo completo de un mensaje de la conversación. El abierto ya está
    *  cargado; cualquier otro se trae (de la caché, casi siempre al instante). */
   const completoDe = (m: MailSummary): Promise<MailMessage> =>
@@ -1070,7 +1080,7 @@ export default function CorreoPage() {
       // masiva se lleve solo el último sería una trampa.
       seleccionado={h.mensajes.every((m) => seleccion.has(claveDe(m)))}
       onToggleSeleccion={() => toggleSeleccionHilo(h)}
-      onClick={() => abrir(h.ultimo)}
+      onClick={() => abrirHilo(h)}
       onPrecargar={() => precargar(carpeta, h.ultimo)}
       onArrastrar={(e) => empezarArrastre(h, e)}
       onFinArrastre={terminarArrastre}

@@ -375,31 +375,46 @@ export function useNoLeidosPorEtiqueta() {
       const filas = (rel ?? []) as unknown as { label_id: string; message_id: string }[];
       if (!filas.length) return new Map();
 
-      // Qué message_id están sin leer. Se pregunta por los etiquetados y no por
-      // todos: la bandeja tiene miles y las etiquetas, decenas.
+      // Las copias de los etiquetados, leídas o no. Se pregunta por los
+      // etiquetados y no por todos: la bandeja tiene miles y las etiquetas,
+      // decenas.
       const ids = [...new Set(filas.map((f) => f.message_id))];
-      const { data: sinLeer } = await supabase
+      const { data: copias } = await supabase
         .from("mail_messages" as never)
-        .select("message_id")
+        .select("message_id, unread")
         .in("message_id", ids)
-        .eq("unread", true)
-        .limit(5000);
-      const noLeidos = new Set(
-        ((sinLeer ?? []) as unknown as { message_id: string }[]).map((m) => m.message_id),
-      );
-
-      const cuenta = new Map<string, number>();
-      // ⚠️ Por message_id ÚNICO y no por fila: el mismo correo está en la
-      // caché de cada buzón que lo recibió, y contar filas lo contaría dos
-      // veces.
-      const yaContado = new Set<string>();
-      for (const f of filas) {
-        const clave = `${f.label_id}|${f.message_id}`;
-        if (yaContado.has(clave) || !noLeidos.has(f.message_id)) continue;
-        yaContado.add(clave);
-        cuenta.set(f.label_id, (cuenta.get(f.label_id) ?? 0) + 1);
-      }
-      return cuenta;
+        .limit(10000);
+      return contarNoLeidosPorEtiqueta(filas, (copias ?? []) as unknown as { message_id: string; unread: boolean }[]);
     },
   });
+}
+
+/** Cuántos sin leer tiene cada etiqueta.
+ *
+ *  ⚠️ UN CORREO CON UNA COPIA LEÍDA ESTÁ LEÍDO (Keila, 08/10: «los abro varias
+ *  veces pero no se quita eso»). En su buzón había dos copias del MISMO correo
+ *  en Archivo —la que envió y la que recibió, archivadas juntas—; abría una y la
+ *  otra seguía sin leer, y esa contaba para siempre. Ahora leer marca todas las
+ *  copias (useMarkSeen), y acá, por si quedó alguna vieja, basta con que una
+ *  esté leída.
+ *
+ *  Por message_id ÚNICO y no por fila: contar filas contaría dos veces lo que
+ *  tiene dos copias. */
+export function contarNoLeidosPorEtiqueta(
+  relaciones: { label_id: string; message_id: string }[],
+  copias: { message_id: string; unread: boolean }[],
+): Map<string, number> {
+  const conCopiaSinLeer = new Set<string>();
+  const conCopiaLeida = new Set<string>();
+  for (const c of copias) (c.unread ? conCopiaSinLeer : conCopiaLeida).add(c.message_id);
+
+  const cuenta = new Map<string, number>();
+  const yaContado = new Set<string>();
+  for (const f of relaciones) {
+    const clave = `${f.label_id}|${f.message_id}`;
+    if (yaContado.has(clave) || !conCopiaSinLeer.has(f.message_id) || conCopiaLeida.has(f.message_id)) continue;
+    yaContado.add(clave);
+    cuenta.set(f.label_id, (cuenta.get(f.label_id) ?? 0) + 1);
+  }
+  return cuenta;
 }
