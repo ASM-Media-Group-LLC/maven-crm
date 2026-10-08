@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useTheme } from "next-themes";
-import { Check, ChevronDown, House, IdCard, Images, Loader2, LogOut, Moon, Settings, Sun } from "lucide-react";
+import { Check, ChevronDown, House, IdCard, KeyRound, Images, Loader2, LogOut, Moon, Settings, Sun } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { TranslationKey } from "@/lib/i18n";
@@ -60,6 +60,7 @@ const SECCIONES: { a: string; icono: typeof House; etiqueta: TranslationKey; exa
   { a: "/portal", icono: House, etiqueta: "portal.nav.inicio", exacta: true },
   { a: "/portal/contenido", icono: Images, etiqueta: "portal.nav.contenido" },
   { a: "/portal/ficha", icono: IdCard, etiqueta: "portal.nav.ficha" },
+  { a: "/portal/accesos", icono: KeyRound, etiqueta: "portal.nav.accesos" },
   { a: "/portal/ajustes", icono: Settings, etiqueta: "portal.nav.ajustes" },
 ];
 
