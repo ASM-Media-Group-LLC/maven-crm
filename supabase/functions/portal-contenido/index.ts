@@ -14,7 +14,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
 import { corsFor } from "../_shared/cors.ts";
 import { ahoraMas, firmar, verificar } from "../_shared/drive-firma.ts";
 import { type Item, manejar, type Puertos, VENCE_BORRAR } from "./logica.ts";
-import type { FilaPedido } from "./pedidos.ts";
+import { type FilaPedido, PEDIDOS_DESDE } from "./pedidos.ts";
 
 const corsHeaders = (req: Request) =>
   corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" });
@@ -142,7 +142,8 @@ function puertosReales(nas: string, secreto: string): Puertos {
       const { data, error } = await admin.from("custom_requests")
         .select("id, status, fan_handle, description, price_usd, content_type, duration_or_qty, requested_on, due_on, creadora_motivo, created_at, " +
           "custom_request_attachments(id, kind, file_name, mime_type, size_bytes, drive_item_id, storage_path, created_at)")
-        .eq("creator_id", creatorId).order("created_at", { ascending: false }).limit(200);
+        // Solo los nuevos: los de antes del portal no existen para ella.
+        .eq("creator_id", creatorId).gte("created_at", PEDIDOS_DESDE).order("created_at", { ascending: false }).limit(200);
       if (error) throw new Error(`no se pudieron leer los pedidos: ${error.message}`);
       return (data ?? []) as unknown as FilaPedido[];
     },

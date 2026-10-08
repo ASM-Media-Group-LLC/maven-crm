@@ -18,6 +18,10 @@ describe("Accesos de OnlyFans: solo admins", () => {
     expect(pestana.match(/<AccesosOFCard /g)).toHaveLength(1);
   });
 
+  it("ya no tiene «Importar desde una hoja» (Jhon, 08/10, después de la carga inicial)", () => {
+    expect(tarjeta).not.toMatch(/ImportarAccesosDialog|portal\.accesos\.importar|FileSpreadsheet/);
+  });
+
   it("la tarjeta no depende de un es_admin que mande la edge", () => {
     expect(tarjeta).not.toMatch(/es_admin/);
     expect(tarjeta).not.toMatch(/claveSoloAdmin/);

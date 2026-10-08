@@ -20,6 +20,12 @@ export type AccionPedido = typeof ACCIONES_PEDIDOS[number];
 
 export const NOMBRE_CARPETA = "Personalizados";
 
+/** Desde cuándo cuentan los pedidos para el portal (Jhon, 08/10/2026: «solo nuevas
+ *  peticiones»): los de antes (la hoja y septiembre) no existen para ella. La base
+ *  usa la misma fecha para los avisos (portal_pedidos_desde(), migración
+ *  20261009110000_portal_pedidos_solo_nuevos); el banco portal_pedidos.ts las compara. */
+export const PEDIDOS_DESDE = "2026-10-08T05:00:00.000Z"; // 08/10/2026 00:00 en Bogotá
+
 /** Lo que trae la base de cada pedido (con service_role: se recorta acá). */
 export interface FilaPedido {
   id: string;
