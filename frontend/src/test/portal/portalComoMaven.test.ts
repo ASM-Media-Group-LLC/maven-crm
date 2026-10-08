@@ -36,6 +36,20 @@ describe("el portal usa las piezas de Maven", () => {
     expect(fuente("DashboardSidebar.tsx")).toMatch(/from "@\/components\/dashboard\/estilosDelMenu"/);
   });
 
+  it("Ajustes NO va en el menú del computador (está el engranaje de la tarjeta); en la barra del celular SÍ (Jhon, 08/10)", () => {
+    const marco = fuente("PortalLayout.tsx");
+    expect(marco).toMatch(/const SECCIONES_DEL_MENU = SECCIONES\.filter\(\(s\) => s\.a !== RUTA_AJUSTES\)/);
+    expect(marco).toMatch(/const RUTA_AJUSTES = "\/portal\/ajustes"/);
+    // El menú lateral (computador) usa la lista sin Ajustes…
+    const menu = marco.slice(marco.indexOf("<SidebarMenu"), marco.indexOf("</SidebarMenu>"));
+    expect(menu).toMatch(/SECCIONES_DEL_MENU\.map/);
+    // …y la barra de abajo (celular, md:hidden), la completa.
+    const barra = marco.slice(marco.indexOf("bottom-0 z-30 flex border-t"), marco.indexOf("</nav>", marco.indexOf("bottom-0 z-30 flex border-t")));
+    expect(barra).toMatch(/\{SECCIONES\.map/);
+    // Y el engranaje sigue llevando a Ajustes.
+    expect(marco).toMatch(/navigate\(RUTA_AJUSTES\)/);
+  });
+
   it("barra de arriba: el idioma y la campana de Maven (sin «Ver todas», que es del equipo); claro/oscuro", () => {
     const marco = fuente("PortalLayout.tsx");
     expect(marco).toMatch(/<SelectorDeIdioma \/>/);

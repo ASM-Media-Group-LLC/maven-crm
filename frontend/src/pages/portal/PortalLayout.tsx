@@ -63,6 +63,12 @@ const SECCIONES: { a: string; icono: typeof House; etiqueta: TranslationKey; exa
   { a: "/portal/ajustes", icono: Settings, etiqueta: "portal.nav.ajustes" },
 ];
 
+// En el computador, Ajustes NO va en el menú (Jhon, 08/10: «es redundante»): ya
+// está el engranaje de la tarjeta de abajo. En el celular la tarjeta no está, así
+// que en la barra de abajo sí va: es la única entrada a Ajustes.
+const RUTA_AJUSTES = "/portal/ajustes";
+const SECCIONES_DEL_MENU = SECCIONES.filter((s) => s.a !== RUTA_AJUSTES);
+
 function Pantalla({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-background px-6 text-center text-foreground">
@@ -230,7 +236,7 @@ function MenuDelPortal({ activa, selectorDeAgencia }: { activa: FichaDeAgencia; 
       </SidebarHeader>
       <SidebarContent className="gap-0.5 overflow-x-hidden px-2 py-1">
         <SidebarMenu aria-label={t("portal.nav.menu")}>
-          {SECCIONES.map(({ a, icono: Icono, etiqueta, exacta }) => (
+          {SECCIONES_DEL_MENU.map(({ a, icono: Icono, etiqueta, exacta }) => (
             <SidebarMenuItem key={a}>
               <SidebarMenuButton asChild tooltip={t(etiqueta)}>
                 {/* El iluminado de Maven (ACTIVE_CLASS) con el tamaño de antes: ítems de
@@ -258,12 +264,12 @@ function TarjetaDeLaCreadora({ activa, plegado, selectorDeAgencia }: { activa: F
   const { t } = useLanguage();
   const navigate = useNavigate();
   const { pathname } = useLocation();
-  const enAjustes = pathname.startsWith("/portal/ajustes");
+  const enAjustes = pathname.startsWith(RUTA_AJUSTES);
   const [volverA, setVolverA] = useState("/portal");
   const engranaje = () => {
     if (enAjustes) return navigate(volverA);
     setVolverA(pathname);
-    navigate("/portal/ajustes");
+    navigate(RUTA_AJUSTES);
   };
   const nombre = nombreParaMostrar(activa);
   const avatar = <UserAvatar name={nombre} src={activa.foto} seed={activa.creator_id} size={plegado ? "sm" : "md"} />;
