@@ -7,8 +7,11 @@ lugar. Decisión de Jhon (28/09/2026): **sin R2 y sin copia de seguridad**.
 
 - Solo atiende permisos firmados por la edge `drive` (misma firma que
   `supabase/functions/_shared/drive-firma.ts`; vector compartido en los tests).
-- Escucha en `127.0.0.1:8790`: la única puerta desde afuera es el
-  **Cloudflare Tunnel**.
+- Escucha en el puerto 8790 (solo peticiones firmadas): la única puerta desde
+  afuera es la **puerta** de `puerta/` (Caddy + Tailscale) en el Dokploy de
+  microservicios, que llega al mini por su nombre MagicDNS. El túnel de
+  Cloudflare se descartó (el DNS está en GoDaddy). Operación día a día:
+  `CLAUDE.md` en esta carpeta.
 - `GET /salud` dice cuánto lugar queda en cada disco.
 - `POST /zip` arma **un .zip con varios archivos y carpetas** mientras baja
   («Descargar» con varios elegidos en el Drive). Ver abajo.
