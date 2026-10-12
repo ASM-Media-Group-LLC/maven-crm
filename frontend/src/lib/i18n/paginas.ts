@@ -13,7 +13,7 @@ export const PREFIJOS_PAGINAS = ["page.", "meet.", "grab.", "phones."] as const;
 
 export const paginas = {
   // ── Raíz (/) de desarrollo ──────────────────────────────────────────────────
-  "page.index.salesDashboard": { es: "Dashboard Ventas", en: "Sales dashboard" },
+  "page.index.salesDashboard": { es: "Dashboard de Ventas", en: "Sales dashboard" },
 
   // ── Diagnóstico de pantalla (/diagnostico-pantalla) ─────────────────────────
   "page.diag.title": { es: "Diagnóstico de pantalla", en: "Screen diagnostics" },

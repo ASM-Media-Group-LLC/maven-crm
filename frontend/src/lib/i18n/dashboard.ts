@@ -83,7 +83,7 @@ export const dashboard = {
   "dashboard.rowAbsencesToday": { es: "Ausencias hoy", en: "Absences today" },
   // >>> i18n ola 3 (paginas-a)
   // ── El selector de tablero (título desplegable del admin) ────────────────────
-  "dashboard.board.sales.title": { es: "Dashboard Ventas", en: "Sales dashboard" },
+  "dashboard.board.sales.title": { es: "Dashboard de Ventas", en: "Sales dashboard" },
   "dashboard.board.sales.dept": { es: "Dirección · Ventas", en: "Leadership · Sales" },
   "dashboard.board.sales.detail": { es: "Ingresos de todas las creadoras y los tops del equipo", en: "Earnings from every creator and the team's top performers" },
   "dashboard.board.team.title": { es: "Tu equipo de chatters", en: "Your chatter team" },
