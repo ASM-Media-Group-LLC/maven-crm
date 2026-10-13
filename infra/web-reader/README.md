@@ -1,5 +1,8 @@
 # web-reader (Playwright, Dokploy)
 
+<!-- Migrado a ASM-Media-Group-LLC/maven-crm; auto-deploy por la conexión dkowe5 de la org (2026-10-13). -->
+
+
 Micro headless que renderiza una URL con JS y devuelve **texto limpio + HTML +
 metadata**. Para que los bots de Maven lean páginas que el edge de Supabase no
 puede: SPAs, dashboards con JS (ej. `radar.marketingkash.com`), links que pega el
