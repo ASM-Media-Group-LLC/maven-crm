@@ -1286,7 +1286,7 @@ serve(async (req) => {
 
       const { count } = await admin.from("cowork_rooms").select("*", { count: "exact", head: true }).eq("session_id", sessionId);
       if (count !== null && count >= MAX_SALAS_POR_SESION) {
-        return err(req, `Esta sesión ya tiene ${MAX_SALAS_POR_SESION} salas, el máximo. Si necesitan más, avísale a Jhon.`);
+        return err(req, `Esta sesión ya tiene ${MAX_SALAS_POR_SESION} salas, el máximo. Si necesitan más, avísale al administrador.`);
       }
 
       const { data: last } = await admin.from("cowork_rooms").select("sort_order").eq("session_id", sessionId).order("sort_order", { ascending: false }).limit(1).maybeSingle();

@@ -215,7 +215,7 @@ async function buildDailyIncome(sb: any): Promise<string> {
         .select("date").order("date", { ascending: false }).limit(1).maybeSingle();
       const ultimoDia = ult?.date ? fmtDia(String(ult.date)) : "sin registro";
       return `${head}\n\n⚠️ No pude leer BLU hoy, así que no tengo dato (no es que no se facturó). ` +
-        `Último día con datos: ${ultimoDia}. Avisen a Jhon: el puente de BLU necesita renovar sesión.`;
+        `Último día con datos: ${ultimoDia}. Avisen al administrador: el puente de BLU necesita renovar sesión.`;
     }
     return `${head}\n\nSin ingresos registrados todavía (corte BLU: ${fmtCorte(hoy.corte)}).`;
   }
