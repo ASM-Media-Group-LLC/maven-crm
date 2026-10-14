@@ -2,38 +2,43 @@
 
 Maven es el CRM interno de la agencia: Messenger, Cowork y Meet, Correo (Zoho), Oficina (documentos, calendario, Drive sobre el NAS), Chatters, Closers, Creadoras y Portal de creadoras, Promolog, Finanzas y RRHH. Frontend en `frontend/` (React + Vite + Tailwind + Supabase), base y edge functions en `supabase/`, servicios aparte en `servicios/` e `infra/`. Producción es `app.maven-ai.me`.
 
+## Quién decide
+
+- Las decisiones de producto, prioridades, precios y textos públicos las toma **Alvaro (ASM Tech, cuenta GitHub `ASM-TECH-MIAMI`)**, administrador actual del proyecto.
+- **Velocidad primero.** Lo chico se hace directo y se muestra el resultado. Preguntas, solo las de negocio; lo técnico se decide y se reporta, sin rondas de propuestas.
+- Los borradores para los grupos de WhatsApp u otros canales del equipo se entregan a Alvaro; nadie publica por él.
+
 ## Idioma
 
 - Español neutro en todo: interfaz, comentarios, commits, PRs y respuestas. **Sin voseo**: se conjuga con «tú» (tienes, quieres, mira), nunca con «vos». Sin palabras en inglés cuando hay una en español.
 - Texto nuevo de interfaz va por `t()` de `useLanguage()`, con la clave en `frontend/src/lib/i18n.ts` como `"clave": { es, en }`. Hay un freno (`sinEspanolNuevo.test.ts`) que rechaza español a mano en archivos nuevos.
 
-## Git y despliegue
+## Git y despliegue (flujo rápido)
 
-- `origin` es `jhonjlopez-sudo/maven-crm`. El `main` local suele estar atrasado: ramifica **siempre desde `origin/main`** después de `git fetch`.
-- Una tarea = un worktree aparte, para no mezclar cambios entre sesiones:
-  `git worktree add /tmp/wt-tarea -b rama origin/main && ln -s $PWD/node_modules /tmp/wt-tarea/node_modules`.
-  Al terminar, `git worktree remove` (commitea antes de borrar: `--force` tira los cambios sin commit).
-- Un PR por cambio, con una guarda (test) que impida que el defecto vuelva. Merge por squash. Al entrar a `main`: el frontend se despliega solo en Dokploy (unos 10 minutos); las edge functions las despliega el CI; las migraciones se aplican aparte (MCP de Supabase o editor SQL) y se commitean en `supabase/migrations/`.
-- Verifica el deploy abriendo la página o leyendo la hoja servida, no mirando solo el bundle.
+- `origin` es **`ASM-Media-Group-LLC/maven-crm`**. Haz `git fetch` y trabaja sobre `origin/main`.
+- **Cambio chico o mediano (un área, sin migraciones): commit directo a `main` y push.** Al entrar a `main`, Dokploy despliega el frontend solo (~1 min); verifica el deploy abriendo la página, no mirando solo el bundle.
+- **Cambio grande o riesgoso** (varias áreas, migraciones, autenticación, dinero): rama corta + PR, y auto-merge del monitor o el clic de Alvaro. Agrega una guarda (test) cuando el defecto pueda volver.
+- Si el clasificador de seguridad bloquea el push directo a `main`, cae a PR con auto-merge; no te atasques ahí.
+- Las edge functions las despliega el CI; las migraciones se aplican por el MCP de Supabase (o editor SQL) y se commitean en `supabase/migrations/`.
+- Worktrees (`git worktree add /tmp/wt-tarea -b rama origin/main && ln -s $PWD/node_modules /tmp/wt-tarea/node_modules`): solo cuando hay varias sesiones trabajando a la vez; no son obligatorios.
 
-## Verificación antes de mergear (no negociable)
+## Verificación (proporcional al cambio)
 
-1. `npx tsc --noEmit -p tsconfig.app.json` **desde la raíz** (el `tsc` del `package.json` no revisa nada). Hay cientos de errores preexistentes: compara la **lista** contra un worktree limpio de `origin/main` (normaliza los números de línea) y no sumes ninguno.
-2. `npx vitest run src/test`. Lee **las dos líneas**: «Test Files» y «Tests». Un archivo que no carga no aparece en «Tests». Base conocida: los archivos de `test/videocall` fallan en local por el worklet de ruido; `expresiones`, `personalizados/filtros` y `CallControls` son flaky bajo carga (pasan en aislamiento).
-3. `npm run build`.
-4. Las guardas leen fuentes con `import.meta.glob(ruta literal, { query: "?raw", import: "default", eager: true })`: ruta y opciones **literales**. No uses `node:fs` ni `process` en tests: el tsconfig no trae tipos de Node.
+- **Siempre:** `npm run build` y los tests del área tocada (`npx vitest run src/test/<área>`), más la guarda nueva si se agregó.
+- **Cambios grandes o transversales:** la suite completa `npx vitest run src/test` (lee las dos líneas «Test Files» y «Tests»; base conocida: `test/videocall` falla en local por el worklet de ruido; `expresiones`, `personalizados/filtros` y `CallControls` son flaky bajo carga) y `npx tsc --noEmit -p tsconfig.app.json` **desde la raíz** sin sumar errores a los ~219 preexistentes (el `tsc` del `package.json` no revisa nada).
+- Las guardas leen fuentes con `import.meta.glob(ruta literal, { query: "?raw", import: "default", eager: true })`: ruta y opciones **literales**. No uses `node:fs` ni `process` en tests: el tsconfig no trae tipos de Node.
+- Cambios de interfaz: renderiza y mira antes de subir (Chrome headless sirve para mocks; en producción, mide el DOM). Prueba los colores derivados de la skin con un primario oscuro y en tema claro, no solo con el coral.
 
-## Datos y producción
+## Datos y producción (se mantiene: protege el negocio)
 
 - La base de Supabase es **producción**. `execute_sql` del MCP salta la RLS. No escribas sobre cuentas reales para probar, no insertes notificaciones de prueba (disparan push reales) y nunca entres ni manejes contraseñas: solo `reset_password` desde `admin-user-actions`.
 - Las cuentas no se borran: van a la papelera 30 días (`profiles.deleted_at`).
-- Nunca publiques en los grupos de WhatsApp del equipo: se entregan borradores y Jhon los pega.
+- Nunca publiques en los grupos de WhatsApp del equipo: se entregan borradores a Alvaro y él decide.
 - PostgREST devuelve `[]` cuando no hay filas y `null` cuando la petición falló. **Un fallo no es «vacío»**: no muestres «no hay nada» ante un error, dilo y ofrece reintentar. Lo mismo con permisos: si la consulta de permisos falla, no se concluye «sin permisos».
 - Canales de realtime en el frontend: siempre por `useCanalQueRevive` (nombre versionado, revive en CLOSED). Un `.channel()` con nombre fijo y `.subscribe()` a secas muere en silencio.
 - Políticas RLS: envuelve `auth.uid()` en `(select auth.uid())`; `ALTER POLICY`, nunca `DROP` + `CREATE`.
 
 ## Estilo de entrega
 
-- Resultados visibles: lo chico se hace y se mergea; no se acumulan rondas de propuestas.
-- Cambios de interfaz: renderiza y mira antes de mergear (Chrome headless sirve para mocks; en producción, mide el DOM). Prueba los colores derivados de la skin con un primario oscuro y en tema claro, no solo con el coral.
+- Resultados visibles y rápidos: lo chico se hace y se sube; no se acumulan rondas de propuestas.
 - Al terminar, cuenta qué pasaba, qué cambió y cómo probarlo, en palabras simples.
