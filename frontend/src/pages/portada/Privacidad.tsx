@@ -71,7 +71,7 @@ export default function Privacidad() {
             <p>
               Puedes pedirnos en cualquier momento ver, corregir o borrar lo que tenemos tuyo.
               Escríbenos a{" "}
-              <a href="mailto:jhon.lopez@maven-ai.me">jhon.lopez@maven-ai.me</a> y lo resolvemos
+              <a href="mailto:alvaro@maven-ai.me">alvaro@maven-ai.me</a> y lo resolvemos
               en el acto.
             </p>
 
@@ -85,7 +85,7 @@ export default function Privacidad() {
             <h3>Quién responde por esto</h3>
             <p>
               Maven, a través de{" "}
-              <a href="mailto:jhon.lopez@maven-ai.me">jhon.lopez@maven-ai.me</a>. Es la misma
+              <a href="mailto:alvaro@maven-ai.me">alvaro@maven-ai.me</a>. Es la misma
               persona que te contesta la demo.
             </p>
 
@@ -102,7 +102,7 @@ export default function Privacidad() {
           <nav className="foot-links" aria-label="Enlaces del pie">
             <Link to="/">Portada</Link>
             <Link to="/login">Entrar</Link>
-            <a href="mailto:jhon.lopez@maven-ai.me">Contacto</a>
+            <a href="mailto:alvaro@maven-ai.me">Contacto</a>
           </nav>
         </div>
       </footer>

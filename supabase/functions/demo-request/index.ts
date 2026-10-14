@@ -36,7 +36,7 @@ const json = (req: Request, data: unknown, status = 200) =>
   });
 
 /** A dónde llegan los pedidos. Se puede cambiar por env sin tocar código. */
-const DESTINO = Deno.env.get("DEMO_REQUEST_TO") || "jhon.lopez@maven-ai.me";
+const DESTINO = Deno.env.get("DEMO_REQUEST_TO") || "alvaro@maven-ai.me";
 
 const TOPE_POR_IP_HORA = 5;
 const TOPE_POR_CORREO_DIA = 3;
