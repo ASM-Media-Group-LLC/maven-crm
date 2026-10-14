@@ -1,0 +1,104 @@
+name: Guard Frontend (main)
+
+# Red de seguridad del flujo rápido. Los cambios chicos ahora van DIRECTO a main
+# (sin PR, ver CLAUDE.md), así que el guard-frontend de los PR no los revisa. Cuando
+# un push a main toca el frontend (o lo que sus tests leen), esto corre la MISMA
+# verificación DESPUÉS de que ya entró: no bloquea nada (Dokploy ya armó la imagen),
+# pero avisa en rojo si main quedó roto — un test caído, un build que no arma o un
+# error de tipos nuevo. Solo lee el código: no despliega ni necesita secretos.
+#
+# Corre en el mini5 igual que el guard de PR (runner «maven-ci», sin minutos de
+# GitHub); si el Mac está apagado, espera en cola hasta que vuelva. Los pushes de
+# solo documentación/infra no disparan esto: el filtro `paths` es el mismo del guard
+# de PR, así que un cambio de docs/transformacion no arranca la suite entera.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - "vite.config.ts"
+      - "vitest.config.ts"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig*.json"
+      - "tailwind.config.ts"
+      - "postcss.config.js"
+      - "scripts/ci/**"
+      - ".github/workflows/guard-frontend.yml"
+      - ".github/workflows/guard-frontend-main.yml"
+      # Lo que lee `docker build`.
+      - "Dockerfile"
+      - ".dockerignore"
+      - "docker-entrypoint.sh"
+      # Lo que los tests de frontend/src leen de afuera (con fs o import.meta.glob).
+      - "supabase/functions/**"
+      - "supabase/migrations/**"
+      - "infra/nas-drive/**"
+      - "nginx.conf"
+
+permissions:
+  contents: read
+
+# Un push más nuevo a main cancela el net anterior: solo importa el último estado.
+concurrency:
+  group: guard-frontend-main
+  cancel-in-progress: true
+
+jobs:
+  frontend-main:
+    name: frontend en main (vitest, build, tsc vs push anterior)
+    runs-on: [self-hosted, macOS, ARM64, mini5]
+    timeout-minutes: 40
+    steps:
+      # fetch-depth 0: para comparar los tipos contra el main de ANTES del push
+      # (github.event.before) hace falta tener ese commit y su árbol en el runner.
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      # Node 24 por lo mismo que el guard de PR: el npm 11 acepta este package-lock
+      # en `npm ci` y el npm 10 de Node 20 no.
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - name: npm ci
+        id: npmci
+        run: npm ci --no-audit --no-fund
+
+      # Las pruebas de las propias guardas primero: si el lector del resumen de vitest
+      # o el de tsc están rotos, no se puede confiar en lo que digan abajo.
+      - name: Pruebas de las guardas
+        run: node --test scripts/ci/guardas.test.mjs scripts/ci/corredores.test.mjs
+
+      - name: vitest — la suite entera, leyendo «Test Files»
+        run: node scripts/ci/vitest-completo.mjs --testTimeout=30000 --hookTimeout=30000 --maxWorkers=4
+
+      - name: npm run build
+        if: ${{ !cancelled() && steps.npmci.outcome == 'success' }}
+        run: npm run build
+
+      # tsc: falla solo si ESTE push agregó un error de tipos que main no tenía antes.
+      # La base es el main anterior al push (github.event.before). Si no está (push
+      # inicial, SHA en ceros o reescritura de historia), cae a HEAD~1; si tampoco hay
+      # padre, se salta la comparación en vez de fallar en falso.
+      - name: tsc — ningún error de tipos nuevo respecto del main anterior
+        if: ${{ !cancelled() && steps.npmci.outcome == 'success' }}
+        run: |
+          set -euo pipefail
+          antes="${{ github.event.before }}"
+          base=""
+          if [ -n "$antes" ] && [ "$antes" != "0000000000000000000000000000000000000000" ] && git cat-file -e "${antes}^{commit}" 2>/dev/null; then
+            base="$antes"
+          elif git rev-parse --verify -q "HEAD~1^{commit}" >/dev/null; then
+            base="HEAD~1"
+          fi
+          if [ -z "$base" ]; then
+            echo "Sin base contra la cual comparar (push inicial): se salta tsc."
+            exit 0
+          fi
+          echo "Comparando tipos contra ${base}"
+          node scripts/ci/tsc-sin-errores-nuevos.mjs --base="${base}"

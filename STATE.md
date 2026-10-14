@@ -1,6 +1,6 @@
 # Estado del Proyecto — Maven CRM (v3)
 
-> Última actualización: 2026-05-04 · Mantenedor: Jhon · Repo: `ASM-Media-Group-LLC/maven-crm`
+> Última actualización: 2026-10-14 · Mantenedor: Alvaro (ASM Tech) · Repo: `ASM-Media-Group-LLC/maven-crm`
 >
 > Este archivo se actualiza al cierre de cada slice grande. Sirve como
 > punto de entrada para cualquier humano o agente nuevo: en una página

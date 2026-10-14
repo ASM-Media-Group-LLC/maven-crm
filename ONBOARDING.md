@@ -2,7 +2,7 @@
 
 Esta guía deja tu Mac listo para trabajar en Maven con Claude Code, igual que el resto del equipo.
 
-## 1. Accesos que te tiene que dar Jhon
+## 1. Accesos que te tiene que dar el administrador (Alvaro)
 
 - **GitHub:** colaborador en `ASM-Media-Group-LLC/maven-crm` con tu usuario de GitHub.
 - **Tailscale:** tu Mac aprobado en la red del equipo (para llegar al mini5, que guarda el Drive y el NAS).
@@ -18,7 +18,7 @@ curl -fsSL https://raw.githubusercontent.com/ASM-Media-Group-LLC/maven-crm/main/
 
 El script instala Homebrew, git, Node, la CLI de GitHub y Claude Code si faltan; te pide entrar a GitHub (`gh auth login`, con tu usuario); clona el repo en `~/Projects/maven-crm`; instala las dependencias y comprueba que compile. Es seguro volver a correrlo.
 
-Como el repo es privado, el `curl` de arriba solo funciona si ya estás dentro de GitHub en el navegador; si no, pídele el archivo a Jhon y córrelo con `bash preparar-mac-dev.sh`.
+Como el repo es privado, el `curl` de arriba solo funciona si ya estás dentro de GitHub en el navegador; si no, pídele el archivo al administrador (Alvaro) y córrelo con `bash preparar-mac-dev.sh`.
 
 ## 3. Entrar a Claude Code
 
@@ -40,4 +40,4 @@ La primera vez te pide iniciar sesión con tu cuenta de Anthropic. Claude lee so
 - `supabase/functions/` las edge functions (`admin-user-actions`, `drive`, `web-push`…); `supabase/migrations/` el historial de la base.
 - `infra/nas-drive/` el servidor de archivos del mini5; `infra/scripts/` utilidades como esta.
 
-Cualquier duda, en el Messenger de Maven: grupo del equipo o directo a Jhon.
+Cualquier duda, en el Messenger de Maven: grupo del equipo o directo al administrador (Alvaro).

@@ -21,6 +21,7 @@ Maven pasó a ser administrado por **Alvaro (ASM Tech)**. El repositorio, los se
   - Bot de WhatsApp: Alvaro como única autoridad final; avisos «a Jhon» → «al administrador»; reglas persistentes de la base auditadas (ninguna lo nombra). Commit `90bec3c1` (edge: se despliega con el token).
   - Contacto público (portada + privacidad) y fallback de `demo-request` → `alvaro@maven-ai.me`. ✅ live (`38ea29fe`).
   - Docs/infra que apuntaban al repo viejo `jhonjlopez-sudo` → org ASM (`104adcf3`).
+- **2026-10-14** — **Fase 1 completa (5/5):** `/documentation` a prueba de fallos (solo registra con etiqueta explícita `hecho:`/`decidí:`/`pendiente:`) y la página viva fijada en la barra lateral de claude.ai; prosa «quién da accesos / mantenedor» de `ONBOARDING.md` y `STATE.md` a nombre de Alvaro; guarda de frontend corriendo también en `push` a `main` (nuevo `guard-frontend-main.yml`, red de seguridad del flujo rápido).
 
 ## Recopilación: qué seguía vivo de Jhon (14/10)
 
@@ -38,8 +39,8 @@ Maven pasó a ser administrado por **Alvaro (ASM Tech)**. El repositorio, los se
 - [x] Super-admin → Alvaro en `plataforma_admins`, Jhon retirado (migración `7098431f`, live).
 - [x] Bot de WhatsApp: Alvaro única autoridad final + avisos «al administrador» + reglas auditadas (`90bec3c1`; se despliega con el token).
 - [x] Contacto público + `DEMO_REQUEST_TO` → `alvaro@maven-ai.me` (`38ea29fe`, frontend live).
-- [~] Docs/infra al repo de ASM: URLs cambiadas (`104adcf3`). Pendiente: prosa «quién da accesos / mantenedor» en `ONBOARDING.md` y `STATE.md`. — Claude
-- [ ] Guarda de frontend corriendo también en `push` a `main` (red de seguridad del flujo rápido). — Claude
+- [x] Docs/infra al repo de ASM (`104adcf3`) + prosa «quién da accesos / mantenedor» en `ONBOARDING.md` y `STATE.md` a nombre de Alvaro.
+- [x] Guarda de frontend corriendo también en `push` a `main` (red de seguridad del flujo rápido): nuevo workflow `guard-frontend-main.yml`.
 
 ### Fase 2 — Independencia (siguientes 2 semanas)
 - [ ] Verificar titularidad de las cuentas raíz: org de Supabase, Zoho, dominio `maven-ai.me`, VPS de LiveKit, Tailscale, mini5 (asm002/SSH). — Alvaro con guía de Claude
