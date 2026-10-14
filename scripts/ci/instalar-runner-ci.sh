@@ -22,7 +22,8 @@ CASA=/Users/$USUARIO
 DIR=$CASA/actions-runner
 ETIQUETA=ai.maven.ci-runner
 PLIST=/Library/LaunchDaemons/$ETIQUETA.plist
-REPO_URL=https://github.com/jhonjlopez-sudo/maven-crm
+# El repo se migró a la org ASM Tech el 2026-10-13 (antes jhonjlopez-sudo).
+REPO_URL=https://github.com/ASM-Media-Group-LLC/maven-crm
 DUENO=asm002
 DISCOS="/Volumes/NAS1 /Volumes/NAS2"
 
