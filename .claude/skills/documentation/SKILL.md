@@ -1,16 +1,22 @@
 ---
 name: documentation
-description: Consulta o actualiza la documentación viva de la transformación de Maven bajo ASM (estado, plan, decisiones) en docs/transformacion-asm.md.
+description: Muestra y mantiene la página viva de la transformación de Maven bajo ASM — devuelve el link que se abre y comparte, y registra avances y decisiones.
 ---
 
-# /documentation — la documentación viva de la transformación
+# /documentation — la página viva de la transformación
 
-El documento es `docs/transformacion-asm.md`. Este comando lo consulta y lo mantiene.
+- **Fuente de verdad:** `docs/transformacion-asm.md`.
+- **Página viva (link estable para abrir/compartir):** https://claude.ai/artifact/CfovucgxeBkzYY7zN4CgEx
+- **Base HTML de esa página:** `docs/transformacion-asm.html` — se edita (no se regenera desde cero).
 
-Al invocarse:
+Al invocar `/documentation`:
 
-1. Lee `docs/transformacion-asm.md` completo.
-2. **Sin argumentos:** responde un resumen corto del estado — lo último hecho, lo urgente pendiente (con responsable) y el siguiente paso de cada fase. No pegues el documento entero.
-3. **Con argumentos** (por ejemplo `/documentation hecho: rotamos DRIVE_SECRETO` o `/documentation decidimos que el contacto es contacto@maven-ai.me`): registra el cambio en la sección que corresponde, con fecha absoluta (nada de «hoy» o «ayer»), marca los checkboxes que se completaron y mueve lo terminado de «Plan» a «Hecho». Después commitea directo a `main` con un mensaje `docs(transformacion): …`, siguiendo el flujo rápido del CLAUDE.md.
-4. Mantén el documento fiel y corto: hechos con fecha, pendientes con responsable (Alvaro o Claude), decisiones con su porqué. Si algo del plan cambió de rumbo, se corrige el plan y se anota la decisión — el documento refleja la realidad, no la aspiración.
-5. El informe completo de la auditoría del 14/10/2026 vive en https://claude.ai/artifact/7YSisjoJmZcFCADexLhUYy — enlázalo cuando haga falta contexto profundo; no dupliques su contenido en el documento.
+1. Lee `docs/transformacion-asm.md`.
+2. **Sin argumentos:** responde con el **link de la página viva** + 3 líneas: último hecho · urgente (con responsable) · siguiente paso. Nada de pegar el documento entero ni estas instrucciones.
+3. **Con argumentos** (un avance o decisión, p. ej. `/documentation hecho: rotamos DRIVE_SECRETO` o `/documentation decidimos X porque Y`):
+   1. Actualiza `docs/transformacion-asm.md`: entrada con **fecha absoluta** (nada de «hoy»), marca los checkboxes, mueve lo terminado a «Hecho», ajusta los contadores de fase.
+   2. Edita `docs/transformacion-asm.html` para reflejar el mismo cambio, conservando el diseño (oscuro; fases con checklist ✓ hecho / ! parcial / ○ pendiente; callout de urgente; KPIs de progreso; la fecha de «Actualizado»).
+   3. Commitea directo a `main`: `docs(transformacion): …` (flujo rápido del CLAUDE.md).
+   4. Publica `docs/transformacion-asm.html` al **mismo link** (Artifact con `url: https://claude.ai/artifact/CfovucgxeBkzYY7zN4CgEx`) y responde con el link.
+4. El documento refleja la **realidad, no la aspiración**: hechos con fecha, pendientes con responsable (Alvaro / Claude), decisiones con su porqué. Si el plan cambió de rumbo, se corrige y se anota la decisión.
+5. Informe completo de la auditoría (14/10/2026): https://claude.ai/artifact/7YSisjoJmZcFCADexLhUYy — enlázalo cuando haga falta contexto profundo; no dupliques su contenido.

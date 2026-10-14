@@ -1,6 +1,7 @@
 # Transformación de Maven bajo ASM Tech
 
 > Documentación viva. Se consulta y actualiza con el comando **`/documentation`**.
+> **Página viva (abrir/compartir):** https://claude.ai/artifact/CfovucgxeBkzYY7zN4CgEx
 > Informe completo de la auditoría (14/10/2026): https://claude.ai/artifact/7YSisjoJmZcFCADexLhUYy
 
 ## Qué está pasando

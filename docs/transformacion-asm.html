@@ -1,0 +1,157 @@
+<title>Transformación Maven</title>
+<meta name="description" content="Documentación viva de la transformación de Maven bajo ASM Tech: estado, plan por fases, urgente y decisiones.">
+<style>
+/* Página viva de estado. Refleja docs/transformacion-asm.md. Tema oscuro único. */
+:root{
+  --bg:#07090f;--bg-2:#0b0e17;--surface:#10141f;--surface-2:#151a28;
+  --border:#232a3a;--border-soft:#1a2030;--fg:#eef0f6;--muted:#9aa3b8;--faint:#64708a;
+  --accent:#6a92ff;--accent-2:#a870ff;--grad:linear-gradient(100deg,#6a92ff,#a870ff);
+  --good:#38d6a0;--warn:#f5b454;--bad:#f07178;
+  --font-display:"Sora",system-ui,sans-serif;--font-body:"Hanken Grotesk",system-ui,sans-serif;--font-mono:"JetBrains Mono",ui-monospace,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+.wrap{max-width:860px;margin-inline:auto;padding-inline:clamp(16px,4vw,32px)}
+h1,h2,h3{font-family:var(--font-display);letter-spacing:-.02em;text-wrap:balance;line-height:1.15;margin:0}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+code{font-family:var(--font-mono);font-size:.82em;background:rgba(255,255,255,.06);border:1px solid var(--border-soft);border-radius:6px;padding:1px 6px}
+.hero{padding:52px 0 30px;border-bottom:1px solid var(--border-soft);background:radial-gradient(760px 380px at 85% -10%,rgba(168,112,255,.14),transparent 60%),radial-gradient(680px 360px at 0% 0%,rgba(106,146,255,.12),transparent 55%)}
+.eyebrow{font-family:var(--font-mono);font-size:.7rem;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin:0 0 12px}
+h1{font-size:clamp(1.9rem,5vw,2.8rem);font-weight:800}
+.lead{margin-top:14px;color:var(--muted);font-size:1.05rem;max-width:64ch}
+.updated{margin-top:14px;font-family:var(--font-mono);font-size:.72rem;color:var(--faint)}
+.prog{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:26px}
+.pc{background:var(--surface);border:1px solid var(--border);border-radius:13px;padding:14px 16px}
+.pc .pl{font-family:var(--font-mono);font-size:.64rem;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+.pc b{display:block;font-family:var(--font-display);font-size:1.5rem;font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums}
+.bar{height:6px;border-radius:4px;background:rgba(255,255,255,.08);overflow:hidden;margin-top:10px}
+.bar i{display:block;height:100%;background:var(--grad);border-radius:4px}
+section{padding-block:34px;border-bottom:1px solid var(--border-soft)}
+section:last-child{border-bottom:0}
+h2{font-size:clamp(1.3rem,3vw,1.7rem);font-weight:700}
+.alerta{background:linear-gradient(135deg,rgba(240,113,120,.1),var(--surface));border:1px solid rgba(240,113,120,.4);border-radius:14px;padding:18px 20px;margin-top:8px}
+.alerta h2{font-size:1.2rem}
+p{margin:10px 0 0}p.dim{color:var(--muted)}
+ul.clean{list-style:none;padding:0;margin:16px 0 0}
+ul.clean li{display:flex;gap:12px;align-items:flex-start;padding:11px 0;border-top:1px solid var(--border-soft)}
+ul.clean li:first-child{border-top:0}
+.ck{flex:none;width:22px;height:22px;border-radius:7px;display:grid;place-items:center;font-size:.8rem;font-weight:700;margin-top:1px}
+.ck.done{background:rgba(56,214,160,.15);color:var(--good)}
+.ck.part{background:rgba(245,180,84,.15);color:var(--warn)}
+.ck.todo{background:rgba(255,255,255,.05);color:var(--faint);border:1px solid var(--border)}
+.it{min-width:0}
+.it .tt{color:var(--fg)}
+.it .who{font-family:var(--font-mono);font-size:.64rem;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);margin-left:8px;border:1px solid var(--border);border-radius:999px;padding:2px 8px;white-space:nowrap}
+.who.al{color:var(--warn);border-color:rgba(245,180,84,.4)}
+.who.cl{color:var(--accent);border-color:rgba(106,146,255,.4)}
+.fase{margin-top:22px}
+.fase .fh{display:flex;align-items:baseline;gap:10px}
+.fase .fh h3{font-size:1.05rem;font-weight:600}
+.fase .fh span{font-family:var(--font-mono);font-size:.72rem;color:var(--faint)}
+.hecho{list-style:none;padding:0;margin:14px 0 0}
+.hecho li{position:relative;padding:0 0 14px 22px;border-left:1px solid var(--border);margin-left:4px}
+.hecho li::before{content:"";position:absolute;left:-5px;top:4px;width:9px;height:9px;border-radius:50%;background:var(--grad)}
+.hecho li:last-child{border-left-color:transparent}
+.hecho .d{font-family:var(--font-mono);font-size:.68rem;color:var(--accent);letter-spacing:.04em}
+.hecho .x{color:var(--muted);display:block;margin-top:2px}
+.deci{list-style:none;padding:0;margin:14px 0 0}
+.deci li{padding:10px 0;border-top:1px solid var(--border-soft);color:var(--muted)}
+.deci li:first-child{border-top:0}
+.deci .d{font-family:var(--font-mono);font-size:.66rem;color:var(--faint)}
+footer{padding:28px 0 46px;color:var(--faint);font-size:.78rem}
+@media(max-width:620px){.prog{grid-template-columns:1fr}}
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+
+<header class="hero"><div class="wrap">
+  <p class="eyebrow">Documentación viva · ASM Tech</p>
+  <h1>Transformación Maven</h1>
+  <p class="lead">Maven pasó a manos de <b>Alvaro (ASM Tech)</b>. Repo, servicios y flujo ya están en la org <code>ASM-Media-Group-LLC</code>, los cambios van «push y al aire» (~1 min), y se retiran una a una las dependencias del constructor anterior. Las reglas de protección de datos se conservan.</p>
+  <p class="updated">Actualizado 14 · oct · 2026 · 19:30 — <a href="https://claude.ai/artifact/7YSisjoJmZcFCADexLhUYy">informe completo de la auditoría ↗</a></p>
+  <div class="prog">
+    <div class="pc"><span class="pl">Fase 1 · Control</span><b>3 / 5</b><div class="bar"><i style="width:70%"></i></div></div>
+    <div class="pc"><span class="pl">Fase 2 · Independencia</span><b>0 / 6</b><div class="bar"><i style="width:4%"></i></div></div>
+    <div class="pc"><span class="pl">Fase 3 · Robustez</span><b>0 / 5</b><div class="bar"><i style="width:2%"></i></div></div>
+  </div>
+</div></header>
+
+<main class="wrap">
+
+<section>
+  <div class="alerta">
+    <h2>🔴 Urgente · lo tienes que hacer tú (5 min)</h2>
+    <p>Falta el secret <code>SUPABASE_ACCESS_TOKEN</code> en GitHub Actions del repo de ASM. <b>Sin esto, ningún cambio de backend se despliega</b> — incluida la nueva autoridad del bot de WhatsApp.</p>
+    <p class="dim">Supabase → Account → <b>Access Tokens</b> → generar · GitHub → repo → Settings → Secrets → Actions → <code>SUPABASE_ACCESS_TOKEN</code> · luego Actions → <b>Deploy Edge Functions</b> con <code>deploy_all</code>.</p>
+  </div>
+</section>
+
+<section>
+  <h2>Hecho</h2>
+  <ul class="hecho">
+    <li><span class="d">12–13 oct</span><span class="x">Repo espejado a <code>ASM-Media-Group-LLC/maven-crm</code>; 9 servicios de Dokploy + frontend repuntados a la org; jhonjlopez desconectado. Auto-deploy verificado.</span></li>
+    <li><span class="d">13–14 oct</span><span class="x">Runner de CI (mini5) re-registrado a la org ASM y verde end-to-end.</span></li>
+    <li><span class="d">14 oct</span><span class="x"><code>CLAUDE.md</code> reescrito: Alvaro decide, flujo rápido directo a main, protección de datos intacta (<code>fbc3064b</code>).</span></li>
+    <li><span class="d">14 oct</span><span class="x">Portada pública sin muñequitos: siluetas neutras + guarda (<code>3110ac0e</code>). En vivo.</span></li>
+    <li><span class="d">14 oct</span><span class="x">Auditoría completa en 6 áreas; informe publicado.</span></li>
+    <li><span class="d">14 oct</span><span class="x"><b>Independización de Jhon, tanda 1:</b> super-admin → Alvaro (<code>7098431f</code>, live) · bot con Alvaro como única autoridad (<code>90bec3c1</code>, se despliega con el token) · contacto público → <code>alvaro@maven-ai.me</code> (<code>38ea29fe</code>, live) · docs/infra al repo de ASM (<code>104adcf3</code>).</span></li>
+  </ul>
+</section>
+
+<section>
+  <h2>Recopilación — qué seguía vivo de Jhon</h2>
+  <ul class="clean">
+    <li><span class="ck done">✓</span><div class="it"><span class="tt"><b>Agente Promolog en su Mac</b> — 💀 muerto desde el 8-ago. El activo corre en <code>unlok-server-1</code> (empresa). <b>No dependemos de su Mac.</b></span></div></li>
+    <li><span class="ck part">!</span><div class="it"><span class="tt"><b>Sesión BLU</b> — viva y auto-refrescándose, pero la agencia «plus» está atada a su cuenta personal. Hay que re-sembrarla con cuenta corporativa.<span class="who al">Alvaro</span></span></div></li>
+    <li><span class="ck done">✓</span><div class="it"><span class="tt"><b>Hubstaff</b> — el PAT se auto-rota; riesgo menor.</span></div></li>
+  </ul>
+</section>
+
+<section>
+  <h2>Plan</h2>
+
+  <div class="fase"><div class="fh"><h3>Fase 1 · Control</h3><span>esta semana · 3 de 5</span></div>
+    <ul class="clean">
+      <li><span class="ck done">✓</span><div class="it"><span class="tt">Super-admin → Alvaro en <code>plataforma_admins</code>, Jhon retirado (live).</span></div></li>
+      <li><span class="ck done">✓</span><div class="it"><span class="tt">Bot de WhatsApp: Alvaro única autoridad + avisos «al administrador» + reglas auditadas. <span class="dim">(se despliega con el token)</span></span></div></li>
+      <li><span class="ck done">✓</span><div class="it"><span class="tt">Contacto público + <code>demo-request</code> → <code>alvaro@maven-ai.me</code> (live).</span></div></li>
+      <li><span class="ck part">!</span><div class="it"><span class="tt">Docs/infra al repo de ASM: URLs listas; falta la prosa «quién da accesos / mantenedor» en ONBOARDING/STATE.<span class="who cl">Claude</span></span></div></li>
+      <li><span class="ck todo">○</span><div class="it"><span class="tt">Guarda de frontend corriendo también en push a main (red de seguridad).<span class="who cl">Claude</span></span></div></li>
+    </ul>
+  </div>
+
+  <div class="fase"><div class="fh"><h3>Fase 2 · Independencia</h3><span>2 semanas · 0 de 6</span></div>
+    <ul class="clean">
+      <li><span class="ck todo">○</span><div class="it"><span class="tt">Verificar titularidad de cuentas raíz: Supabase, Zoho, dominio, VPS de LiveKit, Tailscale, mini5.<span class="who al">Alvaro + Claude</span></span></div></li>
+      <li><span class="ck todo">○</span><div class="it"><span class="tt">Rotación de secretos (DRIVE_SECRETO, MAIL_CRED_KEY, tokens de gateways, LIVEKIT_KEYS…) por pares servicio↔Supabase.<span class="who al">Alvaro + Claude</span></span></div></li>
+      <li><span class="ck todo">○</span><div class="it"><span class="tt">Mudar <code>promolog-agent</code> a una Mac de la empresa.<span class="who al">Alvaro</span></span></div></li>
+      <li><span class="ck todo">○</span><div class="it"><span class="tt">Sesión Hubstaff/BLU con cuenta corporativa.<span class="who al">Alvaro</span></span></div></li>
+      <li><span class="ck todo">○</span><div class="it"><span class="tt">Acceso directo de Alvaro al mini5 y reemplazo del «empuje desde su Mac».<span class="who al">Alvaro + Claude</span></span></div></li>
+      <li><span class="ck todo">○</span><div class="it"><span class="tt">Burn-down de los 219 errores de tsc + retry para los 4 tests flaky.<span class="who cl">Claude</span></span></div></li>
+    </ul>
+  </div>
+
+  <div class="fase"><div class="fh"><h3>Fase 3 · Robustez</h3><span>después · 0 de 5</span></div>
+    <ul class="clean">
+      <li><span class="ck todo">○</span><div class="it"><span class="tt">Respaldo del Drive (reabrir la decisión «sin copia»).<span class="who al">Alvaro</span></span></div></li>
+      <li><span class="ck todo">○</span><div class="it"><span class="tt">Deploy scripteado del nas-drive.<span class="who cl">Claude</span></span></div></li>
+      <li><span class="ck todo">○</span><div class="it"><span class="tt">Plan B del CI cuando el mini5 esté apagado.<span class="who cl">Claude</span></span></div></li>
+      <li><span class="ck todo">○</span><div class="it"><span class="tt">Inventario único servicio → Dokploy → dominio → secretos → deploy.<span class="who cl">Claude</span></span></div></li>
+      <li><span class="ck todo">○</span><div class="it"><span class="tt">Entorno de pruebas (rama de Supabase con datos sintéticos).<span class="who cl">Claude</span></span></div></li>
+    </ul>
+  </div>
+</section>
+
+<section>
+  <h2>Decisiones</h2>
+  <ul class="deci">
+    <li><span class="d">14 oct</span> — La sección «Datos y producción» del CLAUDE.md se conserva: protege el negocio de ASM, no al constructor anterior.</li>
+    <li><span class="d">14 oct</span> — Los ~1.300 comentarios históricos «decisión de Jhon» NO se renombran en masa: son la memoria del producto.</li>
+    <li><span class="d">14 oct</span> — Portada con siluetas neutras en vez de caras caricaturescas.</li>
+    <li><span class="d">14 oct</span> — Las propuestas de homepage nuevo quedan como borradores; la portada actual sigue en producción hasta nueva orden.</li>
+  </ul>
+</section>
+
+</main>
+<footer><div class="wrap">Documentación viva · se actualiza con el comando <code>/documentation</code> · privada (compártela desde Share).</div></footer>
