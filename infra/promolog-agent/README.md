@@ -126,7 +126,7 @@ deja de escanear. En una Mac Mini queda como servicio y corre solo.
 ### 1. Traer el código y los tokens
 
 ```bash
-git clone https://github.com/jhonjlopez-sudo/maven-crm.git
+git clone https://github.com/ASM-Media-Group-LLC/maven-crm.git
 cd maven-crm/infra/promolog-agent
 npm install
 npx playwright install chromium

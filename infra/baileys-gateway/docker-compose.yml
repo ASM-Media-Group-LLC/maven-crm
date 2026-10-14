@@ -13,7 +13,7 @@
 #                         y buildea.
 #
 # Opcion B: Provider = Raw, pero entonces hay que cambiar el `build: .` por
-#           un `build: https://github.com/jhonjlopez-sudo/maven-crm.git#fix/notification-bell:infra/baileys-gateway`
+#           un `build: https://github.com/ASM-Media-Group-LLC/maven-crm.git#fix/notification-bell:infra/baileys-gateway`
 #           Funciona si el repo es publico.
 #
 # ENV VARS REQUERIDAS EN DOKPLOY (tab Environment):

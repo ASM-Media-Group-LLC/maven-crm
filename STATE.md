@@ -1,6 +1,6 @@
 # Estado del Proyecto — Maven CRM (v3)
 
-> Última actualización: 2026-05-04 · Mantenedor: Jhon · Repo: `jhonjlopez-sudo/maven-crm`
+> Última actualización: 2026-05-04 · Mantenedor: Jhon · Repo: `ASM-Media-Group-LLC/maven-crm`
 >
 > Este archivo se actualiza al cierre de cada slice grande. Sirve como
 > punto de entrada para cualquier humano o agente nuevo: en una página
@@ -15,7 +15,7 @@
 | IA | Groq (`api.groq.com/openai/v1`) — migrado: Lovable AI Gateway → MiniMax → Groq |
 | Video | LiveKit (`LIVEKIT_URL` env, self-hosted o cloud) |
 | Email | Resend (sólo para invitaciones de calls hoy) |
-| Deploy | Dokploy → `jhonjlopez-sudo/maven-crm`, branch `main` |
+| Deploy | Dokploy → `ASM-Media-Group-LLC/maven-crm`, branch `main` |
 | Build | `npm run build` → `dist/` (Dockerfile multistage con nginx) |
 
 ## Layout del repo (post-split)
@@ -91,7 +91,7 @@ Ambos sets ya tienen migrations subidas (`20260504100000`, `20260504110000`) per
 
 | Fecha | Decisión | Contexto |
 |---|---|---|
-| 2026-05-02 | Branch JHON-V3 → main del nuevo repo | Migración `ASM-TECH-MIAMI/maven-s-simple-page` → `jhonjlopez-sudo/maven-crm` |
+| 2026-05-02 | Branch JHON-V3 → main del nuevo repo | Migración `ASM-TECH-MIAMI/maven-s-simple-page` → `ASM-Media-Group-LLC/maven-crm` |
 | 2026-05-04 | Repo dividido en `frontend/` `backend/` `servicios/` | Preparar para microservicios futuros sin romper Dokploy |
 | 2026-05-04 | Lovable AI Gateway → MiniMax | Eliminar dependencia de Lovable en runtime |
 | 2026-05-04 | MiniMax → Groq | Cambio de proveedor; Groq tiene mejor latencia para llama-3.3-70b + tier free razonable |
@@ -131,7 +131,7 @@ Ambos sets ya tienen migrations subidas (`20260504100000`, `20260504110000`) per
 
 ## Cómo retomar este proyecto desde cero
 
-1. Clonar `jhonjlopez-sudo/maven-crm` (rama `main`).
+1. Clonar `ASM-Media-Group-LLC/maven-crm` (rama `main`).
 2. `npm install`.
 3. `.env` → setear `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_PUBLIC_URL`. Mismas vars en Dokploy.
 4. Edge function secrets en Supabase: `MINIMAX_API_KEY`, `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `RESEND_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.

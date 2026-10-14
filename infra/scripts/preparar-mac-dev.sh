@@ -4,7 +4,7 @@
 set -euo pipefail
 
 DESTINO="${MAVEN_DIR:-$HOME/Projects/maven-crm}"
-REPO="jhonjlopez-sudo/maven-crm"
+REPO="ASM-Media-Group-LLC/maven-crm"
 
 paso() { printf '\n\033[1;36m▶ %s\033[0m\n' "$*"; }
 ok()   { printf '  ✓ %s\n' "$*"; }

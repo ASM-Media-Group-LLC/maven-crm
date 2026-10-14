@@ -4,7 +4,7 @@ Esta guía deja tu Mac listo para trabajar en Maven con Claude Code, igual que e
 
 ## 1. Accesos que te tiene que dar Jhon
 
-- **GitHub:** colaborador en `jhonjlopez-sudo/maven-crm` con tu usuario de GitHub.
+- **GitHub:** colaborador en `ASM-Media-Group-LLC/maven-crm` con tu usuario de GitHub.
 - **Tailscale:** tu Mac aprobado en la red del equipo (para llegar al mini5, que guarda el Drive y el NAS).
 - **Supabase (opcional):** acceso al proyecto si tu Claude va a usar el MCP de Supabase para consultar la base. Sin esto puedes trabajar igual en el código.
 
@@ -13,7 +13,7 @@ Esta guía deja tu Mac listo para trabajar en Maven con Claude Code, igual que e
 En la Terminal de tu Mac:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/jhonjlopez-sudo/maven-crm/main/infra/scripts/preparar-mac-dev.sh -o /tmp/preparar-mac-dev.sh && bash /tmp/preparar-mac-dev.sh
+curl -fsSL https://raw.githubusercontent.com/ASM-Media-Group-LLC/maven-crm/main/infra/scripts/preparar-mac-dev.sh -o /tmp/preparar-mac-dev.sh && bash /tmp/preparar-mac-dev.sh
 ```
 
 El script instala Homebrew, git, Node, la CLI de GitHub y Claude Code si faltan; te pide entrar a GitHub (`gh auth login`, con tu usuario); clona el repo en `~/Projects/maven-crm`; instala las dependencias y comprueba que compile. Es seguro volver a correrlo.
