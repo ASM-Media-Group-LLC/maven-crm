@@ -222,9 +222,15 @@
   .pt .ofi-pulso { display: flex; align-items: flex-end; gap: 14px; padding: 11px 16px 12px; border-bottom: 1px solid var(--line); background: rgba(255,255,255,.015); }
   .pt .ofi-pulso-rot { flex: none; padding-bottom: 3px; font: 500 10px/1 "JetBrains Mono", monospace; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); }
   .pt .ofi-barras { flex: 1; display: flex; align-items: flex-end; gap: 4px; height: 46px; }
-  .pt .ofi-barras i { flex: 1; min-height: 3px; border-radius: 3px 3px 0 0; transform-origin: bottom; background: linear-gradient(180deg, var(--azul-claro), var(--violeta)); animation: ofi-crecer .85s cubic-bezier(.2,.7,.3,1) both; }
-  .pt .ofi-barras i.viva { background: linear-gradient(180deg, #8fe6ff, var(--azul-claro)); box-shadow: 0 0 14px -1px rgba(var(--azul-claro-rgb),.95), 0 0 5px rgba(143,230,255,.85); }
-  @keyframes ofi-crecer { from { transform: scaleY(0); opacity: 0; } to { transform: scaleY(1); opacity: 1; } }
+  .pt .ofi-barras i { flex: 1; min-height: 3px; border-radius: 3px 3px 0 0; transform-origin: bottom; background: linear-gradient(180deg, var(--azul-claro), var(--violeta)); animation: ofi-vivir 2.6s ease-in-out infinite; }
+  .pt .ofi-barras i.viva { background: linear-gradient(180deg, #8fe6ff, var(--azul-claro)); animation: ofi-vivir 2.6s ease-in-out infinite, ofi-brillo 2.2s ease-in-out infinite; }
+  /* El gráfico vive: cada barra sube y baja desfasada (una ola que recorre), y
+     la última palpita su brillo — como el video de la referencia. */
+  @keyframes ofi-vivir { 0%, 100% { transform: scaleY(.68); } 50% { transform: scaleY(1); } }
+  @keyframes ofi-brillo {
+    0%, 100% { box-shadow: 0 0 8px -2px rgba(var(--azul-claro-rgb),.5); }
+    50% { box-shadow: 0 0 18px 0 rgba(var(--azul-claro-rgb),.95), 0 0 6px rgba(143,230,255,.9); }
+  }
 
   .pt .cinta { position: relative; height: 372px; overflow: hidden; padding: 6px 0; }
   /* Difumina arriba y abajo para que la cinta parezca infinita. */

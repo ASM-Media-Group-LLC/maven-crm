@@ -141,7 +141,7 @@ export default function Oficina({ publico }: { publico: Publico }) {
             <i
               key={i}
               className={i === BARRAS.length - 1 ? "viva" : ""}
-              style={{ height: `${h}%`, animationDelay: `${i * 45}ms` }}
+              style={{ height: `${h}%`, animationDelay: `${i * 0.13}s` }}
             />
           ))}
         </div>
