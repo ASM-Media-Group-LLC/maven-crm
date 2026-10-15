@@ -1,4 +1,3 @@
-import { Sparkles } from "lucide-react";
 import type { Publico } from "./guiones";
 
 // LO QUE CAMBIA CUANDO CAMBIA EL PÚBLICO.
@@ -14,8 +13,10 @@ import type { Publico } from "./guiones";
 // esconderle a una agencia lo que se hizo para ella.
 
 export interface Guion {
-  /** Segunda línea del título, la que va con el degradado. */
+  /** Primera línea del título: la del degradado, el gancho. */
   remate: string;
+  /** Segunda línea del título, en blanco: continúa la frase del remate. */
+  remateBajo: string;
   bajada: React.ReactNode;
   /** La franja de números. `hasta` es el valor final del contador. */
   cifras: { hasta: number; prefijo: string; pie: string }[];
@@ -56,22 +57,16 @@ const LINKS_CIERRE: [string, string][] = [
 
 export const GUION: Record<Publico, Guion> = {
   empresas: {
-    remate: "Control total, en tiempo real.",
+    remate: "Control total, en tiempo real,",
+    remateBajo: "a todo tu equipo en la oficina virtual.",
     bajada: (
-      <>
-        <p className="bajada-lead">Todo tu equipo trabajando en un mismo lugar.</p>
-        <ul className="bajada-chips">
-          <li>Chat</li>
-          <li>Reuniones</li>
-          <li>Correo propio</li>
-          <li>Documentos</li>
-          <li>Tareas</li>
-        </ul>
-        <p className="bajada-ia">
-          <Sparkles width={16} height={16} strokeWidth={2.2} aria-hidden="true" />
-          <span>Y una <b>capa de IA</b> que supervisa la actividad, califica el trabajo y te avisa — sin que tengas que estar mirando.</span>
-        </p>
-      </>
+      <ul className="bajada-chips">
+        <li>Chat</li>
+        <li>Reuniones</li>
+        <li>Correo propio</li>
+        <li>Documentos</li>
+        <li>Tareas</li>
+      </ul>
     ),
     cifras: [
       {
@@ -92,23 +87,17 @@ export const GUION: Record<Publico, Guion> = {
   },
 
   agencias: {
-    remate: "Control total de cada cuenta, en tiempo real.",
+    remate: "Control total, en tiempo real,",
+    remateBajo: "a toda tu agencia en la oficina virtual.",
     bajada: (
-      <>
-        <p className="bajada-lead">La oficina de tu agencia, con todo bajo control.</p>
-        <ul className="bajada-chips">
-          <li>Chat</li>
-          <li>Reuniones</li>
-          <li>Correo propio</li>
-          <li>Promoción</li>
-          <li>Turnos</li>
-          <li>Simulador</li>
-        </ul>
-        <p className="bajada-ia">
-          <Sparkles width={16} height={16} strokeWidth={2.2} aria-hidden="true" />
-          <span>Seguimiento de promoción con <b>evidencia</b>, ingresos por cuenta y control de cada chatter — en vivo.</span>
-        </p>
-      </>
+      <ul className="bajada-chips">
+        <li>Chat</li>
+        <li>Reuniones</li>
+        <li>Correo propio</li>
+        <li>Promoción</li>
+        <li>Turnos</li>
+        <li>Simulador</li>
+      </ul>
     ),
     cifras: [
       {

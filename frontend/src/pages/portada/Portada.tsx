@@ -88,7 +88,7 @@ export default function Portada() {
   // El título de la pestaña: el mismo que el <title> estático, por si se entra
   // desde adentro de la app, donde la pestaña dice solo "Maven".
   useEffect(() => {
-    document.title = "Maven — Tu equipo en una sola oficina, control total en tiempo real";
+    document.title = "Maven — Control total en tiempo real, a todo tu equipo en la oficina virtual";
   }, []);
 
   // La portada es la única pantalla pública, y va en oscuro sí o sí: el
@@ -122,8 +122,8 @@ export default function Portada() {
               Oficina virtual con control del equipo
             </span>
             <h1>
-              Tu equipo en una sola oficina.<br />
-              <span className="resalte">{guion.remate}</span>
+              <span className="resalte">{guion.remate}</span><br />
+              {guion.remateBajo}
             </h1>
             <div className="bajada">{guion.bajada}</div>
 
