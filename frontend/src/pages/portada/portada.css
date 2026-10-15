@@ -489,8 +489,10 @@
 
 
   /* ── Avatares ─────────────────────────────────────────────────────────────
-     Los mismos muñequitos que usa la app: dibujos deterministas, un seed por
-     persona. Van incrustados en la página, no pedidos a un servicio externo. */
+     Cada seed tiene su retrato de oficina (componente Cara). `cara-foto` hace
+     que la foto llene su círculo sin deformarse, recortando hacia arriba —
+     donde está la cara. Si la foto no carga, Cara cae a una silueta neutra. */
+  .pt .cara-foto { object-fit: cover; object-position: center 28%; }
   .pt .pila { display: flex; align-items: center; }
   .pt .pila img {
     width: 30px; height: 30px; border-radius: 50%;
@@ -600,7 +602,7 @@
   /* La gente dentro de las maquetas: siluetas, como el panel del hero. La que
      habla lleva las ondas de voz (reusa @keyframes ofi-onda). */
   .pt .mini { height: 100%; }
-  .pt .mini .cara { width: 24px; height: 24px; border-radius: 50%; background: var(--surface-2); border: 1.5px solid var(--line-strong); flex: none; }
+  .pt .mini .cara { width: 24px; height: 24px; border-radius: 50%; flex: none; border: 1.5px solid var(--line-strong); background-color: var(--surface-2); background-size: cover; background-position: center 28%; background-repeat: no-repeat; }
   .pt .mini .habla .cara:first-child { border-color: var(--azul-claro); }
   .pt .mini .ondas { display: inline-flex; align-items: flex-end; gap: 2px; height: 11px; }
   .pt .mini .ondas i { width: 2px; height: 4px; border-radius: 1px; background: var(--azul-claro); animation: ofi-onda 1s ease-in-out infinite; }

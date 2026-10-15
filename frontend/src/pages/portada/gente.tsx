@@ -2,9 +2,10 @@
 //
 // Son personas INVENTADAS. La portada es pública: no muestra a nadie del
 // equipo ni de ningún cliente, ni una conversación real, ni una cifra de
-// nadie. En vez de caras, se dibuja una SILUETA NEUTRA: una figura genérica
-// sobre un círculo con un tinte estable por seed (mismo seed → mismo color),
-// para distinguir quién es quién sin mostrar un rostro caricaturesco.
+// nadie. Cada seed tiene su retrato de oficina generado con IA (gente que no
+// existe), servido como estático; si una foto no carga, se cae a una silueta
+// neutra con un tinte estable por seed. Mismo seed → misma persona en toda la
+// página, para que se reconozca de una sección a otra.
 export const GENTE = [
   { seed: "camilo", nombre: "Camilo" },
   { seed: "valentina", nombre: "Valentina" },
@@ -45,11 +46,35 @@ export function siluetaUri(seed: string): string {
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
-/** Una cara (ahora una silueta neutra). `alt=""` a propósito: es decorativa,
- *  el nombre siempre está en el texto de al lado y repetirlo solo ensucia el
- *  lector de pantalla. */
+/** La foto de cada persona inventada: retratos de oficina generados con IA
+ *  (no son empleados ni clientes reales), servidos como estáticos desde
+ *  `public/portada/caras`. Hombres y mujeres repartidos por seed. */
+const FOTO: Record<Seed, string> = {
+  camilo: "/portada/caras/cara-01.jpg",
+  andres: "/portada/caras/cara-02.jpg",
+  emilio: "/portada/caras/cara-03.jpg",
+  joaquin: "/portada/caras/cara-04.jpg",
+  valentina: "/portada/caras/cara-05.jpg",
+  luciana: "/portada/caras/cara-06.jpg",
+  martina: "/portada/caras/cara-07.jpg",
+  sofia: "/portada/caras/cara-08.jpg",
+};
+
+/** Una cara: la foto de oficina de esa persona inventada. `alt=""` a propósito:
+ *  es decorativa, el nombre va en el texto de al lado. La clase `cara-foto` le
+ *  da `object-fit: cover`. Si la foto no carga, cae a la silueta neutra. */
 export function Cara({ seed, className, style }: { seed: Seed; className?: string; style?: React.CSSProperties }) {
-  return <img src={siluetaUri(seed)} alt="" className={className} style={style} />;
+  const clase = className ? `cara-foto ${className}` : "cara-foto";
+  return (
+    <img
+      src={FOTO[seed]}
+      alt=""
+      loading="lazy"
+      className={clase}
+      style={style}
+      onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = siluetaUri(seed); }}
+    />
+  );
 }
 
 /** La fila de caras superpuestas, como en el sidebar de la app. */

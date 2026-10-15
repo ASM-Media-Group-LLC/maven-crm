@@ -85,6 +85,11 @@ const HERRAMIENTAS = ["Correo", "Chat", "Video", "Oficina virtual", "Tickets", "
 
 const DIAS = ["L", "M", "X", "J", "V", "S", "D"];
 
+// Las mismas fotos de oficina que usa el resto de la portada (public/portada/caras):
+// así la gente de las maquetas chicas es la misma que la del panel del hero.
+const CARAS = Array.from({ length: 8 }, (_, i) => `/portada/caras/cara-${String(i + 1).padStart(2, "0")}.jpg`);
+const caraFoto = (i: number) => ({ backgroundImage: `url(${CARAS[i % CARAS.length]})` });
+
 /** La maqueta chica de cada tarjeta: un vistazo de cómo se ve el módulo en
  *  Maven, reconstruido con `<div>` y sin un solo dato real. */
 function Mini({ clave }: { clave: string }) {
@@ -105,7 +110,7 @@ function Mini({ clave }: { clave: string }) {
       return (
         <div className="mini mini-msg">
           <div className="fila">
-            <span className="cara" />
+            <span className="cara" style={caraFoto(5)} />
             <div className="bb"><span className="nom" /><span className="l" /><span className="l corta" /></div>
           </div>
           <div className="bb mia"><span className="l" /><span className="pie">10:42 ✓✓</span></div>
@@ -118,7 +123,7 @@ function Mini({ clave }: { clave: string }) {
           <div className="meet-grid">
             {[0, 1, 2, 3].map((n) => (
               <span className={`t${n === 0 ? " habla" : ""}`} key={n}>
-                <span className="cara" />
+                <span className="cara" style={caraFoto([0, 4, 1, 6][n])} />
                 {n === 0 ? <span className="ondas" aria-hidden="true"><i /><i /><i /></span> : null}
               </span>
             ))}
@@ -130,11 +135,11 @@ function Mini({ clave }: { clave: string }) {
         <div className="mini mini-cowork">
           <div className="sala viva">
             <span className="tope"><b /><span className="ondas" aria-hidden="true"><i /><i /><i /></span></span>
-            <span className="gente"><span className="cara" /><span className="cara" /></span>
+            <span className="gente"><span className="cara" style={caraFoto(2)} /><span className="cara" style={caraFoto(7)} /></span>
           </div>
           <div className="sala">
             <span className="tope"><b /></span>
-            <span className="gente"><span className="cara" /><span className="cara" /></span>
+            <span className="gente"><span className="cara" style={caraFoto(3)} /><span className="cara" style={caraFoto(5)} /></span>
           </div>
         </div>
       );
@@ -149,7 +154,7 @@ function Mini({ clave }: { clave: string }) {
     default:
       return (
         <div className="mini mini-gen">
-          {[0, 1, 2].map((n) => <div className="g-row" key={n}><span className="cara" /><i /></div>)}
+          {[0, 1, 2].map((n) => <div className="g-row" key={n}><span className="cara" style={caraFoto([0, 4, 1][n])} /><i /></div>)}
         </div>
       );
   }
