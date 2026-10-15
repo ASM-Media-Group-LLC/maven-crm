@@ -125,7 +125,7 @@ export default function Portada() {
               Tu equipo en una sola oficina.<br />
               <span className="resalte">{guion.remate}</span>
             </h1>
-            <p className="bajada">{guion.bajada}</p>
+            <div className="bajada">{guion.bajada}</div>
 
             <div className="publico" role="tablist" aria-label="Elegir público">
               <button

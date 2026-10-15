@@ -1,3 +1,4 @@
+import { Sparkles } from "lucide-react";
 import type { Publico } from "./guiones";
 
 // LO QUE CAMBIA CUANDO CAMBIA EL PÚBLICO.
@@ -58,9 +59,18 @@ export const GUION: Record<Publico, Guion> = {
     remate: "Control total, en tiempo real.",
     bajada: (
       <>
-        Chat, reuniones, correo con tu dominio y documentos, donde tu gente trabaja de verdad.
-        Con una <b>capa de IA que supervisa la actividad, califica el trabajo y te avisa</b> sin
-        que tengas que estar mirando.
+        <p className="bajada-lead">Todo tu equipo trabajando en un mismo lugar.</p>
+        <ul className="bajada-chips">
+          <li>Chat</li>
+          <li>Reuniones</li>
+          <li>Correo propio</li>
+          <li>Documentos</li>
+          <li>Tareas</li>
+        </ul>
+        <p className="bajada-ia">
+          <Sparkles width={16} height={16} strokeWidth={2.2} aria-hidden="true" />
+          <span>Y una <b>capa de IA</b> que supervisa la actividad, califica el trabajo y te avisa — sin que tengas que estar mirando.</span>
+        </p>
       </>
     ),
     cifras: [
@@ -85,10 +95,19 @@ export const GUION: Record<Publico, Guion> = {
     remate: "Control total de cada cuenta, en tiempo real.",
     bajada: (
       <>
-        Oficina virtual con chat, reuniones y correo propio — y arriba, lo que ninguna suite de
-        oficina te va a dar: <b>seguimiento de promoción con evidencia, ingresos por cuenta,
-        turnos de chatters y un simulador para probar a los candidatos</b> antes de darles una
-        cuenta que factura.
+        <p className="bajada-lead">La oficina de tu agencia, con todo bajo control.</p>
+        <ul className="bajada-chips">
+          <li>Chat</li>
+          <li>Reuniones</li>
+          <li>Correo propio</li>
+          <li>Promoción</li>
+          <li>Turnos</li>
+          <li>Simulador</li>
+        </ul>
+        <p className="bajada-ia">
+          <Sparkles width={16} height={16} strokeWidth={2.2} aria-hidden="true" />
+          <span>Seguimiento de promoción con <b>evidencia</b>, ingresos por cuenta y control de cada chatter — en vivo.</span>
+        </p>
       </>
     ),
     cifras: [

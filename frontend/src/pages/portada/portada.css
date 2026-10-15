@@ -166,14 +166,33 @@
   @keyframes latir { 0% { box-shadow: 0 0 0 0 rgba(16,185,129,.55); } 70% { box-shadow: 0 0 0 9px rgba(16,185,129,0); } 100% { box-shadow: 0 0 0 0 rgba(16,185,129,0); } }
 
   .pt h1 {
-    font-size: clamp(38px, 6.2vw, 66px); line-height: 1.02; margin: 22px 0 0;
+    font: 800 clamp(34px, 5vw, 56px)/1.0 Sora, sans-serif;
+    letter-spacing: -.035em; margin: 20px 0 0; text-wrap: balance;
   }
   .pt h1 .resalte {
-    background: linear-gradient(100deg, var(--azul-claro), var(--violeta) 82%);
+    background: linear-gradient(104deg, var(--azul-claro), var(--violeta) 78%);
     -webkit-background-clip: text; background-clip: text; color: transparent;
+    /* Un resplandor suave detrás del degradado: le da profundidad sin brillar. */
+    filter: drop-shadow(0 6px 26px rgba(var(--violeta-rgb), .32));
   }
-  .pt .bajada { margin: 22px 0 0; font-size: 18px; line-height: 1.6; color: var(--ink-soft); max-width: 54ch; }
-  .pt .bajada b { color: var(--ink); font-weight: 600; }
+
+  /* La bajada: ya no un párrafo gris, sino una línea fuerte + fichas de lo que
+     trae + la promesa de IA destacada. A juego con las fichas del panel. */
+  .pt .bajada { margin: 24px 0 0; max-width: 48ch; }
+  .pt .bajada-lead { margin: 0; font: 600 19px/1.4 Sora, sans-serif; letter-spacing: -.01em; color: var(--ink); }
+  .pt .bajada-chips { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 0; padding: 0; }
+  .pt .bajada-chips li {
+    font: 500 13px/1 "Instrument Sans", sans-serif; color: var(--ink-soft);
+    border: 1px solid var(--line); border-radius: 999px; padding: 7px 12px;
+    background: rgba(255,255,255,.03); transition: border-color .2s, transform .2s;
+  }
+  .pt .bajada-chips li:hover { border-color: var(--line-strong); transform: translateY(-2px); }
+  .pt .bajada-ia {
+    display: flex; gap: 9px; align-items: flex-start; margin: 18px 0 0;
+    font-size: 14.5px; line-height: 1.55; color: var(--muted); max-width: 48ch;
+  }
+  .pt .bajada-ia svg { color: var(--violeta); flex: none; margin-top: 2px; }
+  .pt .bajada-ia b { color: var(--ink-soft); font-weight: 600; }
   .pt .acciones { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 32px; }
   .pt .pie-hero { margin: 20px 0 0; font-size: 13px; color: var(--faint); }
 
