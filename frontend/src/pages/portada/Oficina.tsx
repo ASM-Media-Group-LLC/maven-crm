@@ -42,6 +42,11 @@ const SALAS: Record<Publico, Sala[]> = {
   ],
 };
 
+// La barra de actividad del hero (el gráfico "tipo command center"): 12 tramos
+// del día, el último encendido. Es ILUSTRATIVA, como el reloj y el conteo — no
+// es una cifra real de nadie.
+const BARRAS = [44, 50, 47, 57, 54, 62, 59, 69, 65, 77, 83, 100];
+
 function SalaVista({ s, escuchada, vozActiva }: { s: Sala; escuchada: boolean; vozActiva?: Seed }) {
   const vacia = s.gente.length === 0;
   const habla = s.gente.find((p) => p.estado === "habla");
@@ -128,6 +133,18 @@ export default function Oficina({ publico }: { publico: Publico }) {
         <span className="consola-titulo">oficina · en vivo</span>
         <span className="ofi-cuenta">{enSalas} en salas · {hablantes.length} hablando</span>
         <span className="consola-reloj">{hora}</span>
+      </div>
+      <div className="ofi-pulso">
+        <span className="ofi-pulso-rot">actividad · hoy</span>
+        <div className="ofi-barras" aria-hidden="true">
+          {BARRAS.map((h, i) => (
+            <i
+              key={i}
+              className={i === BARRAS.length - 1 ? "viva" : ""}
+              style={{ height: `${h}%`, animationDelay: `${i * 45}ms` }}
+            />
+          ))}
+        </div>
       </div>
       <div className="ofi" aria-label="Oficina en vivo">
         {/* El `key` por público remonta la grilla: cambia el guión sin que se

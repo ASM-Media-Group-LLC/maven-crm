@@ -200,15 +200,31 @@
 
   /* ── La cinta de operación: el corazón del hero ───────────────────────── */
   .pt .consola {
+    position: relative;
     border: 1px solid var(--line-strong); border-radius: var(--r-lg); overflow: hidden;
     background: linear-gradient(180deg, var(--surface), var(--ground-deep));
-    box-shadow: 0 40px 90px -40px rgba(0,0,0,.95), 0 0 0 1px rgba(255,255,255,.03) inset;
+    box-shadow: 0 40px 90px -40px rgba(0,0,0,.95), 0 26px 80px -34px rgba(var(--azul-rgb),.5), 0 0 0 1px rgba(255,255,255,.03) inset;
+  }
+  /* El panel se presenta en 3D, como un producto de verdad; al pasar el mouse
+     se endereza. Solo en pantallas anchas: en mobile el hero se apila y va plano. */
+  @media (min-width: 1000px) {
+    .pt .consola { transform: perspective(1700px) rotateY(-6deg) rotateX(2deg); transform-origin: center left; transition: transform .55s cubic-bezier(.2,.7,.3,1); }
+    .pt .consola:hover { transform: perspective(1700px) rotateY(0deg) rotateX(0deg); }
   }
   .pt .consola-barra { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--line); background: rgba(255,255,255,.02); }
   .pt .semaforo { display: flex; gap: 6px; }
   .pt .semaforo i { width: 9px; height: 9px; border-radius: 50%; background: rgba(255,255,255,.14); }
   .pt .consola-titulo { font: 500 12px/1 "JetBrains Mono", monospace; color: var(--muted); letter-spacing: .05em; }
   .pt .consola-reloj { margin-left: auto; font: 400 11.5px/1 "JetBrains Mono", monospace; color: var(--faint); }
+
+  /* La barra de actividad del hero: el gráfico "tipo command center" — 12 tramos
+     con degradado morado→cian y el último encendido, que crecen al cargar. */
+  .pt .ofi-pulso { display: flex; align-items: flex-end; gap: 14px; padding: 11px 16px 12px; border-bottom: 1px solid var(--line); background: rgba(255,255,255,.015); }
+  .pt .ofi-pulso-rot { flex: none; padding-bottom: 3px; font: 500 10px/1 "JetBrains Mono", monospace; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); }
+  .pt .ofi-barras { flex: 1; display: flex; align-items: flex-end; gap: 4px; height: 46px; }
+  .pt .ofi-barras i { flex: 1; min-height: 3px; border-radius: 3px 3px 0 0; transform-origin: bottom; background: linear-gradient(180deg, var(--azul-claro), var(--violeta)); animation: ofi-crecer .85s cubic-bezier(.2,.7,.3,1) both; }
+  .pt .ofi-barras i.viva { background: linear-gradient(180deg, #8fe6ff, var(--azul-claro)); box-shadow: 0 0 14px -1px rgba(var(--azul-claro-rgb),.95), 0 0 5px rgba(143,230,255,.85); }
+  @keyframes ofi-crecer { from { transform: scaleY(0); opacity: 0; } to { transform: scaleY(1); opacity: 1; } }
 
   .pt .cinta { position: relative; height: 372px; overflow: hidden; padding: 6px 0; }
   /* Difumina arriba y abajo para que la cinta parezca infinita. */
