@@ -405,6 +405,11 @@
   .pt .ofi-cam-voz i { width: 2px; min-height: 2px; border-radius: 1px; background: var(--verde); animation: cwx-voz 1s ease-in-out infinite; }
   .pt .ofi-cam-voz i:nth-child(2) { animation-delay: .15s; }
   .pt .ofi-cam-voz i:nth-child(3) { animation-delay: .3s; }
+  /* La cámara del hero también respira (mismo efecto que el tablero). */
+  .pt .ofi-cam-full { animation: cam-vivo 11s ease-in-out infinite alternate; will-change: transform; }
+  .pt .ofi-grilla .ofi-sala:nth-child(2) .ofi-cam-full { animation-duration: 13s; animation-delay: -5s; }
+  .pt .ofi-grilla .ofi-sala:nth-child(3) .ofi-cam-full { animation-duration: 12.5s; animation-delay: -8s; }
+  .pt .ofi-grilla .ofi-sala:nth-child(4) .ofi-cam-full { animation-duration: 14s; animation-delay: -3s; }
   .pt .ofi-pie { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 11px; line-height: 1.2; color: var(--muted); white-space: nowrap; overflow: hidden; }
   .pt .ofi-pie > span:first-child { overflow: hidden; text-overflow: ellipsis; }
   .pt .ofi-esc { display: inline-flex; align-items: center; gap: 5px; flex: none; font: 500 10px/1 "JetBrains Mono", monospace; letter-spacing: .04em; color: var(--verde); }
@@ -1023,6 +1028,19 @@
   .pt .cwx-sala .pantalla .cam-voz i:nth-child(3) { animation-delay: .3s; }
   .pt .cwx-sala .pantalla .cam-voz i:nth-child(4) { animation-delay: .45s; }
   @keyframes cwx-voz { 0%, 100% { height: 3px; } 50% { height: 12px; } }
+  /* Las cámaras "respiran": un leve zoom/deriva continuo, desfasado por sala, para
+     que se sientan EN VIVO (como un video) sin el peso de video real. Junto con las
+     ondas de voz y el cambio cámara↔pantalla, el tile se ve vivo. */
+  .pt .cwx-sala .pantalla .cam-full { animation: cam-vivo 11s ease-in-out infinite alternate; will-change: transform; }
+  .pt .cwx-sala:nth-child(2) .pantalla .cam-full { animation-duration: 13s; animation-delay: -4s; }
+  .pt .cwx-sala:nth-child(3) .pantalla .cam-full { animation-duration: 10s; animation-delay: -7s; }
+  .pt .cwx-sala:nth-child(4) .pantalla .cam-full { animation-duration: 12.5s; animation-delay: -2s; }
+  .pt .cwx-sala:nth-child(5) .pantalla .cam-full { animation-duration: 14s; animation-delay: -9s; }
+  .pt .cwx-sala:nth-child(6) .pantalla .cam-full { animation-duration: 11.5s; animation-delay: -5s; }
+  .pt .cwx-sala:nth-child(7) .pantalla .cam-full { animation-duration: 12s; animation-delay: -11s; }
+  .pt .cwx-sala:nth-child(8) .pantalla .cam-full { animation-duration: 13.5s; animation-delay: -3s; }
+  .pt .cwx-sala:nth-child(9) .pantalla .cam-full { animation-duration: 10.5s; animation-delay: -6s; }
+  @keyframes cam-vivo { 0% { transform: scale(1.04) translate(0, 0); } 100% { transform: scale(1.09) translate(-1.6%, -1.2%); } }
   /* La pantalla compartida respira: su gráfico oscila en ola (sirve en el hero y
      en el tablero, los dos usan .cwx-screen). */
   .pt .cwx-screen .ss-chart i { transform-origin: bottom; animation: cwx-barra 2.6s ease-in-out infinite; }
