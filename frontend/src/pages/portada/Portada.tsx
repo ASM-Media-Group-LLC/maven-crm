@@ -7,8 +7,7 @@ import PulsoCanvas from "./PulsoCanvas";
 import Oficina from "./Oficina";
 import Cifras from "./Cifras";
 import { useRevelar } from "./useRevelar";
-import { Pila } from "./gente";
-import { PIES, type Publico } from "./guiones";
+import { type Publico } from "./guiones";
 import { GUION } from "./publico";
 import { SKINS, tokensDe } from "./skins";
 
@@ -117,11 +116,6 @@ export default function Portada() {
         <PulsoCanvas skin={paleta.id} />
         <div className="wrap hero-grid">
           <div>
-            <span className="chip-vivo">
-              <span className="punto" />
-              <Pila cuantas={5} />
-              Oficina virtual con control del equipo
-            </span>
             <h1><span className="resalte">{guion.remate}</span></h1>
             <p className="deck">{guion.remateBajo}</p>
             <div className="bajada">{guion.bajada}</div>
@@ -130,7 +124,6 @@ export default function Portada() {
               <a className="btn btn-primario btn-lg" href="#demo">Pedir una demo</a>
               <a className="btn btn-fantasma btn-lg" href="#reemplaza">Ver lo que reemplaza</a>
             </div>
-            <p className="pie-hero">{PIES[publico]}</p>
           </div>
 
           <Oficina publico={publico} />
