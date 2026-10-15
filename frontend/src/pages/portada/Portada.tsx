@@ -88,7 +88,7 @@ export default function Portada() {
   // El título de la pestaña: el mismo que el <title> estático, por si se entra
   // desde adentro de la app, donde la pestaña dice solo "Maven".
   useEffect(() => {
-    document.title = "Maven — Reemplaza siete suscripciones por una sola sesión";
+    document.title = "Maven — Tu equipo en una sola oficina, control total en tiempo real";
   }, []);
 
   // La portada es la única pantalla pública, y va en oscuro sí o sí: el
@@ -119,10 +119,10 @@ export default function Portada() {
             <span className="chip-vivo">
               <span className="punto" />
               <Pila cuantas={5} />
-              Una sola sesión para todo el equipo
+              Oficina virtual con control del equipo
             </span>
             <h1>
-              Reemplaza siete suscripciones<br />
+              Tu equipo en una sola oficina.<br />
               <span className="resalte">{guion.remate}</span>
             </h1>
             <p className="bajada">{guion.bajada}</p>

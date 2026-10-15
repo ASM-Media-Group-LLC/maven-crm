@@ -55,12 +55,12 @@ const LINKS_CIERRE: [string, string][] = [
 
 export const GUION: Record<Publico, Guion> = {
   empresas: {
-    remate: "por una sola sesión.",
+    remate: "Control total, en tiempo real.",
     bajada: (
       <>
-        Correo con tu dominio, chat interno, oficina virtual, reuniones con grabación, tickets,
-        recursos humanos y finanzas. Con una <b>capa de IA que supervisa, califica y avisa</b> sin
-        que nadie tenga que estar mirando.
+        Chat, reuniones, correo con tu dominio y documentos, donde tu gente trabaja de verdad.
+        Con una <b>capa de IA que supervisa la actividad, califica el trabajo y te avisa</b> sin
+        que tengas que estar mirando.
       </>
     ),
     cifras: [
@@ -82,11 +82,11 @@ export const GUION: Record<Publico, Guion> = {
   },
 
   agencias: {
-    remate: "por la plataforma que la agencia necesitaba.",
+    remate: "Control total de cada cuenta, en tiempo real.",
     bajada: (
       <>
-        Correo propio, chat interno, oficina virtual y reuniones — y arriba, lo que ninguna suite
-        de oficina te va a dar: <b>seguimiento de promoción con evidencia, ingresos por cuenta,
+        Oficina virtual con chat, reuniones y correo propio — y arriba, lo que ninguna suite de
+        oficina te va a dar: <b>seguimiento de promoción con evidencia, ingresos por cuenta,
         turnos de chatters y un simulador para probar a los candidatos</b> antes de darles una
         cuenta que factura.
       </>

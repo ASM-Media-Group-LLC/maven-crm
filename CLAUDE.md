@@ -5,7 +5,12 @@ Maven es el CRM interno de la agencia: Messenger, Cowork y Meet, Correo (Zoho), 
 ## Quién decide
 
 - Las decisiones de producto, prioridades, precios y textos públicos las toma **Alvaro (ASM Tech, cuenta GitHub `ASM-TECH-MIAMI`)**, administrador actual del proyecto.
-- **Velocidad primero.** Lo chico se hace directo y se muestra el resultado. Preguntas, solo las de negocio; lo técnico se decide y se reporta, sin rondas de propuestas.
+- **Velocidad primero.** Lo chico se hace directo y se muestra el resultado ya en vivo. Lo técnico se decide y se reporta, sin rondas de propuestas.
+- **Cómo va un cambio que pide Alvaro (en este orden):**
+  1. **Preguntas al inicio**, todas juntas y cortas, solo de negocio (qué mensaje, para quién, qué va primero). Nada técnico.
+  2. Con las respuestas, **se hace, se verifica y se sube a producción en una sola pasada**. No se pide confirmación al final ni se muestran variantes para elegir después de hecho: lo que se eligió en las preguntas es lo que sale.
+  3. Se reporta con evidencia (captura o link) de lo que ya está en vivo.
+  - Lo único que se devuelve a Alvaro es lo que el sistema no permite hacer desde aquí (claves, borrado de datos), con el paso exacto.
 - Los borradores para los grupos de WhatsApp u otros canales del equipo se entregan a Alvaro; nadie publica por él.
 
 ## Idioma
