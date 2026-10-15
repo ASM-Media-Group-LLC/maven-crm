@@ -2,7 +2,7 @@ import {
   AlertTriangle, Check, Copy, Headphones, Link2, LayoutPanelLeft, Monitor,
   Pencil, Power, Send, Share2, SlidersHorizontal, Users, X,
 } from "lucide-react";
-import { Cara, type Seed } from "../gente";
+import { Cara, nombreDe, type Seed } from "../gente";
 
 // COWORK · EL TABLERO DEL SUPERVISOR.
 //
@@ -16,18 +16,24 @@ import { Cara, type Seed } from "../gente";
 // sesión, que se queda al frente) y un mensaje directo abierto — que es la
 // prueba de "el chat de Maven mientras estás en Cowork".
 
-type Sala = { n: string; gente: number; comparte?: string; cam?: Seed; apagadas?: boolean; codigo: string };
+// Cada sala con gente adentro. Unas en cámara, otras compartiendo pantalla:
+// eso es lo que se vende, un turno entero trabajando acompañado y a la vista.
+type Sala = {
+  n: string; codigo: string; gente: number;
+  comparte?: { seed: Seed; titulo: string }; // alguien comparte su pantalla
+  caras?: Seed[];                             // o están en cámara
+};
 
 const SALAS: Sala[] = [
-  { n: "SALA 1", gente: 1, comparte: "Camilo", cam: "camilo", codigo: "T2GEGG" },
-  { n: "SALA 2", gente: 0, codigo: "ZAZD6V" },
-  { n: "SALA 3", gente: 2, apagadas: true, codigo: "8RBV2E" },
-  { n: "SALA 4", gente: 1, cam: "valentina", codigo: "H6WYPU" },
-  { n: "SALA 5", gente: 0, codigo: "5H6X8V" },
-  { n: "SALA 6", gente: 0, codigo: "2CT3Y7" },
-  { n: "TARDE 1", gente: 1, cam: "luciana", codigo: "CWTXKX" },
-  { n: "TARDE 2", gente: 0, codigo: "JVTW25" },
-  { n: "TARDE 3", gente: 0, codigo: "MEXS5Y" },
+  { n: "SALA 1", codigo: "T2GEGG", gente: 3, comparte: { seed: "camilo", titulo: "Panel de ventas" } },
+  { n: "SALA 2", codigo: "ZAZD6V", gente: 2, caras: ["valentina", "andres"] },
+  { n: "SALA 3", codigo: "8RBV2E", gente: 2, caras: ["emilio", "sofia"] },
+  { n: "SALA 4", codigo: "H6WYPU", gente: 4, comparte: { seed: "martina", titulo: "Diseño · campaña" } },
+  { n: "SALA 5", codigo: "5H6X8V", gente: 1, caras: ["joaquin"] },
+  { n: "SALA 6", codigo: "2CT3Y7", gente: 2, caras: ["luciana", "camilo"] },
+  { n: "TARDE 1", codigo: "CWTXKX", gente: 2, caras: ["andres", "martina"] },
+  { n: "TARDE 2", codigo: "JVTW25", gente: 1, caras: ["sofia"] },
+  { n: "TARDE 3", codigo: "MEXS5Y", gente: 2, comparte: { seed: "luciana", titulo: "Reporte del día" } },
 ];
 
 // Tres + "la llamada te sigue". Lo que la maqueta ya muestra (pantallas en vivo) o que ya
@@ -49,16 +55,30 @@ function TarjetaSala({ s }: { s: Sala }) {
         <span className="accion"><X width={10} height={10} aria-hidden="true" /></span>
       </div>
       <p className={`comp${s.comparte ? " si" : ""}`}>
-        {s.comparte ? `Compartiendo: ${s.comparte}` : "Sin pantalla compartida"}
+        {s.comparte ? `Compartiendo: ${nombreDe(s.comparte.seed)}` : `${s.gente} en cámara`}
       </p>
-      {s.cam ? (
-        <div className="pantalla">
-          <Cara seed={s.cam} className="cara-cam" />
-          <span className="quien-cam">{s.comparte ?? s.n}</span>
+      {s.comparte ? (
+        <div className="pantalla compartiendo">
+          <div className="cwx-screen" aria-hidden="true">
+            <span className="ss-bar"><i /><i /><i /></span>
+            <div className="ss-body">
+              <span className="l t" /><span className="l" /><span className="l" />
+              <div className="ss-chart"><i /><i /><i /><i /><i /></div>
+            </div>
+          </div>
+          <span className="ss-quien">
+            <Cara seed={s.comparte.seed} className="ss-cara" />
+            {nombreDe(s.comparte.seed)} · {s.comparte.titulo}
+          </span>
         </div>
       ) : (
-        <div className="pantalla vacia">
-          <span className="sin">{s.apagadas ? "Cámaras apagadas" : "Sin participantes"}</span>
+        <div className="pantalla">
+          <span className="cam-gente">
+            {(s.caras ?? []).slice(0, 2).map((c) => <Cara seed={c} className="cara-cam" key={c} />)}
+          </span>
+          <span className="quien-cam">
+            {nombreDe((s.caras ?? ["camilo"])[0])}{s.gente > 1 ? ` +${s.gente - 1}` : ""}
+          </span>
         </div>
       )}
       <div className="par">
@@ -99,7 +119,7 @@ export default function Cowork() {
                 <span className="semaforo"><i /><i /><i /></span>
                 <span className="tit">cowork · tablero del supervisor</span>
                 <span className="der" style={{ font: "400 10.5px/1 'JetBrains Mono',monospace", color: "var(--faint)" }}>
-                  3 salas con gente
+                  9 salas con gente
                 </span>
               </div>
 
@@ -123,9 +143,13 @@ export default function Cowork() {
                   <div className="cwx-grupo">
                     <span className="rot">
                       <AlertTriangle width={11} height={11} strokeWidth={2.4} aria-hidden="true" />
-                      Solicitudes (0)
+                      Solicitudes (1)
                     </span>
-                    <p>Sin solicitudes pendientes</p>
+                    <div className="cwx-vivo" style={{ marginTop: 9 }}>
+                      <Cara seed="emilio" style={{ width: 20, height: 20, borderRadius: "50%" }} />
+                      Emilio quiere entrar
+                      <span className="sala-chip" style={{ color: "var(--verde)", borderColor: "rgba(16,185,129,.35)" }}>Admitir</span>
+                    </div>
                   </div>
                   <div className="cwx-grupo" style={{ borderBottom: 0 }}>
                     <span className="rot" style={{ color: "var(--rosa)" }}>
@@ -136,6 +160,11 @@ export default function Cowork() {
                       <Cara seed="camilo" style={{ width: 20, height: 20, borderRadius: "50%" }} />
                       Camilo
                       <span className="sala-chip">SALA 1</span>
+                    </div>
+                    <div className="cwx-vivo" style={{ marginTop: 7 }}>
+                      <Cara seed="martina" style={{ width: 20, height: 20, borderRadius: "50%" }} />
+                      Martina
+                      <span className="sala-chip">SALA 4</span>
                     </div>
                   </div>
                 </div>
@@ -164,12 +193,15 @@ export default function Cowork() {
                 Hub del supervisor
                 <span className="ctrls">🔊 ▭ − ⤢</span>
               </div>
-              <div className="hub-tit">Hub del supervisor <span>1 participante</span></div>
-              <div className="hub-escena">
-                <span className="fl izq">‹</span>
+              <div className="hub-tit">Hub del supervisor <span>4 participantes</span></div>
+              <div className="hub-escena activa">
+                <span className="hub-mini" aria-hidden="true">
+                  <Cara seed="camilo" className="hub-cara habla" />
+                  <Cara seed="valentina" className="hub-cara" />
+                  <Cara seed="andres" className="hub-cara" />
+                </span>
                 <span className="yo">JL</span>
-                <span className="fl der">›</span>
-                <span className="espera">Esperando a que se unan los demás…</span>
+                <span className="espera en-vivo">4 en la sesión · Camilo hablando</span>
               </div>
               <div className="hub-pie">Tú 🔇 <span className="sesion-chip">TURNO MAÑANA ⌄</span> ▁▃▅</div>
               <div className="hub-ctrl">
