@@ -553,6 +553,116 @@
   .pt .despues b { display: block; font: 700 16px/1.3 Sora, sans-serif; }
   .pt .despues em { display: block; margin-top: 5px; font-style: normal; font-size: 13.5px; line-height: 1.55; color: var(--muted); }
 
+  /* ── Lo que reemplaza · el showcase ────────────────────────────────────────
+     Reemplaza a la tabla de texto. Arriba, el golpe económico (siete
+     suscripciones → una); abajo, una tarjeta por módulo con una maqueta chica
+     en HTML de cómo se ve en Maven —con gente, no cuadros vacíos—. Las maquetas
+     grandes de cada módulo siguen más abajo; estas son el adelanto que vende. */
+  .pt .ahorro { margin-top: 44px; display: grid; gap: 18px; align-items: stretch; }
+  @media (min-width: 900px) { .pt .ahorro { grid-template-columns: 1fr 56px 1fr; align-items: center; } }
+  .pt .ahorro-caja { border: 1px solid var(--line); border-radius: var(--r-lg); padding: 22px 24px; background: var(--surface); }
+  .pt .ahorro-rotulo { font: 500 11px/1 "JetBrains Mono", monospace; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); }
+  .pt .ahorro-chips { list-style: none; margin: 16px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+  .pt .ahorro-chips li {
+    font: 500 13px/1 "Instrument Sans", sans-serif; color: var(--faint);
+    border: 1px solid var(--line); border-radius: 999px; padding: 8px 13px;
+    background: rgba(255,255,255,.02); text-decoration: line-through; text-decoration-color: rgba(255,255,255,.22);
+  }
+  .pt .ahorro-flecha { display: grid; place-items: center; color: var(--azul-claro); font-size: 26px; }
+  @media (max-width: 899px) { .pt .ahorro-flecha { transform: rotate(90deg); } }
+  .pt .ahorro-nuevo {
+    border-color: rgba(var(--azul-claro-rgb),.5);
+    background: linear-gradient(165deg, rgba(var(--azul-rgb),.12), var(--surface) 70%);
+    box-shadow: 0 0 0 1px rgba(var(--azul-claro-rgb),.18), 0 26px 64px -32px rgba(var(--azul-rgb),.85);
+  }
+  .pt .ahorro-nuevo .uno { margin: 14px 0 0; font: 800 clamp(30px, 4vw, 44px)/1 Sora, sans-serif; letter-spacing: -.03em; }
+  .pt .ahorro-nuevo .uno b {
+    background: linear-gradient(104deg, var(--azul-claro), var(--violeta));
+    -webkit-background-clip: text; background-clip: text; color: transparent; font-weight: 800;
+  }
+  .pt .ahorro-nuevo .sub { margin: 10px 0 0; font-size: 14px; line-height: 1.5; color: var(--ink-soft); }
+
+  .pt .reempla-grid { margin-top: 20px; display: grid; gap: 16px; grid-template-columns: 1fr; }
+  @media (min-width: 820px) { .pt .reempla-grid { grid-template-columns: repeat(2, 1fr); } }
+  .pt .reempla-card {
+    display: flex; flex-direction: column; overflow: hidden;
+    border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface);
+    transition: transform .25s cubic-bezier(.2,.7,.3,1), border-color .25s, box-shadow .25s;
+  }
+  .pt .reempla-card:hover { transform: translateY(-4px); border-color: var(--line-strong); box-shadow: 0 24px 50px -34px rgba(0,0,0,.9); }
+  .pt .reempla-mini { height: 140px; border-bottom: 1px solid var(--line); overflow: hidden; padding: 14px; background: linear-gradient(180deg, var(--surface-2), var(--ground-deep)); }
+  .pt .reempla-cuerpo { padding: 18px 20px 20px; }
+  .pt .reempla-tag { display: inline-block; font: 500 10.5px/1 "JetBrains Mono", monospace; letter-spacing: .06em; text-transform: uppercase; color: var(--faint); }
+  .pt .reempla-tag s { color: var(--faint); text-decoration-color: rgba(255,255,255,.3); }
+  .pt .reempla-card h3 { font: 700 18px/1.2 Sora, sans-serif; margin: 10px 0 0; }
+  .pt .reempla-card p { margin: 8px 0 0; font-size: 13.5px; line-height: 1.55; color: var(--muted); }
+
+  /* La gente dentro de las maquetas: siluetas, como el panel del hero. La que
+     habla lleva las ondas de voz (reusa @keyframes ofi-onda). */
+  .pt .mini { height: 100%; }
+  .pt .mini .cara { width: 24px; height: 24px; border-radius: 50%; background: var(--surface-2); border: 1.5px solid var(--line-strong); flex: none; }
+  .pt .mini .habla .cara:first-child { border-color: var(--azul-claro); }
+  .pt .mini .ondas { display: inline-flex; align-items: flex-end; gap: 2px; height: 11px; }
+  .pt .mini .ondas i { width: 2px; height: 4px; border-radius: 1px; background: var(--azul-claro); animation: ofi-onda 1s ease-in-out infinite; }
+  .pt .mini .ondas i:nth-child(2) { animation-delay: .18s; }
+  .pt .mini .ondas i:nth-child(3) { animation-delay: .36s; }
+
+  /* Correo: dominio propio + bandeja. */
+  .pt .mini-correo .mc-top { display: flex; align-items: center; gap: 7px; font: 500 11px/1 "JetBrains Mono", monospace; color: var(--azul-claro); margin-bottom: 9px; }
+  .pt .mini-correo .mc-top i { width: 13px; height: 13px; border-radius: 4px; background: rgba(var(--azul-rgb),.35); }
+  .pt .mini-correo .mc-row { display: grid; grid-template-columns: 8px 1fr; gap: 9px; align-items: center; padding: 7px 10px; border: 1px solid var(--line); border-radius: 9px; background: rgba(255,255,255,.03); margin-bottom: 6px; }
+  .pt .mini-correo .dot { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,.18); }
+  .pt .mini-correo .dot.on { background: var(--azul); }
+  .pt .mini-correo .mc-lines { display: grid; gap: 4px; }
+  .pt .mini-correo .mc-lines i { height: 5px; border-radius: 3px; background: rgba(255,255,255,.16); }
+  .pt .mini-correo .mc-lines i:last-child { width: 55%; background: rgba(255,255,255,.08); }
+
+  /* Messenger: una persona escribe, yo respondo. */
+  .pt .mini-msg { display: flex; flex-direction: column; gap: 9px; }
+  .pt .mini-msg .fila { display: grid; grid-template-columns: 24px 1fr; gap: 8px; align-items: start; max-width: 84%; }
+  .pt .mini-msg .bb { border: 1px solid var(--line); border-radius: 4px 11px 11px 11px; background: var(--surface-2); padding: 9px 11px; display: grid; gap: 5px; }
+  .pt .mini-msg .bb .nom { height: 6px; width: 40px; border-radius: 3px; background: rgba(var(--azul-claro-rgb),.6); }
+  .pt .mini-msg .bb .l { height: 5px; border-radius: 3px; background: rgba(255,255,255,.18); }
+  .pt .mini-msg .bb .l.corta { width: 60%; }
+  .pt .mini-msg .bb.mia { max-width: 74%; margin-left: auto; border-radius: 11px 4px 11px 11px; background: rgba(var(--azul-rgb),.18); border-color: rgba(var(--azul-rgb),.32); }
+  .pt .mini-msg .bb.mia .l { background: rgba(255,255,255,.3); }
+  .pt .mini-msg .bb .pie { justify-self: end; font: 400 9px/1 "JetBrains Mono", monospace; color: var(--azul-claro); }
+
+  /* Meet: cuatro en la llamada, uno hablando. */
+  .pt .mini-meet { position: relative; height: 100%; }
+  .pt .mini-meet .rec { position: absolute; top: -2px; right: 0; z-index: 2; font: 600 9px/1 "JetBrains Mono", monospace; color: var(--red); letter-spacing: .06em; }
+  .pt .mini-meet .meet-grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 7px; height: 100%; }
+  .pt .mini-meet .t { position: relative; display: grid; place-items: center; border-radius: 8px; background: rgba(255,255,255,.05); border: 1px solid var(--line); }
+  .pt .mini-meet .t.habla { border-color: var(--azul-claro); box-shadow: 0 0 0 1px rgba(var(--azul-claro-rgb),.35); background: rgba(var(--azul-rgb),.08); }
+  .pt .mini-meet .t .ondas { position: absolute; right: 6px; bottom: 5px; }
+
+  /* Cowork: salas con gente; la viva, hablando. */
+  .pt .mini-cowork { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; height: 100%; }
+  .pt .mini-cowork .sala { display: flex; flex-direction: column; gap: 9px; border-radius: 9px; padding: 9px 10px; background: rgba(255,255,255,.035); border: 1px solid var(--line); }
+  .pt .mini-cowork .sala.viva { border-color: rgba(var(--azul-claro-rgb),.55); background: rgba(var(--azul-rgb),.09); box-shadow: 0 0 0 1px rgba(var(--azul-claro-rgb),.3); }
+  .pt .mini-cowork .tope { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+  .pt .mini-cowork .tope b { display: block; width: 40px; height: 6px; border-radius: 3px; background: rgba(255,255,255,.22); }
+  .pt .mini-cowork .gente { display: flex; gap: 7px; align-items: center; }
+
+  /* Genérico (módulos de agencia): una fila por persona. */
+  .pt .mini-gen { display: flex; flex-direction: column; gap: 11px; justify-content: center; height: 100%; }
+  .pt .mini-gen .g-row { display: grid; grid-template-columns: 24px 1fr; gap: 10px; align-items: center; }
+  .pt .mini-gen .g-row i { height: 7px; border-radius: 4px; background: rgba(255,255,255,.14); }
+
+  /* Horarios: la semana como barras. */
+  .pt .mini-hor { display: grid; grid-template-columns: repeat(7, 1fr); gap: 7px; height: 100%; align-items: end; }
+  .pt .mini-hor .col { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .pt .mini-hor .bar { width: 100%; border-radius: 4px 4px 0 0; background: rgba(var(--azul-rgb),.4); }
+  .pt .mini-hor .col:nth-child(odd) .bar { background: rgba(var(--azul-claro-rgb),.5); }
+  .pt .mini-hor .col:nth-child(1) .bar { height: 44px; }
+  .pt .mini-hor .col:nth-child(2) .bar { height: 66px; }
+  .pt .mini-hor .col:nth-child(3) .bar { height: 52px; }
+  .pt .mini-hor .col:nth-child(4) .bar { height: 78px; }
+  .pt .mini-hor .col:nth-child(5) .bar { height: 58px; }
+  .pt .mini-hor .col:nth-child(6) .bar { height: 30px; }
+  .pt .mini-hor .col:nth-child(7) .bar { height: 22px; }
+  .pt .mini-hor .dia { font: 500 9px/1 "JetBrains Mono", monospace; color: var(--faint); }
+
 
   /* ── Maquetas de producto ─────────────────────────────────────────────────
      Son la interfaz reconstruida en HTML, no capturas: se ve como Maven y no
