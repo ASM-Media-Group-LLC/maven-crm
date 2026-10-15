@@ -232,6 +232,47 @@
     50% { box-shadow: 0 0 18px 0 rgba(var(--azul-claro-rgb),.95), 0 0 6px rgba(143,230,255,.9); }
   }
 
+  /* Badge "en vivo" verde en la barra del panel. */
+  .pt .ofi-live { display: inline-flex; align-items: center; gap: 5px; margin-left: 2px; font: 500 10px/1 "JetBrains Mono", monospace; letter-spacing: .06em; color: var(--verde); border: 1px solid rgba(16,185,129,.32); border-radius: 999px; padding: 4px 8px; }
+  .pt .ofi-live i { width: 6px; height: 6px; border-radius: 50%; background: var(--verde); animation: latir 2.4s ease-out infinite; }
+
+  /* Sala a la que se le está hablando: se enciende en rosa (no azul). */
+  .pt .ofi-sala.hablando-a {
+    border-color: rgba(244,63,126,.55);
+    box-shadow: 0 0 0 1px rgba(244,63,126,.22), 0 0 34px -14px rgba(244,63,126,.9);
+    background: rgba(244,63,126,.06);
+  }
+  .pt .ofi-esc.hab { color: var(--rosa); }
+  .pt .ofi-esc.hab i { background: var(--rosa); }
+
+  /* El cursor de la demo: se desliza a la sala que toca y hace clic. */
+  .pt .ofi-cursor {
+    position: absolute; z-index: 7; pointer-events: none; color: #fff;
+    transform: translate(-3px, -2px);
+    transition: left .75s cubic-bezier(.5,.05,.2,1), top .75s cubic-bezier(.5,.05,.2,1);
+    filter: drop-shadow(0 2px 5px rgba(0,0,0,.7));
+  }
+  .pt .ofi-cursor svg { display: block; }
+  .pt .ofi-accion {
+    position: absolute; left: 16px; top: 12px; white-space: nowrap;
+    font: 600 10px/1 "Instrument Sans", sans-serif; color: #fff;
+    background: linear-gradient(100deg, var(--azul), var(--violeta));
+    border-radius: 7px; padding: 4px 8px; box-shadow: 0 8px 18px -8px rgba(var(--azul-rgb),.9);
+  }
+  .pt .ofi-cursor.hab .ofi-accion { background: linear-gradient(100deg, var(--rosa), #c026d3); box-shadow: 0 8px 18px -8px rgba(244,63,126,.9); }
+  .pt .ofi-click {
+    position: absolute; left: 1px; top: 2px; width: 10px; height: 10px; border-radius: 50%;
+    border: 2px solid rgba(var(--azul-claro-rgb),.9); transform: translate(-50%,-50%);
+    animation: ofi-clic 1.7s ease-out .7s both;
+  }
+  .pt .ofi-cursor.hab .ofi-click { border-color: rgba(244,63,126,.9); }
+  @keyframes ofi-clic {
+    0% { opacity: 0; transform: translate(-50%,-50%) scale(.2); }
+    12% { opacity: 1; }
+    45% { opacity: 0; transform: translate(-50%,-50%) scale(3.4); }
+    100% { opacity: 0; }
+  }
+
   .pt .cinta { position: relative; height: 372px; overflow: hidden; padding: 6px 0; }
   /* Difumina arriba y abajo para que la cinta parezca infinita. */
   .pt .cinta::before, .pt .cinta::after { content: ""; position: absolute; inset-inline: 0; height: 56px; z-index: 2; pointer-events: none; }
@@ -255,7 +296,7 @@
   .pt .ofi-cuenta { margin-left: auto; font: 400 11.5px/1 "JetBrains Mono", monospace; color: var(--faint); white-space: nowrap; }
   .pt .consola-barra .ofi-cuenta + .consola-reloj { margin-left: 0; }
   .pt .ofi { position: relative; height: 372px; padding: 14px 14px 12px; display: flex; flex-direction: column; gap: 10px; }
-  .pt .ofi-grilla { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; flex: 1; min-height: 0; }
+  .pt .ofi-grilla { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; flex: 1; min-height: 0; }
   .pt .ofi-sala {
     position: relative; display: flex; flex-direction: column; min-height: 0;
     border: 1px solid var(--line); border-radius: var(--r); padding: 10px 11px 9px;

@@ -1,28 +1,24 @@
 import { useEffect, useState } from "react";
-import { Headphones, Monitor, Users } from "lucide-react";
+import { Headphones, Monitor, MousePointer2, Users } from "lucide-react";
 import { Cara, nombreDe, type Seed } from "./gente";
 import type { Publico } from "./guiones";
 
-// LA OFICINA EN VIVO.
+// LA OFICINA EN VIVO · DEMO QUE SE MANEJA SOLA.
 //
-// El hero abre con la oficina misma y no con una lista de eventos: lo que se
-// vende es Cowork + control. Son salas abiertas con gente adentro —unos
-// hablando, otros tecleando, alguien compartiendo pantalla— y una persona
-// (quien supervisa) escuchando una sala sin entrar. Esa última línea es la
-// prueba del control, por eso va fija abajo y cambia de sala sola.
+// El hero abre con Cowork trabajando: salas abiertas con gente adentro —unos
+// hablando, otros tecleando, alguien compartiendo pantalla— y, encima, un
+// cursor que recorre el tablero y va MOSTRANDO cómo se usa: escucha una sala
+// sin entrar, le habla, entra a otra. Es el "video" de cómo trabaja la
+// plataforma, pero reconstruido en vivo (sin grabar nada ni exponer a nadie).
 //
 // Todo es ILUSTRATIVO: personas inventadas (gente.tsx), nombres de sala
-// genéricos, ni un cliente ni una cifra real. Vive dentro del mismo marco
-// `.consola` que la cinta anterior y mide lo mismo de alto (372px), así el
-// hero no salta al cambiar de público.
+// genéricos, ni un cliente ni una cifra real. Vive dentro del marco `.consola`.
 
 type Estado = "habla" | "trabaja" | "pantalla" | "quieto";
 type Persona = { seed: Seed; estado: Estado };
 type Sala = { n: string; gente: Persona[]; codigo?: string };
 
-// Dos guiones, como en la cinta: la misma oficina contada desde el problema de
-// cada público. Las salas de agencia hablan de chats y cartera; las de empresa,
-// de ventas y soporte.
+// Dos guiones: la misma oficina contada desde el problema de cada público.
 const SALAS: Record<Publico, Sala[]> = {
   empresas: [
     { n: "Ventas", gente: [{ seed: "camilo", estado: "habla" }, { seed: "valentina", estado: "trabaja" }] },
@@ -43,11 +39,22 @@ const SALAS: Record<Publico, Sala[]> = {
 };
 
 // La barra de actividad del hero (el gráfico "tipo command center"): 12 tramos
-// del día, el último encendido. Es ILUSTRATIVA, como el reloj y el conteo — no
-// es una cifra real de nadie.
+// del día, el último encendido. Es ILUSTRATIVA, como el reloj y el conteo.
 const BARRAS = [44, 50, 47, 57, 54, 62, 59, 69, 65, 77, 83, 100];
 
-function SalaVista({ s, escuchada, vozActiva }: { s: Sala; escuchada: boolean; vozActiva?: Seed }) {
+// El guion del recorrido: el cursor va de sala en sala mostrando cómo se usa
+// Cowork — escuchar una sin entrar, hablarle, entrar. Se repite en bucle. Las
+// salas van por índice para que sirva igual en los dos públicos.
+type Accion = "Escuchar" | "Hablar" | "Entrar";
+const PASOS: { i: number; accion: Accion }[] = [
+  { i: 0, accion: "Escuchar" },
+  { i: 2, accion: "Escuchar" },
+  { i: 4, accion: "Hablar" },
+  { i: 1, accion: "Entrar" },
+  { i: 4, accion: "Escuchar" },
+];
+
+function SalaVista({ s, resaltada, modo, vozActiva }: { s: Sala; resaltada: boolean; modo?: Accion; vozActiva?: Seed }) {
   const vacia = s.gente.length === 0;
   const habla = s.gente.find((p) => p.estado === "habla");
   const pantalla = s.gente.find((p) => p.estado === "pantalla");
@@ -62,8 +69,10 @@ function SalaVista({ s, escuchada, vozActiva }: { s: Sala; escuchada: boolean; v
           ? `${trabajan} trabajando`
           : "en pausa";
 
+  const resalte = resaltada ? (modo === "Hablar" ? " hablando-a" : " escuchando") : "";
+
   return (
-    <div className={`ofi-sala${escuchada ? " escuchando" : ""}${vacia ? " vacia" : ""}`}>
+    <div className={`ofi-sala${resalte}${vacia ? " vacia" : ""}`}>
       <div className="ofi-cab">
         <b>{s.n}</b>
         <span>
@@ -90,7 +99,11 @@ function SalaVista({ s, escuchada, vozActiva }: { s: Sala; escuchada: boolean; v
       </div>
       <div className="ofi-pie">
         <span>{pie}</span>
-        {escuchada && <span className="ofi-esc"><i />Escuchando</span>}
+        {resaltada && (
+          <span className={`ofi-esc${modo === "Hablar" ? " hab" : ""}`}>
+            <i />{modo === "Hablar" ? "Hablando" : modo === "Entrar" ? "Entrando" : "Escuchando"}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -99,6 +112,7 @@ function SalaVista({ s, escuchada, vozActiva }: { s: Sala; escuchada: boolean; v
 export default function Oficina({ publico }: { publico: Publico }) {
   const [hora, setHora] = useState("--:--:--");
   const [tick, setTick] = useState(0);
+  const [paso, setPaso] = useState(0);
 
   useEffect(() => {
     const tic = () => {
@@ -111,26 +125,43 @@ export default function Oficina({ publico }: { publico: Publico }) {
     return () => window.clearInterval(t);
   }, []);
 
-  // Un solo pulso mueve todo: quién tiene la palabra (cada 2,6 s) y qué sala
-  // escucha quien supervisa (cada dos pulsos). Así la oficina "respira" sin
-  // que haga falta un guión de eventos.
+  // Un pulso mueve quién tiene la palabra (anima el avatar que habla).
   useEffect(() => {
     const t = window.setInterval(() => setTick((x) => x + 1), 2600);
     return () => window.clearInterval(t);
   }, []);
 
+  // El recorrido: cada paso mueve el cursor a una sala y "hace clic".
+  useEffect(() => {
+    const t = window.setInterval(() => setPaso((p) => (p + 1) % PASOS.length), 2400);
+    return () => window.clearInterval(t);
+  }, []);
+
   const salas = SALAS[publico];
-  const conGente = salas.filter((s) => s.gente.length > 0);
-  const escuchada = (conGente[Math.floor(tick / 2) % conGente.length] ?? salas[0]).n;
+  const { i: salaResaltada, accion } = PASOS[paso];
+  const escuchada = (salas[salaResaltada] ?? salas[0]).n;
   const hablantes = salas.flatMap((s) => s.gente.filter((p) => p.estado === "habla").map((p) => p.seed));
   const vozActiva = hablantes.length ? hablantes[tick % hablantes.length] : undefined;
   const enSalas = salas.reduce((a, s) => a + s.gente.length, 0);
+
+  // Dónde está el cursor: centro-bajo de la sala que toca (grilla 3×2).
+  const col = salaResaltada % 3;
+  const fila = Math.floor(salaResaltada / 3);
+  const cx = [18, 50, 82][col];
+  const cy = fila === 0 ? 45 : 90;
+
+  const pie = accion === "Hablar"
+    ? <>Tú · hablando a <b>{escuchada}</b></>
+    : accion === "Entrar"
+      ? <>Tú · entrando a <b>{escuchada}</b></>
+      : <>Tú · escuchando <b>{escuchada}</b> sin entrar</>;
 
   return (
     <div className="consola">
       <div className="consola-barra">
         <span className="semaforo"><i /><i /><i /></span>
-        <span className="consola-titulo">oficina · en vivo</span>
+        <span className="consola-titulo">oficina</span>
+        <span className="ofi-live"><i />en vivo</span>
         <span className="ofi-cuenta">{enSalas} en salas · {hablantes.length} hablando</span>
         <span className="consola-reloj">{hora}</span>
       </div>
@@ -147,16 +178,27 @@ export default function Oficina({ publico }: { publico: Publico }) {
         </div>
       </div>
       <div className="ofi" aria-label="Oficina en vivo">
-        {/* El `key` por público remonta la grilla: cambia el guión sin que se
-            vea a medio camino una sala del otro público. */}
+        {/* El `key` por público remonta la grilla al cambiar de guión. */}
         <div className="ofi-grilla" key={publico}>
-          {salas.map((s) => (
-            <SalaVista s={s} escuchada={s.n === escuchada} vozActiva={vozActiva} key={s.n} />
+          {salas.map((s, idx) => (
+            <SalaVista
+              s={s}
+              resaltada={idx === salaResaltada}
+              modo={idx === salaResaltada ? accion : undefined}
+              vozActiva={vozActiva}
+              key={s.n}
+            />
           ))}
+          {/* El cursor que maneja la demo: se desliza a la sala y hace clic. */}
+          <span className={`ofi-cursor${accion === "Hablar" ? " hab" : ""}`} style={{ left: `${cx}%`, top: `${cy}%` }} aria-hidden="true">
+            <span className="ofi-accion">{accion}</span>
+            <MousePointer2 width={16} height={16} strokeWidth={2.2} fill="currentColor" />
+            <span className="ofi-click" key={paso} />
+          </span>
         </div>
         <div className="ofi-tu">
           <Headphones width={14} height={14} strokeWidth={2.2} aria-hidden="true" />
-          <span>Tú · escuchando <b>{escuchada}</b> sin entrar</span>
+          <span>{pie}</span>
           <span className="ofi-ondas" aria-hidden="true"><i /><i /><i /></span>
         </div>
       </div>
