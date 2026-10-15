@@ -655,4 +655,12 @@ export const messenger = {
   "messenger.topbar.enlaceCopiado": { es: "Enlace copiado", en: "Link copied" },
   "messenger.topbar.unParticipante": { es: "1 participante", en: "1 participant" },
   "messenger.topbar.copiarEnlace": { es: "Copiar enlace", en: "Copy link" },
+
+  // Banner de reconexión (BannerReconectando): sale cuando el realtime del chat
+  // se cae, para que nadie crea que "está roto" ni recargue. Mientras, los
+  // mensajes llegan igual por el repaso rápido.
+  "messenger.reconectando.aviso": {
+    es: "Reconectando… los mensajes pueden tardar unos segundos",
+    en: "Reconnecting… messages may take a few seconds",
+  },
 } as const satisfies Record<string, { es: string; en: string }>;

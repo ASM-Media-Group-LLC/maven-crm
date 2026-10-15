@@ -2,6 +2,14 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useCanalQueRevive } from "@/hooks/useCanalQueRevive";
+import { useSaludDelChat } from "@/hooks/canalDelChat";
+
+/** Repaso de las reacciones de la conversación abierta. `chat_reactions` no está
+ *  en la replicación en vivo (quedó fuera como `chat_read_receipts`, por el mismo
+ *  costo de difundir a todos), así que, igual que el "visto", se mueven con un
+ *  repaso corto de la conversación abierta y solo con la pestaña a la vista. */
+export const REFRESCO_REACCIONES_MS = 7_000;
+export const REFRESCO_REACCIONES_CAIDO_MS = 4_000;
 
 export interface Reaction {
   id: string;
@@ -20,9 +28,13 @@ export interface ReactionGroup {
 
 export function useReactions(conversationId: string | null) {
   const { user } = useAuth();
+  const salud = useSaludDelChat();
   const [reactions, setReactions] = useState<Reaction[]>([]);
   const messageIdsRef = useRef<Set<string>>(new Set());
   const reactionsRef = useRef<Reaction[]>([]);
+  // Cuándo fue el último toggle: el repaso (reemplazo total) se salta si hay uno
+  // recién hecho, para no pisar la reacción optimista mientras la base confirma.
+  const ultimoToggleRef = useRef(0);
 
   useEffect(() => { reactionsRef.current = reactions; }, [reactions]);
 
@@ -38,6 +50,9 @@ export function useReactions(conversationId: string | null) {
         supabase.from("chat_reactions").select("*").in("message_id", chunk)
       )
     );
+    // Un fallo NO es "sin reacciones": si alguna tanda falló, conservar lo que hay
+    // (si no, se borrarían en pantalla hasta el próximo repaso). Reintenta luego.
+    if (results.some((r) => r.error)) return;
     const allReactions: Reaction[] = [];
     for (const { data } of results) {
       if (data) allReactions.push(...(data as Reaction[]));
@@ -77,8 +92,32 @@ export function useReactions(conversationId: string | null) {
     alRevivir: () => void loadReactionsForMessages(Array.from(messageIdsRef.current)),
   });
 
+  // Repaso de la conversación abierta: lo que hace que las reacciones se muevan
+  // solas (la tabla no está en vivo). Solo con la pestaña a la vista; más seguido
+  // si el realtime está caído. Al cambiar la salud se pone al día de una.
+  useEffect(() => {
+    if (!conversationId) return;
+    const repasar = () => {
+      if (document.visibilityState !== "visible") return;
+      // Hay un toggle recién hecho: esperar al próximo tick para no pisar la
+      // reacción optimista antes de que la base la confirme.
+      if (Date.now() - ultimoToggleRef.current < 2500) return;
+      const ids = Array.from(messageIdsRef.current);
+      if (ids.length) void loadReactionsForMessages(ids);
+    };
+    const cada = salud === "reconectando" ? REFRESCO_REACCIONES_CAIDO_MS : REFRESCO_REACCIONES_MS;
+    const id = window.setInterval(repasar, cada);
+    document.addEventListener("visibilitychange", repasar);
+    repasar();
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", repasar);
+    };
+  }, [conversationId, salud, loadReactionsForMessages]);
+
   const toggleReaction = useCallback(async (messageId: string, emoji: string) => {
     if (!user) return;
+    ultimoToggleRef.current = Date.now();
 
     const current = reactionsRef.current;
     const existing = current.find(

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useCanalQueRevive } from "@/hooks/useCanalQueRevive";
+import { useSaludDelChat } from "@/hooks/canalDelChat";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
 /** Cuántos ids caben en una consulta: la lista viaja en la URL. */
@@ -14,7 +15,11 @@ export const TANDA_RECIBOS = 100;
  *  enorme: antes, un visto despertaba a TODOS los conectados; ahora es una
  *  consulta chica por persona, solo de la conversación que tiene abierta, y solo
  *  con la pestaña a la vista. */
-export const REFRESCO_RECIBOS_MS = 12_000;
+export const REFRESCO_RECIBOS_MS = 7_000;
+
+/** Cuando el realtime está caído, el "visto" se repasa aún más seguido: es el
+ *  único modo de que se mueva mientras el socket no entrega. */
+export const REFRESCO_RECIBOS_CAIDO_MS = 4_000;
 
 export interface ReadReceipt {
   message_id: string;
@@ -43,6 +48,7 @@ export async function markMessagesDelivered(userId: string, messageIds: string[]
 
 export function useReadReceipts(conversationId: string | null, messages: { id: string; sender_id: string }[]) {
   const { user } = useAuth();
+  const salud = useSaludDelChat();
   const [receipts, setReceipts] = useState<ReadReceipt[]>([]);
 
   // TODOS los ids (para cargar/mostrar recibos, incluidos los de mis propios mensajes).
@@ -69,10 +75,13 @@ export function useReadReceipts(conversationId: string | null, messages: { id: s
     // pasa de largo.
     const partes: ReadReceipt[] = [];
     for (let i = 0; i < stableMessageIds.length; i += TANDA_RECIBOS) {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("chat_read_receipts")
         .select("message_id, user_id, delivered_at, read_at")
         .in("message_id", stableMessageIds.slice(i, i + TANDA_RECIBOS));
+      // Un fallo NO es "sin recibos": conservar lo que hay (si no, los ✓✓ parpadean
+      // a ✓ simple justo cuando la red está inestable). El próximo repaso reintenta.
+      if (error) return;
       if (data) partes.push(...(data as ReadReceipt[]));
     }
     setReceipts(partes);
@@ -144,13 +153,16 @@ export function useReadReceipts(conversationId: string | null, messages: { id: s
       if (document.visibilityState !== "visible") return;
       void loadReceiptsRef.current();
     };
-    const id = window.setInterval(repasar, REFRESCO_RECIBOS_MS);
+    const cada = salud === "reconectando" ? REFRESCO_RECIBOS_CAIDO_MS : REFRESCO_RECIBOS_MS;
+    const id = window.setInterval(repasar, cada);
     document.addEventListener("visibilitychange", repasar);
+    // Al cambiar la salud (vuelve el realtime) o al reabrir, ponerse al día ya.
+    repasar();
     return () => {
       window.clearInterval(id);
       document.removeEventListener("visibilitychange", repasar);
     };
-  }, [conversationId]);
+  }, [conversationId, salud]);
 
   // Marcar como LEÍDO. Merge (sin ignoreDuplicates): si ya existe la fila de "entregado",
   // la actualiza poniendo read_at (deja delivered_at intacto porque no va en el payload).

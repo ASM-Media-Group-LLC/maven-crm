@@ -8,7 +8,7 @@ import {
 } from "@/hooks/useTypingInbox";
 import { useAuth } from "@/hooks/useAuth";
 import { useReanudarAlVolver } from "@/hooks/useReanudarAlVolver";
-import { registrarEnElCanalDelChat } from "@/hooks/canalDelChat";
+import { registrarEnElCanalDelChat, useSaludDelChat, reportarSaludDelChat } from "@/hooks/canalDelChat";
 import { cerrarNotificacionesDeChat } from "@/lib/insigniaDeLaApp";
 import {
   ChatConversation,
@@ -806,6 +806,11 @@ export function useChat() {
 
 const PAGE_SIZE = 50;
 
+/** Cada cuánto se repasa la conversación ABIERTA cuando el realtime está caído.
+ *  Es la red de seguridad del "hay que refrescar": con el socket muerto, los
+ *  mensajes llegan igual en ≤4 s. En vivo no corre (el realtime ya los trae). */
+export const REPASO_CAIDO_MS = 4000;
+
 export function useMessages(
   conversationId: string | null,
   onNewMessage?: (msg: ChatMessage) => void,
@@ -816,6 +821,13 @@ export function useMessages(
   destinatariosDelTecleo?: string[],
 ) {
   const { user } = useAuth();
+  // Salud del realtime del chat (compartida por pestaña): dispara el repaso rápido.
+  const salud = useSaludDelChat();
+  // Este hook puede montarse varias veces a la vez (la página y cada ventanita del
+  // muelle). Cada instancia reporta la salud de SU canal de mensajes bajo una clave
+  // propia, para que al desmontar una no borre el estado de otra.
+  const fuenteSaludRef = useRef<string>();
+  if (!fuenteSaludRef.current) fuenteSaludRef.current = `mensajes:${crypto.randomUUID()}`;
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -946,6 +958,66 @@ export function useMessages(
 
   // Keep ref updated for use inside effects without triggering re-subscriptions
   loadMessagesRef.current = loadMessages;
+
+  // RELECTURA LIGERA para el poll de caída: trae SOLO lo que llegó después del
+  // último mensaje REAL que ya tenemos y lo mezcla (dedup + reconcilia optimistas,
+  // igual que el canal en vivo). A diferencia de loadMessages, NO reemplaza la
+  // lista (no colapsa el historial que el usuario subió a leer ni resetea
+  // `hasMore`) y NO reescribe last_read_at ni re-marca "entregado" en cada tick:
+  // esas escrituras (sobre las tablas más sensibles) quedan para abrir la
+  // conversación y para el canal en vivo. Así la red de seguridad SOLO lee.
+  const traerNuevosMensajes = useCallback(async () => {
+    const convId = currentConvRef.current;
+    if (!convId) return;
+    const actuales = messagesRef.current;
+    // Ancla: el mensaje real (no optimista) más nuevo en pantalla.
+    const ancla = [...actuales].reverse().find((m) => !optimisticIdsRef.current.has(m.id));
+    if (!ancla) { void loadMessagesRef.current?.(); return; }
+    const res = await supabase
+      .from("chat_messages")
+      .select("*")
+      .eq("conversation_id", convId)
+      .gte("created_at", ancla.created_at) // gte + dedup: no se pierde un empate de milisegundos
+      .order("created_at", { ascending: true })
+      .limit(PAGE_SIZE);
+    if (convId !== currentConvRef.current) return; // cambió de chat mientras cargaba
+    // Un fallo NO es "no llegó nada": no se toca lo que hay, el próximo tick reintenta.
+    if (queHacerConLaCarga(res) === "abortar") return;
+    const entrantes = (res.data as ChatMessage[]) || [];
+    if (entrantes.length === 0) return;
+    setMessages((prev) => {
+      const tengo = new Set(prev.map((m) => m.id));
+      let out = prev;
+      for (const entrante of entrantes) {
+        if (tengo.has(entrante.id)) continue;
+        // Mismo reemplazo de optimista que el canal en vivo: una fila real mía que
+        // coincide reemplaza a su burbuja optimista en lugar de duplicarla.
+        const difMs = (a: string, b: string) => Math.abs(new Date(a).getTime() - new Date(b).getTime());
+        const opt = entrante.api_key_id != null ? undefined : out.find(
+          (m) => optimisticIdsRef.current.has(m.id) &&
+            m.sender_id === entrante.sender_id &&
+            m.content === entrante.content &&
+            difMs(m.created_at, entrante.created_at) < 5000,
+        );
+        if (opt) {
+          optimisticIdsRef.current.delete(opt.id);
+          out = out.map((m) => (m.id === opt.id ? entrante : m));
+        } else {
+          tengo.add(entrante.id);
+          out = [...out, entrante];
+        }
+      }
+      return out;
+    });
+    // "Entregado" SOLO para los que de verdad llegaron de otros (barato y correcto,
+    // como el canal en vivo): sin mensajes nuevos no escribe nada.
+    if (user) {
+      const deOtros = entrantes.filter((m) => m.sender_id !== user.id).map((m) => m.id);
+      if (deOtros.length) void markMessagesDelivered(user.id, deOtros);
+    }
+  }, [user]);
+  const traerNuevosRef = useRef(traerNuevosMensajes);
+  traerNuevosRef.current = traerNuevosMensajes;
 
   // Al volver la red, si la última carga falló, se reintenta. Los reintentos con
   // espera cubren cortes cortos (~1 min); este cubre los largos.
@@ -1124,9 +1196,13 @@ export function useMessages(
             clearTimeout(messagesRealtimeReconnectTimerRef.current);
             messagesRealtimeReconnectTimerRef.current = null;
           }
+          // La conversación abierta entrega: así "en-vivo" global no se declara
+          // hasta que ESTE canal (no solo el de la lista) esté arriba.
+          reportarSaludDelChat(fuenteSaludRef.current!, "en-vivo");
         }
 
         if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+          reportarSaludDelChat(fuenteSaludRef.current!, "reconectando");
           scheduleMessagesReconnect();
         }
       });
@@ -1150,9 +1226,33 @@ export function useMessages(
         messagesRealtimeReconnectTimerRef.current = null;
       }
       cancelado = true;
+      // Dejar de pesar en la salud global: esta conversación ya no está abierta.
+      reportarSaludDelChat(fuenteSaludRef.current!, "conectando");
       supabase.removeChannel(channel);
     };
   }, [conversationId, user?.id, messagesRealtimeVersion]);
+
+  // ── POLL ADAPTATIVO · la red de seguridad del "hay que refrescar" ──────────
+  //
+  // El canal de esta conversación comparte el websocket del chat; cuando ese se
+  // cae, la salud pasa a "reconectando". SOLO entonces —y con la pestaña a la
+  // vista— repasamos la conversación abierta cada 4 s, así los mensajes llegan
+  // igual aunque el socket esté muerto, sin que nadie recargue. En vivo no corre:
+  // el realtime ya los trae (red extra solo cuando cae, como se decidió).
+  useEffect(() => {
+    if (!conversationId || salud !== "reconectando") return;
+    const repasar = () => {
+      if (document.visibilityState === "visible") void traerNuevosRef.current?.();
+    };
+    repasar(); // de una, sin esperar el primer turno
+    const id = window.setInterval(repasar, REPASO_CAIDO_MS);
+    const alVolverAVer = () => { if (document.visibilityState === "visible") repasar(); };
+    document.addEventListener("visibilitychange", alVolverAVer);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", alVolverAVer);
+    };
+  }, [conversationId, salud]);
 
   // UN freno para las dos rutas. A 3s son 0,33 avisos/s por persona: lejísimos
   // del uno-por-tecla que cortó el socket en #1605.

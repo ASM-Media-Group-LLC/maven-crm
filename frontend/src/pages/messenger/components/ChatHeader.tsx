@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { getInitials, puedeVerLaListaDeMiembros } from "../utils";
 import { avisarEvento, type ClienteParaAvisos } from "../avisoDeSistema";
 import { useLanguage } from "@/hooks/useLanguage";
+import BannerReconectando from "@/components/messenger/BannerReconectando";
 
 interface ChatHeaderProps {
   conversation: ConversationWithDetails;
@@ -334,6 +335,9 @@ export default function ChatHeader({
           </DropdownMenu>
         </div>
       </div>
+      {/* Franja fina de "reconectando" cuando el realtime se cae (cubre esta vista
+          y la ventanita del muelle, que comparten este encabezado). */}
+      <BannerReconectando />
     </div>
   );
 }
