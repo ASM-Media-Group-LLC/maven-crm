@@ -5,7 +5,6 @@ import "./portada.css";
 
 import PulsoCanvas from "./PulsoCanvas";
 import Oficina from "./Oficina";
-import Cifras from "./Cifras";
 import { useRevelar } from "./useRevelar";
 import { type Publico } from "./guiones";
 import { GUION } from "./publico";
@@ -130,7 +129,6 @@ export default function Portada() {
         </div>
       </section>
 
-      <Cifras cifras={guion.cifras} />
       <Reemplaza publico={publico} />
       <Messenger />
       <Cowork />
