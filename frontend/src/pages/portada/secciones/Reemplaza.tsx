@@ -87,7 +87,7 @@ const DIAS = ["L", "M", "X", "J", "V", "S", "D"];
 
 // Las mismas fotos de oficina que usa el resto de la portada (public/portada/caras):
 // así la gente de las maquetas chicas es la misma que la del panel del hero.
-const CARAS = Array.from({ length: 8 }, (_, i) => `/portada/caras/cara-${String(i + 1).padStart(2, "0")}.jpg`);
+const CARAS = Array.from({ length: 8 }, (_, i) => `/portada/caras/cara-${String(i + 1).padStart(2, "0")}.jpg?v=2`);
 const caraFoto = (i: number) => ({ backgroundImage: `url(${CARAS[i % CARAS.length]})` });
 
 /** La maqueta chica de cada tarjeta: un vistazo de cómo se ve el módulo en

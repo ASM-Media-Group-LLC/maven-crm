@@ -67,7 +67,10 @@ export function Cara({ seed, className, style }: { seed: Seed; className?: strin
   const clase = className ? `cara-foto ${className}` : "cara-foto";
   return (
     <img
-      src={FOTO[seed]}
+      // `?v=` fuerza a los navegadores a traer las fotos nuevas aunque tengan en
+      // caché las viejas (el nombre de archivo no cambia). Subir el número al
+      // cambiar las caras.
+      src={`${FOTO[seed]}?v=2`}
       alt=""
       loading="lazy"
       className={clase}
