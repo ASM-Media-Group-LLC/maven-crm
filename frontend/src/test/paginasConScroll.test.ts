@@ -36,6 +36,8 @@ const SON_LAYOUT = new Set(["HRLayout",
 /** Páginas que NO viven dentro del AppShell: la ventana scrollea sola. */
 const FUERA_DEL_SHELL = new Set([
   "Portada", "Privacidad", "Concepto", "Login", "NotFound", "ForgotPassword", "ResetPassword",
+  // Documentación pública del producto (/documentation): fuera del shell, la ventana scrollea sola.
+  "Documentacion",
   "VideoCallPage", "MeetGuestPage", "ChatterPublicSession", "DesignSystem", "Docs", "Roadmap",
   // Medidas del dispositivo para depurar la PWA: pública, fuera del shell, scroll del documento.
   "DiagnosticoPantalla",

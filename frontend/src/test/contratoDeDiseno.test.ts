@@ -40,6 +40,8 @@ const leer = (ruta: string): string | null => fuentes[ruta] ?? null;
 /** Páginas que NO viven dentro del AppShell (portada, login, públicas). */
 const FUERA_DEL_SHELL = new Set([
   "Portada", "Concepto", "Privacidad", "Login", "NotFound", "ForgotPassword", "ResetPassword",
+  // Documentación pública del producto (/documentation): fuera del shell, como la portada.
+  "Documentacion",
   "VideoCallPage", "MeetGuestPage", "ChatterPublicSession", "ChatterPublicView", "DiagnosticoPantalla",
   "DesignSystem", "Docs", 
   // Portal de creadoras: entrar y elegir contraseña son públicas (como Login y

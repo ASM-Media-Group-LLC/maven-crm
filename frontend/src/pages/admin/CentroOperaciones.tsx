@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { Activity, Bell, LayoutGrid, MessageSquare, PhoneOff, Users, Video } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { supabase } from "@/integrations/supabase/client";
+import { Page } from "@/components/ui/page";
+import { PageHeader } from "@/components/ui/page-header";
 
 // EL CENTRO DE OPERACIONES (solo admin, detrás de AdminRoute).
 //
@@ -78,11 +80,9 @@ export default function CentroOperaciones() {
     : n;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 p-6">
-      <div>
-        <h1 className="text-2xl font-semibold">{t("centroOps.title")}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">{t("centroOps.subtitle")}</p>
-      </div>
+    <Page>
+      <PageHeader title={t("centroOps.title")} subtitle={t("centroOps.subtitle")} />
+      <div className="space-y-6">
 
       {fallo && (
         <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm">
@@ -108,9 +108,9 @@ export default function CentroOperaciones() {
             <ul className="divide-y">
               {estado.servicios.map((s) => (
                 <li className="flex items-center gap-3 px-5 py-3 text-sm" key={s.nombre}>
-                  <span className={`h-2.5 w-2.5 rounded-full ${s.ok ? "bg-emerald-500" : "bg-red-500"}`} aria-hidden="true" />
+                  <span className={`h-2.5 w-2.5 rounded-full ${s.ok ? "bg-success" : "bg-destructive"}`} aria-hidden="true" />
                   <span className="flex-1">{nombreSrv(s.nombre)}</span>
-                  <span className={s.ok ? "text-emerald-500" : "text-red-500"}>
+                  <span className={s.ok ? "text-success" : "text-destructive"}>
                     {s.ok ? t("centroOps.ok") : t("centroOps.caido")}
                   </span>
                   {s.ms != null && (
@@ -126,6 +126,7 @@ export default function CentroOperaciones() {
           </p>
         </>
       )}
-    </div>
+      </div>
+    </Page>
   );
 }
