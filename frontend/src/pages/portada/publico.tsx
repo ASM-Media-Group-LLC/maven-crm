@@ -58,7 +58,7 @@ const LINKS_CIERRE: [string, string][] = [
 export const GUION: Record<Publico, Guion> = {
   empresas: {
     remate: "Control total, en tiempo real.",
-    remateBajo: "A todo tu equipo, en una sola oficina virtual.",
+    remateBajo: "Aquí está todo tu equipo, como en una oficina real.",
     bajada: (
       <ul className="bajada-chips">
         <li>Chat</li>
