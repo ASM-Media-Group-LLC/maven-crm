@@ -79,8 +79,8 @@ function Pantalla({ seed }: { seed: Seed }) {
   );
 }
 
-function SalaVista({ s, resaltada, accion, paso, pantalla, vozActiva }: {
-  s: Sala; resaltada: boolean; accion?: Accion; paso: number; pantalla: boolean; vozActiva?: Seed;
+function SalaVista({ s, resaltada, accion, paso, pantalla }: {
+  s: Sala; resaltada: boolean; accion?: Accion; paso: number; pantalla: boolean;
 }) {
   const presenta = s.gente[0].seed;
   return (
@@ -94,15 +94,17 @@ function SalaVista({ s, resaltada, accion, paso, pantalla, vozActiva }: {
         {pantalla ? (
           <Pantalla seed={presenta} key="scr" />
         ) : (
-          <span className="ofi-cams cwx-fade" key="cam">
-            {s.gente.map((p) => (
-              <span className={`ofi-persona ${p.estado}${p.seed === vozActiva ? " activa" : ""}`} key={p.seed}>
-                <Cara seed={p.seed} className="ofi-cara" />
-                {p.estado === "habla" && <span className="ofi-ondas" aria-hidden="true"><i /><i /><i /></span>}
-                {p.estado === "trabaja" && <span className="ofi-teclea" aria-hidden="true"><i /><i /><i /></span>}
-              </span>
-            ))}
-          </span>
+          // Cámara a pantalla completa: la cara llena el tile (como un video), con
+          // la cámara chica del segundo y las ondas de voz — no caritas sueltas.
+          <div className="ofi-cam cwx-fade" key="cam">
+            <Cara seed={presenta} className="ofi-cam-full" />
+            {s.gente[1] && <Cara seed={s.gente[1].seed} className="ofi-cam-pip" />}
+            <span className="ofi-cam-voz" aria-hidden="true"><i /><i /><i /></span>
+            <span className="ofi-share-quien">
+              <span className="ofi-share-live" aria-hidden="true" />
+              {nombreDe(presenta)}{s.gente.length > 1 ? ` +${s.gente.length - 1}` : ""}
+            </span>
+          </div>
         )}
       </div>
       <div className="ofi-acciones">
@@ -132,7 +134,6 @@ function SalaVista({ s, resaltada, accion, paso, pantalla, vozActiva }: {
 
 export default function Oficina({ publico }: { publico: Publico }) {
   const [hora, setHora] = useState("--:--:--");
-  const [tick, setTick] = useState(0);
   const [paso, setPaso] = useState(0);
   const [ciclo, setCiclo] = useState(0);
 
@@ -144,12 +145,6 @@ export default function Oficina({ publico }: { publico: Publico }) {
     };
     tic();
     const t = window.setInterval(tic, 1000);
-    return () => window.clearInterval(t);
-  }, []);
-
-  // Mueve quién tiene la palabra (anima el avatar que habla).
-  useEffect(() => {
-    const t = window.setInterval(() => setTick((x) => x + 1), 2600);
     return () => window.clearInterval(t);
   }, []);
 
@@ -169,7 +164,6 @@ export default function Oficina({ publico }: { publico: Publico }) {
   const { sala: salaResaltada, accion } = PASOS[paso];
   const escuchada = (salas[salaResaltada] ?? salas[0]).n;
   const hablantes = salas.flatMap((s) => s.gente.filter((p) => p.estado === "habla").map((p) => p.seed));
-  const vozActiva = hablantes.length ? hablantes[tick % hablantes.length] : undefined;
   const enSalas = salas.reduce((a, s) => a + s.gente.length, 0);
   const pantallasEnVivo = salas.filter((_, i) => enPantalla(i, ciclo));
 
@@ -232,7 +226,6 @@ export default function Oficina({ publico }: { publico: Publico }) {
                 accion={idx === salaResaltada ? accion : undefined}
                 paso={paso}
                 pantalla={enPantalla(idx, ciclo)}
-                vozActiva={vozActiva}
                 key={s.n}
               />
             ))}

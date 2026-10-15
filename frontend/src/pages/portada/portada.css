@@ -397,6 +397,14 @@
   .pt .ofi-share-quien { position: absolute; left: 6px; bottom: 6px; z-index: 2; display: inline-flex; align-items: center; gap: 5px; font: 500 9px/1.1 "JetBrains Mono", monospace; color: var(--ink-soft); background: rgba(5,7,11,.82); border-radius: 8px; padding: 2px 7px 2px 3px; }
   .pt .ofi-share-quien .ofi-share-cara { width: 16px; height: 16px; border-radius: 50%; flex: none; }
   .pt .ofi-share-live { width: 6px; height: 6px; border-radius: 50%; background: var(--rosa); animation: latir 2s ease-out infinite; flex: none; }
+  /* Cámara del hero a PANTALLA COMPLETA (mismo lenguaje que el tablero real). */
+  .pt .ofi-cam { align-self: stretch; position: relative; width: 100%; min-height: 58px; border-radius: 10px; overflow: hidden; background: #0a0e16; border: 1px solid var(--line); }
+  .pt .ofi-cam-full { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .pt .ofi-cam-pip { position: absolute; right: 5px; top: 5px; z-index: 2; width: 30%; max-width: 40px; height: auto; aspect-ratio: 4 / 3; border-radius: 6px; border: 1.5px solid rgba(255,255,255,.55); object-fit: cover; }
+  .pt .ofi-cam-voz { position: absolute; right: 6px; bottom: 6px; z-index: 2; display: flex; align-items: flex-end; gap: 2px; height: 12px; padding: 2px 4px; border-radius: 6px; background: rgba(5,7,11,.65); }
+  .pt .ofi-cam-voz i { width: 2px; min-height: 2px; border-radius: 1px; background: var(--verde); animation: cwx-voz 1s ease-in-out infinite; }
+  .pt .ofi-cam-voz i:nth-child(2) { animation-delay: .15s; }
+  .pt .ofi-cam-voz i:nth-child(3) { animation-delay: .3s; }
   .pt .ofi-pie { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 11px; line-height: 1.2; color: var(--muted); white-space: nowrap; overflow: hidden; }
   .pt .ofi-pie > span:first-child { overflow: hidden; text-overflow: ellipsis; }
   .pt .ofi-esc { display: inline-flex; align-items: center; gap: 5px; flex: none; font: 500 10px/1 "JetBrains Mono", monospace; letter-spacing: .04em; color: var(--verde); }
@@ -1004,6 +1012,27 @@
   /* Cámara con gente: una o dos caras ocupando el tile. */
   .pt .cwx-sala .pantalla .cam-gente { display: flex; align-items: center; justify-content: center; gap: 9px; }
   .pt .cwx-sala .pantalla .cam-gente .cara-cam { width: 48px; height: 48px; max-width: none; }
+  /* CÁMARA A PANTALLA COMPLETA: la cara llena el tile como un video real (no dos
+     caritas sueltas). El segundo va en una cámara chica (PiP) y las ondas de voz
+     se mueven. */
+  .pt .cwx-sala .pantalla .cam-full { position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; border-radius: 0; object-fit: cover; }
+  .pt .cwx-sala .pantalla .cam-pip { position: absolute; right: 7px; top: 7px; z-index: 2; width: 28%; max-width: 54px; height: auto; aspect-ratio: 4 / 3; border-radius: 7px; border: 1.5px solid rgba(255,255,255,.6); object-fit: cover; box-shadow: 0 8px 18px -8px rgba(0,0,0,.9); }
+  .pt .cwx-sala .pantalla .cam-voz { position: absolute; right: 8px; bottom: 8px; z-index: 2; display: flex; align-items: flex-end; gap: 2px; height: 15px; padding: 3px 5px; border-radius: 7px; background: rgba(5,7,11,.72); }
+  .pt .cwx-sala .pantalla .cam-voz i { width: 2.5px; min-height: 3px; border-radius: 2px; background: var(--verde); animation: cwx-voz 1s ease-in-out infinite; }
+  .pt .cwx-sala .pantalla .cam-voz i:nth-child(2) { animation-delay: .15s; }
+  .pt .cwx-sala .pantalla .cam-voz i:nth-child(3) { animation-delay: .3s; }
+  .pt .cwx-sala .pantalla .cam-voz i:nth-child(4) { animation-delay: .45s; }
+  @keyframes cwx-voz { 0%, 100% { height: 3px; } 50% { height: 12px; } }
+  /* La pantalla compartida respira: su gráfico oscila en ola (sirve en el hero y
+     en el tablero, los dos usan .cwx-screen). */
+  .pt .cwx-screen .ss-chart i { transform-origin: bottom; animation: cwx-barra 2.6s ease-in-out infinite; }
+  .pt .cwx-screen .ss-chart i:nth-child(2) { animation-delay: .2s; }
+  .pt .cwx-screen .ss-chart i:nth-child(3) { animation-delay: .4s; }
+  .pt .cwx-screen .ss-chart i:nth-child(4) { animation-delay: .6s; }
+  .pt .cwx-screen .ss-chart i:nth-child(5) { animation-delay: .8s; }
+  @keyframes cwx-barra { 0%, 100% { transform: scaleY(.72); } 50% { transform: scaleY(1); } }
+  /* La sala que el supervisor está ESCUCHANDO ahora se enciende (y se mueve). */
+  .pt .cwx-sala.escuchando { border-color: rgba(16,185,129,.5); box-shadow: 0 0 0 1px rgba(16,185,129,.2), 0 16px 40px -20px rgba(16,185,129,.55); }
   /* Pantalla compartida: un mock claro de la pantalla (como un panel/slide en
      vivo), con quién comparte y qué, abajo a la izquierda. */
   .pt .cwx-sala .pantalla.compartiendo { background: #0a0e16; }

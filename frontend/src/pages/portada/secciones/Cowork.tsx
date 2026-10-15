@@ -55,10 +55,11 @@ const PORQUES = [
   ["El chat va encima", "Desde el mismo tablero se busca a alguien y se le escribe en una ventanita, sin salir de la sesión ni abrir otra pestaña."],
 ] as const;
 
-function TarjetaSala({ s, pantalla }: { s: Sala; pantalla: boolean }) {
+function TarjetaSala({ s, pantalla, foco }: { s: Sala; pantalla: boolean; foco: boolean }) {
   const presenta = s.caras[0];
+  const segunda = s.caras[1];
   return (
-    <div className="cwx-sala con-gente">
+    <div className={`cwx-sala con-gente${foco ? " escuchando" : ""}`}>
       <div className="cab">
         <b>{s.n}</b>
         <span className="n-gente">{s.gente} 👤</span>
@@ -68,7 +69,9 @@ function TarjetaSala({ s, pantalla }: { s: Sala; pantalla: boolean }) {
       <p className={`comp${pantalla ? " si" : ""}`}>
         {pantalla ? `Compartiendo: ${nombreDe(presenta)}` : `${s.gente} en cámara`}
       </p>
-      {/* La vista cambia sola entre pantalla y cámara; el `key` reinicia el fundido. */}
+      {/* La vista cambia sola entre pantalla y cámara; el `key` reinicia el fundido.
+          En cámara, la persona va a PANTALLA COMPLETA (su video llena el tile), con
+          la cámara chica del segundo y sus ondas de voz — no dos caritas. */}
       <div className={`pantalla${pantalla ? " compartiendo" : ""} cwx-fade`} key={pantalla ? "scr" : "cam"}>
         {pantalla ? (
           <>
@@ -86,9 +89,9 @@ function TarjetaSala({ s, pantalla }: { s: Sala; pantalla: boolean }) {
           </>
         ) : (
           <>
-            <span className="cam-gente">
-              {s.caras.slice(0, 2).map((c) => <Cara seed={c} className="cara-cam" key={c} />)}
-            </span>
+            <Cara seed={presenta} className="cam-full" />
+            {segunda && <Cara seed={segunda} className="cam-pip" />}
+            <span className="cam-voz" aria-hidden="true"><i /><i /><i /><i /></span>
             <span className="quien-cam">
               {nombreDe(presenta)}{s.gente > 1 ? ` +${s.gente - 1}` : ""}
             </span>
@@ -96,7 +99,7 @@ function TarjetaSala({ s, pantalla }: { s: Sala; pantalla: boolean }) {
         )}
       </div>
       <div className="par">
-        <span className="activo">Escuchando</span>
+        <span className={foco ? "activo" : ""}>{foco ? "Escuchando" : "Escuchar"}</span>
         <span className="hablar">Hablar</span>
       </div>
       <div className="par"><span>Cámara</span><span>Pantalla</span></div>
@@ -120,6 +123,15 @@ export default function Cowork() {
     const t = window.setInterval(() => setTick((x) => x + 1), 4000);
     return () => window.clearInterval(t);
   }, []);
+
+  // El foco del supervisor: va "escuchando" una sala a la vez y se mueve, como
+  // el cursor del hero — eso es el movimiento que faltaba en el tablero.
+  const [foco, setFoco] = useState(0);
+  useEffect(() => {
+    const t = window.setInterval(() => setFoco((f) => f + 1), 2800);
+    return () => window.clearInterval(t);
+  }, []);
+  const focoIdx = foco % SALAS.length;
 
   return (
     <section className="bloque" id="cowork" style={{ borderTop: "1px solid var(--line)" }}>
@@ -202,7 +214,7 @@ export default function Cowork() {
                     </span>
                   </div>
                   <div className="cwx-grilla">
-                    {SALAS.map((s, i) => <TarjetaSala s={s} pantalla={enPantalla(i, tick)} key={s.n} />)}
+                    {SALAS.map((s, i) => <TarjetaSala s={s} pantalla={enPantalla(i, tick)} foco={i === focoIdx} key={s.n} />)}
                   </div>
                 </div>
               </div>
