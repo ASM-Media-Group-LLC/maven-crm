@@ -69,11 +69,11 @@ footer{padding:28px 0 46px;color:var(--faint);font-size:.78rem}
   <p class="eyebrow">Documentación viva · ASM Tech</p>
   <h1>Transformación Maven</h1>
   <p class="lead">Maven pasó a manos de <b>Alvaro (ASM Tech)</b>. Repo, servicios y flujo ya están en la org <code>ASM-Media-Group-LLC</code>, los cambios van «push y al aire» (~1 min), y se retiran una a una las dependencias del constructor anterior. Las reglas de protección de datos se conservan.</p>
-  <p class="updated">Actualizado 14 · oct · 2026 · 22:22 — <a href="https://claude.ai/artifact/7YSisjoJmZcFCADexLhUYy">informe completo de la auditoría ↗</a></p>
+  <p class="updated">Actualizado 15 · oct · 2026 · 00:58 — <a href="https://claude.ai/artifact/7YSisjoJmZcFCADexLhUYy">informe completo de la auditoría ↗</a></p>
   <div class="prog">
     <div class="pc"><span class="pl">Fase 1 · Control</span><b>5 / 5</b><div class="bar"><i style="width:100%"></i></div></div>
     <div class="pc"><span class="pl">Fase 2 · Independencia</span><b>0 / 6</b><div class="bar"><i style="width:4%"></i></div></div>
-    <div class="pc"><span class="pl">Fase 3 · Robustez</span><b>0 / 5</b><div class="bar"><i style="width:2%"></i></div></div>
+    <div class="pc"><span class="pl">Fase 3 · Robustez</span><b>0 / 6</b><div class="bar"><i style="width:2%"></i></div></div>
   </div>
 </div></header>
 
@@ -97,6 +97,7 @@ footer{padding:28px 0 46px;color:var(--faint);font-size:.78rem}
     <li><span class="d">14 oct</span><span class="x"><b>Independización de Jhon, tanda 1:</b> super-admin → Alvaro (<code>7098431f</code>, live) · bot con Alvaro como única autoridad (<code>90bec3c1</code>, en producción) · contacto público → <code>alvaro@maven-ai.me</code> (<code>38ea29fe</code>, live) · docs/infra al repo de ASM (<code>104adcf3</code>).</span></li>
     <li><span class="d">14 oct</span><span class="x"><b>Fase 1 completa (5/5):</b> <code>/documentation</code> a prueba de fallos y fijado en la barra lateral · prosa de ONBOARDING/STATE («quién da accesos / mantenedor») a nombre de Alvaro · guarda de frontend corriendo también en push a main (red de seguridad del flujo rápido).</span></li>
     <li><span class="d">14 oct</span><span class="x"><b>🔴 Urgente cerrado:</b> <code>SUPABASE_ACCESS_TOKEN</code> puesto en GitHub y deploy de TODAS las edge functions en verde (run <code>38670096131</code>). La autoridad del bot de WhatsApp (Alvaro = última palabra) ya está <b>en producción</b>; el backend se despliega solo.</span></li>
+    <li><span class="d">15 oct</span><span class="x"><b>Centro de operaciones en vivo</b> (<code>/admin/centro-de-operaciones</code>, solo admin): personas en salas ahora, reuniones, volumen de la última hora y semáforo de servicios, refresco cada 10 s (<code>1109bb66</code>, CI en verde). Nació del «Error de conexión» del Hub visto sin dónde mirar qué pasaba.</span></li>
   </ul>
 </section>
 
@@ -133,13 +134,14 @@ footer{padding:28px 0 46px;color:var(--faint);font-size:.78rem}
     </ul>
   </div>
 
-  <div class="fase"><div class="fh"><h3>Fase 3 · Robustez</h3><span>después · 0 de 5</span></div>
+  <div class="fase"><div class="fh"><h3>Fase 3 · Robustez</h3><span>después · 0 de 6</span></div>
     <ul class="clean">
       <li><span class="ck todo">○</span><div class="it"><span class="tt">Respaldo del Drive (reabrir la decisión «sin copia»).<span class="who al">Alvaro</span></span></div></li>
       <li><span class="ck todo">○</span><div class="it"><span class="tt">Deploy scripteado del nas-drive.<span class="who cl">Claude</span></span></div></li>
       <li><span class="ck todo">○</span><div class="it"><span class="tt">Plan B del CI cuando el mini5 esté apagado.<span class="who cl">Claude</span></span></div></li>
       <li><span class="ck todo">○</span><div class="it"><span class="tt">Inventario único servicio → Dokploy → dominio → secretos → deploy.<span class="who cl">Claude</span></span></div></li>
       <li><span class="ck todo">○</span><div class="it"><span class="tt">Entorno de pruebas (rama de Supabase con datos sintéticos).<span class="who cl">Claude</span></span></div></li>
+      <li><span class="ck todo">○</span><div class="it"><span class="tt">Canario post-deploy: el CI llama a las funciones críticas tras cada deploy y avisa verde/rojo.<span class="who cl">Claude</span></span></div></li>
     </ul>
   </div>
 </section>
@@ -151,6 +153,8 @@ footer{padding:28px 0 46px;color:var(--faint);font-size:.78rem}
     <li><span class="d">14 oct</span> — Los ~1.300 comentarios históricos «decisión de Jhon» NO se renombran en masa: son la memoria del producto.</li>
     <li><span class="d">14 oct</span> — Portada con siluetas neutras en vez de caras caricaturescas.</li>
     <li><span class="d">14 oct</span> — Las propuestas de homepage nuevo quedan como borradores; la portada actual sigue en producción hasta nueva orden.</li>
+    <li><span class="d">15 oct</span> — Deploys con <b>canario a cualquier hora</b>, sin ventana fija; la hora valle medida (4–8 a.m. Miami) queda para migraciones de base.</li>
+    <li><span class="d">15 oct</span> — Cuando haya más compañías, <b>la de Alvaro es el canario</b>: lo nuevo se estrena en su operación antes de llegar a clientes.</li>
   </ul>
 </section>
 

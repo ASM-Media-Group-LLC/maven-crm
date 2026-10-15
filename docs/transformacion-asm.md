@@ -21,6 +21,7 @@ Maven pasó a ser administrado por **Alvaro (ASM Tech)**. El repositorio, los se
   - Bot de WhatsApp: Alvaro como única autoridad final; avisos «a Jhon» → «al administrador»; reglas persistentes de la base auditadas (ninguna lo nombra). Commit `90bec3c1` (edge en producción, run `38670096131`).
   - Contacto público (portada + privacidad) y fallback de `demo-request` → `alvaro@maven-ai.me`. ✅ live (`38ea29fe`).
   - Docs/infra que apuntaban al repo viejo `jhonjlopez-sudo` → org ASM (`104adcf3`).
+- **2026-10-15** — **Centro de operaciones en vivo** (`/admin/centro-de-operaciones`, solo admin): personas en salas ahora, reuniones en curso, volumen de la última hora y semáforo de servicios (base/app/LiveKit), con refresco cada 10 s. Edge `centro-operaciones` + página (`1109bb66`), desplegado por el CI en verde. Nació del «Error de conexión» del Hub visto con 11 personas trabajando y sin dónde mirar qué pasaba.
 - **2026-10-14** — **Fase 1 completa (5/5):** `/documentation` a prueba de fallos (solo registra con etiqueta explícita `hecho:`/`decidí:`/`pendiente:`) y la página viva fijada en la barra lateral de claude.ai; prosa «quién da accesos / mantenedor» de `ONBOARDING.md` y `STATE.md` a nombre de Alvaro; guarda de frontend corriendo también en `push` a `main` (nuevo `guard-frontend-main.yml`, red de seguridad del flujo rápido).
 
 ## Recopilación: qué seguía vivo de Jhon (14/10)
@@ -56,6 +57,7 @@ Maven pasó a ser administrado por **Alvaro (ASM Tech)**. El repositorio, los se
 - [ ] Plan B del CI para cuando el mini5 esté apagado (`workflow_dispatch` en ubuntu-latest). — Claude
 - [ ] Inventario único servicio → app de Dokploy → dominio → secretos → modo de deploy. — Claude
 - [ ] Entorno de pruebas (rama de Supabase con datos sintéticos) para experimentar sin tocar producción. — Claude
+- [ ] Canario post-deploy: tras cada deploy de edge functions, el CI llama a las funciones críticas y avisa verde/rojo. — Claude
 
 ## Decisiones
 
@@ -63,3 +65,5 @@ Maven pasó a ser administrado por **Alvaro (ASM Tech)**. El repositorio, los se
 - **2026-10-14** — Los ~1.300 comentarios históricos «decisión de Jhon, fecha» NO se renombran en masa: son la memoria de por qué el producto es como es.
 - **2026-10-14** — Portada con siluetas neutras en lugar de caras caricaturescas (pedido de Alvaro).
 - **2026-10-14** — Las propuestas de homepage nuevo (limpia, cinematográfica, Cowork con scrollytelling) quedan como borradores en sus links; la portada actual sigue siendo la de producción hasta nueva orden.
+- **2026-10-15** — Deploys con **canario a cualquier hora**, sin ventana fija: lo que esté listo sale, y el chequeo automático avisa. La hora valle medida con datos (4–8 a.m. Miami) queda reservada para migraciones de base.
+- **2026-10-15** — Cuando haya más compañías, **la de Alvaro es el canario**: lo nuevo se estrena en su operación y a los clientes les llega solo lo que ya sobrevivió.
