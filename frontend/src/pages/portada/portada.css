@@ -187,15 +187,22 @@
   }
 
   /* La bajada: limpia — solo las fichas de lo que trae, a juego con el panel. */
-  .pt .bajada { margin: 28px 0 0; max-width: 48ch; }
-  .pt .bajada-chips { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; }
+  .pt .bajada { margin: 26px 0 0; max-width: 48ch; }
+  .pt .bajada-chips { list-style: none; display: flex; flex-wrap: wrap; gap: 9px; margin: 0; padding: 0; }
   .pt .bajada-chips li {
+    display: inline-flex; align-items: center; gap: 7px;
     font: 500 13.5px/1 "Instrument Sans", sans-serif; color: var(--ink-soft);
-    border: 1px solid var(--line); border-radius: 999px; padding: 8px 14px;
-    background: rgba(255,255,255,.03); transition: border-color .2s, transform .2s;
+    border: 1px solid var(--line); border-radius: 999px; padding: 9px 15px 9px 12px;
+    background: rgba(255,255,255,.035); transition: border-color .2s, transform .2s, background .2s, color .2s;
   }
-  .pt .bajada-chips li:hover { border-color: var(--line-strong); transform: translateY(-2px); }
-  .pt .acciones { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 32px; }
+  .pt .bajada-chips li svg { width: 15px; height: 15px; color: var(--azul-claro); opacity: .95; }
+  .pt .bajada-chips li:hover { border-color: rgba(var(--azul-claro-rgb),.4); background: rgba(var(--azul-rgb),.07); color: var(--ink); transform: translateY(-2px); }
+  /* Kicker del hero: a juego con los eyebrow de las secciones, pero en acento. */
+  .pt .eyebrow-hero { color: var(--azul-claro); }
+  .pt .acciones { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
+  /* La flecha del CTA avanza al pasar el mouse. */
+  .pt .btn-primario svg { transition: transform .2s; }
+  .pt .btn-primario:hover svg { transform: translateX(3px); }
   .pt .pie-hero { margin: 20px 0 0; font-size: 13px; color: var(--faint); }
 
   /* ── La cinta de operación: el corazón del hero ───────────────────────── */

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { ArrowRight } from "lucide-react";
 import { MarcaM } from "@/components/MarcaM";
 import { Link } from "react-router-dom";
 import "./portada.css";
@@ -115,14 +116,16 @@ export default function Portada() {
         <PulsoCanvas skin={paleta.id} />
         <div className="wrap hero-grid">
           <div>
+            <span className="eyebrow eyebrow-hero">La oficina virtual de tu equipo</span>
             <h1><span className="resalte">{guion.remate}</span></h1>
             <p className="deck">{guion.remateBajo}</p>
             <div className="bajada">{guion.bajada}</div>
 
             <div className="acciones">
-              <a className="btn btn-primario btn-lg" href="#demo">Pedir una demo</a>
+              <a className="btn btn-primario btn-lg" href="#demo">Pedir una demo <ArrowRight width={17} height={17} strokeWidth={2.4} aria-hidden="true" /></a>
               <a className="btn btn-fantasma btn-lg" href="#reemplaza">Ver lo que reemplaza</a>
             </div>
+            <p className="pie-hero">Sin instalar nada · lista para tu equipo en minutos</p>
           </div>
 
           <Oficina publico={publico} />

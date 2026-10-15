@@ -1,3 +1,4 @@
+import { MessageCircle, Video, Mail, FileText, ListChecks, Megaphone, CalendarClock, Sparkles } from "lucide-react";
 import type { Publico } from "./guiones";
 
 // LO QUE CAMBIA CUANDO CAMBIA EL PÚBLICO.
@@ -61,11 +62,11 @@ export const GUION: Record<Publico, Guion> = {
     remateBajo: "Aquí está todo tu equipo, como en una oficina real.",
     bajada: (
       <ul className="bajada-chips">
-        <li>Chat</li>
-        <li>Reuniones</li>
-        <li>Correo propio</li>
-        <li>Documentos</li>
-        <li>Tareas</li>
+        <li><MessageCircle aria-hidden="true" />Chat</li>
+        <li><Video aria-hidden="true" />Reuniones</li>
+        <li><Mail aria-hidden="true" />Correo propio</li>
+        <li><FileText aria-hidden="true" />Documentos</li>
+        <li><ListChecks aria-hidden="true" />Tareas</li>
       </ul>
     ),
     cifras: [
@@ -91,12 +92,12 @@ export const GUION: Record<Publico, Guion> = {
     remateBajo: "A toda tu agencia, en una sola oficina virtual.",
     bajada: (
       <ul className="bajada-chips">
-        <li>Chat</li>
-        <li>Reuniones</li>
-        <li>Correo propio</li>
-        <li>Promoción</li>
-        <li>Turnos</li>
-        <li>Simulador</li>
+        <li><MessageCircle aria-hidden="true" />Chat</li>
+        <li><Video aria-hidden="true" />Reuniones</li>
+        <li><Mail aria-hidden="true" />Correo propio</li>
+        <li><Megaphone aria-hidden="true" />Promoción</li>
+        <li><CalendarClock aria-hidden="true" />Turnos</li>
+        <li><Sparkles aria-hidden="true" />Simulador</li>
       </ul>
     ),
     cifras: [
