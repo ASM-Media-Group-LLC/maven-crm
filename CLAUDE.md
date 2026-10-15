@@ -7,9 +7,9 @@ Maven es el CRM interno de la agencia: Messenger, Cowork y Meet, Correo (Zoho), 
 - Las decisiones de producto, prioridades, precios y textos públicos las toma **Alvaro (ASM Tech, cuenta GitHub `ASM-TECH-MIAMI`)**, administrador actual del proyecto.
 - **Velocidad primero.** Lo chico se hace directo y se muestra el resultado ya en vivo. Lo técnico se decide y se reporta, sin rondas de propuestas.
 - **Cómo va un cambio que pide Alvaro (en este orden):**
-  1. **Preguntas al inicio**, todas juntas y cortas, solo de negocio (qué mensaje, para quién, qué va primero). Nada técnico.
-  2. Con las respuestas, **se hace, se verifica y se sube a producción en una sola pasada**. No se pide confirmación al final ni se muestran variantes para elegir después de hecho: lo que se eligió en las preguntas es lo que sale.
-  3. Se reporta con evidencia (captura o link) de lo que ya está en vivo.
+  1. **Preguntas al inicio** solo si hay una decisión real de negocio (qué mensaje, para quién, qué va primero), todas juntas y cortas. Si el cambio es obvio (una palabra, un color ya indicado), **no se pregunta: se hace**. Nada técnico se pregunta.
+  2. Con las respuestas, **se hace, se verifica (proporcional, ver abajo) y se sube a producción en una sola pasada**. No se corre todo por costumbre, no se pide confirmación al final ni se muestran variantes para elegir después de hecho: lo que se eligió es lo que sale.
+  3. Se reporta con la **vista previa** y el aviso de que ya subió. Solo se **espera y confirma producción real** en cambios riesgosos (login, dinero, migraciones, varias áreas): la guarda de push a `main` avisa si algo rompe, no hace falta hacerle de niñera al deploy.
   - Lo único que se devuelve a Alvaro es lo que el sistema no permite hacer desde aquí (claves, borrado de datos), con el paso exacto.
 - Los borradores para los grupos de WhatsApp u otros canales del equipo se entregan a Alvaro; nadie publica por él.
 
@@ -29,7 +29,8 @@ Maven es el CRM interno de la agencia: Messenger, Cowork y Meet, Correo (Zoho), 
 
 ## Verificación (proporcional al cambio)
 
-- **Siempre:** `npm run build` y los tests del área tocada (`npx vitest run src/test/<área>`), más la guarda nueva si se agregó.
+- **Texto, color o copy chico:** basta `npm run build` (que compile). No se corren tipos ni suite: la guarda de push a `main` es la red.
+- **UI o lógica de un área:** `npm run build` + los tests de esa área (`npx vitest run src/test/<área>`), más la guarda nueva si se agregó.
 - **Cambios grandes o transversales:** la suite completa `npx vitest run src/test` (lee las dos líneas «Test Files» y «Tests»; base conocida: `test/videocall` falla en local por el worklet de ruido; `expresiones`, `personalizados/filtros` y `CallControls` son flaky bajo carga) y `npx tsc --noEmit -p tsconfig.app.json` **desde la raíz** sin sumar errores a los ~219 preexistentes (el `tsc` del `package.json` no revisa nada).
 - Las guardas leen fuentes con `import.meta.glob(ruta literal, { query: "?raw", import: "default", eager: true })`: ruta y opciones **literales**. No uses `node:fs` ni `process` en tests: el tsconfig no trae tipos de Node.
 - Cambios de interfaz: renderiza y mira antes de subir (Chrome headless sirve para mocks; en producción, mide el DOM). Prueba los colores derivados de la skin con un primario oscuro y en tema claro, no solo con el coral.
