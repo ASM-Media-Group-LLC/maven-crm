@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Headphones, Monitor, MousePointer2, Users } from "lucide-react";
+import { Headphones, MousePointer2, Users } from "lucide-react";
 import { Cara, nombreDe, type Seed } from "./gente";
 import type { Publico } from "./guiones";
 
@@ -82,17 +82,30 @@ function SalaVista({ s, resaltada, modo, vozActiva }: { s: Sala; resaltada: bool
       <div className="ofi-escena">
         {vacia ? (
           <span className="ofi-libre">Sala libre</span>
+        ) : pantalla ? (
+          // Comparte pantalla: se ve la PANTALLA de verdad —un panel en vivo— con
+          // la cámara chica de quien presenta, igual que el tablero de Cowork. Así
+          // el supervisor no "lee" que alguien comparte: lo VE.
+          <div className="ofi-share">
+            <div className="cwx-screen" aria-hidden="true">
+              <div className="ss-bar"><i /><i /><i /></div>
+              <div className="ss-body">
+                <span className="l t" /><span className="l" /><span className="l" />
+                <div className="ss-chart"><i /><i /><i /><i /><i /></div>
+              </div>
+            </div>
+            <span className="ofi-share-quien">
+              <span className="ofi-share-live" aria-hidden="true" />
+              <Cara seed={pantalla.seed} className="ofi-share-cara" />
+              {nombreDe(pantalla.seed)}
+            </span>
+          </div>
         ) : (
           s.gente.map((p) => (
             <span className={`ofi-persona ${p.estado}${p.seed === vozActiva ? " activa" : ""}`} key={p.seed}>
               <Cara seed={p.seed} className="ofi-cara" />
               {p.estado === "habla" && <span className="ofi-ondas" aria-hidden="true"><i /><i /><i /></span>}
               {p.estado === "trabaja" && <span className="ofi-teclea" aria-hidden="true"><i /><i /><i /></span>}
-              {p.estado === "pantalla" && (
-                <span className="ofi-pant" aria-hidden="true">
-                  <Monitor width={9} height={9} strokeWidth={2.4} />
-                </span>
-              )}
             </span>
           ))
         )}

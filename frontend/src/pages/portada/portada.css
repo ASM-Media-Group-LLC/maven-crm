@@ -350,6 +350,13 @@
     position: absolute; right: -9px; bottom: -3px; display: grid; place-items: center; width: 16px; height: 16px;
     border-radius: 6px; background: rgba(var(--violeta-rgb),.22); border: 1px solid rgba(var(--violeta-rgb),.5); color: var(--violeta);
   }
+  /* Comparte pantalla en el hero: la PANTALLA de verdad (un panel en vivo) con la
+     cámara chica de quien presenta — mismo lenguaje que el tablero de Cowork. */
+  .pt .ofi-share { align-self: stretch; position: relative; width: 100%; min-height: 58px; border-radius: 10px; overflow: hidden; background: #0a0e16; border: 1px solid var(--line); }
+  .pt .ofi-share .cwx-screen { inset: 5px; border-radius: 6px; }
+  .pt .ofi-share-quien { position: absolute; left: 6px; bottom: 6px; z-index: 2; display: inline-flex; align-items: center; gap: 5px; font: 500 9px/1.1 "JetBrains Mono", monospace; color: var(--ink-soft); background: rgba(5,7,11,.82); border-radius: 8px; padding: 2px 7px 2px 3px; }
+  .pt .ofi-share-quien .ofi-share-cara { width: 16px; height: 16px; border-radius: 50%; flex: none; }
+  .pt .ofi-share-live { width: 6px; height: 6px; border-radius: 50%; background: var(--rosa); animation: latir 2s ease-out infinite; flex: none; }
   .pt .ofi-pie { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 11px; line-height: 1.2; color: var(--muted); white-space: nowrap; overflow: hidden; }
   .pt .ofi-pie > span:first-child { overflow: hidden; text-overflow: ellipsis; }
   .pt .ofi-esc { display: inline-flex; align-items: center; gap: 5px; flex: none; font: 500 10px/1 "JetBrains Mono", monospace; letter-spacing: .04em; color: var(--verde); }
