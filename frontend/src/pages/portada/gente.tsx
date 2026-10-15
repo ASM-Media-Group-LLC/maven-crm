@@ -70,7 +70,7 @@ export function Cara({ seed, className, style }: { seed: Seed; className?: strin
       // `?v=` fuerza a los navegadores a traer las fotos nuevas aunque tengan en
       // caché las viejas (el nombre de archivo no cambia). Subir el número al
       // cambiar las caras.
-      src={`${FOTO[seed]}?v=2`}
+      src={`${FOTO[seed]}?v=3`}
       alt=""
       loading="lazy"
       className={clase}
