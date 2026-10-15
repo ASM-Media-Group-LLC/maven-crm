@@ -67,13 +67,16 @@ Deno.serve(async (req) => {
     // "En salas ahora" = segmento abierto con latido en los últimos 2 minutos:
     // un segmento sin ended_at pero con last_seen viejo es alguien que se fue
     // sin cerrar (se cayó el navegador), no alguien presente.
-    const [seg, meets, sesiones, msgs, notis, pings] = await Promise.all([
+    const [seg, meets, sesiones, msgs, notis, cortes, pings] = await Promise.all([
       admin.from("cowork_tiempo_segmentos").select("user_id, room_id")
         .is("ended_at", null).gte("last_seen_at", hace2min),
       admin.from("cowork_meets").select("id", { count: "exact", head: true }).is("ended_at", null),
       admin.from("cowork_sessions").select("id", { count: "exact", head: true }).is("ended_at", null),
       admin.from("chat_messages").select("id", { count: "exact", head: true }).gte("created_at", hace1h),
       admin.from("notifications").select("id", { count: "exact", head: true }).gte("created_at", hace1h),
+      // Cortes de llamada: parpadeos (reconexión interna) + caídas de verdad.
+      admin.from("llamada_cortes").select("id", { count: "exact", head: true })
+        .gte("creado", hace1h).in("fase", ["caida", "parpadeo"]),
       Promise.all([
         ping("frontend", "https://app.maven-ai.me/"),
         // LIVEKIT_URL viene como wss://; el server de LiveKit contesta en https.
@@ -97,6 +100,7 @@ Deno.serve(async (req) => {
       reuniones_activas: meets.count ?? 0,
       mensajes_ultima_hora: msgs.count ?? 0,
       notificaciones_ultima_hora: notis.count ?? 0,
+      cortes_llamada_ultima_hora: cortes.count ?? 0,
       servicios,
     }), { headers });
   } catch (e) {

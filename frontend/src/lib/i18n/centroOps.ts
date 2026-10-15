@@ -16,6 +16,7 @@ export const centroOps = {
   "centroOps.reuniones": { es: "Reuniones en curso", en: "Meetings in progress" },
   "centroOps.mensajes1h": { es: "Mensajes (última hora)", en: "Messages (last hour)" },
   "centroOps.notis1h": { es: "Notificaciones (última hora)", en: "Notifications (last hour)" },
+  "centroOps.cortes1h": { es: "Cortes de llamada (última hora)", en: "Call drops (last hour)" },
   "centroOps.servicios": { es: "Servicios", en: "Services" },
   "centroOps.srv.base": { es: "Base de datos", en: "Database" },
   "centroOps.srv.frontend": { es: "Aplicación", en: "App" },

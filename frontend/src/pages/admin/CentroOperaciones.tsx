@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Activity, Bell, LayoutGrid, MessageSquare, Users, Video } from "lucide-react";
+import { Activity, Bell, LayoutGrid, MessageSquare, PhoneOff, Users, Video } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -22,6 +22,7 @@ type Estado = {
   reuniones_activas: number;
   mensajes_ultima_hora: number;
   notificaciones_ultima_hora: number;
+  cortes_llamada_ultima_hora?: number;
   servicios: Servicio[];
 };
 
@@ -99,6 +100,7 @@ export default function CentroOperaciones() {
             <Tarjeta Icono={Video} titulo={t("centroOps.reuniones")} valor={estado.reuniones_activas} />
             <Tarjeta Icono={MessageSquare} titulo={t("centroOps.mensajes1h")} valor={estado.mensajes_ultima_hora} />
             <Tarjeta Icono={Bell} titulo={t("centroOps.notis1h")} valor={estado.notificaciones_ultima_hora} />
+            <Tarjeta Icono={PhoneOff} titulo={t("centroOps.cortes1h")} valor={estado.cortes_llamada_ultima_hora ?? 0} />
           </div>
 
           <div className="rounded-xl border bg-card">

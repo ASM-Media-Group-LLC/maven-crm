@@ -15,6 +15,7 @@ import {
 } from "livekit-client";
 import type { TrackPublishOptions } from "livekit-client";
 import { esOtraPestana } from "@/lib/sesionDuplicada";
+import { fueUnaCaida } from "@/lib/conexionSala";
 import {
   reproducirAudiosPausados, reanudarAudioConGesto, dejarDeEsperarGesto, registrarDesbloqueo,
   decidirSiRepararElMicro, MEMORIA_VIGILANTE_VACIA, type MemoriaDelVigilante,
@@ -462,6 +463,39 @@ export function useLiveKit() {
   const [activeSpeaker, setActiveSpeaker] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isReconnecting, setIsReconnecting] = useState(false);
+
+  // ── Re-entrada automática tras una caída (ver conexionSala.ts) ───────────
+  // La decisión del 29/09 dejó, tras la caída, un cartel con un botón manual
+  // para volver. La queja del equipo (14/10: «estás hablando y se cae») es que
+  // ese botón lo aprieta un humano. Ahora, si fueUnaCaida(razón) —ni salir a
+  // propósito, ni otra pestaña, ni expulsión—, se vuelve a entrar solo con
+  // token nuevo: hasta 4 intentos (2 s, 4 s, 8 s, 8 s). El cartel sigue
+  // existiendo: se ve durante el intento y se queda, con su botón, solo si
+  // los cuatro fallan.
+  const ultimaConexionRef = useRef<{ roomName: string; participantName: string; isAdmin: boolean; options: ConnectOptions } | null>(null);
+  const reentradasRef = useRef(0);
+  const reentradaTimerRef = useRef<number | null>(null);
+  const programarReentradaRef = useRef<(razon?: DisconnectReason | null) => void>(() => {});
+
+  // Telemetría de cortes (tabla llamada_cortes): cada parpadeo y cada caída
+  // queda con su motivo, para saber si el cuello es el servidor, la red o la
+  // app. Fuego y olvido, con catch: la telemetría jamás rompe una llamada.
+  // El tipo angosto es porque la tabla es más nueva que los tipos generados
+  // de Supabase (mismo idioma que ClienteQueEscribe en admin-user-actions).
+  type InsertaCorte = (tabla: "llamada_cortes") => {
+    insert: (fila: { sala: string | null; fase: string; motivo: string | null }) =>
+      PromiseLike<{ error: { message: string } | null }>;
+  };
+  const anotarCorte = useCallback((fase: string, sala?: string | null, razon?: DisconnectReason | number | null) => {
+    try {
+      const motivo = razon == null
+        ? null
+        : ((DisconnectReason as unknown as Record<number, string>)[razon as number] ?? String(razon));
+      void (supabase.from as unknown as InsertaCorte)("llamada_cortes")
+        .insert({ sala: sala ?? null, fase, motivo })
+        .then(({ error }) => { if (error) console.warn("[llamada_cortes]", error.message); });
+    } catch { /* sin telemetría, pero con llamada */ }
+  }, []);
   // Nos sacaron porque esta misma cuenta entró desde otra pestaña o equipo.
   // Va aparte de `error` a propósito: no se rompió nada, y sobre todo NO se
   // reintenta — reintentar es lo que arma la pelea infinita entre las dos.
@@ -1131,6 +1165,13 @@ export function useLiveKit() {
       return;
     }
     connectingRef.current = true;
+    // La re-entrada automática recuerda estos argumentos, y un connect nuevo
+    // (manual o automático) cancela cualquier reintento que esté esperando.
+    if (reentradaTimerRef.current != null) {
+      clearTimeout(reentradaTimerRef.current);
+      reentradaTimerRef.current = null;
+    }
+    ultimaConexionRef.current = { roomName, participantName, isAdmin, options };
     const intento = ++intentoRef.current;
     const vigente = () => intento === intentoRef.current;
     // Mientras ENTRA también es una llamada: una recarga ahora (un deploy, o el
@@ -1231,11 +1272,13 @@ export function useLiveKit() {
 
       room.on(RoomEvent.Reconnecting, () => {
         setIsReconnecting(true);
+        anotarCorte("parpadeo", room.name);
         console.info("[LiveKit] Reconnecting...");
       });
 
       room.on(RoomEvent.Reconnected, () => {
         setIsReconnecting(false);
+        anotarCorte("parpadeo_ok", room.name);
         console.info("[LiveKit] Reconnected successfully");
         refreshParticipants();
 
@@ -1499,6 +1542,9 @@ export function useLiveKit() {
         setIsReconnecting(false);
         setParticipants([]);
         setActiveSpeaker(null);
+        anotarCorte(fueUnaCaida(razon) ? "caida" : "salida", room.name, razon);
+        // La caída de verdad no se queda esperando un clic: se vuelve solo.
+        if (fueUnaCaida(razon)) programarReentradaRef.current(razon);
       });
 
       // ── Connect & publish tracks ────────────────────────────
@@ -1506,6 +1552,8 @@ export function useLiveKit() {
       if (!vigente()) { void room.disconnect(true); return; }
       // Que la página NO se recargue sola por un deploy mientras esto dure.
       marcarLlamadaActiva(roomName);
+      if (reentradasRef.current > 0) anotarCorte("reentrada_ok", roomName);
+      reentradasRef.current = 0;
       room.once(RoomEvent.Disconnected, () => quitarLlamadaActiva(roomName));
       console.info("[LiveKit] Connected to room:", roomName, "as", room.localParticipant.identity);
       console.info("[LiveKit] Remote participants already in room:", room.remoteParticipants.size);
@@ -1609,10 +1657,40 @@ export function useLiveKit() {
       // Tampoco libera el cerrojo del intento que lo reemplazó.
       if (vigente()) connectingRef.current = false;
     }
-  }, [refreshParticipants, debouncedRefresh, clearSyncInterval, clearBackgroundReapplyTimer, cleanupAudioResumeListeners, hasActiveCameraPublication, enableCameraWithRecovery, disposeBackgroundProcessor, applyConfiguredBackgroundIfNeeded, applyBackgroundBeforeLocalVideoVisible, scheduleBackgroundApply, scheduleDeferredBackgroundReapply, kickAudioPlayback, vigilarMicro]);
+  }, [refreshParticipants, debouncedRefresh, clearSyncInterval, clearBackgroundReapplyTimer, cleanupAudioResumeListeners, hasActiveCameraPublication, enableCameraWithRecovery, disposeBackgroundProcessor, applyConfiguredBackgroundIfNeeded, applyBackgroundBeforeLocalVideoVisible, scheduleBackgroundApply, scheduleDeferredBackgroundReapply, kickAudioPlayback, vigilarMicro, anotarCorte]);
+
+  // Debajo de connect porque lo usa; por ref para que el handler de
+  // Disconnected (que nace dentro de cada connect) vea siempre la versión
+  // vigente sin sumar dependencias al useCallback gigante de arriba.
+  programarReentradaRef.current = (razon?: DisconnectReason | null) => {
+    const datos = ultimaConexionRef.current;
+    if (!datos) return; // salió a propósito: no hay a dónde volver
+    if (reentradasRef.current >= 4) {
+      anotarCorte("reentrada_agotada", datos.roomName, razon);
+      return; // se queda el cartel con su botón, como hasta hoy
+    }
+    const n = ++reentradasRef.current;
+    const espera = Math.min(2000 * Math.pow(2, n - 1), 8000); // 2 s, 4 s, 8 s, 8 s
+    console.info(`[LiveKit] Caída (razón ${String(razon)}): volviendo solo, intento ${n}/4 en ${espera} ms`);
+    setIsReconnecting(true);
+    reentradaTimerRef.current = window.setTimeout(() => {
+      reentradaTimerRef.current = null;
+      const d = ultimaConexionRef.current;
+      if (!d) return;
+      connect(d.roomName, d.participantName, d.isAdmin, d.options)
+        .catch(() => programarReentradaRef.current(razon));
+    }, espera);
+  };
 
   // ── Disconnect ─────────────────────────────────────────────────
   const disconnect = useCallback(() => {
+    // Salir a propósito también apaga la re-entrada automática.
+    if (reentradaTimerRef.current != null) {
+      clearTimeout(reentradaTimerRef.current);
+      reentradaTimerRef.current = null;
+    }
+    ultimaConexionRef.current = null;
+    reentradasRef.current = 0;
     clearSyncInterval();
     clearBackgroundReapplyTimer();
     cleanupAudioResumeListeners();
