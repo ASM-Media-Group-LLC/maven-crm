@@ -91,7 +91,7 @@ function SalaVista({ s, escuchada, vozActiva }: { s: Sala; escuchada: boolean; v
   );
 }
 
-export default function Oficina({ publico, idPestana }: { publico: Publico; idPestana: string }) {
+export default function Oficina({ publico }: { publico: Publico }) {
   const [hora, setHora] = useState("--:--:--");
   const [tick, setTick] = useState(0);
 
@@ -129,7 +129,7 @@ export default function Oficina({ publico, idPestana }: { publico: Publico; idPe
         <span className="ofi-cuenta">{enSalas} en salas · {hablantes.length} hablando</span>
         <span className="consola-reloj">{hora}</span>
       </div>
-      <div className="ofi" id="cinta" role="tabpanel" aria-labelledby={idPestana}>
+      <div className="ofi" aria-label="Oficina en vivo">
         {/* El `key` por público remonta la grilla: cambia el guión sin que se
             vea a medio camino una sala del otro público. */}
         <div className="ofi-grilla" key={publico}>

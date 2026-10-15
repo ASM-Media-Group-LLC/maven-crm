@@ -67,7 +67,8 @@ function Marca({ chico = false }: { chico?: boolean }) {
 
 export default function Portada() {
   const raiz = useRef<HTMLDivElement>(null);
-  const [publico, setPublico] = useState<Publico>("empresas");
+  // La portada habla solo a empresas: sin selector de público (decisión de Alvaro).
+  const publico: Publico = "empresas";
   const [pegado, setPegado] = useState(false);
   // La paleta con la que se está viendo la portada. Vive SOLO en memoria: al
   // refrescar vuelve al azul de Maven, porque es una demostración de marca
@@ -121,28 +122,9 @@ export default function Portada() {
               <Pila cuantas={5} />
               Oficina virtual con control del equipo
             </span>
-            <h1>
-              <span className="resalte">{guion.remate}</span><br />
-              {guion.remateBajo}
-            </h1>
+            <h1><span className="resalte">{guion.remate}</span></h1>
+            <p className="deck">{guion.remateBajo}</p>
             <div className="bajada">{guion.bajada}</div>
-
-            <div className="publico" role="tablist" aria-label="Elegir público">
-              <button
-                role="tab" id="tab-empresas" type="button"
-                aria-selected={publico === "empresas"} aria-controls="cinta"
-                onClick={() => setPublico("empresas")}
-              >
-                Para empresas
-              </button>
-              <button
-                role="tab" id="tab-agencias" type="button"
-                aria-selected={publico === "agencias"} aria-controls="cinta"
-                onClick={() => setPublico("agencias")}
-              >
-                Para agencias de creadoras
-              </button>
-            </div>
 
             <div className="acciones">
               <a className="btn btn-primario btn-lg" href="#demo">Pedir una demo</a>
@@ -151,7 +133,7 @@ export default function Portada() {
             <p className="pie-hero">{PIES[publico]}</p>
           </div>
 
-          <Oficina publico={publico} idPestana={`tab-${publico}`} />
+          <Oficina publico={publico} />
         </div>
       </section>
 

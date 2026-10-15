@@ -57,8 +57,8 @@ const LINKS_CIERRE: [string, string][] = [
 
 export const GUION: Record<Publico, Guion> = {
   empresas: {
-    remate: "Control total, en tiempo real,",
-    remateBajo: "a todo tu equipo en la oficina virtual.",
+    remate: "Control total, en tiempo real.",
+    remateBajo: "A todo tu equipo, en una sola oficina virtual.",
     bajada: (
       <ul className="bajada-chips">
         <li>Chat</li>
@@ -87,8 +87,8 @@ export const GUION: Record<Publico, Guion> = {
   },
 
   agencias: {
-    remate: "Control total, en tiempo real,",
-    remateBajo: "a toda tu agencia en la oficina virtual.",
+    remate: "Control total, en tiempo real.",
+    remateBajo: "A toda tu agencia, en una sola oficina virtual.",
     bajada: (
       <ul className="bajada-chips">
         <li>Chat</li>
