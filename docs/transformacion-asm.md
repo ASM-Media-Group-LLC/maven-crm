@@ -18,7 +18,7 @@ Maven pasó a ser administrado por **Alvaro (ASM Tech)**. El repositorio, los se
 - **2026-10-14** — Auditoría completa en 6 áreas (frontend, Supabase, servicios, CI, dependencias, fricciones); informe publicado (link arriba).
 - **2026-10-14** — **Independización de Jhon, tanda 1:**
   - Super-admin de la plataforma → Alvaro; Jhon retirado de `plataforma_admins`. Aplicado a producción (migración `7098431f`). ✅ live
-  - Bot de WhatsApp: Alvaro como única autoridad final; avisos «a Jhon» → «al administrador»; reglas persistentes de la base auditadas (ninguna lo nombra). Commit `90bec3c1` (edge: se despliega con el token).
+  - Bot de WhatsApp: Alvaro como única autoridad final; avisos «a Jhon» → «al administrador»; reglas persistentes de la base auditadas (ninguna lo nombra). Commit `90bec3c1` (edge en producción, run `38670096131`).
   - Contacto público (portada + privacidad) y fallback de `demo-request` → `alvaro@maven-ai.me`. ✅ live (`38ea29fe`).
   - Docs/infra que apuntaban al repo viejo `jhonjlopez-sudo` → org ASM (`104adcf3`).
 - **2026-10-14** — **Fase 1 completa (5/5):** `/documentation` a prueba de fallos (solo registra con etiqueta explícita `hecho:`/`decidí:`/`pendiente:`) y la página viva fijada en la barra lateral de claude.ai; prosa «quién da accesos / mantenedor» de `ONBOARDING.md` y `STATE.md` a nombre de Alvaro; guarda de frontend corriendo también en `push` a `main` (nuevo `guard-frontend-main.yml`, red de seguridad del flujo rápido).
@@ -29,15 +29,15 @@ Maven pasó a ser administrado por **Alvaro (ASM Tech)**. El repositorio, los se
 - **Sesión BLU (chatters)**: ✅ viva, se auto-refresca. Pero la de la agencia «plus» está sembrada con su cuenta personal `unlok.me` (accountId 4). Si cambia su clave, «plus» se cae. **Pendiente: re-sembrarla con cuenta corporativa (necesita credenciales BLU de Alvaro).**
 - **Hubstaff**: el PAT se auto-rota en `hubstaff_secrets`; riesgo menor, revisar la semilla.
 
-## 🔴 Urgente pendiente
+## ✅ Resuelto (antes urgente)
 
-- [ ] **Secret `SUPABASE_ACCESS_TOKEN`** en GitHub → repo `ASM-Media-Group-LLC/maven-crm` → Settings → Secrets → Actions (el token se genera en Supabase → Account → Access Tokens), y luego correr el workflow **Deploy Edge Functions** con `deploy_all = true`. **Responsable: Alvaro (5 min).** Sin esto, el próximo cambio de backend NO se despliega (verificado: run 38301565957 falló por este motivo).
+- [x] **Secret `SUPABASE_ACCESS_TOKEN`** puesto en GitHub Actions (2026-10-14) y deploy de TODAS las edge functions en verde (run `38670096131`, 4m47s). La autoridad del bot de WhatsApp (Alvaro = última palabra) quedó **en producción**; de aquí en adelante el backend se despliega solo al entrar a `main`.
 
 ## Plan
 
 ### Fase 1 — Control (esta semana)
 - [x] Super-admin → Alvaro en `plataforma_admins`, Jhon retirado (migración `7098431f`, live).
-- [x] Bot de WhatsApp: Alvaro única autoridad final + avisos «al administrador» + reglas auditadas (`90bec3c1`; se despliega con el token).
+- [x] Bot de WhatsApp: Alvaro única autoridad final + avisos «al administrador» + reglas auditadas (`90bec3c1`; en producción).
 - [x] Contacto público + `DEMO_REQUEST_TO` → `alvaro@maven-ai.me` (`38ea29fe`, frontend live).
 - [x] Docs/infra al repo de ASM (`104adcf3`) + prosa «quién da accesos / mantenedor» en `ONBOARDING.md` y `STATE.md` a nombre de Alvaro.
 - [x] Guarda de frontend corriendo también en `push` a `main` (red de seguridad del flujo rápido): nuevo workflow `guard-frontend-main.yml`.
