@@ -3,120 +3,128 @@ import { Headphones, MousePointer2, Users } from "lucide-react";
 import { Cara, nombreDe, type Seed } from "./gente";
 import type { Publico } from "./guiones";
 
-// LA OFICINA EN VIVO · DEMO QUE SE MANEJA SOLA.
+// EL HERO ES EL TABLERO DE COWORK, EN CHICO Y MANEJÁNDOSE SOLO.
 //
-// El hero abre con Cowork trabajando: salas abiertas con gente adentro —unos
-// hablando, otros tecleando, alguien compartiendo pantalla— y, encima, un
-// cursor que recorre el tablero y va MOSTRANDO cómo se usa: escucha una sala
-// sin entrar, le habla, entra a otra. Es el "video" de cómo trabaja la
-// plataforma, pero reconstruido en vivo (sin grabar nada ni exponer a nadie).
+// Un supervisor ve todas las salas a la vez: unas en cámara, otras compartiendo
+// pantalla. A la izquierda, su rail —las pantallas en vivo y quién pide entrar—.
+// A la derecha, las salas con sus controles (Escuchar / Hablar / Entrar) y un
+// cursor que los va tocando solo para mostrar cómo se usa. Es el mismo tablero
+// que vive más abajo en la página (Cowork.tsx), reconstruido en chico.
 //
-// Todo es ILUSTRATIVO: personas inventadas (gente.tsx), nombres de sala
-// genéricos, ni un cliente ni una cifra real. Vive dentro del marco `.consola`.
+// Todo ILUSTRATIVO: personas inventadas (gente.tsx), nombres de sala genéricos,
+// códigos de adorno, ni un cliente ni una cifra real.
 
-type Estado = "habla" | "trabaja" | "pantalla" | "quieto";
+type Estado = "habla" | "trabaja";
 type Persona = { seed: Seed; estado: Estado };
-type Sala = { n: string; gente: Persona[]; codigo?: string };
+type Sala = {
+  n: string;
+  codigo: string;
+  gente: Persona[];     // quiénes están en la sala (cámara)
+  titulo: string;       // qué muestra quien comparte pantalla
+};
 
-// Dos guiones: la misma oficina contada desde el problema de cada público.
+// Cuatro salas en una grilla 2×2. Como en Cowork de verdad, cada sala va
+// alternando sola entre la cámara de la gente y la pantalla que alguien comparte.
 const SALAS: Record<Publico, Sala[]> = {
   empresas: [
-    { n: "Ventas", gente: [{ seed: "camilo", estado: "habla" }, { seed: "valentina", estado: "trabaja" }] },
-    { n: "Soporte", gente: [{ seed: "luciana", estado: "pantalla" }] },
-    { n: "Diseño", gente: [{ seed: "andres", estado: "trabaja" }, { seed: "martina", estado: "trabaja" }] },
-    { n: "Turno tarde", gente: [{ seed: "emilio", estado: "quieto" }] },
-    { n: "Reunión", gente: [{ seed: "joaquin", estado: "habla" }, { seed: "sofia", estado: "habla" }] },
-    { n: "Sala libre", gente: [], codigo: "K7Q2PD" },
+    { n: "Ventas", codigo: "T2GEGG", titulo: "Panel de ventas", gente: [{ seed: "camilo", estado: "habla" }, { seed: "valentina", estado: "trabaja" }] },
+    { n: "Soporte", codigo: "H6WYPU", titulo: "Panel de soporte", gente: [{ seed: "luciana", estado: "trabaja" }] },
+    { n: "Diseño", codigo: "K4MP2A", titulo: "Diseño · campaña", gente: [{ seed: "martina", estado: "trabaja" }] },
+    { n: "Reunión", codigo: "BR8VZE", titulo: "Cartera del día", gente: [{ seed: "joaquin", estado: "habla" }, { seed: "sofia", estado: "habla" }] },
   ],
   agencias: [
-    { n: "Chat 1", gente: [{ seed: "camilo", estado: "trabaja" }, { seed: "valentina", estado: "habla" }] },
-    { n: "Chat 2", gente: [{ seed: "luciana", estado: "pantalla" }] },
-    { n: "Promoción", gente: [{ seed: "andres", estado: "trabaja" }, { seed: "martina", estado: "trabaja" }] },
-    { n: "Turno tarde", gente: [{ seed: "emilio", estado: "quieto" }] },
-    { n: "Cartera", gente: [{ seed: "joaquin", estado: "habla" }, { seed: "sofia", estado: "habla" }] },
-    { n: "Sala libre", gente: [], codigo: "K7Q2PD" },
+    { n: "Chat 1", codigo: "T2GEGG", titulo: "Tablero del día", gente: [{ seed: "camilo", estado: "habla" }, { seed: "valentina", estado: "trabaja" }] },
+    { n: "Soporte", codigo: "H6WYPU", titulo: "Reporte del día", gente: [{ seed: "luciana", estado: "trabaja" }] },
+    { n: "Promoción", codigo: "K4MP2A", titulo: "Parrilla", gente: [{ seed: "martina", estado: "trabaja" }] },
+    { n: "Cartera", codigo: "BR8VZE", titulo: "Cuentas", gente: [{ seed: "joaquin", estado: "habla" }, { seed: "sofia", estado: "habla" }] },
   ],
 };
 
-// La barra de actividad del hero (el gráfico "tipo command center"): 12 tramos
-// del día, el último encendido. Es ILUSTRATIVA, como el reloj y el conteo.
-const BARRAS = [44, 50, 47, 57, 54, 62, 59, 69, 65, 77, 83, 100];
+// Qué sala muestra pantalla ahora: Soporte queda fija compartiendo (siempre hay
+// una pantalla a la vista) y las otras van alternando cámara ↔ pantalla, lento y
+// desfasado, para que respire sin competir con el cursor.
+const HERO_ANCLAS = new Set([1]);
+const enPantalla = (i: number, ciclo: number): boolean =>
+  HERO_ANCLAS.has(i) || (ciclo + i) % 4 === 0;
 
-// El guion del recorrido: el cursor va de sala en sala mostrando cómo se usa
-// Cowork — escuchar una sin entrar, hablarle, entrar. Se repite en bucle. Las
-// salas van por índice para que sirva igual en los dos públicos.
 type Accion = "Escuchar" | "Hablar" | "Entrar";
-const PASOS: { i: number; accion: Accion }[] = [
-  { i: 0, accion: "Escuchar" },
-  { i: 2, accion: "Escuchar" },
-  { i: 4, accion: "Hablar" },
-  { i: 1, accion: "Entrar" },
-  { i: 4, accion: "Escuchar" },
+const ACCIONES: Accion[] = ["Escuchar", "Hablar", "Entrar"];
+
+// El recorrido del cursor: a qué sala va y qué botón toca. Se repite en bucle;
+// las salas van por índice para que sirva igual en los dos públicos.
+const PASOS: { sala: number; accion: Accion }[] = [
+  { sala: 0, accion: "Escuchar" },
+  { sala: 1, accion: "Entrar" },
+  { sala: 3, accion: "Hablar" },
+  { sala: 2, accion: "Escuchar" },
 ];
 
-function SalaVista({ s, resaltada, modo, vozActiva }: { s: Sala; resaltada: boolean; modo?: Accion; vozActiva?: Seed }) {
-  const vacia = s.gente.length === 0;
-  const habla = s.gente.find((p) => p.estado === "habla");
-  const pantalla = s.gente.find((p) => p.estado === "pantalla");
-  const trabajan = s.gente.filter((p) => p.estado === "trabaja").length;
-  const pie = vacia
-    ? `código ${s.codigo}`
-    : habla
-      ? `${nombreDe(habla.seed)} hablando`
-      : pantalla
-        ? `${nombreDe(pantalla.seed)} comparte pantalla`
-        : trabajan
-          ? `${trabajan} trabajando`
-          : "en pausa";
-
-  const resalte = resaltada ? (modo === "Hablar" ? " hablando-a" : " escuchando") : "";
-
+/** La pantalla compartida: un panel en vivo con la cámara chica de quien presenta. */
+function Pantalla({ seed }: { seed: Seed }) {
   return (
-    <div className={`ofi-sala${resalte}${vacia ? " vacia" : ""}`}>
+    <div className="ofi-share cwx-fade">
+      <div className="cwx-screen" aria-hidden="true">
+        <div className="ss-bar"><i /><i /><i /></div>
+        <div className="ss-body">
+          <span className="l t" /><span className="l" /><span className="l" />
+          <div className="ss-chart"><i /><i /><i /><i /><i /></div>
+        </div>
+      </div>
+      <span className="ofi-share-quien">
+        <span className="ofi-share-live" aria-hidden="true" />
+        <Cara seed={seed} className="ofi-share-cara" />
+        {nombreDe(seed)}
+      </span>
+    </div>
+  );
+}
+
+function SalaVista({ s, resaltada, accion, paso, pantalla, vozActiva }: {
+  s: Sala; resaltada: boolean; accion?: Accion; paso: number; pantalla: boolean; vozActiva?: Seed;
+}) {
+  const presenta = s.gente[0].seed;
+  return (
+    <div className={`ofi-sala${resaltada ? " activa" : ""}`}>
       <div className="ofi-cab">
         <b>{s.n}</b>
-        <span>
-          {vacia ? "libre" : <><Users width={10} height={10} strokeWidth={2.4} aria-hidden="true" />{s.gente.length}</>}
-        </span>
+        <span><Users width={10} height={10} strokeWidth={2.4} aria-hidden="true" />{s.gente.length}</span>
       </div>
+      {/* La vista cambia sola entre pantalla y cámara; el `key` reinicia el fundido. */}
       <div className="ofi-escena">
-        {vacia ? (
-          <span className="ofi-libre">Sala libre</span>
-        ) : pantalla ? (
-          // Comparte pantalla: se ve la PANTALLA de verdad —un panel en vivo— con
-          // la cámara chica de quien presenta, igual que el tablero de Cowork. Así
-          // el supervisor no "lee" que alguien comparte: lo VE.
-          <div className="ofi-share">
-            <div className="cwx-screen" aria-hidden="true">
-              <div className="ss-bar"><i /><i /><i /></div>
-              <div className="ss-body">
-                <span className="l t" /><span className="l" /><span className="l" />
-                <div className="ss-chart"><i /><i /><i /><i /><i /></div>
-              </div>
-            </div>
-            <span className="ofi-share-quien">
-              <span className="ofi-share-live" aria-hidden="true" />
-              <Cara seed={pantalla.seed} className="ofi-share-cara" />
-              {nombreDe(pantalla.seed)}
-            </span>
-          </div>
+        {pantalla ? (
+          <Pantalla seed={presenta} key="scr" />
         ) : (
-          s.gente.map((p) => (
-            <span className={`ofi-persona ${p.estado}${p.seed === vozActiva ? " activa" : ""}`} key={p.seed}>
-              <Cara seed={p.seed} className="ofi-cara" />
-              {p.estado === "habla" && <span className="ofi-ondas" aria-hidden="true"><i /><i /><i /></span>}
-              {p.estado === "trabaja" && <span className="ofi-teclea" aria-hidden="true"><i /><i /><i /></span>}
-            </span>
-          ))
-        )}
-      </div>
-      <div className="ofi-pie">
-        <span>{pie}</span>
-        {resaltada && (
-          <span className={`ofi-esc${modo === "Hablar" ? " hab" : ""}`}>
-            <i />{modo === "Hablar" ? "Hablando" : modo === "Entrar" ? "Entrando" : "Escuchando"}
+          <span className="ofi-cams cwx-fade" key="cam">
+            {s.gente.map((p) => (
+              <span className={`ofi-persona ${p.estado}${p.seed === vozActiva ? " activa" : ""}`} key={p.seed}>
+                <Cara seed={p.seed} className="ofi-cara" />
+                {p.estado === "habla" && <span className="ofi-ondas" aria-hidden="true"><i /><i /><i /></span>}
+                {p.estado === "trabaja" && <span className="ofi-teclea" aria-hidden="true"><i /><i /><i /></span>}
+              </span>
+            ))}
           </span>
         )}
+      </div>
+      <div className="ofi-acciones">
+        {ACCIONES.map((a) => {
+          const activo = resaltada && accion === a;
+          return (
+            <span className={`ofi-btn ofi-btn-${a.toLowerCase()}${activo ? " activo" : ""}`} key={a}>
+              {a}
+              {activo && (
+                // El cursor vive SOBRE el botón activo: siempre alineado, sin
+                // cálculo de coordenadas. El `key` por paso reanima el clic.
+                <span className="ofi-cursor" aria-hidden="true">
+                  <span className="ofi-click" key={paso} />
+                  <MousePointer2 width={14} height={14} strokeWidth={2.2} fill="currentColor" />
+                </span>
+              )}
+            </span>
+          );
+        })}
+      </div>
+      <div className="ofi-codigo">
+        {pantalla ? `Compartiendo · ${nombreDe(presenta)}` : `código ${s.codigo}`}
       </div>
     </div>
   );
@@ -126,6 +134,7 @@ export default function Oficina({ publico }: { publico: Publico }) {
   const [hora, setHora] = useState("--:--:--");
   const [tick, setTick] = useState(0);
   const [paso, setPaso] = useState(0);
+  const [ciclo, setCiclo] = useState(0);
 
   useEffect(() => {
     const tic = () => {
@@ -138,30 +147,31 @@ export default function Oficina({ publico }: { publico: Publico }) {
     return () => window.clearInterval(t);
   }, []);
 
-  // Un pulso mueve quién tiene la palabra (anima el avatar que habla).
+  // Mueve quién tiene la palabra (anima el avatar que habla).
   useEffect(() => {
     const t = window.setInterval(() => setTick((x) => x + 1), 2600);
     return () => window.clearInterval(t);
   }, []);
 
-  // El recorrido: cada paso mueve el cursor a una sala y "hace clic".
+  // El recorrido: cada paso lleva el cursor a otra sala y "toca" un botón.
   useEffect(() => {
     const t = window.setInterval(() => setPaso((p) => (p + 1) % PASOS.length), 2400);
     return () => window.clearInterval(t);
   }, []);
 
+  // El latido de cámara ↔ pantalla de las salas (lento, para que respire).
+  useEffect(() => {
+    const t = window.setInterval(() => setCiclo((c) => c + 1), 4200);
+    return () => window.clearInterval(t);
+  }, []);
+
   const salas = SALAS[publico];
-  const { i: salaResaltada, accion } = PASOS[paso];
+  const { sala: salaResaltada, accion } = PASOS[paso];
   const escuchada = (salas[salaResaltada] ?? salas[0]).n;
   const hablantes = salas.flatMap((s) => s.gente.filter((p) => p.estado === "habla").map((p) => p.seed));
   const vozActiva = hablantes.length ? hablantes[tick % hablantes.length] : undefined;
   const enSalas = salas.reduce((a, s) => a + s.gente.length, 0);
-
-  // Dónde está el cursor: centro-bajo de la sala que toca (grilla 3×2).
-  const col = salaResaltada % 3;
-  const fila = Math.floor(salaResaltada / 3);
-  const cx = [18, 50, 82][col];
-  const cy = fila === 0 ? 45 : 90;
+  const pantallasEnVivo = salas.filter((_, i) => enPantalla(i, ciclo));
 
   const pie = accion === "Hablar"
     ? <>Tú · hablando a <b>{escuchada}</b></>
@@ -173,47 +183,68 @@ export default function Oficina({ publico }: { publico: Publico }) {
     <div className="consola">
       <div className="consola-barra">
         <span className="semaforo"><i /><i /><i /></span>
-        <span className="consola-titulo">oficina</span>
+        <span className="consola-titulo">cowork</span>
         <span className="ofi-live"><i />en vivo</span>
         <span className="ofi-cuenta">{enSalas} en salas · {hablantes.length} hablando</span>
         <span className="consola-reloj">{hora}</span>
       </div>
-      <div className="ofi-pulso">
-        <span className="ofi-pulso-rot">actividad · hoy</span>
-        <div className="ofi-barras" aria-hidden="true">
-          {BARRAS.map((h, i) => (
-            <i
-              key={i}
-              className={i === BARRAS.length - 1 ? "viva" : ""}
-              style={{ height: `${h}%`, animationDelay: `${i * 0.13}s` }}
-            />
-          ))}
+
+      {/* El tablero del supervisor: su rail + las salas. `.ofi` fija la altura
+          (372px) para que el hero no salte al alternar con "un día". */}
+      <div className="ofi">
+      <div className="ofi-board" aria-label="Tablero de Cowork en vivo" key={publico}>
+        <aside className="ofi-rail">
+          <div className="ofi-rail-cab">
+            <b>Tablero</b>
+            <small>del supervisor</small>
+          </div>
+          <div className="ofi-rail-sec">
+            <span className="ofi-rail-rot">Pantallas en vivo</span>
+            {pantallasEnVivo.map((s) => (
+              <div className="ofi-rail-item" key={s.n}>
+                <Cara seed={s.gente[0].seed} className="ofi-rail-cara" />
+                <span className="ofi-rail-nom">{nombreDe(s.gente[0].seed)}</span>
+                <span className="ofi-rail-chip">{s.n}</span>
+              </div>
+            ))}
+          </div>
+          <div className="ofi-rail-sec">
+            <span className="ofi-rail-rot amb">Solicitudes · 1</span>
+            <div className="ofi-rail-item">
+              <Cara seed="emilio" className="ofi-rail-cara" />
+              <span className="ofi-rail-nom">{nombreDe("emilio")} quiere entrar</span>
+              <span className="ofi-rail-admitir">Admitir</span>
+            </div>
+          </div>
+        </aside>
+
+        <div className="ofi-main">
+          <div className="ofi-toolbar">
+            <span className="ofi-toolbar-rot">Selecciona una sala</span>
+            <span className="ofi-toolbar-acc">Escuchar todas</span>
+            <span className="ofi-toolbar-acc">Hablar a todas</span>
+          </div>
+          <div className="ofi-grilla">
+            {salas.map((s, idx) => (
+              <SalaVista
+                s={s}
+                resaltada={idx === salaResaltada}
+                accion={idx === salaResaltada ? accion : undefined}
+                paso={paso}
+                pantalla={enPantalla(idx, ciclo)}
+                vozActiva={vozActiva}
+                key={s.n}
+              />
+            ))}
+          </div>
         </div>
       </div>
-      <div className="ofi" aria-label="Oficina en vivo">
-        {/* El `key` por público remonta la grilla al cambiar de guión. */}
-        <div className="ofi-grilla" key={publico}>
-          {salas.map((s, idx) => (
-            <SalaVista
-              s={s}
-              resaltada={idx === salaResaltada}
-              modo={idx === salaResaltada ? accion : undefined}
-              vozActiva={vozActiva}
-              key={s.n}
-            />
-          ))}
-          {/* El cursor que maneja la demo: se desliza a la sala y hace clic. */}
-          <span className={`ofi-cursor${accion === "Hablar" ? " hab" : ""}`} style={{ left: `${cx}%`, top: `${cy}%` }} aria-hidden="true">
-            <span className="ofi-accion">{accion}</span>
-            <MousePointer2 width={16} height={16} strokeWidth={2.2} fill="currentColor" />
-            <span className="ofi-click" key={paso} />
-          </span>
-        </div>
-        <div className="ofi-tu">
-          <Headphones width={14} height={14} strokeWidth={2.2} aria-hidden="true" />
-          <span>{pie}</span>
-          <span className="ofi-ondas" aria-hidden="true"><i /><i /><i /></span>
-        </div>
+
+      <div className="ofi-tu">
+        <Headphones width={14} height={14} strokeWidth={2.2} aria-hidden="true" />
+        <span>{pie}</span>
+        <span className="ofi-ondas" aria-hidden="true"><i /><i /><i /></span>
+      </div>
       </div>
     </div>
   );

@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import {
   AlertTriangle, Check, Copy, Headphones, Link2, LayoutPanelLeft, Monitor,
   Pencil, Power, Send, Share2, SlidersHorizontal, Users, X,
@@ -16,25 +17,35 @@ import { Cara, nombreDe, type Seed } from "../gente";
 // sesión, que se queda al frente) y un mensaje directo abierto — que es la
 // prueba de "el chat de Maven mientras estás en Cowork".
 
-// Cada sala con gente adentro. Unas en cámara, otras compartiendo pantalla:
-// eso es lo que se vende, un turno entero trabajando acompañado y a la vista.
+// Cada sala con gente adentro. Lo que se vende es un turno entero trabajando
+// acompañado y a la vista — y, como pasa de verdad, cada sala VA CAMBIANDO entre
+// la cámara de la gente y la pantalla que alguien comparte. Por eso cada sala
+// tiene las dos cosas: sus caras y qué estaría mostrando quien presenta.
 type Sala = {
   n: string; codigo: string; gente: number;
-  comparte?: { seed: Seed; titulo: string }; // alguien comparte su pantalla
-  caras?: Seed[];                             // o están en cámara
+  caras: Seed[];     // quiénes están en la sala (cámara)
+  titulo: string;    // qué muestra quien comparte pantalla
 };
 
 const SALAS: Sala[] = [
-  { n: "SALA 1", codigo: "T2GEGG", gente: 3, comparte: { seed: "camilo", titulo: "Panel de ventas" } },
-  { n: "SALA 2", codigo: "ZAZD6V", gente: 2, caras: ["valentina", "andres"] },
-  { n: "SALA 3", codigo: "8RBV2E", gente: 2, caras: ["emilio", "sofia"] },
-  { n: "SALA 4", codigo: "H6WYPU", gente: 4, comparte: { seed: "martina", titulo: "Diseño · campaña" } },
-  { n: "SALA 5", codigo: "5H6X8V", gente: 1, caras: ["joaquin"] },
-  { n: "SALA 6", codigo: "2CT3Y7", gente: 2, caras: ["luciana", "camilo"] },
-  { n: "TARDE 1", codigo: "CWTXKX", gente: 2, caras: ["andres", "martina"] },
-  { n: "TARDE 2", codigo: "JVTW25", gente: 1, caras: ["sofia"] },
-  { n: "TARDE 3", codigo: "MEXS5Y", gente: 2, comparte: { seed: "luciana", titulo: "Reporte del día" } },
+  { n: "SALA 1", codigo: "T2GEGG", gente: 3, caras: ["camilo", "valentina", "andres"], titulo: "Panel de ventas" },
+  { n: "SALA 2", codigo: "ZAZD6V", gente: 2, caras: ["valentina", "andres"], titulo: "Tablero del día" },
+  { n: "SALA 3", codigo: "8RBV2E", gente: 2, caras: ["emilio", "sofia"], titulo: "Cuentas por cerrar" },
+  { n: "SALA 4", codigo: "H6WYPU", gente: 4, caras: ["martina", "joaquin"], titulo: "Diseño · campaña" },
+  { n: "SALA 5", codigo: "5H6X8V", gente: 1, caras: ["joaquin"], titulo: "Reporte del turno" },
+  { n: "SALA 6", codigo: "2CT3Y7", gente: 2, caras: ["luciana", "camilo"], titulo: "Soporte en vivo" },
+  { n: "TARDE 1", codigo: "CWTXKX", gente: 2, caras: ["andres", "martina"], titulo: "Parrilla" },
+  { n: "TARDE 2", codigo: "JVTW25", gente: 1, caras: ["sofia"], titulo: "Notas del día" },
+  { n: "TARDE 3", codigo: "MEXS5Y", gente: 2, caras: ["luciana", "valentina"], titulo: "Reporte del día" },
 ];
+
+// Qué sala muestra pantalla en este momento. Dos quedan fijas compartiendo (las
+// que anuncia el rail de "Pantallas en vivo"); el resto va alternando cámara ↔
+// pantalla sola, desfasada por índice para que el tablero respire, no parpadee
+// todo junto. Cada sala muestra pantalla 2 de cada 6 pasos (≈8 s de 24 s).
+const ANCLAS = new Set([0, 3]); // SALA 1 (Camilo) y SALA 4 (Martina), como el rail
+const enPantalla = (i: number, tick: number): boolean =>
+  ANCLAS.has(i) || (tick + i) % 6 < 2;
 
 // Tres + "la llamada te sigue". Lo que la maqueta ya muestra (pantallas en vivo) o que ya
 // dijeron las cifras y el mapa de módulos (sin instalar nada, grabaciones) no vuelve acá.
@@ -44,46 +55,49 @@ const PORQUES = [
   ["El chat va encima", "Desde el mismo tablero se busca a alguien y se le escribe en una ventanita, sin salir de la sesión ni abrir otra pestaña."],
 ] as const;
 
-function TarjetaSala({ s }: { s: Sala }) {
-  const conGente = s.gente > 0;
+function TarjetaSala({ s, pantalla }: { s: Sala; pantalla: boolean }) {
+  const presenta = s.caras[0];
   return (
-    <div className={`cwx-sala${conGente ? " con-gente" : ""}`}>
+    <div className="cwx-sala con-gente">
       <div className="cab">
         <b>{s.n}</b>
         <span className="n-gente">{s.gente} 👤</span>
         <span className="accion"><Pencil width={10} height={10} aria-hidden="true" /></span>
         <span className="accion"><X width={10} height={10} aria-hidden="true" /></span>
       </div>
-      <p className={`comp${s.comparte ? " si" : ""}`}>
-        {s.comparte ? `Compartiendo: ${nombreDe(s.comparte.seed)}` : `${s.gente} en cámara`}
+      <p className={`comp${pantalla ? " si" : ""}`}>
+        {pantalla ? `Compartiendo: ${nombreDe(presenta)}` : `${s.gente} en cámara`}
       </p>
-      {s.comparte ? (
-        <div className="pantalla compartiendo">
-          <div className="cwx-screen" aria-hidden="true">
-            <span className="ss-bar"><i /><i /><i /></span>
-            <div className="ss-body">
-              <span className="l t" /><span className="l" /><span className="l" />
-              <div className="ss-chart"><i /><i /><i /><i /><i /></div>
+      {/* La vista cambia sola entre pantalla y cámara; el `key` reinicia el fundido. */}
+      <div className={`pantalla${pantalla ? " compartiendo" : ""} cwx-fade`} key={pantalla ? "scr" : "cam"}>
+        {pantalla ? (
+          <>
+            <div className="cwx-screen" aria-hidden="true">
+              <span className="ss-bar"><i /><i /><i /></span>
+              <div className="ss-body">
+                <span className="l t" /><span className="l" /><span className="l" />
+                <div className="ss-chart"><i /><i /><i /><i /><i /></div>
+              </div>
             </div>
-          </div>
-          <span className="ss-quien">
-            <Cara seed={s.comparte.seed} className="ss-cara" />
-            {nombreDe(s.comparte.seed)} · {s.comparte.titulo}
-          </span>
-        </div>
-      ) : (
-        <div className="pantalla">
-          <span className="cam-gente">
-            {(s.caras ?? []).slice(0, 2).map((c) => <Cara seed={c} className="cara-cam" key={c} />)}
-          </span>
-          <span className="quien-cam">
-            {nombreDe((s.caras ?? ["camilo"])[0])}{s.gente > 1 ? ` +${s.gente - 1}` : ""}
-          </span>
-        </div>
-      )}
+            <span className="ss-quien">
+              <Cara seed={presenta} className="ss-cara" />
+              {nombreDe(presenta)} · {s.titulo}
+            </span>
+          </>
+        ) : (
+          <>
+            <span className="cam-gente">
+              {s.caras.slice(0, 2).map((c) => <Cara seed={c} className="cara-cam" key={c} />)}
+            </span>
+            <span className="quien-cam">
+              {nombreDe(presenta)}{s.gente > 1 ? ` +${s.gente - 1}` : ""}
+            </span>
+          </>
+        )}
+      </div>
       <div className="par">
-        <span className={conGente ? "activo" : ""}>Escuchando</span>
-        <span className={conGente ? "hablar" : ""}>Hablar</span>
+        <span className="activo">Escuchando</span>
+        <span className="hablar">Hablar</span>
       </div>
       <div className="par"><span>Cámara</span><span>Pantalla</span></div>
       <div className="entrar">
@@ -99,6 +113,14 @@ function TarjetaSala({ s }: { s: Sala }) {
 }
 
 export default function Cowork() {
+  // El latido del tablero: cada 4 s las salas que no son ancla cambian de cámara
+  // a pantalla y de vuelta, desfasadas, como en un turno real.
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const t = window.setInterval(() => setTick((x) => x + 1), 4000);
+    return () => window.clearInterval(t);
+  }, []);
+
   return (
     <section className="bloque" id="cowork" style={{ borderTop: "1px solid var(--line)" }}>
       <div className="wrap">
@@ -180,7 +202,7 @@ export default function Cowork() {
                     </span>
                   </div>
                   <div className="cwx-grilla">
-                    {SALAS.map((s) => <TarjetaSala s={s} key={s.n} />)}
+                    {SALAS.map((s, i) => <TarjetaSala s={s} pantalla={enPantalla(i, tick)} key={s.n} />)}
                   </div>
                 </div>
               </div>
