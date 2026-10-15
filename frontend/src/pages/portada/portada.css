@@ -207,6 +207,83 @@
   .pt .evento .txt .quien { color: var(--faint); }
   .pt .evento .plata { color: var(--verde); font-weight: 600; }
 
+  /* ── La oficina en vivo: salas con gente, y quien supervisa escuchando ── */
+  /* Mide lo mismo de alto que la cinta (372px) para que el hero no salte. */
+  .pt .ofi-cuenta { margin-left: auto; font: 400 11.5px/1 "JetBrains Mono", monospace; color: var(--faint); white-space: nowrap; }
+  .pt .consola-barra .ofi-cuenta + .consola-reloj { margin-left: 0; }
+  .pt .ofi { position: relative; height: 372px; padding: 14px 14px 12px; display: flex; flex-direction: column; gap: 10px; }
+  .pt .ofi-grilla { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; flex: 1; min-height: 0; }
+  .pt .ofi-sala {
+    position: relative; display: flex; flex-direction: column; min-height: 0;
+    border: 1px solid var(--line); border-radius: var(--r); padding: 10px 11px 9px;
+    background: rgba(255,255,255,.025);
+    transition: border-color .45s, box-shadow .45s, background .45s;
+  }
+  /* La sala que se está escuchando se enciende: es el control, visible. */
+  .pt .ofi-sala.escuchando {
+    border-color: rgba(var(--azul-claro-rgb),.55);
+    box-shadow: 0 0 0 1px rgba(var(--azul-claro-rgb),.25), 0 0 34px -14px rgba(var(--azul-rgb),.9);
+    background: rgba(var(--azul-rgb),.06);
+  }
+  .pt .ofi-sala.vacia { border-style: dashed; opacity: .7; }
+  .pt .ofi-cab { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+  .pt .ofi-cab b { font: 600 12px/1.2 Sora, sans-serif; letter-spacing: -.01em; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pt .ofi-cab span { display: inline-flex; align-items: center; gap: 3px; font: 400 10.5px/1 "JetBrains Mono", monospace; color: var(--faint); flex: none; }
+  .pt .ofi-escena { flex: 1; display: flex; align-items: center; justify-content: center; gap: 14px; min-height: 58px; }
+  .pt .ofi-libre { font: 400 11px/1 "JetBrains Mono", monospace; color: var(--faint); letter-spacing: .04em; }
+  .pt .ofi-persona { position: relative; display: grid; place-items: center; }
+  .pt .ofi-cara {
+    width: 34px; height: 34px; border-radius: 50%; background: var(--surface-2);
+    border: 1.5px solid var(--line-strong); transition: transform .3s, opacity .3s, border-color .3s;
+  }
+  .pt .ofi-persona.quieto .ofi-cara { opacity: .45; }
+  .pt .ofi-persona.habla .ofi-cara { border-color: var(--azul-claro); }
+  .pt .ofi-persona.activa .ofi-cara { animation: ofi-latir 1.6s ease-out infinite; transform: scale(1.06); }
+  @keyframes ofi-latir {
+    0% { box-shadow: 0 0 0 0 rgba(var(--azul-claro-rgb),.55); }
+    70% { box-shadow: 0 0 0 9px rgba(var(--azul-claro-rgb),0); }
+    100% { box-shadow: 0 0 0 0 rgba(var(--azul-claro-rgb),0); }
+  }
+  /* Las ondas de voz: tres barras que suben y bajan desfasadas. */
+  .pt .ofi-ondas {
+    position: absolute; right: -9px; bottom: -3px; display: flex; align-items: flex-end; gap: 2px;
+    height: 12px; padding: 2px 3px; border-radius: 6px; background: var(--ground-deep); border: 1px solid var(--line);
+  }
+  .pt .ofi-ondas i { width: 2px; height: 4px; border-radius: 1px; background: var(--azul-claro); animation: ofi-onda 1s ease-in-out infinite; }
+  .pt .ofi-ondas i:nth-child(2) { animation-delay: .18s; }
+  .pt .ofi-ondas i:nth-child(3) { animation-delay: .36s; }
+  @keyframes ofi-onda { 0%, 100% { height: 3px; } 50% { height: 9px; } }
+  /* Tecleando: tres puntos que parpadean en cadena. */
+  .pt .ofi-teclea {
+    position: absolute; right: -9px; bottom: -3px; display: flex; gap: 2px;
+    padding: 4px; border-radius: 6px; background: var(--ground-deep); border: 1px solid var(--line);
+  }
+  .pt .ofi-teclea i { width: 3px; height: 3px; border-radius: 50%; background: var(--muted); animation: ofi-punto 1.2s ease-in-out infinite; }
+  .pt .ofi-teclea i:nth-child(2) { animation-delay: .2s; }
+  .pt .ofi-teclea i:nth-child(3) { animation-delay: .4s; }
+  @keyframes ofi-punto { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
+  .pt .ofi-pant {
+    position: absolute; right: -9px; bottom: -3px; display: grid; place-items: center; width: 16px; height: 16px;
+    border-radius: 6px; background: rgba(var(--violeta-rgb),.22); border: 1px solid rgba(var(--violeta-rgb),.5); color: var(--violeta);
+  }
+  .pt .ofi-pie { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 11px; line-height: 1.2; color: var(--muted); white-space: nowrap; overflow: hidden; }
+  .pt .ofi-pie > span:first-child { overflow: hidden; text-overflow: ellipsis; }
+  .pt .ofi-esc { display: inline-flex; align-items: center; gap: 5px; flex: none; font: 500 10px/1 "JetBrains Mono", monospace; letter-spacing: .04em; color: var(--verde); }
+  .pt .ofi-esc i { width: 6px; height: 6px; border-radius: 50%; background: var(--verde); animation: latir 2.4s ease-out infinite; }
+  /* Quien supervisa: escucha una sala sin entrar. La prueba del control. */
+  .pt .ofi-tu {
+    display: flex; align-items: center; gap: 9px; padding: 9px 12px; border-radius: 10px;
+    border: 1px solid var(--line-strong); background: rgba(255,255,255,.03); font-size: 12.5px; color: var(--ink-soft);
+  }
+  .pt .ofi-tu svg { color: var(--azul-claro); flex: none; }
+  .pt .ofi-tu b { color: var(--ink); font-weight: 600; }
+  .pt .ofi-tu .ofi-ondas { position: static; margin-left: auto; }
+  @media (max-width: 560px) {
+    .pt .ofi { height: auto; }
+    .pt .ofi-grilla { grid-template-columns: repeat(2, 1fr); }
+    .pt .ofi-cuenta { display: none; }
+  }
+
   /* ── Franja de números ────────────────────────────────────────────────── */
   .pt .cifras {
     border-block: 1px solid var(--line);

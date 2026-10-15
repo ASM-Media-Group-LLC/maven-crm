@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import "./portada.css";
 
 import PulsoCanvas from "./PulsoCanvas";
-import Consola from "./Consola";
+import Oficina from "./Oficina";
 import Cifras from "./Cifras";
 import { useRevelar } from "./useRevelar";
 import { Pila } from "./gente";
@@ -108,7 +108,7 @@ export default function Portada() {
         </div>
       </nav>
 
-      {/* ── HERO ── La tesis a la izquierda y la operación en vivo a la
+      {/* ── HERO ── La tesis a la izquierda y la oficina en vivo a la
           derecha. El movimiento del lienzo es infinito por construcción: cada
           punto nace en el centro y muere en el borde, donde renace con otro
           ángulo. Nada se invierte, así que no se percibe el "va y vuelve". */}
@@ -151,7 +151,7 @@ export default function Portada() {
             <p className="pie-hero">{PIES[publico]}</p>
           </div>
 
-          <Consola publico={publico} idPestana={`tab-${publico}`} />
+          <Oficina publico={publico} idPestana={`tab-${publico}`} />
         </div>
       </section>
 
