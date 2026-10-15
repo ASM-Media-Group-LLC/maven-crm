@@ -351,3 +351,9 @@ verify_jwt = false
 # participante de la conversación. Solo escribe `delivered_at`, nunca `read_at`.
 [functions.push-entregado]
 verify_jwt = false
+
+# El Centro de operaciones del administrador: SOLO LEE (gente en salas,
+# volumen de la última hora, semáforo de servicios). El gate de admin va
+# adentro (es-admin), además del JWT de la puerta.
+[functions.centro-operaciones]
+verify_jwt = true
