@@ -60,9 +60,12 @@ services:
       resources:
         limits:
           # Techo para que un all-hands de 50 no ahogue a los otros ~20 contenedores
-          # de la caja. La caja tiene 8 vCPU / 32 GB; dejamos hasta 4 cores / 3 GB a LiveKit.
+          # de la caja. La caja tiene 8 vCPU / 32 GB; dejamos hasta 4 cores / 6 GB a LiveKit.
+          # Subido de 3g a 6g (2026-10-17): con 3g el contenedor llegaba al tope y el
+          # OOM-killer mataba el proceso, botando a TODOS los de la llamada de golpe.
+          # 6g da margen para picos de concurrencia sin ahogar al resto (la caja tiene 32 GB).
           cpus: "4"
-          memory: 3g
+          memory: 6g
 
   # Coordina servidor <-> egress (obligatorio para grabar; el server solo
   # no lo necesitaba). Solo en la red interna, sin puertos al host.
