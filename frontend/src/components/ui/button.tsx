@@ -12,11 +12,13 @@ const buttonVariants = cva(
         // Botón primario con shadow glow sutil para realzarlo.
         default: "bg-gradient-to-r from-accent to-primary text-primary-foreground shadow-md shadow-primary/20 hover:opacity-90 hover:shadow-primary/30",
         destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-        // Outline glass: bg semi-transparente + ring blanco sutil + hover
-        // que se ilumina sin saltar de color a 100% del accent.
-        outline: "border border-white/15 bg-background/40 hover:bg-white/10 hover:border-primary/40 hover:text-foreground",
+        // Outline glass: bg semi-transparente + borde sutil + hover que se
+        // ilumina sin saltar de color a 100% del accent. Aurora (10/2026): el
+        // borde y el hover pasan de blanco crudo a tokens — con blanco, en
+        // tema claro el contorno era invisible y el hover no se veía.
+        outline: "border border-border/70 bg-background/40 hover:bg-muted/70 hover:border-primary/40 hover:text-foreground",
         secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        ghost: "hover:bg-white/10 hover:text-foreground",
+        ghost: "hover:bg-muted/70 hover:text-foreground",
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {

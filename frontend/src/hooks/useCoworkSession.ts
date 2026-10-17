@@ -67,7 +67,10 @@ export interface AdminSessionRow {
   online: number | null;
   // Conectados al Supervisor Hub (null = LiveKit no contestó o no hay hub).
   hubOnline: number | null;
-  rooms: Array<{ id: string; name: string; online: number | null }>;
+  // `gente` = nombres ASIGNADOS a la sala (DB, is_active): dice quién trabaja
+  // dónde aunque tenga la pestaña cerrada; el punto/conteo `online` sigue
+  // siendo la verdad en vivo de LiveKit. Opcional: una edge vieja no lo manda.
+  rooms: Array<{ id: string; name: string; online: number | null; gente?: string[] }>;
   // Admins mirando esta sesión DE INCÓGNITO ahora (latido fresco). Solo lo ven
   // otros admins: el dato sale de adminListSessions, que exige rol admin.
   incognito: string[];
@@ -149,8 +152,15 @@ async function invokeCowork(action: string, payload: Record<string, unknown>) {
       body: JSON.stringify({ action, ...payload }),
     }
   );
-  const json = await res.json();
-  if (!res.ok) throw new Error(json.error || "Request failed");
+  // Un 5xx del gateway o un corte de red dejan el cuerpo vacío: res.json() a
+  // secas revienta con "Unexpected end of JSON input" y ese texto crudo
+  // acababa pintado en la pantalla del Hub. Cuerpo ilegible = fallo del
+  // servidor, con el status como pista.
+  let json = null;
+  try { json = await res.json(); } catch { json = null; }
+  if (!res.ok || json === null) {
+    throw new Error(json?.error || `cowork-session: ${res.status}`);
+  }
   return json;
 }
 

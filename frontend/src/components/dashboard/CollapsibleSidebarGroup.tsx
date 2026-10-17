@@ -134,18 +134,21 @@ export const CollapsibleSidebarGroup = ({
     <SidebarGroup className="p-0">
       <Collapsible open={open} onOpenChange={setOpen}>
         <CollapsibleTrigger asChild>
-          {/* Fila de primer nivel del menú (rediseño 09/2026): mismo peso que
-              cualquier entrada suelta (Panel de control): ícono de 20 px,
-              etiqueta a 16 px medium, chevron a la derecha, 48 px de alto. Si la
-              ruta activa cae aquí adentro y el grupo está plegado, la fila se
-              realza con una superficie neutra: "estás aquí" sin robarle el
-              acento al ítem. */}
+          {/* Fila de primer nivel del menú. Rediseño Aurora (Alvaro, 10/2026):
+              el acordeón se quería "fino y elegante" — la fila baja al mismo
+              peso que cualquier ítem suelto (texto sm, 14 px, alto compacto) y
+              la flecha pierde el circulito con fondo. La fila ENTERA sigue
+              siendo clicable y se ilumina al pasar, así que el control se
+              encuentra igual (la preocupación del rediseño 09/2026). Si la ruta
+              activa cae aquí adentro y el grupo está plegado, la fila se realza
+              con una superficie neutra: "estás aquí" sin robarle el acento al
+              ítem. */}
           <SidebarGroupLabel
-            className={`group/label flex h-auto w-full cursor-pointer items-center gap-3 rounded-xl px-2.5 py-3 text-base font-medium !text-foreground/85 transition-colors hover:!text-foreground hover:bg-foreground/5 ${
+            className={`group/label flex h-auto w-full cursor-pointer items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-sm font-medium !text-foreground/85 transition-colors hover:!text-foreground hover:bg-foreground/5 ${
               active && !open ? "bg-foreground/[0.06] !text-foreground" : ""
             }`}
           >
-            <Icon className="h-5 w-5 shrink-0 opacity-80 transition-opacity group-hover/label:opacity-100" />
+            <Icon className="h-[18px] w-[18px] shrink-0 opacity-80 transition-opacity group-hover/label:opacity-100" />
             <span className="flex-1 truncate text-left">{label}</span>
             {/* El puntito "estás acá": se pinta con el acento del skin de cada
                 persona (bg-accent) y brilla. Se ve siempre que la ruta activa
@@ -157,15 +160,10 @@ export const CollapsibleSidebarGroup = ({
                 className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent shadow-[0_0_6px_hsl(var(--accent)/0.55)]"
               />
             )}
-            {/* La flecha va en un circulito con fondo y a plena opacidad: es el
-                control para desplegar el grupo y tiene que verse como tal
-                (había gente que no lo encontraba). Gira al abrir. */}
-            <span
+            <ChevronDown
               aria-hidden
-              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-foreground/[0.08] text-foreground/90 transition-colors group-hover/label:bg-foreground/[0.14] group-hover/label:text-foreground"
-            >
-              <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
-            </span>
+              className={`h-4 w-4 shrink-0 text-muted-foreground transition-all duration-200 group-hover/label:text-foreground ${open ? "rotate-180" : ""}`}
+            />
           </SidebarGroupLabel>
         </CollapsibleTrigger>
         <CollapsibleContent>

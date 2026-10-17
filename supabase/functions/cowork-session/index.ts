@@ -356,6 +356,30 @@ serve(async (req) => {
         // LiveKit caído o inalcanzable: contadores en null, la lista no se cae.
       }
 
+      // QUIÉN está en cada sala (asignaciones activas + nombre): el landing
+      // decía "3 conectados" pero no quiénes, y Alvaro pedía ver quién está en
+      // dónde sin tener que entrar (10/2026). Es la foto de la DB — quién
+      // TRABAJA en qué sala, aunque tenga la pestaña cerrada un momento —;
+      // la verdad en vivo sigue siendo el conteo de LiveKit de arriba.
+      const gentePorSala = new Map<string, string[]>();
+      {
+        const { data: asigs } = await admin.from("cowork_room_assignments")
+          .select("room_id, user_id").in("session_id", ids).eq("is_active", true);
+        if (asigs?.length) {
+          const uids = [...new Set(asigs.map((a) => a.user_id))];
+          const { data: profs } = await admin.from("profiles").select("id, full_name").in("id", uids);
+          const nombre = new Map((profs || []).map((p) => [p.id, (p.full_name as string | null) || ""]));
+          for (const a of asigs) {
+            const n = nombre.get(a.user_id);
+            if (!n) continue;
+            const list = gentePorSala.get(a.room_id) ?? [];
+            list.push(n);
+            gentePorSala.set(a.room_id, list);
+          }
+          for (const list of gentePorSala.values()) list.sort((a, b) => a.localeCompare(b));
+        }
+      }
+
       // Admins de incógnito con latido fresco (la vista pinguea cada 60s; 150s
       // tolera un tic perdido). Solo llega acá: esta acción exige rol admin, así
       // que "visible solo para otro admin" lo garantiza el borde.
@@ -385,6 +409,7 @@ serve(async (req) => {
           id: r.id,
           name: r.name,
           online: lkOk ? (lkOnline.get(r.livekit_room_name) ?? 0) : null,
+          gente: gentePorSala.get(r.id) ?? [],
         }));
         const hubLk = hubDe.get(s.id as string) ?? null;
         return {

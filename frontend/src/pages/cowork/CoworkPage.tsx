@@ -117,7 +117,7 @@ export default function CoworkPage() {
     type Fila = {
       id: string; name: string; role: string | null; members: number; createdBy: string | null;
       hostName: string | null; lastRoomId: string | null; online: number | null; incognito: string[];
-      rooms: Array<{ id: string; name: string; online: number | null }>; admin: AdminSessionRow | null;
+      rooms: Array<{ id: string; name: string; online: number | null; gente?: string[] }>; admin: AdminSessionRow | null;
     };
     const mias = new Map(mySessions.map((m) => [m.id, m]));
     const porAlcance: Fila[] = veTodasLasSesiones
@@ -272,17 +272,17 @@ export default function CoworkPage() {
             (pedido de Jhon, 03/09/2026). Al dejar de ser un pie se le bajó el
             alto: si no, en un portátil el título se comía la pantalla y había
             que scrollear para ver a qué sala entrar. */}
-        <div className="w-full rounded-3xl bg-primary/5 px-5 py-6 md:px-8 md:py-7">
+        <div className="w-full rounded-3xl border border-primary/10 bg-gradient-to-br from-primary/10 via-accent/5 to-transparent px-5 py-6 md:px-8 md:py-7">
           {/* En pantalla ancha el encabezado es una FILA (icono + título a la
               izquierda, acciones a la derecha): en columna se comía media
               pantalla y había que scrollear para ver las salas. En móvil se
               apila y queda centrado, como estaba. */}
           <div className="flex flex-col items-center gap-4 text-center md:flex-row md:items-center md:gap-5 md:text-left">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary/10 md:h-12 md:w-12">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary/20 to-accent/20 md:h-12 md:w-12">
               <Users2 className="h-7 w-7 text-primary md:h-6 md:w-6" />
             </div>
             <div className="min-w-0 flex-1">
-              <h1 className="text-xl font-bold tracking-tight text-foreground md:text-2xl">
+              <h1 className="font-display text-xl font-bold tracking-tight text-foreground md:text-2xl">
                 {t("cowork.page.title")}
               </h1>
               <p className="mt-0.5 text-sm text-muted-foreground">
@@ -349,14 +349,14 @@ export default function CoworkPage() {
             {filasActivas.map((s) => (
               <div
                 key={s.id}
-                className="flex flex-col gap-2 bg-card border border-border rounded-2xl px-4 py-3"
+                className="flex flex-col gap-2.5 bg-card border border-border rounded-2xl px-4 py-3.5 md:px-5"
               >
                 <div className="flex flex-wrap items-center gap-3">
-                  <div className="flex items-center justify-center h-10 w-10 rounded-full bg-primary/10 shrink-0">
+                  <div className="flex items-center justify-center h-10 w-10 rounded-full bg-gradient-to-br from-primary/15 to-accent/15 shrink-0">
                     <Users2 className="h-5 w-5 text-primary" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-foreground truncate">{s.name}</div>
+                    <div className="font-display font-semibold text-foreground truncate">{s.name}</div>
                     <div className="text-xs text-muted-foreground truncate">
                       {s.role === "host" ? t("cowork.page.roleHost") : s.role === "participant" ? t("cowork.page.roleParticipant") : t("cowork.page.notJoined")}
                       {s.hostName && s.createdBy !== userId ? ` · ${t("cowork.page.byHost", { name: s.hostName })}` : ""}
@@ -441,24 +441,37 @@ export default function CoworkPage() {
                     )}
                   </div>
                 </div>
-                {/* pl-[52px] = ancho del avatar (40) + gap (12): alinea los chips
-                    con el nombre. */}
+                {/* QUIÉN ESTÁ EN DÓNDE, sin entrar (Alvaro, 10/2026): cada sala
+                    es un mini-panel con su gente asignada (nombres, de la DB) y
+                    el punto/conteo en vivo de LiveKit. Antes eran chips con
+                    puro número y tocaba entrar para saber quién era. */}
                 {s.rooms.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 pl-[52px]">
-                    {s.rooms.map((r) => (
-                      <span
-                        key={r.id}
-                        className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-0.5 text-[11px] text-muted-foreground"
-                      >
-                        <span className={
-                          r.online != null && r.online > 0
-                            ? "h-1.5 w-1.5 rounded-full bg-success"
-                            : "h-1.5 w-1.5 rounded-full bg-muted-foreground/30"
-                        } />
-                        {r.name}
-                        <span className="font-semibold text-foreground/80">{r.online ?? "–"}</span>
-                      </span>
-                    ))}
+                  <div className="grid gap-1.5 sm:grid-cols-2 xl:grid-cols-3">
+                    {s.rooms.map((r) => {
+                      const gente = r.gente ?? [];
+                      const visibles = gente.slice(0, 4);
+                      return (
+                        <div key={r.id} className="min-w-0 rounded-xl border border-border/60 bg-muted/30 px-2.5 py-1.5">
+                          <div className="flex items-center gap-1.5 text-xs">
+                            <span className={
+                              r.online != null && r.online > 0
+                                ? "h-1.5 w-1.5 shrink-0 rounded-full bg-success"
+                                : "h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground/30"
+                            } />
+                            <span className="truncate font-medium text-foreground/90">{r.name}</span>
+                            <span className={`ml-auto shrink-0 tabular-nums text-[11px] font-semibold ${r.online != null && r.online > 0 ? "text-success" : "text-muted-foreground"}`}>
+                              {r.online ?? "–"}
+                            </span>
+                          </div>
+                          {gente.length > 0 && (
+                            <p className="mt-0.5 truncate text-[11px] leading-snug text-muted-foreground">
+                              {visibles.join(" · ")}
+                              {gente.length > visibles.length ? ` · +${gente.length - visibles.length}` : ""}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>

@@ -741,7 +741,13 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
       <div className="flex flex-col h-full bg-background text-foreground items-center justify-center gap-4">
         <p className="text-destructive font-medium">{t("messenger.callView.errorConexion")}</p>
         <p className="text-sm text-muted-foreground max-w-md text-center">{lk.error}</p>
-        <button onClick={handleLeave} className="mt-4 px-4 py-2 rounded-full bg-primary text-white text-sm hover:bg-primary/90">{t("common.back")}</button>
+        {/* Reintentar sin salir: el botón de antes solo COLGABA, y un fetch
+            cortado dejaba al supervisor con el Hub muerto hasta volver a
+            entrar a mano. */}
+        <div className="mt-4 flex items-center gap-3">
+          <button onClick={() => setReintentoManual((n) => n + 1)} className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm hover:bg-primary/90">{t("messenger.callView.reintentar")}</button>
+          <button onClick={handleLeave} className="px-4 py-2 rounded-full border border-border text-sm text-muted-foreground hover:bg-muted hover:text-foreground">{t("common.back")}</button>
+        </div>
       </div>
     );
   }

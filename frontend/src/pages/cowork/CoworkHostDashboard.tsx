@@ -106,9 +106,9 @@ function BotonSala({ activo, tono = "verde", icono: Icono, etiqueta, title, gran
   onClick: () => void;
 }) {
   const color = tono === "caido"
-    ? "bg-destructive text-white animate-pulse motion-reduce:animate-none"
+    ? "bg-destructive text-destructive-foreground animate-pulse motion-reduce:animate-none"
     : activo
-      ? (tono === "neutro" ? "text-foreground hover:bg-muted" : "bg-success text-white hover:bg-success/90")
+      ? (tono === "neutro" ? "text-foreground hover:bg-muted" : "bg-success text-success-foreground hover:bg-success/90")
       : "text-muted-foreground/60 hover:bg-muted hover:text-foreground";
   return (
     <button
@@ -1356,7 +1356,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   };
   const TONO_ETIQUETA: Record<Etiqueta["tono"], string> = {
     warning: "bg-warning text-warning-foreground",
-    destructive: "bg-destructive text-white animate-pulse motion-reduce:animate-none",
+    destructive: "bg-destructive text-destructive-foreground animate-pulse motion-reduce:animate-none",
     muted: "bg-black/60 text-white",
   };
 
@@ -1522,7 +1522,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               >
                 <Coffee className="h-4 w-4" />
                 <span className={`absolute -top-1 -right-1 h-4 min-w-4 px-1 rounded-full text-[10px] font-semibold flex items-center justify-center ${
-                  excedidas ? "bg-destructive text-white" : "bg-success text-black"
+                  excedidas ? "bg-destructive text-destructive-foreground" : "bg-success text-success-foreground"
                 }`}>
                   {enPausa}
                 </span>
@@ -1961,8 +1961,8 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                       // Verde solo si de verdad te están oyendo. Un botón en
                       // verde con el micro caído es peor que no tener botón.
                       ? (micCaido
-                          ? "bg-destructive hover:bg-destructive/90 text-white border-transparent animate-pulse"
-                          : "bg-success hover:bg-success/90 text-white border-transparent")
+                          ? "bg-destructive hover:bg-destructive/90 text-destructive-foreground border-transparent animate-pulse"
+                          : "bg-success hover:bg-success/90 text-success-foreground border-transparent")
                       : ""
                   }`}
                   title={micCaido
@@ -1982,7 +1982,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 <Button
                   size="sm"
                   variant={camaraATodas ? "default" : "outline"}
-                  className={`gap-1.5 rounded-full h-8 ${camaraATodas ? "bg-success hover:bg-success/90 text-white border-transparent" : ""}`}
+                  className={`gap-1.5 rounded-full h-8 ${camaraATodas ? "bg-success hover:bg-success/90 text-success-foreground border-transparent" : ""}`}
                   title={camaraATodas
                     ? t("cowork.host.all.cameraOnHint")
                     : t("cowork.host.all.cameraHint")}
@@ -1994,7 +1994,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 <Button
                   size="sm"
                   variant={pantallaATodas ? "default" : "outline"}
-                  className={`gap-1.5 rounded-full h-8 ${pantallaATodas ? "bg-success hover:bg-success/90 text-white border-transparent" : ""}`}
+                  className={`gap-1.5 rounded-full h-8 ${pantallaATodas ? "bg-success hover:bg-success/90 text-success-foreground border-transparent" : ""}`}
                   title={pantallaATodas
                     ? t("cowork.host.all.screenOnHint")
                     : t("cowork.host.all.screenHint")}
@@ -2442,7 +2442,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className={`h-5 w-5 ${hubSilenciado ? "text-amber-500 hover:text-amber-400" : "text-muted-foreground hover:text-foreground"}`}
+                  className={`h-5 w-5 ${hubSilenciado ? "text-warning hover:text-warning/80" : "text-muted-foreground hover:text-foreground"}`}
                   onClick={toggleHubSilencio}
                   title={hubSilenciado
                     ? t("cowork.host.hub.mutedHint")
@@ -2453,7 +2453,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className={`h-5 w-5 ${hubPinned && !ventanaDelSistemaSoportada ? "text-amber-500 hover:text-amber-400" : "text-muted-foreground hover:text-foreground"}`}
+                  className={`h-5 w-5 ${hubPinned && !ventanaDelSistemaSoportada ? "text-warning hover:text-warning/80" : "text-muted-foreground hover:text-foreground"}`}
                   onClick={popOutHub}
                   title={ventanaDelSistemaSoportada
                     ? (ventanaDelSistemaAbierta
