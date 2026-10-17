@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
 import { usePersistentCall, CallOutlet } from "@/components/PersistentCallProvider";
 import type { useCoworkSession } from "@/hooks/useCoworkSession";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
 import { useCoworkMediaPresence, salirDePresencia } from "@/hooks/useCoworkMediaPresence";
 import { iniciarLatido, actualizarLatido, detenerLatido, suscribirReloj, leerReloj } from "@/lib/coworkLatido";
 import type { ConexionSala } from "@/lib/coworkTiempoRegla";
@@ -459,7 +459,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
 
     const sendLeaveBeacon = () => {
       try {
-        const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/cowork-session`;
+        const url = `${SUPABASE_URL}/functions/v1/cowork-session`;
         supabase.auth.getSession().then(({ data }) => {
           const token = data.session?.access_token;
           if (!token) return;
@@ -468,7 +468,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             keepalive: true,
             headers: {
               "Content-Type": "application/json",
-              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+              apikey: SUPABASE_PUBLISHABLE_KEY,
               Authorization: `Bearer ${token}`,
             },
             body: JSON.stringify({ action: "leaveRoom", sessionId }),

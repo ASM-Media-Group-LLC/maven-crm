@@ -9,7 +9,7 @@
 // que la persona navegue por Maven (la ventanita flotante), así que el latido
 // tiene que seguir aunque la pantalla de Cowork se desmonte. Se detiene solo
 // cuando la persona SALE de la sala.
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
 import { ESTADOS_TIEMPO, INTERVALO_LATIDO_MS, type Latido } from "@/lib/coworkTiempoRegla";
 import type { RelojCowork } from "@/lib/coworkReloj";
 
@@ -107,12 +107,12 @@ async function enviar(v: Vivo): Promise<void> {
   try {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
-    const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/cowork-session`, {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/cowork-session`, {
       method: "POST",
       keepalive: true,
       headers: {
         "Content-Type": "application/json",
-        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        apikey: SUPABASE_PUBLISHABLE_KEY,
         Authorization: `Bearer ${session.access_token}`,
       },
       body: JSON.stringify({ action: "latido", sessionId: v.sessionId, equipo: equipoDeEstaPestana(), ...v.estado }),
