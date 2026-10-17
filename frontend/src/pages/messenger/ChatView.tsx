@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { useLanguage } from "@/hooks/useLanguage";
 import ChatHeader from "./components/ChatHeader";
 import MessageList from "./components/MessageList";
+import TypingBubble from "./components/TypingBubble";
 import { ProgramadosDelChat, useProgramarEnChat } from "./components/ProgramadosDelChat";
 import MessageInput, { MessageInputHandle } from "./components/MessageInput";
 import ThreadPanel from "./components/ThreadPanel";
@@ -323,6 +324,12 @@ export default function ChatView({
         hasMore={hasMore}
         loadingMore={loadingMore}
         onLoadMore={onLoadMore}
+      />
+
+      <TypingBubble
+        typingUsers={typingUsers}
+        profiles={profiles}
+        isGroup={conversation.type === "group"}
       />
 
       {announcementLocked ? (
