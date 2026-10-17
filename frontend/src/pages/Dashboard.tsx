@@ -12,6 +12,7 @@ const EquipoDashboard = lazy(() => import("@/pages/chatters/dashboard/EquipoDash
 const ManagerDashboard = lazy(() => import("@/pages/manager/ManagerDashboard"));
 const CloserDashboard = lazy(() => import("@/pages/closers/dashboard/CloserDashboard"));
 const DashboardVentas = lazy(() => import("@/pages/Dashboard2"));
+const CentroDeOperaciones = lazy(() => import("@/pages/centro/CentroDeOperaciones"));
 
 // Roles que ven el tablero del ADMIN aunque no sean admin. Es una decisión de
 // producto por rol, no una capacidad: Jhon pidió que "operation sales puede
@@ -52,7 +53,7 @@ const Dashboard = () => {
   // se pueda compartir y sobreviva un refresh. Solo admin: para el resto el
   // parámetro se ignora y cada uno cae en el suyo por rol.
   const elegido = tier === "admin" ? tableroDe(params.get("ver")) : null;
-  if (elegido && elegido !== "ventas") {
+  if (elegido && elegido !== "ventas" && elegido !== "centro") {
     return (
       <Suspense fallback={<Cargando />}>
         {elegido === "equipo" ? <EquipoDashboard />
@@ -67,6 +68,14 @@ const Dashboard = () => {
   // debería tener el permiso de ventas.
   if (isChatter) {
     return <Suspense fallback={<Cargando />}><ChatterDashboard /></Suspense>;
+  }
+
+  // Rediseño Aurora (10/2026, decisión de Alvaro): el admin aterriza en el
+  // CENTRO DE OPERACIONES — llamadas, salas y mensajería al frente, que es lo
+  // que se mira a cada rato. El Dashboard de Ventas NO se quitó: sigue entero
+  // en ?ver=ventas (el desplegable del título y el botón del final del Centro).
+  if (tier === "admin" && elegido !== "ventas") {
+    return <Suspense fallback={<Cargando />}><CentroDeOperaciones /></Suspense>;
   }
 
   // Solo ADMIN (decisión de Jhon: "dejalo solo admin"). El permiso del menú lo

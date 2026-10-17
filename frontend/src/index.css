@@ -7,26 +7,31 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
 */
 
 @layer base {
+  /* Paleta "Aurora" (rediseño 10/2026, elegida por Alvaro entre 5 propuestas):
+     neutros fríos con sesgo índigo y primario índigo/violeta. El azul 211 y el
+     violeta 271 anteriores viven solo en la historia de git. Los contrastes del
+     primario con texto blanco SUBEN respecto al azul viejo (claro ~6.4:1,
+     oscuro ~4.8:1 vs 3.97:1), así que el contrato AA de los skins no se toca. */
   :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 4%;
+    --background: 231 40% 98%;
+    --foreground: 231 26% 13%;
 
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 4%;
+    --card-foreground: 231 26% 13%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 4%;
+    --popover-foreground: 231 26% 13%;
 
-    --primary: 211 100% 50%;
+    --primary: 240 70% 56%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 240 5% 96%;
-    --secondary-foreground: 240 6% 10%;
+    --secondary: 231 32% 95%;
+    --secondary-foreground: 231 22% 12%;
 
-    --muted: 240 5% 96%;
-    --muted-foreground: 240 4% 46%;
+    --muted: 231 32% 95%;
+    --muted-foreground: 231 14% 42%;
 
-    --accent: 271 91% 50%;
+    --accent: 258 72% 52%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
@@ -38,20 +43,20 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
     --warning: 40 96% 40%;
     --warning-foreground: 0 0% 100%;
 
-    --border: 240 6% 90%;
-    --input: 240 6% 90%;
-    --ring: 211 100% 50%;
+    --border: 231 26% 90%;
+    --input: 231 26% 90%;
+    --ring: 240 70% 56%;
 
     --radius: 0.75rem;
 
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 10% 4%;
-    --sidebar-primary: 211 100% 50%;
+    --sidebar-background: 231 36% 97%;
+    --sidebar-foreground: 231 26% 13%;
+    --sidebar-primary: 240 70% 56%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 5% 96%;
-    --sidebar-accent-foreground: 240 6% 10%;
-    --sidebar-border: 240 6% 90%;
-    --sidebar-ring: 211 100% 50%;
+    --sidebar-accent: 231 32% 94%;
+    --sidebar-accent-foreground: 231 22% 12%;
+    --sidebar-border: 231 26% 89%;
+    --sidebar-ring: 240 70% 56%;
 
     --instagram-pink: 340 82% 59%;
     --instagram-purple: 271 91% 50%;
@@ -73,25 +78,25 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
   }
 
   .dark {
-    --background: 227 24% 7%;
-    --foreground: 240 5% 96%;
+    --background: 230 30% 7%;
+    --foreground: 229 30% 94%;
 
-    --card: 227 30% 12%;
-    --card-foreground: 240 5% 96%;
+    --card: 230 28% 11%;
+    --card-foreground: 229 30% 94%;
 
-    --popover: 227 30% 12%;
-    --popover-foreground: 240 5% 96%;
+    --popover: 230 28% 11%;
+    --popover-foreground: 229 30% 94%;
 
-    --primary: 211 100% 50%;
+    --primary: 239 84% 67%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 227 27% 14%;
-    --secondary-foreground: 240 5% 96%;
+    --secondary: 230 26% 14%;
+    --secondary-foreground: 229 30% 94%;
 
-    --muted: 227 27% 14%;
-    --muted-foreground: 225 15% 63%;
+    --muted: 230 26% 14%;
+    --muted-foreground: 229 18% 66%;
 
-    --accent: 271 91% 50%;
+    --accent: 260 80% 58%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
@@ -106,18 +111,18 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
     --warning: 40 92% 56%;
     --warning-foreground: 40 90% 10%;
 
-    --border: 225 26% 17%;
-    --input: 225 26% 17%;
-    --ring: 211 100% 50%;
+    --border: 229 26% 18%;
+    --input: 229 26% 18%;
+    --ring: 239 84% 67%;
 
-    --sidebar-background: 226 28% 8%;
-    --sidebar-foreground: 240 5% 96%;
-    --sidebar-primary: 211 100% 50%;
+    --sidebar-background: 230 32% 9%;
+    --sidebar-foreground: 229 30% 94%;
+    --sidebar-primary: 239 84% 67%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 227 27% 14%;
-    --sidebar-accent-foreground: 240 5% 96%;
-    --sidebar-border: 226 26% 12%;
-    --sidebar-ring: 211 100% 50%;
+    --sidebar-accent: 230 26% 14%;
+    --sidebar-accent-foreground: 229 30% 94%;
+    --sidebar-border: 230 28% 13%;
+    --sidebar-ring: 239 84% 67%;
 
     --instagram-pink: 340 82% 59%;
     --instagram-purple: 271 91% 50%;
@@ -128,7 +133,7 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
 
     /* Charts: mismos matices que :root pero con pasos re-calibrados para la
        superficie oscura (banda de luminosidad OKLCH + contraste ≥ 3:1 sobre
-       la card 227 30% 12%, verificado con el validador CVD). */
+       la card 230 28% 11%, verificado con el validador CVD). */
     --chart-1: 211 100% 50%; /* azul */
     --chart-2: 150 56% 34%;  /* verde */
     --chart-3: 190 90% 40%;  /* cyan */

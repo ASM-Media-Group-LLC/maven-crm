@@ -17,6 +17,7 @@ vi.mock("@/pages/chatters/dashboard/EquipoDashboard", () => ({ default: () => <d
 vi.mock("@/pages/manager/ManagerDashboard", () => ({ default: () => <div>MANAGER</div> }));
 vi.mock("@/pages/closers/dashboard/CloserDashboard", () => ({ default: () => <div>CLOSER</div> }));
 vi.mock("@/pages/Dashboard2", () => ({ default: () => <div>VENTAS</div> }));
+vi.mock("@/pages/centro/CentroDeOperaciones", () => ({ default: () => <div>CENTRO</div> }));
 
 import Dashboard from "@/pages/Dashboard";
 
@@ -36,11 +37,12 @@ beforeEach(() => {
 });
 
 describe("/dashboard · reparto por rol", () => {
-  it("el admin ve el Dashboard Ventas", async () => {
+  it("el admin ve el Centro de operaciones (rediseño Aurora 10/2026); Ventas quedó detrás de ?ver=", async () => {
     permisos = { canAccess: conVentas, isLoading: false };
     tier = { tier: "admin", isLoading: false };
     pintar();
-    await waitFor(() => expect(screen.getByText("VENTAS")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("CENTRO")).toBeInTheDocument());
+    expect(screen.queryByText("VENTAS")).not.toBeInTheDocument();
   });
 
   it("un manager NO ve el de ventas: ese es el tablero del admin (decisión de Jhon)", async () => {
@@ -62,7 +64,7 @@ describe("/dashboard · reparto por rol", () => {
     permisos = { canAccess: (m: string, s?: string) => conVentas(m, s) || conCreadores(m), isLoading: false };
     tier = { tier: "admin", isLoading: false };
     pintar();
-    await waitFor(() => expect(screen.getByText("VENTAS")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("CENTRO")).toBeInTheDocument());
   });
 
   it("⚠️ nivel supervisor NO ve el de ventas: la RPC de ingresos le responde 42501 y sería un tablero vacío", async () => {
@@ -88,17 +90,17 @@ describe("/dashboard · reparto por rol", () => {
     expect(screen.queryByText("EQUIPO")).not.toBeInTheDocument();
   });
 
-  it("el admin, aunque supervise chatters, ve el de ventas", async () => {
+  it("el admin, aunque supervise chatters, ve su Centro", async () => {
     permisos = { canAccess: (m: string, s?: string) => conVentas(m, s) || conChatters(m, s), isLoading: false };
     tier = { tier: "admin", isLoading: false };
     pintar();
-    await waitFor(() => expect(screen.getByText("VENTAS")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("CENTRO")).toBeInTheDocument());
   });
 
-  it("admin SIN el permiso de ventas se queda con el genérico", async () => {
+  it("admin SIN el permiso de ventas igual ve el Centro (no depende de la RPC de ventas)", async () => {
     tier = { tier: "admin", isLoading: false };
     pintar();
-    await waitFor(() => expect(screen.getByText("GENERICO")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("CENTRO")).toBeInTheDocument());
   });
 
   it("Operations Sales ve el tablero del admin, aunque no sea admin", async () => {
@@ -116,11 +118,11 @@ describe("/dashboard · reparto por rol", () => {
     await waitFor(() => expect(screen.getByText("CLOSER")).toBeInTheDocument());
   });
 
-  it("un admin con acceso a Closers sigue viendo el de ventas", async () => {
+  it("un admin con acceso a Closers sigue viendo su Centro", async () => {
     permisos = { canAccess: (m: string, s?: string) => conVentas(m, s) || conClosers(m), isLoading: false };
     tier = { tier: "admin", isLoading: false };
     pintar();
-    await waitFor(() => expect(screen.getByText("VENTAS")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("CENTRO")).toBeInTheDocument());
     expect(screen.queryByText("CLOSER")).not.toBeInTheDocument();
   });
 
@@ -145,6 +147,7 @@ describe("/dashboard · reparto por rol", () => {
     const { container } = pintar();
     expect(screen.queryByText("GENERICO")).not.toBeInTheDocument();
     expect(screen.queryByText("VENTAS")).not.toBeInTheDocument();
+    expect(screen.queryByText("CENTRO")).not.toBeInTheDocument();
     expect(container.querySelector(".animate-spin")).toBeTruthy();
   });
 
@@ -157,18 +160,25 @@ describe("/dashboard · reparto por rol", () => {
     expect(screen.queryByText("VENTAS")).not.toBeInTheDocument();
   });
 
-  it("?ver=ventas (o sin parámetro) es el tablero que le toca al admin", async () => {
+  it("?ver=ventas abre el Dashboard de Ventas, entero, detrás del Centro", async () => {
     permisos = { canAccess: conVentas, isLoading: false };
     tier = { tier: "admin", isLoading: false };
     pintar("/dashboard?ver=ventas");
     await waitFor(() => expect(screen.getByText("VENTAS")).toBeInTheDocument());
   });
 
-  it("un ?ver= inventado no rompe nada: cae en el tablero de su rol", async () => {
+  it("un ?ver= inventado no rompe nada: cae en el tablero de su rol (el Centro)", async () => {
     permisos = { canAccess: conVentas, isLoading: false };
     tier = { tier: "admin", isLoading: false };
     pintar("/dashboard?ver=cualquiercosa");
-    await waitFor(() => expect(screen.getByText("VENTAS")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("CENTRO")).toBeInTheDocument());
+  });
+
+  it("?ver=centro vuelve explícitamente al Centro", async () => {
+    permisos = { canAccess: conVentas, isLoading: false };
+    tier = { tier: "admin", isLoading: false };
+    pintar("/dashboard?ver=centro");
+    await waitFor(() => expect(screen.getByText("CENTRO")).toBeInTheDocument());
   });
 
   it("quien NO es admin no puede colarse en otro tablero con ?ver=", async () => {

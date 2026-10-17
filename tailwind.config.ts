@@ -94,7 +94,7 @@ export default {
       fontFamily: {
         // Fuente display del reskin — solo títulos/números grandes vía
         // `font-display`; el stack por defecto (body) no se toca.
-        display: ["Sora", "ui-sans-serif", "system-ui", "sans-serif"],
+        display: ["Manrope", "ui-sans-serif", "system-ui", "sans-serif"],
       },
       keyframes: {
         "accordion-down": {

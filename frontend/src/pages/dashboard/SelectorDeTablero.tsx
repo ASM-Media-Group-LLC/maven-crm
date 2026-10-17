@@ -1,5 +1,5 @@
 import { useSearchParams } from "react-router-dom";
-import { BarChart3, Check, ChevronDown, Megaphone, Target, User, Users } from "lucide-react";
+import { Activity, BarChart3, Check, ChevronDown, Megaphone, Target, User, Users } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useRoleTier } from "@/hooks/useRoleTier";
 import { cn } from "@/lib/utils";
@@ -16,7 +16,7 @@ import type { TranslationKey } from "@/lib/i18n";
 // sobrevive un refresh. Para quien no puede cambiar, el título es un h1 normal:
 // nadie ve un menú con opciones que no le corresponden.
 
-export type ClaveTablero = "ventas" | "equipo" | "roster" | "pipeline" | "chatter";
+export type ClaveTablero = "centro" | "ventas" | "equipo" | "roster" | "pipeline" | "chatter";
 
 // `clave` viaja en la URL (?ver=) y es dato; titulo/depto/detalle son claves del diccionario.
 export const TABLEROS: Array<{
@@ -28,6 +28,7 @@ export const TABLEROS: Array<{
   /** true = la data es de la persona que mira, no del departamento. */
   personal?: boolean;
 }> = [
+  { clave: "centro",   titulo: "dashboard.board.centro.title",   depto: "dashboard.board.centro.dept",   detalle: "dashboard.board.centro.detail",   icono: Activity },
   { clave: "ventas",   titulo: "dashboard.board.sales.title",    depto: "dashboard.board.sales.dept",    detalle: "dashboard.board.sales.detail",    icono: BarChart3 },
   { clave: "equipo",   titulo: "dashboard.board.team.title",     depto: "dashboard.board.team.dept",     detalle: "dashboard.board.team.detail",     icono: Users },
   { clave: "roster",   titulo: "dashboard.board.roster.title",   depto: "dashboard.board.roster.dept",   detalle: "dashboard.board.roster.detail",   icono: Megaphone, personal: true },
@@ -61,8 +62,10 @@ export default function SelectorDeTablero({ actual, titulo, clase }: {
 
   const elegir = (clave: ClaveTablero) => {
     const siguiente = new URLSearchParams(params);
-    // El de ventas es el que le toca por rol: sin parámetro en la URL.
-    if (clave === "ventas") siguiente.delete("ver");
+    // El Centro de operaciones es el tablero por defecto del admin desde el
+    // rediseño Aurora (10/2026): sin parámetro en la URL. Ventas y el resto
+    // viajan en ?ver= para que el link se pueda compartir.
+    if (clave === "centro") siguiente.delete("ver");
     else siguiente.set("ver", clave);
     setParams(siguiente, { replace: true });
   };
