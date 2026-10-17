@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { esperaDeReconexion, ESTADOS_MUERTOS } from "@/hooks/useCanalQueRevive";
@@ -134,6 +134,71 @@ export function topicDelCanalDelChat(userId: string, v: number): string {
   return `chat-${userId}::v${v}`;
 }
 
+// ── SALUD DE LA CONEXIÓN (para el banner y el poll adaptativo) ────────────────
+//
+// Una sola señal por pestaña: ¿el realtime del chat está entregando? El canal de
+// la conversación abierta (useChat) comparte ESTE mismo websocket, así que cuando
+// este se cae —socket muerto, JWT vencido— aquel también. Es un proxy honesto de
+// "los mensajes llegan solos": cuando dice "reconectando", la app muestra el aviso
+// y acelera el repaso de la conversación a ~4s; al volver a "en-vivo" se apaga el
+// aviso y no hay poll extra (así lo quiso Alvaro: red extra solo cuando cae).
+export type SaludDelChat = "conectando" | "en-vivo" | "reconectando";
+
+let saludActual: SaludDelChat = "conectando";
+const oyentesSalud = new Set<() => void>();
+
+// La salud se arma de VARIAS fuentes: el canal compartido de la lista ("lista") y
+// el canal de cada conversación abierta (useChat, una por ventana). Que la lista
+// esté en vivo NO garantiza que la conversación abierta entregue —son canales
+// distintos con su propio reintento—, así que la salud global es la PEOR de las
+// fuentes: si alguna reconecta, "reconectando"; si no, "en-vivo" si alguna
+// entrega; "conectando" si no hay ninguna. Así el banner y el poll se encienden
+// mientras CUALQUIER canal del chat esté caído, no solo el de la lista.
+const fuentesSalud = new Map<string, SaludDelChat>();
+
+function emitirSalud(s: SaludDelChat): void {
+  if (saludActual === s) return;
+  saludActual = s;
+  for (const avisar of Array.from(oyentesSalud)) {
+    try {
+      avisar();
+    } catch (err) {
+      console.error("[canalDelChat] un oyente de salud falló:", err);
+    }
+  }
+}
+
+function recomputarSalud(): void {
+  let next: SaludDelChat = "conectando";
+  for (const estado of fuentesSalud.values()) {
+    if (estado === "reconectando") { next = "reconectando"; break; }
+    if (estado === "en-vivo") next = "en-vivo";
+  }
+  emitirSalud(next);
+}
+
+/** Una fuente reporta su estado. "conectando" la retira (ya no cuenta). La salud
+ *  global queda como la peor de las fuentes vivas (ver arriba). */
+export function reportarSaludDelChat(fuente: string, estado: SaludDelChat): void {
+  if (estado === "conectando") fuentesSalud.delete(fuente);
+  else fuentesSalud.set(fuente, estado);
+  recomputarSalud();
+}
+
+export function saludDelChatAhora(): SaludDelChat {
+  return saludActual;
+}
+
+function suscribirSalud(avisar: () => void): () => void {
+  oyentesSalud.add(avisar);
+  return () => void oyentesSalud.delete(avisar);
+}
+
+/** La salud de la conexión del chat, viva. Re-renderiza al cambiar. */
+export function useSaludDelChat(): SaludDelChat {
+  return useSyncExternalStore(suscribirSalud, saludDelChatAhora, saludDelChatAhora);
+}
+
 function escuchar(canal: RealtimeChannel, def: Definicion, userId: string, alLlegar: (carga: CargaDelChat) => void): void {
   const cb = (payload: unknown) => alLlegar(payload as CargaDelChat);
   const conFiltro = def.filtro ? { filter: def.filtro(userId) } : {};
@@ -189,6 +254,7 @@ function armar(c: Centro): void {
     if (estado === "SUBSCRIBED") {
       c.intento = 0;
       c.suscrito = true;
+      reportarSaludDelChat("lista", "en-vivo");
       // realtime-js reintenta solo tras un CHANNEL_ERROR: si el canal volvió por
       // su cuenta, el rearmado que quedó programado ya no hace falta (la lista
       // de useChat lo cancelaba igual con su canal propio).
@@ -206,6 +272,7 @@ function armar(c: Centro): void {
     }
     if (ESTADOS_MUERTOS.has(estado)) {
       c.suscrito = false;
+      reportarSaludDelChat("lista", "reconectando");
       if (c.timer) return;
       c.huboCaida = true;
       c.timer = setTimeout(() => {
@@ -236,6 +303,9 @@ function cerrar(c: Centro): void {
   c.suscrito = false;
   if (canal) void supabase.removeChannel(canal);
   if (centros.get(c.userId) === c) centros.delete(c.userId);
+  // Sin chat montado no hay nada que reconectar: que un "reconectando" viejo no
+  // quede colgado para el próximo montaje (el primer SUBSCRIBED lo pondrá en vivo).
+  if (centros.size === 0) reportarSaludDelChat("lista", "conectando");
 }
 
 /** Canal nuevo para `userId` (volver del segundo plano, recuperar la red). */
