@@ -496,6 +496,7 @@ export const messenger = {
   "messenger.callView.conectando": { es: "Conectando a la sala...", en: "Connecting to the room..." },
   "messenger.callView.errorConexion": { es: "Error de conexión", en: "Connection error" },
   "messenger.callView.reintentar": { es: "Reintentar", en: "Try again" },
+  "messenger.callView.reintentaSolo": { es: "Se vuelve a intentar solo…", en: "Retrying automatically…" },
   "messenger.callView.cambiarDeSala": { es: "Cambiar de sala: te saca de la actual y entras muteado a la elegida", en: "Switch rooms: takes you out of this one and you join the new one muted" },
   "messenger.callView.salas": { es: "Salas", en: "Rooms" },
   "messenger.callView.reconectando": { es: "Reconectando...", en: "Reconnecting..." },

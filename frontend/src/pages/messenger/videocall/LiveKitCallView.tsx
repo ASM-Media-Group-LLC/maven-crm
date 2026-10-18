@@ -333,6 +333,9 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     let cancelled = false;
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
     let retried = false;
+    // Espera creciente para los reintentos automáticos de la conexión inicial.
+    let intentosFallidos = 0;
+    const ESPERAS_RECONEXION = [2000, 5000, 10000, 20000, 30000];
 
     // Volviendo de una caída: todo apagado (ver volviendoDeCaidaRef).
     const deCaida = volviendoDeCaidaRef.current;
@@ -356,7 +359,19 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
           retried = true;
           console.warn("[LiveKit] Signal aborted, retrying once in 600ms…", msg);
           retryTimer = setTimeout(() => { if (!cancelled) void tryConnect(); }, 600);
+          return;
         }
+        // La conexión inicial que falla (token que no llegó, "Failed to fetch",
+        // un 5xx) SE REINTENTA SOLA con espera creciente, mientras la vista siga
+        // montada. El Hub del supervisor se quedaba muerto en "Error de conexión"
+        // hasta que alguien tocara un botón (Alvaro, 10/2026: "siempre tenemos un
+        // error de conexión — arréglalo de una vez"). Esto NO pelea con la
+        // protección de pestañas: esa es un desconecte POSTERIOR (sala viva que
+        // otra pestaña adopta), nunca un throw de connect().
+        const espera = ESPERAS_RECONEXION[Math.min(intentosFallidos, ESPERAS_RECONEXION.length - 1)];
+        intentosFallidos++;
+        console.warn(`[LiveKit] Conexión inicial falló (${msg}); se reintenta en ${espera / 1000}s`);
+        retryTimer = setTimeout(() => { if (!cancelled) void tryConnect(); }, espera);
       }
     };
 
@@ -741,6 +756,11 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
       <div className="flex flex-col h-full bg-background text-foreground items-center justify-center gap-4">
         <p className="text-destructive font-medium">{t("messenger.callView.errorConexion")}</p>
         <p className="text-sm text-muted-foreground max-w-md text-center">{lk.error}</p>
+        {/* La conexión inicial se reintenta sola (espera creciente): que se vea,
+            para que nadie se quede esperando con el dedo en el botón. */}
+        <p className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" /> {t("messenger.callView.reintentaSolo")}
+        </p>
         {/* Reintentar sin salir: el botón de antes solo COLGABA, y un fetch
             cortado dejaba al supervisor con el Hub muerto hasta volver a
             entrar a mano. */}
