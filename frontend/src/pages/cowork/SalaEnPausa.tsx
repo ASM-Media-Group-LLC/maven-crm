@@ -139,7 +139,7 @@ export function describirPausa(
   return { titulo: tono === "excedida" ? t("cowork.pauseTile.titleOver", { title: titulo }) : titulo, detalle: partes.join(" · "), pct, tono };
 }
 
-export default function SalaEnPausa({ pausa, className }: { pausa: PausaDeSala; className?: string }) {
+export default function SalaEnPausa({ pausa, className, nombres }: { pausa: PausaDeSala; className?: string; nombres?: string[] }) {
   // Sin proveedor de idioma (los tests la dibujan sola) cae al idioma vigente:
   // la miniatura se vuelve a dibujar cada segundo con el reloj que corre.
   const t = useLanguageSiHay()?.t ?? traducir;
@@ -184,6 +184,13 @@ export default function SalaEnPausa({ pausa, className }: { pausa: PausaDeSala; 
           <div className={cn("font-display text-xl font-bold tabular-nums leading-tight md:text-2xl", acento)}>{mmss(pausa.segundos)}</div>
         </div>
       </div>
+      {/* QUIÉN está en la pausa (Alvaro, 10/2026: "no sabes quién se fue a
+          break, solo dice break"). Se muestran los nombres debajo del reloj. */}
+      {nombres && nombres.length > 0 && (
+        <div className="relative max-w-[32ch] truncate text-[11px] font-medium leading-snug text-white/90 md:text-xs">
+          {nombres.slice(0, 3).join(", ")}{nombres.length > 3 ? ` +${nombres.length - 3}` : ""}
+        </div>
+      )}
       <div className={cn("relative text-[10px] leading-snug md:text-[11px]", excedida ? "text-red-100/85" : "text-white/80")}>
         {partes.map((p, i) => (
           <span key={p} className="whitespace-nowrap">

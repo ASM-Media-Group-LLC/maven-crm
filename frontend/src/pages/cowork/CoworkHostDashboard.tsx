@@ -10,7 +10,7 @@ import {
   X, Loader2, Radio, Link2, Menu, XIcon, Maximize2, Minimize2, Phone, Share2,
   Mic, MicOff, Video, VideoOff, ArrowLeft, Plus, Pencil, Volume2, VolumeX, ScreenShare, ScreenShareOff,
   PanelRightClose, PanelRightOpen, MoreVertical, MessageCircle,
-  Pin, PinOff, PhoneOff, PictureInPicture2, KeyRound, Copy, Check, Coffee, EyeOff, MonitorOff, Settings2, MoreHorizontal,
+  Pin, PinOff, PhoneOff, PictureInPicture2, KeyRound, Check, Coffee, EyeOff, MonitorOff, Settings2, MoreHorizontal,
   WifiOff, type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
@@ -2103,20 +2103,12 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                       isMobile && "cursor-pointer active:bg-muted/40",
                     )}
                   >
-                    {/* Cabecera de una línea: nombre, código y cuántos hay. */}
+                    {/* Cabecera de una línea: nombre y cuántos hay. El código de
+                        sala (R9D9XR…) se sacó de la cara — se veía feo y ruidoso;
+                        sigue disponible en el menú ⋯ → "Copiar código" (Alvaro,
+                        10/2026). */}
                     <div className="flex h-10 items-center gap-2 px-3">
                       <span className="min-w-0 truncate font-display text-sm font-semibold text-foreground">{room.name}</span>
-                      {room.join_code && (
-                        <button
-                          type="button"
-                          title={t("cowork.host.copyRoomCode")}
-                          className="hidden md:inline-flex items-center gap-1 font-mono text-[11px] tracking-[0.18em] text-muted-foreground transition-colors hover:text-primary"
-                          onClick={() => copiarCodigoDeSala(room)}
-                        >
-                          {room.join_code}
-                          <Copy className="h-2.5 w-2.5 opacity-60" />
-                        </button>
-                      )}
                       <span className="ml-auto inline-flex items-center gap-1 text-[11px] tabular-nums text-muted-foreground" title={t("cowork.host.inRoomCount", { n: participants.length })}>
                         <Users2 className="h-3 w-3" />{participants.length}
                       </span>
@@ -2177,7 +2169,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                         <>
                           {/* En pausa la miniatura se apaga (mock aprobado el 08/09).
                               El monitor sigue conectado SOLO para el audio. */}
-                          <SalaEnPausa pausa={pausaSala} className="h-full w-full rounded-none border-0" />
+                          <SalaEnPausa pausa={pausaSala} nombres={participants.map((a) => nombreYApellido(cowork.profiles[a.user_id]))} className="h-full w-full rounded-none border-0" />
                           {monitor(false)}
                         </>
                       ) : (room.preview_mode ?? "video") === "avatars" ? (
