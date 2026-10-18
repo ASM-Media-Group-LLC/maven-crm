@@ -50,7 +50,7 @@ const definirSkin = (def: Omit<SkinDef, "labelKey" | "label">, labelKey: Transla
   conEtiqueta(def, labelKey);
 
 export const SKINS: SkinDef[] = [
-  definirSkin({ id: "maven", primary: "hsl(240 70% 56%)", accent: "hsl(258 72% 52%)" }, "int.skin.maven"),
+  definirSkin({ id: "maven", primary: "hsl(262 78% 56%)", accent: "hsl(268 74% 54%)" }, "int.skin.maven"),
   definirSkin({ id: "atardecer", primary: "hsl(25 95% 39%)", accent: "hsl(340 82% 59%)" }, "int.skin.atardecer"),
   definirSkin({ id: "esmeralda", primary: "hsl(160 84% 28%)", accent: "hsl(190 90% 45%)" }, "int.skin.esmeralda"),
   definirSkin({ id: "orquidea", primary: "hsl(290 84% 49%)", accent: "hsl(320 85% 55%)" }, "int.skin.orquidea"),

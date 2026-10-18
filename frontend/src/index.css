@@ -7,31 +7,33 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
 */
 
 @layer base {
-  /* Paleta "Aurora" (rediseño 10/2026, elegida por Alvaro entre 5 propuestas):
-     neutros fríos con sesgo índigo y primario índigo/violeta. El azul 211 y el
-     violeta 271 anteriores viven solo en la historia de git. Los contrastes del
-     primario con texto blanco SUBEN respecto al azul viejo (claro ~6.4:1,
-     oscuro ~4.8:1 vs 3.97:1), así que el contrato AA de los skins no se toca. */
+  /* Paleta "Aurora" (rediseño 10/2026, elegida por Alvaro). AJUSTE 10/2026
+     ("estaba muy morado"): las SUPERFICIES pasan a neutros casi sin color
+     (saturación baja, hue 240 apenas de guiño frío) — negro/gris en oscuro,
+     blanco/gris en claro — y el MORADO se concentra en primario, acento, ring
+     y estados activos. Antes los fondos tenían sesgo índigo marcado (hue 230,
+     sat 28-40%) y teñían toda la plataforma. El contrato AA de los skins no se
+     toca: primary-foreground sigue blanco y el primario mantiene su luminosidad. */
   :root {
-    --background: 231 40% 98%;
-    --foreground: 231 26% 13%;
+    --background: 240 20% 98%;
+    --foreground: 240 20% 12%;
 
     --card: 0 0% 100%;
-    --card-foreground: 231 26% 13%;
+    --card-foreground: 240 20% 12%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 231 26% 13%;
+    --popover-foreground: 240 20% 12%;
 
-    --primary: 240 70% 56%;
+    --primary: 262 78% 56%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 231 32% 95%;
-    --secondary-foreground: 231 22% 12%;
+    --secondary: 240 16% 95%;
+    --secondary-foreground: 240 18% 12%;
 
-    --muted: 231 32% 95%;
-    --muted-foreground: 231 14% 42%;
+    --muted: 240 16% 95%;
+    --muted-foreground: 240 8% 42%;
 
-    --accent: 258 72% 52%;
+    --accent: 268 74% 54%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
@@ -43,20 +45,20 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
     --warning: 40 96% 40%;
     --warning-foreground: 0 0% 100%;
 
-    --border: 231 26% 90%;
-    --input: 231 26% 90%;
-    --ring: 240 70% 56%;
+    --border: 240 14% 90%;
+    --input: 240 14% 90%;
+    --ring: 262 78% 56%;
 
     --radius: 0.75rem;
 
-    --sidebar-background: 231 36% 97%;
-    --sidebar-foreground: 231 26% 13%;
-    --sidebar-primary: 240 70% 56%;
+    --sidebar-background: 240 18% 97%;
+    --sidebar-foreground: 240 20% 12%;
+    --sidebar-primary: 262 78% 56%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 231 32% 94%;
-    --sidebar-accent-foreground: 231 22% 12%;
-    --sidebar-border: 231 26% 89%;
-    --sidebar-ring: 240 70% 56%;
+    --sidebar-accent: 240 16% 94%;
+    --sidebar-accent-foreground: 240 18% 12%;
+    --sidebar-border: 240 14% 89%;
+    --sidebar-ring: 262 78% 56%;
 
     --instagram-pink: 340 82% 59%;
     --instagram-purple: 271 91% 50%;
@@ -78,25 +80,28 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
   }
 
   .dark {
-    --background: 230 30% 7%;
-    --foreground: 229 30% 94%;
+    /* Negro de verdad con un guiño frío (hue 240, sat baja): el fondo ya no
+       "tira a morado". El morado vive en primary/accent/ring y en los estados
+       activos del sidebar (glass deriva de --primary/--accent). */
+    --background: 240 14% 4%;
+    --foreground: 240 12% 95%;
 
-    --card: 230 28% 11%;
-    --card-foreground: 229 30% 94%;
+    --card: 240 12% 7%;
+    --card-foreground: 240 12% 95%;
 
-    --popover: 230 28% 11%;
-    --popover-foreground: 229 30% 94%;
+    --popover: 240 12% 7%;
+    --popover-foreground: 240 12% 95%;
 
-    --primary: 239 84% 67%;
+    --primary: 262 88% 68%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 230 26% 14%;
-    --secondary-foreground: 229 30% 94%;
+    --secondary: 240 10% 12%;
+    --secondary-foreground: 240 12% 95%;
 
-    --muted: 230 26% 14%;
-    --muted-foreground: 229 18% 66%;
+    --muted: 240 10% 12%;
+    --muted-foreground: 240 8% 64%;
 
-    --accent: 260 80% 58%;
+    --accent: 268 84% 64%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
@@ -111,18 +116,18 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
     --warning: 40 92% 56%;
     --warning-foreground: 40 90% 10%;
 
-    --border: 229 26% 18%;
-    --input: 229 26% 18%;
-    --ring: 239 84% 67%;
+    --border: 240 9% 15%;
+    --input: 240 9% 15%;
+    --ring: 262 88% 68%;
 
-    --sidebar-background: 230 32% 9%;
-    --sidebar-foreground: 229 30% 94%;
-    --sidebar-primary: 239 84% 67%;
+    --sidebar-background: 240 14% 5%;
+    --sidebar-foreground: 240 12% 95%;
+    --sidebar-primary: 262 88% 68%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 230 26% 14%;
-    --sidebar-accent-foreground: 229 30% 94%;
-    --sidebar-border: 230 28% 13%;
-    --sidebar-ring: 239 84% 67%;
+    --sidebar-accent: 240 10% 12%;
+    --sidebar-accent-foreground: 240 12% 95%;
+    --sidebar-border: 240 9% 13%;
+    --sidebar-ring: 262 88% 68%;
 
     --instagram-pink: 340 82% 59%;
     --instagram-purple: 271 91% 50%;
