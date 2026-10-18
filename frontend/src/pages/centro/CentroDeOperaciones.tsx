@@ -213,33 +213,78 @@ export default function CentroDeOperaciones() {
         ) : sesiones.length === 0 ? (
           <p className="text-sm text-muted-foreground">{t("dashboard.centro.sinSesiones")}</p>
         ) : (
-          <div className="grid gap-2 sm:grid-cols-2">
-            {sesiones.map((s) => (
-              <div key={s.id} className="rounded-panel border border-border bg-background/60 p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="truncate text-sm font-semibold">{s.name}</span>
-                  <span className="flex items-center gap-1 text-xs font-semibold tabular-nums text-muted-foreground">
-                    <Users className="h-3.5 w-3.5" />{s.online == null ? "–" : s.online}
-                    {(s.hubOnline ?? 0) > 0 && (
-                      <span className="ml-1.5 rounded-control bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
-                        {t("dashboard.centro.hub")} {s.hubOnline}
+          <div className="grid gap-2.5 sm:grid-cols-2">
+            {sesiones.map((s) => {
+              // Interfaz nueva (Alvaro, 10/2026 — "mejor interfaz de salas"): el
+              // muro de chips iguales se separa en DOS. Las salas con gente suben
+              // como filas con las INICIALES de quién está adentro (r.gente, de la
+              // DB) + el conteo en vivo; las vacías se recogen en un resumen, para
+              // que de un vistazo se vea DÓNDE hay movimiento y no una pared.
+              const activas = s.rooms.filter((r) => (r.online ?? 0) > 0);
+              const reposo = s.rooms.filter((r) => (r.online ?? 0) === 0);
+              const enLinea = s.online == null ? "–" : s.online;
+              return (
+                <div key={s.id} className="flex flex-col gap-2.5 rounded-panel border border-border bg-background/60 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate text-sm font-semibold">{s.name}</span>
+                    <span className="flex shrink-0 items-center gap-1.5">
+                      <span className={`inline-flex items-center gap-1 rounded-control px-1.5 py-0.5 text-[11px] font-semibold tabular-nums ${(s.online ?? 0) > 0 ? "bg-success/10 text-success" : "text-muted-foreground"}`}>
+                        <Users className="h-3 w-3" />{enLinea}
                       </span>
-                    )}
-                  </span>
-                </div>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {s.rooms.map((r) => {
-                    const n = r.online ?? 0;
-                    return (
-                      <span key={r.id} className={`inline-flex items-center gap-1.5 rounded-control px-2 py-1 text-[11px] font-medium ${n > 0 ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"}`}>
-                        <span className={`h-1.5 w-1.5 rounded-full ${n > 0 ? "bg-success" : "bg-muted-foreground/40"}`} />
-                        {r.name}{n > 0 && <span className="tabular-nums">· {n}</span>}
+                      {(s.hubOnline ?? 0) > 0 && (
+                        <span className="rounded-control bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                          {t("dashboard.centro.hub")} {s.hubOnline}
+                        </span>
+                      )}
+                    </span>
+                  </div>
+
+                  {/* Salas con gente ahora: fila por sala con iniciales + conteo. */}
+                  {activas.length > 0 && (
+                    <div className="flex flex-col gap-1">
+                      {activas.map((r) => {
+                        const gente = r.gente ?? [];
+                        const visibles = gente.slice(0, 4);
+                        return (
+                          <div key={r.id} className="flex items-center gap-2 rounded-control bg-success/5 px-2 py-1.5">
+                            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-success" />
+                            <span className="truncate text-xs font-medium">{r.name}</span>
+                            <span className="ml-auto flex shrink-0 items-center gap-1">
+                              {visibles.map((nm, i) => (
+                                <span key={i} title={nm} className="flex h-5 w-5 items-center justify-center rounded-full bg-success/15 text-[9px] font-bold text-success">
+                                  {iniciales(nm)}
+                                </span>
+                              ))}
+                              <span className="ml-0.5 text-xs font-semibold tabular-nums text-success">{r.online}</span>
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Vacías: recogidas. Si NO hay ninguna activa, una línea calma
+                      con el total; si hay activas, un solo chip "+N en reposo"
+                      (con los nombres en el title) en vez del muro gris. */}
+                  {activas.length === 0 ? (
+                    reposo.length > 0 ? (
+                      <span className="text-xs text-muted-foreground">
+                        {reposo.length === 1 ? t("dashboard.centro.unaSalaLista") : t("dashboard.centro.salasListas", { n: reposo.length })}
                       </span>
-                    );
-                  })}
+                    ) : (
+                      <span className="text-xs text-muted-foreground">{t("dashboard.centro.sinSalas")}</span>
+                    )
+                  ) : reposo.length > 0 && (
+                    <span
+                      className="w-fit rounded-control bg-muted px-2 py-0.5 text-[10px] text-muted-foreground"
+                      title={reposo.map((r) => r.name).join(", ")}
+                    >
+                      +{reposo.length} {t("dashboard.centro.enReposo")}
+                    </span>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>
