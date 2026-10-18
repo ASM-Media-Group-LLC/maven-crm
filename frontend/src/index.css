@@ -7,26 +7,32 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
 */
 
 @layer base {
+  /* Paleta "Aurora" (rediseño 10/2026, elegida por Alvaro). AJUSTE 10/2026 (Alvaro eligió ACERO, azul): las SUPERFICIES pasan a neutros casi sin color
+     (saturación baja, hue 240 apenas de guiño frío) — negro/gris en oscuro,
+     blanco/gris en claro — y el MORADO se concentra en primario, acento, ring
+     y estados activos. Antes los fondos tenían sesgo índigo marcado (hue 230,
+     sat 28-40%) y teñían toda la plataforma. El contrato AA de los skins no se
+     toca: primary-foreground sigue blanco y el primario mantiene su luminosidad. */
   :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 4%;
+    --background: 240 20% 98%;
+    --foreground: 240 20% 12%;
 
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 4%;
+    --card-foreground: 240 20% 12%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 4%;
+    --popover-foreground: 240 20% 12%;
 
-    --primary: 211 100% 50%;
+    --primary: 213 72% 47%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 240 5% 96%;
-    --secondary-foreground: 240 6% 10%;
+    --secondary: 240 16% 95%;
+    --secondary-foreground: 240 18% 12%;
 
-    --muted: 240 5% 96%;
-    --muted-foreground: 240 4% 46%;
+    --muted: 240 16% 95%;
+    --muted-foreground: 240 8% 42%;
 
-    --accent: 271 91% 50%;
+    --accent: 202 82% 45%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
@@ -38,20 +44,20 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
     --warning: 40 96% 40%;
     --warning-foreground: 0 0% 100%;
 
-    --border: 240 6% 90%;
-    --input: 240 6% 90%;
-    --ring: 211 100% 50%;
+    --border: 240 14% 90%;
+    --input: 240 14% 90%;
+    --ring: 213 72% 47%;
 
     --radius: 0.75rem;
 
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 10% 4%;
-    --sidebar-primary: 211 100% 50%;
+    --sidebar-background: 240 18% 97%;
+    --sidebar-foreground: 240 20% 12%;
+    --sidebar-primary: 213 72% 47%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 5% 96%;
-    --sidebar-accent-foreground: 240 6% 10%;
-    --sidebar-border: 240 6% 90%;
-    --sidebar-ring: 211 100% 50%;
+    --sidebar-accent: 240 16% 94%;
+    --sidebar-accent-foreground: 240 18% 12%;
+    --sidebar-border: 240 14% 89%;
+    --sidebar-ring: 213 72% 47%;
 
     --instagram-pink: 340 82% 59%;
     --instagram-purple: 271 91% 50%;
@@ -73,25 +79,28 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
   }
 
   .dark {
-    --background: 227 24% 7%;
-    --foreground: 240 5% 96%;
+    /* Negro de verdad con un guiño frío (hue 240, sat baja): el fondo ya no
+       "tira a morado". El morado vive en primary/accent/ring y en los estados
+       activos del sidebar (glass deriva de --primary/--accent). */
+    --background: 240 14% 4%;
+    --foreground: 240 12% 95%;
 
-    --card: 227 30% 12%;
-    --card-foreground: 240 5% 96%;
+    --card: 240 12% 7%;
+    --card-foreground: 240 12% 95%;
 
-    --popover: 227 30% 12%;
-    --popover-foreground: 240 5% 96%;
+    --popover: 240 12% 7%;
+    --popover-foreground: 240 12% 95%;
 
-    --primary: 211 100% 50%;
+    --primary: 213 70% 58%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 227 27% 14%;
-    --secondary-foreground: 240 5% 96%;
+    --secondary: 240 10% 12%;
+    --secondary-foreground: 240 12% 95%;
 
-    --muted: 227 27% 14%;
-    --muted-foreground: 225 15% 63%;
+    --muted: 240 10% 12%;
+    --muted-foreground: 240 8% 64%;
 
-    --accent: 271 91% 50%;
+    --accent: 202 80% 54%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
@@ -106,18 +115,18 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
     --warning: 40 92% 56%;
     --warning-foreground: 40 90% 10%;
 
-    --border: 225 26% 17%;
-    --input: 225 26% 17%;
-    --ring: 211 100% 50%;
+    --border: 240 9% 15%;
+    --input: 240 9% 15%;
+    --ring: 213 70% 58%;
 
-    --sidebar-background: 226 28% 8%;
-    --sidebar-foreground: 240 5% 96%;
-    --sidebar-primary: 211 100% 50%;
+    --sidebar-background: 240 14% 5%;
+    --sidebar-foreground: 240 12% 95%;
+    --sidebar-primary: 213 70% 58%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 227 27% 14%;
-    --sidebar-accent-foreground: 240 5% 96%;
-    --sidebar-border: 226 26% 12%;
-    --sidebar-ring: 211 100% 50%;
+    --sidebar-accent: 240 10% 12%;
+    --sidebar-accent-foreground: 240 12% 95%;
+    --sidebar-border: 240 9% 13%;
+    --sidebar-ring: 213 70% 58%;
 
     --instagram-pink: 340 82% 59%;
     --instagram-purple: 271 91% 50%;
@@ -128,7 +137,7 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
 
     /* Charts: mismos matices que :root pero con pasos re-calibrados para la
        superficie oscura (banda de luminosidad OKLCH + contraste ≥ 3:1 sobre
-       la card 227 30% 12%, verificado con el validador CVD). */
+       la card 230 28% 11%, verificado con el validador CVD). */
     --chart-1: 211 100% 50%; /* azul */
     --chart-2: 150 56% 34%;  /* verde */
     --chart-3: 190 90% 40%;  /* cyan */
@@ -1019,6 +1028,100 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
 .glass-panel .presence-ring { border-color: hsl(var(--popover) / .55); }
 .dark .glass-panel .presence-ring { border-color: hsl(var(--popover) / .5); }
 :root[data-contrast="high"] .glass-panel .presence-ring { border-color: hsl(var(--popover)); }
+
+/* ─────────────────────────────────────────────────────────────────────
+   TARJETA DE SESIÓN DEL COWORK — "más estética y sensación" (Alvaro, 10/2026)
+   Síntesis de 3 direcciones exploradas: la gente al frente + el borde vivo
+   que ya eligió (8+9), elevados con:
+     · el RESPLANDOR interior acero→verde (de "Vidrio Vivo"): la presencia se
+       SIENTE desde el canto, no solo se lee en el número;
+     · el filo de luz arriba + la sombra honda en capas y el leve alzado al
+       pasar el mouse (de "Placa de Acero"): peso y lujo sobrio.
+   SIN el borde animado en bucle (el cliché "tarjeta IA" que detesta). Todo
+   por token → claro y oscuro. La variante --viva es solo cuando hay gente. */
+.tarjeta-sesion {
+  position: relative;
+  border: 1px solid hsl(var(--border));
+  border-radius: 1rem;
+  background: hsl(var(--card));
+  box-shadow:
+    inset 0 1px 0 hsl(0 0% 100% / .6),
+    0 1px 2px hsl(240 10% 20% / .05),
+    0 10px 24px -14px hsl(240 20% 20% / .12);
+  transition: transform .22s cubic-bezier(.2,.7,.2,1), box-shadow .22s ease, border-color .22s ease;
+}
+.tarjeta-sesion:hover {
+  transform: translateY(-2px);
+  border-color: hsl(var(--primary) / .4);
+  box-shadow:
+    inset 0 1px 0 hsl(0 0% 100% / .7),
+    0 2px 4px hsl(240 10% 20% / .06),
+    0 18px 36px -16px hsl(var(--primary) / .20);
+}
+.tarjeta-sesion:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+.dark .tarjeta-sesion {
+  box-shadow:
+    inset 0 1px 0 hsl(0 0% 100% / .06),
+    0 1px 2px hsl(0 0% 0% / .3),
+    0 14px 30px -16px hsl(0 0% 0% / .5);
+}
+.dark .tarjeta-sesion:hover {
+  box-shadow:
+    inset 0 1px 0 hsl(0 0% 100% / .08),
+    0 2px 6px hsl(0 0% 0% / .35),
+    0 22px 44px -18px hsl(var(--primary) / .30);
+}
+
+/* CON gente: el borde entero se enciende acero→verde (padding-box el relleno,
+   border-box el degradé) y la luz se derrama HACIA ADENTRO desde el canto
+   (verde desde abajo, acero desde la izquierda). */
+.tarjeta-sesion--viva {
+  border-color: transparent;
+  background:
+    linear-gradient(hsl(var(--card)), hsl(var(--card))) padding-box,
+    linear-gradient(135deg, hsl(var(--accent) / .85), hsl(var(--primary) / .45) 55%, hsl(var(--success) / .8)) border-box;
+  box-shadow:
+    inset 0 1px 0 hsl(0 0% 100% / .6),
+    inset 0 -26px 34px -24px hsl(var(--success) / .42),
+    inset 18px 0 32px -26px hsl(var(--accent) / .36),
+    0 1px 2px hsl(240 10% 20% / .05),
+    0 12px 28px -14px hsl(var(--primary) / .18),
+    0 14px 34px -18px hsl(var(--success) / .16);
+}
+.tarjeta-sesion--viva:hover {
+  box-shadow:
+    inset 0 1px 0 hsl(0 0% 100% / .7),
+    inset 0 -26px 38px -24px hsl(var(--success) / .45),
+    inset 18px 0 34px -26px hsl(var(--accent) / .38),
+    0 2px 4px hsl(240 10% 20% / .06),
+    0 20px 40px -16px hsl(var(--primary) / .26),
+    0 20px 44px -20px hsl(var(--success) / .20);
+}
+.dark .tarjeta-sesion--viva {
+  box-shadow:
+    inset 0 1px 0 hsl(0 0% 100% / .07),
+    inset 0 -28px 40px -24px hsl(var(--success) / .48),
+    inset 18px 0 34px -26px hsl(var(--accent) / .40),
+    0 1px 2px hsl(0 0% 0% / .3),
+    0 16px 34px -16px hsl(var(--primary) / .28),
+    0 16px 38px -20px hsl(var(--success) / .22);
+}
+.dark .tarjeta-sesion--viva:hover {
+  box-shadow:
+    inset 0 1px 0 hsl(0 0% 100% / .09),
+    inset 0 -28px 42px -24px hsl(var(--success) / .5),
+    inset 18px 0 36px -26px hsl(var(--accent) / .42),
+    0 2px 6px hsl(0 0% 0% / .35),
+    0 24px 46px -18px hsl(var(--primary) / .34),
+    0 24px 50px -22px hsl(var(--success) / .26);
+}
+@media (prefers-reduced-motion: reduce) {
+  .tarjeta-sesion { transition: none; }
+  .tarjeta-sesion:hover { transform: none; }
+}
 
 /* Áreas seguras del teléfono (notch, barra de inicio). Valen 0 donde no aplica,
    así que van sin condición y no cambian nada en escritorio. Con

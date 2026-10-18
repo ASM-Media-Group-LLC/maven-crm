@@ -409,7 +409,7 @@ const ClariAiChat = ({
                       }`}
                     >
                       {!isUser && (
-                        <div className="mb-1 text-xs font-bold text-violet-500">
+                        <div className="mb-1 text-xs font-bold text-primary">
                           Clari
                         </div>
                       )}
@@ -480,8 +480,8 @@ const ClariAiChat = ({
             ) : (
               <div className="flex items-end gap-2">
                 <ClariBubbleAvatar size={28} />
-                <div className="max-w-[80%] rounded-2xl border border-dashed border-violet-500/40 bg-violet-500/10 px-3 py-2 text-sm">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-violet-500">
+                <div className="max-w-[80%] rounded-2xl border border-dashed border-primary/40 bg-primary/10 px-3 py-2 text-sm">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-primary">
                     <Bot className="h-3 w-3 animate-pulse" />
                     {t("shared.clari.typing")}
                   </div>

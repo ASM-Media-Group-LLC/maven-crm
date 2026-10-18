@@ -363,10 +363,38 @@ const DashboardSidebar = () => {
   // mientras se está trabajando adentro.
   const isOficinaActive = pathname === "/oficina" || pathname.startsWith("/oficina/");
 
-  const operationsCollapsedItems: CI[] = operationsMenu.map((i) => ({
-    title: i.title,
-    url: i.url,
-  }));
+  // OPERACIONES EN SUB-ACORDEONES (Alvaro, 10/2026): eran 14 ítems planos en
+  // una sola lista — "traen un vergazo de cosas... no es como que hayas metido
+  // una cosa dentro de otra". Mismo patrón que Finanzas/RRHH: grupo → subgrupo
+  // → ítem. Se agrupa por URL sobre la lista YA filtrada por permisos; un ítem
+  // nuevo que no esté en ningún subgrupo se pinta SUELTO arriba — así nada
+  // desaparece por olvidar actualizar este mapa.
+  type OpsGrupo = { key: string; label: string; icon: typeof Briefcase; urls: string[] };
+  const opsGruposDef: OpsGrupo[] = [
+    { key: "contenido", label: t("nav.ops.content"), icon: Megaphone, urls: ["/promolog", "/parrilla", "/personalizados"] },
+    { key: "ventas", label: t("nav.ops.sales"), icon: Phone, urls: ["/leadgen", "/closers", "/scouter-assist", "/telefonos"] },
+    { key: "bandejas", label: t("nav.ops.inboxes"), icon: Inbox, urls: ["/inbox", "/telegram/bandeja", "/tickets"] },
+    { key: "chatters", label: t("nav.ops.quality"), icon: Gauge, urls: ["/chatter-evaluator", "/chatter-evaluator/rendimiento", "/chatters/horarios", "/agency-qa"] },
+  ];
+  const opsGrupos = opsGruposDef
+    .map((g) => ({
+      ...g,
+      items: g.urls
+        .map((u) => operationsMenu.find((i) => i.url === u))
+        .filter((i): i is (typeof operationsMenu)[number] => !!i),
+    }))
+    .filter((g) => g.items.length > 0);
+  const opsAgrupadas = new Set(opsGrupos.flatMap((g) => g.items.map((i) => i.url)));
+  const opsSueltos = operationsMenu.filter((i) => !opsAgrupadas.has(i.url));
+
+  const operationsCollapsedItems: CI[] = [
+    ...opsSueltos.map((i) => ({ title: i.title, url: i.url })),
+    ...opsGrupos.flatMap((g) => [
+      { kind: "separator" } as const,
+      { kind: "label", title: g.label } as const,
+      ...g.items.map((i) => ({ title: i.title, url: i.url })),
+    ]),
+  ];
   const isOperationsActive = operationsMenu.some(
     (i) => pathname === i.url || pathname.startsWith(i.url + "/")
   );
@@ -483,7 +511,8 @@ const DashboardSidebar = () => {
           collapsedItems={operationsCollapsedItems}
         >
             <SidebarMenu>
-              {operationsMenu.map((item) => (
+              {/* Ítems fuera de todo subgrupo (red de seguridad del mapa de arriba). */}
+              {opsSueltos.map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild tooltip={item.title}>
                     <NavLink to={item.url} className={cn(LINK_CLASS, item.url === operationsActiveUrl && ACTIVE_CLASS)} onMouseEnter={() => precargarRuta(item.url)} onFocus={() => precargarRuta(item.url)}>
@@ -498,6 +527,51 @@ const DashboardSidebar = () => {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+              {opsGrupos.map((group) => {
+                const isGroupActive = group.items.some((i) => pathname === i.url || pathname.startsWith(i.url + "/"));
+                // Con el subgrupo CERRADO, la suma de sus avisos se asoma en el
+                // título (y se esconde al abrirlo: ahí ya se ven los de cada
+                // ítem) — plegar no puede significar perder los pendientes.
+                const avisos = group.items.reduce((acc, i) => acc + (i.badge ?? 0), 0);
+                return (
+                  <Collapsible key={group.key} defaultOpen={isGroupActive}>
+                    <SidebarMenuItem>
+                      <CollapsibleTrigger asChild>
+                        <SidebarMenuButton tooltip={group.label} className="group/ops sidebar-glass-hover">
+                          <group.icon className="h-4 w-4 shrink-0" />
+                          <span className="truncate">{group.label}</span>
+                          <span className="ml-auto flex shrink-0 items-center gap-1">
+                            {avisos > 0 && (
+                              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary/15 px-1.5 text-[10px] font-semibold text-primary group-data-[state=open]/ops:hidden">
+                                {compactBadge(avisos)}
+                              </span>
+                            )}
+                            <ChevronRight className="h-4 w-4 shrink-0 transition-transform duration-200 group-data-[state=open]/ops:rotate-90" />
+                          </span>
+                        </SidebarMenuButton>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <SidebarMenuSub>
+                          {group.items.map((item) => (
+                            <SidebarMenuSubItem key={item.url}>
+                              <SidebarMenuSubButton asChild isActive={item.url === operationsActiveUrl} className="sidebar-glass-hover data-[active=true]:sidebar-glass-active">
+                                <NavLink to={item.url} onMouseEnter={() => precargarRuta(item.url)} onFocus={() => precargarRuta(item.url)}>
+                                  <span className="truncate">{item.title}</span>
+                                  {"badge" in item && item.badge != null && (
+                                    <span className={`ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold ${badgeTint(item.module)}`}>
+                                      {compactBadge(item.badge)}
+                                    </span>
+                                  )}
+                                </NavLink>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          ))}
+                        </SidebarMenuSub>
+                      </CollapsibleContent>
+                    </SidebarMenuItem>
+                  </Collapsible>
+                );
+              })}
             </SidebarMenu>
         </CollapsibleSidebarGroup>
         )}

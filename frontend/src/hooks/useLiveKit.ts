@@ -1236,18 +1236,31 @@ export function useLiveKit() {
       setActiveSpeaker(null);
       handRaisedMap.current = {};
 
-      let tokenData: { token: string; url: string };
-
-      if (options.tokenProvider) {
-        tokenData = await options.tokenProvider();
-      } else {
+      // El token viaja por la red ANTES de que exista sala, así que
+      // reintentarlo no pelea con ninguna otra pestaña (eso solo pasa al
+      // reconectar una sala viva). Sin esto, un parpadeo de red al montar
+      // pintaba "Error de conexión" sin más salida que colgar — así quedó el
+      // Hub del supervisor una mañana entera.
+      const pedirToken = async (): Promise<{ token: string; url: string }> => {
+        if (options.tokenProvider) return options.tokenProvider();
         const { data, error: fnErr } = await supabase.functions.invoke("livekit-token", {
           body: { roomName, participantName, isAdmin },
         });
         if (fnErr || !data?.token) {
           throw new Error(fnErr?.message || data?.error || "Failed to get token");
         }
-        tokenData = { token: data.token, url: data.url };
+        return { token: data.token, url: data.url };
+      };
+      const esperasToken = [700, 2000];
+      let tokenData: { token: string; url: string } | null = null;
+      for (let ronda = 0; tokenData === null; ronda++) {
+        try {
+          tokenData = await pedirToken();
+        } catch (e) {
+          if (ronda >= esperasToken.length || !vigente()) throw e;
+          await new Promise((r) => setTimeout(r, esperasToken[ronda]));
+          if (!vigente()) return;
+        }
       }
 
       const livekitUrl = tokenData.url;

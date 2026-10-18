@@ -216,7 +216,7 @@ const ControlGastoTab = ({ range }: ControlGastoTabProps = {}) => {
       {/* Hero — Total mes en curso. Mismo lenguaje visual que las hero
           cards de Reclutamiento modelos: border-2 con color, gradient
           corner blur que se intensifica en hover. */}
-      <Card className="p-5 border-2 border-indigo-500/30 relative overflow-hidden">
+      <Card className="p-5 border-2 border-primary/30 relative overflow-hidden">
         <div className="relative">
           <p className="text-xs text-foreground/80 font-semibold">
             {t("panel.spend.total")}

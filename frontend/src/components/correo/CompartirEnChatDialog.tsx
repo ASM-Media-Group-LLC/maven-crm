@@ -183,7 +183,7 @@ function FilaConversacion({
       )}
     >
       {c.type === "group" && !c.avatar_url ? (
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-600 to-fuchsia-600 text-white">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent text-white">
           <Users className="h-4 w-4" />
         </span>
       ) : (

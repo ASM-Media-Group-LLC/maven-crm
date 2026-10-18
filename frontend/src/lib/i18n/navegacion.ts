@@ -8,6 +8,11 @@ export const navegacion = {
   // Sidebar groups
   "sidebar.menu": { es: "Menu", en: "Menu" },
   "sidebar.operations": { es: "Operaciones", en: "Operations" },
+  // Subgrupos de Operaciones (acordeón anidado, rediseño Aurora 10/2026).
+  "nav.ops.content": { es: "Contenido", en: "Content" },
+  "nav.ops.sales": { es: "Ventas y leads", en: "Sales & leads" },
+  "nav.ops.inboxes": { es: "Bandejas", en: "Inboxes" },
+  "nav.ops.quality": { es: "Chatters y calidad", en: "Chatters & quality" },
   "sidebar.resources": { es: "Recursos", en: "Resources" },
 
   // Sidebar items - Menu

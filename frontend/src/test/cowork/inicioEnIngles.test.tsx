@@ -102,13 +102,23 @@ describe("Cowork · la entrada en inglés", () => {
     expect(screen.getByText("Active sessions · 2")).toBeTruthy();
     expect(screen.getByText(/^Not joined/)).toBeTruthy();
     expect(screen.getByText("someone (not recorded: before Sep 3)")).toBeTruthy();
+    // Con las tarjetas (rediseño 10/2026, propuestas 8+9 de Alvaro) el pulso va
+    // ARRIBA: la gente al frente (caras) y, en una línea, cuántos en línea y en
+    // cuántas salas. Aquí las salas no traen `gente`, así que no hay caras:
+    // queda el conteo "2 online · 1 room".
     expect(screen.getByText("2 online", { exact: false })).toBeTruthy();
+    expect(screen.getByText("· 1 room")).toBeTruthy();
   });
 
   it("el diálogo de finalizar y el de crear sesión están en inglés", async () => {
     montar();
     await screen.findByText("Morning shift");
-    fireEvent.click(screen.getAllByRole("button", { name: "End" })[0]);
+    // Finalizar vive ahora en el menú ⋯ de la sesión (rediseño 10/2026): se abre
+    // el menú (con Enter, como el ⋮ del correo — el click de Radix no abre en
+    // jsdom) y de ahí se elige "End".
+    fireEvent.keyDown(screen.getAllByRole("button", { name: "More options" })[0], { key: "Enter" });
+    const menuSesion = await screen.findByRole("menu");
+    fireEvent.click(within(menuSesion).getByRole("menuitem", { name: "End" }));
     let dialogo = await screen.findByRole("alertdialog");
     expect(within(dialogo).getByText("End “Morning shift”?")).toBeTruthy();
     expect(within(dialogo).getByText(/It closes for the 3 people inside/)).toBeTruthy();

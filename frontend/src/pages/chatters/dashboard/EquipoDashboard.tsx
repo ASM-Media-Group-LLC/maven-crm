@@ -334,7 +334,7 @@ export default function EquipoDashboard() {
               // Honestidad: de cuántos hay dato. Un promedio de 3 de 19 no es
               // el promedio del equipo.
               pie={t("chatters.equipo.nWithData", { n: resumen.conNota, total: resumen.total })}
-              icono={Zap} color="bg-violet-500" tinte="from-violet-500/10"
+              icono={Zap} color="bg-primary" tinte="from-primary/10"
               barra={resumen.nota != null ? { pct: (resumen.nota / 10) * 100, clase: tonoNota(resumen.nota).punto } : undefined}
             />
             <Kpi
@@ -349,7 +349,7 @@ export default function EquipoDashboard() {
               pie={cowork.personasConReloj > 0
                 ? t("chatters.equipo.coworkClockN", { n: cowork.personasConReloj, total: filas.length })
                 : coworkCargando ? t("chatters.equipo.loadingLower") : t("chatters.equipo.coworkClockNone")}
-              icono={Timer} color="bg-violet-500" tinte="from-violet-500/10"
+              icono={Timer} color="bg-primary" tinte="from-primary/10"
             />
           </div>
         )}

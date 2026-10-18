@@ -16,6 +16,8 @@ const pausada = vi.fn(() => false);
 vi.mock("@/lib/coworkPausa", () => ({ estaEnPausa: () => pausada() }));
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: { auth: { getSession: async () => ({ data: { session: { access_token: "t" } } }) } },
+  SUPABASE_URL: "https://test.supabase.co",
+  SUPABASE_PUBLISHABLE_KEY: "test-key",
 }));
 
 const {

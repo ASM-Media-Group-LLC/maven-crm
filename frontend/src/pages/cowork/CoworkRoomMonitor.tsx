@@ -483,7 +483,20 @@ export default function CoworkRoomMonitor({ roomId, roomName, issueToken, showVi
             </button>
           </div>
         ) : status === "error" ? (
-          <div className="flex items-center justify-center h-full text-[11px] tactil:text-[12px] text-muted-foreground/50 italic">{t("cowork.monitor.previewUnavailable")}</div>
+          // Mismo trato que "duplicada": decir qué pasó Y dar la salida ahí
+          // mismo. El texto en cursiva solo, sin botón, dejaba la sala con
+          // cara de rota hasta recargar la página (Aurora, 10/2026).
+          <div className="flex flex-col items-center justify-center h-full gap-1 px-2 text-center">
+            <VideoOff className="h-4 w-4 text-muted-foreground/50" />
+            <span className="text-[10px] tactil:text-[11px] text-muted-foreground/70">{t("cowork.monitor.previewUnavailable")}</span>
+            <button
+              type="button"
+              onClick={() => setIntento((n) => n + 1)}
+              className="text-[10px] underline text-primary hover:text-primary/80"
+            >
+              {t("cowork.monitor.retry")}
+            </button>
+          </div>
         ) : partVideos.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-1 text-muted-foreground/50">
             <VideoOff className="h-4 w-4" />

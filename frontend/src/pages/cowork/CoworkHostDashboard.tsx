@@ -10,7 +10,7 @@ import {
   X, Loader2, Radio, Link2, Menu, XIcon, Maximize2, Minimize2, Phone, Share2,
   Mic, MicOff, Video, VideoOff, ArrowLeft, Plus, Pencil, Volume2, VolumeX, ScreenShare, ScreenShareOff,
   PanelRightClose, PanelRightOpen, MoreVertical, MessageCircle,
-  Pin, PinOff, PhoneOff, PictureInPicture2, KeyRound, Copy, Check, Coffee, EyeOff, MonitorOff, Settings2, MoreHorizontal,
+  Pin, PinOff, PhoneOff, PictureInPicture2, KeyRound, Check, Coffee, EyeOff, MonitorOff, Settings2, MoreHorizontal,
   WifiOff, type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
@@ -33,6 +33,7 @@ import { olvidarAusentes, tocaAvisar, type MarcasAviso } from "@/lib/avisosSuper
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
 import { useCoworkMediaPresence, type MediaState } from "@/hooks/useCoworkMediaPresence";
 import { cn } from "@/lib/utils";
+import { tituloBonito } from "@/lib/tituloBonito";
 import { leerLimitesPausa } from "@/lib/coworkTablas";
 import { relojDesdePresencia, segundosMostrados, formatoReloj } from "@/lib/coworkReloj";
 import { personasEnSala, relojDeRespaldo, latidoFresco, sinConexionConLaSala } from "@/lib/coworkOcupacion";
@@ -106,9 +107,9 @@ function BotonSala({ activo, tono = "verde", icono: Icono, etiqueta, title, gran
   onClick: () => void;
 }) {
   const color = tono === "caido"
-    ? "bg-destructive text-white animate-pulse motion-reduce:animate-none"
+    ? "bg-destructive text-destructive-foreground animate-pulse motion-reduce:animate-none"
     : activo
-      ? (tono === "neutro" ? "text-foreground hover:bg-muted" : "bg-success text-white hover:bg-success/90")
+      ? (tono === "neutro" ? "text-foreground hover:bg-muted" : "bg-success text-success-foreground hover:bg-success/90")
       : "text-muted-foreground/60 hover:bg-muted hover:text-foreground";
   return (
     <button
@@ -1356,7 +1357,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   };
   const TONO_ETIQUETA: Record<Etiqueta["tono"], string> = {
     warning: "bg-warning text-warning-foreground",
-    destructive: "bg-destructive text-white animate-pulse motion-reduce:animate-none",
+    destructive: "bg-destructive text-destructive-foreground animate-pulse motion-reduce:animate-none",
     muted: "bg-black/60 text-white",
   };
 
@@ -1522,7 +1523,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               >
                 <Coffee className="h-4 w-4" />
                 <span className={`absolute -top-1 -right-1 h-4 min-w-4 px-1 rounded-full text-[10px] font-semibold flex items-center justify-center ${
-                  excedidas ? "bg-destructive text-white" : "bg-success text-black"
+                  excedidas ? "bg-destructive text-destructive-foreground" : "bg-success text-success-foreground"
                 }`}>
                   {enPausa}
                 </span>
@@ -1556,7 +1557,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                   setRenameOpen(true);
                 }}
               >
-                <h2 className="truncate font-display text-base font-semibold text-foreground decoration-primary/60 decoration-dotted underline-offset-4 transition-colors group-hover:text-primary group-hover:underline">{cowork.session?.name}</h2>
+                <h2 className="truncate font-display text-base font-semibold text-foreground decoration-primary/60 decoration-dotted underline-offset-4 transition-colors group-hover:text-primary group-hover:underline">{tituloBonito(cowork.session?.name)}</h2>
               </button>
             </div>
             {/* Acciones de la sesión, todas del mismo tamaño y color: antes cada
@@ -1961,8 +1962,8 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                       // Verde solo si de verdad te están oyendo. Un botón en
                       // verde con el micro caído es peor que no tener botón.
                       ? (micCaido
-                          ? "bg-destructive hover:bg-destructive/90 text-white border-transparent animate-pulse"
-                          : "bg-success hover:bg-success/90 text-white border-transparent")
+                          ? "bg-destructive hover:bg-destructive/90 text-destructive-foreground border-transparent animate-pulse"
+                          : "bg-success hover:bg-success/90 text-success-foreground border-transparent")
                       : ""
                   }`}
                   title={micCaido
@@ -1982,7 +1983,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 <Button
                   size="sm"
                   variant={camaraATodas ? "default" : "outline"}
-                  className={`gap-1.5 rounded-full h-8 ${camaraATodas ? "bg-success hover:bg-success/90 text-white border-transparent" : ""}`}
+                  className={`gap-1.5 rounded-full h-8 ${camaraATodas ? "bg-success hover:bg-success/90 text-success-foreground border-transparent" : ""}`}
                   title={camaraATodas
                     ? t("cowork.host.all.cameraOnHint")
                     : t("cowork.host.all.cameraHint")}
@@ -1994,7 +1995,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 <Button
                   size="sm"
                   variant={pantallaATodas ? "default" : "outline"}
-                  className={`gap-1.5 rounded-full h-8 ${pantallaATodas ? "bg-success hover:bg-success/90 text-white border-transparent" : ""}`}
+                  className={`gap-1.5 rounded-full h-8 ${pantallaATodas ? "bg-success hover:bg-success/90 text-success-foreground border-transparent" : ""}`}
                   title={pantallaATodas
                     ? t("cowork.host.all.screenOnHint")
                     : t("cowork.host.all.screenHint")}
@@ -2103,20 +2104,12 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                       isMobile && "cursor-pointer active:bg-muted/40",
                     )}
                   >
-                    {/* Cabecera de una línea: nombre, código y cuántos hay. */}
+                    {/* Cabecera de una línea: nombre y cuántos hay. El código de
+                        sala (R9D9XR…) se sacó de la cara — se veía feo y ruidoso;
+                        sigue disponible en el menú ⋯ → "Copiar código" (Alvaro,
+                        10/2026). */}
                     <div className="flex h-10 items-center gap-2 px-3">
-                      <span className="min-w-0 truncate font-display text-sm font-semibold text-foreground">{room.name}</span>
-                      {room.join_code && (
-                        <button
-                          type="button"
-                          title={t("cowork.host.copyRoomCode")}
-                          className="hidden md:inline-flex items-center gap-1 font-mono text-[11px] tracking-[0.18em] text-muted-foreground transition-colors hover:text-primary"
-                          onClick={() => copiarCodigoDeSala(room)}
-                        >
-                          {room.join_code}
-                          <Copy className="h-2.5 w-2.5 opacity-60" />
-                        </button>
-                      )}
+                      <span className="min-w-0 truncate font-display text-sm font-semibold text-foreground">{tituloBonito(room.name)}</span>
                       <span className="ml-auto inline-flex items-center gap-1 text-[11px] tabular-nums text-muted-foreground" title={t("cowork.host.inRoomCount", { n: participants.length })}>
                         <Users2 className="h-3 w-3" />{participants.length}
                       </span>
@@ -2177,7 +2170,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                         <>
                           {/* En pausa la miniatura se apaga (mock aprobado el 08/09).
                               El monitor sigue conectado SOLO para el audio. */}
-                          <SalaEnPausa pausa={pausaSala} className="h-full w-full rounded-none border-0" />
+                          <SalaEnPausa pausa={pausaSala} nombres={participants.map((a) => nombreYApellido(cowork.profiles[a.user_id]))} className="h-full w-full rounded-none border-0" />
                           {monitor(false)}
                         </>
                       ) : (room.preview_mode ?? "video") === "avatars" ? (
@@ -2442,7 +2435,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className={`h-5 w-5 ${hubSilenciado ? "text-amber-500 hover:text-amber-400" : "text-muted-foreground hover:text-foreground"}`}
+                  className={`h-5 w-5 ${hubSilenciado ? "text-warning hover:text-warning/80" : "text-muted-foreground hover:text-foreground"}`}
                   onClick={toggleHubSilencio}
                   title={hubSilenciado
                     ? t("cowork.host.hub.mutedHint")
@@ -2453,7 +2446,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className={`h-5 w-5 ${hubPinned && !ventanaDelSistemaSoportada ? "text-amber-500 hover:text-amber-400" : "text-muted-foreground hover:text-foreground"}`}
+                  className={`h-5 w-5 ${hubPinned && !ventanaDelSistemaSoportada ? "text-warning hover:text-warning/80" : "text-muted-foreground hover:text-foreground"}`}
                   onClick={popOutHub}
                   title={ventanaDelSistemaSoportada
                     ? (ventanaDelSistemaAbierta
@@ -2527,7 +2520,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               <>
                 <SheetHeader className="text-left">
                   <SheetTitle className="flex items-center gap-2 font-display">
-                    {room.name}
+                    {tituloBonito(room.name)}
                     <span className="text-xs font-normal text-muted-foreground">{participants.length === 1 ? t("cowork.host.personOne") : t("cowork.host.personMany", { n: participants.length })}</span>
                   </SheetTitle>
                   <SheetDescription>

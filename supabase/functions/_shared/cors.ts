@@ -24,7 +24,14 @@ export const ALLOWED_ORIGINS = [
   "https://app.maven-ai.me",
   "https://www.maven-ai.me",
   "https://maven-ai.me",
-  "http://localhost:5173", // Vite dev
+  "http://localhost:5173", // Vite dev (puerto por defecto de Vite)
+  // El dev server de Maven corre en 8080 (ver .claude/launch.json y el PORT del
+  // vite.config). Sin este origen, desde el dev local las edge functions
+  // negaban TODO lo de cowork: el Hub moría con "Failed to fetch" y los
+  // previews de sala con "Preview no disponible" — el error de conexión que
+  // Alvaro veía una y otra vez en el panel (10/2026).
+  "http://localhost:8080",
+  "http://127.0.0.1:8080",
   "http://localhost:4173", // Vite preview
   // El preview por IP: pwa.ts no registra el service worker cuando el host es
   // "localhost", así que para probar push en local el build se abre en

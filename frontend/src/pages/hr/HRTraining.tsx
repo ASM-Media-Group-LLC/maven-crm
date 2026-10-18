@@ -368,7 +368,7 @@ function TrainingDashboard({ onAssign, onConfig, onViewDetail, onViewProgram }: 
             <Card className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => navigate("/hr/capacitacion/chatters")}>
               <CardContent className="flex items-center justify-between p-4">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-violet-500/10"><MessageSquare className="h-5 w-5 text-violet-600" /></div>
+                  <div className="p-2 rounded-lg bg-primary/10"><MessageSquare className="h-5 w-5 text-primary" /></div>
                   <div>
                     <p className="font-medium">{t("hr.train.chatters")}</p>
                     <p className="text-xs text-muted-foreground">{t("hr.train.chattersDesc")}</p>

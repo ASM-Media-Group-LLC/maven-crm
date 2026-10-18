@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
 import { estaEnPausa } from "@/lib/coworkPausa";
 import { estaEnLlamadaDeMaven } from "@/lib/llamadaEnMaven";
 import type { FaceWatch } from "@/hooks/useFaceWatch";
@@ -137,11 +137,11 @@ async function anotar(kind: KindLlamado, nonce: string, segundos: number, detail
     console.warn(`[cowork] sin sesión: no se registró el llamado "${kind}"`);
     return;
   }
-  const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/cowork-session`, {
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/cowork-session`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+      apikey: SUPABASE_PUBLISHABLE_KEY,
       Authorization: `Bearer ${session.access_token}`,
     },
     body: JSON.stringify({ action: "registrarLlamado", kind, nonce, detail, seconds: segundos }),

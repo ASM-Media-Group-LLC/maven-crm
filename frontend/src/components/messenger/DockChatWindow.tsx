@@ -117,7 +117,7 @@ export default function DockChatWindow({
               {conversation.avatar_url && (
                 <AvatarImage src={conversation.avatar_url} alt={conversation.displayName} className="object-cover" />
               )}
-              <AvatarFallback className="bg-gradient-to-br from-violet-600 to-fuchsia-600 text-white">
+              <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-white">
                 <Users className="h-3.5 w-3.5" />
               </AvatarFallback>
             </Avatar>

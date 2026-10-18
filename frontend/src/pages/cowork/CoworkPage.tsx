@@ -17,14 +17,20 @@ import CoworkHostDashboard from "./CoworkHostDashboard";
 import CoworkParticipantView from "./CoworkParticipantView";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { normalizeRoomCode, isCompleteRoomCode, ROOM_CODE_LENGTH } from "@/lib/coworkRoomCode";
-import { Plus, Users2, ArrowRight, KeyRound, Loader2, VenetianMask, LogOut, History } from "lucide-react";
+import { Plus, Users2, ArrowRight, KeyRound, Loader2, VenetianMask, LogOut, History, MoreHorizontal, Power } from "lucide-react";
 import CoworkIncognitoView from "./CoworkIncognitoView";
 import { toast } from "sonner";
 import { useFormato } from "@/hooks/useFormato";
 import type { Formato } from "@/lib/formato";
 import { useLanguage } from "@/hooks/useLanguage";
 import { traducir } from "@/lib/i18n";
+import { tituloBonito } from "@/lib/tituloBonito";
+import { UserAvatar } from "@/components/UserAvatar";
+import { cn } from "@/lib/utils";
 
 export default function CoworkPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -117,7 +123,7 @@ export default function CoworkPage() {
     type Fila = {
       id: string; name: string; role: string | null; members: number; createdBy: string | null;
       hostName: string | null; lastRoomId: string | null; online: number | null; incognito: string[];
-      rooms: Array<{ id: string; name: string; online: number | null }>; admin: AdminSessionRow | null;
+      rooms: Array<{ id: string; name: string; online: number | null; gente?: string[] }>; admin: AdminSessionRow | null;
     };
     const mias = new Map(mySessions.map((m) => [m.id, m]));
     const porAlcance: Fila[] = veTodasLasSesiones
@@ -272,17 +278,17 @@ export default function CoworkPage() {
             (pedido de Jhon, 03/09/2026). Al dejar de ser un pie se le bajó el
             alto: si no, en un portátil el título se comía la pantalla y había
             que scrollear para ver a qué sala entrar. */}
-        <div className="w-full rounded-3xl bg-primary/5 px-5 py-6 md:px-8 md:py-7">
+        <div className="w-full rounded-3xl border border-primary/10 bg-gradient-to-br from-primary/10 via-accent/5 to-transparent px-5 py-6 md:px-8 md:py-7">
           {/* En pantalla ancha el encabezado es una FILA (icono + título a la
               izquierda, acciones a la derecha): en columna se comía media
               pantalla y había que scrollear para ver las salas. En móvil se
               apila y queda centrado, como estaba. */}
           <div className="flex flex-col items-center gap-4 text-center md:flex-row md:items-center md:gap-5 md:text-left">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary/10 md:h-12 md:w-12">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary/20 to-accent/20 md:h-12 md:w-12">
               <Users2 className="h-7 w-7 text-primary md:h-6 md:w-6" />
             </div>
             <div className="min-w-0 flex-1">
-              <h1 className="text-xl font-bold tracking-tight text-foreground md:text-2xl">
+              <h1 className="font-display text-xl font-bold tracking-tight text-foreground md:text-2xl">
                 {t("cowork.page.title")}
               </h1>
               <p className="mt-0.5 text-sm text-muted-foreground">
@@ -345,124 +351,162 @@ export default function CoworkPage() {
             <h2 className="text-xs font-semibold text-muted-foreground px-1">
               {t("cowork.page.activeSessions")}{veTodasLasSesiones ? ` · ${filasActivas.length}` : ""}
             </h2>
-            <div className="flex flex-col gap-2">
-            {filasActivas.map((s) => (
+            {/* TARJETAS EN GRILLA (Alvaro, 10/2026: "tiene que ser tarjetas,
+                cuadritos — como una plataforma sólida"): cada sesión es un
+                cuadro compacto y parejo. UNA acción principal (Entrar/Volver),
+                el resto en ⋯ (Finalizar es destructivo y ya se disparó sin
+                querer: CHATTERS KASH, 4 veces en 4 días). Lo vivo se resume en
+                una línea —salas activas y quiénes—; el detalle sala por sala
+                vive en el Centro de operaciones. */}
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {filasActivas.map((s) => {
+              const activas = s.rooms.filter((r) => (r.online ?? 0) > 0);
+              const genteEnVivo = activas.flatMap((r) => r.gente ?? []);
+              // Hay gente = LiveKit contó a alguien. online null (LiveKit calló)
+              // NO enciende nada: fallo no es vacío.
+              const n = s.online ?? 0;
+              const hayGente = n > 0;
+              const puedeFinalizar = s.createdBy === userId || isAdmin;
+              const puedeSalir = s.role === "host" && s.createdBy !== userId && !isAdmin;
+              const hayMenu = puedeFinalizar || puedeSalir || isAdmin;
+              // La TARJETA ENTERA es la acción de entrar (estilo Linear/Stripe):
+              // nada de botón gigante — Alvaro, 10/2026: "ese botón gigante de
+              // Volver no se ve profesional". El ⋯ va en la esquina y frena la
+              // burbuja para no entrar por accidente al abrir el menú.
+              const entrarALaSesion = () => {
+                if (s.role) {
+                  setSearchParams(
+                    // Sin el `room` el participante vuelve SIN asignación y queda
+                    // esperando una asignación que ya nadie puede hacer.
+                    s.lastRoomId && s.role !== "host"
+                      ? { session: s.id, room: s.lastRoomId }
+                      : { session: s.id }
+                  );
+                } else if (s.admin && enteringId !== s.id) {
+                  /* No es miembro pero la ve: admin, o alcance de Cowork sobre
+                     esta sesión. El edge deja entrar como host sin código en
+                     ambos casos (cowork_puede_supervisar); si no corresponde,
+                     responde 403 y se muestra el error. */
+                  void handleAdminEnter(s.admin);
+                }
+              };
+              return (
               <div
                 key={s.id}
-                className="flex flex-col gap-2 bg-card border border-border rounded-2xl px-4 py-3"
+                role="button"
+                tabIndex={0}
+                onClick={entrarALaSesion}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); entrarALaSesion(); } }}
+                className={cn(
+                  // El relleno, el borde vivo, el resplandor interior, la sombra
+                  // honda y el alzado al pasar el mouse viven en .tarjeta-sesion
+                  // (index.css). Aquí solo el layout.
+                  "tarjeta-sesion group flex h-full cursor-pointer flex-col gap-3 p-5 text-left outline-none",
+                  hayGente && "tarjeta-sesion--viva",
+                )}
               >
-                <div className="flex flex-wrap items-center gap-3">
-                  <div className="flex items-center justify-center h-10 w-10 rounded-full bg-primary/10 shrink-0">
-                    <Users2 className="h-5 w-5 text-primary" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-foreground truncate">{s.name}</div>
-                    <div className="text-xs text-muted-foreground truncate">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-display text-[15px] font-semibold leading-snug text-foreground truncate">{tituloBonito(s.name)}</div>
+                    <div className="mt-0.5 text-xs text-muted-foreground truncate">
                       {s.role === "host" ? t("cowork.page.roleHost") : s.role === "participant" ? t("cowork.page.roleParticipant") : t("cowork.page.notJoined")}
                       {s.hostName && s.createdBy !== userId ? ` · ${t("cowork.page.byHost", { name: s.hostName })}` : ""}
                       {" · "}{s.members === 1 ? t("cowork.page.membersOne") : t("cowork.page.membersMany", { n: s.members })}
-                      {s.online != null && (
-                        <span className={s.online > 0 ? "text-success font-medium" : ""}>
-                          {" "}· {t("cowork.common.online", { n: s.online })}
-                        </span>
-                      )}
-                      {s.incognito.length > 0 && (
-                        <span className="text-violet-500" title={t("cowork.page.adminsOnly")}>
-                          {" "}· 🕶 {s.incognito.join(", ")}
-                        </span>
-                      )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-3 shrink-0 w-full justify-end sm:w-auto">
-                    {/* Finalizar apaga la sesión para TODOS: solo quien la creó (o un
-                        admin). Los demás hosts tienen Salir, que se los lleva solo a
-                        ellos. Antes cualquier host veía Finalizar, y CHATTERS KASH se
-                        finalizó cuatro veces en cuatro días por hosts que querían irse. */}
-                    {(s.createdBy === userId || isAdmin) && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-destructive hover:text-destructive rounded-full"
-                        onClick={() => setPorFinalizar({ id: s.id, name: s.name, members: s.members })}
-                      >
-                        {t("cowork.page.end")}
-                      </Button>
-                    )}
-                    {s.role === "host" && s.createdBy !== userId && !isAdmin && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-muted-foreground hover:text-foreground rounded-full gap-1"
-                        title={t("cowork.page.leaveHint")}
-                        onClick={() => setPorSalir({ id: s.id, name: s.name })}
-                      >
-                        <LogOut className="h-4 w-4" /> {t("cowork.page.leave")}
-                      </Button>
-                    )}
-                    {/* Incógnito (solo admin): observar sin unirse ni aparecer. */}
-                    {isAdmin && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="rounded-full gap-1 shrink-0 text-violet-500 hover:text-violet-600"
-                        title={t("cowork.page.incognitoHint")}
-                        onClick={() => setSearchParams({ session: s.id, spy: "1" })}
-                      >
-                        <VenetianMask className="h-4 w-4" /> {t("cowork.page.incognito")}
-                      </Button>
-                    )}
-                    {s.role ? (
-                      <Button
-                        size="sm"
-                        className="rounded-full gap-1 shrink-0"
-                        onClick={() => setSearchParams(
-                          // Sin el `room` el participante vuelve SIN asignación y queda
-                          // esperando una asignación que ya nadie puede hacer.
-                          s.lastRoomId && s.role !== "host"
-                            ? { session: s.id, room: s.lastRoomId }
-                            : { session: s.id }
+                  {hayMenu && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        {/* stopPropagation también en TECLADO: el menú vive dentro
+                            de la tarjeta-botón y, sin esto, Enter sobre el ⋯ (o
+                            dentro del menú, que es un portal de React y burbujea
+                            por el árbol de componentes) también "entraría" a la
+                            sesión. */}
+                        <Button variant="ghost" size="icon" className="-mr-1.5 -mt-1 h-7 w-7 shrink-0 rounded-lg text-muted-foreground/70 hover:text-foreground" title={t("cowork.page.sessionMenu")} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-48" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+                        {isAdmin && (
+                          <DropdownMenuItem onClick={() => setSearchParams({ session: s.id, spy: "1" })}>
+                            <VenetianMask className="mr-2 h-4 w-4" /> {t("cowork.page.incognito")}
+                          </DropdownMenuItem>
                         )}
-                      >
-                        {t("common.back")} <ArrowRight className="h-4 w-4" />
-                      </Button>
-                    ) : (
-                      /* No es miembro pero la ve: admin, o alcance de Cowork sobre
-                         esta sesión. El edge deja entrar como host sin código en
-                         ambos casos (cowork_puede_supervisar); si por lo que sea no
-                         corresponde, responde 403 y se muestra el error. */
-                      <Button
-                        size="sm"
-                        className="rounded-full gap-1 shrink-0"
-                        disabled={enteringId === s.id}
-                        onClick={() => s.admin && handleAdminEnter(s.admin)}
-                      >
-                        {enteringId === s.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <>{t("cowork.common.enter")} <ArrowRight className="h-4 w-4" /></>}
-                      </Button>
-                    )}
-                  </div>
+                        {puedeSalir && (
+                          <DropdownMenuItem onClick={() => setPorSalir({ id: s.id, name: s.name })}>
+                            <LogOut className="mr-2 h-4 w-4" /> {t("cowork.page.leave")}
+                          </DropdownMenuItem>
+                        )}
+                        {puedeFinalizar && (
+                          <>
+                            {(isAdmin || puedeSalir) && <DropdownMenuSeparator />}
+                            <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setPorFinalizar({ id: s.id, name: s.name, members: s.members })}>
+                              <Power className="mr-2 h-4 w-4" /> {t("cowork.page.end")}
+                            </DropdownMenuItem>
+                          </>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
                 </div>
-                {/* pl-[52px] = ancho del avatar (40) + gap (12): alinea los chips
-                    con el nombre. */}
-                {s.rooms.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 pl-[52px]">
-                    {s.rooms.map((r) => (
-                      <span
-                        key={r.id}
-                        className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-0.5 text-[11px] text-muted-foreground"
-                      >
-                        <span className={
-                          r.online != null && r.online > 0
-                            ? "h-1.5 w-1.5 rounded-full bg-success"
-                            : "h-1.5 w-1.5 rounded-full bg-muted-foreground/30"
-                        } />
-                        {r.name}
-                        <span className="font-semibold text-foreground/80">{r.online ?? "–"}</span>
-                      </span>
-                    ))}
+
+                {/* El pulso de la sesión con la GENTE al frente (Alvaro eligió
+                    la 8): se ve de un vistazo QUIÉN está, no solo cuántos. Las
+                    caras salen de las salas activas; si LiveKit contó cabezas
+                    pero no hay nombres (sin asignación), queda el conteo solo.
+                    online null (LiveKit calló) NO dice "nadie conectado" — solo
+                    cuántas salas hay. Fallo no es vacío. */}
+                {hayGente ? (
+                  <div className="flex flex-col gap-2">
+                    {genteEnVivo.length > 0 && (
+                      <div className="flex items-center">
+                        {genteEnVivo.slice(0, 5).map((nombre, i) => (
+                          <div key={`${s.id}-cara-${i}`} className={i === 0 ? "" : "-ml-1.5"}>
+                            <UserAvatar name={tituloBonito(nombre)} size="xs" className="ring-2 ring-card" />
+                          </div>
+                        ))}
+                        {genteEnVivo.length > 5 && (
+                          <div className="z-10 -ml-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-muted text-[9px] font-semibold text-muted-foreground ring-2 ring-card">
+                            +{genteEnVivo.length - 5}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    <span className="inline-flex items-center gap-1.5 text-xs font-medium text-success">
+                      <span className="h-1.5 w-1.5 rounded-full bg-success" />
+                      <span className="tabular-nums">{t("cowork.common.online", { n })}</span>
+                      {activas.length > 0 && (
+                        <span className="font-normal text-muted-foreground">
+                          · {activas.length === 1 ? t("cowork.page.oneRoom") : t("cowork.page.roomsCount", { n: activas.length })}
+                        </span>
+                      )}
+                    </span>
                   </div>
+                ) : s.rooms.length > 0 ? (
+                  s.online == null ? (
+                    <p className="text-xs text-muted-foreground">{s.rooms.length === 1 ? t("cowork.page.oneRoom") : t("cowork.page.roomsCount", { n: s.rooms.length })}</p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">{s.rooms.length === 1 ? t("cowork.page.oneRoomIdle") : t("cowork.page.roomsIdle", { n: s.rooms.length })}</p>
+                  )
+                ) : null}
+                {s.incognito.length > 0 && (
+                  <p className="truncate text-[11px] text-primary" title={t("cowork.page.adminsOnly")}>🕶 {s.incognito.join(", ")}</p>
                 )}
+
+                {/* Pie quieto: nada de botón gigante. El pulso ya vive arriba
+                    con las caras; acá solo la acción, como enlace fino que se
+                    desliza un pelo al pasar — la tarjeta entera ya es el botón
+                    (Alvaro: el botón gigante de Volver no se veía profesional). */}
+                <div className="mt-auto flex items-center justify-end border-t border-border/40 pt-2.5">
+                  <span className="inline-flex items-center gap-1 text-[13px] font-medium text-primary transition-transform duration-150 group-hover:translate-x-0.5 motion-reduce:transform-none">
+                    {enteringId === s.id
+                      ? <Loader2 className="h-4 w-4 animate-spin" />
+                      : <>{s.role ? t("common.back") : t("cowork.common.enter")} <ArrowRight className="h-3.5 w-3.5" /></>}
+                  </span>
+                </div>
               </div>
-            ))}
+              );
+            })}
             </div>
           </div>
         )}
