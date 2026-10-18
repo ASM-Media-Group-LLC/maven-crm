@@ -349,142 +349,138 @@ export default function CoworkPage() {
             <h2 className="text-xs font-semibold text-muted-foreground px-1">
               {t("cowork.page.activeSessions")}{veTodasLasSesiones ? ` · ${filasActivas.length}` : ""}
             </h2>
-            <div className="flex flex-col gap-2">
-            {filasActivas.map((s) => (
+            {/* TARJETAS EN GRILLA (Alvaro, 10/2026: "tiene que ser tarjetas,
+                cuadritos — como una plataforma sólida"): cada sesión es un
+                cuadro compacto y parejo. UNA acción principal (Entrar/Volver),
+                el resto en ⋯ (Finalizar es destructivo y ya se disparó sin
+                querer: CHATTERS KASH, 4 veces en 4 días). Lo vivo se resume en
+                una línea —salas activas y quiénes—; el detalle sala por sala
+                vive en el Centro de operaciones. */}
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {filasActivas.map((s) => {
+              const activas = s.rooms.filter((r) => (r.online ?? 0) > 0);
+              const genteEnVivo = activas.flatMap((r) => r.gente ?? []);
+              const puedeFinalizar = s.createdBy === userId || isAdmin;
+              const puedeSalir = s.role === "host" && s.createdBy !== userId && !isAdmin;
+              const hayMenu = puedeFinalizar || puedeSalir || isAdmin;
+              return (
               <div
                 key={s.id}
-                className="flex flex-col gap-2.5 bg-card border border-border rounded-2xl px-4 py-3.5 md:px-5"
+                className="flex h-full flex-col gap-3 rounded-2xl border border-border bg-card p-4 transition-colors hover:border-primary/30"
               >
-                <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-start gap-3">
                   <div className="flex items-center justify-center h-10 w-10 rounded-full bg-gradient-to-br from-primary/15 to-accent/15 shrink-0">
                     <Users2 className="h-5 w-5 text-primary" />
                   </div>
-                  <div className="flex-1 min-w-0">
+                  <div className="min-w-0 flex-1">
                     <div className="font-display font-semibold text-foreground truncate">{tituloBonito(s.name)}</div>
                     <div className="text-xs text-muted-foreground truncate">
                       {s.role === "host" ? t("cowork.page.roleHost") : s.role === "participant" ? t("cowork.page.roleParticipant") : t("cowork.page.notJoined")}
                       {s.hostName && s.createdBy !== userId ? ` · ${t("cowork.page.byHost", { name: s.hostName })}` : ""}
                       {" · "}{s.members === 1 ? t("cowork.page.membersOne") : t("cowork.page.membersMany", { n: s.members })}
-                      {s.online != null && (
-                        <span className={s.online > 0 ? "text-success font-medium" : ""}>
-                          {" "}· {t("cowork.common.online", { n: s.online })}
-                        </span>
-                      )}
-                      {s.incognito.length > 0 && (
-                        <span className="text-primary" title={t("cowork.page.adminsOnly")}>
-                          {" "}· 🕶 {s.incognito.join(", ")}
-                        </span>
-                      )}
                     </div>
                   </div>
-                  {/* Acciones (rediseño 10/2026, Alvaro: "se veían ordinarias y
-                      amontonadas"): una sola acción PRINCIPAL destacada
-                      (Entrar/Volver), y el resto —Incógnito, Salir, Finalizar—
-                      recogidas en un menú ⋯ discreto. De paso Finalizar deja de
-                      estar a un toque suelto: es destructivo y ya se disparó sin
-                      querer (CHATTERS KASH, 4 veces en 4 días). */}
-                  {(() => {
-                    const puedeFinalizar = s.createdBy === userId || isAdmin;
-                    const puedeSalir = s.role === "host" && s.createdBy !== userId && !isAdmin;
-                    const hayMenu = puedeFinalizar || puedeSalir || isAdmin;
-                    return (
-                      <div className="flex items-center gap-2 shrink-0 w-full justify-end sm:w-auto">
-                        {s.role ? (
-                          <Button
-                            size="sm"
-                            className="rounded-full gap-1.5 shrink-0 shadow-sm shadow-primary/20"
-                            onClick={() => setSearchParams(
-                              // Sin el `room` el participante vuelve SIN asignación y queda
-                              // esperando una asignación que ya nadie puede hacer.
-                              s.lastRoomId && s.role !== "host"
-                                ? { session: s.id, room: s.lastRoomId }
-                                : { session: s.id }
-                            )}
-                          >
-                            {t("common.back")} <ArrowRight className="h-4 w-4" />
-                          </Button>
-                        ) : (
-                          /* No es miembro pero la ve: admin, o alcance de Cowork sobre
-                             esta sesión. El edge deja entrar como host sin código en
-                             ambos casos (cowork_puede_supervisar); si por lo que sea no
-                             corresponde, responde 403 y se muestra el error. */
-                          <Button
-                            size="sm"
-                            className="rounded-full gap-1.5 shrink-0 shadow-sm shadow-primary/20"
-                            disabled={enteringId === s.id}
-                            onClick={() => s.admin && handleAdminEnter(s.admin)}
-                          >
-                            {enteringId === s.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <>{t("cowork.common.enter")} <ArrowRight className="h-4 w-4" /></>}
-                          </Button>
-                        )}
-                        {hayMenu && (
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0 rounded-full text-muted-foreground hover:text-foreground" title={t("cowork.page.sessionMenu")}>
-                                <MoreHorizontal className="h-[18px] w-[18px]" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48">
-                              {isAdmin && (
-                                <DropdownMenuItem onClick={() => setSearchParams({ session: s.id, spy: "1" })}>
-                                  <VenetianMask className="mr-2 h-4 w-4" /> {t("cowork.page.incognito")}
-                                </DropdownMenuItem>
-                              )}
-                              {puedeSalir && (
-                                <DropdownMenuItem onClick={() => setPorSalir({ id: s.id, name: s.name })}>
-                                  <LogOut className="mr-2 h-4 w-4" /> {t("cowork.page.leave")}
-                                </DropdownMenuItem>
-                              )}
-                              {puedeFinalizar && (
-                                <>
-                                  {(isAdmin || puedeSalir) && <DropdownMenuSeparator />}
-                                  <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setPorFinalizar({ id: s.id, name: s.name, members: s.members })}>
-                                    <Power className="mr-2 h-4 w-4" /> {t("cowork.page.end")}
-                                  </DropdownMenuItem>
-                                </>
-                              )}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        )}
-                      </div>
-                    );
-                  })()}
+                  {s.online != null && s.online > 0 && (
+                    <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-success/10 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-success" title={t("cowork.common.online", { n: s.online })}>
+                      <span className="h-1.5 w-1.5 rounded-full bg-success" />{s.online}
+                    </span>
+                  )}
                 </div>
-                {/* QUIÉN ESTÁ EN DÓNDE, sin entrar (Alvaro, 10/2026): cada sala
-                    es un mini-panel con su gente asignada (nombres, de la DB) y
-                    el punto/conteo en vivo de LiveKit. Antes eran chips con
-                    puro número y tocaba entrar para saber quién era. */}
+
+                {/* El pulso de la sesión, compacto. OJO con null: si LiveKit no
+                    contestó (online null) NO se dice "nadie conectado" — solo
+                    cuántas salas hay. Fallo no es vacío. */}
                 {s.rooms.length > 0 && (
-                  <div className="grid gap-1.5 sm:grid-cols-2 xl:grid-cols-3">
-                    {s.rooms.map((r) => {
-                      const gente = r.gente ?? [];
-                      const visibles = gente.slice(0, 4);
-                      return (
-                        <div key={r.id} className="min-w-0 rounded-xl border border-border/60 bg-muted/30 px-2.5 py-1.5">
-                          <div className="flex items-center gap-1.5 text-xs">
-                            <span className={
-                              r.online != null && r.online > 0
-                                ? "h-1.5 w-1.5 shrink-0 rounded-full bg-success"
-                                : "h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground/30"
-                            } />
-                            <span className="truncate font-medium text-foreground/90">{tituloBonito(r.name)}</span>
-                            <span className={`ml-auto shrink-0 tabular-nums text-[11px] font-semibold ${r.online != null && r.online > 0 ? "text-success" : "text-muted-foreground"}`}>
-                              {r.online ?? "–"}
-                            </span>
-                          </div>
-                          {gente.length > 0 && (
-                            <p className="mt-0.5 truncate text-[11px] leading-snug text-muted-foreground">
-                              {visibles.join(" · ")}
-                              {gente.length > visibles.length ? ` · +${gente.length - visibles.length}` : ""}
-                            </p>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
+                  activas.length > 0 ? (
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {activas.slice(0, 3).map((r) => (
+                          <span key={r.id} className="inline-flex items-center gap-1.5 rounded-full bg-success/10 px-2 py-0.5 text-[11px] font-medium text-success">
+                            <span className="h-1.5 w-1.5 rounded-full bg-success" />
+                            {tituloBonito(r.name)} · <span className="tabular-nums font-semibold">{r.online}</span>
+                          </span>
+                        ))}
+                        {activas.length > 3 && <span className="text-[11px] text-muted-foreground">+{activas.length - 3}</span>}
+                      </div>
+                      {genteEnVivo.length > 0 && (
+                        <p className="truncate text-[11px] text-muted-foreground">
+                          {genteEnVivo.slice(0, 4).join(" · ")}
+                          {genteEnVivo.length > 4 ? ` · +${genteEnVivo.length - 4}` : ""}
+                        </p>
+                      )}
+                    </div>
+                  ) : s.online == null ? (
+                    <p className="text-xs text-muted-foreground">{s.rooms.length === 1 ? t("cowork.page.oneRoom") : t("cowork.page.roomsCount", { n: s.rooms.length })}</p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">{s.rooms.length === 1 ? t("cowork.page.oneRoomIdle") : t("cowork.page.roomsIdle", { n: s.rooms.length })}</p>
+                  )
                 )}
+                {s.incognito.length > 0 && (
+                  <p className="truncate text-[11px] text-primary" title={t("cowork.page.adminsOnly")}>🕶 {s.incognito.join(", ")}</p>
+                )}
+
+                <div className="mt-auto flex items-center gap-2 pt-1">
+                  {s.role ? (
+                    <Button
+                      size="sm"
+                      className="flex-1 rounded-full gap-1.5 shadow-sm shadow-primary/20"
+                      onClick={() => setSearchParams(
+                        // Sin el `room` el participante vuelve SIN asignación y queda
+                        // esperando una asignación que ya nadie puede hacer.
+                        s.lastRoomId && s.role !== "host"
+                          ? { session: s.id, room: s.lastRoomId }
+                          : { session: s.id }
+                      )}
+                    >
+                      {t("common.back")} <ArrowRight className="h-4 w-4" />
+                    </Button>
+                  ) : (
+                    /* No es miembro pero la ve: admin, o alcance de Cowork sobre
+                       esta sesión. El edge deja entrar como host sin código en
+                       ambos casos (cowork_puede_supervisar); si por lo que sea no
+                       corresponde, responde 403 y se muestra el error. */
+                    <Button
+                      size="sm"
+                      className="flex-1 rounded-full gap-1.5 shadow-sm shadow-primary/20"
+                      disabled={enteringId === s.id}
+                      onClick={() => s.admin && handleAdminEnter(s.admin)}
+                    >
+                      {enteringId === s.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <>{t("cowork.common.enter")} <ArrowRight className="h-4 w-4" /></>}
+                    </Button>
+                  )}
+                  {hayMenu && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0 rounded-full text-muted-foreground hover:text-foreground" title={t("cowork.page.sessionMenu")}>
+                          <MoreHorizontal className="h-[18px] w-[18px]" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-48">
+                        {isAdmin && (
+                          <DropdownMenuItem onClick={() => setSearchParams({ session: s.id, spy: "1" })}>
+                            <VenetianMask className="mr-2 h-4 w-4" /> {t("cowork.page.incognito")}
+                          </DropdownMenuItem>
+                        )}
+                        {puedeSalir && (
+                          <DropdownMenuItem onClick={() => setPorSalir({ id: s.id, name: s.name })}>
+                            <LogOut className="mr-2 h-4 w-4" /> {t("cowork.page.leave")}
+                          </DropdownMenuItem>
+                        )}
+                        {puedeFinalizar && (
+                          <>
+                            {(isAdmin || puedeSalir) && <DropdownMenuSeparator />}
+                            <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setPorFinalizar({ id: s.id, name: s.name, members: s.members })}>
+                              <Power className="mr-2 h-4 w-4" /> {t("cowork.page.end")}
+                            </DropdownMenuItem>
+                          </>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                </div>
               </div>
-            ))}
+              );
+            })}
             </div>
           </div>
         )}

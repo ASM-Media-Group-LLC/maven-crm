@@ -102,7 +102,11 @@ describe("Cowork · la entrada en inglés", () => {
     expect(screen.getByText("Active sessions · 2")).toBeTruthy();
     expect(screen.getByText(/^Not joined/)).toBeTruthy();
     expect(screen.getByText("someone (not recorded: before Sep 3)")).toBeTruthy();
-    expect(screen.getByText("2 online", { exact: false })).toBeTruthy();
+    // Con las tarjetas (rediseño 10/2026) el conteo en vivo es una insignia con
+    // el número; el texto completo va en el title. Y la sala activa sale como
+    // chip con su conteo.
+    expect(screen.getByTitle("2 online")).toBeTruthy();
+    expect(screen.getByText("Room 1 ·", { exact: false })).toBeTruthy();
   });
 
   it("el diálogo de finalizar y el de crear sesión están en inglés", async () => {

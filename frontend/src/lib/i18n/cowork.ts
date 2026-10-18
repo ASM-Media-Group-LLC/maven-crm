@@ -59,6 +59,10 @@ export const cowork = {
   "cowork.page.leaveHint": { es: "Salir de esta sesión (sigue para los demás)", en: "Leave this session (it continues for everyone else)" },
   "cowork.page.incognito": { es: "Incógnito", en: "Incognito" },
   "cowork.page.sessionMenu": { es: "Más opciones", en: "More options" },
+  "cowork.page.roomsIdle": { es: "{n} salas listas · nadie conectado", en: "{n} rooms ready · nobody connected" },
+  "cowork.page.oneRoomIdle": { es: "1 sala lista · nadie conectado", en: "1 room ready · nobody connected" },
+  "cowork.page.roomsCount": { es: "{n} salas", en: "{n} rooms" },
+  "cowork.page.oneRoom": { es: "1 sala", en: "1 room" },
   "cowork.page.incognitoHint": {
     es: "Entrar de incógnito: ver y escuchar sin que nadie te vea",
     en: "Enter incognito: watch and listen without anyone seeing you",
