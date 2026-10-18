@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, type CSSProperties } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useCoworkSession, type AdminSessionRow, type SesionFinalizada, type CoworkSessionRow } from "@/hooks/useCoworkSession";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -366,19 +366,6 @@ export default function CoworkPage() {
               // NO enciende nada: fallo no es vacío.
               const n = s.online ?? 0;
               const hayGente = n > 0;
-              // Borde vivo (Alvaro eligió la 9): con gente adentro, el borde
-              // entero se enciende con un degradé finísimo acero→verde. El
-              // relleno de la tarjeta va por dentro (padding-box) y el degradé
-              // solo en el borde (border-box). Todo en tokens → se ve igual en
-              // claro y en oscuro.
-              const bordeVivo: CSSProperties | undefined = hayGente
-                ? {
-                    borderColor: "transparent",
-                    background:
-                      "linear-gradient(hsl(var(--card)), hsl(var(--card))) padding-box, " +
-                      "linear-gradient(135deg, hsl(var(--accent) / 0.85), hsl(var(--primary) / 0.45) 55%, hsl(var(--success) / 0.8)) border-box",
-                  }
-                : undefined;
               const puedeFinalizar = s.createdBy === userId || isAdmin;
               const puedeSalir = s.role === "host" && s.createdBy !== userId && !isAdmin;
               const hayMenu = puedeFinalizar || puedeSalir || isAdmin;
@@ -410,10 +397,12 @@ export default function CoworkPage() {
                 tabIndex={0}
                 onClick={entrarALaSesion}
                 onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); entrarALaSesion(); } }}
-                style={bordeVivo}
                 className={cn(
-                  "group flex h-full cursor-pointer flex-col gap-2.5 rounded-2xl border p-4 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
-                  hayGente ? "border-transparent" : "border-border bg-card hover:border-primary/40",
+                  // El relleno, el borde vivo, el resplandor interior, la sombra
+                  // honda y el alzado al pasar el mouse viven en .tarjeta-sesion
+                  // (index.css). Aquí solo el layout.
+                  "tarjeta-sesion group flex h-full cursor-pointer flex-col gap-3 p-5 text-left outline-none",
+                  hayGente && "tarjeta-sesion--viva",
                 )}
               >
                 <div className="flex items-start justify-between gap-2">
