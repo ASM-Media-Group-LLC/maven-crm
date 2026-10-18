@@ -6,16 +6,13 @@ name: Guard Edge Functions
 # incluidos los arreglos urgentes— hasta que alguien arreglara el test.
 # Solo lee el código: no despliega nada ni necesita secretos.
 
+# Corre en TODOS los PR (sin filtro de rutas). Antes el filtro hacía que un PR
+# que solo tocaba pantalla creara este run y lo CANCELARA, y como es un chequeo
+# obligatorio había que relanzarlo a mano cada vez. Ahora el job siempre reporta:
+# si el PR no toca el backend, pasa en segundos sin correr los tests; si lo toca,
+# corre la guarda completa. Así nunca más se cancela ni hay que relanzar nada.
 on:
   pull_request:
-    paths:
-      - "supabase/functions/**"
-      - "supabase/config.toml"
-      - "supabase/migrations/**"
-      - "supabase/tests/**"
-      - "infra/nas-drive/**"
-      - ".github/workflows/deploy-edge-functions.yml"
-      - ".github/workflows/guard-edge-functions.yml"
 
 permissions:
   contents: read
@@ -27,19 +24,43 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Historia completa: hace falta para comparar con la base del PR y
+          # saber si de verdad cambió algo del backend.
+          fetch-depth: 0
+
+      # ¿El PR toca el backend (edge functions, migraciones, tests, NAS) o solo
+      # pantalla? Si es solo pantalla, el resto de los pasos se saltan y el
+      # chequeo pasa en segundos — sin cancelarse ni pedir relanzar.
+      - name: ¿Cambió el backend?
+        id: cambios
+        run: |
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          ARCHIVOS=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")
+          echo "Archivos del PR:"; echo "$ARCHIVOS"
+          if echo "$ARCHIVOS" | grep -qE '^(supabase/functions/|supabase/config\.toml$|supabase/migrations/|supabase/tests/|infra/nas-drive/|\.github/workflows/(deploy|guard)-edge-functions\.yml$)'; then
+            echo "Hay cambios de backend → corre la guarda completa."
+            echo "correr=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Solo cambios de pantalla → la guarda pasa sin correr los tests del backend."
+            echo "correr=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Setup Deno
+        if: steps.cambios.outputs.correr == 'true'
         uses: denoland/setup-deno@v2
         with:
           deno-version: 2.9.5
 
       - name: Guard — aislamiento entre agencias
+        if: steps.cambios.outputs.correr == 'true'
         run: deno test --allow-read --no-check supabase/functions/public-api/ supabase/functions/manage-api-keys/ supabase/functions/messenger-webhooks/
 
       # La salida de los webhooks: que un timbre no pueda pegarle a Maven ni a una
       # red interna, que no lleve contenido de mensajes, la firma con el vector
       # oficial de Standard Webhooks. Con tipos (sin --no-check): el archivo los pasa.
       - name: Guard — salida de los webhooks
+        if: steps.cambios.outputs.correr == 'true'
         run: deno test --allow-read supabase/functions/_shared/webhook-salida.test.ts
 
       # Mover un correo tiene que decir ADÓNDE fue a parar (COPYUID), para que
@@ -48,6 +69,7 @@ jobs:
       # usa «Deshacer» (mail-fetch/destino.ts): solo pares de lo pedido, nunca
       # dos correos atados al mismo uid de destino.
       - name: Guard — mover correos (IMAP)
+        if: steps.cambios.outputs.correr == 'true'
         run: deno test --no-check supabase/functions/_shared/imap-mover.test.ts supabase/functions/mail-fetch/destino.test.ts
 
       # Los adjuntos que se mandan Y los de un borrador pasan por la misma
@@ -56,27 +78,32 @@ jobs:
       # Y los dos se siembran en la caché igual (sembrar.ts), con sus adjuntos y
       # el Content-ID de las imágenes pegadas.
       - name: Guard — adjuntos del correo y del borrador
+        if: steps.cambios.outputs.correr == 'true'
         run: deno test --no-check supabase/functions/mail-fetch/adjuntos.test.ts supabase/functions/mail-fetch/sembrar.test.ts
 
       # «Programar envío» (Keila, 08/10): la hora que se acepta, la fila que se
       # guarda, y que el cron arma EXACTAMENTE el correo que se programó. El envío
       # es el mismo del botón Enviar (mail-fetch/enviar.ts).
       - name: Guard — correos programados
+        if: steps.cambios.outputs.correr == 'true'
         run: deno test --no-check supabase/functions/mail-fetch/programados.test.ts
 
       # Reacciones con emoji, como Gmail (Keila, 08/10): un solo emoji, a quién va
       # (responder a todos, sin uno mismo), nunca con copia oculta ni a más de 20.
       # El formato (la parte de Gmail entre el texto y el HTML) lo prueba smtp.test.ts.
       - name: Guard — reacciones del correo
+        if: steps.cambios.outputs.correr == 'true'
         run: deno test --no-check supabase/functions/mail-fetch/reacciones.test.ts supabase/functions/_shared/smtp.test.ts
 
       - name: Tipos — mail-fetch
+        if: steps.cambios.outputs.correr == 'true'
         run: deno check supabase/functions/mail-fetch/index.ts supabase/functions/mail-fetch/programados.test.ts supabase/functions/mail-fetch/reacciones.test.ts
 
       # La tabla de los programados: cada persona ve los suyos y solo la lista (el
       # correo entero no viaja a la pantalla), el cron toma lo vencido sin tomarlo
       # dos veces, un colgado NO se reintenta, cancelar devuelve el correo. ~3 s.
       - name: Banco — correos programados (PGlite)
+        if: steps.cambios.outputs.correr == 'true'
         run: deno run -A --node-modules-dir=none --no-lock supabase/tests/correo_programados.ts
 
       # Los mensajes programados del Messenger (como Google Chat): solo quien está en la
@@ -84,23 +111,27 @@ jobs:
       # el cron los inserta a nombre de la persona, en orden y con los avisos de
       # siempre; si dejó el grupo antes de la hora, NO salen y se le avisa. ~10 s.
       - name: Banco — mensajes programados del Messenger (PGlite)
+        if: steps.cambios.outputs.correr == 'true'
         run: deno run -A --node-modules-dir=none --no-lock supabase/tests/chat_programados.ts
 
       # Drive: Maven y el NAS tienen que firmar IGUAL (vector compartido con
       # infra/nas-drive), y las reglas de subida (tope, partes, nombres).
       - name: Guard — Drive (firma y subidas)
+        if: steps.cambios.outputs.correr == 'true'
         run: deno test --no-check supabase/functions/_shared/drive-firma.test.ts supabase/functions/drive/logica.test.ts
 
       # Un archivo del Drive en ONLYOFFICE (oficina-doc): la vista es solo
       # lectura, la llave de caché es estable, la copia editable sale en
       # docx/xlsx/pptx, y la firma HS256 es la estándar (vector de jwt.io).
       - name: Guard — Drive en la Oficina (visor y copia editable)
+        if: steps.cambios.outputs.correr == 'true'
         run: deno test --no-check supabase/functions/oficina-doc/drive.test.ts supabase/functions/oficina-doc/jwt.test.ts
 
       # El lado del NAS (infra/nas-drive, Node): el servidor, el índice diario
       # (paginado: arma el árbol en la mini) y el importador del archivo de Google
       # (enlaces duros en el mismo disco, ids estables, nombres del Mac a NFC).
       - name: Guard — Drive del NAS (servidor, índice e importador)
+        if: steps.cambios.outputs.correr == 'true'
         run: node --test infra/nas-drive/test.mjs infra/nas-drive/indice.test.mjs infra/nas-drive/importar.test.mjs infra/nas-drive/tipos.test.mjs
 
       # La IA por OpenRouter (desde el 01/10/2026 no hay llave de Anthropic): el bucle de
@@ -110,6 +141,7 @@ jobs:
       # Y «Traducir» del Correo (mail-fetch): el HTML a texto con sus saltos de línea, el
       # tope, que un error no devuelva la llave y que la acción lea solo filas de quien llama.
       - name: Guard — IA por OpenRouter
+        if: steps.cambios.outputs.correr == 'true'
         run: deno test --no-check -A supabase/functions/ai-orchestrator/openrouter.test.ts supabase/functions/qa-analyze/openrouter.test.ts supabase/functions/parrilla-generate/ia.test.ts supabase/functions/mail-fetch/traducir.test.ts
 
       # Cowork por agencia: todo id que nombra un pedido a cowork-session (sesión, salas,
@@ -117,6 +149,7 @@ jobs:
       # después de la migración 20261001213000. También lee index.ts: la guarda corre una
       # vez antes de toda acción y toda acción con requestId está clasificada. Con tipos.
       - name: Guard — Cowork por agencia (cowork-session)
+        if: steps.cambios.outputs.correr == 'true'
         run: deno test --allow-read supabase/functions/cowork-session/agencia.test.ts
 
       # Meet, llamadas, grabaciones y LiveKit por agencia (entrega 3c): la guarda
@@ -126,10 +159,12 @@ jobs:
       # la corren antes de actuar, y stop ya no deja elegir destinatarios a cualquiera.
       # Con tipos.
       - name: Guard — Meet y LiveKit por agencia (livekit-agencia)
+        if: steps.cambios.outputs.correr == 'true'
         run: deno test --allow-read supabase/functions/_shared/livekit-agencia.test.ts
 
       # Las cinco edges de llamadas, con tipos (antes ninguna corría deno check).
       - name: Tipos — edges de llamadas (LiveKit, Meet, grabaciones)
+        if: steps.cambios.outputs.correr == 'true'
         run: >-
           deno check
           supabase/functions/livekit-token/index.ts
@@ -145,6 +180,7 @@ jobs:
       # importarse; nombre-emisor.test.ts sí lo LEE, para que la función probada sea
       # la que de verdad arma el push.
       - name: Guard — web-push
+        if: steps.cambios.outputs.correr == 'true'
         run: deno test --allow-read supabase/functions/web-push/ supabase/functions/_shared/push-notify.test.ts
 
       # El buzón de Zoho de una cuenta dada de baja se borra al PURGARLA (a los 30
@@ -153,9 +189,11 @@ jobs:
       # Zoho, que la purga encole el buzón antes de app_purge_user_refs, y la
       # paginación de listAccounts. Con tipos las tres edges que lo usan.
       - name: Guard — buzones de Zoho al purgar
+        if: steps.cambios.outputs.correr == 'true'
         run: deno test --allow-read --allow-env --no-check supabase/functions/_shared/buzon-por-borrar.test.ts supabase/functions/_shared/zoho.test.ts
 
       - name: Tipos — bajas de cuentas y buzones de Zoho
+        if: steps.cambios.outputs.correr == 'true'
         run: >-
           deno check
           supabase/functions/admin-user-actions/index.ts
@@ -169,11 +207,13 @@ jobs:
       # vencido, nada lo llama anon/authenticated, y la vuelta atrás deja la purga
       # con la huella exacta de prod.
       - name: Banco — buzones de Zoho al purgar (PGlite)
+        if: steps.cambios.outputs.correr == 'true'
         run: deno run -A --node-modules-dir=none --no-lock supabase/tests/buzones_por_borrar.ts
 
       # Las acciones de webhooks de manage-api-keys: el guard de arriba las corre sin
       # tipos; aquí el tipo de cada mensaje (clave que existe, variables) y de Datos.
       - name: Tipos — manage-api-keys
+        if: steps.cambios.outputs.correr == 'true'
         run: >-
           deno check
           supabase/functions/manage-api-keys/index.ts
@@ -184,6 +224,7 @@ jobs:
       # El despachador de timbres, con tipos (las acciones y clases de los logs son
       # uniones cerradas; y lineaDeLog además limpia en tiempo de ejecución).
       - name: Tipos — messenger-webhooks
+        if: steps.cambios.outputs.correr == 'true'
         run: >-
           deno check
           supabase/functions/messenger-webhooks/index.ts
@@ -198,12 +239,14 @@ jobs:
       # escriben manage-api-keys y el despachador, con los triggers de verdad. Solo en
       # el PR (baja PGlite de npm); en el deploy no.
       - name: Banco — tablas de los webhooks (PGlite)
+        if: steps.cambios.outputs.correr == 'true'
         run: deno run -A --node-modules-dir=none --no-lock supabase/tests/api_webhooks_tablas.ts
 
       # El Messenger por agencia y sus huecos, sobre el esquema de PROD del 28/09
       # (supabase/tests/fixtures, con sus huellas): cada hueco A–H tiene que abrirse
       # sin la migración y cerrarse con ella, y los flujos de la app seguir andando.
       - name: Banco — el Messenger por agencia y sus huecos (PGlite)
+        if: steps.cambios.outputs.correr == 'true'
         run: deno run -A --node-modules-dir=none --no-lock supabase/tests/chat_agencia_y_huecos.ts
 
       # Los avisos de sistema («Ana agregó a Beto al grupo») los arma la base: sobre
@@ -211,6 +254,7 @@ jobs:
       # y no entrar con ella; los siete eventos de la RPC dan el texto exacto que
       # escribía la app, y avisa exactamente quien puede hacer la acción.
       - name: Banco — los avisos de sistema del Messenger (PGlite)
+        if: steps.cambios.outputs.correr == 'true'
         run: deno run -A --node-modules-dir=none --no-lock supabase/tests/chat_mensajes_de_sistema.ts
 
       # La base de la escritura del Messenger por API (PR 2), sobre los dos fixtures de
@@ -218,6 +262,7 @@ jobs:
       # mvk, el cerco de la sesión fabricada, service_role sin INSERT), los cupos, la
       # idempotencia, el freno, la retirada, la vuelta atrás y 18 mutantes.
       - name: Banco — la escritura del Messenger por API (PGlite)
+        if: steps.cambios.outputs.correr == 'true'
         run: deno run -A --node-modules-dir=none --no-lock supabase/tests/api_messenger_escritura.ts
 
       # La escritura de PUNTA A PUNTA (PR 4): el public-api de verdad (su Deno.serve
@@ -226,24 +271,28 @@ jobs:
       # el token del edge (mvf + mvk) es el que la base reconoce, que las RPC y sus
       # parámetros son los de la migración y que cada código de la base sale bien por HTTP.
       - name: Banco — la escritura de punta a punta, edge + base (PGlite)
+        if: steps.cambios.outputs.correr == 'true'
         run: deno run -A --node-modules-dir=none --no-lock supabase/tests/api_messenger_escritura_edge.ts
 
       # La base de las agencias, sobre el mismo esquema de PROD: una persona en una
       # sola agencia, el alta que ya no cae sola en asm-tech y el super admin. Cada
       # prueba tiene su línea base contra prod de hoy (tiene que poder fallar).
       - name: Banco — la base de las agencias (PGlite)
+        if: steps.cambios.outputs.correr == 'true'
         run: deno run -A --node-modules-dir=none --no-lock supabase/tests/agencias_base.ts
 
       # Los roles por agencia, sobre el catálogo de PROD del 01/10 (fixtures/prod_roles_20261001.sql,
       # con las huellas de las 56 funciones): con una agencia da lo mismo que prod persona por
       # persona; con dos, cada hueco se prueba abierto en prod y cerrado con la migración.
       - name: Banco — los roles por agencia (PGlite)
+        if: steps.cambios.outputs.correr == 'true'
         run: deno run -A --node-modules-dir=none --no-lock supabase/tests/roles_por_agencia.ts
 
       # Las personas por agencia, sobre los fixtures de PROD (Messenger 28/09 y API 01/10):
       # los perfiles, el «Para» del Correo y el karma, cada uno abierto en prod y cerrado
       # con las migraciones; con una agencia, cada persona ve lo mismo que en prod.
       - name: Banco — las personas por agencia (PGlite)
+        if: steps.cambios.outputs.correr == 'true'
         run: deno run -A --node-modules-dir=none --no-lock supabase/tests/personas_por_agencia.ts
 
       # Cowork por agencia, sobre el catálogo de PROD del 01/10 (roles + fixtures/prod_cowork_20261001.sql,
@@ -251,6 +300,7 @@ jobs:
       # en prod (11 funciones, 13 tablas, 8 salas); con dos, cada cosa se prueba abierta en prod y
       # cerrada con la migración.
       - name: Banco — Cowork por agencia (PGlite)
+        if: steps.cambios.outputs.correr == 'true'
         run: deno run -A --node-modules-dir=none --no-lock supabase/tests/cowork_por_agencia.ts
 
       # Meet, llamadas y grabaciones por agencia, sobre el catálogo de PROD del 01/10
@@ -260,6 +310,7 @@ jobs:
       # abierto en prod y cerrado con la migración; la guarda de las edges dice lo
       # mismo que agencia_de_sala_livekit; la vuelta atrás deja todo como en prod.
       - name: Banco — Meet, llamadas y grabaciones por agencia (PGlite)
+        if: steps.cambios.outputs.correr == 'true'
         run: deno run -A --node-modules-dir=none --no-lock supabase/tests/meet_por_agencia.ts
 
       # Drive (03/10): quién mandó cada cosa a la papelera (trigger propio, antes
@@ -268,6 +319,7 @@ jobs:
       # dueño se ve en la papelera de quien tiene la unidad, nadie de afuera mide
       # nada, y la vuelta atrás deja la tabla como estaba.
       - name: Banco — Drive, papelera y tamaños (PGlite)
+        if: steps.cambios.outputs.correr == 'true'
         run: deno run -A --node-modules-dir=none --no-lock supabase/tests/drive_papelera_y_detalles.ts
 
       # Drive (03/10): el buscador rápido (drive_buscar arma primero lo que la
@@ -276,6 +328,7 @@ jobs:
       # dejar ver nada que drive_mi_rol no deje; y la papelera ya no cambia
       # «Última modificación». ~30 s.
       - name: Banco — Drive, buscador y fecha de la papelera (PGlite)
+        if: steps.cambios.outputs.correr == 'true'
         run: deno run -A --node-modules-dir=none --no-lock supabase/tests/drive_buscar_y_fecha.ts
 
       # Creadoras por agencia, cuentas externas y avisos (05/10), sobre el catálogo de
@@ -286,6 +339,7 @@ jobs:
       # vistas, la cuenta de creadora sin rol, los avisos a otra agencia o con enlaces de
       # afuera); la vuelta atrás deja todo como en prod. ~5 s.
       - name: Banco — creadoras por agencia, cuentas externas y avisos (PGlite)
+        if: steps.cambios.outputs.correr == 'true'
         run: deno run -A --node-modules-dir=none --no-lock supabase/tests/creadoras_por_agencia.ts
 
       # Antes del portal de creadoras (05/10): creator-video (quién ve, sube,
@@ -294,9 +348,11 @@ jobs:
       # { plantilla, id }, a cuentas de la misma agencia, con tope y sin devolver
       # correos; el modo servidor igual que siempre). Con tipos.
       - name: Guard — creator-video y send-notification-email
+        if: steps.cambios.outputs.correr == 'true'
         run: deno test --allow-read supabase/functions/creator-video/logica.test.ts supabase/functions/send-notification-email/logica.test.ts
 
       - name: Tipos — creator-video y send-notification-email
+        if: steps.cambios.outputs.correr == 'true'
         run: >-
           deno check
           supabase/functions/creator-video/index.ts
@@ -309,6 +365,7 @@ jobs:
       # agencia, 5 por minuto). Cada hueco abierto sin la migración y cerrado con
       # ella; la vuelta atrás; con una política distinta de la revisada, no corre.
       - name: Banco — videos de creadoras, archivos de Personalizados y correos (PGlite)
+        if: steps.cambios.outputs.correr == 'true'
         run: deno run -A --node-modules-dir=none --no-lock supabase/tests/seguridad_archivos.ts
 
       # Portal de creadoras, fase 1 (06/10): creadora_cuentas (solo cuentas de creadora,
@@ -317,6 +374,7 @@ jobs:
       # solo la suya) y el historial (cada columna anota quién y qué; cada agencia ve el
       # suyo y desde el navegador no se cambia ni se borra: en prod, sí). ~5 s.
       - name: Banco — portal de creadoras, cuentas y ficha (PGlite)
+        if: steps.cambios.outputs.correr == 'true'
         run: deno run -A --node-modules-dir=none --no-lock supabase/tests/portal_creadoras.ts
 
       # portal-creadoras (la agencia da y quita el acceso): solo alguien del equipo que
@@ -324,9 +382,11 @@ jobs:
       # equipo; la misma cuenta en dos agencias; quitar bloquea sin borrar; los correos,
       # escapados y de tú. Con tipos.
       - name: Guard — portal-creadoras
+        if: steps.cambios.outputs.correr == 'true'
         run: deno test --allow-read supabase/functions/portal-creadoras/logica.test.ts
 
       - name: Tipos — portal-creadoras
+        if: steps.cambios.outputs.correr == 'true'
         run: deno check supabase/functions/portal-creadoras/index.ts
 
       # Portal de creadoras, fase 2 (06/10): la carpeta de contenido de cada creadora es
@@ -335,6 +395,7 @@ jobs:
       # de siempre igual para todos (64 casos contra prod), lector sin escritura, el
       # espacio de la agencia y la vuelta atrás. ~10 s.
       - name: Banco — portal de creadoras, su contenido en el Drive (PGlite)
+        if: steps.cambios.outputs.correr == 'true'
         run: deno run -A --node-modules-dir=none --no-lock supabase/tests/portal_contenido.ts
 
       # Portal fase 3, los personalizados (08/10): a ella le llega el pedido apenas se
@@ -343,32 +404,38 @@ jobs:
       # pone y solo un supervisor lo resuelve; avisos al chatter, su manager y los
       # supervisores de SU agencia; el historial la nombra a ella. ~20 s.
       - name: Banco — los personalizados del portal (PGlite)
+        if: steps.cambios.outputs.correr == 'true'
         run: deno run -A --node-modules-dir=none --no-lock supabase/tests/portal_pedidos.ts
 
       # La agencia de cada creadora, por agencia (06/10): Kash se llama Kash y elige entre
       # Kash Plus, Kash Massive y Atomick (con su compañía y su tier); otra agencia no ve
       # ninguna (su nombre fijo); nadie las escribe desde el navegador; vuelta atrás. ~5 s.
       - name: Banco — la agencia de cada creadora (PGlite)
+        if: steps.cambios.outputs.correr == 'true'
         run: deno run -A --node-modules-dir=none --no-lock supabase/tests/agencia_lineas.ts
 
       # El tipo real de los archivos sin extensión (06/10): la mini pide los que faltan y les
       # pone el tipo por la firma; solo si siguen genéricos, sin tocar la fecha (el disparador
       # la respeta), solo tipos de la lista y solo service_role; vuelta atrás. ~5 s.
       - name: Banco — el tipo real de los archivos sin extensión (PGlite)
+        if: steps.cambios.outputs.correr == 'true'
         run: deno run -A --node-modules-dir=none --no-lock supabase/tests/drive_tipos_por_firma.ts
 
       # portal-contenido (ella y su carpeta): solo su ficha y lo de SU carpeta; borrar lo
       # suyo hasta 24 h, primero en el NAS; partes de 8 MB firmadas; el recibo del NAS.
       - name: Guard — portal-contenido
+        if: steps.cambios.outputs.correr == 'true'
         run: deno test --allow-read supabase/functions/portal-contenido/logica.test.ts
 
       - name: Tipos — portal-contenido
+        if: steps.cambios.outputs.correr == 'true'
         run: deno check supabase/functions/portal-contenido/index.ts
 
       # Los accesos de OnlyFans de las creadoras (08/10): la tabla, cerrada al navegador
       # (ni un admin la lee: todo por la edge); la agencia sale de la ficha; la fecha de la
       # contraseña solo se mueve si cambia; los eventos solo se agregan; vuelta atrás. ~5 s.
       - name: Banco — accesos de OnlyFans de las creadoras (PGlite)
+        if: steps.cambios.outputs.correr == 'true'
         run: deno run -A --node-modules-dir=none --no-lock supabase/tests/creadora_accesos.ts
 
       # creadora-accesos: TODO lo del equipo solo para admin (la contraseña, además,
@@ -376,15 +443,18 @@ jobs:
       # credenciales en la vista previa, empareja solo si UNA coincide, la respuesta más
       # nueva gana y no pisa sin pedirlo.
       - name: Guard — creadora-accesos
+        if: steps.cambios.outputs.correr == 'true'
         run: deno test --allow-read supabase/functions/creadora-accesos/logica.test.ts
 
       - name: Tipos — creadora-accesos
+        if: steps.cambios.outputs.correr == 'true'
         run: deno check supabase/functions/creadora-accesos/index.ts supabase/functions/creadora-accesos/logica.test.ts
 
       # ¿Es admin? desde una edge (08/10): rpc("has_role") contesta 300 porque hay dos
       # has_role (text y app_role), y daba «no es admin» a todos. esAdmin lo resuelve
       # sin esa ambigüedad, lanza si la base falla, y ninguna edge vuelve a usar el rpc.
       - name: Guard — esAdmin y nada de rpc("has_role")
+        if: steps.cambios.outputs.correr == 'true'
         run: deno test --no-check --allow-read supabase/functions/_shared/es-admin.test.ts && deno check supabase/functions/_shared/es-admin.ts
 
       # `deno test --no-check` no mira tipos: sin este paso, el tipo de msg() (clave que
@@ -392,6 +462,7 @@ jobs:
       # podrían fallar en CI. messenger.test.ts queda afuera: arrastra un error de tipos
       # anterior (línea 247) que no es de este cambio.
       - name: Tipos — public-api
+        if: steps.cambios.outputs.correr == 'true'
         run: >-
           deno check
           supabase/functions/public-api/index.ts
