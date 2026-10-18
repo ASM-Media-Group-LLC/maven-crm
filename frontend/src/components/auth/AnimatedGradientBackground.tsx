@@ -15,7 +15,7 @@ const AnimatedGradientBackground = () => {
           animation: "blob-move-1 20s ease-in-out infinite",
         }}
       />
-      {/* Blob 2 - Blue/Primary */}
+      {/* Blob 2 - Acero (primary) */}
       <div
         className="absolute rounded-full"
         style={{
@@ -23,13 +23,13 @@ const AnimatedGradientBackground = () => {
           height: "75%",
           bottom: "-25%",
           right: "-20%",
-          background: "hsl(271, 91%, 50%)",
+          background: "hsl(var(--primary))",
           filter: "blur(130px)",
           opacity: 0.3,
           animation: "blob-move-2 25s ease-in-out infinite",
         }}
       />
-      {/* Blob 3 - Purple/Accent */}
+      {/* Blob 3 - azul acero profundo */}
       <div
         className="absolute rounded-full"
         style={{
@@ -37,13 +37,13 @@ const AnimatedGradientBackground = () => {
           height: "60%",
           top: "20%",
           left: "30%",
-          background: "hsl(220, 80%, 40%)",
+          background: "hsl(208, 80%, 42%)",
           filter: "blur(100px)",
           opacity: 0.2,
           animation: "blob-move-3 18s ease-in-out infinite",
         }}
       />
-      {/* Blob 4 - Pink */}
+      {/* Blob 4 - cian acero (accent) */}
       <div
         className="absolute rounded-full"
         style={{
@@ -51,13 +51,13 @@ const AnimatedGradientBackground = () => {
           height: "55%",
           bottom: "10%",
           left: "-10%",
-          background: "hsl(260, 70%, 35%)",
+          background: "hsl(var(--accent))",
           filter: "blur(110px)",
           opacity: 0.25,
           animation: "blob-move-4 22s ease-in-out infinite",
         }}
       />
-      {/* Blob 5 - Warm accent for extra dynamics */}
+      {/* Blob 5 - cian para dar aire */}
       <div
         className="absolute rounded-full"
         style={{
@@ -65,7 +65,7 @@ const AnimatedGradientBackground = () => {
           height: "50%",
           top: "-10%",
           right: "10%",
-          background: "hsl(240, 60%, 45%)",
+          background: "hsl(200, 62%, 46%)",
           filter: "blur(140px)",
           opacity: 0.15,
           animation: "blob-move-5 24s ease-in-out infinite",

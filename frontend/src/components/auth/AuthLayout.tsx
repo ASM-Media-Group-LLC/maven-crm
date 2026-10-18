@@ -28,7 +28,7 @@ const AuthLayout = ({ children }: AuthLayoutProps) => {
         <p className="text-white/60 mt-2 mb-8 text-sm font-light tracking-wide text-center max-w-xs">
           {t("shared.authLayout.tagline")}
         </p>
-        <div className="w-full max-w-md backdrop-blur-2xl bg-white/[0.03] border border-white/[0.08] rounded-2xl p-8 shadow-[0_0_80px_-20px_hsl(271,91%,50%,0.3)]">
+        <div className="w-full max-w-md backdrop-blur-2xl bg-white/[0.03] border border-white/[0.08] rounded-2xl p-8 shadow-[0_0_80px_-20px_hsl(var(--primary)/0.3)]">
           {children}
         </div>
       </div>

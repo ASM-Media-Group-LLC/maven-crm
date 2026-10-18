@@ -10,13 +10,13 @@ const AnimatedWaves = () => {
       >
         <defs>
           <linearGradient id="wave-fill-1" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="hsl(271,91%,50%)" stopOpacity="0.08" />
-            <stop offset="50%" stopColor="hsl(240,60%,45%)" stopOpacity="0.05" />
+            <stop offset="0%" stopColor="hsl(210,80%,50%)" stopOpacity="0.08" />
+            <stop offset="50%" stopColor="hsl(200,62%,45%)" stopOpacity="0.05" />
             <stop offset="100%" stopColor="hsl(211,100%,50%)" stopOpacity="0.1" />
           </linearGradient>
           <linearGradient id="wave-stroke-1" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="hsl(271,91%,65%)" stopOpacity="0.25" />
-            <stop offset="50%" stopColor="hsl(220,80%,55%)" stopOpacity="0.15" />
+            <stop offset="0%" stopColor="hsl(210,80%,65%)" stopOpacity="0.25" />
+            <stop offset="50%" stopColor="hsl(206,80%,55%)" stopOpacity="0.15" />
             <stop offset="100%" stopColor="hsl(211,100%,60%)" stopOpacity="0.3" />
           </linearGradient>
         </defs>
@@ -43,11 +43,11 @@ const AnimatedWaves = () => {
         <defs>
           <linearGradient id="wave-fill-2" x1="100%" y1="0%" x2="0%" y2="100%">
             <stop offset="0%" stopColor="hsl(211,100%,50%)" stopOpacity="0.06" />
-            <stop offset="100%" stopColor="hsl(271,91%,50%)" stopOpacity="0.09" />
+            <stop offset="100%" stopColor="hsl(210,80%,50%)" stopOpacity="0.09" />
           </linearGradient>
           <linearGradient id="wave-stroke-2" x1="100%" y1="0%" x2="0%" y2="100%">
             <stop offset="0%" stopColor="hsl(211,100%,65%)" stopOpacity="0.2" />
-            <stop offset="100%" stopColor="hsl(271,91%,60%)" stopOpacity="0.28" />
+            <stop offset="100%" stopColor="hsl(210,80%,60%)" stopOpacity="0.28" />
           </linearGradient>
         </defs>
         <path
@@ -72,13 +72,13 @@ const AnimatedWaves = () => {
       >
         <defs>
           <linearGradient id="wave-fill-3" x1="0%" y1="50%" x2="100%" y2="50%">
-            <stop offset="0%" stopColor="hsl(240,70%,50%)" stopOpacity="0.04" />
-            <stop offset="50%" stopColor="hsl(271,91%,50%)" stopOpacity="0.07" />
+            <stop offset="0%" stopColor="hsl(200,70%,50%)" stopOpacity="0.04" />
+            <stop offset="50%" stopColor="hsl(210,80%,50%)" stopOpacity="0.07" />
             <stop offset="100%" stopColor="hsl(211,100%,50%)" stopOpacity="0.05" />
           </linearGradient>
           <linearGradient id="wave-stroke-3" x1="0%" y1="50%" x2="100%" y2="50%">
-            <stop offset="0%" stopColor="hsl(240,70%,60%)" stopOpacity="0.15" />
-            <stop offset="50%" stopColor="hsl(271,91%,65%)" stopOpacity="0.22" />
+            <stop offset="0%" stopColor="hsl(200,70%,60%)" stopOpacity="0.15" />
+            <stop offset="50%" stopColor="hsl(210,80%,65%)" stopOpacity="0.22" />
             <stop offset="100%" stopColor="hsl(211,100%,65%)" stopOpacity="0.18" />
           </linearGradient>
         </defs>
