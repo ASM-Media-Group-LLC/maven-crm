@@ -229,7 +229,13 @@ Deno.test("el guard corre los tests del despachador y el banco PGlite", () => {
   const guard = Deno.readTextFileSync(new URL(".github/workflows/guard-edge-functions.yml", RAIZ));
   assert(guard.includes("supabase/functions/messenger-webhooks/"));
   assert(guard.includes("supabase/tests/api_webhooks_tablas.ts"));
-  for (const p of ['"supabase/config.toml"', '"supabase/migrations/**"', '"supabase/tests/**"']) assert(guard.includes(p), p);
+  // La cobertura de rutas ya no es un bloque `paths:` del trigger (hacía que
+  // GitHub creara el run y lo CANCELARA en PRs de solo-pantalla, y había que
+  // relanzarlo a mano). Ahora el guard corre SIEMPRE y el paso "¿Cambió el
+  // backend?" decide por grep si corre la guarda completa; ese grep tiene que
+  // seguir cubriendo config, migraciones y tests.
+  assert(guard.includes("correr=true"), "el paso de detección decide si corre la guarda completa");
+  for (const p of ["supabase/config\\.toml", "supabase/migrations/", "supabase/tests/"]) assert(guard.includes(p), p);
   const deploy = Deno.readTextFileSync(new URL(".github/workflows/deploy-edge-functions.yml", RAIZ));
   assert(deploy.includes("supabase/functions/messenger-webhooks/"), "el guard del deploy también");
 });
