@@ -7,8 +7,7 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
 */
 
 @layer base {
-  /* Paleta "Aurora" (rediseño 10/2026, elegida por Alvaro). AJUSTE 10/2026
-     ("estaba muy morado"): las SUPERFICIES pasan a neutros casi sin color
+  /* Paleta "Aurora" (rediseño 10/2026, elegida por Alvaro). AJUSTE 10/2026 (Alvaro eligió ACERO, azul): las SUPERFICIES pasan a neutros casi sin color
      (saturación baja, hue 240 apenas de guiño frío) — negro/gris en oscuro,
      blanco/gris en claro — y el MORADO se concentra en primario, acento, ring
      y estados activos. Antes los fondos tenían sesgo índigo marcado (hue 230,
@@ -24,7 +23,7 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
     --popover: 0 0% 100%;
     --popover-foreground: 240 20% 12%;
 
-    --primary: 260 58% 52%;
+    --primary: 213 72% 47%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 240 16% 95%;
@@ -33,7 +32,7 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
     --muted: 240 16% 95%;
     --muted-foreground: 240 8% 42%;
 
-    --accent: 266 52% 50%;
+    --accent: 202 82% 45%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
@@ -47,18 +46,18 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
 
     --border: 240 14% 90%;
     --input: 240 14% 90%;
-    --ring: 260 58% 52%;
+    --ring: 213 72% 47%;
 
     --radius: 0.75rem;
 
     --sidebar-background: 240 18% 97%;
     --sidebar-foreground: 240 20% 12%;
-    --sidebar-primary: 260 58% 52%;
+    --sidebar-primary: 213 72% 47%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 240 16% 94%;
     --sidebar-accent-foreground: 240 18% 12%;
     --sidebar-border: 240 14% 89%;
-    --sidebar-ring: 260 58% 52%;
+    --sidebar-ring: 213 72% 47%;
 
     --instagram-pink: 340 82% 59%;
     --instagram-purple: 271 91% 50%;
@@ -92,7 +91,7 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
     --popover: 240 12% 7%;
     --popover-foreground: 240 12% 95%;
 
-    --primary: 260 56% 60%;
+    --primary: 213 70% 58%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 240 10% 12%;
@@ -101,7 +100,7 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
     --muted: 240 10% 12%;
     --muted-foreground: 240 8% 64%;
 
-    --accent: 266 52% 57%;
+    --accent: 202 80% 54%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
@@ -118,16 +117,16 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
 
     --border: 240 9% 15%;
     --input: 240 9% 15%;
-    --ring: 260 56% 60%;
+    --ring: 213 70% 58%;
 
     --sidebar-background: 240 14% 5%;
     --sidebar-foreground: 240 12% 95%;
-    --sidebar-primary: 260 56% 60%;
+    --sidebar-primary: 213 70% 58%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 240 10% 12%;
     --sidebar-accent-foreground: 240 12% 95%;
     --sidebar-border: 240 9% 13%;
-    --sidebar-ring: 260 56% 60%;
+    --sidebar-ring: 213 70% 58%;
 
     --instagram-pink: 340 82% 59%;
     --instagram-purple: 271 91% 50%;
