@@ -44,3 +44,5 @@ infra/*/.env
 # corrida local se corta, que no se suban por error (el canario es un error de tipos a propósito).
 /.guarda-tsc-canario.ts
 /.guarda-tsc.json
+frontend/public/_ogf/
+frontend/public/_propuestas-og.html
