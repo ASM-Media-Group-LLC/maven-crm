@@ -363,27 +363,78 @@ export default function CoworkPage() {
               const puedeFinalizar = s.createdBy === userId || isAdmin;
               const puedeSalir = s.role === "host" && s.createdBy !== userId && !isAdmin;
               const hayMenu = puedeFinalizar || puedeSalir || isAdmin;
+              // La TARJETA ENTERA es la acción de entrar (estilo Linear/Stripe):
+              // nada de botón gigante — Alvaro, 10/2026: "ese botón gigante de
+              // Volver no se ve profesional". El ⋯ va en la esquina y frena la
+              // burbuja para no entrar por accidente al abrir el menú.
+              const entrarALaSesion = () => {
+                if (s.role) {
+                  setSearchParams(
+                    // Sin el `room` el participante vuelve SIN asignación y queda
+                    // esperando una asignación que ya nadie puede hacer.
+                    s.lastRoomId && s.role !== "host"
+                      ? { session: s.id, room: s.lastRoomId }
+                      : { session: s.id }
+                  );
+                } else if (s.admin && enteringId !== s.id) {
+                  /* No es miembro pero la ve: admin, o alcance de Cowork sobre
+                     esta sesión. El edge deja entrar como host sin código en
+                     ambos casos (cowork_puede_supervisar); si no corresponde,
+                     responde 403 y se muestra el error. */
+                  void handleAdminEnter(s.admin);
+                }
+              };
               return (
               <div
                 key={s.id}
-                className="flex h-full flex-col gap-3 rounded-2xl border border-border bg-card p-4 transition-colors hover:border-primary/30"
+                role="button"
+                tabIndex={0}
+                onClick={entrarALaSesion}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); entrarALaSesion(); } }}
+                className="group flex h-full cursor-pointer flex-col gap-2.5 rounded-2xl border border-border bg-card p-4 text-left outline-none transition-colors hover:border-primary/40 focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <div className="flex items-start gap-3">
-                  <div className="flex items-center justify-center h-10 w-10 rounded-full bg-gradient-to-br from-primary/15 to-accent/15 shrink-0">
-                    <Users2 className="h-5 w-5 text-primary" />
-                  </div>
+                <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
-                    <div className="font-display font-semibold text-foreground truncate">{tituloBonito(s.name)}</div>
-                    <div className="text-xs text-muted-foreground truncate">
+                    <div className="font-display text-[15px] font-semibold leading-snug text-foreground truncate">{tituloBonito(s.name)}</div>
+                    <div className="mt-0.5 text-xs text-muted-foreground truncate">
                       {s.role === "host" ? t("cowork.page.roleHost") : s.role === "participant" ? t("cowork.page.roleParticipant") : t("cowork.page.notJoined")}
                       {s.hostName && s.createdBy !== userId ? ` · ${t("cowork.page.byHost", { name: s.hostName })}` : ""}
                       {" · "}{s.members === 1 ? t("cowork.page.membersOne") : t("cowork.page.membersMany", { n: s.members })}
                     </div>
                   </div>
-                  {s.online != null && s.online > 0 && (
-                    <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-success/10 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-success" title={t("cowork.common.online", { n: s.online })}>
-                      <span className="h-1.5 w-1.5 rounded-full bg-success" />{s.online}
-                    </span>
+                  {hayMenu && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        {/* stopPropagation también en TECLADO: el menú vive dentro
+                            de la tarjeta-botón y, sin esto, Enter sobre el ⋯ (o
+                            dentro del menú, que es un portal de React y burbujea
+                            por el árbol de componentes) también "entraría" a la
+                            sesión. */}
+                        <Button variant="ghost" size="icon" className="-mr-1.5 -mt-1 h-7 w-7 shrink-0 rounded-lg text-muted-foreground/70 hover:text-foreground" title={t("cowork.page.sessionMenu")} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-48" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+                        {isAdmin && (
+                          <DropdownMenuItem onClick={() => setSearchParams({ session: s.id, spy: "1" })}>
+                            <VenetianMask className="mr-2 h-4 w-4" /> {t("cowork.page.incognito")}
+                          </DropdownMenuItem>
+                        )}
+                        {puedeSalir && (
+                          <DropdownMenuItem onClick={() => setPorSalir({ id: s.id, name: s.name })}>
+                            <LogOut className="mr-2 h-4 w-4" /> {t("cowork.page.leave")}
+                          </DropdownMenuItem>
+                        )}
+                        {puedeFinalizar && (
+                          <>
+                            {(isAdmin || puedeSalir) && <DropdownMenuSeparator />}
+                            <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setPorFinalizar({ id: s.id, name: s.name, members: s.members })}>
+                              <Power className="mr-2 h-4 w-4" /> {t("cowork.page.end")}
+                            </DropdownMenuItem>
+                          </>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   )}
                 </div>
 
@@ -419,64 +470,21 @@ export default function CoworkPage() {
                   <p className="truncate text-[11px] text-primary" title={t("cowork.page.adminsOnly")}>🕶 {s.incognito.join(", ")}</p>
                 )}
 
-                <div className="mt-auto flex items-center gap-2 pt-1">
-                  {s.role ? (
-                    <Button
-                      size="sm"
-                      className="flex-1 rounded-full gap-1.5 shadow-sm shadow-primary/20"
-                      onClick={() => setSearchParams(
-                        // Sin el `room` el participante vuelve SIN asignación y queda
-                        // esperando una asignación que ya nadie puede hacer.
-                        s.lastRoomId && s.role !== "host"
-                          ? { session: s.id, room: s.lastRoomId }
-                          : { session: s.id }
-                      )}
-                    >
-                      {t("common.back")} <ArrowRight className="h-4 w-4" />
-                    </Button>
-                  ) : (
-                    /* No es miembro pero la ve: admin, o alcance de Cowork sobre
-                       esta sesión. El edge deja entrar como host sin código en
-                       ambos casos (cowork_puede_supervisar); si por lo que sea no
-                       corresponde, responde 403 y se muestra el error. */
-                    <Button
-                      size="sm"
-                      className="flex-1 rounded-full gap-1.5 shadow-sm shadow-primary/20"
-                      disabled={enteringId === s.id}
-                      onClick={() => s.admin && handleAdminEnter(s.admin)}
-                    >
-                      {enteringId === s.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <>{t("cowork.common.enter")} <ArrowRight className="h-4 w-4" /></>}
-                    </Button>
-                  )}
-                  {hayMenu && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0 rounded-full text-muted-foreground hover:text-foreground" title={t("cowork.page.sessionMenu")}>
-                          <MoreHorizontal className="h-[18px] w-[18px]" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-48">
-                        {isAdmin && (
-                          <DropdownMenuItem onClick={() => setSearchParams({ session: s.id, spy: "1" })}>
-                            <VenetianMask className="mr-2 h-4 w-4" /> {t("cowork.page.incognito")}
-                          </DropdownMenuItem>
-                        )}
-                        {puedeSalir && (
-                          <DropdownMenuItem onClick={() => setPorSalir({ id: s.id, name: s.name })}>
-                            <LogOut className="mr-2 h-4 w-4" /> {t("cowork.page.leave")}
-                          </DropdownMenuItem>
-                        )}
-                        {puedeFinalizar && (
-                          <>
-                            {(isAdmin || puedeSalir) && <DropdownMenuSeparator />}
-                            <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setPorFinalizar({ id: s.id, name: s.name, members: s.members })}>
-                              <Power className="mr-2 h-4 w-4" /> {t("cowork.page.end")}
-                            </DropdownMenuItem>
-                          </>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
+                {/* Pie quieto: nada de botón gigante. A la izquierda el pulso
+                    (solo si hay gente); a la derecha la acción como enlace fino
+                    que se desliza un pelo al pasar — la tarjeta entera ya es el
+                    botón. */}
+                <div className="mt-auto flex items-center justify-between gap-2 border-t border-border/40 pt-2.5">
+                  {s.online != null && s.online > 0 ? (
+                    <span className="inline-flex items-center gap-1.5 text-xs font-medium tabular-nums text-success">
+                      <span className="h-1.5 w-1.5 rounded-full bg-success" />{t("cowork.common.online", { n: s.online })}
+                    </span>
+                  ) : <span />}
+                  <span className="inline-flex items-center gap-1 text-[13px] font-medium text-primary transition-transform duration-150 group-hover:translate-x-0.5 motion-reduce:transform-none">
+                    {enteringId === s.id
+                      ? <Loader2 className="h-4 w-4 animate-spin" />
+                      : <>{s.role ? t("common.back") : t("cowork.common.enter")} <ArrowRight className="h-3.5 w-3.5" /></>}
+                  </span>
                 </div>
               </div>
               );
