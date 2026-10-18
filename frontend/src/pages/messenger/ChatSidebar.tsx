@@ -635,7 +635,7 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
             {isGroup ? (
               <Avatar className={cn("h-10 w-10 sm:h-9 sm:w-9", isActive && "ring-2 ring-primary/20")}>
                 {conversation.avatar_url && <AvatarImage src={conversation.avatar_url} alt={conversation.displayName} className="object-cover" />}
-                <AvatarFallback className="text-xs font-bold text-white bg-gradient-to-br from-violet-600 to-fuchsia-600">
+                <AvatarFallback className="text-xs font-bold text-white bg-gradient-to-br from-primary to-accent">
                   <Users className="h-4 w-4" />
                 </AvatarFallback>
               </Avatar>

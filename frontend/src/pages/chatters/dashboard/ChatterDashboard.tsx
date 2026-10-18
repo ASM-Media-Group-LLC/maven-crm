@@ -116,7 +116,7 @@ export default function ChatterDashboard({ hoy = new Date() }: { hoy?: Date }) {
             <StatChip label={t("common.hours")} icon={<Clock className="h-3.5 w-3.5" />} value={resumen.horas ? resumen.horas.toFixed(0) : "—"} hint="Hubstaff" />
             {/* El reloj de Cowork (cámara + pantalla, presente): el dato que va a
                 reemplazar a Hubstaff. Conviven mientras dure la transición. */}
-            <StatChip label="Cowork" icon={<Timer className="h-3.5 w-3.5" />} color="bg-violet-500"
+            <StatChip label="Cowork" icon={<Timer className="h-3.5 w-3.5" />} color="bg-accent"
               value={cowork.horas > 0 ? cowork.horas.toFixed(0) : "—"} hint={pieTiempoCowork(cowork, coworkCargando, t)} />
             <StatChip label={t("chatters.dash.productivity")} icon={<Activity className="h-3.5 w-3.5" />} value={resumen.actividad == null ? "—" : `${Math.round(resumen.actividad)}%`}
               color={resumen.actividad == null ? undefined : resumen.actividad >= 60 ? "bg-success" : resumen.actividad >= 40 ? "bg-warning" : "bg-destructive"} hint={t("chatters.dash.hubstaffActivity")} />

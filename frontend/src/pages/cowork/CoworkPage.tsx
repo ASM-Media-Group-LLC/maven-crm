@@ -367,7 +367,7 @@ export default function CoworkPage() {
                         </span>
                       )}
                       {s.incognito.length > 0 && (
-                        <span className="text-violet-500" title={t("cowork.page.adminsOnly")}>
+                        <span className="text-primary" title={t("cowork.page.adminsOnly")}>
                           {" "}· 🕶 {s.incognito.join(", ")}
                         </span>
                       )}
@@ -404,7 +404,7 @@ export default function CoworkPage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="rounded-full gap-1 shrink-0 text-violet-500 hover:text-violet-600"
+                        className="rounded-full gap-1 shrink-0 text-primary hover:text-primary/80"
                         title={t("cowork.page.incognitoHint")}
                         onClick={() => setSearchParams({ session: s.id, spy: "1" })}
                       >

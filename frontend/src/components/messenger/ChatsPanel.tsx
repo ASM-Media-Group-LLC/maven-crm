@@ -309,7 +309,7 @@ function FilaChat({
             {conversation.avatar_url && (
               <AvatarImage src={conversation.avatar_url} alt={conversation.displayName} className="object-cover" />
             )}
-            <AvatarFallback className="bg-gradient-to-br from-violet-600 to-fuchsia-600 text-xs font-bold text-white">
+            <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-xs font-bold text-white">
               <Users className="h-4 w-4" />
             </AvatarFallback>
           </Avatar>

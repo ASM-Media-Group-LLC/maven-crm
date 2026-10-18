@@ -259,7 +259,7 @@ function Burbuja({
             {conversation.avatar_url && (
               <AvatarImage src={conversation.avatar_url} alt={conversation.displayName} className="object-cover" />
             )}
-            <AvatarFallback className="bg-gradient-to-br from-violet-600 to-fuchsia-600 text-white">
+            <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-white">
               <Users className="h-5 w-5" />
             </AvatarFallback>
           </Avatar>

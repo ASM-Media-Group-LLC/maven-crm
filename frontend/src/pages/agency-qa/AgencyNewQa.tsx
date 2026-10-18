@@ -1130,9 +1130,9 @@ const IgLookupBanner = ({ result, loading }: IgLookupBannerProps) => {
   if (!result || result.total === 0) return null;
 
   return (
-    <div className="rounded-xl border border-violet-500/30 bg-gradient-to-br from-violet-500/10 via-indigo-500/5 to-transparent p-4 shadow-sm">
+    <div className="rounded-xl border border-primary/30 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-4 shadow-sm">
       <div className="mb-2 flex items-center gap-2">
-        <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 text-white shadow-sm">
+        <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent text-white shadow-sm">
           <Sparkles className="h-3.5 w-3.5" />
         </span>
         <div className="min-w-0">

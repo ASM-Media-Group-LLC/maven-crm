@@ -35,7 +35,10 @@ function bannerDeRespaldo(titulo: string, boton: string, recargar: () => void) {
   const btn = document.createElement("button");
   btn.id = "pwa-reload-btn";
   btn.textContent = boton;
-  btn.style.cssText = "background:#6366f1;color:#fff;border:none;padding:6px 16px;border-radius:6px;cursor:pointer;font-size:13px";
+  // Hex literal (no token) a propósito: este banner es el fallback de cuando la
+  // app NO cargó, así que el CSS con las variables puede no estar. #8660d2 es el
+  // morado primario nuevo (hsl 260 56% 60%) escrito a mano para que se vea igual.
+  btn.style.cssText = "background:#8660d2;color:#fff;border:none;padding:6px 16px;border-radius:6px;cursor:pointer;font-size:13px";
   btn.addEventListener("click", recargar);
   banner.append(span, btn);
   document.body.appendChild(banner);

@@ -201,7 +201,7 @@ export default function CloserDashboard() {
               label="Cowork"
               valor={cowork.horas > 0 ? cowork.horas.toFixed(1) : "—"}
               pie={pieTiempoCowork(cowork, coworkCargando, t)}
-              icono={Timer} color="bg-violet-500" tinte="from-violet-500/10"
+              icono={Timer} color="bg-primary" tinte="from-primary/10"
             />
             <Kpi
               label={t("closers.dash.productivity")}
@@ -209,8 +209,8 @@ export default function CloserDashboard() {
               // Sin semáforo a propósito: es actividad de teclado y mouse, y
               // buena parte del trabajo de un closer pasa fuera de la pantalla.
               pie={t("closers.dash.keyboardMouse")}
-              icono={MousePointerClick} color="bg-violet-500" tinte="from-violet-500/10"
-              barra={hubstaff.actividad != null ? { pct: hubstaff.actividad, clase: "bg-violet-500" } : undefined}
+              icono={MousePointerClick} color="bg-primary" tinte="from-primary/10"
+              barra={hubstaff.actividad != null ? { pct: hubstaff.actividad, clase: "bg-primary" } : undefined}
             />
             <Kpi
               label={t("closers.kpi.closed")}

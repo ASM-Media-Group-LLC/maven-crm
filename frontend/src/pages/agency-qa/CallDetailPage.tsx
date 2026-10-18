@@ -1925,8 +1925,8 @@ const AudioWithCaptions = ({
         {t("agencyQa.detail.noAudioSupport")}
       </audio>
       {hasCaptions && (
-        <div className="rounded-xl border border-violet-500/30 bg-gradient-to-br from-violet-500/10 via-indigo-500/5 to-transparent p-4">
-          <p className="mb-1.5 text-xs font-bold text-violet-400">
+        <div className="rounded-xl border border-primary/30 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-4">
+          <p className="mb-1.5 text-xs font-bold text-primary">
             {t("agencyQa.detail.liveCaptions")}
           </p>
           <p className="text-sm leading-relaxed text-foreground/80">
@@ -1943,7 +1943,7 @@ const AudioWithCaptions = ({
                     className={cn(
                       "transition-colors",
                       isActive
-                        ? "rounded bg-violet-500/30 px-1 font-semibold text-foreground"
+                        ? "rounded bg-primary/30 px-1 font-semibold text-foreground"
                         : "",
                     )}
                   >

@@ -1143,7 +1143,7 @@ const CompanyFormModal = ({
                   }}
                   className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
                     (cfg.geo_targets ?? []).includes(geo)
-                      ? "border-blue-400 bg-blue-400/15 text-blue-400"
+                      ? "border-primary bg-primary/15 text-primary"
                       : "border-border text-muted-foreground hover:border-primary/40"
                   }`}
                 >

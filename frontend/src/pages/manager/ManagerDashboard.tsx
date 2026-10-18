@@ -286,7 +286,7 @@ export default function ManagerDashboard({ forzado = false }: {
               pie={ultima
                 ? <>{t("sales.mgr.scoreOf", { date: format(new Date(`${ultima.fecha}T12:00:00`), "d MMM", { locale: f.fechas }) })}{promedio != null && ` · ${t("sales.mgr.average", { avg: promedio.toFixed(1) })}`}</>
                 : t("sales.mgr.noScore")}
-              icono={Sparkles} color="bg-violet-500" tinte="from-violet-500/10"
+              icono={Sparkles} color="bg-primary" tinte="from-primary/10"
               barra={ultima ? { pct: (ultima.nota / 10) * 100, clase: tonoNota(ultima.nota).barra } : undefined}
             />
             <Kpi
@@ -325,7 +325,7 @@ export default function ManagerDashboard({ forzado = false }: {
               label="Cowork"
               valor={cowork.horas > 0 ? cowork.horas.toFixed(1) : "—"}
               pie={pieTiempoCowork(cowork, coworkCargando, t)}
-              icono={Timer} color="bg-violet-500" tinte="from-violet-500/10"
+              icono={Timer} color="bg-primary" tinte="from-primary/10"
             />
             <Kpi
               label={t("sales.mgr.productivity")}

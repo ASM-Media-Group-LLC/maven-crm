@@ -614,7 +614,7 @@ const Avatar = ({ src, fallback, size = 48 }: { src: string | null; fallback: st
   const initial = fallback.charAt(0).toUpperCase();
   return (
     <span
-      className="inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 text-white shadow-sm ring-2 ring-violet-500/20"
+      className="inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-primary to-accent text-white shadow-sm ring-2 ring-primary/20"
       style={{ width: size, height: size }}
     >
       {src ? (
@@ -1189,7 +1189,7 @@ const SpammerDetailDialog = ({
             </div>
 
             <p className="text-sm leading-relaxed">
-              <span className="text-xs font-bold text-violet-400 mr-2">{t("leadgen.perf.summary")}</span>
+              <span className="text-xs font-bold text-primary mr-2">{t("leadgen.perf.summary")}</span>
               {a.summary}
             </p>
 

@@ -276,7 +276,7 @@ const LeadFoundRow = ({ line }: { line: LeadFoundLine }) => {
         <span className="text-muted-foreground truncate hidden md:inline">· {line.country}</span>
       )}
       {line.companySlug && (
-        <span className="text-violet-400/80 truncate hidden md:inline">
+        <span className="text-primary/80 truncate hidden md:inline">
           · {line.companySlug}
         </span>
       )}
