@@ -28,6 +28,7 @@ import { useFormato } from "@/hooks/useFormato";
 import type { Formato } from "@/lib/formato";
 import { useLanguage } from "@/hooks/useLanguage";
 import { traducir } from "@/lib/i18n";
+import { tituloBonito } from "@/lib/tituloBonito";
 
 export default function CoworkPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -359,7 +360,7 @@ export default function CoworkPage() {
                     <Users2 className="h-5 w-5 text-primary" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="font-display font-semibold text-foreground truncate">{s.name}</div>
+                    <div className="font-display font-semibold text-foreground truncate">{tituloBonito(s.name)}</div>
                     <div className="text-xs text-muted-foreground truncate">
                       {s.role === "host" ? t("cowork.page.roleHost") : s.role === "participant" ? t("cowork.page.roleParticipant") : t("cowork.page.notJoined")}
                       {s.hostName && s.createdBy !== userId ? ` · ${t("cowork.page.byHost", { name: s.hostName })}` : ""}
@@ -466,7 +467,7 @@ export default function CoworkPage() {
                                 ? "h-1.5 w-1.5 shrink-0 rounded-full bg-success"
                                 : "h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground/30"
                             } />
-                            <span className="truncate font-medium text-foreground/90">{r.name}</span>
+                            <span className="truncate font-medium text-foreground/90">{tituloBonito(r.name)}</span>
                             <span className={`ml-auto shrink-0 tabular-nums text-[11px] font-semibold ${r.online != null && r.online > 0 ? "text-success" : "text-muted-foreground"}`}>
                               {r.online ?? "–"}
                             </span>

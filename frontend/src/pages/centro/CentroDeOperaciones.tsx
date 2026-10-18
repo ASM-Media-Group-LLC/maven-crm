@@ -9,6 +9,7 @@ import { useEquipoTiempoCowork } from "@/hooks/useEquipoTiempoCowork";
 import { usePanelMensajeria } from "@/hooks/usePanelMensajeria";
 import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/hooks/useLanguage";
+import { tituloBonito } from "@/lib/tituloBonito";
 
 // CENTRO DE OPERACIONES — el tablero por defecto del admin desde el rediseño
 // Aurora (10/2026, decisión de Alvaro): lo primero son las LLAMADAS y la
@@ -226,7 +227,7 @@ export default function CentroDeOperaciones() {
               return (
                 <div key={s.id} className="flex flex-col gap-2.5 rounded-panel border border-border bg-background/60 p-3">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="truncate text-sm font-semibold">{s.name}</span>
+                    <span className="truncate text-sm font-semibold">{tituloBonito(s.name)}</span>
                     <span className="flex shrink-0 items-center gap-1.5">
                       <span className={`inline-flex items-center gap-1 rounded-control px-1.5 py-0.5 text-[11px] font-semibold tabular-nums ${(s.online ?? 0) > 0 ? "bg-success/10 text-success" : "text-muted-foreground"}`}>
                         <Users className="h-3 w-3" />{enLinea}
@@ -248,7 +249,7 @@ export default function CentroDeOperaciones() {
                         return (
                           <div key={r.id} className="flex items-center gap-2 rounded-control bg-success/5 px-2 py-1.5">
                             <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-success" />
-                            <span className="truncate text-xs font-medium">{r.name}</span>
+                            <span className="truncate text-xs font-medium">{tituloBonito(r.name)}</span>
                             <span className="ml-auto flex shrink-0 items-center gap-1">
                               {visibles.map((nm, i) => (
                                 <span key={i} title={nm} className="flex h-5 w-5 items-center justify-center rounded-full bg-success/15 text-[9px] font-bold text-success">

@@ -33,6 +33,7 @@ import { olvidarAusentes, tocaAvisar, type MarcasAviso } from "@/lib/avisosSuper
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
 import { useCoworkMediaPresence, type MediaState } from "@/hooks/useCoworkMediaPresence";
 import { cn } from "@/lib/utils";
+import { tituloBonito } from "@/lib/tituloBonito";
 import { leerLimitesPausa } from "@/lib/coworkTablas";
 import { relojDesdePresencia, segundosMostrados, formatoReloj } from "@/lib/coworkReloj";
 import { personasEnSala, relojDeRespaldo, latidoFresco, sinConexionConLaSala } from "@/lib/coworkOcupacion";
@@ -1556,7 +1557,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                   setRenameOpen(true);
                 }}
               >
-                <h2 className="truncate font-display text-base font-semibold text-foreground decoration-primary/60 decoration-dotted underline-offset-4 transition-colors group-hover:text-primary group-hover:underline">{cowork.session?.name}</h2>
+                <h2 className="truncate font-display text-base font-semibold text-foreground decoration-primary/60 decoration-dotted underline-offset-4 transition-colors group-hover:text-primary group-hover:underline">{tituloBonito(cowork.session?.name)}</h2>
               </button>
             </div>
             {/* Acciones de la sesión, todas del mismo tamaño y color: antes cada
@@ -2108,7 +2109,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                         sigue disponible en el menú ⋯ → "Copiar código" (Alvaro,
                         10/2026). */}
                     <div className="flex h-10 items-center gap-2 px-3">
-                      <span className="min-w-0 truncate font-display text-sm font-semibold text-foreground">{room.name}</span>
+                      <span className="min-w-0 truncate font-display text-sm font-semibold text-foreground">{tituloBonito(room.name)}</span>
                       <span className="ml-auto inline-flex items-center gap-1 text-[11px] tabular-nums text-muted-foreground" title={t("cowork.host.inRoomCount", { n: participants.length })}>
                         <Users2 className="h-3 w-3" />{participants.length}
                       </span>
@@ -2519,7 +2520,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               <>
                 <SheetHeader className="text-left">
                   <SheetTitle className="flex items-center gap-2 font-display">
-                    {room.name}
+                    {tituloBonito(room.name)}
                     <span className="text-xs font-normal text-muted-foreground">{participants.length === 1 ? t("cowork.host.personOne") : t("cowork.host.personMany", { n: participants.length })}</span>
                   </SheetTitle>
                   <SheetDescription>
