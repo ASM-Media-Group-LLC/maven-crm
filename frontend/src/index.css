@@ -24,7 +24,7 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
     --popover: 0 0% 100%;
     --popover-foreground: 240 20% 12%;
 
-    --primary: 262 78% 56%;
+    --primary: 260 58% 52%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 240 16% 95%;
@@ -33,7 +33,7 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
     --muted: 240 16% 95%;
     --muted-foreground: 240 8% 42%;
 
-    --accent: 268 74% 54%;
+    --accent: 266 52% 50%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
@@ -47,18 +47,18 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
 
     --border: 240 14% 90%;
     --input: 240 14% 90%;
-    --ring: 262 78% 56%;
+    --ring: 260 58% 52%;
 
     --radius: 0.75rem;
 
     --sidebar-background: 240 18% 97%;
     --sidebar-foreground: 240 20% 12%;
-    --sidebar-primary: 262 78% 56%;
+    --sidebar-primary: 260 58% 52%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 240 16% 94%;
     --sidebar-accent-foreground: 240 18% 12%;
     --sidebar-border: 240 14% 89%;
-    --sidebar-ring: 262 78% 56%;
+    --sidebar-ring: 260 58% 52%;
 
     --instagram-pink: 340 82% 59%;
     --instagram-purple: 271 91% 50%;
@@ -92,7 +92,7 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
     --popover: 240 12% 7%;
     --popover-foreground: 240 12% 95%;
 
-    --primary: 262 88% 68%;
+    --primary: 260 56% 60%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 240 10% 12%;
@@ -101,7 +101,7 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
     --muted: 240 10% 12%;
     --muted-foreground: 240 8% 64%;
 
-    --accent: 268 84% 64%;
+    --accent: 266 52% 57%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
@@ -118,16 +118,16 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
 
     --border: 240 9% 15%;
     --input: 240 9% 15%;
-    --ring: 262 88% 68%;
+    --ring: 260 56% 60%;
 
     --sidebar-background: 240 14% 5%;
     --sidebar-foreground: 240 12% 95%;
-    --sidebar-primary: 262 88% 68%;
+    --sidebar-primary: 260 56% 60%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 240 10% 12%;
     --sidebar-accent-foreground: 240 12% 95%;
     --sidebar-border: 240 9% 13%;
-    --sidebar-ring: 262 88% 68%;
+    --sidebar-ring: 260 56% 60%;
 
     --instagram-pink: 340 82% 59%;
     --instagram-purple: 271 91% 50%;
