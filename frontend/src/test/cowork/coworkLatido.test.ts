@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: { auth: { getSession: vi.fn().mockResolvedValue({ data: { session: { access_token: "tok" } } }) } },
+  SUPABASE_URL: "https://test.supabase.co",
+  SUPABASE_PUBLISHABLE_KEY: "test-key",
 }));
 
 import { iniciarLatido, actualizarLatido, detenerLatido, latidoActivo, leerReloj, suscribirReloj, INTERVALO_LATIDO_MS, RESPIRO_CAMBIO_MS } from "@/lib/coworkLatido";

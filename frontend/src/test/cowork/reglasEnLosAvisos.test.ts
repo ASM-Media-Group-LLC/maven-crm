@@ -30,6 +30,8 @@ vi.mock("@/lib/voz", () => ({ hablar: (...a: unknown[]) => habla(...a) }));
 vi.mock("@/lib/coworkPausa", () => ({ estaEnPausa: () => pausada(), marcarPausa: () => {} }));
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: { auth: { getSession: async () => ({ data: { session: { access_token: "t" } } }) } },
+  SUPABASE_URL: "https://test.supabase.co",
+  SUPABASE_PUBLISHABLE_KEY: "test-key",
 }));
 
 // `coworkReglas` NO se mockea: es un módulo puro y es justamente lo que se prueba.
