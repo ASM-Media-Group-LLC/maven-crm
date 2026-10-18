@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, type CSSProperties } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useCoworkSession, type AdminSessionRow, type SesionFinalizada, type CoworkSessionRow } from "@/hooks/useCoworkSession";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -29,6 +29,8 @@ import type { Formato } from "@/lib/formato";
 import { useLanguage } from "@/hooks/useLanguage";
 import { traducir } from "@/lib/i18n";
 import { tituloBonito } from "@/lib/tituloBonito";
+import { UserAvatar } from "@/components/UserAvatar";
+import { cn } from "@/lib/utils";
 
 export default function CoworkPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -360,6 +362,23 @@ export default function CoworkPage() {
             {filasActivas.map((s) => {
               const activas = s.rooms.filter((r) => (r.online ?? 0) > 0);
               const genteEnVivo = activas.flatMap((r) => r.gente ?? []);
+              // Hay gente = LiveKit contó a alguien. online null (LiveKit calló)
+              // NO enciende nada: fallo no es vacío.
+              const n = s.online ?? 0;
+              const hayGente = n > 0;
+              // Borde vivo (Alvaro eligió la 9): con gente adentro, el borde
+              // entero se enciende con un degradé finísimo acero→verde. El
+              // relleno de la tarjeta va por dentro (padding-box) y el degradé
+              // solo en el borde (border-box). Todo en tokens → se ve igual en
+              // claro y en oscuro.
+              const bordeVivo: CSSProperties | undefined = hayGente
+                ? {
+                    borderColor: "transparent",
+                    background:
+                      "linear-gradient(hsl(var(--card)), hsl(var(--card))) padding-box, " +
+                      "linear-gradient(135deg, hsl(var(--accent) / 0.85), hsl(var(--primary) / 0.45) 55%, hsl(var(--success) / 0.8)) border-box",
+                  }
+                : undefined;
               const puedeFinalizar = s.createdBy === userId || isAdmin;
               const puedeSalir = s.role === "host" && s.createdBy !== userId && !isAdmin;
               const hayMenu = puedeFinalizar || puedeSalir || isAdmin;
@@ -391,7 +410,11 @@ export default function CoworkPage() {
                 tabIndex={0}
                 onClick={entrarALaSesion}
                 onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); entrarALaSesion(); } }}
-                className="group flex h-full cursor-pointer flex-col gap-2.5 rounded-2xl border border-border bg-card p-4 text-left outline-none transition-colors hover:border-primary/40 focus-visible:ring-2 focus-visible:ring-ring"
+                style={bordeVivo}
+                className={cn(
+                  "group flex h-full cursor-pointer flex-col gap-2.5 rounded-2xl border p-4 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+                  hayGente ? "border-transparent" : "border-border bg-card hover:border-primary/40",
+                )}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
@@ -438,48 +461,54 @@ export default function CoworkPage() {
                   )}
                 </div>
 
-                {/* El pulso de la sesión, compacto. OJO con null: si LiveKit no
-                    contestó (online null) NO se dice "nadie conectado" — solo
+                {/* El pulso de la sesión con la GENTE al frente (Alvaro eligió
+                    la 8): se ve de un vistazo QUIÉN está, no solo cuántos. Las
+                    caras salen de las salas activas; si LiveKit contó cabezas
+                    pero no hay nombres (sin asignación), queda el conteo solo.
+                    online null (LiveKit calló) NO dice "nadie conectado" — solo
                     cuántas salas hay. Fallo no es vacío. */}
-                {s.rooms.length > 0 && (
-                  activas.length > 0 ? (
-                    <div className="flex flex-col gap-1.5">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        {activas.slice(0, 3).map((r) => (
-                          <span key={r.id} className="inline-flex items-center gap-1.5 rounded-full bg-success/10 px-2 py-0.5 text-[11px] font-medium text-success">
-                            <span className="h-1.5 w-1.5 rounded-full bg-success" />
-                            {tituloBonito(r.name)} · <span className="tabular-nums font-semibold">{r.online}</span>
-                          </span>
+                {hayGente ? (
+                  <div className="flex flex-col gap-2">
+                    {genteEnVivo.length > 0 && (
+                      <div className="flex items-center">
+                        {genteEnVivo.slice(0, 5).map((nombre, i) => (
+                          <div key={`${s.id}-cara-${i}`} className={i === 0 ? "" : "-ml-1.5"}>
+                            <UserAvatar name={tituloBonito(nombre)} size="xs" className="ring-2 ring-card" />
+                          </div>
                         ))}
-                        {activas.length > 3 && <span className="text-[11px] text-muted-foreground">+{activas.length - 3}</span>}
+                        {genteEnVivo.length > 5 && (
+                          <div className="z-10 -ml-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-muted text-[9px] font-semibold text-muted-foreground ring-2 ring-card">
+                            +{genteEnVivo.length - 5}
+                          </div>
+                        )}
                       </div>
-                      {genteEnVivo.length > 0 && (
-                        <p className="truncate text-[11px] text-muted-foreground">
-                          {genteEnVivo.slice(0, 4).join(" · ")}
-                          {genteEnVivo.length > 4 ? ` · +${genteEnVivo.length - 4}` : ""}
-                        </p>
+                    )}
+                    <span className="inline-flex items-center gap-1.5 text-xs font-medium text-success">
+                      <span className="h-1.5 w-1.5 rounded-full bg-success" />
+                      <span className="tabular-nums">{t("cowork.common.online", { n })}</span>
+                      {activas.length > 0 && (
+                        <span className="font-normal text-muted-foreground">
+                          · {activas.length === 1 ? t("cowork.page.oneRoom") : t("cowork.page.roomsCount", { n: activas.length })}
+                        </span>
                       )}
-                    </div>
-                  ) : s.online == null ? (
+                    </span>
+                  </div>
+                ) : s.rooms.length > 0 ? (
+                  s.online == null ? (
                     <p className="text-xs text-muted-foreground">{s.rooms.length === 1 ? t("cowork.page.oneRoom") : t("cowork.page.roomsCount", { n: s.rooms.length })}</p>
                   ) : (
                     <p className="text-xs text-muted-foreground">{s.rooms.length === 1 ? t("cowork.page.oneRoomIdle") : t("cowork.page.roomsIdle", { n: s.rooms.length })}</p>
                   )
-                )}
+                ) : null}
                 {s.incognito.length > 0 && (
                   <p className="truncate text-[11px] text-primary" title={t("cowork.page.adminsOnly")}>🕶 {s.incognito.join(", ")}</p>
                 )}
 
-                {/* Pie quieto: nada de botón gigante. A la izquierda el pulso
-                    (solo si hay gente); a la derecha la acción como enlace fino
-                    que se desliza un pelo al pasar — la tarjeta entera ya es el
-                    botón. */}
-                <div className="mt-auto flex items-center justify-between gap-2 border-t border-border/40 pt-2.5">
-                  {s.online != null && s.online > 0 ? (
-                    <span className="inline-flex items-center gap-1.5 text-xs font-medium tabular-nums text-success">
-                      <span className="h-1.5 w-1.5 rounded-full bg-success" />{t("cowork.common.online", { n: s.online })}
-                    </span>
-                  ) : <span />}
+                {/* Pie quieto: nada de botón gigante. El pulso ya vive arriba
+                    con las caras; acá solo la acción, como enlace fino que se
+                    desliza un pelo al pasar — la tarjeta entera ya es el botón
+                    (Alvaro: el botón gigante de Volver no se veía profesional). */}
+                <div className="mt-auto flex items-center justify-end border-t border-border/40 pt-2.5">
                   <span className="inline-flex items-center gap-1 text-[13px] font-medium text-primary transition-transform duration-150 group-hover:translate-x-0.5 motion-reduce:transform-none">
                     {enteringId === s.id
                       ? <Loader2 className="h-4 w-4 animate-spin" />
