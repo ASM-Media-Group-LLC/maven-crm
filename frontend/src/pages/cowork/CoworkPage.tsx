@@ -17,8 +17,11 @@ import CoworkHostDashboard from "./CoworkHostDashboard";
 import CoworkParticipantView from "./CoworkParticipantView";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { normalizeRoomCode, isCompleteRoomCode, ROOM_CODE_LENGTH } from "@/lib/coworkRoomCode";
-import { Plus, Users2, ArrowRight, KeyRound, Loader2, VenetianMask, LogOut, History } from "lucide-react";
+import { Plus, Users2, ArrowRight, KeyRound, Loader2, VenetianMask, LogOut, History, MoreHorizontal, Power } from "lucide-react";
 import CoworkIncognitoView from "./CoworkIncognitoView";
 import { toast } from "sonner";
 import { useFormato } from "@/hooks/useFormato";
@@ -373,73 +376,78 @@ export default function CoworkPage() {
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-3 shrink-0 w-full justify-end sm:w-auto">
-                    {/* Finalizar apaga la sesión para TODOS: solo quien la creó (o un
-                        admin). Los demás hosts tienen Salir, que se los lleva solo a
-                        ellos. Antes cualquier host veía Finalizar, y CHATTERS KASH se
-                        finalizó cuatro veces en cuatro días por hosts que querían irse. */}
-                    {(s.createdBy === userId || isAdmin) && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-destructive hover:text-destructive rounded-full"
-                        onClick={() => setPorFinalizar({ id: s.id, name: s.name, members: s.members })}
-                      >
-                        {t("cowork.page.end")}
-                      </Button>
-                    )}
-                    {s.role === "host" && s.createdBy !== userId && !isAdmin && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-muted-foreground hover:text-foreground rounded-full gap-1"
-                        title={t("cowork.page.leaveHint")}
-                        onClick={() => setPorSalir({ id: s.id, name: s.name })}
-                      >
-                        <LogOut className="h-4 w-4" /> {t("cowork.page.leave")}
-                      </Button>
-                    )}
-                    {/* Incógnito (solo admin): observar sin unirse ni aparecer. */}
-                    {isAdmin && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="rounded-full gap-1 shrink-0 text-primary hover:text-primary/80"
-                        title={t("cowork.page.incognitoHint")}
-                        onClick={() => setSearchParams({ session: s.id, spy: "1" })}
-                      >
-                        <VenetianMask className="h-4 w-4" /> {t("cowork.page.incognito")}
-                      </Button>
-                    )}
-                    {s.role ? (
-                      <Button
-                        size="sm"
-                        className="rounded-full gap-1 shrink-0"
-                        onClick={() => setSearchParams(
-                          // Sin el `room` el participante vuelve SIN asignación y queda
-                          // esperando una asignación que ya nadie puede hacer.
-                          s.lastRoomId && s.role !== "host"
-                            ? { session: s.id, room: s.lastRoomId }
-                            : { session: s.id }
+                  {/* Acciones (rediseño 10/2026, Alvaro: "se veían ordinarias y
+                      amontonadas"): una sola acción PRINCIPAL destacada
+                      (Entrar/Volver), y el resto —Incógnito, Salir, Finalizar—
+                      recogidas en un menú ⋯ discreto. De paso Finalizar deja de
+                      estar a un toque suelto: es destructivo y ya se disparó sin
+                      querer (CHATTERS KASH, 4 veces en 4 días). */}
+                  {(() => {
+                    const puedeFinalizar = s.createdBy === userId || isAdmin;
+                    const puedeSalir = s.role === "host" && s.createdBy !== userId && !isAdmin;
+                    const hayMenu = puedeFinalizar || puedeSalir || isAdmin;
+                    return (
+                      <div className="flex items-center gap-2 shrink-0 w-full justify-end sm:w-auto">
+                        {s.role ? (
+                          <Button
+                            size="sm"
+                            className="rounded-full gap-1.5 shrink-0 shadow-sm shadow-primary/20"
+                            onClick={() => setSearchParams(
+                              // Sin el `room` el participante vuelve SIN asignación y queda
+                              // esperando una asignación que ya nadie puede hacer.
+                              s.lastRoomId && s.role !== "host"
+                                ? { session: s.id, room: s.lastRoomId }
+                                : { session: s.id }
+                            )}
+                          >
+                            {t("common.back")} <ArrowRight className="h-4 w-4" />
+                          </Button>
+                        ) : (
+                          /* No es miembro pero la ve: admin, o alcance de Cowork sobre
+                             esta sesión. El edge deja entrar como host sin código en
+                             ambos casos (cowork_puede_supervisar); si por lo que sea no
+                             corresponde, responde 403 y se muestra el error. */
+                          <Button
+                            size="sm"
+                            className="rounded-full gap-1.5 shrink-0 shadow-sm shadow-primary/20"
+                            disabled={enteringId === s.id}
+                            onClick={() => s.admin && handleAdminEnter(s.admin)}
+                          >
+                            {enteringId === s.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <>{t("cowork.common.enter")} <ArrowRight className="h-4 w-4" /></>}
+                          </Button>
                         )}
-                      >
-                        {t("common.back")} <ArrowRight className="h-4 w-4" />
-                      </Button>
-                    ) : (
-                      /* No es miembro pero la ve: admin, o alcance de Cowork sobre
-                         esta sesión. El edge deja entrar como host sin código en
-                         ambos casos (cowork_puede_supervisar); si por lo que sea no
-                         corresponde, responde 403 y se muestra el error. */
-                      <Button
-                        size="sm"
-                        className="rounded-full gap-1 shrink-0"
-                        disabled={enteringId === s.id}
-                        onClick={() => s.admin && handleAdminEnter(s.admin)}
-                      >
-                        {enteringId === s.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <>{t("cowork.common.enter")} <ArrowRight className="h-4 w-4" /></>}
-                      </Button>
-                    )}
-                  </div>
+                        {hayMenu && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0 rounded-full text-muted-foreground hover:text-foreground" title={t("cowork.page.sessionMenu")}>
+                                <MoreHorizontal className="h-[18px] w-[18px]" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                              {isAdmin && (
+                                <DropdownMenuItem onClick={() => setSearchParams({ session: s.id, spy: "1" })}>
+                                  <VenetianMask className="mr-2 h-4 w-4" /> {t("cowork.page.incognito")}
+                                </DropdownMenuItem>
+                              )}
+                              {puedeSalir && (
+                                <DropdownMenuItem onClick={() => setPorSalir({ id: s.id, name: s.name })}>
+                                  <LogOut className="mr-2 h-4 w-4" /> {t("cowork.page.leave")}
+                                </DropdownMenuItem>
+                              )}
+                              {puedeFinalizar && (
+                                <>
+                                  {(isAdmin || puedeSalir) && <DropdownMenuSeparator />}
+                                  <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setPorFinalizar({ id: s.id, name: s.name, members: s.members })}>
+                                    <Power className="mr-2 h-4 w-4" /> {t("cowork.page.end")}
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
                 {/* QUIÉN ESTÁ EN DÓNDE, sin entrar (Alvaro, 10/2026): cada sala
                     es un mini-panel con su gente asignada (nombres, de la DB) y

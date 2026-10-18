@@ -108,7 +108,12 @@ describe("Cowork · la entrada en inglés", () => {
   it("el diálogo de finalizar y el de crear sesión están en inglés", async () => {
     montar();
     await screen.findByText("Morning shift");
-    fireEvent.click(screen.getAllByRole("button", { name: "End" })[0]);
+    // Finalizar vive ahora en el menú ⋯ de la sesión (rediseño 10/2026): se abre
+    // el menú (con Enter, como el ⋮ del correo — el click de Radix no abre en
+    // jsdom) y de ahí se elige "End".
+    fireEvent.keyDown(screen.getAllByRole("button", { name: "More options" })[0], { key: "Enter" });
+    const menuSesion = await screen.findByRole("menu");
+    fireEvent.click(within(menuSesion).getByRole("menuitem", { name: "End" }));
     let dialogo = await screen.findByRole("alertdialog");
     expect(within(dialogo).getByText("End “Morning shift”?")).toBeTruthy();
     expect(within(dialogo).getByText(/It closes for the 3 people inside/)).toBeTruthy();

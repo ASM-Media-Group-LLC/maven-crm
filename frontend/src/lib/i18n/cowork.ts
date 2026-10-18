@@ -58,6 +58,7 @@ export const cowork = {
   "cowork.page.leave": { es: "Salir", en: "Leave" },
   "cowork.page.leaveHint": { es: "Salir de esta sesión (sigue para los demás)", en: "Leave this session (it continues for everyone else)" },
   "cowork.page.incognito": { es: "Incógnito", en: "Incognito" },
+  "cowork.page.sessionMenu": { es: "Más opciones", en: "More options" },
   "cowork.page.incognitoHint": {
     es: "Entrar de incógnito: ver y escuchar sin que nadie te vea",
     en: "Enter incognito: watch and listen without anyone seeing you",
