@@ -105,7 +105,7 @@ function MonitorTile({ pv, viewingScreen, onSwap, showName = true }: { pv: PartV
               : t("cowork.monitor.viewScreen")
         }
         aria-label={viewingScreen ? t("cowork.monitor.viewCamera") : t("cowork.monitor.viewScreen")}
-        className="absolute top-1 right-1 z-10 flex h-6 w-6 tactil:h-8 tactil:w-8 items-center justify-center rounded-md bg-black/50 text-white/90 backdrop-blur-sm transition hover:bg-black/70 disabled:cursor-not-allowed disabled:opacity-30"
+        className="absolute bottom-2 right-2 z-10 flex h-6 w-6 tactil:h-8 tactil:w-8 items-center justify-center rounded-md bg-black/50 text-white/90 backdrop-blur-sm transition hover:bg-black/70 disabled:cursor-not-allowed disabled:opacity-30"
       >
         {viewingScreen ? <Video className="h-3.5 w-3.5" /> : <Monitor className="h-3.5 w-3.5" />}
       </button>

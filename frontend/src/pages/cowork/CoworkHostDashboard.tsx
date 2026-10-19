@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  Users2, Headphones, Hand, Monitor, DoorOpen, ArrowRight,
+  Users2, Headphones, Hand, Monitor, DoorOpen,
   X, Loader2, Radio, Link2, Menu, XIcon, Maximize2, Minimize2, Phone, Share2,
   Mic, MicOff, Video, VideoOff, ArrowLeft, Plus, Pencil, Volume2, VolumeX, ScreenShare, ScreenShareOff,
   PanelRightClose, PanelRightOpen, MoreVertical, MessageCircle,
@@ -2270,7 +2270,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                         className="ml-auto h-8 gap-1.5 rounded-lg border border-primary/40 bg-primary/15 px-3 text-xs font-semibold text-primary hover:bg-primary/25 hover:text-primary"
                         onClick={() => enterRoom(room.id)}
                       >
-                        {t("cowork.common.enter")} <ArrowRight className="h-3.5 w-3.5" />
+                        <DoorOpen className="h-3.5 w-3.5" /> {t("cowork.common.enter")}
                       </Button>
                     </div>
                   </div>
