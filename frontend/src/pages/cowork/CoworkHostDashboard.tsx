@@ -2267,10 +2267,10 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="ml-auto h-8 gap-1.5 rounded-lg border border-primary/40 bg-primary/15 px-3 text-xs font-semibold text-primary hover:bg-primary/25 hover:text-primary"
+                        className="ml-auto h-8 rounded-lg border border-primary/40 bg-primary/15 px-4 text-xs font-semibold text-primary hover:bg-primary/25 hover:text-primary"
                         onClick={() => enterRoom(room.id)}
                       >
-                        <DoorOpen className="h-3.5 w-3.5" /> {t("cowork.common.enter")}
+                        {t("cowork.common.enter")}
                       </Button>
                     </div>
                   </div>
