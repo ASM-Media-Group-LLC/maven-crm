@@ -1123,6 +1123,42 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
   .tarjeta-sesion:hover { transform: none; }
 }
 
+/* ─────────────────────────────────────────────────────────────────────
+   VISTA EN LLAMADA — "Estudio Acero" (Alvaro eligió la propuesta 5, 10/2026).
+   Set de transmisión: la grilla vive sobre un ambiente de luces de set
+   (acero + un toque cálido), cada cámara es un tile ELEVADO (filo de luz
+   arriba + sombra honda), el nombre va como rótulo lower-third y el dock de
+   controles como consola. Afecta Cowork, Meet y llamadas 1:1 (comparten
+   LiveKitCallView/ParticipantTile). La llamada es tema oscuro; todo por token. */
+.call-ambiente {
+  background:
+    radial-gradient(90% 55% at 18% -8%, hsl(28 40% 46% / .05), transparent 60%),
+    radial-gradient(120% 75% at 50% -12%, hsl(210 44% 44% / .10), transparent 62%),
+    radial-gradient(100% 70% at 50% 120%, hsl(var(--primary) / .06), transparent 60%),
+    hsl(var(--background));
+}
+/* El tile elevado. El fondo (degradé de set) solo se ve con la cámara apagada
+   —detrás del avatar— o en las franjas del video (object-contain); con la
+   cámara prendida el video lo tapa. El anillo de "quien habla" lo pone el
+   propio componente (ring-primary). */
+.tile-estudio {
+  border: 1px solid hsl(var(--border));
+  background: radial-gradient(120% 120% at 50% 28%, hsl(var(--card)), hsl(var(--background)));
+  box-shadow:
+    inset 0 1px 0 hsl(0 0% 100% / .05),
+    0 2px 8px -4px hsl(0 0% 0% / .55),
+    0 20px 42px -24px hsl(0 0% 0% / .8);
+}
+/* El dock de controles como consola: una barra elevada translúcida que sostiene
+   los botones. */
+.dock-estudio {
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--card) / .6);
+  box-shadow: inset 0 1px 0 hsl(0 0% 100% / .05), 0 14px 34px -16px hsl(0 0% 0% / .7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
 /* Áreas seguras del teléfono (notch, barra de inicio). Valen 0 donde no aplica,
    así que van sin condición y no cambian nada en escritorio. Con
    viewport-fit=cover (index.html) el contenido de la PWA instalada en iPhone

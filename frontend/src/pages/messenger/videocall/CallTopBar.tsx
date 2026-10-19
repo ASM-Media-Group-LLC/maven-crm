@@ -1,5 +1,5 @@
 import { useState, useEffect, type ReactNode } from "react";
-import { Link2, LayoutGrid, Shield, Clock } from "lucide-react";
+import { Link2, LayoutGrid, Shield } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -50,17 +50,21 @@ export default function CallTopBar({
             el selector ya dice dónde estás, y en el Supervisor Hub el nombre
             además se repetía con el título de la ventanita, uno debajo del otro
             (Jhon, 10/09). Sin selector —un Meet, una videollamada— el nombre. */}
+        {/* EN VIVO (Estudio Acero): la sala está transmitiendo. */}
+        {!compact && (
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card/50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+            <span className="h-1.5 w-1.5 rounded-full bg-destructive animate-pulse motion-reduce:animate-none" />{t("messenger.call.enVivo")}
+          </span>
+        )}
         {extra ?? (
           <span className={cn("font-medium text-foreground", compact ? "text-xs truncate max-w-[120px]" : "text-sm")}>{roomName}</span>
         )}
+        {/* Cronómetro en caja, tipo marcador de transmisión. */}
         {(!compact || tactil) && (
-          <>
-            <div className="h-4 w-px bg-muted" />
-            <div className="flex items-center gap-1.5 text-muted-foreground">
-              <Clock className="h-3 w-3" />
-              <span className="text-xs tabular-nums">{formatTime(elapsed)}</span>
-            </div>
-          </>
+          <div className="flex items-center gap-1.5 rounded-lg border border-border bg-card/60 px-2 py-1">
+            <span className="h-1.5 w-1.5 rounded-full bg-destructive animate-pulse motion-reduce:animate-none" />
+            <span className="font-mono text-xs tabular-nums tracking-wide text-foreground">{formatTime(elapsed)}</span>
+          </div>
         )}
         {isEncrypted && (
           <div className="flex items-center gap-1 text-success">
@@ -78,7 +82,7 @@ export default function CallTopBar({
           <button
             onClick={copyLink}
             title={t("messenger.topbar.copiarEnlace")}
-            className="flex items-center gap-1.5 h-8 px-3 rounded-full text-xs text-foreground hover:bg-card transition-colors"
+            className="flex items-center gap-1.5 h-8 px-3 rounded-full border border-border bg-card/40 text-xs text-foreground hover:bg-card transition-colors"
           >
             <Link2 className="h-3.5 w-3.5" />
             <span className="hidden md:inline">{t("messenger.topbar.copiarEnlace")}</span>
@@ -88,7 +92,7 @@ export default function CallTopBar({
           <button
             onClick={onOpenAdjustView}
             title={t("messenger.call.ajustarVista")}
-            className="flex items-center gap-1.5 h-8 px-3 rounded-full text-xs text-foreground hover:bg-card transition-colors"
+            className="flex items-center gap-1.5 h-8 px-3 rounded-full border border-border bg-card/40 text-xs text-foreground hover:bg-card transition-colors"
           >
             <LayoutGrid className="h-3.5 w-3.5" />
             <span className="hidden md:inline">{t("messenger.call.ajustarVista")}</span>

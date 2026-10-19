@@ -330,12 +330,14 @@ const ParticipantTile = memo(function ParticipantTile({
   return (
     <div
       className={cn(
-        "group relative rounded-lg overflow-hidden flex items-center justify-center h-full transition-all duration-200",
-        participant.isSpeaking && "ring-2 ring-primary ring-offset-1 ring-offset-[hsl(220_3%_14%)]",
+        // tile-estudio: borde + filo de luz + sombra honda (tile elevado de set).
+        // El fondo del tile lo pone esa clase (antes era un gris plano inline).
+        "tile-estudio group relative overflow-hidden flex items-center justify-center h-full transition-all duration-200",
+        compact ? "rounded-lg" : "rounded-2xl",
+        participant.isSpeaking && "ring-2 ring-primary ring-offset-2 ring-offset-background",
         isPinned && "ring-2 ring-primary",
         className
       )}
-      style={{ background: "hsl(220 3% 20%)" }}
     >
       {participant.isScreenSharing && showVideo && (
         <div className="absolute bottom-2 right-2 z-20 flex items-center gap-1 rounded-full bg-black/60 px-1.5 py-1 backdrop-blur-sm opacity-0 hover:opacity-100 focus-within:opacity-100 group-hover:opacity-100 transition-opacity">
@@ -541,26 +543,27 @@ const ParticipantTile = memo(function ParticipantTile({
         </div>
       )}
 
-      {/* Bottom bar */}
-      <div className={cn("absolute bottom-0 left-0 right-0 flex items-center justify-between z-10 bg-gradient-to-t from-black/50 to-transparent", compact ? "px-1.5 py-1" : "px-2.5 py-1.5")}>
-        <div className="flex min-w-0 items-center gap-1.5">
+      {/* Rótulo lower-third (Estudio Acero): el nombre en una placa sólida
+          abajo-izquierda y la señal en su propia placa abajo-derecha, como un
+          rótulo de transmisión — en vez de una barra con degradé. */}
+      <div className={cn("absolute bottom-0 left-0 right-0 flex items-end justify-between z-10 pointer-events-none", compact ? "px-1.5 py-1.5" : "px-2.5 py-2.5")}>
+        <div className={cn("flex min-w-0 items-center gap-1.5 rounded-md border border-white/10 bg-[hsl(var(--background)/0.72)] backdrop-blur-sm", compact ? "px-1.5 py-0.5" : "px-2 py-1")}>
           <span className={cn("truncate font-medium text-white", compact ? "text-[10px]" : "text-xs")}>
             {participant.isLocal ? t("messenger.preview.tu") : participant.name}
           </span>
           {participant.isMuted && (
-            <div className="h-5 w-5 rounded-full bg-destructive flex items-center justify-center">
-              <MicOff className="h-3 w-3 text-white" />
+            <div className={cn("rounded-full bg-destructive flex items-center justify-center shrink-0", compact ? "h-4 w-4" : "h-5 w-5")}>
+              <MicOff className={compact ? "h-2.5 w-2.5 text-white" : "h-3 w-3 text-white"} />
             </div>
           )}
         </div>
-        {/* La calidad de conexión es de la PERSONA, no de cada recuadro. Cuando
-            alguien comparte pantalla con la cámara prendida se dibujan dos
-            tiles suyos, y sin esta guarda el iconito de señal salía repetido.
-            Se muestra en el de su cámara; el de la pantalla no lo repite.
-            Si comparte con la cámara APAGADA hay un solo tile y no lleva la
-            bandera, así que el indicador se sigue viendo. */}
+        {/* La calidad de conexión es de la PERSONA, no de cada recuadro: con
+            cámara + pantalla se dibujan dos tiles suyos y sin esta guarda el
+            iconito salía repetido. Va en el de su cámara. */}
         {!participant.esTileDePantalla && (
-          <ConnectionIndicator quality={participant.connectionQuality} />
+          <div className="shrink-0 rounded-md border border-white/10 bg-[hsl(var(--background)/0.72)] px-1.5 py-1 backdrop-blur-sm">
+            <ConnectionIndicator quality={participant.connectionQuality} />
+          </div>
         )}
       </div>
     </div>

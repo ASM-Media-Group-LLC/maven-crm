@@ -484,6 +484,7 @@ export const messenger = {
   "messenger.call.masOpciones": { es: "Más opciones", en: "More options" },
   "messenger.call.girarCamara": { es: "Girar cámara", en: "Flip camera" },
   "messenger.call.ajustarVista": { es: "Ajustar vista", en: "Adjust view" },
+  "messenger.call.enVivo": { es: "En vivo", en: "Live" },
   "messenger.call.metricas": { es: "Métricas", en: "Metrics" },
   "messenger.call.participantes": { es: "Participantes", en: "Participants" },
   "messenger.call.chat": { es: "Chat", en: "Chat" },

@@ -890,7 +890,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
       )}
 
       <div className="relative flex-1 flex overflow-hidden">
-        <div className="relative flex-1 p-3 overflow-hidden">
+        <div className="call-ambiente relative flex-1 p-3 overflow-hidden">
           <div className="absolute left-5 top-5 z-20">
             <RecordingControl
               room={room}
@@ -905,7 +905,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
             // Techo de ancho: en un monitor ultra-ancho, con una o dos personas
             // los cajones se volvian enormes y la cara quedaba perdida en el
             // medio. Centrado y con tope se ve como en Meet.
-            <div className={cn("grid gap-2 h-full mx-auto w-full max-w-[1600px]", gridCols)}>
+            <div className={cn("grid gap-3 h-full mx-auto w-full max-w-[1600px]", gridCols)}>
               {visibleParticipants.map((p) => <ParticipantTile key={`${p.identity}-${p.sid}`} participant={p} room={room} preferredAudioOutputDeviceId={audioOutputId} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} onPinParticipant={handlePinParticipant} pinnedSid={pinnedSid} isAdmin={isAdmin} />)}
             </div>
           ) : (

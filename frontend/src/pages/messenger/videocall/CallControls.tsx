@@ -408,8 +408,9 @@ export default function CallControls({
     <div className={cn("shrink-0 flex items-center bg-background", compact ? "py-1.5 px-2 justify-center flex-wrap" : "py-3 px-4")}>
       {!compact && <div className="flex-1" />}
 
-      {/* Center controls */}
-      <div className={cn("flex items-center flex-wrap justify-center", compact ? "gap-1" : "gap-2")}>
+      {/* Center controls — en no-compacto van dentro de una consola (dock-estudio):
+          una barra elevada translúcida que agrupa los controles. */}
+      <div className={cn("flex items-center flex-wrap justify-center", compact ? "gap-1" : "dock-estudio gap-2 rounded-2xl px-2.5 py-2")}>
         {/* Mic — compact skips device popover */}
         {compact ? (
           <button
