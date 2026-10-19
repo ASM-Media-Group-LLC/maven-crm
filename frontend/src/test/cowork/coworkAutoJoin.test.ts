@@ -28,15 +28,17 @@ describe("decidirAutoJoin — la URL de Cowork nunca degrada a un host", () => {
   });
 });
 
-// EL BUG (19/10/2026): "entré a mi link del cowork y aparecí en la sala de otro"
-// (Grace cayó en COORDINADORES). La sala del link viejo pisaba la sala real de
-// la persona. Ahora tu última sala manda; solo un recién llegado usa la del link.
-describe("salaParaAutoUnir — el link viejo no te saca de tu sala", () => {
-  it("si ya tienes una sala (tu última), ESA manda sobre la del link", () => {
-    expect(salaParaAutoUnir("sala-del-link", "mi-sala")).toBe("mi-sala");
+// EL BUG (19/10/2026): Grace solo había estado en COORDINADORES. getMyLastRoomId
+// resucita asignaciones INACTIVAS, así que su "última sala" era un fantasma, y la
+// lógica vieja (última sala manda) la devolvía a Coordinadores ignorando el link
+// de Chatters. Ahora el link del coordinador manda; la última sala solo se usa si
+// el link no trae sala. Para mover a propósito está el código (joinByCode).
+describe("salaParaAutoUnir — el link del coordinador manda sobre la última sala", () => {
+  it("si el link trae sala, ESA manda aunque tengas una última sala (fantasma)", () => {
+    expect(salaParaAutoUnir("sala-del-link", "mi-sala")).toBe("sala-del-link");
   });
-  it("recién llegado sin historial: usa la sala del link", () => {
-    expect(salaParaAutoUnir("sala-del-link", null)).toBe("sala-del-link");
+  it("link sin sala: reanuda tu última sala", () => {
+    expect(salaParaAutoUnir(null, "mi-sala")).toBe("mi-sala");
   });
   it("sin link ni historial: nada", () => {
     expect(salaParaAutoUnir(null, null)).toBe(null);

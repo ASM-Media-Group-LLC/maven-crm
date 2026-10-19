@@ -37,12 +37,17 @@ export function decidirAutoJoin(p: {
   return quiereHost ? "unirse-como-host" : "unirse-como-participante";
 }
 
-/** Qué sala usar al auto-unirse a una sesión. La sala del link (`?room=`) puede
- *  estar VIEJA: te la reenvió alguien, o es de ayer. Si ya tienes una sala en
- *  esta sesión (tu última), ESA manda — el link no te mueve de tu sala. Solo
- *  quien entra por PRIMERA vez (sin historial) usa la sala del link. Arregla el
- *  "entré a mi link y caí en la sala de otro". Para MOVER a alguien a propósito
- *  está el código de 6 caracteres (joinByCode), que sí reasigna. */
+/** Qué sala usar al auto-unirse por un link. El link (`?room=`) es la orden del
+ *  coordinador: es LA sala a la que quiere mandar a la persona, así que MANDA.
+ *  `ultimaSala` solo entra si el link no trae sala (reabrir desde la lista de
+ *  sesiones o el ícono del PWA), para reanudar donde estabas.
+ *
+ *  EL BUG (19/10/2026): antes era al revés — "tu última sala" pisaba el link. Y
+ *  como getMyLastRoomId devuelve hasta asignaciones INACTIVAS, una sala vieja se
+ *  volvía un fantasma eterno: Grace solo había estado en COORDINADORES, así que
+ *  cada link de Chatters la devolvía a Coordinadores y no había forma de salir
+ *  (entrar de incógnito sí mostraba la sala real; entrar normal, no). Para MOVER
+ *  a propósito sigue estando el código de 6 caracteres (joinByCode). */
 export function salaParaAutoUnir(urlRoomId: string | null, ultimaSala: string | null): string | null {
-  return ultimaSala ?? urlRoomId;
+  return urlRoomId ?? ultimaSala;
 }

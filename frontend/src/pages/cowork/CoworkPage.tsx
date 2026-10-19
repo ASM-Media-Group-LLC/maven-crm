@@ -256,11 +256,12 @@ export default function CoworkPage() {
         if (decision === "unirse-como-host") {
           await cowork.joinSession(sessionId, "host", code ?? undefined);
         } else if (roomId) {
-          // La sala del link puede estar VIEJA (te la reenvió alguien, es de
-          // ayer). Si ya tienes una sala en esta sesión, ESA manda: el link no
-          // te saca de tu sala. Solo quien entra por primera vez (sin historial)
-          // usa la del link. Arregla el "entré a mi link y caí en la sala de
-          // otro". Para mover a alguien a propósito está el código de la sala.
+          // El link (`?room=`) es la orden del coordinador: es LA sala a la que
+          // quiere mandar a la persona, así que MANDA. Tu última sala solo se usa
+          // si el link no trae sala. Antes era al revés y una asignación vieja
+          // (fantasma: getMyLastRoomId lee hasta las inactivas) devolvía a Grace a
+          // COORDINADORES ignorando el link de Chatters. Para mover a propósito
+          // está el código de 6 caracteres (joinByCode).
           const ultimaSala = await cowork.getMyLastRoomId(sessionId);
           await cowork.joinSession(sessionId, "participant", undefined, salaParaAutoUnir(roomId, ultimaSala));
         }
