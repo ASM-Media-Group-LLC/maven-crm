@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  Users2, Headphones, Hand, Monitor, DoorOpen,
+  Users2, Headphones, Hand, Monitor, DoorOpen, ArrowRight,
   X, Loader2, Radio, Link2, Menu, XIcon, Maximize2, Minimize2, Phone, Share2,
   Mic, MicOff, Video, VideoOff, ArrowLeft, Plus, Pencil, Volume2, VolumeX, ScreenShare, ScreenShareOff,
   PanelRightClose, PanelRightOpen, MoreVertical, MessageCircle,
@@ -2103,56 +2103,17 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                       // amerita pintar la tarjeta. Compartir pantalla es lo normal
                       // y ya no colorea el borde; lo anormal (no compartir) sale
                       // como etiqueta sobre el video.
-                      speakers.length ? "border-success" : "border-border",
+                      speakers.length ? "card-estudio--viva border-success" : "border-border",
                       isMobile && "cursor-pointer active:bg-muted/40",
                     )}
                   >
-                    {/* Cabecera de una línea: nombre y cuántos hay. El código de
-                        sala (R9D9XR…) se sacó de la cara — se veía feo y ruidoso;
-                        sigue disponible en el menú ⋯ → "Copiar código" (Alvaro,
-                        10/2026). */}
-                    <div className="flex h-10 items-center gap-2 px-3">
-                      <span className="min-w-0 truncate font-display text-sm font-semibold text-foreground">{tituloBonito(room.name)}</span>
-                      <span className="ml-auto inline-flex items-center gap-1 text-[11px] tabular-nums text-muted-foreground" title={t("cowork.host.inRoomCount", { n: participants.length })}>
-                        <Users2 className="h-3 w-3" />{participants.length}
-                      </span>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="hidden md:inline-flex h-7 w-7 rounded-lg text-muted-foreground hover:text-foreground"
-                            title={t("cowork.host.roomMenu")}
-                          >
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-56">
-                          <DropdownMenuItem onClick={() => copiarEnlaceDeSala(room)}>
-                            <Link2 className="mr-2 h-4 w-4" /> {t("cowork.host.copyParticipantLink")}
-                          </DropdownMenuItem>
-                          {room.join_code && (
-                            <DropdownMenuItem onClick={() => copiarCodigoDeSala(room)}>
-                              <KeyRound className="mr-2 h-4 w-4" /> {t("cowork.host.copyCode")} <span className="ml-auto font-mono text-xs text-muted-foreground">{room.join_code}</span>
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => openEdit(room)}>
-                            <Pencil className="mr-2 h-4 w-4" /> {t("cowork.host.editRoom")}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setCloseTarget(room)}>
-                            <X className="mr-2 h-4 w-4" /> {t("cowork.host.closeRoom")}
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-
-                    {/* El video, a 16:9 y de borde a borde. Encima: los llamados
-                        (arriba a la izquierda) y la gente con su reloj (abajo). */}
+                    {/* La cámara es la protagonista, a sangre: el nombre de la
+                        sala, el conteo y el menú ⋯ flotan ENCIMA del video (antes
+                        iban en una cabecera aparte arriba). El código de sala
+                        (R9D9XR…) sigue en el menú ⋯ → "Copiar código". A 4:3 en el
+                        teléfono (a 175 px, 16:9 daban 98 px y la pausa no cabía). */}
                     <div className={cn(
-                      // En el teléfono va redondeado y a 4:3: a 175 px de ancho, 16:9
-                      // daban 98 px de alto y el panel de pausa no cabía (10/09).
-                      "relative mx-2 mb-2 aspect-[4/3] overflow-hidden rounded-xl md:mx-0 md:mb-0 md:aspect-video md:rounded-none",
+                      "relative aspect-[4/3] overflow-hidden md:aspect-video",
                       participants.length === 0 ? "bg-muted/50" : "bg-black/40",
                     )}>
                       {participants.length === 0 ? (
@@ -2203,8 +2164,46 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                         monitor(true)
                       )}
 
+                      {/* Overlay superior: nombre de la sala + conteo (izq) y el
+                          menú ⋯ (der), flotando sobre el video. */}
+                      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-center gap-2 bg-gradient-to-b from-black/60 to-transparent px-3 py-2">
+                        <span className="min-w-0 flex-1 truncate font-display text-sm font-semibold text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.5)]">{tituloBonito(room.name)}</span>
+                        <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-white/15 bg-black/45 px-2 py-0.5 text-[11px] tabular-nums text-white backdrop-blur-sm" title={t("cowork.host.inRoomCount", { n: participants.length })}>
+                          <Users2 className="h-3 w-3" />{participants.length}
+                        </span>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="pointer-events-auto hidden h-7 w-7 shrink-0 rounded-lg border border-white/10 bg-black/35 text-white hover:bg-black/55 hover:text-white md:inline-flex"
+                              title={t("cowork.host.roomMenu")}
+                            >
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-56">
+                            <DropdownMenuItem onClick={() => copiarEnlaceDeSala(room)}>
+                              <Link2 className="mr-2 h-4 w-4" /> {t("cowork.host.copyParticipantLink")}
+                            </DropdownMenuItem>
+                            {room.join_code && (
+                              <DropdownMenuItem onClick={() => copiarCodigoDeSala(room)}>
+                                <KeyRound className="mr-2 h-4 w-4" /> {t("cowork.host.copyCode")} <span className="ml-auto font-mono text-xs text-muted-foreground">{room.join_code}</span>
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => openEdit(room)}>
+                              <Pencil className="mr-2 h-4 w-4" /> {t("cowork.host.editRoom")}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setCloseTarget(room)}>
+                              <X className="mr-2 h-4 w-4" /> {t("cowork.host.closeRoom")}
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+
                       {etiquetas.length > 0 && (
-                        <div className="pointer-events-none absolute left-2 top-2 flex max-w-[80%] flex-col items-start gap-1">
+                        <div className="pointer-events-none absolute left-2 top-11 z-10 flex max-w-[80%] flex-col items-start gap-1">
                           {etiquetas.map((e) => (
                             <span
                               key={e.key}
@@ -2218,9 +2217,9 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                       )}
 
                       {personas.length === 1 && !pausaSala && (room.preview_mode ?? "video") === "video" && (
-                        <div className="pointer-events-none absolute bottom-2 left-2 right-2 flex flex-wrap items-end gap-1">
+                        <div className="pointer-events-none absolute bottom-2.5 left-2.5 right-2.5 z-10 flex flex-wrap items-end gap-1">
                           {personas.map((p) => (
-                            <span key={p.uid} className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-white/10 bg-[hsl(var(--background)/0.72)] px-2 py-1 text-[11px] text-white backdrop-blur-sm">
+                            <span key={p.uid} className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-white/10 bg-[hsl(var(--background)/0.74)] px-2.5 py-1.5 text-xs text-white shadow-[0_6px_18px_-8px_rgba(0,0,0,0.6)] backdrop-blur-sm">
                               <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", p.online ? "bg-success" : "bg-white/40")} />
                               {/* El reloj va SIEMPRE al lado del nombre, también en el teléfono
                                   (Jhon, 10/09). Si el nombre es largo, cede él: min-w-0 deja que
@@ -2266,12 +2265,12 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                         </div>
                       )}
                       <Button
-                        variant="secondary"
+                        variant="ghost"
                         size="sm"
-                        className="ml-auto h-8 gap-1.5 rounded-lg text-xs"
+                        className="ml-auto h-8 gap-1.5 rounded-lg border border-primary/40 bg-primary/15 px-3 text-xs font-semibold text-primary hover:bg-primary/25 hover:text-primary"
                         onClick={() => enterRoom(room.id)}
                       >
-                        <DoorOpen className="h-3.5 w-3.5" /> {t("cowork.common.enter")}
+                        {t("cowork.common.enter")} <ArrowRight className="h-3.5 w-3.5" />
                       </Button>
                     </div>
                   </div>
