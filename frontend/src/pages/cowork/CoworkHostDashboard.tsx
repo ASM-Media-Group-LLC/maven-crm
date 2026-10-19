@@ -1932,7 +1932,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
             />
           </div>
         ) : (
-          <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 pt-14 pb-28 md:p-6 md:pb-32">
+          <div className="call-ambiente flex-1 overflow-y-auto overflow-x-hidden p-3 pt-14 pb-28 md:p-6 md:pb-32">
             <div className="mb-4 flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
               <div className="min-w-0">
                 <h2 className="font-display text-lg font-semibold leading-tight text-foreground">{t("cowork.create.rooms")}</h2>
@@ -2095,7 +2095,10 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                     onClick={isMobile ? (e) => { if ((e.target as HTMLElement).closest("button")) return; setSalaEnHoja(room.id); } : undefined}
                     onKeyDown={isMobile ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setSalaEnHoja(room.id); } } : undefined}
                     className={cn(
-                      "flex min-w-0 flex-col overflow-hidden rounded-2xl border bg-card transition-colors",
+                      // card-estudio: la misma elevación de set que los tiles de la
+                      // llamada (sombra honda + filo de luz), conservando bg-card y
+                      // el borde verde al hablar.
+                      "card-estudio flex min-w-0 flex-col overflow-hidden rounded-2xl border bg-card transition-colors",
                       // Verde cuando alguien está HABLANDO ahora: es lo único que
                       // amerita pintar la tarjeta. Compartir pantalla es lo normal
                       // y ya no colorea el borde; lo anormal (no compartir) sale
@@ -2217,7 +2220,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                       {personas.length === 1 && !pausaSala && (room.preview_mode ?? "video") === "video" && (
                         <div className="pointer-events-none absolute bottom-2 left-2 right-2 flex flex-wrap items-end gap-1">
                           {personas.map((p) => (
-                            <span key={p.uid} className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-black/60 px-2 py-0.5 text-[11px] text-white backdrop-blur-sm">
+                            <span key={p.uid} className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-white/10 bg-[hsl(var(--background)/0.72)] px-2 py-1 text-[11px] text-white backdrop-blur-sm">
                               <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", p.online ? "bg-success" : "bg-white/40")} />
                               {/* El reloj va SIEMPRE al lado del nombre, también en el teléfono
                                   (Jhon, 10/09). Si el nombre es largo, cede él: min-w-0 deja que

@@ -1158,6 +1158,15 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
 }
+/* Las TARJETAS de sala del piso de supervisión: la misma elevación de set que
+   los tiles, pero conservando su propio fondo/borde (bg-card + borde verde al
+   hablar) — por eso es solo la sombra + el filo de luz, no el fondo. */
+.card-estudio {
+  box-shadow:
+    inset 0 1px 0 hsl(0 0% 100% / .04),
+    0 2px 8px -4px hsl(0 0% 0% / .5),
+    0 18px 40px -24px hsl(0 0% 0% / .7);
+}
 
 /* Áreas seguras del teléfono (notch, barra de inicio). Valen 0 donde no aplica,
    así que van sin condición y no cambian nada en escritorio. Con
