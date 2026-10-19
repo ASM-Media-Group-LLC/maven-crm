@@ -57,8 +57,16 @@ export function hablar(
     const sintesis = window.speechSynthesis;
     if (!sintesis) return false;
     // Si venía diciendo otra cosa, se corta: dos frases encimadas no se
-    // entienden y es peor que una sola.
-    sintesis.cancel();
+    // entienden y es peor que una sola. Pero SOLO si de verdad hay algo sonando
+    // o en cola: un cancel() sobre un motor INACTIVO es, en Chromium, uno de los
+    // gestos que lo TRABAN (queda speaking=true y sin eventos). La cola del
+    // supervisor llama a hablar() con el motor ya quieto entre frase y frase, así
+    // que antes esto disparaba un cancel() ocioso por CADA aviso durante todo el
+    // turno. Si el motor ya está trabado, speaking vale true igual, así que el
+    // corte se sigue intentando justo cuando queremos destrabarlo.
+    if (sintesis.speaking || sintesis.pending) {
+      try { sintesis.cancel(); } catch { /* noop */ }
+    }
     const u = new SpeechSynthesisUtterance(texto);
     u.lang = "es-419";
     u.rate = opciones?.velocidad ?? 0.95;
@@ -74,9 +82,16 @@ export function hablar(
     // quien encadena frases adelantaria la cola de a dos y volveria a encimar
     // — que es justo lo que se quiere evitar.
     let termino = false;
+    // Latido que mantiene vivo el motor (ver abajo, junto al speak). Se apaga en
+    // CUALQUIER salida de la frase para no dejar un timer colgado.
+    let latido: number | undefined;
+    const pararLatido = () => {
+      if (latido !== undefined) { window.clearInterval(latido); latido = undefined; }
+    };
     const terminar = (como: FinDeFrase) => {
       if (termino) return;
       termino = true;
+      pararLatido();
       opciones?.onFin?.(como);
     };
 
@@ -97,7 +112,26 @@ export function hablar(
       }
     }, 2500);
 
+    // Chrome PAUSA la síntesis cuando la pestaña pasa a segundo plano o tras unos
+    // segundos de habla, y el tablero del supervisor casi siempre está en segundo
+    // plano: la frase se ACEPTA (speaking=true) y nunca suena — el "aceptó pero
+    // nunca reprodujo" que se veía en pantalla. resume() la destraba y es no-op si
+    // el motor no está pausado (el mismo gesto que ya usamos con el AudioContext en
+    // notificationSound y useLiveKit). Va ANTES del speak por si quedó pausado de
+    // una frase anterior, y además LATE mientras esta frase esté en vuelo: el
+    // resume() de antes del speak corre sin que el navegador lo frene; el latido
+    // cubre la pausa de los ~15 s en primer plano (en segundo plano el navegador
+    // ralentiza los timers, pero para entonces el resume() de arriba ya hizo lo suyo).
+    try { sintesis.resume(); } catch { /* noop */ }
     sintesis.speak(u);
+    latido = window.setInterval(() => {
+      try {
+        // Cuando el motor ya no habla, la frase terminó: el latido se apaga solo
+        // aunque onend nunca haya llegado (motor trabado a mitad de frase).
+        if (!sintesis.speaking) { pararLatido(); return; }
+        sintesis.resume();
+      } catch { pararLatido(); }
+    }, 5000);
     return true;
   } catch {
     return false;
