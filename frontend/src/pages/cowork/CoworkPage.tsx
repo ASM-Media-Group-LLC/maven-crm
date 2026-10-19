@@ -6,7 +6,7 @@ import { useRoleTier } from "@/hooks/useRoleTier";
 import { usePermissions } from "@/hooks/usePermissions";
 import { supabase } from "@/integrations/supabase/client";
 import { avisarPersona } from "@/lib/avisoPersona";
-import { decidirAutoJoin } from "@/lib/coworkAutoJoin";
+import { decidirAutoJoin, salaParaAutoUnir } from "@/lib/coworkAutoJoin";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -256,7 +256,13 @@ export default function CoworkPage() {
         if (decision === "unirse-como-host") {
           await cowork.joinSession(sessionId, "host", code ?? undefined);
         } else if (roomId) {
-          await cowork.joinSession(sessionId, "participant", undefined, roomId);
+          // La sala del link puede estar VIEJA (te la reenvió alguien, es de
+          // ayer). Si ya tienes una sala en esta sesión, ESA manda: el link no
+          // te saca de tu sala. Solo quien entra por primera vez (sin historial)
+          // usa la del link. Arregla el "entré a mi link y caí en la sala de
+          // otro". Para mover a alguien a propósito está el código de la sala.
+          const ultimaSala = await cowork.getMyLastRoomId(sessionId);
+          await cowork.joinSession(sessionId, "participant", undefined, salaParaAutoUnir(roomId, ultimaSala));
         }
         cowork.refetch();
       } catch (e) {

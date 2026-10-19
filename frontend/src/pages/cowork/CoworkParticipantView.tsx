@@ -440,6 +440,14 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     reconnectToMainRoom();
   }, [reconnectToMainRoom]);
 
+  // "Ir a mi sala": con un clic vuelves a TU sala asignada desde un meet grupal
+  // o una llamada privada, sin pedirle nada a nadie. Si estás en un meet, sale
+  // del meet primero; si no, reconecta a tu sala.
+  const irAMiSala = useCallback(() => {
+    if (meetId || meetRoom) volverDelMeet();
+    else reconnectToMainRoom();
+  }, [meetId, meetRoom, volverDelMeet, reconnectToMainRoom]);
+
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
       if (data.user) {
@@ -842,6 +850,11 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
 
         {/* Desktop actions */}
         <div className="hidden md:flex items-center gap-2">
+          {(isInOneOnOne || !!meetRoom) && myRoom && (
+            <Button variant="ghost" size="sm" className="text-primary hover:text-primary hover:bg-primary/10 gap-1.5 rounded-full" onClick={irAMiSala}>
+              <DoorOpen className="h-4 w-4" /> {t("cowork.participant.goToMyRoom")}
+            </Button>
+          )}
           {dismissedActiveRequest && !isInOneOnOne && (
             <Button variant="ghost" size="sm" className="text-warning hover:text-warning/80 hover:bg-warning/10 gap-1.5 animate-pulse rounded-full" onClick={handleReconnectPrivateCall}>
               <PhoneCall className="h-4 w-4" /> {t("cowork.participant.reconnectPrivate")}
@@ -897,6 +910,12 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
 
         {/* Mobile actions dropdown */}
         <div className="flex md:hidden items-center gap-1 shrink-0">
+          {(isInOneOnOne || !!meetRoom) && myRoom && (
+            <button type="button" onClick={irAMiSala} title={t("cowork.participant.goToMyRoom")}
+              className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
+              <DoorOpen className="h-3.5 w-3.5" /> {t("cowork.participant.goToMyRoom")}
+            </button>
+          )}
           {breakStartedAt && (() => {
             const c = cuentaPausa(breakElapsed, breakLimite, consumidoDe(breakKind));
             return (

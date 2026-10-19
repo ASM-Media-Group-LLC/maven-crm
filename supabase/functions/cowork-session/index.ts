@@ -268,9 +268,19 @@ serve(async (req) => {
         return err(req, "Tu rol no permite crear sesiones de Cowork. Pide el enlace de la sala a tu coordinador.", 403);
       }
 
-      const { name, description, roomNames } = body; // roomNames: string[]
+      const { description, roomNames } = body; // roomNames: string[]
+      const name = String(body.name ?? "").trim();
       if (!name || !roomNames?.length) return err(req, "name and roomNames required");
       if (roomNames.length > MAX_SALAS_POR_SESION) return err(req, `Máximo ${MAX_SALAS_POR_SESION} salas por sesión`);
+
+      // No dos sesiones ACTIVAS con el mismo nombre en la agencia: las repetidas
+      // (hubo 5 "CHATTERS KASH") repartían a la gente entre varias y se perdían
+      // los links. Las TERMINADAS no cuentan, así que siempre se puede crear una
+      // nueva cuando la anterior ya cerró.
+      const { data: dupNombre } = await admin.from("cowork_sessions")
+        .select("id").eq("tenant_id", miAgencia).eq("status", "active")
+        .ilike("name", name).limit(1).maybeSingle();
+      if (dupNombre) return err(req, "Ya existe una sesión activa con ese nombre. Reúsala, o termínala antes de crear otra.", 409);
 
       // Check active session limit per user
       const { count: activeCount } = await admin.from("cowork_sessions")

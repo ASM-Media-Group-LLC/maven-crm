@@ -393,6 +393,7 @@ export const cowork = {
   "cowork.participant.stepAway": { es: "Avisar que te ausentas un momento", en: "Let them know you're stepping away" },
   "cowork.participant.over": { es: "pasado", en: "over" },
   "cowork.participant.pause": { es: "Pausa", en: "Pause" },
+  "cowork.participant.goToMyRoom": { es: "Ir a mi sala", en: "Go to my room" },
   "cowork.participant.inMeet": { es: "Estás en un meet grupal.", en: "You're in a group meet." },
   "cowork.participant.inMeetOnBreak": {
     es: "Sigues en break: prende el micrófono o la cámara para salir del break.",

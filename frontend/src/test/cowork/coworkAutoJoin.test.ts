@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { decidirAutoJoin } from "@/lib/coworkAutoJoin";
+import { decidirAutoJoin, salaParaAutoUnir } from "@/lib/coworkAutoJoin";
 
 const base = { role: null, code: null, roomId: null, membresia: null, tieneAsignacion: false };
 
@@ -25,5 +25,20 @@ describe("decidirAutoJoin — la URL de Cowork nunca degrada a un host", () => {
   it("sin membresía: entra con el rol que pide la URL", () => {
     expect(decidirAutoJoin({ ...base, role: "host", code: "ABC" })).toBe("unirse-como-host");
     expect(decidirAutoJoin({ ...base, roomId: "r1" })).toBe("unirse-como-participante");
+  });
+});
+
+// EL BUG (19/10/2026): "entré a mi link del cowork y aparecí en la sala de otro"
+// (Grace cayó en COORDINADORES). La sala del link viejo pisaba la sala real de
+// la persona. Ahora tu última sala manda; solo un recién llegado usa la del link.
+describe("salaParaAutoUnir — el link viejo no te saca de tu sala", () => {
+  it("si ya tienes una sala (tu última), ESA manda sobre la del link", () => {
+    expect(salaParaAutoUnir("sala-del-link", "mi-sala")).toBe("mi-sala");
+  });
+  it("recién llegado sin historial: usa la sala del link", () => {
+    expect(salaParaAutoUnir("sala-del-link", null)).toBe("sala-del-link");
+  });
+  it("sin link ni historial: nada", () => {
+    expect(salaParaAutoUnir(null, null)).toBe(null);
   });
 });
