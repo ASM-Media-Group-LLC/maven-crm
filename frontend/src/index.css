@@ -83,22 +83,28 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
        "tira a morado". El morado vive en primary/accent/ring y en los estados
        activos del sidebar (glass deriva de --primary/--accent). */
     --background: 240 14% 4%;
-    --foreground: 240 12% 95%;
+    /* Blanco suavizado (antes 95%): el 95% sobre el fondo casi negro "quemaba"
+       y aplanaba la jerarquía. Dos niveles: fuerte = este 89%, tenue =
+       muted-foreground (bajado a 61% para que lo secundario se separe más).
+       No toca los botones (usan *-foreground: 0 0% 100%) ni el texto sobre
+       fotos/video (text-white). Decisión de Alvaro (19/10): "todo un poco más
+       suave, dos niveles". */
+    --foreground: 240 12% 89%;
 
     --card: 240 12% 7%;
-    --card-foreground: 240 12% 95%;
+    --card-foreground: 240 12% 89%;
 
     --popover: 240 12% 7%;
-    --popover-foreground: 240 12% 95%;
+    --popover-foreground: 240 12% 89%;
 
     --primary: 213 70% 58%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 240 10% 12%;
-    --secondary-foreground: 240 12% 95%;
+    --secondary-foreground: 240 12% 89%;
 
     --muted: 240 10% 12%;
-    --muted-foreground: 240 8% 64%;
+    --muted-foreground: 240 8% 61%;
 
     --accent: 202 80% 54%;
     --accent-foreground: 0 0% 100%;
@@ -120,11 +126,11 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
     --ring: 213 70% 58%;
 
     --sidebar-background: 240 14% 5%;
-    --sidebar-foreground: 240 12% 95%;
+    --sidebar-foreground: 240 12% 89%;
     --sidebar-primary: 213 70% 58%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 240 10% 12%;
-    --sidebar-accent-foreground: 240 12% 95%;
+    --sidebar-accent-foreground: 240 12% 89%;
     --sidebar-border: 240 9% 13%;
     --sidebar-ring: 213 70% 58%;
 
