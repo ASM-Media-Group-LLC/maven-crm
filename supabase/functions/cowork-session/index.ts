@@ -1238,6 +1238,14 @@ serve(async (req) => {
         .update({ status: "ended", ended_at: new Date().toISOString(), ended_by: userId })
         .eq("id", sessionId);
       if (upErr) return err(req, upErr.message, 500);
+      // Finalizar saca a TODOS: hay que SOLTAR sus asignaciones de sala. Sin
+      // esto quedaban is_active=true para siempre (26 colgadas en sesiones ya
+      // terminadas el 19/10/2026), y la gente arrastraba pertenencia a sesiones
+      // viejas — entrabas a tu link y aparecías en la sala/sesión de otro, o se
+      // "mezclaban" las varias sesiones del mismo nombre. leaveSession ya lo
+      // hacía; endSession se lo había saltado.
+      await admin.from("cowork_room_assignments")
+        .update({ is_active: false }).eq("session_id", sessionId).eq("is_active", true);
       await cerrarSegmentosAbiertos({ sessionId });
       return json(req, { success: true });
     }
