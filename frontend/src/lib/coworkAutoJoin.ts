@@ -36,3 +36,13 @@ export function decidirAutoJoin(p: {
   }
   return quiereHost ? "unirse-como-host" : "unirse-como-participante";
 }
+
+/** Qué sala usar al auto-unirse a una sesión. La sala del link (`?room=`) puede
+ *  estar VIEJA: te la reenvió alguien, o es de ayer. Si ya tienes una sala en
+ *  esta sesión (tu última), ESA manda — el link no te mueve de tu sala. Solo
+ *  quien entra por PRIMERA vez (sin historial) usa la sala del link. Arregla el
+ *  "entré a mi link y caí en la sala de otro". Para MOVER a alguien a propósito
+ *  está el código de 6 caracteres (joinByCode), que sí reasigna. */
+export function salaParaAutoUnir(urlRoomId: string | null, ultimaSala: string | null): string | null {
+  return ultimaSala ?? urlRoomId;
+}
