@@ -162,7 +162,10 @@ export default function CoworkPage() {
   const handleAdminEnter = async (s: AdminSessionRow) => {
     setEnteringId(s.id);
     try {
-      if (!s.my_role) await cowork.joinSession(s.id, "host");
+      // Aunque YA sea miembro: si entró alguna vez como participante, el edge la
+      // sube a host y le SUELTA la asignación de sala. Así un admin con membresía
+      // vieja de participante (Grace, clavada en COORDINADORES) se libera al entrar.
+      if (s.my_role !== "host") await cowork.joinSession(s.id, "host");
       setSearchParams({ session: s.id });
     } catch (e) {
       toast.error((e as Error).message || t("cowork.page.enterError"));
@@ -381,6 +384,16 @@ export default function CoworkPage() {
               // Volver no se ve profesional". El ⋯ va en la esquina y frena la
               // burbuja para no entrar por accidente al abrir el menú.
               const entrarALaSesion = () => {
+                // Un admin SIEMPRE entra como SUPERVISOR, aunque arrastre una
+                // membresía vieja de participante. Si no, el landing lo pincha a su
+                // "última sala" (room: s.lastRoomId) y, siendo esa un fantasma viejo
+                // (Grace: COORDINADORES), queda atrapado ahí sin poder llegar a otra.
+                // Al entrar como host el edge le SUELTA la asignación y lo deja en el
+                // tablero, con todas las salas a mano. (19/10/2026)
+                if (isAdmin && s.admin && enteringId !== s.id) {
+                  void handleAdminEnter(s.admin);
+                  return;
+                }
                 if (s.role) {
                   setSearchParams(
                     // Sin el `room` el participante vuelve SIN asignación y queda
