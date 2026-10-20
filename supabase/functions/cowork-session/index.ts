@@ -1360,6 +1360,7 @@ serve(async (req) => {
     // mismo maneja no mide nada, y sin registro no hay historial que revisar.
     // ═══════════════════════════════════════════════════════════════
     if (action === "startBreak") {
+      // Tipos válidos: bano / break / almuerzo. Cualquier otra cosa cae a bano.
       const kind = body.kind === "break" ? "break" : body.kind === "almuerzo" ? "almuerzo" : "bano";
       const { data: asignacion } = await admin.from("cowork_room_assignments")
         .select("session_id, room_id").eq("user_id", userId).eq("is_active", true)
