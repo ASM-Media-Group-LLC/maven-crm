@@ -7,7 +7,7 @@
 // al lado, un renglón con desde cuándo y cuánto queda, y una frase corta para
 // que la pausa no parezca una falta. Rojo y latiendo si se pasó.
 import { useId } from "react";
-import { Coffee, Video, Droplet, Utensils } from "lucide-react";
+import { Video } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FRASES_DE_PAUSA } from "@/lib/frasesDePausa";
 import { formatoActual, type Formato } from "@/lib/formato";
@@ -180,10 +180,9 @@ export default function SalaEnPausa({ pausa, className, nombres }: { pausa: Paus
   // van en dos renglones limpios; en escritorio, en uno separados por el punto.
   const partes = d.detalle.split(" · ");
   // Avatar: la INICIAL de quien está en pausa dentro de un anillo que se llena
-  // con lo que lleva de su tope (mock de Álvaro). El tipo de pausa queda en una
-  // chapa chica sobre el anillo. El meet grupal no es de una persona: ahí se
-  // deja el ícono, sin inicial ni anillo.
-  const Icono = pausa.kind === "bano" ? Droplet : pausa.kind === "almuerzo" ? Utensils : Coffee;
+  // con lo que lleva de su tope. El TIPO de pausa va en palabras (el título "En
+  // el baño/break/almuerzo" y los recuadros de abajo), no en íconos: la gota y
+  // la taza confundían. El meet grupal no es de una persona: ahí va su ícono.
   const iniciales = inicialesDeNombre(nombres?.[0]);
   const RADIO = 20, CIRC = 2 * Math.PI * RADIO;
   const avance = (Math.max(0, Math.min(100, d.pct)) / 100) * CIRC;
@@ -202,7 +201,8 @@ export default function SalaEnPausa({ pausa, className, nombres }: { pausa: Paus
           const tope = limiteMin * 60;
           estado = usadoSeg >= tope ? "excedida" : usadoSeg >= tope * 0.75 ? "poco" : "ok";
         }
-        return { k, usadoMin: Math.round(usadoSeg / 60), limiteMin, estado };
+        const etiqueta = t(k === "bano" ? "cowork.pause.bano" : k === "almuerzo" ? "cowork.pause.almuerzo" : "cowork.pause.break");
+        return { k, usadoMin: Math.round(usadoSeg / 60), limiteMin, estado, etiqueta };
       })
     : null;
   return (
@@ -236,12 +236,6 @@ export default function SalaEnPausa({ pausa, className, nombres }: { pausa: Paus
             <div className="absolute inset-0 grid place-items-center">
               <span className={cn("font-display text-[13px] font-bold leading-none md:text-sm", acento)}>{iniciales}</span>
             </div>
-            <div className={cn(
-              "absolute -bottom-0.5 -right-0.5 grid h-4 w-4 place-items-center rounded-full ring-2 ring-black/40 md:h-[18px] md:w-[18px]",
-              excedida ? "bg-destructive text-white" : "bg-warning text-black",
-            )}>
-              <Icono className="h-2.5 w-2.5" />
-            </div>
           </div>
         )}
         <div className="text-left">
@@ -266,16 +260,15 @@ export default function SalaEnPausa({ pausa, className, nombres }: { pausa: Paus
           {/* Hoy en pausas: Baño / Break / Almuerzo (minutos usados/tope). */}
           <div className="relative mt-0.5 grid w-full max-w-[230px] grid-cols-3 gap-1">
             {recuadros.map((r) => {
-              const IconoR = r.k === "bano" ? Droplet : r.k === "almuerzo" ? Utensils : Coffee;
               const col = r.estado === "excedida"
                 ? "border-destructive/50 bg-destructive/10 text-red-200"
                 : r.estado === "poco"
                   ? "border-warning/40 bg-warning/10 text-amber-100"
                   : "border-white/15 bg-white/[0.06] text-white/80";
               return (
-                <div key={r.k} className={cn("flex items-center justify-center gap-1 rounded-md border px-1 py-1 text-[10px] font-semibold tabular-nums", col)}>
-                  <IconoR className="h-3 w-3 shrink-0" />
-                  <span>{r.usadoMin}{r.limiteMin != null ? `/${r.limiteMin}` : ""}</span>
+                <div key={r.k} className={cn("flex flex-col items-center justify-center rounded-md border px-1 py-1 leading-tight", col)}>
+                  <span className="text-[9px] font-semibold uppercase tracking-wide opacity-80">{r.etiqueta}</span>
+                  <span className="text-[11px] font-bold tabular-nums">{r.usadoMin}{r.limiteMin != null ? `/${r.limiteMin}` : ""}</span>
                 </div>
               );
             })}
