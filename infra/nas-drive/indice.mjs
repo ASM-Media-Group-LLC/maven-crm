@@ -14,10 +14,15 @@
 //   /Volumes/NASx/maven-drive/<agencia>/_indice/actual.csv / actual.json
 //   /Volumes/NASx/maven-drive/<agencia>/_indice/AAAA-MM-DD.csv / .json
 // Se guardan los últimos 30 días.
+//
+// Y de paso, cada noche (papelera.mjs): purga de <raíz>/.borrados los días de
+// hace más de 30 (lo que se borró en Maven espera ahí, entero) y borra lo que
+// una subida o una miniatura dejó a medias hace más de 24 h.
 
 import fsp from "node:fs/promises";
 import path from "node:path";
 import { firmar } from "./firma.mjs";
+import { DIAS_EN_LA_PAPELERA, limpiarTemporales, purgarPapelera, resumen } from "./papelera.mjs";
 
 export const COLUMNAS = [
   "ruta", "tipo", "nombre", "dueno", "correo_dueno", "tamano", "sha256", "estado",
@@ -205,13 +210,23 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const funciones = (process.env.MAVEN_FUNCIONES ?? "https://lsagslbkliprespbyhts.supabase.co/functions/v1").replace(/\/+$/, "");
   const raices = (process.env.RAICES ?? "").split(",").map((r) => r.trim()).filter(Boolean);
   const fecha = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Bogota" }); // AAAA-MM-DD
+  let ok = false;
   try {
     const { generado, filas } = await pedirIndice({ funciones, secreto });
     const r = await escribirIndice({ raices, filas, generado, fecha });
     console.log(`[indice] ${new Date().toISOString()} · ${r.filas} filas · ${r.agencias} agencias · discos: ${r.discos.join(", ") || "NINGUNO"}${r.errores.length ? ` · ERRORES: ${r.errores.join(" | ")}` : ""}`);
-    process.exit(r.discos.length ? 0 : 1);
+    ok = r.discos.length > 0;
   } catch (e) {
     console.error(`[indice] ${new Date().toISOString()} · FALLÓ: ${e.message}`);
-    process.exit(1);
   }
+  // La papelera del disco (lo borrado hace más de 30 días) y lo que una subida
+  // dejó a medias (papelera.mjs). No dependen de Maven: corren aunque el
+  // índice haya fallado.
+  try {
+    console.log(resumen(`días de la papelera de más de ${DIAS_EN_LA_PAPELERA} purgados`, await purgarPapelera(raices)));
+    console.log(resumen("temporales de más de 24 h", await limpiarTemporales(raices)));
+  } catch (e) {
+    console.error(`[papelera] ${new Date().toISOString()} · FALLÓ: ${e.message}`);
+  }
+  process.exit(ok ? 0 : 1);
 }

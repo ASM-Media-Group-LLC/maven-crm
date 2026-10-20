@@ -18,7 +18,8 @@ lugar. Decisión de Jhon (28/09/2026): **sin R2 y sin copia de seguridad**.
 
 ## Instalado en mini5
 
-- `~/maven-nas-drive/` con `server.mjs`, `firma.mjs`, `zip.mjs`, `.env` (chmod 600:
+- `~/maven-nas-drive/` con `server.mjs`, `firma.mjs`, `zip.mjs`, `miniaturas.mjs`,
+  `papelera.mjs`, `indice.mjs`, `.env` (chmod 600:
   `DRIVE_SECRETO`, `RAICES`, `ORIGENES`, `PUERTO`, `HOST`) e `iniciar.sh`.
 - LaunchAgent `~/Library/LaunchAgents/ai.maven.nas-drive.plist` (arranca solo
   y se reinicia si se cae). Log: `~/maven-nas-drive/servidor.log`.
@@ -29,15 +30,49 @@ lugar. Decisión de Jhon (28/09/2026): **sin R2 y sin copia de seguridad**.
 ## Actualizar
 
 ```bash
-scp infra/nas-drive/{server.mjs,firma.mjs,zip.mjs,miniaturas.mjs} asm002@unlok-server-5:~/maven-nas-drive/
+scp infra/nas-drive/{server.mjs,firma.mjs,zip.mjs,miniaturas.mjs,papelera.mjs,indice.mjs} asm002@unlok-server-5:~/maven-nas-drive/
 ssh asm002@unlok-server-5 'launchctl kickstart -k gui/$(id -u)/ai.maven.nas-drive'
 ```
 
-⚠️ `server.mjs` importa `zip.mjs` y `miniaturas.mjs` (desde el 02/10): si se
-copia uno sin los otros, el servidor no arranca y el Drive entero queda sin
-archivos.
+⚠️ `server.mjs` importa `zip.mjs`, `miniaturas.mjs` (desde el 02/10) y
+`papelera.mjs` (desde el 20/10, que también usa `indice.mjs`): si se copia uno
+sin los otros, el servidor no arranca y el Drive entero queda sin archivos. El
+paso a paso con respaldo está en `CLAUDE.md`.
 
 Tests: `node --test infra/nas-drive/test.mjs`.
+
+## La papelera del disco (`papelera.mjs`)
+
+Desde que Google se vació (05/10), NAS1 y NAS2 son la **única copia** del
+Drive. Por eso «Borrar para siempre» en Maven no borra en el acto: la edge
+`drive` quita la ficha y el NAS **mueve** el archivo (un `rename` en el mismo
+disco, instantáneo y sin copiar) a
+
+```
+/Volumes/NASx/maven-drive/.borrados/AAAA-MM-DD/<agencia>/<id>
+/Volumes/NASx/maven-drive/.borrados/AAAA-MM-DD/<agencia>/google/<id>   ← importado de Google
+```
+
+con la fecha de Bogotá. Si ese día ya se había borrado algo con la misma clave,
+el nuevo queda al lado con `.2`, `.3`… (nunca pisa). Su miniatura sí se borra
+(se rehace sola). De lo importado de Google se mueve solo el **enlace duro** del
+Drive: el archivo bajado de Google sigue donde estaba.
+
+- **Cada noche** `indice.mjs` purga los días de hace **más de 30** (solo
+  carpetas con nombre de fecha) y borra lo que una subida o una miniatura dejó a
+  medias hace más de **24 h** en `.partes`, `.tmp` y `.miniaturas/.tmp`. Al
+  arrancar, el servidor hace esa misma limpieza de temporales. Va al log del
+  índice como `[papelera] …`.
+- ⚠️ El lugar de lo borrado se libera **a los 30 días**, no al borrar: si un
+  disco se llena, mirar primero cuánto ocupa `.borrados`
+  (`du -sh /Volumes/NAS*/maven-drive/.borrados/*`) antes de tocar nada.
+- **Recuperar un archivo**: buscar su nombre en el índice de un día ANTERIOR al
+  borrado (`<agencia>/_indice/AAAA-MM-DD.csv`, columna `archivo_en_disco`; se
+  guardan 30 días, lo mismo que la papelera) y devolverlo a su lugar con `mv`
+  dentro del MISMO disco:
+  `mv /Volumes/NASx/maven-drive/.borrados/<fecha>/<agencia>/<id> /Volumes/NASx/maven-drive/<agencia>/<id>`.
+  La ficha ya no existe en Maven: hay que volver a crearla (o subirlo de nuevo
+  desde la copia recuperada).
 
 ## Varios archivos en un .zip (`POST /zip`, `zip.mjs`)
 

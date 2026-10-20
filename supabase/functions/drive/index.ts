@@ -36,6 +36,7 @@ import {
   type FichaZip,
 } from "./logica.ts";
 import { conExtension, extensionParaMiniatura, extensionParaVerComoJpg, idsParaMiniaturas, LADO_VISTA, venceMiniatura } from "./logica.ts";
+import { type HijosParaPurgar, loQueCuelgaDe, PAGINA_PURGA } from "./logica.ts";
 
 Deno.serve(async (req) => {
   const CORS = corsFor(req, { "Access-Control-Allow-Methods": "POST, OPTIONS" });
@@ -412,24 +413,25 @@ Deno.serve(async (req) => {
       const id = String(body.id ?? "");
       const rol = await rolDe(comoLaPersona, id);
       if (rol !== "dueno" && rol !== "editor") throw new HttpError("No puedes borrar esto", 403);
-      const { data: raiz } = await admin.from("drive_items").select("id, trashed_at").eq("id", id).maybeSingle();
+      const { data: raiz, error: eR } = await admin.from("drive_items").select("id, storage_key, trashed_at").eq("id", id).maybeSingle();
+      if (eR) throw new HttpError(eR.message, 500);
       if (!raiz) throw new HttpError("No existe", 404);
       if (!raiz.trashed_at) throw new HttpError("Primero hay que mandarlo a la papelera", 409);
 
-      // Todo lo de adentro (una carpeta arrastra a sus hijos).
-      const archivos: string[] = [];
-      const fichas: string[] = [id];
-      let nivel = [id];
-      let vueltas = 0;
-      while (nivel.length && vueltas++ < 60) {
-        const { data } = await admin.from("drive_items").select("id, tipo, storage_key").in("parent_id", nivel);
-        const hijos = (data ?? []) as { id: string; tipo: string; storage_key: string | null }[];
-        for (const h of hijos) if (h.storage_key) archivos.push(h.storage_key);
-        for (const h of hijos) if (h.tipo === "archivo") fichas.push(h.id);
-        nivel = hijos.filter((h) => h.tipo === "carpeta").map((h) => h.id);
-      }
-      const { data: propio } = await admin.from("drive_items").select("storage_key").eq("id", id).maybeSingle();
-      if (propio?.storage_key) archivos.push(propio.storage_key);
+      // Todo lo de adentro (una carpeta arrastra a sus hijos), leído ENTERO
+      // antes de tocar nada: de a 150 carpetas y de a 1000 filas, y cualquier
+      // error frena el borrado (loQueCuelgaDe). Al final se borra solo la ficha
+      // raíz y el ON DELETE CASCADE se lleva todas las demás: lo que no se
+      // leyera acá quedaría en el NAS sin ficha.
+      const hijosDe: HijosParaPurgar = async (madres, despuesDe) => {
+        let q = admin.from("drive_items").select("id, tipo, storage_key").in("parent_id", madres).order("id").limit(PAGINA_PURGA);
+        if (despuesDe) q = q.gt("id", despuesDe);
+        return await q;
+      };
+      const adentro = await loQueCuelgaDe(hijosDe, id);
+      const fichas = [id, ...adentro.archivos];
+      const archivos = [...adentro.claves];
+      if (raiz.storage_key) archivos.push(raiz.storage_key);
       // Y las versiones viejas de lo que se editó en la Oficina
       // (drive_versiones): el NAS las guarda aparte y, sin esto, quedarían
       // ocupando lugar para siempre sin ficha que las nombre.
@@ -438,13 +440,25 @@ Deno.serve(async (req) => {
       // ⚠️ PRIMERO el NAS, después la ficha. Al revés, si el NAS no contesta,
       // quedaría un archivo huérfano que nadie ve pero ocupa lugar para
       // siempre. Así, si falla, la ficha sigue en la papelera y se reintenta.
-      for (const k of new Set(archivos)) {
+      // El NAS no lo borra en el acto: lo pasa a su papelera de 30 días
+      // (<raíz>/.borrados, infra/nas-drive/papelera.mjs).
+      const borrados = new Set(archivos);
+      for (const k of borrados) {
         const r = await fetch(await permisoNas({ op: "borrar", k }, VENCE.borrar), { method: "DELETE" });
         if (!r.ok && r.status !== 404) throw new HttpError(`El NAS no pudo borrar (${r.status}); prueba de nuevo`, 502);
       }
+      // Si mientras tanto entró algo nuevo adentro (una subida a esa carpeta
+      // desde otra pestaña), el CASCADE se llevaría su ficha y su archivo
+      // quedaría huérfano: se vuelve a mirar y, si cambió, no se borra la ficha.
+      const otraVez = await loQueCuelgaDe(hijosDe, id);
+      const yaVistas = new Set(adentro.fichas);
+      const versionesAhora = await versionesGuardadas(admin, [id, ...otraVez.archivos]);
+      if (otraVez.fichas.some((f) => !yaVistas.has(f)) || versionesAhora.some((k) => !borrados.has(k))) {
+        throw new HttpError("Alguien agregó algo adentro mientras se borraba. Vuelve a intentarlo.", 409);
+      }
       const { error } = await admin.from("drive_items").delete().eq("id", id);
       if (error) throw new HttpError(error.message, 500);
-      return responder({ ok: true, archivos: archivos.length });
+      return responder({ ok: true, archivos: borrados.size });
     }
 
     if (accion === "crear_unidad") {

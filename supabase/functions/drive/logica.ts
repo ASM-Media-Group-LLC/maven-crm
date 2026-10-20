@@ -538,3 +538,68 @@ export function validarTipos(raw: unknown): Map<string, string[]> {
   }
   return grupos;
 }
+
+// ── Borrar para siempre (borrar_para_siempre) ───────────────────────────────
+// ⚠️ Auditoría del 19/10: el recorrido leía los hijos con UNA consulta por
+// nivel, sin páginas (PostgREST corta en 1000 sin avisar), sin trocear los ids
+// (más de ~150 rompen la URL) y con `data ?? []` (un error era «no hay nada»).
+// Después se borraba la ficha raíz y el ON DELETE CASCADE se llevaba TODAS las
+// fichas: lo que no se leyó quedaba en el NAS sin ficha que lo nombre. Ahora
+// se lee todo antes de tocar nada y cualquier error lo frena.
+
+/** Una ficha de lo que cuelga de lo que se borra. */
+export interface FichaParaPurgar { id: string; tipo: string; storage_key: string | null }
+/** Una página de los hijos de `madres` (a lo sumo TRAMO_PURGA ids), en orden
+ *  de id y con id mayor que `despuesDe`. Es la forma de responder de PostgREST:
+ *  `data` null y `error` cuando la petición falló. */
+export type HijosParaPurgar = (madres: string[], despuesDe: string | null) =>
+  Promise<{ data: FichaParaPurgar[] | null; error: { message: string } | null }>;
+
+/** De a 150 carpetas (una URL con más ids se corta) y de a 1000 filas. */
+export const TRAMO_PURGA = 150;
+export const PAGINA_PURGA = 1000;
+/** Más hondo que esto no se borra de una vez: se avisa, no se deja a medias. */
+export const PROFUNDIDAD_PURGA = 100;
+
+/** Todo lo que cuelga de `raiz`, nivel por nivel. Página por cursor (id > el
+ *  último), no por offset: un offset sobre una tabla que cambia salta filas. Y
+ *  la página termina cuando llega VACÍA, no cuando llega corta: si el tope de
+ *  PostgREST fuera menor que PAGINA_PURGA, cortar en «menos de 1000» dejaría
+ *  filas sin leer. */
+export async function loQueCuelgaDe(hijosDe: HijosParaPurgar, raiz: string) {
+  const fichas: string[] = [];
+  const archivos: string[] = [];
+  const claves: string[] = [];
+  const vistas = new Set([raiz]);
+  let nivel = [raiz];
+  for (let n = 0; nivel.length; n++) {
+    if (n >= PROFUNDIDAD_PURGA) {
+      throw new HttpError(`Tiene más de ${PROFUNDIDAD_PURGA} niveles de carpetas; no se borró nada. Borra primero las de más adentro.`, 409);
+    }
+    const siguiente: string[] = [];
+    for (let i = 0; i < nivel.length; i += TRAMO_PURGA) {
+      const tramo = nivel.slice(i, i + TRAMO_PURGA);
+      for (let despuesDe: string | null = null; ;) {
+        const { data, error } = await hijosDe(tramo, despuesDe);
+        if (error || !data) {
+          throw new HttpError(`No se pudo leer lo que hay adentro (${error?.message ?? "sin respuesta"}); no se borró nada. Prueba de nuevo.`, 500);
+        }
+        if (!data.length) break;
+        for (const f of data) {
+          // Un ciclo lo impide un trigger; si igual hubiera uno, no se vuelve a entrar.
+          if (vistas.has(f.id)) continue;
+          vistas.add(f.id);
+          fichas.push(f.id);
+          if (f.storage_key) claves.push(f.storage_key);
+          if (f.tipo === "carpeta") siguiente.push(f.id);
+          else if (f.tipo === "archivo") archivos.push(f.id);
+        }
+        const ultimo = data[data.length - 1].id;
+        if (ultimo === despuesDe) throw new HttpError("La base devolvió la misma página dos veces; no se borró nada", 500);
+        despuesDe = ultimo;
+      }
+    }
+    nivel = siguiente;
+  }
+  return { fichas, archivos, claves };
+}
