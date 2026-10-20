@@ -61,10 +61,11 @@ export function claveMotivoDetenido(estado: EstadoTiempo | null | undefined, deO
   return c ? (deOtro ? c.deOtro : c.propio) : null;
 }
 
-/** El nombre de cada tipo de pausa. El valor ("bano"/"break") es dato. */
-export const NOMBRE_PAUSA: Record<"bano" | "break", TranslationKey> = {
+/** El nombre de cada tipo de pausa. El valor ("bano"/"break"/"almuerzo") es dato. */
+export const NOMBRE_PAUSA: Record<"bano" | "break" | "almuerzo", TranslationKey> = {
   bano: "cowork.pause.bano",
   break: "cowork.pause.break",
+  almuerzo: "cowork.pause.almuerzo",
 };
 
 // Lo que el chatter manda al pedir supervisor queda GUARDADO en la solicitud

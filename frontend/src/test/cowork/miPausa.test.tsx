@@ -72,4 +72,29 @@ describe("<MiPausa>", () => {
     // El encabezado del resumen del día.
     expect(screen.getByText(traducir("cowork.miPausa.today"))).toBeInTheDocument();
   });
+
+  it("en almuerzo muestra su propio título y los tres recuadros", () => {
+    render(
+      <MiPausa
+        nombre="Grace Duque"
+        kind="almuerzo"
+        segundos={600}
+        desde={Date.now()}
+        limiteMin={60}
+        consumidoPrevio={0}
+        consumoHoy={{ bano: 120, break: 300, almuerzo: 0 }}
+        limites={{ bano: 10, break: 30, almuerzo: 60 }}
+        kindsResumen={["bano", "break", "almuerzo"]}
+        horaDesde="1:00 p. m."
+        onVolver={() => {}}
+        t={traducir}
+      />,
+    );
+    // Título de la pausa activa: "En almuerzo", no "En break".
+    expect(screen.getByText(traducir("cowork.pauseTile.inLunch"))).toBeInTheDocument();
+    // Los tres recuadros del día.
+    expect(screen.getByText(traducir("cowork.pause.bano"))).toBeInTheDocument();
+    expect(screen.getByText(traducir("cowork.pause.break"))).toBeInTheDocument();
+    expect(screen.getByText(traducir("cowork.pause.almuerzo"))).toBeInTheDocument();
+  });
 });

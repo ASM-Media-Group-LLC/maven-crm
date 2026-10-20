@@ -181,7 +181,9 @@ function minutosDePausaDeSesion(alertRules: unknown, kind: string): number | nul
     : undefined;
   if (!pausas || typeof pausas !== "object") return null;
   const p = normalizarPausas(pausas, REGLAS_ESTANDAR.pausas);
-  return kind === "break" ? p.breakMin : p.banoMin;
+  // El almuerzo no tiene tope propio en las reglas de la sesión: rige la tabla
+  // cowork_break_limits (null = "usá la tabla").
+  return kind === "break" ? p.breakMin : kind === "bano" ? p.banoMin : null;
 }
 
 serve(async (req) => {
@@ -1358,7 +1360,7 @@ serve(async (req) => {
     // mismo maneja no mide nada, y sin registro no hay historial que revisar.
     // ═══════════════════════════════════════════════════════════════
     if (action === "startBreak") {
-      const kind = body.kind === "break" ? "break" : "bano";
+      const kind = body.kind === "break" ? "break" : body.kind === "almuerzo" ? "almuerzo" : "bano";
       const { data: asignacion } = await admin.from("cowork_room_assignments")
         .select("session_id, room_id").eq("user_id", userId).eq("is_active", true)
         .order("assigned_at", { ascending: false }).limit(1).maybeSingle();

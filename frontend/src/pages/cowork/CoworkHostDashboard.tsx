@@ -397,7 +397,9 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // el cast solo afirma "es un objeto que puede traer pausas", nada más.
   const traePausasPropias = !!(cowork.session?.alert_rules as { pausas?: unknown } | null | undefined)?.pausas;
   const limitesPausa = useMemo<Record<string, number>>(
-    () => (traePausasPropias ? { bano: reglas.pausas.banoMin, break: reglas.pausas.breakMin } : limitesTabla),
+    // El almuerzo no se configura por sesión: su tope sale siempre de la tabla,
+    // así que aun con reglas propias se parte de la tabla y se pisan baño y break.
+    () => (traePausasPropias ? { ...limitesTabla, bano: reglas.pausas.banoMin, break: reglas.pausas.breakMin } : limitesTabla),
     [traePausasPropias, reglas, limitesTabla],
   );
   // Segundos que lleva alguien en pausa, o null si no está en una.
@@ -405,7 +407,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     const st = mediaStates[uid];
     if (!st?.onBreak || !st.breakStartedAt) return null;
     const segundos = Math.max(0, Math.floor((now - (st.breakStartedAt as number)) / 1000));
-    const kind = st.breakKind === "break" ? "break" : "bano";
+    const kind: "bano" | "break" | "almuerzo" = st.breakKind === "break" ? "break" : st.breakKind === "almuerzo" ? "almuerzo" : "bano";
     const limite = limitesPausa[kind];
     // La cuenta la hace lib/pausaCowork, el MISMO módulo que usa la pantalla
     // del empleado. Si cada lado la calculara por su cuenta, tarde o temprano
@@ -416,7 +418,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     // Si cada lado lo calculara aparte, discutirían sobre distintos minutos.
     const cuenta = cuentaPausa(segundos, limite, kind === "bano" ? (st.banoConsumidoSeg ?? 0) : 0);
     return {
-      segundos, kind: kind as "bano" | "break",
+      segundos, kind,
       excedida: cuenta.excedida,
       cuenta,
     };
@@ -447,7 +449,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     const { uid, p } = pausas.reduce((a, b) => (b.p!.segundos > a.p!.segundos ? b : a));
     const st = mediaStates[uid];
     return {
-      kind: p!.kind === "break" ? "break" : "bano", segundos: p!.segundos, desde: (st?.breakStartedAt as number | null) ?? null,
+      kind: p!.kind, segundos: p!.segundos, desde: (st?.breakStartedAt as number | null) ?? null,
       limiteMin: limitesPausa[p!.kind] ?? null,
       consumidoSeg: p!.kind === "bano" ? (st?.banoConsumidoSeg ?? 0) : 0,
       excedida: p!.excedida,
@@ -1112,9 +1114,9 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       // de golpe es lo que traba el motor de voz de Chromium. La cola agrupa
       // por persona y habla de a una.
       // La voz, en español (ver VOZ_PROBLEMA); el cartel, en el idioma de la interfaz.
-      encolarVoz(quien, `lleva ${Math.floor(pasadoSeg / 60)} minutos pasado de su ${p.kind === "break" ? "break" : "baño"}`,
+      encolarVoz(quien, `lleva ${Math.floor(pasadoSeg / 60)} minutos pasado de su ${p.kind === "break" ? "break" : p.kind === "almuerzo" ? "almuerzo" : "baño"}`,
         { volumen: 0.85 });
-      toast.warning(traducir(p.kind === "break" ? "cowork.host.alert.overBreak" : "cowork.host.alert.overBathroom", { name: quien }), {
+      toast.warning(traducir(p.kind === "break" ? "cowork.host.alert.overBreak" : p.kind === "almuerzo" ? "cowork.host.alert.overLunch" : "cowork.host.alert.overBathroom", { name: quien }), {
         description: traducir("cowork.host.alert.overDesc", { time: p.cuenta.texto.replace("−", "") }),
         duration: 10_000,
       });
@@ -1772,8 +1774,8 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                   sala: cowork.rooms.find((r) => r.id === sala?.room_id)?.name,
                   cuenta: cuentaPausa(
                     Math.max(0, Math.floor((now - (st.breakStartedAt as number)) / 1000)),
-                    limitesPausa[st.breakKind === "break" ? "break" : "bano"],
-                    st.breakKind === "break" ? 0 : (st.banoConsumidoSeg ?? 0),
+                    limitesPausa[st.breakKind === "break" ? "break" : st.breakKind === "almuerzo" ? "almuerzo" : "bano"],
+                    st.breakKind === "bano" ? (st.banoConsumidoSeg ?? 0) : 0,
                   ),
                 };
               })
@@ -1877,7 +1879,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                         <div className="flex items-center gap-1.5">
                           <span
                             className={cn("h-2 w-2 shrink-0 rounded-full", f.kindPausa ? "bg-warning" : f.enMeet ? "bg-primary" : "bg-success")}
-                            title={f.kindPausa ? t(f.kindPausa === "break" ? "cowork.host.status.onBreak" : "cowork.host.status.inBathroom") : f.enMeet ? t("cowork.pauseTile.inMeet") : t("cowork.host.status.working")}
+                            title={f.kindPausa ? t(f.kindPausa === "break" ? "cowork.host.status.onBreak" : f.kindPausa === "almuerzo" ? "cowork.host.status.atLunch" : "cowork.host.status.inBathroom") : f.enMeet ? t("cowork.pauseTile.inMeet") : t("cowork.host.status.working")}
                           />
                           <span className="truncate text-xs text-foreground/90">{f.nombre}</span>
                         </div>

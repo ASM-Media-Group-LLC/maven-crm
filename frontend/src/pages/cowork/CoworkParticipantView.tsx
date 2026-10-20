@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { normalizeRoomCode, isCompleteRoomCode, ROOM_CODE_LENGTH } from "@/lib/coworkRoomCode";
-import { Hand, Loader2, Crown, Phone, PhoneCall, MoreVertical, ArrowLeft, LogOut, KeyRound, DoorOpen, Coffee, Copy, Video } from "lucide-react";
+import { Hand, Loader2, Crown, Phone, PhoneCall, MoreVertical, ArrowLeft, LogOut, KeyRound, DoorOpen, Coffee, Copy, Video, Utensils } from "lucide-react";
 import { toast } from "sonner";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
 import { usePersistentCall, CallOutlet } from "@/components/PersistentCallProvider";
@@ -71,7 +71,7 @@ function relojParaPresencia(): { relojEstado: string | null; relojSegundosHoy: n
 // Qué pausas muestra el resumen "Hoy en pausas" de la pantalla de pausa propia.
 // Hoy: Baño y Break (los dos tipos que existen). El Almuerzo separado llega
 // después: necesita su propio tipo en la base y su botón para marcarlo.
-const KINDS_RESUMEN_PAUSA: readonly TipoPausa[] = ["bano", "break"];
+const KINDS_RESUMEN_PAUSA: readonly TipoPausa[] = ["bano", "break", "almuerzo"];
 
 export default function CoworkParticipantView({ cowork, userId }: Props) {
   // Los métodos del meet grupal sueltos: los callbacks dependen de ellos, no de `cowork` entero.
@@ -175,7 +175,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     return () => window.clearInterval(id);
   }, [breakStartedAt]);
 
-  const [breakKind, setBreakKind] = useState<"bano" | "break" | null>(null);
+  const [breakKind, setBreakKind] = useState<"bano" | "break" | "almuerzo" | null>(null);
   const [breakLimite, setBreakLimite] = useState<number | null>(null);
 
   // ── Recuperar la pausa que quedó abierta ───────────────────────────────
@@ -268,21 +268,24 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   }), [trackMediaState, breakStartedAt, breakKind, banoConsumido]);
   const recargarConsumido = useCallback(async () => {
     if (!userId) return;
-    const [bano, porTipo] = await Promise.all([
-      rpcBanoConsumido(supabase, [userId]),
-      rpcConsumoPausas(supabase, [userId]),
-    ]);
-    setBanoConsumido(bano.data?.[0]?.segundos ?? 0);
-    const mapa: Record<string, number> = {};
-    for (const f of porTipo.data ?? []) mapa[f.kind] = (mapa[f.kind] ?? 0) + f.segundos;
-    setConsumoHoy(mapa);
+    try {
+      const [bano, porTipo] = await Promise.all([
+        rpcBanoConsumido(supabase, [userId]),
+        rpcConsumoPausas(supabase, [userId]),
+      ]);
+      setBanoConsumido(bano.data?.[0]?.segundos ?? 0);
+      const mapa: Record<string, number> = {};
+      for (const f of porTipo.data ?? []) mapa[f.kind] = (mapa[f.kind] ?? 0) + f.segundos;
+      setConsumoHoy(mapa);
+    } catch { /* si el servidor no responde, se quedan los valores que había */ }
   }, [userId]);
   // Al entrar, y cada vez que se cierra una pausa (ahí cambia el acumulado).
   useEffect(() => { void recargarConsumido(); }, [recargarConsumido]);
   useEffect(() => { if (!breakStartedAt) void recargarConsumido(); }, [breakStartedAt, recargarConsumido]);
 
-  /** Lo ya gastado hoy solo cuenta para el baño; el break sigue siendo por pausa. */
-  const consumidoDe = (kind: "bano" | "break" | null) => (kind === "break" ? 0 : banoConsumido);
+  /** Lo ya gastado hoy solo cuenta para el baño (presupuesto diario); el break y
+   *  el almuerzo son por pausa, así que arrancan en cero. */
+  const consumidoDe = (kind: "bano" | "break" | "almuerzo" | null) => (kind === "bano" ? banoConsumido : 0);
 
   // Avisar EN VOZ cuando se acaba la pausa.
   //
@@ -301,11 +304,13 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
       avisoFinPausa.current = ahora;
       playMessageNotification(0.5);
       // Pasarse un minuto es una cosa; haberse gastado el presupuesto del día
-      // es otra, y merece que se lo digan con esas palabras.
-      const diaAgotado = breakKind !== "break" && pasadoMs >= LIMITE_DIARIO_AGOTADO_MS;
+      // es otra, y merece que se lo digan con esas palabras. Solo el baño es
+      // presupuesto diario; break y almuerzo son por pausa.
+      const diaAgotado = breakKind === "bano" && pasadoMs >= LIMITE_DIARIO_AGOTADO_MS;
       // La VOZ sigue en español: el motor de voz está fijo en español (lib/voz)
       // y leer inglés con esa voz no se entiende. El cartel sí va en su idioma.
-      void anunciar(diaAgotado ? fraseDiaAgotado() : fraseFinDePausa(breakKind));
+      // El almuerzo usa las frases del break (volver del descanso largo).
+      void anunciar(diaAgotado ? fraseDiaAgotado() : fraseFinDePausa(breakKind === "bano" ? "bano" : "break"));
       toast.warning(
         diaAgotado ? traducir("cowork.participant.bathroomDayOver") : traducir("cowork.participant.pauseOver"),
         {
@@ -322,7 +327,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     return () => window.clearInterval(id);
   }, [breakStartedAt, breakLimite, breakKind, banoConsumido]);
 
-  const etiquetaPausa = (kind: "bano" | "break") => {
+  const etiquetaPausa = (kind: "bano" | "break" | "almuerzo") => {
     const nombre = t(NOMBRE_PAUSA[kind]);
     const min = limitesPausa[kind];
     return min != null ? `${nombre} (${min} min)` : nombre;
@@ -332,7 +337,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   // navegador de quien está siendo medido. Lo que viaja por presence sigue
   // siendo el arranque, para que el coordinador lo vea en vivo, pero el
   // registro real y el tiempo que cuenta son los de la base.
-  const toggleBreak = useCallback(async (kind: "bano" | "break" = "bano") => {
+  const toggleBreak = useCallback(async (kind: "bano" | "break" | "almuerzo" = "bano") => {
     const cerrando = !!breakStartedAt;
     try {
       const r = await cowork.setBreak?.(cerrando ? null : kind);
@@ -892,7 +897,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             {breakStartedAt ? (
               <>
                 <Coffee className="h-4 w-4" />
-                <span>{t(NOMBRE_PAUSA[breakKind === "break" ? "break" : "bano"])} ·</span>
+                <span>{t(NOMBRE_PAUSA[breakKind ?? "bano"])} ·</span>
                 {(() => {
                   const c = cuentaPausa(breakElapsed, breakLimite, consumidoDe(breakKind));
                   return (
@@ -914,6 +919,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem onClick={() => toggleBreak("bano")}>{etiquetaPausa("bano")}</DropdownMenuItem>
                     <DropdownMenuItem onClick={() => toggleBreak("break")}>{etiquetaPausa("break")}</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => toggleBreak("almuerzo")}>{etiquetaPausa("almuerzo")}</DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </span>
@@ -974,7 +980,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
               {breakStartedAt ? (
                 <DropdownMenuItem onClick={() => toggleBreak()}>
                   <Coffee className="h-4 w-4 mr-2" />
-                  <span>{t(NOMBRE_PAUSA[breakKind === "break" ? "break" : "bano"])} ·&nbsp;</span>
+                  <span>{t(NOMBRE_PAUSA[breakKind ?? "bano"])} ·&nbsp;</span>
                   {(() => {
                     const c = cuentaPausa(breakElapsed, breakLimite, consumidoDe(breakKind));
                     return <span className={cn("tabular-nums", clasesPausa(c.estado))}>{c.texto}</span>;
@@ -987,6 +993,9 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => toggleBreak("break")}>
                     <Coffee className="h-4 w-4 mr-2" /> {etiquetaPausa("break")}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => toggleBreak("almuerzo")}>
+                    <Utensils className="h-4 w-4 mr-2" /> {etiquetaPausa("almuerzo")}
                   </DropdownMenuItem>
                 </>
               )}

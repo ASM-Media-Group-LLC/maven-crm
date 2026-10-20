@@ -28,6 +28,13 @@ describe("describirPausa — lo que dice el panel gris", () => {
     expect(d.pct).toBe(70);
     expect(d.tono).toBe("ok");
   });
+  it("almuerzo: título propio y cuenta por pausa (como el break, no como el baño)", () => {
+    const d = describirPausa({ kind: "almuerzo", segundos: 18 * 60 + 42, desde: T, limiteMin: 60, consumidoSeg: 0, excedida: false });
+    expect(d.titulo).toBe("En almuerzo");
+    // "Quedan X min" (por pausa), no "Hoy lleva … de …" (presupuesto del día del baño).
+    expect(d.detalle).toMatch(/Quedan 42 min/);
+    expect(d.tono).toBe("ok");
+  });
   it("meet grupal: solo desde cuándo, sin tope ni 'pasado'", () => {
     const d = describirPausa({ kind: "meet", segundos: 5 * 60, desde: T, limiteMin: 30, consumidoSeg: 0, excedida: false });
     expect(d.titulo).toBe("En meet grupal");
@@ -47,6 +54,10 @@ describe("SalaEnPausa", () => {
     expect(screen.getByText("En break")).toBeInTheDocument();
     expect(screen.getByText("18:42")).toBeInTheDocument();
     expect(screen.getByTestId("sala-en-pausa").getAttribute("data-tono")).toBe("ok");
+  });
+  it("el almuerzo se ve como 'En almuerzo', no como break ni baño", () => {
+    render(<SalaEnPausa pausa={{ kind: "almuerzo", segundos: 12 * 60, desde: T, limiteMin: 60, consumidoSeg: 0, excedida: false }} />);
+    expect(screen.getByText("En almuerzo")).toBeInTheDocument();
   });
   it("la frase del mock sale solo en el break que va bien", () => {
     const { rerender } = render(<SalaEnPausa pausa={{ kind: "break", segundos: 60, desde: T, limiteMin: 45, consumidoSeg: 0, excedida: false }} />);

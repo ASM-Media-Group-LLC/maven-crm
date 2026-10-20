@@ -25,12 +25,11 @@ const ICONO: Record<TipoPausa, typeof Droplet> = {
   almuerzo: Utensils,
 };
 
-// El título de la pausa en curso ("En el baño" / "En break"). Almuerzo reusa la
-// clave del break hasta que exista su propia pausa; hoy nadie puede marcar
-// almuerzo, así que la pausa activa solo es baño o break.
-const TITULO_ACTIVA: Record<"bano" | "break", TranslationKey> = {
+// El título de la pausa en curso ("En el baño" / "En break" / "En almuerzo").
+const TITULO_ACTIVA: Record<TipoPausa, TranslationKey> = {
   bano: "cowork.pauseTile.inBathroom",
   break: "cowork.pauseTile.onBreak",
+  almuerzo: "cowork.pauseTile.inLunch",
 };
 
 function mmss(seg: number): string {
@@ -89,7 +88,7 @@ const COLOR_TEXTO: Record<EstadoPausa, string> = {
 
 export interface MiPausaProps {
   nombre: string;
-  kind: "bano" | "break" | null;
+  kind: TipoPausa | null;
   /** Segundos de ESTA pausa. */
   segundos: number;
   /** Epoch ms de cuándo arrancó. */
@@ -115,7 +114,7 @@ export default function MiPausa({
   nombre, kind, segundos, desde: _desde, limiteMin, consumidoPrevio,
   consumoHoy, limites, kindsResumen, onVolver, t, horaDesde, className,
 }: MiPausaProps) {
-  const activa: "bano" | "break" = kind === "break" ? "break" : "bano";
+  const activa: TipoPausa = kind ?? "bano";
   const Icono = ICONO[activa];
   const c = cuentaPausa(segundos, limiteMin, consumidoPrevio);
   const estado = c.estado;
@@ -202,7 +201,7 @@ export default function MiPausa({
               >
                 <div className="flex items-center justify-center gap-1.5 text-[11px] font-medium text-white/70">
                   <IconoTile className="h-3.5 w-3.5" />
-                  {t(NOMBRE_PAUSA[tile.kind === "almuerzo" ? "break" : tile.kind])}
+                  {t(NOMBRE_PAUSA[tile.kind])}
                 </div>
                 <div className={cn("mt-1 font-display text-lg font-bold tabular-nums", COLOR_TEXTO[tile.estado])}>
                   {mmss(tile.usadoSeg)}

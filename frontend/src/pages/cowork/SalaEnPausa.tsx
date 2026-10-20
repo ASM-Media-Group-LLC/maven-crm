@@ -7,7 +7,7 @@
 // al lado, un renglón con desde cuándo y cuánto queda, y una frase corta para
 // que la pausa no parezca una falta. Rojo y latiendo si se pasó.
 import { useId } from "react";
-import { Coffee, Video, Droplet } from "lucide-react";
+import { Coffee, Video, Droplet, Utensils } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FRASES_DE_PAUSA } from "@/lib/frasesDePausa";
 import { formatoActual, type Formato } from "@/lib/formato";
@@ -19,7 +19,7 @@ import type { Traductor } from "./textosCowork";
 export interface PausaDeSala {
   /** "meet" = la sala entera está en un meet grupal del supervisor: no es una
    *  pausa (el reloj sigue sumando), pero la miniatura se apaga igual. */
-  kind: "bano" | "break" | "meet";
+  kind: "bano" | "break" | "almuerzo" | "meet";
   /** Segundos que lleva ESTA pausa. */
   segundos: number;
   /** Epoch ms de cuándo arrancó. */
@@ -109,7 +109,11 @@ export function describirPausa(
   t: Traductor = traducir,
 ): { titulo: string; detalle: string; pct: number; tono: "ok" | "poco" | "excedida" } {
   const esBano = p.kind === "bano";
-  const titulo = p.kind === "meet" ? t("cowork.pauseTile.inMeet") : esBano ? t("cowork.pauseTile.inBathroom") : t("cowork.pauseTile.onBreak");
+  const titulo = p.kind === "meet"
+    ? t("cowork.pauseTile.inMeet")
+    : p.kind === "almuerzo"
+      ? t("cowork.pauseTile.inLunch")
+      : esBano ? t("cowork.pauseTile.inBathroom") : t("cowork.pauseTile.onBreak");
   const partes: string[] = [];
   const desde = horaCorta(f, p.desde);
   if (desde) partes.push(t("cowork.pauseTile.since", { time: desde }));
@@ -151,7 +155,13 @@ export default function SalaEnPausa({ pausa, className, nombres }: { pausa: Paus
   const acento = excedida ? "text-destructive" : esMeet ? "text-primary" : "text-warning";
   // En la miniatura el título va en una línea al lado del anillo: "En break ·
   // pasado" no cabe en el teléfono, así que pasado el tope se acorta.
-  const etiqueta = excedida ? (pausa.kind === "bano" ? t("cowork.pauseTile.bathroomOverShort") : t("cowork.pauseTile.breakOverShort")) : d.titulo;
+  const etiqueta = excedida
+    ? (pausa.kind === "bano"
+        ? t("cowork.pauseTile.bathroomOverShort")
+        : pausa.kind === "almuerzo"
+          ? t("cowork.pauseTile.lunchOverShort")
+          : t("cowork.pauseTile.breakOverShort"))
+    : d.titulo;
   // "Desde 1:51 p. m." y "Quedan 24 min": en el teléfono (163 px de ancho útil)
   // van en dos renglones limpios; en escritorio, en uno separados por el punto.
   const partes = d.detalle.split(" · ");
@@ -177,7 +187,9 @@ export default function SalaEnPausa({ pausa, className, nombres }: { pausa: Paus
         )}>
           {pausa.kind === "bano"
             ? <Droplet className="h-4 w-4 md:h-5 md:w-5" />
-            : esMeet ? <Video className="h-4 w-4 md:h-5 md:w-5" /> : <Coffee className="h-4 w-4 md:h-5 md:w-5" />}
+            : pausa.kind === "almuerzo"
+              ? <Utensils className="h-4 w-4 md:h-5 md:w-5" />
+              : esMeet ? <Video className="h-4 w-4 md:h-5 md:w-5" /> : <Coffee className="h-4 w-4 md:h-5 md:w-5" />}
         </div>
         <div className="text-left">
           <div className={cn("whitespace-nowrap text-[11px] font-semibold leading-none", acento)}>{etiqueta}</div>

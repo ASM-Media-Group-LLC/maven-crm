@@ -415,7 +415,7 @@ export function useCoworkSession(sessionId: string | null) {
   // Abre (kind) o cierra (null) la pausa. El arranque y el cierre los sella el
   // servidor: si el reloj lo llevara el navegador de quien está en pausa, el
   // dato sería lo que esa persona dice que duró.
-  const setBreak = useCallback(async (kind: "bano" | "break" | null) => {
+  const setBreak = useCallback(async (kind: "bano" | "break" | "almuerzo" | null) => {
     const r = kind
       ? await invokeCowork("startBreak", { kind })
       : await invokeCowork("endBreak", {});
@@ -433,7 +433,7 @@ export function useCoworkSession(sessionId: string | null) {
     const p = (r as any)?.pausa;
     if (!p) return null;
     return {
-      kind: p.kind as "bano" | "break",
+      kind: p.kind as "bano" | "break" | "almuerzo",
       startedAt: new Date(p.started_at).getTime(),
       limiteMinutos: (r as any)?.limiteMinutos ?? null,
     };

@@ -24,6 +24,7 @@ export const cowork = {
   // ── Tipos de pausa ─────────────────────────────────────────────────────────
   "cowork.pause.bano": { es: "Baño", en: "Bathroom" },
   "cowork.pause.break": { es: "Break", en: "Break" },
+  "cowork.pause.almuerzo": { es: "Almuerzo", en: "Lunch" },
 
   // ── Pantalla de inicio (lista de sesiones) ─────────────────────────────────
   "cowork.page.title": { es: "Sala Cowork", en: "Cowork rooms" },
@@ -177,6 +178,7 @@ export const cowork = {
   "cowork.pauseTile.inMeet": { es: "En meet grupal", en: "In group meet" },
   "cowork.pauseTile.inBathroom": { es: "En el baño", en: "In the bathroom" },
   "cowork.pauseTile.onBreak": { es: "En break", en: "On break" },
+  "cowork.pauseTile.inLunch": { es: "En almuerzo", en: "At lunch" },
   "cowork.pauseTile.since": { es: "Desde {time}", en: "Since {time}" },
   "cowork.pauseTile.bathroomOver": { es: "Pasó los {limit} min de baño de hoy", en: "Over today's {limit} min of bathroom time" },
   "cowork.pauseTile.minOver": { es: "{min} min de más", en: "{min} min over" },
@@ -186,6 +188,7 @@ export const cowork = {
   "cowork.pauseTile.titleOver": { es: "{title} · pasado", en: "{title} · overtime" },
   "cowork.pauseTile.bathroomOverShort": { es: "Baño pasado", en: "Bathroom overtime" },
   "cowork.pauseTile.breakOverShort": { es: "Break pasado", en: "Break overtime" },
+  "cowork.pauseTile.lunchOverShort": { es: "Almuerzo pasado", en: "Lunch overtime" },
   // ── La pantalla de pausa propia (MiPausa): la ve la persona en su pausa ─────
   "cowork.miPausa.thisPause": { es: "Esta pausa", en: "This break" },
   "cowork.miPausa.today": { es: "Hoy en pausas", en: "Today's breaks" },
@@ -462,6 +465,7 @@ export const cowork = {
   "cowork.host.voiceReason.noSynthesis": { es: "este navegador no tiene síntesis de voz", en: "This browser has no speech synthesis" },
   "cowork.host.alert.overBathroom": { es: "{name}: pasado de baño", en: "{name}: over bathroom time" },
   "cowork.host.alert.overBreak": { es: "{name}: pasado de break", en: "{name}: over break time" },
+  "cowork.host.alert.overLunch": { es: "{name}: pasado de almuerzo", en: "{name}: over lunch time" },
   "cowork.host.alert.overDesc": { es: "Lleva {time} de más y ya se le avisó por voz.", en: "{time} over, and they've already been alerted by voice." },
   "cowork.host.alert.faceDesc": { es: "Lleva {time} así y {warned}.", en: "It's been {time} like this and {warned}." },
   "cowork.host.alert.noScreen": { es: "{name}: sin compartir pantalla", en: "{name}: not sharing screen" },
@@ -554,6 +558,7 @@ export const cowork = {
   "cowork.host.nobodyInRooms": { es: "Nadie conectado en las salas", en: "Nobody connected in the rooms" },
   "cowork.host.status.inBathroom": { es: "En baño", en: "In the bathroom" },
   "cowork.host.status.onBreak": { es: "En break", en: "On break" },
+  "cowork.host.status.atLunch": { es: "En almuerzo", en: "At lunch" },
   "cowork.host.status.working": { es: "Trabajando", en: "Working" },
   "cowork.host.sharingScreen": { es: "Compartiendo pantalla", en: "Sharing screen" },
   "cowork.host.notSharingScreen": { es: "Sin pantalla compartida", en: "Not sharing screen" },

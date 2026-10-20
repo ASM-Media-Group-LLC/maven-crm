@@ -19,10 +19,10 @@ export interface MediaState {
   // de idas al baño por persona, solo el estado de ahora.
   onBreak?: boolean;
   breakStartedAt?: number | null;
-  /** "bano" o "break": el supervisor necesita saber CUÁL, porque los topes son
-   *  distintos y el de baño además es un presupuesto diario. Estaba viajando
-   *  igual, pero fuera del tipo, así que cada lado lo leía con un cast. */
-  breakKind?: "bano" | "break" | null;
+  /** "bano", "break" o "almuerzo": el supervisor necesita saber CUÁL, porque los
+   *  topes son distintos y el de baño además es un presupuesto diario. Estaba
+   *  viajando igual, pero fuera del tipo, así que cada lado lo leía con un cast. */
+  breakKind?: "bano" | "break" | "almuerzo" | null;
   // Encuadre: lo reporta el navegador de cada persona sobre su PROPIO video
   // (ver hooks/useFaceWatch). `faceSince` es el epoch del último cambio, para
   // poder decir "sin rostro hace 2 min" en vez de alarmar al primer frame.
