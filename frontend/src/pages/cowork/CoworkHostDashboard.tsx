@@ -34,7 +34,7 @@ import { useOnlinePresence } from "@/hooks/useOnlinePresence";
 import { useCoworkMediaPresence, type MediaState } from "@/hooks/useCoworkMediaPresence";
 import { cn } from "@/lib/utils";
 import { tituloBonito } from "@/lib/tituloBonito";
-import { leerLimitesPausa } from "@/lib/coworkTablas";
+import { leerLimitesPausa, rpcConsumoPausas } from "@/lib/coworkTablas";
 import { relojDesdePresencia, segundosMostrados, formatoReloj } from "@/lib/coworkReloj";
 import { personasEnSala, relojDeRespaldo, latidoFresco, sinConexionConLaSala } from "@/lib/coworkOcupacion";
 import { cuentaComoTrabajo } from "@/lib/coworkTiempoRegla";
@@ -402,6 +402,29 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     () => (traePausasPropias ? { ...limitesTabla, bano: reglas.pausas.banoMin, break: reglas.pausas.breakMin } : limitesTabla),
     [traePausasPropias, reglas, limitesTabla],
   );
+  // Lo que lleva HOY cada persona en pausa por tipo (baño/break/almuerzo), para
+  // el resumen de la tarjeta. Lo cuenta el servidor (cowork_consumo_pausas_hoy);
+  // se pide solo para quienes están en pausa ahora y se refresca cada 30 s.
+  const [consumoHoy, setConsumoHoy] = useState<Record<string, Record<string, number>>>({});
+  const pausadosKey = useMemo(
+    () => Object.entries(mediaStates).filter(([, s]) => s?.onBreak).map(([uid]) => uid).sort().join(","),
+    [mediaStates],
+  );
+  useEffect(() => {
+    const ids = pausadosKey ? pausadosKey.split(",") : [];
+    if (!ids.length) { setConsumoHoy({}); return; }
+    let vivo = true;
+    const cargar = async () => {
+      const { data } = await rpcConsumoPausas(supabase, ids);
+      if (!vivo || !data) return;
+      const m: Record<string, Record<string, number>> = {};
+      for (const f of data) { (m[f.user_id] ??= {})[f.kind] = (m[f.user_id]?.[f.kind] ?? 0) + f.segundos; }
+      setConsumoHoy(m);
+    };
+    void cargar();
+    const id = window.setInterval(() => void cargar(), 30_000);
+    return () => { vivo = false; window.clearInterval(id); };
+  }, [pausadosKey]);
   // Segundos que lleva alguien en pausa, o null si no está en una.
   const pausaDe = (uid: string) => {
     const st = mediaStates[uid];
@@ -453,6 +476,8 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       limiteMin: limitesPausa[p!.kind] ?? null,
       consumidoSeg: p!.kind === "bano" ? (st?.banoConsumidoSeg ?? 0) : 0,
       excedida: p!.excedida,
+      resumenHoy: consumoHoy[uid],
+      limites: limitesPausa,
     };
   };
   // Cada dos minutos se apagan las asignaciones de quien lleva más de tres sin

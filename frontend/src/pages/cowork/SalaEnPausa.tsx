@@ -29,6 +29,12 @@ export interface PausaDeSala {
   /** Baño: segundos ya gastados hoy en pausas anteriores. */
   consumidoSeg: number;
   excedida: boolean;
+  /** Segundos CERRADOS hoy por tipo de pausa (baño/break/almuerzo) de la
+   *  persona que se muestra, para el resumen "Hoy en pausas" de la tarjeta.
+   *  Si falta, la tarjeta no dibuja los recuadros (p. ej. el meet grupal). */
+  resumenHoy?: Record<string, number>;
+  /** Topes en minutos por tipo, para los recuadros. */
+  limites?: Record<string, number>;
 }
 
 /** Iniciales (primera y última palabra) para el avatar del que está en pausa. */
@@ -181,6 +187,24 @@ export default function SalaEnPausa({ pausa, className, nombres }: { pausa: Paus
   const iniciales = inicialesDeNombre(nombres?.[0]);
   const RADIO = 20, CIRC = 2 * Math.PI * RADIO;
   const avance = (Math.max(0, Math.min(100, d.pct)) / 100) * CIRC;
+  const desdeTxt = horaCorta(f, pausa.desde);
+  // "Hoy en pausas": lo que lleva hoy de cada tipo contra su tope. Solo si el
+  // tablero mandó el resumen (al meet grupal no se le pasa). Al tipo en curso se
+  // le suma el tiempo que corre en vivo, para que cuadre con el reloj de arriba.
+  const KINDS_RESUMEN: Array<"bano" | "break" | "almuerzo"> = ["bano", "break", "almuerzo"];
+  const recuadros = pausa.resumenHoy && pausa.limites && !esMeet
+    ? KINDS_RESUMEN.map((k) => {
+        const vivo = pausa.kind === k ? pausa.segundos : 0;
+        const usadoSeg = (pausa.resumenHoy![k] ?? 0) + vivo;
+        const limiteMin = pausa.limites![k] ?? null;
+        let estado: "ok" | "poco" | "excedida" = "ok";
+        if (limiteMin != null) {
+          const tope = limiteMin * 60;
+          estado = usadoSeg >= tope ? "excedida" : usadoSeg >= tope * 0.75 ? "poco" : "ok";
+        }
+        return { k, usadoMin: Math.round(usadoSeg / 60), limiteMin, estado };
+      })
+    : null;
   return (
     <div
       data-testid="sala-en-pausa"
@@ -232,18 +256,47 @@ export default function SalaEnPausa({ pausa, className, nombres }: { pausa: Paus
           {nombres.slice(0, 3).join(", ")}{nombres.length > 3 ? ` +${nombres.length - 3}` : ""}
         </div>
       )}
-      <div className={cn("relative text-[10px] leading-snug md:text-[11px]", excedida ? "text-red-100/85" : "text-white/80")}>
-        {partes.map((p, i) => (
-          <span key={p} className="whitespace-nowrap">
-            {i > 0 && <span className="hidden md:inline"> · </span>}
-            {i > 0 && <br className="md:hidden" />}
-            {p}
-          </span>
-        ))}
-      </div>
-      {/* La frase es del break y de cuando va bien: pasado el tope, sobra. */}
-      {pausa.kind === "break" && !excedida && (
-        <p className="relative line-clamp-2 max-w-[30ch] text-[10px] italic leading-snug text-white/60">{t(claveFraseDePausa(pausa.desde))}</p>
+      {recuadros ? (
+        <>
+          {desdeTxt && (
+            <div className="relative text-[10px] leading-snug text-white/70 md:text-[11px]">
+              {t("cowork.pauseTile.since", { time: desdeTxt })}
+            </div>
+          )}
+          {/* Hoy en pausas: Baño / Break / Almuerzo (minutos usados/tope). */}
+          <div className="relative mt-0.5 grid w-full max-w-[230px] grid-cols-3 gap-1">
+            {recuadros.map((r) => {
+              const IconoR = r.k === "bano" ? Droplet : r.k === "almuerzo" ? Utensils : Coffee;
+              const col = r.estado === "excedida"
+                ? "border-destructive/50 bg-destructive/10 text-red-200"
+                : r.estado === "poco"
+                  ? "border-warning/40 bg-warning/10 text-amber-100"
+                  : "border-white/15 bg-white/[0.06] text-white/80";
+              return (
+                <div key={r.k} className={cn("flex items-center justify-center gap-1 rounded-md border px-1 py-1 text-[10px] font-semibold tabular-nums", col)}>
+                  <IconoR className="h-3 w-3 shrink-0" />
+                  <span>{r.usadoMin}{r.limiteMin != null ? `/${r.limiteMin}` : ""}</span>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      ) : (
+        <>
+          <div className={cn("relative text-[10px] leading-snug md:text-[11px]", excedida ? "text-red-100/85" : "text-white/80")}>
+            {partes.map((p, i) => (
+              <span key={p} className="whitespace-nowrap">
+                {i > 0 && <span className="hidden md:inline"> · </span>}
+                {i > 0 && <br className="md:hidden" />}
+                {p}
+              </span>
+            ))}
+          </div>
+          {/* La frase es del break y de cuando va bien: pasado el tope, sobra. */}
+          {pausa.kind === "break" && !excedida && (
+            <p className="relative line-clamp-2 max-w-[30ch] text-[10px] italic leading-snug text-white/60">{t(claveFraseDePausa(pausa.desde))}</p>
+          )}
+        </>
       )}
     </div>
   );
