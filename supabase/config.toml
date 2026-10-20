@@ -1,5 +1,10 @@
 project_id = "lsagslbkliprespbyhts"
 
+# Voz de los anuncios (ElevenLabs). verify_jwt=true: la llama un usuario logueado
+# desde la app; la función igual revive el usuario adentro para resolver su agencia.
+[functions.anuncio-tts]
+verify_jwt = true
+
 [functions.ai-sales-chat]
 verify_jwt = false
 
