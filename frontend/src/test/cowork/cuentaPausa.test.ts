@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { cuentaPausa, clasesPausa, nombreYApellido, fraseFinDePausa, AVISAR_SUPERVISOR_PASADO_MS, LIMITE_DIARIO_AGOTADO_MS, fraseDiaAgotado } from "@/lib/pausaCowork";
+import { CLIPS_VOZ } from "@/lib/clipsVoz";
 
 // La cuenta regresiva de las pausas. Lo que se fija acá es lo que el
 // coordinador y el empleado tienen que ver IGUAL: si cada lado calculara por su
@@ -77,9 +78,24 @@ describe("aviso hablado de fin de pausa", () => {
     expect(brk.toLowerCase()).toContain("break");
   });
 
-  it("rota: la misma frase cada dos minutos se vuelve ruido que el oído filtra", () => {
-    const dichas = [fraseFinDePausa("bano"), fraseFinDePausa("bano"), fraseFinDePausa("bano")];
-    expect(new Set(dichas).size).toBe(3);
+  it("rota: dos avisos seguidos no repiten la misma frase (son dos, con audio)", () => {
+    // Solo dos frases por tipo: las que tienen clip de voz Mario (lib/clipsVoz).
+    const dichas = [fraseFinDePausa("bano"), fraseFinDePausa("bano")];
+    expect(new Set(dichas).size).toBe(2);
+  });
+
+  it("cada frase hablada de fin de pausa tiene su audio Mario (lib/clipsVoz)", () => {
+    // Si alguien agrega una frase sin generarle el clip, sonaría con la voz
+    // robótica del navegador y se notaría el salto. Esta guarda lo caza.
+    const dichas = new Set<string>();
+    for (let i = 0; i < 12; i++) {
+      dichas.add(fraseFinDePausa("bano"));
+      dichas.add(fraseFinDePausa("break"));
+      dichas.add(fraseDiaAgotado());
+    }
+    for (const frase of dichas) {
+      expect(CLIPS_VOZ[frase], `falta el audio Mario para: "${frase}"`).toBeTruthy();
+    }
   });
 
   it("al supervisor se le avisa a los 3 minutos de excedido, no antes", () => {
