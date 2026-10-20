@@ -10,7 +10,7 @@ create table if not exists public.announcement_overrides (
   -- { "<clave>": ["frase 1", "frase 2", ...] } — solo las claves que el admin tocó.
   phrases     jsonb not null default '{}'::jsonb,
   -- Voz de ElevenLabs para TODOS los anuncios de esta agencia. Default: Mario Deep.
-  voice_id    text  not null default '6yXdJiDseQt6BOet0rXz',
+  voice_id    text  not null default 'tomkxGQGz4b1kE0EM722',
   updated_by  uuid,
   updated_at  timestamptz not null default now()
 );

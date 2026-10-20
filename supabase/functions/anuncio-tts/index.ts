@@ -17,7 +17,7 @@ const CORS = {
 };
 
 const BUCKET = "anuncios-voz";
-const VOZ_DEFECTO = "6yXdJiDseQt6BOet0rXz"; // Mario - Deep and Expressive
+const VOZ_DEFECTO = "tomkxGQGz4b1kE0EM722"; // Mario - Animated and chatty (elegida por Alvaro)
 const MODELO = "eleven_multilingual_v2";
 
 function json(body: unknown, status = 200) {
