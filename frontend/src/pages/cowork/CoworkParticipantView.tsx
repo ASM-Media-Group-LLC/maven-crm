@@ -23,7 +23,7 @@ import { fijarReglas, normalizarReglas } from "@/lib/coworkReglas";
 import { cn } from "@/lib/utils";
 import { rpcBanoConsumido, leerLimitesPausa } from "@/lib/coworkTablas";
 import { cuentaPausa, clasesPausa, fraseFinDePausa, REPETIR_FIN_PAUSA_MS, fraseDiaAgotado, LIMITE_DIARIO_AGOTADO_MS } from "@/lib/pausaCowork";
-import { hablar } from "@/lib/voz";
+import { anunciar } from "@/lib/anunciarVoz";
 import { playMessageNotification } from "@/lib/notificationSound";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { marcarDescartada, fueDescartada, olvidarDescartada } from "@/lib/solicitudPrivada";
@@ -290,7 +290,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
       const diaAgotado = breakKind !== "break" && pasadoMs >= LIMITE_DIARIO_AGOTADO_MS;
       // La VOZ sigue en español: el motor de voz está fijo en español (lib/voz)
       // y leer inglés con esa voz no se entiende. El cartel sí va en su idioma.
-      hablar(diaAgotado ? fraseDiaAgotado() : fraseFinDePausa(breakKind));
+      void anunciar(diaAgotado ? fraseDiaAgotado() : fraseFinDePausa(breakKind));
       toast.warning(
         diaAgotado ? traducir("cowork.participant.bathroomDayOver") : traducir("cowork.participant.pauseOver"),
         {

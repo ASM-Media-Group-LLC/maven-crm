@@ -20,7 +20,7 @@ let pausa = false;
 
 vi.mock("sonner", () => ({ toast: { warning: (...a: unknown[]) => toastWarning(...a) } }));
 vi.mock("@/lib/notificationSound", () => ({ playMessageNotification: (...a: unknown[]) => sonido(...a) }));
-vi.mock("@/lib/voz", () => ({ hablar: (...a: unknown[]) => habla(...a) }));
+vi.mock("@/lib/anunciarVoz", () => ({ anunciar: (...a: unknown[]) => habla(...a) }));
 vi.mock("@/lib/coworkPausa", () => ({ estaEnPausa: () => pausa, marcarPausa: (v: boolean) => { pausa = v; } }));
 
 const { useFaceNudge, esProblemaDeEncuadre, useScreenShareNudge, debeAvisarSinPantalla, AVISAR_SUPERVISOR_SIN_PANTALLA_MS } = await import("@/hooks/useFaceNudge");

@@ -26,7 +26,7 @@ const pausada = vi.fn(() => false);
 
 vi.mock("sonner", () => ({ toast: { warning: (...a: unknown[]) => toastWarning(...a) } }));
 vi.mock("@/lib/notificationSound", () => ({ playMessageNotification: (...a: unknown[]) => sonido(...a) }));
-vi.mock("@/lib/voz", () => ({ hablar: (...a: unknown[]) => habla(...a) }));
+vi.mock("@/lib/anunciarVoz", () => ({ anunciar: (...a: unknown[]) => habla(...a) }));
 vi.mock("@/lib/coworkPausa", () => ({ estaEnPausa: () => pausada(), marcarPausa: () => {} }));
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: { auth: { getSession: async () => ({ data: { session: { access_token: "t" } } }) } },
