@@ -186,6 +186,12 @@ export const cowork = {
   "cowork.pauseTile.titleOver": { es: "{title} · pasado", en: "{title} · overtime" },
   "cowork.pauseTile.bathroomOverShort": { es: "Baño pasado", en: "Bathroom overtime" },
   "cowork.pauseTile.breakOverShort": { es: "Break pasado", en: "Break overtime" },
+  // ── La pantalla de pausa propia (MiPausa): la ve la persona en su pausa ─────
+  "cowork.miPausa.thisPause": { es: "Esta pausa", en: "This break" },
+  "cowork.miPausa.today": { es: "Hoy en pausas", en: "Today's breaks" },
+  "cowork.miPausa.over": { es: "Se te pasó el tiempo", en: "You're over time" },
+  "cowork.miPausa.ofLimit": { es: "de {limit} min", en: "of {limit} min" },
+  "cowork.miPausa.imBack": { es: "Ya volví", en: "I'm back" },
   // Las cuatro de lib/frasesDePausa, en el mismo orden.
   "cowork.pauseTile.phrase1": {
     es: "Un pequeño descanso también construye grandes resultados.",

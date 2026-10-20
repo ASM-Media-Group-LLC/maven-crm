@@ -22,6 +22,17 @@ export async function rpcBanoConsumido(
   return { data: (data ?? null) as { user_id: string; segundos: number }[] | null };
 }
 
+/** Segundos consumidos HOY por TIPO de pausa (baño/break/…) de cada usuario.
+ *  Alimenta el resumen "Hoy en pausas" de la pantalla de pausa propia. */
+export async function rpcConsumoPausas(
+  sb: SupabaseClient,
+  userIds: string[],
+): Promise<{ data: { user_id: string; kind: string; segundos: number }[] | null }> {
+  const { data } = await (sb as unknown as ClienteFlexible)
+    .rpc("cowork_consumo_pausas_hoy", { _user_ids: userIds });
+  return { data: (data ?? null) as { user_id: string; kind: string; segundos: number }[] | null };
+}
+
 /** Topes por tipo de pausa, en minutos. Salen de la tabla, no de constantes:
  *  si mañana alguien cambia el tope, la pantalla no sigue prometiendo lo viejo. */
 export async function leerLimitesPausa(sb: SupabaseClient): Promise<Record<string, number>> {

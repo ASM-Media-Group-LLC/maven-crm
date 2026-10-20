@@ -21,7 +21,8 @@ import { pedirApagarPorPausa, pedirReanudarTrasPausa } from "@/lib/ordenesDePaus
 import { marcarPausa } from "@/lib/coworkPausa";
 import { fijarReglas, normalizarReglas } from "@/lib/coworkReglas";
 import { cn } from "@/lib/utils";
-import { rpcBanoConsumido, leerLimitesPausa } from "@/lib/coworkTablas";
+import { rpcBanoConsumido, rpcConsumoPausas, leerLimitesPausa } from "@/lib/coworkTablas";
+import MiPausa, { type TipoPausa } from "./MiPausa";
 import { cuentaPausa, clasesPausa, fraseFinDePausa, REPETIR_FIN_PAUSA_MS, fraseDiaAgotado, LIMITE_DIARIO_AGOTADO_MS } from "@/lib/pausaCowork";
 import { anunciar } from "@/lib/anunciarVoz";
 import { playMessageNotification } from "@/lib/notificationSound";
@@ -66,6 +67,11 @@ function relojParaPresencia(): { relojEstado: string | null; relojSegundosHoy: n
   const r = leerReloj();
   return r ? { relojEstado: r.estado, relojSegundosHoy: r.segundosHoy, relojEn: r.en } : { relojEstado: null, relojSegundosHoy: null, relojEn: null };
 }
+
+// Qué pausas muestra el resumen "Hoy en pausas" de la pantalla de pausa propia.
+// Hoy: Baño y Break (los dos tipos que existen). El Almuerzo separado llega
+// después: necesita su propio tipo en la base y su botón para marcarlo.
+const KINDS_RESUMEN_PAUSA: readonly TipoPausa[] = ["bano", "break"];
 
 export default function CoworkParticipantView({ cowork, userId }: Props) {
   // Los métodos del meet grupal sueltos: los callbacks dependen de ellos, no de `cowork` entero.
@@ -241,6 +247,9 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   // Lo cuenta el SERVIDOR: el navegador de quien está siendo medido no puede
   // ser la fuente, y además el presupuesto cruza sesiones y salas.
   const [banoConsumido, setBanoConsumido] = useState(0);
+  // Segundos por tipo de pausa consumidos HOY (pausas cerradas), para el resumen
+  // "Hoy en pausas" de la pantalla de pausa propia.
+  const [consumoHoy, setConsumoHoy] = useState<Record<string, number>>({});
 
   // El reloj que contesta el servidor viaja por presencia para que el
   // supervisor vea el MISMO número que la persona. Presence reemplaza el payload
@@ -259,8 +268,14 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   }), [trackMediaState, breakStartedAt, breakKind, banoConsumido]);
   const recargarConsumido = useCallback(async () => {
     if (!userId) return;
-    const { data } = await rpcBanoConsumido(supabase, [userId]);
-    setBanoConsumido(data?.[0]?.segundos ?? 0);
+    const [bano, porTipo] = await Promise.all([
+      rpcBanoConsumido(supabase, [userId]),
+      rpcConsumoPausas(supabase, [userId]),
+    ]);
+    setBanoConsumido(bano.data?.[0]?.segundos ?? 0);
+    const mapa: Record<string, number> = {};
+    for (const f of porTipo.data ?? []) mapa[f.kind] = (mapa[f.kind] ?? 0) + f.segundos;
+    setConsumoHoy(mapa);
   }, [userId]);
   // Al entrar, y cada vez que se cierra una pausa (ahí cambia el acumulado).
   useEffect(() => { void recargarConsumido(); }, [recargarConsumido]);
@@ -988,7 +1003,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
       )}
 
       {/* Video area */}
-      <div className="flex-1 min-h-0">
+      <div className="relative flex-1 min-h-0">
         {meetRoom && meetId ? (
           <div className="flex h-full flex-col">
             {/* La barra del meet: qué pasa y el botón grande para volver (Jhon, 10/09). */}
@@ -1065,6 +1080,27 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
           <div className="flex items-center justify-center h-full">
             <Loader2 className="h-8 w-8 animate-spin text-primary/60" />
           </div>
+        )}
+
+        {/* La pantalla de pausa propia (mini dashboard). Tapa el video —la cámara
+            ya está apagada en pausa— con el avatar en el anillo, el tiempo grande
+            y el resumen del día. En meet o llamada privada NO se tapa: ahí la
+            persona está en una llamada activa aunque haya marcado pausa. */}
+        {breakStartedAt && !meetRoom && !isInOneOnOne && (
+          <MiPausa
+            nombre={displayName}
+            kind={breakKind}
+            segundos={breakElapsed}
+            desde={breakStartedAt}
+            limiteMin={breakLimite}
+            consumidoPrevio={consumidoDe(breakKind)}
+            consumoHoy={consumoHoy}
+            limites={limitesPausa}
+            kindsResumen={KINDS_RESUMEN_PAUSA}
+            horaDesde={new Date(breakStartedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+            onVolver={() => toggleBreak()}
+            t={t}
+          />
         )}
       </div>
     </div>
