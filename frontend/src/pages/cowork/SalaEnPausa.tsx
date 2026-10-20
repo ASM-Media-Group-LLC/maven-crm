@@ -7,7 +7,7 @@
 // al lado, un renglón con desde cuándo y cuánto queda, y una frase corta para
 // que la pausa no parezca una falta. Rojo y latiendo si se pasó.
 import { useId } from "react";
-import { Coffee, Video } from "lucide-react";
+import { Coffee, Video, Droplet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FRASES_DE_PAUSA } from "@/lib/frasesDePausa";
 import { formatoActual, type Formato } from "@/lib/formato";
@@ -176,7 +176,7 @@ export default function SalaEnPausa({ pausa, className, nombres }: { pausa: Paus
             : esMeet ? "bg-primary/15 text-primary ring-primary/50" : "bg-warning/15 text-warning ring-warning/50",
         )}>
           {pausa.kind === "bano"
-            ? <span aria-hidden className="text-base leading-none md:text-lg">🚻</span>
+            ? <Droplet className="h-4 w-4 md:h-5 md:w-5" />
             : esMeet ? <Video className="h-4 w-4 md:h-5 md:w-5" /> : <Coffee className="h-4 w-4 md:h-5 md:w-5" />}
         </div>
         <div className="text-left">
