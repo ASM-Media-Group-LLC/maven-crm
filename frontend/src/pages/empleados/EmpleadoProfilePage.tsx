@@ -13,6 +13,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useEmployeeAvisos } from "@/hooks/useEmployeeAvisos";
 import { diasDelMes, claveDeDia } from "@/lib/calendario";
 import { UserAvatar } from "@/components/UserAvatar";
+import { Page } from "@/components/ui/page";
+import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -62,45 +64,51 @@ export default function EmpleadoProfilePage() {
   );
   const encabezadosSemana = dias.slice(0, 7).map((d) => format(d, "EEEEE", { locale }));
 
+  const volver = (
+    <Link to="/empleados" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground">
+      <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+      {t("empleados.profile.back")}
+    </Link>
+  );
+
   if (perfilCargando) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center text-muted-foreground">
-        <Loader2 className="h-6 w-6 animate-spin" />
-      </div>
+      <Page>
+        <div className="flex min-h-[50vh] items-center justify-center text-muted-foreground">
+          <Loader2 className="h-6 w-6 animate-spin" />
+        </div>
+      </Page>
     );
   }
 
   if (!perfil) {
     return (
-      <div className="mx-auto w-full max-w-3xl px-4 py-10 md:px-6">
-        <Link to="/empleados" className="mb-6 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-          {t("empleados.profile.back")}
-        </Link>
-        <p className="text-sm text-muted-foreground">{t("empleados.profile.notFound")}</p>
-      </div>
+      <Page>
+        <div className="mb-5">{volver}</div>
+        <PageHeader title={t("empleados.profile.back")} />
+        <p className="mt-4 text-sm text-muted-foreground">{t("empleados.profile.notFound")}</p>
+      </Page>
     );
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 py-6 md:px-6">
-      <Link to="/empleados" className="mb-5 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground">
-        <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-        {t("empleados.profile.back")}
-      </Link>
+    <Page>
+      <div className="mb-4">{volver}</div>
+      <PageHeader
+        className="mb-6"
+        title={
+          <span className="inline-flex items-center gap-3">
+            <UserAvatar name={perfil.full_name ?? "—"} src={perfil.avatar_url} seed={perfil.avatar_seed} size="lg" />
+            <span className="min-w-0 truncate">{perfil.full_name ?? "—"}</span>
+          </span>
+        }
+        subtitle={t("empleados.profile.heading")}
+      />
 
-      <header className="mb-6 flex items-center gap-4">
-        <UserAvatar name={perfil.full_name ?? "—"} src={perfil.avatar_url} seed={perfil.avatar_seed} size="xl" />
-        <div className="min-w-0">
-          <h1 className="truncate text-2xl font-semibold tracking-tight">{perfil.full_name ?? "—"}</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">{t("empleados.profile.heading")}</p>
-        </div>
-      </header>
-
-      <section className="rounded-2xl border border-border bg-card p-4 md:p-5">
+      <section className="rounded-card border border-border bg-card p-4 md:p-5">
         <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-center gap-2">
-            <Bell className="h-4 w-4 text-amber-500" aria-hidden="true" />
+            <Bell className="h-4 w-4 text-warning" aria-hidden="true" />
             <div>
               <h2 className="text-sm font-semibold">{t("empleados.avisos.title")}</h2>
               <p className="text-xs text-muted-foreground">{t("empleados.avisos.subtitle")}</p>
@@ -135,8 +143,8 @@ export default function EmpleadoProfilePage() {
           </div>
         ) : (
           <>
-            {/* Grilla del mes */}
-            <div className="grid grid-cols-7 gap-1">
+            {/* Grilla del mes (7 columnas fijas: es un calendario) */}
+            <div className="grid grid-cols-7 gap-1 sm:grid-cols-7">
               {encabezadosSemana.map((etq, i) => (
                 <div key={i} className="pb-1 text-center text-[11px] font-semibold uppercase text-muted-foreground">
                   {etq}
@@ -153,7 +161,7 @@ export default function EmpleadoProfilePage() {
                     type="button"
                     onClick={() => setDiaSel(k)}
                     className={cn(
-                      "relative flex aspect-square flex-col items-center justify-center rounded-lg border text-sm transition-colors",
+                      "relative flex aspect-square flex-col items-center justify-center rounded-control border text-sm transition-colors",
                       sel ? "border-primary bg-primary/10 font-semibold" : "border-transparent hover:bg-accent/50",
                       !enMes && "text-muted-foreground/40",
                       isToday(d) && !sel && "border-border",
@@ -167,7 +175,7 @@ export default function EmpleadoProfilePage() {
                     {n > 0 && (
                       <span className={cn(
                         "mt-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold",
-                        enMes ? "bg-amber-500 text-white" : "bg-amber-500/40 text-white",
+                        enMes ? "bg-warning text-warning-foreground" : "bg-warning/40 text-warning-foreground",
                       )}>
                         {n}
                       </span>
@@ -179,7 +187,7 @@ export default function EmpleadoProfilePage() {
 
             {/* Detalle del día elegido */}
             <div className="mt-5 border-t border-border pt-4">
-              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <h3 className="mb-2 text-xs font-semibold capitalize text-muted-foreground">
                 {format(fechaSel, "PPP", { locale })}
               </h3>
               {avisosCargando ? (
@@ -191,7 +199,7 @@ export default function EmpleadoProfilePage() {
               ) : (
                 <ul className="flex flex-col gap-1.5">
                   {avisosDelDia.map((a) => (
-                    <li key={a.id} className="flex items-start gap-3 rounded-lg border border-border bg-muted/20 px-3 py-2">
+                    <li key={a.id} className="flex items-start gap-3 rounded-control border border-border bg-muted/20 px-3 py-2">
                       <span className="mt-0.5 shrink-0 text-xs font-semibold tabular-nums text-muted-foreground">
                         {format(a.createdAt, "HH:mm")}
                       </span>
@@ -209,6 +217,6 @@ export default function EmpleadoProfilePage() {
           </>
         )}
       </section>
-    </div>
+    </Page>
   );
 }
