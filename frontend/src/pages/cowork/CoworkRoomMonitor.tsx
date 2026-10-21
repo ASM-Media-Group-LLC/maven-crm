@@ -241,6 +241,28 @@ export default function CoworkRoomMonitor({ roomId, roomName, issueToken, showVi
   const [audioTracks, setAudioTracks] = useState<Array<{ sid: string; track: any }>>([]);
   // Qué participantes están mostrando su PANTALLA en vez de su cámara (por identity).
   const [screenView, setScreenView] = useState<Record<string, boolean>>({});
+  // Cuando alguien EMPIEZA a compartir pantalla, la miniatura salta sola a la
+  // pantalla (y vuelve a la cámara cuando deja de compartir). Antes había que
+  // tocar el botón de swap a mano; en el teléfono el supervisor se queda en
+  // estas miniaturas, así que solo veía la cara y nunca la pantalla (Álvaro,
+  // 21/10). Solo actúa en el CAMBIO (empezó / dejó), por eso un swap manual en
+  // el medio se respeta.
+  const compartiendoPrev = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const compartenAhora = new Set(partVideos.filter((p) => p.screen).map((p) => p.identity));
+    setScreenView((prev) => {
+      const next = { ...prev };
+      let cambio = false;
+      for (const id of compartenAhora) {
+        if (!compartiendoPrev.current.has(id)) { next[id] = true; cambio = true; }
+      }
+      for (const id of compartiendoPrev.current) {
+        if (!compartenAhora.has(id)) { next[id] = false; cambio = true; }
+      }
+      return cambio ? next : prev;
+    });
+    compartiendoPrev.current = compartenAhora;
+  }, [partVideos]);
   // "duplicada" NO es un error y por eso es un estado aparte: la sala está
   // perfecta, lo que pasa es que esta cuenta abrió Cowork en otro lado y
   // LiveKit nos sacó de acá. Mezclarlo con "error" era lo que disparaba el
