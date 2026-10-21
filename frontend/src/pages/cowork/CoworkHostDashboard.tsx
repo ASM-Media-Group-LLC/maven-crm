@@ -41,6 +41,9 @@ import { cuentaComoTrabajo } from "@/lib/coworkTiempoRegla";
 import { useRelojDeSala } from "@/hooks/useRelojDeSala";
 import SalaEnPausa, { type PausaDeSala } from "./SalaEnPausa";
 import AvisarDialog from "./AvisarDialog";
+import AvisarGeneralDialog, { type ObjetivoAviso } from "./AvisarGeneralDialog";
+import AvisoChatter from "./AvisoChatter";
+import { useRecepcionAvisos } from "./useRecepcionAvisos";
 import { AVISADORES } from "@/lib/coworkAvisos";
 import { cuentaPausa, clasesPausa, nombreYApellido } from "@/lib/pausaCowork";
 import { normalizarReglas, reglaDeEstado, sonEstandar, type ReglaAviso } from "@/lib/coworkReglas";
@@ -196,22 +199,42 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // ni convierten en host a nadie: así se cortó la racha de cierres.
   const { isAdmin } = useUserRole();
   const puedeFinalizar = !!cowork.session && (cowork.session.created_by === userId || isAdmin);
-  // Avisar al chatter: solo los designados (lista fija en lib/coworkAvisos, NO
-  // el rol admin — hay admins que Álvaro no nombró). El supervisor elige una
-  // situación y se inserta la fila; la RLS de cowork_avisos vuelve a validar que
-  // sea host de la sesión Y uno de los cuatro. Al chatter le llega por realtime.
+  // Avisar: los cuatro designados (lista fija en lib/coworkAvisos, NO el rol
+  // admin — hay admins que Álvaro no nombró) le avisan a un CHATTER; el dueño
+  // (admin) además puede avisarle a un SUPERVISOR. Entre supervisores, no. Se
+  // inserta una fila por persona; la RLS de cowork_avisos vuelve a validar cada
+  // una (host de la sesión + la matriz). Al destinatario le llega por realtime.
   const puedeAvisar = AVISADORES.has(userId);
-  const enviarAviso = useCallback(async (roomId: string, chatterId: string, slug: string) => {
+  const puedeAvisarGeneral = puedeAvisar || isAdmin;
+  const enviarAviso = useCallback(async (targetIds: string[], slug: string, roomId?: string) => {
     const sid = cowork.session?.id;
-    if (!sid) return;
+    if (!sid || targetIds.length === 0) return;
+    const filas = targetIds.map((uid) => ({
+      session_id: sid, user_id: uid, situacion: slug, ...(roomId ? { room_id: roomId } : {}),
+    }));
     // (supabase as any): cowork_avisos no está en los tipos generados (ver el
     // mismo patrón en useCoworkSession con `sinTipar` y en las tablas wa_*).
     const { error } = await (supabase as unknown as {
-      from: (t: string) => { insert: (row: Record<string, unknown>) => Promise<{ error: unknown }> };
-    }).from("cowork_avisos").insert({ session_id: sid, room_id: roomId, user_id: chatterId, situacion: slug });
+      from: (t: string) => { insert: (rows: Record<string, unknown>[]) => Promise<{ error: unknown }> };
+    }).from("cowork_avisos").insert(filas);
     if (error) toast.error(traducir("cowork.avisar.failed"));
-    else toast.success(traducir("cowork.avisar.sent"));
+    else toast.success(traducir(targetIds.length > 1 ? "cowork.avisar.sentAll" : "cowork.avisar.sent"));
   }, [cowork.session?.id]);
+  // A quién puede avisar ESTE usuario (host = supervisor, participant = chatter),
+  // menos a sí mismo. El pop-up general lo usa para el selector; espeja la RLS.
+  const objetivosAviso = useMemo<ObjetivoAviso[]>(() => {
+    return cowork.memberships
+      .filter((m) => m.user_id !== userId)
+      .map((m) => ({
+        uid: m.user_id,
+        nombre: cowork.profiles[m.user_id] ? nombreYApellido(cowork.profiles[m.user_id]) : m.user_id.slice(0, 8),
+        esSupervisor: m.role === "host",
+      }))
+      .filter((o) => (o.esSupervisor ? isAdmin : puedeAvisar));
+  }, [cowork.memberships, cowork.profiles, userId, isAdmin, puedeAvisar]);
+  // Recepción de avisos para ESTE supervisor: el dueño avisándole a un supervisor
+  // no servía si el supervisor no lo oía. Mismo hook que CoworkParticipantView.
+  const { aviso: avisoRecibido, cerrar: cerrarAvisoRecibido } = useRecepcionAvisos(userId);
   const [copiandoEnlace, setCopiandoEnlace] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [hubMinimized, setHubMinimized] = useState(false);
@@ -1520,6 +1543,17 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
         {sidebarOpen ? <XIcon className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
       </Button>
 
+      {/* Aviso recibido (si a ESTE supervisor le avisaron): cartel + campana + voz,
+          por encima de todo. El root es `relative`, así se ancla acá. */}
+      {avisoRecibido && (
+        <AvisoChatter
+          nombreDe={avisoRecibido.nombreDe}
+          etiqueta={avisoRecibido.etiqueta}
+          onCerrar={cerrarAvisoRecibido}
+          t={t}
+        />
+      )}
+
       {/* Overlay for mobile sidebar */}
       {sidebarOpen && (
         <div className="fixed inset-0 bg-black/50 z-30 md:hidden" onClick={() => setSidebarOpen(false)} />
@@ -1705,6 +1739,18 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 </Button>
               ) : null}
             </div>
+            {/* Avisar general: eliges a una persona de la sesión o a todos, y la
+                situación. Solo lo ven quienes pueden avisar (los 4 designados o
+                el dueño). */}
+            {puedeAvisarGeneral && (
+              <div className="mt-2.5">
+                <AvisarGeneralDialog
+                  objetivos={objetivosAviso}
+                  onAvisar={(ids, slug) => void enviarAviso(ids, slug)}
+                  t={t}
+                />
+              </div>
+            )}
           </section>
 
           {/* Unassigned members section removed — participants self-join via URL ?room=X */}
@@ -2316,7 +2362,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                             <AvisarDialog
                               nombreChatter={chatterId ? nombreYApellido(cowork.profiles[chatterId]) : null}
                               disabled={!chatterId}
-                              onAvisar={(slug) => { if (chatterId) void enviarAviso(room.id, chatterId, slug); }}
+                              onAvisar={(slug) => { if (chatterId) void enviarAviso([chatterId], slug, room.id); }}
                               t={t}
                             />
                           );
