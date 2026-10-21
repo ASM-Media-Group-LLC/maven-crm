@@ -40,7 +40,7 @@ import { personasEnSala, relojDeRespaldo, latidoFresco, sinConexionConLaSala } f
 import { cuentaComoTrabajo } from "@/lib/coworkTiempoRegla";
 import { useRelojDeSala } from "@/hooks/useRelojDeSala";
 import SalaEnPausa, { type PausaDeSala } from "./SalaEnPausa";
-import AvisarMenu from "./AvisarMenu";
+import AvisarDialog from "./AvisarDialog";
 import { AVISADORES } from "@/lib/coworkAvisos";
 import { cuentaPausa, clasesPausa, nombreYApellido } from "@/lib/pausaCowork";
 import { normalizarReglas, reglaDeEstado, sonEstandar, type ReglaAviso } from "@/lib/coworkReglas";
@@ -2313,7 +2313,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                         {puedeAvisar && (() => {
                           const chatterId = participants[0]?.user_id ?? asignados[0]?.user_id ?? null;
                           return (
-                            <AvisarMenu
+                            <AvisarDialog
                               nombreChatter={chatterId ? nombreYApellido(cowork.profiles[chatterId]) : null}
                               disabled={!chatterId}
                               onAvisar={(slug) => { if (chatterId) void enviarAviso(room.id, chatterId, slug); }}
