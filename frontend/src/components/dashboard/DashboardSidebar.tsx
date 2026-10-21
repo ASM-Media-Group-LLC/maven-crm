@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/sidebar";
 import { useLanguage } from "@/hooks/useLanguage";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useRoleTier } from "@/hooks/useRoleTier";
 import { CollapsibleSidebarGroup } from "@/components/dashboard/CollapsibleSidebarGroup";
 import WhatsAppIcon from "@/components/icons/WhatsAppIcon";
 import TelegramIcon from "@/components/icons/TelegramIcon";
@@ -80,6 +81,7 @@ const DashboardSidebar = () => {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const { canAccess, isLoading: permisosCargando, hayError: permisosFallaron, reintentar: reintentarPermisos } = usePermissions();
+  const { isSupervisorOrAbove } = useRoleTier();
 
   const unreadChatCount = useUnreadChatCount();
   const { promologCount, leadgenCount, closersCount, waInboxCount, tgInboxCount, coworkRequestsCount, correoUnreadCount } = useSidebarBadges();
@@ -96,6 +98,12 @@ const DashboardSidebar = () => {
     { title: t("nav.contacts"), url: "/contactos", icon: UserPlus, module: "Contactos" },
   ];
   const mainMenu = mainMenuAll.filter((item) => canAccess(item.module));
+  // "Empleados": sección nueva (perfil de desempeño de cada persona). No tiene
+  // módulo de permisos; se gatea por nivel de rol —supervisores y superiores—
+  // igual que su ruta (SupervisorRoute). Entre ellos: un admin también pasa.
+  if (isSupervisorOrAbove) {
+    mainMenu.push({ title: t("empleados.nav.title"), url: "/empleados", icon: UserCheck, module: "" });
+  }
 
   const creadoresSubItems = [
     { title: t("nav.creators.dashboard"), url: "/creadores/dashboard", submodule: "Dashboard" },
