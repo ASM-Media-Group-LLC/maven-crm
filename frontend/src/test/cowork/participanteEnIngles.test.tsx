@@ -49,10 +49,16 @@ vi.mock("@/integrations/supabase/client", () => {
   const q: Record<string, unknown> = {};
   for (const m of ["select", "eq"]) q[m] = () => q;
   q.single = async () => ({ data: { full_name: "Laura Gomez" } });
+  q.maybeSingle = async () => ({ data: { full_name: "Laura Gomez" } });
+  // El canal del receptor de avisos (useCanalQueRevive): basta con que exista;
+  // no llega ningún aviso en estas pruebas.
+  const chan = { on: () => chan, subscribe: () => chan };
   return {
     supabase: {
       auth: { getUser: async () => ({ data: { user: { id: "u1" } } }), getSession: async () => ({ data: { session: null } }) },
       from: () => q,
+      channel: () => chan,
+      removeChannel: () => Promise.resolve(),
     },
   };
 });

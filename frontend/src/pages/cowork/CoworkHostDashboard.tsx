@@ -40,6 +40,8 @@ import { personasEnSala, relojDeRespaldo, latidoFresco, sinConexionConLaSala } f
 import { cuentaComoTrabajo } from "@/lib/coworkTiempoRegla";
 import { useRelojDeSala } from "@/hooks/useRelojDeSala";
 import SalaEnPausa, { type PausaDeSala } from "./SalaEnPausa";
+import AvisarDialog from "./AvisarDialog";
+import { AVISADORES } from "@/lib/coworkAvisos";
 import { cuentaPausa, clasesPausa, nombreYApellido } from "@/lib/pausaCowork";
 import { normalizarReglas, reglaDeEstado, sonEstandar, type ReglaAviso } from "@/lib/coworkReglas";
 import { armarCadenaNC, loadNCPreference, type CadenaNC } from "@/lib/noise-suppression-processor";
@@ -194,6 +196,22 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // ni convierten en host a nadie: así se cortó la racha de cierres.
   const { isAdmin } = useUserRole();
   const puedeFinalizar = !!cowork.session && (cowork.session.created_by === userId || isAdmin);
+  // Avisar al chatter: solo los designados (lista fija en lib/coworkAvisos, NO
+  // el rol admin — hay admins que Álvaro no nombró). El supervisor elige una
+  // situación y se inserta la fila; la RLS de cowork_avisos vuelve a validar que
+  // sea host de la sesión Y uno de los cuatro. Al chatter le llega por realtime.
+  const puedeAvisar = AVISADORES.has(userId);
+  const enviarAviso = useCallback(async (roomId: string, chatterId: string, slug: string) => {
+    const sid = cowork.session?.id;
+    if (!sid) return;
+    // (supabase as any): cowork_avisos no está en los tipos generados (ver el
+    // mismo patrón en useCoworkSession con `sinTipar` y en las tablas wa_*).
+    const { error } = await (supabase as unknown as {
+      from: (t: string) => { insert: (row: Record<string, unknown>) => Promise<{ error: unknown }> };
+    }).from("cowork_avisos").insert({ session_id: sid, room_id: roomId, user_id: chatterId, situacion: slug });
+    if (error) toast.error(traducir("cowork.avisar.failed"));
+    else toast.success(traducir("cowork.avisar.sent"));
+  }, [cowork.session?.id]);
   const [copiandoEnlace, setCopiandoEnlace] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [hubMinimized, setHubMinimized] = useState(false);
@@ -2291,14 +2309,27 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                           {controlesDeSala(room, false)}
                         </div>
                       )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="ml-auto h-8 rounded-lg border border-primary/40 bg-primary/15 px-4 text-xs font-semibold text-primary hover:bg-primary/25 hover:text-primary"
-                        onClick={() => enterRoom(room.id)}
-                      >
-                        {t("cowork.common.enter")}
-                      </Button>
+                      <div className="ml-auto flex items-center gap-1.5">
+                        {puedeAvisar && (() => {
+                          const chatterId = participants[0]?.user_id ?? asignados[0]?.user_id ?? null;
+                          return (
+                            <AvisarDialog
+                              nombreChatter={chatterId ? nombreYApellido(cowork.profiles[chatterId]) : null}
+                              disabled={!chatterId}
+                              onAvisar={(slug) => { if (chatterId) void enviarAviso(room.id, chatterId, slug); }}
+                              t={t}
+                            />
+                          );
+                        })()}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 rounded-lg border border-primary/40 bg-primary/15 px-4 text-xs font-semibold text-primary hover:bg-primary/25 hover:text-primary"
+                          onClick={() => enterRoom(room.id)}
+                        >
+                          {t("cowork.common.enter")}
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 );
