@@ -8,6 +8,7 @@ import {
   situacionesDe,
   type GrupoAviso,
 } from "@/lib/coworkAvisos";
+import { CLIPS_VOZ } from "@/lib/clipsVoz";
 
 // El botón "Avisar": un supervisor le manda a un chatter una de estas
 // situaciones y le llega en voz (Mario) y por escrito. Lo que esta guarda
@@ -49,6 +50,18 @@ describe("situaciones de Avisar", () => {
   it("cada situación tiene una frase de voz (lo que dice Mario)", () => {
     const sinVoz = SITUACIONES_AVISO.filter((s) => !s.vozEs.trim()).map((s) => s.slug);
     expect(sinVoz).toEqual([]);
+  });
+
+  it("cada situación tiene su clip Mario pregrabado (lib/clipsVoz)", () => {
+    // Si alguien agrega o cambia una frase sin generar/re-mapear su clip, sonaría
+    // con la voz robótica del navegador y se notaría el salto. Esta guarda lo caza.
+    const sinClip = SITUACIONES_AVISO
+      .filter((s) => !CLIPS_VOZ[s.vozEs])
+      .map((s) => `${s.slug} → «${s.vozEs}»`);
+    expect(
+      sinClip,
+      `Falta el audio Mario (o el texto no coincide exacto) para:\n${sinClip.join("\n")}`,
+    ).toEqual([]);
   });
 });
 
