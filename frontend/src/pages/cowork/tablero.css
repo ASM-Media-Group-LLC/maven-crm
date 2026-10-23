@@ -1,0 +1,178 @@
+/* El look "consola" del tablero de Cowork — portado 1:1 del mockup de la portada
+ * (pages/portada/Oficina.tsx + portada.css, clases .ofi-*), renombrado a .cwk-*
+ * y scopeado bajo .cwk-tablero para no chocar con el resto del app. Es el mismo
+ * lenguaje: fondo oscuro, JetBrains Mono para lo "terminal", Sora para los
+ * nombres, tarjetas con escena + 3 acciones. Álvaro lo pidió "igualito al
+ * mockup" (22/10). */
+@import url("https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap");
+
+.cwk-tablero {
+  /* La paleta exacta del mockup (no depende del tema del app: este tablero es
+   * siempre oscuro, como la portada). */
+  --line: rgba(255, 255, 255, 0.075);
+  --line-strong: rgba(255, 255, 255, 0.14);
+  --ink: #f2f3f7;
+  --ink-soft: #b9bfcd;
+  --muted: #858da0;
+  --faint: #5b6376;
+  --azul: #0a84ff;
+  --azul-claro: #4fa8ff;
+  --violeta: #8b5cf6;
+  --azul-rgb: 10, 132, 255;
+  --azul-claro-rgb: 79, 168, 255;
+  --verde: #10b981;
+  --ambar: #f59e0b;
+  --rosa: #f43f7e;
+
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  color: var(--ink);
+  background: #0a0c12;
+  font-family: "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
+}
+
+/* ── Barra de consola ─────────────────────────────────────────────────────── */
+.cwk-barra {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.02);
+}
+.cwk-semaforo { display: flex; gap: 6px; }
+.cwk-semaforo i { width: 9px; height: 9px; border-radius: 50%; background: rgba(255, 255, 255, 0.14); }
+.cwk-semaforo i:nth-child(1) { background: #ff5f57; }
+.cwk-semaforo i:nth-child(2) { background: #febc2e; }
+.cwk-semaforo i:nth-child(3) { background: #28c840; }
+.cwk-titulo { font: 500 12px/1 "JetBrains Mono", monospace; color: var(--muted); letter-spacing: 0.05em; }
+.cwk-live {
+  display: inline-flex; align-items: center; gap: 5px; margin-left: 2px;
+  font: 500 10px/1 "JetBrains Mono", monospace; letter-spacing: 0.06em; color: var(--verde);
+  border: 1px solid rgba(16, 185, 129, 0.32); border-radius: 999px; padding: 4px 8px;
+}
+.cwk-live i { width: 6px; height: 6px; border-radius: 50%; background: var(--verde); animation: cwk-latir 2.4s ease-out infinite; }
+.cwk-cuenta { margin-left: auto; font: 400 11.5px/1 "JetBrains Mono", monospace; color: var(--faint); white-space: nowrap; }
+.cwk-reloj { font: 400 11.5px/1 "JetBrains Mono", monospace; color: var(--faint); }
+.cwk-barra .cwk-cuenta + .cwk-reloj { margin-left: 14px; }
+
+/* ── Cuerpo: rail + salas ─────────────────────────────────────────────────── */
+.cwk-board { display: flex; flex: 1; min-height: 0; }
+
+.cwk-rail {
+  flex: none; width: 184px; display: flex; flex-direction: column; gap: 15px;
+  padding: 15px 13px; border-right: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.028), rgba(255, 255, 255, 0.004));
+}
+.cwk-rail-cab b { display: block; font: 700 14px/1.1 Sora, sans-serif; letter-spacing: 0.01em; color: var(--ink); }
+.cwk-rail-cab small { display: block; margin-top: 2px; font: 400 9.5px/1 "JetBrains Mono", monospace; color: var(--faint); letter-spacing: 0.04em; }
+.cwk-rail-sec { display: flex; flex-direction: column; gap: 6px; }
+.cwk-rail-rot { font: 600 8.5px/1 "JetBrains Mono", monospace; letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint); }
+.cwk-rail-rot.amb { color: var(--ambar); }
+.cwk-rail-item { display: flex; align-items: center; gap: 7px; padding: 6px 7px; border: 1px solid var(--line); border-radius: 10px; background: rgba(255, 255, 255, 0.022); }
+.cwk-rail-cara { width: 22px; height: 22px; border-radius: 50%; flex: none; object-fit: cover; background: #11151f; }
+.cwk-rail-nom { flex: 1; min-width: 0; font: 500 11px/1.25 "Instrument Sans", sans-serif; color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cwk-rail-chip { flex: none; font: 500 8px/1 "JetBrains Mono", monospace; color: var(--azul-claro); border: 1px solid rgba(var(--azul-claro-rgb), 0.3); border-radius: 999px; padding: 2px 5px; }
+.cwk-rail-admitir { flex: none; cursor: pointer; font: 600 8.5px/1 "Instrument Sans", sans-serif; color: var(--verde); border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 999px; padding: 3px 7px; background: transparent; }
+
+.cwk-main { flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: 0; }
+.cwk-toolbar { display: flex; align-items: center; gap: 7px; padding: 11px 14px; border-bottom: 1px solid var(--line); }
+.cwk-toolbar-rot { font: 500 9px/1 "JetBrains Mono", monospace; letter-spacing: 0.11em; text-transform: uppercase; color: var(--muted); }
+.cwk-toolbar-acc { cursor: pointer; font: 500 10px/1 "Instrument Sans", sans-serif; color: var(--ink-soft); border: 1px solid var(--line); border-radius: 8px; padding: 5px 9px; background: rgba(255, 255, 255, 0.03); }
+.cwk-toolbar-acc:first-of-type { margin-left: auto; }
+
+.cwk-grilla {
+  position: relative; display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 12px; padding: 14px; overflow-y: auto; flex: 1; min-height: 0;
+}
+
+/* ── Tarjeta de sala ──────────────────────────────────────────────────────── */
+.cwk-sala {
+  position: relative; display: flex; flex-direction: column; gap: 9px; min-height: 0;
+  border: 1px solid var(--line); border-radius: 14px; padding: 11px 12px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.008));
+  transition: border-color 0.35s, box-shadow 0.35s, background 0.35s;
+}
+.cwk-sala.activa {
+  border-color: rgba(var(--azul-claro-rgb), 0.5);
+  box-shadow: 0 0 0 1px rgba(var(--azul-claro-rgb), 0.2), 0 16px 42px -20px rgba(var(--azul-rgb), 0.95);
+  background: linear-gradient(180deg, rgba(var(--azul-rgb), 0.09), rgba(255, 255, 255, 0.01));
+}
+
+.cwk-cab { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.cwk-cab b { font: 600 13.5px/1.2 Sora, sans-serif; letter-spacing: -0.01em; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cwk-cab .cwk-gente { display: inline-flex; align-items: center; gap: 3px; font: 400 11px/1 "JetBrains Mono", monospace; color: var(--faint); flex: none; }
+
+/* La escena: cámara a pantalla completa o pantalla compartida. */
+.cwk-escena { position: relative; align-self: stretch; width: 100%; aspect-ratio: 16 / 10; min-height: 96px; border-radius: 11px; overflow: hidden; background: #0a0e16; border: 1px solid var(--line); }
+.cwk-escena-full { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.cwk-escena-pip { position: absolute; right: 6px; top: 6px; z-index: 2; width: 26%; max-width: 64px; aspect-ratio: 4 / 3; border-radius: 7px; border: 1.5px solid rgba(255, 255, 255, 0.55); object-fit: cover; }
+.cwk-escena-vacia { position: absolute; inset: 0; display: grid; place-items: center; font: 400 11px/1 "JetBrains Mono", monospace; color: var(--faint); letter-spacing: 0.04em; }
+
+/* Etiqueta "quién" sobre la escena (en vivo). */
+.cwk-quien { position: absolute; left: 7px; bottom: 7px; z-index: 2; display: inline-flex; align-items: center; gap: 5px; font: 500 10px/1.1 "JetBrains Mono", monospace; color: var(--ink-soft); background: rgba(5, 7, 11, 0.82); border-radius: 8px; padding: 3px 8px 3px 4px; }
+.cwk-quien-cara { width: 17px; height: 17px; border-radius: 50%; flex: none; object-fit: cover; }
+.cwk-live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--rosa); animation: cwk-latir 2s ease-out infinite; flex: none; }
+
+/* Ondas de voz de la escena. */
+.cwk-voz { position: absolute; right: 7px; bottom: 7px; z-index: 2; display: flex; align-items: flex-end; gap: 2px; height: 13px; padding: 2px 4px; border-radius: 6px; background: rgba(5, 7, 11, 0.65); }
+.cwk-voz i { width: 2px; min-height: 2px; border-radius: 1px; background: var(--verde); animation: cwk-voz 1s ease-in-out infinite; }
+.cwk-voz i:nth-child(2) { animation-delay: 0.15s; }
+.cwk-voz i:nth-child(3) { animation-delay: 0.3s; }
+
+/* Mock de pantalla compartida (cuando no hay imagen real). */
+.cwk-screen { position: absolute; inset: 6px; border-radius: 7px; background: linear-gradient(160deg, #0f1420, #0a0e16); border: 1px solid rgba(255, 255, 255, 0.06); overflow: hidden; }
+.cwk-screen .ss-bar { display: flex; gap: 4px; padding: 6px 8px; }
+.cwk-screen .ss-bar i { width: 6px; height: 6px; border-radius: 50%; background: rgba(255, 255, 255, 0.18); }
+.cwk-screen .ss-body { padding: 2px 10px; display: flex; flex-direction: column; gap: 6px; }
+.cwk-screen .l { height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.09); }
+.cwk-screen .l.t { width: 42%; background: rgba(var(--azul-claro-rgb), 0.5); }
+.cwk-screen .l:nth-child(2) { width: 88%; }
+.cwk-screen .l:nth-child(3) { width: 66%; }
+.cwk-screen .ss-chart { display: flex; align-items: flex-end; gap: 4px; height: 26px; margin-top: 4px; }
+.cwk-screen .ss-chart i { flex: 1; border-radius: 2px 2px 0 0; background: linear-gradient(180deg, var(--azul-claro), var(--violeta)); }
+.cwk-screen .ss-chart i:nth-child(1) { height: 40%; }
+.cwk-screen .ss-chart i:nth-child(2) { height: 70%; }
+.cwk-screen .ss-chart i:nth-child(3) { height: 52%; }
+.cwk-screen .ss-chart i:nth-child(4) { height: 90%; }
+.cwk-screen .ss-chart i:nth-child(5) { height: 64%; }
+
+/* Las 3 acciones (Escuchar / Hablar / Entrar). */
+.cwk-acciones { display: grid; grid-template-columns: 1fr 1fr 1.15fr; gap: 6px; }
+.cwk-btn {
+  position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 4px; cursor: pointer;
+  font: 600 11px/1 "Instrument Sans", sans-serif; color: var(--muted);
+  border: 1px solid var(--line); border-radius: 8px; padding: 8px 4px; background: rgba(255, 255, 255, 0.02);
+  transition: color 0.25s, border-color 0.25s, background 0.25s, box-shadow 0.25s;
+}
+.cwk-btn:hover { color: var(--ink-soft); border-color: var(--line-strong); }
+.cwk-btn-entrar { color: var(--azul-claro); border-color: rgba(var(--azul-claro-rgb), 0.33); background: rgba(var(--azul-rgb), 0.06); }
+.cwk-btn-escuchar.activo { color: var(--verde); border-color: rgba(16, 185, 129, 0.55); background: rgba(16, 185, 129, 0.15); box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.22); }
+.cwk-btn-hablar.activo { color: var(--rosa); border-color: rgba(244, 63, 126, 0.55); background: rgba(244, 63, 126, 0.15); box-shadow: 0 0 0 1px rgba(244, 63, 126, 0.22); }
+.cwk-btn-entrar.activo { color: #fff; border-color: transparent; background: linear-gradient(100deg, var(--azul), var(--violeta)); box-shadow: 0 8px 20px -8px rgba(var(--azul-rgb), 0.9); }
+
+.cwk-codigo { font: 400 9.5px/1 "JetBrains Mono", monospace; letter-spacing: 0.05em; color: var(--faint); }
+
+/* Pie: el supervisor escuchando una sala sin entrar. */
+.cwk-pie {
+  display: flex; align-items: center; gap: 9px; margin: 0 14px 14px; padding: 10px 13px; border-radius: 11px;
+  border: 1px solid var(--line-strong); background: rgba(255, 255, 255, 0.03); font-size: 12.5px; color: var(--ink-soft);
+}
+.cwk-pie svg { color: var(--azul-claro); flex: none; }
+.cwk-pie b { color: var(--ink); font-weight: 600; }
+.cwk-ondas { display: inline-flex; align-items: flex-end; gap: 2px; height: 12px; margin-left: auto; }
+.cwk-ondas i { width: 2px; height: 4px; border-radius: 1px; background: var(--azul-claro); animation: cwk-onda 1s ease-in-out infinite; }
+.cwk-ondas i:nth-child(2) { animation-delay: 0.18s; }
+.cwk-ondas i:nth-child(3) { animation-delay: 0.36s; }
+
+@keyframes cwk-latir { 0% { box-shadow: 0 0 0 0 currentColor; } 70%, 100% { box-shadow: 0 0 0 5px transparent; } }
+@keyframes cwk-voz { 0%, 100% { height: 3px; } 50% { height: 12px; } }
+@keyframes cwk-onda { 0%, 100% { height: 4px; } 50% { height: 12px; } }
+
+@media (max-width: 760px) {
+  .cwk-rail { display: none; }
+  .cwk-grilla { grid-template-columns: 1fr; }
+  .cwk-cuenta { display: none; }
+}

@@ -46,6 +46,8 @@ const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const ChatterPublicView = lazy(() => import("./pages/ChatterPublicView"));
 const VideoCallPage = lazy(() => import("./pages/VideoCallPage"));
 const CoworkPage = lazy(() => import("./pages/cowork/CoworkPage"));
+// Vista de prueba TEMPORAL del nuevo look del tablero (solo en dev; se quita al aprobar).
+const TableroEstiloPreview = lazy(() => import("./pages/cowork/TableroEstiloPreview"));
 const MeetPage = lazy(() => import("./pages/meet/MeetPage"));
 const MeetGuestPage = lazy(() => import("./pages/meet/MeetGuestPage"));
 // Portal de creadoras: su espacio, fuera del AppShell del equipo.
@@ -285,6 +287,7 @@ const App = () => (
               <Route path="/register" element={<Navigate to="/#demo" replace />} />
               <Route path="/concept" element={<Concepto />} />
               {import.meta.env.DEV && Credentials && <Route path="/credentials" element={<Credentials />} />}
+              {import.meta.env.DEV && <Route path="/cowork-estilo" element={<TableroEstiloPreview />} />}
               
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
