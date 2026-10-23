@@ -6,13 +6,13 @@ Esta guía es para un Claude que opera **en** el mini5 (`unlok-server-5`, usuari
 
 | Pieza | Cómo corre | Cómo se comprueba |
 |---|---|---|
-| Servidor de archivos del Drive | LaunchAgent `ai.maven.nas-drive` → `~/maven-nas-drive/server.mjs` (Node, puerto 8790, solo acepta peticiones firmadas) | `curl -s http://127.0.0.1:8790/salud` en el mini; desde fuera `https://drive.217-216-95-7.nip.io/salud`. Registro: `~/maven-nas-drive/servidor.log` |
+| Servidor de archivos del Drive | LaunchAgent `ai.maven.nas-drive` → `~/maven-nas-drive/server.mjs` (Node, puerto 8790, solo acepta peticiones firmadas) | `curl -s http://127.0.0.1:8790/salud` en el mini; desde fuera `https://drive.147-93-3-97.nip.io/salud` (la puerta; hasta el 23/10 era `drive.217-216-95-7.nip.io`). Registro: `~/maven-nas-drive/servidor.log` |
 | Índice diario de los discos | LaunchAgent `ai.maven.nas-drive-indice`, 3:15 de la madrugada | `~/maven-nas-drive/indice.log`; deja `_indice/actual.csv` y `.json` en cada disco |
 | Runner del CI (revisión de cada PR) | LaunchDaemon `ai.maven.ci-runner`, usuario aislado `maven-ci` | `launchctl print system/ai.maven.ci-runner` (state = running) o `gh api repos/<repo>/actions/runners` |
 | Herramientas de la salida de Google | rclone con los remotos `gdrive` (lectura), `gborrar` (borrado) y `nas`; carpetas `~/importar`, `~/vaciar`, `~/permisos` | los scripts dejan `.log` al lado |
 | Copia del repo | `~/Projects/maven-crm`, se actualiza por empuje desde el Mac de Jhon (`actualizar-repo-equipo`) | `git log -1` ahí. No tiene acceso a GitHub: desde el mini no se abren PRs |
 
-El camino de un archivo: el frontend pide a la edge `drive` de Supabase, que firma un permiso; el navegador va a la **puerta** (`infra/nas-drive/puerta`, Caddy + Tailscale en el Dokploy de microservicios), y la puerta entra al mini por Tailscale con el nombre MagicDNS `unlok-workstation`, nunca por IP (cambia al volver a entrar). En disco los archivos son `/Volumes/NASx/maven-drive/<agencia>/<id>`, sin nombre ni carpeta: eso vive en `drive_items` en la base.
+El camino de un archivo: el frontend pide a la edge `drive` de Supabase, que firma un permiso; el navegador va a la **puerta** (`infra/nas-drive/puerta`, Caddy + Tailscale en el Dokploy de 147.93.3.97; cómo montarla o mudarla, en el `README.md`), y la puerta entra al mini por Tailscale con el nombre MagicDNS `unlok-workstation`, nunca por IP (cambia al volver a entrar). En disco los archivos son `/Volumes/NASx/maven-drive/<agencia>/<id>`, sin nombre ni carpeta: eso vive en `drive_items` en la base.
 
 ## Actualizar el servidor
 
