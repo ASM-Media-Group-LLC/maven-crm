@@ -1,6 +1,7 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import AudioSink from "./AudioSink";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
 import { Room, RoomEvent, Track } from "livekit-client";
 import { copiaSirve } from "@/lib/microDelSupervisor";
 import { VideoOff, Loader2, Monitor, Video, Copy } from "lucide-react";
@@ -106,9 +107,20 @@ function MonitorTile({ pv, viewingScreen, onSwap, showName = true }: { pv: PartV
               : t("cowork.monitor.viewScreen")
         }
         aria-label={viewingScreen ? t("cowork.monitor.viewCamera") : t("cowork.monitor.viewScreen")}
-        className="absolute bottom-2 right-2 z-10 flex h-6 w-6 tactil:h-8 tactil:w-8 items-center justify-center rounded-md bg-black/50 text-white/90 backdrop-blur-sm transition hover:bg-black/70 disabled:cursor-not-allowed disabled:opacity-30"
+        className={cn(
+          "absolute bottom-2 right-2 z-10 flex items-center gap-1 rounded-md px-1.5 h-6 tactil:h-8 backdrop-blur-sm transition disabled:cursor-not-allowed disabled:opacity-30",
+          // Cuando HAY una pantalla para ver y estás en cámara, el botón se pinta
+          // (ya no salta solo en escritorio): así se nota de un vistazo que esa
+          // sala está compartiendo y con un clic la ves (Álvaro, 23/10).
+          canSwap && !viewingScreen
+            ? "bg-primary text-primary-foreground ring-1 ring-white/40 shadow-md hover:bg-primary/90"
+            : "bg-black/50 text-white/90 hover:bg-black/70",
+        )}
       >
         {viewingScreen ? <Video className="h-3.5 w-3.5" /> : <Monitor className="h-3.5 w-3.5" />}
+        {canSwap && !viewingScreen && (
+          <span className="text-[9px] tactil:text-[11px] font-semibold leading-none">{t("cowork.monitor.screenShort")}</span>
+        )}
       </button>
       {showName && (pv.name || viewingScreen) && (
         <span className="absolute bottom-1 left-1 max-w-[85%] truncate rounded bg-black/50 px-1.5 py-0.5 text-[9px] tactil:text-[11px] text-white/90">

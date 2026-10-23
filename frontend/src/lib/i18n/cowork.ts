@@ -343,6 +343,7 @@ export const cowork = {
   "cowork.monitor.viewCamera": { es: "Ver cámara", en: "View camera" },
   "cowork.monitor.viewScreen": { es: "Ver pantalla compartida", en: "View shared screen" },
   "cowork.monitor.screenSuffix": { es: "pantalla", en: "screen" },
+  "cowork.monitor.screenShort": { es: "Pantalla", en: "Screen" },
   "cowork.monitor.previewUnavailable": { es: "Preview no disponible", en: "Preview unavailable" },
   "cowork.monitor.retry": { es: "Reintentar", en: "Try again" },
   "cowork.monitor.otherWindow": { es: "Abierto en otra ventana", en: "Open in another window" },
