@@ -1283,6 +1283,29 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // Quién está HABLANDO en cada sala (ActiveSpeakersChanged de LiveKit), para
   // pintar la card en verde mientras alguien habla.
   const [roomSpeakers, setRoomSpeakers] = useState<Record<string, string[]>>({});
+  // Manejadores ESTABLES por sala para CoworkRoomMonitor (que está memoizado):
+  // si se recrean en cada render —como las flechas inline de antes— el memo no
+  // sirve y los 8-9 monitores se redibujan con cada tick del reloj o evento de
+  // presencia, que era parte de lo que congelaba el navegador del supervisor
+  // (Álvaro, 23/10). Los setX de useState son estables, así que cachear una vez
+  // por sala es seguro.
+  const manejadoresMonitor = useRef<Record<string, {
+    sharers: (names: string[], ids?: string[]) => void;
+    speaking: (names: string[]) => void;
+    participants: (ids: string[] | null) => void;
+  }>>({});
+  const manejadoresDe = (roomId: string) => {
+    let h = manejadoresMonitor.current[roomId];
+    if (!h) {
+      h = {
+        sharers: (_names, ids) => setRoomSharerIds((m) => ({ ...m, [roomId]: ids ?? [] })),
+        speaking: (names) => setRoomSpeakers((m) => ({ ...m, [roomId]: names })),
+        participants: (ids) => setRoomConectados((m) => ({ ...m, [roomId]: ids })),
+      };
+      manejadoresMonitor.current[roomId] = h;
+    }
+    return h;
+  };
 
   const handleAddRoom = async () => {
     const name = addName.trim();
@@ -2154,6 +2177,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 const speakers = roomSpeakers[room.id] ?? [];
                 const etiquetas = etiquetasDe(participants, !pausaSala);
                 const personas = personasDe(participants);
+                const manejadores = manejadoresDe(room.id);
                 const monitor = (showVideo: boolean) => (
                   <CoworkRoomMonitor
                     roomId={room.id}
@@ -2169,9 +2193,9 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                     screenOn={screenFor(room.id)}
                     screenBaseTrack={screenBaseTrack}
                     enabled={activeRoomId !== room.id}
-                    onSharersChange={(_names, ids) => setRoomSharerIds((m) => ({ ...m, [room.id]: ids ?? [] }))}
-                    onSpeakingChange={(names) => setRoomSpeakers((m) => ({ ...m, [room.id]: names }))}
-                    onParticipantsChange={(ids) => setRoomConectados((m) => ({ ...m, [room.id]: ids }))}
+                    onSharersChange={manejadores.sharers}
+                    onSpeakingChange={manejadores.speaking}
+                    onParticipantsChange={manejadores.participants}
                   />
                 );
                 return (
