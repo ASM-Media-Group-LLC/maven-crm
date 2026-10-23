@@ -89,7 +89,11 @@ export function useCoworkRequestAlerts() {
         { event: "*", schema: "public", table: "cowork_host_requests" },
         () => { void revisar(); })
       .subscribe();
-    const id = window.setInterval(() => { void revisar(); }, 30_000);
+    // El repaso periódico es solo una red por si la suscripción se cae; con la
+    // pestaña oculta no hace falta gastarlo (realtime igual lo despierta al
+    // volver). Este hook va montado para TODO host en toda la app, así que el
+    // ahorro se multiplica.
+    const id = window.setInterval(() => { if (document.visibilityState === "visible") void revisar(); }, 30_000);
 
     return () => {
       cancelado = true;
