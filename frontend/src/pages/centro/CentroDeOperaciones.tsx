@@ -1,14 +1,18 @@
 import { useMemo, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, BarChart3, Clock, DoorOpen, Headset, MessageCircle, Timer, Users } from "lucide-react";
+import { AlertTriangle, ArrowRight, BarChart3, Clock, DoorOpen, Headset, MessageCircle, Timer, TrendingUp, Users } from "lucide-react";
 import SelectorDeTablero from "@/pages/dashboard/SelectorDeTablero";
 import { Button } from "@/components/ui/button";
 import { useCoworkSession, type AdminSessionRow } from "@/hooks/useCoworkSession";
 import { useEquipoTiempoCowork } from "@/hooks/useEquipoTiempoCowork";
 import { usePanelMensajeria } from "@/hooks/usePanelMensajeria";
+import { useCentroAhora } from "@/hooks/useCentroAhora";
+import { useChatterPeriodo, rangoDeDias } from "@/pages/chatters/useChatterRendimiento";
+import { useRoster } from "@/pages/chatters/horarios/useHorarios";
 import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/hooks/useLanguage";
+import { type TranslationKey } from "@/lib/i18n";
 import { tituloBonito } from "@/lib/tituloBonito";
 
 // CENTRO DE OPERACIONES — el tablero por defecto del admin desde el rediseño
@@ -46,6 +50,23 @@ const segundosBonitos = (s: number) => {
   const m = Math.floor(total / 60);
   const seg = total % 60;
   return m > 0 ? `${m} m ${String(seg).padStart(2, "0")} s` : `${seg} s`;
+};
+
+const dinero = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
+
+// Estados problemáticos del reloj de Cowork → su etiqueta. El mapa es explícito
+// (y no un template string) para que el diccionario lo pueda verificar.
+const ESTADOS_PROBLEMA: Record<string, TranslationKey> = {
+  sin_camara: "dashboard.centro.estado.sin_camara",
+  sin_pantalla: "dashboard.centro.estado.sin_pantalla",
+  fuera_de_camara: "dashboard.centro.estado.fuera_de_camara",
+  sin_conexion: "dashboard.centro.estado.sin_conexion",
+  sin_conexion_larga: "dashboard.centro.estado.sin_conexion_larga",
+};
+const ETIQUETA_PAUSA_CENTRO: Record<string, TranslationKey> = {
+  bano: "dashboard.centro.pausaKind.bano",
+  break: "dashboard.centro.pausaKind.break",
+  almuerzo: "dashboard.centro.pausaKind.almuerzo",
 };
 
 function TarjetaKpi({ icono: Icono, etiqueta, valor, detalle, tono = "primary" }: {
@@ -91,6 +112,53 @@ export default function CentroDeOperaciones() {
 
   const { porPersona, cargando: tiempoCargando } = useEquipoTiempoCowork(hoy, hoy);
   const mensajeria = usePanelMensajeria();
+
+  // ── Vista de dueño (10/2026, Alvaro): primero LO QUE ESTÁ MAL ahora y el
+  // rendimiento del equipo; el pulso operativo queda debajo. ──
+  const ahoraQ = useCentroAhora();
+  const ahora = ahoraQ.data ?? [];
+  const faltan = useMemo(() => ahora.filter((p) => p.programado && !p.conectado), [ahora]);
+  const pausasPasadas = useMemo(() => ahora.filter((p) => p.pausa_excedida), [ahora]);
+  const conProblema = useMemo(
+    () => ahora.filter((p) => p.conectado && p.estado != null && p.estado in ESTADOS_PROBLEMA),
+    [ahora],
+  );
+  const programadosTurno = useMemo(() => ahora.filter((p) => p.programado).length, [ahora]);
+  const conectadosTurno = useMemo(() => ahora.filter((p) => p.programado && p.conectado).length, [ahora]);
+  const todoEnOrden = faltan.length === 0 && pausasPasadas.length === 0 && conProblema.length === 0;
+
+  // Rendimiento: últimos 7 días CERRADOS (las notas/ventas confiables llegan
+  // hasta ayer; se dice en la pantalla, no se finge "hoy").
+  const rango = useMemo(() => rangoDeDias(7), []);
+  const periodoQ = useChatterPeriodo(rango.desde, rango.hasta);
+  const conDatos = useMemo(
+    () => (periodoQ.data ?? []).filter((c) => c.activo && ((c.ventas_total ?? 0) > 0 || c.dias_con_nota > 0)),
+    [periodoQ.data],
+  );
+  const topVentas = useMemo(
+    () => [...conDatos].sort((a, b) => (b.ventas_total ?? 0) - (a.ventas_total ?? 0)).slice(0, 5),
+    [conDatos],
+  );
+  const aEmpujar = useMemo(
+    () => conDatos.filter((c) => c.nota_promedio != null)
+      .sort((a, b) => (a.nota_promedio ?? 0) - (b.nota_promedio ?? 0)).slice(0, 5),
+    [conDatos],
+  );
+  const roster = useRoster();
+  const porEquipo = useMemo(() => {
+    const grupoDe = new Map(roster.miembros.map((m) => [m.identity_id, m.group_id]));
+    const nombreDe = new Map(roster.grupos.map((g) => [g.id, g.name]));
+    const acc = new Map<string, number>();
+    for (const c of periodoQ.data ?? []) {
+      const gid = grupoDe.get(c.identity_id);
+      if (!gid) continue;
+      const nombre = nombreDe.get(gid);
+      if (!nombre) continue;
+      acc.set(nombre, (acc.get(nombre) ?? 0) + (c.ventas_total ?? 0));
+    }
+    return [...acc.entries()].map(([equipo, ventas]) => ({ equipo, ventas })).sort((a, b) => b.ventas - a.ventas);
+  }, [periodoQ.data, roster.miembros, roster.grupos]);
+  const maxEquipo = porEquipo[0]?.ventas ?? 0;
 
   // Totales de la cabecera. online null = LiveKit no contestó: se propaga como
   // desconocido ("–"), jamás como cero.
@@ -154,6 +222,149 @@ export default function CentroDeOperaciones() {
           </Button>
         </div>
       </div>
+
+      {/* ── AHORA MISMO: lo que está mal, primero (vista de dueño) ── */}
+      <section className="rounded-card border border-border bg-card p-4">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h2 className="flex items-center gap-2 text-sm font-semibold">
+            <span className={`flex h-7 w-7 items-center justify-center rounded-panel ${todoEnOrden && !ahoraQ.isLoading && !ahoraQ.isError ? "bg-success/10 text-success" : "bg-warning/10 text-warning"}`}>
+              <AlertTriangle className="h-4 w-4" />
+            </span>
+            {t("dashboard.centro.ahoraTitulo")}
+          </h2>
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-60 motion-reduce:animate-none" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-success" />
+          </span>
+        </div>
+        {ahoraQ.isError ? (
+          <p className="text-sm text-muted-foreground">
+            {t("dashboard.centro.fallo")}
+            <button type="button" className="underline underline-offset-2 hover:text-foreground" onClick={() => ahoraQ.refetch()}>{t("dashboard.centro.reintentar")}</button>
+          </p>
+        ) : ahoraQ.isLoading ? (
+          <div className="h-10 animate-pulse rounded-panel bg-muted" />
+        ) : todoEnOrden ? (
+          <p className="text-sm font-medium text-success">{t("dashboard.centro.todoEnOrden", { con: conectadosTurno, prog: programadosTurno })}</p>
+        ) : (
+          <div className="grid gap-3 md:grid-cols-3">
+            {faltan.length > 0 && (
+              <div className="rounded-panel border border-destructive/30 bg-destructive/5 p-3">
+                <h3 className="mb-1.5 text-xs font-semibold text-destructive">{t("dashboard.centro.faltan")} · {faltan.length}</h3>
+                <ul className="space-y-1">
+                  {faltan.map((p) => (
+                    <li key={p.user_id} className="flex items-baseline justify-between gap-2 text-sm">
+                      <span className="truncate">{p.nombre ?? "…"}</span>
+                      <span className="shrink-0 text-xs text-muted-foreground">{p.grupo ?? ""}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {pausasPasadas.length > 0 && (
+              <div className="rounded-panel border border-warning/30 bg-warning/5 p-3">
+                <h3 className="mb-1.5 text-xs font-semibold text-warning">{t("dashboard.centro.pausasPasadas")} · {pausasPasadas.length}</h3>
+                <ul className="space-y-1">
+                  {pausasPasadas.map((p) => {
+                    const deMas = Math.max(1, Math.floor(((p.pausa_seg ?? 0) - (p.pausa_limite_min ?? 0) * 60) / 60));
+                    const kind = p.pausa_kind && ETIQUETA_PAUSA_CENTRO[p.pausa_kind];
+                    return (
+                      <li key={p.user_id} className="flex items-baseline justify-between gap-2 text-sm">
+                        <span className="truncate">{p.nombre ?? "…"}</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">{kind ? t(kind) : p.pausa_kind} · {t("dashboard.centro.pausaDeMas", { min: deMas })}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+            {conProblema.length > 0 && (
+              <div className="rounded-panel border border-border bg-background/60 p-3">
+                <h3 className="mb-1.5 text-xs font-semibold text-muted-foreground">{t("dashboard.centro.conProblema")} · {conProblema.length}</h3>
+                <ul className="space-y-1">
+                  {conProblema.map((p) => (
+                    <li key={p.user_id} className="flex items-baseline justify-between gap-2 text-sm">
+                      <span className="truncate">{p.nombre ?? "…"}</span>
+                      <span className="shrink-0 text-xs text-warning">{t(ESTADOS_PROBLEMA[p.estado as string])}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+      </section>
+
+      {/* ── RENDIMIENTO DEL EQUIPO (cierre de ayer) ── */}
+      <section className="rounded-card border border-border bg-card p-4">
+        <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="flex items-center gap-2 text-sm font-semibold">
+            <span className="flex h-7 w-7 items-center justify-center rounded-panel bg-primary/10 text-primary"><TrendingUp className="h-4 w-4" /></span>
+            {t("dashboard.centro.rendimientoTitulo")}
+          </h2>
+          <Button asChild variant="ghost" size="sm" className="rounded-control text-xs">
+            <Link to="/chatter-evaluator/rendimiento">{t("dashboard.centro.verRendimiento")}<ArrowRight className="ml-1 h-3.5 w-3.5" /></Link>
+          </Button>
+        </div>
+        <p className="mb-3 text-xs text-muted-foreground">{t("dashboard.centro.rendimientoNota")}</p>
+        {periodoQ.isError ? (
+          <p className="text-sm text-muted-foreground">
+            {t("dashboard.centro.fallo")}
+            <button type="button" className="underline underline-offset-2 hover:text-foreground" onClick={() => periodoQ.refetch()}>{t("dashboard.centro.reintentar")}</button>
+          </p>
+        ) : periodoQ.isLoading ? (
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="h-28 animate-pulse rounded-panel bg-muted" />
+            <div className="h-28 animate-pulse rounded-panel bg-muted" />
+            <div className="h-28 animate-pulse rounded-panel bg-muted" />
+          </div>
+        ) : conDatos.length === 0 ? (
+          <p className="text-sm text-muted-foreground">{t("dashboard.centro.sinRendimiento")}</p>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-3">
+            <div>
+              <h3 className="mb-1.5 text-xs font-semibold text-success">{t("dashboard.centro.topVentas")}</h3>
+              <ul className="space-y-1">
+                {topVentas.map((c) => (
+                  <li key={c.identity_id} className="flex items-baseline justify-between gap-2 text-sm">
+                    <span className="truncate">{c.display_name}</span>
+                    <span className="shrink-0 font-semibold tabular-nums">{dinero(c.ventas_total ?? 0)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <h3 className="mb-1.5 text-xs font-semibold text-warning">{t("dashboard.centro.aEmpujar")}</h3>
+              <ul className="space-y-1">
+                {aEmpujar.map((c) => (
+                  <li key={c.identity_id} className="flex items-baseline justify-between gap-2 text-sm">
+                    <span className="truncate">{c.display_name}</span>
+                    <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                      {t("dashboard.centro.notaCorta", { n: c.nota_promedio?.toFixed(1) ?? "–" })} · {dinero(c.ventas_total ?? 0)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <h3 className="mb-1.5 text-xs font-semibold text-muted-foreground">{t("dashboard.centro.porEquipo")}</h3>
+              <ul className="space-y-1.5">
+                {porEquipo.slice(0, 6).map((e) => (
+                  <li key={e.equipo} className="text-sm">
+                    <span className="flex items-baseline justify-between gap-2">
+                      <span className="truncate">{tituloBonito(e.equipo)}</span>
+                      <span className="shrink-0 font-semibold tabular-nums">{dinero(e.ventas)}</span>
+                    </span>
+                    <span className="mt-0.5 block h-1 overflow-hidden rounded-full bg-primary/15">
+                      <span className="block h-full rounded-full bg-primary" style={{ width: `${maxEquipo > 0 ? Math.max(4, (e.ventas / maxEquipo) * 100) : 0}%` }} />
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
+      </section>
 
       {/* Tarjetas resumen: compactas, lo vivo primero */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
