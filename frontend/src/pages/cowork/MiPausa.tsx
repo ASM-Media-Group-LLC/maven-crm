@@ -10,7 +10,6 @@
 // Fondo: el mismo paisaje nocturno de la miniatura del coordinador
 // (PaisajeDePausa), para que las dos vistas de pausa sean la misma familia y el
 // ámbar/rojo del tiempo se lea igual en los dos temas.
-import { Droplet, Coffee, Utensils } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { cuentaPausa, type EstadoPausa } from "@/lib/pausaCowork";
 import { PaisajeDePausa } from "./SalaEnPausa";
@@ -19,11 +18,9 @@ import type { TranslationKey } from "@/lib/i18n";
 
 export type TipoPausa = "bano" | "break" | "almuerzo";
 
-const ICONO: Record<TipoPausa, typeof Droplet> = {
-  bano: Droplet,
-  break: Coffee,
-  almuerzo: Utensils,
-};
+// El tipo de pausa se dice en PALABRAS, no en íconos (la gota y la taza
+// confundían, Álvaro 20/10): el chip "En el baño/break/almuerzo" y el nombre de
+// cada recuadro ya lo dicen.
 
 // El título de la pausa en curso ("En el baño" / "En break" / "En almuerzo").
 const TITULO_ACTIVA: Record<TipoPausa, TranslationKey> = {
@@ -115,7 +112,6 @@ export default function MiPausa({
   consumoHoy, limites, kindsResumen, onVolver, t, horaDesde, className,
 }: MiPausaProps) {
   const activa: TipoPausa = kind ?? "bano";
-  const Icono = ICONO[activa];
   const c = cuentaPausa(segundos, limiteMin, consumidoPrevio);
   const estado = c.estado;
   const colorAnillo = COLOR_ANILLO[estado];
@@ -144,7 +140,6 @@ export default function MiPausa({
         "relative inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-semibold",
         estado === "excedida" ? "border-red-400/40 bg-red-500/15 text-red-200" : "border-white/20 bg-white/10 text-white/90",
       )}>
-        <Icono className="h-4 w-4" />
         {t(TITULO_ACTIVA[activa])}
       </div>
 
@@ -184,7 +179,6 @@ export default function MiPausa({
         <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.18em] text-white/55">{t("cowork.miPausa.today")}</div>
         <div className={cn("grid gap-2", tiles.length >= 3 ? "grid-cols-3" : "grid-cols-2")}>
           {tiles.map((tile) => {
-            const IconoTile = ICONO[tile.kind];
             const activoTile = kind != null && tile.kind === activa;
             return (
               <div
@@ -199,8 +193,7 @@ export default function MiPausa({
                   activoTile && "ring-1 ring-white/50",
                 )}
               >
-                <div className="flex items-center justify-center gap-1.5 text-[11px] font-medium text-white/70">
-                  <IconoTile className="h-3.5 w-3.5" />
+                <div className="flex items-center justify-center text-[11px] font-medium text-white/70">
                   {t(NOMBRE_PAUSA[tile.kind])}
                 </div>
                 <div className={cn("mt-1 font-display text-lg font-bold tabular-nums", COLOR_TEXTO[tile.estado])}>

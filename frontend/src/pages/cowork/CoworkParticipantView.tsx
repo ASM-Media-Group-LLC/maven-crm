@@ -29,8 +29,10 @@ import { playMessageNotification } from "@/lib/notificationSound";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { marcarDescartada, fueDescartada, olvidarDescartada } from "@/lib/solicitudPrivada";
 import { useLanguage } from "@/hooks/useLanguage";
-import { traducir } from "@/lib/i18n";
+import { traducir, type TranslationKey } from "@/lib/i18n";
 import { MENSAJE_LLAMADA_PRIVADA, MENSAJE_PEDIR_AYUDA, NOMBRE_PAUSA } from "./textosCowork";
+import AvisoChatter from "./AvisoChatter";
+import { useRecepcionAvisos } from "./useRecepcionAvisos";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -332,6 +334,11 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     const min = limitesPausa[kind];
     return min != null ? `${nombre} (${min} min)` : nombre;
   };
+
+  // ── Aviso del supervisor (botón "Avisar") ───────────────────────────────────
+  // La recepción (campana + voz Mario + cartel) vive en un hook compartido con
+  // el tablero del supervisor: así los chatters Y los supervisores reciben igual.
+  const { aviso, cerrar: cerrarAviso } = useRecepcionAvisos(userId);
 
   // La pausa la abre y la cierra el SERVIDOR: el reloj no puede ser el del
   // navegador de quien está siendo medido. Lo que viaja por presence sigue
@@ -1108,6 +1115,16 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             kindsResumen={KINDS_RESUMEN_PAUSA}
             horaDesde={new Date(breakStartedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
             onVolver={() => toggleBreak()}
+            t={t}
+          />
+        )}
+
+        {/* Aviso del supervisor: va por encima de todo, incluso de la pausa. */}
+        {aviso && (
+          <AvisoChatter
+            nombreDe={aviso.nombreDe}
+            etiqueta={aviso.etiqueta}
+            onCerrar={cerrarAviso}
             t={t}
           />
         )}

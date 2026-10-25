@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import AudioSink from "./AudioSink";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
 import { Room, RoomEvent, Track } from "livekit-client";
 import { copiaSirve } from "@/lib/microDelSupervisor";
 import { VideoOff, Loader2, Monitor, Video, Copy } from "lucide-react";
@@ -105,9 +107,20 @@ function MonitorTile({ pv, viewingScreen, onSwap, showName = true }: { pv: PartV
               : t("cowork.monitor.viewScreen")
         }
         aria-label={viewingScreen ? t("cowork.monitor.viewCamera") : t("cowork.monitor.viewScreen")}
-        className="absolute bottom-2 right-2 z-10 flex h-6 w-6 tactil:h-8 tactil:w-8 items-center justify-center rounded-md bg-black/50 text-white/90 backdrop-blur-sm transition hover:bg-black/70 disabled:cursor-not-allowed disabled:opacity-30"
+        className={cn(
+          "absolute bottom-2 right-2 z-10 flex items-center gap-1 rounded-md px-1.5 h-6 tactil:h-8 backdrop-blur-sm transition disabled:cursor-not-allowed disabled:opacity-30",
+          // Cuando HAY una pantalla para ver y estás en cámara, el botón se pinta
+          // (ya no salta solo en escritorio): así se nota de un vistazo que esa
+          // sala está compartiendo y con un clic la ves (Álvaro, 23/10).
+          canSwap && !viewingScreen
+            ? "bg-primary text-primary-foreground ring-1 ring-white/40 shadow-md hover:bg-primary/90"
+            : "bg-black/50 text-white/90 hover:bg-black/70",
+        )}
       >
         {viewingScreen ? <Video className="h-3.5 w-3.5" /> : <Monitor className="h-3.5 w-3.5" />}
+        {canSwap && !viewingScreen && (
+          <span className="text-[9px] tactil:text-[11px] font-semibold leading-none">{t("cowork.monitor.screenShort")}</span>
+        )}
       </button>
       {showName && (pv.name || viewingScreen) && (
         <span className="absolute bottom-1 left-1 max-w-[85%] truncate rounded bg-black/50 px-1.5 py-0.5 text-[9px] tactil:text-[11px] text-white/90">
@@ -162,6 +175,10 @@ function useClonPublicado(opts: {
     }
     if (!room) return;
     let cancelado = false;
+    // El reintento de publicar se guarda para LIMPIARLO al salir: antes quedaba
+    // vivo y, en un turno largo con caídas de micro, se acumulaban temporizadores
+    // que disparaban setState sobre efectos ya muertos (degradaba la pestaña).
+    let timeoutReintento: number | null = null;
     (async () => {
       if (activo && baseTrack) {
         const actual = publishedCloneRef.current;
@@ -201,7 +218,7 @@ function useClonPublicado(opts: {
             const espera = intentoPublicar < MAX_INTENTOS_PUBLICAR
               ? 2_000 * (intentoPublicar + 1)
               : 15_000;
-            window.setTimeout(() => setIntentoPublicar((n) => n + 1), espera);
+            timeoutReintento = window.setTimeout(() => setIntentoPublicar((n) => n + 1), espera);
           }
         }
       } else {
@@ -214,7 +231,10 @@ function useClonPublicado(opts: {
         }
       }
     })();
-    return () => { cancelado = true; };
+    return () => {
+      cancelado = true;
+      if (timeoutReintento != null) window.clearTimeout(timeoutReintento);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activo, baseTrack, status, intentoPublicar]);
 
@@ -235,12 +255,40 @@ function useClonPublicado(opts: {
 // (publica el micro del coordinador) y muestra el video en miniatura. Una Room LiveKit propia
 // por sala (adaptiveStream → capa baja para thumbnails). El coordinador aparece como
 // "📢 Coordinador" (solo audio) en las salas donde tenga el micro activo.
-export default function CoworkRoomMonitor({ roomId, roomName, issueToken, showVideo, hearOn, broadcastOn, micBaseTrack, camOn = false, camBaseTrack = null, screenOn = false, screenBaseTrack = null, enabled = true, onSharersChange, onSpeakingChange, showNames = true, onParticipantsChange }: Props) {
+function CoworkRoomMonitor({ roomId, roomName, issueToken, showVideo, hearOn, broadcastOn, micBaseTrack, camOn = false, camBaseTrack = null, screenOn = false, screenBaseTrack = null, enabled = true, onSharersChange, onSpeakingChange, showNames = true, onParticipantsChange }: Props) {
   const { t } = useLanguage();
+  const esMovil = useIsMobile();
   const [partVideos, setPartVideos] = useState<PartVideo[]>([]);
   const [audioTracks, setAudioTracks] = useState<Array<{ sid: string; track: any }>>([]);
   // Qué participantes están mostrando su PANTALLA en vez de su cámara (por identity).
   const [screenView, setScreenView] = useState<Record<string, boolean>>({});
+  // Cuando alguien EMPIEZA a compartir pantalla, la miniatura salta sola a la
+  // pantalla (y vuelve a la cámara cuando deja de compartir). SOLO EN EL
+  // TELÉFONO: ahí el supervisor se queda en estas miniaturas y sin el salto
+  // solo veía la cara (Álvaro, 21/10). En ESCRITORIO este salto resultó ser
+  // una bomba: con 8-9 salas compartiendo, el tablero pasaba de decodificar
+  // camaritas livianas a 8-9 PANTALLAS en alta resolución a la vez, y el
+  // navegador del supervisor se congelaba en segundos (Álvaro, 23/10). En
+  // escritorio vuelve a ser como antes: cámara por defecto + botón manual.
+  // Solo actúa en el CAMBIO (empezó / dejó): un swap manual se respeta.
+  const compartiendoPrev = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const compartenAhora = new Set(partVideos.filter((p) => p.screen).map((p) => p.identity));
+    if (esMovil) {
+      setScreenView((prev) => {
+        const next = { ...prev };
+        let cambio = false;
+        for (const id of compartenAhora) {
+          if (!compartiendoPrev.current.has(id)) { next[id] = true; cambio = true; }
+        }
+        for (const id of compartiendoPrev.current) {
+          if (!compartenAhora.has(id)) { next[id] = false; cambio = true; }
+        }
+        return cambio ? next : prev;
+      });
+    }
+    compartiendoPrev.current = compartenAhora;
+  }, [partVideos, esMovil]);
   // "duplicada" NO es un error y por eso es un estado aparte: la sala está
   // perfecta, lo que pasa es que esta cuenta abrió Cowork en otro lado y
   // LiveKit nos sacó de acá. Mezclarlo con "error" era lo que disparaba el
@@ -519,3 +567,9 @@ export default function CoworkRoomMonitor({ roomId, roomName, issueToken, showVi
     </>
   );
 }
+
+// Memoizado: el tablero re-renderiza cada segundo (reloj) y con cada evento de
+// presencia/voz; sin memo, los 8-9 monitores y sus videos se reconciliaban en
+// cada tick. Con props estables (ver manejadores en CoworkHostDashboard), cada
+// monitor solo se redibuja cuando SU sala cambia.
+export default memo(CoworkRoomMonitor);

@@ -97,18 +97,17 @@ export function nombreYApellido(completo: string | null | undefined): string {
 // Rotan por la misma razón que las del supervisor de encuadre: la misma frase
 // repetida cada dos minutos se vuelve ruido de fondo que el oído filtra.
 
+// Solo DOS por tipo: son las que tienen audio pregrabado con la voz Mario
+// (lib/clipsVoz). Si se agrega otra frase, hay que generarle su clip o sonará
+// con la voz robótica del navegador y se notaría el salto.
 const FRASES_FIN_PAUSA: Record<"bano" | "break", string[]> = {
   bano: [
     "Se te acabó el tiempo de baño. Por favor, vuelve a tu puesto.",
     "Terminó tu tiempo de baño. Regresa a la sala, por favor.",
-    "Tu pausa de baño ya terminó. Por favor, vuelve a la cámara.",
-    "Se cumplió el tiempo de baño. Te esperamos de vuelta.",
   ],
   break: [
     "Se te acabó el break. Por favor, vuelve a tu puesto.",
     "Terminó tu break. Regresa a la sala, por favor.",
-    "Tu break ya terminó. Por favor, vuelve a la cámara.",
-    "Se cumplió el tiempo de break. Te esperamos de vuelta.",
   ],
 };
 
@@ -142,10 +141,9 @@ export const AVISAR_SUPERVISOR_PASADO_MS = 180_000;
 /** Cuánto tiene que estar en negativo para que se le diga que agotó el día. */
 export const LIMITE_DIARIO_AGOTADO_MS = 300_000; // 5 minutos pasado
 
+// Una sola: la que tiene audio pregrabado con la voz Mario (lib/clipsVoz).
 const FRASES_DIA_AGOTADO = [
-  "Has excedido el límite de pausas para ir al baño por hoy. Por favor, regresa a tu puesto.",
   "Ya superaste tu tiempo de baño del día. Por favor, vuelve a tu puesto ahora.",
-  "Se agotó tu tiempo de baño de hoy y lo superaste. Regresa a tu puesto, por favor.",
 ];
 
 let idxDiaAgotado = 0;

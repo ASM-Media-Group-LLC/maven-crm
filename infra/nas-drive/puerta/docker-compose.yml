@@ -1,20 +1,27 @@
-# La PUERTA del Drive: un servicio en el Dokploy de microservicios
-# (217.216.95.7) que recibe https://drive.217-216-95-7.nip.io y lo reenvía a
-# la mini (mini5) por Tailscale.
+# La PUERTA del Drive: un servicio en el Dokploy de 147.93.3.97 que recibe
+# https://drive.147-93-3-97.nip.io y lo reenvía a la mini (mini5) por
+# Tailscale.
 #
 # Por qué así (28/09/2026): Jhon no quiere pagar ni mover el DNS de
 # maven-ai.me (está en GoDaddy), y Tailscale Funnel no existe en el plan
 # Starter. nip.io resuelve el nombre a la IP sin tocar ningún DNS, Dokploy saca
 # el certificado HTTPS, y la mini sigue sin estar expuesta a internet.
 #
+# Mudanza (23/10/2026): la primera puerta vivía en el Dokploy de 217.216.95.7
+# (drive.217-216-95-7.nip.io, nodo `maven-drive-puerta`). Desde el 15/10 daba
+# 502: el Dokploy seguía arriba, pero el contenedor no le mandaba ni un byte a
+# la mini por Tailscale, y no había acceso a ese panel para reiniciarlo. El
+# nodo nuevo se llama `maven-drive-puerta-2` para no chocar con el viejo
+# mientras siga registrado en Tailscale. Pasos en infra/nas-drive/README.md.
+#
 # En Dokploy: Compose nuevo con este archivo; en Environment la variable
 # TS_AUTHKEY (una auth key de Tailscale: Settings → Keys); en Domains,
-# drive.217-216-95-7.nip.io → servicio `puerta-tailscale`, puerto 8080, HTTPS.
+# drive.147-93-3-97.nip.io → servicio `puerta-tailscale`, puerto 8080, HTTPS.
 
 services:
   puerta-tailscale:
     image: tailscale/tailscale:stable
-    hostname: maven-drive-puerta
+    hostname: maven-drive-puerta-2
     environment:
       TS_AUTHKEY: ${TS_AUTHKEY}
       TS_STATE_DIR: /var/lib/tailscale
@@ -42,8 +49,7 @@ services:
       - puerta-tailscale
     # Sin filtro de rutas a propósito: /o, /salud y POST /zip (el .zip de
     # varios archivos, 02/10) pasan tal cual; quien decide es la firma del NAS.
-    # La respuesta del .zip va sin Content-Length y Caddy la manda a medida que
-    # llega, sin acumularla.
+    # Caddy manda la respuesta del .zip a medida que llega, sin acumularla.
     # ⚠️ SOLO por nombre (MagicDNS), nunca por IP. La IP de Tailscale de la
     # mini CAMBIÓ el 28/09 cuando se volvió a iniciar sesión (100.64.206.91 →
     # 100.127.43.97), y con las dos como destino Caddy alternaba al azar: la

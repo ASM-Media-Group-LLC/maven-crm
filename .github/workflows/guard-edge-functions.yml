@@ -20,7 +20,12 @@ permissions:
 jobs:
   guard:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # La suite completa (deno + bancos PGlite de correo, Drive, creadoras,
+    # webhooks, agencias…) creció y ya no cabe en 10 min: iba pasando todo y la
+    # mataban al llegar a ~portal-creadoras, con ~15 pasos por correr. No está
+    # colgada, solo es larga. 25 min le da aire sin dejar un cuelgue corriendo
+    # horas. Cada PR con migración o cambio de backend la dispara entera.
+    timeout-minutes: 25
     steps:
       - name: Checkout
         uses: actions/checkout@v4

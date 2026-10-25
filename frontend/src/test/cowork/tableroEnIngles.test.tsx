@@ -134,6 +134,9 @@ function consulta(resultado: unknown) {
   q.then = (ok: (v: unknown) => unknown, mal?: (e: unknown) => unknown) => Promise.resolve(resultado).then(ok, mal);
   return q;
 }
+// El canal de realtime: el tablero ahora RECIBE avisos (useRecepcionAvisos), que
+// abre un canal con useCanalQueRevive. El mock solo tiene que encadenar.
+const chan = { on: () => chan, subscribe: () => chan, unsubscribe: () => {} };
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     auth: { getUser: async () => ({ data: { user: { id: "me" } } }), getSession: async () => ({ data: { session: null } }) },
@@ -141,6 +144,8 @@ vi.mock("@/integrations/supabase/client", () => ({
       ? { data: [{ kind: "bano", minutos: 10 }, { kind: "break", minutos: 30 }] }
       : { data: { full_name: "Jhon Lopez" } }),
     rpc: async () => ({ data: [] }),
+    channel: () => chan,
+    removeChannel: () => Promise.resolve(),
   },
 }));
 

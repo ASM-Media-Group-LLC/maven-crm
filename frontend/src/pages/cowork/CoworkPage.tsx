@@ -111,7 +111,8 @@ export default function CoworkPage() {
         .catch(() => { /* sin permiso o edge caído: la sección no se dibuja */ });
     };
     load();
-    const t = setInterval(load, 30000);
+    // Solo refresca la lista de sesiones mientras se mira la pantalla.
+    const t = setInterval(() => { if (document.visibilityState === "visible") load(); }, 30000);
     return () => { alive = false; clearInterval(t); };
   }, [sessionId, veTodasLasSesiones, cowork.adminListSessions]);
 

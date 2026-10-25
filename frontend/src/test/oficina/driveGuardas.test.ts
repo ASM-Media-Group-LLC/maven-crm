@@ -19,6 +19,8 @@ const fuentes = (import.meta as unknown as {
   "/frontend/src/hooks/useDriveVarios.ts",
   "/infra/nas-drive/zip.mjs",
   "/infra/nas-drive/miniaturas.mjs",
+  "/infra/nas-drive/puerta/docker-compose.yml",
+  "/infra/nas-drive/README.md",
 ], { query: "?raw", import: "default", eager: true });
 const leer = (fin: string) => Object.entries(fuentes).find(([k]) => k.endsWith(fin))?.[1] ?? "";
 const mig = leer("oficina_drive.sql");
@@ -33,6 +35,8 @@ const logica = leer("drive/logica.ts");
 const varios = leer("hooks/useDriveVarios.ts");
 const zip = leer("nas-drive/zip.mjs");
 const miniaturas = leer("nas-drive/miniaturas.mjs");
+const puerta = leer("puerta/docker-compose.yml");
+const leeme = leer("nas-drive/README.md");
 
 describe("⚠️ multi-agencia", () => {
   it("toda política de drive_items exige la agencia", () => {
@@ -251,3 +255,19 @@ describe("⚠️ unidades compartidas (como en Google)", () => {
   });
 });
 
+
+describe("⚠️ la puerta del NAS (mudanza del 23/10)", () => {
+  it("Caddy llega al mini por su nombre MagicDNS, nunca por IP", () => {
+    // Con la IP vieja y la nueva como destino, la mitad de los pedidos daban 502 (28/09).
+    expect(puerta).toMatch(/--to unlok-workstation\.tail11d450\.ts\.net:8790/);
+    expect(puerta).not.toMatch(/--to \d+\.\d+\.\d+\.\d+/);
+  });
+  it("el nodo nuevo no se llama como el viejo, que sigue registrado en Tailscale", () => {
+    expect(puerta).toMatch(/^\s+hostname: maven-drive-puerta-2$/m);
+  });
+  it("la dirección pública del compose es la misma que anota el README", () => {
+    const dominio = puerta.match(/drive\.\d+-\d+-\d+-\d+\.nip\.io(?= → servicio)/)?.[0];
+    expect(dominio).toBe("drive.147-93-3-97.nip.io");
+    expect(leeme).toContain(`DRIVE_NAS_URL=https://${dominio}`);
+  });
+});

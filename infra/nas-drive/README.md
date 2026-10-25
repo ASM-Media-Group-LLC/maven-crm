@@ -9,7 +9,9 @@ lugar. Decisión de Jhon (28/09/2026): **sin R2 y sin copia de seguridad**.
   `supabase/functions/_shared/drive-firma.ts`; vector compartido en los tests).
 - Escucha en el puerto 8790 (solo peticiones firmadas): la única puerta desde
   afuera es la **puerta** de `puerta/` (Caddy + Tailscale) en el Dokploy de
-  microservicios, que llega al mini por su nombre MagicDNS. El túnel de
+  147.93.3.97 (`https://drive.147-93-3-97.nip.io`), que llega al mini por su
+  nombre MagicDNS. Hasta el 23/10/2026 vivía en el de 217.216.95.7: ver
+  «Montar o mudar la puerta». El túnel de
   Cloudflare se descartó (el DNS está en GoDaddy). Operación día a día:
   `CLAUDE.md` en esta carpeta.
 - `GET /salud` dice cuánto lugar queda en cada disco.
@@ -73,6 +75,49 @@ Drive: el archivo bajado de Google sigue donde estaba.
   `mv /Volumes/NASx/maven-drive/.borrados/<fecha>/<agencia>/<id> /Volumes/NASx/maven-drive/<agencia>/<id>`.
   La ficha ya no existe en Maven: hay que volver a crearla (o subirlo de nuevo
   desde la copia recuperada).
+## Montar o mudar la puerta (`puerta/`)
+
+La puerta no guarda nada: es Tailscale + Caddy. Se puede rehacer en cualquier
+Dokploy sin tocar el mini ni los archivos. Lo único que cambia es la dirección
+pública, y esa dirección vive en un solo lugar: el secreto `DRIVE_NAS_URL` de
+Supabase. El frontend no la conoce, porque recibe las URL ya firmadas desde las
+edges `drive`, `oficina-doc` y `portal-contenido`.
+
+1. **Auth key de Tailscale** (consola de Tailscale → Settings → Keys →
+   *Generate auth key*). Que no sea *Ephemeral*, porque el nodo se borraría al
+   reiniciar el contenedor. Que no lleve tag salvo que la ACL lo permita: hoy
+   el mini acepta conexiones de los nodos de la cuenta `corp@`, y un nodo con
+   tag puede quedar afuera.
+2. **Compose en Dokploy** (proyecto de microservicios → *Create Service* →
+   *Compose*). Contenido: `puerta/docker-compose.yml` tal cual.
+   - *Environment*: `TS_AUTHKEY=<la key>`.
+   - *Domains*: host `drive.<ip-con-guiones>.nip.io` (hoy
+     `drive.147-93-3-97.nip.io`) → servicio `puerta-tailscale`, puerto
+     `8080`, HTTPS con Let's Encrypt.
+   - *Deploy*.
+3. **Comprobar antes de tocar Supabase.** Desde el mini:
+   ```bash
+   /Applications/Tailscale.app/Contents/MacOS/Tailscale status | grep puerta
+   curl -s https://drive.147-93-3-97.nip.io/salud          # {"ok":true,...}
+   curl -s -o /dev/null -w '%{http_code}\n' 'https://drive.147-93-3-97.nip.io/o?t=falso'   # 403
+   ```
+   Si `/salud` da 502: o el nodo no aparece en Tailscale (la key), o la ACL no
+   lo deja entrar al mini. Hay que revisar las reglas del mini con
+   `tailscale debug netmap`, en `PacketFilter`: la IP del nodo nuevo tiene que
+   estar en `Srcs`.
+4. **Cambiar el secreto** en Supabase (*Edge Functions → Secrets*):
+   `DRIVE_NAS_URL=https://drive.147-93-3-97.nip.io`, sin `/` al final. Las
+   tres edges lo leen en cada arranque, así que no hace falta desplegarlas de
+   nuevo. `DRIVE_SECRETO` no cambia.
+5. **Probar en la app.** Subir un archivo chico en `/oficina/drive`, abrirlo y
+   ver una miniatura. Después, en la consola de Tailscale, borrar el nodo
+   viejo (`maven-drive-puerta`) y apagar el compose de la puerta vieja si
+   todavía hay acceso a ese Dokploy.
+
+El cambio no toca ONLYOFFICE: baja y guarda los archivos con las URL firmadas
+que arma `oficina-doc`, así que sigue la dirección nueva sola. Tampoco hace
+falta sumar la IP a `IPS_PROPIAS` (`supabase/functions/_shared/webhook-salida.ts`),
+porque 147.93.3.97 ya está en la lista.
 
 ## Varios archivos en un .zip (`POST /zip`, `zip.mjs`)
 
