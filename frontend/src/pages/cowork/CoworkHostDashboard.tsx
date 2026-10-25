@@ -417,10 +417,23 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // hoy solo se lee dentro de funciones que corren al renderizar —así que no
   // rompe— pero es el mismo patrón que tumbó esta pantalla dos veces, y basta
   // que alguien lo mueva a un arreglo de dependencias para que vuelva a pasar.
+  // El reloj que mueve los contadores (pausas, tiempos) y re-evalúa los avisos.
+  // Tic de 1 s MIENTRAS se mira; 10 s con la pestaña oculta. Así un tablero en
+  // segundo plano deja de redibujarse —y de re-evaluar alertas— cada segundo,
+  // que es puro gasto cuando nadie lo está viendo. Al volver a la pestaña,
+  // salta a `now` al instante y retoma el tic fino.
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    const id = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(id);
+    let id: number | undefined;
+    const armar = () => {
+      if (id != null) window.clearInterval(id);
+      const ms = document.visibilityState === "visible" ? 1000 : 10_000;
+      id = window.setInterval(() => setNow(Date.now()), ms);
+    };
+    const alCambiar = () => { if (document.visibilityState === "visible") setNow(Date.now()); armar(); };
+    armar();
+    document.addEventListener("visibilitychange", alCambiar);
+    return () => { if (id != null) window.clearInterval(id); document.removeEventListener("visibilitychange", alCambiar); };
   }, []);
 
   // Límites por tipo de pausa. Si la sesión trae pausas propias en sus reglas,
@@ -463,7 +476,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       setConsumoHoy(m);
     };
     void cargar();
-    const id = window.setInterval(() => void cargar(), 30_000);
+    const id = window.setInterval(() => { if (document.visibilityState === "visible") void cargar(); }, 30_000);
     return () => { vivo = false; window.clearInterval(id); };
   }, [pausadosKey]);
   // Segundos que lleva alguien en pausa, o null si no está en una.
