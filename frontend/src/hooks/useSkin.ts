@@ -231,12 +231,13 @@ export const SEASONS: SeasonDef[] = [
   },
 ];
 
-export const activeSeason = (now: Date = new Date()): SeasonDef | null => {
-  const month = now.getMonth() + 1;
-  const day = now.getDate();
-  return (
-    SEASONS.find((s) => month === s.from.month && day >= s.from.day && day <= s.to.day) ?? null
-  );
+export const activeSeason = (_now: Date = new Date()): SeasonDef | null => {
+  // Temporadas automáticas APAGADAS (decisión de Alvaro, 25/10/2026): Maven es
+  // una herramienta de trabajo y el color cambiaba solo (Halloween pintaba todo
+  // de naranja del 25 al 31 de oct). Ahora el color elegido por cada persona —
+  // y el azul por defecto — se quedan todo el año, sin sorpresas. Para reactivar,
+  // devolver la búsqueda por fecha en SEASONS (se conserva abajo por si acaso).
+  return null;
 };
 
 /* ---- Aplicación al DOM ---- */
