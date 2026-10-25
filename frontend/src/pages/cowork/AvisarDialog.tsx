@@ -81,7 +81,13 @@ export default function AvisarDialog({ nombreChatter, disabled, onAvisar, t }: A
                       type="button"
                       size="sm"
                       className="h-7 shrink-0 bg-amber-500 px-3 text-xs font-semibold text-white hover:bg-amber-500/90"
-                      onClick={() => { onAvisar(s.slug); setOpen(false); }}
+                      onClick={() => {
+                        // Que el supervisor OIGA lo mismo que le llega al chatter al
+                        // enviar, no solo un "Enviado" escrito (Álvaro, 21/10).
+                        void anunciar(s.vozEs);
+                        onAvisar(s.slug);
+                        setOpen(false);
+                      }}
                     >
                       {t("cowork.avisar.send")}
                     </Button>

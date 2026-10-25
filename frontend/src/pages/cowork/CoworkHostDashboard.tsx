@@ -41,6 +41,9 @@ import { cuentaComoTrabajo } from "@/lib/coworkTiempoRegla";
 import { useRelojDeSala } from "@/hooks/useRelojDeSala";
 import SalaEnPausa, { type PausaDeSala } from "./SalaEnPausa";
 import AvisarDialog from "./AvisarDialog";
+import AvisarGeneralDialog, { type ObjetivoAviso } from "./AvisarGeneralDialog";
+import AvisoChatter from "./AvisoChatter";
+import { useRecepcionAvisos } from "./useRecepcionAvisos";
 import { AVISADORES } from "@/lib/coworkAvisos";
 import { cuentaPausa, clasesPausa, nombreYApellido } from "@/lib/pausaCowork";
 import { normalizarReglas, reglaDeEstado, sonEstandar, type ReglaAviso } from "@/lib/coworkReglas";
@@ -196,22 +199,42 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // ni convierten en host a nadie: así se cortó la racha de cierres.
   const { isAdmin } = useUserRole();
   const puedeFinalizar = !!cowork.session && (cowork.session.created_by === userId || isAdmin);
-  // Avisar al chatter: solo los designados (lista fija en lib/coworkAvisos, NO
-  // el rol admin — hay admins que Álvaro no nombró). El supervisor elige una
-  // situación y se inserta la fila; la RLS de cowork_avisos vuelve a validar que
-  // sea host de la sesión Y uno de los cuatro. Al chatter le llega por realtime.
+  // Avisar: los cuatro designados (lista fija en lib/coworkAvisos, NO el rol
+  // admin — hay admins que Álvaro no nombró) le avisan a un CHATTER; el dueño
+  // (admin) además puede avisarle a un SUPERVISOR. Entre supervisores, no. Se
+  // inserta una fila por persona; la RLS de cowork_avisos vuelve a validar cada
+  // una (host de la sesión + la matriz). Al destinatario le llega por realtime.
   const puedeAvisar = AVISADORES.has(userId);
-  const enviarAviso = useCallback(async (roomId: string, chatterId: string, slug: string) => {
+  const puedeAvisarGeneral = puedeAvisar || isAdmin;
+  const enviarAviso = useCallback(async (targetIds: string[], slug: string, roomId?: string) => {
     const sid = cowork.session?.id;
-    if (!sid) return;
+    if (!sid || targetIds.length === 0) return;
+    const filas = targetIds.map((uid) => ({
+      session_id: sid, user_id: uid, situacion: slug, ...(roomId ? { room_id: roomId } : {}),
+    }));
     // (supabase as any): cowork_avisos no está en los tipos generados (ver el
     // mismo patrón en useCoworkSession con `sinTipar` y en las tablas wa_*).
     const { error } = await (supabase as unknown as {
-      from: (t: string) => { insert: (row: Record<string, unknown>) => Promise<{ error: unknown }> };
-    }).from("cowork_avisos").insert({ session_id: sid, room_id: roomId, user_id: chatterId, situacion: slug });
+      from: (t: string) => { insert: (rows: Record<string, unknown>[]) => Promise<{ error: unknown }> };
+    }).from("cowork_avisos").insert(filas);
     if (error) toast.error(traducir("cowork.avisar.failed"));
-    else toast.success(traducir("cowork.avisar.sent"));
+    else toast.success(traducir(targetIds.length > 1 ? "cowork.avisar.sentAll" : "cowork.avisar.sent"));
   }, [cowork.session?.id]);
+  // A quién puede avisar ESTE usuario (host = supervisor, participant = chatter),
+  // menos a sí mismo. El pop-up general lo usa para el selector; espeja la RLS.
+  const objetivosAviso = useMemo<ObjetivoAviso[]>(() => {
+    return cowork.memberships
+      .filter((m) => m.user_id !== userId)
+      .map((m) => ({
+        uid: m.user_id,
+        nombre: cowork.profiles[m.user_id] ? nombreYApellido(cowork.profiles[m.user_id]) : m.user_id.slice(0, 8),
+        esSupervisor: m.role === "host",
+      }))
+      .filter((o) => (o.esSupervisor ? isAdmin : puedeAvisar));
+  }, [cowork.memberships, cowork.profiles, userId, isAdmin, puedeAvisar]);
+  // Recepción de avisos para ESTE supervisor: el dueño avisándole a un supervisor
+  // no servía si el supervisor no lo oía. Mismo hook que CoworkParticipantView.
+  const { aviso: avisoRecibido, cerrar: cerrarAvisoRecibido } = useRecepcionAvisos(userId);
   const [copiandoEnlace, setCopiandoEnlace] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [hubMinimized, setHubMinimized] = useState(false);
@@ -394,10 +417,23 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // hoy solo se lee dentro de funciones que corren al renderizar —así que no
   // rompe— pero es el mismo patrón que tumbó esta pantalla dos veces, y basta
   // que alguien lo mueva a un arreglo de dependencias para que vuelva a pasar.
+  // El reloj que mueve los contadores (pausas, tiempos) y re-evalúa los avisos.
+  // Tic de 1 s MIENTRAS se mira; 10 s con la pestaña oculta. Así un tablero en
+  // segundo plano deja de redibujarse —y de re-evaluar alertas— cada segundo,
+  // que es puro gasto cuando nadie lo está viendo. Al volver a la pestaña,
+  // salta a `now` al instante y retoma el tic fino.
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    const id = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(id);
+    let id: number | undefined;
+    const armar = () => {
+      if (id != null) window.clearInterval(id);
+      const ms = document.visibilityState === "visible" ? 1000 : 10_000;
+      id = window.setInterval(() => setNow(Date.now()), ms);
+    };
+    const alCambiar = () => { if (document.visibilityState === "visible") setNow(Date.now()); armar(); };
+    armar();
+    document.addEventListener("visibilitychange", alCambiar);
+    return () => { if (id != null) window.clearInterval(id); document.removeEventListener("visibilitychange", alCambiar); };
   }, []);
 
   // Límites por tipo de pausa. Si la sesión trae pausas propias en sus reglas,
@@ -440,7 +476,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       setConsumoHoy(m);
     };
     void cargar();
-    const id = window.setInterval(() => void cargar(), 30_000);
+    const id = window.setInterval(() => { if (document.visibilityState === "visible") void cargar(); }, 30_000);
     return () => { vivo = false; window.clearInterval(id); };
   }, [pausadosKey]);
   // Segundos que lleva alguien en pausa, o null si no está en una.
@@ -1260,6 +1296,29 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // Quién está HABLANDO en cada sala (ActiveSpeakersChanged de LiveKit), para
   // pintar la card en verde mientras alguien habla.
   const [roomSpeakers, setRoomSpeakers] = useState<Record<string, string[]>>({});
+  // Manejadores ESTABLES por sala para CoworkRoomMonitor (que está memoizado):
+  // si se recrean en cada render —como las flechas inline de antes— el memo no
+  // sirve y los 8-9 monitores se redibujan con cada tick del reloj o evento de
+  // presencia, que era parte de lo que congelaba el navegador del supervisor
+  // (Álvaro, 23/10). Los setX de useState son estables, así que cachear una vez
+  // por sala es seguro.
+  const manejadoresMonitor = useRef<Record<string, {
+    sharers: (names: string[], ids?: string[]) => void;
+    speaking: (names: string[]) => void;
+    participants: (ids: string[] | null) => void;
+  }>>({});
+  const manejadoresDe = (roomId: string) => {
+    let h = manejadoresMonitor.current[roomId];
+    if (!h) {
+      h = {
+        sharers: (_names, ids) => setRoomSharerIds((m) => ({ ...m, [roomId]: ids ?? [] })),
+        speaking: (names) => setRoomSpeakers((m) => ({ ...m, [roomId]: names })),
+        participants: (ids) => setRoomConectados((m) => ({ ...m, [roomId]: ids })),
+      };
+      manejadoresMonitor.current[roomId] = h;
+    }
+    return h;
+  };
 
   const handleAddRoom = async () => {
     const name = addName.trim();
@@ -1520,6 +1579,17 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
         {sidebarOpen ? <XIcon className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
       </Button>
 
+      {/* Aviso recibido (si a ESTE supervisor le avisaron): cartel + campana + voz,
+          por encima de todo. El root es `relative`, así se ancla acá. */}
+      {avisoRecibido && (
+        <AvisoChatter
+          nombreDe={avisoRecibido.nombreDe}
+          etiqueta={avisoRecibido.etiqueta}
+          onCerrar={cerrarAvisoRecibido}
+          t={t}
+        />
+      )}
+
       {/* Overlay for mobile sidebar */}
       {sidebarOpen && (
         <div className="fixed inset-0 bg-black/50 z-30 md:hidden" onClick={() => setSidebarOpen(false)} />
@@ -1705,6 +1775,18 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 </Button>
               ) : null}
             </div>
+            {/* Avisar general: eliges a una persona de la sesión o a todos, y la
+                situación. Solo lo ven quienes pueden avisar (los 4 designados o
+                el dueño). */}
+            {puedeAvisarGeneral && (
+              <div className="mt-2.5">
+                <AvisarGeneralDialog
+                  objetivos={objetivosAviso}
+                  onAvisar={(ids, slug) => void enviarAviso(ids, slug)}
+                  t={t}
+                />
+              </div>
+            )}
           </section>
 
           {/* Unassigned members section removed — participants self-join via URL ?room=X */}
@@ -2108,6 +2190,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 const speakers = roomSpeakers[room.id] ?? [];
                 const etiquetas = etiquetasDe(participants, !pausaSala);
                 const personas = personasDe(participants);
+                const manejadores = manejadoresDe(room.id);
                 const monitor = (showVideo: boolean) => (
                   <CoworkRoomMonitor
                     roomId={room.id}
@@ -2123,9 +2206,9 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                     screenOn={screenFor(room.id)}
                     screenBaseTrack={screenBaseTrack}
                     enabled={activeRoomId !== room.id}
-                    onSharersChange={(_names, ids) => setRoomSharerIds((m) => ({ ...m, [room.id]: ids ?? [] }))}
-                    onSpeakingChange={(names) => setRoomSpeakers((m) => ({ ...m, [room.id]: names }))}
-                    onParticipantsChange={(ids) => setRoomConectados((m) => ({ ...m, [room.id]: ids }))}
+                    onSharersChange={manejadores.sharers}
+                    onSpeakingChange={manejadores.speaking}
+                    onParticipantsChange={manejadores.participants}
                   />
                 );
                 return (
@@ -2316,7 +2399,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                             <AvisarDialog
                               nombreChatter={chatterId ? nombreYApellido(cowork.profiles[chatterId]) : null}
                               disabled={!chatterId}
-                              onAvisar={(slug) => { if (chatterId) void enviarAviso(room.id, chatterId, slug); }}
+                              onAvisar={(slug) => { if (chatterId) void enviarAviso([chatterId], slug, room.id); }}
                               t={t}
                             />
                           );
