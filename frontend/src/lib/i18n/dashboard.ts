@@ -88,6 +88,7 @@ export const dashboard = {
   "dashboard.board.centro.detail": { es: "Llamadas, salas y mensajería del equipo, en vivo", en: "Calls, rooms and team messaging, live" },
   // Centro de operaciones (rediseño Aurora 10/2026): el tablero por defecto del admin.
   "dashboard.centro.subtitulo": { es: "El pulso del equipo, ahora mismo", en: "Your team's pulse, right now" },
+  "dashboard.centro.version": { es: "App del", en: "App build from" },
   "dashboard.centro.conectados": { es: "Conectados ahora", en: "Online now" },
   "dashboard.centro.enSalas": { es: "en {salas} salas · {sesiones} sesiones", en: "in {salas} rooms · {sesiones} sessions" },
   "dashboard.centro.coworkHoy": { es: "Cowork hoy", en: "Cowork today" },

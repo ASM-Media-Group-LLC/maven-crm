@@ -13,6 +13,7 @@ import { useRoster } from "@/pages/chatters/horarios/useHorarios";
 import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/hooks/useLanguage";
 import { type TranslationKey } from "@/lib/i18n";
+import { BUILD_PROPIO } from "@/lib/versionDelBundle";
 import { tituloBonito } from "@/lib/tituloBonito";
 
 // CENTRO DE OPERACIONES — el tablero por defecto del admin desde el rediseño
@@ -212,6 +213,14 @@ export default function CentroDeOperaciones() {
         <div>
           <SelectorDeTablero actual="centro" />
           <p className="mt-0.5 text-sm text-muted-foreground">{t("dashboard.centro.subtitulo")}</p>
+          {/* La hora del build que carga ESTA pestaña (meta maven-build): con verla,
+              se sabe si el último cambio ya llegó, sin adivinar. 0 = dev/tests. */}
+          {BUILD_PROPIO > 0 && (
+            <p className="mt-0.5 text-xs text-muted-foreground/80 tabular-nums">
+              {t("dashboard.centro.version")}{" "}
+              {new Date(BUILD_PROPIO).toLocaleString(undefined, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+            </p>
+          )}
         </div>
         <div className="flex gap-2">
           <Button asChild variant="outline" size="sm" className="rounded-control">
