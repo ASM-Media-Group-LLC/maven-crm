@@ -181,38 +181,64 @@ export function useCoworkSession(sessionId: string | null) {
   const [avatares, setAvatares] = useState<Record<string, { src: string | null; seed: string | null }>>({});
   const initialLoadDone = useRef(false);
   const channelsRef = useRef<RealtimeChannel[]>([]);
+  // Nº de corrida de fetchData: si entran dos refetch juntos (ráfaga o
+  // reconexión), solo la ÚLTIMA en empezar puede escribir el estado — así una
+  // respuesta vieja que resuelve tarde no pisa datos nuevos.
+  const fetchSeqRef = useRef(0);
+  // Debounce de los refetch de realtime: una ráfaga de eventos (10 personas se
+  // mueven de sala) se junta en UNA sola relectura, no diez.
+  const refetchTimerRef = useRef<number | null>(null);
 
   const isHost = myMembership?.role === "host";
 
   // Fetch all data (silent = true skips loading state for realtime refetches)
   const fetchData = useCallback(async (silent = false) => {
     if (!sessionId) return;
+    // Esta corrida; si una más nueva empieza, esta deja de escribir estado.
+    const seq = ++fetchSeqRef.current;
+    const vigente = () => seq === fetchSeqRef.current;
     if (!silent) setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user || !vigente()) return;
 
-      const { data: sess } = await supabase.from("cowork_sessions").select("*").eq("id", sessionId).single();
-      setSession(sess);
+      // REGLA (CLAUDE.md): "un fallo no es vacío". PostgREST devuelve
+      // { data:null, error } cuando la petición FALLA (red/5xx), y [] cuando no
+      // hay filas. Por eso cada consulta solo pisa su estado si NO hubo error:
+      // antes, en cada reconexión (p.ej. tras un reinicio de la base), una
+      // consulta fallida vaciaba la sesión/membresías y sacaba al host o al
+      // chatter a la pantalla de "Unirse" en medio del turno (el parpadeo).
+      const { data: sess, error: eSess } = await supabase.from("cowork_sessions").select("*").eq("id", sessionId).single();
+      if (!vigente()) return;
+      if (!eSess && sess) setSession(sess);
 
-      const { data: rms } = await supabase.from("cowork_rooms").select("*").eq("session_id", sessionId).order("sort_order");
-      setRooms((rms as CoworkRoom[]) || []);
+      const { data: rms, error: eRms } = await supabase.from("cowork_rooms").select("*").eq("session_id", sessionId).order("sort_order");
+      if (!vigente()) return;
+      if (!eRms && rms) setRooms(rms as CoworkRoom[]);
 
-      const { data: mems } = await supabase.from("cowork_memberships").select("*").eq("session_id", sessionId);
-      setMemberships((mems as CoworkMembership[]) || []);
-      const mine = (mems as CoworkMembership[])?.find(m => m.user_id === user.id);
-      setMyMembership(mine || null);
+      const { data: mems, error: eMems } = await supabase.from("cowork_memberships").select("*").eq("session_id", sessionId);
+      if (!vigente()) return;
+      const memsOk = !eMems && mems ? (mems as CoworkMembership[]) : null;
+      if (memsOk) {
+        setMemberships(memsOk);
+        setMyMembership(memsOk.find(m => m.user_id === user.id) || null);
+      }
 
-      const { data: assigns } = await supabase.from("cowork_room_assignments").select("*").eq("session_id", sessionId).eq("is_active", true);
-      setAssignments((assigns as CoworkAssignment[]) || []);
-      const myAss = (assigns as CoworkAssignment[])?.find(a => a.user_id === user.id && a.is_active);
-      setMyAssignment(myAss || null);
+      const { data: assigns, error: eAss } = await supabase.from("cowork_room_assignments").select("*").eq("session_id", sessionId).eq("is_active", true);
+      if (!vigente()) return;
+      if (!eAss && assigns) {
+        const arr = assigns as CoworkAssignment[];
+        setAssignments(arr);
+        setMyAssignment(arr.find(a => a.user_id === user.id && a.is_active) || null);
+      }
 
-      const { data: hReqs } = await supabase.from("cowork_host_requests").select("*").eq("session_id", sessionId).neq("status", "resolved").order("created_at", { ascending: false });
-      setHostRequests((hReqs as HostRequest[]) || []);
+      const { data: hReqs, error: eH } = await supabase.from("cowork_host_requests").select("*").eq("session_id", sessionId).neq("status", "resolved").order("created_at", { ascending: false });
+      if (!vigente()) return;
+      if (!eH && hReqs) setHostRequests(hReqs as HostRequest[]);
 
-      const { data: ssReqs } = await supabase.from("cowork_screenshare_requests").select("*").eq("session_id", sessionId).in("status", ["pending", "approved"]).order("created_at", { ascending: false });
-      setScreenShareRequests((ssReqs as ScreenShareRequest[]) || []);
+      const { data: ssReqs, error: eSS } = await supabase.from("cowork_screenshare_requests").select("*").eq("session_id", sessionId).in("status", ["pending", "approved"]).order("created_at", { ascending: false });
+      if (!vigente()) return;
+      if (!eSS && ssReqs) setScreenShareRequests(ssReqs as ScreenShareRequest[]);
 
       // Meets grupales ABIERTOS con su gente. Los cerrados son historia: los ven
       // los reportes, no el tablero.
@@ -220,26 +246,32 @@ export function useCoworkSession(sessionId: string | null) {
       // migración, hasta entonces se consulta sin tipar la tabla.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sinTipar = supabase as unknown as { from: (tabla: string) => any };
-      const { data: ms } = await sinTipar.from("cowork_meets")
+      const { data: ms, error: eMs } = await sinTipar.from("cowork_meets")
         .select("*, participantes:cowork_meet_participants(*)")
         .eq("session_id", sessionId).is("ended_at", null).order("started_at", { ascending: false });
-      const filas = (ms ?? []) as Array<Omit<CoworkMeet, "participantes"> & { participantes?: CoworkMeetParticipant[] }>;
-      setMeets(filas.map((m) => ({ ...m, participantes: m.participantes ?? [] })));
+      if (!vigente()) return;
+      if (!eMs && ms) {
+        const filas = ms as Array<Omit<CoworkMeet, "participantes"> & { participantes?: CoworkMeetParticipant[] }>;
+        setMeets(filas.map((m) => ({ ...m, participantes: m.participantes ?? [] })));
+      }
 
-      const userIds = (mems as CoworkMembership[])?.map(m => m.user_id) || [];
+      const userIds = memsOk?.map(m => m.user_id) ?? [];
       if (userIds.length) {
-        const { data: profs } = await supabase.from("profiles").select("id, full_name, avatar_url, avatar_seed").in("id", userIds);
-        const map: Record<string, string> = {};
-        const caras: Record<string, { src: string | null; seed: string | null }> = {};
-        profs?.forEach((p: any) => {
-          map[p.id] = p.full_name || "User";
-          caras[p.id] = { src: p.avatar_url ?? null, seed: p.avatar_seed ?? null };
-        });
-        setProfiles(map);
-        setAvatares(caras);
+        const { data: profs, error: eP } = await supabase.from("profiles").select("id, full_name, avatar_url, avatar_seed").in("id", userIds);
+        if (!vigente()) return;
+        if (!eP && profs) {
+          const map: Record<string, string> = {};
+          const caras: Record<string, { src: string | null; seed: string | null }> = {};
+          profs.forEach((p: any) => {
+            map[p.id] = p.full_name || "User";
+            caras[p.id] = { src: p.avatar_url ?? null, seed: p.avatar_seed ?? null };
+          });
+          setProfiles(map);
+          setAvatares(caras);
+        }
       }
     } finally {
-      if (!silent) setLoading(false);
+      if (!silent && vigente()) setLoading(false);
       initialLoadDone.current = true;
     }
   }, [sessionId]);
@@ -249,7 +281,19 @@ export function useCoworkSession(sessionId: string | null) {
     if (!sessionId) return;
     fetchData();
 
-    const realtimeRefetch = () => fetchData(true);
+    // Relectura DEBOUNCED: muchos eventos juntos (una sala que mueve 10
+    // personas = 10 cambios) se juntan en UNA sola relectura ~1,2s después del
+    // último, en vez de disparar diez relecturas de ~9 consultas cada una. Baja
+    // muchísimo la carga (lo que casi tumba la base hoy) y el tablero entra más
+    // liviano, sin perder frescura real para un panel de monitoreo.
+    const programarRefetch = () => {
+      if (refetchTimerRef.current != null) window.clearTimeout(refetchTimerRef.current);
+      refetchTimerRef.current = window.setTimeout(() => {
+        refetchTimerRef.current = null;
+        fetchData(true);
+      }, 1_200);
+    };
+    const realtimeRefetch = programarRefetch;
 
     const sessionCh = supabase.channel(`cowork-session-${sessionId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "cowork_sessions", filter: `id=eq.${sessionId}` }, realtimeRefetch)
@@ -286,20 +330,23 @@ export function useCoworkSession(sessionId: string | null) {
 
     // Red de seguridad (Jhon, 10/09: "tengo que actualizar para ver quiénes
     // están en break, voy perdiendo pantallas"): un canal de Realtime puede
-    // morir en silencio y nada lo vuelve a traer. Cada minuto, y al volver a la
-    // pestaña o a tener red, se relee todo aunque no haya llegado ningún
-    // evento. Siete lecturas por minuto por pantalla abierta: barato.
-    const cadaMinuto = window.setInterval(realtimeRefetch, 60_000);
-    const alVolver = () => { if (document.visibilityState === "visible") realtimeRefetch(); };
+    // morir en silencio y nada lo vuelve a traer. Cada minuto —SOLO con la
+    // pestaña a la vista—, y al volver a la pestaña o a tener red, se reprograma
+    // una relectura. Con la pestaña oculta no se gasta: nadie la está mirando.
+    const cadaMinuto = window.setInterval(() => {
+      if (document.visibilityState === "visible") programarRefetch();
+    }, 60_000);
+    const alVolver = () => { if (document.visibilityState === "visible") programarRefetch(); };
     document.addEventListener("visibilitychange", alVolver);
-    window.addEventListener("online", realtimeRefetch);
+    window.addEventListener("online", programarRefetch);
 
     return () => {
       channelsRef.current.forEach(ch => supabase.removeChannel(ch));
       channelsRef.current = [];
       window.clearInterval(cadaMinuto);
+      if (refetchTimerRef.current != null) { window.clearTimeout(refetchTimerRef.current); refetchTimerRef.current = null; }
       document.removeEventListener("visibilitychange", alVolver);
-      window.removeEventListener("online", realtimeRefetch);
+      window.removeEventListener("online", programarRefetch);
     };
   }, [sessionId, fetchData]);
 
