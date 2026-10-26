@@ -53,6 +53,14 @@ interface Props {
   /** Dibujar el nombre sobre cada miniatura. El tablero del supervisor lo
    *  apaga porque pone la gente (con su reloj) él mismo, al pie del video. */
   showNames?: boolean;
+  /** Vista de pantalla CONTROLADA desde afuera: true = los tiles muestran la
+   *  pantalla compartida (si existe); undefined = manda el estado interno
+   *  (salto automático en el teléfono). La usa la pantallita de la tarjeta. */
+  verPantalla?: boolean;
+  /** Dibujar el botón de swap cámara↔pantalla en cada tile. El tablero lo
+   *  apaga: ahí el control es la ÚNICA pantallita de la tarjeta — con dos
+   *  iconos de pantalla la tarjeta se veía fatal (Álvaro, 26/10). */
+  conBotonDePantalla?: boolean;
 }
 
 // Video por participante: su cámara y su pantalla (cualquiera puede faltar).
@@ -82,7 +90,7 @@ function VideoTile({ track }: { track: any }) {
 // cámara; si comparte pantalla, el botón deja alternar. Si NO comparte, el botón va
 // deshabilitado. Solo se ADJUNTA (y por ende streamea) el track que se está viendo — el otro
 // queda pausado por adaptiveStream, así ver la pantalla no cuesta ancho de banda hasta pedirlo.
-function MonitorTile({ pv, viewingScreen, onSwap, showName = true }: { pv: PartVideo; viewingScreen: boolean; onSwap: () => void; showName?: boolean }) {
+function MonitorTile({ pv, viewingScreen, onSwap, showName = true, showSwap = true }: { pv: PartVideo; viewingScreen: boolean; onSwap: () => void; showName?: boolean; showSwap?: boolean }) {
   const { t } = useLanguage();
   const canSwap = !!pv.screen;
   const activeTrack = viewingScreen && pv.screen ? pv.screen : pv.camera;
@@ -96,7 +104,7 @@ function MonitorTile({ pv, viewingScreen, onSwap, showName = true }: { pv: PartV
           <span className="text-[9px] tactil:text-[11px]">{t("cowork.monitor.cameraOff")}</span>
         </div>
       )}
-      <button
+      {showSwap && <button
         type="button"
         disabled={!canSwap}
         onClick={onSwap}
@@ -115,7 +123,7 @@ function MonitorTile({ pv, viewingScreen, onSwap, showName = true }: { pv: PartV
         className="absolute bottom-2 right-2 z-10 flex items-center justify-center rounded-md h-7 w-7 tactil:h-9 tactil:w-9 bg-black/50 text-white/90 backdrop-blur-sm transition hover:bg-black/70 disabled:cursor-not-allowed disabled:opacity-30"
       >
         {viewingScreen ? <Video className="h-3.5 w-3.5 tactil:h-4 tactil:w-4" /> : <Monitor className="h-3.5 w-3.5 tactil:h-4 tactil:w-4" />}
-      </button>
+      </button>}
       {showName && (pv.name || viewingScreen) && (
         // Nombre corto y letra apagada (diseño v5, Álvaro 26/10): la chapita
         // informa sin tapar el video ni gritar en blanco puro.
@@ -251,7 +259,7 @@ function useClonPublicado(opts: {
 // (publica el micro del coordinador) y muestra el video en miniatura. Una Room LiveKit propia
 // por sala (adaptiveStream → capa baja para thumbnails). El coordinador aparece como
 // "📢 Coordinador" (solo audio) en las salas donde tenga el micro activo.
-function CoworkRoomMonitor({ roomId, roomName, issueToken, showVideo, hearOn, broadcastOn, micBaseTrack, camOn = false, camBaseTrack = null, screenOn = false, screenBaseTrack = null, enabled = true, onSharersChange, onSpeakingChange, showNames = true, onParticipantsChange }: Props) {
+function CoworkRoomMonitor({ roomId, roomName, issueToken, showVideo, hearOn, broadcastOn, micBaseTrack, camOn = false, camBaseTrack = null, screenOn = false, screenBaseTrack = null, enabled = true, onSharersChange, onSpeakingChange, showNames = true, onParticipantsChange, verPantalla, conBotonDePantalla = true }: Props) {
   const { t } = useLanguage();
   const esMovil = useIsMobile();
   const [partVideos, setPartVideos] = useState<PartVideo[]>([]);
@@ -552,8 +560,9 @@ function CoworkRoomMonitor({ roomId, roomName, issueToken, showVideo, hearOn, br
               <MonitorTile
                 key={pv.identity}
                 pv={pv}
-                viewingScreen={!!screenView[pv.identity] && !!pv.screen}
+                viewingScreen={(verPantalla ?? !!screenView[pv.identity]) && !!pv.screen}
                 showName={showNames}
+                showSwap={conBotonDePantalla}
                 onSwap={() => setScreenView((m) => ({ ...m, [pv.identity]: !m[pv.identity] }))}
               />
             ))}

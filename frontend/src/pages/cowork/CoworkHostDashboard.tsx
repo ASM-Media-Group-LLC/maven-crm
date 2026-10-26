@@ -1378,6 +1378,11 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // suben en una hoja inferior.
   const isMobile = useIsMobile();
   const [salaEnHoja, setSalaEnHoja] = useState<string | null>(null);
+  // Qué salas están mostrando la PANTALLA compartida en su miniatura. Lo
+  // controla la ÚNICA pantallita de la tarjeta (escritorio); en el teléfono
+  // no aplica: ahí el salto a la pantalla es automático y la pantallita abre
+  // la hoja de la sala.
+  const [verPantallaDe, setVerPantallaDe] = useState<Record<string, boolean>>({});
   // Escribirle a alguien desde la lista de pantallas: se abre (o crea) el DM
   // y sale en la ventanita flotante del Messenger, sin irse del tablero.
   const { createDirectChat } = useChatShared();
@@ -2222,6 +2227,10 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                     issueToken={cowork.issueLiveKitToken}
                     showVideo={showVideo}
                     showNames={false}
+                    // UNA sola pantallita por tarjeta (la de arriba): el botón
+                    // de swap de cada tile se apaga aquí (duplicado = feo).
+                    conBotonDePantalla={false}
+                    verPantalla={!isMobile && verPantallaDe[room.id] ? true : undefined}
                     hearOn={hearFor(room.id)}
                     broadcastOn={broadcastFor(room.id)}
                     micBaseTrack={micBaseTrack}
@@ -2364,23 +2373,40 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                         {/* La pantallita SIEMPRE está (no negociable — Álvaro,
                             26/10): gris neutro de base, y verde suave cuando esa
                             sala está compartiendo. */}
-                        <span
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            // Teléfono: abre la sala (ahí el video salta solo a la
+                            // pantalla). Escritorio: alterna cámara ↔ pantalla en
+                            // la propia miniatura. UNA pantallita que SIRVE.
+                            if (isMobile) setSalaEnHoja(room.id);
+                            else setVerPantallaDe((m) => ({ ...m, [room.id]: !m[room.id] }));
+                          }}
                           className={cn(
-                            // pointer-events-auto: sin esto el title jamás se
-                            // mostraba (el overlay entero es pointer-events-none).
-                            "pointer-events-auto inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border backdrop-blur-sm",
+                            // pointer-events-auto: el overlay entero es
+                            // pointer-events-none y sin esto no recibiría clics.
+                            "pointer-events-auto inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border backdrop-blur-sm transition-colors",
                             alguienComparte
-                              ? "border-success/40 bg-success/20 text-success"
+                              ? "border-success/40 bg-success/20 text-success hover:bg-success/30"
                               : participants.length > 0
-                                ? "border-white/10 bg-black/35 text-white/60"
+                                ? "border-white/10 bg-black/35 text-white/60 hover:bg-black/55"
                                 : "border-border bg-muted/40 text-muted-foreground/70",
+                            !isMobile && verPantallaDe[room.id] && "ring-1 ring-success/60",
                           )}
-                          role="img"
-                          aria-label={alguienComparte ? t("cowork.host.sharingScreen") : t("cowork.host.screen")}
-                          title={alguienComparte ? t("cowork.host.sharingScreen") : t("cowork.host.screen")}
+                          aria-label={!isMobile && verPantallaDe[room.id]
+                            ? t("cowork.monitor.viewCamera")
+                            : alguienComparte
+                              ? t("cowork.monitor.viewScreen")
+                              : t("cowork.host.screen")}
+                          title={!isMobile && verPantallaDe[room.id]
+                            ? t("cowork.monitor.viewCamera")
+                            : alguienComparte
+                              ? t("cowork.monitor.viewScreen")
+                              : t("cowork.host.screen")}
                         >
                           <Monitor className="h-3.5 w-3.5" />
-                        </span>
+                        </button>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button
