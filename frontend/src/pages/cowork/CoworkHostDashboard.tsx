@@ -2205,7 +2205,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                     camBaseTrack={camBaseTrack}
                     screenOn={screenFor(room.id)}
                     screenBaseTrack={screenBaseTrack}
-                    enabled={activeRoomId !== room.id}
+                    enabled={activeRoomId !== room.id && !(isMobile && salaEnHoja === room.id)}
                     onSharersChange={manejadores.sharers}
                     onSpeakingChange={manejadores.speaking}
                     onParticipantsChange={manejadores.participants}
@@ -2265,7 +2265,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                           <SalaEnPausa pausa={pausaSala} nombres={participants.map((a) => nombreYApellido(cowork.profiles[a.user_id]))} className="h-full w-full rounded-none border-0" />
                           {monitor(false)}
                         </>
-                      ) : (room.preview_mode ?? "video") === "avatars" ? (
+                      ) : ((room.preview_mode ?? "video") === "avatars" || isMobile) ? (
                         <>
                           <div className="flex h-full flex-wrap items-center justify-center gap-4 p-3">
                             {participants.map((a) => {
@@ -2658,7 +2658,8 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
             if (!room) return null;
             const participants = getRoomParticipants(room.id);
             const personas = personasDe(participants);
-            const etiquetas = etiquetasDe(participants, !pausaDeLaSala(participants.map((p) => p.user_id)));
+            const pausaSala = pausaDeLaSala(participants.map((p) => p.user_id));
+            const etiquetas = etiquetasDe(participants, !pausaSala);
             return (
               <>
                 <SheetHeader className="text-left">
@@ -2670,6 +2671,29 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                     {room.join_code ? <>{t("cowork.host.roomCode")} <span className="font-mono tracking-[0.18em] text-foreground">{room.join_code}</span></> : t("cowork.host.roomNoCode")}
                   </SheetDescription>
                 </SheetHeader>
+                {/* El video EN VIVO de la sala que tocó — solo aquí (una sala a la
+                    vez) para no decodificar video de todo el grid en el teléfono.
+                    El monitor salta solo a la pantalla compartida y trae el botón
+                    para volver a la cámara (CoworkRoomMonitor, modo móvil). */}
+                {participants.length > 0 && !pausaSala && (
+                  <div className="mt-3 aspect-video overflow-hidden rounded-xl bg-black">
+                    <CoworkRoomMonitor
+                      roomId={room.id}
+                      roomName={room.name}
+                      issueToken={cowork.issueLiveKitToken}
+                      showVideo={true}
+                      showNames={true}
+                      hearOn={hearFor(room.id)}
+                      broadcastOn={broadcastFor(room.id)}
+                      micBaseTrack={micBaseTrack}
+                      camOn={camFor(room.id)}
+                      camBaseTrack={camBaseTrack}
+                      screenOn={screenFor(room.id)}
+                      screenBaseTrack={screenBaseTrack}
+                      enabled={true}
+                    />
+                  </div>
+                )}
                 {personas.length > 0 && (
                   <ul className="mt-3 space-y-2">
                     {personas.map((p) => (
