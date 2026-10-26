@@ -48,7 +48,7 @@ export default function AvisarDialog({ nombreChatter, onAvisar, t, open, onOpenC
     : t("cowork.avisar.menuTitle");
 
   const cuerpo = (
-    <div className="mt-2">
+    <div className="mt-2 min-w-0">
       {/* Categorías: tocas una y ves sus situaciones. Nada que bajar. */}
       <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {GRUPOS_AVISO.map(({ grupo: g, titulo: tl }) => (
@@ -71,20 +71,20 @@ export default function AvisarDialog({ nombreChatter, onAvisar, t, open, onOpenC
 
       {/* Situaciones de la categoría: cada una con Oír (fantasma) y Enviar
           (tinte violeta suave). Delicados — nada prendido. */}
-      <div className="mt-3 grid grid-cols-2 gap-2.5">
+      <div className="mt-3 grid min-w-0 grid-cols-2 gap-2.5">
         {situacionesDe(grupo).map((s) => (
           <div
             key={s.slug}
-            className="flex flex-col gap-2.5 rounded-xl border border-border/70 bg-card/60 p-3 [box-shadow:inset_0_1px_0_hsl(0_0%_100%/.05)]"
+            className="flex min-w-0 flex-col gap-2.5 rounded-xl border border-border/70 bg-gradient-to-b from-card/80 to-card/40 p-3 [box-shadow:inset_0_1px_0_hsl(0_0%_100%/.05)]"
           >
             <span className="text-sm font-semibold leading-snug">{t(s.etiqueta)}</span>
             <div className="mt-auto flex gap-2">
               <button
                 type="button"
                 onClick={() => { void anunciar(s.vozEs); }}
-                className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border bg-muted/30 px-2 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground"
+                className="flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg border border-border bg-muted/30 px-2 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground"
               >
-                <Volume2 className="h-3.5 w-3.5" /> {t("cowork.avisar.listen")}
+                <Volume2 className="h-3.5 w-3.5 shrink-0" /> {t("cowork.avisar.listen")}
               </button>
               <button
                 type="button"
@@ -95,9 +95,9 @@ export default function AvisarDialog({ nombreChatter, onAvisar, t, open, onOpenC
                   onAvisar(s.slug);
                   onOpenChange(false);
                 }}
-                className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-violet-400/40 bg-violet-500/10 px-2 py-2 text-xs font-semibold text-violet-200 transition-colors hover:bg-violet-500/20"
+                className="flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg border border-violet-400/40 bg-violet-500/10 px-2 py-2 text-xs font-semibold text-violet-200 transition-colors hover:bg-violet-500/20"
               >
-                <Megaphone className="h-3.5 w-3.5" /> {t("cowork.avisar.send")}
+                <Megaphone className="h-3.5 w-3.5 shrink-0" /> {t("cowork.avisar.send")}
               </button>
             </div>
           </div>
@@ -123,7 +123,7 @@ export default function AvisarDialog({ nombreChatter, onAvisar, t, open, onOpenC
   if (isMobile) {
     return (
       <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent side="bottom" className="max-h-[85dvh] overflow-y-auto rounded-t-2xl px-4 pb-6 pt-4">
+        <SheetContent side="bottom" className="max-h-[85dvh] overflow-y-auto overflow-x-hidden rounded-t-2xl px-4 pb-6 pt-4">
           <SheetHeader className="text-left">
             <SheetTitle className="font-display">{titulo}</SheetTitle>
             <SheetDescription>{t("cowork.avisar.dialogHint")}</SheetDescription>
@@ -135,7 +135,7 @@ export default function AvisarDialog({ nombreChatter, onAvisar, t, open, onOpenC
   }
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md gap-2 max-h-[85dvh] overflow-y-auto">
+      <DialogContent className="max-w-xl gap-2 max-h-[85dvh] overflow-y-auto overflow-x-hidden bg-none">
         <DialogHeader className="text-left">
           <DialogTitle className="font-display">{titulo}</DialogTitle>
           <DialogDescription>{t("cowork.avisar.dialogHint")}</DialogDescription>
