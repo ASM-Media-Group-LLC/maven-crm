@@ -2412,13 +2412,27 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="pointer-events-auto hidden h-7 w-7 shrink-0 rounded-lg border border-white/10 bg-black/35 text-white hover:bg-black/55 hover:text-white md:inline-flex"
+                              className={cn(
+                                // Visibles TAMBIÉN en el teléfono (Álvaro, 26/10):
+                                // los tres puntitos son su puerta para entrar a
+                                // donde esa persona y hablarle.
+                                "pointer-events-auto inline-flex h-6 w-6 shrink-0 rounded-md border",
+                                participants.length > 0
+                                  ? "border-white/10 bg-black/35 text-white/70 hover:bg-black/55 hover:text-white"
+                                  : "border-border bg-muted/40 text-muted-foreground/70 hover:text-foreground",
+                              )}
                               title={t("cowork.host.roomMenu")}
                             >
-                              <MoreHorizontal className="h-4 w-4" />
+                              <MoreHorizontal className="h-3.5 w-3.5" />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-56">
+                            {/* Primero lo que se hace con los puntitos: ENTRAR
+                                a donde esa persona (y ya adentro, hablarle). */}
+                            <DropdownMenuItem onClick={() => enterRoom(room.id)}>
+                              <DoorOpen className="mr-2 h-4 w-4" /> {t("cowork.host.enterRoom")}
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={() => copiarEnlaceDeSala(room)}>
                               <Link2 className="mr-2 h-4 w-4" /> {t("cowork.host.copyParticipantLink")}
                             </DropdownMenuItem>
