@@ -195,18 +195,6 @@ export const cowork = {
   "cowork.miPausa.over": { es: "Se te pasó el tiempo", en: "You're over time" },
   "cowork.miPausa.ofLimit": { es: "de {limit} min", en: "of {limit} min" },
   "cowork.miPausa.imBack": { es: "Ya volví", en: "I'm back" },
-  // Las cuatro de lib/frasesDePausa, en el mismo orden.
-  "cowork.pauseTile.phrase1": {
-    es: "Un pequeño descanso también construye grandes resultados.",
-    en: "A short break helps build great results too.",
-  },
-  "cowork.pauseTile.phrase2": { es: "Recarga tu energía para seguir creando juntos.", en: "Recharge so we can keep creating together." },
-  "cowork.pauseTile.phrase3": { es: "Parar un momento también es avanzar.", en: "Pausing for a moment is progress too." },
-  "cowork.pauseTile.phrase4": {
-    es: "Volver con la cabeza fresca vale más que no parar.",
-    en: "Coming back with a fresh mind beats never stopping.",
-  },
-
   // ── Meet grupal ────────────────────────────────────────────────────────────
   "cowork.meet.title": { es: "Meet grupal", en: "Group meet" },
   "cowork.meet.dialogDesc": {

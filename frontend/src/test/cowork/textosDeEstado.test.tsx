@@ -1,6 +1,6 @@
 // Los textos de Cowork que salen de un ESTADO (pausa del supervisor, reloj
-// detenido, frase del break) viven ahora en el diccionario y no en las funciones
-// de lib/. Dos cosas que no pueden pasar en silencio:
+// detenido) viven ahora en el diccionario y no en las funciones de lib/.
+// Dos cosas que no pueden pasar en silencio:
 //   1. que el español del diccionario deje de decir lo mismo que lib/ (en
 //      español la pantalla tiene que quedar igual que antes);
 //   2. que un estado nuevo llegue sin su clave (en inglés saldría la clave).
@@ -12,9 +12,7 @@ import { getTranslation } from "@/lib/i18n";
 import { ESTADOS_SUPERVISOR, fraseDePausaSupervisor, subtituloDePausaSupervisor, fijarPausaSupervisor } from "@/lib/pausaSupervisor";
 import { motivoDetenido, motivoDetenidoDeOtro } from "@/lib/coworkReloj";
 import { ESTADOS_TIEMPO, cuentaComoTrabajo } from "@/lib/coworkTiempoRegla";
-import { FRASES_DE_PAUSA } from "@/lib/frasesDePausa";
 import { ETIQUETA_SUPERVISOR, FRASE_SUPERVISOR, SUBTITULO_SUPERVISOR, claveMotivoDetenido } from "@/pages/cowork/textosCowork";
-import SalaEnPausa from "@/pages/cowork/SalaEnPausa";
 import PausaSupervisorBoton from "@/pages/cowork/PausaSupervisorBoton";
 import { enEspanol } from "./enIngles";
 
@@ -52,12 +50,6 @@ describe("el español del diccionario es el mismo de lib/", () => {
     }
     expect(detenidos).toBeGreaterThanOrEqual(5);
   });
-
-  it("las frases del break, en el mismo orden", () => {
-    const claves = ["cowork.pauseTile.phrase1", "cowork.pauseTile.phrase2", "cowork.pauseTile.phrase3", "cowork.pauseTile.phrase4"] as const;
-    expect(claves.length).toBe(FRASES_DE_PAUSA.length);
-    claves.forEach((k, i) => expect(es(k)).toBe(FRASES_DE_PAUSA[i]));
-  });
 });
 
 describe("las piezas chicas en inglés", () => {
@@ -67,25 +59,7 @@ describe("las piezas chicas en inglés", () => {
     fijarPausaSupervisor(null);
   });
 
-  const T = new Date("2026-09-08T12:04:00-05:00").getTime();
   const conIdioma = (ui: ReactNode) => render(<LanguageProvider>{ui}</LanguageProvider>);
-
-  it("la miniatura en pausa: break bien, break pasado, baño y meet", () => {
-    const { rerender } = conIdioma(<SalaEnPausa pausa={{ kind: "break", segundos: 60, desde: T, limiteMin: 45, consumidoSeg: 0, excedida: false }} />);
-    expect(screen.getByText("On break")).toBeTruthy();
-    expect(screen.getByText("44 min left")).toBeTruthy();
-    expect(enEspanol(document.body)).toEqual([]);
-    for (const pausa of [
-      { kind: "break" as const, segundos: 50 * 60, desde: T, limiteMin: 45, consumidoSeg: 0, excedida: true },
-      { kind: "bano" as const, segundos: 200, desde: T, limiteMin: 10, consumidoSeg: 220, excedida: false },
-      { kind: "bano" as const, segundos: 700, desde: T, limiteMin: 10, consumidoSeg: 0, excedida: true },
-      { kind: "meet" as const, segundos: 300, desde: T, limiteMin: null, consumidoSeg: 0, excedida: false },
-    ]) {
-      rerender(<LanguageProvider><SalaEnPausa pausa={pausa} /></LanguageProvider>);
-      expect(enEspanol(document.body)).toEqual([]);
-    }
-    expect(screen.getByText("In group meet")).toBeTruthy();
-  });
 
   it("la tacita del supervisor y su menú", () => {
     conIdioma(<PausaSupervisorBoton />);
