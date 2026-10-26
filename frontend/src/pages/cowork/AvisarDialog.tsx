@@ -25,24 +25,34 @@ interface AvisarDialogProps {
   disabled: boolean;
   onAvisar: (slug: string) => void;
   t: Traductor;
+  /** Modo CONTROLADO, sin botón propio: lo abren los tres puntitos de la
+   *  sala o la hoja del teléfono (Álvaro, 26/10 — el aviso por voz tiene
+   *  que estar también en el celular). */
+  open?: boolean;
+  onOpenChange?: (abierto: boolean) => void;
 }
 
-export default function AvisarDialog({ nombreChatter, disabled, onAvisar, t }: AvisarDialogProps) {
-  const [open, setOpen] = useState(false);
+export default function AvisarDialog({ nombreChatter, disabled, onAvisar, t, open: openProp, onOpenChange }: AvisarDialogProps) {
+  const [openLocal, setOpenLocal] = useState(false);
+  const controlado = openProp !== undefined;
+  const open = controlado ? openProp : openLocal;
+  const setOpen = (o: boolean) => { if (controlado) onOpenChange?.(o); else setOpenLocal(o); };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button
-          variant="ghost"
-          size="sm"
-          disabled={disabled}
-          className="h-8 rounded-lg border border-border bg-muted/40 px-3 text-xs font-semibold text-foreground hover:bg-muted/70 hover:text-foreground"
-        >
-          {t("cowork.avisar.trigger")}
-          <ChevronDown className="ml-1 h-3.5 w-3.5" aria-hidden="true" />
-        </Button>
-      </DialogTrigger>
+      {!controlado && (
+        <DialogTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={disabled}
+            className="h-8 rounded-lg border border-border bg-muted/40 px-3 text-xs font-semibold text-foreground hover:bg-muted/70 hover:text-foreground"
+          >
+            {t("cowork.avisar.trigger")}
+            <ChevronDown className="ml-1 h-3.5 w-3.5" aria-hidden="true" />
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="max-w-md gap-3 max-h-[85dvh] overflow-y-auto">
         <DialogHeader className="text-left">
           <DialogTitle>

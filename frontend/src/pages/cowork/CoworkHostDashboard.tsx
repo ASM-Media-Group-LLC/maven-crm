@@ -11,7 +11,7 @@ import {
   Mic, MicOff, Video, VideoOff, ArrowLeft, Plus, Pencil, Volume2, VolumeX, ScreenShare, ScreenShareOff,
   PanelRightClose, PanelRightOpen, MoreVertical, MessageCircle,
   Pin, PinOff, PhoneOff, PictureInPicture2, KeyRound, Check, Coffee, EyeOff, MonitorOff, Settings2, MoreHorizontal,
-  WifiOff, ChevronRight, type LucideIcon } from "lucide-react";
+  WifiOff, ChevronRight, Megaphone, type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
 import { usePersistentCall, CallOutlet } from "@/components/PersistentCallProvider";
@@ -1383,6 +1383,9 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // no aplica: ahí el salto a la pantalla es automático y la pantallita abre
   // la hoja de la sala.
   const [verPantallaDe, setVerPantallaDe] = useState<Record<string, boolean>>({});
+  // La sala a la que se le está AVISANDO (voz Mario) desde los tres puntitos
+  // o la hoja del teléfono: un solo diálogo controlado para todas.
+  const [avisarSala, setAvisarSala] = useState<string | null>(null);
   // Escribirle a alguien desde la lista de pantallas: se abre (o crea) el DM
   // y sale en la ventanita flotante del Messenger, sin irse del tablero.
   const { createDirectChat } = useChatShared();
@@ -2292,11 +2295,88 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                       isMobile && "cursor-pointer active:bg-muted/40",
                     )}
                   >
-                    {/* La cámara es la protagonista, a sangre: el nombre de la
-                        sala, el conteo y el menú ⋯ flotan ENCIMA del video (antes
-                        iban en una cabecera aparte arriba). El código de sala
-                        (R9D9XR…) sigue en el menú ⋯ → "Copiar código". A 4:3 en el
-                        teléfono (a 175 px, 16:9 daban 98 px y la pausa no cabía). */}
+                    {/* Cabecera FUERA del cuadro del video (Álvaro, 26/10): el
+                        nombre arribita, y a la derecha la pantallita (iconito
+                        discreto, verde solo si esa sala comparte) y los tres
+                        puntitos. El video queda limpio; el código de sala sigue
+                        en ⋯ → «Copiar código». */}
+                    <div className="flex h-9 shrink-0 items-center gap-1 pl-3 pr-1.5">
+                      <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-foreground">{tituloBonito(room.name)}</span>
+                      {participants.length > 1 && (
+                        <span className="inline-flex shrink-0 items-center gap-1 text-[11px] tabular-nums text-muted-foreground" title={t("cowork.host.inRoomCount", { n: participants.length })}>
+                          <Users2 className="h-3 w-3" />{participants.length}
+                        </span>
+                      )}
+                      {/* La pantallita SIEMPRE está, pero como SEÑAL discreta.
+                          En escritorio además alterna cámara ↔ pantalla en la
+                          miniatura; en el teléfono no es botón: tocar la tarjeta
+                          ya te mete con la persona (Álvaro, 26/10). */}
+                      <button
+                        type="button"
+                        tabIndex={isMobile ? -1 : undefined}
+                        onClick={isMobile ? undefined : (e) => { e.stopPropagation(); setVerPantallaDe((m) => ({ ...m, [room.id]: !m[room.id] })); }}
+                        className={cn(
+                          "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-colors",
+                          alguienComparte ? "text-success" : "text-muted-foreground/50",
+                          isMobile ? "pointer-events-none" : "hover:bg-muted/60",
+                          !isMobile && verPantallaDe[room.id] && "bg-muted/70 text-foreground",
+                        )}
+                        aria-label={!isMobile && verPantallaDe[room.id]
+                          ? t("cowork.monitor.viewCamera")
+                          : alguienComparte
+                            ? t("cowork.monitor.viewScreen")
+                            : t("cowork.host.screen")}
+                        title={!isMobile && verPantallaDe[room.id]
+                          ? t("cowork.monitor.viewCamera")
+                          : alguienComparte
+                            ? t("cowork.monitor.viewScreen")
+                            : t("cowork.host.screen")}
+                      >
+                        <Monitor className="h-3.5 w-3.5" />
+                      </button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 shrink-0 rounded-md text-muted-foreground hover:text-foreground"
+                            title={t("cowork.host.roomMenu")}
+                          >
+                            <MoreHorizontal className="h-3.5 w-3.5" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56">
+                          {/* Primero lo que se hace con los puntitos: ENTRAR a
+                              donde esa persona, y AVISARLE con la voz. */}
+                          <DropdownMenuItem onClick={() => enterRoom(room.id)}>
+                            <DoorOpen className="mr-2 h-4 w-4" /> {t("cowork.host.enterRoom")}
+                          </DropdownMenuItem>
+                          {puedeAvisar && (
+                            <DropdownMenuItem onClick={() => setAvisarSala(room.id)} disabled={participants.length === 0}>
+                              <Megaphone className="mr-2 h-4 w-4" /> {t("cowork.avisar.trigger")}
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => copiarEnlaceDeSala(room)}>
+                            <Link2 className="mr-2 h-4 w-4" /> {t("cowork.host.copyParticipantLink")}
+                          </DropdownMenuItem>
+                          {room.join_code && (
+                            <DropdownMenuItem onClick={() => copiarCodigoDeSala(room)}>
+                              <KeyRound className="mr-2 h-4 w-4" /> {t("cowork.host.copyCode")} <span className="ml-auto font-mono text-xs text-muted-foreground">{room.join_code}</span>
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => openEdit(room)}>
+                            <Pencil className="mr-2 h-4 w-4" /> {t("cowork.host.editRoom")}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setCloseTarget(room)}>
+                            <X className="mr-2 h-4 w-4" /> {t("cowork.host.closeRoom")}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                    {/* El cuadro del video, limpio, a 4:3 en el teléfono (a
+                        175 px, 16:9 daban 98 px y la pausa no cabía). */}
                     <div className={cn(
                       "relative aspect-[4/3] overflow-hidden md:aspect-video",
                       participants.length === 0 ? "bg-muted/50" : "bg-black/40",
@@ -2349,111 +2429,9 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                         monitor(true)
                       )}
 
-                      {/* Overlay superior: nombre de la sala + conteo (izq) y el
-                          menú ⋯ (der), flotando sobre el video. */}
-                      <div className={cn(
-                        "pointer-events-none absolute inset-x-0 top-0 z-10 flex items-center gap-1.5 px-3 py-2",
-                        participants.length > 0 && "bg-gradient-to-b from-black/45 to-transparent",
-                      )}>
-                        {/* Una sola letra en toda la tarjeta (v5): sin font-display
-                            ni mono — la jerarquía la dan el grosor y el tamaño.
-                            En la tarjeta vacía no hay video debajo: texto del
-                            tema, no blanco fijo (ilegible en tema claro). */}
-                        <span className={cn(
-                          "min-w-0 flex-1 truncate text-[13px] font-semibold",
-                          participants.length > 0 ? "text-white/90 [text-shadow:0_1px_2px_rgba(0,0,0,0.5)]" : "text-muted-foreground",
-                        )}>{tituloBonito(room.name)}</span>
-                        {/* El conteo solo cuando hay MÁS de una persona: el «1»
-                            en cada tarjeta era ruido (Álvaro, 26/10). */}
-                        {participants.length > 1 && (
-                          <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-white/10 bg-black/40 px-2 py-0.5 text-[11px] tabular-nums text-white/85 backdrop-blur-sm" title={t("cowork.host.inRoomCount", { n: participants.length })}>
-                            <Users2 className="h-3 w-3" />{participants.length}
-                          </span>
-                        )}
-                        {/* La pantallita SIEMPRE está (no negociable — Álvaro,
-                            26/10): gris neutro de base, y verde suave cuando esa
-                            sala está compartiendo. */}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            // Teléfono: abre la sala (ahí el video salta solo a la
-                            // pantalla). Escritorio: alterna cámara ↔ pantalla en
-                            // la propia miniatura. UNA pantallita que SIRVE.
-                            if (isMobile) setSalaEnHoja(room.id);
-                            else setVerPantallaDe((m) => ({ ...m, [room.id]: !m[room.id] }));
-                          }}
-                          className={cn(
-                            // pointer-events-auto: el overlay entero es
-                            // pointer-events-none y sin esto no recibiría clics.
-                            "pointer-events-auto inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border backdrop-blur-sm transition-colors",
-                            alguienComparte
-                              ? "border-success/40 bg-success/20 text-success hover:bg-success/30"
-                              : participants.length > 0
-                                ? "border-white/10 bg-black/35 text-white/60 hover:bg-black/55"
-                                : "border-border bg-muted/40 text-muted-foreground/70",
-                            !isMobile && verPantallaDe[room.id] && "ring-1 ring-success/60",
-                          )}
-                          aria-label={!isMobile && verPantallaDe[room.id]
-                            ? t("cowork.monitor.viewCamera")
-                            : alguienComparte
-                              ? t("cowork.monitor.viewScreen")
-                              : t("cowork.host.screen")}
-                          title={!isMobile && verPantallaDe[room.id]
-                            ? t("cowork.monitor.viewCamera")
-                            : alguienComparte
-                              ? t("cowork.monitor.viewScreen")
-                              : t("cowork.host.screen")}
-                        >
-                          <Monitor className="h-3.5 w-3.5" />
-                        </button>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className={cn(
-                                // Visibles TAMBIÉN en el teléfono (Álvaro, 26/10):
-                                // los tres puntitos son su puerta para entrar a
-                                // donde esa persona y hablarle.
-                                "pointer-events-auto inline-flex h-6 w-6 shrink-0 rounded-md border",
-                                participants.length > 0
-                                  ? "border-white/10 bg-black/35 text-white/70 hover:bg-black/55 hover:text-white"
-                                  : "border-border bg-muted/40 text-muted-foreground/70 hover:text-foreground",
-                              )}
-                              title={t("cowork.host.roomMenu")}
-                            >
-                              <MoreHorizontal className="h-3.5 w-3.5" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-56">
-                            {/* Primero lo que se hace con los puntitos: ENTRAR
-                                a donde esa persona (y ya adentro, hablarle). */}
-                            <DropdownMenuItem onClick={() => enterRoom(room.id)}>
-                              <DoorOpen className="mr-2 h-4 w-4" /> {t("cowork.host.enterRoom")}
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => copiarEnlaceDeSala(room)}>
-                              <Link2 className="mr-2 h-4 w-4" /> {t("cowork.host.copyParticipantLink")}
-                            </DropdownMenuItem>
-                            {room.join_code && (
-                              <DropdownMenuItem onClick={() => copiarCodigoDeSala(room)}>
-                                <KeyRound className="mr-2 h-4 w-4" /> {t("cowork.host.copyCode")} <span className="ml-auto font-mono text-xs text-muted-foreground">{room.join_code}</span>
-                              </DropdownMenuItem>
-                            )}
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => openEdit(room)}>
-                              <Pencil className="mr-2 h-4 w-4" /> {t("cowork.host.editRoom")}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setCloseTarget(room)}>
-                              <X className="mr-2 h-4 w-4" /> {t("cowork.host.closeRoom")}
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
 
                       {etiquetas.length > 0 && (
-                        <div className="pointer-events-none absolute left-2 top-11 z-10 flex max-w-[80%] flex-col items-start gap-1">
+                        <div className="pointer-events-none absolute left-2 top-2 z-10 flex max-w-[80%] flex-col items-start gap-1">
                           {etiquetas.map((e) => (
                             <span
                               key={e.key}
@@ -2851,6 +2829,14 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                     {controlesDeSala(room, true)}
                   </div>
                 )}
+                {/* AVISAR también desde el teléfono (la voz que corrige al
+                    chatter): sin esto la operación quedaba coja fuera de la
+                    computadora (Álvaro, 26/10). */}
+                {puedeAvisar && participants.length > 0 && (
+                  <Button variant="outline" className="mt-2 h-10 w-full gap-1.5 rounded-xl text-xs" onClick={() => setAvisarSala(room.id)}>
+                    <Megaphone className="h-3.5 w-3.5" /> {t("cowork.avisar.trigger")}
+                  </Button>
+                )}
                 <Button className="mt-3 h-11 w-full gap-2 rounded-xl" onClick={() => { setSalaEnHoja(null); enterRoom(room.id); }}>
                   <DoorOpen className="h-4 w-4" /> {t("cowork.host.enterRoom")}
                 </Button>
@@ -2870,6 +2856,25 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
           })()}
         </SheetContent>
       </Sheet>
+
+      {/* El AVISAR de los tres puntitos y de la hoja: UN diálogo controlado
+          para la sala elegida, con las situaciones y la voz Mario. */}
+      {avisarSala && (() => {
+        const room = cowork.rooms.find((r) => r.id === avisarSala);
+        if (!room) return null;
+        const gente = getRoomParticipants(room.id);
+        const chatterId = gente[0]?.user_id ?? null;
+        return (
+          <AvisarDialog
+            nombreChatter={chatterId ? nombreYApellido(cowork.profiles[chatterId]) : null}
+            disabled={!chatterId}
+            onAvisar={(slug) => { if (chatterId) void enviarAviso([chatterId], slug, room.id); }}
+            t={t}
+            open
+            onOpenChange={(abierto) => { if (!abierto) setAvisarSala(null); }}
+          />
+        );
+      })()}
 
       <MeetGrupalDialog
         open={meetDialogOpen}
