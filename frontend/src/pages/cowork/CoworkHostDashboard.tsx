@@ -11,7 +11,7 @@ import {
   Mic, MicOff, Video, VideoOff, ArrowLeft, Plus, Pencil, Volume2, VolumeX, ScreenShare, ScreenShareOff,
   PanelRightClose, PanelRightOpen, MoreVertical, MessageCircle,
   Pin, PinOff, PhoneOff, PictureInPicture2, KeyRound, Check, Coffee, EyeOff, MonitorOff, Settings2, MoreHorizontal,
-  WifiOff, type LucideIcon } from "lucide-react";
+  WifiOff, ChevronRight, type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
 import { usePersistentCall, CallOutlet } from "@/components/PersistentCallProvider";
@@ -2154,13 +2154,40 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
             {/* La grilla se llena sola: en un monitor grande entran cinco o
                 seis salas por fila y todas quedan a la vista; en una ventana
                 angosta bajan a dos; en el teléfono son dos miniaturas por fila. */}
-            <div className="grid grid-cols-2 gap-2 md:gap-4 md:grid-cols-[repeat(auto-fill,minmax(300px,1fr))] 2xl:grid-cols-[repeat(auto-fill,minmax(360px,1fr))]">
+            <div className={cn(
+              // Teléfono: lista compacta, una fila por sala (decisión de Álvaro,
+              // 26/10 — los avatares gigantes se veían clunky). Escritorio: la
+              // grilla de tarjetas de siempre.
+              isMobile
+                ? "flex flex-col gap-2"
+                : "grid grid-cols-2 gap-2 md:gap-4 md:grid-cols-[repeat(auto-fill,minmax(300px,1fr))] 2xl:grid-cols-[repeat(auto-fill,minmax(360px,1fr))]",
+            )}>
               {/* Meets grupales abiertos: una tarjeta cada uno, antes de las salas,
                   con su gente y el tiempo. Cualquier supervisor puede entrar; el
                   que lo invocó lo termina al colgar. */}
               {cowork.meets.map((meet) => {
                 const gente = meet.participantes.filter((p) => !p.left_at);
                 const dentro = activeMeetId === meet.id;
+                if (isMobile) {
+                  return (
+                    <button
+                      key={`meet-${meet.id}`}
+                      data-meet={meet.id}
+                      type="button"
+                      disabled={dentro}
+                      onClick={() => entrarAlMeet(meet)}
+                      className="flex w-full items-center gap-3 rounded-2xl border border-primary/40 bg-primary/5 px-3 py-2.5 text-left transition-colors active:bg-primary/10 disabled:opacity-60"
+                    >
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary"><Video className="h-4 w-4" /></span>
+                      <div className="min-w-0 flex-1">
+                        <span className="block truncate font-display text-sm font-semibold text-foreground">{t("cowork.meet.title")}</span>
+                        <span className="block truncate text-xs text-muted-foreground">{gente.map((p) => nombreYApellido(cowork.profiles[p.user_id])).join(", ") || t("cowork.host.everyoneBack")}</span>
+                      </div>
+                      <span className="shrink-0 font-mono text-xs tabular-nums text-primary">{formatoReloj(Math.max(0, Math.floor((now - Date.parse(meet.started_at)) / 1000)))}</span>
+                      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/40" />
+                    </button>
+                  );
+                }
                 return (
                   <div key={`meet-${meet.id}`} data-meet={meet.id} className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-primary/40 bg-card">
                     <div className="flex h-10 items-center gap-2 px-3">
@@ -2211,6 +2238,83 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                     onParticipantsChange={manejadores.participants}
                   />
                 );
+
+                // ── TELÉFONO: una fila limpia por sala ──────────────────────
+                // Avatar chico, nombre de la sala, quién está y su tiempo; las
+                // pausas/problemas se resaltan en color y lo normal va apagado.
+                // Sin decodificar video ni conectar audio por sala (liviano, no
+                // se traba); al tocar una fila se abre su hoja con el video.
+                if (isMobile) {
+                  const vacia = participants.length === 0;
+                  const principal = personas[0];
+                  const alguienComparte = participants.some((a) => mediaStates[a.user_id]?.screenShareOn);
+                  const pausaMmSs = pausaSala
+                    ? `${Math.floor(pausaSala.segundos / 60)}:${String(pausaSala.segundos % 60).padStart(2, "0")}`
+                    : null;
+                  const pausaTxt = pausaSala
+                    ? pausaSala.kind === "bano"
+                      ? t("cowork.pause.bano")
+                      : pausaSala.kind === "almuerzo"
+                        ? t("cowork.pause.almuerzo")
+                        : pausaSala.kind === "meet"
+                          ? t("cowork.meet.title")
+                          : t("cowork.pause.break")
+                    : null;
+                  return (
+                    <button
+                      key={room.id}
+                      data-sala={room.id}
+                      type="button"
+                      onClick={() => setSalaEnHoja(room.id)}
+                      className={cn(
+                        "flex w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition-colors active:bg-muted/50",
+                        vacia
+                          ? "border-border/50 bg-card/40 opacity-55"
+                          : pausaSala?.excedida
+                            ? "border-destructive/50 bg-destructive/10"
+                            : pausaSala
+                              ? "border-warning/50 bg-warning/10"
+                              : speakers.length
+                                ? "border-success/60 bg-success/5"
+                                : "border-border bg-card",
+                      )}
+                    >
+                      {vacia || !principal ? (
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted/40 text-muted-foreground/50">
+                          <Users2 className="h-4 w-4" />
+                        </span>
+                      ) : (
+                        <div className="relative shrink-0">
+                          <UserAvatar name={cowork.profiles[principal.uid]} src={cowork.avatares[principal.uid]?.src} seed={cowork.avatares[principal.uid]?.seed} size="md" status={principal.online ? "online" : "away"} />
+                          {participants.length > 1 && (
+                            <span className="absolute -bottom-1 -right-1 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold text-primary-foreground ring-2 ring-card">+{participants.length - 1}</span>
+                          )}
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="truncate font-display text-sm font-semibold text-foreground">{tituloBonito(room.name)}</span>
+                          {alguienComparte && <Monitor className="h-3.5 w-3.5 shrink-0 text-primary" title={t("cowork.host.screen")} />}
+                        </div>
+                        <span className="block truncate text-xs text-muted-foreground">
+                          {vacia ? t("cowork.host.noParticipants") : personas.map((p) => p.nombre).join(", ")}
+                        </span>
+                      </div>
+                      {pausaSala ? (
+                        <span className={cn(
+                          "shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold tabular-nums",
+                          pausaSala.excedida ? "bg-destructive text-destructive-foreground" : "bg-warning text-warning-foreground",
+                        )}>
+                          {pausaTxt} · {pausaMmSs}
+                        </span>
+                      ) : !vacia && principal?.reloj ? (
+                        <span className="shrink-0 font-mono text-xs tabular-nums text-success">{principal.reloj}</span>
+                      ) : null}
+                      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/40" />
+                    </button>
+                  );
+                }
+
                 return (
                   <div
                     key={room.id}
