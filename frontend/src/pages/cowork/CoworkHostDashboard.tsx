@@ -2341,6 +2341,21 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                       >
                         <Monitor className="h-3.5 w-3.5" />
                       </button>
+                      {/* El megáfono del Avisar: su propio botón en cada sala
+                          (Álvaro, 26/10), violeta para que no se confunda con
+                          escuchar la sala. Cosa aparte. */}
+                      {puedeAvisar && (
+                        <button
+                          type="button"
+                          disabled={participants.length === 0}
+                          onClick={(e) => { e.stopPropagation(); setAvisarSala(room.id); }}
+                          className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-violet-300/80 transition-colors hover:bg-violet-500/15 hover:text-violet-200 disabled:cursor-not-allowed disabled:opacity-35"
+                          aria-label={t("cowork.avisar.trigger")}
+                          title={t("cowork.avisar.trigger")}
+                        >
+                          <Megaphone className="h-3.5 w-3.5" />
+                        </button>
+                      )}
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button
@@ -2358,11 +2373,6 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                           <DropdownMenuItem onClick={() => enterRoom(room.id)}>
                             <DoorOpen className="mr-2 h-4 w-4" /> {t("cowork.host.enterRoom")}
                           </DropdownMenuItem>
-                          {puedeAvisar && (
-                            <DropdownMenuItem onClick={() => setAvisarSala(room.id)} disabled={participants.length === 0}>
-                              <Megaphone className="mr-2 h-4 w-4" /> {t("cowork.avisar.trigger")}
-                            </DropdownMenuItem>
-                          )}
                           <DropdownMenuSeparator />
                           <DropdownMenuItem onClick={() => copiarEnlaceDeSala(room)}>
                             <Link2 className="mr-2 h-4 w-4" /> {t("cowork.host.copyParticipantLink")}
@@ -2502,17 +2512,8 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                         </div>
                       )}
                       <div className="ml-auto flex items-center gap-1.5">
-                        {puedeAvisar && (() => {
-                          const chatterId = participants[0]?.user_id ?? asignados[0]?.user_id ?? null;
-                          return (
-                            <AvisarDialog
-                              nombreChatter={chatterId ? nombreYApellido(cowork.profiles[chatterId]) : null}
-                              disabled={!chatterId}
-                              onAvisar={(slug) => { if (chatterId) void enviarAviso([chatterId], slug, room.id); }}
-                              t={t}
-                            />
-                          );
-                        })()}
+                        {/* Avisar vive ahora en el megáfono de la cabecera; aquí
+                            solo queda Entrar. */}
                         <Button
                           variant="ghost"
                           size="sm"
@@ -2840,7 +2841,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                     chatter): sin esto la operación quedaba coja fuera de la
                     computadora (Álvaro, 26/10). */}
                 {puedeAvisar && participants.length > 0 && (
-                  <Button variant="outline" className="mt-2 h-10 w-full gap-1.5 rounded-xl text-xs" onClick={() => setAvisarSala(room.id)}>
+                  <Button variant="outline" className="mt-2 h-10 w-full gap-1.5 rounded-xl text-xs text-violet-300 hover:text-violet-200" onClick={() => { const id = room.id; setSalaEnHoja(null); setAvisarSala(id); }}>
                     <Megaphone className="h-3.5 w-3.5" /> {t("cowork.avisar.trigger")}
                   </Button>
                 )}
@@ -2864,8 +2865,8 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
         </SheetContent>
       </Sheet>
 
-      {/* El AVISAR de los tres puntitos y de la hoja: UN diálogo controlado
-          para la sala elegida, con las situaciones y la voz Mario. */}
+      {/* El AVISAR: UN diálogo controlado para la sala elegida (lo abre el
+          megáfono de la tarjeta o de la hoja), con categorías y la voz Mario. */}
       {avisarSala && (() => {
         const room = cowork.rooms.find((r) => r.id === avisarSala);
         if (!room) return null;
@@ -2874,7 +2875,6 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
         return (
           <AvisarDialog
             nombreChatter={chatterId ? nombreYApellido(cowork.profiles[chatterId]) : null}
-            disabled={!chatterId}
             onAvisar={(slug) => { if (chatterId) void enviarAviso([chatterId], slug, room.id); }}
             t={t}
             open

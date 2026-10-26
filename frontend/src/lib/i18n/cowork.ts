@@ -677,6 +677,8 @@ export const cowork = {
   "cowork.avisar.dialogHint": { es: "Toca Enviar para avisarle. «Oír» reproduce la voz Mario.", en: "Tap Send to alert them. “Listen” plays the Mario voice." },
   "cowork.avisar.listen": { es: "Oír", en: "Listen" },
   "cowork.avisar.send": { es: "Enviar", en: "Send" },
+  "cowork.avisar.oirQue": { es: "la escuchas tú", en: "you hear it" },
+  "cowork.avisar.enviarQue": { es: "le llega al chatter", en: "sent to the chatter" },
   "cowork.avisar.sent": { es: "Aviso enviado", en: "Alert sent" },
   "cowork.avisar.sentAll": { es: "Aviso enviado a todos", en: "Alert sent to everyone" },
   "cowork.avisar.failed": { es: "No se pudo enviar el aviso", en: "Couldn't send the alert" },
