@@ -2233,7 +2233,13 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                     // UNA sola pantallita por tarjeta (la de arriba): el botón
                     // de swap de cada tile se apaga aquí (duplicado = feo).
                     conBotonDePantalla={false}
-                    verPantalla={!isMobile && verPantallaDe[room.id] ? true : undefined}
+                    // Controla la vista desde la pantallita de la cabecera, en
+                    // teléfono Y escritorio: por defecto la cámara; al tocarla
+                    // muestra la PANTALLA compartida en la propia tarjeta
+                    // (Álvaro, 26/10 — "que me deje ver la pantalla ahí en
+                    // chiquito, no que me lleve"). Explícito (no undefined) para
+                    // que el toque mande y no choque con el salto automático.
+                    verPantalla={!!verPantallaDe[room.id]}
                     hearOn={hearFor(room.id)}
                     broadcastOn={broadcastFor(room.id)}
                     micBaseTrack={micBaseTrack}
@@ -2307,26 +2313,27 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                           <Users2 className="h-3 w-3" />{participants.length}
                         </span>
                       )}
-                      {/* La pantallita SIEMPRE está, pero como SEÑAL discreta.
-                          En escritorio además alterna cámara ↔ pantalla en la
-                          miniatura; en el teléfono no es botón: tocar la tarjeta
-                          ya te mete con la persona (Álvaro, 26/10). */}
+                      {/* La pantallita: en teléfono Y escritorio, tocarla
+                          muestra la PANTALLA compartida de esa sala aquí mismo,
+                          en la miniatura (tócala otra vez y vuelve la cámara).
+                          NO te lleva a ningún lado — stopPropagation para que no
+                          dispare el toque de la tarjeta (Álvaro, 26/10). Verde
+                          solo como señal de que esa sala está compartiendo. */}
                       <button
                         type="button"
-                        tabIndex={isMobile ? -1 : undefined}
-                        onClick={isMobile ? undefined : (e) => { e.stopPropagation(); setVerPantallaDe((m) => ({ ...m, [room.id]: !m[room.id] })); }}
+                        onClick={(e) => { e.stopPropagation(); setVerPantallaDe((m) => ({ ...m, [room.id]: !m[room.id] })); }}
                         className={cn(
-                          "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-colors",
-                          alguienComparte ? "text-success" : "text-muted-foreground/50",
-                          isMobile ? "pointer-events-none" : "hover:bg-muted/60",
-                          !isMobile && verPantallaDe[room.id] && "bg-muted/70 text-foreground",
+                          "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-muted/60",
+                          verPantallaDe[room.id]
+                            ? "bg-muted/70 text-foreground"
+                            : alguienComparte ? "text-success" : "text-muted-foreground/50",
                         )}
-                        aria-label={!isMobile && verPantallaDe[room.id]
+                        aria-label={verPantallaDe[room.id]
                           ? t("cowork.monitor.viewCamera")
                           : alguienComparte
                             ? t("cowork.monitor.viewScreen")
                             : t("cowork.host.screen")}
-                        title={!isMobile && verPantallaDe[room.id]
+                        title={verPantallaDe[room.id]
                           ? t("cowork.monitor.viewCamera")
                           : alguienComparte
                             ? t("cowork.monitor.viewScreen")
