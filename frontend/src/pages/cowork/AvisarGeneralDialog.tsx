@@ -18,9 +18,9 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Megaphone, Users } from "lucide-react";
-import { GRUPOS_AVISO, situacionesDe } from "@/lib/coworkAvisos";
 import { anunciar } from "@/lib/anunciarVoz";
 import { cn } from "@/lib/utils";
+import SituacionesPorCategoria from "./SituacionesPorCategoria";
 import type { Traductor } from "./textosCowork";
 
 export interface ObjetivoAviso {
@@ -64,7 +64,7 @@ export default function AvisarGeneralDialog({ objetivos, onAvisar, t }: AvisarGe
     cn(
       "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
       activo
-        ? "border-amber-400 bg-amber-400/20 text-amber-700 dark:text-amber-200"
+        ? "border-violet-400/50 bg-violet-500/15 text-violet-200 [box-shadow:0_0_18px_-9px_hsl(263_80%_64%)]"
         : "border-border bg-muted/30 text-foreground hover:bg-muted/60",
     );
 
@@ -81,7 +81,7 @@ export default function AvisarGeneralDialog({ objetivos, onAvisar, t }: AvisarGe
           {t("cowork.avisar.trigger")}
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-md gap-3 max-h-[85dvh] overflow-y-auto">
+      <DialogContent className="max-w-xl gap-3 max-h-[85dvh] overflow-y-auto overflow-x-hidden bg-none">
         <DialogHeader className="text-left">
           <DialogTitle>{t("cowork.avisar.generalTitle")}</DialogTitle>
           <DialogDescription>{t("cowork.avisar.generalHint")}</DialogDescription>
@@ -99,7 +99,7 @@ export default function AvisarGeneralDialog({ objetivos, onAvisar, t }: AvisarGe
               <button key={o.uid} type="button" onClick={() => setSel(o.uid)} className={chip(sel === o.uid)}>
                 {o.nombre}
                 {o.esSupervisor && (
-                  <span className="text-[10px] uppercase text-amber-600 dark:text-amber-400">
+                  <span className="text-[10px] uppercase text-violet-500 dark:text-violet-300">
                     {t("cowork.avisar.supervisorTag")}
                   </span>
                 )}
@@ -108,46 +108,9 @@ export default function AvisarGeneralDialog({ objetivos, onAvisar, t }: AvisarGe
           </div>
         </div>
 
-        {/* Paso 2: la situación (apagada hasta elegir a quién) */}
-        <div className={cn("flex flex-col gap-4", !sel && "pointer-events-none opacity-40")}>
-          {GRUPOS_AVISO.map(({ grupo, titulo }) => {
-            const items = situacionesDe(grupo);
-            if (!items.length) return null;
-            return (
-              <section key={grupo} className="flex flex-col gap-1.5">
-                <h3 className="text-[11px] font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400">
-                  {t(titulo)}
-                </h3>
-                {items.map((s) => (
-                  <div
-                    key={s.slug}
-                    className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2"
-                  >
-                    <span className="min-w-0 flex-1 text-sm leading-snug">{t(s.etiqueta)}</span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 shrink-0 px-2.5 text-xs text-muted-foreground hover:text-foreground"
-                      onClick={() => { void anunciar(s.vozEs); }}
-                    >
-                      {t("cowork.avisar.listen")}
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      disabled={!sel}
-                      className="h-7 shrink-0 bg-amber-500 px-3 text-xs font-semibold text-white hover:bg-amber-500/90"
-                      onClick={() => enviar(s.slug, s.vozEs)}
-                    >
-                      {t("cowork.avisar.send")}
-                    </Button>
-                  </div>
-                ))}
-              </section>
-            );
-          })}
-        </div>
+        {/* Paso 2: la situación (apagada hasta elegir a quién). Mismo cuerpo que
+            el Avisar por sala — por categoría, con Oír y Enviar delicados. */}
+        <SituacionesPorCategoria t={t} disabled={!sel} onEnviar={enviar} />
       </DialogContent>
     </Dialog>
   );
