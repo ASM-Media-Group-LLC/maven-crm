@@ -226,7 +226,9 @@ describe("Cowork · tablero del supervisor en inglés", () => {
     expect(enEspanol(document.body)).toEqual([]);
     // Los estados que cambian el texto, dichos en inglés.
     expect(screen.getByText("No participants")).toBeTruthy();                     // Room 3
-    expect(screen.getAllByText("In group meet").length).toBeGreaterThan(0);        // Room 2, toda en el meet
+    // Room 2, toda en el meet: con el diseño v5 (26/10) ya no hay panel que
+    // tape el video — el estado va en la línea de abajo: «Group meet · mm:ss».
+    expect(screen.getAllByText(/^Group meet · \d+:\d{2}$/).length).toBeGreaterThan(0);
     expect(screen.getByText(/^Laura Gomez · Break −/)).toBeTruthy();               // chip de la pausa pasada
     expect(screen.getByText(/^Mateo Ruiz · No face · /)).toBeTruthy();             // chip de encuadre
     expect(screen.getByText(/^Mateo Ruiz · No screen · /)).toBeTruthy();           // chip de pantalla

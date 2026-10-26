@@ -39,13 +39,13 @@ import { relojDesdePresencia, segundosMostrados, formatoReloj } from "@/lib/cowo
 import { personasEnSala, relojDeRespaldo, latidoFresco, sinConexionConLaSala } from "@/lib/coworkOcupacion";
 import { cuentaComoTrabajo } from "@/lib/coworkTiempoRegla";
 import { useRelojDeSala } from "@/hooks/useRelojDeSala";
-import SalaEnPausa, { type PausaDeSala } from "./SalaEnPausa";
+import { type PausaDeSala } from "./SalaEnPausa";
 import AvisarDialog from "./AvisarDialog";
 import AvisarGeneralDialog, { type ObjetivoAviso } from "./AvisarGeneralDialog";
 import AvisoChatter from "./AvisoChatter";
 import { useRecepcionAvisos } from "./useRecepcionAvisos";
 import { AVISADORES } from "@/lib/coworkAvisos";
-import { cuentaPausa, clasesPausa, nombreYApellido } from "@/lib/pausaCowork";
+import { cuentaPausa, clasesPausa, nombreYApellido, nombreCorto } from "@/lib/pausaCowork";
 import { normalizarReglas, reglaDeEstado, sonEstandar, type ReglaAviso } from "@/lib/coworkReglas";
 import { armarCadenaNC, loadNCPreference, type CadenaNC } from "@/lib/noise-suppression-processor";
 import CoworkReglasDialog from "./CoworkReglasDialog";
@@ -500,9 +500,10 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       cuenta,
     };
   };
-  // Si TODOS los que están en la sala marcaron pausa, la miniatura se apaga y
-  // muestra el panel de pausa (mock aprobado por Jhon, 08/09). Con una sola
-  // persona por sala —el caso normal— es "esa persona está en pausa".
+  // Si TODOS los que están en la sala marcaron pausa, la tarjeta entra en
+  // "pausa": el video sigue apenas atenuado y el estado va en la línea de
+  // abajo de la miniatura (diseño v5, Álvaro 26/10). Con una sola persona por
+  // sala —el caso normal— es "esa persona está en pausa".
   /** Si la persona está en un meet grupal ahora: cuál y desde cuándo (epoch ms). */
   const meetDe = (uid: string): { meetId: string; desde: number } | null => {
     for (const m of cowork.meets) {
@@ -1459,10 +1460,12 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     }
     return out;
   };
+  // Chips sobrios (diseño v5, Álvaro 26/10): fondo oscuro uniforme y el color
+  // va en el TEXTO — ámbar avisa, rojo exige, lo neutro no compite.
   const TONO_ETIQUETA: Record<Etiqueta["tono"], string> = {
-    warning: "bg-warning text-warning-foreground",
-    destructive: "bg-destructive text-destructive-foreground animate-pulse motion-reduce:animate-none",
-    muted: "bg-black/60 text-white",
+    warning: "border border-warning/35 bg-black/55 text-warning",
+    destructive: "border border-destructive/40 bg-black/55 text-destructive animate-pulse motion-reduce:animate-none",
+    muted: "border border-white/10 bg-black/55 text-white/75",
   };
 
   /** La gente de una sala con su reloj de Cowork (el mismo número que ve la
@@ -2153,15 +2156,9 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
             </div>
             {/* La grilla se llena sola: en un monitor grande entran cinco o
                 seis salas por fila y todas quedan a la vista; en una ventana
-                angosta bajan a dos; en el teléfono son dos miniaturas por fila. */}
-            <div className={cn(
-              // Teléfono: lista compacta, una fila por sala (decisión de Álvaro,
-              // 26/10 — los avatares gigantes se veían clunky). Escritorio: la
-              // grilla de tarjetas de siempre.
-              isMobile
-                ? "flex flex-col gap-2"
-                : "grid grid-cols-2 gap-2 md:gap-4 md:grid-cols-[repeat(auto-fill,minmax(300px,1fr))] 2xl:grid-cols-[repeat(auto-fill,minmax(360px,1fr))]",
-            )}>
+                angosta bajan a dos; en el teléfono son dos miniaturas por fila
+                CON su video (diseño v5 aprobado por Álvaro, 26/10). */}
+            <div className="grid grid-cols-2 gap-2 md:gap-4 md:grid-cols-[repeat(auto-fill,minmax(300px,1fr))] 2xl:grid-cols-[repeat(auto-fill,minmax(360px,1fr))]">
               {/* Meets grupales abiertos: una tarjeta cada uno, antes de las salas,
                   con su gente y el tiempo. Cualquier supervisor puede entrar; el
                   que lo invocó lo termina al colgar. */}
@@ -2176,7 +2173,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                       type="button"
                       disabled={dentro}
                       onClick={() => entrarAlMeet(meet)}
-                      className="flex w-full items-center gap-3 rounded-2xl border border-primary/40 bg-primary/5 px-3 py-2.5 text-left transition-colors active:bg-primary/10 disabled:opacity-60"
+                      className="col-span-2 flex w-full items-center gap-3 rounded-2xl border border-primary/40 bg-primary/5 px-3 py-2.5 text-left transition-colors active:bg-primary/10 disabled:opacity-60"
                     >
                       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary"><Video className="h-4 w-4" /></span>
                       <div className="min-w-0 flex-1">
@@ -2232,88 +2229,33 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                     camBaseTrack={camBaseTrack}
                     screenOn={screenFor(room.id)}
                     screenBaseTrack={screenBaseTrack}
-                    enabled={activeRoomId !== room.id && !(isMobile && salaEnHoja === room.id)}
+                    // Apagado también cuando SU hoja está abierta, sin mirar
+                    // isMobile: si el viewport cruza el breakpoint con la hoja
+                    // abierta, dos monitores de la misma sala comparten
+                    // identidad en LiveKit y uno patea al otro.
+                    enabled={activeRoomId !== room.id && salaEnHoja !== room.id}
                     onSharersChange={manejadores.sharers}
                     onSpeakingChange={manejadores.speaking}
                     onParticipantsChange={manejadores.participants}
                   />
                 );
 
-                // ── TELÉFONO: una fila limpia por sala ──────────────────────
-                // Avatar chico, nombre de la sala, quién está y su tiempo; las
-                // pausas/problemas se resaltan en color y lo normal va apagado.
-                // Sin decodificar video ni conectar audio por sala (liviano, no
-                // se traba); al tocar una fila se abre su hoja con el video.
-                if (isMobile) {
-                  const vacia = participants.length === 0;
-                  const principal = personas[0];
-                  const alguienComparte = participants.some((a) => mediaStates[a.user_id]?.screenShareOn);
-                  const pausaMmSs = pausaSala
-                    ? `${Math.floor(pausaSala.segundos / 60)}:${String(pausaSala.segundos % 60).padStart(2, "0")}`
-                    : null;
-                  const pausaTxt = pausaSala
-                    ? pausaSala.kind === "bano"
-                      ? t("cowork.pause.bano")
-                      : pausaSala.kind === "almuerzo"
-                        ? t("cowork.pause.almuerzo")
-                        : pausaSala.kind === "meet"
-                          ? t("cowork.meet.title")
-                          : t("cowork.pause.break")
-                    : null;
-                  return (
-                    <button
-                      key={room.id}
-                      data-sala={room.id}
-                      type="button"
-                      onClick={() => setSalaEnHoja(room.id)}
-                      className={cn(
-                        "flex w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition-colors active:bg-muted/50",
-                        vacia
-                          ? "border-border/50 bg-card/40 opacity-55"
-                          : pausaSala?.excedida
-                            ? "border-destructive/50 bg-destructive/10"
-                            : pausaSala
-                              ? "border-warning/50 bg-warning/10"
-                              : speakers.length
-                                ? "border-success/60 bg-success/5"
-                                : "border-border bg-card",
-                      )}
-                    >
-                      {vacia || !principal ? (
-                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted/40 text-muted-foreground/50">
-                          <Users2 className="h-4 w-4" />
-                        </span>
-                      ) : (
-                        <div className="relative shrink-0">
-                          <UserAvatar name={cowork.profiles[principal.uid]} src={cowork.avatares[principal.uid]?.src} seed={cowork.avatares[principal.uid]?.seed} size="md" status={principal.online ? "online" : "away"} />
-                          {participants.length > 1 && (
-                            <span className="absolute -bottom-1 -right-1 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold text-primary-foreground ring-2 ring-card">+{participants.length - 1}</span>
-                          )}
-                        </div>
-                      )}
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5">
-                          <span className="truncate font-display text-sm font-semibold text-foreground">{tituloBonito(room.name)}</span>
-                          {alguienComparte && <Monitor className="h-3.5 w-3.5 shrink-0 text-primary" title={t("cowork.host.screen")} />}
-                        </div>
-                        <span className="block truncate text-xs text-muted-foreground">
-                          {vacia ? t("cowork.host.noParticipants") : personas.map((p) => p.nombre).join(", ")}
-                        </span>
-                      </div>
-                      {pausaSala ? (
-                        <span className={cn(
-                          "shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold tabular-nums",
-                          pausaSala.excedida ? "bg-destructive text-destructive-foreground" : "bg-warning text-warning-foreground",
-                        )}>
-                          {pausaTxt} · {pausaMmSs}
-                        </span>
-                      ) : !vacia && principal?.reloj ? (
-                        <span className="shrink-0 font-mono text-xs tabular-nums text-success">{principal.reloj}</span>
-                      ) : null}
-                      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/40" />
-                    </button>
-                  );
-                }
+                const alguienComparte = participants.some((a) => mediaStates[a.user_id]?.screenShareOn);
+                // Si la sala pidió NO mostrar video en el tablero («Mostrar
+                // video en vivo» apagado), eso se respeta TAMBIÉN en pausa.
+                const modoVideo = (room.preview_mode ?? "video") === "video";
+                // La cuenta de la pausa para la línea de abajo de la tarjeta
+                // (v5): regresiva, la MISMA que ve la persona en su pantalla.
+                const cuentaSala = pausaSala ? cuentaPausa(pausaSala.segundos, pausaSala.limiteMin, pausaSala.consumidoSeg) : null;
+                const pausaTxt = pausaSala
+                  ? pausaSala.kind === "bano"
+                    ? t("cowork.pause.bano")
+                    : pausaSala.kind === "almuerzo"
+                      ? t("cowork.pause.almuerzo")
+                      : pausaSala.kind === "meet"
+                        ? t("cowork.meet.title")
+                        : t("cowork.pause.break")
+                  : null;
 
                 return (
                   <div
@@ -2325,7 +2267,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                     // Un toque sobre un botón de adentro (el de ver la pantalla
                     // compartida) hace lo suyo y no abre nada.
                     onClick={isMobile ? (e) => { if ((e.target as HTMLElement).closest("button")) return; setSalaEnHoja(room.id); } : undefined}
-                    onKeyDown={isMobile ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setSalaEnHoja(room.id); } } : undefined}
+                    onKeyDown={isMobile ? (e) => { if ((e.target as HTMLElement).closest("button")) return; if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setSalaEnHoja(room.id); } } : undefined}
                     className={cn(
                       // card-estudio: la misma elevación de set que los tiles de la
                       // llamada (sombra honda + filo de luz), conservando bg-card y
@@ -2336,6 +2278,8 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                       // y ya no colorea el borde; lo anormal (no compartir) sale
                       // como etiqueta sobre el video.
                       speakers.length ? "card-estudio--viva border-success" : "border-border",
+                      // Vacía: borde punteado y apagada (v5) — se distingue sin gritar.
+                      participants.length === 0 && "border-dashed opacity-80",
                       isMobile && "cursor-pointer active:bg-muted/40",
                     )}
                   >
@@ -2362,15 +2306,15 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                               asignados: una sala vacía de verdad no gasta conexión. */}
                           {asignados.length > 0 && monitor(false)}
                         </>
-                      ) : pausaSala ? (
-                        <>
-                          {/* En pausa la miniatura se apaga (mock aprobado el 08/09).
-                              El monitor sigue conectado SOLO para el audio. */}
-                          <SalaEnPausa pausa={pausaSala} nombres={participants.map((a) => nombreYApellido(cowork.profiles[a.user_id]))} className="h-full w-full rounded-none border-0" />
-                          {monitor(false)}
-                        </>
-                      ) : ((room.preview_mode ?? "video") === "avatars" || isMobile) ? (
-                        <>
+                      ) : pausaSala && modoVideo ? (
+                        // En pausa el video SIGUE, apenas atenuado (diseño v5,
+                        // Álvaro 26/10): nada encimado en el centro — el estado
+                        // va en la línea de abajo, donde iba el reloj.
+                        <div className="h-full w-full [filter:saturate(.5)_brightness(.55)]">{monitor(true)}</div>
+                      ) : !modoVideo ? (
+                        // Modo avatares (con o sin pausa): NUNCA video; en pausa
+                        // los avatares se atenúan igual que el video.
+                        <div className={cn("h-full w-full", pausaSala && "[filter:saturate(.5)_brightness(.55)]")}>
                           <div className="flex h-full flex-wrap items-center justify-center gap-4 p-3">
                             {participants.map((a) => {
                               const ms = mediaStates[a.user_id];
@@ -2391,17 +2335,51 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                           </div>
                           {/* En modo avatares el monitor sigue conectado SOLO para el audio (sin video). */}
                           {monitor(false)}
-                        </>
+                        </div>
                       ) : (
                         monitor(true)
                       )}
 
                       {/* Overlay superior: nombre de la sala + conteo (izq) y el
                           menú ⋯ (der), flotando sobre el video. */}
-                      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-center gap-2 bg-gradient-to-b from-black/60 to-transparent px-3 py-2">
-                        <span className="min-w-0 flex-1 truncate font-display text-sm font-semibold text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.5)]">{tituloBonito(room.name)}</span>
-                        <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-white/15 bg-black/45 px-2 py-0.5 text-[11px] tabular-nums text-white backdrop-blur-sm" title={t("cowork.host.inRoomCount", { n: participants.length })}>
-                          <Users2 className="h-3 w-3" />{participants.length}
+                      <div className={cn(
+                        "pointer-events-none absolute inset-x-0 top-0 z-10 flex items-center gap-1.5 px-3 py-2",
+                        participants.length > 0 && "bg-gradient-to-b from-black/45 to-transparent",
+                      )}>
+                        {/* Una sola letra en toda la tarjeta (v5): sin font-display
+                            ni mono — la jerarquía la dan el grosor y el tamaño.
+                            En la tarjeta vacía no hay video debajo: texto del
+                            tema, no blanco fijo (ilegible en tema claro). */}
+                        <span className={cn(
+                          "min-w-0 flex-1 truncate text-[13px] font-semibold",
+                          participants.length > 0 ? "text-white/90 [text-shadow:0_1px_2px_rgba(0,0,0,0.5)]" : "text-muted-foreground",
+                        )}>{tituloBonito(room.name)}</span>
+                        {/* El conteo solo cuando hay MÁS de una persona: el «1»
+                            en cada tarjeta era ruido (Álvaro, 26/10). */}
+                        {participants.length > 1 && (
+                          <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-white/10 bg-black/40 px-2 py-0.5 text-[11px] tabular-nums text-white/85 backdrop-blur-sm" title={t("cowork.host.inRoomCount", { n: participants.length })}>
+                            <Users2 className="h-3 w-3" />{participants.length}
+                          </span>
+                        )}
+                        {/* La pantallita SIEMPRE está (no negociable — Álvaro,
+                            26/10): gris neutro de base, y verde suave cuando esa
+                            sala está compartiendo. */}
+                        <span
+                          className={cn(
+                            // pointer-events-auto: sin esto el title jamás se
+                            // mostraba (el overlay entero es pointer-events-none).
+                            "pointer-events-auto inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border backdrop-blur-sm",
+                            alguienComparte
+                              ? "border-success/40 bg-success/20 text-success"
+                              : participants.length > 0
+                                ? "border-white/10 bg-black/35 text-white/60"
+                                : "border-border bg-muted/40 text-muted-foreground/70",
+                          )}
+                          role="img"
+                          aria-label={alguienComparte ? t("cowork.host.sharingScreen") : t("cowork.host.screen")}
+                          title={alguienComparte ? t("cowork.host.sharingScreen") : t("cowork.host.screen")}
+                        >
+                          <Monitor className="h-3.5 w-3.5" />
                         </span>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -2448,22 +2426,24 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                         </div>
                       )}
 
-                      {personas.length === 1 && !pausaSala && (room.preview_mode ?? "video") === "video" && (
-                        <div className="pointer-events-none absolute bottom-2.5 left-2.5 right-2.5 z-10 flex flex-wrap items-end gap-1">
-                          {personas.map((p) => (
-                            <span key={p.uid} className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-white/10 bg-[hsl(var(--background)/0.74)] px-2.5 py-1.5 text-xs text-white shadow-[0_6px_18px_-8px_rgba(0,0,0,0.6)] backdrop-blur-sm">
-                              <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", p.online ? "bg-success" : "bg-white/40")} />
-                              {/* El reloj va SIEMPRE al lado del nombre, también en el teléfono
-                                  (Jhon, 10/09). Si el nombre es largo, cede él: min-w-0 deja que
-                                  se corte con puntos y el reloj no se sale de la miniatura. */}
-                              <span className="min-w-0 truncate">{p.nombre}</span>
-                              {p.reloj && (
-                                <span className={cn("shrink-0 font-mono tabular-nums", p.corre ? "text-success" : "text-white/60")} title={p.corre ? t("cowork.host.clockRunning") : t("cowork.host.clockStopped", { reason: p.motivo ?? "—" })}>
-                                  {p.reloj}
-                                </span>
-                              )}
+                      {/* Línea de abajo (v5): nombre corto y reloj en gris
+                          discreto sobre un degradado suave — sin cajitas. En
+                          pausa, el estado toma el lugar del reloj: «Baño · 2:33»
+                          en ámbar, y en rojo si ya se pasó. */}
+                      {(pausaSala || (personas.length === 1 && modoVideo)) && participants.length > 0 && (
+                        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex items-baseline gap-2 bg-gradient-to-t from-black/60 to-transparent px-3 pb-2 pt-6">
+                          <span className="min-w-0 truncate text-xs text-white/90 [text-shadow:0_1px_2px_rgba(0,0,0,0.5)]">
+                            {personas.map((p) => nombreCorto(p.nombre)).join(", ")}
+                          </span>
+                          {pausaSala && cuentaSala ? (
+                            <span className={cn("ml-auto shrink-0 text-[11px] font-medium tabular-nums [text-shadow:0_1px_2px_rgba(0,0,0,0.5)]", pausaSala.excedida ? "text-destructive" : "text-warning")}>
+                              {pausaTxt} · {cuentaSala.texto}
                             </span>
-                          ))}
+                          ) : personas[0]?.reloj ? (
+                            <span className="ml-auto shrink-0 text-[11px] tabular-nums text-white/55" title={personas[0].corre ? t("cowork.host.clockRunning") : t("cowork.host.clockStopped", { reason: personas[0].motivo ?? "—" })}>
+                              {personas[0].reloj}
+                            </span>
+                          ) : null}
                         </div>
                       )}
 
@@ -2477,9 +2457,9 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                         {personas.map((p) => (
                           <li key={p.uid} className="flex items-center gap-1.5 py-1 text-[11px]">
                             <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", p.online ? "bg-success" : "bg-muted-foreground/40")} />
-                            <span className="min-w-0 flex-1 truncate text-foreground/90">{p.nombre}</span>
+                            <span className="min-w-0 flex-1 truncate text-foreground/90">{nombreCorto(p.nombre)}</span>
                             {p.reloj && (
-                              <span className={cn("shrink-0 font-mono tabular-nums", p.corre ? "text-success" : "text-muted-foreground")} title={p.corre ? t("cowork.host.clockRunning") : t("cowork.host.clockStopped", { reason: p.motivo ?? "—" })}>
+                              <span className="shrink-0 tabular-nums text-muted-foreground" title={p.corre ? t("cowork.host.clockRunning") : t("cowork.host.clockStopped", { reason: p.motivo ?? "—" })}>
                                 {p.reloj}
                               </span>
                             )}
@@ -2779,8 +2759,9 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                     vez) para no decodificar video de todo el grid en el teléfono.
                     El monitor salta solo a la pantalla compartida y trae el botón
                     para volver a la cámara (CoworkRoomMonitor, modo móvil). */}
-                {participants.length > 0 && !pausaSala && (
-                  <div className="mt-3 aspect-video overflow-hidden rounded-xl bg-black">
+                {participants.length > 0 && (
+                  // En pausa el video también se ve aquí, apenas atenuado (v5).
+                  <div className={cn("mt-3 aspect-video overflow-hidden rounded-xl bg-black", pausaSala && "[filter:saturate(.5)_brightness(.55)]")}>
                     <CoworkRoomMonitor
                       roomId={room.id}
                       roomName={room.name}
@@ -2808,7 +2789,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                           {p.motivo && <span className="block truncate text-xs text-muted-foreground">{t("cowork.host.clockStopped", { reason: p.motivo })}</span>}
                         </span>
                         {p.reloj && (
-                          <span className={cn("shrink-0 font-mono text-xs tabular-nums", p.corre ? "text-success" : "text-muted-foreground")}>
+                          <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
                             {p.reloj}
                           </span>
                         )}

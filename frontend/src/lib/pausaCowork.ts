@@ -88,6 +88,17 @@ export function nombreYApellido(completo: string | null | undefined): string {
   return `${partes[0]} ${partes[partes.length - 1]}`;
 }
 
+/** Nombre CORTO para las miniaturas: primer nombre + inicial del apellido con
+ *  punto («Juan V.»). Decisión de Álvaro (26/10): el nombre completo llenaba
+ *  la tarjeta. Donde identificar de verdad importa (avisos, hoja de la sala),
+ *  se sigue usando nombreYApellido. */
+export function nombreCorto(completo: string | null | undefined): string {
+  const partes = (completo ?? "").trim().split(/\s+/).filter(Boolean);
+  if (!partes.length) return "Alguien";
+  if (partes.length === 1) return partes[0];
+  return `${partes[0]} ${partes[partes.length - 1][0].toUpperCase()}.`;
+}
+
 // ── La voz que avisa que se acabó la pausa ──────────────────────────────────
 //
 // Quien está en pausa está LEJOS DE LA PANTALLA — es el sentido de la pausa —

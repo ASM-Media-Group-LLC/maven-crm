@@ -4,6 +4,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { Room, RoomEvent, Track } from "livekit-client";
 import { copiaSirve } from "@/lib/microDelSupervisor";
+import { nombreCorto } from "@/lib/pausaCowork";
 import { VideoOff, Loader2, Monitor, Video, Copy } from "lucide-react";
 import { esOtraPestana } from "@/lib/sesionDuplicada";
 import { toast } from "sonner";
@@ -116,8 +117,10 @@ function MonitorTile({ pv, viewingScreen, onSwap, showName = true }: { pv: PartV
         {viewingScreen ? <Video className="h-3.5 w-3.5 tactil:h-4 tactil:w-4" /> : <Monitor className="h-3.5 w-3.5 tactil:h-4 tactil:w-4" />}
       </button>
       {showName && (pv.name || viewingScreen) && (
-        <span className="absolute bottom-1 left-1 max-w-[85%] truncate rounded bg-black/50 px-1.5 py-0.5 text-[9px] tactil:text-[11px] text-white/90">
-          {pv.name}{viewingScreen ? ` · ${t("cowork.monitor.screenSuffix")}` : ""}
+        // Nombre corto y letra apagada (diseño v5, Álvaro 26/10): la chapita
+        // informa sin tapar el video ni gritar en blanco puro.
+        <span className="absolute bottom-1 left-1 max-w-[85%] truncate rounded bg-black/45 px-1.5 py-0.5 text-[9px] tactil:text-[11px] text-white/85">
+          {nombreCorto(pv.name)}{viewingScreen ? ` · ${t("cowork.monitor.screenSuffix")}` : ""}
         </span>
       )}
     </div>
