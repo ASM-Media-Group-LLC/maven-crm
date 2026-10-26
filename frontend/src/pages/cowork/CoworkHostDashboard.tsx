@@ -1575,6 +1575,12 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     return { room, asignados, participants, pausaSala };
   });
 
+  // Barrita de consola (el aire del "cuadrito" del homepage, Álvaro 26/10):
+  // cuánta gente hay en salas, cuántas con conversación, y el reloj de pared.
+  const enSalas = fichas.reduce((n, f) => n + f.participants.length, 0);
+  const salasHablando = fichas.reduce((n, f) => n + ((roomSpeakers[f.room.id]?.length ?? 0) > 0 ? 1 : 0), 0);
+  const relojPared = new Date(now).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+
   return (
     <div className="flex flex-1 min-h-0 bg-background text-foreground relative md:flex-row-reverse">
       {/* En escritorio el panel lateral va a la DERECHA (Jhon, 10/09); el orden del
@@ -2071,6 +2077,26 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
           </div>
         ) : (
           <div className="call-ambiente flex-1 overflow-y-auto overflow-x-hidden p-3 pt-14 pb-28 md:p-6 md:pb-32">
+            {/* Barrita de consola, como el cuadrito del homepage: semáforo,
+                «en vivo» latiendo, el conteo y el reloj de pared. Mismo look en
+                teléfono y computadora. */}
+            <div className="mb-3 flex items-center gap-2.5 rounded-xl border border-border/70 bg-card/50 px-3.5 py-2 [box-shadow:inset_0_1px_0_hsl(0_0%_100%/.05)]">
+              <span className="flex shrink-0 items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-destructive/70" />
+                <span className="h-2 w-2 rounded-full bg-warning/70" />
+                <span className="h-2 w-2 rounded-full bg-success/70" />
+              </span>
+              <span className="font-mono text-xs tracking-wide text-muted-foreground">cowork</span>
+              <span className="inline-flex shrink-0 items-center gap-1.5 font-mono text-[11px] text-success">
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-60 motion-reduce:animate-none" />
+                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-success" />
+                </span>
+                {t("cowork.host.consola.live")}
+              </span>
+              <span className="hidden min-w-0 truncate font-mono text-[11px] text-muted-foreground/70 sm:inline">{t("cowork.host.consola.estado", { n: enSalas, m: salasHablando })}</span>
+              <span className="ml-auto shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground/60">{relojPared}</span>
+            </div>
             <div className="mb-4 flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
               <div className="min-w-0">
                 <h2 className="font-display text-lg font-semibold leading-tight text-foreground">{t("cowork.create.rooms")}</h2>

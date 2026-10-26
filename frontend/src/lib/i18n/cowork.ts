@@ -679,6 +679,8 @@ export const cowork = {
   "cowork.avisar.send": { es: "Enviar", en: "Send" },
   "cowork.avisar.oirQue": { es: "la escuchas tú", en: "you hear it" },
   "cowork.avisar.enviarQue": { es: "le llega al chatter", en: "sent to the chatter" },
+  "cowork.host.consola.live": { es: "en vivo", en: "live" },
+  "cowork.host.consola.estado": { es: "{n} en salas · {m} hablando", en: "{n} in rooms · {m} talking" },
   "cowork.avisar.sent": { es: "Aviso enviado", en: "Alert sent" },
   "cowork.avisar.sentAll": { es: "Aviso enviado a todos", en: "Alert sent to everyone" },
   "cowork.avisar.failed": { es: "No se pudo enviar el aviso", en: "Couldn't send the alert" },
