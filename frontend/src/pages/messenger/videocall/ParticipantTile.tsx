@@ -340,7 +340,7 @@ const ParticipantTile = memo(function ParticipantTile({
       )}
     >
       {participant.isScreenSharing && showVideo && (
-        <div className="absolute bottom-2 right-2 z-20 flex items-center gap-1 rounded-full bg-black/60 px-1.5 py-1 backdrop-blur-sm opacity-0 hover:opacity-100 focus-within:opacity-100 group-hover:opacity-100 transition-opacity">
+        <div className="absolute bottom-2 right-2 z-20 flex items-center gap-1 rounded-full bg-black/60 px-1.5 py-1 backdrop-blur-sm opacity-0 hover:opacity-100 focus-within:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity">
           <button
             type="button"
             onClick={zoom.zoomOut}

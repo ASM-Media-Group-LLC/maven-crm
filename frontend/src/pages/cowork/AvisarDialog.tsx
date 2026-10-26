@@ -37,7 +37,7 @@ export default function AvisarDialog({ nombreChatter, disabled, onAvisar, t }: A
           variant="ghost"
           size="sm"
           disabled={disabled}
-          className="h-8 rounded-lg border border-amber-400/50 bg-amber-400/10 px-3 text-xs font-semibold text-amber-700 hover:bg-amber-400/20 hover:text-amber-700 dark:text-amber-300 dark:hover:text-amber-200"
+          className="h-8 rounded-lg border border-border bg-muted/40 px-3 text-xs font-semibold text-foreground hover:bg-muted/70 hover:text-foreground"
         >
           {t("cowork.avisar.trigger")}
           <ChevronDown className="ml-1 h-3.5 w-3.5" aria-hidden="true" />

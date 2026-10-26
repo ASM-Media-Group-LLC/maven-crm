@@ -75,7 +75,7 @@ export default function AvisarGeneralDialog({ objetivos, onAvisar, t }: AvisarGe
           variant="ghost"
           size="sm"
           disabled={objetivos.length === 0}
-          className="h-7 w-full rounded-full border border-amber-400/50 bg-amber-400/10 px-2.5 text-[11px] font-semibold text-amber-700 hover:bg-amber-400/20 hover:text-amber-700 dark:text-amber-300 dark:hover:text-amber-200"
+          className="h-7 w-full rounded-full border border-border bg-muted/40 px-2.5 text-[11px] font-semibold text-foreground hover:bg-muted/70 hover:text-foreground"
         >
           <Megaphone className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
           {t("cowork.avisar.trigger")}
