@@ -15,7 +15,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { UserAvatar } from "@/components/UserAvatar";
-import { HRPageHeader } from "@/components/hr/HRPageHeader";
+import { Page } from "@/components/ui/page";
+import { PageHeader } from "@/components/ui/page-header";
 import { HRMetricCard } from "@/components/hr/HRMetricCard";
 import { useMonitorEventos, urlCaptura, type MonitorEvento } from "@/hooks/useMonitorEventos";
 import { useMonitorConfig } from "@/hooks/useMonitorConfig";
@@ -160,41 +161,40 @@ export default function HRMonitorIA() {
   const monitorOff = config ? !config.activo : false;
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="shrink-0 border-b border-border bg-background px-6 py-4">
-        <HRPageHeader
-          title={t("hr.monia.title")}
-          subtitle={t("hr.monia.subtitle")}
-          actions={
-            <>
-              <Badge
-                variant="outline"
-                className={`gap-1.5 px-3 py-1.5 text-xs font-medium ${monitorOff ? "border-warning/50 bg-warning/10 text-warning" : "border-success/50 bg-success/10 text-success"}`}
-              >
-                <Eye className="h-3 w-3" />
-                {monitorOff ? t("hr.monia.apagado") : t("hr.monia.activo")}
-              </Badge>
-              <Button variant="outline" size="sm" onClick={() => refrescar()}>
-                <RefreshCw className="mr-1.5 h-4 w-4" />
-                {t("hr.monia.refrescar")}
-              </Button>
-            </>
-          }
-        />
+    <Page>
+      <PageHeader
+        title={t("hr.monia.title")}
+        subtitle={t("hr.monia.subtitle")}
+        icon={<Eye className="h-5 w-5" />}
+        actions={
+          <>
+            <Badge
+              variant="outline"
+              className={`gap-1.5 px-3 py-1.5 text-xs font-medium ${monitorOff ? "border-warning/50 bg-warning/10 text-warning" : "border-success/50 bg-success/10 text-success"}`}
+            >
+              <Eye className="h-3 w-3" />
+              {monitorOff ? t("hr.monia.apagado") : t("hr.monia.activo")}
+            </Badge>
+            <Button variant="outline" size="sm" onClick={() => refrescar()}>
+              <RefreshCw className="mr-1.5 h-4 w-4" />
+              {t("hr.monia.refrescar")}
+            </Button>
+          </>
+        }
+      />
 
-        <div className="mb-5 grid grid-cols-2 gap-4 md:grid-cols-4">
-          <HRMetricCard title={t("hr.monia.kpi.hoy")} value={hoy.length} icon={AlertTriangle} color={hoy.length > 0 ? "warning" : "default"} subtitle={t("hr.monia.kpi.hoySub")} />
-          <HRMetricCard title={t("hr.monia.kpi.personas")} value={personas} icon={Users} color="primary" subtitle={t("hr.monia.kpi.personasSub")} />
-          <HRMetricCard title={t("hr.monia.kpi.celular")} value={enCel} icon={Smartphone} color={enCel > 0 ? "destructive" : "default"} subtitle={t("hr.monia.kpi.celularSub")} />
-          <HRMetricCard title={t("hr.monia.kpi.camOff")} value={camOff} icon={VideoOff} color={camOff > 0 ? "warning" : "default"} subtitle={t("hr.monia.kpi.camOffSub")} />
-        </div>
-
-        {isAdmin && <PanelAjustes t={t} />}
+      <div className="mt-5 grid grid-cols-2 gap-4 md:grid-cols-4">
+        <HRMetricCard title={t("hr.monia.kpi.hoy")} value={hoy.length} icon={AlertTriangle} color={hoy.length > 0 ? "warning" : "default"} subtitle={t("hr.monia.kpi.hoySub")} />
+        <HRMetricCard title={t("hr.monia.kpi.personas")} value={personas} icon={Users} color="primary" subtitle={t("hr.monia.kpi.personasSub")} />
+        <HRMetricCard title={t("hr.monia.kpi.celular")} value={enCel} icon={Smartphone} color={enCel > 0 ? "destructive" : "default"} subtitle={t("hr.monia.kpi.celularSub")} />
+        <HRMetricCard title={t("hr.monia.kpi.camOff")} value={camOff} icon={VideoOff} color={camOff > 0 ? "warning" : "default"} subtitle={t("hr.monia.kpi.camOffSub")} />
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+      {isAdmin && <div className="mt-4"><PanelAjustes t={t} /></div>}
+
+      <div className="mt-5">
         {error && eventos.length === 0 ? (
-          <div className="mx-auto mt-10 max-w-md rounded-2xl border border-destructive/40 bg-destructive/5 p-6 text-center">
+          <div className="mx-auto mt-6 max-w-md rounded-card border border-destructive/40 bg-destructive/5 p-6 text-center">
             <AlertTriangle className="mx-auto mb-3 h-8 w-8 text-destructive" />
             <p className="text-sm text-foreground">{t("hr.monia.error")}</p>
             <Button variant="outline" size="sm" className="mt-4" onClick={() => refrescar()}>
@@ -211,11 +211,11 @@ export default function HRMonitorIA() {
             <p className="text-sm">{t("hr.monia.vacio")}</p>
           </div>
         ) : (
-          <div className="mx-auto flex max-w-3xl flex-col gap-2">
+          <div className="flex flex-col gap-2">
             {eventos.map((e) => <FilaEvento key={e.id} e={e} t={t} />)}
           </div>
         )}
       </div>
-    </div>
+    </Page>
   );
 }

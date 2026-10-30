@@ -48,7 +48,10 @@ create table if not exists public.monitor_eventos (
   id          uuid primary key default gen_random_uuid(),
   user_id     uuid not null,                                 -- la persona monitoreada
   room_nombre text,                                          -- nombre de la sala de LiveKit
-  session_id  uuid references public.cowork_sessions(id) on delete set null,
+  -- id de la sesión de Cowork (opcional). Sin FK a cowork_sessions a propósito:
+  -- esa tabla no se crea por migración (vive solo en prod), así que una FK rompe
+  -- los bancos de prueba que cargan las migraciones sobre un esquema limpio.
+  session_id  uuid,
   tipo        text not null,   -- camara_apagada|camara_tapada|se_fue|cara_incompleta|celular|distraido|no_mira
   fuente      text not null default 'local',                 -- 'local' (gratis) | 'ia'
   detalle     text,                                          -- texto del veredicto / contexto
@@ -81,20 +84,40 @@ create policy "monitor_eventos_select_propio" on public.monitor_eventos
   for select to authenticated
   using (user_id = (select auth.uid()));
 
-alter publication supabase_realtime add table public.monitor_eventos;
+-- Realtime para el panel en vivo. Protegido: la publicación solo existe en una
+-- base Supabase real, no en los bancos de prueba.
+do $$
+begin
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
+    begin
+      alter publication supabase_realtime add table public.monitor_eventos;
+    exception when duplicate_object then null;
+    end;
+  end if;
+end $$;
 
 -- ───────────────────────── Capturas de la IA (bucket privado) ─────────────────────────
-insert into storage.buckets (id, name, public)
-values ('monitor-capturas', 'monitor-capturas', false)
-on conflict (id) do nothing;
+-- El esquema storage solo existe en una base Supabase real; en los bancos de
+-- prueba no, así que todo esto se salta ahí sin romper la carga de la migración.
+do $$
+begin
+  if exists (select 1 from information_schema.schemata where schema_name = 'storage') then
+    insert into storage.buckets (id, name, public)
+    values ('monitor-capturas', 'monitor-capturas', false)
+    on conflict (id) do nothing;
 
--- Solo supervisores/admin ven las capturas; las sube el edge con service_role.
-create policy "monitor_capturas_read_supervisor" on storage.objects
-  for select to authenticated
-  using (
-    bucket_id = 'monitor-capturas'
-    and public.is_in_role_group((select auth.uid()), 'supervisor_or_above')
-  );
+    -- Solo supervisores/admin ven las capturas; las sube el edge con service_role.
+    begin
+      create policy "monitor_capturas_read_supervisor" on storage.objects
+        for select to authenticated
+        using (
+          bucket_id = 'monitor-capturas'
+          and public.is_in_role_group((select auth.uid()), 'supervisor_or_above')
+        );
+    exception when duplicate_object then null;
+    end;
+  end if;
+end $$;
 
 -- ───────────────────────── Aviso al supervisor (campana/push) ─────────────────────────
 -- Al registrar una falta SERIA, avisa a los supervisores por la campana (y, si

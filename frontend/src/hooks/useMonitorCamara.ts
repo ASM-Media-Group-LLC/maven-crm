@@ -1,8 +1,7 @@
 import { useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useUserRole } from "@/hooks/useUserRole";
-import { useMonitorConfig } from "@/hooks/useMonitorConfig";
+import { useMonitorEstado } from "@/hooks/useMonitorEstado";
 import type { FaceWatch } from "@/hooks/useFaceWatch";
 import { TIPO_POR_CARA } from "@/lib/monitorFaltas";
 
@@ -82,14 +81,14 @@ async function capturarJPEG(track: MediaStreamTrack): Promise<string | null> {
 
 export function useMonitorCamara({ track, camaraRealOn, faceWatch, activo, roomNombre }: Params): void {
   const { user } = useAuth();
-  const { isAdmin } = useUserRole();
-  const { config } = useMonitorConfig(activo && !isAdmin);
+  const { esAdmin, activo: cfgActivo, intervaloSeg } = useMonitorEstado(activo);
 
-  const base = activo && !isAdmin && !!user;
-  // Un fallo de lectura de config NO apaga el monitor: las faltas gratis corren
-  // salvo que esté explícitamente apagado. La IA sí espera a tener config.
-  const activoFree = base && (config ? config.activo : true);
-  const activoIA = base && !!config?.activo;
+  // Solo se monitorea una vez confirmado que NO es admin (esAdmin === false).
+  const base = activo && !!user && esAdmin === false;
+  // Un fallo/espera de config NO apaga el monitor: las faltas gratis corren
+  // salvo que esté explícitamente apagado. La IA sí espera a saber que está ON.
+  const activoFree = base && cfgActivo !== false;
+  const activoIA = base && cfgActivo === true;
 
   const faceRef = useRef(faceWatch);
   faceRef.current = faceWatch;
@@ -123,7 +122,6 @@ export function useMonitorCamara({ track, camaraRealOn, faceWatch, activo, roomN
   const camRef = useRef(camaraRealOn);
   camRef.current = camaraRealOn;
   const enVueloRef = useRef(false);
-  const intervaloSeg = config?.intervaloIaSeg ?? 120;
 
   useEffect(() => {
     if (!activoIA) return;

@@ -74,6 +74,9 @@ const FIXTURE_HASTA = "20260929180000";
 // Migraciones que tocan objetos de este banco pero necesitan tablas que sus fixtures no traen.
 // Se prueban en su propio banco, con el motivo al lado.
 const NO_CARGAN_AQUI: Record<string, string> = {
+  "20261030120000_monitor_camara_ia.sql":
+    "el monitor de cámara de Cowork; solo toca el Messenger porque su trigger inserta avisos en notifications, pero " +
+    "crea sus propias tablas y el bucket de storage, y no aporta nada al Messenger. Se prueba en frontend/test/monitor.",
   "20261009100000_portal_pedidos.sql":
     "solo toca el Messenger porque inserta avisos en notifications (los Personalizados del portal), pero necesita " +
     "custom_requests, creadora_cuentas y drive_items, que este fixture no trae. Se prueba en portal_pedidos.ts.",
