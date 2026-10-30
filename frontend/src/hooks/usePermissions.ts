@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserRole } from "@/hooks/useUserRole";
+import { esModuloOculto } from "@/lib/modulosOcultos";
 
 interface Permission {
   module: string;
@@ -75,6 +76,13 @@ export const usePermissions = () => {
   const canAccess = (module: string, submodule?: string): boolean => {
     // Admin always has full access
     if (isAdmin) return true;
+
+    // Recorte reversible (Alvaro, 30/10/2026): módulos apagados para el equipo.
+    // Va DESPUÉS del admin a propósito —el admin los sigue viendo— y antes de
+    // todo lo demás para que el menú (filtra por canAccess) y PermissionRoute
+    // (misma función) los escondan de una. Revivir = sacar la entrada de
+    // MODULOS_OCULTOS. Ver frontend/src/lib/modulosOcultos.ts.
+    if (esModuloOculto(module)) return false;
 
     // No permissions configured for this role at all → only universal
     // modules are reachable (everything else is locked).

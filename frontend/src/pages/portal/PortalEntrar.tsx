@@ -11,6 +11,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { useToast } from "@/hooks/use-toast";
 import { traducirErrorAuth } from "@/lib/authErrors";
 import { esCuentaDeCreadora } from "@/lib/portal/cuenta";
+import { PORTAL_CERRADO } from "@/lib/modulosOcultos";
 
 // Entrar al portal de creadoras: su correo personal y su contraseña. La cuenta la
 // crea la agencia (pestaña Portal del perfil); aquí no hay registro.
@@ -31,6 +32,21 @@ export default function PortalEntrar() {
       <div className="flex min-h-dvh items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" aria-hidden="true" />
       </div>
+    );
+  }
+  // Portal cerrado (recorte reversible): nadie entra ni opera; el equipo que
+  // caiga aquí vuelve a su Maven. Reabrir = PORTAL_CERRADO = false en
+  // lib/modulosOcultos.ts. Va antes del redirect de sesión para que una
+  // creadora ya logueada vea el aviso en vez de rebotar a /portal.
+  if (PORTAL_CERRADO) {
+    if (user && !esCuentaDeCreadora(user)) return <Navigate to="/dashboard" replace />;
+    return (
+      <AuthLayout>
+        <div className="space-y-4 text-center">
+          <h1 className="text-2xl font-bold text-white">{t("portal.cerrado.titulo")}</h1>
+          <p className="text-sm text-white/60">{t("portal.cerrado.detalle")}</p>
+        </div>
+      </AuthLayout>
     );
   }
   if (user) return <Navigate to={esCuentaDeCreadora(user) ? "/portal" : "/dashboard"} replace />;
