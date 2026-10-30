@@ -128,6 +128,7 @@ export const NAV_CATALOG: NavCatalogEntry[] = [
   { title: "RRHH · Vacaciones", i18nKey: "nav.cat.hrVacations", url: "/hr/vacaciones", icon: CalendarDays, module: "HR", submodule: "Vacaciones", section: "RRHH", keywords: ["ausencias"] },
   { title: "RRHH · Permisos", i18nKey: "nav.cat.hrLeave", url: "/hr/permisos", icon: ListChecks, module: "HR", submodule: "Permisos", section: "RRHH" },
   { title: "RRHH · Monitoreo", i18nKey: "nav.cat.hrMonitoring", url: "/hr/monitoreo", icon: Eye, module: "HR", submodule: "Monitoreo", section: "RRHH", keywords: ["hubstaff"] },
+  { title: "RRHH · Monitor IA", i18nKey: "nav.cat.hrMonitorIA", url: "/hr/monitor-ia", icon: Eye, module: "HR", submodule: "Monitor IA", section: "RRHH", keywords: ["camara", "ia", "cowork", "celular"] },
   { title: "RRHH · Incidentes", i18nKey: "nav.cat.hrIncidents", url: "/hr/incidentes", icon: Shield, module: "HR", submodule: "Incidentes", section: "RRHH" },
   { title: "RRHH · Desempeño", i18nKey: "nav.cat.hrPerformance", url: "/hr/desempeno", icon: GraduationCap, module: "HR", submodule: "Desempeño", section: "RRHH" },
   { title: "RRHH · Capacitación", i18nKey: "nav.cat.hrTraining", url: "/hr/capacitacion", icon: GraduationCap, module: "HR", submodule: "Capacitación", section: "RRHH" },

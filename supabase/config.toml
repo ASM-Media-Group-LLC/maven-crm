@@ -8,6 +8,11 @@ verify_jwt = true
 [functions.ai-sales-chat]
 verify_jwt = false
 
+# Ojo de IA del monitor de cámara de Cowork. verify_jwt=true: la llama el navegador
+# de un usuario logueado; adentro revive al usuario, excluye admins y valida el monitor.
+[functions.monitor-vision]
+verify_jwt = true
+
 # Gestión de API keys (solo-admin). verify_jwt=false: valida el JWT + rol admin adentro.
 [functions.manage-api-keys]
 verify_jwt = false

@@ -193,6 +193,7 @@ const DashboardSidebar = () => {
       ],
       items: [
         { title: t("nav.hr.monitoring"), url: "/hr/monitoreo", submodule: "Monitoreo" },
+        { title: t("nav.hr.monitorIA"), url: "/hr/monitor-ia", submodule: "Monitor IA" },
       ],
     },
     {

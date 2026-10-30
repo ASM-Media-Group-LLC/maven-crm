@@ -8,6 +8,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { LanguageProvider } from "@/hooks/useLanguage";
 import { enEspanol, pareceEspanol, textosDeAvisos } from "./enIngles";
 
@@ -41,6 +42,9 @@ vi.mock("@/components/PersistentCallProvider", () => ({
 }));
 vi.mock("@/pages/messenger/videocall/LiveKitCallView", () => ({ default: () => null }));
 vi.mock("@/hooks/use-mobile", () => ({ useIsMobile: () => false }));
+// El cartelito "monitor activo" usa react-query; este test renderiza la vista
+// sin QueryClientProvider y no es lo que prueba, así que se mockea apagado.
+vi.mock("@/hooks/useMonitorConfig", () => ({ useMonitorConfig: () => ({ config: null, cargando: false, error: null }) }));
 vi.mock("@/lib/coworkTablas", () => ({
   rpcBanoConsumido: async () => ({ data: [{ user_id: "u1", segundos: 0 }] }),
   leerLimitesPausa: async () => ({ bano: 10, break: 30 }),
@@ -88,12 +92,15 @@ function coworkFalso(): Record<string, unknown> {
 
 function montar() {
   cowork = coworkFalso();
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <MemoryRouter>
-      <LanguageProvider>
-        <CoworkParticipantView cowork={cowork as never} userId="u1" />
-      </LanguageProvider>
-    </MemoryRouter>,
+    <QueryClientProvider client={qc}>
+      <MemoryRouter>
+        <LanguageProvider>
+          <CoworkParticipantView cowork={cowork as never} userId="u1" />
+        </LanguageProvider>
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 
