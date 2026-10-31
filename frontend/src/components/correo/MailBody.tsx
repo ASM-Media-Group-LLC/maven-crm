@@ -70,8 +70,10 @@ function documento(cuerpo: string, cargarRemotas: boolean, oscuro: boolean): str
   // bien. Es la técnica de Dark Reader / Apple Mail: los correos de texto quedan
   // perfectos; un boletín muy cargado puede verse un poco distinto, nunca blanco.
   const estiloOscuro = oscuro
-    ? `html { filter: invert(0.92) hue-rotate(180deg); }
-  img, video, svg, picture, [style*="background-image"], [background], [bgcolor] { filter: invert(1) hue-rotate(180deg); }`
+    ? `:root { color-scheme: dark; }
+  html, body { background: transparent !important; }
+  #medida, #medida * { color: #e7e9f2 !important; border-color: rgba(255,255,255,.14) !important; }
+  #medida a { color: #9bb3ff !important; }`
     : "";
   return `<!doctype html><html><head><meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="${csp(cargarRemotas)}">
@@ -82,11 +84,21 @@ function documento(cuerpo: string, cargarRemotas: boolean, oscuro: boolean): str
      el documento (ver estiloOscuro) para que quede claro sobre oscuro. */
   :root { color-scheme: light; }
   body {
-    margin: 0; padding: 16px 18px;
+    margin: 0; padding: 14px 16px;
     font: 14px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
-    color: #1c1c22; background: #ffffff;
+    /* Fondo TRANSPARENTE (Alvaro: "no quiero ver la caja"): el correo se funde
+       con el panel de lectura, sin cajón. En claro el texto oscuro se lee sobre
+       el panel claro; en oscuro el invert lo vuelve claro y se lee sobre el
+       panel oscuro. Los correos con su propio fondo (boletines) lo conservan. */
+    color: #1c1c22; background: transparent;
     overflow-wrap: break-word; word-break: break-word;
   }
+  /* SIN CAJA (Alvaro, 31/10): el correo se funde con el panel. Se quitan los
+     fondos propios del HTML del correo (muchos traen background:#fff inline),
+     que era lo que formaba el cajón. Los correos de Maven son casi siempre
+     texto, así que quedan limpios; un boletín pierde su fondo pero se lee.
+     SOLO display: el HTML guardado/enviado no cambia. */
+  #medida, #medida * { background-color: transparent !important; background-image: none !important; box-shadow: none !important; }
   ${estiloOscuro}
   /* Los correos vienen con tablas de ancho fijo pensadas para escritorio.
      Sin esto, en un teléfono se sale de la pantalla y rompe el layout. */
@@ -235,7 +247,7 @@ export function MailBody({ html, text, remoteImages, truncated }: Props) {
         srcDoc={srcDoc}
         sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
         referrerPolicy="no-referrer"
-        className="w-full rounded-2xl border-0 bg-white shadow-[0_10px_40px_-12px_rgba(0,0,0,0.5)] ring-1 ring-black/5 dark:bg-[#141417] dark:ring-white/10"
+        className="w-full border-0 bg-transparent"
         style={{ height: alto }}
       />
 
