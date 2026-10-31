@@ -279,7 +279,7 @@ export default function MessengerPage() {
   }, []);
 
   return (
-    <div className="h-full flex overflow-hidden bg-background">
+    <div className="h-full flex overflow-hidden">
       {/* Sidebar. El corte lista→chat es `md` (768), el MISMO umbral de useIsMobile
           y del Sheet del sidebar: con `sm` (640), entre 640 y 767 px se veían dos
           columnas de 280 px con el menú ya en modo teléfono. */}
