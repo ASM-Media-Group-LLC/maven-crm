@@ -26,6 +26,7 @@ import { HRMetricCard } from "@/components/hr/HRMetricCard";
 import { useMonitorEventos, urlCaptura, type MonitorEvento } from "@/hooks/useMonitorEventos";
 import { useMonitorConfig } from "@/hooks/useMonitorConfig";
 import { useMonitorRondas, useMonitorRanking } from "@/hooks/useMonitorPanel";
+import { NotasEquipoPanel } from "@/components/hr/NotasEquipoPanel";
 import { LABEL_FALTA, type FaltaTipo } from "@/lib/monitorFaltas";
 import type { TranslationKey } from "@/lib/i18n";
 
@@ -396,6 +397,9 @@ export default function HRMonitorIA() {
           </>
         }
       />
+
+      {/* La nota del equipo — lo primero: saber al instante quién va bien o mal. */}
+      <div className="mt-5"><NotasEquipoPanel /></div>
 
       <div className="mt-5"><BannerRonda t={t} /></div>
 
