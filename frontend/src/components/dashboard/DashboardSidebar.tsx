@@ -84,7 +84,7 @@ const DashboardSidebar = () => {
   const unreadChatCount = useUnreadChatCount();
   const { promologCount, leadgenCount, closersCount, waInboxCount, tgInboxCount, coworkRequestsCount, correoUnreadCount } = useSidebarBadges();
 
-  const mainMenuAll: { title: string; url: string; icon: any; module: string; badge?: number }[] = [
+  const mainMenuAll: { title: string; url: string; icon: any; module: string; submodule?: string; badge?: number }[] = [
     { title: t("nav.dashboard"), url: "/dashboard", icon: LayoutDashboard, module: "Dashboard" },
     { title: t("nav.mail"), url: "/correo", icon: Mail, module: "Correo", badge: correoUnreadCount || undefined },
     // El mute del Messenger vive en la cabecera de su lista de chats, al lado
@@ -95,7 +95,7 @@ const DashboardSidebar = () => {
     { title: t("nav.recordings"), url: "/grabaciones", icon: Clapperboard, module: "Grabaciones" },
     { title: t("nav.contacts"), url: "/contactos", icon: UserPlus, module: "Contactos" },
   ];
-  const mainMenu = mainMenuAll.filter((item) => canAccess(item.module));
+  const mainMenu = mainMenuAll.filter((item) => canAccess(item.module, item.submodule));
 
   const creadoresSubItems = [
     { title: t("nav.creators.dashboard"), url: "/creadores/dashboard", submodule: "Dashboard" },
@@ -502,6 +502,22 @@ const DashboardSidebar = () => {
 
             </SidebarMenu>
         </CollapsibleSidebarGroup>
+
+        {/* Argos: su PROPIO botón en el riel (Alvaro), no dentro del flyout de
+            Menú. Monitor del equipo en vivo; solo lo ven supervisores y admin
+            (gate HR/Monitor IA). */}
+        {canAccess("HR", "Monitor IA") && (
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip={t("nav.argos")}>
+                <NavLink to="/hr/monitor-ia" className={LINK_CLASS} activeClassName={ACTIVE_CLASS} onMouseEnter={() => precargarRuta("/hr/monitor-ia")} onFocus={() => precargarRuta("/hr/monitor-ia")}>
+                  <Eye className="h-4 w-4 shrink-0" />
+                  <span>{t("nav.argos")}</span>
+                </NavLink>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        )}
 
         {operationsMenu.length > 0 && (
         <CollapsibleSidebarGroup
