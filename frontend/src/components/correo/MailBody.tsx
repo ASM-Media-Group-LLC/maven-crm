@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { ImageOff, MoreHorizontal } from "lucide-react";
 import { partirCitado, partirCitadoTexto } from "@/lib/mailCita";
@@ -61,16 +62,24 @@ function csp(cargarRemotas: boolean): string {
   ].join("; ");
 }
 
-function documento(cuerpo: string, cargarRemotas: boolean): string {
+function documento(cuerpo: string, cargarRemotas: boolean, oscuro: boolean): string {
+  // MODO OSCURO (Alvaro, 31/10 — "nada de blanco en la noche"): el correo se
+  // renderiza normal (como si fuera claro) y luego se INVIERTE todo el documento
+  // (blanco→oscuro, texto negro→claro) con un remapeo de color que conserva los
+  // tonos (hue-rotate 180), y se RE-INVIERTEN imágenes/medios para que se vean
+  // bien. Es la técnica de Dark Reader / Apple Mail: los correos de texto quedan
+  // perfectos; un boletín muy cargado puede verse un poco distinto, nunca blanco.
+  const estiloOscuro = oscuro
+    ? `html { filter: invert(0.92) hue-rotate(180deg); }
+  img, video, svg, picture, [style*="background-image"], [background], [bgcolor] { filter: invert(1) hue-rotate(180deg); }`
+    : "";
   return `<!doctype html><html><head><meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="${csp(cargarRemotas)}">
 <base target="_blank">
 <style>
-  /* LIENZO SIEMPRE CLARO, a propósito. Los correos HTML se escriben
-     asumiendo fondo blanco: llegan con color:#222 inline y sin fondo.
-     Con un iframe transparente sobre el tema oscuro de Maven, ese texto
-     era casi invisible (negro sobre negro). Gmail resuelve esto igual:
-     el mensaje se pinta como tarjeta clara, sin importar el tema. */
+  /* LIENZO CLARO de base, a propósito. Los correos HTML se escriben asumiendo
+     fondo blanco (color:#222 inline, sin fondo). En modo oscuro se invierte todo
+     el documento (ver estiloOscuro) para que quede claro sobre oscuro. */
   :root { color-scheme: light; }
   body {
     margin: 0; padding: 16px 18px;
@@ -78,6 +87,7 @@ function documento(cuerpo: string, cargarRemotas: boolean): string {
     color: #1c1c22; background: #ffffff;
     overflow-wrap: break-word; word-break: break-word;
   }
+  ${estiloOscuro}
   /* Los correos vienen con tablas de ancho fijo pensadas para escritorio.
      Sin esto, en un teléfono se sale de la pantalla y rompe el layout. */
   img, table, td, pre { max-width: 100% !important; }
@@ -104,6 +114,10 @@ function textoPlano(t: string): string {
 
 export function MailBody({ html, text, remoteImages, truncated }: Props) {
   const { t: tr } = useLanguage();
+  // En oscuro el correo se oscurece (ver documento()); el srcDoc se rearma al
+  // cambiar de tema. resolvedTheme ya resuelve "system" a claro/oscuro real.
+  const { resolvedTheme } = useTheme();
+  const oscuro = resolvedTheme === "dark";
   const [cargarRemotas, setCargarRemotas] = useState(false);
   const [verCita, setVerCita] = useState(false);
   const [alto, setAlto] = useState(160);   // provisorio: se remide con el contenido
@@ -131,8 +145,8 @@ export function MailBody({ html, text, remoteImages, truncated }: Props) {
       const t = verCita || !partidoTexto.citado ? text : partidoTexto.propio;
       return t ? textoPlano(t) : `<p><em>${tr("mail.body.empty")}</em></p>`;
     };
-    return documento(html ? armarHtml() : armarTexto(), cargarRemotas);
-  }, [html, text, cargarRemotas, verCita, partido, partidoTexto, tr]);
+    return documento(html ? armarHtml() : armarTexto(), cargarRemotas, oscuro);
+  }, [html, text, cargarRemotas, verCita, partido, partidoTexto, tr, oscuro]);
 
   // Medimos la altura del contenido para que el correo se lea de corrido, sin
   // un scroll dentro de otro scroll. Se vuelve a medir cuando cambia el
@@ -218,7 +232,7 @@ export function MailBody({ html, text, remoteImages, truncated }: Props) {
         srcDoc={srcDoc}
         sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
         referrerPolicy="no-referrer"
-        className="w-full rounded-2xl border-0 bg-white shadow-[0_10px_40px_-12px_rgba(0,0,0,0.5)] ring-1 ring-black/5 dark:ring-white/10"
+        className="w-full rounded-2xl border-0 bg-white shadow-[0_10px_40px_-12px_rgba(0,0,0,0.5)] ring-1 ring-black/5 dark:bg-[#141417] dark:ring-white/10"
         style={{ height: alto }}
       />
 
