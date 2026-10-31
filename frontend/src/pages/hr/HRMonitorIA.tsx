@@ -3,7 +3,7 @@ import { isToday, format } from "date-fns";
 import {
   Eye, VideoOff, UserX, Smartphone, ScanFace, AlertTriangle, Users,
   RefreshCw, Loader2, ImageIcon, Cpu, Activity, Check, X, StickyNote,
-  Mail, Copy, Clock, Trophy,
+  Mail, Copy, Trophy,
 } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -25,8 +25,9 @@ import { PageHeader } from "@/components/ui/page-header";
 import { HRMetricCard } from "@/components/hr/HRMetricCard";
 import { useMonitorEventos, urlCaptura, type MonitorEvento } from "@/hooks/useMonitorEventos";
 import { useMonitorConfig } from "@/hooks/useMonitorConfig";
-import { useMonitorRondas, useMonitorRanking } from "@/hooks/useMonitorPanel";
+import { useMonitorRanking } from "@/hooks/useMonitorPanel";
 import { NotasEquipoPanel } from "@/components/hr/NotasEquipoPanel";
+import { RondinVivoPanel } from "@/components/hr/RondinVivoPanel";
 import { LABEL_FALTA, type FaltaTipo } from "@/lib/monitorFaltas";
 import type { TranslationKey } from "@/lib/i18n";
 
@@ -130,34 +131,6 @@ function FilaEvento({
           <Mail className="h-3 w-3" /> {t("hr.monia.accion.correo")}
         </Button>
       </div>
-    </div>
-  );
-}
-
-// ── Rondín: cuándo pasó el robot y cuántos hay en sala ──
-function BannerRonda({ t }: { t: Tr }) {
-  const { ultimaRonda, enSala, trabajando } = useMonitorRondas();
-  const texto = useMemo(() => {
-    if (!ultimaRonda) return t("hr.monia.ronda.sinRonda");
-    const min = Math.max(0, Math.round((Date.now() - ultimaRonda.getTime()) / 60000));
-    return min < 1 ? t("hr.monia.ronda.reciente") : t("hr.monia.ronda.hace", { n: min });
-  }, [ultimaRonda, t]);
-  return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-panel border border-border/50 bg-muted/30 px-4 py-2.5 text-sm">
-      <span className="flex items-center gap-1.5 font-medium text-foreground">
-        <Clock className="h-4 w-4 text-primary" />
-        {t("hr.monia.ronda.ultima")}: {ultimaRonda ? `${format(ultimaRonda, "HH:mm")} · ${texto}` : texto}
-      </span>
-      {ultimaRonda && (
-        <>
-          <span className="flex items-center gap-1.5 text-muted-foreground">
-            <Users className="h-4 w-4" /> {t("hr.monia.ronda.enSala", { n: enSala })}
-          </span>
-          <span className="flex items-center gap-1.5 text-success">
-            <Eye className="h-4 w-4" /> {t("hr.monia.ronda.trabajando", { n: trabajando })}
-          </span>
-        </>
-      )}
     </div>
   );
 }
@@ -401,7 +374,8 @@ export default function HRMonitorIA() {
       {/* La nota del equipo — lo primero: saber al instante quién va bien o mal. */}
       <div className="mt-5"><NotasEquipoPanel /></div>
 
-      <div className="mt-5"><BannerRonda t={t} /></div>
+      {/* El rondín en vivo: qué hace cada quien AHORA. */}
+      <div className="mt-5"><RondinVivoPanel /></div>
 
       <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
         <HRMetricCard title={t("hr.monia.kpi.hoy")} value={hoy.length} icon={AlertTriangle} color={hoy.length > 0 ? "warning" : "default"} subtitle={t("hr.monia.kpi.hoySub")} />
