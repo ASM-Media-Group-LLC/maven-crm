@@ -15,6 +15,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import PermissionRoute from "@/components/PermissionRoute";
 import CreadorRosterRoute from "@/components/CreadorRosterRoute";
 import AdminRoute from "./components/AdminRoute";
+import SupervisorRoute from "@/components/SupervisorRoute";
 import AppShell from "@/components/dashboard/AppShell";
 import { CallProvider } from "@/components/CallProvider";
 import { PersistentCallProvider } from "@/components/PersistentCallProvider";
@@ -120,6 +121,8 @@ const ChatterWorkspace = lazy(() => import("./pages/ChatterWorkspace"));
 const ChatterRendimiento = lazy(() => import("./pages/chatters/ChatterRendimiento"));
 const Contactos = lazy(() => import("./pages/Contactos"));
 const NuevoContacto = lazy(() => import("./pages/NuevoContacto"));
+const EmpleadosPage = lazy(() => import("./pages/empleados/EmpleadosPage"));
+const EmpleadoProfilePage = lazy(() => import("./pages/empleados/EmpleadoProfilePage"));
 
 // Admin
 const AdminUsuarios = lazy(() => import("./pages/admin/AdminUsuarios"));
@@ -324,6 +327,8 @@ const App = () => (
                 <Route path="/docs" element={<Docs />} />
                 <Route path="/contactos" element={<PermissionRoute module="Contactos"><Contactos /></PermissionRoute>} />
                 <Route path="/contactos/nuevo" element={<PermissionRoute module="Contactos"><NuevoContacto /></PermissionRoute>} />
+                <Route path="/empleados" element={<SupervisorRoute><EmpleadosPage /></SupervisorRoute>} />
+                <Route path="/empleados/:id" element={<SupervisorRoute><EmpleadoProfilePage /></SupervisorRoute>} />
                 <Route path="/creadores" element={<PermissionRoute module="Creadores" submodule="Lista"><Creadores /></PermissionRoute>} />
                 <Route path="/creadores/dashboard" element={<PermissionRoute module="Creadores" submodule="Dashboard"><CreadorasDashboardPage /></PermissionRoute>} />
                 <Route path="/creadores/nuevo" element={<PermissionRoute module="Creadores" submodule="Nuevo"><NuevoCreador /></PermissionRoute>} />
