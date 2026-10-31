@@ -1634,7 +1634,7 @@ export default function CorreoPage() {
           })()}
 
           <ScrollArea className="flex-1 [&_[data-radix-scroll-area-viewport]>div]:!block">
-            <div className="space-y-0.5 p-2">
+            <div className="space-y-1.5 p-2">
               {cargandoItems &&
                 [...Array(6)].map((_, i) => (
                   <div key={i} className="flex items-center gap-3 px-2.5 py-2.5">
@@ -2273,7 +2273,10 @@ function FilaMensaje({
       onDragEnd={onFinArrastre}
       data-testid="fila-correo"
       className={cn(
-        "group relative flex items-center gap-1 rounded-2xl pl-2 transition-colors",
+        // Cada conversación como TARJETA de vidrio (Propuesta 3): superficie
+        // frost en reposo + aire entre hilos. Los estados (activo/sin leer/
+        // seleccionado) se pintan en el botón de adentro y mandan encima.
+        "group relative flex items-center gap-1 rounded-2xl border border-white/30 bg-card/40 pl-2 transition-colors dark:border-white/[0.05]",
         seleccionado && "bg-primary/10 ring-1 ring-primary/25",
       )}
     >
