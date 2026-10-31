@@ -6,6 +6,7 @@ import SelectorDeTablero from "@/pages/dashboard/SelectorDeTablero";
 import { Button } from "@/components/ui/button";
 import { useCoworkSession, type AdminSessionRow } from "@/hooks/useCoworkSession";
 import { useEquipoTiempoCowork } from "@/hooks/useEquipoTiempoCowork";
+import { useProductividad7Dias } from "@/hooks/useProductividad7Dias";
 import { usePanelMensajeria } from "@/hooks/usePanelMensajeria";
 import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -49,12 +50,14 @@ const segundosBonitos = (s: number) => {
   return m > 0 ? `${m} m ${String(seg).padStart(2, "0")} s` : `${seg} s`;
 };
 
-function TarjetaKpi({ icono: Icono, etiqueta, valor, detalle, tono = "primary" }: {
+function TarjetaKpi({ icono: Icono, etiqueta, valor, detalle, tono = "primary", indice = 0 }: {
   icono: typeof Users;
   etiqueta: string;
   valor: ReactNode;
   detalle: ReactNode;
   tono?: "primary" | "success" | "warning";
+  /** Orden de entrada: escalona la animación "sube" (como el link). */
+  indice?: number;
 }) {
   const chip =
     tono === "success" ? "bg-success/10 text-success"
@@ -65,7 +68,7 @@ function TarjetaKpi({ icono: Icono, etiqueta, valor, detalle, tono = "primary" }
     : tono === "warning" ? "glow-a"
     : "glow-b";
   return (
-    <div className={`vidrio vidrio-glow ${glow} p-4`}>
+    <div className={`vidrio vidrio-glow vidrio-lift sube ${glow} p-4`} style={{ animationDelay: `${indice * 0.06}s` }}>
       <div className="v-cont flex flex-col gap-3">
         <div className="flex items-center gap-2.5">
           <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-panel ${chip}`}>
@@ -98,6 +101,11 @@ export default function CentroDeOperaciones() {
 
   const { porPersona, cargando: tiempoCargando } = useEquipoTiempoCowork(hoy, hoy);
   const mensajeria = usePanelMensajeria();
+  const productividad = useProductividad7Dias();
+  const maxProd = useMemo(
+    () => productividad.dias.reduce((m, d) => Math.max(m, d.horas), 0),
+    [productividad.dias],
+  );
 
   // Totales de la cabecera. online null = LiveKit no contestó: se propaga como
   // desconocido ("–"), jamás como cero.
@@ -173,12 +181,14 @@ export default function CentroDeOperaciones() {
       {/* Tarjetas resumen: compactas, lo vivo primero */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <TarjetaKpi
+          indice={0}
           icono={Users}
           etiqueta={t("dashboard.centro.conectados")}
           valor={sesionesQ.isLoading ? "…" : vivo.conectados == null ? "–" : vivo.conectados}
           detalle={t("dashboard.centro.enSalas", { salas: vivo.salasConGente, sesiones: vivo.sesiones })}
         />
         <TarjetaKpi
+          indice={1}
           icono={Clock}
           tono="success"
           etiqueta={t("dashboard.centro.coworkHoy")}
@@ -186,6 +196,7 @@ export default function CentroDeOperaciones() {
           detalle={t("dashboard.centro.personas", { n: equipoHoy.length })}
         />
         <TarjetaKpi
+          indice={2}
           icono={MessageCircle}
           etiqueta={t("dashboard.centro.mensajesHoy")}
           valor={mensajeria.fallo ? "–" : mensajeria.cargando ? "…" : mensajeria.datos?.mensajesHoy ?? "–"}
@@ -194,6 +205,7 @@ export default function CentroDeOperaciones() {
             : t("dashboard.centro.chatsActivos", { n: mensajeria.datos?.conversacionesActivas ?? 0 })}
         />
         <TarjetaKpi
+          indice={3}
           icono={Timer}
           tono="warning"
           etiqueta={t("dashboard.centro.respuesta")}
@@ -204,8 +216,60 @@ export default function CentroDeOperaciones() {
         />
       </div>
 
+      {/* Productividad del equipo — barras REALES de horas de Cowork por día,
+          últimos 7 días (como la gráfica central del link). Hoy se resalta. */}
+      <section className="vidrio sube p-4" style={{ animationDelay: "0.2s" }}>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h2 className="flex items-baseline gap-2 text-sm font-semibold">
+            <span className="flex h-7 w-7 items-center justify-center rounded-panel bg-primary/10 text-primary"><BarChart3 className="h-4 w-4" /></span>
+            {t("dashboard.centro.productividad")}
+            <span className="text-xs font-normal text-muted-foreground">· {t("dashboard.centro.ultimos7")}</span>
+          </h2>
+          <span className="flex items-center gap-1.5 text-xs text-success">
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-60 motion-reduce:animate-none" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-success" />
+            </span>
+            {t("dashboard.centro.hoy")}
+          </span>
+        </div>
+        {productividad.fallo ? (
+          <p className="text-sm text-muted-foreground">
+            {t("dashboard.centro.fallo")}
+            <button type="button" className="underline underline-offset-2 hover:text-foreground" onClick={() => productividad.reintentar()}>{t("dashboard.centro.reintentar")}</button>
+          </p>
+        ) : productividad.cargando ? (
+          <div className="flex h-40 items-end gap-3">
+            {Array.from({ length: 7 }).map((_, i) => (
+              <div key={i} className="flex-1 animate-pulse rounded-t-lg bg-muted" style={{ height: `${30 + ((i * 37) % 60)}%` }} />
+            ))}
+          </div>
+        ) : maxProd <= 0 ? (
+          <p className="text-sm text-muted-foreground">{t("dashboard.centro.sinProductividad")}</p>
+        ) : (
+          <div className="flex h-40 items-end gap-2.5 sm:gap-3">
+            {productividad.dias.map((d) => (
+              <div key={d.dia} className="group flex h-full flex-1 flex-col items-center justify-end gap-2">
+                <span className="text-[10px] font-semibold tabular-nums text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
+                  {horasBonitas(d.horas)}
+                </span>
+                <div
+                  className={`w-full max-w-[38px] rounded-t-lg transition-[filter] group-hover:brightness-110 ${
+                    d.esHoy
+                      ? "bg-gradient-to-b from-primary to-primary/40 shadow-[0_0_22px_hsl(var(--primary)/0.5)]"
+                      : "bg-gradient-to-b from-primary/50 to-primary/10"
+                  }`}
+                  style={{ height: `${Math.max(4, (d.horas / maxProd) * 100)}%` }}
+                />
+                <span className={`text-[11px] font-semibold ${d.esHoy ? "text-primary" : "text-muted-foreground"}`}>{d.etiqueta}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
       {/* Salas en vivo */}
-      <section className="vidrio p-4">
+      <section className="vidrio sube p-4" style={{ animationDelay: "0.26s" }}>
         <div className="mb-3 flex items-center justify-between gap-3">
           <h2 className="flex items-center gap-2 text-sm font-semibold">
             <span className="flex h-7 w-7 items-center justify-center rounded-panel bg-primary/10 text-primary"><DoorOpen className="h-4 w-4" /></span>
@@ -306,7 +370,7 @@ export default function CentroDeOperaciones() {
       </section>
 
       {/* Tiempo del equipo hoy */}
-      <section className="vidrio p-4">
+      <section className="vidrio sube p-4" style={{ animationDelay: "0.3s" }}>
         <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold">
           <span className="flex h-7 w-7 items-center justify-center rounded-panel bg-success/10 text-success"><Clock className="h-4 w-4" /></span>
           {t("dashboard.centro.equipoHoy")}
@@ -344,7 +408,7 @@ export default function CentroDeOperaciones() {
       </section>
 
       {/* Ventas, empujado al fondo pero entero: todo el tablero vive detrás de este botón. */}
-      <section className="vidrio flex flex-wrap items-center gap-3 p-4">
+      <section className="vidrio sube flex flex-wrap items-center gap-3 p-4" style={{ animationDelay: "0.36s" }}>
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-panel bg-muted text-muted-foreground"><BarChart3 className="h-[18px] w-[18px]" /></span>
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-semibold">{t("dashboard.centro.ventasTitulo")}</span>

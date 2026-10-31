@@ -1256,6 +1256,21 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
 :root[data-contrast="high"] .vidrio-panel,
 :root[data-contrast="high"] .vidrio-barra { background: hsl(var(--card)); box-shadow: none; }
 
+/* MOVIMIENTO (como el link): las tarjetas SUBEN al entrar (escalonadas con
+   animationDelay inline) y LEVANTAN al pasar el mouse. Todo se apaga con
+   prefers-reduced-motion y en alto contraste. */
+@keyframes vidrio-subir { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+.sube { animation: vidrio-subir .5s cubic-bezier(.2,.8,.2,1) both; }
+.vidrio-lift { transition: transform .28s cubic-bezier(.2,.8,.2,1), box-shadow .28s cubic-bezier(.2,.8,.2,1); }
+.vidrio-lift:hover { transform: translateY(-4px); box-shadow: 0 24px 50px rgba(30,40,70,.18), inset 0 1px 0 rgba(255,255,255,.95); }
+.dark .vidrio-lift:hover { box-shadow: 0 30px 64px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.2); }
+@media (prefers-reduced-motion: reduce) {
+  .sube { animation: none; }
+  .vidrio-lift { transition: none; }
+  .vidrio-lift:hover { transform: none; }
+}
+:root[data-contrast="high"] .sube { animation: none; }
+
 /* CLARO (día): escena de ventanales al atardecer — el ámbar fuerte abajo al
    centro, violeta arriba-izq, azul arriba-der, sobre un degradado cálido
    crema→frío. Valores literales del mockup aprobado ("Maven Glass"). */
